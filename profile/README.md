@@ -39,7 +39,7 @@ The canonical platform monorepo. Full ecosystem in a single repository:
 
 - **16 deployable artifacts** — web apps, mobile apps (Expo/React Native), API server
 - **6 shared libraries** — ai-engine, db, shared-ui, workflow-engine, design-tokens, api-spec
-- **120+ database tables** — governed schema via Drizzle ORM + PostgreSQL
+- **446 database tables** — governed schema via Drizzle ORM + PostgreSQL
 - **TypeScript everywhere** — strict types, no unsafe any, full compile-time guarantees
 - **Enterprise CI/CD** — CodeQL, dependency review, structured release pipeline
 
@@ -63,7 +63,7 @@ The canonical platform monorepo. Full ecosystem in a single repository:
 
 **Stephen Lutar** — Founder & CEO  
 **Website:** [szlholdings.com](https://szlholdings.com)  
-**LinkedIn:** [linkedin.com/in/stephen-l-279315240](https://linkedin.com/in/stephen-l-279315240)  
+**LinkedIn:** [linkedin.com/in/stephenlutar](https://linkedin.com/in/stephen-l-279315240)  
 **Inquiries:** inquiries@szlholdings.com
 
 Open to design partner conversations, enterprise evaluation, and investment introductions.
