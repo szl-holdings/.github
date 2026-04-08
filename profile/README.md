@@ -63,7 +63,7 @@ The canonical platform monorepo. Full ecosystem in a single repository:
 
 **Stephen Lutar** — Founder & CEO  
 **Website:** [szlholdings.com](https://szlholdings.com)  
-**LinkedIn:** [linkedin.com/in/stephenlutar](https://linkedin.com/in/stephen-l-279315240)  
+**LinkedIn:** [linkedin.com/in/stephenlutar](https://linkedin.com/in/stephenlutar)  
 **Inquiries:** inquiries@szlholdings.com
 
 Open to design partner conversations, enterprise evaluation, and investment introductions.
