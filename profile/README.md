@@ -1,130 +1,129 @@
 <p align="center">
-    <img src="https://capsule-render.vercel.app/api?type=waving&color=0:080c14,50:1a1a2e,100:d4a054&height=200&section=header&text=SZL%20Holdings&fontSize=48&fontColor=e2e8f0&fontAlignY=30&desc=Governed%20Intelligence%20Software&descSize=18&descColor=d4a054&descAlignY=52&animation=fadeIn" width="100%" />
+    <img src="https://capsule-render.vercel.app/api?type=waving&color=0:080c14,50:1a1a2e,100:d4a054&height=200&section=header&text=SZL%20Holdings&fontSize=48&fontColor=e2e8f0&fontAlignY=30&desc=Governed%20Operational%20Intelligence&descSize=18&descColor=d4a054&descAlignY=52&animation=fadeIn" width="100%" />
   </p>
 
   <p align="center">
-    <img src="https://img.shields.io/badge/Live_Applications-16-D4A054?style=for-the-badge" />
-    <img src="https://img.shields.io/badge/Database_Tables-446-8b7ac8?style=for-the-badge" />
-    <img src="https://img.shields.io/badge/API_Endpoints-1,618+-4a90b8?style=for-the-badge" />
-    <img src="https://img.shields.io/badge/Stack-TypeScript-3178C6?style=for-the-badge&logo=typescript&logoColor=white" />
+    <img src="https://img.shields.io/badge/LIVE_APPLICATIONS-16-D4A054?style=for-the-badge" />
+    <img src="https://img.shields.io/badge/DATABASE_TABLES-446-D4A054?style=for-the-badge" />
+    <img src="https://img.shields.io/badge/API_ENDPOINTS-1,618+-D4A054?style=for-the-badge" />
+    <img src="https://img.shields.io/badge/FULL_TYPESCRIPT-3178C6?style=for-the-badge&logo=typescript&logoColor=white" />
   </p>
 
   <p align="center">
-    <b>Enterprise command software for organizations where silent failures, invisible risk, and unaccountable AI are not acceptable.</b>
-  </p>
-
-  <p align="center">
-    <a href="https://szlholdings.com"><img src="https://img.shields.io/badge/Platform-szlholdings.com-D4A054?style=flat-square&logo=google-chrome&logoColor=white" /></a>
-    <a href="https://linkedin.com/in/stephenlutar"><img src="https://img.shields.io/badge/LinkedIn-Stephen_Lutar-0A66C2?style=flat-square&logo=linkedin&logoColor=white" /></a>
-    <a href="https://szlholdings.substack.com"><img src="https://img.shields.io/badge/Substack-Signal_Over_Noise-FF6719?style=flat-square&logo=substack&logoColor=white" /></a>
+    <a href="https://szlholdings.com"><img src="https://img.shields.io/badge/PLATFORM-szlholdings.com-1e293b?style=for-the-badge&logo=google-chrome&logoColor=white" /></a>
+    <a href="https://linkedin.com/in/stephenlutar"><img src="https://img.shields.io/badge/FOUNDER-Stephen_Lutar-0A66C2?style=for-the-badge&logo=linkedin&logoColor=white" /></a>
+    <a href="mailto:stephenlutar2@gmail.com"><img src="https://img.shields.io/badge/CONTACT-stephenlutar2@gmail.com-1e293b?style=for-the-badge&logo=gmail&logoColor=white" /></a>
   </p>
 
   ---
 
-  ## What We Build
+  ### One holding company. Six platforms. 16 live applications. One architect.
 
-  SZL Holdings develops governed, production-grade command platforms for verticals where operational visibility, decision traceability, and AI accountability are non-negotiable.
+  SZL Holdings builds governed operational intelligence software for industries where silent failures, invisible risk, and unaccountable AI are not acceptable.
 
-  Every platform shares the same execution fabric: one TypeScript monorepo, one governed database schema, one orchestration engine. Domain specialization on a compounding foundation.
-
-  ---
-
-  ## Platform Portfolio
-
-  | Platform | Domain | Capability |
-  |:---------|:-------|:-----------|
-  | **Lyte** | Business Observability | PRISM framework — People, Revenue, Infrastructure, Security, Market. Detects execution risk, ownership drift, and operational friction before they compound into losses. |
-  | **Alloy** | Execution Engine | Signal normalization, workflow orchestration, approval gates, and immutable audit trails. The execution layer every platform runs on. |
-  | **Vessels** | Maritime Intelligence | Fleet command, AIS analytics, dark vessel detection, voyage management, sanctions compliance, and route risk assessment. |
-  | **Aegis** | Defense & Security | Unified SOC command — threat correlation, incident governance, adversary emulation, and continuous security posture management. |
-  | **Terra** | Real Estate Intelligence | Market intelligence, distress property engine, deal pipeline automation, and institutional portfolio analytics. |
-  | **PRISM Counsel** | Legal Operations | Deadline tracking, litigation pressure scoring, proof chain export, privilege-safe document handling. |
-  | **Carlota Jo** | Private Advisory | Bespoke coordination and operational management for luxury residential and UHNW household environments. |
+  Every platform ships from a single TypeScript monorepo. Every improvement compounds across every vertical.
 
   ---
 
-  ## Architecture at a Glance
+  ### The Platforms
+
+  <table>
+    <tr>
+      <td width="50%" align="center">
+        <strong>Vessels — Maritime Intelligence</strong><br/>
+        Fleet command · AIS analytics · Voyage management · Sanctions screening<br/><br/>
+        <img src="https://raw.githubusercontent.com/szl-holdings/.github/main/profile/screenshots/vessels.jpg" width="100%" />
+      </td>
+      <td width="50%" align="center">
+        <strong>Aegis — Defense &amp; Intelligence</strong><br/>
+        Unified SOC command · Threat correlation · CVE tracking · Incident governance<br/><br/>
+        <img src="https://raw.githubusercontent.com/szl-holdings/.github/main/profile/screenshots/firestorm-aegis.jpg" width="100%" />
+      </td>
+    </tr>
+    <tr>
+      <td width="50%" align="center">
+        <strong>Terra — Real Estate Intelligence</strong><br/>
+        Market intelligence · Distress engine · Deal pipeline · Portfolio analytics<br/><br/>
+        <img src="https://raw.githubusercontent.com/szl-holdings/.github/main/profile/screenshots/terra.jpg" width="100%" />
+      </td>
+      <td width="50%" align="center">
+        <strong>Lyte — Business Observability</strong><br/>
+        Execution risk · Ownership drift · Workflow friction · Infrastructure health<br/><br/>
+        <img src="https://raw.githubusercontent.com/szl-holdings/.github/main/profile/screenshots/lyte-command-center.jpg" width="100%" />
+      </td>
+    </tr>
+    <tr>
+      <td width="50%" align="center">
+        <strong>PRISM Counsel — Legal Matter Command</strong><br/>
+        Deadline tracking · Pressure scoring · Proof chain export · Document handling<br/><br/>
+        <img src="https://raw.githubusercontent.com/szl-holdings/.github/main/profile/screenshots/prism-counsel.jpg" width="100%" />
+      </td>
+      <td width="50%" align="center">
+        <strong>Carlota Jo — Private Advisory</strong><br/>
+        Bespoke coordination for luxury residential environments<br/><br/>
+        <img src="https://raw.githubusercontent.com/szl-holdings/.github/main/profile/screenshots/carlota-jo.jpg" width="100%" />
+      </td>
+    </tr>
+    <tr>
+      <td width="50%" align="center">
+        <strong>SZL Holdings — Command Surface</strong><br/>
+        Holding company dashboard · Cross-platform intelligence<br/><br/>
+        <img src="https://raw.githubusercontent.com/szl-holdings/.github/main/profile/screenshots/szl-holdings.jpg" width="100%" />
+      </td>
+      <td width="50%" align="center">
+        <strong>Stephen Lutar — Founder Portfolio</strong><br/>
+        Personal site · Ecosystem overview · Case studies<br/><br/>
+        <img src="https://raw.githubusercontent.com/szl-holdings/.github/main/profile/screenshots/stephen-site-fresh.jpg" width="100%" />
+      </td>
+    </tr>
+  </table>
+
+  ---
+
+  ### Architecture
 
   ```
-                            ┌───────────────────────────────┐
-                            │         SZL Holdings           │
-                            │   Single Monorepo · TypeScript  │
-                            │   446 Tables · 1,618+ Endpoints │
-                            └───────────────┬────────────────┘
-                                            │
-                            ┌───────────────┴────────────────┐
-                            │         Lyte  +  Alloy          │
-                            │  Observability + Execution       │
-                            │  Signal → Decision → Audit Trail │
-                            └───────────────┬────────────────┘
-                                            │
-             ┌──────────┬──────────┬────────┴────────┬──────────┬──────────┐
-             │          │          │                  │          │          │
-          Vessels     Aegis     Terra            PRISM      Carlota    Future
-          Maritime    Defense   Real Estate      Legal       Jo        Domain
-          Command     & Intel   Intelligence     Ops        Advisory    Packs
+  Stack         TypeScript · React · Vite · Express 5 · PostgreSQL · Drizzle ORM · Expo
+  Monorepo      pnpm workspace — shared libraries, shared UI, shared database layer
+  API           1,618+ endpoints across REST, GraphQL, and WebSocket
+  Database      446 tables, one shared PostgreSQL schema
+  Mobile        8 Expo React Native apps (iOS + Android ready)
+  AI            Governed advisory agents — source citations, confidence scores, human gates
+  Auth          RBAC with session management
+  Deployment    Production-ready, single-command dev environment
   ```
 
-  ---
-
-  ## Governance Principles
-
-  | | |
-  |:--|:--|
-  | **AI Governance by Design** | Advisory agents cannot execute consequential actions without explicit human confirmation. Enforced at the workflow layer — not the UI. |
-  | **Evidence-Backed Output** | Every AI recommendation includes source citations, confidence scores, and retrieval provenance. No opaque outputs ship. |
-  | **Explicit Over Implicit** | Platform state is always visible. Failures surface immediately. No silent fallbacks, no hidden degradation. |
-  | **Compounding Architecture** | Lyte and Alloy are platform infrastructure. Domain packs run on top. Every improvement propagates across every vertical. |
-  | **Audit-First Data Model** | All state transitions are versioned and immutable. Decision lineage is traceable from trigger to outcome. |
-
-  ---
-
-  ## By the Numbers
-
-  | Metric | Value |
-  |:-------|:------|
-  | Live Applications | 16 (8 web + 8 mobile) |
-  | Database Tables | 446 |
-  | API Endpoints | 1,618+ |
-  | Shared Libraries | 6 |
-  | Architecture | Single TypeScript monorepo |
-  | AI Model | Human-in-the-loop, citation-required |
-  | Deployment | Continuous, production-grade |
-
-  ---
-
-  ## Trust & Evaluation
-
-  SZL Holdings maintains comprehensive architecture documentation, security posture reports, and an investor thesis — available upon request for qualified evaluators, design partners, and institutional investors.
-
-  **We do not publish source code.** Our platforms are live, our architecture is documented, and our governance model is verifiable through the product itself.
-
-  ---
-
-  ## Founder
-
-  **Stephen Lutar** — Founder & CEO
-
-  Builder-operator. One architect behind 16 live applications, 446 database tables, and 1,618+ API endpoints. Full-stack TypeScript. Every line of code, every schema, every deployment.
-
-  <p>
-    <a href="https://linkedin.com/in/stephenlutar"><img src="https://img.shields.io/badge/LinkedIn-stephenlutar-0A66C2?style=flat-square&logo=linkedin&logoColor=white" /></a>
-    <a href="https://medium.com/@stephen_38454"><img src="https://img.shields.io/badge/Medium-@stephen__38454-000000?style=flat-square&logo=medium&logoColor=white" /></a>
-    <a href="https://szlholdings.substack.com"><img src="https://img.shields.io/badge/Substack-Signal_Over_Noise-FF6719?style=flat-square&logo=substack&logoColor=white" /></a>
-    <a href="https://x.com/szlholdings"><img src="https://img.shields.io/badge/X-@szlholdings-000000?style=flat-square&logo=x&logoColor=white" /></a>
+  <p align="center">
+    <img src="https://skillicons.dev/icons?i=ts,react,vite,nodejs,express,postgres,tailwind&theme=dark" />
   </p>
 
   ---
 
+  ### Operating Philosophy
+
+  - **AI governance by design.** Advisory agents cannot execute without explicit human confirmation. Every recommendation includes source citations.
+  - **Shared fabric, domain specialization.** Six industry verticals on one compounding architecture. One fix benefits every platform.
+  - **Explicit over implicit.** Platform state is always visible. Failures surface immediately — never silently.
+  - **Builder-operator.** One founder, full ownership, no contractor dependencies. Clean IP.
+
+  ---
+
+  ### Writing
+
+  - **Substack:** [Signal Over Noise](https://szlholdings.substack.com) — business observability, AI governance, founder operations
+  - **Medium:** [Stephen Lutar](https://medium.com/@stephen_38454) — architecture, domain intelligence, operating philosophy
+
+  ---
+
   <p align="center">
-    <img src="https://capsule-render.vercel.app/api?type=waving&color=0:080c14,50:1a1a2e,100:d4a054&height=80&section=footer" width="100%" />
+    <em>This organization operates private repositories. Source code access available under NDA.</em>
   </p>
 
   <p align="center">
-    Open to design partner conversations, enterprise evaluation, and investment introductions.
+    <em>Open to design partner conversations, enterprise evaluation, and investment introductions.</em>
   </p>
 
   <p align="center">
-    <a href="mailto:inquiries@szlholdings.com"><b>inquiries@szlholdings.com</b></a> · <a href="https://szlholdings.com"><b>szlholdings.com</b></a>
+    <a href="mailto:stephenlutar2@gmail.com"><strong>stephenlutar2@gmail.com</strong></a> · <a href="https://linkedin.com/in/stephenlutar"><strong>LinkedIn</strong></a> · <a href="https://szlholdings.com"><strong>szlholdings.com</strong></a>
   </p>
   
