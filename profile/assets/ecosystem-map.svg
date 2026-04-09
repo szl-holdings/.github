@@ -1,0 +1,51 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 200" fill="none">
+  <defs>
+    <linearGradient id="ecoGold" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#d4a054" stop-opacity="0"/>
+      <stop offset="50%" stop-color="#d4a054" stop-opacity="0.3"/>
+      <stop offset="100%" stop-color="#d4a054" stop-opacity="0"/>
+    </linearGradient>
+  </defs>
+
+  <rect width="900" height="200" fill="#060a10"/>
+
+  <text x="450" y="24" text-anchor="middle" fill="#475569" font-family="system-ui, -apple-system, sans-serif" font-size="9" font-weight="500" letter-spacing="3">DOCTRINE</text>
+
+  <rect x="60" y="44" width="180" height="50" rx="6" fill="#0c1018" stroke="#3b82f6" stroke-width="1.5" stroke-opacity="0.6"/>
+  <text x="150" y="68" text-anchor="middle" fill="#3b82f6" font-family="system-ui, -apple-system, sans-serif" font-size="14" font-weight="700">OBSERVE</text>
+  <text x="150" y="84" text-anchor="middle" fill="#64748b" font-family="system-ui, -apple-system, sans-serif" font-size="9">Signal ingestion &amp; sensing</text>
+
+  <text x="262" y="72" text-anchor="middle" fill="#334155" font-family="system-ui, -apple-system, sans-serif" font-size="16">&#8594;</text>
+
+  <rect x="280" y="44" width="180" height="50" rx="6" fill="#0c1018" stroke="#8b5cf6" stroke-width="1.5" stroke-opacity="0.6"/>
+  <text x="370" y="68" text-anchor="middle" fill="#8b5cf6" font-family="system-ui, -apple-system, sans-serif" font-size="14" font-weight="700">UNDERSTAND</text>
+  <text x="370" y="84" text-anchor="middle" fill="#64748b" font-family="system-ui, -apple-system, sans-serif" font-size="9">Correlation &amp; context</text>
+
+  <text x="482" y="72" text-anchor="middle" fill="#334155" font-family="system-ui, -apple-system, sans-serif" font-size="16">&#8594;</text>
+
+  <rect x="500" y="44" width="180" height="50" rx="6" fill="#0c1018" stroke="#d4a054" stroke-width="1.5" stroke-opacity="0.6"/>
+  <text x="590" y="68" text-anchor="middle" fill="#d4a054" font-family="system-ui, -apple-system, sans-serif" font-size="14" font-weight="700">DECIDE</text>
+  <text x="590" y="84" text-anchor="middle" fill="#64748b" font-family="system-ui, -apple-system, sans-serif" font-size="9">Governed AI advisors</text>
+
+  <text x="702" y="72" text-anchor="middle" fill="#334155" font-family="system-ui, -apple-system, sans-serif" font-size="16">&#8594;</text>
+
+  <rect x="720" y="44" width="140" height="50" rx="6" fill="#0c1018" stroke="#22c55e" stroke-width="1.5" stroke-opacity="0.6"/>
+  <text x="790" y="68" text-anchor="middle" fill="#22c55e" font-family="system-ui, -apple-system, sans-serif" font-size="14" font-weight="700">EXECUTE</text>
+  <text x="790" y="84" text-anchor="middle" fill="#64748b" font-family="system-ui, -apple-system, sans-serif" font-size="9">Audited actions</text>
+
+  <rect x="60" y="114" width="800" height="1" fill="url(#ecoGold)"/>
+
+  <text x="150" y="142" text-anchor="middle" fill="#94a3b8" font-family="system-ui, -apple-system, sans-serif" font-size="10">Vessels  ·  Aegis  ·  Terra</text>
+  <text x="150" y="158" text-anchor="middle" fill="#475569" font-family="system-ui, -apple-system, sans-serif" font-size="8">sensors &amp; feeds</text>
+
+  <text x="370" y="142" text-anchor="middle" fill="#94a3b8" font-family="system-ui, -apple-system, sans-serif" font-size="10">Lyte  ·  PRISM  ·  Alloy</text>
+  <text x="370" y="158" text-anchor="middle" fill="#475569" font-family="system-ui, -apple-system, sans-serif" font-size="8">pattern recognition</text>
+
+  <text x="590" y="142" text-anchor="middle" fill="#94a3b8" font-family="system-ui, -apple-system, sans-serif" font-size="10">AI Advisors  ·  Copilots</text>
+  <text x="590" y="158" text-anchor="middle" fill="#475569" font-family="system-ui, -apple-system, sans-serif" font-size="8">human-gated recommendations</text>
+
+  <text x="790" y="142" text-anchor="middle" fill="#94a3b8" font-family="system-ui, -apple-system, sans-serif" font-size="10">Alloy  ·  Carlota Jo</text>
+  <text x="790" y="158" text-anchor="middle" fill="#475569" font-family="system-ui, -apple-system, sans-serif" font-size="8">immutable audit trail</text>
+
+  <text x="450" y="188" text-anchor="middle" fill="#334155" font-family="system-ui, -apple-system, sans-serif" font-size="9" letter-spacing="1">Every improvement compounds across every platform</text>
+</svg>
