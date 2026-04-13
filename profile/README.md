@@ -11,8 +11,8 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/Apps-16_Production-00C853?style=flat-square" alt="16 Apps" />
-  <img src="https://img.shields.io/badge/Database-415+_Tables-4169E1?style=flat-square" alt="415+ Tables" />
+  <img src="https://img.shields.io/badge/Apps-22_Production-00C853?style=flat-square" alt="16 Apps" />
+  <img src="https://img.shields.io/badge/Database-600+_Tables-4169E1?style=flat-square" alt="600+ Tables" />
   <img src="https://img.shields.io/badge/Industries-5_Verticals-FF6F00?style=flat-square" alt="5 Industries" />
   <img src="https://img.shields.io/badge/TypeScript-5.9-3178C6?style=flat-square&logo=typescript&logoColor=white" alt="TypeScript" />
   <img src="https://img.shields.io/badge/React-19-61DAFB?style=flat-square&logo=react&logoColor=black" alt="React" />
@@ -28,7 +28,7 @@ SZL Holdings builds the **governed operational intelligence layer** — the plat
 **Lyte** is the command surface. **Alloy** is the execution fabric. Domain intelligence packs extend the same system into cybersecurity, maritime, real estate, legal, and private advisory.
 
 ```
-16 Production Applications     415+ Database Tables     5,300+ Columns
+22 Production Applications     600+ Database Tables     5,300+ Columns
  9 Web Platforms                940+ Database Indexes    6 Shared Libraries
  7 Mobile Apps (Expo)            5  Industry Verticals   1 Founder
 ```
