@@ -92,7 +92,7 @@ From the raw signal that triggered an alert, through the routing logic that assi
 Each new vertical doesn't just add surface area — it makes the whole platform more intelligent. A maritime anomaly enriches a threat intelligence profile. A legal filing surfaces a distress property signal. A financial irregularity triggers a compliance workflow. This is **compounding moat architecture**.
 
 ### Unified Mobile Command (CORTEX)
-All 8 domain workspaces in a single Expo/React Native app. Biometric auth, cross-domain badge counts, workspace-adaptive AI copilot, and a unified command feed. Operators in the field have full platform coverage from one authenticated session on iOS or Android.
+All active domain workspaces in a single Expo/React Native app. Biometric auth, cross-domain badge counts, workspace-adaptive AI copilot, and a unified command feed. Operators in the field have full platform coverage from one authenticated session on iOS or Android.
 
 ---
 
