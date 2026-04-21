@@ -17,10 +17,10 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/Artifacts-11_Registered-00C853?style=flat-square" alt="11 Artifacts" />
+  <img src="https://img.shields.io/badge/Artifacts-13_Registered-00C853?style=flat-square" alt="13 Artifacts" />
   <img src="https://img.shields.io/badge/API_Endpoints-2,816-FF6F00?style=flat-square" alt="2,816 Endpoints" />
   <img src="https://img.shields.io/badge/Database-798_Tables-4169E1?style=flat-square" alt="798 Tables" />
-  <img src="https://img.shields.io/badge/Domain_Packs-6_Verticals-9C27B0?style=flat-square" alt="6 Domain Packs" />
+  <img src="https://img.shields.io/badge/Domain_Packs-8_Verticals-9C27B0?style=flat-square" alt="8 Domain Packs" />
 </p>
 
 <p align="center">
@@ -37,12 +37,12 @@
 
 SZL Holdings builds the **governed decision infrastructure layer** — the platform that connects what's observable to what's executable, under governance, with full attribution.
 
-**Lyte** is the command surface. **Alloy** is the execution fabric. **CORTEX** is the unified mobile command center. Domain intelligence packs extend the same system into cybersecurity, maritime, real estate, legal, and private advisory.
+**Lyte** is the command surface (now unified under Command Portal). **Alloy** is the execution fabric. **CORTEX** is the unified mobile command center. Domain intelligence packs — Sentra (cyber resilience), Counsel (legal), Aegis (defense), Vessels (maritime), Terra (real estate), Carlota Jo (private advisory), and Pulse (executive briefing) — extend the same governance infrastructure into eight verticals.
 
 ```
-11 Registered Artifacts    798 Database Tables     2,816 API Endpoints
- 8 Web Applications         40  Shared Libraries     450,000+ Lines of Code
- 1 Mobile Command Center     6  Domain Packs         1 Founder
+13 Registered Artifacts    798 Database Tables     2,816 API Endpoints
+10 Web Applications         40  Shared Libraries     450,000+ Lines of Code
+ 1 Mobile Command Center     8  Domain Packs         1 Founder
 ```
 
 ---
@@ -115,6 +115,33 @@ All active domain workspaces in a single Expo/React Native app. Biometric auth, 
 
 ---
 
+  ### Sentra — Cyber Resilience Command
+  | Dashboard | Incident Feed |
+  |---|---|
+  | ![Sentra Dashboard](../assets/screenshots/sentra-dashboard.jpg) | ![Sentra Command Center](../assets/screenshots/sentra-dashboard.jpg) |
+
+  *Turn cyber posture, recovery readiness, and live incidents into command. Exposure mapping, behavioral baseline monitoring, asset risk graph, recovery readiness scoring, and incident commander. AI-powered threat intelligence query in natural language.*
+
+  ---
+
+  ### Counsel — Legal Matter Command
+  | Matter Command | Obligation Feed |
+  |---|---|
+  | ![Counsel Matters](../assets/screenshots/counsel-matters.jpg) | ![Counsel Home](../assets/screenshots/counsel-home.jpg) |
+
+  *Turn matters, obligations, and legal exposure into command. Matter board, obligation dependency graph, exposure quantification, court filing integration, and cross-domain signal fusion (Vessels sanctions + Counsel legal risk).*
+
+  ---
+
+  ### Pulse — AI Executive Briefing
+  | Executive Brief | Intelligence Dashboard |
+  |---|---|
+  | ![Pulse](../assets/screenshots/pulse-home.jpg) | ![Pulse](../assets/screenshots/pulse-home.jpg) |
+
+  *Narrative intelligence reports synthesized from live platform signals. Daily executive briefings covering all active domain packs — threats, opportunities, and required decisions — in a single daily intelligence surface.*
+
+  ---
+
 ### Vessels — Maritime Fleet Intelligence
 | Fleet Command | Mobile Fleet Tracking |
 |---|---|
@@ -133,18 +160,18 @@ All active domain workspaces in a single Expo/React Native app. Biometric auth, 
 
 ---
 
-### Lyte — Business Observability
+### Lyte — Business Observability *(Merged into Command Portal)*
 | Command Center | Executive Action Queue |
 |---|---|
 | ![Lyte Command](../assets/screenshots/lyte-command-center-hero.jpg) | ![Lyte Executive](../assets/screenshots/lyte-executive-command.jpg) |
 
-*PRISM framework — People, Revenue, Infrastructure, Security, Market. Signal timeline, correlation engine, priority action queue, and AIOps. 142 components.*
+*PRISM framework — People, Revenue, Infrastructure, Security, Market. Signal timeline, correlation engine, priority action queue, and AIOps. 142 components. Lyte has been merged into the Unified Command Portal — all capabilities remain active under `/command/`.*
 
 ---
 
 ### PRISM Counsel — Legal Matter Command *(Archived)*
 
-PRISM Counsel was the legal matter command workspace — court filing integration, multi-jurisdictional compliance, recovery tracking, and approval chains. The domain API routes remain active; the web interface has been archived. Source retained in the monorepo.
+PRISM Counsel has been superseded by **Counsel** (see above), the next-generation legal matter command workspace with full agentic capabilities. The domain API routes remain active; source is retained in the monorepo. New deployments should use Counsel (`/counsel/`).
 
 ---
 
@@ -218,7 +245,7 @@ PRISM Counsel was the legal matter command workspace — court filing integratio
 
 → **[szl-holdings/szl-holdings-platform](https://github.com/szl-holdings/szl-holdings-platform)**
 
-The canonical platform monorepo. 11 registered artifacts (8 web, 1 mobile, 1 video, 1 design), 40 shared libraries, 798 database tables, 2,816 API endpoints. TypeScript throughout.
+The canonical platform monorepo. 13 registered artifacts (10 web, 1 mobile, 1 video, 1 design), 40 shared libraries, 798 database tables, 2,816 API endpoints. TypeScript throughout.
 
 ---
 
