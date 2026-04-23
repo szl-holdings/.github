@@ -17,7 +17,7 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/Artifacts-13_Registered-00C853?style=flat-square" alt="13 Artifacts" />
+  <img src="https://img.shields.io/badge/Artifacts-14_Registered-00C853?style=flat-square" alt="14 Artifacts" />
   <img src="https://img.shields.io/badge/API_Endpoints-2,816-FF6F00?style=flat-square" alt="2,816 Endpoints" />
   <img src="https://img.shields.io/badge/Database-798_Tables-4169E1?style=flat-square" alt="798 Tables" />
   <img src="https://img.shields.io/badge/Domain_Packs-8_Verticals-9C27B0?style=flat-square" alt="8 Domain Packs" />
@@ -40,8 +40,8 @@ SZL Holdings builds the **governed decision infrastructure layer** — the platf
 **Lyte** is the command surface (now unified under Command Portal). **Alloy** is the execution fabric. **CORTEX** is the unified mobile command center. Domain intelligence packs — Sentra (cyber resilience), Counsel (legal), Aegis (defense), Vessels (maritime), Terra (real estate), Carlota Jo (private advisory), and Pulse (executive briefing) — extend the same governance infrastructure into eight verticals.
 
 ```
-13 Registered Artifacts    798 Database Tables     2,816 API Endpoints
-10 Web Applications         40  Shared Libraries     450,000+ Lines of Code
+14 Registered Artifacts    798 Database Tables     2,816 API Endpoints
+11 Web Applications         40  Shared Libraries     450,000+ Lines of Code
  1 Mobile Command Center     8  Domain Packs         1 Founder
 ```
 
@@ -245,7 +245,7 @@ PRISM Counsel has been superseded by **Counsel** (see above), the next-generatio
 
 → **[szl-holdings/szl-holdings-platform](https://github.com/szl-holdings/szl-holdings-platform)**
 
-The canonical platform monorepo. 13 registered artifacts (10 web, 1 mobile, 1 video, 1 design), 40 shared libraries, 798 database tables, 2,816 API endpoints. TypeScript throughout.
+The canonical platform monorepo. 14 registered artifacts (11 web, 1 mobile, 1 video, 1 design), 40 shared libraries, 798 database tables, 2,816 API endpoints. TypeScript throughout.
 
 ---
 
