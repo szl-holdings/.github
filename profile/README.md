@@ -98,7 +98,7 @@ From raw signal through routing logic through human approval through executed ou
 | **Counsel** | Legal matter command — diligence, evidence, and AI-assisted contract risk | Active |
 | **Carlota Jo** | Premium advisory operations for UHNW clients | Active |
 | **Aegis** | Defense and intelligence command — SOC command, SOAR playbooks, threat intelligence | Active |
-| **SZL Holdings Mobile** | Unified mobile command — all domain workspaces in one Expo/React Native app | Deferred |
+| **Mobile Command** | Unified mobile command — all domain workspaces in one Expo/React Native app | Deferred |
 
 ---
 
@@ -141,7 +141,7 @@ From raw signal through routing logic through human approval through executed ou
 +------------------------------------------------------------------------+
 |  Lyte                  — Command surface (PRAXIS framework)           |
 |  Command               — Unified operator surface (cross-domain)      |
-|  SZL Holdings Mobile   — Unified mobile command (iOS + Android)       |
+|  Mobile Command        — Unified mobile command (iOS + Android)        |
 +------------------------------------------------------------------------+
 |  DOMAIN PACKS                                                          |
 |                                                                        |
@@ -239,7 +239,7 @@ The canonical platform monorepo. TypeScript throughout. A11oy, all domain packs,
 | A11oy Phase 1 — Foundation (type system, fabric, demo seed, read API) | ✅ Complete |
 | A11oy Phase 2 — Workcell engine with live AI reasoning | 🔜 Planned |
 | A11oy Phase 3 — Full proof-carrying execution, live connectors | 🔜 Planned |
-| SZL Holdings Mobile (iOS + Android unified command) | 🔜 Deferred |
+| Mobile Command (iOS + Android unified command) | 🔜 Deferred |
 | SOC 2 Type 1 audit readiness | 🔜 Roadmap |
 | Production customer onboarding | 🔜 Roadmap |
 
