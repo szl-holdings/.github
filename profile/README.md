@@ -83,33 +83,6 @@ Every action, approval, and AI recommendation generates an append-only Proof Led
 **Signal-to-outcome traceability.**  
 From raw signal through routing logic through human approval through executed outcome — every step is logged, linked, and replayable. Zero black-box decisions.
 
-
----
-
-## Loop-Native Research — What Sets Us Apart
-
-Most enterprise AI platforms run a single forward pass and call the answer done. We don't. Every consequential decision in our platform runs through the **Ouroboros Loop kernel** — a bounded recursive process with cross-step consistency, adaptive depth, and entropy-regularized exit. The answer is the *converged* answer, not the first one.
-
-The kernel is grounded in seven papers we read together:
-
-| Year | Paper | Contribution |
-|------|-------|--------------|
-| 2018 | Universal Transformers (Dehghani) | Turing-complete weight-tied recurrence |
-| 2020 | Scaling Laws (Kaplan) | Width vs. depth fungibility — permission slip for looped depth |
-| 2021 | PonderNet (Banino) | ELBO-based adaptive halting |
-| 2022 | Will We Run Out of Data (Villalobos) | Public text exhausts 2026–2032 → loop = data efficiency |
-| 2025 | RLVR Limits (Yue) | RL polishes more than it extends → bias toward distillation loops |
-| 2025 | Ouro (ByteDance) | Synthesis: 7.7T tokens, sandwich norm, 4-stage curriculum |
-| 2026 | Parcae (Prairie) | Spectral stability, first scaling laws for looped LMs |
-
-We ship that research as the `@workspace/ouroboros` kernel, instilled into:
-
-- **A11oy** — Loop Reasoner and Andean Orchestration (paired Sentra × Amaru child loops with cross-distillation signals)
-- **Sentra** — Recursive Threat Modeler with convergent risk scoring
-- **Amaru** — Convergent reverse-ETL (named for the Andean cosmic serpent — the two-headed Ouroboros bridging the upper world of risk and the lower world of entity truth)
-
-Full thesis: [`docs/ouroboros-thesis.md`](https://github.com/szl-holdings/szl-holdings-platform/blob/main/docs/ouroboros-thesis.md) (~600 lines, 7-paper genealogy, paper-to-primitive table, 7-experiment pipeline, BibTeX appendix).
-
 ---
 
 ## Product Surfaces
@@ -124,9 +97,8 @@ Full thesis: [`docs/ouroboros-thesis.md`](https://github.com/szl-holdings/szl-ho
 | **Terra** | Real estate intelligence — distress signals, ownership graph, deal pipeline | Active |
 | **Counsel** | Legal matter command — diligence, evidence, and AI-assisted contract risk | Active |
 | **Carlota Jo** | Premium advisory operations for UHNW clients | Active |
-| **Amaru** | Convergent reverse-ETL — sync loops that converge to canonical state under the Ouroboros kernel | Active |
 | **Aegis** | Defense and intelligence command — SOC command, SOAR playbooks, threat intelligence | Active |
-| **Mobile Command** | Unified mobile command — all domain workspaces in one Expo/React Native app (offline-first, biometric sign-in) | Active — Beta |
+| **Mobile Command** | Unified mobile command — all domain workspaces in one Expo/React Native app | Deferred |
 
 ---
 
