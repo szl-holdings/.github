@@ -4,7 +4,9 @@
 
   [![szlholdings.com](https://img.shields.io/badge/web-szlholdings.com-0a0a0a?style=flat-square)](https://szlholdings.com)
   [![CodeQL](https://img.shields.io/badge/CodeQL-passing-2da44e?style=flat-square&logo=github)](https://github.com/szl-holdings/szl-holdings-platform/actions)
-  [![Ouroboros tests](https://img.shields.io/badge/ouroboros%20tests-133%2F133-2da44e?style=flat-square)](https://github.com/szl-holdings/ouroboros)
+  [![Ouroboros tests](https://img.shields.io/badge/ouroboros%20tests-1%2C372%2F1%2C372-2da44e?style=flat-square)](https://github.com/szl-holdings/ouroboros)
+  [![Paper v3](https://img.shields.io/badge/paper-v3.0.0%20Lutar%20Invariant-c4356b?style=flat-square)](https://github.com/szl-holdings/ouroboros-thesis/tree/main/papers/v3)
+  [![Zenodo v3](https://zenodo.org/badge/DOI/10.5281/zenodo.19951520.svg)](https://doi.org/10.5281/zenodo.19951520)
   [![Government Readiness](https://img.shields.io/badge/NYSTEC%20audit-2026--04--30-2b6cb0?style=flat-square)](https://github.com/szl-holdings/ouroboros/blob/main/docs/audit/szl-government-readiness.md)
   [![License](https://img.shields.io/badge/license-Proprietary-red?style=flat-square)](https://github.com/szl-holdings/szl-holdings-platform/blob/master/LICENSE.md)
 
@@ -57,8 +59,8 @@
 
   | Repo | Purpose | Status |
   |---|---|---|
-  | [`ouroboros`](https://github.com/szl-holdings/ouroboros) | `@workspace/ouroboros` — bounded-loop runtime, v6 ecosystem layer, government readiness module | **133/133 tests** passing |
-  | [`ouroboros-thesis`](https://github.com/szl-holdings/ouroboros-thesis) | Architectural rationale + v6 operational contract JSON | v6 published |
+  | [`ouroboros`](https://github.com/szl-holdings/ouroboros) | `@szl-holdings/ouroboros` v6.1.0 — bounded-loop runtime implementing the Lutar Invariant Λ across nine axes | **1,372/1,372 tests** passing (925 TS + 447 Py) |
+  | [`ouroboros-thesis`](https://github.com/szl-holdings/ouroboros-thesis) | Architectural rationale + v6 operational contract JSON. **v3 paper** — [The Lutar Invariant](https://doi.org/10.5281/zenodo.19951520) | v3 published 2026-05-01 |
 
   ### Three-platform stack
 
