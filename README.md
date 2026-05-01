@@ -94,7 +94,7 @@
 
   ## Contact
 
-  [szlholdings.com](https://szlholdings.com) · [inquiries@szlholdings.com](mailto:inquiries@szlholdings.com) · [LinkedIn](https://linkedin.com/in/stephen-l-279315240)
+  [szlholdings.com](https://szlholdings.com) · [stephen@szlholdings.com](mailto:stephen@szlholdings.com) · [LinkedIn](https://linkedin.com/in/stephen-l-279315240)
 
   © 2026 SZL Holdings. All rights reserved.
   
