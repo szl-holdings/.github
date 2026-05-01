@@ -1,37 +1,100 @@
 # SZL Holdings
 
-  > A Series-A holding company building governed AI-augmented control surfaces across seven domains, all powered by the **Ouroboros runtime** — bounded loops with measurable convergence.
+  > Governed AI decision infrastructure for organizations that cannot afford silent failures, invisible risk, or unaccountable AI.
 
-  ## Portfolio
-
-  | Product | Domain | Proof Route | Repository |
-  | --- | --- | --- | --- |
-  | **Amaru** | Multi-source data sync | `PRF_DATA_SYNC` | [`amaru`](https://github.com/szl-holdings/amaru) |
-  | **A11oy** | Cross-domain agent fabric | `PRF_SYSTEM_CLAIMS` | [`a11oy`](https://github.com/szl-holdings/a11oy) |
-  | **Sentra** | Cyber resilience command | `PRF_SECURITY_ACTIONS` | [`sentra`](https://github.com/szl-holdings/sentra) |
-  | **Counsel** | Legal matter command | `PRF_SYSTEM_CLAIMS` | [`counsel`](https://github.com/szl-holdings/counsel) |
-  | **Terra** | Real-estate intelligence | `PRF_SYSTEM_CLAIMS` | [`terra`](https://github.com/szl-holdings/terra) |
-  | **Vessels** | Maritime fleet intelligence | `PRF_SYSTEM_CLAIMS` | [`vessels`](https://github.com/szl-holdings/vessels) |
-  | **Carlota Jo** | Premium UHNW advisory ops | `PRF_SYSTEM_CLAIMS` | [`carlota-jo`](https://github.com/szl-holdings/carlota-jo) |
-
-  ## Foundations
-
-  - 📜 **[`ouroboros-thesis`](https://github.com/szl-holdings/ouroboros-thesis)** — the architectural rationale (full v2 thesis + operational contract JSON)
-  - 🔁 **[`ouroboros`](https://github.com/szl-holdings/ouroboros)** — the runtime: loop kernel, depth allocator, consistency, proof-route resolver, risk-tier escalation gate, almanac cycle advancer
-  - 🏛 **[`szl-holdings-platform`](https://github.com/szl-holdings/szl-holdings-platform)** — the canonical pnpm monorepo (private; the seven product repos above are public mirrors of their READMEs)
-
-  ## Operational substrate
-
-  Every commit-bearing decision in every product binds to:
-
-  1. a **decision receipt** (replayable, hash-verified),
-  2. a **proof route** (`PRF_SYSTEM_CLAIMS` / `PRF_SECURITY_ACTIONS` / `PRF_DATA_SYNC`),
-  3. a **risk tier** (R1 → R4, with R3 gating manual approval and R4 force-escalating),
-  4. an **almanac cycle position** (Madrid 1, Paris 3, Grolier 2 — bounded periodic coordination).
-
-  The `/api/healthz` endpoint exposes a deployment health contract that probes each subsystem and degrades the service to advisory mode when any critical check fails.
+  [![szlholdings.com](https://img.shields.io/badge/web-szlholdings.com-0a0a0a?style=flat-square)](https://szlholdings.com)
+  [![CodeQL](https://img.shields.io/badge/CodeQL-passing-2da44e?style=flat-square&logo=github)](https://github.com/szl-holdings/szl-holdings-platform/actions)
+  [![Ouroboros tests](https://img.shields.io/badge/ouroboros%20tests-133%2F133-2da44e?style=flat-square)](https://github.com/szl-holdings/ouroboros)
+  [![Government Readiness](https://img.shields.io/badge/NYSTEC%20audit-2026--04--30-2b6cb0?style=flat-square)](https://github.com/szl-holdings/ouroboros/blob/main/docs/audit/szl-government-readiness.md)
+  [![License](https://img.shields.io/badge/license-Proprietary-red?style=flat-square)](https://github.com/szl-holdings/szl-holdings-platform/blob/master/LICENSE.md)
 
   ---
+
+  ## What we build
+
+  A **three-platform stack** — A11oy (orchestration), Sentra (security), Amaru (data sync) — plus four product surfaces (Counsel, Terra, Vessels, Carlota Jo) on top of a shared, replay-safe runtime: the **Ouroboros loop kernel** and **Codex decision-receipt kernel**.
+
+  Every agent action produces a cryptographically traceable receipt, an append-only log, and a primary-source hash. Human approval is enforced at risk tiers R3/R4. Every conclusion can be replayed and verified.
+
+  ## Government readiness scorecard
+
+  April 30, 2026 NYSTEC pre-briefing audit — Empire APEX Accelerator (Mercy McInnis, Procurement Counselor). Full report: [`docs/audit/szl-government-readiness.md`](https://github.com/szl-holdings/ouroboros/blob/main/docs/audit/szl-government-readiness.md).
+
+  | Platform | Governance | Proof Chain | Auditability | Human Oversight | Cert Path | Overall |
+  |---|---|---|---|---|---|---|
+  | **A11oy**  | ✅ Strong | ✅ Strong | ✅ Strong | ✅ Strong | ⚠️ In progress | **72/100** |
+  | **Sentra** | ✅ Strong | ✅ Strong | ✅ Strong | ✅ Strong | ⚠️ Needs SOC 2 | **68/100** |
+  | **Amaru**  | ✅ Strong | ✅ Strong | ✅ Strong | ✅ Strong | ⚠️ Needs privacy docs | **65/100** |
+
+  ### NIST AI RMF — full coverage across all four functions
+
+  | Function | A11oy | Sentra | Amaru |
+  |---|---|---|---|
+  | **GOVERN**  | Validator registry, loop policy, operator modes | Risk tier governance | Source priority + merge safety |
+  | **MAP**     | Domain pack router, task-type routing | Threat loop profiles | Schema variant mapping |
+  | **MEASURE** | Delta, consistency, uncertainty per step | Risk tier scoring | Consistency scoring |
+  | **MANAGE**  | Approval gate, halt conditions, replay | Evidence packs, escalation | Conflict reconciliation |
+
+  ### DoD Responsible AI Tenets — 4 of 5 covered
+
+  | Tenet | Status |
+  |---|---|
+  | Responsible | ✅ Human approval at R3/R4, validator hard stops |
+  | Equitable   | ⚠️ Bias-testing methodology in 30-day roadmap |
+  | Traceable   | ✅ Full trace runtime, append-only logs, receipts |
+  | Reliable    | ✅ Golden runs, replay verification, consistency gates |
+  | Governable  | ✅ Approval gate, halt conditions, operational modes |
+
+  ### GSAR 552.239-7001 (proposed) — 5 of 10 covered, 5 documented gaps
+
+  Covered: human oversight, summarized intermediate processing, model routing rationale, RAG source attribution, complete audit trail. Gaps (all documentation, no architectural rework needed): NIST AI RMF written documentation, 72-hour incident reporting procedure, no-cross-customer-training contractual commitment, American AI Systems vendor disclosure, formal bias audit plan.
+
+  ---
+
+  ## Repositories
+
+  ### Runtime + thesis
+
+  | Repo | Purpose | Status |
+  |---|---|---|
+  | [`ouroboros`](https://github.com/szl-holdings/ouroboros) | `@workspace/ouroboros` — bounded-loop runtime, v6 ecosystem layer, government readiness module | **133/133 tests** passing |
+  | [`ouroboros-thesis`](https://github.com/szl-holdings/ouroboros-thesis) | Architectural rationale + v6 operational contract JSON | v6 published |
+
+  ### Three-platform stack
+
+  | Repo | Purpose | Readiness |
+  |---|---|---|
+  | [`a11oy`](https://github.com/szl-holdings/a11oy)   | Orchestration control plane — agent ecosystem brain, validator registry, approval gate | **72/100** |
+  | [`sentra`](https://github.com/szl-holdings/sentra) | Governed security and threat intelligence — recursive threat modeling, evidence packs | **68/100** |
+  | [`amaru`](https://github.com/szl-holdings/amaru)   | Convergent data sync and reconciliation — append-only delta log, consistency gates | **65/100** |
+
+  ### Domain product surfaces
+
+  | Repo | Purpose |
+  |---|---|
+  | [`counsel`](https://github.com/szl-holdings/counsel)       | Legal matter command — policy-gated human review |
+  | [`terra`](https://github.com/szl-holdings/terra)           | NYC distress pipeline + AI-assisted real-estate workflow |
+  | [`vessels`](https://github.com/szl-holdings/vessels)       | Maritime fleet intelligence — sanctions screening, dark-vessel detection |
+  | [`carlota-jo`](https://github.com/szl-holdings/carlota-jo) | Premium UHNW advisory operations portal with Proof-Chain delivery |
+
+  ### Platform monorepo
+
+  [`szl-holdings-platform`](https://github.com/szl-holdings/szl-holdings-platform) — full monorepo. Latest release: [`v1.0.2-codex-kernel`](https://github.com/szl-holdings/szl-holdings-platform/releases) (2026-04-30).
+
+  ---
+
+  ## Security & supply-chain posture
+
+  - **Dependabot alerts**: 0 open across all 11 org repositories.
+  - **CodeQL**: enabled on the platform monorepo, all checks passing.
+  - **Dependency hygiene**: 3 dependabot PRs merged this cycle (react-ecosystem, vite-build, ui-components in progress).
+  - **CMMC / FedRAMP / SOC 2**: roadmap items, disclosed in audit; NIST SP 800-171 gap assessment scoped.
+
+  ---
+
+  ## Contact
+
+  [szlholdings.com](https://szlholdings.com) · [inquiries@szlholdings.com](mailto:inquiries@szlholdings.com) · [LinkedIn](https://linkedin.com/in/stephen-l-279315240)
 
   © 2026 SZL Holdings. All rights reserved.
   
