@@ -3,16 +3,17 @@
   > Governed runtime infrastructure for AI-assisted decisions.
 
   [![Ouroboros tests](https://img.shields.io/badge/ouroboros%20tests-150%20declared-2da44e?style=flat-square)](https://github.com/szl-holdings/ouroboros)
-  [![Paper v3](https://img.shields.io/badge/paper-v3.0.0%20Lutar%20Invariant-c4356b?style=flat-square)](https://github.com/szl-holdings/ouroboros-thesis/tree/main/papers/v3)
-  [![Zenodo v3](https://zenodo.org/badge/DOI/10.5281/zenodo.19951520.svg)](https://doi.org/10.5281/zenodo.19951520)
+  [![Paper v2 (empirical)](https://img.shields.io/badge/paper-v2.0.0%20empirical-805ad5?style=flat-square)](https://github.com/szl-holdings/ouroboros-thesis/tree/main/v2)
+  [![Zenodo v2](https://zenodo.org/badge/DOI/10.5281/zenodo.19934129.svg)](https://doi.org/10.5281/zenodo.19934129)
+  [![Zenodo v1](https://zenodo.org/badge/DOI/10.5281/zenodo.19867281.svg)](https://doi.org/10.5281/zenodo.19867281)
 
   ---
 
   ## What is here
 
-  The shipped, open-source piece is the **Ouroboros runtime** — `@szl-holdings/ouroboros` v6.1.0 — a bounded-loop runtime that implements the **Lutar Invariant Λ**, a closed-form scalar in [0, 1] that aggregates nine independent runtime-trust axes (Cleanliness, Horizon, Resonance, Frustum, Geometry, Invariance, Moral, Being, Non-measurability) into a single auditable number.
+  The shipped, open-source piece is the **Ouroboros runtime** — `@szl-holdings/ouroboros` v6.1.0 — a bounded-loop runtime with measurable convergence as a system primitive. It ships the loop kernel, depth allocator, consistency scoring, proof-route resolver, risk-tier escalation gate, almanac cycle advancer, the v6 ecosystem layer (services, halts, routing, permissions, sandbox, agent registry), and a structured government-procurement readiness module. **150 declared Vitest tests pass** at v6.1.0.
 
-  The companion thesis ([`ouroboros-thesis`](https://github.com/szl-holdings/ouroboros-thesis)) carries the v1 position paper, the v2 empirical companion, and the v3 closed-form scalar law with its uniqueness proof under four axioms. Each version has a Zenodo DOI.
+  The companion thesis ([`ouroboros-thesis`](https://github.com/szl-holdings/ouroboros-thesis)) carries the v1 position paper and the v2 empirical companion. Each has a Zenodo DOI. v3 (Lutar Invariant) was retracted by the author on 2026-05-02 after a self-audit found overstated implementation and commercial claims; a rewritten v3 containing only verifiable claims is in preparation.
 
   Everything else in this org is at varying earlier stages of work.
 
@@ -24,8 +25,8 @@
 
   | Repo | Purpose | Status |
   |---|---|---|
-  | [`ouroboros`](https://github.com/szl-holdings/ouroboros) | `@szl-holdings/ouroboros` v6.1.0 — bounded-loop runtime implementing the Lutar Invariant Λ | **150 declared Vitest tests** in the single `ouroboros` package |
-  | [`ouroboros-thesis`](https://github.com/szl-holdings/ouroboros-thesis) | v1 position paper, v2 empirical companion, v3 closed-form scalar law + v6 operational contract JSON | v3 published 2026-05-01 ([DOI](https://doi.org/10.5281/zenodo.19951520)) |
+  | [`ouroboros`](https://github.com/szl-holdings/ouroboros) | `@szl-holdings/ouroboros` v6.1.0 — bounded-loop runtime, v6 ecosystem layer, government-readiness module | **150 declared Vitest tests** in the single `ouroboros` package |
+  | [`ouroboros-thesis`](https://github.com/szl-holdings/ouroboros-thesis) | v1 position paper, v2 empirical companion, v6 operational contract JSON | v2 published 2026-04-30 ([DOI](https://doi.org/10.5281/zenodo.19934129)); v3 retracted 2026-05-02 |
 
   ### Product surfaces (varying stages)
 
