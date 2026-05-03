@@ -7,7 +7,7 @@
   ## What we ship
 
   - **[ouroboros](https://github.com/szl-holdings/ouroboros)** — bounded-loop runtime. v6.2.0, 172/172 tests.
-  - **[ouroboros-thesis](https://github.com/szl-holdings/ouroboros-thesis)** — v3 paper, [DOI 10.5281/zenodo.19983066](https://doi.org/10.5281/zenodo.19983066).
+  - **[ouroboros-thesis](https://github.com/szl-holdings/ouroboros-thesis)** — v3 paper, [DOI 10.5281/zenodo.19944926](https://doi.org/10.5281/zenodo.19944926).
   - **[a11oy](https://github.com/szl-holdings/a11oy)** — orchestration product with operator-facing decision intelligence and a working Claude-backed chat.
   - **[szl-holdings-platform](https://github.com/szl-holdings/szl-holdings-platform)** — pnpm monorepo: A11oy plus seven domain surfaces (Sentra, Amaru, Counsel, Terra, Vessels, Carlota Jo, plus the SZL API).
 
