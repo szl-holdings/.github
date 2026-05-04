@@ -1,37 +1,24 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="640" viewBox="0 0 1280 640">
+<svg xmlns="http://www.w3.org/2000/svg" width="800" height="280" viewBox="0 0 800 280">
     <defs>
-      <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
-        <stop offset="0%" stop-color="#0a0a0f"/>
-        <stop offset="100%" stop-color="#12121a"/>
+      <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+        <stop offset="0%" style="stop-color:#0a0a0a"/>
+        <stop offset="100%" style="stop-color:#111827"/>
       </linearGradient>
-      <linearGradient id="accent" x1="0" y1="0" x2="1" y2="0">
-        <stop offset="0%" stop-color="#c9a55a"/>
-        <stop offset="100%" stop-color="#c9a55a88"/>
+      <linearGradient id="accent" x1="0%" y1="0%" x2="100%" y2="0%">
+        <stop offset="0%" style="stop-color:#3b82f6"/>
+        <stop offset="100%" style="stop-color:#8b5cf6"/>
       </linearGradient>
     </defs>
-    <rect width="1280" height="640" fill="url(#bg)"/>
-    <rect x="0" y="0" width="6" height="640" fill="url(#accent)"/>
-    <rect x="0" y="634" width="1280" height="6" fill="url(#accent)" opacity="0.3"/>
-    <text x="80" y="120" font-family="system-ui, -apple-system, sans-serif" font-size="22" font-weight="400" fill="#666" letter-spacing="4">SZL HOLDINGS</text>
-    <text x="80" y="220" font-family="system-ui, -apple-system, sans-serif" font-size="72" font-weight="700" fill="#f0f0f0">SZL Holdings</text>
-    <text x="80" y="290" font-family="system-ui, -apple-system, sans-serif" font-size="28" font-weight="400" fill="#999">Governed operational intelligence for regulated enterprises</text>
-    <line x1="80" y1="330" x2="400" y2="330" stroke="#c9a55a" stroke-width="2" opacity="0.5"/>
-    
-    <rect x="80" y="370" width="240" height="100" rx="8" fill="#ffffff08" stroke="#ffffff10" stroke-width="1"/>
-    <text x="200" y="410" font-family="system-ui, -apple-system, sans-serif" font-size="36" font-weight="700" fill="#c9a55a" text-anchor="middle">34</text>
-    <text x="200" y="445" font-family="system-ui, -apple-system, sans-serif" font-size="16" font-weight="400" fill="#888" text-anchor="middle">Sovereign Innovations</text>
-    
-    <rect x="360" y="370" width="240" height="100" rx="8" fill="#ffffff08" stroke="#ffffff10" stroke-width="1"/>
-    <text x="480" y="410" font-family="system-ui, -apple-system, sans-serif" font-size="36" font-weight="700" fill="#c9a55a" text-anchor="middle">48</text>
-    <text x="480" y="445" font-family="system-ui, -apple-system, sans-serif" font-size="16" font-weight="400" fill="#888" text-anchor="middle">API Endpoints Tested</text>
-    
-    <rect x="640" y="370" width="240" height="100" rx="8" fill="#ffffff08" stroke="#ffffff10" stroke-width="1"/>
-    <text x="760" y="410" font-family="system-ui, -apple-system, sans-serif" font-size="36" font-weight="700" fill="#c9a55a" text-anchor="middle">11</text>
-    <text x="760" y="445" font-family="system-ui, -apple-system, sans-serif" font-size="16" font-weight="400" fill="#888" text-anchor="middle">Published Papers</text>
-    
-    <rect x="920" y="370" width="240" height="100" rx="8" fill="#ffffff08" stroke="#ffffff10" stroke-width="1"/>
-    <text x="1040" y="410" font-family="system-ui, -apple-system, sans-serif" font-size="36" font-weight="700" fill="#c9a55a" text-anchor="middle">172</text>
-    <text x="1040" y="445" font-family="system-ui, -apple-system, sans-serif" font-size="16" font-weight="400" fill="#888" text-anchor="middle">Runtime Tests Passing</text>
-    
-    <text x="80" y="560" font-family="system-ui, -apple-system, sans-serif" font-size="18" font-weight="400" fill="#555">Stephen P. Lutar Jr.  |  ORCID 0009-0001-0110-4173  |  szlholdings.com</text>
+    <rect width="800" height="280" fill="url(#bg)" rx="12"/>
+    <rect x="60" y="168" width="80" height="3" fill="url(#accent)" rx="1.5"/>
+    <text x="60" y="100" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="42" font-weight="700" fill="#ffffff" letter-spacing="-1">SZL Holdings</text>
+    <text x="60" y="145" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="18" fill="#9ca3af" letter-spacing="0.5">Governed AI decision infrastructure</text>
+    <text x="60" y="210" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="13" fill="#6b7280">Signal detection</text>
+    <text x="194" y="210" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="13" fill="#4b5563">&#x2192;</text>
+    <text x="214" y="210" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="13" fill="#6b7280">AI recommendation</text>
+    <text x="370" y="210" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="13" fill="#4b5563">&#x2192;</text>
+    <text x="390" y="210" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="13" fill="#6b7280">Human approval</text>
+    <text x="515" y="210" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="13" fill="#4b5563">&#x2192;</text>
+    <text x="535" y="210" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="13" fill="#6b7280">Cryptographic proof</text>
+    <text x="60" y="250" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="12" fill="#4b5563">TypeScript &#x00B7; React &#x00B7; PostgreSQL &#x00B7; szlholdings.com</text>
   </svg>
