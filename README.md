@@ -1,61 +1,70 @@
 # SZL Holdings
 
-  > Governed runtime infrastructure for AI-assisted decisions.
+  > Governed operational intelligence for regulated enterprises.
 
-  [![Ouroboros tests](https://img.shields.io/badge/ouroboros%20tests-150%20declared-2da44e?style=flat-square)](https://github.com/szl-holdings/ouroboros)
-  [![Paper v2 (empirical)](https://img.shields.io/badge/paper-v2.0.0%20empirical-805ad5?style=flat-square)](https://github.com/szl-holdings/ouroboros-thesis/tree/main/v2)
-  [![Zenodo v2](https://zenodo.org/badge/DOI/10.5281/zenodo.19934129.svg)](https://doi.org/10.5281/zenodo.19934129)
-  [![Zenodo v1](https://zenodo.org/badge/DOI/10.5281/zenodo.19867281.svg)](https://doi.org/10.5281/zenodo.19867281)
-
-  ---
-
-  ## What is here
-
-  The shipped, open-source piece is the **Ouroboros runtime** — `@szl-holdings/ouroboros` v6.1.0 — a bounded-loop runtime with measurable convergence as a system primitive. It ships the loop kernel, depth allocator, consistency scoring, proof-route resolver, risk-tier escalation gate, almanac cycle advancer, the v6 ecosystem layer (services, halts, routing, permissions, sandbox, agent registry), and a structured government-procurement readiness module. **150 declared Vitest tests pass** at v6.1.0.
-
-  The companion thesis ([`ouroboros-thesis`](https://github.com/szl-holdings/ouroboros-thesis)) carries the v1 position paper and the v2 empirical companion. Each has a Zenodo DOI. v3 (Lutar Invariant) was retracted by the author on 2026-05-02 after a self-audit found overstated implementation and commercial claims; a rewritten v3 containing only verifiable claims is in preparation.
-
-  Everything else in this org is at varying earlier stages of work.
+  [![Ouroboros tests](https://img.shields.io/badge/runtime%20tests-172%2F172-2da44e?style=flat-square)](https://github.com/szl-holdings/ouroboros)
+  [![Runtime](https://img.shields.io/badge/ouroboros-v6.2.0-2b6cb0?style=flat-square)](https://github.com/szl-holdings/ouroboros/releases/tag/v6.2.0)
+  [![DOI v3](https://img.shields.io/badge/DOI%20v3-10.5281%2Fzenodo.19983066-1f78b4?style=flat-square)](https://doi.org/10.5281/zenodo.19983066)
+  [![Innovations](https://img.shields.io/badge/sovereign%20innovations-34-e6522c?style=flat-square)](https://github.com/szl-holdings/szl-holdings-platform)
+  [![Papers](https://img.shields.io/badge/papers-v1--v11-805ad5?style=flat-square)](https://github.com/szl-holdings/ouroboros-thesis)
+  [![Endpoints](https://img.shields.io/badge/API%20endpoints-48%20tested-2da44e?style=flat-square)](https://github.com/szl-holdings/szl-holdings-platform)
 
   ---
 
   ## Repositories
 
-  ### Runtime + thesis (shipped, open-source)
+  ### Core infrastructure
 
-  | Repo | Purpose | Status |
+  | Repository | What it is | Status |
   |---|---|---|
-  | [`ouroboros`](https://github.com/szl-holdings/ouroboros) | `@szl-holdings/ouroboros` v6.1.0 — bounded-loop runtime, v6 ecosystem layer, government-readiness module | **150 declared Vitest tests** in the single `ouroboros` package |
-  | [`ouroboros-thesis`](https://github.com/szl-holdings/ouroboros-thesis) | v1 position paper, v2 empirical companion, v6 operational contract JSON | v2 published 2026-04-30 ([DOI](https://doi.org/10.5281/zenodo.19934129)); v3 retracted 2026-05-02 |
+  | [**szl-holdings-platform**](https://github.com/szl-holdings/szl-holdings-platform) | TypeScript monorepo: 34 sovereign innovations, 48 API endpoints, 7 domain surfaces | Active development |
+  | [**ouroboros**](https://github.com/szl-holdings/ouroboros) | Bounded-loop runtime implementing the Lutar Invariant | v6.2.0, 172/172 tests |
+  | [**ouroboros-thesis**](https://github.com/szl-holdings/ouroboros-thesis) | 11 published papers (v1--v11) with Zenodo DOIs | v3 current, v4--v11 consolidated |
 
-  ### Product surfaces (varying stages)
+  ### Product surfaces
 
-  | Repo | Stage |
+  | Product | Domain | Repository |
+  |---|---|---|
+  | [**A11oy**](https://github.com/szl-holdings/a11oy) | Brand orchestration and AI governance | Cross-domain agent fabric |
+  | [**Sentra**](https://github.com/szl-holdings/sentra) | Cyber resilience command | Threat modeling, posture drift |
+  | [**Amaru**](https://github.com/szl-holdings/amaru) | Convergent data sync | Append-only delta logs |
+  | [**Counsel**](https://github.com/szl-holdings/counsel) | Legal matter command | Policy-gated AI workflows |
+  | [**Terra**](https://github.com/szl-holdings/terra) | Real estate intelligence | Distress pipeline scoring |
+  | [**Vessels**](https://github.com/szl-holdings/vessels) | Maritime fleet intelligence | Sanctions, dark-vessel detection |
+  | [**Carlota Jo**](https://github.com/szl-holdings/carlota-jo) | UHNW advisory operations | Proof-chain delivery |
+
+  ### Key numbers (verified 2026-05-04)
+
+  | Metric | Value |
   |---|---|
-  | [`a11oy`](https://github.com/szl-holdings/a11oy) | Public repo, README-stage |
-  | [`sentra`](https://github.com/szl-holdings/sentra) | Public repo, README-stage |
-  | [`amaru`](https://github.com/szl-holdings/amaru) | Public repo, README-stage |
-  | [`counsel`](https://github.com/szl-holdings/counsel) | Public repo, README-stage |
-  | [`terra`](https://github.com/szl-holdings/terra) | Public repo, README-stage |
-  | [`vessels`](https://github.com/szl-holdings/vessels) | Public repo, README-stage |
-  | [`carlota-jo`](https://github.com/szl-holdings/carlota-jo) | Public repo, README-stage |
+  | Sovereign innovations | 34 (operational, API-served) |
+  | API endpoints tested | 48/48 passing |
+  | Runtime tests | 172/172 passing |
+  | Published papers | 11 (v1--v11) |
+  | Zenodo DOIs | 3 assigned (v1, v2, v3) |
+  | Domain verticals | 7 integrated products |
+  | Tech stack | TypeScript 5.9, React 19, Vite, Node.js, PostgreSQL |
 
-  ### Platform monorepo
+  ## Architecture
 
-  [`szl-holdings-platform`](https://github.com/szl-holdings/szl-holdings-platform) — public monorepo, in active development. CI is currently flaky on master.
+  - **Ouroboros Runtime** -- bounded loops with measurable convergence as a system primitive
+  - **Sovereign Engine** -- 34 innovations spanning AI governance, quantum-inspired optimization, active inference, sacred geometry coherence, and dynamical systems analysis
+  - **Lambda Engine** -- 9-axis Lutar Invariant pipeline producing formal trust scores
+  - **Proof Chain** -- tamper-evident, hash-chained decision receipts for every operation
+  - **A11oy Orchestrator** -- unified control plane routing decisions across all 7 domain surfaces
 
-  ---
+  ## Principles
 
-  ## Architecture principles
-
-  - **AI governance by design.** Advisory agents cannot execute consequential actions without explicit human confirmation.
-  - **Evidence-backed decisions.** Every recommendation includes source citations and retrieval provenance.
-  - **Explicit over implicit.** Platform state is visible. No silent fallbacks. Failures surface.
-
-  ---
+  1. **AI governance by design.** Agents cannot execute consequential actions without human confirmation.
+  2. **Evidence-backed decisions.** Every recommendation includes source citations and retrieval provenance.
+  3. **Explicit over implicit.** Platform state is visible. No silent fallbacks. Failures surface.
+  4. **Proof-carrying execution.** Every decision produces a tamper-evident receipt.
 
   ## Contact
 
-  [stephenlutar2@gmail.com](mailto:stephenlutar2@gmail.com) · [ORCID 0009-0001-0110-4173](https://orcid.org/0009-0001-0110-4173) · [LinkedIn](https://linkedin.com/in/stephen-l-279315240)
+  Stephen P. Lutar Jr. -- ORCID [0009-0001-0110-4173](https://orcid.org/0009-0001-0110-4173) -- [stephenlutar2@gmail.com](mailto:stephenlutar2@gmail.com) -- [LinkedIn](https://linkedin.com/in/stephen-l-279315240)
 
-  © 2026 SZL Holdings.
+  ---
+
+  (c) 2026 SZL Holdings. Runtime proprietary; thesis text under CC BY 4.0.
+  
