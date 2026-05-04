@@ -10,7 +10,7 @@
   [![Tests](https://img.shields.io/badge/runtime%20tests-172%2F172-2da44e?style=flat-square)](https://github.com/szl-holdings/ouroboros)
   [![DOI](https://img.shields.io/badge/DOI-10.5281%2Fzenodo.19983066-1f78b4?style=flat-square)](https://doi.org/10.5281/zenodo.19983066)
   [![Innovations](https://img.shields.io/badge/sovereign%20innovations-34-e6522c?style=flat-square)](https://github.com/szl-holdings/szl-holdings-platform)
-  [![Papers](https://img.shields.io/badge/thesis%20papers-v1--v11-805ad5?style=flat-square)](https://github.com/szl-holdings/ouroboros-thesis)
+  [![Papers](https://img.shields.io/badge/thesis%20papers-8%20with%20DOIs-805ad5?style=flat-square)](https://github.com/szl-holdings/ouroboros-thesis)
   [![License](https://img.shields.io/badge/thesis-CC%20BY%204.0-blue?style=flat-square)](https://github.com/szl-holdings/ouroboros-thesis/blob/main/LICENSE)
 
   ---
@@ -46,16 +46,38 @@
 
   ## Research
 
-  The Ouroboros Thesis is published across 11 papers with DOIs on Zenodo:
+  The Ouroboros Thesis is published across 8 papers, all with DOIs on Zenodo. Papers v4--v8 show how each innovation powers the SZL ecosystem with A11oy as the cross-domain orchestrator.
+
+  ### Foundation series
 
   | Version | Title | DOI |
   |---|---|---|
-  | **v3** | The Lutar Invariant | [10.5281/zenodo.19983066](https://doi.org/10.5281/zenodo.19983066) |
-  | v2 | Empirical companion | [10.5281/zenodo.19934129](https://doi.org/10.5281/zenodo.19934129) |
-  | v1 | Position paper | [10.5281/zenodo.19867281](https://doi.org/10.5281/zenodo.19867281) |
-  | v4--v11 | Consolidated series (8 papers) | [ouroboros-thesis/papers](https://github.com/szl-holdings/ouroboros-thesis/tree/main/papers) |
+  | **v3** | The Lutar Invariant -- axiomatic trust aggregator | [10.5281/zenodo.19983066](https://doi.org/10.5281/zenodo.19983066) |
+  | **v2** | Empirical companion -- A11oy, Sentra, Amaru case studies | [10.5281/zenodo.19934129](https://doi.org/10.5281/zenodo.19934129) |
+  | **v1** | Position paper -- bounded looped computation | [10.5281/zenodo.19867281](https://doi.org/10.5281/zenodo.19867281) |
 
-  The v4--v11 series covers: Omega Formalism, Prisca-GraphRAG, Hermetic AI Safety, Sefirot/Hopfield Memory, Free-Energy Active Inference, Tawa SAE Interpretability, EPR-Bell Sacred Geometry, and Scaling/Bifurcation Dynamics. Every citation is verified against real published work. Every formula is verified against operational TypeScript code. Each paper includes a "what this paper does and does not claim" section.
+  ### Consolidated series
+
+  | Version | Title | Innovations | DOI |
+  |---|---|---|---|
+  | **v4** | Omega Formalism + EPR-Bell + Sacred Geometry | #1, #29, #32 | [10.5281/zenodo.20020841](https://doi.org/10.5281/zenodo.20020841) |
+  | **v5** | Prisca-GraphRAG + Tawa SAE Interpretability | #5, #6, #7, #9 | [10.5281/zenodo.20020846](https://doi.org/10.5281/zenodo.20020846) |
+  | **v6** | Hermetic Safety + Scaling + Bifurcation | #3, #4, #15, #22, #23, #34 | [10.5281/zenodo.20020845](https://doi.org/10.5281/zenodo.20020845) |
+  | **v7** | Sefirot Memory + Hopfield Associative Retrieval | #10, #11, #12, #30 | [10.5281/zenodo.20020848](https://doi.org/10.5281/zenodo.20020848) |
+  | **v8** | Free-Energy Active Inference + Cognitive Maps | #24, #31, #33 | [10.5281/zenodo.20020849](https://doi.org/10.5281/zenodo.20020849) |
+
+  ### How v3--v8 build the cognitive architecture
+
+  | Layer | Paper | A11oy role |
+  |---|---|---|
+  | **Trust** | v3 | Aggregates 9 runtime axes into auditable trust scalar |
+  | **Quality** | v4 | Evaluates every AI output across 7 epistemic dimensions |
+  | **Retrieval** | v5 | Retrieves knowledge with provenance; explains features |
+  | **Safety** | v6 | Evaluates safety; governs compute; monitors stability |
+  | **Memory** | v7 | Manages retention tiers; enables pattern matching |
+  | **Action** | v8 | Selects actions via free energy; surfaces prediction surprises |
+
+  Every formula is verified against operational TypeScript code. Every citation references real published work. Each paper includes a "what this paper does and does not claim" section. 48/48 API endpoints passing.
 
   ## Architecture principles
 
@@ -85,5 +107,5 @@
 
   ---
 
-  © 2026 SZL Holdings. Runtime proprietary; thesis text under CC BY 4.0.
+  (c) 2026 SZL Holdings. Runtime proprietary; thesis text under CC BY 4.0.
   
