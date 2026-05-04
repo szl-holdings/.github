@@ -1,0 +1,37 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="640" viewBox="0 0 1280 640">
+    <defs>
+      <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+        <stop offset="0%" stop-color="#0a0a0f"/>
+        <stop offset="100%" stop-color="#12121a"/>
+      </linearGradient>
+      <linearGradient id="accent" x1="0" y1="0" x2="1" y2="0">
+        <stop offset="0%" stop-color="#805ad5"/>
+        <stop offset="100%" stop-color="#805ad588"/>
+      </linearGradient>
+    </defs>
+    <rect width="1280" height="640" fill="url(#bg)"/>
+    <rect x="0" y="0" width="6" height="640" fill="url(#accent)"/>
+    <rect x="0" y="634" width="1280" height="6" fill="url(#accent)" opacity="0.3"/>
+    <text x="80" y="120" font-family="system-ui, -apple-system, sans-serif" font-size="22" font-weight="400" fill="#666" letter-spacing="4">SZL HOLDINGS</text>
+    <text x="80" y="220" font-family="system-ui, -apple-system, sans-serif" font-size="72" font-weight="700" fill="#f0f0f0">Ouroboros Thesis</text>
+    <text x="80" y="290" font-family="system-ui, -apple-system, sans-serif" font-size="28" font-weight="400" fill="#999">Bounded loops with measurable convergence</text>
+    <line x1="80" y1="330" x2="400" y2="330" stroke="#805ad5" stroke-width="2" opacity="0.5"/>
+    
+    <rect x="80" y="370" width="240" height="100" rx="8" fill="#ffffff08" stroke="#ffffff10" stroke-width="1"/>
+    <text x="200" y="410" font-family="system-ui, -apple-system, sans-serif" font-size="36" font-weight="700" fill="#805ad5" text-anchor="middle">11</text>
+    <text x="200" y="445" font-family="system-ui, -apple-system, sans-serif" font-size="16" font-weight="400" fill="#888" text-anchor="middle">Papers Published</text>
+    
+    <rect x="360" y="370" width="240" height="100" rx="8" fill="#ffffff08" stroke="#ffffff10" stroke-width="1"/>
+    <text x="480" y="410" font-family="system-ui, -apple-system, sans-serif" font-size="36" font-weight="700" fill="#805ad5" text-anchor="middle">3</text>
+    <text x="480" y="445" font-family="system-ui, -apple-system, sans-serif" font-size="16" font-weight="400" fill="#888" text-anchor="middle">Zenodo DOIs</text>
+    
+    <rect x="640" y="370" width="240" height="100" rx="8" fill="#ffffff08" stroke="#ffffff10" stroke-width="1"/>
+    <text x="760" y="410" font-family="system-ui, -apple-system, sans-serif" font-size="36" font-weight="700" fill="#805ad5" text-anchor="middle">172/172</text>
+    <text x="760" y="445" font-family="system-ui, -apple-system, sans-serif" font-size="16" font-weight="400" fill="#888" text-anchor="middle">Runtime Tests</text>
+    
+    <rect x="920" y="370" width="240" height="100" rx="8" fill="#ffffff08" stroke="#ffffff10" stroke-width="1"/>
+    <text x="1040" y="410" font-family="system-ui, -apple-system, sans-serif" font-size="36" font-weight="700" fill="#805ad5" text-anchor="middle">v6.2.0</text>
+    <text x="1040" y="445" font-family="system-ui, -apple-system, sans-serif" font-size="16" font-weight="400" fill="#888" text-anchor="middle">Runtime Version</text>
+    
+    <text x="80" y="560" font-family="system-ui, -apple-system, sans-serif" font-size="18" font-weight="400" fill="#555">Stephen P. Lutar Jr.  |  ORCID 0009-0001-0110-4173  |  szlholdings.com</text>
+  </svg>
