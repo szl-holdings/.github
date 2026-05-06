@@ -105,8 +105,25 @@ jobs:
             echo "::warning::No $FILE found — cache disabled, install will not be frozen"
           fi
 
-      - name: Setup pnpm
+      - name: Detect packageManager in package.json
         if: steps.skip.outputs.enabled == 'true' && inputs.package-manager == 'pnpm'
+        id: pkgmgr
+        working-directory: ${{ inputs.working-directory }}
+        shell: bash
+        run: |
+          if [ -f package.json ] && grep -qE '"packageManager"\s*:\s*"pnpm@' package.json; then
+            echo "present=true" >> "$GITHUB_OUTPUT"
+            echo "::notice::package.json has packageManager — letting pnpm/action-setup read it"
+          else
+            echo "present=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Setup pnpm (from package.json packageManager)
+        if: steps.skip.outputs.enabled == 'true' && inputs.package-manager == 'pnpm' && steps.pkgmgr.outputs.present == 'true'
+        uses: pnpm/action-setup@8912a9102ac27614460f54aedde9e1e7f9aec20d # v4.1.0
+
+      - name: Setup pnpm (from input version)
+        if: steps.skip.outputs.enabled == 'true' && inputs.package-manager == 'pnpm' && steps.pkgmgr.outputs.present != 'true'
         uses: pnpm/action-setup@8912a9102ac27614460f54aedde9e1e7f9aec20d # v4.1.0
         with:
           version: ${{ inputs.pnpm-version }}
