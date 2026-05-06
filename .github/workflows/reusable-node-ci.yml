@@ -2,6 +2,8 @@ name: Reusable — Node CI
 
 # Standard Node/TypeScript CI: install, lint, typecheck, test, build.
 # Caller can opt-out of any stage by passing `false` for that input.
+# Tolerates repos without a committed lockfile (cache + frozen-lockfile
+# are skipped automatically — see `Detect lockfile` step below).
 
 on:
   workflow_call:
@@ -82,30 +84,68 @@ jobs:
         if: steps.skip.outputs.enabled == 'true'
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.0
 
+      - name: Detect lockfile
+        if: steps.skip.outputs.enabled == 'true'
+        id: lockfile
+        working-directory: ${{ inputs.working-directory }}
+        shell: bash
+        run: |
+          PM="${{ inputs.package-manager }}"
+          case "$PM" in
+            pnpm) FILE="pnpm-lock.yaml";;
+            yarn) FILE="yarn.lock";;
+            npm)  FILE="package-lock.json";;
+          esac
+          if [ -f "$FILE" ]; then
+            echo "found=true" >> "$GITHUB_OUTPUT"
+            echo "file=$FILE" >> "$GITHUB_OUTPUT"
+            echo "::notice::Found lockfile $FILE — enabling cache + frozen install"
+          else
+            echo "found=false" >> "$GITHUB_OUTPUT"
+            echo "::warning::No $FILE found — cache disabled, install will not be frozen"
+          fi
+
       - name: Setup pnpm
         if: steps.skip.outputs.enabled == 'true' && inputs.package-manager == 'pnpm'
         uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4.1.0
         with:
           version: ${{ inputs.pnpm-version }}
 
-      - name: Setup Node
-        if: steps.skip.outputs.enabled == 'true'
+      - name: Setup Node (with cache)
+        if: steps.skip.outputs.enabled == 'true' && steps.lockfile.outputs.found == 'true'
         uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: ${{ inputs.node-version }}
           cache: ${{ inputs.package-manager }}
-          cache-dependency-path: ${{ inputs.working-directory }}/${{ inputs.package-manager == 'pnpm' && 'pnpm-lock.yaml' || (inputs.package-manager == 'yarn' && 'yarn.lock' || 'package-lock.json') }}
+          cache-dependency-path: ${{ inputs.working-directory }}/${{ steps.lockfile.outputs.file }}
+
+      - name: Setup Node (no cache)
+        if: steps.skip.outputs.enabled == 'true' && steps.lockfile.outputs.found != 'true'
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: ${{ inputs.node-version }}
 
       - name: Install dependencies
         if: steps.skip.outputs.enabled == 'true'
         working-directory: ${{ inputs.working-directory }}
         shell: bash
+        env:
+          HAS_LOCKFILE: ${{ steps.lockfile.outputs.found }}
         run: |
-          case "${{ inputs.package-manager }}" in
-            pnpm) pnpm install --frozen-lockfile;;
-            yarn) yarn install --frozen-lockfile;;
-            npm)  npm ci;;
-          esac
+          PM="${{ inputs.package-manager }}"
+          if [ "$HAS_LOCKFILE" = "true" ]; then
+            case "$PM" in
+              pnpm) pnpm install --frozen-lockfile;;
+              yarn) yarn install --frozen-lockfile;;
+              npm)  npm ci;;
+            esac
+          else
+            case "$PM" in
+              pnpm) pnpm install --no-frozen-lockfile;;
+              yarn) yarn install;;
+              npm)  npm install --no-package-lock;;
+            esac
+          fi
 
       - name: Run ${{ matrix.task }}
         if: steps.skip.outputs.enabled == 'true'
