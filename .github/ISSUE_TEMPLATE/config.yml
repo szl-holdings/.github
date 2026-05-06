@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Security vulnerability
+    url: https://github.com/szl-holdings/.github/security/policy
+    about: Please report security issues privately — do NOT file a public issue.
+  - name: General questions
+    url: mailto:inquiries@szlholdings.com
+    about: For non-bug questions, email us directly.

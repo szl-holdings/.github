@@ -1,0 +1,60 @@
+name: Reusable — CodeQL
+
+# CodeQL static analysis. Callable from any repo in the org.
+#
+# Pass `languages` as a JSON array string, e.g. '["javascript-typescript"]'
+# or '["javascript-typescript","python"]'. Default: javascript-typescript only.
+
+on:
+  workflow_call:
+    inputs:
+      languages:
+        description: 'JSON array of CodeQL languages: javascript-typescript, python, go, java-kotlin, ruby, swift, csharp, cpp'
+        required: false
+        type: string
+        default: '["javascript-typescript"]'
+      build-mode:
+        description: 'CodeQL build mode (none, autobuild, manual)'
+        required: false
+        type: string
+        default: 'none'
+      queries:
+        description: 'CodeQL query suite (default, security-extended, security-and-quality)'
+        required: false
+        type: string
+        default: 'security-and-quality'
+
+permissions:
+  actions: read
+  contents: read
+  security-events: write
+
+jobs:
+  analyze:
+    name: Analyze (${{ matrix.language }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        language: ${{ fromJSON(inputs.languages) }}
+    steps:
+      - name: Harden runner
+        uses: step-security/harden-runner@a5ad31d6a139d249332a2605b85202e8c0b78450 # v2.12.0
+        with:
+          egress-policy: audit
+
+      - name: Checkout
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.0
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@0daab03d71ff584ef619d027a3fd9146679c5d84 # v3.30.10
+        with:
+          languages: ${{ matrix.language }}
+          build-mode: ${{ inputs.build-mode }}
+          queries: ${{ inputs.queries }}
+
+      - name: Perform CodeQL Analysis
+        uses: github/codeql-action/analyze@0daab03d71ff584ef619d027a3fd9146679c5d84 # v3.30.10
+        with:
+          category: "/language:${{ matrix.language }}"

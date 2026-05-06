@@ -1,0 +1,58 @@
+name: Pin Check
+
+# Enforces SHA-pinning on every workflow file in this repo. The reusable
+# workflows here are consumed by every other repo in the org, so they MUST
+# be SHA-pinned themselves — `@main` would let an attacker who compromised
+# this repo silently swap out the action.
+
+on:
+  push:
+    branches: [main]
+    paths: ['.github/workflows/**']
+  pull_request:
+    branches: [main]
+    paths: ['.github/workflows/**']
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    name: All actions SHA-pinned
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Harden runner
+        uses: step-security/harden-runner@a5ad31d6a139d249332a2605b85202e8c0b78450 # v2.12.0
+        with:
+          egress-policy: audit
+
+      - name: Checkout
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.0
+
+      - name: Verify SHA-pins
+        shell: bash
+        run: |
+          set -euo pipefail
+          WORKFLOW_DIR=".github/workflows"
+          VIOLATIONS=$(mktemp)
+          for file in "$WORKFLOW_DIR"/*.yml "$WORKFLOW_DIR"/*.yaml; do
+            [ -f "$file" ] || continue
+            while IFS= read -r line; do
+              ref=$(echo "$line" | sed -n 's/.*uses:[[:space:]]*\([^[:space:]#]*\).*/\1/p')
+              [ -z "$ref" ] && continue
+              [[ "$ref" == ./* ]] && continue
+              # Reusable workflows live in this org and may use @main — allow that
+              [[ "$ref" == szl-holdings/* ]] && continue
+              after_at="${ref##*@}"
+              if ! echo "$after_at" | grep -qE '^[0-9a-f]{40}$'; then
+                echo "::error file=$file::Unpinned action — $ref" | tee -a "$VIOLATIONS"
+              fi
+            done < <(grep -E '^\s*(-\s+)?uses:\s+\S' "$file" | grep -v '^\s*#')
+          done
+          if [ -s "$VIOLATIONS" ]; then
+            echo ""
+            echo "Pin every action to a 40-char SHA. Add '# v1.2.3' as a trailing comment."
+            exit 1
+          fi
+          echo "✓ All action refs are SHA-pinned."

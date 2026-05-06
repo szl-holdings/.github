@@ -1,0 +1,43 @@
+name: Reusable — Dependency Review
+
+# Blocks PRs that introduce vulnerable dependencies or non-permissive licenses.
+# Runs only on pull_request events.
+
+on:
+  workflow_call:
+    inputs:
+      fail-on-severity:
+        description: 'Lowest severity that fails the job (low, moderate, high, critical)'
+        required: false
+        type: string
+        default: 'high'
+      allow-licenses:
+        description: 'Comma-separated SPDX license identifiers allowed in dependencies'
+        required: false
+        type: string
+        default: 'Apache-2.0, MIT, BSD-2-Clause, BSD-3-Clause, ISC, CC0-1.0, Unlicense, 0BSD, MPL-2.0, CC-BY-4.0, BlueOak-1.0.0, Python-2.0, Zlib'
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  review:
+    name: Dependency Review
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Harden runner
+        uses: step-security/harden-runner@a5ad31d6a139d249332a2605b85202e8c0b78450 # v2.12.0
+        with:
+          egress-policy: audit
+
+      - name: Checkout
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.0
+
+      - name: Dependency Review
+        uses: actions/dependency-review-action@2031cfc080254a8a887f58cffee85186f0e49e48 # v4.9.0
+        with:
+          fail-on-severity: ${{ inputs.fail-on-severity }}
+          allow-licenses: ${{ inputs.allow-licenses }}
+          comment-summary-in-pr: on-failure

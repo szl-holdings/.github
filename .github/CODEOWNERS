@@ -1,0 +1,7 @@
+# Default code owner for all paths in repos that inherit from szl-holdings/.github.
+# Per-repo CODEOWNERS files override these defaults.
+
+* @stephenlutar2-hash
+
+# Reusable workflows: any change here propagates to every repo in the org.
+/.github/workflows/ @stephenlutar2-hash
