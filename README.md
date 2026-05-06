@@ -4,9 +4,9 @@
 
   [![Ouroboros tests](https://img.shields.io/badge/runtime%20tests-172%2F172-2da44e?style=flat-square)](https://github.com/szl-holdings/ouroboros)
   [![Runtime](https://img.shields.io/badge/ouroboros-v6.2.0-2b6cb0?style=flat-square)](https://github.com/szl-holdings/ouroboros/releases/tag/v6.2.0)
-  [![DOI v3](https://img.shields.io/badge/DOI%20v3-10.5281%2Fzenodo.19983066-1f78b4?style=flat-square)](https://doi.org/10.5281/zenodo.19983066)
+  [![DOI concept](https://img.shields.io/badge/DOI-10.5281%2Fzenodo.19944926-1f78b4?style=flat-square)](https://doi.org/10.5281/zenodo.19944926)
   [![Innovations](https://img.shields.io/badge/sovereign%20innovations-34-e6522c?style=flat-square)](https://github.com/szl-holdings/szl-holdings-platform)
-  [![Papers](https://img.shields.io/badge/papers-v1--v11-805ad5?style=flat-square)](https://github.com/szl-holdings/ouroboros-thesis)
+  [![Papers](https://img.shields.io/badge/papers-v1--v10-805ad5?style=flat-square)](https://github.com/szl-holdings/ouroboros-thesis)
   [![Endpoints](https://img.shields.io/badge/API%20endpoints-48%20tested-2da44e?style=flat-square)](https://github.com/szl-holdings/szl-holdings-platform)
 
   ---
@@ -19,7 +19,7 @@
   |---|---|---|
   | [**szl-holdings-platform**](https://github.com/szl-holdings/szl-holdings-platform) | TypeScript monorepo: 34 sovereign innovations, 48 API endpoints, 7 domain surfaces | Active development |
   | [**ouroboros**](https://github.com/szl-holdings/ouroboros) | Bounded-loop runtime implementing the Lutar Invariant | v6.2.0, 172/172 tests |
-  | [**ouroboros-thesis**](https://github.com/szl-holdings/ouroboros-thesis) | 11 published papers (v1--v11) with Zenodo DOIs | v3 current, v4--v11 consolidated |
+  | [**ouroboros-thesis**](https://github.com/szl-holdings/ouroboros-thesis) | 10 published papers (v1--v10) with Zenodo DOIs | All 10 versions minted, concept DOI active |
 
   ### Product surfaces
 
@@ -33,15 +33,15 @@
   | [**Vessels**](https://github.com/szl-holdings/vessels) | Maritime fleet intelligence | Sanctions, dark-vessel detection |
   | [**Carlota Jo**](https://github.com/szl-holdings/carlota-jo) | UHNW advisory operations | Proof-chain delivery |
 
-  ### Key numbers (verified 2026-05-04)
+  ### Key numbers (verified 2026-05-06)
 
   | Metric | Value |
   |---|---|
   | Sovereign innovations | 34 (operational, API-served) |
   | API endpoints tested | 48/48 passing |
   | Runtime tests | 172/172 passing |
-  | Published papers | 11 (v1--v11) |
-  | Zenodo DOIs | 3 assigned (v1, v2, v3) |
+  | Published papers | 10 (v1--v10) |
+  | Zenodo DOIs | 10 minted (v1–v10) + concept DOI |
   | Domain verticals | 7 integrated products |
   | Tech stack | TypeScript 5.9, React 19, Vite, Node.js, PostgreSQL |
 
@@ -66,5 +66,4 @@
 
   ---
 
-  (c) 2026 SZL Holdings. Runtime proprietary; thesis text under CC BY 4.0.
-  
+  (c) 2026 SZL Holdings. Runtime Apache-2.0; platform BUSL-1.1 (converts to Apache-2.0 on 2030-05-06); thesis text under CC BY 4.0.
