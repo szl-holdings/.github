@@ -1,194 +1,54 @@
-<p align="center">
-    <img src="https://raw.githubusercontent.com/szl-holdings/.github/main/profile/assets/hero.svg" alt="SZL Holdings" width="720" />
-  </p>
+# SZL Holdings
 
-  <p align="center">
-    <strong>Governed AI decision infrastructure for regulated enterprises.</strong><br/>
-    Signal detection → AI recommendation → human approval → cryptographic proof.
-  </p>
+  > Sovereign decision intelligence. Bounded recursion as a system primitive.
 
-  <p align="center">
-    <a href="https://szlholdings.com">Website</a> · <a href="https://github.com/szl-holdings/szl-holdings-platform">Platform Repo</a> · <a href="mailto:inquiries@szlholdings.com">Contact</a>
-  </p>
+  [![Ouroboros Thesis](https://img.shields.io/badge/research-Ouroboros%20Thesis%20v10-1f78b4?style=flat-square)](https://github.com/szl-holdings/ouroboros-thesis)
+  [![Runtime tests](https://img.shields.io/badge/runtime%20tests-172%2F172-2da44e?style=flat-square)](https://github.com/szl-holdings/ouroboros)
+  [![ORCID](https://img.shields.io/badge/ORCID-0009--0001--0110--4173-a6ce39?style=flat-square&logo=orcid&logoColor=white)](https://orcid.org/0009-0001-0110-4173)
+  [![License — research](https://img.shields.io/badge/research%20license-CC%20BY%204.0-blue?style=flat-square)](https://github.com/szl-holdings/ouroboros-thesis/blob/main/LICENSE)
+
+  SZL Holdings builds **A11oy** and a portfolio of vertical operator surfaces (Sentra, Amaru, Vessels, Terra, Counsel, Carlota Jo) on top of a single research foundation: the **Ouroboros Thesis** — bounded loops with measurable convergence and machine-verifiable audit closure as a first-class primitive for auditable AI.
 
   ---
 
-  ## The Platform
+  ## Products
 
-  SZL Holdings builds the governed execution layer between enterprise data and enterprise decisions. Every AI recommendation carries source citations and confidence scores. Every consequential action requires human approval. Every outcome produces a cryptographic proof record.
+  | Product | Domain | Repo |
+  |---|---|---|
+  | **A11oy** | Brand orchestration & governed intelligence | [`a11oy`](https://github.com/szl-holdings/a11oy) |
+  | **Sentra** | Cyber resilience command | [`sentra`](https://github.com/szl-holdings/sentra) |
+  | **Amaru** | Andean ouroboros — data convergence runtime | [`amaru`](https://github.com/szl-holdings/amaru) |
+  | **Vessels** | Maritime intelligence | [`vessels`](https://github.com/szl-holdings/vessels) |
+  | **Terra** | Real estate intelligence | [`terra`](https://github.com/szl-holdings/terra) |
+  | **Counsel** | Legal matter command | [`counsel`](https://github.com/szl-holdings/counsel) |
+  | **Carlota Jo** | Consulting practice | [`carlota-jo`](https://github.com/szl-holdings/carlota-jo) |
 
-  One platform. Seven domain packs. Full audit trail.
-
-  ---
-
-  ## Domain Packs
-
-  <table>
-  <tr>
-  <td width="50%">
-
-  ### A11oy — Orchestration Layer
-  The governed agentic OS. Perceives business events, reasons across domains, executes workflows, and seals proof records. Every action policy-gated.
-
-  <a href="https://github.com/szl-holdings/a11oy">Repository →</a>
-
-  </td>
-  <td width="50%">
-
-  <img src="https://raw.githubusercontent.com/szl-holdings/.github/main/profile/screenshots/a11oy.jpg" alt="A11oy — Governed Intelligence" width="100%" />
-
-  </td>
-  </tr>
-  </table>
-
-  <table>
-  <tr>
-  <td width="50%">
-
-  <img src="https://raw.githubusercontent.com/szl-holdings/.github/main/profile/screenshots/sentra.jpg" alt="Sentra — Cyber Resilience" width="100%" />
-
-  </td>
-  <td width="50%">
-
-  ### Sentra — Cyber Resilience
-  SOC operations, threat intelligence, compliance, and incident response in a single command surface — 80+ modules powered by A11oy.
-
-  <a href="https://github.com/szl-holdings/sentra">Repository →</a>
-
-  </td>
-  </tr>
-  </table>
-
-  <table>
-  <tr>
-  <td width="50%">
-
-  ### Counsel — Legal Matter Command
-  Matters, obligations, and legal exposure turned into command. See exposure across every matter, obligations that depend on each other, and the next decision due this week.
-
-  <a href="https://github.com/szl-holdings/counsel">Repository →</a>
-
-  </td>
-  <td width="50%">
-
-  <img src="https://raw.githubusercontent.com/szl-holdings/.github/main/profile/screenshots/counsel.jpg" alt="Counsel — Legal Matter Command" width="100%" />
-
-  </td>
-  </tr>
-  </table>
-
-  <table>
-  <tr>
-  <td width="50%">
-
-  <img src="https://raw.githubusercontent.com/szl-holdings/.github/main/profile/screenshots/terra.jpg" alt="Terra — Real Estate Intelligence" width="100%" />
-
-  </td>
-  <td width="50%">
-
-  ### Terra — Real Estate Intelligence
-  The intelligence surface for serious real estate. Distressed property discovery, ownership analysis, pipeline management, and deal execution. NYC and NYS live.
-
-  <a href="https://github.com/szl-holdings/terra">Repository →</a>
-
-  </td>
-  </tr>
-  </table>
-
-  <table>
-  <tr>
-  <td width="50%">
-
-  ### Vessels — Maritime Intelligence
-  Fleet operations decided faster. Positions, voyage economics, compliance, and exception management — one command platform for maritime operators.
-
-  <a href="https://github.com/szl-holdings/vessels">Repository →</a>
-
-  </td>
-  <td width="50%">
-
-  <img src="https://raw.githubusercontent.com/szl-holdings/.github/main/profile/screenshots/vessels.jpg" alt="Vessels — Maritime Intelligence" width="100%" />
-
-  </td>
-  </tr>
-  </table>
-
-  <table>
-  <tr>
-  <td width="50%">
-
-  <img src="https://raw.githubusercontent.com/szl-holdings/.github/main/profile/screenshots/amaru.jpg" alt="Amaru — Data Sync Engine" width="100%" />
-
-  </td>
-  <td width="50%">
-
-  ### Amaru — Data Sync Engine
-  Convergent multi-source data sync. Append-only delta logs, hash-verified ingest, and bounded loops with measurable convergence. The data backbone.
-
-  <a href="https://github.com/szl-holdings/amaru">Repository →</a>
-
-  </td>
-  </tr>
-  </table>
-
-  <table>
-  <tr>
-  <td width="50%">
-
-  ### Carlota Jo — Private Advisory
-  Concierge advisory for individuals who demand precision, discretion, and a trusted presence across every dimension of their private life.
-
-  <a href="https://github.com/szl-holdings/carlota-jo">Repository →</a>
-
-  </td>
-  <td width="50%">
-
-  <img src="https://raw.githubusercontent.com/szl-holdings/.github/main/profile/screenshots/carlota-jo.jpg" alt="Carlota Jo — Private Advisory" width="100%" />
-
-  </td>
-  </tr>
-  </table>
+  All products run on the [`szl-holdings-platform`](https://github.com/szl-holdings/szl-holdings-platform) monorepo with the [`ouroboros`](https://github.com/szl-holdings/ouroboros) runtime.
 
   ---
 
-  ## Architecture
+  ## Research foundation — Ouroboros Thesis chain
 
-  ```
-  ┌─────────────────────────────────────────────────────────┐
-  │                    Enterprise Data                       │
-  ├──────────┬──────────┬──────────┬──────────┬─────────────┤
-  │  Sense   │ Structure│ Correlate│ Explain  │  Recommend  │
-  ├──────────┴──────────┴──────────┴──────────┴─────────────┤
-  │              A11oy Orchestration Layer                   │
-  ├──────────┬──────────┬──────────┬──────────┬─────────────┤
-  │  Approve │ Execute  │  Verify  │  Prove   │   Record    │
-  ├──────────┴──────────┴──────────┴──────────┴─────────────┤
-  │                   Proof Chain (Immutable)                │
-  └─────────────────────────────────────────────────────────┘
-  ```
+  Ten canonical papers, full DOI lineage, every formula bound to operational TypeScript code.
 
-  Every signal passes through seven layers before reaching production. No AI recommendation executes without human approval. No outcome exists without a cryptographic proof record.
-
-  ---
-
-  ## Tech Stack
-
-  **TypeScript** · **React** · **Vite** · **Express** · **PostgreSQL** · **Drizzle ORM** · **pnpm monorepo**
+  | Version | Title | DOI |
+  |---|---|---|
+  | v10 | EXHAUSTIVE-AUDIT — Audit Closure Operator Λ₁₀ | _Pending mint_ |
+  | v9 | UNIFIED-OPERATIONAL — Lutar Family v1 → v7 + Ω with Bianchi closure | _Pending mint_ |
+  | v8 | Free-Energy Active Inference + Predictive Coding + Cognitive Maps | [`10.5281/zenodo.20020849`](https://doi.org/10.5281/zenodo.20020849) |
+  | v7 | Sefirot Memory + Hopfield Associative Retrieval | [`10.5281/zenodo.20020848`](https://doi.org/10.5281/zenodo.20020848) |
+  | v6 | Hermetic Safety + Chinchilla-Lutar Scaling + Bifurcation | [`10.5281/zenodo.20020845`](https://doi.org/10.5281/zenodo.20020845) |
+  | v5 | Prisca-GraphRAG + Tawa SAE Interpretability | [`10.5281/zenodo.20020846`](https://doi.org/10.5281/zenodo.20020846) |
+  | v4 | Omega Formalism + EPR-Bell + Sacred Geometry | [`10.5281/zenodo.20020841`](https://doi.org/10.5281/zenodo.20020841) |
+  | v3 | The Lutar Invariant — axiomatic trust aggregator | [`10.5281/zenodo.19983066`](https://doi.org/10.5281/zenodo.19983066) |
+  | v2 | Empirical companion — A11oy / Sentra / Amaru case studies | [`10.5281/zenodo.19934129`](https://doi.org/10.5281/zenodo.19934129) |
+  | v1 | Position paper — bounded looped computation | [`10.5281/zenodo.19867281`](https://doi.org/10.5281/zenodo.19867281) |
 
   ---
 
-  ## Research
+  ## Contact
 
-  The platform is built on the [Ouroboros Thesis](https://github.com/szl-holdings/ouroboros-thesis) — bounded loops with measurable convergence as a first-class system primitive. 11 papers with Zenodo DOIs. 172/172 runtime tests passing.
+  **Stephen P. Lutar Jr.** — Principal · SZL Holdings · [ORCID 0009-0001-0110-4173](https://orcid.org/0009-0001-0110-4173)
 
-  ---
-
-  <p align="center">
-    <strong>SZL Holdings</strong> · New York, NY<br/>
-    <a href="https://szlholdings.com">szlholdings.com</a> · <a href="mailto:inquiries@szlholdings.com">inquiries@szlholdings.com</a> · <a href="https://x.com/szlholdings">@szlholdings</a>
-  </p>
-
-  <p align="center">
-    <sub>© 2024–2026 SZL Holdings. All rights reserved.</sub>
-  </p>
+  © 2026 SZL Holdings.
   
