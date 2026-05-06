@@ -12,17 +12,22 @@ on:
         type: boolean
         default: true
 
-permissions:
-  contents: read
-  security-events: write
-  id-token: write
-  actions: read
+# Workflow-level permissions intentionally minimal (read-only).
+# OSSF Scorecard requires the elevated permissions to be declared
+# only at the JOB level — not at the workflow level — to avoid
+# triggering the "global perm is set to write" verification failure.
+permissions: read-all
 
 jobs:
   analysis:
     name: Scorecard analysis
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    permissions:
+      contents: read
+      security-events: write
+      id-token: write
+      actions: read
     steps:
       - name: Harden runner
         uses: step-security/harden-runner@a5ad31d6a139d249332a2605b85202e8c0b78450 # v2.12.0
