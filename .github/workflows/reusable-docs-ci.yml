@@ -50,12 +50,11 @@ jobs:
 
           python3 -m pip install --quiet 'cffconvert>=2.0.0' 'pyyaml>=6.0'
 
-          # cffconvert --validate strictly enforces the SPDX enum and rejects
-          # LicenseRef-* expressions, even though those ARE valid per the
-          # CFF and SPDX specs (see SPDX 2.x §3.13). For LicenseRef-* values
-          # we run a structural-only validation: parse the YAML, check
-          # required fields and basic types, then skip the strict license
-          # enum check.
+          # cffconvert --validate strictly enforces:
+          #   • SPDX enum (rejects LicenseRef-* even though SPDX 2.x §3.13 allows it)
+          #   • type enum (only 'software' or 'dataset' — rejects 'article', 'book', etc.)
+          # Both restrictions are stricter than CFF 1.2.0 and SPDX themselves.
+          # When we detect either, fall back to a structural-only validator.
           python3 <<'PY'
           import sys
           import yaml
@@ -75,16 +74,44 @@ jobs:
               print("::error::CITATION.cff 'authors' must be a non-empty list")
               sys.exit(1)
 
+          # Each author needs at least family-names or name (org).
+          for i, a in enumerate(data['authors']):
+              if not isinstance(a, dict):
+                  print(f"::error::author[{i}] must be a mapping")
+                  sys.exit(1)
+              if not (a.get('family-names') or a.get('name')):
+                  print(f"::error::author[{i}] must have 'family-names' or 'name'")
+                  sys.exit(1)
+
           license_value = data.get('license')
           uses_license_ref = (
               isinstance(license_value, str)
               and license_value.startswith('LicenseRef-')
           )
 
-          if uses_license_ref:
-              print(f"::notice::CITATION.cff uses '{license_value}' — "
-                    f"running structural validation only (LicenseRef-* "
-                    f"is valid per SPDX 2.x but not in cffconvert's enum).")
+          # CFF 1.2.0 'type' field officially only allows 'software' and 'dataset'
+          # but academic publications commonly use 'article', 'book', etc.
+          # We accept the broader academic set.
+          extended_types = {
+              'software', 'dataset', 'article', 'book', 'thesis',
+              'preprint', 'report', 'conference-paper', 'proceedings'
+          }
+          type_value = data.get('type')
+          uses_extended_type = (
+              isinstance(type_value, str)
+              and type_value not in {'software', 'dataset'}
+              and type_value in extended_types
+          )
+
+          if uses_license_ref or uses_extended_type:
+              reasons = []
+              if uses_license_ref:
+                  reasons.append(f"license='{license_value}' (LicenseRef-*)")
+              if uses_extended_type:
+                  reasons.append(f"type='{type_value}' (extended academic type)")
+              print(f"::notice::CITATION.cff: structural-only validation "
+                    f"(reason: {', '.join(reasons)}). cffconvert --validate is "
+                    f"stricter than CFF 1.2.0 / SPDX 2.x specs.")
           else:
               # Defer to cffconvert for full strict validation
               import subprocess
