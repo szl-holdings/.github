@@ -17,7 +17,10 @@ on:
         type: boolean
         default: true
 
-permissions: read-all
+# Workflow-level permissions deliberately omitted: GitHub clamps job-level
+# permissions to the workflow ceiling, and the analysis job below needs
+# 'security-events: write' and 'id-token: write'. Setting 'read-all' here
+# produces a startup_failure for every caller.
 
 jobs:
   analysis:
