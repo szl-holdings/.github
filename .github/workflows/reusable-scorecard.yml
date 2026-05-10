@@ -2,6 +2,11 @@ name: Reusable — OSSF Scorecard
 
 # Runs the OpenSSF Scorecard against the repo and uploads results to the
 # Security tab. Provides a public supply-chain hygiene score.
+#
+# NOTE: We deliberately do NOT include `branch_protection_rule` as a trigger
+# in caller workflows because that event runs without a checked-out commit
+# context and produces a `startup_failure` on the Scorecard analysis job.
+# Use `schedule` + `push: branches: [main]` instead.
 
 on:
   workflow_call:
@@ -12,10 +17,6 @@ on:
         type: boolean
         default: true
 
-# Workflow-level permissions intentionally minimal (read-only).
-# OSSF Scorecard requires the elevated permissions to be declared
-# only at the JOB level — not at the workflow level — to avoid
-# triggering the "global perm is set to write" verification failure.
 permissions: read-all
 
 jobs:
