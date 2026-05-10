@@ -1,0 +1,44 @@
+name: Security report (low-sensitivity only)
+description: Use ONLY for low-sensitivity hardening suggestions. Real vulnerabilities must use the private disclosure path.
+title: "security: "
+labels: ["security", "triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        > **Stop.** If this report contains exploitable details, do not file
+        > a public issue.
+        >
+        > Use one of these private channels instead:
+        > - GitHub Private Vulnerability Reporting on the affected repo
+        > - Email `security@szlholdings.com` (see `SECURITY.md`)
+        > - Web form at <https://szlholdings.com/.well-known/security.txt>
+        >
+        > Use this template only for non-exploitable hardening suggestions
+        > (e.g. "consider pinning this action by SHA", "add Scorecard badge").
+  - type: dropdown
+    id: confirm_public
+    attributes:
+      label: I confirm this report is safe to be public
+      options:
+        - "Yes — no exploitable details"
+        - "No — I should use the private channel"
+    validations:
+      required: true
+  - type: textarea
+    id: suggestion
+    attributes:
+      label: Hardening suggestion
+      description: A concise description of the improvement.
+    validations:
+      required: true
+  - type: textarea
+    id: reference
+    attributes:
+      label: Reference (OpenSSF, CIS, NIST, etc.)
+      description: Link to the standard or guidance this is based on.
+  - type: input
+    id: repo
+    attributes:
+      label: Affected repository (optional)
+      placeholder: "szl-holdings/ouroboros"
