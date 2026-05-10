@@ -1,0 +1,48 @@
+name: Reusable — Gitleaks
+
+# Secondary secret-detection layer in CI. GitHub's native push-protection
+# blocks pushes containing known patterns; gitleaks catches everything else
+# (entropy-based, custom org patterns, historical commits on PR branches).
+
+on:
+  workflow_call:
+    inputs:
+      fail-on-leak:
+        description: 'Fail the build if any leak is found (default true).'
+        required: false
+        type: boolean
+        default: true
+      config-path:
+        description: 'Path to .gitleaks.toml in the caller repo (optional).'
+        required: false
+        type: string
+        default: ''
+
+permissions:
+  contents: read
+
+jobs:
+  gitleaks:
+    name: gitleaks scan
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - name: Harden runner
+        uses: step-security/harden-runner@a5ad31d6a139d249332a2605b85202e8c0b78450 # v2.19.1
+        with:
+          egress-policy: audit
+
+      - name: Checkout (full history)
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          # Gitleaks needs depth>1 to scan PR commits. fetch-depth=0 gets all.
+          fetch-depth: 0
+
+      - name: Run gitleaks
+        uses: gitleaks/gitleaks-action@ff98106e4c7b2bc287b24eaf42907196329070c7 # v2.3.9
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          GITLEAKS_ENABLE_UPLOAD_ARTIFACT: true
+          GITLEAKS_ENABLE_SUMMARY: true
+          GITLEAKS_CONFIG: ${{ inputs.config-path }}
+        continue-on-error: ${{ !inputs.fail-on-leak }}
