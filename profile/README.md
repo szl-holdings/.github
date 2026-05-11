@@ -142,6 +142,6 @@ Ten canonical papers, full DOI lineage, every formula bound to operational TypeS
 ## Contact
 
 **Stephen P. Lutar Jr.** — Principal · SZL Holdings
-[ORCID `0009-0001-0110-4173`](https://orcid.org/0009-0001-0110-4173) · [`inquiries@szlholdings.com`](mailto:inquiries@szlholdings.com) · [`szlholdings.com`](https://szlholdings.com) · [`@szlholdings`](https://twitter.com/szlholdings)
+[ORCID `0009-0001-0110-4173`](https://orcid.org/0009-0001-0110-4173) · [`stephen@szlholdings.com`](mailto:stephen@szlholdings.com) · [`szlholdings.com`](https://szlholdings.com) · [`@szlholdings`](https://twitter.com/szlholdings)
 
 <sub>© 2026 SZL Holdings. Runtime Apache-2.0 · Platform BUSL-1.1 (converts to Apache-2.0 on 2030-05-06) · Thesis text CC BY 4.0.</sub>
