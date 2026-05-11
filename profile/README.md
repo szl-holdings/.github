@@ -16,7 +16,6 @@
 <p>
   <a href="https://securityscorecards.dev/viewer/?uri=github.com/szl-holdings/ouroboros"><img alt="OpenSSF Scorecard — ouroboros" src="https://api.securityscorecards.dev/projects/github.com/szl-holdings/ouroboros/badge"></a>
   <a href="https://securityscorecards.dev/viewer/?uri=github.com/szl-holdings/ouroboros-thesis"><img alt="OpenSSF Scorecard — thesis" src="https://api.securityscorecards.dev/projects/github.com/szl-holdings/ouroboros-thesis/badge"></a>
-  <a href="https://securityscorecards.dev/viewer/?uri=github.com/szl-holdings/.github"><img alt="OpenSSF Scorecard — .github" src="https://api.securityscorecards.dev/projects/github.com/szl-holdings/.github/badge"></a>
   <a href="https://github.com/szl-holdings/.github/security/policy"><img alt="Security policy" src="https://img.shields.io/badge/security-policy-01696F?style=flat-square&logo=github&logoColor=white"></a>
 </p>
 
