@@ -11,10 +11,10 @@
 
 <br/>
 
-[![Research — Ouroboros Thesis](https://img.shields.io/badge/research-Ouroboros%20Thesis-1F78B4?style=for-the-badge&logo=readthedocs&logoColor=white)](https://github.com/szl-holdings/ouroboros-thesis)
-[![Runtime — 172/172 tests](https://img.shields.io/badge/runtime-172%2F172%20tests-2DA44E?style=for-the-badge&logo=jest&logoColor=white)](https://github.com/szl-holdings/ouroboros)
-[![SDK — @szl-holdings/sdk](https://img.shields.io/badge/SDK-%40szl--holdings%2Fsdk-01696F?style=for-the-badge&logo=npm&logoColor=white)](https://github.com/szl-holdings/szl-sdk)
-[![Trust Center](https://img.shields.io/badge/trust-center-C8B26A?style=for-the-badge&logo=letsencrypt&logoColor=white)](https://github.com/szl-holdings/trust)
+[![Research — Ouroboros Thesis](https://img.shields.io/badge/research-Ouroboros%20Thesis%20v1%E2%86%92v11%20%C2%B7%20v12%20in%20review-1F78B4?style=for-the-badge&logo=readthedocs&logoColor=white)](https://github.com/szl-holdings/ouroboros-thesis)
+[![Runtime — 218/218 tests](https://img.shields.io/badge/runtime-218%2F218%20tests-2DA44E?style=for-the-badge&logo=jest&logoColor=white)](https://github.com/szl-holdings/ouroboros)
+[![Lean kernel](https://img.shields.io/badge/Lean%204-kernel--verified-2D5BB9?style=for-the-badge&logo=lean&logoColor=white)](https://github.com/szl-holdings/lutar-lean)
+[![Trust Portal](https://img.shields.io/badge/trust-portal-C8B26A?style=for-the-badge&logo=letsencrypt&logoColor=white)](https://github.com/szl-holdings/szl-trust)
 
 [![ORCID](https://img.shields.io/badge/ORCID-0009--0001--0110--4173-A6CE39?style=flat-square&logo=orcid&logoColor=white)](https://orcid.org/0009-0001-0110-4173)
 [![Concept DOI](https://img.shields.io/badge/DOI-10.5281%2Fzenodo.19944926-01696F?style=flat-square&logo=doi&logoColor=white)](https://doi.org/10.5281/zenodo.19944926)
@@ -47,10 +47,10 @@ flowchart TD
     classDef surface  fill:#F7F6F2,stroke:#01696F,color:#1B474D,stroke-width:1.5px;
 
     T["📄 Ouroboros Thesis<br/>preprints · Zenodo DOIs · CC BY 4.0"]:::research
-    R["⚙️ Ouroboros Runtime v6.2.0<br/>bounded loops · 172/172 tests · Apache-2.0"]:::runtime
+    R["⚙️ Ouroboros Runtime v6.2.0<br/>bounded loops · 218/218 tests · Apache-2.0"]:::runtime
     L["Λ Audit-Closure Operator<br/>sub-millisecond per-request overhead"]:::runtime
-    SDK["📦 @szl-holdings/sdk<br/>public TypeScript SDK · Apache-2.0"]:::sdk
-    P["🏛️ Platform<br/>governed AI decision infrastructure · BSL-1.1"]:::platform
+    K["△ Lutar-Lean<br/>Lean 4 + Mathlib kernel-verified proofs"]:::sdk
+    P["🏛️ Platform<br/>1,220 tests · 76 packages · BSL-1.1"]:::platform
 
     A["A11oy<br/>orchestration + decision intelligence<br/>+ Trust Plane"]:::surface
     AM["Amaru<br/>convergent data sync"]:::surface
@@ -59,10 +59,9 @@ flowchart TD
     V["Vessels<br/>maritime intel"]:::surface
     TE["Terra<br/>real estate intel"]:::surface
     C["Counsel<br/>legal matter command"]:::surface
-    RO["ROSIE<br/>unified decision fabric"]:::surface
 
     T --> R --> L --> P
-    SDK -.public surface.-> P
+    K -.kernel referee.-> L
     P --> A
     A --> AM
     A --> S
@@ -70,7 +69,6 @@ flowchart TD
     A --> V
     A --> TE
     A --> C
-    A --> RO
 ```
 
 ## Open source pillars
@@ -78,19 +76,19 @@ flowchart TD
 | Pillar | Repo | License | What it is |
 |---|---|---|---|
 | 📄 **Research** | [`ouroboros-thesis`](https://github.com/szl-holdings/ouroboros-thesis) | CC BY 4.0 | The thesis. Bounded recursive computation as a system primitive. Zenodo DOIs. |
-| ⚙️ **Runtime** | [`ouroboros`](https://github.com/szl-holdings/ouroboros) | Apache-2.0 | Reference TypeScript implementation. 172/172 tests passing. Audit-closure operator Λ. |
-| 📦 **SDK** | [`szl-sdk`](https://github.com/szl-holdings/szl-sdk) | Apache-2.0 | Public TypeScript SDK. `npm install @szl-holdings/sdk` to integrate with the platform. |
-| 🛡️ **Trust** | [`trust`](https://github.com/szl-holdings/trust) | CC BY 4.0 | Public Trust Center. Security disclosures, sub-processors, SOC 2 roadmap, DPA template. |
-| 📝 **Engineering** | [`engineering`](https://github.com/szl-holdings/engineering) | CC BY 4.0 | Technical posts on Λ, proof-chain, bounded recursion, governed AI architecture. |
+| ⚙️ **Runtime** | [`ouroboros`](https://github.com/szl-holdings/ouroboros) | Apache-2.0 | Reference TypeScript implementation. **218/218 tests** passing (verified 2026-05-12). Audit-closure operator Λ. |
+| △ **Proofs** | [`lutar-lean`](https://github.com/szl-holdings/lutar-lean) | Apache-2.0 | Lean 4 + Mathlib machine-checked proofs of the Λ uniqueness theorem and the Egyptian-exactness lemma. The kernel is the referee. |
+| 🛡️ **Trust portal** | [`szl-trust`](https://github.com/szl-holdings/szl-trust) | CC BY 4.0 | Public Trust Portal. Covenant Proof Standard (CPS) reference run with 12 receipts (`mocked:false`), deterministic replay. |
+| 📖 **Cookbook** | [`szl-cookbook`](https://github.com/szl-holdings/szl-cookbook) | Apache-2.0 | 9 engineering skills (Anthropic SKILL.md pattern) covering pre-flight thinking, refactoring, review, debugging. |
+| 🎨 **Brand** | [`szl-brand`](https://github.com/szl-holdings/szl-brand) | CC BY 4.0 | 14 social preview images, brand guidance, deterministic banner builder. |
 
 ## Product surfaces
 
-Eight customer-facing surfaces, orchestrated by the A11oy decision-intelligence + Trust Plane.
+Seven customer-facing surfaces, orchestrated by the A11oy decision-intelligence + Trust Plane. Each surface has its own README with mechanism-level cross-references.
 
 | Surface | Repo | Domain |
 |---|---|---|
 | **A11oy** | [`a11oy`](https://github.com/szl-holdings/a11oy) | Orchestration + Decision Intelligence + Trust Plane. Hosts **Argo** (champion policies, mirror eval, counterfactuals, reward-hacking guardrails), **PSYCHE** (emergent-sentience observatory), **Trust Center / Exchange / Public Trust Portal**, **Agent Zero Trust** runtime gate, and a Claude-Sonnet-4.6-backed advisory chat at `/a11oy/chat`. |
-| **ROSIE** | [`rosie`](https://github.com/szl-holdings/rosie) | Unified Decision Fabric. Six operator pages — Identity · Optimizer · Fabric · Research · Proof · Evidence Bench. The operator surface for **CPS** payloads. |
 | **Sentra** | [`sentra`](https://github.com/szl-holdings/sentra) | Cyber resilience. Posture drift, incident response, policy-gated remediation. Ships a **governed adversary loop** emitting a six-step proof chain through A11oy. |
 | **Amaru** | [`amaru`](https://github.com/szl-holdings/amaru) | Convergent multi-source data sync. Append-only delta logs, hash-verified ingest, three-witness reconciliation (Frustum). |
 | **Carlota Jo** | [`carlota-jo`](https://github.com/szl-holdings/carlota-jo) | UHNW advisory operations. Concierge workflow with proof-chain delivery. |
@@ -120,9 +118,9 @@ Three flagship payloads ship with the standard — covering the cross-domain sha
 
 ## How to engage
 
-- **Builders / integrators** → start with the [SDK](https://github.com/szl-holdings/szl-sdk) and the [runtime](https://github.com/szl-holdings/ouroboros).
-- **Researchers** → read the [thesis preprints](https://github.com/szl-holdings/ouroboros-thesis), cite via Zenodo DOI.
-- **Security / procurement** → see the [Trust Center](https://github.com/szl-holdings/trust) and our [Security Policy](https://github.com/szl-holdings/.github/security/policy).
+- **Builders / integrators** → start with the [runtime](https://github.com/szl-holdings/ouroboros) and the [Lean proofs](https://github.com/szl-holdings/lutar-lean).
+- **Researchers** → read the [thesis preprints](https://github.com/szl-holdings/ouroboros-thesis), cite via Zenodo DOI (concept `10.5281/zenodo.19944926`).
+- **Security / procurement** → see the [Trust Portal](https://github.com/szl-holdings/szl-trust) and our [Security Policy](https://github.com/szl-holdings/.github/security/policy).
 - **Enterprise customers** → [stephen@szlholdings.com](mailto:stephen@szlholdings.com)
 - **Press / partnerships** → [stephen@szlholdings.com](mailto:stephen@szlholdings.com)
 
@@ -145,9 +143,11 @@ Three flagship payloads ship with the standard — covering the cross-domain sha
 | DB schema files | 170 |
 | CI workflows | 23 |
 | RBAC roles | 11 |
-| Ouroboros runtime test calls | 133 (172/172 passing) |
-| Ouroboros packages | 28 |
-| Ouroboros guardrails tests | 62 passing |
+| Ouroboros runtime tests | **218 / 218 passing** (verified 2026-05-12 against szl-holdings/ouroboros `f31d749`) |
+| Platform monorepo packages | **76** |
+| Platform monorepo tests | **1,220 / 1,220 passing** (verified 2026-05-12 via full-sweep-2b) |
+| MCP gateway e2e tests | **27 / 27 passing** |
+| Lean kernel `sorry` count | tracked per CI run on [lutar-lean](https://github.com/szl-holdings/lutar-lean) |
 | Formal axes in Lutar invariant family | 9 |
 | Codex v11 nodes / typed edges | 76 / 95 across 11 domains |
 | Λ overhead | ≤ 0.59 ms median per request |
@@ -158,9 +158,12 @@ Three flagship payloads ship with the standard — covering the cross-domain sha
 
 | Version | Title | Released | DOI |
 |---|---|---|---|
-| **v3-2.0.0** | The Loop Is the Product: Measuring Bounded Recursion as a System Primitive for Auditable AI | 2026-05-02 | [`10.5281/zenodo.19944926`](https://doi.org/10.5281/zenodo.19944926) |
-| **v9-1.0.0** | The Lutar Invariant Family v1 → v7 → Ω: From Three-Term Foundation to Bianchi-Closed Fiber Bundle | 2026-05-05 | Zenodo (concept `19944926`) |
-| **v10-1.0.0** | The Audit Closure Operator Λ₁₀: Formalising the Implementation Contract of the Lutar Family | 2026-05-05 | Zenodo (concept `19944926`) |
+| **v11-1.0.0** (current) | APPLIED Λ — Measured per-request latency overhead of Λ₁₀ in a governed AI runtime | 2026-05-09 | [`10.5281/zenodo.20119582`](https://doi.org/10.5281/zenodo.20119582) |
+| **v10-1.0.0** | EXHAUSTIVE-AUDIT — The Audit Closure Operator Λ₁₀ | 2026-05-07 | [`10.5281/zenodo.20053163`](https://doi.org/10.5281/zenodo.20053163) |
+| **v9-1.0.0** | UNIFIED-OPERATIONAL — The Lutar Invariant Family v1 → v7 → Ω with Bianchi closure | 2026-05-07 | [`10.5281/zenodo.20053148`](https://doi.org/10.5281/zenodo.20053148) |
+| **v8-1.0.0** | Free-Energy Active Inference + Predictive Coding + Cognitive Maps | 2026-05-05 | [`10.5281/zenodo.20020849`](https://doi.org/10.5281/zenodo.20020849) |
+| **v3-2.0.0** | The Loop Is the Product: Measuring Bounded Recursion as a System Primitive for Auditable AI | 2026-05-02 | [`10.5281/zenodo.19983066`](https://doi.org/10.5281/zenodo.19983066) |
+| v12 (in review) | The Λ-Ouroboros Substrate — Four Machine-Verified Mechanisms | [PR #25](https://github.com/szl-holdings/ouroboros-thesis/pull/25) | concept [`10.5281/zenodo.19944926`](https://doi.org/10.5281/zenodo.19944926) |
 
 ---
 
