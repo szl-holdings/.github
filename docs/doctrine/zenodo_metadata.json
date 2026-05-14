@@ -1,0 +1,112 @@
+{
+  "metadata": {
+    "title": "SZL Doctrine v2: A Self-Enforcing Contract for Agentic Systems",
+    "description": "Doctrine v2 formalises the original six-clause verbal doctrine of Stephen P. Lutar Jr. into a machine-checkable contract binding every SZL agent (Alloy, a11oy code-agents, fabric agents, sentra, amaru). The spec defines 9 quality axes (cleanliness, horizon, resonance, frustum, gaussClosure, invariance, moralGrounding, ontologicalGrounding, measurabilityHonesty) and 6 Λ₁₀ artifact dimensions (CODE, CODEX, API, TEST, THESIS, SURFACE), each with a 0-1 rubric, measurable proxy, and Lean theorem stub. Every axis and dimension requires a score ≥ 0.9 before output is accepted. The doctrine self-enforces: agents are injected with the contract at spawn time and must include a §4 Self-Grade block in every output; PRs without this block fail CI automatically.",
+    "creators": [
+      {
+        "name": "Lutar Jr., Stephen P.",
+        "affiliation": "SZL Holdings",
+        "orcid": "0009-0001-0110-4173"
+      }
+    ],
+    "upload_type": "publication",
+    "publication_type": "technicalnote",
+    "publication_date": "2026-05-13",
+    "access_right": "open",
+    "license": "apache-2.0",
+    "version": "2.0.0",
+    "keywords": [
+      "agentic-ai",
+      "doctrine",
+      "self-grading",
+      "formal-methods",
+      "provenance",
+      "szl",
+      "agentic-systems",
+      "quality-assurance",
+      "lean4",
+      "receipt-chain"
+    ],
+    "language": "eng",
+    "notes": "This specification is the canonical version of SZL Doctrine v2. It supersedes all prior informal doctrine statements. License: Apache-2.0. ORCID of author: 0009-0001-0110-4173. Related Λ chain DOIs listed in related_identifiers.",
+    "related_identifiers": [
+      {
+        "identifier": "10.5281/zenodo.19867281",
+        "relation": "cites",
+        "scheme": "doi",
+        "resource_type": "publication"
+      },
+      {
+        "identifier": "10.5281/zenodo.19934129",
+        "relation": "cites",
+        "scheme": "doi",
+        "resource_type": "publication"
+      },
+      {
+        "identifier": "10.5281/zenodo.20020841",
+        "relation": "cites",
+        "scheme": "doi",
+        "resource_type": "publication"
+      },
+      {
+        "identifier": "10.5281/zenodo.20020846",
+        "relation": "cites",
+        "scheme": "doi",
+        "resource_type": "publication"
+      },
+      {
+        "identifier": "10.5281/zenodo.20020845",
+        "relation": "cites",
+        "scheme": "doi",
+        "resource_type": "publication"
+      },
+      {
+        "identifier": "10.5281/zenodo.20020848",
+        "relation": "cites",
+        "scheme": "doi",
+        "resource_type": "publication"
+      },
+      {
+        "identifier": "10.5281/zenodo.20020849",
+        "relation": "cites",
+        "scheme": "doi",
+        "resource_type": "publication"
+      },
+      {
+        "identifier": "10.5281/zenodo.20053148",
+        "relation": "cites",
+        "scheme": "doi",
+        "resource_type": "publication"
+      },
+      {
+        "identifier": "10.5281/zenodo.20053163",
+        "relation": "cites",
+        "scheme": "doi",
+        "resource_type": "publication"
+      },
+      {
+        "identifier": "10.5281/zenodo.20119582",
+        "relation": "cites",
+        "scheme": "doi",
+        "resource_type": "publication"
+      },
+      {
+        "identifier": "10.5281/zenodo.20162352",
+        "relation": "cites",
+        "scheme": "doi",
+        "resource_type": "publication"
+      },
+      {
+        "identifier": "https://github.com/szl-holdings/.github",
+        "relation": "isSupplementedBy",
+        "scheme": "url",
+        "resource_type": "software"
+      }
+    ],
+    "communities": [
+      {
+        "identifier": "zenodo"
+      }
+    ]
+  }
+}
