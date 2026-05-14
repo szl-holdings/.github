@@ -1,0 +1,14 @@
+DOCTRINE_V2.replay — file: /home/user/workspace/fix_squads/02_doctrine/A/DOCTRINE_V2.md
+  size : 35148 bytes
+  seeds: [42, 137, 256, 512, 1024]
+
+  seed=42      sha256=0577859b4592dba3efc2ba6ca27220611c9f8642d0f53d637f39a216d49f6ed3
+  seed=137     sha256=0577859b4592dba3efc2ba6ca27220611c9f8642d0f53d637f39a216d49f6ed3
+  seed=256     sha256=0577859b4592dba3efc2ba6ca27220611c9f8642d0f53d637f39a216d49f6ed3
+  seed=512     sha256=0577859b4592dba3efc2ba6ca27220611c9f8642d0f53d637f39a216d49f6ed3
+  seed=1024    sha256=0577859b4592dba3efc2ba6ca27220611c9f8642d0f53d637f39a216d49f6ed3
+
+  unique hash count : 1 of 5 ✅
+
+[DOCTRINE PASS] DOCTRINE_V2.md is byte-identical across all 5 reads.
+  canonical sha256: 0577859b4592dba3efc2ba6ca27220611c9f8642d0f53d637f39a216d49f6ed3
