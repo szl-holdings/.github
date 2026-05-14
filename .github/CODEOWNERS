@@ -1,7 +1,20 @@
-# Default code owner for all paths in repos that inherit from szl-holdings/.github.
-# Per-repo CODEOWNERS files override these defaults.
+# SZL Holdings — Code owners
+#
+# These owners will be requested for review when someone opens a pull request.
+# Order matters: the LAST matching pattern wins.
 
-* @stephenlutar2-hash
+# Default — all files require review by the SZL Holdings maintainer
+*       @stephenlutar2-hash
 
-# Reusable workflows: any change here propagates to every repo in the org.
-/.github/workflows/ @stephenlutar2-hash
+# CI / repo configuration
+/.github/                 @stephenlutar2-hash
+/.github/workflows/       @stephenlutar2-hash
+
+# Security-sensitive surface
+SECURITY.md               @stephenlutar2-hash
+LICENSE                   @stephenlutar2-hash
+NOTICE                    @stephenlutar2-hash
+
+# Citation / DOI metadata
+CITATION.cff              @stephenlutar2-hash
+.zenodo.json              @stephenlutar2-hash

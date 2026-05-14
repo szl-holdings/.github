@@ -1,33 +1,44 @@
 cff-version: 1.2.0
-message: "If you use the SZL Holdings reusable GitHub workflows, please cite this organization profile and the canonical thesis below. The thesis concept DOI 10.5281/zenodo.19944926 always resolves to the latest version."
-title: "szl-holdings/.github — Organization-wide reusable workflows and security policies"
+message: "If you use this software, please cite it using the metadata below."
+title: ".github — SZL Holdings organization profile, community health files, and reusable CI/CD workflows."
+abstract: >-
+  SZL Holdings organization profile, community health files, and reusable CI/CD workflows. Part of the SZL Holdings governed AI decision infrastructure,
+  built on the Ouroboros Thesis (DOI 10.5281/zenodo.19944926).
+type: software
+version: "1.0.0"
+date-released: "2026-01-01"
+license: Apache-2.0
 authors:
   - family-names: Lutar
     given-names: Stephen
-    name-particle: P.
-    affiliation: SZL Holdings
+    name-particle: "P."
+    name-suffix: "Jr."
+    affiliation: "SZL Holdings"
+    email: "stephen@szlholdings.com"
     orcid: "https://orcid.org/0009-0001-0110-4173"
-date-released: 2026-05-06
-license: Apache-2.0
-type: software
 url: "https://github.com/szl-holdings/.github"
 repository-code: "https://github.com/szl-holdings/.github"
+keywords:
+  - szl-holdings
+  - ai-governance
+  - ouroboros-thesis
 identifiers:
-  - description: "Concept DOI for the canonical Ouroboros Thesis (always resolves to the latest version)"
+  - description: "Ouroboros Thesis — research foundation (Zenodo concept DOI)"
     type: doi
     value: "10.5281/zenodo.19944926"
-keywords:
-  - reusable-workflows
-  - github-actions
-  - sha-pinning
-  - codeql
-  - scorecard
-  - trivy
-  - secret-scanning
-  - sbom
-  - supply-chain-security
-contact:
-  - family-names: Lutar
-    given-names: Stephen
-    name-particle: P.
-    email: "stephen@szlholdings.com"
+  - description: "ORCID iD of the principal author"
+    type: other
+    value: "https://orcid.org/0009-0001-0110-4173"
+preferred-citation:
+  type: software
+  title: ".github — SZL Holdings organization profile, community health files, and reusable CI/CD workflows."
+  authors:
+    - family-names: Lutar
+      given-names: Stephen
+      name-particle: "P."
+      name-suffix: "Jr."
+      affiliation: "SZL Holdings"
+      email: "stephen@szlholdings.com"
+      orcid: "https://orcid.org/0009-0001-0110-4173"
+  year: 2026
+  url: "https://github.com/szl-holdings/.github"
