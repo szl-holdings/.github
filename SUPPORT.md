@@ -24,4 +24,4 @@ This is a small private company. We aim to acknowledge issues within five busine
 
 ---
 
-© SZL Holdings. Maintained by Stephen P. Lutar Jr.
+© SZL Holdings. Maintained by Lutar, Stephen P.

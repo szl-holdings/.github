@@ -169,7 +169,7 @@ Three flagship payloads ship with the standard — covering the cross-domain sha
 
 <div align="center">
 
-**SZL Holdings, LLC** · Founded by [Stephen P. Lutar Jr.](https://orcid.org/0009-0001-0110-4173) · [szlholdings.com](https://szlholdings.com)
+**SZL Holdings, LLC** · Founded by [Lutar, Stephen P.](https://orcid.org/0009-0001-0110-4173) · [szlholdings.com](https://szlholdings.com)
 
 [![CITATION.cff](https://img.shields.io/badge/cite-CITATION.cff-blue?style=flat-square)](https://github.com/szl-holdings/ouroboros-thesis/blob/main/CITATION.cff)
 [![Software Heritage](https://archive.softwareheritage.org/badge/origin/https://github.com/szl-holdings/ouroboros-thesis/)](https://archive.softwareheritage.org/browse/origin/?origin_url=https://github.com/szl-holdings/ouroboros-thesis)
