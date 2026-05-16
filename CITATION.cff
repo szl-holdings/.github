@@ -3,8 +3,9 @@ message: "If you use the SZL Holdings reusable GitHub workflows, please cite thi
 title: "szl-holdings/.github — Organization-wide reusable workflows and security policies"
 authors:
   - family-names: Lutar
-    given-names: Stephen
-    name-particle: P.
+    given-names: "Stephen P."
+
+    email: stephen@szlholdings.com
     affiliation: SZL Holdings
     orcid: "https://orcid.org/0009-0001-0110-4173"
 date-released: 2026-05-06
@@ -28,6 +29,7 @@ keywords:
   - supply-chain-security
 contact:
   - family-names: Lutar
-    given-names: Stephen
-    name-particle: P.
+    given-names: "Stephen P."
+
+    email: stephen@szlholdings.com
     email: "stephen@szlholdings.com"
