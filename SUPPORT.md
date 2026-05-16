@@ -10,8 +10,8 @@ SZL Holdings is a private company building governed AI decision infrastructure f
 | **Bug in the published research / DOI claim** | Open an issue in [`ouroboros-thesis`](https://github.com/szl-holdings/ouroboros-thesis/issues). |
 | **Bug in the runtime / platform code** | Open an issue on the relevant repo. Please include reproduction steps. |
 | **Question about a published paper** | Cite the relevant Zenodo DOI and email the author at the address listed in `CITATION.cff`. |
-| **Commercial licensing or partnership** | Email [stephenlutar2@gmail.com](mailto:stephenlutar2@gmail.com). |
-| **Press, investment, or general business** | Email [stephenlutar2@gmail.com](mailto:stephenlutar2@gmail.com). |
+| **Commercial licensing or partnership** | Email [stephen@szlholdings.com](mailto:stephen@szlholdings.com). |
+| **Press, investment, or general business** | Email [stephen@szlholdings.com](mailto:stephen@szlholdings.com). |
 
 ## Response expectations
 
