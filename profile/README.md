@@ -11,7 +11,7 @@
 
 <br/>
 
-[![Research — Ouroboros Thesis](https://img.shields.io/badge/research-Ouroboros%20Thesis%20v1%E2%86%92v11%20%C2%B7%20v12%20in%20review-1F78B4?style=for-the-badge&logo=readthedocs&logoColor=white)](https://github.com/szl-holdings/ouroboros-thesis)
+[![Research — Ouroboros Thesis](https://img.shields.io/badge/research-Ouroboros%20Thesis%20v1%E2%86%92v12%20%C2%B7%20v13--exhaustive%20published-1F78B4?style=for-the-badge&logo=readthedocs&logoColor=white)](https://github.com/szl-holdings/ouroboros-thesis/releases/tag/paper-v12-1.0.0)
 [![Runtime — 218/218 tests](https://img.shields.io/badge/runtime-218%2F218%20tests-2DA44E?style=for-the-badge&logo=jest&logoColor=white)](https://github.com/szl-holdings/ouroboros)
 [![Lean kernel](https://img.shields.io/badge/Lean%204-kernel--verified-2D5BB9?style=for-the-badge&logo=lean&logoColor=white)](https://github.com/szl-holdings/lutar-lean)
 [![Trust Portal](https://img.shields.io/badge/trust-portal-C8B26A?style=for-the-badge&logo=letsencrypt&logoColor=white)](https://github.com/szl-holdings/szl-trust)
@@ -185,7 +185,8 @@ Three flagship payloads ship with the standard — covering the cross-domain sha
 | **v9-1.0.0** | UNIFIED-OPERATIONAL — The Lutar Invariant Family v1 → v7 → Ω with Bianchi closure | 2026-05-07 | [`10.5281/zenodo.20053148`](https://doi.org/10.5281/zenodo.20053148) |
 | **v8-1.0.0** | Free-Energy Active Inference + Predictive Coding + Cognitive Maps | 2026-05-05 | [`10.5281/zenodo.20020849`](https://doi.org/10.5281/zenodo.20020849) |
 | **v3-2.0.0** | The Loop Is the Product: Measuring Bounded Recursion as a System Primitive for Auditable AI | 2026-05-02 | [`10.5281/zenodo.19983066`](https://doi.org/10.5281/zenodo.19983066) |
-| v12 (in review) | The Λ-Ouroboros Substrate — Four Machine-Verified Mechanisms | [PR #25](https://github.com/szl-holdings/ouroboros-thesis/pull/25) | concept [`10.5281/zenodo.19944926`](https://doi.org/10.5281/zenodo.19944926) |
+| **v12-1.0.0** | The Λ-Ouroboros Substrate — Four Machine-Verified Mechanisms | 2026-05-14 | DOI pending Zenodo mint — concept [`10.5281/zenodo.19944926`](https://doi.org/10.5281/zenodo.19944926) |
+| **v13-exhaustive-1.0.0** | Anatomy as Architecture — The SZL Agent Body as a governed AI runtime | 2026-05-18 | DOI pending Zenodo mint |
 
 ---
 
