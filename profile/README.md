@@ -11,7 +11,7 @@
 
 <br/>
 
-[![Research — Ouroboros Thesis](https://img.shields.io/badge/research-Ouroboros%20Thesis%20v1%E2%86%92v11%20%C2%B7%20v12%20in%20review-1F78B4?style=for-the-badge&logo=readthedocs&logoColor=white)](https://github.com/szl-holdings/ouroboros-thesis)
+[![Research — Ouroboros Thesis](https://img.shields.io/badge/research-Ouroboros%20Thesis%20v1%E2%86%92v13%20%C2%B7%20all%20published-1F78B4?style=for-the-badge&logo=readthedocs&logoColor=white)](https://github.com/szl-holdings/ouroboros-thesis)
 [![Runtime — 218/218 tests](https://img.shields.io/badge/runtime-218%2F218%20tests-2DA44E?style=for-the-badge&logo=jest&logoColor=white)](https://github.com/szl-holdings/ouroboros)
 [![Lean kernel](https://img.shields.io/badge/Lean%204-kernel--verified-2D5BB9?style=for-the-badge&logo=lean&logoColor=white)](https://github.com/szl-holdings/lutar-lean)
 [![Trust Portal](https://img.shields.io/badge/trust-portal-C8B26A?style=for-the-badge&logo=letsencrypt&logoColor=white)](https://github.com/szl-holdings/szl-trust)
@@ -56,7 +56,7 @@ Originals with richer diagrams: [brain_original.pdf](https://raw.githubuserconte
 
 Every enterprise AI deployment fails the same diligence question: **"prove what your model decided, why, and that it was within policy."** Most can't. We can. Our runtime emits a **proof-chain receipt** for every decision — bounded loop trace, policy gates traversed, evidence cited, convergence verified — recorded against an audit-closure operator (Λ) with sub-millisecond per-request overhead. The receipt is the deliverable. The loop is the product.
 
-The math is published as a peer-style thesis family (v3, v9, v10 — Zenodo DOI-pinned). The runtime is shipped as a library. The fabric is shipped as a platform exposing the **Covenant Proof Standard (CPS)** as a first-class API. Eight product surfaces sit on top, governed by a single Decision Intelligence + Trust Plane (A11oy) that owns the proof-chain, the Outcome Graph, and the policy ladder.
+The math is published as a peer-style thesis family (v1–v13 — Zenodo DOI-pinned). The runtime is shipped as a library. The fabric is shipped as a platform exposing the **Covenant Proof Standard (CPS)** as a first-class API. Eight product surfaces sit on top, governed by a single Decision Intelligence + Trust Plane (A11oy) that owns the proof-chain, the Outcome Graph, and the policy ladder.
 
 ## Architecture
 
@@ -180,12 +180,13 @@ Three flagship payloads ship with the standard — covering the cross-domain sha
 
 | Version | Title | Released | DOI |
 |---|---|---|---|
-| **v11-1.0.0** (current) | APPLIED Λ — Measured per-request latency overhead of Λ₁₀ in a governed AI runtime | 2026-05-09 | [`10.5281/zenodo.20119582`](https://doi.org/10.5281/zenodo.20119582) |
+| **v13-1.0.0** (current) | Unified Ouroboros Spine — Anatomy as Architecture | 2026-05-17 | [`10.5281/zenodo.20195368`](https://doi.org/10.5281/zenodo.20195368) |
+| **v12-1.0.0** | The Λ-Ouroboros Substrate — Four Machine-Verified Mechanisms | 2026-05-13 | [`10.5281/zenodo.20173920`](https://doi.org/10.5281/zenodo.20173920) |
+| **v11-1.0.0** | APPLIED Λ — Measured per-request latency overhead of Λ₁₀ in a governed AI runtime | 2026-05-09 | [`10.5281/zenodo.20119582`](https://doi.org/10.5281/zenodo.20119582) |
 | **v10-1.0.0** | EXHAUSTIVE-AUDIT — The Audit Closure Operator Λ₁₀ | 2026-05-07 | [`10.5281/zenodo.20053163`](https://doi.org/10.5281/zenodo.20053163) |
 | **v9-1.0.0** | UNIFIED-OPERATIONAL — The Lutar Invariant Family v1 → v7 → Ω with Bianchi closure | 2026-05-07 | [`10.5281/zenodo.20053148`](https://doi.org/10.5281/zenodo.20053148) |
 | **v8-1.0.0** | Free-Energy Active Inference + Predictive Coding + Cognitive Maps | 2026-05-05 | [`10.5281/zenodo.20020849`](https://doi.org/10.5281/zenodo.20020849) |
 | **v3-2.0.0** | The Loop Is the Product: Measuring Bounded Recursion as a System Primitive for Auditable AI | 2026-05-02 | [`10.5281/zenodo.19983066`](https://doi.org/10.5281/zenodo.19983066) |
-| v12 (in review) | The Λ-Ouroboros Substrate — Four Machine-Verified Mechanisms | [PR #25](https://github.com/szl-holdings/ouroboros-thesis/pull/25) | concept [`10.5281/zenodo.19944926`](https://doi.org/10.5281/zenodo.19944926) |
 
 ---
 
