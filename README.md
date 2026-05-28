@@ -76,4 +76,26 @@ All Actions are SHA-pinned and wrapped with [`step-security/harden-runner`](http
 
 ---
 
-<sub>© 2026 SZL Holdings — [`szlholdings.com`](https://szlholdings.com) · ORCID [`0009-0001-0110-4173`](https://orcid.org/0009-0001-0110-4173)</sub>
+<sub>© 2026 SZL Holdings — [`github.com/szl-holdings`](https://github.com/szl-holdings) · ORCID [`0009-0001-0110-4173`](https://orcid.org/0009-0001-0110-4173)</sub>
+
+---
+
+## Related repositories in the SZL substrate
+
+The 13 substrate repos cross-link reciprocally. This footer is maintained by GH Admin #1 (org-wide).
+
+- [`a11oy`](https://github.com/szl-holdings/a11oy) — vertical alignment substrate (policy · measurement · knowledge · QEC-integrity)
+- [`amaru`](https://github.com/szl-holdings/amaru) — Shor-encoded receipt minting (Cardano-anchored)
+- [`rosie`](https://github.com/szl-holdings/rosie) — CSS-ingress receipt orchestration
+- [`sentra`](https://github.com/szl-holdings/sentra) — Kitaev-surface drift detection on audit fibers
+- [`uds-mesh`](https://github.com/szl-holdings/uds-mesh) — UDS span schemas + governance receipts
+- [`lutar-lean`](https://github.com/szl-holdings/lutar-lean) — Lean 4 + Mathlib v4.13.0 kernel proofs (30 GREEN modules)
+- [`ouroboros`](https://github.com/szl-holdings/ouroboros) — bounded-recursion runtime
+- [`ouroboros-thesis`](https://github.com/szl-holdings/ouroboros-thesis) — DOI-pinned thesis substrate (v3 → v18)
+- [`platform`](https://github.com/szl-holdings/platform) — composing monorepo (76 packages, 1,220 tests)
+- [`szl-brand`](https://github.com/szl-holdings/szl-brand) — anatomy + visual doctrine (PDFs hosted in-repo)
+- [`szl-cookbook`](https://github.com/szl-holdings/szl-cookbook) — governed-AI recipes
+- [`agi-forecast`](https://github.com/szl-holdings/agi-forecast) — PAC-Bayes + Bekenstein governance-trajectory forecasts
+- [`vsp-otel`](https://github.com/szl-holdings/vsp-otel) — OpenTelemetry exporter for Λ-axis spans
+
+Org page: [github.com/szl-holdings](https://github.com/szl-holdings) · Doctrine v6 · 11 axioms · 30 GREEN modules · v18.0 DOI [`10.5281/zenodo.20434276`](https://doi.org/10.5281/zenodo.20434276)
