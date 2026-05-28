@@ -11,13 +11,16 @@
 
 <br/>
 
-[![Research — Ouroboros Thesis](https://img.shields.io/badge/research-Ouroboros%20Thesis%20v1%E2%86%92v13%20%C2%B7%20all%20published-1F78B4?style=for-the-badge&logo=readthedocs&logoColor=white)](https://github.com/szl-holdings/ouroboros-thesis)
+[![Research — Ouroboros Thesis](https://img.shields.io/badge/research-Ouroboros%20Thesis%20v1%E2%86%92v16%20%C2%B7%20all%20published-1F78B4?style=for-the-badge&logo=readthedocs&logoColor=white)](https://github.com/szl-holdings/ouroboros-thesis)
 [![Runtime — 218/218 tests](https://img.shields.io/badge/runtime-218%2F218%20tests-2DA44E?style=for-the-badge&logo=jest&logoColor=white)](https://github.com/szl-holdings/ouroboros)
 [![Lean kernel](https://img.shields.io/badge/Lean%204-kernel--verified-2D5BB9?style=for-the-badge&logo=lean&logoColor=white)](https://github.com/szl-holdings/lutar-lean)
 [![Trust Portal](https://img.shields.io/badge/trust-portal-C8B26A?style=for-the-badge&logo=letsencrypt&logoColor=white)](https://github.com/szl-holdings/szl-trust)
 
 [![ORCID](https://img.shields.io/badge/ORCID-0009--0001--0110--4173-A6CE39?style=flat-square&logo=orcid&logoColor=white)](https://orcid.org/0009-0001-0110-4173)
-[![Concept DOI](https://img.shields.io/badge/DOI-10.5281%2Fzenodo.19944926-01696F?style=flat-square&logo=doi&logoColor=white)](https://doi.org/10.5281/zenodo.19944926)
+[![Concept DOI](https://img.shields.io/badge/concept%20DOI-10.5281%2Fzenodo.19944926-01696F?style=flat-square&logo=doi&logoColor=white)](https://doi.org/10.5281/zenodo.19944926)
+[![v16 DOI](https://img.shields.io/badge/v16%20DOI-10.5281%2Fzenodo.20424996-805AD5?style=flat-square&logo=doi&logoColor=white)](https://doi.org/10.5281/zenodo.20424996)
+[![v15 DOI](https://img.shields.io/badge/v15%20DOI-10.5281%2Fzenodo.20424995-805AD5?style=flat-square&logo=doi&logoColor=white)](https://doi.org/10.5281/zenodo.20424995)
+[![v14 DOI](https://img.shields.io/badge/v14%20DOI-10.5281%2Fzenodo.20424992-805AD5?style=flat-square&logo=doi&logoColor=white)](https://doi.org/10.5281/zenodo.20424992)
 [![Research license — CC BY 4.0](https://img.shields.io/badge/research-CC%20BY%204.0-1F78B4?style=flat-square)](https://github.com/szl-holdings/ouroboros-thesis/blob/main/LICENSE)
 [![Runtime license — Apache 2.0](https://img.shields.io/badge/runtime-Apache%202.0-2DA44E?style=flat-square)](https://github.com/szl-holdings/ouroboros/blob/main/LICENSE)
 [![Platform license — BSL 1.1](https://img.shields.io/badge/platform-BSL%201.1-28251D?style=flat-square)](https://github.com/szl-holdings/platform)
@@ -178,15 +181,18 @@ Three flagship payloads ship with the standard — covering the cross-domain sha
 
 ## Thesis publications (DOI-pinned)
 
-| Version | Title | Released | DOI |
-|---|---|---|---|
-| **v13-1.0.0** (current) | Unified Ouroboros Spine — Anatomy as Architecture | 2026-05-17 | [`10.5281/zenodo.20195368`](https://doi.org/10.5281/zenodo.20195368) |
-| **v12-1.0.0** | The Λ-Ouroboros Substrate — Four Machine-Verified Mechanisms | 2026-05-13 | [`10.5281/zenodo.20173920`](https://doi.org/10.5281/zenodo.20173920) |
-| **v11-1.0.0** | APPLIED Λ — Measured per-request latency overhead of Λ₁₀ in a governed AI runtime | 2026-05-09 | [`10.5281/zenodo.20119582`](https://doi.org/10.5281/zenodo.20119582) |
-| **v10-1.0.0** | EXHAUSTIVE-AUDIT — The Audit Closure Operator Λ₁₀ | 2026-05-07 | [`10.5281/zenodo.20053163`](https://doi.org/10.5281/zenodo.20053163) |
-| **v9-1.0.0** | UNIFIED-OPERATIONAL — The Lutar Invariant Family v1 → v7 → Ω with Bianchi closure | 2026-05-07 | [`10.5281/zenodo.20053148`](https://doi.org/10.5281/zenodo.20053148) |
-| **v8-1.0.0** | Free-Energy Active Inference + Predictive Coding + Cognitive Maps | 2026-05-05 | [`10.5281/zenodo.20020849`](https://doi.org/10.5281/zenodo.20020849) |
-| **v3-2.0.0** | The Loop Is the Product: Measuring Bounded Recursion as a System Primitive for Auditable AI | 2026-05-02 | [`10.5281/zenodo.19983066`](https://doi.org/10.5281/zenodo.19983066) |
+| Version | Title | Released | DOI | PDF |
+|---|---|---|---|---|
+| **v16-1.0.2** (current) | Feynman path-integral audit closure + Gates doctrine codes + cross-component composite invariant | 2026-05-28 | [`10.5281/zenodo.20424996`](https://doi.org/10.5281/zenodo.20424996) | [PDF](https://zenodo.org/records/20424996/files/ouroboros-thesis-v16.pdf) |
+| **v15-1.0.2** | Knot Calculus for Governed Decision Receipts — audit-Reidemeister R1/R2/R3, PAC-Bayes head, Khipu-DAG | 2026-05-28 | [`10.5281/zenodo.20424995`](https://doi.org/10.5281/zenodo.20424995) | [PDF](https://zenodo.org/records/20424995/files/ouroboros-thesis-v15.pdf) |
+| **v14-1.0.2** | Verifiable Multi-Agent Anatomy — Lutar Calculus, formal foundations, runtime verification, honest proof record | 2026-05-28 | [`10.5281/zenodo.20424992`](https://doi.org/10.5281/zenodo.20424992) | [PDF](https://zenodo.org/records/20424992/files/ouroboros-thesis-v14.pdf) |
+| **v13-1.0.0** | Unified Ouroboros Spine — Anatomy as Architecture | 2026-05-17 | [`10.5281/zenodo.20195368`](https://doi.org/10.5281/zenodo.20195368) | — |
+| **v12-1.0.0** | The Λ-Ouroboros Substrate — Four Machine-Verified Mechanisms | 2026-05-13 | [`10.5281/zenodo.20173920`](https://doi.org/10.5281/zenodo.20173920) | — |
+| **v11-1.0.0** | APPLIED Λ — Measured per-request latency overhead of Λ₁₀ in a governed AI runtime | 2026-05-09 | [`10.5281/zenodo.20119582`](https://doi.org/10.5281/zenodo.20119582) | — |
+| **v10-1.0.0** | EXHAUSTIVE-AUDIT — The Audit Closure Operator Λ₁₀ | 2026-05-07 | [`10.5281/zenodo.20053163`](https://doi.org/10.5281/zenodo.20053163) | — |
+| **v9-1.0.0** | UNIFIED-OPERATIONAL — The Lutar Invariant Family v1 → v7 → Ω with Bianchi closure | 2026-05-07 | [`10.5281/zenodo.20053148`](https://doi.org/10.5281/zenodo.20053148) | — |
+| **v8-1.0.0** | Free-Energy Active Inference + Predictive Coding + Cognitive Maps | 2026-05-05 | [`10.5281/zenodo.20020849`](https://doi.org/10.5281/zenodo.20020849) | — |
+| **v3-2.0.0** | The Loop Is the Product: Measuring Bounded Recursion as a System Primitive for Auditable AI | 2026-05-02 | [`10.5281/zenodo.19983066`](https://doi.org/10.5281/zenodo.19983066) | — |
 
 ---
 
