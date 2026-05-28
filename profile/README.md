@@ -11,13 +11,14 @@
 
 <br/>
 
-[![Research — Ouroboros Thesis](https://img.shields.io/badge/research-Ouroboros%20Thesis%20v1%E2%86%92v16%20%C2%B7%20all%20published-1F78B4?style=for-the-badge&logo=readthedocs&logoColor=white)](https://github.com/szl-holdings/ouroboros-thesis)
+[![Research — Ouroboros Thesis](https://img.shields.io/badge/research-Ouroboros%20Thesis%20v1%E2%86%92v17%20%C2%B7%20all%20published-1F78B4?style=for-the-badge&logo=readthedocs&logoColor=white)](https://github.com/szl-holdings/ouroboros-thesis)
 [![Runtime — 218/218 tests](https://img.shields.io/badge/runtime-218%2F218%20tests-2DA44E?style=for-the-badge&logo=jest&logoColor=white)](https://github.com/szl-holdings/ouroboros)
 [![Lean kernel](https://img.shields.io/badge/Lean%204-kernel--verified-2D5BB9?style=for-the-badge&logo=lean&logoColor=white)](https://github.com/szl-holdings/lutar-lean)
 [![Trust Portal](https://img.shields.io/badge/trust-portal-C8B26A?style=for-the-badge&logo=letsencrypt&logoColor=white)](https://github.com/szl-holdings/szl-trust)
 
 [![ORCID](https://img.shields.io/badge/ORCID-0009--0001--0110--4173-A6CE39?style=flat-square&logo=orcid&logoColor=white)](https://orcid.org/0009-0001-0110-4173)
 [![Concept DOI](https://img.shields.io/badge/concept%20DOI-10.5281%2Fzenodo.19944926-01696F?style=flat-square&logo=doi&logoColor=white)](https://doi.org/10.5281/zenodo.19944926)
+[![v17 DOI](https://img.shields.io/badge/v17%20DOI-10.5281%2Fzenodo.20431181-805AD5?style=flat-square&logo=doi&logoColor=white)](https://doi.org/10.5281/zenodo.20431181)
 [![v16 DOI](https://img.shields.io/badge/v16%20DOI-10.5281%2Fzenodo.20424996-805AD5?style=flat-square&logo=doi&logoColor=white)](https://doi.org/10.5281/zenodo.20424996)
 [![v15 DOI](https://img.shields.io/badge/v15%20DOI-10.5281%2Fzenodo.20424995-805AD5?style=flat-square&logo=doi&logoColor=white)](https://doi.org/10.5281/zenodo.20424995)
 [![v14 DOI](https://img.shields.io/badge/v14%20DOI-10.5281%2Fzenodo.20424992-805AD5?style=flat-square&logo=doi&logoColor=white)](https://doi.org/10.5281/zenodo.20424992)
@@ -183,7 +184,8 @@ Three flagship payloads ship with the standard — covering the cross-domain sha
 
 | Version | Title | Released | DOI | PDF |
 |---|---|---|---|---|
-| **v16-1.0.2** (current) | Feynman path-integral audit closure + Gates doctrine codes + cross-component composite invariant | 2026-05-28 | [`10.5281/zenodo.20424996`](https://doi.org/10.5281/zenodo.20424996) | [PDF](https://zenodo.org/records/20424996/files/ouroboros-thesis-v16.pdf) |
+| **v17-1.0.1** (current) | Wheelerian audit closure + Shannon doctrine code + QEC-evolved Agent Body | 2026-05-28 | [`10.5281/zenodo.20431181`](https://doi.org/10.5281/zenodo.20431181) | [PDF](https://zenodo.org/records/20431181/files/ouroboros-thesis-v17.pdf) |
+| **v16-1.0.2** | Feynman path-integral audit closure + Gates doctrine codes + cross-component composite invariant | 2026-05-28 | [`10.5281/zenodo.20424996`](https://doi.org/10.5281/zenodo.20424996) | [PDF](https://zenodo.org/records/20424996/files/ouroboros-thesis-v16.pdf) |
 | **v15-1.0.2** | Knot Calculus for Governed Decision Receipts — audit-Reidemeister R1/R2/R3, PAC-Bayes head, Khipu-DAG | 2026-05-28 | [`10.5281/zenodo.20424995`](https://doi.org/10.5281/zenodo.20424995) | [PDF](https://zenodo.org/records/20424995/files/ouroboros-thesis-v15.pdf) |
 | **v14-1.0.2** | Verifiable Multi-Agent Anatomy — Lutar Calculus, formal foundations, runtime verification, honest proof record | 2026-05-28 | [`10.5281/zenodo.20424992`](https://doi.org/10.5281/zenodo.20424992) | [PDF](https://zenodo.org/records/20424992/files/ouroboros-thesis-v14.pdf) |
 | **v13-1.0.0** | Unified Ouroboros Spine — Anatomy as Architecture | 2026-05-17 | [`10.5281/zenodo.20195368`](https://doi.org/10.5281/zenodo.20195368) | — |
