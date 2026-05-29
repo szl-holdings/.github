@@ -396,6 +396,29 @@ The 13 substrate repos cross-link via a `Related repositories in the SZL substra
 
 ---
 
+
+---
+
+## Vertical applications — vessels (featured)
+
+vessels is the SZL Holdings maritime intelligence vertical application and the strongest UDS deployment story.
+
+| Surface | URL | Status |
+|---|---|---|
+| **GitHub** | [szl-holdings/vessels](https://github.com/szl-holdings/vessels) | CI · Tests · SBOM · SLSA 3 · OpenSSF all green |
+| **Source mirror** | [SZLHOLDINGS/vessels-source](https://huggingface.co/datasets/SZLHOLDINGS/vessels-source) | 201 source files mirrored · refreshed 2026-05-29 |
+| **Deep-dive Space** |  | **STAGED — deploys after midnight UTC** |
+| **UDS package** | [du-upstream-contributions/uds-package-vessels](https://github.com/szl-holdings/du-upstream-contributions/tree/main/uds-package-vessels) | Phase 1 staged · Warhacker 2026 demo-ready |
+
+**What vessels provides:** Sanctions screening (OFAC/UN/EU · daily refresh · DSSE receipt per match) ·
+Dark-vessel detection (AIS gap + spoofing) · Ownership graph traversal · Voyage analytics (Monte Carlo P&L) ·
+Every alert backed by a SHA-pinned, prevHash-linked DSSE governance receipt.
+
+**Defense Unicorns fit:** Zarf package + Helm chart + Istio VirtualService staged.
+Phase 2 requires containerizing . No fabricated customers — illustrative mission patterns only.
+
+**What vessels is NOT:** not SOC 2 · not FedRAMP · not GDPR-cleared · not an AIS data provider.
+
 ## Repository Badge Matrix — Series-A Dashboard
 
 Live badge status across all 15 production repositories × 10 canonical badges.
