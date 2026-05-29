@@ -9,7 +9,8 @@ authors:
     email: stephen@szlholdings.com
     affiliation: SZL Holdings
     orcid: "https://orcid.org/0009-0001-0110-4173"
-date-released: 2026-05-06
+date-released: "2026-05-29"
+version: "0.1.0"
 license: Apache-2.0
 type: software
 url: "https://github.com/szl-holdings/.github"

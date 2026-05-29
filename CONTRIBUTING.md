@@ -35,3 +35,22 @@
 
   (c) 2024–2026 SZL Holdings, LLC. All rights reserved.
   
+---
+
+## Developer Certificate of Origin (DCO)
+
+All commits to this repository must carry a Developer Certificate of Origin sign-off per [DCO v1.1](https://developercertificate.org/). Add with:
+
+```bash
+git commit -s -m "your commit message"
+# Produces: Signed-off-by: Name <email>
+```
+
+### Branch naming convention
+
+```
+feat/<scope>/<short-description>    # New functionality
+fix/<scope>/<short-description>     # Bug fix
+docs/<short-description>            # Documentation only
+chore/<short-description>           # Maintenance, dependencies
+```
