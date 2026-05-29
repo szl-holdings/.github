@@ -1,0 +1,39 @@
+
+========================================================================
+  SZL ANATOMY-ALIVE HARNESS  |  Doctrine v6  |  2026-05-30
+  Trace:   anatomy-alive-trace-20260530T000000Z
+  Formula: AdversarialRobustness  →  Lean: robustness_preserved_by_composition
+========================================================================
+
+  Running L1 (lutar-lean)...
+  [PASS           ] L1 ✓ lutar-lean   theorem robustness_preserved_by_composition exists; sorry-free; blob SHA matches pin (a96e448f83da)  (1018ms)
+
+  Running L2 (ouroboros)...
+  [PASS           ] L2 ✓ ouroboros    TS source confirmed (blob=728686770357); Python parity: epsilon2=0.300 composedL=3.0 ✓  (1100ms)
+
+  Running L3 (ouroboros)...
+  [STAGED         ] L3 ⬡ ouroboros    6/6 formula test files on ouroboros/main; adversarialRobustness.test.ts imports fn + has assertions; pnpm vitest pending Cursor  (3612ms)
+
+  Running L4 (vsp-otel)...
+  [STAGED         ] L4 ⬡ vsp-otel     signSpan() simulated: λ=0.9208 ≥ 0.90 PASS; szl.anchor_formula.id NOT yet injected in exporter.ts (blob 026eb6295a46) — Cursor Phase 1 Track 1  (1160ms)
+
+  Running L5 (uds-mesh)...
+  [PASS           ] L5 ✓ uds-mesh     DSSE receipt emitted + HMAC verified; ANCHOR_REGISTRY=True; lean_commit_sha consistent L1↔L5; blob 2d31586b0035  (1070ms)
+
+  Running L6 (a11oy)...
+  [PASS           ] L6 ✓ a11oy        adversarialRobustnessGate confirmed main (blob 72693e68f968); epsilon2=0.300 ≤ 0.500 allow=true; lean_theorem in source=True; formula_witness emission=False  (2620ms)
+
+  Running L7 (sentra)...
+  [NOT-YET-WIRED  ] L7 ○ sentra       sentra/main has 3 forecast modules (receipt_consumption=False); witnessed.py absent; UDS input not wired — Cursor Track 1+2a  (3758ms)
+
+========================================================================
+
+  [STAGED OUTPUT] L1=PASS L2=PASS L3=STAGED L4=STAGED L5=PASS L6=PASS L7=NOT-YET-WIRED
+    NOT-YET-WIRED: 1
+    PASS: 4
+    STAGED: 2
+
+  VERDICT: STAGED-PASS — harness runs end-to-end, honest labels applied
+========================================================================
+
+Evidence written → anatomy_alive_evidence.json

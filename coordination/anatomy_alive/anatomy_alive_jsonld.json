@@ -1,0 +1,364 @@
+{
+  "@context": {
+    "prov": "http://www.w3.org/ns/prov#",
+    "schema": "https://schema.org/",
+    "szl": "https://szl-holdings.github.io/ontology/v1#",
+    "dsse": "https://github.com/secure-systems-lab/dsse/blob/master/protocol.md#",
+    "xsd": "http://www.w3.org/2001/XMLSchema#"
+  },
+  "@graph": [
+    {
+      "@id": "szl:anatomy-alive-run-2026-05-29T19-50-15.832631Z",
+      "@type": [
+        "prov:Activity",
+        "schema:Action"
+      ],
+      "schema:name": "SZL Anatomy-Alive Harness Run",
+      "schema:description": "7-layer cross-organ integration harness for SZL Holdings Phase 1 anatomy-alive instillation. Exercises AdversarialRobustness anchor formula from Lean theorem through OTel spans, DSSE receipts, and policy gates.",
+      "prov:startedAtTime": {
+        "@type": "xsd:dateTime",
+        "@value": "2026-05-29T19:50:15.832631Z"
+      },
+      "prov:endedAtTime": {
+        "@type": "xsd:dateTime",
+        "@value": "2026-05-29T19:50:30.171749Z"
+      },
+      "prov:wasAssociatedWith": {
+        "@id": "szl:perplexity-computer-acting-cto"
+      },
+      "szl:doctrineVersion": "v6",
+      "szl:traceId": "anatomy-alive-trace-20260530T000000Z",
+      "szl:anchorFormula": "AdversarialRobustness",
+      "szl:leanTheoremFQ": "Lutar.Composition.Robustness.robustness_preserved_by_composition",
+      "szl:leanCommitSha": "1dca00032dfc9aa8559cc6c2e4b63192fcf52371",
+      "szl:harnessVersion": "1.1.0",
+      "prov:generated": [
+        {
+          "@id": "szl:layer-result-L1"
+        },
+        {
+          "@id": "szl:layer-result-L2"
+        },
+        {
+          "@id": "szl:layer-result-L3"
+        },
+        {
+          "@id": "szl:layer-result-L4"
+        },
+        {
+          "@id": "szl:layer-result-L5"
+        },
+        {
+          "@id": "szl:layer-result-L6"
+        },
+        {
+          "@id": "szl:layer-result-L7"
+        }
+      ]
+    },
+    {
+      "@id": "szl:perplexity-computer-acting-cto",
+      "@type": "prov:Agent",
+      "schema:name": "Perplexity Computer (acting CTO)",
+      "schema:url": "https://www.perplexity.ai"
+    },
+    {
+      "@id": "szl:layer-result-L1",
+      "@type": [
+        "prov:Entity",
+        "szl:LayerResult"
+      ],
+      "schema:name": "L1 Lean Theorem Verification",
+      "szl:layer": {
+        "@type": "xsd:integer",
+        "@value": "1"
+      },
+      "szl:organ": "lutar-lean",
+      "szl:status": "PASS",
+      "szl:label": "theorem robustness_preserved_by_composition exists; sorry-free; blob SHA matches pin (a96e448f83da)",
+      "szl:durationMs": 1018.3789870061446,
+      "szl:evidence": {
+        "szl:repo": "https://github.com/szl-holdings/lutar-lean",
+        "szl:file": "Lutar/Composition/AdversarialRobustness.lean",
+        "szl:blobSha": "a96e448f83da40f06f005e7f8ff0492e0870e819",
+        "szl:expectedBlobSha": "a96e448f83da40f06f005e7f8ff0492e0870e819",
+        "szl:blobShaMatch": true,
+        "szl:sorryFree": true,
+        "szl:hasTheorem": true,
+        "szl:verificationMethod": "gh_api_blob_sha_pin + grep_theorem_name + grep_sorry"
+      },
+      "prov:wasGeneratedBy": {
+        "@id": "szl:anatomy-alive-run-2026-05-29T19-50-15.832631Z"
+      },
+      "prov:wasDerivedFrom": {
+        "@id": "szl:lutar-lean-AdversarialRobustness",
+        "@type": [
+          "prov:Entity",
+          "schema:SoftwareSourceCode"
+        ],
+        "schema:codeRepository": "https://github.com/szl-holdings/lutar-lean",
+        "schema:identifier": "a96e448f83da40f06f005e7f8ff0492e0870e819",
+        "schema:name": "Lutar/Composition/AdversarialRobustness.lean",
+        "szl:leanCommitSha": "1dca00032dfc9aa8559cc6c2e4b63192fcf52371",
+        "szl:theoremNamespace": "Lutar.Composition.Robustness",
+        "szl:theoremName": "robustness_preserved_by_composition",
+        "szl:axiomFree": true,
+        "szl:sorryFree": true,
+        "schema:citation": [
+          "Madry et al. (2018) arXiv:1706.06083",
+          "Lutar Doctrine v6 §AdversarialRobustness"
+        ]
+      }
+    },
+    {
+      "@id": "szl:layer-result-L2",
+      "@type": [
+        "prov:Entity",
+        "szl:LayerResult"
+      ],
+      "schema:name": "L2 TypeScript Formula Runtime",
+      "szl:layer": {
+        "@type": "xsd:integer",
+        "@value": "2"
+      },
+      "szl:organ": "ouroboros",
+      "szl:status": "PASS",
+      "szl:label": "TS source confirmed (blob=728686770357); Python parity: epsilon2=0.300 composedL=3.0 ✓",
+      "szl:durationMs": 1099.7875969915185,
+      "szl:evidence": {
+        "szl:repo": "https://github.com/szl-holdings/ouroboros",
+        "szl:file": "agentic/formulas/src/adversarialRobustness.ts",
+        "szl:blobSha": "7286867703574cc4252e3de3712f3c40c8e316ba",
+        "szl:parityInputs": {
+          "l1": 2.0,
+          "l2": 1.5,
+          "delta": 0.1
+        },
+        "szl:parityOutput": {
+          "formula": "adversarialRobustness",
+          "lipschitz1": 2.0,
+          "lipschitz2": 1.5,
+          "delta": 0.1,
+          "epsilon1": 0.2,
+          "epsilon2": 0.30000000000000004,
+          "composedLipschitz": 3.0,
+          "composedEpsilon": 0.30000000000000004,
+          "leanTheorem": "robustness_preserved_by_composition",
+          "leanFile": "Lutar/Composition/AdversarialRobustness.lean",
+          "leanCommitSha": "1dca00032dfc9aa8559cc6c2e4b63192fcf52371"
+        },
+        "szl:epsilon2AssertPass": true,
+        "szl:verificationMethod": "gh_api_blob_existence + python_parity_reimplementation"
+      },
+      "prov:wasGeneratedBy": {
+        "@id": "szl:anatomy-alive-run-2026-05-29T19-50-15.832631Z"
+      }
+    },
+    {
+      "@id": "szl:layer-result-L3",
+      "@type": [
+        "prov:Entity",
+        "szl:LayerResult"
+      ],
+      "schema:name": "L3 Parity Test Suite",
+      "szl:layer": {
+        "@type": "xsd:integer",
+        "@value": "3"
+      },
+      "szl:organ": "ouroboros",
+      "szl:status": "STAGED",
+      "szl:label": "6/6 formula test files on ouroboros/main; adversarialRobustness.test.ts imports fn + has assertions; pnpm vitest pending Cursor",
+      "szl:durationMs": 3611.8093699915335,
+      "szl:stagedReason": "6 vitest test files confirmed on ouroboros/main. pnpm vitest execution requires Node.js runtime. Cursor must run pnpm test:anatomy-alive to close STAGED status.",
+      "szl:evidence": {
+        "szl:repo": "https://github.com/szl-holdings/ouroboros",
+        "szl:testFiles": [
+          "agentic/formulas/tests/adversarialRobustness.test.ts",
+          "agentic/formulas/tests/formulas.test.ts",
+          "agentic/formulas/tests/liuHuiPi.test.ts",
+          "agentic/formulas/tests/madhavaBound.test.ts",
+          "agentic/formulas/tests/summationInvariant.test.ts",
+          "agentic/formulas/tests/falsePosition.test.ts"
+        ],
+        "szl:allFilesExist": true,
+        "szl:verificationMethod": "gh_api_blob_existence + grep_assertions"
+      },
+      "prov:wasGeneratedBy": {
+        "@id": "szl:anatomy-alive-run-2026-05-29T19-50-15.832631Z"
+      }
+    },
+    {
+      "@id": "szl:layer-result-L4",
+      "@type": [
+        "prov:Entity",
+        "szl:LayerResult"
+      ],
+      "schema:name": "L4 OTel Span Emission",
+      "szl:layer": {
+        "@type": "xsd:integer",
+        "@value": "4"
+      },
+      "szl:organ": "vsp-otel",
+      "szl:status": "STAGED",
+      "szl:label": "signSpan() simulated: λ=0.9208 ≥ 0.90 PASS; szl.anchor_formula.id NOT yet injected in exporter.ts (blob 026eb6295a46) — Cursor Phase 1 Track 1",
+      "szl:durationMs": 1159.9559789901832,
+      "szl:stagedReason": "vsp-otel/runtime/src/exporter.ts (blob 026eb6295a46) exports signSpan() which produces lambda-signed spans with λ=0.9208 ≥ 0.90. Missing: szl.anchor_formula.id and szl.lean_theorem_ref are not auto-injected as OTel attributes — these must come from the a11oy policy gate result that fires during the span. Cursor Phase 1 Track 1: add attribute injection in exporter.ts.",
+      "szl:evidence": {
+        "szl:repo": "https://github.com/szl-holdings/vsp-otel",
+        "szl:file": "runtime/src/exporter.ts",
+        "szl:blobSha": "026eb6295a46f241fc40c0bcd5dc69f5f8d81a8f",
+        "szl:lambdaScore": 0.92078,
+        "szl:lambdaPass": true,
+        "szl:szlAnchorFormulaAttrPresent": false,
+        "szl:szlLeanTheoremRefAttrPresent": false,
+        "szl:verificationMethod": "gh_api_blob_existence + grep_signSpan + simulate_sign_span_python"
+      },
+      "prov:wasGeneratedBy": {
+        "@id": "szl:anatomy-alive-run-2026-05-29T19-50-15.832631Z"
+      }
+    },
+    {
+      "@id": "szl:layer-result-L5",
+      "@type": [
+        "prov:Entity",
+        "szl:LayerResult",
+        "dsse:Envelope"
+      ],
+      "schema:name": "L5 DSSE Formula Receipt",
+      "szl:layer": {
+        "@type": "xsd:integer",
+        "@value": "5"
+      },
+      "szl:organ": "uds-mesh",
+      "szl:status": "PASS",
+      "szl:label": "DSSE receipt emitted + HMAC verified; ANCHOR_REGISTRY=True; lean_commit_sha consistent L1↔L5; blob 2d31586b0035",
+      "szl:durationMs": 1070.4157889995258,
+      "szl:dssePayloadType": "application/vnd.szl.formula-receipt+json;v=1",
+      "szl:dsseSignatureAlgorithm": "HMAC-SHA-256",
+      "szl:evidence": {
+        "szl:repo": "https://github.com/szl-holdings/uds-mesh",
+        "szl:file": "formula_receipts.py",
+        "szl:blobSha": "2d31586b003529fe405934c62d102b77135e53e9",
+        "szl:signatureValid": true,
+        "szl:leanCommitShaCrossLayerConsistent": true,
+        "szl:receiptFormula": "AdversarialRobustness",
+        "szl:receiptLeanTheorem": "robustness_preserved_by_composition",
+        "szl:receiptInputsHash": "aab0d5653b13207a21d876ad4dc0347385876deb3319094f97f48885658043fc",
+        "szl:verificationMethod": "gh_api_blob_existence + grep_anchor_registry + python_dsse_hmac_round_trip"
+      },
+      "prov:wasGeneratedBy": {
+        "@id": "szl:anatomy-alive-run-2026-05-29T19-50-15.832631Z"
+      }
+    },
+    {
+      "@id": "szl:layer-result-L6",
+      "@type": [
+        "prov:Entity",
+        "szl:LayerResult"
+      ],
+      "schema:name": "L6 Policy Gate Decision",
+      "szl:layer": {
+        "@type": "xsd:integer",
+        "@value": "6"
+      },
+      "szl:organ": "a11oy",
+      "szl:status": "PASS",
+      "szl:label": "adversarialRobustnessGate confirmed main (blob 72693e68f968); epsilon2=0.300 ≤ 0.500 allow=true; lean_theorem in source=True; formula_witness emission=False",
+      "szl:durationMs": 2620.1596519968007,
+      "szl:evidence": {
+        "szl:repo": "https://github.com/szl-holdings/a11oy",
+        "szl:file": "packages/policy/src/gates/adversarialRobustness_gate.ts",
+        "szl:blobSha": "72693e68f968038a62b7bcba8b91ef60f4133944",
+        "szl:gateDecisionAllow": true,
+        "szl:gateDecisionEpsilon2": 0.30000000000000004,
+        "szl:gateDecisionLambdaScore": 0.4,
+        "szl:gateDecisionLeanTheorem": "robustness_preserved_by_composition",
+        "szl:gateDecisionRationale": "epsilon2=0.300 ≤ maxEpsilon=0.5. Lean: robustness_preserved_by_composition @1dca00032dfc. File: Lutar/Composition/AdversarialRobustness.lean",
+        "szl:gateEmitsFormulaWitness": false,
+        "szl:gateEmitsDsseReceipt": false,
+        "szl:verificationMethod": "gh_api_blob_existence + grep_lean_refs + python_gate_mirror"
+      },
+      "prov:wasGeneratedBy": {
+        "@id": "szl:anatomy-alive-run-2026-05-29T19-50-15.832631Z"
+      }
+    },
+    {
+      "@id": "szl:layer-result-L7",
+      "@type": [
+        "prov:Entity",
+        "szl:LayerResult"
+      ],
+      "schema:name": "L7 Forecast with Formula Witness",
+      "szl:layer": {
+        "@type": "xsd:integer",
+        "@value": "7"
+      },
+      "szl:organ": "sentra",
+      "szl:status": "NOT-YET-WIRED",
+      "szl:label": "sentra/main has 3 forecast modules (receipt_consumption=False); witnessed.py absent; UDS input not wired — Cursor Track 1+2a",
+      "szl:durationMs": 3758.2790209999075,
+      "szl:notYetWiredReason": "sentra/main (2026-05-29): src/sentra_immune.py and src/tupu_replay_5x.py exist but contain no calls to uds-mesh formula_receipts API or formula_witness field. Missing file: 'src/forecasts/witnessed.py' (Phase 1 Track 2a). Cursor must deliver: (1) witnessed.py with 12 doctests, (2) UDS receipt subscription in forecast loop, (3) formula_witness on every prediction output.",
+      "szl:cursorDeliverable": "1) src/forecasts/witnessed.py with 12 doctests; 2) UDS receipt subscription in forecast loop; 3) formula_witness field on every prediction output",
+      "szl:evidence": {
+        "szl:repo": "https://github.com/szl-holdings/sentra",
+        "szl:filesChecked": [
+          "src/sentra_immune.py",
+          "src/tupu_replay_5x.py",
+          "src/tupu_verify.py"
+        ],
+        "szl:witnessedPyExists": false,
+        "szl:anyReceiptConsumption": false,
+        "szl:verificationMethod": "gh_api_blob_existence + grep_receipt_keywords"
+      },
+      "prov:wasGeneratedBy": {
+        "@id": "szl:anatomy-alive-run-2026-05-29T19-50-15.832631Z"
+      }
+    },
+    {
+      "@id": "szl:anatomy-alive-summary",
+      "@type": [
+        "prov:Entity",
+        "schema:Dataset"
+      ],
+      "schema:name": "SZL Anatomy-Alive Harness Evidence",
+      "schema:version": "1.1.0",
+      "schema:datePublished": "2026-05-29T19:50:30.171749Z",
+      "schema:creator": {
+        "@id": "szl:perplexity-computer-acting-cto"
+      },
+      "schema:license": "https://spdx.org/licenses/Apache-2.0.html",
+      "schema:description": "Cross-organ integration evidence for SZL Holdings Phase 1 anatomy-alive instillation. 7-layer harness exercises the AdversarialRobustness anchor formula from Lean theorem (lutar-lean) through TypeScript runtimes (ouroboros), OTel spans (vsp-otel), DSSE receipts (uds-mesh), and policy gates (a11oy).",
+      "szl:verdict": "STAGED-PASS",
+      "szl:layerSummary": {
+        "total": 7,
+        "PASS": 4,
+        "STAGED": 2,
+        "NOT-YET-WIRED": 1,
+        "FAIL": 0
+      },
+      "prov:wasDerivedFrom": [
+        {
+          "@id": "szl:layer-result-L1"
+        },
+        {
+          "@id": "szl:layer-result-L2"
+        },
+        {
+          "@id": "szl:layer-result-L3"
+        },
+        {
+          "@id": "szl:layer-result-L4"
+        },
+        {
+          "@id": "szl:layer-result-L5"
+        },
+        {
+          "@id": "szl:layer-result-L6"
+        },
+        {
+          "@id": "szl:layer-result-L7"
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,145 @@
+{
+  "_comment": "Expected DSSE receipt schema for each layer in the anatomy-alive trace. Doctrine v6.",
+  "_version": "1.0.0",
+  "trace_id": "anatomy-alive-trace-20260530T000000Z",
+  "layers": [
+    {
+      "layer": 1,
+      "organ": "lutar-lean",
+      "receipt_type": "lean_theorem_proof",
+      "required_fields": [
+        "theorem_namespace",
+        "theorem_name",
+        "lean_file",
+        "lean_commit_sha",
+        "sorry_free"
+      ],
+      "expected_values": {
+        "theorem_namespace": "Lutar.Composition.Robustness",
+        "theorem_name": "robustness_preserved_by_composition",
+        "lean_file": "Lutar/Composition/AdversarialRobustness.lean",
+        "lean_commit_sha": "1dca00032dfc9aa8559cc6c2e4b63192fcf52371",
+        "sorry_free": true
+      },
+      "verification_method": "gh_api_blob_sha_check + grep_sorry"
+    },
+    {
+      "layer": 2,
+      "organ": "ouroboros",
+      "receipt_type": "formula_runtime_result",
+      "required_fields": [
+        "formula",
+        "inputs",
+        "output",
+        "pass"
+      ],
+      "expected_values": {
+        "formula": "adversarialRobustness",
+        "inputs": {"lipschitz1": 2.0, "lipschitz2": 1.5, "delta": 0.1},
+        "output": {
+          "composedEpsilon": 0.3,
+          "composedLipschitz": 3.0,
+          "epsilon2": 0.3
+        },
+        "pass": true
+      },
+      "verification_method": "inline_python_reimplementation"
+    },
+    {
+      "layer": 3,
+      "organ": "ouroboros",
+      "receipt_type": "parity_test_result",
+      "required_fields": [
+        "formula",
+        "test_file",
+        "tests_found",
+        "status"
+      ],
+      "expected_values": {
+        "formula": "adversarialRobustness",
+        "test_file": "agentic/formulas/tests/adversarialRobustness.test.ts",
+        "tests_found": true,
+        "status": "file_confirmed_on_main"
+      },
+      "verification_method": "gh_api_file_existence"
+    },
+    {
+      "layer": 4,
+      "organ": "vsp-otel",
+      "receipt_type": "lambda_signed_span",
+      "required_fields": [
+        "span",
+        "receiptHash",
+        "lambda",
+        "axes",
+        "pass"
+      ],
+      "expected_values": {
+        "span.attributes.szl.anchor_formula.id": "NOT_YET_WIRED",
+        "span.attributes.szl.lean_theorem_ref": "NOT_YET_WIRED",
+        "pass": true,
+        "note": "vsp-otel signSpan() emits lambda-signed spans but szl.anchor_formula.id and szl.lean_theorem_ref attributes are not yet auto-derived in exporter.ts on main"
+      },
+      "verification_method": "vsp_otel_inline_simulation"
+    },
+    {
+      "layer": 5,
+      "organ": "uds-mesh",
+      "receipt_type": "dsse_formula_receipt",
+      "required_fields": [
+        "formula",
+        "inputs_hash",
+        "output",
+        "lean_theorem",
+        "lean_file",
+        "lean_commit_sha",
+        "timestamp",
+        "signature"
+      ],
+      "expected_values": {
+        "formula": "AdversarialRobustness",
+        "lean_theorem": "robustness_preserved_by_composition",
+        "lean_file": "Lutar/Composition/AdversarialRobustness.lean",
+        "lean_commit_sha": "1dca00032dfc9aa8559cc6c2e4b63192fcf52371"
+      },
+      "verification_method": "uds_mesh_formula_receipts_inline_run"
+    },
+    {
+      "layer": 6,
+      "organ": "a11oy",
+      "receipt_type": "policy_gate_decision",
+      "required_fields": [
+        "allow",
+        "formula",
+        "leanTheorem",
+        "leanFile",
+        "leanCommitSha",
+        "rationale"
+      ],
+      "expected_values": {
+        "formula": "AdversarialRobustness",
+        "leanTheorem": "robustness_preserved_by_composition",
+        "leanFile": "Lutar/Composition/AdversarialRobustness.lean",
+        "leanCommitSha": "1dca00032dfc9aa8559cc6c2e4b63192fcf52371",
+        "allow": true,
+        "note": "Gate logic is confirmed real in packages/policy/src/gates/adversarialRobustness_gate.ts. Inline Python simulation used — full pnpm test:policy-gates requires Cursor integration."
+      },
+      "verification_method": "a11oy_gate_inline_python_simulation"
+    },
+    {
+      "layer": 7,
+      "organ": "sentra",
+      "receipt_type": "forecast_with_formula_witness",
+      "required_fields": [
+        "formula_witness",
+        "uds_receipt_input",
+        "prediction"
+      ],
+      "expected_values": {
+        "status": "NOT_YET_WIRED",
+        "note": "sentra main does not yet consume UDS receipts as forecast input per Phase 1 Track 1 directive. Cursor owns this wiring."
+      },
+      "verification_method": "repo_structure_audit"
+    }
+  ]
+}

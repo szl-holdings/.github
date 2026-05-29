@@ -1,0 +1,7 @@
+# SZL anatomy-alive harness Python dependencies
+# All stdlib — no third-party packages required for core harness.
+# The harness uses only: hashlib, hmac, base64, json, math, urllib.request
+# (all Python 3.8+ standard library)
+#
+# Optional for diagram generation (anatomy_alive_diagram.py):
+matplotlib>=3.7.0
