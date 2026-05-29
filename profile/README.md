@@ -87,19 +87,16 @@ The 7-organ body is now a fully operational HF Space with live demo links and ve
 | Nervous | otel | vsp-otel + W3C TraceContext + OTLP | [vsp-otel-emitter](https://huggingface.co/spaces/SZLHOLDINGS/vsp-otel-emitter) |
 | Wires | kallpa | 5-tool MCP receipt bus, cross-component fabric | [mcp-receipts-server](https://huggingface.co/spaces/SZLHOLDINGS/mcp-receipts-server) |
 
-[![Heart](https://img.shields.io/badge/anatomy-heart-01696F?style=flat-square)](https://raw.githubusercontent.com/szl-holdings/szl-brand/main/anatomy/heart.pdf)
 [![Brain](https://img.shields.io/badge/anatomy-brain-01696F?style=flat-square)](https://raw.githubusercontent.com/szl-holdings/szl-brand/main/anatomy/brain.pdf)
 [![Wires](https://img.shields.io/badge/anatomy-wires-01696F?style=flat-square)](https://raw.githubusercontent.com/szl-holdings/szl-brand/main/anatomy/wires.pdf)
-[![Full Body](https://img.shields.io/badge/anatomy-full--body-01696F?style=flat-square)](https://raw.githubusercontent.com/szl-holdings/szl-brand/main/anatomy/full_body.pdf)
+[![Full Body v3](https://img.shields.io/badge/anatomy-full--body--v3-01696F?style=flat-square)](https://raw.githubusercontent.com/szl-holdings/szl-brand/main/anatomy/full_body_v3.pdf)
 
-| Series | Title | PDF (raw.githubusercontent.com) |
-|--------|-------|---------------------------------|
-| Anatomy 1/4 | The SZL Agent Body — v3, drawn from the disk up | [`full_body.pdf`](https://raw.githubusercontent.com/szl-holdings/szl-brand/main/anatomy/full_body.pdf) |
+| Series | Title | Download |
+|--------|-------|----------|
+| Anatomy 1/4 | The SZL Agent Body — v3, drawn from the disk up | [`full_body_v3.pdf`](https://raw.githubusercontent.com/szl-holdings/szl-brand/main/anatomy/full_body_v3.pdf) |
 | Anatomy 2/4 | Blood and Immune — the wiring under the agent | [`wires.pdf`](https://raw.githubusercontent.com/szl-holdings/szl-brand/main/anatomy/wires.pdf) |
 | Anatomy 3/4 | Inside the Head — what an AI agent's brain actually is | [`brain.pdf`](https://raw.githubusercontent.com/szl-holdings/szl-brand/main/anatomy/brain.pdf) |
-| Anatomy 4/4 | The Heart — yuyay_v3, the gate every cycle clears | [`heart.pdf`](https://raw.githubusercontent.com/szl-holdings/szl-brand/main/anatomy/heart.pdf) |
-
-Originals with richer diagrams: [`brain_original.pdf`](https://raw.githubusercontent.com/szl-holdings/szl-brand/main/anatomy/brain_original.pdf) · [`wires_original.pdf`](https://raw.githubusercontent.com/szl-holdings/szl-brand/main/anatomy/wires_original.pdf) · [`full_body_original.pdf`](https://raw.githubusercontent.com/szl-holdings/szl-brand/main/anatomy/full_body_original.pdf)
+| Anatomy 4/4 | The Heart — yuyay_v3, 13-axis conjunctive gate | see `szl-brand/anatomy/` · in-progress |
 
 **Author:** Lutar, Stephen P. · ORCID [`0009-0001-0110-4173`](https://orcid.org/0009-0001-0110-4173)
 
