@@ -1,0 +1,27 @@
+name: SBOM
+
+# Generates a Software Bill of Materials (CycloneDX + SPDX).
+# Required for Series-A supply-chain diligence.
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+  release:
+    types: [published]
+
+permissions:
+  contents: write
+
+jobs:
+  sbom:
+    name: Generate SBOM
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - name: Generate SBOM (CycloneDX + SPDX)
+        uses: anchore/sbom-action@f325610c9f50a54015d37c8d16cb3b0e2c8f4de # v0.18.0
+        with:
+          format: cyclonedx-json
+          artifact-name: sbom.cyclonedx.json
+          upload-artifact: true
