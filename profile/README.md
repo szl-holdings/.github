@@ -364,7 +364,7 @@ The 13 substrate repos cross-link via a `Related repositories in the SZL substra
 
 <div align="center">
 
-**SZL Holdings, LLC** · Founded by [Lutar, Stephen P.](https://orcid.org/0009-0001-0110-4173) · org page [github.com/szl-holdings](https://github.com/szl-holdings)
+**SZL Holdings, LLC** · Founded by [Stephen Lutar](https://github.com/stephenlutar2-hash) ([ORCID 0009-0001-0110-4173](https://orcid.org/0009-0001-0110-4173)) · org page [github.com/szl-holdings](https://github.com/szl-holdings)
 
 [![CITATION.cff](https://img.shields.io/badge/cite-CITATION.cff-blue?style=flat-square)](https://github.com/szl-holdings/.github/blob/main/CITATION.cff)
 [![Software Heritage](https://archive.softwareheritage.org/badge/origin/https://github.com/szl-holdings/ouroboros-thesis/)](https://archive.softwareheritage.org/browse/origin/?origin_url=https://github.com/szl-holdings/ouroboros-thesis)
