@@ -2,6 +2,10 @@
 <!-- Doctrine v6. Λ-axis substrate for verifiable agentic AI. -->
 <!-- Source of truth: this file. All assets hosted in szl-holdings/* GitHub repos. -->
 
+> **Live on Hugging Face:** [SZLHOLDINGS](https://huggingface.co/SZLHOLDINGS) — 22 datasets · 19+ Spaces · 2 models · all RUNNING
+>
+> 🔬 [szl-anatomy](https://huggingface.co/spaces/SZLHOLDINGS/szl-anatomy) · 🛠 [a11oy-platform](https://huggingface.co/spaces/SZLHOLDINGS/a11oy-platform) · 📜 [lean-proof-playground](https://huggingface.co/spaces/SZLHOLDINGS/lean-proof-playground) · 📨 [mcp-receipts-server](https://huggingface.co/spaces/SZLHOLDINGS/mcp-receipts-server) · 🛡 [sentra-security-gates](https://huggingface.co/spaces/SZLHOLDINGS/sentra-security-gates)
+
 <div align="center">
 
 # SZL Holdings — Λ-Axis Substrate for Verifiable Agentic AI
