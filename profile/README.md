@@ -16,6 +16,18 @@
 
 <br/>
 
+[![License: Apache 2.0](https://img.shields.io/badge/License-Apache_2.0-0B1F3A.svg?style=flat-square&logo=apache&logoColor=00D4FF)](https://www.apache.org/licenses/LICENSE-2.0)
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.20434276.svg)](https://doi.org/10.5281/zenodo.20434276)
+[![CI](https://github.com/szl-holdings/.github/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/szl-holdings/.github/actions/workflows/ci.yml)
+[![Tests](https://github.com/szl-holdings/.github/actions/workflows/tests.yml/badge.svg?branch=main)](https://github.com/szl-holdings/.github/actions/workflows/tests.yml)
+[![CodeQL](https://github.com/szl-holdings/.github/actions/workflows/codeql.yml/badge.svg?branch=main)](https://github.com/szl-holdings/.github/actions/workflows/codeql.yml)
+[![SBOM](https://github.com/szl-holdings/.github/actions/workflows/sbom.yml/badge.svg?branch=main)](https://github.com/szl-holdings/.github/actions/workflows/sbom.yml)
+[![SLSA 3](https://github.com/szl-holdings/.github/actions/workflows/slsa.yml/badge.svg?branch=main)](https://github.com/szl-holdings/.github/actions/workflows/slsa.yml)
+[![DCO](https://github.com/szl-holdings/.github/actions/workflows/dco.yml/badge.svg?branch=main)](https://github.com/szl-holdings/.github/actions/workflows/dco.yml)
+[![OpenSSF Scorecard](https://api.securityscorecards.dev/projects/github.com/szl-holdings/.github/badge)](https://securityscorecards.dev/viewer/?uri=github.com/szl-holdings/.github)
+[![ORCID](https://img.shields.io/badge/ORCID-0009--0001--0110--4173-A6CE39.svg?style=flat-square&logo=orcid&logoColor=white)](https://orcid.org/0009-0001-0110-4173)
+
+
 [![Doctrine v6](https://img.shields.io/badge/doctrine-v6-01696F?style=for-the-badge)](https://github.com/szl-holdings/platform/blob/main/docs/doctrine/szl-doctrine.md)
 [![Λ-axis](https://img.shields.io/badge/%CE%9B--axis-governance%20substrate-805AD5?style=for-the-badge)](https://github.com/szl-holdings/ouroboros-thesis)
 [![Lean 4](https://img.shields.io/badge/Lean%204-kernel--verified-2D5BB9?style=for-the-badge&logo=lean&logoColor=white)](https://github.com/szl-holdings/lutar-lean)
