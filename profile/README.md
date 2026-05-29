@@ -53,6 +53,24 @@ SZL Holdings publishes a verifiable substrate for agentic AI: a doctrine of 11 a
 
 The SZL Agent Body is the canonical anatomy of an audit-closure AI agent — Heart (yuyay_v3, 13-axis conjunctive AND), Brain (5 cortical regions + Quantum Mind), Blood (YAWAR append-only receipt bus, 20 SLOC), Immune (SENTRA inline + HUKLLA 10 tripwires). All four figures live in [`szl-brand/anatomy/`](https://github.com/szl-holdings/szl-brand/tree/main/anatomy) — never on a CDN.
 
+### Interactive showcase: szl-anatomy Space
+
+The 7-organ body is now a fully operational HF Space with live demo links and verified source counts for every organ:
+
+**[huggingface.co/spaces/SZLHOLDINGS/szl-anatomy](https://huggingface.co/spaces/SZLHOLDINGS/szl-anatomy)**
+
+<img src="https://huggingface.co/spaces/SZLHOLDINGS/szl-anatomy/resolve/main/assets/08_body_graph_composed.png" alt="SZL full body graph — 7-organ anatomy composed, Doctrine v6" width="100%"/>
+
+| Organ | Quechua | System | Space |
+|-------|---------|--------|-------|
+| Brain | amaru | Memory + attestation, Cardano-anchored | [amaru-memory-attestation](https://huggingface.co/spaces/SZLHOLDINGS/amaru-memory-attestation) |
+| Heart | yuyay | Λ-axis pulse, Ouroboros 32-module runtime | [szl-showcase](https://huggingface.co/spaces/SZLHOLDINGS/szl-showcase) |
+| Blood | yawar | DSSE 5-link receipt chain + UDS span flow | [mcp-receipts-server](https://huggingface.co/spaces/SZLHOLDINGS/mcp-receipts-server) |
+| Immune | huklla | sentra 6-gate + a11oy 12-innovation; 248+269 assertions | [sentra-security-gates](https://huggingface.co/spaces/SZLHOLDINGS/sentra-security-gates) |
+| Skeleton | Λ-spine | 76 named theorems, 134 lake-verified, 241 stubs | [lean-proof-playground](https://huggingface.co/spaces/SZLHOLDINGS/lean-proof-playground) |
+| Nervous | otel | vsp-otel + W3C TraceContext + OTLP | [vsp-otel-emitter](https://huggingface.co/spaces/SZLHOLDINGS/vsp-otel-emitter) |
+| Wires | kallpa | 5-tool MCP receipt bus, cross-component fabric | [mcp-receipts-server](https://huggingface.co/spaces/SZLHOLDINGS/mcp-receipts-server) |
+
 [![Heart](https://img.shields.io/badge/anatomy-heart-01696F?style=flat-square)](https://raw.githubusercontent.com/szl-holdings/szl-brand/main/anatomy/heart.pdf)
 [![Brain](https://img.shields.io/badge/anatomy-brain-01696F?style=flat-square)](https://raw.githubusercontent.com/szl-holdings/szl-brand/main/anatomy/brain.pdf)
 [![Wires](https://img.shields.io/badge/anatomy-wires-01696F?style=flat-square)](https://raw.githubusercontent.com/szl-holdings/szl-brand/main/anatomy/wires.pdf)
