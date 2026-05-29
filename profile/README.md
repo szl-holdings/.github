@@ -376,6 +376,21 @@ The 13 substrate repos cross-link via a `Related repositories in the SZL substra
 - [`agi-forecast`](https://github.com/szl-holdings/agi-forecast) — PAC-Bayes + Bekenstein forecasts
 - [`vsp-otel`](https://github.com/szl-holdings/vsp-otel) — OTEL exporter for Λ-axis spans
 
+
+
+---
+
+## What SZL Holdings Is NOT
+
+Doctrine v6 honest scoping — for due diligence reviewers:
+
+- **Not a general-purpose AI company.** SZL Holdings builds governance substrate for bounded-recursion agentic AI in specific enterprise verticals; we are not an LLM provider.
+- **Not post-revenue.** The platform is Series-A stage; current focus is on technical buildout and investor readiness.
+- **Not making AGI claims.** The `agi-forecast` repo publishes PAC-Bayes governance-trajectory forecasts, not claims of artificial general intelligence development.
+- **Not a blockchain company.** Cardano anchoring (via amaru) is one receipt-chain primitive; the substrate is not a crypto project.
+- **Not open-source (all of it).** Core substrate repos are BSL-1.1 or proprietary; Apache-licensed repos are explicitly marked.
+
+
 ---
 
 <div align="center">
