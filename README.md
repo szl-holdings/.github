@@ -1,16 +1,13 @@
 <!-- Repo-level README for szl-holdings/.github -->
 
 # `szl-holdings/.github`
+[![License: Apache 2.0](https://img.shields.io/badge/License-Apache_2.0-0B1F3A.svg?style=flat-square&logo=apache&logoColor=00D4FF)](https://www.apache.org/licenses/LICENSE-2.0)
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.20434276.svg)](https://doi.org/10.5281/zenodo.20434276)
+[![SLSA: enabled](https://img.shields.io/badge/SLSA-enabled-0B1F3A.svg?style=flat-square&logoColor=00D4FF)](https://slsa.dev/spec/v1.0/levels)
+[![ORCID](https://img.shields.io/badge/ORCID-0009--0001--0110--4173-A6CE39.svg?style=flat-square&logo=orcid&logoColor=white)](https://orcid.org/0009-0001-0110-4173)
 
 > Org-wide governance, reusable workflows, templates, and security policy for [SZL Holdings](https://github.com/szl-holdings).
 
-<p>
-  <a href="https://securityscorecards.dev/viewer/?uri=github.com/szl-holdings/.github"><img alt="OpenSSF Scorecard" src="https://api.securityscorecards.dev/projects/github.com/szl-holdings/.github/badge"></a>
-  <a href="./LICENSE"><img alt="License Apache-2.0" src="https://img.shields.io/badge/license-Apache--2.0-01696F?style=flat-square"></a>
-  <a href="./SECURITY.md"><img alt="Security policy" src="https://img.shields.io/badge/security-policy-1B474D?style=flat-square&logo=github&logoColor=white"></a>
-  <a href="./CODE_OF_CONDUCT.md"><img alt="Contributor Covenant 2.1" src="https://img.shields.io/badge/conduct-Contributor%20Covenant%202.1-C8B26A?style=flat-square"></a>
-  <img alt="Workflows SHA-pinned" src="https://img.shields.io/badge/workflows-SHA--pinned-2DA44E?style=flat-square">
-</p>
 
 ---
 
