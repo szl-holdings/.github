@@ -2,7 +2,7 @@
 <!-- Doctrine v6. Λ-axis substrate for verifiable agentic AI. -->
 <!-- Source of truth: this file. All assets hosted in szl-holdings/* GitHub repos. -->
 
-> **Live on Hugging Face:** [SZLHOLDINGS](https://huggingface.co/SZLHOLDINGS) — 22 datasets · 19+ Spaces · 2 models · all RUNNING
+> **Live on Hugging Face:** [SZLHOLDINGS](https://huggingface.co/SZLHOLDINGS) — 24 datasets · 19+ Spaces · 2 models · all RUNNING
 >
 > 🔬 [szl-anatomy](https://huggingface.co/spaces/SZLHOLDINGS/szl-anatomy) · 🛠 [a11oy-platform](https://huggingface.co/spaces/SZLHOLDINGS/a11oy-platform) · 📜 [lean-proof-playground](https://huggingface.co/spaces/SZLHOLDINGS/lean-proof-playground) · 📨 [mcp-receipts-server](https://huggingface.co/spaces/SZLHOLDINGS/mcp-receipts-server) · 🛡 [sentra-security-gates](https://huggingface.co/spaces/SZLHOLDINGS/sentra-security-gates)
 
@@ -10,7 +10,7 @@
 
 # SZL Holdings — Λ-Axis Substrate for Verifiable Agentic AI
 
-### Governance-grade infrastructure for bounded-recursion agentic AI · doctrine v6 · 11 axioms · 30 GREEN modules
+### Governance-grade infrastructure for bounded-recursion agentic AI · doctrine v6 · 11 axioms · 32 GREEN modules
 
 **Auditable by construction. Receipt-emitting by primitive. Kernel-verified by Lean 4.**
 
@@ -61,7 +61,7 @@
 
 ## Positioning — governance-mathematical, not marketing
 
-SZL Holdings publishes a verifiable substrate for agentic AI: a doctrine of 11 axioms (v6), a Λ-axis audit-closure operator defined on the receipt-bus σ-algebra, 30 kernel-verified Lean 4 modules (Mathlib v4.13.0), and a runtime that emits a SHA-pinned proof-chain receipt for every decision. The substrate is the deliverable. Every claim in this README terminates in a DOI, a commit SHA, a Lean theorem, or a CI workflow run; no claim terminates in marketing prose. The math is in [`ouroboros-thesis`](https://github.com/szl-holdings/ouroboros-thesis), the proofs are in [`lutar-lean`](https://github.com/szl-holdings/lutar-lean), the runtime is in [`ouroboros`](https://github.com/szl-holdings/ouroboros), the receipt fabric is in [`amaru`](https://github.com/szl-holdings/amaru) + [`rosie`](https://github.com/szl-holdings/rosie) + [`sentra`](https://github.com/szl-holdings/sentra), and the platform that composes them is in [`platform`](https://github.com/szl-holdings/platform).
+SZL Holdings publishes a verifiable substrate for agentic AI: a doctrine of 11 axioms (v6), a Λ-axis audit-closure operator defined on the receipt-bus σ-algebra, 32 kernel-verified Lean 4 modules (Mathlib v4.13.0), and a runtime that emits a SHA-pinned proof-chain receipt for every decision. The substrate is the deliverable. Every claim in this README terminates in a DOI, a commit SHA, a Lean theorem, or a CI workflow run; no claim terminates in marketing prose. The math is in [`ouroboros-thesis`](https://github.com/szl-holdings/ouroboros-thesis), the proofs are in [`lutar-lean`](https://github.com/szl-holdings/lutar-lean), the runtime is in [`ouroboros`](https://github.com/szl-holdings/ouroboros), the receipt fabric is in [`amaru`](https://github.com/szl-holdings/amaru) + [`rosie`](https://github.com/szl-holdings/rosie) + [`sentra`](https://github.com/szl-holdings/sentra), and the platform that composes them is in [`platform`](https://github.com/szl-holdings/platform).
 
 ---
 
@@ -179,7 +179,7 @@ These six repos define the spine of the Λ-axis substrate. Each card links to th
 
 - **DOIs**: [`10.5281/zenodo.20431181`](https://doi.org/10.5281/zenodo.20431181)
 - **Stack**: Lean 4 v4.13.0 · Mathlib v4.13.0 · Lake build · CI workflow [`lean.yml`](https://github.com/szl-holdings/lutar-lean/actions/workflows/lean.yml)
-- **Carries**: 30 GREEN modules · Λ-gate theorems · audit-fiber invariants · DPI / PAC-Bayes bounds · Knot calculus R1/R2/R3
+- **Carries**: 32 GREEN modules · Λ-gate theorems · audit-fiber invariants · DPI / PAC-Bayes bounds · Knot calculus R1/R2/R3
 - **License**: CC BY 4.0
 
 ### 3. `ouroboros` — the runtime
@@ -225,7 +225,7 @@ flowchart TD
     classDef surface  fill:#F7F6F2,stroke:#01696F,color:#1B474D,stroke-width:1.5px;
 
     T["Ouroboros Thesis v3 to v18<br/>Zenodo DOIs · CC BY 4.0"]:::research
-    K["Lutar-Lean<br/>Lean 4 + Mathlib v4.13.0<br/>30 GREEN modules"]:::sdk
+    K["Lutar-Lean<br/>Lean 4 + Mathlib v4.13.0<br/>32 GREEN modules"]:::sdk
     R["Ouroboros Runtime<br/>bounded loops · sub-ms Λ overhead<br/>Apache 2.0"]:::runtime
     L["Λ Audit-Closure Operator<br/>defined on receipt-bus σ-algebra"]:::runtime
     A["Amaru<br/>Cardano-anchored Shor receipts"]:::runtime
@@ -253,7 +253,7 @@ The path from a peer-style paper (`ouroboros-thesis`) to a byte-string receipt (
 
 ## Λ-axis · in one paragraph
 
-The Λ-axis is a measurable governance operator defined on the receipt-bus σ-algebra of a bounded-recursion runtime. It composes axiom-by-axiom (doctrine v6: 11 axioms) under a monotone geometric mean, with PAC-Bayes [(McAllester, 2003)](https://link.springer.com/article/10.1023/A:1021840411064) tail bounds on the confidence margin, Bekenstein information-density caps [(Bekenstein, 1981)](https://doi.org/10.1103/PhysRevD.23.287) on per-receipt entropy, and Reidemeister R1/R2/R3 equivalence classes [(Reidemeister, 1927)](https://link.springer.com/article/10.1007/BF02952507) on receipt-knot chains. The closure is proved in Lean 4 (Mathlib v4.13.0) across 30 GREEN modules in [`lutar-lean`](https://github.com/szl-holdings/lutar-lean). The runtime overhead is bounded above by 0.59 ms / request median in the [`ouroboros`](https://github.com/szl-holdings/ouroboros) bench harness.
+The Λ-axis is a measurable governance operator defined on the receipt-bus σ-algebra of a bounded-recursion runtime. It composes axiom-by-axiom (doctrine v6: 11 axioms) under a monotone geometric mean, with PAC-Bayes [(McAllester, 2003)](https://link.springer.com/article/10.1023/A:1021840411064) tail bounds on the confidence margin, Bekenstein information-density caps [(Bekenstein, 1981)](https://doi.org/10.1103/PhysRevD.23.287) on per-receipt entropy, and Reidemeister R1/R2/R3 equivalence classes [(Reidemeister, 1927)](https://link.springer.com/article/10.1007/BF02952507) on receipt-knot chains. The closure is proved in Lean 4 (Mathlib v4.13.0) across 32 GREEN modules in [`lutar-lean`](https://github.com/szl-holdings/lutar-lean). The runtime overhead is bounded above by 0.59 ms / request median in the [`ouroboros`](https://github.com/szl-holdings/ouroboros) bench harness.
 
 ---
 
@@ -301,7 +301,7 @@ AIMS submission portal: [OpenReview `colmweb.org/COLM/2026/Workshop/AIMS`](https
 
 | Version | Title | Released | DOI | PDF |
 |---|---|---|---|---|
-| **v18.0** (master) | Λ-Axis Substrate for Verifiable Agentic AI — doctrine v6, 11 axioms, 30 GREEN modules | 2026-05-29 | [`10.5281/zenodo.20434276`](https://doi.org/10.5281/zenodo.20434276) | via Zenodo |
+| **v18.0** (master) | Λ-Axis Substrate for Verifiable Agentic AI — doctrine v6, 11 axioms, 32 GREEN modules | 2026-05-29 | [`10.5281/zenodo.20434276`](https://doi.org/10.5281/zenodo.20434276) | via Zenodo |
 | **v18.0.0** (software) | Reference runtime + Lean kernel for v18 master | 2026-05-29 | [`10.5281/zenodo.20434308`](https://doi.org/10.5281/zenodo.20434308) | via Zenodo |
 | **v17-1.0.1** | Wheelerian audit closure + Shannon doctrine code + QEC-evolved Agent Body | 2026-05-28 | [`10.5281/zenodo.20431181`](https://doi.org/10.5281/zenodo.20431181) | [PDF](https://zenodo.org/records/20431181/files/ouroboros-thesis-v17.pdf) |
 | **v16-1.0.2** | Feynman path-integral audit closure + Gates doctrine codes + cross-component composite invariant | 2026-05-28 | [`10.5281/zenodo.20424996`](https://doi.org/10.5281/zenodo.20424996) | [PDF](https://zenodo.org/records/20424996/files/ouroboros-thesis-v16.pdf) |
@@ -322,7 +322,7 @@ Re-verified by command, not estimated. See [`SOURCE_OF_TRUTH.md`](https://github
 |---|---|
 | Substrate repos (this org) | **13** |
 | Doctrine v6 axioms | **11** |
-| GREEN Lean modules (Mathlib v4.13.0) | **30 / 30** |
+| GREEN Lean modules (Mathlib v4.13.0) | **32 / 32** |
 | Ouroboros runtime tests | **218 / 218 passing** |
 | Platform monorepo packages | **76** |
 | Platform monorepo tests | **1,220 / 1,220 passing** |
@@ -391,7 +391,7 @@ The 13 substrate repos cross-link via a `Related repositories in the SZL substra
 <!--
   Profile README maintained by GH Admin #1 (Profile + Org + 404 Hunter).
   Source of truth: this file. All assets in szl-holdings/* repos. No external CDN.
-  Doctrine v6 · 11 axioms · 30 GREEN modules · v18.0 DOI 10.5281/zenodo.20434276.
+  Doctrine v6 · 11 axioms · 32 GREEN modules · v18.0 DOI 10.5281/zenodo.20434276.
 -->
 
 ---
