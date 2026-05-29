@@ -20,10 +20,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout .github
-        uses: actions/checkout@v4
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
 
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
         with:
           python-version: '3.12'
 
@@ -124,7 +124,7 @@ jobs:
                   commit_message=f"feat(receipt): daily activity receipt {date_str} [automated]",
                   token=TOKEN,
               )
-              print(f"✓ Pushed daily receipt for {date_str}")
+              print(f"Pushed daily receipt for {date_str}")
           except Exception as e:
               print(f"Note: szl-evidence dataset not available or write blocked: {e}")
               # Non-fatal: fallback to appending to szl-artifacts
@@ -139,7 +139,7 @@ jobs:
                       commit_message=f"feat(receipt): daily activity receipt {date_str} [automated]",
                       token=TOKEN,
                   )
-                  print(f"✓ Pushed daily receipt to szl-artifacts for {date_str}")
+                  print(f"Pushed daily receipt to szl-artifacts for {date_str}")
               except Exception as e2:
                   print(f"Warning: could not push receipt: {e2}")
           PYEOF
