@@ -1,0 +1,68 @@
+name: Reusable — DCO sign-off check
+
+# Verifies that every commit in a pull request carries a valid
+# Developer Certificate of Origin (DCO) Signed-off-by trailer.
+#
+# Replaces tim-actions/dco@node12 + tim-actions/get-pr-commits@node12,
+# both of which are abandoned (last release 2021) and use node12, a runtime
+# deprecated by GitHub Actions on 2026-06-02 and removed 2026-09-16.
+#
+# This implementation is zero-dependency: pure bash + the GitHub CLI
+# (pre-installed on ubuntu-latest). No third-party action is involved.
+
+on:
+  workflow_call:
+
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  dco:
+    name: DCO sign-off
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Harden runner
+        uses: step-security/harden-runner@9af89fc71515a100421586dfdb3dc9c984fbf411 # v2.19.4
+        with:
+          egress-policy: audit
+
+      - name: Check Signed-off-by on every PR commit
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          REPO: ${{ github.repository }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          if [ -z "${PR_NUMBER:-}" ]; then
+            echo "::error::This workflow must be called from a pull_request event."
+            exit 1
+          fi
+
+          missing=0
+
+          while IFS= read -r sha; do
+            msg=$(gh api "repos/$REPO/git/commits/$sha" --jq '.message')
+            # A valid DCO line looks like:
+            #   Signed-off-by: Full Name <email@example.com>
+            # The trailer may appear anywhere in the commit body.
+            if ! echo "$msg" | grep -qE '^Signed-off-by: .+ <.+@.+>'; then
+              echo "::error::Commit ${sha:0:12} is missing a Signed-off-by trailer."
+              echo "  Subject: $(echo "$msg" | head -1)"
+              missing=1
+            fi
+          done < <(gh api "repos/$REPO/pulls/$PR_NUMBER/commits" --jq '.[].sha')
+
+          if [ "$missing" -ne 0 ]; then
+            echo ""
+            echo "One or more commits are missing the DCO sign-off."
+            echo "Fix options:"
+            echo "  Single commit:  git commit --amend --signoff"
+            echo "  Multiple:       git rebase HEAD~N --signoff"
+            exit 1
+          fi
+
+          echo "✓ All commits carry a valid Signed-off-by trailer."

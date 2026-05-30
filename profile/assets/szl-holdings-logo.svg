@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="640" height="160" viewBox="0 0 640 160" role="img" aria-label="SZL Holdings">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#060812"/>
+      <stop offset="100%" stop-color="#131729"/>
+    </linearGradient>
+    <linearGradient id="gold" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#c9a227"/>
+      <stop offset="100%" stop-color="#e2d7b4"/>
+    </linearGradient>
+  </defs>
+  <rect width="640" height="160" rx="12" fill="url(#bg)"/>
+  <rect x="0" y="0" width="6" height="160" fill="url(#gold)"/>
+  <g font-family="'Helvetica Neue', Arial, sans-serif">
+    <text x="40" y="78" font-size="48" font-weight="700" letter-spacing="6" fill="url(#gold)">SZL HOLDINGS</text>
+    <text x="40" y="110" font-size="14" font-weight="500" letter-spacing="3" fill="#9aa3b2">GOVERNED  ·  ATTRIBUTED  ·  EXECUTABLE</text>
+    <text x="40" y="134" font-size="11" font-weight="400" letter-spacing="2" fill="#5b6477">DECISION INFRASTRUCTURE FOR REGULATED ENTERPRISES</text>
+  </g>
+</svg>

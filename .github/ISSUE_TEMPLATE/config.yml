@@ -1,0 +1,14 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Security vulnerability (PRIVATE)
+    url: https://github.com/szl-holdings/.github/security/policy
+    about: Report exploitable security issues privately. Do NOT file a public issue.
+  - name: security.txt (RFC 9116)
+    url: https://szlholdings.com/.well-known/security.txt
+    about: Canonical private-disclosure contact and PGP key.
+  - name: Ouroboros Thesis discussion
+    url: https://github.com/szl-holdings/ouroboros-thesis/discussions
+    about: Academic and methodology questions on the published papers.
+  - name: General questions
+    url: mailto:inquiries@szlholdings.com
+    about: Press, partnerships, hiring, and other non-bug inquiries.

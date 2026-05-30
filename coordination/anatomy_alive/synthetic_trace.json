@@ -1,0 +1,119 @@
+{
+  "_comment": "SZL anatomy-alive synthetic agent trace — Doctrine v6",
+  "_version": "1.0.0",
+  "trace_id": "anatomy-alive-trace-20260530T000000Z",
+  "session_id": "szl-harness-session-001",
+  "initiated_at": "2026-05-30T00:00:00Z",
+  "agent": "amaru-sidecar",
+  "scenario": "adversarial_robustness_composition_check",
+  "anchor_formula": "AdversarialRobustness",
+  "lean_theorem_ref": "Lutar.Composition.Robustness.robustness_preserved_by_composition",
+  "lean_file": "Lutar/Composition/AdversarialRobustness.lean",
+  "lean_commit_sha": "1dca00032dfc9aa8559cc6c2e4b63192fcf52371",
+
+  "steps": [
+    {
+      "step_id": "L1-lean-lookup",
+      "layer": 1,
+      "organ": "lutar-lean",
+      "action": "verify_theorem_exists",
+      "theorem_namespace": "Lutar.Composition.Robustness",
+      "theorem_name": "robustness_preserved_by_composition",
+      "lean_file": "Lutar/Composition/AdversarialRobustness.lean",
+      "expected_status": "proven_no_sorry"
+    },
+    {
+      "step_id": "L2-ts-runtime",
+      "layer": 2,
+      "organ": "ouroboros",
+      "action": "invoke_formula_runtime",
+      "formula": "adversarialRobustness",
+      "inputs": {
+        "lipschitz1": 2.0,
+        "lipschitz2": 1.5,
+        "delta": 0.1
+      },
+      "expected_output_fields": ["composedEpsilon", "composedLipschitz", "pass"]
+    },
+    {
+      "step_id": "L3-parity",
+      "layer": 3,
+      "organ": "ouroboros",
+      "action": "parity_test",
+      "formula": "adversarialRobustness",
+      "parity_test_file": "agentic/formulas/tests/adversarialRobustness.test.ts",
+      "expected_status": "all_tests_pass"
+    },
+    {
+      "step_id": "L4-otel-span",
+      "layer": 4,
+      "organ": "vsp-otel",
+      "action": "emit_otel_span",
+      "span": {
+        "spanId": "aa-span-0001",
+        "traceId": "anatomy-alive-trace-20260530T000000Z",
+        "name": "amaru.decision.adversarial_robustness",
+        "startTime": 1748563200000,
+        "endTime": 1748563200050,
+        "attributes": {
+          "szl.anchor_formula.id": "adversarial_robustness",
+          "szl.lean_theorem_ref": "Lutar.Composition.Robustness.robustness_preserved_by_composition",
+          "szl.formula_witness": "AdversarialRobustness",
+          "lambda.moralGrounding": 0.95,
+          "lambda.measurabilityHonesty": 0.92,
+          "lambda.epistemicHumility": 0.90,
+          "lambda.harmAvoidance": 0.93,
+          "lambda.logicalCoherence": 0.91,
+          "lambda.citationIntegrity": 0.94,
+          "lambda.noveltyContribution": 0.88,
+          "lambda.reproducibility": 0.96,
+          "lambda.stakeholderAlignment": 0.90
+        },
+        "status": "OK"
+      },
+      "expected_attrs": ["szl.anchor_formula.id", "szl.lean_theorem_ref"]
+    },
+    {
+      "step_id": "L5-dsse-receipt",
+      "layer": 5,
+      "organ": "uds-mesh",
+      "action": "emit_dsse_receipt",
+      "formula": "AdversarialRobustness",
+      "inputs": {
+        "l1": 2.0,
+        "l2": 1.5,
+        "delta": 0.1
+      },
+      "expected_receipt_fields": [
+        "formula", "inputs_hash", "output", "lean_theorem",
+        "lean_file", "lean_commit_sha", "timestamp", "signature"
+      ]
+    },
+    {
+      "step_id": "L6-policy-gate",
+      "layer": 6,
+      "organ": "a11oy",
+      "action": "run_policy_gate",
+      "gate": "adversarialRobustnessGate",
+      "gate_file": "packages/policy/src/gates/adversarialRobustness_gate.ts",
+      "gate_inputs": {
+        "lipschitz1": 2.0,
+        "lipschitz2": 1.5,
+        "delta": 0.1
+      },
+      "expected_decision_fields": [
+        "allow", "formula", "leanTheorem", "leanFile", "leanCommitSha"
+      ],
+      "expected_formula_witness_emitted": false,
+      "note": "a11oy#83 ships inline policy gates; formula_witness emission to uds-mesh not yet wired per Phase 1 Track 1"
+    },
+    {
+      "step_id": "L7-forecast",
+      "layer": 7,
+      "organ": "sentra",
+      "action": "forecast_with_receipt_input",
+      "expected_status": "not_yet_wired",
+      "note": "sentra forecast loop does not yet consume UDS receipts as input per Phase 1 Track 1"
+    }
+  ]
+}

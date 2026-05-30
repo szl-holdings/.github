@@ -1,0 +1,17 @@
+{
+  "id": "6f7a030ecb3dc5c7fbc46d37e44af48e727b24c7be464f50c5d5ce34787cabe4",
+  "timestamp": "2026-06-17T18:42:07Z",
+  "envelope": {
+    "payload": "eyJfdHlwZSI6ICJodHRwczovL3N6bGhvbGRpbmdzLmNvbS9yZWNlaXB0L3YxIiwgInN1YmplY3QiOiAic3psLWRlbW8td29ya2xvYWQvRGVwbG95bWVudC91YXY3LXJlY292ZXJ5LWNvbnRyb2xsZXIiLCAic3BlY0hhc2giOiAiZGVhZGJlZWZkZWFkYmVlZmRlYWRiZWVmZGVhZGJlZWZkZWFkYmVlZmRlYWRiZWVmZGVhZGJlZWZkZWFkYmVlZiIsICJ0aW1lc3RhbXAiOiAiMjAyNi0wNi0xN1QxODo0MjowN1oiLCAiYWRtaXNzaW9uT3AiOiAiVVBEQVRFIiwgInJlc291cmNlVmVyc2lvbiI6ICIxMDQyNyJ9",
+    "payloadType": "application/vnd.szl.receipt.v1+json",
+    "signatures": [
+      {
+        "keyid": "szl-dev-hmac-sha256-2026",
+        "sig": "vPrRe59RLy4VAaNyDeEJq6hfG3RykJQcQwlcfXHXBE4="
+      }
+    ]
+  },
+  "valid": false,
+  "_tamper_note": "payload specHash mutated after signing; signature is over the ORIGINAL payload bytes and will not verify",
+  "_expected_verify_result": "UNVERIFIED \u2014 HMAC mismatch on tampered payload"
+}

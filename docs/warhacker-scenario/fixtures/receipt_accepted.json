@@ -1,0 +1,15 @@
+{
+  "id": "51e264692443c34930337ee17b671ee1f35c8dfc8c9483fe529e17f8da10e00b",
+  "timestamp": "2026-06-17T18:42:07Z",
+  "envelope": {
+    "payload": "eyJfdHlwZSI6ICJodHRwczovL3N6bGhvbGRpbmdzLmNvbS9yZWNlaXB0L3YxIiwgInN1YmplY3QiOiAic3psLWRlbW8td29ya2xvYWQvRGVwbG95bWVudC91YXY3LXJlY292ZXJ5LWNvbnRyb2xsZXIiLCAic3BlY0hhc2giOiAiNDFkMTMwZWJmMzljN2JhNDY5NDRlNzU0Yzg4Y2FlNTM3NTg4NDk5MWViMDIwM2UxNDRmNDVlMzdiM2RkNTAxNiIsICJ0aW1lc3RhbXAiOiAiMjAyNi0wNi0xN1QxODo0MjowN1oiLCAiYWRtaXNzaW9uT3AiOiAiQ1JFQVRFIiwgInJlc291cmNlVmVyc2lvbiI6ICIxMDQyNyJ9",
+    "payloadType": "application/vnd.szl.receipt.v1+json",
+    "signatures": [
+      {
+        "keyid": "szl-dev-hmac-sha256-2026",
+        "sig": "vPrRe59RLy4VAaNyDeEJq6hfG3RykJQcQwlcfXHXBE4="
+      }
+    ]
+  },
+  "valid": true
+}

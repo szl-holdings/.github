@@ -1,0 +1,104 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://szl-holdings.github.io/schemas/formula_witness/v1.json",
+  "title": "SZL Formula Witness Schema",
+  "description": "Schema the formula_witness field must satisfy in any anatomy-alive span or receipt. Doctrine v6.",
+  "type": "object",
+  "required": [
+    "formula_id",
+    "lean_theorem_ref",
+    "lean_file",
+    "lean_commit_sha",
+    "inputs_hash",
+    "output_summary",
+    "timestamp"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "formula_id": {
+      "type": "string",
+      "enum": [
+        "liu_hui_pi",
+        "madhava_bound",
+        "false_position",
+        "summation_invariant",
+        "adversarial_robustness"
+      ],
+      "description": "One of the 5 SZL anchor formulas (snake_case canonical form)"
+    },
+    "lean_theorem_ref": {
+      "type": "string",
+      "pattern": "^Lutar\\.",
+      "description": "Fully qualified Lean 4 theorem identifier. Must start with 'Lutar.' to be grep-verifiable in lutar-lean."
+    },
+    "lean_file": {
+      "type": "string",
+      "pattern": "^Lutar/.*\\.lean$",
+      "description": "Relative path within szl-holdings/lutar-lean to the .lean file containing the theorem"
+    },
+    "lean_commit_sha": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{40}$",
+      "description": "Full 40-char SHA of the lutar-lean commit where this theorem is verified"
+    },
+    "inputs_hash": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$",
+      "description": "SHA-256 hex of canonical JSON of formula inputs"
+    },
+    "output_summary": {
+      "type": "object",
+      "description": "Key scalar outputs of the formula computation",
+      "minProperties": 1
+    },
+    "timestamp": {
+      "type": "string",
+      "format": "date-time",
+      "description": "ISO-8601 UTC timestamp when witness was generated"
+    },
+    "gate_decision": {
+      "type": "object",
+      "description": "Optional: policy gate decision from a11oy if gate fired",
+      "properties": {
+        "gate_id": {"type": "string"},
+        "allow": {"type": "boolean"},
+        "rationale": {"type": "string"}
+      },
+      "required": ["gate_id", "allow"]
+    },
+    "dsse_receipt_ref": {
+      "type": "string",
+      "description": "Optional: reference to the DSSE envelope in uds-mesh ledger (SHA-256 of payload)"
+    },
+    "trace_id": {
+      "type": "string",
+      "description": "OTel trace_id for cross-organ correlation"
+    },
+    "span_id": {
+      "type": "string",
+      "description": "OTel span_id for the span carrying this witness"
+    }
+  },
+  "examples": [
+    {
+      "formula_id": "adversarial_robustness",
+      "lean_theorem_ref": "Lutar.Composition.Robustness.robustness_preserved_by_composition",
+      "lean_file": "Lutar/Composition/AdversarialRobustness.lean",
+      "lean_commit_sha": "1dca00032dfc9aa8559cc6c2e4b63192fcf52371",
+      "inputs_hash": "a5f3d2c1e0b4a98765432109abcdef0123456789abcdef0123456789abcdef01",
+      "output_summary": {
+        "composedEpsilon": 0.3,
+        "composedLipschitz": 3.0,
+        "pass": true
+      },
+      "timestamp": "2026-05-30T00:00:00Z",
+      "gate_decision": {
+        "gate_id": "adversarialRobustnessGate",
+        "allow": true,
+        "rationale": "epsilon2=0.300 ≤ maxEpsilon=0.500. Lean: robustness_preserved_by_composition"
+      },
+      "trace_id": "anatomy-alive-trace-20260530T000000Z",
+      "span_id": "aa-span-0001"
+    }
+  ]
+}

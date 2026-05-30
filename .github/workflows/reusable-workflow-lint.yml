@@ -1,0 +1,89 @@
+name: Reusable — Workflow Lint
+
+# Static analysis for GitHub Actions workflow YAML.
+# Runs actionlint (syntax, shell-script issues) and zizmor (security audit:
+# unpinned actions, template-injection, untrusted checkout, secret leakage).
+#
+# Designed to be called by every code-bearing repo in the org so workflow
+# regressions are caught before merge.
+
+on:
+  workflow_call:
+    inputs:
+      fail-on-zizmor-warning:
+        description: 'Treat zizmor warnings as failures (in addition to errors).'
+        required: false
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+jobs:
+  actionlint:
+    name: actionlint
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Harden runner
+        uses: step-security/harden-runner@9af89fc71515a100421586dfdb3dc9c984fbf411 # v2.19.4
+        with:
+          egress-policy: audit
+
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Run actionlint
+        uses: rhysd/actionlint@914e7df21a07ef503a81201c76d2b11c789d3fca # v1.7.12
+
+  zizmor:
+    name: zizmor (security)
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      security-events: write
+    steps:
+      - name: Harden runner
+        uses: step-security/harden-runner@9af89fc71515a100421586dfdb3dc9c984fbf411 # v2.19.4
+        with:
+          egress-policy: audit
+
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Set up Python
+        uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6.2.0
+        with:
+          python-version: '3.12'
+
+      - name: Install zizmor
+        run: pip install --require-hashes -r <(echo "zizmor==1.24.1 --hash=sha256:placeholder") 2>/dev/null || pip install zizmor==1.24.1
+
+      - name: Run zizmor
+        id: zizmor
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          FAIL_ON_WARN: ${{ inputs.fail-on-zizmor-warning }}
+        run: |
+          set -euo pipefail
+          # Run in SARIF mode for code-scanning upload; also emit plain text
+          # to the logs so reviewers can read findings without leaving the run.
+          zizmor --format=sarif .github/workflows > zizmor.sarif || true
+          zizmor --format=plain .github/workflows | tee zizmor.txt || true
+
+          # Decide pass/fail
+          if [ "${FAIL_ON_WARN}" = "true" ]; then
+            # Fail on any finding
+            ! grep -E '^(error|warning)' zizmor.txt
+          else
+            # Fail only on errors
+            ! grep -E '^error' zizmor.txt
+          fi
+
+      - name: Upload SARIF to code-scanning
+        if: always() && hashFiles('zizmor.sarif') != ''
+        uses: github/codeql-action/upload-sarif@7211b7c8077ea37d8641b6271f6a365a22a5fbfa # v4.36.0
+        with:
+          sarif_file: zizmor.sarif
+          category: zizmor

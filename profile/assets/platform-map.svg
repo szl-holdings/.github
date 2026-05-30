@@ -1,0 +1,67 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 380" fill="none">
+  <defs>
+    <linearGradient id="goldLine2" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#d4a054" stop-opacity="0"/>
+      <stop offset="50%" stop-color="#d4a054" stop-opacity="0.3"/>
+      <stop offset="100%" stop-color="#d4a054" stop-opacity="0"/>
+    </linearGradient>
+    <linearGradient id="goldFill" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#e8c675"/>
+      <stop offset="50%" stop-color="#d4a054"/>
+      <stop offset="100%" stop-color="#b8862c"/>
+    </linearGradient>
+  </defs>
+
+  <rect width="900" height="380" fill="#060a10"/>
+
+  <g opacity="0.03">
+    <line x1="0" y1="60" x2="900" y2="60" stroke="#d4a054" stroke-width="0.5"/>
+    <line x1="0" y1="120" x2="900" y2="120" stroke="#d4a054" stroke-width="0.5"/>
+    <line x1="0" y1="180" x2="900" y2="180" stroke="#d4a054" stroke-width="0.5"/>
+    <line x1="0" y1="240" x2="900" y2="240" stroke="#d4a054" stroke-width="0.5"/>
+    <line x1="0" y1="300" x2="900" y2="300" stroke="#d4a054" stroke-width="0.5"/>
+  </g>
+
+  <text x="450" y="30" text-anchor="middle" fill="#475569" font-family="system-ui, -apple-system, sans-serif" font-size="9" font-weight="500" letter-spacing="3">ARCHITECTURE</text>
+
+  <rect x="350" y="48" width="200" height="44" rx="6" fill="#0c1018" stroke="#d4a054" stroke-width="1.5"/>
+  <text x="450" y="76" text-anchor="middle" fill="#d4a054" font-family="system-ui, -apple-system, sans-serif" font-size="14" font-weight="700">SZL Holdings</text>
+
+  <line x1="450" y1="92" x2="450" y2="115" stroke="#d4a054" stroke-width="1" opacity="0.4"/>
+
+  <rect x="290" y="115" width="320" height="40" rx="6" fill="#0c1018" stroke="#d4a054" stroke-width="1" stroke-opacity="0.6"/>
+  <text x="370" y="140" text-anchor="middle" fill="#d4a054" font-family="system-ui, -apple-system, sans-serif" font-size="12" font-weight="600">Lyte</text>
+  <text x="370" y="150" text-anchor="middle" fill="#64748b" font-family="system-ui, -apple-system, sans-serif" font-size="7">OBSERVE</text>
+  <rect x="440" y="125" width="1" height="20" fill="#1e293b"/>
+  <text x="530" y="140" text-anchor="middle" fill="#8b7ac8" font-family="system-ui, -apple-system, sans-serif" font-size="12" font-weight="600">Alloy</text>
+  <text x="530" y="150" text-anchor="middle" fill="#64748b" font-family="system-ui, -apple-system, sans-serif" font-size="7">EXECUTE</text>
+
+  <line x1="300" y1="155" x2="300" y2="195" stroke="#1e293b" stroke-width="1"/>
+  <line x1="450" y1="155" x2="450" y2="195" stroke="#1e293b" stroke-width="1"/>
+  <line x1="600" y1="155" x2="600" y2="195" stroke="#1e293b" stroke-width="1"/>
+  <line x1="160" y1="175" x2="750" y2="175" stroke="#1e293b" stroke-width="0.5" stroke-dasharray="4,4"/>
+
+  <rect x="40" y="195" width="180" height="56" rx="6" fill="#0c1018" stroke="#4a90b8" stroke-width="1" stroke-opacity="0.6"/>
+  <text x="130" y="220" text-anchor="middle" fill="#4a90b8" font-family="system-ui, -apple-system, sans-serif" font-size="13" font-weight="600">Vessels</text>
+  <text x="130" y="238" text-anchor="middle" fill="#64748b" font-family="system-ui, -apple-system, sans-serif" font-size="9">Maritime Intelligence</text>
+
+  <rect x="240" y="195" width="180" height="56" rx="6" fill="#0c1018" stroke="#c45a4a" stroke-width="1" stroke-opacity="0.6"/>
+  <text x="330" y="220" text-anchor="middle" fill="#c45a4a" font-family="system-ui, -apple-system, sans-serif" font-size="13" font-weight="600">Aegis</text>
+  <text x="330" y="238" text-anchor="middle" fill="#64748b" font-family="system-ui, -apple-system, sans-serif" font-size="9">Defense &amp; Intelligence</text>
+
+  <rect x="440" y="195" width="180" height="56" rx="6" fill="#0c1018" stroke="#c8953c" stroke-width="1" stroke-opacity="0.6"/>
+  <text x="530" y="220" text-anchor="middle" fill="#c8953c" font-family="system-ui, -apple-system, sans-serif" font-size="13" font-weight="600">Terra</text>
+  <text x="530" y="238" text-anchor="middle" fill="#64748b" font-family="system-ui, -apple-system, sans-serif" font-size="9">Real Estate Intelligence</text>
+
+  <rect x="640" y="195" width="220" height="56" rx="6" fill="#0c1018" stroke="#94a3b8" stroke-width="1" stroke-opacity="0.4"/>
+  <text x="710" y="218" text-anchor="middle" fill="#e2e8f0" font-family="system-ui, -apple-system, sans-serif" font-size="12" font-weight="600">PRISM</text>
+  <text x="790" y="218" text-anchor="middle" fill="#e2e8f0" font-family="system-ui, -apple-system, sans-serif" font-size="12" font-weight="600">Carlota Jo</text>
+  <text x="750" y="238" text-anchor="middle" fill="#64748b" font-family="system-ui, -apple-system, sans-serif" font-size="9">Legal &amp; Advisory</text>
+
+  <rect x="40" y="280" width="820" height="36" rx="4" fill="#0c1018" stroke="#1e293b" stroke-width="1"/>
+  <text x="450" y="303" text-anchor="middle" fill="#475569" font-family="system-ui, -apple-system, sans-serif" font-size="10" letter-spacing="0.5">PostgreSQL  ·  Drizzle ORM  ·  Express 5  ·  React  ·  Expo  ·  AI Engine  ·  RBAC  ·  Audit Trail  ·  Signal Pipeline</text>
+
+  <text x="450" y="348" text-anchor="middle" fill="#334155" font-family="system-ui, -apple-system, sans-serif" font-size="9" letter-spacing="1">OBSERVE  ·  UNDERSTAND  ·  DECIDE  ·  EXECUTE</text>
+
+  <rect x="150" y="362" width="600" height="1" fill="url(#goldLine2)"/>
+</svg>

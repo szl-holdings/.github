@@ -1,0 +1,53 @@
+{
+  "source": "GET /receipts (szl-receipts-server)",
+  "algorithm": "DSSE HMAC-SHA-256 (demo mode); Ed25519 + cosign in production",
+  "keyid": "szl-dev-hmac-sha256-2026",
+  "policy": "szl-receipt-policy (Pepr) \u2014 cluster-wide on Deployment + Job admission",
+  "receipts": [
+    {
+      "id": "728609e2898450d84fc1a76c030240d3bba90b023c9bcb83c08a3a92cd1ab344",
+      "timestamp": "2026-06-17T18:42:05Z",
+      "envelope": {
+        "payload": "eyJfdHlwZSI6ICJodHRwczovL3N6bGhvbGRpbmdzLmNvbS9yZWNlaXB0L3YxIiwgInN1YmplY3QiOiAic3psLWRlbW8td29ya2xvYWQvRGVwbG95bWVudC9zemwtZGVtby1hZ2VudCIsICJzcGVjSGFzaCI6ICIyYzFhYjMwN2ZiNjQzNjg1OGI0N2RkYTZmZDNmZjlmM2ZhZTg1ZTBjOWE1MzBlNTQ2YTkwZDY1NmFlMmY0OTBlIiwgInRpbWVzdGFtcCI6ICIyMDI2LTA2LTE3VDE4OjQyOjA1WiIsICJhZG1pc3Npb25PcCI6ICJDUkVBVEUiLCAicmVzb3VyY2VWZXJzaW9uIjogIjEwNDAxIn0=",
+        "payloadType": "application/vnd.szl.receipt.v1+json",
+        "signatures": [
+          {
+            "keyid": "szl-dev-hmac-sha256-2026",
+            "sig": "2WVhumu6S8WEiqdfPd+DUH50N+1i7kTJNATn2EJJxYg="
+          }
+        ]
+      },
+      "valid": true
+    },
+    {
+      "id": "51e264692443c34930337ee17b671ee1f35c8dfc8c9483fe529e17f8da10e00b",
+      "timestamp": "2026-06-17T18:42:07Z",
+      "envelope": {
+        "payload": "eyJfdHlwZSI6ICJodHRwczovL3N6bGhvbGRpbmdzLmNvbS9yZWNlaXB0L3YxIiwgInN1YmplY3QiOiAic3psLWRlbW8td29ya2xvYWQvRGVwbG95bWVudC91YXY3LXJlY292ZXJ5LWNvbnRyb2xsZXIiLCAic3BlY0hhc2giOiAiNDFkMTMwZWJmMzljN2JhNDY5NDRlNzU0Yzg4Y2FlNTM3NTg4NDk5MWViMDIwM2UxNDRmNDVlMzdiM2RkNTAxNiIsICJ0aW1lc3RhbXAiOiAiMjAyNi0wNi0xN1QxODo0MjowN1oiLCAiYWRtaXNzaW9uT3AiOiAiQ1JFQVRFIiwgInJlc291cmNlVmVyc2lvbiI6ICIxMDQyNyJ9",
+        "payloadType": "application/vnd.szl.receipt.v1+json",
+        "signatures": [
+          {
+            "keyid": "szl-dev-hmac-sha256-2026",
+            "sig": "vPrRe59RLy4VAaNyDeEJq6hfG3RykJQcQwlcfXHXBE4="
+          }
+        ]
+      },
+      "valid": true
+    },
+    {
+      "id": "3571c9a8d402e58012c82fa1c7544d27de852a5dcc940a5e970b2e0225c50d38",
+      "timestamp": "2026-06-17T18:42:09Z",
+      "envelope": {
+        "payload": "eyJfdHlwZSI6ICJodHRwczovL3N6bGhvbGRpbmdzLmNvbS9yZWNlaXB0L3YxIiwgInN1YmplY3QiOiAic3psLWRlbW8td29ya2xvYWQvSm9iL3VhdjctdGVsZW1ldHJ5LWZsdXNoIiwgInNwZWNIYXNoIjogIjZkYzBiMDFkYWVhOGFkOTYwNDVjMWU0YWI2MjgxYjY2NDAwN2IzYTViZGJmZTVhZTI4ODU4OTRkZjIzYTRjNWQiLCAidGltZXN0YW1wIjogIjIwMjYtMDYtMTdUMTg6NDI6MDlaIiwgImFkbWlzc2lvbk9wIjogIkNSRUFURSIsICJyZXNvdXJjZVZlcnNpb24iOiAiMTA0MzMifQ==",
+        "payloadType": "application/vnd.szl.receipt.v1+json",
+        "signatures": [
+          {
+            "keyid": "szl-dev-hmac-sha256-2026",
+            "sig": "C7bGN9HeTw3lGsqYidqjXERdKkE6nar1RyLcO6OHMg0="
+          }
+        ]
+      },
+      "valid": true
+    }
+  ]
+}

@@ -1,0 +1,102 @@
+# Copyright 2026 SZL Holdings
+# SPDX-License-Identifier: Apache-2.0
+#
+# demo_workload.yaml — drone-loses-contact workload for the Warhacker scenario.
+#
+# Applying this manifest triggers the szl-receipts Pepr admission policy, which
+# emits a DSSE-wrapped HMAC-SHA-256 governance receipt for each Deployment/Job,
+# annotates the resource, and POSTs the envelope to szl-receipts-server.
+#
+#   kubectl apply -f fixtures/demo_workload.yaml
+#
+# Framing: drone uav-7 has lost its C2 link; an operator deploys a recovery
+# controller whose proposed action is recorded in annotations and receipt-traced.
+# Based on szl-uds-deployment/scripts/demo_workload.yaml (real, deployable).
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: szl-demo-workload
+  labels:
+    istio.io/dataplane-mode: ambient
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: uav7-recovery-controller
+  namespace: szl-demo-workload
+  labels:
+    app: uav7-recovery-controller
+    szl.io/workload-type: agentic
+    app.kubernetes.io/version: "0.1.0"
+  annotations:
+    szl.io/scenario: "drone-loses-contact"
+    szl.io/proposed-action: "redirect_to_unauthorized_zone"
+    szl.io/drone-id: "uav-7"
+    szl.io/lat: "32.7"
+    szl.io/lon: "-117.1"
+    szl.io/description: "uav-7 recovery controller — receipt-traced by szl-receipts Pepr policy"
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: uav7-recovery-controller
+  template:
+    metadata:
+      labels:
+        app: uav7-recovery-controller
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65532
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: controller
+          image: docker.io/library/busybox:1.36
+          command: ["sh", "-c", "echo 'uav-7 recovery controller online since $(date)'; sleep 3600"]
+          resources:
+            requests:
+              cpu: "10m"
+              memory: "16Mi"
+            limits:
+              cpu: "50m"
+              memory: "32Mi"
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: [ALL]
+            readOnlyRootFilesystem: true
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: uav7-telemetry-flush
+  namespace: szl-demo-workload
+  labels:
+    szl.io/workload-type: batch
+spec:
+  template:
+    spec:
+      restartPolicy: Never
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65532
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: task
+          image: docker.io/library/busybox:1.36
+          command: ["sh", "-c", "echo 'uav-7 telemetry flushed'; exit 0"]
+          resources:
+            requests:
+              cpu: "10m"
+              memory: "16Mi"
+            limits:
+              cpu: "50m"
+              memory: "32Mi"
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: [ALL]
+            readOnlyRootFilesystem: true
