@@ -227,7 +227,7 @@ a11oy#57, amaru#46, sentra#45 (DRAFT relicense IP HOLD)
 revolutionary, unprecedented, world-class, seamless, industry-leading, cutting-edge, game-changing, breakthrough, only, first
 
 ### Canonical numbers (verify before push)
-24 / 29 / 12 / 217 / 7 / 35/35 / 7 / 8.3%
+27 / 31 / 12 / 217 / 7 / 40/40 / 7 / 8.3%
 
 ---
 

@@ -73,10 +73,10 @@ For lutar-lean, ouroboros-thesis, a11oy: create `docs/RELATED_WORK.md` listing 2
 
 ### T0.5 — Fix global stale counts (PM PR-02)
 Search and replace across all repos:
-- `22 Spaces` → `24 Spaces`
-- `28 datasets` → `26 datasets`
+- `22 Spaces` → `27 Spaces`
+- `28 datasets` → `31 datasets`
 - `11 axioms` → `12 axioms`
-- `19+ Spaces` → `24 Spaces`
+- `19+ Spaces` → `27 Spaces`
 - `eleven honest-gap` → `twelve honest-gap`
 
 **Branch per repo**: `cursor/canonical-numbers-2026-05-29`
@@ -171,7 +171,7 @@ Per PM_VISUAL_NARRATIVE_AUDIT.md. Top P0s:
 Once limit resets, create `SZLHOLDINGS/README` Space (static SDK) and upload content from `/home/user/workspace/szl/hf_org_card_README.md`.
 
 ### T3.2 — HF org Description field
-Set via HF web UI Settings: "SZL Holdings builds governed AI execution infrastructure. Doctrine v6 · 12 axioms · 217 Lean declarations · 7 Zenodo DOIs · 24 Spaces · 26 datasets · DSSE receipts at every decision boundary."
+Set via HF web UI Settings: "SZL Holdings builds governed AI execution infrastructure. Doctrine v6 · 12 axioms · 217 Lean declarations · 7 Zenodo DOIs · 27 Spaces · 31 datasets · DSSE receipts at every decision boundary."
 
 ### T3.3 — szl-uds-deployment README badge wall + 12 topics
 Per PM PR-05.
