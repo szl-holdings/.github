@@ -171,7 +171,7 @@ Per PM_VISUAL_NARRATIVE_AUDIT.md. Top P0s:
 Once limit resets, create `SZLHOLDINGS/README` Space (static SDK) and upload content from `/home/user/workspace/szl/hf_org_card_README.md`.
 
 ### T3.2 — HF org Description field
-Set via HF web UI Settings: "SZL Holdings builds governed AI execution infrastructure. Doctrine v6 · 12 axioms · 217 Lean declarations · 7 Zenodo DOIs · 27 Spaces · 31 datasets · DSSE receipts at every decision boundary."
+Set via HF web UI Settings: "SZL Holdings builds governed AI execution infrastructure. Doctrine v6 · 15 axioms (14u) · 626 Lean declarations · 7 Zenodo DOIs · 26 Spaces · 29 datasets · DSSE receipts at every decision boundary."
 
 ### T3.3 — szl-uds-deployment README badge wall + 12 topics
 Per PM PR-05.

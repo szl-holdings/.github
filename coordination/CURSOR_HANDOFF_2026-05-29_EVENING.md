@@ -352,7 +352,7 @@ Then `gh pr merge <num> -R <repo> --squash --delete-branch` for each.
 - Do not touch: `a11oy#57`, `amaru#46`, `sentra#45` (DRAFT relicense HOLD)
 - Do not toggle branch protection
 - arXiv: stage only (founder awaiting endorsement)
-- Honest numbers: **217 declarations**, **12 axioms**, **7 sorries** (lutar-lean), TH10 = axiom-structured
+- Honest numbers: **626 declarations**, **15 axioms (14 unique)**, **189 sorries (138+51 Putnam)** (lutar-lean), TH10 = axiom-structured
 
 ---
 
