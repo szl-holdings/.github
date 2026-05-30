@@ -272,3 +272,38 @@ Grant write only where required (e.g., release workflows).
 **Branch per repo**: `cursor/codeql-token-permissions`
 **Acceptance**: CodeQL TokenPermissions alerts go from 27 to 0.
 
+
+---
+
+## TIER 1.5 — HF MCP SERVER ECOSYSTEM (PUBLIC MOAT MULTIPLIER)
+
+We already run `SZLHOLDINGS/mcp-receipts-server` as a Docker SDK Space, MCP-tagged, RUNNING. To convert this into a public moat:
+
+### T1.5A — Convert to Gradio MCP-server SDK
+Per HF docs (https://huggingface.co/docs/hub/spaces-mcp-servers), MCP-compatible Spaces must expose tools via Gradio MCP. Either:
+- (a) Keep Docker SDK but ensure it exposes the JSON-RPC MCP endpoint at `/mcp` per Anthropic protocol; tag with `mcp-server`; OR
+- (b) Refactor to Gradio MCP SDK and expose 4–6 SZL governance tools:
+  - `verify_receipt(receipt_jsonl)` → returns DSSE verification result + Lean theorem reference
+  - `query_putnam_baseline()` → returns current Putnam score with chain head SHA
+  - `check_doctrine(text)` → flags doctrine v6 violations (superlatives, fake numbers, etc.)
+  - `lookup_theorem(name)` → returns Lean file:line, theorem statement, runtime gate path
+  - `verify_sbom(sbom_url)` → DSSE verification of a SLSA L1 SBOM
+  - `query_canonical_numbers()` → live HF/GitHub counts
+
+**Branch**: `cursor/mcp-server-gradio-tools`
+**Acceptance**: `curl https://szlholdings-mcp-receipts-server.hf.space/mcp/tools` lists 4-6 tools with JSON schemas. The Space appears in https://huggingface.co/spaces?filter=mcp-server search results when filtered.
+
+### T1.5B — Submit to HF MCP filter index
+Add proper tags + ensure `mcp-server` tag is detected. Once Gradio MCP SDK is live, the Space appears in https://huggingface.co/spaces?filter=mcp-server automatically.
+
+**Acceptance**: SZLHOLDINGS/mcp-receipts-server appears in filtered MCP spaces.
+
+### T1.5C — Add MCP server card to SZL org card + readme
+Once T1.5A is live, prominently feature: "Use SZL governance from your AI assistant: add SZLHOLDINGS/mcp-receipts-server to your https://huggingface.co/settings/mcp". This is a 10x discoverability multiplier.
+
+**Acceptance**: Every public README mentions the MCP server with copy-paste add instructions.
+
+### T1.5D — Document published MCP tool spec
+Add `mcp-receipts-server/MCP_TOOLS.md` to the repo (use docker repo source `mcp-receipts-source` if it exists in HF datasets) listing every tool's JSON-RPC signature and example invocation.
+
+**Why this is a moat multiplier**: Today SZL governance lives in our repos. After T1.5, any Cursor/Claude Desktop user worldwide can add our MCP server and start using SZL's DSSE verification, doctrine check, theorem lookup, and Putnam baseline tools from their editor. We become a public verification utility, not just a private one. This is the Anthropic-grade distribution play.
