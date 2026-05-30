@@ -115,8 +115,10 @@ Source: `/home/user/workspace/szl/audit_2026-05-29_evening/hf_truth_audit/REPORT
 
 **Rule:** When a canonical numeric value is updated (benchmark score, sorry count, tool count, theorem count, or any other metric cited across multiple files), all affected files must reflect the updated value within 48 hours of the canonical update. After 48 hours, a stale numeric is a doctrine violation in any file that still carries the old value. The owner of the canonical number must maintain an inventory of all files where the number appears; that inventory is a required artifact of the update.
 
-**Rationale:** The Putnam percentage `8.3% (1/12)` lingered on 31 HF assets after the canonical value was updated to `83.3% (10/12)` on 2026-10-12. The stale figure persisted as a 10× magnitude error on investor-facing assets.  
-Source: `/home/user/workspace/szl/audit_2026-05-29_evening/hf_truth_audit/REPORT.md`, LIE #1: "This is a 10x magnitude error on a key investor-facing metric" affecting "ALL 29 datasets + ALL 2 models = 31 files."
+**Rationale:** The Putnam percentage `8.3% (1/12)` lingered on 31 HF assets after a canonical-value update on 2026-10-12. The stale figure persisted on investor-facing assets.  
+Source: `/home/user/workspace/szl/audit_2026-05-29_evening/hf_truth_audit/REPORT.md`, LIE #1, affecting "ALL 29 datasets + ALL 2 models = 31 files."
+
+> **Honesty correction (PhD-verified, 2026-05-30):** The `83.3% (10/12)` figure used in the original example above counts files with structural scaffolding, **not** proved problems, and is itself misleading. Per the PhD Math audit, **0/12** Putnam 2025 problems are fully proved: 2/12 files are sorry-token-free (A1, A3) but stated as `→ True` shells, and A5/B4/B6 carry root-level sorries. Two files previously encoded the wrong official answer (P_B6: r=1/2 vs official 1/4; P_A3: Alice vs official Bob), corrected in lutar-lean. Official answers verified against the [86th Putnam official solutions](https://kskedlaya.org/putnam-archive/2025s.pdf). This §11 example is retained only to illustrate the staleness-propagation rule; the `10/12` value must not be cited as a progress metric.
 
 **Enforcement:**  
 - Canonical numbers are declared in a `canonical_numbers.json` file at the `.github` repo root.  
