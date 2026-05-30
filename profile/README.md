@@ -1,5 +1,5 @@
 <!-- Organization profile README — rendered at github.com/szl-holdings -->
-<!-- Doctrine v6. Λ-axis substrate for verifiable agentic AI. -->
+<!-- Doctrine v7. Λ-axis substrate for verifiable agentic AI. -->
 <!-- Source of truth: this file. All assets hosted in szl-holdings/* GitHub repos. -->
 
 > **Live on Hugging Face:** [SZLHOLDINGS](https://huggingface.co/SZLHOLDINGS) — 24 datasets · 19+ Spaces · 2 models · all RUNNING
@@ -10,7 +10,7 @@
 
 # SZL Holdings — Λ-Axis Substrate for Verifiable Agentic AI
 
-### Governance-grade infrastructure for bounded-recursion agentic AI · doctrine v6 · 11 axioms · 32 GREEN modules
+### Governance-grade infrastructure for bounded-recursion agentic AI · Doctrine v7 · 15 axioms (14 unique) · 626 Lean 4 declarations · 44 anchor formula gates
 
 **Auditable by construction. Receipt-emitting by primitive. Kernel-verified by Lean 4.**
 
@@ -28,10 +28,10 @@
 [![ORCID](https://img.shields.io/badge/ORCID-0009--0001--0110--4173-A6CE39.svg?style=flat-square&logo=orcid&logoColor=white)](https://orcid.org/0009-0001-0110-4173)
 
 
-[![Doctrine v6](https://img.shields.io/badge/doctrine-v6-01696F?style=for-the-badge)](https://github.com/szl-holdings/platform/blob/main/docs/doctrine/szl-doctrine.md)
+[![Doctrine v7](https://img.shields.io/badge/doctrine-v7-01696F?style=for-the-badge)](https://github.com/szl-holdings/platform/blob/main/docs/doctrine/szl-doctrine.md)
 [![Λ-axis](https://img.shields.io/badge/%CE%9B--axis-governance%20substrate-805AD5?style=for-the-badge)](https://github.com/szl-holdings/ouroboros-thesis)
 [![Lean 4](https://img.shields.io/badge/Lean%204-kernel--verified-2D5BB9?style=for-the-badge&logo=lean&logoColor=white)](https://github.com/szl-holdings/lutar-lean)
-[![GREEN modules](https://img.shields.io/badge/GREEN%20modules-30%2F30-2DA44E?style=for-the-badge)](https://github.com/szl-holdings/lutar-lean)
+[![Lean 4 declarations](https://img.shields.io/badge/Lean%204-626%20declarations%20%C2%B7%2044%20gates-2DA44E?style=for-the-badge)](https://github.com/szl-holdings/lutar-lean)
 
 <br/>
 
@@ -61,7 +61,7 @@
 
 ## Positioning — governance-mathematical, not marketing
 
-SZL Holdings publishes a verifiable substrate for agentic AI: a doctrine of 11 axioms (v6), a Λ-axis audit-closure operator defined on the receipt-bus σ-algebra, 32 kernel-verified Lean 4 modules (Mathlib v4.13.0), and a runtime that emits a SHA-pinned proof-chain receipt for every decision. The substrate is the deliverable. Every claim in this README terminates in a DOI, a commit SHA, a Lean theorem, or a CI workflow run; no claim terminates in marketing prose. The math is in [`ouroboros-thesis`](https://github.com/szl-holdings/ouroboros-thesis), the proofs are in [`lutar-lean`](https://github.com/szl-holdings/lutar-lean), the runtime is in [`ouroboros`](https://github.com/szl-holdings/ouroboros), the receipt fabric is in [`amaru`](https://github.com/szl-holdings/amaru) + [`rosie`](https://github.com/szl-holdings/rosie) + [`sentra`](https://github.com/szl-holdings/sentra), and the platform that composes them is in [`platform`](https://github.com/szl-holdings/platform).
+SZL Holdings publishes a verifiable substrate for agentic AI: a doctrine of 15 axioms (14 unique, v7), a Λ-axis audit-closure operator defined on the receipt-bus σ-algebra, 626 Lean 4 declarations · 189 sorries (138 baseline + 51 Putnam) · 44 anchor formula gates (Mathlib v4.13.0), and a runtime that emits a SHA-pinned proof-chain receipt for every decision. The substrate is the deliverable. Every claim in this README terminates in a DOI, a commit SHA, a Lean theorem, or a CI workflow run; no claim terminates in marketing prose. The math is in [`ouroboros-thesis`](https://github.com/szl-holdings/ouroboros-thesis), the proofs are in [`lutar-lean`](https://github.com/szl-holdings/lutar-lean), the runtime is in [`ouroboros`](https://github.com/szl-holdings/ouroboros), the receipt fabric is in [`amaru`](https://github.com/szl-holdings/amaru) + [`rosie`](https://github.com/szl-holdings/rosie) + [`sentra`](https://github.com/szl-holdings/sentra), and the platform that composes them is in [`platform`](https://github.com/szl-holdings/platform).
 
 ---
 
@@ -75,7 +75,7 @@ The 7-organ body is now a fully operational HF Space with live demo links and ve
 
 **[huggingface.co/spaces/SZLHOLDINGS/szl-anatomy](https://huggingface.co/spaces/SZLHOLDINGS/szl-anatomy)**
 
-<img src="https://huggingface.co/spaces/SZLHOLDINGS/szl-anatomy/resolve/main/assets/08_body_graph_composed.png" alt="SZL full body graph — 7-organ anatomy composed, Doctrine v6" width="100%"/>
+<img src="https://huggingface.co/spaces/SZLHOLDINGS/szl-anatomy/resolve/main/assets/08_body_graph_composed.png" alt="SZL full body graph — 7-organ anatomy composed, Doctrine v7" width="100%"/>
 
 | Organ | Quechua | System | Space |
 |-------|---------|--------|-------|
@@ -83,7 +83,7 @@ The 7-organ body is now a fully operational HF Space with live demo links and ve
 | Heart | yuyay | Λ-axis pulse, Ouroboros 32-module runtime | [szl-showcase](https://huggingface.co/spaces/SZLHOLDINGS/szl-showcase) |
 | Blood | yawar | DSSE 5-link receipt chain + UDS span flow | [mcp-receipts-server](https://huggingface.co/spaces/SZLHOLDINGS/mcp-receipts-server) |
 | Immune | huklla | sentra 6-gate + a11oy 12-innovation; 248+269 assertions | [sentra-security-gates](https://huggingface.co/spaces/SZLHOLDINGS/sentra-security-gates) |
-| Skeleton | Λ-spine | 76 named theorems, 134 lake-verified, 241 stubs | [lean-proof-playground](https://huggingface.co/spaces/SZLHOLDINGS/lean-proof-playground) |
+| Skeleton | Λ-spine | 626 declarations · 189 sorries · 44 anchor formula gates (Lean 4 + Mathlib v4.13.0) | [lean-proof-playground](https://huggingface.co/spaces/SZLHOLDINGS/lean-proof-playground) |
 | Nervous | otel | vsp-otel + W3C TraceContext + OTLP | [vsp-otel-emitter](https://huggingface.co/spaces/SZLHOLDINGS/vsp-otel-emitter) |
 | Wires | kallpa | 5-tool MCP receipt bus, cross-component fabric | [mcp-receipts-server](https://huggingface.co/spaces/SZLHOLDINGS/mcp-receipts-server) |
 
@@ -146,7 +146,7 @@ Each line states the governance-mathematical capability that repo carries. No ma
 | # | Repo | Frontier capability line |
 |---|------|--------------------------|
 | 1 | [`a11oy`](https://github.com/szl-holdings/a11oy) | Vertical alignment substrate — policy / measurement / knowledge / QEC-integrity packages for governed AI execution |
-| 2 | [`amaru`](https://github.com/szl-holdings/amaru) | Cardano-anchored governance receipt minting with Shor-encoded provenance under doctrine v6 |
+| 2 | [`amaru`](https://github.com/szl-holdings/amaru) | Cardano-anchored governance receipt minting with Shor-encoded provenance under Doctrine v7 |
 | 3 | [`rosie`](https://github.com/szl-holdings/rosie) | Receipt orchestration — CSS-ingress, canonical byte-string emission, Λ-axis closure binding |
 | 4 | [`sentra`](https://github.com/szl-holdings/sentra) | Sensor/telemetry adapter — Kitaev-surface drift detection on audit fibers |
 | 5 | [`uds-mesh`](https://github.com/szl-holdings/uds-mesh) | Unified Data System — cross-component span schemas and governance receipts for OTEL-style observability |
@@ -169,14 +169,14 @@ These six repos define the spine of the Λ-axis substrate. Each card links to th
 
 - **DOIs**: [v18.0 master `10.5281/zenodo.20434276`](https://doi.org/10.5281/zenodo.20434276) · [concept `10.5281/zenodo.19944926`](https://doi.org/10.5281/zenodo.19944926)
 - **License**: CC BY 4.0
-- **Carries**: 11 axioms · Λ-axis closure operator · audit-fiber sheaf · receipt-bus σ-algebra
+- **Carries**: 15 axioms (14 unique, v7) · Λ-axis closure operator · audit-fiber sheaf · receipt-bus σ-algebra
 - **Cite**: [`CITATION.cff`](https://github.com/szl-holdings/ouroboros-thesis/blob/main/CITATION.cff)
 
 ### 2. `lutar-lean` — the kernel proofs
 
 - **DOIs**: [`10.5281/zenodo.20431181`](https://doi.org/10.5281/zenodo.20431181)
 - **Stack**: Lean 4 v4.13.0 · Mathlib v4.13.0 · Lake build · CI workflow [`lean.yml`](https://github.com/szl-holdings/lutar-lean/actions/workflows/lean.yml)
-- **Carries**: 32 GREEN modules · Λ-gate theorems · audit-fiber invariants · DPI / PAC-Bayes bounds · Knot calculus R1/R2/R3
+- **Carries**: 626 Lean 4 declarations · 189 sorries (138 baseline + 51 Putnam) · 44 anchor formula gates · Mathlib v4.13.0 · Λ-gate theorems · audit-fiber invariants · DPI / PAC-Bayes bounds · Knot calculus R1/R2/R3
 - **License**: CC BY 4.0
 
 ### 3. `ouroboros` — the runtime
@@ -200,7 +200,7 @@ These six repos define the spine of the Λ-axis substrate. Each card links to th
 - **DOI**: [`10.5281/zenodo.19867281`](https://doi.org/10.5281/zenodo.19867281)
 - **License**: Apache 2.0
 - **CI**: [![CI](https://github.com/szl-holdings/amaru/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/szl-holdings/amaru/actions/workflows/ci.yml)
-- **Carries**: Cardano anchoring · Shor-encoded provenance · CIP-25 / CIP-68 metadata · doctrine v6 byte-string canonicalization
+- **Carries**: Cardano anchoring · Shor-encoded provenance · CIP-25 / CIP-68 metadata · Doctrine v7 byte-string canonicalization
 
 ### 6. `a11oy` — vertical alignment + decision intelligence
 
@@ -222,7 +222,7 @@ flowchart TD
     classDef surface  fill:#F7F6F2,stroke:#01696F,color:#1B474D,stroke-width:1.5px;
 
     T["Ouroboros Thesis v3 to v18<br/>Zenodo DOIs · CC BY 4.0"]:::research
-    K["Lutar-Lean<br/>Lean 4 + Mathlib v4.13.0<br/>32 GREEN modules"]:::sdk
+    K["Lutar-Lean<br/>Lean 4 + Mathlib v4.13.0<br/>626 declarations · 44 gates"]:::sdk
     R["Ouroboros Runtime<br/>bounded loops · sub-ms Λ overhead<br/>Apache 2.0"]:::runtime
     L["Λ Audit-Closure Operator<br/>defined on receipt-bus σ-algebra"]:::runtime
     A["Amaru<br/>Cardano-anchored Shor receipts"]:::runtime
@@ -250,13 +250,13 @@ The path from a peer-style paper (`ouroboros-thesis`) to a byte-string receipt (
 
 ## Λ-axis · in one paragraph
 
-The Λ-axis is a measurable governance operator defined on the receipt-bus σ-algebra of a bounded-recursion runtime. It composes axiom-by-axiom (doctrine v6: 11 axioms) under a monotone geometric mean, with PAC-Bayes [(McAllester, 2003)](https://link.springer.com/article/10.1023/A:1021840411064) tail bounds on the confidence margin, Bekenstein information-density caps [(Bekenstein, 1981)](https://doi.org/10.1103/PhysRevD.23.287) on per-receipt entropy, and Reidemeister R1/R2/R3 equivalence classes [(Reidemeister, 1927)](https://link.springer.com/article/10.1007/BF02952507) on receipt-knot chains. The closure is proved in Lean 4 (Mathlib v4.13.0) across 32 GREEN modules in [`lutar-lean`](https://github.com/szl-holdings/lutar-lean). The runtime overhead is bounded above by 0.59 ms / request median in the [`ouroboros`](https://github.com/szl-holdings/ouroboros) bench harness.
+The Λ-axis is a measurable governance operator defined on the receipt-bus σ-algebra of a bounded-recursion runtime. It composes axiom-by-axiom (Doctrine v7: 15 axioms, 14 unique) under a monotone geometric mean, with PAC-Bayes [(McAllester, 2003)](https://link.springer.com/article/10.1023/A:1021840411064) tail bounds on the confidence margin, Bekenstein information-density caps [(Bekenstein, 1981)](https://doi.org/10.1103/PhysRevD.23.287) on per-receipt entropy, and Reidemeister R1/R2/R3 equivalence classes [(Reidemeister, 1927)](https://link.springer.com/article/10.1007/BF02952507) on receipt-knot chains. The closure is proved in Lean 4 (Mathlib v4.13.0) with 626 declarations · 189 sorries · 44 anchor formula gates in [`lutar-lean`](https://github.com/szl-holdings/lutar-lean). The runtime overhead is bounded above by 0.59 ms / request median in the [`ouroboros`](https://github.com/szl-holdings/ouroboros) bench harness.
 
 ---
 
-## Doctrine v6 — eleven axioms, kernel-pinned
+## Doctrine v7 — fifteen axioms (14 unique), kernel-pinned
 
-Doctrine v6 is the eleven-axiom governance core that every substrate component must satisfy at build time:
+Doctrine v7 is the fifteen-axiom (14 unique) governance core that every substrate component must satisfy at build time:
 
 | # | Axiom | Lean module |
 |---|-------|-------------|
@@ -298,7 +298,7 @@ AIMS submission portal: [OpenReview `colmweb.org/COLM/2026/Workshop/AIMS`](https
 
 | Version | Title | Released | DOI | PDF |
 |---|---|---|---|---|
-| **v18.0** (master) | Λ-Axis Substrate for Verifiable Agentic AI — doctrine v6, 11 axioms, 32 GREEN modules | 2026-05-29 | [`10.5281/zenodo.20434276`](https://doi.org/10.5281/zenodo.20434276) | via Zenodo |
+| **v18.0** (master) | Λ-Axis Substrate for Verifiable Agentic AI — Doctrine v7, 15 axioms (14 unique), 626 Lean 4 declarations · 44 gates | 2026-05-29 | [`10.5281/zenodo.20434276`](https://doi.org/10.5281/zenodo.20434276) | via Zenodo |
 | **v18.0.0** (software) | Reference runtime + Lean kernel for v18 master | 2026-05-29 | [`10.5281/zenodo.20434308`](https://doi.org/10.5281/zenodo.20434308) | via Zenodo |
 | **v17-1.0.1** | Wheelerian audit closure + Shannon doctrine code + QEC-evolved Agent Body | 2026-05-28 | [`10.5281/zenodo.20431181`](https://doi.org/10.5281/zenodo.20431181) | [PDF](https://zenodo.org/records/20431181/files/ouroboros-thesis-v17.pdf) |
 | **v16-1.0.2** | Feynman path-integral audit closure + Gates doctrine codes + cross-component composite invariant | 2026-05-28 | [`10.5281/zenodo.20424996`](https://doi.org/10.5281/zenodo.20424996) | [PDF](https://zenodo.org/records/20424996/files/ouroboros-thesis-v16.pdf) |
@@ -318,8 +318,8 @@ Re-verified by command, not estimated. See [`SOURCE_OF_TRUTH.md`](https://github
 | Metric | Value |
 |---|---|
 | Substrate repos (this org) | **13** |
-| Doctrine v6 axioms | **11** |
-| GREEN Lean modules (Mathlib v4.13.0) | **32 / 32** |
+| Doctrine v7 axioms (14 unique) | **15** |
+| Lean 4 declarations (Mathlib v4.13.0) | **626 total · 189 sorries · 44 anchor gates** |
 | Ouroboros runtime tests | **218 / 218 passing** |
 | Platform monorepo packages | **76** |
 | Platform monorepo tests | **1,220 / 1,220 passing** |
@@ -379,7 +379,7 @@ The 13 substrate repos cross-link via a `Related repositories in the SZL substra
 
 ## What SZL Holdings Is NOT
 
-Doctrine v6 honest scoping — for due diligence reviewers:
+Doctrine v7 honest scoping — for due diligence reviewers:
 
 - **Not a general-purpose AI company.** SZL Holdings builds governance substrate for bounded-recursion agentic AI in specific enterprise verticals; we are not an LLM provider.
 - **Not post-revenue.** The platform is Series-A stage; current focus is on technical buildout and investor readiness.
@@ -403,7 +403,7 @@ Doctrine v6 honest scoping — for due diligence reviewers:
 <!--
   Profile README maintained by GH Admin #1 (Profile + Org + 404 Hunter).
   Source of truth: this file. All assets in szl-holdings/* repos. No external CDN.
-  Doctrine v6 · 11 axioms · 32 GREEN modules · v18.0 DOI 10.5281/zenodo.20434276.
+  Doctrine v7 · 15 axioms (14 unique) · 626 Lean 4 declarations · 189 sorries · 44 anchor formula gates · Mathlib v4.13.0 · v18.0 DOI 10.5281/zenodo.20434276.
 -->
 
 ---
