@@ -18,7 +18,7 @@ Apply these to every file touched, every commit made, every PR opened:
    Co-authored-by: Lutar, Stephen P. <stephen@szlholdings.com>
    ```
 5. **Canonical numbers** (use exactly, no rounding):
-   - 217 declarations / 12 axioms / 7 executable sorries
+   - 626 declarations / 15 axioms (14 unique) / 189 sorries (138+51 Putnam)
    - TH10 axiom-structured / 35-35 anchors / Putnam 8.3% (1/12)
 6. **DO NOT TOUCH**: a11oy#57, amaru#46, sentra#45 — DRAFT relicense IP HOLD.
 7. **Merge posture**: `gh pr merge --admin --squash` — founder pre-authorized.
@@ -303,8 +303,8 @@ Apply `gh pr merge --admin --squash` for all OPEN PRs that pass CI before touchi
 
 ### ouroboros
 **Current state**: PR #84 MERGED (TH10 axiom-structured). 248 tests GREEN.
-- **PR A**: Bump version in `package.json` to reflect 217 declarations count
-- **PR B**: Add `CANONICAL_NUMBERS.md` with the locked counts (217/12/7/35)
+- **PR A**: Bump version in `package.json` to reflect 626 declarations count (Agent C audit 2026-05-30)
+- **PR B**: Add `CANONICAL_NUMBERS.md` with the locked counts (626/15(14u)/189/44)
 - **PR C**: Wire `TH10` axiom check into the CI lint step
 - **Acceptance**: `vitest run` exits 0; canonical numbers file present
 
@@ -395,7 +395,7 @@ Apply `gh pr merge --admin --squash` for all OPEN PRs that pass CI before touchi
 ```markdown
 ![Doctrine v6](https://img.shields.io/badge/Doctrine-v6_STRICT-navy)
 ![Lean 4](https://img.shields.io/badge/Lean-4_Mathlib_v4.13.0-blue)
-![217 Declarations](https://img.shields.io/badge/Declarations-217-brightgreen)
+![626 Declarations](https://img.shields.io/badge/Declarations-626-brightgreen)
 ![12 Axioms](https://img.shields.io/badge/Axioms-12-brightgreen)
 ![7 Sorries](https://img.shields.io/badge/Sorries-7_STAGED-yellow)
 ![DSSE](https://img.shields.io/badge/DSSE-SLSA_Level_1-purple)
@@ -409,7 +409,7 @@ Apply `gh pr merge --admin --squash` for all OPEN PRs that pass CI before touchi
 
 | Space | Key change |
 |-------|-----------|
-| szl-anatomy | 10-badge stack; `26 datasets · 19 Spaces · 2 models`; `217/12/7 STAGED` |
+| szl-anatomy | 10-badge stack; `29 datasets · 26 Spaces · 2 models`; `626/15(14u)/189 STAGED` |
 | thesis-v18-formal-verification | Signal table: `217` (not 241); DOI `10.5281/zenodo.20434276` |
 | a11oy-platform | `35-35 anchors across 7 layers`; Putnam 8.3% line |
 | szl-showcase | No superlatives in `app.py` title; STAGED label on non-live features |
@@ -440,7 +440,7 @@ sed -i 's/24 datasets/26 datasets/g; s/241 declarations/217 declarations/g' READ
 
 Update the `README.md` (dataset card):
 - `2 models · 26 datasets · 19 Spaces` (was 47 datasets — the org card claims 47 which appears to overcount; use the curl-verified 26)
-- `217 declarations · 12 axioms · 7 sorries STAGED`
+- `626 declarations · 15 axioms (14 unique) · 189 sorries (138+51 Putnam)`
 - `Putnam 8.3% (1/12)`
 
 ---
@@ -662,7 +662,7 @@ Checklist — complete before `git commit`:
 - [ ] **No emoji in `##` or `###` headers** in any Markdown changed
 - [ ] **STAGED label present** on every `sorry` and every STAGED code block
 - [ ] **Commit message includes both sign-off lines** (Cursor Agent + Stephen Lutar)
-- [ ] **Canonical numbers** (217/12/7/35/8.3%) cited correctly wherever numbers appear
+- [ ] **Canonical numbers** (626/15(14u)/189/44) cited correctly wherever numbers appear
 - [ ] **DO NOT TOUCH list respected**: a11oy#57, amaru#46, sentra#45 not in this PR's diff
 - [ ] **PR opened on feature branch**, not directly to main
 - [ ] **`gh pr merge --admin --squash`** used (not rebase, not merge commit)

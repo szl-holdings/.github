@@ -250,7 +250,7 @@ Per `meta_zoom/FOUNDER_TONIGHT_ACTIONS.md`:
 ## ONE-OF-ONE THESIS (the pitch)
 
 SZL Holdings is the only organization that simultaneously:
-1. Maintains a Lean 4 + Mathlib formal proof library (217 declarations, kernel-green, 12 axioms with 7 publicly-tracked sorries)
+1. Maintains a Lean 4 + Mathlib formal proof library (626 declarations, kernel-green, 15 axioms (14 unique) with 189 sorries (138+51 Putnam))
 2. Emits cryptographically signed DSSE receipts on every governed action (RAE-1 protocol)
 3. Wires every theorem into an executable TypeScript policy gate (35/35 anchor formulas via a11oy)
 4. Deploys via UDS / Zarf v0.77 keyless to air-gap DoD environments
