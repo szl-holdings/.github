@@ -1,0 +1,134 @@
+# Doctrine v7 Checklist
+
+**Status:** Enacted 2026-05-30  
+**Applies to:** Every PR, asset file, receipt, roadmap, README, and governance artifact produced after Doctrine v7 enactment.  
+**Enforcement:** Automated checks run first. Human review items are second. All items must pass before merge.
+
+---
+
+## How to Use This Checklist
+
+Copy the checklist below into your PR description. Check each item. A PR with unchecked items requires explicit Founder waiver, documented in the PR thread.
+
+---
+
+## Part A — Automated Checks (CI enforced — must pass green before review)
+
+### A-1 | §1 — No Superlatives
+
+- [ ] CI grep gate passes: no banned terms (revolutionary, unprecedented, world-class, seamless, industry-leading, cutting-edge, game-changing, breakthrough, first, only) without an adjacent citation.
+
+### A-2 | §2 / §10 — No Fake Green / Version-Scoped Badges
+
+- [ ] All status badges in modified files carry a version anchor: `(as of <sha>)` or `(as of v<semver>)`.
+- [ ] `badges.json` manifest is updated if a new badge is introduced.
+- [ ] CI badge manifest check passes.
+
+### A-3 | §5 — Signed Commits
+
+- [ ] All commits carry DCO sign-off (`Signed-off-by:` trailer).
+- [ ] GPG/SSH commit signature present where branch protection requires it.
+- [ ] DCO GitHub App check passes.
+
+### A-4 | §6 — No Emoji in Headers
+
+- [ ] CI grep gate passes: no non-ASCII characters in `##` or `###` headers in any `.md` file.
+
+### A-5 | §9 — DOI Dereferencing
+
+- [ ] No known concept-DOI alias (e.g., `10.5281/zenodo.19944926`) cited without `[concept-DOI-alias]` annotation.
+- [ ] a11oy checker reports no `DOI_UNRESOLVED` violations.
+
+### A-6 | §10 — Badge Scoping
+
+- [ ] a11oy checker reports no `BADGE_UNSCOPED` violations.
+
+### A-7 | §11 — Canonical-Number Propagation
+
+- [ ] If `canonical_numbers.json` is modified, CI script confirms all `propagation_targets` files are updated in this PR or within the 48-hour window.
+- [ ] a11oy checker reports no `STALE_CANONICAL` violations.
+
+### A-8 | §12 — Staged-Advisory Language
+
+- [ ] a11oy checker reports no `OUTRIGHT_CLAIM` violations.
+- [ ] All catalog-grade, SLSA-compliant, production-ready, and air-gap-ready claims carry `STAGED-ADVISORY:` prefix or a verifiable artifact URL.
+
+### A-9 | §13 — Artifact URLs
+
+- [ ] a11oy checker reports no `ARTIFACT_NO_URL` violations.
+- [ ] Every referenced container image, signed tarball, or release binary has an adjacent verifiable URL.
+
+### A-10 | §14 — Orchestrator Attribution
+
+- [ ] If any commit in this PR was authored by a bot or agent, the commit message carries `[orchestrator: <tool-name>]` trailer.
+- [ ] CI check on bot-actor commits passes.
+
+### A-11 | §15 — Invariant Corpus Count
+
+- [ ] If this PR introduces or modifies a structural invariant claim, the corresponding DSSE receipt `corpus_convergence` field lists ≥3 distinct corpus identifiers.
+- [ ] CI receipt validator passes (rejects receipts with fewer than 3 corpora for invariant claims).
+
+### A-12 | §16 — Protection-Toggle Authorization
+
+- [ ] If this PR modifies `.github/workflows/`, `branch-protection.json`, `rulesets/`, or `classifier/` paths, a named member of the `doctrine-authority` team has approved via a GitHub PR review (not a comment).
+- [ ] CODEOWNERS required-reviewer check passes.
+
+---
+
+## Part B — Human Review Items (Reviewer responsibility)
+
+### B-1 | §3 — No New Axioms
+
+- [ ] No new axiom has been added to the Lean corpus, governance DSL, or receipt chain without Founder approval.
+- [ ] If an axiom is added, the Founder approval is linked in the PR thread.
+
+### B-2 | §4 — Sorry Discharge Routes
+
+- [ ] If any new `sorry` is introduced in a `.lean` file, a `-- discharge: <route>` comment appears on the same line or the line immediately above.
+- [ ] The sorry count in `canonical_numbers.json` is updated if the count changes.
+
+### B-3 | §7 — Every Claim Citable
+
+- [ ] Every numeric, status, capability, or comparative claim in modified files has a citation (URL, DOI, or internal artifact path + commit SHA).
+- [ ] Reviewer has spot-checked at least 3 claims in files with 10+ claims.
+
+### B-4 | §8 — Lineage Tags
+
+- [ ] Any reference to an ancient, philosophical, or esoteric source carries a `lineage:<philosopher>-<concept>` tag within 3 lines.
+
+### B-5 | §15 — Invariant Founder Sign-off
+
+- [ ] If this PR promotes any result to validated-invariant status, the Founder has signed off in the PR thread.
+
+### B-6 | §16 — Blanket Pre-Auth Prohibition
+
+- [ ] No blanket pre-authorization has been granted for a class of protection-toggle modifications. Reviewer confirms that each protection-toggle PR in a series has independent human approval.
+
+### B-7 — Doctrine Self-Compliance
+
+- [ ] The PR body itself passes all automated checks (no superlatives, no emoji in headers, orchestrator tag if applicable).
+- [ ] All session artifacts cited in this PR are at their correct paths.
+
+---
+
+## Part C — Post-Merge Actions
+
+- [ ] DSSE receipts generated by `doctrine_v7_checker.ts` are archived to `SZLHOLDINGS/uds-governance-receipts` HuggingFace dataset.
+- [ ] If canonical numbers changed, the change is announced in the session log within 48 hours.
+- [ ] If a new sorry was introduced, the discharge route is added to the sorry tracker in `lutar-lean/README.md`.
+
+---
+
+## Waiver Process
+
+If any checklist item cannot be completed for a specific PR, the Founder must post a waiver statement in the PR thread specifying:
+1. Which checklist item is waived.
+2. Why the waiver is necessary.
+3. The discharge condition (when will this be resolved).
+4. A target merge date for the discharge PR.
+
+A waiver is not a permanent exemption. The waivered condition must be resolved before the next doctrine review cycle.
+
+---
+
+*Doctrine v7 | SZL | 2026-05-30 | This checklist itself passes §1, §6 self-checks.*
