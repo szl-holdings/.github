@@ -61,7 +61,7 @@
 
 ## Positioning — governance-mathematical, not marketing
 
-SZL Holdings publishes a verifiable substrate for agentic AI: a doctrine of 15 axioms (14 unique, v7), a Λ-axis audit-closure operator defined on the receipt-bus σ-algebra, 752 Lean 4 declarations · 160 sorries (109 baseline + 51 Putnam) · 44 anchor formula gates (Mathlib v4.13.0), and a runtime that emits a SHA-pinned proof-chain receipt for every decision. The substrate is the deliverable. Every claim in this README terminates in a DOI, a commit SHA, a Lean theorem, or a CI workflow run; no claim terminates in marketing prose. The math is in [`ouroboros-thesis`](https://github.com/szl-holdings/ouroboros-thesis), the proofs are in [`lutar-lean`](https://github.com/szl-holdings/lutar-lean), the runtime is in [`ouroboros`](https://github.com/szl-holdings/ouroboros), the receipt fabric is in [`amaru`](https://github.com/szl-holdings/amaru) + [`rosie`](https://github.com/szl-holdings/rosie) + [`sentra`](https://github.com/szl-holdings/sentra), and the platform that composes them is in [`platform`](https://github.com/szl-holdings/platform).
+SZL Holdings builds a formally-verified governance gate for agentic AI. The Λ aggregator is proved in Lean 4 against 749 declarations / 14 unique axioms / 163 tracked sorries. Every gate decision emits a DSSE-signed receipt onto a hash-linked Khipu Merkle DAG with summation-checked integrity. The system packages as a UDS bundle and aligns with EU AI Act Article 12 and NIST AI RMF. The substrate is the deliverable. Every claim in this README terminates in a DOI, a commit SHA, a Lean theorem, or a CI workflow run; no claim terminates in marketing prose. The math is in [`ouroboros-thesis`](https://github.com/szl-holdings/ouroboros-thesis), the proofs are in [`lutar-lean`](https://github.com/szl-holdings/lutar-lean), the runtime is in [`ouroboros`](https://github.com/szl-holdings/ouroboros), the receipt fabric is in [`amaru`](https://github.com/szl-holdings/amaru) + [`rosie`](https://github.com/szl-holdings/rosie) + [`sentra`](https://github.com/szl-holdings/sentra), and the platform that composes them is in [`platform`](https://github.com/szl-holdings/platform).
 
 ---
 
@@ -169,7 +169,7 @@ These six repos define the spine of the Λ-axis substrate. Each card links to th
 
 - **DOIs**: [v18.0 master `10.5281/zenodo.20434276`](https://doi.org/10.5281/zenodo.20434276) · [concept `10.5281/zenodo.19944926`](https://doi.org/10.5281/zenodo.19944926)
 - **License**: CC BY 4.0
-- **Carries**: 15 axioms (14 unique, v7) · Λ-axis closure operator · audit-fiber sheaf · receipt-bus σ-algebra
+- **Carries**: 15 axioms (14 unique, v7) · Λ-axis closure operator · audit-fiber sheaf · hash-linked Khipu Merkle DAG receipt substrate
 - **Cite**: [`CITATION.cff`](https://github.com/szl-holdings/ouroboros-thesis/blob/main/CITATION.cff)
 
 ### 2. `lutar-lean` — the kernel proofs
@@ -224,7 +224,7 @@ flowchart TD
     T["Ouroboros Thesis v3 to v18<br/>Zenodo DOIs · CC BY 4.0"]:::research
     K["Lutar-Lean<br/>Lean 4 + Mathlib v4.13.0<br/>752 declarations · 44 gates"]:::sdk
     R["Ouroboros Runtime<br/>bounded loops · sub-ms Λ overhead<br/>Apache 2.0"]:::runtime
-    L["Λ Audit-Closure Operator<br/>defined on receipt-bus σ-algebra"]:::runtime
+    L["Λ Audit-Closure Operator<br/>formally-verified governance gate (Lean 4)"]:::runtime
     A["Amaru<br/>Cardano-anchored Shor receipts"]:::runtime
     Ro["Rosie<br/>CSS-ingress · canonical byte-strings"]:::runtime
     S["Sentra<br/>Kitaev-surface drift detection"]:::runtime
@@ -250,7 +250,7 @@ The path from a peer-style paper (`ouroboros-thesis`) to a byte-string receipt (
 
 ## Λ-axis · in one paragraph
 
-The Λ-axis is a measurable governance operator defined on the receipt-bus σ-algebra of a bounded-recursion runtime. It composes axiom-by-axiom (Doctrine v7: 15 axioms, 14 unique) under a monotone geometric mean, with PAC-Bayes [(McAllester, 2003)](https://link.springer.com/article/10.1023/A:1021840411064) tail bounds on the confidence margin, Bekenstein information-density caps [(Bekenstein, 1981)](https://doi.org/10.1103/PhysRevD.23.287) on per-receipt entropy, and Reidemeister R1/R2/R3 equivalence classes [(Reidemeister, 1927)](https://link.springer.com/article/10.1007/BF02952507) on receipt-knot chains. The closure is proved in Lean 4 (Mathlib v4.13.0) with 752 declarations · 160 sorries · 44 anchor formula gates in [`lutar-lean`](https://github.com/szl-holdings/lutar-lean). The runtime overhead is bounded above by 0.59 ms / request median in the [`ouroboros`](https://github.com/szl-holdings/ouroboros) bench harness.
+The Λ aggregator is proved in Lean 4 against 749 declarations / 14 unique axioms / 163 tracked sorries (Mathlib v4.13.0; [`lutar-lean`](https://github.com/szl-holdings/lutar-lean)). Every gate decision emits a DSSE-signed receipt onto a hash-linked Khipu Merkle DAG with summation-checked integrity. The runtime overhead is bounded above by 0.59 ms / request median in the [`ouroboros`](https://github.com/szl-holdings/ouroboros) bench harness. The system packages as a UDS bundle and aligns with EU AI Act Article 12 and NIST AI RMF. The receipt chain provides integrity-checked append-only audit provenance under SHA-256 prefix-hashing; the Khipu DAG provides a summation-checked three-tier receipt structure with runtime verification. Together these form a tamper-evident audit substrate for governance decisions, with PAC-Bayes [(McAllester, 2003)](https://link.springer.com/article/10.1023/A:1021840411064) tail bounds on the confidence margin, Bekenstein information-density caps [(Bekenstein, 1981)](https://doi.org/10.1103/PhysRevD.23.287) on per-receipt entropy, and Reidemeister R1/R2/R3 equivalence classes [(Reidemeister, 1927)](https://link.springer.com/article/10.1007/BF02952507) on receipt-knot chains.
 
 ---
 
