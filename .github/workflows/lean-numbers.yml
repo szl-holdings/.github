@@ -1,0 +1,56 @@
+name: Lean Numbers (canonical corpus counts)
+
+# Trust Tier 1 reproducibility (TRUST.md TODO): recompute lutar-lean
+# declaration / axiom / sorry counts from the current main HEAD and commit the
+# canonical JSON so public surfaces stop drifting. Runs on push to main (when the
+# script changes) and on a manual/scheduled trigger that re-reads lutar-lean.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/scripts/lean_numbers.py"
+      - ".github/workflows/lean-numbers.yml"
+  workflow_dispatch: {}
+  schedule:
+    # Daily refresh so the JSON tracks lutar-lean main even when this repo is idle.
+    - cron: "17 6 * * *"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: lean-numbers-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  recount:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout (.github)
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Recount lutar-lean @ main and write canonical JSON
+        run: |
+          python3 .github/scripts/lean_numbers.py \
+            --clone --ref main \
+            --out .github/data/lean_numbers.json
+          echo "----- canonical numbers -----"
+          cat .github/data/lean_numbers.json
+
+      - name: Commit updated numbers if changed
+        run: |
+          if git diff --quiet -- .github/data/lean_numbers.json; then
+            echo "No change in canonical numbers; nothing to commit."
+            exit 0
+          fi
+          git config user.name "Stephen P. Lutar Jr."
+          git config user.email "stephenlutar2@gmail.com"
+          git add .github/data/lean_numbers.json
+          git commit -s -m "chore(numbers): refresh canonical lutar-lean counts [skip ci]"
+          git push
