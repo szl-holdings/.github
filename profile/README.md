@@ -333,6 +333,12 @@ Re-verified by command, not estimated. See [`SOURCE_OF_TRUTH.md`](https://github
 
 ---
 
+## Heritage
+
+SZL Holdings, Inc. develops the public org's substrate from a private predecessor monorepo (now archived). That predecessor codified 90+ TypeScript packages and a 730-table provisioned schema in production by Q1 2026, including the original alloy coordinator, cognitive-runtime, guardian, policy-engine, approvals-inbox, run-ledger, eval-os, memory-fabric, and AEF stack. The current public substrate (a11oy + amaru + sentra + rosie + vessels + platform + lutar-lean + agi-forecast + ouroboros-thesis) is the next-generation extraction — re-engineered for Doctrine v7, Lean-mechanized governance, and UDS-deployable surfaces. Build-in-public provenance: every public artifact carries an ORCID-signed commit chain dating from 2026-04. The migration delta and lost-surface inventory are tracked privately.
+
+---
+
 ## Operating principles
 
 1. **Bounded recursion is a system primitive.** Convergence is measurable; the loop trace is the audit deliverable.
