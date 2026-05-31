@@ -1,0 +1,33 @@
+{
+  "schema": "szl.lean_numbers/v1",
+  "repo": "szl-holdings/lutar-lean",
+  "ref": "main",
+  "sha": "3de37e5258648cbd1263ade1a6f36f54d3a79ae3",
+  "measured_at_utc": "2026-05-31T02:31:06Z",
+  "method": "see .github/scripts/lean_numbers.py docstring (fixed grep-equivalent regexes)",
+  "numbers": {
+    "declarations": 752,
+    "axioms_raw": 15,
+    "axioms_unique": 14,
+    "axiom_names": [
+      "MomentSubGaussian",
+      "audit_reidemeister_invariance",
+      "canonicalReceipt",
+      "chromotopology_code_bijection",
+      "gleason_length_mod_8",
+      "klDivergence_nonneg",
+      "lambda_schur_concave_n_axis",
+      "lambda_stationary_unique",
+      "liu_hui_pi_converges",
+      "pinsker",
+      "r1_invariance",
+      "r2_invariance",
+      "sha256",
+      "sha256_collision_resistant"
+    ],
+    "sorries_raw": 160,
+    "sorries_noncomment": 146,
+    "sorries_putnam": 51,
+    "sorries_baseline": 109
+  }
+}
