@@ -2,7 +2,7 @@
 
 **Status:** ENACTED — 2026-05-30  
 **Supersedes:** Doctrine v6 (session-locked 2026-05-29 evening)  
-**Authority:** Founder — Wayne Slaughter  
+**Authority:** Founder — Stephen P. Lutar Jr.  
 **Attestation:** This document was drafted under Doctrine v6 and must itself pass v6/v7 grep on every clause.  
 **Audit basis:** Lessons derived from `/home/user/workspace/szl/audit_2026-05-29_evening/` session artifacts.
 

@@ -1,6 +1,6 @@
 # Warhacker Demo v3 — Script
 **Event:** Warhacker, June 16–20, 2026
-**Presenter:** Wayne Slaughter (Stephen)
+**Presenter:** Stephen P. Lutar Jr.
 **Version:** v3 | 3 verifiable proof points per minute
 **Total runtime:** 15 minutes = 45 proof points
 **Classification:** UNCLASSIFIED//FOUO
@@ -460,7 +460,7 @@ cat UDS_CATALOG_SPONSOR_APPLICATION.md | head -30
 
 ## Segment 4 — "What's Next: v0.4.0" (11:00–14:00)
 
-**Narration:** Wayne returns to keyboard. "Here's where we're going."
+**Narration:** Stephen returns to keyboard. "Here's where we're going."
 
 ### Minute 12 (11:00–12:00)
 
