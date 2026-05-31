@@ -192,7 +192,7 @@ These six repos define the spine of the Λ-axis substrate. Each card links to th
 - **License**: BSL 1.1
 - **Stack**: Node 24+ · pnpm 9+ · uv · TypeScript 5.x · Python 3.11+
 - **CI**: [![build](https://github.com/szl-holdings/platform/actions/workflows/build.yml/badge.svg)](https://github.com/szl-holdings/platform/actions/workflows/build.yml) · [![ci](https://github.com/szl-holdings/platform/actions/workflows/ci.yml/badge.svg)](https://github.com/szl-holdings/platform/actions/workflows/ci.yml) · [![codeql](https://github.com/szl-holdings/platform/actions/workflows/codeql.yml/badge.svg)](https://github.com/szl-holdings/platform/actions/workflows/codeql.yml) · [![security](https://github.com/szl-holdings/platform/actions/workflows/security.yml/badge.svg)](https://github.com/szl-holdings/platform/actions/workflows/security.yml)
-- **Carries**: 76 packages · 1,220 / 1,220 tests · Lutar formula registry · dual-witness adapters · MCP gateway (27 / 27 e2e)
+- **Carries**: 76 packages · 1,220 / 1,220 tests · Lutar formula registry · dual-witness adapters · MCP gateway (27 / 27 e2e) · [**Hatun Doctrine Specification**](https://github.com/szl-holdings/platform/tree/main/docs/a11oy/spec/hatun-doctrine-spec) (ten machine-checkable governance JSON Schemas; cite as Lutar 2026)
 - **Screenshot**: [`szl-holdings-hero.jpg`](https://raw.githubusercontent.com/szl-holdings/platform/main/.github/assets/screenshots/szl-holdings-hero.jpg) (in-repo, raw.githubusercontent.com)
 
 ### 5. `amaru` — Shor-encoded receipts
