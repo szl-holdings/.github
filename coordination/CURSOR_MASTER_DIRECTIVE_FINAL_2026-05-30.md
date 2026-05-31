@@ -2,7 +2,7 @@
 **Date:** 2026-05-30 09:36 UTC  
 **Auditor:** Perplexity subagent (PhD Cursor Master Directive task)  
 **Doctrine:** v6 strict, v7 enacted  
-**Authority:** Founder — Wayne Slaughter  
+**Authority:** Founder — Stephen P. Lutar Jr.  
 **Tracking issue:** https://github.com/szl-holdings/.github/issues/76  
 **Prior directive superseded:** `.github/coordination/CURSOR_MASTER_DIRECTIVE.md` (all prior versions)  
 **Commit trail:** This file is the source of truth. All per-session workspace files in `/home/user/workspace/szl/audit_2026-05-29_evening/` feed this document.

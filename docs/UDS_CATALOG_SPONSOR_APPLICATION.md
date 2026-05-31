@@ -183,7 +183,7 @@ The sponsor handoff from Andrew Greene to a DU engineering reviewer follows this
 3. SZL provides dedicated review access:
    - Read access to szl-holdings/szl-uds-deployment (or DU fork)
    - Slack channel #szl-du-catalog-review (SZL workspace invite)
-   - Wayne Slaughter (wayne@szlholdings.com) as primary eng contact
+   - Stephen P. Lutar Jr. (stephen@szlholdings.com) as primary eng contact
 
 4. Andrew Greene → DU reviewer handoff brief:
    - Architecture walkthrough (30 min video call)
@@ -196,12 +196,12 @@ The sponsor handoff from Andrew Greene to a DU engineering reviewer follows this
 6. On approval: DU Catalog team adds uds-package-szl-organs to catalog
    OCI tag: ghcr.io/szl-holdings/uds-package-szl-organs:v0.4.0
 
-7. Ongoing: Wayne Slaughter maintains package; Andrew Greene is
+7. Ongoing: Stephen P. Lutar Jr. maintains package; Andrew Greene is
    "sponsor of record" at DU. Quarterly sync with DU Catalog team.
 ```
 
 ### Escalation
-If Andrew Greene is unavailable: escalate to Wayne Slaughter → SZL executive sponsor. SZL will seek a second DU sponsor if needed per DU policy.
+If Andrew Greene is unavailable: escalate to Stephen P. Lutar Jr. → SZL executive sponsor. SZL will seek a second DU sponsor if needed per DU policy.
 
 ---
 
@@ -305,7 +305,7 @@ echo "AIRGAP_TEST=PASS" >> $GITHUB_OUTPUT
 
 | Role | Name | Contact |
 |------|------|---------|
-| SZL Founder / Submitter | Wayne Slaughter | wayne@szlholdings.com |
+| SZL Founder / Submitter | Stephen P. Lutar Jr. | stephen@szlholdings.com |
 | DU Sponsor (internal) | Andrew Greene | andrew.greene@defenseunicorns.com |
 | SZL Eng Lead | [TBD v0.4.0] | eng@szlholdings.com |
 | SZL Legal | [TBD] | legal@szlholdings.com |
