@@ -1,3 +1,5 @@
+> **⚠ STALE SNAPSHOT** — Live Lean numbers as of 2026-05-30 (verified via `gh api repos/szl-holdings/lutar-lean`): **626 declarations / 15 raw axioms (14 unique) / 189 sorries** on HEAD `3de37e5`. The figures below (217 declarations / 12 axioms) reflect an earlier session state and are retained for audit history only. Do not cite from this document — cite live.
+
 # CURSOR MASTER DIRECTIVE — Series-A One-Shot Buildout
 **Founder-approved**: 2026-05-29 22:03 EDT — Stephen Lutar
 **Doctrine**: v6 STRICT
