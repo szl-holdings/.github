@@ -103,7 +103,7 @@ The 13 substrate repos cross-link reciprocally. This footer is maintained by GH 
 - [`rosie`](https://github.com/szl-holdings/rosie) — operator console + receipt stream UI
 - [`sentra`](https://github.com/szl-holdings/sentra) — immune / red-team (egress inspector + tripwires, Wire B live)
 - [`uds-mesh`](https://github.com/szl-holdings/uds-mesh) — UDS span schemas + governance receipts
-- [`lutar-lean`](https://github.com/szl-holdings/lutar-lean) — Lean 4 + Mathlib proofs of the Λ aggregator (749 decl / 14 axioms / 163 sorries)
+- [`lutar-lean`](https://github.com/szl-holdings/lutar-lean) — Lean 4 + Mathlib proofs of the Λ aggregator (749 decl / 14 axioms / 168 sorries)
 - [`ouroboros`](https://github.com/szl-holdings/ouroboros) — bounded-recursion runtime
 - [`ouroboros-thesis`](https://github.com/szl-holdings/ouroboros-thesis) — DOI-pinned thesis substrate (v3 → v18)
 - [`platform`](https://github.com/szl-holdings/platform) — composing monorepo for the substrate runtime
@@ -112,4 +112,4 @@ The 13 substrate repos cross-link reciprocally. This footer is maintained by GH 
 - [`agi-forecast`](https://github.com/szl-holdings/agi-forecast) — PAC-Bayes + Bekenstein governance-trajectory forecasts
 - [`vsp-otel`](https://github.com/szl-holdings/vsp-otel) — OpenTelemetry exporter for Λ-axis spans
 
-Org page: [github.com/szl-holdings](https://github.com/szl-holdings) · Doctrine v7 · 14 unique axioms · 749 declarations · 163 sorries · DOI [`10.5281/zenodo.20434276`](https://doi.org/10.5281/zenodo.20434276)
+Org page: [github.com/szl-holdings](https://github.com/szl-holdings) · Doctrine v7 · 14 unique axioms · 749 declarations · 168 sorries · DOI [`10.5281/zenodo.20434276`](https://doi.org/10.5281/zenodo.20434276)
