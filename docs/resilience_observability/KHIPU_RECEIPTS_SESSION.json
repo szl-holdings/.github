@@ -1,0 +1,265 @@
+{
+  "session": "resilience_observability_chaos_layer",
+  "agent": "Yachay (SZL reliability agent), under CTO authority",
+  "generated": "2026-06-01T10:35:00Z",
+  "doctrine": "v12 (additive over v11 LOCKED)",
+  "chain_head": "594ad6c4e21a97181d3373d3135d07802e37e1afd77ae768ef603a46ac625d0f",
+  "count": 8,
+  "receipts": [
+    {
+      "schema": "szl.resilience.ship.receipt/v1",
+      "ts": "2026-06-01T10:35:00Z",
+      "traceparent": "00-ca9fd072d05509e1da8053df109b3beb-bd7b3be7eae7a208-01",
+      "agent": "Yachay (SZL reliability agent)",
+      "authority": "CTO",
+      "doctrine": "v12",
+      "locked": {
+        "declarations": 749,
+        "axioms": 14,
+        "sorries": 163,
+        "replay_hash": "bacf54434f1a3bf2d758b27a62d5fd580ca4c8d3b180693573eeebcaea631fc5"
+      },
+      "kind": "github_push",
+      "event": {
+        "repo": "szl-holdings/.github",
+        "ref": "main",
+        "commit": "105dc17ef27eebed92fcef26441f40dd898f9eab",
+        "path": "docs/resilience_observability/",
+        "files": 15,
+        "mode": "ADDITIVE",
+        "method": "git/gh-cli (NEVER GitHub Actions secrets.HF_TOKEN)"
+      },
+      "prev_hash": "GENESIS",
+      "dsse": {
+        "sig": "PLACEHOLDER \u2014 Sigstore CI signing not yet wired (Doctrine v12)",
+        "keyid": "PENDING"
+      },
+      "honest_note": "Hash-chain integrity, NOT cryptographic signature. Sigstore PLACEHOLDER. SLSA L1.",
+      "receipt_hash": "4e5138687318a20d69643f50643e686c7895225692c305303783e98ee988c2c3"
+    },
+    {
+      "schema": "szl.resilience.ship.receipt/v1",
+      "ts": "2026-06-01T10:35:00Z",
+      "traceparent": "00-cb0253a3557505f460a67c5ff4ec4d88-89f2f1fa439f6ab0-01",
+      "agent": "Yachay (SZL reliability agent)",
+      "authority": "CTO",
+      "doctrine": "v12",
+      "locked": {
+        "declarations": 749,
+        "axioms": 14,
+        "sorries": 163,
+        "replay_hash": "bacf54434f1a3bf2d758b27a62d5fd580ca4c8d3b180693573eeebcaea631fc5"
+      },
+      "kind": "hf_push",
+      "event": {
+        "space": "SZLHOLDINGS/a11oy",
+        "sha": "097be5a8fb374bc7283d44d31fca7d7a0e67a760",
+        "files": [
+          "resilience/szl_breaker.py",
+          "resilience/szl_exporter.py",
+          "resilience/status_feed.py"
+        ],
+        "mode": "ADDITIVE",
+        "method": "HfApi.create_commit"
+      },
+      "prev_hash": "4e5138687318a20d69643f50643e686c7895225692c305303783e98ee988c2c3",
+      "dsse": {
+        "sig": "PLACEHOLDER \u2014 Sigstore CI signing not yet wired (Doctrine v12)",
+        "keyid": "PENDING"
+      },
+      "honest_note": "Hash-chain integrity, NOT cryptographic signature. Sigstore PLACEHOLDER. SLSA L1.",
+      "receipt_hash": "d87a48c871b843fd8a1f02c5fc907402218987cfc453e9ee213978373b12d1cf"
+    },
+    {
+      "schema": "szl.resilience.ship.receipt/v1",
+      "ts": "2026-06-01T10:35:00Z",
+      "traceparent": "00-d1d8fcafef2b3c13a94c98b268fd1eef-225f58a3ad518275-01",
+      "agent": "Yachay (SZL reliability agent)",
+      "authority": "CTO",
+      "doctrine": "v12",
+      "locked": {
+        "declarations": 749,
+        "axioms": 14,
+        "sorries": 163,
+        "replay_hash": "bacf54434f1a3bf2d758b27a62d5fd580ca4c8d3b180693573eeebcaea631fc5"
+      },
+      "kind": "hf_push",
+      "event": {
+        "space": "SZLHOLDINGS/a11oy",
+        "sha": "df035d2c9b8def16f37632f5c1e352761176e61f",
+        "files": [
+          "resilience/szlBreaker.ts"
+        ],
+        "mode": "ADDITIVE",
+        "method": "HfApi.create_commit"
+      },
+      "prev_hash": "d87a48c871b843fd8a1f02c5fc907402218987cfc453e9ee213978373b12d1cf",
+      "dsse": {
+        "sig": "PLACEHOLDER \u2014 Sigstore CI signing not yet wired (Doctrine v12)",
+        "keyid": "PENDING"
+      },
+      "honest_note": "Hash-chain integrity, NOT cryptographic signature. Sigstore PLACEHOLDER. SLSA L1.",
+      "receipt_hash": "3fac47a3d4176d6df11a775ca60ee27b9d76dc12d02570586cdd8056a42fc3ba"
+    },
+    {
+      "schema": "szl.resilience.ship.receipt/v1",
+      "ts": "2026-06-01T10:35:00Z",
+      "traceparent": "00-bd1e8ad7c4391b212c4d52bea65e0536-5d9df84ea9658dab-01",
+      "agent": "Yachay (SZL reliability agent)",
+      "authority": "CTO",
+      "doctrine": "v12",
+      "locked": {
+        "declarations": 749,
+        "axioms": 14,
+        "sorries": 163,
+        "replay_hash": "bacf54434f1a3bf2d758b27a62d5fd580ca4c8d3b180693573eeebcaea631fc5"
+      },
+      "kind": "hf_push",
+      "event": {
+        "space": "SZLHOLDINGS/amaru",
+        "sha": "667becca1f4d7f1168b04aefc595ee93e4ec4a4e",
+        "files": [
+          "resilience/szl_breaker.py",
+          "resilience/szl_exporter.py",
+          "resilience/status_feed.py"
+        ],
+        "mode": "ADDITIVE",
+        "method": "HfApi.create_commit"
+      },
+      "prev_hash": "3fac47a3d4176d6df11a775ca60ee27b9d76dc12d02570586cdd8056a42fc3ba",
+      "dsse": {
+        "sig": "PLACEHOLDER \u2014 Sigstore CI signing not yet wired (Doctrine v12)",
+        "keyid": "PENDING"
+      },
+      "honest_note": "Hash-chain integrity, NOT cryptographic signature. Sigstore PLACEHOLDER. SLSA L1.",
+      "receipt_hash": "129e7f9da397a6bd764ce072d293b89d82349aa6f3f087b92680f4784e28a1ec"
+    },
+    {
+      "schema": "szl.resilience.ship.receipt/v1",
+      "ts": "2026-06-01T10:35:00Z",
+      "traceparent": "00-1613c19ee6c247068788ad6144a54429-db6137b05b583d48-01",
+      "agent": "Yachay (SZL reliability agent)",
+      "authority": "CTO",
+      "doctrine": "v12",
+      "locked": {
+        "declarations": 749,
+        "axioms": 14,
+        "sorries": 163,
+        "replay_hash": "bacf54434f1a3bf2d758b27a62d5fd580ca4c8d3b180693573eeebcaea631fc5"
+      },
+      "kind": "hf_push",
+      "event": {
+        "space": "SZLHOLDINGS/sentra",
+        "sha": "4286d7589a52f9be1a26be8ff236e09d3389719c",
+        "files": [
+          "resilience/szl_breaker.py",
+          "resilience/szl_exporter.py",
+          "resilience/status_feed.py"
+        ],
+        "mode": "ADDITIVE",
+        "method": "HfApi.create_commit"
+      },
+      "prev_hash": "129e7f9da397a6bd764ce072d293b89d82349aa6f3f087b92680f4784e28a1ec",
+      "dsse": {
+        "sig": "PLACEHOLDER \u2014 Sigstore CI signing not yet wired (Doctrine v12)",
+        "keyid": "PENDING"
+      },
+      "honest_note": "Hash-chain integrity, NOT cryptographic signature. Sigstore PLACEHOLDER. SLSA L1.",
+      "receipt_hash": "6fd257d83e2bd0e1c372436b57f0e6b1ba6a2ebe45b68eaed3665f60cb47309a"
+    },
+    {
+      "schema": "szl.resilience.ship.receipt/v1",
+      "ts": "2026-06-01T10:35:00Z",
+      "traceparent": "00-2563ab007afc7988971e76c950d1c565-4fb228c0b43585d2-01",
+      "agent": "Yachay (SZL reliability agent)",
+      "authority": "CTO",
+      "doctrine": "v12",
+      "locked": {
+        "declarations": 749,
+        "axioms": 14,
+        "sorries": 163,
+        "replay_hash": "bacf54434f1a3bf2d758b27a62d5fd580ca4c8d3b180693573eeebcaea631fc5"
+      },
+      "kind": "hf_push",
+      "event": {
+        "space": "SZLHOLDINGS/vessels",
+        "sha": "fc43ff06d5e92845a00b452b9e4c4b880360b5df",
+        "files": [
+          "resilience/szl_breaker.py",
+          "resilience/szl_exporter.py",
+          "resilience/status_feed.py"
+        ],
+        "mode": "ADDITIVE",
+        "method": "HfApi.create_commit"
+      },
+      "prev_hash": "6fd257d83e2bd0e1c372436b57f0e6b1ba6a2ebe45b68eaed3665f60cb47309a",
+      "dsse": {
+        "sig": "PLACEHOLDER \u2014 Sigstore CI signing not yet wired (Doctrine v12)",
+        "keyid": "PENDING"
+      },
+      "honest_note": "Hash-chain integrity, NOT cryptographic signature. Sigstore PLACEHOLDER. SLSA L1.",
+      "receipt_hash": "e2367002c6534b53aee4f6700c2a88de0adb7f199242af04b11eb271f990ed63"
+    },
+    {
+      "schema": "szl.resilience.ship.receipt/v1",
+      "ts": "2026-06-01T10:35:00Z",
+      "traceparent": "00-8e9accc3d0c23e123c616e93a0ddb318-fa39616ed19ff1c4-01",
+      "agent": "Yachay (SZL reliability agent)",
+      "authority": "CTO",
+      "doctrine": "v12",
+      "locked": {
+        "declarations": 749,
+        "axioms": 14,
+        "sorries": 163,
+        "replay_hash": "bacf54434f1a3bf2d758b27a62d5fd580ca4c8d3b180693573eeebcaea631fc5"
+      },
+      "kind": "hf_push",
+      "event": {
+        "space": "SZLHOLDINGS/rosie",
+        "sha": "1e8fd740ee9acad7e1939be1987ee85ade739056",
+        "files": [
+          "resilience/szl_breaker.py",
+          "resilience/szl_exporter.py",
+          "resilience/status_feed.py"
+        ],
+        "mode": "ADDITIVE",
+        "method": "HfApi.create_commit"
+      },
+      "prev_hash": "e2367002c6534b53aee4f6700c2a88de0adb7f199242af04b11eb271f990ed63",
+      "dsse": {
+        "sig": "PLACEHOLDER \u2014 Sigstore CI signing not yet wired (Doctrine v12)",
+        "keyid": "PENDING"
+      },
+      "honest_note": "Hash-chain integrity, NOT cryptographic signature. Sigstore PLACEHOLDER. SLSA L1.",
+      "receipt_hash": "66b68d42e38391460112be819f0af07e3692f0515f2b81e703b89d802f35331a"
+    },
+    {
+      "schema": "szl.resilience.skip.receipt/v1",
+      "ts": "2026-06-01T10:35:00Z",
+      "traceparent": "00-cb15e9c76996aa9069f76769d0ef5220-623cdd7cc609bf90-01",
+      "agent": "Yachay (SZL reliability agent)",
+      "authority": "CTO",
+      "doctrine": "v12",
+      "locked": {
+        "declarations": 749,
+        "axioms": 14,
+        "sorries": 163,
+        "replay_hash": "bacf54434f1a3bf2d758b27a62d5fd580ca4c8d3b180693573eeebcaea631fc5"
+      },
+      "kind": "hf_skip",
+      "event": {
+        "space": "SZLHOLDINGS/killinchu",
+        "reason": "Space does not exist in HF inventory yet; breaker/exporter ship the moment the Space is created. NOT faked.",
+        "mode": "HONEST_SKIP"
+      },
+      "prev_hash": "66b68d42e38391460112be819f0af07e3692f0515f2b81e703b89d802f35331a",
+      "dsse": {
+        "sig": "PLACEHOLDER \u2014 Sigstore CI signing not yet wired (Doctrine v12)",
+        "keyid": "PENDING"
+      },
+      "honest_note": "Hash-chain integrity, NOT cryptographic signature. Sigstore PLACEHOLDER. SLSA L1.",
+      "receipt_hash": "594ad6c4e21a97181d3373d3135d07802e37e1afd77ae768ef603a46ac625d0f"
+    }
+  ],
+  "footer": "NO BANDAID. Honest fault tolerance. No vapor. Append-only Khipu DAG; RUWAY is the only writer (this is an out-of-band manifest, not a live DAG mutation)."
+}

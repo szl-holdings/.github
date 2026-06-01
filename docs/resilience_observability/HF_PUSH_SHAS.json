@@ -1,0 +1,32 @@
+{
+  "a11oy": {
+    "space": "a11oy",
+    "sha": "097be5a8fb374bc7283d44d31fca7d7a0e67a760",
+    "status": "OK"
+  },
+  "amaru": {
+    "space": "amaru",
+    "sha": "667becca1f4d7f1168b04aefc595ee93e4ec4a4e",
+    "status": "OK"
+  },
+  "sentra": {
+    "space": "sentra",
+    "sha": "4286d7589a52f9be1a26be8ff236e09d3389719c",
+    "status": "OK"
+  },
+  "vessels": {
+    "space": "vessels",
+    "sha": "fc43ff06d5e92845a00b452b9e4c4b880360b5df",
+    "status": "OK"
+  },
+  "rosie": {
+    "space": "rosie",
+    "sha": "1e8fd740ee9acad7e1939be1987ee85ade739056",
+    "status": "OK"
+  },
+  "a11oy_ts": {
+    "space": "a11oy",
+    "sha": "df035d2c9b8def16f37632f5c1e352761176e61f",
+    "status": "OK"
+  }
+}
