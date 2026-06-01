@@ -44,7 +44,7 @@ SZL Holdings builds a **formally-verified governance substrate for agentic AI**.
 Five flagships, each with a live 🤗 Space, a GitHub repo, and a CI status badge.
 
 ### 🛡️ a11oy — Brand Orchestration Layer
-Policy + receipt substrate. Every action signed, every decision gated through the Λ-aggregator, every receipt verifiable. Anchor gates evaluate each request before it reaches a tool.
+**Λ-gate governance platform · Lean-proven · DSSE-signed.** Policy + receipt substrate. Every action signed, every decision gated through the Λ-aggregator, every receipt verifiable. Anchor gates evaluate each request before it reaches a tool.
 [![CI](https://github.com/szl-holdings/a11oy/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/szl-holdings/a11oy/actions/workflows/ci.yml)
 🤗 [SZLHOLDINGS/a11oy](https://huggingface.co/spaces/SZLHOLDINGS/a11oy) · [github.com/szl-holdings/a11oy](https://github.com/szl-holdings/a11oy)
 
@@ -63,8 +63,12 @@ Andean counter-UAS rule engine. Real decoders for FAA Remote ID, ADS-B Mode-S, M
 [![CI](https://github.com/szl-holdings/killinchu/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/szl-holdings/killinchu/actions/workflows/ci.yml)
 🤗 [SZLHOLDINGS/killinchu](https://huggingface.co/spaces/SZLHOLDINGS/killinchu) · [github.com/szl-holdings/killinchu](https://github.com/szl-holdings/killinchu) · *maritime sibling:* 🤗 [SZLHOLDINGS/vessels](https://huggingface.co/spaces/SZLHOLDINGS/vessels)
 
-### 🪢 rosie — Cross-Session Memory
-Cross-session memory + operator console. Human-facing UI for verdicts and the live receipt stream; persistent memory carries provenance across sessions. Wire C live to a11oy.
+> **Provenanced defense intelligence · 53-drone mesh · cosign-signed missions · geofence-enforced.** As of Doctrine v11 (2026-06-01) killinchu is also an **a11oy understudy** — it carries every a11oy moat + the 11 understudy capabilities (7-tier LLM router, agentic RAG, 18-tool MCP, PURIQ 12 organs, 23 formulas, Khipu DAG, AYNI, WAYRA) under `/api/killinchu/v2/*`, failover-ready with `ready_to_substitute: true`.
+
+### 🪢 rosie — Cross-Session Memory · a11oy Understudy
+**Your provenanced AI aide. Every action signed. Every memory yours.** Cross-session memory + operator console. Human-facing UI for verdicts and the live receipt stream; persistent memory carries provenance across sessions. Wire C live to a11oy.
+
+> As of Doctrine v11 (2026-06-01) rosie is a **failover-ready a11oy understudy** — she carries every a11oy moat + the 11 understudy capabilities (full 7-tier open-LLM router, full agentic RAG with live corpus, 18-tool MCP, PURIQ 12 organs, 23 formulas, Khipu DAG, AYNI, WAYRA) under `/api/rosie/v2/*`, `ready_to_substitute: true`. See [`platform/docs/moat-equivalence.md`](https://github.com/szl-holdings/platform/blob/main/docs/moat-equivalence.md).
 [![CI](https://github.com/szl-holdings/rosie/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/szl-holdings/rosie/actions/workflows/ci.yml)
 🤗 [SZLHOLDINGS/rosie](https://huggingface.co/spaces/SZLHOLDINGS/rosie) · [github.com/szl-holdings/rosie](https://github.com/szl-holdings/rosie)
 
