@@ -43,7 +43,7 @@ Policy immune system. Deny by default, allow with proof; eight gates evaluate ev
 ### 🦅 killinchu — Drone Intelligence *(NEW — air sibling of vessels)*
 Andean counter-UAS rule engine. Real decoders for FAA Remote ID, ADS-B Mode-S, MAVLink, and STANAG 4609. Decoded telemetry is scored as a *claim* against geofence + policy, emitting an honest Λ-receipt. The maritime sibling [`vessels`](https://github.com/szl-holdings/vessels) remains live during the transition.
 [![CI](https://github.com/szl-holdings/killinchu/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/szl-holdings/killinchu/actions/workflows/ci.yml)
-[github.com/szl-holdings/killinchu](https://github.com/szl-holdings/killinchu) · 🤗 Space queued (HF deploy pending) · *vessels:* 🤗 [SZLHOLDINGS/vessels](https://huggingface.co/spaces/SZLHOLDINGS/vessels)
+🤗 [SZLHOLDINGS/killinchu](https://huggingface.co/spaces/SZLHOLDINGS/killinchu) · [github.com/szl-holdings/killinchu](https://github.com/szl-holdings/killinchu) · *maritime sibling:* 🤗 [SZLHOLDINGS/vessels](https://huggingface.co/spaces/SZLHOLDINGS/vessels)
 
 ### 🪢 rosie — Cross-Session Memory
 Cross-session memory + operator console. Human-facing UI for verdicts and the live receipt stream; persistent memory carries provenance across sessions. Wire C live to a11oy.
@@ -61,11 +61,11 @@ The full substrate renders as an interactive 3D anatomy: 12 organs around the Λ
 <a href="https://szlholdings-anatomy-3d.static.hf.space/"><img src="https://raw.githubusercontent.com/szl-holdings/.github/main/profile/screenshots/3d/anatomy-3d-default.png" alt="SZL 3D Anatomy — live Λ=0.902, 13/13 axes, 749 declarations / 14 axioms / 163 sorries" width="48%" /></a>
 <a href="https://szlholdings-anatomy-3d.static.hf.space/"><img src="https://raw.githubusercontent.com/szl-holdings/.github/main/profile/screenshots/3d/anatomy-3d-organ-panel.png" alt="SZL 3D Anatomy V2 — organ inspection panel with formula registry and per-organ Zenodo DOI" width="48%" /></a>
 
-**[▶ Explore Live — anatomy-3d](https://szlholdings-anatomy-3d.static.hf.space/)**
+**[▶ Explore Live — anatomy-3d](https://szlholdings-anatomy-3d.static.hf.space/)** · **[▶ rosie-3d](https://szlholdings-rosie-3d.static.hf.space/)**
 
 </div>
 
-The 3D anatomy reports the same canonical numbers as `lutar-lean@main` and labels Λ uniqueness as a **Conjecture**. A rosie cross-session-memory 3D view is in development (`rosie-3d`); the live, deployed viewer today is **anatomy-3d**.
+The 3D anatomy reports the same canonical numbers as `lutar-lean@main` and labels Λ uniqueness as a **Conjecture**. Two live 3D viewers are deployed: **[anatomy-3d](https://szlholdings-anatomy-3d.static.hf.space/)** (the 12-organ substrate) and **[rosie-3d](https://szlholdings-rosie-3d.static.hf.space/)** (cross-session-memory view).
 
 ---
 
