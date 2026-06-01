@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>SZL Constellation — live receipt star field</title>
+<meta name="description" content="SZL Holdings flagship constellation. Each star is a live governance surface; edges are the Khipu receipt chain." />
+<style>
+  :root{ --bg:#070912; --fg:#e8ecf6; --accent:#5ad1ff; --accent2:#8b7bff; --dim:#5b6478; }
+  @font-face{ font-family:'JetBrains Mono'; src:local('JetBrains Mono'); }
+  html,body{ margin:0; height:100%; background:var(--bg); color:var(--fg);
+    font-family:'Inter','IBM Plex Sans',system-ui,sans-serif; overflow:hidden; }
+  #c{ position:fixed; inset:0; display:block; }
+  .hud{ position:fixed; left:18px; top:16px; z-index:5; pointer-events:none; }
+  .hud h1{ font-size:15px; font-weight:600; letter-spacing:.12em; margin:0; text-transform:uppercase; }
+  .hud p{ margin:4px 0 0; font-size:12px; color:var(--dim);
+    font-family:'JetBrains Mono','SFMono-Regular',monospace; }
+  .legend{ position:fixed; right:16px; bottom:14px; z-index:5; font-size:11px;
+    color:var(--dim); font-family:'JetBrains Mono',monospace; text-align:right; line-height:1.7; }
+  .legend b{ color:var(--accent); font-weight:600; }
+  .tip{ position:fixed; left:50%; bottom:16px; transform:translateX(-50%); z-index:5;
+    font-size:11px; color:var(--dim); font-family:'JetBrains Mono',monospace; }
+  #label{ position:fixed; z-index:6; padding:4px 8px; font-size:12px; pointer-events:none;
+    background:rgba(10,14,26,.92); border:1px solid var(--accent); border-radius:6px;
+    color:var(--fg); font-family:'JetBrains Mono',monospace; opacity:0; transition:opacity .12s; white-space:nowrap; }
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div class="hud">
+  <h1>SZL Constellation</h1>
+  <p>flagship surfaces · live Khipu receipt chain</p>
+</div>
+<div id="label"></div>
+<div class="legend">
+  <div><b>nodes</b> = governance surfaces</div>
+  <div><b>edges</b> = receipt-chain links</div>
+  <div>749 decl · 14 axioms · 163 sorries</div>
+</div>
+<div class="tip">drag to orbit · scroll to zoom · hover a star</div>
+<script type="importmap">
+{ "imports": {
+  "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+  "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+}}
+</script>
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+// Flagship surfaces — the real SZL constellation (shared with HF org card).
+const NODES = [
+  { id:'a11oy',   label:'a11oy · policy + receipt substrate' },
+  { id:'amaru',   label:'amaru · cortex memory + reasoner' },
+  { id:'sentra',  label:'sentra · policy immune system' },
+  { id:'rosie',   label:'rosie · operator console' },
+  { id:'vessels', label:'vessels · UDS governed-AI bundle' },
+  { id:'killinchu',label:'killinchu · counter-UAS rule engine' },
+  { id:'ouroboros',label:'ouroboros · bounded-loop runtime' },
+  { id:'lutar-lean',label:'lutar-lean · 749 Lean declarations' },
+  { id:'uds-mesh',label:'uds-mesh · span schemas + DSSE' },
+  { id:'vsp-otel',label:'vsp-otel · Λ-signed OTel exporter' },
+  { id:'platform',label:'platform · substrate runtime + MCP' },
+  { id:'szl-trust',label:'szl-trust · public trust portal' },
+];
+// receipt-chain edges (DAG)
+const EDGES = [
+  ['lutar-lean','ouroboros'],['ouroboros','a11oy'],['a11oy','sentra'],
+  ['a11oy','amaru'],['amaru','rosie'],['sentra','vessels'],['vessels','killinchu'],
+  ['a11oy','uds-mesh'],['uds-mesh','vsp-otel'],['platform','a11oy'],
+  ['platform','rosie'],['a11oy','szl-trust'],['sentra','szl-trust'],
+];
+
+const canvas = document.getElementById('c');
+const renderer = new THREE.WebGLRenderer({ canvas, antialias:true });
+renderer.setPixelRatio(Math.min(devicePixelRatio,2));
+const scene = new THREE.Scene();
+scene.fog = new THREE.FogExp2(0x070912, 0.012);
+const camera = new THREE.PerspectiveCamera(55, 1, 0.1, 400);
+camera.position.set(0,8,52);
+const controls = new OrbitControls(camera, canvas);
+controls.enableDamping = true; controls.autoRotate = true; controls.autoRotateSpeed = 0.45;
+controls.minDistance = 18; controls.maxDistance = 120;
+
+// deterministic positions on a sphere shell (golden-angle)
+const R = 22, GA = Math.PI*(3-Math.sqrt(5));
+const pos = {};
+NODES.forEach((n,i)=>{
+  const y = 1 - (i/(NODES.length-1))*2; const r = Math.sqrt(1-y*y);
+  const t = GA*i;
+  pos[n.id] = new THREE.Vector3(Math.cos(t)*r*R, y*R, Math.sin(t)*r*R);
+});
+
+// background star dust
+const dustGeo = new THREE.BufferGeometry();
+const N=1400, arr=new Float32Array(N*3);
+for(let i=0;i<N;i++){ const r=60+Math.random()*120, th=Math.random()*Math.PI*2, ph=Math.acos(2*Math.random()-1);
+  arr[i*3]=r*Math.sin(ph)*Math.cos(th); arr[i*3+1]=r*Math.sin(ph)*Math.sin(th); arr[i*3+2]=r*Math.cos(ph); }
+dustGeo.setAttribute('position', new THREE.BufferAttribute(arr,3));
+scene.add(new THREE.Points(dustGeo, new THREE.PointsMaterial({color:0x2a3350,size:0.5,transparent:true,opacity:.7})));
+
+// edges
+const edgeMat = new THREE.LineBasicMaterial({ color:0x5ad1ff, transparent:true, opacity:0.28 });
+const epts=[]; EDGES.forEach(([a,b])=>{ epts.push(pos[a].clone(),pos[b].clone()); });
+const edgeGeo = new THREE.BufferGeometry().setFromPoints(epts);
+scene.add(new THREE.LineSegments(edgeGeo, edgeMat));
+
+// pulse particles travelling edges (receipt flow)
+const pulseGeo = new THREE.BufferGeometry();
+const pc = EDGES.length, parr = new Float32Array(pc*3);
+pulseGeo.setAttribute('position', new THREE.BufferAttribute(parr,3));
+const pulse = new THREE.Points(pulseGeo, new THREE.PointsMaterial({color:0x8b7bff,size:1.4}));
+scene.add(pulse);
+
+// nodes
+const nodeMeshes=[];
+const sphereGeo = new THREE.IcosahedronGeometry(0.9,2);
+NODES.forEach(n=>{
+  const mat = new THREE.MeshStandardMaterial({ color:0x5ad1ff, emissive:0x153a4d, emissiveIntensity:1.4, metalness:.3, roughness:.4 });
+  const m = new THREE.Mesh(sphereGeo, mat); m.position.copy(pos[n.id]); m.userData=n;
+  scene.add(m); nodeMeshes.push(m);
+  // halo
+  const halo = new THREE.Mesh(new THREE.SphereGeometry(1.5,16,16),
+    new THREE.MeshBasicMaterial({color:0x5ad1ff,transparent:true,opacity:0.07}));
+  halo.position.copy(pos[n.id]); scene.add(halo);
+});
+
+scene.add(new THREE.AmbientLight(0x4060a0, 1.1));
+const key = new THREE.PointLight(0x8b7bff, 220, 200); key.position.set(20,30,30); scene.add(key);
+const fill = new THREE.PointLight(0x5ad1ff, 160, 200); fill.position.set(-30,-10,20); scene.add(fill);
+
+// hover picking
+const ray = new THREE.Raycaster(); const mouse = new THREE.Vector2(-2,-2);
+const labelEl = document.getElementById('label'); let hovered=null;
+addEventListener('pointermove', e=>{ mouse.x=(e.clientX/innerWidth)*2-1; mouse.y=-(e.clientY/innerHeight)*2+1;
+  labelEl.style.left=(e.clientX+12)+'px'; labelEl.style.top=(e.clientY+12)+'px'; });
+
+function resize(){ const w=innerWidth,h=innerHeight; renderer.setSize(w,h,false); camera.aspect=w/h; camera.updateProjectionMatrix(); }
+addEventListener('resize',resize); resize();
+
+const clock = new THREE.Clock();
+function animate(){
+  requestAnimationFrame(animate);
+  const t = clock.getElapsedTime();
+  nodeMeshes.forEach((m,i)=>{ m.material.emissiveIntensity = 1.1 + 0.6*Math.sin(t*1.8+i); m.rotation.y = t*0.3; });
+  // move pulses along edges
+  for(let i=0;i<pc;i++){ const [a,b]=EDGES[i]; const f=(Math.sin(t*0.8+i)*0.5+0.5);
+    const p=pos[a].clone().lerp(pos[b], f); parr[i*3]=p.x; parr[i*3+1]=p.y; parr[i*3+2]=p.z; }
+  pulseGeo.attributes.position.needsUpdate=true;
+  ray.setFromCamera(mouse,camera); const hit=ray.intersectObjects(nodeMeshes)[0];
+  if(hit){ hovered=hit.object; labelEl.textContent=hovered.userData.label; labelEl.style.opacity=1; document.body.style.cursor='pointer'; }
+  else { labelEl.style.opacity=0; document.body.style.cursor='default'; }
+  controls.update(); renderer.render(scene,camera);
+}
+animate();
+</script>
+</body>
+</html>
