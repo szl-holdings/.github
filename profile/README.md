@@ -3,6 +3,11 @@
 
 <div align="center">
 
+<!-- ===== INCA AVATAR HERO (additive · Amaru animated mark · Yachay · 2026-06-01) =====
+     Animated Inca avatar placed at the top of the hero. Existing static logo
+     (szl-holdings-logo.svg) and every section below are preserved verbatim. -->
+<img src="https://raw.githubusercontent.com/szl-holdings/.github/main/profile/assets/szl-avatar-animated.gif" alt="SZL Holdings — Amaru animated avatar" width="180" height="180" />
+
 <img src="https://raw.githubusercontent.com/szl-holdings/.github/main/profile/assets/szl-holdings-logo.svg" alt="SZL Holdings" height="72" />
 
 # SZL Holdings — Formally-Verified Governance Substrate for Agentic AI

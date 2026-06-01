@@ -126,3 +126,9 @@ The 13 substrate repos cross-link reciprocally. This footer is maintained by GH 
 - [`vsp-otel`](https://github.com/szl-holdings/vsp-otel) — OpenTelemetry exporter for Λ-axis spans
 
 Org page: [github.com/szl-holdings](https://github.com/szl-holdings) · Doctrine v11 · 14 unique axioms · 749 declarations · 163 sorries · DOI [`10.5281/zenodo.20434276`](https://doi.org/10.5281/zenodo.20434276)
+
+## SZL Holdings
+
+![SZL Holdings](./branding/szl-avatar-animated.gif)
+
+*Amaru — the Inca avatar of SZL Holdings. Animated mark (400×400, 16fps loop). Signed Yachay.*
