@@ -75,16 +75,17 @@ The following Lean proof-corpus numbers were verified at a specific commit. They
 may drift as the corpus changes; re-verify against current HEAD before reuse.
 
 Verified at commit
-[`3de37e5`](https://github.com/szl-holdings/lutar-lean/commit/3de37e5258648cbd1263ade1a6f36f54d3a79ae3)
-(`lutar-lean`):
+[`c7c0ba17`](https://github.com/szl-holdings/lutar-lean/commit/c7c0ba17)
+(`lutar-lean`, tag `lutar-v18.0.0`, Doctrine v11):
 
-- Declarations: 626
+- Declarations: 749
 - Unique axioms: 14
-- Sorries: 189
+- Sorries: 163
 
-Caveat: these counts are accurate as of `3de37e5` and may drift on later
-commits. A reproducibility script that regenerates these counts from a clean
-checkout is a TODO and is not yet present in the repository.
+Source of truth: [`.github/data/lean_numbers.json`](./.github/data/lean_numbers.json)
+(measured 2026-05-31, method documented in `.github/scripts/lean_numbers.py`).
+The previous figures (626 declarations / 189 sorries) were accurate at the
+earlier commit `3de37e5` and are superseded by the v11-locked counts above.
 
 ## Deliberately NOT claimed
 
