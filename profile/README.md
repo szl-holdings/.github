@@ -14,6 +14,8 @@
 
 SZL Holdings builds a **formally-verified governance substrate for agentic AI**. The Λ aggregator is anchored in Lean 4 against **749 declarations / 14 unique axioms / 163 tracked sorries** on [`lutar-lean@main`](https://github.com/szl-holdings/lutar-lean). Every gate decision emits a DSSE-enveloped receipt onto a hash-linked **Khipu Merkle DAG**, packaged as a UDS-deployable bundle and aligned with EU AI Act Article 12 and NIST AI RMF.
 
+> **Doctrine v12 (ADDITIVE · 2026-06-01) — `781 / 14 / 194`.** v12 = v11 + the PuriqFormulaLean scaffold module (PURIQ-OS Agentic Formula Pack). The Lean corpus on `lutar-lean` is now measured at **781 declarations / 14 unique axioms / 194 tracked sorries** (`lake build` green on PR #142 head `86d9fb2c`, CI run 26758112448). **The 14 unique axioms are unchanged** (identical names — zero added). New sorries are clearly-marked roadmap (`SORRY_PURIQ_OPEN`); **Λ-uniqueness remains Conjecture 1**; SLSA stays **L1 (honest)**; the 13-axis `yuyay_v3` replay hash `bacf5443…631fc5` is **unchanged**. The change is **monotone** (declarations ↑, sorries ↑, axioms unchanged), so the v11 figures cited throughout this page remain the valid, LOCKED reference snapshot.
+
 [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.19944926.svg)](https://doi.org/10.5281/zenodo.19944926)
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache_2.0-0B1F3A.svg?style=flat-square)](https://www.apache.org/licenses/LICENSE-2.0)
 [![Doctrine](https://img.shields.io/badge/Doctrine-v11-3b82f6?style=flat-square)](https://github.com/szl-holdings/.github/blob/main/DOCTRINE_V11.md)
