@@ -7,7 +7,7 @@
 
 ### Formally-verified governance gate for agentic AI
 
-SZL Holdings builds a formally-verified governance gate for agentic AI. The Λ aggregator is proved in Lean 4 against **749 declarations / 14 unique axioms / 163 tracked sorries**. Every gate decision emits a DSSE-signed receipt onto a hash-linked Khipu Merkle DAG with summation-checked integrity, packaged as a UDS-deployable bundle and aligned with EU AI Act Article 12 and NIST AI RMF.
+SZL Holdings builds a formally-verified governance gate for agentic AI. The Λ aggregator is proved in Lean 4 against **749 declarations / 14 unique axioms / 168 tracked sorries**. Every gate decision emits a DSSE-signed receipt onto a hash-linked Khipu Merkle DAG with summation-checked integrity, packaged as a UDS-deployable bundle and aligned with EU AI Act Article 12 and NIST AI RMF.
 
 [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.20434276.svg)](https://doi.org/10.5281/zenodo.20434276)
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache_2.0-0B1F3A.svg?style=flat-square)](https://www.apache.org/licenses/LICENSE-2.0)
@@ -60,7 +60,7 @@ SZL Holdings builds a formally-verified governance gate for agentic AI. The Λ a
 
 ## What is honest right now
 
-- **Formal proof posture:** 749 declarations, 14 unique axioms (15 raw, 1 duplicate), 163 tracked sorries on `lutar-lean@main`. Λ uniqueness is currently a **Conjecture**, not a closed theorem — it depends on a CAUCHY_ND sorry and a missing symmetry axiom.
+- **Formal proof posture:** 749 declarations, 14 unique axioms (15 raw, 1 duplicate), 168 tracked sorries on `lutar-lean@main`. Λ uniqueness is currently a **Conjecture**, not a closed theorem — it depends on a CAUCHY_ND sorry and a missing symmetry axiom.
 - **Receipts:** DSSE envelopes ship from the amaru tick endpoint today. Sigstore CI wiring is **pending** — signature fields are honestly labeled as "PLACEHOLDER — signing not yet wired into CI".
 - **Wires:** Wire B (a11oy ↔ sentra immune) and Wire C (a11oy ↔ rosie receipt stream) are LIVE on `main`. Wire D (W3C traceparent across the mesh) is **not yet implemented**.
 - **SLSA:** Honest L1 (was previously claimed as L3; corrected in platform PR #235).
