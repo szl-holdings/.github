@@ -78,6 +78,16 @@ Full spec: [DOCTRINE_V7.md](https://github.com/szl-holdings/.github/blob/main/DO
 
 ---
 
+## Founder guides
+
+Step-by-step Word guides to stand the ecosystem up from zero:
+
+- **Environment Setup Guide** — hardware to buy, tools to install (with links), accounts, secret keys, 10-step first-time setup: [docs/SZL_ENVIRONMENT_SETUP_GUIDE.docx](https://github.com/szl-holdings/.github/blob/main/docs/SZL_ENVIRONMENT_SETUP_GUIDE.docx)
+- **UDS Run Guide** — sign bundles, build Zarf, k3d deploy, verify, Warhacker demo script, founder action queue: [docs/SZL_UDS_RUN_GUIDE.docx](https://github.com/szl-holdings/.github/blob/main/docs/SZL_UDS_RUN_GUIDE.docx)
+- Mirrored on Hugging Face: [SZLHOLDINGS/doctrine-v10-v11](https://huggingface.co/datasets/SZLHOLDINGS/doctrine-v10-v11) under `founder-guides/`
+
+---
+
 ## Contact
 
 - Founder: Stephen P. Lutar Jr. · [stephen@szlholdings.com](mailto:stephen@szlholdings.com) · ORCID [0009-0001-0110-4173](https://orcid.org/0009-0001-0110-4173)
