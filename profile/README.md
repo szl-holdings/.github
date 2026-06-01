@@ -251,3 +251,29 @@ python .github/scripts/lean_numbers.py   # -> 749 / 14 / 163
 ```
 
 — Signed **Yachay** (CTO authority), 2026-06-01. No mysticism. No bandaid.
+
+---
+
+## Code Mirrors
+
+Every line of code that makes our Hugging Face Spaces real and operational is mirrored (additive, never destructive) into the matching `szl-holdings/*` GitHub repo. Snapshot date **2026-06-01**. Each repo carries an Apache-2.0 `LICENSE` at root, a `v<hf-short-sha>` tag, a `mirror-2026-06-01` tag, and a matching GitHub Release. Doctrine v11 — **749 / 14 / 163**.
+
+| HF Space | GitHub Mirror | Visibility | HF Commit | Tag | Notes |
+|---|---|---|---|---|---|
+| [SZLHOLDINGS/rosie](https://huggingface.co/spaces/SZLHOLDINGS/rosie) | [szl-holdings/rosie](https://github.com/szl-holdings/rosie) | Public | `968c15082317` | `v968c15082317` | Flagship |
+| [SZLHOLDINGS/a11oy](https://huggingface.co/spaces/SZLHOLDINGS/a11oy) | [szl-holdings/a11oy](https://github.com/szl-holdings/a11oy) | Public | `49bfcb59f225` | `v49bfcb59f225` | Flagship |
+| [SZLHOLDINGS/amaru](https://huggingface.co/spaces/SZLHOLDINGS/amaru) | [szl-holdings/amaru](https://github.com/szl-holdings/amaru) | Public | `02ee0445e350` | `v02ee0445e350` | Flagship |
+| [SZLHOLDINGS/sentra](https://huggingface.co/spaces/SZLHOLDINGS/sentra) | [szl-holdings/sentra](https://github.com/szl-holdings/sentra) | Public | `6f2c5cb9aa9b` | `v6f2c5cb9aa9b` | Flagship |
+| [SZLHOLDINGS/killinchu](https://huggingface.co/spaces/SZLHOLDINGS/killinchu) | szl-holdings/killinchu (private) | **Private** | `35363c98f978` | `v35363c98f978` | PRIVATE; 13 Cesium LFS binaries as pointers (CDN proxy-blocked) |
+| [SZLHOLDINGS/khipu-constellation](https://huggingface.co/spaces/SZLHOLDINGS/khipu-constellation) | [szl-holdings/khipu-constellation](https://github.com/szl-holdings/khipu-constellation) | Public | `9a6b01d90fa0` | `v9a6b01d90fa0` | Static scene |
+| [SZLHOLDINGS/anatomy-3d](https://huggingface.co/spaces/SZLHOLDINGS/anatomy-3d) | [szl-holdings/anatomy-3d](https://github.com/szl-holdings/anatomy-3d) | Public | `a56f43cd0858` | `va56f43cd0858` | Static scene |
+| [SZLHOLDINGS/rosie-3d](https://huggingface.co/spaces/SZLHOLDINGS/rosie-3d) | [szl-holdings/rosie-3d](https://github.com/szl-holdings/rosie-3d) | Public | `b2d27bf63baf` | `vb2d27bf63baf` | Static scene |
+| [SZLHOLDINGS/doctrine-cathedral](https://huggingface.co/spaces/SZLHOLDINGS/doctrine-cathedral) | [szl-holdings/doctrine-cathedral](https://github.com/szl-holdings/doctrine-cathedral) | Public | `5c1c52e6afec` | `v5c1c52e6afec` | Static scene |
+| [SZLHOLDINGS/llm-router-live](https://huggingface.co/spaces/SZLHOLDINGS/llm-router-live) | [szl-holdings/llm-router-live](https://github.com/szl-holdings/llm-router-live) | Public | `99aa9a448c82` | `v99aa9a448c82` | Static demo |
+| [SZLHOLDINGS/lean-kernel](https://huggingface.co/spaces/SZLHOLDINGS/lean-kernel) | [szl-holdings/lean-kernel](https://github.com/szl-holdings/lean-kernel) | Public | `05400515811f` | `v05400515811f` | Static |
+| [SZLHOLDINGS/uds-demo](https://huggingface.co/spaces/SZLHOLDINGS/uds-demo) | [szl-holdings/uds-demo](https://github.com/szl-holdings/uds-demo) | Public | `f25fd51bf532` | `vf25fd51bf532` | 1 LFS PNG as pointer (CDN proxy-blocked) |
+| [SZLHOLDINGS/hatun-mcp](https://huggingface.co/spaces/SZLHOLDINGS/hatun-mcp) | [szl-holdings/hatun-mcp](https://github.com/szl-holdings/hatun-mcp) | Public | `043dfe0edf75` | `v043dfe0edf75` | MCP server |
+
+Reusable substrate modules extracted this session (12 packages: ayni-os, edge-organs, formula-os, hatun-mcp, khipu-os, kipu-qillqaq, live-wires, mobile-controls, puriq-os, rosie-v3, wayra, wire-d) are staged for the monorepo at [szl-holdings/platform#278](https://github.com/szl-holdings/platform/pull/278) (branch `feat/instill-session-modules`); merge to `main` awaits required human review + signed commits per branch protection.
+
+— Mirror signed **Yachay** <yachay@szlholdings.dev>; Co-Authored-By: Perplexity Computer Agent.
