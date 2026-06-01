@@ -165,6 +165,8 @@ flowchart LR
 | [`uds-mesh`](https://github.com/szl-holdings/uds-mesh) | UDS span schemas + governance receipts |
 | [`vsp-otel`](https://github.com/szl-holdings/vsp-otel) | OpenTelemetry exporter for Λ-axis spans |
 | [`du-upstream-contributions`](https://github.com/szl-holdings/du-upstream-contributions) | Upstream patches to Defense Unicorns UDS |
+| [`compliance-posture`](https://github.com/szl-holdings/compliance-posture) | Security questionnaire, DPA/MSA templates, SOC 2 + FedRAMP roadmaps, EU AI Act evidence |
+| [`developers`](https://github.com/szl-holdings/developers) | Developer hub — API reference, quickstart, MCP integration, runnable examples |
 | [`szl-trust`](https://github.com/szl-holdings/szl-trust) · [`szl-cookbook`](https://github.com/szl-holdings/szl-cookbook) · [`szl-brand`](https://github.com/szl-holdings/szl-brand) | Trust specs · recipes · visual doctrine |
 
 ---
