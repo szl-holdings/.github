@@ -1,0 +1,80 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="900" height="320" viewBox="0 0 900 320" role="img" aria-label="SZL governance substrate — receipt flow">
+  <defs>
+    <linearGradient id="bgg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#070912"/><stop offset="1" stop-color="#0a1020"/></linearGradient>
+    <linearGradient id="eg" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#5ad1ff"/><stop offset="1" stop-color="#8b7bff"/></linearGradient>
+    <style>
+      text{ font-family:'Inter','IBM Plex Sans',system-ui,sans-serif; }
+      .title{ font-size:18px; font-weight:700; fill:#e8ecf6; letter-spacing:.02em; }
+      .nl{ font-size:12.5px; font-weight:600; fill:#e8ecf6; font-family:'JetBrains Mono',monospace; }
+      .foot{ font-size:11px; fill:#8893ad; font-family:'JetBrains Mono',monospace; }
+    </style>
+  </defs>
+  <rect width="900" height="320" rx="16" fill="url(#bgg)" stroke="#19223a"/>
+  <text class="title" x="28" y="38">SZL governance substrate — receipt flow</text>
+  <g><line x1="120" y1="120" x2="340" y2="95" stroke="url(#eg)" stroke-width="2.2" stroke-linecap="round" stroke-dasharray="10 8"><animate attributeName="stroke-dashoffset" values="0;-36" dur="1.4s" begin="0.0s" repeatCount="indefinite"/></line><line x1="120" y1="120" x2="340" y2="185" stroke="url(#eg)" stroke-width="2.2" stroke-linecap="round" stroke-dasharray="10 8"><animate attributeName="stroke-dashoffset" values="0;-36" dur="1.4s" begin="0.25s" repeatCount="indefinite"/></line><line x1="340" y1="95" x2="340" y2="185" stroke="url(#eg)" stroke-width="2.2" stroke-linecap="round" stroke-dasharray="10 8"><animate attributeName="stroke-dashoffset" values="0;-36" dur="1.4s" begin="0.5s" repeatCount="indefinite"/></line><line x1="340" y1="185" x2="560" y2="120" stroke="url(#eg)" stroke-width="2.2" stroke-linecap="round" stroke-dasharray="10 8"><animate attributeName="stroke-dashoffset" values="0;-36" dur="1.4s" begin="0.75s" repeatCount="indefinite"/></line><line x1="340" y1="185" x2="560" y2="230" stroke="url(#eg)" stroke-width="2.2" stroke-linecap="round" stroke-dasharray="10 8"><animate attributeName="stroke-dashoffset" values="0;-36" dur="1.4s" begin="1.0s" repeatCount="indefinite"/></line><line x1="560" y1="120" x2="780" y2="180" stroke="url(#eg)" stroke-width="2.2" stroke-linecap="round" stroke-dasharray="10 8"><animate attributeName="stroke-dashoffset" values="0;-36" dur="1.4s" begin="0.0s" repeatCount="indefinite"/></line><line x1="560" y1="230" x2="780" y2="180" stroke="url(#eg)" stroke-width="2.2" stroke-linecap="round" stroke-dasharray="10 8"><animate attributeName="stroke-dashoffset" values="0;-36" dur="1.4s" begin="0.25s" repeatCount="indefinite"/></line><line x1="340" y1="185" x2="560" y2="280" stroke="url(#eg)" stroke-width="2.2" stroke-linecap="round" stroke-dasharray="10 8"><animate attributeName="stroke-dashoffset" values="0;-36" dur="1.4s" begin="0.5s" repeatCount="indefinite"/></line><line x1="560" y1="120" x2="560" y2="280" stroke="url(#eg)" stroke-width="2.2" stroke-linecap="round" stroke-dasharray="10 8"><animate attributeName="stroke-dashoffset" values="0;-36" dur="1.4s" begin="0.75s" repeatCount="indefinite"/></line></g>
+  
+  <g transform="translate(120,120)" text-anchor="middle">
+    <rect x="-68" y="-22" width="136" height="44" rx="11" fill="#0d1322" stroke="#7CFFB2" stroke-width="1.6">
+      <animate attributeName="stroke-opacity" values="0.5;1;0.5" dur="2.4s" repeatCount="indefinite"/>
+    </rect>
+    <circle cx="-54" cy="0" r="4" fill="#7CFFB2">
+      <animate attributeName="r" values="3;5.5;3" dur="1.8s" repeatCount="indefinite"/>
+    </circle>
+    <text class="nl" y="5">lutar-lean</text>
+  </g>
+  <g transform="translate(340,95)" text-anchor="middle">
+    <rect x="-62" y="-22" width="125" height="44" rx="11" fill="#0d1322" stroke="#5ad1ff" stroke-width="1.6">
+      <animate attributeName="stroke-opacity" values="0.5;1;0.5" dur="2.7s" repeatCount="indefinite"/>
+    </rect>
+    <circle cx="-48" cy="0" r="4" fill="#5ad1ff">
+      <animate attributeName="r" values="3;5.5;3" dur="2.0s" repeatCount="indefinite"/>
+    </circle>
+    <text class="nl" y="5">ouroboros</text>
+  </g>
+  <g transform="translate(340,185)" text-anchor="middle">
+    <rect x="-48" y="-22" width="96" height="44" rx="11" fill="#0d1322" stroke="#5ad1ff" stroke-width="1.6">
+      <animate attributeName="stroke-opacity" values="0.5;1;0.5" dur="3.0s" repeatCount="indefinite"/>
+    </rect>
+    <circle cx="-34" cy="0" r="4" fill="#5ad1ff">
+      <animate attributeName="r" values="3;5.5;3" dur="2.2s" repeatCount="indefinite"/>
+    </circle>
+    <text class="nl" y="5">a11oy</text>
+  </g>
+  <g transform="translate(560,120)" text-anchor="middle">
+    <rect x="-48" y="-22" width="96" height="44" rx="11" fill="#0d1322" stroke="#5ad1ff" stroke-width="1.6">
+      <animate attributeName="stroke-opacity" values="0.5;1;0.5" dur="3.3s" repeatCount="indefinite"/>
+    </rect>
+    <circle cx="-34" cy="0" r="4" fill="#5ad1ff">
+      <animate attributeName="r" values="3;5.5;3" dur="2.4s" repeatCount="indefinite"/>
+    </circle>
+    <text class="nl" y="5">sentra</text>
+  </g>
+  <g transform="translate(560,230)" text-anchor="middle">
+    <rect x="-48" y="-22" width="96" height="44" rx="11" fill="#0d1322" stroke="#5ad1ff" stroke-width="1.6">
+      <animate attributeName="stroke-opacity" values="0.5;1;0.5" dur="3.6s" repeatCount="indefinite"/>
+    </rect>
+    <circle cx="-34" cy="0" r="4" fill="#5ad1ff">
+      <animate attributeName="r" values="3;5.5;3" dur="2.6s" repeatCount="indefinite"/>
+    </circle>
+    <text class="nl" y="5">amaru</text>
+  </g>
+  <g transform="translate(780,180)" text-anchor="middle">
+    <rect x="-48" y="-22" width="96" height="44" rx="11" fill="#0d1322" stroke="#8b7bff" stroke-width="1.6">
+      <animate attributeName="stroke-opacity" values="0.5;1;0.5" dur="3.9s" repeatCount="indefinite"/>
+    </rect>
+    <circle cx="-34" cy="0" r="4" fill="#8b7bff">
+      <animate attributeName="r" values="3;5.5;3" dur="2.8s" repeatCount="indefinite"/>
+    </circle>
+    <text class="nl" y="5">rosie</text>
+  </g>
+  <g transform="translate(560,280)" text-anchor="middle">
+    <rect x="-62" y="-22" width="125" height="44" rx="11" fill="#0d1322" stroke="#7CFFB2" stroke-width="1.6">
+      <animate attributeName="stroke-opacity" values="0.5;1;0.5" dur="4.2s" repeatCount="indefinite"/>
+    </rect>
+    <circle cx="-48" cy="0" r="4" fill="#7CFFB2">
+      <animate attributeName="r" values="3;5.5;3" dur="3.0s" repeatCount="indefinite"/>
+    </circle>
+    <text class="nl" y="5">Khipu DAG</text>
+  </g>
+  <text class="foot" x="28" y="304">Lambda aggregator (Lean-verified) -&gt; policy gate -&gt; DSSE receipt -&gt; Khipu Merkle DAG -&gt; operator console</text>
+</svg>
