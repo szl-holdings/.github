@@ -37,6 +37,8 @@ Five live organs of the mesh. Each exposes a `/healthz` board reporting the same
 | **rosie** | [SZLHOLDINGS/rosie](https://huggingface.co/spaces/SZLHOLDINGS/rosie) | [![rosie CI](https://github.com/szl-holdings/rosie/actions/workflows/ci.yml/badge.svg)](https://github.com/szl-holdings/rosie/actions/workflows/ci.yml) | Operator console — audit-grade copilot across the mesh. |
 | **killinchu** | [SZLHOLDINGS/killinchu](https://huggingface.co/spaces/SZLHOLDINGS/killinchu) | [![killinchu CI](https://github.com/szl-holdings/killinchu/actions/workflows/ci.yml/badge.svg)](https://github.com/szl-holdings/killinchu/actions/workflows/ci.yml) | Sovereign defense organ — UDS-aware gate for air-gapped deployment. |
 
+_a11oy native capability: **Provenanced observability · 9 pillars · sign-prove-replay** at `/api/a11oy/v3/observability/*` — not a separate product, not a separate brand._
+
 ---
 
 ## 📖 Start here — the SZL Cookbook
