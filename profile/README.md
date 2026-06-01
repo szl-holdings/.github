@@ -1,5 +1,5 @@
 <!-- Organization profile README — rendered at github.com/szl-holdings -->
-<!-- Doctrine v11. Updated 2026-06-01: Series-A polish, killinchu flagship, 3D showcase, full badges. -->
+<!-- Doctrine v11. Updated 2026-06-02: OPS WAVE B — verticals, docs links, Series-A, c7c0ba17. Series-A polish, killinchu flagship, 3D showcase, full badges. -->
 
 <div align="center">
 
@@ -207,6 +207,63 @@ Step-by-step Word guides to stand the ecosystem up from zero:
 - Citation: [CITATION.cff](https://github.com/szl-holdings/.github/blob/main/CITATION.cff) · Concept DOI [10.5281/zenodo.19944926](https://doi.org/10.5281/zenodo.19944926)
 
 ---
+
+
+
+---
+
+<!-- ===== OPS WAVE B ADDITIVE BLOCK · Yachay · 2026-06-02 · Doctrine v11 ===== -->
+
+## Platform verticals
+
+Three verticals, five flagships, one formal proof kernel.
+
+| Vertical | Flagship(s) | Role |
+|---|---|---|
+| **Governance** | [a11oy](https://github.com/szl-holdings/a11oy) | Policy gate · DSSE signing · Λ-aggregator · every receipt verifiable |
+| **Defense** | [killinchu](https://github.com/szl-holdings/killinchu) | Counter-UAS rule engine · FAA Remote ID / ADS-B / MAVLink / STANAG 4609 decoders |
+| **Aide** | [rosie](https://github.com/szl-holdings/rosie) | Cross-session memory · operator console · Chaski escalation |
+| **Immune** | [sentra](https://github.com/szl-holdings/sentra) | Deny-by-default policy gate · 8 gates · egress inspector · Wire B → a11oy |
+| **Memory** | [amaru](https://github.com/szl-holdings/amaru) | Cortex / conduit · provenance-tagged memory · shared by all flagships |
+
+Wire D (DSSE cross-mesh signing fabric) connects all five flagships. Every receipt is verifiable without a network round-trip.
+
+---
+
+## Docs & resources
+
+| Resource | Link |
+|---|---|
+| **Architecture** | [`platform/ARCHITECTURE.md`](https://github.com/szl-holdings/platform/blob/main/ARCHITECTURE.md) — Mermaid system map, why-each-exists, data flow |
+| **Compliance posture** | [`compliance-posture`](https://github.com/szl-holdings/compliance-posture) — SOC 2, FedRAMP roadmap, EU AI Act Article 12 evidence |
+| **Developer hub** | [`developers`](https://github.com/szl-holdings/developers) — API reference, quickstart, MCP integration |
+| **Status page** | [SZLHOLDINGS/status](https://github.com/szl-holdings/status) — per-flagship uptime (landing soon) |
+| **Runbooks** | [`platform/docs/runbooks/`](https://github.com/szl-holdings/platform/tree/main/docs/runbooks/) — per-flagship operational runbooks |
+| **On-call** | [`.github/ONCALL.md`](https://github.com/szl-holdings/.github/blob/main/ONCALL.md) — escalation path, SLA, Chaski endpoint |
+| **Privacy** | [`.github/PRIVACY.md`](https://github.com/szl-holdings/.github/blob/main/PRIVACY.md) — public privacy posture, GDPR contact |
+| **Funding** | [Sponsor this project](https://github.com/sponsors/stephenlutar2) |
+
+---
+
+## Fundraising
+
+**Series A: raising 2026.** Pre-Series-A, founder-operated. No specific terms disclosed. Contact: stephenlutar2@gmail.com
+
+---
+
+## Doctrine v11 LOCKED
+
+**749 declarations / 14 unique axioms / 163 tracked sorries · replay hash c7c0ba17**
+
+Regenerate:
+```bash
+git clone https://github.com/szl-holdings/lutar-lean && cd lutar-lean && git checkout c7c0ba17
+python .github/scripts/lean_numbers.py   # → 749 / 14 / 163
+```
+
+Full spec: [DOCTRINE_V11.md](https://github.com/szl-holdings/.github/blob/main/DOCTRINE_V11.md)
+
+<!-- ===== /OPS WAVE B ADDITIVE BLOCK ===== -->
 
 <sub>© 2026 SZL Holdings · Apache-2.0 · Doctrine v11 · Updated 2026-06-01 — Series-A polish, killinchu flagship, 3D showcase</sub>
 
