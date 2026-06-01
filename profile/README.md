@@ -19,6 +19,19 @@ SZL Holdings builds a **formally-verified governance substrate for agentic AI**.
 
 </div>
 
+<!-- ===== GENIUS HERO (additive overhaul · Yachay · 2026-06-01) ===== -->
+<div align="center">
+
+<a href="https://szl-holdings.github.io/.github/"><img src="https://raw.githubusercontent.com/szl-holdings/.github/main/profile/assets/genius/org_arch.svg" alt="SZL governance substrate — animated receipt-flow architecture" width="92%" /></a>
+
+<a href="https://szl-holdings.github.io/.github/"><b>▶ Open the live SZL Constellation (3D)</b></a> — every star is a governance surface; every edge is a Khipu receipt link.
+
+<img src="https://raw.githubusercontent.com/szl-holdings/.github/main/profile/assets/genius/org_card.svg" alt="SZL metrics — 20 repos · 749 declarations · 14 axioms · 163 sorries · 13 yuyay axes" width="92%" />
+
+</div>
+
+<!-- ===== /GENIUS HERO ===== -->
+
 ---
 
 ## Flagship surfaces
