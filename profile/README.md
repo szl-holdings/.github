@@ -2,7 +2,7 @@
 
 **Provable by math, signed by receipts, runs on your hardware.**
 
-[GitHub: szl-holdings](https://github.com/szl-holdings) · [ORCID 0009-0001-0110-4173](https://orcid.org/0009-0001-0110-4173) · Apache-2.0 OSS
+[GitHub: szl-holdings](https://github.com/szl-holdings) · [ORCID 0009-0001-0110-4173](https://orcid.org/0009-0001-0110-4173) · Apache-2.0 code · CC-BY-4.0 papers & brand
 
 ---
 
@@ -77,7 +77,9 @@ SZL Holdings builds a formally-verified governance gate for agentic AI. The Λ a
 - **Concept DOI** [10.5281/zenodo.19944926](https://doi.org/10.5281/zenodo.19944926)
 - **Developer hub** — [github.com/szl-holdings/developers](https://github.com/szl-holdings/developers)
 - **Compliance posture** — [github.com/szl-holdings/compliance-posture](https://github.com/szl-holdings/compliance-posture). Honest current state: pre-SOC 2 (Type 1 targeted Q4 2026); FedRAMP/IL-4 path targeted Q4 2027.
-- Apache-2.0 across all open-source repos.
+- **Apache-2.0** — source-code repositories (SDKs, substrate, services, demos).
+- **CC-BY-4.0** — research papers, brand assets, and the public data lake (ouroboros-thesis, puriq-preprint, szl-brand, brand-kit, szl-trust, szl-lake).
+- License classification is being normalized across the org; a small number of flagship repos are mid-relicense to Apache-2.0 (see open `re-license` PRs).
 
 ---
 
@@ -85,4 +87,4 @@ SZL Holdings builds a formally-verified governance gate for agentic AI. The Λ a
 
 ---
 
-<sub>Doctrine v11 LOCKED · 🪢 Khipu chain · Lean 4 · Sigstore Rekor · Apache-2.0 OSS · DOI [10.5281/zenodo.19944926](https://doi.org/10.5281/zenodo.19944926) · Source of truth: [szl-holdings/.github lean_numbers.json](https://github.com/szl-holdings/.github/blob/main/.github/data/lean_numbers.json) @ `c7c0ba17` · Founder: Stephen Paul Lutar Jr · [ORCID 0009-0001-0110-4173](https://orcid.org/0009-0001-0110-4173)</sub>
+<sub>Doctrine v11 LOCKED · 🪢 Khipu chain · Lean 4 · Sigstore Rekor · Apache-2.0 code / CC-BY-4.0 papers · DOI [10.5281/zenodo.19944926](https://doi.org/10.5281/zenodo.19944926) · Source of truth: [szl-holdings/.github lean_numbers.json](https://github.com/szl-holdings/.github/blob/main/.github/data/lean_numbers.json) @ `c7c0ba17` · Founder: Stephen Paul Lutar Jr · [ORCID 0009-0001-0110-4173](https://orcid.org/0009-0001-0110-4173)</sub>
