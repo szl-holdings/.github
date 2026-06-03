@@ -14,7 +14,7 @@
 
 </div>
 
-> **What changed:** Repos consolidated for Series-A clarity. The org now holds **39 repositories — 21 active and 18 archived** (archived repos carry redirect notices). Counts verified live against the GitHub org API on 2026-06-03. See the [org consolidation report](https://github.com/szl-holdings/.github) for the full log.
+> **What changed:** Repos consolidated for Series-A clarity. The org now holds **39 repositories — 21 active and 18 archived** (32 public + 7 private; archived repos carry redirect notices). Counts verified live against the GitHub org API (`type=all`) on 2026-06-03. See the [org consolidation report](https://github.com/szl-holdings/.github) for the full log.
 
 ---
 
