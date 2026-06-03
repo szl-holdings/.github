@@ -15,7 +15,7 @@
 
 [Quickstart](https://docs.szlholdings.com/quickstart) · [Docs](https://docs.szlholdings.com) · [Cookbook](https://github.com/szl-holdings/szl-cookbook) · [Verify](https://github.com/szl-holdings/szl-cookbook/blob/main/recipes/01-verify-a-receipt-end-to-end.md) · [Cite](#citation) · [Releases](https://github.com/orgs/szl-holdings/repositories)
 
-[GitHub: szl-holdings](https://github.com/szl-holdings) · [ORCID 0009-0001-0110-4173](https://orcid.org/0009-0001-0110-4173) · [Docs Site](https://github.com/szl-holdings/docs-site) · Apache-2.0 OSS
+[GitHub: szl-holdings](https://github.com/szl-holdings) · [ORCID 0009-0001-0110-4173](https://orcid.org/0009-0001-0110-4173) · [Docs Site](https://github.com/szl-holdings/docs-site) · Apache-2.0 code · CC-BY-4.0 papers & brand
 
 </div>
 
@@ -145,7 +145,9 @@ SZL Holdings builds a formally-verified governance gate for agentic AI. The Λ a
 - **SLSA L1 honest** — real cosign-signed provenance, Sigstore Rekor anchored.
 - **Doctrine v11 LOCKED** — 749 / 14 / 163, locked at `c7c0ba17`.
 - **Section 889 vendors:** Huawei, ZTE, Hytera, Hikvision, Dahua (exactly 5 — no others claimed).
-- Apache-2.0 across all open-source repos.
+- **Apache-2.0** — source-code repositories (SDKs, substrate, services, demos).
+- **CC-BY-4.0** — research papers, brand assets, and the public data lake (ouroboros-thesis, puriq-preprint, szl-brand, brand-kit, szl-trust, szl-lake).
+- License classification is being normalized across the org; a small number of flagship repos are mid-relicense to Apache-2.0 (see open `re-license` PRs).
 
 ## Citation
 
@@ -182,7 +184,7 @@ We are a precision substrate, not a vibes company — the math is the load-beari
 
 ---
 
-<sub>Doctrine v11 LOCKED · 749 / 14 / 163 · 🪢 Khipu chain · Lean 4 · Sigstore Rekor · Apache-2.0 OSS · DOI [10.5281/zenodo.20434276](https://doi.org/10.5281/zenodo.20434276) · 39 repos (21 active · 18 archived), consolidated 2026-06-03 for Series-A clarity · Founder: Stephen Paul Lutar Jr · [ORCID 0009-0001-0110-4173](https://orcid.org/0009-0001-0110-4173)</sub>
+<sub>Doctrine v11 LOCKED · 749 / 14 / 163 · 🪢 Khipu chain · Lean 4 · Sigstore Rekor · Apache-2.0 code / CC-BY-4.0 papers · DOI [10.5281/zenodo.20434276](https://doi.org/10.5281/zenodo.20434276) · 39 repos (21 active · 18 archived), consolidated 2026-06-03 for Series-A clarity · Founder: Stephen Paul Lutar Jr · [ORCID 0009-0001-0110-4173](https://orcid.org/0009-0001-0110-4173)</sub>
 
 ---
 
