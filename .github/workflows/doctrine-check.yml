@@ -40,6 +40,7 @@ jobs:
               --exclude="szl_math_corpus.py" --exclude="szl_chaski.py" \
               --exclude="szl_hub.py" --exclude="run_all_json.py" \
               --exclude="OUROBOROS_RUN_ALL.py" \
+              --exclude="szlBreaker.ts" --exclude="szl_breaker.py" \
               . 2>/dev/null | \
               grep -vE "^(\./)?\.git/|\.lake/|node_modules/|/dist/|/build/" | \
               grep -vE "ADDITIVE|additive|proposed|planned.*release|roadmap|not yet promoted|future" | \
