@@ -166,9 +166,9 @@ Transition:  Cut
 Asset:       /szl/charts_pack_v2/chart_09_ci_gauge.png
 Visual:      Full-frame CI pass gauge — green 100%
              All badges visible: CI · Tests · CodeQL · SBOM · SLSA · DCO
-Voiceover:   "All CI checks pass. SLSA Level 2 attested provenance. OpenSSF scorecard 5.9.
+Voiceover:   "All CI checks pass. SLSA Level 1 honest provenance. OpenSSF scorecard 5.9.
              Thirty of thirty GREEN modules."
-Caption:     chart_09 — CI 100% GREEN · SLSA L2 attested · OpenSSF 5.9 · 30/30 modules
+Caption:     chart_09 — CI 100% GREEN · SLSA L1 honest · OpenSSF 5.9 · 30/30 modules
 Transition:  Cut
 ```
 
