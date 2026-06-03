@@ -24,6 +24,17 @@ Five live organs of the mesh. Each exposes a `/healthz` board reporting the same
 
 ---
 
+## 📖 Start here — the SZL Cookbook
+
+New to the platform? The **[SZL Cookbook](https://github.com/szl-holdings/szl-cookbook)** is the
+first-touch resource: 15 runnable recipes showing how to use the five flagships. The flagship
+recipe — **[Verify a receipt end-to-end](https://github.com/szl-holdings/szl-cookbook/blob/main/recipes/01-verify-a-receipt-end-to-end.md)** —
+cryptographically validates a real DSSE receipt in under a minute, no credentials required.
+
+> **Customer-facing URL:** <https://github.com/szl-holdings/szl-cookbook>
+
+---
+
 ## Core Substrate
 
 Runtime and formal substrate the flagships call. Not products — plumbing.
