@@ -1,5 +1,8 @@
 <div align="center">
 
+<!-- Premium Inca-palette hero banner (Greene polish) — gold #d4a574 · indigo #2a1e5c · terra #b04a30 · parchment #f4e4c1 -->
+<a href="https://docs.szlholdings.com"><img src="https://raw.githubusercontent.com/szl-holdings/.github/main/profile/assets/hero-premium.svg" alt="SZL Holdings — Sovereign Governed AI · Doctrine v11 LOCKED 749/14/163 · c7c0ba17 · Λ = Conjecture 1" width="100%" /></a>
+
 <img src="https://raw.githubusercontent.com/szl-holdings/szl-brand/main/kit/logos/png/kanchay-512.png" alt="SZL Holdings — kanchay mark" width="120" />
 
 # SZL Holdings — Sovereign Governed AI

@@ -1,0 +1,82 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="360" viewBox="0 0 1280 360" font-family="Inter, system-ui, sans-serif" role="img" aria-label="SZL Holdings — Sovereign Governed AI. Doctrine v11 LOCKED 749/14/163.">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#1b1440"/>
+      <stop offset="55%" stop-color="#2a1e5c"/>
+      <stop offset="100%" stop-color="#140f2e"/>
+    </linearGradient>
+    <radialGradient id="glowGold" cx="0.85" cy="0.1" r="0.8">
+      <stop offset="0%" stop-color="#d4a574" stop-opacity="0.30"/>
+      <stop offset="100%" stop-color="#d4a574" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="glowTerra" cx="0.05" cy="1.05" r="0.8">
+      <stop offset="0%" stop-color="#b04a30" stop-opacity="0.28"/>
+      <stop offset="100%" stop-color="#b04a30" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="goldText" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#e6bd8a"/>
+      <stop offset="100%" stop-color="#d4a574"/>
+    </linearGradient>
+  </defs>
+
+  <!-- backdrop -->
+  <rect width="1280" height="360" rx="22" fill="url(#bg)"/>
+  <rect width="1280" height="360" rx="22" fill="url(#glowGold)"/>
+  <rect width="1280" height="360" rx="22" fill="url(#glowTerra)"/>
+  <rect x="1" y="1" width="1278" height="358" rx="22" fill="none" stroke="#8a6d44" stroke-opacity="0.5"/>
+
+  <!-- khipu thread motif: a knotted cord across the band -->
+  <g stroke="#d4a574" stroke-opacity="0.30" stroke-width="2" fill="none">
+    <path d="M40 300 C 220 250, 360 330, 540 286 S 900 320, 1240 270"/>
+  </g>
+  <g fill="#d4a574" fill-opacity="0.55">
+    <circle cx="220" cy="276" r="5"/><circle cx="540" cy="286" r="6"/>
+    <circle cx="760" cy="300" r="5"/><circle cx="1000" cy="296" r="6"/>
+  </g>
+
+  <!-- emblem: layered Inca sun / shield -->
+  <g transform="translate(96,120)">
+    <circle cx="40" cy="40" r="42" fill="none" stroke="#d4a574" stroke-width="3"/>
+    <g stroke="#b04a30" stroke-width="3" stroke-linecap="round">
+      <line x1="40" y1="-6" x2="40" y2="6"/><line x1="40" y1="74" x2="40" y2="86"/>
+      <line x1="-6" y1="40" x2="6" y2="40"/><line x1="74" y1="40" x2="86" y2="40"/>
+      <line x1="11" y1="11" x2="19" y2="19"/><line x1="61" y1="61" x2="69" y2="69"/>
+      <line x1="69" y1="11" x2="61" y2="19"/><line x1="19" y1="61" x2="11" y2="69"/>
+    </g>
+    <path d="M40 16 L62 40 L40 64 L18 40 Z" fill="#b04a30"/>
+    <path d="M40 24 L54 40 L40 56 L26 40 Z" fill="#d4a574"/>
+    <circle cx="40" cy="40" r="6" fill="#f4e4c1"/>
+  </g>
+
+  <!-- wordmark -->
+  <text x="208" y="150" font-size="52" font-weight="800" letter-spacing="-1" fill="#f4e4c1">SZL Holdings</text>
+  <text x="210" y="192" font-size="24" font-weight="600" fill="url(#goldText)">Sovereign Governed AI</text>
+  <text x="210" y="224" font-size="16" font-weight="500" fill="#b9add6" font-family="'JetBrains Mono', ui-monospace, monospace">Provable by math · signed by receipts · runs on your hardware</text>
+
+  <!-- doctrine plaque -->
+  <g transform="translate(848,40)">
+    <rect width="392" height="92" rx="12" fill="#211a4a" stroke="#8a6d44" stroke-opacity="0.7"/>
+    <text x="20" y="34" font-size="15" font-weight="700" font-family="'JetBrains Mono', monospace" fill="#d4a574">v11 LOCKED · 749/14/163 · c7c0ba17</text>
+    <text x="20" y="58" font-size="13" font-family="'JetBrains Mono', monospace" fill="#b9add6">Λ = Conjecture 1 (NOT a theorem)</text>
+    <text x="20" y="78" font-size="13" font-family="'JetBrains Mono', monospace" fill="#b9add6">SLSA L1 honest + L2 attested · Apache-2.0</text>
+  </g>
+
+  <!-- flagship chips -->
+  <g font-family="'JetBrains Mono', monospace" font-size="14" font-weight="600">
+    <g transform="translate(210,266)">
+      <rect width="92" height="30" rx="15" fill="#2a1e5c" stroke="#8a6d44" stroke-opacity="0.6"/><text x="20" y="20" fill="#d4a574">rosie</text>
+    </g>
+    <g transform="translate(312,266)">
+      <rect width="92" height="30" rx="15" fill="#2a1e5c" stroke="#8a6d44" stroke-opacity="0.6"/><text x="16" y="20" fill="#d4a574">a11oy</text>
+    </g>
+    <g transform="translate(414,266)">
+      <rect width="100" height="30" rx="15" fill="#2a1e5c" stroke="#8a6d44" stroke-opacity="0.6"/><text x="16" y="20" fill="#d4a574">amaru</text>
+    </g>
+    <g transform="translate(524,266)">
+      <rect width="100" height="30" rx="15" fill="#2a1e5c" stroke="#8a6d44" stroke-opacity="0.6"/><text x="16" y="20" fill="#d4a574">sentra</text>
+    </g>
+    <g transform="translate(634,266)">
+      <rect width="124" height="30" rx="15" fill="#2a1e5c" stroke="#8a6d44" stroke-opacity="0.6"/><text x="14" y="20" fill="#d4a574">killinchu</text>
+    </g>
+  </g>
+</svg>
