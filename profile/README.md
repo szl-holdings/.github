@@ -1,10 +1,18 @@
+<div align="center">
+
+<img src="https://raw.githubusercontent.com/szl-holdings/szl-brand/main/kit/logos/png/kanchay-512.png" alt="SZL Holdings — kanchay mark" width="120" />
+
 # SZL Holdings — Sovereign Governed AI
 
 **Provable by math, signed by receipts, runs on your hardware.**
 
-> **Doctrine v11 LOCKED — 749 declarations · 14 unique axioms · 163 tracked sorries · kernel commit `c7c0ba17`**
+### 5/5 flagships live · 5 organs · 749 declarations · 14 axioms · 163 sorries · Doctrine v11 LOCKED
+
+[Quickstart](https://docs.szlholdings.com/quickstart) · [Docs](https://docs.szlholdings.com) · [Cookbook](https://github.com/szl-holdings/szl-cookbook) · [Verify](https://github.com/szl-holdings/szl-cookbook/blob/main/recipes/01-verify-a-receipt-end-to-end.md) · [Cite](#citation) · [Releases](https://github.com/orgs/szl-holdings/repositories)
 
 [GitHub: szl-holdings](https://github.com/szl-holdings) · [ORCID 0009-0001-0110-4173](https://orcid.org/0009-0001-0110-4173) · [Docs Site](https://github.com/szl-holdings/docs-site) · Apache-2.0 OSS
+
+</div>
 
 > **What changed:** Consolidated from 45 → 19 repos on 2026-06-03 for Series-A clarity. 12 former repos are archived with redirect notices. See the [org consolidation report](https://github.com/szl-holdings/.github) for the full log.
 
@@ -113,6 +121,35 @@ SZL Holdings builds a formally-verified governance gate for agentic AI. The Λ a
 - **Doctrine v11 LOCKED** — 749 / 14 / 163, locked at `c7c0ba17`.
 - **Section 889 vendors:** Huawei, ZTE, Hytera, Hikvision, Dahua (exactly 5 — no others claimed).
 - Apache-2.0 across all open-source repos.
+
+## Citation
+
+```bibtex
+@software{szl_holdings_2026,
+  author    = {Lutar, Stephen P.},
+  title     = {SZL Holdings: Sovereign Governed AI --- a formally-verified governance substrate for agentic systems},
+  year      = {2026},
+  publisher = {Zenodo},
+  version   = {Doctrine v11 LOCKED},
+  doi       = {10.5281/zenodo.20434276},
+  url       = {https://github.com/szl-holdings},
+  note      = {749 declarations / 14 axioms / 163 sorries, kernel c7c0ba17}
+}
+```
+
+---
+
+## Built with / learned from
+
+Our publication and documentation conventions were learned from open-source leaders — we
+adapted their *patterns*, not their words. Inspired by patterns from **Polymathic AI**
+([the_well](https://github.com/PolymathicAI/the_well), [walrus](https://github.com/PolymathicAI/walrus)),
+**Anthropic**, **OpenAI** ([whisper](https://github.com/openai/whisper)),
+**Stripe** (docs craft), Google DeepMind ([alphafold3](https://github.com/google-deepmind/alphafold3)),
+Meta FAIR ([segment-anything](https://github.com/facebookresearch/segment-anything)),
+EleutherAI ([lm-evaluation-harness](https://github.com/EleutherAI/lm-evaluation-harness)),
+and Hugging Face ([transformers](https://github.com/huggingface/transformers)).
+We are a precision substrate, not a vibes company — the math is the load-bearing part.
 
 ---
 
