@@ -29,6 +29,10 @@ jobs:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
 
       - name: Trivy filesystem scan (SARIF)
+        # SARIF generation feeds Code Scanning and is advisory; a transient DB
+        # download hiccup here must not fail the job. The CRITICAL+HIGH fail
+        # gate below (if: always()) is the authoritative pass/fail signal.
+        continue-on-error: true
         uses: aquasecurity/trivy-action@b6643a29fecd7f34b3597bc6acb0a98b03d33ff8 # v0.33.1
         env:
           GITHUB_TOKEN: ${{ github.token }}
@@ -38,6 +42,7 @@ jobs:
           format: sarif
           output: trivy-results.sarif
           severity: CRITICAL,HIGH
+          github-pat: ${{ github.token }}
 
       - name: Ensure SARIF exists
         if: always()
@@ -55,6 +60,7 @@ jobs:
           sarif_file: trivy-results.sarif
 
       - name: Trivy fail gate (CRITICAL+HIGH)
+        if: always()
         uses: aquasecurity/trivy-action@b6643a29fecd7f34b3597bc6acb0a98b03d33ff8 # v0.33.1
         env:
           GITHUB_TOKEN: ${{ github.token }}
@@ -65,3 +71,4 @@ jobs:
           severity: CRITICAL,HIGH
           exit-code: '1'
           ignore-unfixed: true
+          github-pat: ${{ github.token }}
