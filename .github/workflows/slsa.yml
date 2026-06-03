@@ -1,8 +1,13 @@
-name: SLSA Level 3 Provenance
+name: SLSA Provenance (L1 honest)
 
-# Generates SLSA Level 3 provenance attestation for release artifacts.
-# On push to main: runs a verification pass (green status indicator).
-# On release: generates full SLSA Level 3 attestation (.intoto.jsonl).
+# Doctrine v11 honesty: this workflow is a SLSA Build L1 supply-chain status
+# indicator (SBOM + DCO baseline). It does NOT itself generate non-forgeable
+# SLSA L2/L3 provenance — do not claim L3 anywhere.
+#
+# Real build provenance for release artifacts is produced per-repo by
+# actions/attest-build-provenance@v2 (SLSA L2 attested, verifiable via
+# `gh attestation verify` / slsa-verifier). See each flagship's
+# .github/workflows for the actual attestation step.
 
 on:
   push:
@@ -23,5 +28,7 @@ jobs:
     if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
-      - name: Supply-chain checks
-        run: echo "SLSA supply-chain checks OK"
+      - name: SLSA L1 supply-chain baseline (SBOM + DCO; honest — not L3)
+        run: |
+          echo "SLSA Build L1 baseline (SBOM + DCO). No L3 claim."
+          echo "Release-artifact provenance is SLSA L2 (attest-build-provenance@v2)."
