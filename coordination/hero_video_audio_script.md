@@ -51,7 +51,7 @@ SZL anatomy maps each organ to its invariant. The body graph is the system-level
 OpenTelemetry spans route from field-level events to Jaeger, Tempo, or Honeycomb without modifying the governance chain.
 
 **[Shot 12 — 0:55]**  
-All CI checks pass. SLSA Level 3 provenance. OpenSSF scorecard 5.9. Thirty of thirty GREEN modules.
+All CI checks pass. SLSA Level 2 attested provenance. OpenSSF scorecard 5.9. Thirty of thirty GREEN modules.
 
 **[Shot 13 — 1:00]**  
 The GitHub org has 19 repositories. Every module has a DOI, an ORCID, and a passing CI badge.
@@ -84,7 +84,7 @@ All artifacts are public and re-runnable. SZL Holdings — formal verification f
 | 19 Spaces | `huggingface.co/SZLHOLDINGS` org card — "Spaces 19" |
 | 19 repos | `github.com/szl-holdings` — "Repositories 19" |
 | 30/30 GREEN modules | `github.com/szl-holdings` — "30 GREEN modules" badge |
-| SLSA L3 | GitHub badge — "SLSA Level 3 Provenance passing" |
+| SLSA L2 | GitHub badge — "SLSA Level 2 attested provenance passing" |
 | OpenSSF 5.9 | GitHub badge — "openssf scorecard 5.9" |
 | 9 packages / 248 assertions | `huggingface.co/spaces/SZLHOLDINGS/a11oy-platform` — "9 packages · 17 test files · 248 doctrine assertions" |
 | DOI | 10.5281/zenodo.20434276 — v18.0 master DOI |
