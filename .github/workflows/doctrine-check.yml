@@ -33,6 +33,9 @@ jobs:
           #   szl_hub.py — PURIQ hub integration layer (v12 ADDITIVE label)
           #   run_all_json.py — test runner output format (v10 historical reference)
           #   OUROBOROS_RUN_ALL.py — embedded scaffold scripts with v6 historical refs
+          #   serve.py — JSON response body runtime (healthz v9/v10 legacy)
+          #   szl_wire.py — mesh wire JSON bodies (v10 runtime label)
+          #   _live_serve.py — live serve legacy backup (v9/v10 runtime labels)
           if grep -rE "doctrine.*v(9|10|12|13)" \
               --include="*.md" --include="*.json" --include="*.yaml" --include="*.yml" \
               --include="*.py" --include="*.ts" --include="*.go" \
@@ -41,6 +44,7 @@ jobs:
               --exclude="szl_hub.py" --exclude="run_all_json.py" \
               --exclude="OUROBOROS_RUN_ALL.py" \
               --exclude="szlBreaker.ts" --exclude="szl_breaker.py" \
+              --exclude="serve.py" --exclude="szl_wire.py" --exclude="_live_serve.py" \
               . 2>/dev/null | \
               grep -vE "^(\./)?\.git/|\.lake/|node_modules/|/dist/|/build/" | \
               grep -vE "ADDITIVE|additive|proposed|planned.*release|roadmap|not yet promoted|future" | \
