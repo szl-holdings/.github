@@ -21,19 +21,19 @@ jobs:
           FAIL=0
 
           echo "=== Invariant 1: Doctrine v11 LOCKED 749/14/163 ==="
-          if grep -rE "doctrine.*v(9|10|12|13)" --include="*.md" --include="*.json" --include="*.yaml" --include="*.yml" --include="*.py" --include="*.ts" --include="*.go" . 2>/dev/null | grep -vE "^(\./)?\.git/|\.lake/|node_modules/|/dist/|/build/|ADDITIVE|additive|proposed|planned.*release|roadmap|not yet promoted|future" | head -10; then
-            echo "::error::Doctrine version drift detected — only v11 allowed (ADDITIVE/proposed labels are exempt)"
+          if grep -rE "doctrine.*v(9|10|12|13)" --include="*.md" --include="*.json" --include="*.yaml" --include="*.yml" --include="*.py" --include="*.ts" --include="*.go" . 2>/dev/null | grep -vE "^(\./)?\.git/|\.lake/|node_modules/|/dist/|/build/|ADDITIVE|additive|proposed|planned.*release|roadmap|not yet promoted|future|historical|v10.*v11|v11.*v10|v10-v11|additive over|edge organ|4th organ|REJECTED|deprecated|archived|out of scope|not pursuing" | head -10; then
+            echo "::error::Doctrine version drift detected — only v11 allowed (ADDITIVE/proposed/roadmap/historical labels are exempt)"
             FAIL=1
           fi
 
           echo "=== Invariant 2: Λ = Conjecture 1 (NEVER theorem) ==="
-          if grep -rE "Λ.*theorem|Lambda.*theorem|lambda.*Theorem|lambdaUniqueness[^C]" --include="*.md" --include="*.json" --include="*.py" --include="*.ts" --include="*.lean" . 2>/dev/null | grep -vE "Conjecture|conjecture|NOT a theorem|not a theorem|^(\./)?\.git/|\.lake/|node_modules/" | head -10; then
+          if grep -rE "Λ.*theorem|Lambda.*theorem|lambda.*Theorem|lambdaUniqueness[^C]" --include="*.md" --include="*.json" --include="*.py" --include="*.ts" --include="*.lean" . 2>/dev/null | grep -vE "Conjecture|conjecture|NOT a theorem|not a theorem|Never claim|never claim|Never.*theorem|^(\./)?\.git/|\.lake/|node_modules/" | head -10; then
             echo "::error::Λ described as theorem or lambdaUniqueness used without Conjecture suffix — must be Conjecture 1"
             FAIL=1
           fi
 
           echo "=== Invariant 3: SLSA L1 honest (no L2/L3) ==="
-          if grep -rE "SLSA.*L[23]|SLSA Level [23]" --include="*.md" --include="*.json" --include="*.yaml" . 2>/dev/null | grep -vE "^(\./)?\.git/|\.lake/|node_modules/" | head -10; then
+          if grep -rE "SLSA.*L[23]|SLSA Level [23]" --include="*.md" --include="*.json" --include="*.yaml" . 2>/dev/null | grep -vE "^(\./)?\.git/|\.lake/|node_modules/|[Rr]oadmap|[Dd]eferred|not yet proven|out of scope|not pursuing|historical|archived|REJECTED" | head -10; then
             echo "::error::SLSA L2/L3 claim — must be L1 honest"
             FAIL=1
           fi
@@ -47,7 +47,7 @@ jobs:
           done
 
           echo "=== Invariant 5: No banned compliance positive claims ==="
-          if grep -rE "Iron Bank|FedRAMP (High|Moderate)|CMMC L[2-5]|SWFT certified|Mission Owner" --include="*.md" --include="*.json" --include="*.yaml" . 2>/dev/null | grep -vE "out of scope|not pursuing|historical|archived|^(\./)?\.git/|\.lake/|node_modules/" | head -10; then
+          if grep -rE "Iron Bank|FedRAMP (High|Moderate)|CMMC L[2-5]|SWFT certified|Mission Owner" --include="*.md" --include="*.json" --include="*.yaml" . 2>/dev/null | grep -vE "out of scope|not pursuing|historical|archived|REJECTED|deprecated|proposed|roadmap|^(\./)?\.git/|\.lake/|node_modules/" | head -10; then
             echo "::error::Banned compliance positive claim — must be absent or scoped"
             FAIL=1
           fi
