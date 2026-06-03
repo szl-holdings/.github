@@ -106,7 +106,7 @@ Two step-by-step Word guides for getting the SZL ecosystem running from zero —
 | **Environment Setup Guide** | What to buy (3 hardware options), what to install (with links + one command each), accounts, secret keys, and a 10-step first-time setup | [`docs/SZL_ENVIRONMENT_SETUP_GUIDE.docx`](./docs/SZL_ENVIRONMENT_SETUP_GUIDE.docx) |
 | **UDS Run Guide** | Sign the 5 unsigned bundles, build Zarf packages, spin up k3d, deploy, verify, cleanup, the 90-second Warhacker demo script, and the founder action queue | [`docs/SZL_UDS_RUN_GUIDE.docx`](./docs/SZL_UDS_RUN_GUIDE.docx) |
 
-Mirrored on Hugging Face: [`SZLHOLDINGS/doctrine-v10-v11`](https://huggingface.co/datasets/SZLHOLDINGS/doctrine-v10-v11) under `founder-guides/`.
+Mirrored on Hugging Face: [`SZLHOLDINGS/doctrine-v11`](https://huggingface.co/datasets/SZLHOLDINGS/doctrine-v11) under `founder-guides/`.
 
 ---
 
