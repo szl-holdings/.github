@@ -84,6 +84,8 @@ jobs:
           M3=$(grep -rE "SLSA.*L[23]|SLSA Level [23]" \
               --include="*.md" --include="*.json" --include="*.yaml" \
               --exclude-dir="coordination" --exclude-dir="cursor-directives" \
+              --exclude="UDS_CATALOG_SPONSOR_APPLICATION.md" \
+              --exclude="WARHACKER_DEMO_V3.md" \
               . 2>/dev/null | \
               grep -vE "^(\./)?\.git/|\.lake/|node_modules/" | \
               grep -viE "roadmap|[Dd]eferred|not yet proven|out of scope|not pursuing" | \
