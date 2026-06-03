@@ -6,6 +6,8 @@
 
 [GitHub: szl-holdings](https://github.com/szl-holdings) · [ORCID 0009-0001-0110-4173](https://orcid.org/0009-0001-0110-4173) · [Docs Site](https://github.com/szl-holdings/docs-site) · Apache-2.0 OSS
 
+> **What changed:** Consolidated from 45 → 19 repos on 2026-06-03 for Series-A clarity. 12 former repos are archived with redirect notices. See the [org consolidation report](https://github.com/szl-holdings/.github) for the full log.
+
 ---
 
 ## Flagships
@@ -22,84 +24,83 @@ Five live organs of the mesh. Each exposes a `/healthz` board reporting the same
 
 ---
 
-## Core Libraries
+## Core Substrate
 
 Runtime and formal substrate the flagships call. Not products — plumbing.
 
 | Repo | Badge | Role |
 |---|---|---|
-| [**platform**](https://github.com/szl-holdings/platform) | [![platform CI](https://github.com/szl-holdings/platform/actions/workflows/ci.yml/badge.svg)](https://github.com/szl-holdings/platform/actions/workflows/ci.yml) | Composing monorepo — Ouroboros runtime, Lutar formulas, dual-witness adapters, 76 packages. |
+| [**platform**](https://github.com/szl-holdings/platform) | [![platform CI](https://github.com/szl-holdings/platform/actions/workflows/ci.yml/badge.svg)](https://github.com/szl-holdings/platform/actions/workflows/ci.yml) | Monorepo — Ouroboros runtime, Lutar formulas, dual-witness adapters. Now includes `services/` (5 microservices merged 2026-06-03). |
 | [**lutar-lean**](https://github.com/szl-holdings/lutar-lean) | [![lutar-lean CI](https://github.com/szl-holdings/lutar-lean/actions/workflows/ci.yml/badge.svg)](https://github.com/szl-holdings/lutar-lean/actions/workflows/ci.yml) | Lean 4 + Mathlib kernel proofs — Λ invariant, QEC, KS-18. Doctrine v11 @ `c7c0ba17`. |
 | [**ouroboros**](https://github.com/szl-holdings/ouroboros) | [![ouroboros CI](https://github.com/szl-holdings/ouroboros/actions/workflows/ci.yml/badge.svg)](https://github.com/szl-holdings/ouroboros/actions/workflows/ci.yml) | Bounded recursion runtime, governance loops, and receipt emission spine. |
 
 ---
 
-## Data Lake
+## UDS Stack
+
+Defense Unicorns Unified Defense Stack integration — air-gapped, Zarf-native, cosign-signed.
 
 | Repo | Role |
 |---|---|
-| [**szl-lake**](https://github.com/szl-holdings/szl-lake) | Live governance data lake — audit fiber storage, receipt indexing, replay substrate. |
+| [**szl-fleet-overlay**](https://github.com/szl-holdings/szl-fleet-overlay) | UDS fleet overlay — Package CRs, pepr policies, upstream contributions. |
+| [**uds-bundles**](https://github.com/szl-holdings/uds-bundles) | Zarf bundle definitions for all 5 flagships. |
+| [**szl-uds-deployment**](https://github.com/szl-holdings/szl-uds-deployment) | Deployment manifests — Pepr + Kyverno policies, k3d configs. |
+| [**szl-mesh**](https://github.com/szl-holdings/szl-mesh) | Mesh spec and proto — BFT wiring, 3-of-4 quorum. |
+| [**szl-lake**](https://github.com/szl-holdings/szl-lake) | Live governance data lake — audit fiber, receipt indexing, replay substrate. |
 
 ---
 
-## Docs
+## Trust + Proof
 
-| Resource | Link |
-|---|---|
-| **Docs site** | [github.com/szl-holdings/docs-site](https://github.com/szl-holdings/docs-site) |
-| **Developer hub** | [github.com/szl-holdings/developers](https://github.com/szl-holdings/developers) |
-| **Brand assets** | [github.com/szl-holdings/szl-brand](https://github.com/szl-holdings/szl-brand) (includes design tokens, logos, typography from former brand-kit) |
-
----
-
-## Coming soon — UDS Edition
-
-| Module | Status | Detail |
+| Repo | Badge | Role |
 |---|---|---|
-| **uds-demo** | PRIVATE · Coming Soon · June 16, 2026 | **Warhacker — DoD Pier Demo.** Killinchu UDS edition, UDS-deployable Zarf bundle for air-gapped sovereign deployment. |
-
-<p align="center"><strong>Warhacker T-minus countdown:</strong> June 16–19, 2026 · DoD Pier Demo</p>
-
-> The live JavaScript countdown runs on the [Hugging Face org card](https://huggingface.co/SZLHOLDINGS).
+| [**khipu-consensus**](https://github.com/szl-holdings/khipu-consensus) | [![khipu CI](https://github.com/szl-holdings/khipu-consensus/actions/workflows/ci.yml/badge.svg)](https://github.com/szl-holdings/khipu-consensus/actions/workflows/ci.yml) | BFT Khipu DAG consensus — 3-of-4 threshold DSSE receipt chain. |
+| [**lean-kernel**](https://github.com/szl-holdings/lean-kernel) | [![lean-kernel CI](https://github.com/szl-holdings/lean-kernel/actions/workflows/ci.yml/badge.svg)](https://github.com/szl-holdings/lean-kernel/actions/workflows/ci.yml) | Lean 4 kernel @ `c7c0ba17` — canonical locked proof state. |
 
 ---
 
-## Reproducible Evidence
+## Docs, Brand, Customer
 
-The **Codex-Kernel v1.0.0** release is a replay-grade governed-loop primitive: hash-chained state, decision receipts, an append-only proof ledger, hard-stop validators, and a deterministic replay verifier. It packages everything an independent third party needs to reproduce two bit-exact verified runs (Dresden Venus and SZL governed-ops) on any machine with Node 20+.
-
-**Release:** [platform · v1.0.0-codex-kernel](https://github.com/szl-holdings/platform/releases/tag/v1.0.0-codex-kernel)
-
-| Archive | SHA-256 |
+| Repo | Role |
 |---|---|
-| `codex-kernel-release-v1.0.0.zip` | `6136f3b3ec277a4e4cc8a1157d5afe6633821b29a4133d94a19b843dc9b03f8c` |
-| `codex-kernel-release-v1.0.0.tar.gz` | `3ec84df164108795878f5c20f7974d295ab8908513d496e018100c20513a8a13` |
+| [**docs-site**](https://github.com/szl-holdings/docs-site) | Documentation monorepo. Now includes `developers/`, `cookbook/`, `trust/`, `investor/` (merged 2026-06-03). |
+| [**szl-brand**](https://github.com/szl-holdings/szl-brand) | Brand assets — logos, tokens, typography. Includes `kit/` from former brand-kit. |
+| [**.github**](https://github.com/szl-holdings/.github) | Org-wide workflows, templates, CODEOWNERS, doctrine-check. |
 
-**Verifier one-liner:**
+---
 
-```bash
-cd packages/codex-kernel && pnpm install && pnpm tsx src/cli/replay.ts runner/payload.json   # → ATTESTED
-```
+## Academic Corpus
 
-Aligned with **EU AI Act Article 12** (record-keeping) and **NIST AI RMF**.
+| Repo | Role |
+|---|---|
+| [**szl-papers**](https://github.com/szl-holdings/szl-papers) | Academic corpus — preprints, thesis lineage, bounty problems, prior-art disclosures (consolidated 2026-06-03). |
+
+---
+
+## Sales
+
+| Repo | Role |
+|---|---|
+| [**pitch-collateral**](https://github.com/szl-holdings/pitch-collateral) | Series-A pitch deck and investor materials (private). |
+
+---
+
+## Warhacker Demo
+
+| Repo | Role |
+|---|---|
+| [**warhacker-demo**](https://github.com/szl-holdings/warhacker-demo) | Warhacker DoD pier demo — killinchu C-UAS live, UDS Zarf bundle, Ken agent loop. June 16–19, 2026. |
 
 ---
 
 ## What is honest right now
 
-SZL Holdings builds a formally-verified governance gate for agentic AI. The Λ aggregator is proved in Lean 4 (Mathlib v4.13.0) against **749 declarations · 14 unique axioms · 163 tracked sorries**, lutar-lean @ `c7c0ba17`. Every gate decision emits an ECDSA P-256 DSSE-signed receipt onto a hash-linked Khipu Merkle DAG. The stack packages as UDS-deployable Zarf bundles.
+SZL Holdings builds a formally-verified governance gate for agentic AI. The Λ aggregator is proved in Lean 4 (Mathlib v4.13.0) against **749 declarations · 14 unique axioms · 163 tracked sorries**, lutar-lean @ `c7c0ba17`. Every gate decision emits an ECDSA P-256 DSSE-signed receipt onto a hash-linked Khipu Merkle DAG.
 
 - **Λ uniqueness = Conjecture 1** — not a closed theorem.
-- **SLSA L1 honest** — real cosign-signed provenance, Sigstore Rekor anchored. SLSA L2 is on the roadmap via Wire D; it is not claimed today.
+- **SLSA L1 honest** — real cosign-signed provenance, Sigstore Rekor anchored.
 - **Doctrine v11 LOCKED** — 749 / 14 / 163, locked at `c7c0ba17`.
-- Aligned with **EU AI Act Article 12** and **NIST AI RMF (MANAGE)**.
-
-## Open & cited
-
-- **Lean 4** source — [github.com/szl-holdings/lutar-lean](https://github.com/szl-holdings/lutar-lean) @ `c7c0ba17`
-- **Concept DOI** [10.5281/zenodo.19944926](https://doi.org/10.5281/zenodo.19944926)
-- **Developer hub** — [github.com/szl-holdings/developers](https://github.com/szl-holdings/developers)
-- **Compliance posture** — [github.com/szl-holdings/compliance-posture](https://github.com/szl-holdings/compliance-posture). Honest current state: pre-SOC 2 (Type 1 targeted Q4 2026); FedRAMP/IL-4 path targeted Q4 2027.
+- **Section 889 vendors:** Huawei, ZTE, Hytera, Hikvision, Dahua (exactly 5 — no others claimed).
 - Apache-2.0 across all open-source repos.
 
 ---
@@ -108,4 +109,4 @@ SZL Holdings builds a formally-verified governance gate for agentic AI. The Λ a
 
 ---
 
-<sub>Doctrine v11 LOCKED · 749 / 14 / 163 · 🪢 Khipu chain · Lean 4 · Sigstore Rekor · Apache-2.0 OSS · DOI [10.5281/zenodo.19944926](https://doi.org/10.5281/zenodo.19944926) · Source of truth: [szl-holdings/.github lean_numbers.json](https://github.com/szl-holdings/.github/blob/main/.github/data/lean_numbers.json) @ `c7c0ba17` · Founder: Stephen Paul Lutar Jr · [ORCID 0009-0001-0110-4173](https://orcid.org/0009-0001-0110-4173)</sub>
+<sub>Doctrine v11 LOCKED · 749 / 14 / 163 · 🪢 Khipu chain · Lean 4 · Sigstore Rekor · Apache-2.0 OSS · DOI [10.5281/zenodo.19944926](https://doi.org/10.5281/zenodo.19944926) · Consolidated from 45 → 19 repos on 2026-06-03 for Series-A clarity · Founder: Stephen Paul Lutar Jr · [ORCID 0009-0001-0110-4173](https://orcid.org/0009-0001-0110-4173)</sub>
