@@ -229,7 +229,7 @@ Gate: allow when `entropy_bound > 0` (cite `dpi_bound_positive`) and chain passe
 
 ### GAP-07: Graph Λ → agi-forecast (Production Build FG-S1→S4)
 
-**Gap**: `Λ_graph_automorphism_invariant` and related graph theorems proven but agi-forecast uses no Lean-cited formula  
+**Gap**: `Λ_graph_automorphism_invariant` and related graph-automorphism lemmas proven (Lean theorems on the *graph* invariant — distinct from Λ aggregator uniqueness, which stays Conjecture 1, NOT a theorem) but agi-forecast uses no Lean-cited formula  
 **Organ owner**: `szl-holdings/agi-forecast`  
 **Lean theorem refs**:
 - `Lutar.GraphLambda.Λ_graph_automorphism_invariant` (GraphLambda.lean:144)
@@ -250,7 +250,7 @@ class GraphLambdaForecast:
 Tests: graph Λ ≤ 1; automorphism-invariant check; receipt DSSE verification; synthetic flag
 
 **Branch name**: `cursor/perplexity-instill-graph-lambda-agi-forecast`  
-**PR title**: `feat(forecast): instill Graph-Λ theorem — agi-forecast FG-S1 production build`  
+**PR title**: `feat(forecast): instill Graph-Λ automorphism lemma — agi-forecast FG-S1 production build` (cites the proven graph-automorphism lemma; Λ aggregator uniqueness stays Conjecture 1, NOT a theorem)  
 **Acceptance test**: `pytest tests/test_graph_lambda_forecast.py` green; forecast receipt has `lean_theorem_ref` field  
 **Estimated hours**: 12h
 
