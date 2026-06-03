@@ -6,7 +6,7 @@
 
 **Provable by math, signed by receipts, runs on your hardware.**
 
-### 5/5 flagships live · 5 organs · 749 declarations · 14 axioms · 163 sorries · Doctrine v11 LOCKED
+### 5/5 flagships live · 5/5 cosign-signed via Sigstore Rekor · 749 declarations · 14 axioms · 163 sorries · Doctrine v11 LOCKED
 
 [Quickstart](https://docs.szlholdings.com/quickstart) · [Docs](https://docs.szlholdings.com) · [Cookbook](https://github.com/szl-holdings/szl-cookbook) · [Verify](https://github.com/szl-holdings/szl-cookbook/blob/main/recipes/01-verify-a-receipt-end-to-end.md) · [Cite](#citation) · [Releases](https://github.com/orgs/szl-holdings/repositories)
 
@@ -14,7 +14,7 @@
 
 </div>
 
-> **What changed:** Consolidated from 45 → 19 repos on 2026-06-03 for Series-A clarity. 12 former repos are archived with redirect notices. See the [org consolidation report](https://github.com/szl-holdings/.github) for the full log.
+> **What changed:** Repos consolidated for Series-A clarity. The org now holds **39 repositories — 21 active and 18 archived** (archived repos carry redirect notices). Counts verified live against the GitHub org API on 2026-06-03. See the [org consolidation report](https://github.com/szl-holdings/.github) for the full log.
 
 ---
 
@@ -40,6 +40,16 @@ recipe — **[Verify a receipt end-to-end](https://github.com/szl-holdings/szl-c
 cryptographically validates a real DSSE receipt in under a minute, no credentials required.
 
 > **Customer-facing URL:** <https://github.com/szl-holdings/szl-cookbook>
+
+### Try it now
+
+| Try in | Link |
+|---|---|
+| 🤗 **Hugging Face Spaces** | [a11oy](https://huggingface.co/spaces/SZLHOLDINGS/a11oy) · [sentra](https://huggingface.co/spaces/SZLHOLDINGS/sentra) · [amaru](https://huggingface.co/spaces/SZLHOLDINGS/amaru) · [rosie](https://huggingface.co/spaces/SZLHOLDINGS/rosie) · [killinchu](https://huggingface.co/spaces/SZLHOLDINGS/killinchu) |
+| ✅ **Verify a receipt** | [Recipe 01 — end-to-end, no credentials](https://github.com/szl-holdings/szl-cookbook/blob/main/recipes/01-verify-a-receipt-end-to-end.md) |
+| 📦 **Signed images (GHCR)** | `cosign verify ghcr.io/szl-holdings/<flagship>:uds-v0.2.0` — keyless OIDC, Rekor-anchored |
+
+**Used by / for:** Defense Unicorns UDS air-gapped deployments · Warhacker DoD pier demo (Jun 16–19, 2026) · Series-A diligence reviewers.
 
 ---
 
@@ -157,4 +167,4 @@ We are a precision substrate, not a vibes company — the math is the load-beari
 
 ---
 
-<sub>Doctrine v11 LOCKED · 749 / 14 / 163 · 🪢 Khipu chain · Lean 4 · Sigstore Rekor · Apache-2.0 OSS · DOI [10.5281/zenodo.19944926](https://doi.org/10.5281/zenodo.19944926) · Consolidated from 45 → 19 repos on 2026-06-03 for Series-A clarity · Founder: Stephen Paul Lutar Jr · [ORCID 0009-0001-0110-4173](https://orcid.org/0009-0001-0110-4173)</sub>
+<sub>Doctrine v11 LOCKED · 749 / 14 / 163 · 🪢 Khipu chain · Lean 4 · Sigstore Rekor · Apache-2.0 OSS · DOI [10.5281/zenodo.20434276](https://doi.org/10.5281/zenodo.20434276) · 39 repos (21 active · 18 archived), consolidated 2026-06-03 for Series-A clarity · Founder: Stephen Paul Lutar Jr · [ORCID 0009-0001-0110-4173](https://orcid.org/0009-0001-0110-4173)</sub>
