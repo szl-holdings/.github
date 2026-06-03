@@ -22,6 +22,17 @@ jobs:
       - name: Checkout .github
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
 
+      # LOUD GUARD (no silent green): HF_TOKEN is REQUIRED to read live HF counts
+      # and to push the daily receipt. If it is missing we FAIL here rather than
+      # letting downstream steps emit zeroed counts and a swallowed push error.
+      - name: Require HF_TOKEN (fail loudly if missing)
+        if: ${{ secrets.HF_TOKEN == '' }}
+        run: |
+          echo "::error title=HF_TOKEN missing::HF Daily Activity needs the HF_TOKEN secret to read SZLHOLDINGS counts and push the daily receipt."
+          echo "::error::Founder action required: add the org/repo secret HF_TOKEN (HF write token scoped to the SZLHOLDINGS org)."
+          echo "::error::Create it at https://huggingface.co/settings/tokens . See FOUNDER_SECRETS_RUNBOOK.md."
+          exit 1
+
       - name: Set up Python
         uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
         with:
@@ -64,7 +75,7 @@ jobs:
           HF_TOKEN: ${{ secrets.HF_TOKEN }}
 
       - name: Build + push DSSE-wrapped daily receipt
-        if: inputs.dry_run != 'true'
+        if: ${{ inputs.dry_run != 'true' && secrets.HF_TOKEN != '' }}
         run: |
           python3 << 'PYEOF'
           import json, hashlib, base64, datetime, os, io
@@ -110,38 +121,42 @@ jobs:
               "signatures": [{"sig": sig, "keyid": "szl-hmac-sha256-v1"}],
           }
           
+          # HONESTY NOTE: the `sig` above is an HMAC-SHA256 over the DSSE PAE
+          # (keyid szl-hmac-sha256-v1) — a STUB, not a real asymmetric signature.
+          # A real DSSE signature requires the org secret SZL_COSIGN_PRIVATE_PEM,
+          # which is currently MISSING org-wide. The receipt is therefore marked
+          # `"signing": "hmac-stub"` so no consumer mistakes it for a cosign
+          # signature. Once SZL_COSIGN_PRIVATE_PEM exists this stub must be
+          # replaced with `cosign sign-blob` (see FOUNDER_SECRETS_RUNBOOK.md).
+          envelope["signing"] = "hmac-stub"  # NOT a real signature until SZL_COSIGN_PRIVATE_PEM is set
           receipt_content = json.dumps(envelope, indent=2).encode()
-          
-          # Push to SZLHOLDINGS/szl-evidence daily/ folder
-          try:
-              api.create_commit(
-                  repo_id="SZLHOLDINGS/szl-evidence",
-                  repo_type="dataset",
-                  operations=[CommitOperationAdd(
-                      path_in_repo=f"daily/{date_str}.json",
-                      path_or_fileobj=io.BytesIO(receipt_content)
-                  )],
-                  commit_message=f"feat(receipt): daily activity receipt {date_str} [automated]",
-                  token=TOKEN,
-              )
-              print(f"Pushed daily receipt for {date_str}")
-          except Exception as e:
-              print(f"Note: szl-evidence dataset not available or write blocked: {e}")
-              # Non-fatal: fallback to appending to szl-artifacts
+
+          # Push to SZLHOLDINGS/szl-evidence daily/ folder. Failures are FATAL:
+          # a swallowed push error previously left the job green with NO receipt.
+          pushed = False
+          last_err = None
+          for repo_id, sub in (("SZLHOLDINGS/szl-evidence", "daily"),
+                               ("SZLHOLDINGS/szl-artifacts", "daily-receipts")):
               try:
                   api.create_commit(
-                      repo_id="SZLHOLDINGS/szl-artifacts",
+                      repo_id=repo_id,
                       repo_type="dataset",
                       operations=[CommitOperationAdd(
-                          path_in_repo=f"daily-receipts/{date_str}.json",
+                          path_in_repo=f"{sub}/{date_str}.json",
                           path_or_fileobj=io.BytesIO(receipt_content)
                       )],
                       commit_message=f"feat(receipt): daily activity receipt {date_str} [automated]",
                       token=TOKEN,
                   )
-                  print(f"Pushed daily receipt to szl-artifacts for {date_str}")
-              except Exception as e2:
-                  print(f"Warning: could not push receipt: {e2}")
+                  print(f"Pushed daily receipt to {repo_id} for {date_str}")
+                  pushed = True
+                  break
+              except Exception as e:
+                  print(f"::warning::push to {repo_id} failed: {e}")
+                  last_err = e
+          if not pushed:
+              print("::error title=Receipt push failed::Could not push the daily activity receipt to any dataset.")
+              raise SystemExit(f"FATAL: daily receipt not published (last error: {last_err})")
           PYEOF
         env:
           HF_TOKEN: ${{ secrets.HF_TOKEN }}
