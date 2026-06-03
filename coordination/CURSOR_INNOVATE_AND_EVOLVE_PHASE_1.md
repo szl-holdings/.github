@@ -39,7 +39,7 @@ Right now the thesis (5 anchor formulas × 7 layers = 35) exists as code in 6 se
 | Brain (amaru) | `amaru` | At every decision step, amaru emits a UDS span with `formula_witness` field carrying which of the 5 anchor formulas justified the decision. The witness must reference a Lean theorem name from `lutar-lean` (`Lutar.AdversarialRobustness.theorem_XYZ` etc.). |
 | Heart (yuyay) | `a11oy` | Policy gates from #83 now run **inline** at every agent action, not just in CI. Failed gates emit a DSSE-signed receipt to `uds-mesh`. |
 | Blood (yawar) | `uds-mesh` | Ledger now stores cross-organ correlation: a single trace_id touched by amaru → a11oy → vsp-otel → sentra leaves a graph reconstructible from receipts alone. |
-| Skeleton (Λ-spine) | `lutar-lean` | Every theorem statement that maps to an anchor formula gets a machine-readable `@anchor_formula(name="liu_hui_pi")` attribute the runtime can lookup. |
+| Skeleton (Λ-spine) | `lutar-lean` | Every Lean theorem/lemma statement that maps to an anchor formula gets a machine-readable `@anchor_formula(name="liu_hui_pi")` attribute the runtime can lookup. (Λ aggregator uniqueness remains Conjecture 1 — NOT a theorem.) |
 | Wires (kallpa) | `vsp-otel` | OTel spans now carry `szl.anchor_formula.id` + `szl.lean_theorem_ref` attributes auto-derived from the policy gate that fired. |
 | Nervous (otel) | `rosie` | Receipt observability dashboard becomes the **anatomy live view** — clicking a span reveals the formula → theorem → gate → receipt chain end-to-end. |
 | Forecast (sentra) | `sentra` | Forecast loop now consumes UDS receipts as input; outputs carry their own formula witness. |
