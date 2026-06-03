@@ -104,6 +104,16 @@ Defense Unicorns Unified Defense Stack integration — air-gapped, Zarf-native, 
 |---|---|
 | [**szl-papers**](https://github.com/szl-holdings/szl-papers) | Academic corpus — preprints, thesis lineage, bounty problems, prior-art disclosures (consolidated 2026-06-03). |
 
+### Thesis & Research
+
+**22 thesis versions** · Doctrine **v11 LOCKED 749/14/163** (v11.1 in flight post-A5) · Concept DOI [10.5281/zenodo.19944926](https://doi.org/10.5281/zenodo.19944926)
+
+The **intellectual provenance of SZL Holdings** — every governance claim traces to a versioned, DOI-pinned thesis (v1 2026-04-28 → v22 2026-06-03).
+
+- **Canonical timeline:** [THESIS_LINEAGE.md (v1 → v22)](https://github.com/szl-holdings/szl-papers/blob/main/thesis/THESIS_LINEAGE.md)
+- **Latest:** [v22 — Convergence](https://github.com/szl-holdings/szl-papers/tree/main/thesis/ouroboros/papers/v22) — A5 axiom merge, Cauchy_ND partial closure, VCG truthfulness, **SLSA L1 + L2** (NOT L3), Innovation Rounds 10–11, Sim-to-Real benchmark (α=0.10)
+- **Λ = Conjecture 1** — never a theorem; uniqueness chain completes only when all Cauchy_ND sorries close on `main`
+
 ---
 
 ## Sales
