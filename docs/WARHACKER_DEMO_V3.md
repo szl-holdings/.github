@@ -84,9 +84,9 @@ cosign verify-blob \
 *Expected output: `Verified OK`*
 *Live on projector: receipt-chain WebUI shows "SIGN" event node appears*
 
-**PP2 (0:35) — SLSA L2 attested provenance:**
+**PP2 (0:35) — SLSA Build L1 (honest) provenance:**
 ```bash
-# PROOF POINT 2: Verify SLSA L2 attested provenance (slsa-verifier)
+# PROOF POINT 2: Verify SLSA Build L1 (honest) provenance (slsa-verifier)
 slsa-verifier verify-artifact \
   uds-package-szl-organs-v0.3.1.tar.zst \
   --provenance-path uds-package-szl-organs-v0.3.1.tar.zst.intoto.jsonl \
