@@ -86,7 +86,7 @@ jobs:
               --include="*.md" --include="*.json" --include="*.yaml" \
               . 2>/dev/null | \
               grep -vE "^(\./)?\.git/|\.lake/|node_modules/" | \
-              grep -vE "[Rr]oadmap|[Dd]eferred|not yet proven|out of scope|not pursuing" | \
+              grep -viE "roadmap|[Dd]eferred|not yet proven|out of scope|not pursuing" | \
               grep -vE "historical|archived|REJECTED|[Rr]equires|[Nn]ot yet|⬜" | \
               grep -vE "not L[23]|not.*L[23]|L[23].*not|honest.*not|STAGED|awaiting" | \
               grep -vE "mis-claimed|corrected|previously.*L[23]|Two SLSA|PRs opened" | \
@@ -117,7 +117,7 @@ jobs:
               --exclude="OPS_NOTES.md" \
               . 2>/dev/null | \
               grep -vE "out of scope|not pursuing|historical|archived|REJECTED|deprecated|proposed|roadmap" | \
-              grep -vE "gap|not.*Iron Bank|not.*FedRAMP|vanilla|approved base|citation|NIST" | \
+              grep -viE "no iron bank|not.*iron bank|no fedramp|not.*fedramp|no cmmc|not.*cmmc|gap|vanilla|approved base|citation|NIST" | \
               grep -vE "customer.*requirement|policy.*map|compliance.*map|does not|cannot|without" | \
               grep -vE "^(\./)?\.git/|\.lake/|node_modules/" | \
               head -10; then
