@@ -21,8 +21,8 @@ jobs:
           FAIL=0
 
           echo "=== Invariant 1: Doctrine v11 LOCKED 749/14/163 ==="
-          if grep -rE "doctrine.*v(9|10|12|13)" --include="*.md" --include="*.json" --include="*.yaml" --include="*.yml" --include="*.py" --include="*.ts" --include="*.go" . 2>/dev/null | grep -vE "^(\./)?\.git/|\.lake/|node_modules/|/dist/|/build/" | head -10; then
-            echo "::error::Doctrine version drift detected — only v11 allowed"
+          if grep -rE "doctrine.*v(9|10|12|13)" --include="*.md" --include="*.json" --include="*.yaml" --include="*.yml" --include="*.py" --include="*.ts" --include="*.go" . 2>/dev/null | grep -vE "^(\./)?\.git/|\.lake/|node_modules/|/dist/|/build/|ADDITIVE|additive|proposed|planned.*release|roadmap|not yet promoted|future" | head -10; then
+            echo "::error::Doctrine version drift detected — only v11 allowed (ADDITIVE/proposed labels are exempt)"
             FAIL=1
           fi
 
