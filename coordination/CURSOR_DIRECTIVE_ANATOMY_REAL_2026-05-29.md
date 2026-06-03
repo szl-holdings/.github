@@ -36,7 +36,7 @@ When done: an investor clicks any organ on the Space → JS fetches the live end
 | Heart / yuyay | `szl-holdings/ouroboros` | `/api/anatomy/heart` | Current Λ-axis pulse (1 number ∈ [0,1]) + Ouroboros 32-module green-count | `Lutar/PACBayes/MadhavaBound` |
 | Blood / yawar | `szl-holdings/uds-mesh` | `/api/anatomy/blood` | Total receipts emitted (lifetime) + receipts/min (last 60 min) | `Lutar/Khipu/SummationInvariant` |
 | Immune / huklla | `szl-holdings/sentra` + `szl-holdings/a11oy` | `/api/anatomy/immune` | 6 gate states (each: open/closed) + 248 a11oy assertion green-count | `Lutar/Composition/AdversarialRobustness` |
-| Skeleton / Λ-spine | `szl-holdings/lutar-lean` | `/api/anatomy/skeleton` | 76 theorems · 134 lake-verified · 241 skeleton · 1 residual sorry (live from theorems_index.json) | (the spine cites them all) |
+| Skeleton / Λ-spine | `szl-holdings/lutar-lean` | `/api/anatomy/skeleton` | 76 Lean theorems/lemmas · 134 lake-verified · 241 skeleton · 1 residual sorry (live from theorems_index.json). Λ aggregator uniqueness = Conjecture 1, NOT a theorem. | (the spine cites them all) |
 | Nervous / otel | `szl-holdings/vsp-otel` | `/api/anatomy/nervous` | OTel exporter health + last span emit timestamp + 9 Λ-axis weights | `Lutar/Calibration/FalsePosition` |
 | Wires / kallpa | `szl-holdings/uds-mesh` + `szl-holdings/rosie` | `/api/anatomy/wires` | Cross-component fabric health: 7-organ connectivity matrix | `Lutar/Banach/LiuHuiPi` |
 
