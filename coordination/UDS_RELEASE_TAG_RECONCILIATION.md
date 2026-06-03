@@ -148,7 +148,7 @@ Verified via `gh api repos/szl-holdings/<repo>/releases/tags/uds-v0.3.0`:
 | `.sha256` file as release asset | ✓ | ✓ | ✓ |
 | Container pushed to GHCR | ✓ | ✓ (was missing in 0.3.0) | N/A (pointer only) |
 | Full Zarf package (from GHCR image) | ✓ | ✓ | N/A |
-| in-toto provenance (SLSA L3) | ✓ | ✓ | ✓ |
+| in-toto provenance (SLSA L2 attested) | ✓ | ✓ | ✓ |
 | UDS Package CR (full) | Per-component | vessels delivery | N/A |
 | BFT 2-of-3 skeleton | — | — | ✓ (advisory) |
 | Pointer manifest updated to v0.3.1 | — | — | ✓ |
