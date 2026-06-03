@@ -29,6 +29,11 @@ jobs:
           # Fix: capture grep output into a variable and test for non-empty, and
           # print the matched lines explicitly (no hidden-in-`if` matches).
 
+          # NOTE: --exclude-dir="coordination" — the .github repo's coordination/
+          # directory holds internal cross-repo agent directives and storyboards
+          # (planning docs that reference other repos' roadmaps and the audit trail
+          # of REMOVING fake SLSA L3 claims). They are not shipped artifacts or
+          # customer-facing doctrine claims; flagship repos have no coordination/ dir.
           echo "=== Invariant 1: Doctrine v11 LOCKED 749/14/163 ==="
           M1=$(grep -rE "doctrine.*v(9|10|12|13)" \
               --include="*.md" --include="*.json" --include="*.yaml" --include="*.yml" \
@@ -39,6 +44,7 @@ jobs:
               --exclude="OUROBOROS_RUN_ALL.py" \
               --exclude="szlBreaker.ts" --exclude="szl_breaker.py" \
               --exclude="serve.py" --exclude="szl_wire.py" --exclude="_live_serve.py" \
+              --exclude-dir="coordination" \
               . 2>/dev/null | \
               grep -vE "^(\./)?\.git/|\.lake/|node_modules/|/dist/|/build/" | \
               grep -vE "ADDITIVE|additive|proposed|planned.*release|roadmap|not yet promoted|future" | \
@@ -58,7 +64,7 @@ jobs:
           M2=$(grep -rE "Λ.*theorem|Lambda.*theorem|lambda.*Theorem|lambdaUniqueness[^C]" \
               --include="*.md" --include="*.json" --include="*.py" --include="*.ts" --include="*.lean" \
               --exclude="OUROBOROS_RUN_ALL.py" --exclude="YACHAY_SYSTEM_PROMPT.md" \
-              --exclude-dir="__tests__" \
+              --exclude-dir="__tests__" --exclude-dir="coordination" \
               . 2>/dev/null | \
               grep -vE "Conjecture|conjecture|NOT a theorem|not a proven theorem|not a theorem" | \
               grep -vE "Never claim|never claim|Never.*theorem|don't claim|do not claim" | \
@@ -76,6 +82,7 @@ jobs:
           echo "=== Invariant 3: SLSA L1 honest (no L2/L3) ==="
           M3=$(grep -rE "SLSA.*L[23]|SLSA Level [23]" \
               --include="*.md" --include="*.json" --include="*.yaml" \
+              --exclude-dir="coordination" \
               . 2>/dev/null | \
               grep -vE "^(\./)?\.git/|\.lake/|node_modules/" | \
               grep -viE "roadmap|[Dd]eferred|not yet proven|out of scope|not pursuing" | \
@@ -106,6 +113,7 @@ jobs:
               --exclude-dir="vertical" \
               --exclude="defense*.yaml" --exclude="defense*.json" \
               --exclude="OPS_NOTES.md" \
+              --exclude-dir="coordination" \
               . 2>/dev/null | \
               grep -vE "out of scope|not pursuing|historical|archived|REJECTED|deprecated|proposed|roadmap" | \
               grep -viE "no iron bank|not.*iron bank|no fedramp|not.*fedramp|no cmmc|not.*cmmc|gap|vanilla|approved base|citation|NIST" | \
