@@ -80,26 +80,48 @@ jobs:
             FAIL=1
           fi
 
-          echo "=== Invariant 3: SLSA L1 honest (no L2/L3) ==="
-          M3=$(grep -rE "SLSA.*L[23]|SLSA Level [23]" \
+          echo "=== Invariant 3: SLSA claims must be honest and evidence-gated ==="
+          # L3 is NOT claimed. L2 is permitted ONLY for repos with a verified
+          # actions/attest-build-provenance attestation in GHCR/GitHub Attestations API.
+          # Unverified L2 claims and all L3 claims are banned.
+          #
+          # Verification evidence: all five flagships (a11oy, sentra, amaru, rosie,
+          # killinchu) have actions/attest-build-provenance@v2.4.0 wired in their
+          # ghcr-build-push.yml workflows and have produced Sigstore-signed SLSA
+          # Provenance v1 attestations (predicate type https://slsa.dev/provenance/v1)
+          # verified via the GitHub attestations API (2026-06-04).
+          # Doctrine upgrade: L1 honest -> L2 verified (2026-06-04, slsa_l2.md).
+
+          # RULE 1: L3 is never allowed (requires isolated/reusable-workflow builder)
+          M3_L3=$(grep -rE "SLSA.*L3|SLSA Level 3" \
               --include="*.md" --include="*.json" --include="*.yaml" \
               --exclude-dir="coordination" --exclude-dir="cursor-directives" \
-              --exclude="UDS_CATALOG_SPONSOR_APPLICATION.md" \
-              --exclude="WARHACKER_DEMO_V3.md" \
               . 2>/dev/null | \
               grep -vE "^(\./)?\.git/|\.lake/|node_modules/" | \
-              grep -viE "roadmap|[Dd]eferred|not yet proven|out of scope|not pursuing" | \
-              grep -vE "historical|archived|REJECTED|[Rr]equires|[Nn]ot yet|⬜" | \
-              grep -vE "not L[23]|not.*L[23]|L[23].*not|honest.*not|STAGED|awaiting" | \
-              grep -vE "mis-claimed|corrected|previously.*L[23]|Two SLSA|PRs opened" | \
-              grep -viE "path to|transition|target|by v0|lies|purged|fake|→|->|rename badge|committed path" | \
-              grep -viE "BANNED|banned|prohibited|forbidden|must be L1|enforce L1|sorry-tag" | \
-              grep -vE "[Hh]onest.*not.*L|not.*[Hh]onest.*L|not.*claimed.*L" | \
-              grep -vE "misstatement|supersedes|PROVENANCE_NOTICE" \
+              grep -viE "not L3|no.*L3|L3.*not|banned|prohibited|forbidden|out of scope" | \
+              grep -viE "roadmap|future|planned|historical|archived|REJECTED|path to" \
               || true)
-          if [ -n "$M3" ]; then
-            echo "$M3" | head -10
-            echo "::error::SLSA L2/L3 claim — must be L1 honest"
+          if [ -n "$M3_L3" ]; then
+            echo "$M3_L3" | head -10
+            echo "::error::SLSA L3 claim detected — L3 is NOT achieved (requires isolated builder/reusable workflow). Remove or scope as future roadmap."
+            FAIL=1
+          fi
+
+          # RULE 2: L2 claims require evidence (attestation). Verified repos:
+          # a11oy, sentra, amaru, rosie, killinchu (2026-06-04). Others must not claim L2.
+          M3_L2_UNVERIFIED=$(grep -rE "SLSA.*L2|SLSA Level 2" \
+              --include="*.md" --include="*.json" --include="*.yaml" \
+              --exclude-dir="coordination" --exclude-dir="cursor-directives" \
+              . 2>/dev/null | \
+              grep -vE "^(\./)?\.git/|\.lake/|node_modules/" | \
+              grep -vE "ghcr-build-push\.yml|ghcr\.io/szl-holdings/(a11oy|sentra|amaru|rosie|killinchu)" | \
+              grep -viE "verified|attested|attestation.*exists|attestation.*created|attestation.*uploaded" | \
+              grep -viE "roadmap|future|planned|historical|archived|REJECTED|path to|not yet" | \
+              grep -viE "not L2|no.*L2|L2.*not|banned|prohibited" \
+              || true)
+          if [ -n "$M3_L2_UNVERIFIED" ]; then
+            echo "$M3_L2_UNVERIFIED" | head -10
+            echo "::error::SLSA L2 claim without evidence — only a11oy/sentra/amaru/rosie/killinchu have verified L2 attestations. Add evidence reference or remove the claim."
             FAIL=1
           fi
 
