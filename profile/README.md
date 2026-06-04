@@ -70,6 +70,8 @@ Runtime and formal substrate the flagships call. Not products — plumbing.
 | [**lutar-lean**](https://github.com/szl-holdings/lutar-lean) | [![lutar-lean CI](https://github.com/szl-holdings/lutar-lean/actions/workflows/ci.yml/badge.svg)](https://github.com/szl-holdings/lutar-lean/actions/workflows/ci.yml) | Lean 4 + Mathlib kernel proofs — Λ invariant, QEC, KS-18. Doctrine v11 @ `c7c0ba17`. |
 | [**ouroboros**](https://github.com/szl-holdings/ouroboros) | [![ouroboros CI](https://github.com/szl-holdings/ouroboros/actions/workflows/ci.yml/badge.svg)](https://github.com/szl-holdings/ouroboros/actions/workflows/ci.yml) | Bounded recursion runtime, governance loops, and receipt emission spine. |
 
+- **🏆 [Λ-Uniqueness Bounty — Conjecture 1 (OPEN)](https://github.com/szl-holdings/lutar-lean/blob/main/BOUNTY.md)** — a founder-set monetary award for a complete, machine-checked Lean 4 proof that the 9-axis Λ-aggregator (PURIQ F23) is unique under axioms A1–A4. Conjecture 1 is **NOT a theorem**; `verify-proof` CI on [`lambda-bounty`](https://github.com/szl-holdings/lambda-bounty) is the sole, no-bypass arbiter. Working intake + webhook surface: [`lambda-bounty/webhook`](https://github.com/szl-holdings/lambda-bounty/tree/main/webhook).
+
 ---
 
 ## UDS Stack
