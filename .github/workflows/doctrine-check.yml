@@ -101,7 +101,9 @@ jobs:
               grep -vE "^(\./)?\.git/|\.lake/|node_modules/" | \
               grep -viE "not L3|no.*L3|L3.*not|banned|prohibited|forbidden|out of scope" | \
               grep -viE "roadmap|future|planned|historical|archived|REJECTED|path to" | \
-              grep -viE "staged|awaiting|mis-claimed|misclaimed|corrected|previously" \
+              grep -viE "staged|awaiting|mis-claimed|misclaimed|corrected|previously" | \
+              sed -E 's#;base64,[A-Za-z0-9+/=]+##g' | \
+              grep -E "SLSA.*L3|SLSA Level 3" \
               || true)
           if [ -n "$M3_L3" ]; then
             echo "$M3_L3" | head -10
@@ -119,7 +121,9 @@ jobs:
               grep -vE "ghcr-build-push\.yml|ghcr\.io/szl-holdings/(a11oy|sentra|amaru|rosie|killinchu)" | \
               grep -viE "verified|attested|attestation.*exists|attestation.*created|attestation.*uploaded" | \
               grep -viE "roadmap|future|planned|historical|archived|REJECTED|path to|not yet" | \
-              grep -viE "not L2|no.*L2|L2.*not|banned|prohibited" \
+              grep -viE "not L2|no.*L2|L2.*not|banned|prohibited" | \
+              sed -E 's#;base64,[A-Za-z0-9+/=]+##g' | \
+              grep -E "SLSA.*L2|SLSA Level 2" \
               || true)
           if [ -n "$M3_L2_UNVERIFIED" ]; then
             echo "$M3_L2_UNVERIFIED" | head -10
