@@ -11,7 +11,7 @@
 
 **Provable by math, signed by receipts, runs on your hardware.**
 
-### 4/5 flagship Spaces live (a11oy rebuilding) · cosign-signed images on GHCR · 749 declarations · 14 axioms · 163 sorries · Doctrine v11 LOCKED
+### 5/5 flagship Spaces live · cosign-signed images on GHCR · 749 declarations · 14 axioms · 163 sorries · Doctrine v11 LOCKED
 
 [![License: Apache-2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://www.apache.org/licenses/LICENSE-2.0) [![Doctrine v11 LOCKED 749/14/163](https://img.shields.io/badge/Doctrine-v11_LOCKED_749%2F14%2F163-2a3550)](https://github.com/szl-holdings/lutar-lean/commit/c7c0ba17c2ea) [![Λ = Conjecture 1](https://img.shields.io/badge/%CE%9B-Conjecture_1_(not_a_theorem)-3a2f0f)](https://github.com/szl-holdings/szl-papers/tree/main/thesis/ouroboros/papers/v22) [![DOI](https://img.shields.io/badge/DOI-10.5281%2Fzenodo.20434276-blue)](https://doi.org/10.5281/zenodo.20434276) [![DCO](https://img.shields.io/badge/DCO-sign--off_required-green)](https://developercertificate.org/)
 
