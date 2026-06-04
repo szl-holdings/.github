@@ -401,7 +401,7 @@ gh release view uds-v0.3.0 --repo szl-holdings/vessels  # → 4 assets present
 
 ---
 
-### Founder Action C — git tag v0.3.1 in szl-uds-deployment (3 min — TRIGGERS SLSA L2+)
+### Founder Action C — git tag v0.3.1 in szl-uds-deployment (3 min — advances SLSA L2 roadmap via Wire D; posture remains L1 honest until attested)
 
 ```bash
 # In szl-holdings/szl-uds-deployment repo root:
@@ -409,7 +409,7 @@ git tag v0.3.1
 git push origin v0.3.1
 ```
 
-**Why:** Triggers `uds-package-release.yml`, which produces the first cosign-signed Zarf package and creates the first Rekor transparency log entry. Without this, the SLSA L2+ story has no actual signed artifact. This is required before the UDS Catalog sponsor application can be submitted.
+**Why:** Triggers `uds-package-release.yml`, which produces the first cosign-signed Zarf package and creates the first Rekor transparency log entry. Without this, the SLSA L2 roadmap (via Wire D) has no actual signed artifact; the verified posture remains SLSA L1 honest until a hardened build service attests it. This is required before the UDS Catalog sponsor application can be submitted.
 
 **STAGED-ADVISORY:** v0.3.1 is the first release that will have a CI-generated signed artifact. All references to "catalog-grade" status remain STAGED-ADVISORY until this tag triggers a successful workflow run and 4 assets appear on the release.
 
