@@ -58,7 +58,7 @@
     <rect width="392" height="92" rx="12" fill="#211a4a" stroke="#8a6d44" stroke-opacity="0.7"/>
     <text x="20" y="34" font-size="15" font-weight="700" font-family="'JetBrains Mono', monospace" fill="#d4a574">v11 LOCKED · 749/14/163 · c7c0ba17</text>
     <text x="20" y="58" font-size="13" font-family="'JetBrains Mono', monospace" fill="#b9add6">Λ = Conjecture 1 (NOT a theorem)</text>
-    <text x="20" y="78" font-size="13" font-family="'JetBrains Mono', monospace" fill="#b9add6">SLSA L1 honest + L2 attested · Apache-2.0</text>
+    <text x="20" y="78" font-size="13" font-family="'JetBrains Mono', monospace" fill="#b9add6">SLSA L1 honest (L2 roadmap) · Apache-2.0</text>
   </g>
 
   <!-- flagship chips -->

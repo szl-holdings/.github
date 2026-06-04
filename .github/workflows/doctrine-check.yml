@@ -85,12 +85,12 @@ jobs:
           # actions/attest-build-provenance attestation in GHCR/GitHub Attestations API.
           # Unverified L2 claims and all L3 claims are banned.
           #
-          # Verification evidence: all five flagships (a11oy, sentra, amaru, rosie,
-          # killinchu) have actions/attest-build-provenance@v2.4.0 wired in their
-          # ghcr-build-push.yml workflows and have produced Sigstore-signed SLSA
-          # Provenance v1 attestations (predicate type https://slsa.dev/provenance/v1)
-          # verified via the GitHub attestations API (2026-06-04).
-          # Doctrine upgrade: L1 honest -> L2 verified (2026-06-04, slsa_l2.md).
+          # Posture: SLSA L1 honest (L2 roadmap via Wire D). All five flagships have
+          # actions/attest-build-provenance@v2.4.0 wired in their ghcr-build-push.yml
+          # workflows, BUT the L2 attestation is NOT yet earned on the deployed images:
+          # `cosign verify-attestation --type slsaprovenance ghcr.io/szl-holdings/<organ>`
+          # returns "no matching attestations" (verified 2026-06-04). L2 is not claimed
+          # anywhere until that command passes (likely needs org-level attestations:write).
 
           # RULE 1: L3 is never allowed (requires isolated/reusable-workflow builder)
           M3_L3=$(grep -rE "SLSA.*L3|SLSA Level 3" \

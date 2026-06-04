@@ -5,7 +5,7 @@ name: SLSA Provenance (L1 honest)
 # SLSA L2/L3 provenance — do not claim L3 anywhere.
 #
 # Real build provenance for release artifacts is produced per-repo by
-# actions/attest-build-provenance@v2 (SLSA L2 attested, verifiable via
+# actions/attest-build-provenance@v2 (SLSA L2 roadmap — NOT yet earned; verifiable via
 # `gh attestation verify` / slsa-verifier). See each flagship's
 # .github/workflows for the actual attestation step.
 
@@ -31,4 +31,4 @@ jobs:
       - name: SLSA L1 supply-chain baseline (SBOM + DCO; honest — not L3)
         run: |
           echo "SLSA Build L1 baseline (SBOM + DCO). No L3 claim."
-          echo "Release-artifact provenance is SLSA L2 (attest-build-provenance@v2)."
+          echo "Release-artifact provenance: attest-build-provenance@v2 wired (SLSA L2 roadmap via Wire D); L2 NOT yet earned until cosign verify-attestation passes on the deployed image."
