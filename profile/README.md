@@ -35,7 +35,7 @@ Six live Three.js/WebGL explorations of the proof architecture. Static. No login
 
 ## The proof layer — verify it yourself
 
-[![SLSA L2 Verified](https://img.shields.io/badge/SLSA-L2%20Verified-2C5F2D?style=flat-square&logo=data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCI+PHBhdGggZmlsbD0id2hpdGUiIGQ9Ik0xMiAyTDMgN3YxMGwxNiAxMFY3TDEyIDJ6Ii8+PC9zdmc+)](https://github.com/szl-holdings/a11oy/attestations)
+[![SLSA L1 honest](https://img.shields.io/badge/SLSA-L1%20honest-2C5F2D?style=flat-square&logo=data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCI+PHBhdGggZmlsbD0id2hpdGUiIGQ9Ik0xMiAyTDMgN3YxMGwxNiAxMFY3TDEyIDJ6Ii8+PC9zdmc+)](https://github.com/szl-holdings/a11oy/attestations)
 [![cosign signed](https://img.shields.io/badge/cosign-keyless%20signed-blueviolet?style=flat-square)](https://docs.sigstore.dev/cosign/signing/overview/)
 [![Rekor](https://img.shields.io/badge/Rekor-transparency%20log-blue?style=flat-square)](https://search.sigstore.dev/)
 [![UDS bundle](https://img.shields.io/badge/UDS%20bundle-szl--mesh%3Av0.4.0-4a4a8a?style=flat-square)](https://github.com/szl-holdings/uds-mesh)
@@ -53,19 +53,25 @@ cosign verify oci://ghcr.io/szl-holdings/szl-mesh:v0.4.0 \
   --certificate-oidc-issuer="https://token.actions.githubusercontent.com"
 ```
 
-### Verify SLSA Build L2 provenance (all 5 flagships)
+### Verify the SLSA L1 honest cosign signature (all 5 flagships)
 
 ```bash
-# Any of the five flagships — all have GitHub-hosted runner attestations
-gh attestation verify oci://ghcr.io/szl-holdings/a11oy@sha256:1cfd28e03e6f1fb4b0827f2281f5016ebde8122d8c9ecb00d73145c77dd02cd7 \
-  --repo szl-holdings/a11oy
-# Expected: ✓ Verification succeeded — SLSA Provenance v1, github-hosted runner
+# L1 honest: every flagship image carries a real cosign keyless Sigstore
+# signature (Fulcio cert + Rekor). This passes today:
+cosign verify ghcr.io/szl-holdings/a11oy:uds-v0.2.0 \
+  --certificate-identity-regexp="^https://github.com/szl-holdings/" \
+  --certificate-oidc-issuer="https://token.actions.githubusercontent.com"
 
-# Rekor transparency-log entries (public Sigstore instance):
+# Rekor transparency-log entries (public Sigstore instance) for the signatures:
 # a11oy:   https://search.sigstore.dev/?logIndex=1723769508
 # sentra:  https://search.sigstore.dev/?logIndex=1723794608
 # amaru:   https://search.sigstore.dev/?logIndex=1723784350
 # rosie:   https://search.sigstore.dev/?logIndex=1722745939
+
+# SLSA L2 (roadmap, NOT yet earned): a downstream-verifiable provenance
+# attestation is not yet attached to the deployed images —
+#   cosign verify-attestation --type slsaprovenance ghcr.io/szl-holdings/a11oy:uds-v0.2.0 ...
+# currently returns "no matching attestations". L2 is tracked by the slsa-l2 work.
 ```
 
 ### Deploy the full mesh (airgap, one command)
@@ -85,7 +91,7 @@ uds-cli bundle deploy szl-mesh-v0.4.0.tar.zst --confirm
 | Claim | Status | Verify |
 |---|---|---|
 | 5 live HF demos | ✅ All HTTP 200 | curl any `/healthz` |
-| SLSA Build L2 | ✅ Verified — a11oy/sentra/amaru/rosie (Public Sigstore); killinchu (GitHub Sigstore, private repo) | `gh attestation verify` above |
+| SLSA Build L1 honest | ✅ cosign keyless signature on all 5 deployed images (a11oy/sentra/amaru/rosie public Rekor; killinchu private Fulcio). **L2 = roadmap, not yet earned** — `cosign verify-attestation --type slsaprovenance` returns "no matching attestations" on the deployed images. | `cosign verify` above |
 | cosign keyless signed | ✅ All 5 organs, Public Good Rekor | `cosign verify` above |
 | UDS bundle published | ✅ `szl-mesh:v0.4.0` on GHCR | `uds deploy oci://ghcr.io/szl-holdings/szl-mesh:v0.4.0` |
 | Lean kernel | ✅ 749 decl / 14 axioms / 163 sorries @ `c7c0ba17` | [`lutar-lean@main`](https://github.com/szl-holdings/lutar-lean) |
@@ -126,7 +132,7 @@ graph LR
 
 ### Supply-chain posture
 
-- **SLSA Build L2 verified** — all 5 flagship images have `actions/attest-build-provenance@v2.4.0` wired in `ghcr-build-push.yml`; `runner_environment: github-hosted`; DSSE-signed SLSA Provenance v1 predicate stored in GitHub Attestations API + pushed to registry
+- **SLSA Build L1 honest** — all 5 flagship images carry a real cosign keyless signature. The build workflows wire `actions/attest-build-provenance@v2.4.0` (`runner_environment: github-hosted`), but a downstream-verifiable provenance attestation is **not yet attached to the deployed images** (`cosign verify-attestation --type slsaprovenance` → "no matching attestations"), so **L2 is roadmap, not yet earned**. L3 not claimed.
 - **cosign keyless signed** — every image signed via Fulcio OIDC short-lived cert bound to the GitHub Actions workflow identity; entries in public Sigstore Rekor transparency log (indexes above)
 - **UDS bundle `szl-mesh:v0.4.0`** — real baked images (SBOM-only regression fixed); keyless cosign-signed; deployable via `uds deploy oci://...` into any UDS Core cluster
 - **DCO required** on every commit; OpenSSF Scorecard monitored; Trivy + Grype + Gitleaks in CI
@@ -162,6 +168,6 @@ graph LR
 
 ---
 
-<sub>Doctrine v11 LOCKED · 749/14/163 · kernel `c7c0ba17` · Λ = Conjecture 1 (F23 open bounty, not a theorem) · SLSA L2 verified (a11oy/sentra/amaru/rosie public; killinchu GitHub Sigstore) · Apache-2.0 code / CC-BY-4.0 papers · DOI [10.5281/zenodo.20434276](https://doi.org/10.5281/zenodo.20434276) · [ORCID 0009-0001-0110-4173](https://orcid.org/0009-0001-0110-4173)</sub>
+<sub>Doctrine v11 LOCKED · 749/14/163 · kernel `c7c0ba17` · Λ = Conjecture 1 (F23 open bounty, not a theorem) · SLSA L1 honest (cosign-signed; L2 roadmap, not yet earned) · Apache-2.0 code / CC-BY-4.0 papers · DOI [10.5281/zenodo.20434276](https://doi.org/10.5281/zenodo.20434276) · [ORCID 0009-0001-0110-4173](https://orcid.org/0009-0001-0110-4173)</sub>
 
 Signed-off-by: stephenlutar2-hash <stephenlutar2@gmail.com>
