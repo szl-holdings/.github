@@ -8,6 +8,9 @@ name: Reusable — Release Please
 # Releases produced here can be picked up by downstream workflows for
 # Sigstore-signed artifact publishing, npm publish via OIDC, SBOM attachment,
 # etc. — kept decoupled so each repo opts in to what it needs.
+#
+# NOTE: release-please-action v5 removed `package-name` input (deprecated).
+# Use `path` for monorepo paths if needed; omit for single-package repos.
 
 on:
   workflow_call:
@@ -17,11 +20,6 @@ on:
         required: false
         type: string
         default: 'node'
-      package-name:
-        description: 'Package name for changelog header (default repo name).'
-        required: false
-        type: string
-        default: ''
       target-branch:
         description: 'Branch release-please tracks (default main).'
         required: false
@@ -49,5 +47,7 @@ jobs:
         uses: googleapis/release-please-action@45996ed1f6d02564a971a2fa1b5860e934307cf7 # v5.0.0
         with:
           release-type: ${{ inputs.release-type }}
-          package-name: ${{ inputs.package-name }}
           target-branch: ${{ inputs.target-branch }}
+          # Note: `package-name` removed (deprecated in v5; not in valid inputs list)
+          # GitHub Actions PR creation requires `Allow GitHub Actions to create PRs`
+          # enabled in Settings → Actions → General.
