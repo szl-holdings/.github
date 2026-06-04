@@ -221,3 +221,17 @@ Honesty over checklist.
 → Full diagram + wire-status table: **[docs-site / mesh](https://szl-holdings.github.io/docs-site/mesh)**
 
 <sub>Λ Conjecture 1 (not a theorem) · 749/14/163 v11 LOCKED · SLSA L1 honest · Section 889 = 5 vendors</sub>
+
+---
+
+## Provenance — Software Heritage
+
+Every public SZL Holdings research deposit is tracked in the **Software Heritage provenance manifest** at [`platform/proof-pack/swh/PROVENANCE_MANIFEST.md`](https://github.com/szl-holdings/platform/blob/main/proof-pack/swh/PROVENANCE_MANIFEST.md). The [Software Heritage Archive](https://archive.softwareheritage.org) (run by Inria, backed by UNESCO) is recognized as prior-art evidence by USPTO/EPO.
+
+**Honest status (2026-06-01):** the manifest tracks **9 Zenodo deposits** but reports **0 Software Heritage deposits archived to date** — the SWHID column is intentionally `0` until deposits are submitted. We surface this gap rather than overstate it. Citation footers append:
+
+```
+Software Heritage Archive: https://archive.softwareheritage.org/?origin_url=https://doi.org/<DOI>
+```
+
+— Provenance note signed **Yachay** <yachay@szlholdings.dev>; Co-Authored-By: Perplexity Computer Agent.
