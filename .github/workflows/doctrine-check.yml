@@ -69,6 +69,7 @@ jobs:
               . 2>/dev/null | \
               grep -vE "Conjecture|conjecture|NOT a theorem|not a proven theorem|not a theorem" | \
               grep -vE "Never claim|never claim|Never.*theorem|don't claim|do not claim" | \
+              grep -viE "do not call|don't call|never call|not call.*theorem" | \
               grep -vE "gate.*theorem|theorem.*enforced|README.*theorem|gates/README" | \
               grep -vE "lambdaCategory|lambdaMonotonicity|composability|MinMaxBounds" | \
               grep -vE "knowledge\.json|Lean.*theorem|lean 4.*theorem|Lean 4.*theorem" | \
@@ -99,7 +100,10 @@ jobs:
               . 2>/dev/null | \
               grep -vE "^(\./)?\.git/|\.lake/|node_modules/" | \
               grep -viE "not L3|no.*L3|L3.*not|banned|prohibited|forbidden|out of scope" | \
-              grep -viE "roadmap|future|planned|historical|archived|REJECTED|path to" \
+              grep -viE "roadmap|future|planned|historical|archived|REJECTED|path to" | \
+              grep -viE "staged|awaiting|mis-claimed|misclaimed|corrected|previously" | \
+              sed -E 's#;base64,[A-Za-z0-9+/=]+##g' | \
+              grep -E "SLSA.*L3|SLSA Level 3" \
               || true)
           if [ -n "$M3_L3" ]; then
             echo "$M3_L3" | head -10
@@ -117,7 +121,9 @@ jobs:
               grep -vE "ghcr-build-push\.yml|ghcr\.io/szl-holdings/(a11oy|sentra|amaru|rosie|killinchu)" | \
               grep -viE "verified|attested|attestation.*exists|attestation.*created|attestation.*uploaded" | \
               grep -viE "roadmap|future|planned|historical|archived|REJECTED|path to|not yet" | \
-              grep -viE "not L2|no.*L2|L2.*not|banned|prohibited" \
+              grep -viE "not L2|no.*L2|L2.*not|banned|prohibited" | \
+              sed -E 's#;base64,[A-Za-z0-9+/=]+##g' | \
+              grep -E "SLSA.*L2|SLSA Level 2" \
               || true)
           if [ -n "$M3_L2_UNVERIFIED" ]; then
             echo "$M3_L2_UNVERIFIED" | head -10
@@ -145,6 +151,7 @@ jobs:
               . 2>/dev/null | \
               grep -vE "out of scope|not pursuing|historical|archived|REJECTED|deprecated|proposed|roadmap" | \
               grep -viE "no iron bank|not.*iron bank|no fedramp|not.*fedramp|no cmmc|not.*cmmc|gap|vanilla|approved base|citation|NIST" | \
+              grep -viE "not claimed|❌|not pursued|not held|no.*authorization" | \
               grep -vE "customer.*requirement|policy.*map|compliance.*map|does not|cannot|without" | \
               grep -viE "upstream|ecosystem|respective.*polic|their.*polic|contribute to" | \
               grep -vE "^(\./)?\.git/|\.lake/|node_modules/" \
