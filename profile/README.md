@@ -36,7 +36,7 @@ Air-gap-deployable bundles for all five products: **[uds-bundles](https://github
 
 ![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)
 ![Demos](https://img.shields.io/badge/live_demos-5%2F5_running-2C5F2D.svg)
-![Provenance](https://img.shields.io/badge/SLSA-4%2F5_L2_%C2%B7_killinchu_L1-2C5F2D.svg)
+![Provenance](https://img.shields.io/badge/SLSA-L1_honest-2C5F2D.svg)
 ![Doctrine](https://img.shields.io/badge/Doctrine-v11_LOCKED-2a3550.svg "v11 LOCKED — internal stability marker")
 
 *"Doctrine v11 LOCKED" is our internal stability marker — it means the governance kernel our claims rest on hasn't shifted under our feet, so investors and customers see consistent numbers from one week to the next.*
@@ -53,7 +53,7 @@ Air-gap-deployable bundles for all five products: **[uds-bundles](https://github
 
 ### Cryptographic Provenance
 
-- **4 of 5 organs are SLSA Build Level 2** (hosted GitHub Actions builder + signed in-toto provenance, independently verifiable). **killinchu is held at SLSA Build L1 — honestly disclosed; L2/L3 are not claimed for it.**
+- **All 5 organs are SLSA Build L1 honest** (hosted GitHub Actions builder + cosign-signed images, independently verifiable via `cosign verify`). **L2 (isolated, attested build-service provenance) is roadmap via Wire D — not yet claimed. L3 not claimed.**
 - Every artifact is **cosign keyless-signed** against the public Sigstore Rekor transparency log.
 - Verification: `cosign verify ghcr.io/szl-holdings/<organ>:uds-v0.2.0` (organs: a11oy · sentra · amaru · killinchu · rosie).
 - Every governance decision emits an **ECDSA P-256 DSSE-signed receipt** onto a hash-linked Khipu Merkle DAG.
@@ -71,7 +71,7 @@ Air-gap-deployable bundles for all five products: **[uds-bundles](https://github
 - **Apache-2.0** for source code; **CC-BY-4.0** for papers and brand assets.
 - **DCO sign-off required** on every commit.
 - **Section 889** — exactly 5 vendors disclosed: Huawei, ZTE, Hytera, Hikvision, Dahua. No others claimed.
-- **Honest non-claims:** no Iron Bank, no FedRAMP, no CMMC, no SLSA L3 anywhere.
+- **Honest non-claims:** no Iron Bank, no FedRAMP, no CMMC; SLSA L2/L3 are roadmap-only, not yet claimed anywhere.
 
 ### Citation
 

@@ -94,7 +94,8 @@ jobs:
               grep -vE "mis-claimed|corrected|previously.*L[23]|Two SLSA|PRs opened" | \
               grep -viE "path to|transition|target|by v0|lies|purged|fake|→|->|rename badge|committed path" | \
               grep -viE "BANNED|banned|prohibited|forbidden|must be L1|enforce L1|sorry-tag" | \
-              grep -vE "[Hh]onest.*not.*L|not.*[Hh]onest.*L|not.*claimed.*L" \
+              grep -vE "[Hh]onest.*not.*L|not.*[Hh]onest.*L|not.*claimed.*L" | \
+              grep -vE "misstatement|supersedes|PROVENANCE_NOTICE" \
               || true)
           if [ -n "$M3" ]; then
             echo "$M3" | head -10
