@@ -47,6 +47,23 @@ Air-gap-deployable bundles for all five products: **[uds-bundles](https://github
 
 ---
 
+## 3D Visualizations
+
+Interactive Three.js/WebGL explorations of the governance substrate — all static spaces, no login required. Each verified 200.
+
+| Space | What you see | Link |
+|---|---|---|
+| **anatomy-3d** | 3D anatomy of the governed-AI organs — Λ-gate, Khipu DAG, Ouroboros loop | [Open](https://betterwithage-anatomy-3d.static.hf.space) |
+| **rosie-3d** | 3D operator console — live mesh of cross-session receipt routing | [Open](https://betterwithage-rosie-3d.static.hf.space) |
+| **mesh-cathedral** | Ouroboros loop geometry — 5-chakra bounded-recursion visualization | [Open](https://betterwithage-mesh-cathedral.static.hf.space) |
+| **khipu-constellation** | 3D Merkle-DAG receipt visualizer — Khipu knot-graph in space | [Open](https://betterwithage-khipu-constellation.static.hf.space) |
+| **doctrine-cathedral** | 3D doctrine visualization — 749 declarations rendered as cathedral geometry | [Open](https://betterwithage-doctrine-cathedral.static.hf.space) |
+| **llm-router-live** | Live model-routing topology — real-time LLM dispatch mesh | [Open](https://betterwithage-llm-router-live.static.hf.space) |
+
+*Hosted by the `betterwithage` HF org. L1 honest — no FedRAMP/CMMC claims. Λ = Conjecture 1.*
+
+---
+
 ## Technical Depth (for engineers + math reviewers)
 
 *This section is for those who want to verify the claims. Investors can stop reading above this line — the business case is complete.*
