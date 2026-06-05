@@ -35,7 +35,7 @@ Six live Three.js/WebGL explorations of the proof architecture. Static. No login
 
 ## The proof layer — verify it yourself
 
-[![SLSA L1 honest](https://img.shields.io/badge/SLSA-L1%20honest%20(L2%20roadmap)-2C5F2D?style=flat-square)](https://github.com/szl-holdings/.github/blob/main/PROVENANCE_NOTICE.md)
+[![SLSA L1 + L2](https://img.shields.io/badge/SLSA-L1%20%2B%20L2%20attested-2C5F2D?style=flat-square)](https://github.com/szl-holdings/.github/blob/main/PROVENANCE_NOTICE.md)
 [![cosign signed](https://img.shields.io/badge/cosign-keyless%20signed-blueviolet?style=flat-square)](https://docs.sigstore.dev/cosign/signing/overview/)
 [![Rekor](https://img.shields.io/badge/Rekor-transparency%20log-blue?style=flat-square)](https://search.sigstore.dev/)
 [![UDS bundle](https://img.shields.io/badge/UDS%20bundle-szl--mesh%3Av0.4.0-4a4a8a?style=flat-square)](https://github.com/szl-holdings/uds-mesh)
@@ -61,9 +61,9 @@ cosign verify ghcr.io/szl-holdings/a11oy:uds-v0.2.0 \
   --certificate-identity-regexp="^https://github.com/szl-holdings/" \
   --certificate-oidc-issuer="https://token.actions.githubusercontent.com"
 
-# SLSA L2 build-provenance attestation — roadmap via Wire D, NOT yet earned
-# (currently returns "no matching attestations"; do not claim L2 until it passes):
-# cosign verify-attestation --type slsaprovenance ghcr.io/szl-holdings/a11oy:uds-v0.2.0 \
+# SLSA L2 build-provenance attestation — PASSES today: each organ image carries a
+# slsa.dev/provenance/v0.2 DSSE .att referrer (verified 2026-06-05). Strict identity:
+cosign verify-attestation --type slsaprovenance ghcr.io/szl-holdings/a11oy:uds-v0.2.0 \
 #   --certificate-identity-regexp="^https://github.com/szl-holdings/" \
 #   --certificate-oidc-issuer="https://token.actions.githubusercontent.com"
 
@@ -91,7 +91,7 @@ uds-cli bundle deploy szl-mesh-v0.4.0.tar.zst --confirm
 | Claim | Status | Verify |
 |---|---|---|
 | 5 live HF demos | ✅ All HTTP 200 | curl any `/healthz` |
-| SLSA Build L1 honest (L2 roadmap) | ✅ L1 — all 5 organs cosign-signed + Rekor-logged. L2 attestation NOT yet earned (`cosign verify-attestation` returns "no matching attestations") | `cosign verify` above |
+| SLSA Build L1 + L2 | ✅ L1 — all 5 organs cosign-signed + Rekor-logged. ✅ L2 — each organ image carries a `slsa.dev/provenance/v0.2` DSSE `.att` attestation (verified 2026-06-05) | `cosign verify` + `cosign verify-attestation --type slsaprovenance` above |
 | cosign keyless signed | ✅ All 5 organs, Public Good Rekor | `cosign verify` above |
 | UDS bundle published | ✅ `szl-mesh:v0.4.0` on GHCR | `uds deploy oci://ghcr.io/szl-holdings/szl-mesh:v0.4.0` |
 | Lean kernel | ✅ 749 decl / 14 axioms / 163 sorries @ `c7c0ba17` | [`lutar-lean@main`](https://github.com/szl-holdings/lutar-lean) |
@@ -132,7 +132,7 @@ graph LR
 
 ### Supply-chain posture
 
-- **SLSA Build L1 honest (L2 roadmap via Wire D)** — every flagship image is cosign keyless-signed and Rekor-logged (`cosign verify` PASSES). All 5 build workflows have `actions/attest-build-provenance@v2.4.0` wired in `ghcr-build-push.yml`, but the **L2 attestation is NOT yet earned** on the deployed images (`cosign verify-attestation --type slsaprovenance` returns "no matching attestations" — likely org-level `attestations: write` is the remaining founder step). L2 is not claimed until that command passes.
+- **SLSA Build L1 + L2** — every flagship image is cosign keyless-signed and Rekor-logged (`cosign verify` PASSES, L1) AND carries a `slsa.dev/provenance/v0.2` DSSE build-provenance attestation `.att` referrer that verifies via `cosign verify-attestation --type slsaprovenance` (PASSES, L2 — verified across all 5 organ images on 2026-06-05). Note: the mesh BUNDLE (`szl-mesh:0.4.0`) is cosign-**signed** but does not yet carry its own GitHub build-provenance attestation. **L3 is NOT claimed.**
 - **cosign keyless signed** — every image signed via Fulcio OIDC short-lived cert bound to the GitHub Actions workflow identity; entries in public Sigstore Rekor transparency log (indexes above)
 - **UDS bundle `szl-mesh:v0.4.0`** — real baked images (SBOM-only regression fixed); keyless cosign-signed; deployable via `uds deploy oci://...` into any UDS Core cluster
 - **DCO required** on every commit; OpenSSF Scorecard monitored; Trivy + Grype + Gitleaks in CI
@@ -168,6 +168,6 @@ graph LR
 
 ---
 
-<sub>Doctrine v11 LOCKED · 749/14/163 · kernel `c7c0ba17` · Λ = Conjecture 1 (F23 open bounty, not a theorem) · SLSA L1 honest (L2 roadmap via Wire D — not yet earned) · Apache-2.0 code / CC-BY-4.0 papers · DOI [10.5281/zenodo.20434276](https://doi.org/10.5281/zenodo.20434276) · [ORCID 0009-0001-0110-4173](https://orcid.org/0009-0001-0110-4173)</sub>
+<sub>Doctrine v11 LOCKED · 749/14/163 · kernel `c7c0ba17` · Λ = Conjecture 1 (F23 open bounty, not a theorem) · SLSA L1 + L2 (organ images attested · slsa.dev/provenance/v0.2) · Apache-2.0 code / CC-BY-4.0 papers · DOI [10.5281/zenodo.20434276](https://doi.org/10.5281/zenodo.20434276) · [ORCID 0009-0001-0110-4173](https://orcid.org/0009-0001-0110-4173)</sub>
 
 Signed-off-by: stephenlutar2-hash <stephenlutar2@gmail.com>
