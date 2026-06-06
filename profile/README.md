@@ -7,7 +7,7 @@
     Λ-uniqueness = Conjecture 1 (never a theorem)
     SLSA Build L1 + L2 on service images (NOT L3 / FedRAMP / Iron Bank / CMMC)
   Two-product end-state: a11oy (command platform) + killinchu (drones & vessels).
-  Zero user-facing organ (amaru / sentra / rosie) references — capabilities folded in as reasoning / policy / operator.
+  Zero user-facing dead-organ references — internal capabilities are presented as reasoning / policy / operator.
 -->
 
 <div align="center">
