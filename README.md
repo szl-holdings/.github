@@ -112,21 +112,20 @@ Mirrored on Hugging Face: [`SZLHOLDINGS/doctrine-v11`](https://huggingface.co/da
 
 ## Related repositories in the SZL substrate
 
-The 13 substrate repos cross-link reciprocally. This footer is maintained by GH Admin #1 (org-wide).
+The SZL substrate repos cross-link reciprocally. Two live products (a11oy + killinchu) sit on one signed substrate.
 
-- [`a11oy`](https://github.com/szl-holdings/a11oy) — policy + receipt substrate (TypeScript packages, MCP server)
-- [`amaru`](https://github.com/szl-holdings/amaru) — cortex memory + reasoner (FastAPI, 7-chakra runtime, DSSE receipts)
-- [`rosie`](https://github.com/szl-holdings/rosie) — operator console + receipt stream UI
-- [`sentra`](https://github.com/szl-holdings/sentra) — immune / red-team (egress inspector + tripwires, Wire B live)
-- [`uds-mesh`](https://github.com/szl-holdings/uds-mesh) — UDS span schemas + governance receipts
-- [`lutar-lean`](https://github.com/szl-holdings/lutar-lean) — Lean 4 + Mathlib proofs of the Λ aggregator (749 decl / 14 axioms / 163 sorries)
+- [`a11oy`](https://github.com/szl-holdings/a11oy) — command platform; signed-receipt substrate with built-in reasoning, policy & operator capabilities (TypeScript packages, MCP server)
+- [`killinchu`](https://github.com/szl-holdings/killinchu) — drones & vessels field tool; counter-UAS + maritime picture; DSSE receipt per engagement
+- [`lutar-lean`](https://github.com/szl-holdings/lutar-lean) — Lean 4 + Mathlib proofs of the Λ aggregator (749 decl / 14 axioms / 163 sorries; 5 formulas proven, Λ = Conjecture 1)
+- [`szl-papers`](https://github.com/szl-holdings/szl-papers) — DOI-pinned thesis lineage (v1 → v23)
 - [`ouroboros`](https://github.com/szl-holdings/ouroboros) — bounded-recursion runtime
-- [`ouroboros-thesis`](https://github.com/szl-holdings/ouroboros-thesis) — DOI-pinned thesis substrate (v3 → v18)
 - [`platform`](https://github.com/szl-holdings/platform) — composing monorepo for the substrate runtime
-- [`szl-brand`](https://github.com/szl-holdings/szl-brand) — anatomy + visual doctrine (PDFs hosted in-repo)
-- [`szl-cookbook`](https://github.com/szl-holdings/szl-cookbook) — governed-AI recipes
-- [`agi-forecast`](https://github.com/szl-holdings/agi-forecast) — PAC-Bayes + Bekenstein governance-trajectory forecasts
+- [`uds-mesh`](https://github.com/szl-holdings/uds-mesh) — UDS span schemas + governance receipts
+- [`uds-bundles`](https://github.com/szl-holdings/uds-bundles) · [`szl-mesh`](https://github.com/szl-holdings/szl-mesh) — signed, airgap-deployable mesh bundle
+- [`hatun-mcp`](https://github.com/szl-holdings/hatun-mcp) — doctrine-aware Model Context Protocol server
 - [`vsp-otel`](https://github.com/szl-holdings/vsp-otel) — OpenTelemetry exporter for Λ-axis spans
+- [`developers`](https://github.com/szl-holdings/developers) · [`docs-site`](https://github.com/szl-holdings/docs-site) · [`szl-cookbook`](https://github.com/szl-holdings/szl-cookbook) — build-on-SZL hub, docs & recipes
+- [`szl-trust`](https://github.com/szl-holdings/szl-trust) — public proof portal · [`khipu-consensus`](https://github.com/szl-holdings/khipu-consensus) — BFT witnessing
 
 Org page: [github.com/szl-holdings](https://github.com/szl-holdings) · Doctrine v11 · 14 unique axioms · 749 declarations · 163 sorries · DOI [`10.5281/zenodo.20434276`](https://doi.org/10.5281/zenodo.20434276)
 
@@ -134,4 +133,5 @@ Org page: [github.com/szl-holdings](https://github.com/szl-holdings) · Doctrine
 
 ![SZL Holdings](./branding/szl-avatar-animated.gif)
 
-*Amaru — the Inca avatar of SZL Holdings. Animated mark (400×400, 16fps loop). Signed Yachay.*
+*The SZL Holdings animated mark (400×400, 16fps loop). Signed Yachay.*
+
