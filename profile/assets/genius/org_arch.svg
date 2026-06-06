@@ -47,7 +47,7 @@
     <circle cx="-34" cy="0" r="4" fill="#5ad1ff">
       <animate attributeName="r" values="3;5.5;3" dur="2.4s" repeatCount="indefinite"/>
     </circle>
-    <text class="nl" y="5">sentra</text>
+    <text class="nl" y="5">policy</text>
   </g>
   <g transform="translate(560,230)" text-anchor="middle">
     <rect x="-48" y="-22" width="96" height="44" rx="11" fill="#0d1322" stroke="#5ad1ff" stroke-width="1.6">
@@ -56,7 +56,7 @@
     <circle cx="-34" cy="0" r="4" fill="#5ad1ff">
       <animate attributeName="r" values="3;5.5;3" dur="2.6s" repeatCount="indefinite"/>
     </circle>
-    <text class="nl" y="5">amaru</text>
+    <text class="nl" y="5">reasoning</text>
   </g>
   <g transform="translate(780,180)" text-anchor="middle">
     <rect x="-48" y="-22" width="96" height="44" rx="11" fill="#0d1322" stroke="#8b7bff" stroke-width="1.6">
@@ -65,7 +65,7 @@
     <circle cx="-34" cy="0" r="4" fill="#8b7bff">
       <animate attributeName="r" values="3;5.5;3" dur="2.8s" repeatCount="indefinite"/>
     </circle>
-    <text class="nl" y="5">rosie</text>
+    <text class="nl" y="5">operator</text>
   </g>
   <g transform="translate(560,280)" text-anchor="middle">
     <rect x="-62" y="-22" width="125" height="44" rx="11" fill="#0d1322" stroke="#7CFFB2" stroke-width="1.6">
