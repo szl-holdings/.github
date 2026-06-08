@@ -1,0 +1,96 @@
+name: Reusable — Lockfile Registry Check
+
+# Per-repo fail-fast guard for the Task #308 drift: a lockfile generated inside
+# the Replit sandbox bakes `resolved` URLs pointing at Replit's internal package
+# mirror (http://package-firewall.replit.local/npm/...). Those `*.replit.local`
+# hosts do NOT resolve on GitHub runners, so `npm install` / `pnpm install` fails
+# with EAI_AGAIN and any workflow depending on the install step goes red.
+#
+# A repo wires this into its own CI so a poisoned lockfile fails the PR/push that
+# introduces it — before it ever lands on main. It checks out the CALLER repo and
+# greps its committed lockfiles; no token and no network are required. (The org's
+# scheduled scanner, lockfile-registry-check.yml, is the catch-all safety net.)
+#
+# Wire it up from a consuming repo, e.g.:
+#   jobs:
+#     lockfiles:
+#       uses: szl-holdings/.github/.github/workflows/reusable-lockfile-registry-check.yml@main
+#
+# The check is a self-contained grep so it works even in a repo that does not
+# vendor the python script. The accompanying script
+# (.github/scripts/lockfile_registry_check.py) offers a `--fix` mode that rewrites
+# the host back to https://registry.npmjs.org/ (tarball + integrity sha unchanged).
+
+on:
+  workflow_call:
+    inputs:
+      paths:
+        description: >-
+          Optional newline- or space-separated list of lockfile globs to scan.
+          Defaults to all package-lock.json / npm-shrinkwrap.json /
+          pnpm-lock.yaml / yarn.lock files outside node_modules.
+        required: false
+        type: string
+        default: ""
+
+permissions:
+  contents: read
+
+jobs:
+  scan:
+    name: No lockfile references a Replit-internal registry host
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Harden runner
+        uses: step-security/harden-runner@9af89fc71515a100421586dfdb3dc9c984fbf411 # v2.19.4
+        with:
+          egress-policy: audit
+
+      - name: Checkout caller
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+
+      - name: Grep committed lockfiles for *.replit.local hosts
+        shell: bash
+        run: |
+          set -euo pipefail
+          # Collect lockfiles (skip node_modules and .git).
+          mapfile -t files < <(find . \
+            -path ./node_modules -prune -o \
+            -path ./.git -prune -o \
+            -type f \( \
+              -name package-lock.json -o \
+              -name npm-shrinkwrap.json -o \
+              -name pnpm-lock.yaml -o \
+              -name yarn.lock \
+            \) -print | sed 's#^\./##' | sort)
+
+          if [ "${#files[@]}" -eq 0 ]; then
+            echo "✓ No lockfiles found to scan."
+            exit 0
+          fi
+
+          echo "Scanning ${#files[@]} lockfile(s):"
+          printf '  - %s\n' "${files[@]}"
+
+          # Any host ending in .replit.local is an internal Replit mirror.
+          pattern='[A-Za-z0-9_.-]+\.replit\.local'
+          found=0
+          for f in "${files[@]}"; do
+            if hits="$(grep -Eo "$pattern" "$f" | sort -u)"; [ -n "$hits" ]; then
+              found=1
+              joined="$(echo "$hits" | paste -sd', ' -)"
+              echo "::error file=${f}::References Replit-internal registry host(s): ${joined}. These do not resolve on GitHub runners and break npm/pnpm install. Rewrite to https://registry.npmjs.org/ (integrity sha unchanged)."
+            fi
+          done
+
+          if [ "$found" -ne 0 ]; then
+            echo "::error::One or more lockfiles reference a Replit-internal (*.replit.local) registry host."
+            echo "Fix (safe — the tarball content and integrity sha are identical, only the mirror host differs):"
+            echo "  sed -i 's#https\\?://[A-Za-z0-9_.-]*\\.replit\\.local/npm/#https://registry.npmjs.org/#g' <lockfile>"
+            echo "or, with the org script:"
+            echo "  python3 lockfile_registry_check.py --local . --fix"
+            exit 1
+          fi
+
+          echo "✓ No lockfile references a Replit-internal registry host."

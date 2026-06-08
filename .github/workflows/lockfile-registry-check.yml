@@ -1,0 +1,109 @@
+name: Lockfile Registry Check
+
+# Task #308 class of drift: a lockfile (package-lock.json / npm-shrinkwrap.json /
+# pnpm-lock.yaml / yarn.lock) generated inside the Replit sandbox bakes `resolved`
+# URLs pointing at Replit's internal package mirror
+# (http://package-firewall.replit.local/npm/...). Those hosts do NOT resolve on
+# GitHub runners, so `npm install` / `pnpm install` fails with
+# `EAI_AGAIN getaddrinfo package-firewall.replit.local` and any workflow that
+# depends on the install step goes permanently red — silently starving whatever
+# it gates (this is exactly how the docs-site security-audit gate was starved).
+# The failure looks like a flaky network error, not a committed-artifact bug.
+#
+# This job runs .github/scripts/lockfile_registry_check.py across every PUBLIC
+# repo in the org, scanning committed lockfiles for any `*.replit.local` host and
+# FAILING if any are found. The fix is safe and mechanical: rewrite the host back
+# to https://registry.npmjs.org/ (tarball + integrity sha are identical). For a
+# per-repo fail-fast gate that catches a poisoned lockfile on the PR/push that
+# introduces it (before it ever lands on main), repos call
+# .github/workflows/reusable-lockfile-registry-check.yml from their own CI.
+#
+# Public repo listing + git-tree + raw contents read fine with the built-in
+# GITHUB_TOKEN; SZL_GITHUB_TOKEN is used when present (org-owner) but not required.
+
+on:
+  schedule:
+    # Weekly sweep (Mondays 07:53 UTC) so a poisoned lockfile pushed anywhere in
+    # the org is caught fast even when idle.
+    - cron: "53 7 * * 1"
+  workflow_dispatch: {}
+  push:
+    branches: [main]
+    paths:
+      - ".github/scripts/lockfile_registry_check.py"
+      - ".github/data/lockfile_registry_allowlist.json"
+      - ".github/workflows/lockfile-registry-check.yml"
+  workflow_call: {}
+
+permissions:
+  contents: read
+
+concurrency:
+  group: lockfile-registry-check-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    name: No lockfile references a Replit-internal registry host
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write # only to commit the refreshed report in szl-holdings/.github
+    steps:
+      - name: Harden runner
+        uses: step-security/harden-runner@9af89fc71515a100421586dfdb3dc9c984fbf411 # v2.19.4
+        with:
+          egress-policy: audit
+
+      - name: Checkout
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+
+      - name: Set up Python
+        uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6.2.0
+        with:
+          python-version: "3.12"
+
+      - name: Scan org lockfiles for Replit-internal registry hosts
+        env:
+          # SZL_GITHUB_TOKEN (org-owner) if present lets the scan also see the
+          # public repo listing without the built-in token's rate limits; the
+          # built-in token is a sufficient fallback (all scanned repos are public).
+          SZL_GITHUB_TOKEN: ${{ secrets.SZL_GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          set +e
+          python3 .github/scripts/lockfile_registry_check.py \
+            --include-archived \
+            --report .github/data/lockfile_registry_report.json
+          echo "CHECK_EXIT=$?" >> "$GITHUB_ENV"
+
+      - name: Commit refreshed report if changed
+        # Best-effort: if main is protected (or the token can't push), this must
+        # NOT mask the real signal. The drift gate below is the source of truth.
+        continue-on-error: true
+        if: github.repository == 'szl-holdings/.github' && github.event_name != 'pull_request'
+        run: |
+          if git diff --quiet -- .github/data/lockfile_registry_report.json; then
+            echo "Report unchanged; nothing to commit."
+            exit 0
+          fi
+          git config user.name "Stephen P. Lutar Jr."
+          git config user.email "stephenlutar2@gmail.com"
+          git add .github/data/lockfile_registry_report.json
+          git commit -s -m "chore(lockfile): refresh lockfile-registry report [skip ci]"
+          git push
+
+      - name: Fail if any lockfile references a Replit-internal registry host
+        run: |
+          if [ "${CHECK_EXIT:-1}" != "0" ]; then
+            echo "::error::A committed lockfile references a Replit-internal"
+            echo "::error::(*.replit.local) registry host, which breaks npm/pnpm"
+            echo "::error::install on GitHub runners. See the annotations above and"
+            echo "::error::.github/data/lockfile_registry_report.json."
+            echo "::error::Fix (safe — integrity sha is unchanged): rewrite the host"
+            echo "::error::to https://registry.npmjs.org/, e.g. run"
+            echo "::error::  python3 .github/scripts/lockfile_registry_check.py --local . --fix"
+            echo "::error::then commit the rewritten lockfile."
+            exit 1
+          fi
+          echo "✓ No committed lockfile references a Replit-internal registry host."

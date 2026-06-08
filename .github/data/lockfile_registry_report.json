@@ -1,0 +1,203 @@
+{
+  "schema": "szl.lockfile_registry/v1",
+  "mode": "org",
+  "org": "szl-holdings",
+  "checked_at_utc": "2026-06-08T21:25:27Z",
+  "include_archived": true,
+  "summary": {
+    "checked": 27,
+    "ok": 27,
+    "error": 0
+  },
+  "results": [
+    {
+      "repo": ".github",
+      "archived": false,
+      "default_branch": "main",
+      "status": "OK",
+      "findings": []
+    },
+    {
+      "repo": "a11oy",
+      "archived": false,
+      "default_branch": "main",
+      "status": "OK",
+      "findings": []
+    },
+    {
+      "repo": "developers",
+      "archived": false,
+      "default_branch": "main",
+      "status": "OK",
+      "findings": []
+    },
+    {
+      "repo": "docs-site",
+      "archived": false,
+      "default_branch": "main",
+      "status": "OK",
+      "findings": []
+    },
+    {
+      "repo": "hatun-mcp",
+      "archived": false,
+      "default_branch": "main",
+      "status": "OK",
+      "findings": []
+    },
+    {
+      "repo": "khipu-consensus",
+      "archived": false,
+      "default_branch": "main",
+      "status": "OK",
+      "findings": []
+    },
+    {
+      "repo": "killinchu",
+      "archived": false,
+      "default_branch": "main",
+      "status": "OK",
+      "findings": []
+    },
+    {
+      "repo": "lambda-bounty",
+      "archived": true,
+      "default_branch": "main",
+      "status": "OK",
+      "findings": []
+    },
+    {
+      "repo": "lean-kernel",
+      "archived": false,
+      "default_branch": "main",
+      "status": "OK",
+      "findings": []
+    },
+    {
+      "repo": "lutar-lean",
+      "archived": false,
+      "default_branch": "main",
+      "status": "OK",
+      "findings": []
+    },
+    {
+      "repo": "ouroboros",
+      "archived": false,
+      "default_branch": "main",
+      "status": "OK",
+      "findings": []
+    },
+    {
+      "repo": "platform",
+      "archived": false,
+      "default_branch": "main",
+      "status": "OK",
+      "findings": []
+    },
+    {
+      "repo": "szl-brand",
+      "archived": false,
+      "default_branch": "main",
+      "status": "OK",
+      "findings": []
+    },
+    {
+      "repo": "szl-build-env",
+      "archived": false,
+      "default_branch": "main",
+      "status": "OK",
+      "findings": []
+    },
+    {
+      "repo": "szl-cookbook",
+      "archived": false,
+      "default_branch": "main",
+      "status": "OK",
+      "findings": []
+    },
+    {
+      "repo": "szl-doctrine",
+      "archived": false,
+      "default_branch": "main",
+      "status": "OK",
+      "findings": []
+    },
+    {
+      "repo": "szl-fleet-overlay",
+      "archived": false,
+      "default_branch": "main",
+      "status": "OK",
+      "findings": []
+    },
+    {
+      "repo": "szl-lake",
+      "archived": false,
+      "default_branch": "main",
+      "status": "OK",
+      "findings": []
+    },
+    {
+      "repo": "szl-mesh",
+      "archived": false,
+      "default_branch": "main",
+      "status": "OK",
+      "findings": []
+    },
+    {
+      "repo": "szl-papers",
+      "archived": false,
+      "default_branch": "main",
+      "status": "OK",
+      "findings": []
+    },
+    {
+      "repo": "szl-trust",
+      "archived": false,
+      "default_branch": "main",
+      "status": "OK",
+      "findings": []
+    },
+    {
+      "repo": "szl-uds-deployment",
+      "archived": false,
+      "default_branch": "main",
+      "status": "OK",
+      "findings": []
+    },
+    {
+      "repo": "szlholdings-site",
+      "archived": false,
+      "default_branch": "main",
+      "status": "OK",
+      "findings": []
+    },
+    {
+      "repo": "uds-bundles",
+      "archived": false,
+      "default_branch": "main",
+      "status": "OK",
+      "findings": []
+    },
+    {
+      "repo": "uds-mesh",
+      "archived": false,
+      "default_branch": "main",
+      "status": "OK",
+      "findings": []
+    },
+    {
+      "repo": "vsp-otel",
+      "archived": false,
+      "default_branch": "main",
+      "status": "OK",
+      "findings": []
+    },
+    {
+      "repo": "warhacker-demo",
+      "archived": false,
+      "default_branch": "main",
+      "status": "OK",
+      "findings": []
+    }
+  ]
+}

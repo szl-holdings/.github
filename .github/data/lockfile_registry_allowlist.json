@@ -1,0 +1,5 @@
+{
+  "_comment": "Intentional, reasoned exceptions for the lockfile registry-host checker (see .github/scripts/lockfile_registry_check.py). The checker fails on any committed lockfile (package-lock.json / npm-shrinkwrap.json / pnpm-lock.yaml / yarn.lock) that references a Replit-internal '*.replit.local' registry host, because those hosts do not resolve on GitHub runners and break npm/pnpm install. There is no legitimate reason for a '*.replit.local' host in a committed lockfile, so this allowlist is expected to stay empty; entries exist only as an escape hatch. 'ignore_repos' skips a whole repo by name; 'ignore_paths' skips a specific lockfile path (use sparingly, with a reason).",
+  "ignore_repos": [],
+  "ignore_paths": []
+}
