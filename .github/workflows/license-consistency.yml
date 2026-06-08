@@ -64,6 +64,9 @@ jobs:
           echo "CHECK_EXIT=$?" >> "$GITHUB_ENV"
 
       - name: Commit refreshed report if changed
+        # Best-effort: if main is protected (or the token can't push), this must
+        # NOT mask the real signal. The drift gate below is the source of truth.
+        continue-on-error: true
         if: github.repository == 'szl-holdings/.github' && github.event_name != 'pull_request'
         run: |
           if git diff --quiet -- .github/data/license_consistency_report.json; then
