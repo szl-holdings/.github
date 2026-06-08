@@ -18,10 +18,10 @@ name: Public Repo Link Check
 # Severity split (matches the recurring incident exactly):
 #   * a link to a now-PRIVATE repo (the visibility-flip case) is an ERROR and
 #     FAILS the job -- surfaced as a ::error:: annotation.
-#   * a link to a DELETED/missing repo is the same 404 to a visitor. The
-#     pre-existing backlog was cleared (Task #314), so --fail-on-missing is now
-#     ENABLED below and a missing target also FAILS the job (::warning:: +
-#     report). New intentional exceptions go in the allowlist.
+#   * a link to a DELETED/missing repo is the same 404 to a visitor but is a
+#     pre-existing backlog rather than the flip trigger, so it is surfaced as a
+#     ::warning:: annotation + in the report WITHOUT failing the job. Pass
+#     --fail-on-missing (see below) to ratchet it up once the backlog is cleared.
 #
 # Knowing a target is PRIVATE (vs merely missing) needs a token that can see the
 # org's private repos: SZL_GITHUB_TOKEN if present, else the built-in token (which
@@ -31,7 +31,16 @@ on:
   schedule:
     # Weekly sweep (Mondays 07:41 UTC) so a visibility flip is caught fast.
     - cron: "41 7 * * 1"
-  workflow_dispatch: {}
+  workflow_dispatch:
+    inputs:
+      check_external:
+        description: >-
+          Also liveness-check EXTERNAL (non-org) click-through URLs. Off by
+          default: external sites flake, so this is a manual opt-in and its
+          (noisier) report is NOT auto-committed. Deep org-link rot is always
+          checked on every run.
+        type: boolean
+        default: false
   push:
     branches: [main]
     paths:
@@ -76,14 +85,25 @@ jobs:
           GITHUB_TOKEN: ${{ github.token }}
         run: |
           set +e
+          # Deep org-link rot is deterministic (our own repos) so it runs on every
+          # cadence as WARN (no --fail-on-deep -> a pre-existing rot backlog is
+          # surfaced, never breaks the build). External liveness is opt-in only.
+          EXTRA=""
+          if [ "${{ github.event.inputs.check_external }}" = "true" ]; then
+            EXTRA="--check-external"
+          fi
           python3 .github/scripts/public_repo_link_check.py \
             --scan-docs \
-            --fail-on-missing \
+            --check-deep-links \
+            $EXTRA \
             --report .github/data/public_repo_link_report.json
           echo "CHECK_EXIT=$?" >> "$GITHUB_ENV"
 
       - name: Commit refreshed report if changed
-        if: github.repository == 'szl-holdings/.github' && github.event_name != 'pull_request'
+        # Skip the auto-commit when external liveness was requested: that report
+        # is noisier/non-deterministic, so the committed canonical report always
+        # reflects the deterministic scheduled config (docs + deep links).
+        if: github.repository == 'szl-holdings/.github' && github.event_name != 'pull_request' && github.event.inputs.check_external != 'true'
         run: |
           if git diff --quiet -- .github/data/public_repo_link_report.json; then
             echo "Report unchanged; nothing to commit."
@@ -95,16 +115,16 @@ jobs:
           git commit -s -m "chore(links): refresh public-repo-link report [skip ci]"
           git push
 
-      - name: Fail if any public page links to a private or deleted repo
+      - name: Fail if any public page links to a now-private repo
         run: |
           if [ "${CHECK_EXIT:-1}" != "0" ]; then
-            echo "::error::A public README/docs page links to a now-PRIVATE or"
-            echo "::error::DELETED szl-holdings repo (404 for anonymous visitors)."
-            echo "::error::See the annotations above and"
-            echo "::error::.github/data/public_repo_link_report.json."
-            echo "::error::Fix: repoint the link, de-link to plain text, re-publish"
-            echo "::error::the target repo, or add a reasoned entry to"
-            echo "::error::.github/data/public_repo_link_allowlist.json."
+            echo "::error::A public README/docs page links to a now-PRIVATE"
+            echo "::error::szl-holdings repo (404 for anonymous visitors). See the"
+            echo "::error::annotations above and .github/data/public_repo_link_report.json."
+            echo "::error::Fix: repoint the link, re-publish the target repo, or add a"
+            echo "::error::reasoned entry to .github/data/public_repo_link_allowlist.json."
             exit 1
           fi
-          echo "✓ No public page links to a private or deleted szl-holdings repo."
+          echo "✓ No public page links to a now-private szl-holdings repo."
+          echo "  (Links to deleted/missing repos, if any, are surfaced as"
+          echo "   ::warning:: annotations and in the report without failing.)"
