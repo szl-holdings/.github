@@ -26,14 +26,14 @@ jobs:
   trivy:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
 
       - name: Trivy filesystem scan (SARIF)
         # SARIF generation feeds Code Scanning and is advisory; a transient DB
         # download hiccup here must not fail the job. The CRITICAL+HIGH fail
         # gate below (if: always()) is the authoritative pass/fail signal.
         continue-on-error: true
-        uses: aquasecurity/trivy-action@b6643a29fecd7f34b3597bc6acb0a98b03d33ff8 # v0.33.1
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         env:
           GITHUB_TOKEN: ${{ github.token }}
         with:
@@ -54,14 +54,14 @@ jobs:
           fi
 
       - name: Upload SARIF to Code Scanning
-        uses: github/codeql-action/upload-sarif@87557b9c84dde89fdd9b10e88954ac2f4248e463 # v4.36.1
+        uses: github/codeql-action/upload-sarif@8aad20d150bbac5944a9f9d289da16a4b0d87c1e # v4.36.2
         if: always()
         with:
           sarif_file: trivy-results.sarif
 
       - name: Trivy fail gate (CRITICAL+HIGH)
         if: always()
-        uses: aquasecurity/trivy-action@b6643a29fecd7f34b3597bc6acb0a98b03d33ff8 # v0.33.1
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         env:
           GITHUB_TOKEN: ${{ github.token }}
         with:
