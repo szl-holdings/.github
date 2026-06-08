@@ -5,11 +5,13 @@
     LOCKED kernel (source of truth: lutar-lean@main, kernel c7c0ba17, Lean v4.13.0):
       749 declarations · 14 unique axioms · 163 tracked sorries
       locked-proven = EXACTLY 5 formulas {F1, F11, F12, F18, F19} (machine-enforced, no-axiom theorem)
-    EXPERIMENTAL tier (CI-green on main, Lean v4.18.0):
-      ~119 kernel-clean theorems across Waves 11-19; every #print axioms ⊆ {propext, Classical.choice, Quot.sound}.
+    EXPERIMENTAL tier (CI-green on main @ 880c803e, Lean v4.18.0):
+      ~170 kernel-clean theorems across Waves 11-21; every #print axioms ⊆ {propext, Classical.choice, Quot.sound}.
       Kernel-verified, CI-green, NEVER folded into the locked count.
     Λ-uniqueness = Conjecture 1 (unconditional uniqueness machine-checked FALSE);
       proven CONDITIONAL on slice-multiplicativity/separability (CUT-2, axiom-free).
+      CUT-1: conditional Λ-uniqueness chain now AXIOM-CLEAN END-TO-END on stated hyps (Waves 19-21);
+      reduced to ONE honest structural hypothesis ((C-order) gap-shift ordering, documented NOT faked).
     Byzantine BFT safety = Conjecture 2 (faulty organ can equivocate).
     SLSA = Build L1 honest posture / L2 build-attestation present; L2-verified + L3 + FedRAMP = roadmap
       (NOT L2-verified / L3 / FedRAMP / Iron Bank / CMMC).
@@ -28,7 +30,7 @@
 
 **Every AI decision becomes a cryptographically signed, replayable, tamper-evident receipt** — accountability that no observability or AI-security incumbent ships today. Two live products run on one substrate.
 
-[![Lean 4 proofs](https://img.shields.io/badge/Lean%204-5%20locked%20%2B%20~119%20experimental-c9b787?style=flat-square)](https://github.com/szl-holdings/lutar-lean)
+[![Lean 4 proofs](https://img.shields.io/badge/Lean%204-5%20locked%20%2B%20~170%20experimental-c9b787?style=flat-square)](https://github.com/szl-holdings/lutar-lean)
 [![SLSA Build L1 honest](https://img.shields.io/badge/SLSA-Build%20L1%20honest%20%C2%B7%20L2%20roadmap-2C5F2D?style=flat-square)](https://slsa.dev/spec/v1.0/levels)
 [![cosign keyless](https://img.shields.io/badge/cosign-keyless%20signed-7C3AED?style=flat-square)](https://search.sigstore.dev/)
 [![Λ = Conjecture 1](https://img.shields.io/badge/%CE%9B-Conjecture%201-b3541e?style=flat-square)](https://github.com/szl-holdings/lutar-lean/blob/main/BOUNTY.md)
@@ -57,7 +59,7 @@
 | Layer | Repos | What it provides | Maturity (honest) |
 |---|---|---|---|
 | **Flagship apps** | [a11oy](https://github.com/szl-holdings/a11oy) · [killinchu](https://github.com/szl-holdings/killinchu) | Governed-AI command platform (incl. `a11oy.code`) · maritime + counter-UAS C2 | **Live** (HF Spaces); receipts signed where a key is present |
-| **Formal-methods spine** | [lutar-lean](https://github.com/szl-holdings/lutar-lean) · [lean-kernel](https://github.com/szl-holdings/lean-kernel) · [lambda-bounty](https://github.com/szl-holdings/lambda-bounty) | Lean 4 + Mathlib proofs: **locked-5** {F1,F11,F12,F18,F19} · **~119-theorem experimental tier (Waves 11–19)** · Λ **Conjecture 1** | 5 locked-proven + experimental CI-green; Λ conditional only |
+| **Formal-methods spine** | [lutar-lean](https://github.com/szl-holdings/lutar-lean) · [lean-kernel](https://github.com/szl-holdings/lean-kernel) · [lambda-bounty](https://github.com/szl-holdings/lambda-bounty) | Lean 4 + Mathlib proofs: **locked-5** {F1,F11,F12,F18,F19} · **~170-theorem experimental tier (Waves 11–21)** · Λ **Conjecture 1** | 5 locked-proven + experimental CI-green; Λ conditional only |
 | **Bounded-recursion runtime** | [ouroboros](https://github.com/szl-holdings/ouroboros) · [platform](https://github.com/szl-holdings/platform) | Agent loop with proven early-exit / convergence envelope; substrate monorepo | Reference runtime; dual-witness receipts |
 | **Receipt / lake / trust** | [szl-lake](https://github.com/szl-holdings/szl-lake) · [szl-trust](https://github.com/szl-holdings/szl-trust) · [khipu-consensus](https://github.com/szl-holdings/khipu-consensus) | Append-only DSSE receipt store · public proof portal · 3-of-4 witness quorum | Append-only, tamper-evident, offline-verifiable; BFT safety = **Conjecture 2** |
 | **Mesh / observability** | [szl-mesh](https://github.com/szl-holdings/szl-mesh) · [uds-mesh](https://github.com/szl-holdings/uds-mesh) · [vsp-otel](https://github.com/szl-holdings/vsp-otel) | Doctrine-pinned CRDT mesh · span schemas · Λ-signed OTel exporter | Schemas + exporter shipped |
@@ -91,7 +93,7 @@ Read the full thesis → [szl-papers](https://github.com/szl-holdings/szl-papers
 
 ## Proven formulas — what is machine-checked, and exactly how far
 
-The honest core never moves. **Exactly 5 formulas are formally proven and locked** {`F1, F11, F12, F18, F19`} in the kernel (`c7c0ba17`, `749 / 14 / 163`, Lean `v4.13.0`, `lake build` clean) — machine-enforced by `locked_count_five` (depends on **no** axioms). On top of that floor, a larger experimental tier is **kernel-clean and CI-green on `main`** (Lean `v4.18.0`): **~119 theorems across Waves 11–19**, every one with `#print axioms ⊆ {propext, Classical.choice, Quot.sound}` — no new axiom, no `sorry`. Experimental results are labeled as such and are **never** folded into the locked count.
+The honest core never moves. **Exactly 5 formulas are formally proven and locked** {`F1, F11, F12, F18, F19`} in the kernel (`c7c0ba17`, `749 / 14 / 163`, Lean `v4.13.0`, `lake build` clean) — machine-enforced by `locked_count_five` (depends on **no** axioms). On top of that floor, a larger experimental tier is **kernel-clean and CI-green on `main`** (`880c803e`, Lean `v4.18.0`): **~170 theorems across Waves 11–21**, every one with `#print axioms ⊆ {propext, Classical.choice, Quot.sound}` — no new axiom, no `sorry`. Experimental results are labeled as such and are **never** folded into the locked count.
 
 ### Locked kernel — proven, sorry-free (exactly 5, machine-enforced)
 
@@ -101,7 +103,7 @@ The honest core never moves. **Exactly 5 formulas are formally proven and locked
 
 The count of **exactly 5** is itself a Lean theorem (`locked_count_five`, depends on **no** axioms) — the locked set cannot silently grow.
 
-### Experimental tier — kernel-clean, CI-green (Waves 11–19, ~119 theorems) — NOT in the locked 5
+### Experimental tier — kernel-clean, CI-green (Waves 11–21, ~170 theorems) — NOT in the locked 5
 
 | Wave / result | What it is |
 |---|---|
@@ -112,11 +114,12 @@ The count of **exactly 5** is itself a Lean theorem (`locked_count_five`, depend
 | **Wave 15 — CF-22** | `dpo_klDivergence_nonneg_on_simplex`: conditionally **repairs** the FALSE-as-stated DPO axiom (KL ≥ 0 **on the simplex**), axiom-free |
 | **Wave 16** | CF-23 binary-KL crux, CF-24 `geoBin` satisfies full Aczel quasi-arithmetic axioms (real CUT-1 progress), CF-25 Λ scale-invariance, CF-26 place-value |
 | **Wave 17 — CF-23** | **full binary Pinsker** `binary_pinsker`: `2(p−q)² ≤ KL` — the long-sought headline; CF-27 monotone-DEQ unique equilibrium; CF-28 recurrent-depth contraction |
-| **Waves 18–19** | continued CUT-1 reduction — the full Λ-uniqueness route now hinges on **one published lemma**, `dyadic_image_dense` (BKS, [arXiv:2208.07083](https://arxiv.org/abs/2208.07083)) |
+| **Waves 18–19** | BKS density engine — disjoint-opens / accumulation-uncountable / dyadic-image-dense; continued CUT-1 reduction |
+| **Waves 20–21** | closed the CUT-1 `(B)`-residual via monotone-extension uncountability (no perfect-set machinery); the **conditional Λ-uniqueness chain is now axiom-clean end-to-end** on its stated hypotheses. The remaining `(C-order)` gap-shift ordering is an **honest structural hypothesis** (BKS Fourth-step eqs 8–9, [arXiv:2208.07083](https://arxiv.org/abs/2208.07083)) — documented, not faked |
 
 ### Λ — the honest line on uniqueness
 
-> **What we proved:** the strongest **axiom-free conditional** uniqueness — any A1–A5 aggregator whose per-axis slices are multiplicative / separable **equals Λ** (`lambda_unique_of_separable`, **CUT-2**, no new axiom token), CI-green. All Λ-impostor deaths (AM, HM, PM², max, min) are axiom-free. The remaining unconditional route is now reduced to **one published lemma**, `dyadic_image_dense` (BKS, [arXiv:2208.07083](https://arxiv.org/abs/2208.07083)).
+> **What we proved:** the strongest **axiom-free conditional** uniqueness — any A1–A5 aggregator whose per-axis slices are multiplicative / separable **equals Λ** (`lambda_unique_of_separable`, **CUT-2**, no new axiom token), CI-green. All Λ-impostor deaths (AM, HM, PM², max, min) are axiom-free. As of Waves 19–21 the **conditional Λ-uniqueness chain is axiom-clean end-to-end** on its stated hypotheses; it now rests on **one honest structural hypothesis** — the `(C-order)` gap-shift ordering (BKS, [arXiv:2208.07083](https://arxiv.org/abs/2208.07083)), documented and not faked.
 >
 > **What we don't claim:** unconditional uniqueness under the base axioms A1–A5. That statement is **machine-checked false** (`Round13.maxAgg_ne_Lambda`). Λ-uniqueness therefore stays **Conjecture 1** — never a theorem. Open bounty: [BOUNTY.md](https://github.com/szl-holdings/lutar-lean/blob/main/BOUNTY.md).
 
@@ -145,13 +148,13 @@ We surface only what is machine-checked as fact. Everything else is labeled hone
 
 | We claim | We do **not** claim |
 |---|---|
-| **Exactly 5 formulas formally proven & locked in Lean** (machine-checked, sorry-free): `F1, F11, F12, F18, F19` — the count is itself a no-axiom Lean theorem. Plus a **~119-theorem experimental tier, kernel-clean & CI-green on `main` across Waves 11–19** (every `#print axioms ⊆ {propext, Classical.choice, Quot.sound}`), labeled experimental. | The remaining formulas as "proven." The experimental theorems are **experimental / CI-green**, labeled as such — never folded into the locked five. |
-| **Λ uniqueness is Conjecture 1** unconditionally. It is proven **CONDITIONAL** on slice-multiplicativity (separability) under {A1,A2,A3,A5}, axiom-free — **CUT-2** (`lambda_unique_of_separable`); the unconditional route is reduced to one published lemma (`dyadic_image_dense`). | Λ as an unconditional theorem. Unconditional uniqueness is machine-checked **false** (`Round13.maxAgg_ne_Lambda`). **Byzantine BFT safety is Conjecture 2**, not a theorem. |
+| **Exactly 5 formulas formally proven & locked in Lean** (machine-checked, sorry-free): `F1, F11, F12, F18, F19` — the count is itself a no-axiom Lean theorem. Plus a **~170-theorem experimental tier, kernel-clean & CI-green on `main` across Waves 11–21** (every `#print axioms ⊆ {propext, Classical.choice, Quot.sound}`), labeled experimental. | The remaining formulas as "proven." The experimental theorems are **experimental / CI-green**, labeled as such — never folded into the locked five. |
+| **Λ uniqueness is Conjecture 1** unconditionally. It is proven **CONDITIONAL** on slice-multiplicativity (separability) under {A1,A2,A3,A5}, axiom-free — **CUT-2** (`lambda_unique_of_separable`); the conditional chain is axiom-clean end-to-end, resting on one honest structural hypothesis (`(C-order)` gap-shift). | Λ as an unconditional theorem. Unconditional uniqueness is machine-checked **false** (`Round13.maxAgg_ne_Lambda`). **Byzantine BFT safety is Conjecture 2**, not a theorem. |
 | **`a11oy.code` is the best _governed_ LLM surface** — it routes the strongest **open** models through a Λ-gate with signed receipts. | A frontier-weights / "best LLM in the world" claim. We do not train a frontier model. |
 | **SLSA Build L1 (honest)** — documented source + build provenance, cosign keyless-signed images, Rekor-anchored; **L2 build-attestation present**. | **NOT** SLSA L2-verified, L3, FedRAMP, Iron Bank, or CMMC. L2-verified + L3 + FedRAMP are **roadmap**. |
 | Receipts are genuinely signed where a signing key is present, **honestly marked unsigned** otherwise. AIS / ADS-B feeds are live where available. | Fabricated signatures or fabricated metrics — ever. |
 
-**Locked doctrine** · kernel `c7c0ba17` · **749** declarations / **14** unique axioms / **163** tracked sorries · `lake build` clean. Experimental frontier: Waves 11–19, CI-green.
+**Locked doctrine** · kernel `c7c0ba17` · **749** declarations / **14** unique axioms / **163** tracked sorries · `lake build` clean. Experimental frontier: Waves 11–21, CI-green (`main` `880c803e`).
 
 ---
 
