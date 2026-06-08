@@ -1,0 +1,17 @@
+{
+  "_comment": "Intentional, reasoned exceptions for the HF license-consistency checker (see ../scripts/hf_license_consistency.py). The companion to GitHub's license_allowlist.json. Every entry must explain WHY the HF front-matter license is absent, or differs from the matching GitHub repo's SPDX. Nothing is silently 'passed' — un-listed drift fails the scheduled run. Keys may be a full HF id ('SZLHOLDINGS/foo') or a bare repo name ('foo'). Supported fields: license_optional (bool — repo legitimately has no license front-matter), expected_spdx + allowed_claims (pin/extend the accepted HF license values), github_repo (override or, when false/null, disable the GitHub cross-reference).",
+  "repos": {
+    "SZLHOLDINGS/README": {
+      "license_optional": true,
+      "github_repo": false,
+      "reason": "Org-card Space (sdk: static) — this is the Hugging Face org profile page (huggingface.co/SZLHOLDINGS), not a licensed software/data artifact, so it carries no license: front-matter by design and has no GitHub counterpart."
+    },
+    "SZLHOLDINGS/szl-lake": {
+      "expected_spdx": "CC-BY-4.0",
+      "allowed_claims": ["CC-BY-4.0", "Apache-2.0"],
+      "github_repo": "szl-lake",
+      "reason": "Dual-licensed lake mirrored from szl-holdings/szl-lake: datasets under CC-BY-4.0 (the SPDX GitHub detects), code/tooling under Apache-2.0. The HF dataset card declares CC-BY-4.0; either is acceptable."
+    }
+  },
+  "ignore_repos": []
+}
