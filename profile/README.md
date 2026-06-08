@@ -13,7 +13,7 @@
 
 <div align="center">
 
-<img src="./profile/assets/banner-org.png" alt="SZL Holdings — governed AI you can prove" width="100%" />
+<img src="https://raw.githubusercontent.com/szl-holdings/.github/main/profile/assets/banner-org.png" alt="SZL Holdings — governed AI you can prove" width="100%" />
 
 # SZL Holdings
 
