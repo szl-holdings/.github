@@ -1,43 +1,47 @@
 <!--
-  SZL Holdings — organization profile README (szl-holdings/.github → profile/README.md)
-  Genius Series-A grade. Honesty doctrine LOCKED.
-  TWO-TIER PROOF STORY (honest, do NOT inflate):
-    LOCKED kernel (source of truth: lutar-lean@main, kernel c7c0ba17, Lean v4.13.0):
-      749 declarations · 14 unique axioms · 163 tracked sorries
-      locked-proven = EXACTLY 5 formulas {F1, F11, F12, F18, F19} (machine-enforced, no-axiom theorem)
-    EXPERIMENTAL tier (CI-green on main @ 880c803e, Lean v4.18.0):
-      ~170 kernel-clean theorems across Waves 11-21; every #print axioms ⊆ {propext, Classical.choice, Quot.sound}.
-      Kernel-verified, CI-green, NEVER folded into the locked count.
-    Λ-uniqueness = Conjecture 1 (unconditional uniqueness machine-checked FALSE);
-      proven CONDITIONAL on slice-multiplicativity/separability (CUT-2, axiom-free).
-      CUT-1: conditional Λ-uniqueness chain now AXIOM-CLEAN END-TO-END on stated hyps (Waves 19-21);
-      reduced to ONE honest structural hypothesis ((C-order) gap-shift ordering, documented NOT faked).
-    Byzantine BFT safety = Conjecture 2 (faulty organ can equivocate).
-    SLSA = Build L1 honest posture / L2 build-attestation present; L2-verified + L3 + FedRAMP = roadmap
-      (NOT L2-verified / L3 / FedRAMP / Iron Bank / CMMC).
-  Two-product end-state: a11oy (orchestration / Command Platform, incl. a11oy.code) + killinchu (maritime + counter-UAS C2).
-  Warhacker is independent work referencing Defense Unicorns UDS — NOT an affiliation.
-  IMAGE POLICY: raster assets via ABSOLUTE raw.githubusercontent URLs; diagrams use native mermaid so they always render.
+  SZL Holdings — organization profile README (szl-holdings/.github -> profile/README.md)
+  GENIUS REVAMP v2. Honesty doctrine LOCKED. Edited FROM _live_org_profile_README.md + PROVEN_STATE_CANONICAL.md + warhacker_approved_problems.md.
+  Canonical numbers (source of truth: lutar-lean@main, kernel c7c0ba17):
+    749 declarations / 14 unique axioms / 163 tracked proof placeholders
+    Locked-proven (kernel) = EXACTLY 5 formulas {F1, F11, F12, F18, F19}
+    ~185 machine-checked Lean theorems total (Waves 11-22); CUT-1 closed on its stated hypotheses
+    Lambda-uniqueness = Conjecture 1 (unconditional uniqueness machine-checked FALSE; conditional uniqueness proven, axiom-free)
+    SLSA posture = HYBRID-HONEST: L1 honest posture; L2 build-attestation present; L2-verified / L3 / FedRAMP / Iron Bank / CMMC = roadmap.
+  Two-product end-state: a11oy (command platform) + killinchu (drones & vessels). Honest internal roles only. No banned codenames.
+  Banner expected at: profile/assets/banner-org.png
 -->
 
 <div align="center">
 
-<img src="https://raw.githubusercontent.com/szl-holdings/.github/main/profile/assets/png/szl-holdings-logo.png" alt="SZL Holdings" width="420" />
+<img src="./profile/assets/banner-org.png" alt="SZL Holdings — governed AI you can prove" width="100%" />
 
 # SZL Holdings
 
-### Governed-AI decision infrastructure with a machine-checked Lean 4 proof backbone — and a *published honesty boundary*.
+### Governed AI you can *prove*.
 
-**Every AI decision becomes a cryptographically signed, replayable, tamper-evident receipt** — accountability that no observability or AI-security incumbent ships today. Two live products run on one substrate.
+**Every consequential AI decision becomes a cryptographically signed, replayable, tamper-evident receipt** — accountability that no observability or AI-security incumbent ships today. Two live products run on one substrate.
 
-[![Lean 4 proofs](https://img.shields.io/badge/Lean%204-5%20locked%20%2B%20~170%20experimental-c9b787?style=flat-square)](https://github.com/szl-holdings/lutar-lean)
-[![SLSA Build L1 honest](https://img.shields.io/badge/SLSA-Build%20L1%20honest%20%C2%B7%20L2%20roadmap-2C5F2D?style=flat-square)](https://slsa.dev/spec/v1.0/levels)
+[![Lean 4 proofs](https://img.shields.io/badge/Lean%204-5%20formulas%20locked--proven-c9b787?style=flat-square)](https://github.com/szl-holdings/lutar-lean)
+[![Theorems](https://img.shields.io/badge/machine--checked-~185%20theorems-3b82f6?style=flat-square)](https://github.com/szl-holdings/lutar-lean)
 [![cosign keyless](https://img.shields.io/badge/cosign-keyless%20signed-7C3AED?style=flat-square)](https://search.sigstore.dev/)
-[![Λ = Conjecture 1](https://img.shields.io/badge/%CE%9B-Conjecture%201-b3541e?style=flat-square)](https://github.com/szl-holdings/lutar-lean/blob/main/BOUNTY.md)
-[![Concept DOI](https://img.shields.io/badge/concept%20DOI-10.5281%2Fzenodo.19944926-01696F?style=flat-square)](https://doi.org/10.5281/zenodo.19944926)
+[![SLSA posture](https://img.shields.io/badge/SLSA-L1%20posture%20%C2%B7%20L2%20attestation-2C5F2D?style=flat-square)](https://slsa.dev/spec/v1.0/levels)
 [![License](https://img.shields.io/badge/code-Apache--2.0-5fb3a3?style=flat-square)](https://github.com/szl-holdings)
 
 </div>
+
+> **TL;DR** — SZL turns AI governance into a *substrate*: a Proof Chain where every decision is policy-checked, evidence-bound, scored by a single trust aggregator **Λ**, and sealed into a DSSE receipt over a SHA-256 hash chain that anyone can verify offline. The trust math is pinned in **Lean 4** — **exactly 5 formulas are kernel-locked**, ~**185** theorems are machine-checked, and the one uniqueness claim we cannot prove unconditionally we call **Conjecture 1**. We surface only what the kernel checks. The differentiator vs. every observability and AI-security incumbent: **a machine-checked proof backbone they don't have.**
+
+---
+
+## The company story
+
+Modern AI gives you answers. It does not give you **accountability**.
+
+SZL Holdings was founded by **Stephen P. Lutar Jr.** to close that gap with a missing layer — not a smarter model, but a *machine for producing evidence*. When an AI system makes a consequential call, SZL records it as a signed, hash-chained receipt: *what was decided, against which policy, on what evidence, and whether it stayed inside the authorized envelope.* Hand that receipt to a skeptical auditor and they replay it offline, trusting no one. Tamper with a single byte and verification fails.
+
+We built this as a **substrate**, not a point product, because governance is horizontal. The same Proof Chain that audits an enterprise workflow also audits an autonomous drone's engagement decision. That is why two very different products — an enterprise command platform and a drones-&-vessels field tool — run on one signed core.
+
+And we refused to fake the math. The trust score's foundations are written as theorems in Lean 4 and checked by the kernel. We publish exactly how far each result goes, including where it stops — five locked-proven formulas, ~185 machine-checked theorems, and one honest **Conjecture**. In a market full of "formally verified" marketing, a reproducible proof backbone is the moat.
 
 ---
 
@@ -45,91 +49,76 @@
 
 | Product | What it does | Open it |
 |---|---|---|
-| **a11oy — Orchestration / Command Platform** | One pane of glass for governed AI: ask & act, deny-by-default safety gates, trust scoring with confidence intervals, a live decision feed, readiness & compliance, forecasting, signed receipts, formal-proof status, a live threat library (CVE / KEV / MITRE), and model routing. Includes **`a11oy.code`** — a *governed* coding assistant that routes the top open models behind a **Λ-gate** with **signed receipts** per generation. | [Open a11oy →](https://szlholdings-a11oy.hf.space/) |
-| **killinchu — Maritime + Counter-UAS C2** | Autonomous-systems C2 for air and sea: live **ADS-B / AIS** feeds, multi-sensor fusion, maritime picture (sanctions screening + dark-vessel detection), engagement rules, earthquake forecasting, a **4/4-online governance quorum (3-of-4 majority) reading CONSENSUS HOLDS**, and **verify-it-yourself** signed engagement receipts. | [Open killinchu →](https://szlholdings-killinchu.hf.space/elite) |
+| **a11oy — Command Platform** | One pane of glass for governed AI: ask-&-act with deny-by-default safety gates, trust scoring with confidence intervals, a live decision feed, readiness & compliance, forecasting, signed receipts, formal-proof status, a live CVE / KEV / MITRE threat library, and model routing. | [Open a11oy →](https://szlholdings-a11oy.hf.space/) |
+| **killinchu — Drones & Vessels** | Autonomous-systems field tool for air and sea: live track board, multi-sensor fusion, maritime picture (sanctions screening + dark-vessel detection), engagement rules, autonomy governance, and **verify-it-yourself** signed engagement receipts. | [Open killinchu →](https://szlholdings-killinchu.hf.space/elite) |
 
-**a11oy is the orchestrating brain.** Its reasoning, policy, and operator capabilities are built in as one receipt-bound fabric, and it governs the field tool with the same trust scoring, consensus, and signed receipts. `a11oy.code` is a *governed* LLM surface — not a frontier-weights claim: it routes the strongest **open** models through the Λ-gate and binds every generation to a signed Khipu receipt, so you get top-tier code *with* an audit trail.
+**a11oy is the orchestrator.** Its **Reasoning**, **Policy**, and **Operator** capabilities are built in as one receipt-bound fabric, and it governs the field tool with the same trust scoring, consensus, and signed receipts. The field tool's edge governance runs on a **Field Node** that keeps emitting signed receipts even when the link is degraded.
 
-> **Warhacker 2026 (June 16–19).** SZL builds toward the Defense Unicorns Warhacker problem statement and runs each challenge end to end. This is **independent work that references Defense Unicorns' UDS ecosystem** — *not affiliated with, sponsored by, or endorsed by Defense Unicorns.*
-
----
-
-## The ecosystem at a glance — an honest capability matrix
-
-| Layer | Repos | What it provides | Maturity (honest) |
-|---|---|---|---|
-| **Flagship apps** | [a11oy](https://github.com/szl-holdings/a11oy) · [killinchu](https://github.com/szl-holdings/killinchu) | Governed-AI command platform (incl. `a11oy.code`) · maritime + counter-UAS C2 | **Live** (HF Spaces); receipts signed where a key is present |
-| **Formal-methods spine** | [lutar-lean](https://github.com/szl-holdings/lutar-lean) · [lean-kernel](https://github.com/szl-holdings/lean-kernel) · [lambda-bounty](https://github.com/szl-holdings/lambda-bounty) | Lean 4 + Mathlib proofs: **locked-5** {F1,F11,F12,F18,F19} · **~170-theorem experimental tier (Waves 11–21)** · Λ **Conjecture 1** | 5 locked-proven + experimental CI-green; Λ conditional only |
-| **Bounded-recursion runtime** | [ouroboros](https://github.com/szl-holdings/ouroboros) · [platform](https://github.com/szl-holdings/platform) | Agent loop with proven early-exit / convergence envelope; substrate monorepo | Reference runtime; dual-witness receipts |
-| **Receipt / lake / trust** | [szl-lake](https://github.com/szl-holdings/szl-lake) · [szl-trust](https://github.com/szl-holdings/szl-trust) · [khipu-consensus](https://github.com/szl-holdings/khipu-consensus) | Append-only DSSE receipt store · public proof portal · 3-of-4 witness quorum | Append-only, tamper-evident, offline-verifiable; BFT safety = **Conjecture 2** |
-| **Mesh / observability** | [szl-mesh](https://github.com/szl-holdings/szl-mesh) · [uds-mesh](https://github.com/szl-holdings/uds-mesh) · [vsp-otel](https://github.com/szl-holdings/vsp-otel) | Doctrine-pinned CRDT mesh · span schemas · Λ-signed OTel exporter | Schemas + exporter shipped |
-| **Sovereign deploy (UDS)** | [uds-bundles](https://github.com/szl-holdings/uds-bundles) · [szl-uds-deployment](https://github.com/szl-holdings/szl-uds-deployment) · [szl-fleet-overlay](https://github.com/szl-holdings/szl-fleet-overlay) · [szl-build-env](https://github.com/szl-holdings/szl-build-env) | Zarf bundles · UDS-core packages · Pepr/Helm overlay · kind+Istio build env | **SLSA Build L1 honest**; cosign keyless; **L2-verified / L3 = roadmap** |
-| **Developer surface** | [developers](https://github.com/szl-holdings/developers) · [docs-site](https://github.com/szl-holdings/docs-site) · [szl-cookbook](https://github.com/szl-holdings/szl-cookbook) · [hatun-mcp](https://github.com/szl-holdings/hatun-mcp) | API hub · docs · recipes · doctrine-aware MCP server | Public, Apache-2.0 |
-| **Research / brand** | [szl-papers](https://github.com/szl-holdings/szl-papers) · [szl-doctrine](https://github.com/szl-holdings/szl-doctrine) · [szl-brand](https://github.com/szl-holdings/szl-brand) · [warhacker-demo](https://github.com/szl-holdings/warhacker-demo) | Preprints · governance doctrine · brand assets · sovereign demo | Papers CC-BY-4.0; code Apache-2.0 |
+> **killinchu UDS Edition** packages for [UDS](https://github.com/defenseunicorns/uds-core) deployment but is **not affiliated with, endorsed by, or sponsored by Defense Unicorns.** UDS is referenced for interoperability only.
 
 ---
 
 ## The thesis — a proof layer for consequential AI
 
-Modern AI gives you answers; it does not give you **accountability**. SZL turns the governance layer into a substrate — a **Proof Chain** where each decision is policy-checked, evidence-bound, and replayable, then sealed in a DSSE receipt over a SHA-256 hash chain. Trust is scored by a single aggregator, **Λ**, over thirteen axes (provenance, containment, coherence, convergence, …) — and we are explicit about exactly how far that math is proven.
-
-```mermaid
-flowchart LR
-  decision([decision]) --> POLICY[POLICY<br/>deny-by-default gates]
-  POLICY --> EVIDENCE[EVIDENCE<br/>bound &amp; cited]
-  EVIDENCE --> LAMBDA["Λ score<br/>(advisory · Conjecture 1)"]
-  LAMBDA --> RECEIPT[DSSE receipt<br/>cosign-signed]
-  RECEIPT --> LEDGER[(hash-chained ledger<br/>replayable · tamper-evident)]
-  LEDGER -. "verify offline, trusting no one" .-> decision
-  classDef g fill:#0d1322,stroke:#5ad1ff,color:#e8ecf6;
-  classDef gold fill:#0d1322,stroke:#c9a227,color:#e8ecf6;
-  classDef green fill:#0d1322,stroke:#7CFFB2,color:#e8ecf6;
-  class decision,POLICY,EVIDENCE g; class LAMBDA gold; class RECEIPT,LEDGER green;
+```text
+   decision ──▶  POLICY  ──▶  EVIDENCE  ──▶  Λ score  ──▶  DSSE receipt  ──▶  hash-chained ledger
+                (gates)     (bound)       (trust)        (signed)          (replayable · tamper-evident)
+                                                                                 │
+                                             verify offline, trusting no one ◀───┘
 ```
 
-Read the full thesis → [szl-papers](https://github.com/szl-holdings/szl-papers) · DOI lineage on [Zenodo](https://doi.org/10.5281/zenodo.19944926).
+Trust is scored by a single aggregator, **Λ**, a weighted geometric mean over four axes — provenance, containment, coherence, convergence — and we are explicit about exactly how far that math is proven (see below). Read the full thesis → [szl-papers](https://github.com/szl-holdings/szl-papers) · DOI lineage on [Zenodo](https://doi.org/10.5281/zenodo.19944926).
 
 ---
 
-## Proven formulas — what is machine-checked, and exactly how far
+## The math, explained — without a PhD
 
-The honest core never moves. **Exactly 5 formulas are formally proven and locked** {`F1, F11, F12, F18, F19`} in the kernel (`c7c0ba17`, `749 / 14 / 163`, Lean `v4.13.0`, `lake build` clean) — machine-enforced by `locked_count_five` (depends on **no** axioms). On top of that floor, a larger experimental tier is **kernel-clean and CI-green on `main`** (`880c803e`, Lean `v4.18.0`): **~170 theorems across Waves 11–21**, every one with `#print axioms ⊆ {propext, Classical.choice, Quot.sound}` — no new axiom, no `sorry`. Experimental results are labeled as such and are **never** folded into the locked count.
+The honesty contract, in three labels:
 
-### Locked kernel — proven, sorry-free (exactly 5, machine-enforced)
+- **LOCKED-PROVEN** — sorry-free, kernel-checked, Lean-core axioms only. **Exactly 5.** Never inflated.
+- **MACHINE-CHECKED (experimental)** — kernel-checked by CI in the experimental waves; real, but never folded into the locked 5.
+- **CONJECTURE** — *not* a theorem. Stated honestly; sometimes with its negation proven.
 
-| Formula | Status | Kernel |
+### The 5 locked-proven formulas
+
+| ID | What it proves (plain language) | Why it matters |
 |---|---|---|
-| **F1, F11, F12, F18, F19** | **PROVEN** — sorry-free, Lean-core axioms only `[propext, Classical.choice, Quot.sound]` | `c7c0ba17` · `749 / 14 / 163` · Lean `v4.13.0` |
+| **F1** — Replay determinism | Replaying the same recorded log from the same start yields a **bit-identical** trace. | This is what makes a receipt *replayable*: an auditor re-runs it and must get exactly your result. |
+| **F11** — Reciprocity conservation | Folding an append-only give/take ledger conserves its balance invariant. | Fair, auditable exchange between agents; the ledger can't silently drift. |
+| **F12** — Coupling boundedness (additive fragment) | Discretised coupling stays bounded under additive superposition. *Caveat: additive scaffolding only, **not** full nonlinear Kuramoto.* | Keeps multi-agent coupling from diverging; caveat ships in the Lean docstring. |
+| **F18** — Reed–Solomon recovery | `RS(10,6)`: data is recoverable **iff ≥ 6 of 10 shards survive.** | Resilience math for the receipt/payload encoding — survive up to 4 lost shards. |
+| **F19** — Entropy budget (additive fragment) | Over a region partition, per-region entropy ≤ total. *Caveat: monotone scaffolding only, **not** the full Bekenstein bound.* | A conservative budgeting primitive; caveat ships in the docstring. |
 
-The count of **exactly 5** is itself a Lean theorem (`locked_count_five`, depends on **no** axioms) — the locked set cannot silently grow.
+### Λ — uniqueness, told honestly
 
-### Experimental tier — kernel-clean, CI-green (Waves 11–21, ~170 theorems) — NOT in the locked 5
-
-| Wave / result | What it is |
+| Claim | Status |
 |---|---|
-| **Wave 11** | CF-1 graph-auto distance invariance, CF-2 KV-cache slots, CF-3 loop early-exit, CF-5 Neyman–Pearson optimality (24 theorems) |
-| **Wave 12 — CUT-2** | `lambda_unique_of_separable`: Λ uniqueness **conditional** on {A1,A2,A3,A5 + separability}, **axiom-free** — Λ off bare conjecture, no new axiom |
-| **Wave 13** | replay-root completeness, non-Byzantine single-valued vote (shadow, **not** Conjecture 2), HM-bottleneck |
-| **Wave 14** | CF-18 alternating-series / Mādhava, CF-19 Reed–Solomon MDS, CF-20 VCG efficiency & truthfulness, CF-21 Cover–Thomas log-sum / Gibbs |
-| **Wave 15 — CF-22** | `dpo_klDivergence_nonneg_on_simplex`: conditionally **repairs** the FALSE-as-stated DPO axiom (KL ≥ 0 **on the simplex**), axiom-free |
-| **Wave 16** | CF-23 binary-KL crux, CF-24 `geoBin` satisfies full Aczel quasi-arithmetic axioms (real CUT-1 progress), CF-25 Λ scale-invariance, CF-26 place-value |
-| **Wave 17 — CF-23** | **full binary Pinsker** `binary_pinsker`: `2(p−q)² ≤ KL` — the long-sought headline; CF-27 monotone-DEQ unique equilibrium; CF-28 recurrent-depth contraction |
-| **Waves 18–19** | BKS density engine — disjoint-opens / accumulation-uncountable / dyadic-image-dense; continued CUT-1 reduction |
-| **Waves 20–21** | closed the CUT-1 `(B)`-residual via monotone-extension uncountability (no perfect-set machinery); the **conditional Λ-uniqueness chain is now axiom-clean end-to-end** on its stated hypotheses. The remaining `(C-order)` gap-shift ordering is an **honest structural hypothesis** (BKS Fourth-step eqs 8–9, [arXiv:2208.07083](https://arxiv.org/abs/2208.07083)) — documented, not faked |
+| Λ unique under axioms **A1–A5**, *unconditionally* | **Conjecture 1 — machine-checked FALSE.** `Round13.maxAgg_ne_Lambda` shows `max`/`min` satisfy A1–A5 yet ≠ Λ. Stays Conjecture 1. |
+| Λ unique **given slice-multiplicativity (separability)** | **MACHINE-CHECKED, axiom-free.** `lambda_unique_of_separable`, `#print axioms` ⊆ {propext, Classical.choice, Quot.sound} — no new axiom. |
 
-### Λ — the honest line on uniqueness
+> One line: Λ's unconditional uniqueness **remains Conjecture 1** (unconditional is provably false for A1–A5); we proved the strongest **axiom-free conditional** uniqueness (slice-multiplicativity ⇒ Λ). Open bounty: [BOUNTY.md](https://github.com/szl-holdings/lutar-lean/blob/main/BOUNTY.md).
 
-> **What we proved:** the strongest **axiom-free conditional** uniqueness — any A1–A5 aggregator whose per-axis slices are multiplicative / separable **equals Λ** (`lambda_unique_of_separable`, **CUT-2**, no new axiom token), CI-green. All Λ-impostor deaths (AM, HM, PM², max, min) are axiom-free. As of Waves 19–21 the **conditional Λ-uniqueness chain is axiom-clean end-to-end** on its stated hypotheses; it now rests on **one honest structural hypothesis** — the `(C-order)` gap-shift ordering (BKS, [arXiv:2208.07083](https://arxiv.org/abs/2208.07083)), documented and not faked.
->
-> **What we don't claim:** unconditional uniqueness under the base axioms A1–A5. That statement is **machine-checked false** (`Round13.maxAgg_ne_Lambda`). Λ-uniqueness therefore stays **Conjecture 1** — never a theorem. Open bounty: [BOUNTY.md](https://github.com/szl-holdings/lutar-lean/blob/main/BOUNTY.md).
+Across Waves 11–22 there are **~185 machine-checked theorems** (no `sorry`, no new axiom), including the full **binary Pinsker inequality** and **CUT-1** (the Aczel quasi-arithmetic representation theorem), now **fully closed on its stated hypotheses**. These stay separate from the locked 5.
 
-Full proof table with verbatim `#print axioms` → **[PROVEN_FORMULAS.md](https://github.com/szl-holdings/lutar-lean/blob/main/PROVEN_FORMULAS.md)**.
+---
+
+## SZL at Warhacker 2026 — the 5 Defense Unicorns problems
+
+Warhacker is **16–19 June 2026, San Diego**: build, package, and deploy software for warfighter problems. Our substrate — signed receipts + the Λ-gate + UDS air-gap deploy + vertical readiness packs — is *horizontal*, so it has a credible answer to all five. **In total honesty: only Cannonico is a true bullseye today (real, live). The other four are credible-with-a-readiness-pack — substrate-ready, not solved.**
+
+| # | DU Problem | How SZL's substrate answers it | Status |
+|---|---|---|---|
+| **1** | **Cannonico** — independent real-time AI-behavior monitor for autonomous drones; catch the moment a line is crossed; back it with a permanent, tamper-evident record. | This is the SZL thesis stated as a DoD problem. **killinchu** Field Node + the **Λ-gate** (the "authorized parameters" boundary) + signed DSSE receipts chained in the ledger. When Λ drops below floor, the verdict flips and a tamper-evident receipt is emitted — live today on the killinchu surface. | ★ **BULLSEYE — real, live** |
+| **2** | **Tychee** — proven, reusable deployment stacks for fragmented satellite ground software across air-gapped networks. | The signed **UDS bundle** + Zarf reusable air-gap deploy + the vertical readiness-pack framework (stand up a GSW vertical fast). | Credible — readiness pack |
+| **3** | **HANGAR2APPS** — unify scattered military deployment-health screening data into real-time readiness dashboards. | **Operator** console (dashboards) + **Reasoning** ingest over scattered schemas + the receipt substrate (auditable workflow) as a screening-schema vertical. | Credible — readiness pack |
+| **4** | **Cyber RTS** — lightweight visualization that ingests any trajectory/orbit data into operational context without bespoke integration. | **Operator** viz + **Reasoning** schema ingest + a trajectory readiness adapter. Overlaps killinchu's existing track/trajectory ingest and multi-prioritization. | Credible — readiness pack |
+| **5** | **Raven** — purpose-built infra to deploy and authorize software where the mission happens. | The whole **UDS air-gap deploy** story + UDS Core alignment: a "just works in San Diego" signed bundle is exactly the deploy-and-authorize answer. | Credible — readiness pack |
+
+**The pitch:** we're not a point solution — we're the **governance + deploy substrate** under any of these. We lead with Cannonico because it *is* our thesis, and we are explicit about what is real versus what we can stand up fast.
 
 ---
 
 ## Verify it yourself — trust nothing
-
-Engagement decisions on the **killinchu** surface are signed with a real ECDSA-P256 cosign key. Verify a receipt **offline**, trusting neither us nor the server:
 
 ```bash
 curl -s https://szlholdings-killinchu.hf.space/cosign.pub -o cosign.pub
@@ -138,23 +127,25 @@ curl -s https://szlholdings-killinchu.hf.space/api/killinchu/v1/receipt/export >
 # tamper a single byte and re-verify   ->  "Verification failure"
 ```
 
-That is the whole product in one command: a third party can confirm a decision happened, exactly as recorded, with zero trust in SZL.
+A third party can confirm a decision happened, exactly as recorded, with zero trust in SZL.
+
+> **Fleet command demonstration:** the governance loop is real (policy → Λ → signed receipt), and the effector link is **simulated** — we label this honestly as a command *demonstration*, not a live weapons release.
 
 ---
 
 ## What we claim — and what we don't
 
-We surface only what is machine-checked as fact. Everything else is labeled honestly in the apps.
-
 | We claim | We do **not** claim |
 |---|---|
-| **Exactly 5 formulas formally proven & locked in Lean** (machine-checked, sorry-free): `F1, F11, F12, F18, F19` — the count is itself a no-axiom Lean theorem. Plus a **~170-theorem experimental tier, kernel-clean & CI-green on `main` across Waves 11–21** (every `#print axioms ⊆ {propext, Classical.choice, Quot.sound}`), labeled experimental. | The remaining formulas as "proven." The experimental theorems are **experimental / CI-green**, labeled as such — never folded into the locked five. |
-| **Λ uniqueness is Conjecture 1** unconditionally. It is proven **CONDITIONAL** on slice-multiplicativity (separability) under {A1,A2,A3,A5}, axiom-free — **CUT-2** (`lambda_unique_of_separable`); the conditional chain is axiom-clean end-to-end, resting on one honest structural hypothesis (`(C-order)` gap-shift). | Λ as an unconditional theorem. Unconditional uniqueness is machine-checked **false** (`Round13.maxAgg_ne_Lambda`). **Byzantine BFT safety is Conjecture 2**, not a theorem. |
-| **`a11oy.code` is the best _governed_ LLM surface** — it routes the strongest **open** models through a Λ-gate with signed receipts. | A frontier-weights / "best LLM in the world" claim. We do not train a frontier model. |
-| **SLSA Build L1 (honest)** — documented source + build provenance, cosign keyless-signed images, Rekor-anchored; **L2 build-attestation present**. | **NOT** SLSA L2-verified, L3, FedRAMP, Iron Bank, or CMMC. L2-verified + L3 + FedRAMP are **roadmap**. |
-| Receipts are genuinely signed where a signing key is present, **honestly marked unsigned** otherwise. AIS / ADS-B feeds are live where available. | Fabricated signatures or fabricated metrics — ever. |
+| **5 formulas locked-proven in Lean** (machine-checked, sorry-free): `F1, F11, F12, F18, F19`. | The remaining formulas as "proven." Newer waves are **experimental / CI-green**, labeled as such. |
+| **~185 machine-checked theorems** (Waves 11–22); **CUT-1 closed on its stated hypotheses**. | These as part of the locked 5 — they never inflate the count. |
+| **Λ-uniqueness is Conjecture 1** — conditional uniqueness proven axiom-free (slice-multiplicativity). | Λ as an unconditional theorem. Unconditional uniqueness is machine-checked **false**, and we say so. |
+| **SLSA L1 honest posture; L2 build-attestation present.** | **L2-verified, L3, FedRAMP, Iron Bank, or CMMC** — these are **roadmap**. |
+| Receipts genuinely signed where a signing key is present; **honestly marked unsigned** otherwise. | Fabricated signatures or fabricated metrics — ever. |
+| Maritime AIS uses a clearly-labeled **sample / replay** dataset. | A live production AIS feed. |
+| **best GOVERNED LLM** (a11oy Code) within its governed envelope. | "best LLM" or any frontier-weights claim. |
 
-**Locked doctrine** · kernel `c7c0ba17` · **749** declarations / **14** unique axioms / **163** tracked sorries · `lake build` clean. Experimental frontier: Waves 11–21, CI-green (`main` `880c803e`).
+**Canonical:** kernel `c7c0ba17` · **749** declarations / **14** unique axioms / **163** tracked proof placeholders (honest markers, **not** a quality claim) · `lake build` clean.
 
 ---
 
@@ -164,7 +155,7 @@ We surface only what is machine-checked as fact. Everything else is labeled hone
 uds deploy oci://ghcr.io/szl-holdings/szl-mesh:0.4.0 --confirm
 ```
 
-Cosign-signed, Rekor-anchored bundle (SLSA Build L1 honest; L2-verified provenance on the roadmap). The deployment story lives in [uds-bundles](https://github.com/szl-holdings/uds-bundles), [szl-mesh](https://github.com/szl-holdings/szl-mesh), [uds-mesh](https://github.com/szl-holdings/uds-mesh), [szl-uds-deployment](https://github.com/szl-holdings/szl-uds-deployment), and [szl-fleet-overlay](https://github.com/szl-holdings/szl-fleet-overlay).
+Cosign-signed bundle; each service image carries a build attestation. SLSA: **L1 honest posture; L2 build-attestation present; L2-verified / L3 = roadmap.**
 
 ---
 
@@ -173,15 +164,21 @@ Cosign-signed, Rekor-anchored bundle (SLSA Build L1 honest; L2-verified provenan
 | If you want to… | Go to |
 |---|---|
 | **See the product** | [a11oy](https://szlholdings-a11oy.hf.space/) · [killinchu](https://szlholdings-killinchu.hf.space/elite) |
-| **Read the math** | [lutar-lean](https://github.com/szl-holdings/lutar-lean) (Lean 4 kernel) · [PROVEN_FORMULAS.md](https://github.com/szl-holdings/lutar-lean/blob/main/PROVEN_FORMULAS.md) · [szl-papers](https://github.com/szl-holdings/szl-papers) |
-| **Build on it** | [developers](https://github.com/szl-holdings/developers) (API hub) · [szl-cookbook](https://github.com/szl-holdings/szl-cookbook) (recipes) · [docs-site](https://github.com/szl-holdings/docs-site) |
-| **Deploy it** | [uds-bundles](https://github.com/szl-holdings/uds-bundles) · [szl-mesh](https://github.com/szl-holdings/szl-mesh) · [hatun-mcp](https://github.com/szl-holdings/hatun-mcp) |
-| **Verify the chain** | [szl-trust](https://github.com/szl-holdings/szl-trust) (public proof portal) · [khipu-consensus](https://github.com/szl-holdings/khipu-consensus) |
+| **Read the math** | [lutar-lean](https://github.com/szl-holdings/lutar-lean) (Lean 4 kernel) · [szl-papers](https://github.com/szl-holdings/szl-papers) |
+| **Build on it** | [developers](https://github.com/szl-holdings/developers) · [szl-cookbook](https://github.com/szl-holdings/szl-cookbook) |
+| **Deploy it** | [uds-bundles](https://github.com/szl-holdings/uds-bundles) · [szl-mesh](https://github.com/szl-holdings/szl-mesh) |
+| **Verify the chain** | [szl-trust](https://github.com/szl-holdings/szl-trust) · [khipu-consensus](https://github.com/szl-holdings/khipu-consensus) |
+
+---
+
+## Collaborate
+
+We're looking for design partners, auditors, and contributors who care about *provable* governance. Open the bounty, run the kernel, break our receipts. **[stephen@szlholdings.com](mailto:stephen@szlholdings.com)**
 
 ---
 
 <div align="center">
 
-Built by **Stephen P. Lutar Jr.** · Honest by design · Counsel-governed · [🤗 SZLHOLDINGS](https://huggingface.co/SZLHOLDINGS) · [github.com/szl-holdings](https://github.com/szl-holdings) · [ORCID 0009-0001-0110-4173](https://orcid.org/0009-0001-0110-4173)
+Built by **Stephen P. Lutar Jr.** · Honest by design · [🤗 SZLHOLDINGS](https://huggingface.co/SZLHOLDINGS) · [github.com/szl-holdings](https://github.com/szl-holdings)
 
 </div>
