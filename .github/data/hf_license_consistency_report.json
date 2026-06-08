@@ -1,0 +1,457 @@
+{
+  "schema": "szl.hf_license_consistency/v1",
+  "org": "SZLHOLDINGS",
+  "github_org": "szl-holdings",
+  "checked_at_utc": "2026-06-08T05:55:50Z",
+  "include_private": false,
+  "github_crossref": true,
+  "summary": {
+    "checked": 28,
+    "ok": 28,
+    "warn": 0,
+    "error": 0
+  },
+  "results": [
+    {
+      "repo": "SZLHOLDINGS/canonical-formulas-v1",
+      "kind": "dataset",
+      "private": false,
+      "hf_license": "apache-2.0",
+      "hf_license_norm": "Apache-2.0",
+      "hf_license_name": null,
+      "github_spdx": null,
+      "allowlisted": false,
+      "status": "OK",
+      "errors": [],
+      "warnings": [],
+      "notes": [
+        "no matching GitHub repo (cross-ref skipped)"
+      ]
+    },
+    {
+      "repo": "SZLHOLDINGS/doctrine-v10-v11",
+      "kind": "dataset",
+      "private": false,
+      "hf_license": "apache-2.0",
+      "hf_license_norm": "Apache-2.0",
+      "hf_license_name": null,
+      "github_spdx": null,
+      "allowlisted": false,
+      "status": "OK",
+      "errors": [],
+      "warnings": [],
+      "notes": [
+        "no matching GitHub repo (cross-ref skipped)"
+      ]
+    },
+    {
+      "repo": "SZLHOLDINGS/k-verify-benchmark-v1",
+      "kind": "dataset",
+      "private": false,
+      "hf_license": "cc-by-4.0",
+      "hf_license_norm": "CC-BY-4.0",
+      "hf_license_name": null,
+      "github_spdx": null,
+      "allowlisted": false,
+      "status": "OK",
+      "errors": [],
+      "warnings": [],
+      "notes": [
+        "no matching GitHub repo (cross-ref skipped)"
+      ]
+    },
+    {
+      "repo": "SZLHOLDINGS/lean-proofs-v1",
+      "kind": "dataset",
+      "private": false,
+      "hf_license": "apache-2.0",
+      "hf_license_norm": "Apache-2.0",
+      "hf_license_name": null,
+      "github_spdx": null,
+      "allowlisted": false,
+      "status": "OK",
+      "errors": [],
+      "warnings": [],
+      "notes": [
+        "no matching GitHub repo (cross-ref skipped)"
+      ]
+    },
+    {
+      "repo": "SZLHOLDINGS/lean-theorem-tree",
+      "kind": "dataset",
+      "private": false,
+      "hf_license": "apache-2.0",
+      "hf_license_norm": "Apache-2.0",
+      "hf_license_name": null,
+      "github_spdx": null,
+      "allowlisted": false,
+      "status": "OK",
+      "errors": [],
+      "warnings": [],
+      "notes": [
+        "no matching GitHub repo (cross-ref skipped)"
+      ]
+    },
+    {
+      "repo": "SZLHOLDINGS/org-card-assets",
+      "kind": "dataset",
+      "private": false,
+      "hf_license": "apache-2.0",
+      "hf_license_norm": "Apache-2.0",
+      "hf_license_name": null,
+      "github_spdx": null,
+      "allowlisted": false,
+      "status": "OK",
+      "errors": [],
+      "warnings": [],
+      "notes": [
+        "no matching GitHub repo (cross-ref skipped)"
+      ]
+    },
+    {
+      "repo": "SZLHOLDINGS/ouroboros-arxiv-preprint",
+      "kind": "dataset",
+      "private": false,
+      "hf_license": "apache-2.0",
+      "hf_license_norm": "Apache-2.0",
+      "hf_license_name": null,
+      "github_spdx": null,
+      "allowlisted": false,
+      "status": "OK",
+      "errors": [],
+      "warnings": [],
+      "notes": [
+        "no matching GitHub repo (cross-ref skipped)"
+      ]
+    },
+    {
+      "repo": "SZLHOLDINGS/rag-corpus-v1",
+      "kind": "dataset",
+      "private": false,
+      "hf_license": "apache-2.0",
+      "hf_license_norm": "Apache-2.0",
+      "hf_license_name": null,
+      "github_spdx": null,
+      "allowlisted": false,
+      "status": "OK",
+      "errors": [],
+      "warnings": [],
+      "notes": [
+        "no matching GitHub repo (cross-ref skipped)"
+      ]
+    },
+    {
+      "repo": "SZLHOLDINGS/readiness-runs",
+      "kind": "dataset",
+      "private": false,
+      "hf_license": "apache-2.0",
+      "hf_license_norm": "Apache-2.0",
+      "hf_license_name": null,
+      "github_spdx": null,
+      "allowlisted": false,
+      "status": "OK",
+      "errors": [],
+      "warnings": [],
+      "notes": [
+        "no matching GitHub repo (cross-ref skipped)"
+      ]
+    },
+    {
+      "repo": "SZLHOLDINGS/szl-artifacts",
+      "kind": "dataset",
+      "private": false,
+      "hf_license": "apache-2.0",
+      "hf_license_norm": "Apache-2.0",
+      "hf_license_name": null,
+      "github_spdx": null,
+      "allowlisted": false,
+      "status": "OK",
+      "errors": [],
+      "warnings": [],
+      "notes": [
+        "no matching GitHub repo (cross-ref skipped)"
+      ]
+    },
+    {
+      "repo": "SZLHOLDINGS/szl-lake",
+      "kind": "dataset",
+      "private": false,
+      "hf_license": "cc-by-4.0",
+      "hf_license_norm": "CC-BY-4.0",
+      "hf_license_name": null,
+      "github_spdx": "CC-BY-4.0",
+      "allowlisted": true,
+      "status": "OK",
+      "errors": [],
+      "warnings": [],
+      "notes": []
+    },
+    {
+      "repo": "SZLHOLDINGS/szl-visual-identity",
+      "kind": "dataset",
+      "private": false,
+      "hf_license": "apache-2.0",
+      "hf_license_norm": "Apache-2.0",
+      "hf_license_name": null,
+      "github_spdx": null,
+      "allowlisted": false,
+      "status": "OK",
+      "errors": [],
+      "warnings": [],
+      "notes": [
+        "no matching GitHub repo (cross-ref skipped)"
+      ]
+    },
+    {
+      "repo": "SZLHOLDINGS/SZLHOLDINGS",
+      "kind": "dataset",
+      "private": false,
+      "hf_license": "apache-2.0",
+      "hf_license_norm": "Apache-2.0",
+      "hf_license_name": null,
+      "github_spdx": null,
+      "allowlisted": false,
+      "status": "OK",
+      "errors": [],
+      "warnings": [],
+      "notes": [
+        "no matching GitHub repo (cross-ref skipped)"
+      ]
+    },
+    {
+      "repo": "SZLHOLDINGS/thesis-corpus-v18",
+      "kind": "dataset",
+      "private": false,
+      "hf_license": "apache-2.0",
+      "hf_license_norm": "Apache-2.0",
+      "hf_license_name": null,
+      "github_spdx": null,
+      "allowlisted": false,
+      "status": "OK",
+      "errors": [],
+      "warnings": [],
+      "notes": [
+        "no matching GitHub repo (cross-ref skipped)"
+      ]
+    },
+    {
+      "repo": "SZLHOLDINGS/thesis-v18-formal-verification",
+      "kind": "dataset",
+      "private": false,
+      "hf_license": "apache-2.0",
+      "hf_license_norm": "Apache-2.0",
+      "hf_license_name": null,
+      "github_spdx": null,
+      "allowlisted": false,
+      "status": "OK",
+      "errors": [],
+      "warnings": [],
+      "notes": [
+        "no matching GitHub repo (cross-ref skipped)"
+      ]
+    },
+    {
+      "repo": "SZLHOLDINGS/uds-bundles-v1",
+      "kind": "dataset",
+      "private": false,
+      "hf_license": "apache-2.0",
+      "hf_license_norm": "Apache-2.0",
+      "hf_license_name": null,
+      "github_spdx": null,
+      "allowlisted": false,
+      "status": "OK",
+      "errors": [],
+      "warnings": [],
+      "notes": [
+        "no matching GitHub repo (cross-ref skipped)"
+      ]
+    },
+    {
+      "repo": "SZLHOLDINGS/uds-governance-receipts",
+      "kind": "dataset",
+      "private": false,
+      "hf_license": "apache-2.0",
+      "hf_license_norm": "Apache-2.0",
+      "hf_license_name": null,
+      "github_spdx": null,
+      "allowlisted": false,
+      "status": "OK",
+      "errors": [],
+      "warnings": [],
+      "notes": [
+        "no matching GitHub repo (cross-ref skipped)"
+      ]
+    },
+    {
+      "repo": "SZLHOLDINGS/uds-spans-receipts",
+      "kind": "dataset",
+      "private": false,
+      "hf_license": "apache-2.0",
+      "hf_license_norm": "Apache-2.0",
+      "hf_license_name": null,
+      "github_spdx": null,
+      "allowlisted": false,
+      "status": "OK",
+      "errors": [],
+      "warnings": [],
+      "notes": [
+        "no matching GitHub repo (cross-ref skipped)"
+      ]
+    },
+    {
+      "repo": "SZLHOLDINGS/usb-bundle-v1",
+      "kind": "dataset",
+      "private": false,
+      "hf_license": "apache-2.0",
+      "hf_license_norm": "Apache-2.0",
+      "hf_license_name": null,
+      "github_spdx": null,
+      "allowlisted": false,
+      "status": "OK",
+      "errors": [],
+      "warnings": [],
+      "notes": [
+        "no matching GitHub repo (cross-ref skipped)"
+      ]
+    },
+    {
+      "repo": "SZLHOLDINGS/why-we-lead",
+      "kind": "dataset",
+      "private": false,
+      "hf_license": "apache-2.0",
+      "hf_license_norm": "Apache-2.0",
+      "hf_license_name": null,
+      "github_spdx": null,
+      "allowlisted": false,
+      "status": "OK",
+      "errors": [],
+      "warnings": [],
+      "notes": [
+        "no matching GitHub repo (cross-ref skipped)"
+      ]
+    },
+    {
+      "repo": "SZLHOLDINGS/a11oy-v19-substrate",
+      "kind": "model",
+      "private": false,
+      "hf_license": "apache-2.0",
+      "hf_license_norm": "Apache-2.0",
+      "hf_license_name": null,
+      "github_spdx": null,
+      "allowlisted": false,
+      "status": "OK",
+      "errors": [],
+      "warnings": [],
+      "notes": [
+        "no matching GitHub repo (cross-ref skipped)"
+      ]
+    },
+    {
+      "repo": "SZLHOLDINGS/szl-papers",
+      "kind": "model",
+      "private": false,
+      "hf_license": "cc-by-4.0",
+      "hf_license_norm": "CC-BY-4.0",
+      "hf_license_name": null,
+      "github_spdx": "CC-BY-4.0",
+      "allowlisted": false,
+      "status": "OK",
+      "errors": [],
+      "warnings": [],
+      "notes": []
+    },
+    {
+      "repo": "SZLHOLDINGS/SZLHOLDINGS",
+      "kind": "model",
+      "private": false,
+      "hf_license": "apache-2.0",
+      "hf_license_norm": "Apache-2.0",
+      "hf_license_name": null,
+      "github_spdx": null,
+      "allowlisted": false,
+      "status": "OK",
+      "errors": [],
+      "warnings": [],
+      "notes": [
+        "no matching GitHub repo (cross-ref skipped)"
+      ]
+    },
+    {
+      "repo": "SZLHOLDINGS/a11oy",
+      "kind": "space",
+      "private": false,
+      "hf_license": "apache-2.0",
+      "hf_license_norm": "Apache-2.0",
+      "hf_license_name": null,
+      "github_spdx": "Apache-2.0",
+      "allowlisted": false,
+      "status": "OK",
+      "errors": [],
+      "warnings": [],
+      "notes": []
+    },
+    {
+      "repo": "SZLHOLDINGS/anatomy",
+      "kind": "space",
+      "private": false,
+      "hf_license": "cc-by-4.0",
+      "hf_license_norm": "CC-BY-4.0",
+      "hf_license_name": null,
+      "github_spdx": null,
+      "allowlisted": false,
+      "status": "OK",
+      "errors": [],
+      "warnings": [],
+      "notes": [
+        "no matching GitHub repo (cross-ref skipped)"
+      ]
+    },
+    {
+      "repo": "SZLHOLDINGS/cathedral",
+      "kind": "space",
+      "private": false,
+      "hf_license": "apache-2.0",
+      "hf_license_norm": "Apache-2.0",
+      "hf_license_name": null,
+      "github_spdx": null,
+      "allowlisted": false,
+      "status": "OK",
+      "errors": [],
+      "warnings": [],
+      "notes": [
+        "no matching GitHub repo (cross-ref skipped)"
+      ]
+    },
+    {
+      "repo": "SZLHOLDINGS/killinchu",
+      "kind": "space",
+      "private": false,
+      "hf_license": "apache-2.0",
+      "hf_license_norm": "Apache-2.0",
+      "hf_license_name": null,
+      "github_spdx": "Apache-2.0",
+      "allowlisted": false,
+      "status": "OK",
+      "errors": [],
+      "warnings": [],
+      "notes": []
+    },
+    {
+      "repo": "SZLHOLDINGS/README",
+      "kind": "space",
+      "private": false,
+      "hf_license": null,
+      "hf_license_norm": null,
+      "hf_license_name": null,
+      "github_spdx": null,
+      "allowlisted": true,
+      "status": "OK",
+      "errors": [],
+      "warnings": [],
+      "notes": [
+        "no license front-matter (allowlisted as license-optional)",
+        "github cross-ref disabled by allowlist"
+      ]
+    }
+  ]
+}
