@@ -1,0 +1,16 @@
+{
+  "_comment": "Intentional, reasoned exceptions for the license-consistency checker (see .github/scripts/license_consistency.py). Every entry must explain WHY the detected/claimed license deviates from a single plain OSS SPDX id. Nothing is silently 'passed' — un-listed drift fails CI. Private repos and (by default) archived repos are not checked.",
+  "repos": {
+    "platform": {
+      "expected_spdx": "Proprietary",
+      "allowed_claims": ["Proprietary", "LicenseRef-SZL-Proprietary", "NOASSERTION"],
+      "reason": "Intentionally proprietary flagship suite. LICENSE is a custom proprietary text (SPDX-License-Identifier: LicenseRef-SZL-Proprietary), so GitHub reports NOASSERTION by design. README badge + CITATION.cff must therefore claim proprietary, NOT an OSS license."
+    },
+    "szl-lake": {
+      "expected_spdx": "CC-BY-4.0",
+      "allowed_claims": ["CC-BY-4.0", "Apache-2.0"],
+      "reason": "Dual-licensed data lake: datasets under CC-BY-4.0 (the license GitHub detects from LICENSE), code/tooling under Apache-2.0. The README badge intentionally cites both."
+    }
+  },
+  "ignore_repos": []
+}

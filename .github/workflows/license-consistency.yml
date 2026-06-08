@@ -1,0 +1,88 @@
+name: License Consistency
+
+# Issue #202 class of drift: a repo's public license badge / README / CITATION.cff
+# claiming one license while the actual LICENSE file says another. For a company
+# whose thesis is provable honesty, that must never ship silently.
+#
+# This job runs .github/scripts/license_consistency.py across every PUBLIC repo in
+# the org, comparing GitHub's detected SPDX id (the truth from the LICENSE file)
+# against the license claimed in the README badge / front-matter and CITATION.cff.
+# Intentional cases (proprietary, dual-license) are explicitly allowlisted in
+# .github/data/license_allowlist.json — anything else fails the job.
+#
+# Public repo listing + contents read work with the built-in GITHUB_TOKEN, so no
+# org PAT secret is needed. Other repos may also consume this via `workflow_call`.
+
+on:
+  schedule:
+    # Weekly sweep (Mondays 07:23 UTC) so drift is caught fast even when idle.
+    - cron: "23 7 * * 1"
+  workflow_dispatch: {}
+  push:
+    branches: [main]
+    paths:
+      - ".github/scripts/license_consistency.py"
+      - ".github/data/license_allowlist.json"
+      - ".github/workflows/license-consistency.yml"
+  workflow_call: {}
+
+permissions:
+  contents: read
+
+concurrency:
+  group: license-consistency-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    name: License claims match LICENSE
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write # only to commit the refreshed report in szl-holdings/.github
+    steps:
+      - name: Harden runner
+        uses: step-security/harden-runner@9af89fc71515a100421586dfdb3dc9c984fbf411 # v2.19.4
+        with:
+          egress-policy: audit
+
+      - name: Checkout
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - name: Set up Python
+        uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6.2.0
+        with:
+          python-version: "3.12"
+
+      - name: Check license consistency across the org
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          set +e
+          python3 .github/scripts/license_consistency.py \
+            --report .github/data/license_consistency_report.json
+          echo "CHECK_EXIT=$?" >> "$GITHUB_ENV"
+
+      - name: Commit refreshed report if changed
+        if: github.repository == 'szl-holdings/.github' && github.event_name != 'pull_request'
+        run: |
+          if git diff --quiet -- .github/data/license_consistency_report.json; then
+            echo "Report unchanged; nothing to commit."
+            exit 0
+          fi
+          git config user.name "Stephen P. Lutar Jr."
+          git config user.email "stephenlutar2@gmail.com"
+          git add .github/data/license_consistency_report.json
+          git commit -s -m "chore(license): refresh license-consistency report [skip ci]"
+          git push
+
+      - name: Fail if any license-claim drift
+        run: |
+          if [ "${CHECK_EXIT:-1}" != "0" ]; then
+            echo "::error::License-claim drift detected. See the step output above and"
+            echo "::error::.github/data/license_consistency_report.json. Fix the README"
+            echo "::error::badge / front-matter / CITATION.cff, the LICENSE file, or add a"
+            echo "::error::reasoned entry to .github/data/license_allowlist.json."
+            exit 1
+          fi
+          echo "✓ All public repos' license claims match their LICENSE."

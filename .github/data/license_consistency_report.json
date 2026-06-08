@@ -1,0 +1,505 @@
+{
+  "schema": "szl.license_consistency/v1",
+  "org": "szl-holdings",
+  "checked_at_utc": "2026-06-08T01:39:09Z",
+  "include_archived": true,
+  "summary": {
+    "checked": 26,
+    "ok": 24,
+    "warn": 2,
+    "error": 0
+  },
+  "results": [
+    {
+      "repo": ".github",
+      "archived": false,
+      "detected_spdx": "Apache-2.0",
+      "detected_norm": "Apache-2.0",
+      "allowlisted": false,
+      "claims": {
+        "frontmatter": [],
+        "badge": [
+          "Apache 2.0"
+        ],
+        "citation_cff": [
+          "Apache-2.0"
+        ]
+      },
+      "status": "OK",
+      "errors": [],
+      "warnings": []
+    },
+    {
+      "repo": "a11oy",
+      "archived": false,
+      "detected_spdx": "Apache-2.0",
+      "detected_norm": "Apache-2.0",
+      "allowlisted": false,
+      "claims": {
+        "frontmatter": [
+          "apache-2.0"
+        ],
+        "badge": [
+          "Apache-2.0"
+        ],
+        "citation_cff": [
+          "Apache-2.0"
+        ]
+      },
+      "status": "OK",
+      "errors": [],
+      "warnings": []
+    },
+    {
+      "repo": "developers",
+      "archived": false,
+      "detected_spdx": "Apache-2.0",
+      "detected_norm": "Apache-2.0",
+      "allowlisted": false,
+      "claims": {
+        "frontmatter": [],
+        "badge": [
+          "Apache 2.0"
+        ],
+        "citation_cff": []
+      },
+      "status": "OK",
+      "errors": [],
+      "warnings": []
+    },
+    {
+      "repo": "docs-site",
+      "archived": false,
+      "detected_spdx": "Apache-2.0",
+      "detected_norm": "Apache-2.0",
+      "allowlisted": false,
+      "claims": {
+        "frontmatter": [],
+        "badge": [
+          "Apache 2.0",
+          "Apache 2.0"
+        ],
+        "citation_cff": [
+          "Apache-2.0"
+        ]
+      },
+      "status": "OK",
+      "errors": [],
+      "warnings": []
+    },
+    {
+      "repo": "hatun-mcp",
+      "archived": false,
+      "detected_spdx": "Apache-2.0",
+      "detected_norm": "Apache-2.0",
+      "allowlisted": false,
+      "claims": {
+        "frontmatter": [],
+        "badge": [
+          "Apache 2.0"
+        ],
+        "citation_cff": [
+          "Apache-2.0"
+        ]
+      },
+      "status": "OK",
+      "errors": [],
+      "warnings": []
+    },
+    {
+      "repo": "khipu-consensus",
+      "archived": false,
+      "detected_spdx": "Apache-2.0",
+      "detected_norm": "Apache-2.0",
+      "allowlisted": false,
+      "claims": {
+        "frontmatter": [],
+        "badge": [
+          "Apache 2.0",
+          "Apache 2.0"
+        ],
+        "citation_cff": [
+          "Apache-2.0"
+        ]
+      },
+      "status": "OK",
+      "errors": [],
+      "warnings": []
+    },
+    {
+      "repo": "killinchu",
+      "archived": false,
+      "detected_spdx": "Apache-2.0",
+      "detected_norm": "Apache-2.0",
+      "allowlisted": false,
+      "claims": {
+        "frontmatter": [
+          "apache-2.0"
+        ],
+        "badge": [
+          "Apache-2.0"
+        ],
+        "citation_cff": [
+          "Apache-2.0"
+        ]
+      },
+      "status": "OK",
+      "errors": [],
+      "warnings": []
+    },
+    {
+      "repo": "lambda-bounty",
+      "archived": true,
+      "detected_spdx": "Apache-2.0",
+      "detected_norm": "Apache-2.0",
+      "allowlisted": false,
+      "claims": {
+        "frontmatter": [],
+        "badge": [],
+        "citation_cff": []
+      },
+      "status": "WARN",
+      "errors": [],
+      "warnings": [
+        "no structured license claim (badge / front-matter / CITATION.cff)"
+      ]
+    },
+    {
+      "repo": "lean-kernel",
+      "archived": false,
+      "detected_spdx": "Apache-2.0",
+      "detected_norm": "Apache-2.0",
+      "allowlisted": false,
+      "claims": {
+        "frontmatter": [],
+        "badge": [
+          "Apache 2.0"
+        ],
+        "citation_cff": [
+          "Apache-2.0"
+        ]
+      },
+      "status": "OK",
+      "errors": [],
+      "warnings": []
+    },
+    {
+      "repo": "lutar-lean",
+      "archived": false,
+      "detected_spdx": "Apache-2.0",
+      "detected_norm": "Apache-2.0",
+      "allowlisted": false,
+      "claims": {
+        "frontmatter": [],
+        "badge": [
+          "Apache 2.0"
+        ],
+        "citation_cff": [
+          "Apache-2.0"
+        ]
+      },
+      "status": "OK",
+      "errors": [],
+      "warnings": []
+    },
+    {
+      "repo": "ouroboros",
+      "archived": false,
+      "detected_spdx": "Apache-2.0",
+      "detected_norm": "Apache-2.0",
+      "allowlisted": false,
+      "claims": {
+        "frontmatter": [],
+        "badge": [
+          "Apache 2.0",
+          "Apache 2.0"
+        ],
+        "citation_cff": [
+          "Apache-2.0"
+        ]
+      },
+      "status": "OK",
+      "errors": [],
+      "warnings": []
+    },
+    {
+      "repo": "platform",
+      "archived": false,
+      "detected_spdx": "NOASSERTION",
+      "detected_norm": "NOASSERTION",
+      "allowlisted": true,
+      "claims": {
+        "frontmatter": [],
+        "badge": [
+          "Proprietary"
+        ],
+        "citation_cff": [
+          "LicenseRef-SZL-Proprietary"
+        ]
+      },
+      "status": "OK",
+      "errors": [],
+      "warnings": []
+    },
+    {
+      "repo": "szl-brand",
+      "archived": false,
+      "detected_spdx": "CC-BY-4.0",
+      "detected_norm": "CC-BY-4.0",
+      "allowlisted": false,
+      "claims": {
+        "frontmatter": [],
+        "badge": [
+          "CC BY 4.0"
+        ],
+        "citation_cff": [
+          "CC-BY-4.0"
+        ]
+      },
+      "status": "OK",
+      "errors": [],
+      "warnings": []
+    },
+    {
+      "repo": "szl-build-env",
+      "archived": false,
+      "detected_spdx": "Apache-2.0",
+      "detected_norm": "Apache-2.0",
+      "allowlisted": false,
+      "claims": {
+        "frontmatter": [],
+        "badge": [
+          "Apache 2.0"
+        ],
+        "citation_cff": [
+          "Apache-2.0"
+        ]
+      },
+      "status": "OK",
+      "errors": [],
+      "warnings": []
+    },
+    {
+      "repo": "szl-cookbook",
+      "archived": false,
+      "detected_spdx": "Apache-2.0",
+      "detected_norm": "Apache-2.0",
+      "allowlisted": false,
+      "claims": {
+        "frontmatter": [],
+        "badge": [
+          "Apache 2.0",
+          "Apache 2.0"
+        ],
+        "citation_cff": [
+          "Apache-2.0"
+        ]
+      },
+      "status": "OK",
+      "errors": [],
+      "warnings": []
+    },
+    {
+      "repo": "szl-doctrine",
+      "archived": false,
+      "detected_spdx": "Apache-2.0",
+      "detected_norm": "Apache-2.0",
+      "allowlisted": false,
+      "claims": {
+        "frontmatter": [],
+        "badge": [
+          "Apache 2.0"
+        ],
+        "citation_cff": [
+          "Apache-2.0"
+        ]
+      },
+      "status": "OK",
+      "errors": [],
+      "warnings": []
+    },
+    {
+      "repo": "szl-fleet-overlay",
+      "archived": false,
+      "detected_spdx": "Apache-2.0",
+      "detected_norm": "Apache-2.0",
+      "allowlisted": false,
+      "claims": {
+        "frontmatter": [],
+        "badge": [],
+        "citation_cff": []
+      },
+      "status": "WARN",
+      "errors": [],
+      "warnings": [
+        "no structured license claim (badge / front-matter / CITATION.cff)"
+      ]
+    },
+    {
+      "repo": "szl-lake",
+      "archived": false,
+      "detected_spdx": "CC-BY-4.0",
+      "detected_norm": "CC-BY-4.0",
+      "allowlisted": true,
+      "claims": {
+        "frontmatter": [],
+        "badge": [
+          "Apache-2.0",
+          "CC-BY-4.0"
+        ],
+        "citation_cff": [
+          "CC-BY-4.0"
+        ]
+      },
+      "status": "OK",
+      "errors": [],
+      "warnings": []
+    },
+    {
+      "repo": "szl-mesh",
+      "archived": false,
+      "detected_spdx": "Apache-2.0",
+      "detected_norm": "Apache-2.0",
+      "allowlisted": false,
+      "claims": {
+        "frontmatter": [],
+        "badge": [
+          "Apache 2.0"
+        ],
+        "citation_cff": [
+          "Apache-2.0"
+        ]
+      },
+      "status": "OK",
+      "errors": [],
+      "warnings": []
+    },
+    {
+      "repo": "szl-papers",
+      "archived": false,
+      "detected_spdx": "CC-BY-4.0",
+      "detected_norm": "CC-BY-4.0",
+      "allowlisted": false,
+      "claims": {
+        "frontmatter": [],
+        "badge": [],
+        "citation_cff": [
+          "CC-BY-4.0"
+        ]
+      },
+      "status": "OK",
+      "errors": [],
+      "warnings": []
+    },
+    {
+      "repo": "szl-trust",
+      "archived": false,
+      "detected_spdx": "CC-BY-4.0",
+      "detected_norm": "CC-BY-4.0",
+      "allowlisted": false,
+      "claims": {
+        "frontmatter": [],
+        "badge": [
+          "CC-BY-4.0"
+        ],
+        "citation_cff": [
+          "CC-BY-4.0"
+        ]
+      },
+      "status": "OK",
+      "errors": [],
+      "warnings": []
+    },
+    {
+      "repo": "szl-uds-deployment",
+      "archived": false,
+      "detected_spdx": "Apache-2.0",
+      "detected_norm": "Apache-2.0",
+      "allowlisted": false,
+      "claims": {
+        "frontmatter": [],
+        "badge": [
+          "Apache 2.0"
+        ],
+        "citation_cff": [
+          "Apache-2.0"
+        ]
+      },
+      "status": "OK",
+      "errors": [],
+      "warnings": []
+    },
+    {
+      "repo": "uds-bundles",
+      "archived": false,
+      "detected_spdx": "Apache-2.0",
+      "detected_norm": "Apache-2.0",
+      "allowlisted": false,
+      "claims": {
+        "frontmatter": [],
+        "badge": [
+          "Apache 2.0"
+        ],
+        "citation_cff": [
+          "Apache-2.0"
+        ]
+      },
+      "status": "OK",
+      "errors": [],
+      "warnings": []
+    },
+    {
+      "repo": "uds-mesh",
+      "archived": false,
+      "detected_spdx": "Apache-2.0",
+      "detected_norm": "Apache-2.0",
+      "allowlisted": false,
+      "claims": {
+        "frontmatter": [],
+        "badge": [],
+        "citation_cff": [
+          "Apache-2.0"
+        ]
+      },
+      "status": "OK",
+      "errors": [],
+      "warnings": []
+    },
+    {
+      "repo": "vsp-otel",
+      "archived": false,
+      "detected_spdx": "Apache-2.0",
+      "detected_norm": "Apache-2.0",
+      "allowlisted": false,
+      "claims": {
+        "frontmatter": [],
+        "badge": [],
+        "citation_cff": [
+          "Apache-2.0"
+        ]
+      },
+      "status": "OK",
+      "errors": [],
+      "warnings": []
+    },
+    {
+      "repo": "warhacker-demo",
+      "archived": false,
+      "detected_spdx": "Apache-2.0",
+      "detected_norm": "Apache-2.0",
+      "allowlisted": false,
+      "claims": {
+        "frontmatter": [],
+        "badge": [
+          "Apache 2.0"
+        ],
+        "citation_cff": [
+          "Apache-2.0"
+        ]
+      },
+      "status": "OK",
+      "errors": [],
+      "warnings": []
+    }
+  ]
+}
