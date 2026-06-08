@@ -16,7 +16,7 @@
   3. Confirm the CI badge URL matches the repository's actual workflow file name (`ci.yml` by default).
   4. Open a PR and tag a maintainer for review.
 
-  The audit history of org-wide template rollouts lives in the platform repo at [`docs/audits/github-org.md`](https://github.com/szl-holdings/szl-holdings-platform/blob/master/docs/audits/github-org.md).
+  The audit history of org-wide template rollouts lives in the platform repo at `docs/audits/github-org.md`.
 
   ---
 
