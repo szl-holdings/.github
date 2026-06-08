@@ -1,6 +1,18 @@
 {
-  "_comment": "Intentional, reasoned exceptions for the public-repo-link checker (see .github/scripts/public_repo_link_check.py). A finding is suppressed only when it appears here. 'allow' suppresses a specific (source_repo, target) pair; 'ignore_targets' suppresses a target repo wherever it is referenced; 'ignore_source_repos' skips a source repo's pages entirely. Every entry must explain WHY a public page intentionally links to a private/missing repo. Nothing is silently passed -- un-listed dead links fail the job. Keep this empty unless a link to a private repo is genuinely intended (rare).",
+  "_comment": "Intentional, reasoned exceptions for the public-repo-link checker (see .github/scripts/public_repo_link_check.py). A finding is suppressed only when it appears here. For the ORG-REPO existence check: 'allow' suppresses a specific (source_repo, target) pair; 'ignore_targets' suppresses a target repo wherever it is referenced; 'ignore_source_repos' skips a source repo's pages entirely. For the optional EXTERNAL liveness check (--check-external): 'ignore_external_hosts' skips a hostname everywhere; 'ignore_external_urls' skips an exact URL. For the optional DEEP org-link check (--check-deep-links): 'ignore_deep_urls' skips an exact deep URL. 'ignore_link_patterns' is a list of regexes matched against any deep/external URL (use for whole families, e.g. doc example/localhost URLs). Every entry should explain WHY. Nothing is silently passed -- un-listed dead links fail/warn per the script's severity rules.",
   "allow": [],
   "ignore_targets": [],
-  "ignore_source_repos": []
+  "ignore_source_repos": [],
+  "ignore_external_hosts": [],
+  "ignore_external_urls": [],
+  "ignore_deep_urls": [],
+  "ignore_link_patterns": [
+    "^https?://localhost(?::\\d+)?(?:/|$)",
+    "^https?://127\\.0\\.0\\.1(?::\\d+)?(?:/|$)",
+    "^https?://0\\.0\\.0\\.0(?::\\d+)?(?:/|$)",
+    "^https?://\\[::1\\](?::\\d+)?(?:/|$)",
+    "^https?://(?:www\\.)?example\\.(?:com|org|net)(?:[:/]|$)",
+    "^https?://your-",
+    "^https?://<"
+  ]
 }
