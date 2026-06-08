@@ -1,0 +1,109 @@
+name: Public Repo Link Check
+
+# Task #186 / #236 class of drift: a PUBLIC trust surface (a README or docs page)
+# links to github.com/szl-holdings/<repo> for a repo that is now PRIVATE or has
+# been deleted, so the link 404s for an anonymous visitor. This happened when
+# lutar-lean was made private and left dead click-throughs in the public
+# docs-site and szl-cookbook READMEs. The org flips repo visibility fairly often,
+# so this recurs on every flip. For a "provable honesty" thesis, a public page
+# that points at a 404 must never ship silently.
+#
+# This job runs .github/scripts/public_repo_link_check.py across every PUBLIC repo
+# in the org, scanning README files and docs/ pages for click-through links to
+# github.com/szl-holdings/<repo> and flagging any target that is currently private
+# or missing. shields.io / image-badge URLs are ignored (only click-throughs are
+# checked). Intentional exceptions live in
+# .github/data/public_repo_link_allowlist.json.
+#
+# Severity split (matches the recurring incident exactly):
+#   * a link to a now-PRIVATE repo (the visibility-flip case) is an ERROR and
+#     FAILS the job -- surfaced as a ::error:: annotation.
+#   * a link to a DELETED/missing repo is the same 404 to a visitor but is a
+#     pre-existing backlog rather than the flip trigger, so it is surfaced as a
+#     ::warning:: annotation + in the report WITHOUT failing the job. Pass
+#     --fail-on-missing (see below) to ratchet it up once the backlog is cleared.
+#
+# Knowing a target is PRIVATE (vs merely missing) needs a token that can see the
+# org's private repos: SZL_GITHUB_TOKEN if present, else the built-in token (which
+# downgrades private targets to "missing" -- still flagged, just less precisely).
+
+on:
+  schedule:
+    # Weekly sweep (Mondays 07:41 UTC) so a visibility flip is caught fast.
+    - cron: "41 7 * * 1"
+  workflow_dispatch: {}
+  push:
+    branches: [main]
+    paths:
+      - ".github/scripts/public_repo_link_check.py"
+      - ".github/data/public_repo_link_allowlist.json"
+      - ".github/workflows/public-repo-link-check.yml"
+  workflow_call: {}
+
+permissions:
+  contents: read
+
+concurrency:
+  group: public-repo-link-check-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    name: Public pages link only to reachable repos
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: write # only to commit the refreshed report in szl-holdings/.github
+    steps:
+      - name: Harden runner
+        uses: step-security/harden-runner@9af89fc71515a100421586dfdb3dc9c984fbf411 # v2.19.4
+        with:
+          egress-policy: audit
+
+      - name: Checkout
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - name: Set up Python
+        uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6.2.0
+        with:
+          python-version: "3.12"
+
+      - name: Scan public pages for links to private/deleted repos
+        env:
+          # SZL_GITHUB_TOKEN (org-owner) lets the check see private repos so it can
+          # label a target "private" vs "missing"; falls back to the built-in token.
+          SZL_GITHUB_TOKEN: ${{ secrets.SZL_GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          set +e
+          python3 .github/scripts/public_repo_link_check.py \
+            --scan-docs \
+            --report .github/data/public_repo_link_report.json
+          echo "CHECK_EXIT=$?" >> "$GITHUB_ENV"
+
+      - name: Commit refreshed report if changed
+        if: github.repository == 'szl-holdings/.github' && github.event_name != 'pull_request'
+        run: |
+          if git diff --quiet -- .github/data/public_repo_link_report.json; then
+            echo "Report unchanged; nothing to commit."
+            exit 0
+          fi
+          git config user.name "Stephen P. Lutar Jr."
+          git config user.email "stephenlutar2@gmail.com"
+          git add .github/data/public_repo_link_report.json
+          git commit -s -m "chore(links): refresh public-repo-link report [skip ci]"
+          git push
+
+      - name: Fail if any public page links to a now-private repo
+        run: |
+          if [ "${CHECK_EXIT:-1}" != "0" ]; then
+            echo "::error::A public README/docs page links to a now-PRIVATE"
+            echo "::error::szl-holdings repo (404 for anonymous visitors). See the"
+            echo "::error::annotations above and .github/data/public_repo_link_report.json."
+            echo "::error::Fix: repoint the link, re-publish the target repo, or add a"
+            echo "::error::reasoned entry to .github/data/public_repo_link_allowlist.json."
+            exit 1
+          fi
+          echo "✓ No public page links to a now-private szl-holdings repo."
+          echo "  (Links to deleted/missing repos, if any, are surfaced as"
+          echo "   ::warning:: annotations and in the report without failing.)"

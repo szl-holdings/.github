@@ -1,0 +1,1635 @@
+{
+  "schema": "szl.public_repo_link_check/v1",
+  "org": "szl-holdings",
+  "checked_at_utc": "2026-06-08T06:27:16Z",
+  "scan_docs": true,
+  "scan_scope": "readme+docs",
+  "include_archived": false,
+  "fail_on_missing": false,
+  "private_repos": [],
+  "summary": {
+    "repos_scanned": 26,
+    "ok": 19,
+    "warn": 7,
+    "error": 0,
+    "links_to_private": 0,
+    "links_to_missing": 178,
+    "failing_links": 0,
+    "allowlisted_links": 0
+  },
+  "results": [
+    {
+      "repo": ".github",
+      "archived": false,
+      "pages_scanned": 19,
+      "findings": [
+        {
+          "page": "templates/README.md",
+          "target_repo": "szl-holdings-platform",
+          "kind": "missing",
+          "url": "https://github.com/szl-holdings/szl-holdings-platform/blob/master/docs/audits/github-org.md",
+          "allowlisted": false,
+          "fails": false
+        }
+      ],
+      "status": "WARN"
+    },
+    {
+      "repo": "a11oy",
+      "archived": false,
+      "pages_scanned": 361,
+      "findings": [
+        {
+          "page": "docs/INVESTOR_DEMO.md",
+          "target_repo": "vessels",
+          "kind": "missing",
+          "url": "https://github.com/szl-holdings/vessels",
+          "allowlisted": false,
+          "fails": false
+        },
+        {
+          "page": "docs/PERPLEXITY_BRIEF.md",
+          "target_repo": "ouroboros-thesis",
+          "kind": "missing",
+          "url": "https://github.com/szl-holdings/ouroboros-thesis",
+          "allowlisted": false,
+          "fails": false
+        },
+        {
+          "page": "docs/PERPLEXITY_BRIEF.md",
+          "target_repo": "rosie",
+          "kind": "missing",
+          "url": "https://github.com/szl-holdings/rosie",
+          "allowlisted": false,
+          "fails": false
+        },
+        {
+          "page": "docs/PERPLEXITY_BRIEF.md",
+          "target_repo": "amaru",
+          "kind": "missing",
+          "url": "https://github.com/szl-holdings/amaru",
+          "allowlisted": false,
+          "fails": false
+        },
+        {
+          "page": "docs/PERPLEXITY_BRIEF.md",
+          "target_repo": "sentra",
+          "kind": "missing",
+          "url": "https://github.com/szl-holdings/sentra",
+          "allowlisted": false,
+          "fails": false
+        },
+        {
+          "page": "docs/PERPLEXITY_BRIEF.md",
+          "target_repo": "vessels",
+          "kind": "missing",
+          "url": "https://github.com/szl-holdings/vessels",
+          "allowlisted": false,
+          "fails": false
+        },
+        {
+          "page": "docs/PERPLEXITY_BRIEF.md",
+          "target_repo": "agi-forecast",
+          "kind": "missing",
+          "url": "https://github.com/szl-holdings/agi-forecast",
+          "allowlisted": false,
+          "fails": false
+        },
+        {
+          "page": "docs/PERPLEXITY_BRIEF.md",
+          "target_repo": "counsel",
+          "kind": "missing",
+          "url": "https://github.com/szl-holdings/counsel",
+          "allowlisted": false,
+          "fails": false
+        },
+        {
+          "page": "docs/PERPLEXITY_BRIEF.md",
+          "target_repo": "terra",
+          "kind": "missing",
+          "url": "https://github.com/szl-holdings/terra",
+          "allowlisted": false,
+          "fails": false
+        },
+        {
+          "page": "docs/PERPLEXITY_BRIEF.md",
+          "target_repo": "carlota-jo",
+          "kind": "missing",
+          "url": "https://github.com/szl-holdings/carlota-jo",
+          "allowlisted": false,
+          "fails": false
+        },
+        {
+          "page": "docs/cookbook/ops/REPLIT_HARDCODE_PAYLOAD/anatomy/INDEX.md",
+          "target_repo": "ouroboros-thesis",
+          "kind": "missing",
+          "url": "https://github.com/szl-holdings/ouroboros-thesis",
+          "allowlisted": false,
+          "fails": false
+        },
+        {
+          "page": "docs/cookbook/ops/REPLIT_HARDCODE_PAYLOAD/anatomy/INDEX.md",
+          "target_repo": "ouroboros-thesis",
+          "kind": "missing",
+          "url": "https://github.com/szl-holdings/ouroboros-thesis/pull/46",
+          "allowlisted": false,
+          "fails": false
+        },
+        {
+          "page": "docs/cookbook/ops/REPLIT_HARDCODE_PAYLOAD/docs/ANATOMY_SWEEP_REPORT.md",
+          "target_repo": "ouroboros-thesis",
+          "kind": "missing",
+          "url": "https://github.com/szl-holdings/ouroboros-thesis/pull/39#issuecomment-4467297472",
+          "allowlisted": false,
+          "fails": false
+        },
+        {
+          "page": "docs/cookbook/ops/REPLIT_HARDCODE_PAYLOAD/docs/UNIFIED_OPERATOR_HANDOFF.md",
+          "target_repo": "agi-forecast",
+          "kind": "missing",
+          "url": "https://github.com/szl-holdings/agi-forecast/pull/6",
+          "allowlisted": false,
+          "fails": false
+        },
+        {
+          "page": "docs/cookbook/ops/REPLIT_HARDCODE_PAYLOAD/docs/UNIFIED_OPERATOR_HANDOFF.md",
+          "target_repo": "agi-forecast",
+          "kind": "missing",
+          "url": "https://github.com/szl-holdings/agi-forecast/pull/7",
+          "allowlisted": false,
+          "fails": false
+        },
+        {
+          "page": "docs/cookbook/ops/REPLIT_HARDCODE_PAYLOAD/docs/UNIFIED_OPERATOR_HANDOFF.md",
+          "target_repo": "agi-forecast",
+          "kind": "missing",
+          "url": "https://github.com/szl-holdings/agi-forecast/pull/8",
+          "allowlisted": false,
+          "fails": false
+        },
+        {
+          "page": "docs/cookbook/ops/REPLIT_HARDCODE_PAYLOAD/phd_pods/systems_pod_report.md",
+          "target_repo": "agi-forecast",
+          "kind": "missing",
+          "url": "https://github.com/szl-holdings/agi-forecast",
+          "allowlisted": false,
+          "fails": false
+        },
+        {
+          "page": "docs/cookbook/ops/REPLIT_HARDCODE_PAYLOAD/phd_pods/systems_pod_report.md",
+          "target_repo": "sentra",
+          "kind": "missing",
+          "url": "https://github.com/szl-holdings/sentra",
+          "allowlisted": false,
+          "fails": false
+        },
+        {
+          "page": "docs/cookbook/ops/REPLIT_HARDCODE_PAYLOAD/phd_pods/systems_pod_report.md",
+          "target_repo": "agi-forecast",
+          "kind": "missing",
+          "url": "https://github.com/szl-holdings/agi-forecast/blob/main/README.md",
+          "allowlisted": false,
+          "fails": false
+        },
+        {
+          "page": "docs/cookbook/ops/REPLIT_HARDCODE_PAYLOAD/phd_pods/systems_pod_report.md",
+          "target_repo": "agi-forecast",
+          "kind": "missing",
+          "url": "https://github.com/szl-holdings/agi-forecast/blob/main/CITATION.cff",
+          "allowlisted": false,
+          "fails": false
+        },
+        {
+          "page": "docs/cookbook/ops/REPLIT_HARDCODE_PAYLOAD/phd_pods/systems_pod_report.md",
+          "target_repo": "sentra",
+          "kind": "missing",
+          "url": "https://github.com/szl-holdings/sentra/blob/main/README.md",
+          "allowlisted": false,
+          "fails": false
+        },
+        {
+          "page": "docs/cookbook/ops/REPLIT_HARDCODE_PAYLOAD/truth_audit/TRUTH_AUDIT_RECORD.md",
+          "target_repo": "ouroboros-thesis",
+          "kind": "missing",
+          "url": "https://github.com/szl-holdings/ouroboros-thesis/pull/44#issuecomment-4467393182",
+          "allowlisted": false,
+          "fails": false
+        },
+        {
+          "page": "docs/cookbook/ops/REPLIT_HARDCODE_PAYLOAD/truth_audit/TRUTH_AUDIT_RECORD.md",
+          "target_repo": "agi-forecast",
+          "kind": "missing",
+          "url": "https://github.com/szl-holdings/agi-forecast/pull/4#issuecomment-4467395270",
+          "allowlisted": false,
+          "fails": false
+        },
+        {
+          "page": "docs/cookbook/ops/REPLIT_HARDCODE_PAYLOAD/truth_audit/TRUTH_AUDIT_RECORD.md",
+          "target_repo": "agi-forecast",
+          "kind": "missing",
+          "url": "https://github.com/szl-holdings/agi-forecast/pull/9",
+          "allowlisted": false,
+          "fails": false
+        },
+        {
+          "page": "docs/cookbook/ops/REPLIT_HARDCODE_PAYLOAD/truth_audit/TRUTH_AUDIT_RECORD.md",
+          "target_repo": "ouroboros-thesis",
+          "kind": "missing",
+          "url": "https://github.com/szl-holdings/ouroboros-thesis/pull/47",
+          "allowlisted": false,
+          "fails": false
+        },
+        {
+          "page": "docs/cookbook/ops/REPLIT_HARDCODE_PAYLOAD/truth_audit/TRUTH_AUDIT_RECORD.md",
+          "target_repo": "ouroboros-thesis",
+          "kind": "missing",
+          "url": "https://github.com/szl-holdings/ouroboros-thesis/pull/44#issuecomment-4467525771",
+          "allowlisted": false,
+          "fails": false
+        },
+        {
+          "page": "docs/cookbook/ops/REPLIT_HARDCODE_PAYLOAD/truth_audit/TRUTH_AUDIT_RECORD.md",
+          "target_repo": "sentra",
+          "kind": "missing",
+          "url": "https://github.com/szl-holdings/sentra/pull/22#issuecomment-4467521037",
+          "allowlisted": false,
+          "fails": false
+        },
+        {
+          "page": "docs/cookbook/ops/REPLIT_HARDCODE_PAYLOAD/truth_audit/TRUTH_AUDIT_RECORD.md",
+          "target_repo": "sentra",
+          "kind": "missing",
+          "url": "https://github.com/szl-holdings/sentra/pull/20#issuecomment-4467521090",
+          "allowlisted": false,
+          "fails": false
+        },
+        {
+          "page": "docs/cookbook/recipes/05-memory-attested-reasoning.md",
+          "target_repo": "amaru",
+          "kind": "missing",
+          "url": "https://github.com/szl-holdings/amaru",
+          "allowlisted": false,
+          "fails": false
+        },
+        {
+          "page": "docs/cookbook/recipes/anatomy-evolved-v1/payloads/replit_anatomy_evolved_payload.md",
+          "target_repo": "ouroboros-thesis",
+          "kind": "missing",
+          "url": "https://github.com/szl-holdings/ouroboros-thesis/releases/tag/paper-v13-exhaustive-1.0.0",
+          "allowlisted": false,
+          "fails": false
+        },
+        {
+          "page": "docs/cookbook/recipes/anatomy-evolved-v1/payloads/replit_anatomy_evolved_payload.md",
+          "target_repo": "ouroboros-thesis",
+          "kind": "missing",
+          "url": "https://github.com/szl-holdings/ouroboros-thesis/releases/tag/paper-v14-1.0.0-draft",
+          "allowlisted": false,
+          "fails": false
+        },
+        {
+          "page": "docs/developers/CONTRIBUTING.md",
+          "target_repo": "compliance-posture",
+          "kind": "missing",
+          "url": "https://github.com/szl-holdings/compliance-posture",
+          "allowlisted": false,
+          "fails": false
+        },
+        {
+          "page": "docs/developers/GRAPHQL.md",
+          "target_repo": "graphql-gateway",
+          "kind": "missing",
+          "url": "https://github.com/szl-holdings/graphql-gateway",
+          "allowlisted": false,
+          "fails": false
+        },
+        {
+          "page": "docs/developers/VERIFY.md",
+          "target_repo": "sentra",
+          "kind": "missing",
+          "url": "https://github.com/szl-holdings/sentra/attestations/29917249",
+          "allowlisted": false,
+          "fails": false
+        },
+        {
+          "page": "docs/developers/VERIFY.md",
+          "target_repo": "amaru",
+          "kind": "missing",
+          "url": "https://github.com/szl-holdings/amaru/attestations/29917085",
+          "allowlisted": false,
+          "fails": false
+        },
+        {
+          "page": "docs/developers/VERIFY.md",
+          "target_repo": "rosie",
+          "kind": "missing",
+          "url": "https://github.com/szl-holdings/rosie/attestations/29901651",
+          "allowlisted": false,
+          "fails": false
+        },
+        {
+          "page": "docs/moonshot-one-of-one.md",
+          "target_repo": "ouroboros-thesis",
+          "kind": "missing",
+          "url": "https://github.com/szl-holdings/ouroboros-thesis/blob/main/docs/moonshot.md",
+          "allowlisted": false,
+          "fails": false
+        },
+        {
+          "page": "docs/org-repo-map.md",
+          "target_repo": "ouroboros-thesis",
+          "kind": "missing",
+          "url": "https://github.com/szl-holdings/ouroboros-thesis",
+          "allowlisted": false,
+          "fails": false
+        },
+        {
+          "page": "docs/org-repo-map.md",
+          "target_repo": "amaru",
+          "kind": "missing",
+          "url": "https://github.com/szl-holdings/amaru",
+          "allowlisted": false,
+          "fails": false
+        },
+        {
+          "page": "docs/org-repo-map.md",
+          "target_repo": "rosie",
+          "kind": "missing",
+          "url": "https://github.com/szl-holdings/rosie",
+          "allowlisted": false,
+          "fails": false
+        },
+        {
+          "page": "docs/org-repo-map.md",
+          "target_repo": "sentra",
+          "kind": "missing",
+          "url": "https://github.com/szl-holdings/sentra",
+          "allowlisted": false,
+          "fails": false
+        },
+        {
+          "page": "docs/org-repo-map.md",
+          "target_repo": "vessels",
+          "kind": "missing",
+          "url": "https://github.com/szl-holdings/vessels",
+          "allowlisted": false,
+          "fails": false
+        },
+        {
+          "page": "docs/org-repo-map.md",
+          "target_repo": "counsel",
+          "kind": "missing",
+          "url": "https://github.com/szl-holdings/counsel",
+          "allowlisted": false,
+          "fails": false
+        },
+        {
+          "page": "docs/org-repo-map.md",
+          "target_repo": "terra",
+          "kind": "missing",
+          "url": "https://github.com/szl-holdings/terra",
+          "allowlisted": false,
+          "fails": false
+        },
+        {
+          "page": "docs/org-repo-map.md",
+          "target_repo": "carlota-jo",
+          "kind": "missing",
+          "url": "https://github.com/szl-holdings/carlota-jo",
+          "allowlisted": false,
+          "fails": false
+        },
+        {
+          "page": "docs/org-repo-map.md",
+          "target_repo": "agi-forecast",
+          "kind": "missing",
+          "url": "https://github.com/szl-holdings/agi-forecast",
+          "allowlisted": false,
+          "fails": false
+        },
+        {
+          "page": "docs/papers/README.md",
+          "target_repo": "puriq-preprint",
+          "kind": "missing",
+          "url": "https://github.com/szl-holdings/puriq-preprint",
+          "allowlisted": false,
+          "fails": false
+        },
+        {
+          "page": "docs/papers/README.md",
+          "target_repo": "ouroboros-thesis",
+          "kind": "missing",
+          "url": "https://github.com/szl-holdings/ouroboros-thesis",
+          "allowlisted": false,
+          "fails": false
+        },
+        {
+          "page": "docs/papers/README.md",
+          "target_repo": "prior-art-disclosures",
+          "kind": "missing",
+          "url": "https://github.com/szl-holdings/prior-art-disclosures",
+          "allowlisted": false,
+          "fails": false
+        },
+        {
+          "page": "docs/papers/ouroboros-archive/papers/v3/v3-onepager.md",
+          "target_repo": "szl-holdings-platform",
+          "kind": "missing",
+          "url": "https://github.com/szl-holdings/szl-holdings-platform",
+          "allowlisted": false,
+          "fails": false
+        },
+        {
+          "page": "docs/papers/ouroboros-archive/papers/v4/ouroboros-thesis-v4.md",
+          "target_repo": "szl-holdings-platform",
+          "kind": "missing",
+          "url": "https://github.com/szl-holdings/szl-holdings-platform",
+          "allowlisted": false,
+          "fails": false
+        },
+        {
+          "page": "docs/papers/ouroboros-archive/papers/v4/v4-canonical.md",
+          "target_repo": "szl-holdings-platform",
+          "kind": "missing",
+          "url": "https://github.com/szl-holdings/szl-holdings-platform",
+          "allowlisted": false,
+          "fails": false
+        },
+        {
+          "page": "docs/papers/ouroboros-archive/papers/v4/v4-essay.md",
+          "target_repo": "szl-holdings-platform",
+          "kind": "missing",
+          "url": "https://github.com/szl-holdings/szl-holdings-platform",
+          "allowlisted": false,
+          "fails": false
+        },
+        {
+          "page": "docs/papers/ouroboros-archive/papers/v4/v4-onepager.md",
+          "target_repo": "szl-holdings-platform",
+          "kind": "missing",
+          "url": "https://github.com/szl-holdings/szl-holdings-platform",
+          "allowlisted": false,
+          "fails": false
+        },
+        {
+          "page": "docs/papers/preprints/puriq/README.md",
+          "target_repo": "puriq-preprint",
+          "kind": "missing",
+          "url": "https://github.com/szl-holdings/puriq-preprint/actions",
+          "allowlisted": false,
+          "fails": false
+        },
+        {
+          "page": "docs/papers/prior-art/README.md",
+          "target_repo": "prior-art-disclosures",
+          "kind": "missing",
+          "url": "https://github.com/szl-holdings/prior-art-disclosures/actions",
+          "allowlisted": false,
+          "fails": false
+        },
+        {
+          "page": "docs/papers/thesis/ouroboros/README.md",
+          "target_repo": "ouroboros-thesis",
+          "kind": "missing",
+          "url": "https://github.com/szl-holdings/ouroboros-thesis/actions",
+          "allowlisted": false,
+          "fails": false
+        },
+        {
+          "page": "docs/papers/thesis/ouroboros/README.md",
+          "target_repo": "ouroboros-thesis",
+          "kind": "missing",
+          "url": "https://github.com/szl-holdings/ouroboros-thesis/security/dependabot",
+          "allowlisted": false,
+          "fails": false
+        },
+        {
+          "page": "docs/papers/thesis/ouroboros/README.md",
+          "target_repo": "ouroboros-thesis",
+          "kind": "missing",
+          "url": "https://github.com/szl-holdings/ouroboros-thesis/actions/workflows/ci.yml",
+          "allowlisted": false,
+          "fails": false
+        },
+        {
+          "page": "docs/papers/thesis/ouroboros/README.md",
+          "target_repo": "ouroboros-thesis",
+          "kind": "missing",
+          "url": "https://github.com/szl-holdings/ouroboros-thesis/actions/workflows/codeql.yml",
+          "allowlisted": false,
+          "fails": false
+        },
+        {
+          "page": "docs/papers/thesis/ouroboros/README.md",
+          "target_repo": "ouroboros-thesis",
+          "kind": "missing",
+          "url": "https://github.com/szl-holdings/ouroboros-thesis/security/code-scanning",
+          "allowlisted": false,
+          "fails": false
+        },
+        {
+          "page": "docs/papers/thesis/ouroboros/README.md",
+          "target_repo": "ouroboros-thesis",
+          "kind": "missing",
+          "url": "https://github.com/szl-holdings/ouroboros-thesis/security/secret-scanning",
+          "allowlisted": false,
+          "fails": false
+        },
+        {
+          "page": "docs/papers/thesis/ouroboros/README.md",
+          "target_repo": "ouroboros-thesis",
+          "kind": "missing",
+          "url": "https://github.com/szl-holdings/ouroboros-thesis/actions/workflows/sbom.yml",
+          "allowlisted": false,
+          "fails": false
+        },
+        {
+          "page": "docs/papers/thesis/ouroboros/README.md",
+          "target_repo": "ouroboros-thesis",
+          "kind": "missing",
+          "url": "https://github.com/szl-holdings/ouroboros-thesis/actions/workflows/dco.yml",
+          "allowlisted": false,
+          "fails": false
+        },
+        {
+          "page": "docs/papers/thesis/ouroboros/README.md",
+          "target_repo": "ouroboros-thesis",
+          "kind": "missing",
+          "url": "https://securityscorecards.dev/viewer/?uri=github.com/szl-holdings/ouroboros-thesis",
+          "allowlisted": false,
+          "fails": false
+        },
+        {
+          "page": "docs/site/MERGED.md",
+          "target_repo": "investor-public-summary",
+          "kind": "missing",
+          "url": "https://github.com/szl-holdings/investor-public-summary",
+          "allowlisted": false,
+          "fails": false
+        },
+        {
+          "page": "docs/site/cookbook/README.md",
+          "target_repo": "ouroboros-thesis",
+          "kind": "missing",
+          "url": "https://github.com/szl-holdings/ouroboros-thesis",
+          "allowlisted": false,
+          "fails": false
+        },
+        {
+          "page": "docs/site/cookbook/README.md",
+          "target_repo": "amaru",
+          "kind": "missing",
+          "url": "https://github.com/szl-holdings/amaru",
+          "allowlisted": false,
+          "fails": false
+        },
+        {
+          "page": "docs/site/cookbook/README.md",
+          "target_repo": "sentra",
+          "kind": "missing",
+          "url": "https://github.com/szl-holdings/sentra",
+          "allowlisted": false,
+          "fails": false
+        },
+        {
+          "page": "docs/site/developers/README.md",
+          "target_repo": "compliance-posture",
+          "kind": "missing",
+          "url": "https://github.com/szl-holdings/compliance-posture",
+          "allowlisted": false,
+          "fails": false
+        },
+        {
+          "page": "docs/site/docs/changelog.md",
+          "target_repo": "sentra",
+          "kind": "missing",
+          "url": "https://github.com/szl-holdings/sentra/releases/tag/v1.0.0",
+          "allowlisted": false,
+          "fails": false
+        },
+        {
+          "page": "docs/site/docs/changelog.md",
+          "target_repo": "amaru",
+          "kind": "missing",
+          "url": "https://github.com/szl-holdings/amaru/releases/tag/v1.0.0",
+          "allowlisted": false,
+          "fails": false
+        },
+        {
+          "page": "docs/site/docs/changelog.md",
+          "target_repo": "rosie",
+          "kind": "missing",
+          "url": "https://github.com/szl-holdings/rosie/releases/tag/v1.0.0",
+          "allowlisted": false,
+          "fails": false
+        },
+        {
+          "page": "docs/site/docs/evidence/index.md",
+          "target_repo": "ouroboros-thesis",
+          "kind": "missing",
+          "url": "https://github.com/szl-holdings/ouroboros-thesis",
+          "allowlisted": false,
+          "fails": false
+        },
+        {
+          "page": "docs/site/docs/flagships/amaru.md",
+          "target_repo": "amaru",
+          "kind": "missing",
+          "url": "https://github.com/szl-holdings/amaru",
+          "allowlisted": false,
+          "fails": false
+        },
+        {
+          "page": "docs/site/docs/flagships/amaru.md",
+          "target_repo": "ouroboros-thesis",
+          "kind": "missing",
+          "url": "https://github.com/szl-holdings/ouroboros-thesis",
+          "allowlisted": false,
+          "fails": false
+        },
+        {
+          "page": "docs/site/docs/flagships/amaru.md",
+          "target_repo": "amaru",
+          "kind": "missing",
+          "url": "https://github.com/szl-holdings/amaru.git",
+          "allowlisted": false,
+          "fails": false
+        },
+        {
+          "page": "docs/site/docs/flagships/index.md",
+          "target_repo": "amaru",
+          "kind": "missing",
+          "url": "https://github.com/szl-holdings/amaru",
+          "allowlisted": false,
+          "fails": false
+        },
+        {
+          "page": "docs/site/docs/flagships/index.md",
+          "target_repo": "sentra",
+          "kind": "missing",
+          "url": "https://github.com/szl-holdings/sentra",
+          "allowlisted": false,
+          "fails": false
+        },
+        {
+          "page": "docs/site/docs/flagships/index.md",
+          "target_repo": "rosie",
+          "kind": "missing",
+          "url": "https://github.com/szl-holdings/rosie",
+          "allowlisted": false,
+          "fails": false
+        },
+        {
+          "page": "docs/site/docs/flagships/rosie.md",
+          "target_repo": "rosie",
+          "kind": "missing",
+          "url": "https://github.com/szl-holdings/rosie",
+          "allowlisted": false,
+          "fails": false
+        },
+        {
+          "page": "docs/site/docs/flagships/rosie.md",
+          "target_repo": "rosie",
+          "kind": "missing",
+          "url": "https://github.com/szl-holdings/rosie.git",
+          "allowlisted": false,
+          "fails": false
+        },
+        {
+          "page": "docs/site/docs/flagships/sentra.md",
+          "target_repo": "sentra",
+          "kind": "missing",
+          "url": "https://github.com/szl-holdings/sentra",
+          "allowlisted": false,
+          "fails": false
+        },
+        {
+          "page": "docs/site/docs/flagships/sentra.md",
+          "target_repo": "ouroboros-thesis",
+          "kind": "missing",
+          "url": "https://github.com/szl-holdings/ouroboros-thesis",
+          "allowlisted": false,
+          "fails": false
+        },
+        {
+          "page": "docs/site/docs/flagships/sentra.md",
+          "target_repo": "sentra",
+          "kind": "missing",
+          "url": "https://github.com/szl-holdings/sentra.git",
+          "allowlisted": false,
+          "fails": false
+        },
+        {
+          "page": "docs/site/docs/quickstart.md",
+          "target_repo": "amaru",
+          "kind": "missing",
+          "url": "https://github.com/szl-holdings/amaru.git",
+          "allowlisted": false,
+          "fails": false
+        },
+        {
+          "page": "docs/site/docs/quickstart.md",
+          "target_repo": "sentra",
+          "kind": "missing",
+          "url": "https://github.com/szl-holdings/sentra.git",
+          "allowlisted": false,
+          "fails": false
+        },
+        {
+          "page": "docs/site/docs/quickstart.md",
+          "target_repo": "rosie",
+          "kind": "missing",
+          "url": "https://github.com/szl-holdings/rosie.git",
+          "allowlisted": false,
+          "fails": false
+        },
+        {
+          "page": "docs/site/docs/status.md",
+          "target_repo": "amaru",
+          "kind": "missing",
+          "url": "https://github.com/szl-holdings/amaru",
+          "allowlisted": false,
+          "fails": false
+        },
+        {
+          "page": "docs/site/docs/status.md",
+          "target_repo": "sentra",
+          "kind": "missing",
+          "url": "https://github.com/szl-holdings/sentra",
+          "allowlisted": false,
+          "fails": false
+        },
+        {
+          "page": "docs/site/docs/status.md",
+          "target_repo": "rosie",
+          "kind": "missing",
+          "url": "https://github.com/szl-holdings/rosie",
+          "allowlisted": false,
+          "fails": false
+        },
+        {
+          "page": "docs/site/docs/status.md",
+          "target_repo": "ouroboros-thesis",
+          "kind": "missing",
+          "url": "https://github.com/szl-holdings/ouroboros-thesis",
+          "allowlisted": false,
+          "fails": false
+        },
+        {
+          "page": "docs/site/investor/README.md",
+          "target_repo": "investor-public-summary",
+          "kind": "missing",
+          "url": "https://github.com/szl-holdings/investor-public-summary/actions",
+          "allowlisted": false,
+          "fails": false
+        },
+        {
+          "page": "docs/site/trust/README.md",
+          "target_repo": "ouroboros-thesis",
+          "kind": "missing",
+          "url": "https://github.com/szl-holdings/ouroboros-thesis",
+          "allowlisted": false,
+          "fails": false
+        },
+        {
+          "page": "docs/site/trust/README.md",
+          "target_repo": "amaru",
+          "kind": "missing",
+          "url": "https://github.com/szl-holdings/amaru",
+          "allowlisted": false,
+          "fails": false
+        },
+        {
+          "page": "docs/site/trust/README.md",
+          "target_repo": "sentra",
+          "kind": "missing",
+          "url": "https://github.com/szl-holdings/sentra",
+          "allowlisted": false,
+          "fails": false
+        },
+        {
+          "page": "organs/amaru/README.md",
+          "target_repo": "amaru",
+          "kind": "missing",
+          "url": "https://github.com/szl-holdings/amaru/actions",
+          "allowlisted": false,
+          "fails": false
+        },
+        {
+          "page": "organs/amaru/README.md",
+          "target_repo": "amaru",
+          "kind": "missing",
+          "url": "https://github.com/szl-holdings/amaru/releases/tag/v1.0.0",
+          "allowlisted": false,
+          "fails": false
+        },
+        {
+          "page": "organs/amaru/docs/FORKING.md",
+          "target_repo": "amaru",
+          "kind": "missing",
+          "url": "https://github.com/szl-holdings/amaru/issues/new?template=doctrine_question.yml",
+          "allowlisted": false,
+          "fails": false
+        },
+        {
+          "page": "organs/amaru/docs/FORKING.md",
+          "target_repo": "amaru",
+          "kind": "missing",
+          "url": "https://github.com/szl-holdings/amaru",
+          "allowlisted": false,
+          "fails": false
+        },
+        {
+          "page": "organs/amaru/web/README.md",
+          "target_repo": "szl-holdings-platform",
+          "kind": "missing",
+          "url": "https://github.com/szl-holdings/szl-holdings-platform",
+          "allowlisted": false,
+          "fails": false
+        },
+        {
+          "page": "organs/amaru/web/README.md",
+          "target_repo": "ouroboros-thesis",
+          "kind": "missing",
+          "url": "https://github.com/szl-holdings/ouroboros-thesis",
+          "allowlisted": false,
+          "fails": false
+        },
+        {
+          "page": "organs/sentra/README.md",
+          "target_repo": "sentra",
+          "kind": "missing",
+          "url": "https://github.com/szl-holdings/sentra/actions",
+          "allowlisted": false,
+          "fails": false
+        },
+        {
+          "page": "organs/sentra/README.md",
+          "target_repo": "sentra",
+          "kind": "missing",
+          "url": "https://github.com/szl-holdings/sentra/releases/tag/v1.0.0",
+          "allowlisted": false,
+          "fails": false
+        },
+        {
+          "page": "organs/sentra/docs/FORKING.md",
+          "target_repo": "sentra",
+          "kind": "missing",
+          "url": "https://github.com/szl-holdings/sentra/issues/new?template=doctrine_question.yml",
+          "allowlisted": false,
+          "fails": false
+        },
+        {
+          "page": "organs/sentra/docs/FORKING.md",
+          "target_repo": "sentra",
+          "kind": "missing",
+          "url": "https://github.com/szl-holdings/sentra",
+          "allowlisted": false,
+          "fails": false
+        },
+        {
+          "page": "organs/sentra/docs/OFFLINE_QUICKSTART.md",
+          "target_repo": "rosie",
+          "kind": "missing",
+          "url": "https://github.com/szl-holdings/rosie",
+          "allowlisted": false,
+          "fails": false
+        },
+        {
+          "page": "organs/sentra/web/README.md",
+          "target_repo": "sentra",
+          "kind": "missing",
+          "url": "https://github.com/szl-holdings/sentra/actions/workflows/ci.yml",
+          "allowlisted": false,
+          "fails": false
+        },
+        {
+          "page": "proofs/lutar-lean/README.md",
+          "target_repo": "ouroboros-thesis",
+          "kind": "missing",
+          "url": "https://github.com/szl-holdings/ouroboros-thesis",
+          "allowlisted": false,
+          "fails": false
+        },
+        {
+          "page": "proofs/lutar-lean/README.md",
+          "target_repo": "ouroboros-thesis",
+          "kind": "missing",
+          "url": "https://github.com/szl-holdings/ouroboros-thesis/tree/main/papers/v21",
+          "allowlisted": false,
+          "fails": false
+        },
+        {
+          "page": "proofs/lutar-lean/README.md",
+          "target_repo": "ouroboros-thesis",
+          "kind": "missing",
+          "url": "https://github.com/szl-holdings/ouroboros-thesis/releases/tag/paper-v21-1.0.0",
+          "allowlisted": false,
+          "fails": false
+        },
+        {
+          "page": "runtime/ouroboros/README.md",
+          "target_repo": "ouroboros-thesis",
+          "kind": "missing",
+          "url": "https://github.com/szl-holdings/ouroboros-thesis",
+          "allowlisted": false,
+          "fails": false
+        },
+        {
+          "page": "runtime/ouroboros/README.md",
+          "target_repo": "amaru",
+          "kind": "missing",
+          "url": "https://github.com/szl-holdings/amaru",
+          "allowlisted": false,
+          "fails": false
+        },
+        {
+          "page": "runtime/ouroboros/README.md",
+          "target_repo": "rosie",
+          "kind": "missing",
+          "url": "https://github.com/szl-holdings/rosie",
+          "allowlisted": false,
+          "fails": false
+        },
+        {
+          "page": "runtime/ouroboros/README.md",
+          "target_repo": "sentra",
+          "kind": "missing",
+          "url": "https://github.com/szl-holdings/sentra",
+          "allowlisted": false,
+          "fails": false
+        },
+        {
+          "page": "runtime/ouroboros/README.md",
+          "target_repo": "agi-forecast",
+          "kind": "missing",
+          "url": "https://github.com/szl-holdings/agi-forecast",
+          "allowlisted": false,
+          "fails": false
+        },
+        {
+          "page": "runtime/ouroboros/docs/sdk-innovation-memo.md",
+          "target_repo": "ouroboros-thesis",
+          "kind": "missing",
+          "url": "https://github.com/szl-holdings/ouroboros-thesis/blob/main/docs/sdk-innovation.md",
+          "allowlisted": false,
+          "fails": false
+        },
+        {
+          "page": "web/README.md",
+          "target_repo": "szl-holdings-platform",
+          "kind": "missing",
+          "url": "https://github.com/szl-holdings/szl-holdings-platform/actions/workflows/ci.yml",
+          "allowlisted": false,
+          "fails": false
+        }
+      ],
+      "status": "WARN"
+    },
+    {
+      "repo": "developers",
+      "archived": false,
+      "pages_scanned": 1,
+      "findings": [],
+      "status": "OK"
+    },
+    {
+      "repo": "docs-site",
+      "archived": false,
+      "pages_scanned": 43,
+      "findings": [
+        {
+          "page": "cookbook/README.md",
+          "target_repo": "ouroboros-thesis",
+          "kind": "missing",
+          "url": "https://github.com/szl-holdings/ouroboros-thesis",
+          "allowlisted": false,
+          "fails": false
+        },
+        {
+          "page": "cookbook/README.md",
+          "target_repo": "amaru",
+          "kind": "missing",
+          "url": "https://github.com/szl-holdings/amaru",
+          "allowlisted": false,
+          "fails": false
+        },
+        {
+          "page": "cookbook/README.md",
+          "target_repo": "sentra",
+          "kind": "missing",
+          "url": "https://github.com/szl-holdings/sentra",
+          "allowlisted": false,
+          "fails": false
+        },
+        {
+          "page": "developers/README.md",
+          "target_repo": "compliance-posture",
+          "kind": "missing",
+          "url": "https://github.com/szl-holdings/compliance-posture",
+          "allowlisted": false,
+          "fails": false
+        },
+        {
+          "page": "docs/changelog.md",
+          "target_repo": "sentra",
+          "kind": "missing",
+          "url": "https://github.com/szl-holdings/sentra/releases/tag/v1.0.0",
+          "allowlisted": false,
+          "fails": false
+        },
+        {
+          "page": "docs/changelog.md",
+          "target_repo": "amaru",
+          "kind": "missing",
+          "url": "https://github.com/szl-holdings/amaru/releases/tag/v1.0.0",
+          "allowlisted": false,
+          "fails": false
+        },
+        {
+          "page": "docs/changelog.md",
+          "target_repo": "rosie",
+          "kind": "missing",
+          "url": "https://github.com/szl-holdings/rosie/releases/tag/v1.0.0",
+          "allowlisted": false,
+          "fails": false
+        },
+        {
+          "page": "docs/evidence/index.md",
+          "target_repo": "ouroboros-thesis",
+          "kind": "missing",
+          "url": "https://github.com/szl-holdings/ouroboros-thesis",
+          "allowlisted": false,
+          "fails": false
+        },
+        {
+          "page": "docs/flagships/amaru.md",
+          "target_repo": "amaru",
+          "kind": "missing",
+          "url": "https://github.com/szl-holdings/amaru",
+          "allowlisted": false,
+          "fails": false
+        },
+        {
+          "page": "docs/flagships/amaru.md",
+          "target_repo": "ouroboros-thesis",
+          "kind": "missing",
+          "url": "https://github.com/szl-holdings/ouroboros-thesis",
+          "allowlisted": false,
+          "fails": false
+        },
+        {
+          "page": "docs/flagships/amaru.md",
+          "target_repo": "amaru",
+          "kind": "missing",
+          "url": "https://github.com/szl-holdings/amaru.git",
+          "allowlisted": false,
+          "fails": false
+        },
+        {
+          "page": "docs/flagships/index.md",
+          "target_repo": "amaru",
+          "kind": "missing",
+          "url": "https://github.com/szl-holdings/amaru",
+          "allowlisted": false,
+          "fails": false
+        },
+        {
+          "page": "docs/flagships/index.md",
+          "target_repo": "sentra",
+          "kind": "missing",
+          "url": "https://github.com/szl-holdings/sentra",
+          "allowlisted": false,
+          "fails": false
+        },
+        {
+          "page": "docs/flagships/index.md",
+          "target_repo": "rosie",
+          "kind": "missing",
+          "url": "https://github.com/szl-holdings/rosie",
+          "allowlisted": false,
+          "fails": false
+        },
+        {
+          "page": "docs/flagships/rosie.md",
+          "target_repo": "rosie",
+          "kind": "missing",
+          "url": "https://github.com/szl-holdings/rosie",
+          "allowlisted": false,
+          "fails": false
+        },
+        {
+          "page": "docs/flagships/rosie.md",
+          "target_repo": "rosie",
+          "kind": "missing",
+          "url": "https://github.com/szl-holdings/rosie.git",
+          "allowlisted": false,
+          "fails": false
+        },
+        {
+          "page": "docs/flagships/sentra.md",
+          "target_repo": "sentra",
+          "kind": "missing",
+          "url": "https://github.com/szl-holdings/sentra",
+          "allowlisted": false,
+          "fails": false
+        },
+        {
+          "page": "docs/flagships/sentra.md",
+          "target_repo": "ouroboros-thesis",
+          "kind": "missing",
+          "url": "https://github.com/szl-holdings/ouroboros-thesis",
+          "allowlisted": false,
+          "fails": false
+        },
+        {
+          "page": "docs/flagships/sentra.md",
+          "target_repo": "sentra",
+          "kind": "missing",
+          "url": "https://github.com/szl-holdings/sentra.git",
+          "allowlisted": false,
+          "fails": false
+        },
+        {
+          "page": "docs/quickstart.md",
+          "target_repo": "amaru",
+          "kind": "missing",
+          "url": "https://github.com/szl-holdings/amaru.git",
+          "allowlisted": false,
+          "fails": false
+        },
+        {
+          "page": "docs/quickstart.md",
+          "target_repo": "sentra",
+          "kind": "missing",
+          "url": "https://github.com/szl-holdings/sentra.git",
+          "allowlisted": false,
+          "fails": false
+        },
+        {
+          "page": "docs/quickstart.md",
+          "target_repo": "rosie",
+          "kind": "missing",
+          "url": "https://github.com/szl-holdings/rosie.git",
+          "allowlisted": false,
+          "fails": false
+        },
+        {
+          "page": "docs/status.md",
+          "target_repo": "amaru",
+          "kind": "missing",
+          "url": "https://github.com/szl-holdings/amaru",
+          "allowlisted": false,
+          "fails": false
+        },
+        {
+          "page": "docs/status.md",
+          "target_repo": "sentra",
+          "kind": "missing",
+          "url": "https://github.com/szl-holdings/sentra",
+          "allowlisted": false,
+          "fails": false
+        },
+        {
+          "page": "docs/status.md",
+          "target_repo": "rosie",
+          "kind": "missing",
+          "url": "https://github.com/szl-holdings/rosie",
+          "allowlisted": false,
+          "fails": false
+        },
+        {
+          "page": "docs/status.md",
+          "target_repo": "ouroboros-thesis",
+          "kind": "missing",
+          "url": "https://github.com/szl-holdings/ouroboros-thesis",
+          "allowlisted": false,
+          "fails": false
+        },
+        {
+          "page": "investor/README.md",
+          "target_repo": "investor-public-summary",
+          "kind": "missing",
+          "url": "https://github.com/szl-holdings/investor-public-summary/actions",
+          "allowlisted": false,
+          "fails": false
+        },
+        {
+          "page": "trust/README.md",
+          "target_repo": "ouroboros-thesis",
+          "kind": "missing",
+          "url": "https://github.com/szl-holdings/ouroboros-thesis",
+          "allowlisted": false,
+          "fails": false
+        },
+        {
+          "page": "trust/README.md",
+          "target_repo": "amaru",
+          "kind": "missing",
+          "url": "https://github.com/szl-holdings/amaru",
+          "allowlisted": false,
+          "fails": false
+        },
+        {
+          "page": "trust/README.md",
+          "target_repo": "sentra",
+          "kind": "missing",
+          "url": "https://github.com/szl-holdings/sentra",
+          "allowlisted": false,
+          "fails": false
+        }
+      ],
+      "status": "WARN"
+    },
+    {
+      "repo": "hatun-mcp",
+      "archived": false,
+      "pages_scanned": 1,
+      "findings": [],
+      "status": "OK"
+    },
+    {
+      "repo": "khipu-consensus",
+      "archived": false,
+      "pages_scanned": 3,
+      "findings": [],
+      "status": "OK"
+    },
+    {
+      "repo": "killinchu",
+      "archived": false,
+      "pages_scanned": 7,
+      "findings": [],
+      "status": "OK"
+    },
+    {
+      "repo": "lean-kernel",
+      "archived": false,
+      "pages_scanned": 1,
+      "findings": [],
+      "status": "OK"
+    },
+    {
+      "repo": "lutar-lean",
+      "archived": false,
+      "pages_scanned": 8,
+      "findings": [],
+      "status": "OK"
+    },
+    {
+      "repo": "ouroboros",
+      "archived": false,
+      "pages_scanned": 14,
+      "findings": [
+        {
+          "page": "README.md",
+          "target_repo": "ouroboros-thesis",
+          "kind": "missing",
+          "url": "https://github.com/szl-holdings/ouroboros-thesis",
+          "allowlisted": false,
+          "fails": false
+        },
+        {
+          "page": "docs/sdk-innovation-memo.md",
+          "target_repo": "ouroboros-thesis",
+          "kind": "missing",
+          "url": "https://github.com/szl-holdings/ouroboros-thesis/blob/main/docs/sdk-innovation.md",
+          "allowlisted": false,
+          "fails": false
+        }
+      ],
+      "status": "WARN"
+    },
+    {
+      "repo": "platform",
+      "archived": false,
+      "pages_scanned": 400,
+      "findings": [],
+      "status": "OK"
+    },
+    {
+      "repo": "szl-brand",
+      "archived": false,
+      "pages_scanned": 7,
+      "findings": [
+        {
+          "page": "README.md",
+          "target_repo": "brand-kit",
+          "kind": "missing",
+          "url": "https://github.com/szl-holdings/brand-kit",
+          "allowlisted": false,
+          "fails": false
+        },
+        {
+          "page": "kit/README.md",
+          "target_repo": "brand-kit",
+          "kind": "missing",
+          "url": "https://github.com/szl-holdings/brand-kit/actions",
+          "allowlisted": false,
+          "fails": false
+        }
+      ],
+      "status": "WARN"
+    },
+    {
+      "repo": "szl-build-env",
+      "archived": false,
+      "pages_scanned": 2,
+      "findings": [],
+      "status": "OK"
+    },
+    {
+      "repo": "szl-cookbook",
+      "archived": false,
+      "pages_scanned": 11,
+      "findings": [
+        {
+          "page": "ops/REPLIT_HARDCODE_PAYLOAD/README.md",
+          "target_repo": "ouroboros-thesis",
+          "kind": "missing",
+          "url": "https://github.com/szl-holdings/ouroboros-thesis/pull/44#issuecomment-4467393182",
+          "allowlisted": false,
+          "fails": false
+        },
+        {
+          "page": "ops/REPLIT_HARDCODE_PAYLOAD/README.md",
+          "target_repo": "agi-forecast",
+          "kind": "missing",
+          "url": "https://github.com/szl-holdings/agi-forecast/pull/4#issuecomment-4467395270",
+          "allowlisted": false,
+          "fails": false
+        },
+        {
+          "page": "ops/REPLIT_HARDCODE_PAYLOAD/README.md",
+          "target_repo": "ouroboros-thesis",
+          "kind": "missing",
+          "url": "https://github.com/szl-holdings/ouroboros-thesis/pull/46#issuecomment-4467395463",
+          "allowlisted": false,
+          "fails": false
+        },
+        {
+          "page": "ops/REPLIT_HARDCODE_PAYLOAD/README.md",
+          "target_repo": "agi-forecast",
+          "kind": "missing",
+          "url": "https://github.com/szl-holdings/agi-forecast/pull/9",
+          "allowlisted": false,
+          "fails": false
+        },
+        {
+          "page": "ops/REPLIT_HARDCODE_PAYLOAD/README.md",
+          "target_repo": "ouroboros-thesis",
+          "kind": "missing",
+          "url": "https://github.com/szl-holdings/ouroboros-thesis/pull/47",
+          "allowlisted": false,
+          "fails": false
+        },
+        {
+          "page": "ops/REPLIT_HARDCODE_PAYLOAD/README.md",
+          "target_repo": "ouroboros-thesis",
+          "kind": "missing",
+          "url": "https://github.com/szl-holdings/ouroboros-thesis/pull/44#issuecomment-4467525771",
+          "allowlisted": false,
+          "fails": false
+        },
+        {
+          "page": "ops/REPLIT_HARDCODE_PAYLOAD/README.md",
+          "target_repo": "sentra",
+          "kind": "missing",
+          "url": "https://github.com/szl-holdings/sentra/pull/22#issuecomment-4467521037",
+          "allowlisted": false,
+          "fails": false
+        },
+        {
+          "page": "ops/REPLIT_HARDCODE_PAYLOAD/README.md",
+          "target_repo": "sentra",
+          "kind": "missing",
+          "url": "https://github.com/szl-holdings/sentra/pull/20#issuecomment-4467521090",
+          "allowlisted": false,
+          "fails": false
+        },
+        {
+          "page": "ops/REPLIT_HARDCODE_PAYLOAD/docs/ANATOMY_SWEEP_REPORT.md",
+          "target_repo": "ouroboros-thesis",
+          "kind": "missing",
+          "url": "https://github.com/szl-holdings/ouroboros-thesis/pull/39#issuecomment-4467297472",
+          "allowlisted": false,
+          "fails": false
+        },
+        {
+          "page": "ops/REPLIT_HARDCODE_PAYLOAD/docs/UNIFIED_OPERATOR_HANDOFF.md",
+          "target_repo": "agi-forecast",
+          "kind": "missing",
+          "url": "https://github.com/szl-holdings/agi-forecast/pull/6",
+          "allowlisted": false,
+          "fails": false
+        },
+        {
+          "page": "ops/REPLIT_HARDCODE_PAYLOAD/docs/UNIFIED_OPERATOR_HANDOFF.md",
+          "target_repo": "agi-forecast",
+          "kind": "missing",
+          "url": "https://github.com/szl-holdings/agi-forecast/pull/7",
+          "allowlisted": false,
+          "fails": false
+        },
+        {
+          "page": "ops/REPLIT_HARDCODE_PAYLOAD/docs/UNIFIED_OPERATOR_HANDOFF.md",
+          "target_repo": "agi-forecast",
+          "kind": "missing",
+          "url": "https://github.com/szl-holdings/agi-forecast/pull/8",
+          "allowlisted": false,
+          "fails": false
+        }
+      ],
+      "status": "WARN"
+    },
+    {
+      "repo": "szl-doctrine",
+      "archived": false,
+      "pages_scanned": 1,
+      "findings": [],
+      "status": "OK"
+    },
+    {
+      "repo": "szl-fleet-overlay",
+      "archived": false,
+      "pages_scanned": 2,
+      "findings": [],
+      "status": "OK"
+    },
+    {
+      "repo": "szl-lake",
+      "archived": false,
+      "pages_scanned": 1,
+      "findings": [],
+      "status": "OK"
+    },
+    {
+      "repo": "szl-mesh",
+      "archived": false,
+      "pages_scanned": 2,
+      "findings": [],
+      "status": "OK"
+    },
+    {
+      "repo": "szl-papers",
+      "archived": false,
+      "pages_scanned": 12,
+      "findings": [
+        {
+          "page": "README.md",
+          "target_repo": "ouroboros-thesis",
+          "kind": "missing",
+          "url": "https://github.com/szl-holdings/ouroboros-thesis",
+          "allowlisted": false,
+          "fails": false
+        },
+        {
+          "page": "README.md",
+          "target_repo": "prior-art-disclosures",
+          "kind": "missing",
+          "url": "https://github.com/szl-holdings/prior-art-disclosures",
+          "allowlisted": false,
+          "fails": false
+        },
+        {
+          "page": "preprints/puriq/README.md",
+          "target_repo": "puriq-preprint",
+          "kind": "missing",
+          "url": "https://github.com/szl-holdings/puriq-preprint/actions",
+          "allowlisted": false,
+          "fails": false
+        },
+        {
+          "page": "prior-art/README.md",
+          "target_repo": "prior-art-disclosures",
+          "kind": "missing",
+          "url": "https://github.com/szl-holdings/prior-art-disclosures/actions",
+          "allowlisted": false,
+          "fails": false
+        },
+        {
+          "page": "thesis/ouroboros/README.md",
+          "target_repo": "ouroboros-thesis",
+          "kind": "missing",
+          "url": "https://github.com/szl-holdings/ouroboros-thesis/actions",
+          "allowlisted": false,
+          "fails": false
+        },
+        {
+          "page": "thesis/ouroboros/README.md",
+          "target_repo": "ouroboros-thesis",
+          "kind": "missing",
+          "url": "https://github.com/szl-holdings/ouroboros-thesis/security/dependabot",
+          "allowlisted": false,
+          "fails": false
+        },
+        {
+          "page": "thesis/ouroboros/README.md",
+          "target_repo": "ouroboros-thesis",
+          "kind": "missing",
+          "url": "https://github.com/szl-holdings/ouroboros-thesis/actions/workflows/ci.yml",
+          "allowlisted": false,
+          "fails": false
+        },
+        {
+          "page": "thesis/ouroboros/README.md",
+          "target_repo": "ouroboros-thesis",
+          "kind": "missing",
+          "url": "https://github.com/szl-holdings/ouroboros-thesis/actions/workflows/codeql.yml",
+          "allowlisted": false,
+          "fails": false
+        },
+        {
+          "page": "thesis/ouroboros/README.md",
+          "target_repo": "ouroboros-thesis",
+          "kind": "missing",
+          "url": "https://github.com/szl-holdings/ouroboros-thesis/security/code-scanning",
+          "allowlisted": false,
+          "fails": false
+        },
+        {
+          "page": "thesis/ouroboros/README.md",
+          "target_repo": "ouroboros-thesis",
+          "kind": "missing",
+          "url": "https://github.com/szl-holdings/ouroboros-thesis/security/secret-scanning",
+          "allowlisted": false,
+          "fails": false
+        },
+        {
+          "page": "thesis/ouroboros/README.md",
+          "target_repo": "ouroboros-thesis",
+          "kind": "missing",
+          "url": "https://github.com/szl-holdings/ouroboros-thesis/actions/workflows/sbom.yml",
+          "allowlisted": false,
+          "fails": false
+        },
+        {
+          "page": "thesis/ouroboros/README.md",
+          "target_repo": "ouroboros-thesis",
+          "kind": "missing",
+          "url": "https://github.com/szl-holdings/ouroboros-thesis/actions/workflows/dco.yml",
+          "allowlisted": false,
+          "fails": false
+        },
+        {
+          "page": "thesis/ouroboros/README.md",
+          "target_repo": "ouroboros-thesis",
+          "kind": "missing",
+          "url": "https://securityscorecards.dev/viewer/?uri=github.com/szl-holdings/ouroboros-thesis",
+          "allowlisted": false,
+          "fails": false
+        }
+      ],
+      "status": "WARN"
+    },
+    {
+      "repo": "szl-trust",
+      "archived": false,
+      "pages_scanned": 1,
+      "findings": [],
+      "status": "OK"
+    },
+    {
+      "repo": "szl-uds-deployment",
+      "archived": false,
+      "pages_scanned": 33,
+      "findings": [],
+      "status": "OK"
+    },
+    {
+      "repo": "szlholdings-site",
+      "archived": false,
+      "pages_scanned": 0,
+      "findings": [],
+      "status": "OK"
+    },
+    {
+      "repo": "uds-bundles",
+      "archived": false,
+      "pages_scanned": 15,
+      "findings": [],
+      "status": "OK"
+    },
+    {
+      "repo": "uds-mesh",
+      "archived": false,
+      "pages_scanned": 10,
+      "findings": [],
+      "status": "OK"
+    },
+    {
+      "repo": "vsp-otel",
+      "archived": false,
+      "pages_scanned": 5,
+      "findings": [],
+      "status": "OK"
+    },
+    {
+      "repo": "warhacker-demo",
+      "archived": false,
+      "pages_scanned": 1,
+      "findings": [],
+      "status": "OK"
+    }
+  ]
+}

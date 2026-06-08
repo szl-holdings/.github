@@ -1,0 +1,6 @@
+{
+  "_comment": "Intentional, reasoned exceptions for the public-repo-link checker (see .github/scripts/public_repo_link_check.py). A finding is suppressed only when it appears here. 'allow' suppresses a specific (source_repo, target) pair; 'ignore_targets' suppresses a target repo wherever it is referenced; 'ignore_source_repos' skips a source repo's pages entirely. Every entry must explain WHY a public page intentionally links to a private/missing repo. Nothing is silently passed -- un-listed dead links fail the job. Keep this empty unless a link to a private repo is genuinely intended (rare).",
+  "allow": [],
+  "ignore_targets": [],
+  "ignore_source_repos": []
+}
