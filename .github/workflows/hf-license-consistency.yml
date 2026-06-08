@@ -1,0 +1,96 @@
+name: HF License Consistency
+
+# Issue #202 class of drift, Hugging Face edition: the org also publishes Spaces,
+# models and datasets under huggingface.co/SZLHOLDINGS, where the license is
+# declared in each repo's README front-matter (license:). Those HF declarations
+# can drift from the matching GitHub repo's actual LICENSE (e.g. the killinchu
+# GitHub<->HF content fork) with no guard — and HF has no PR CI like GitHub.
+#
+# This job runs .github/scripts/hf_license_consistency.py across every PUBLIC HF
+# org repo, flags a missing front-matter license:, and cross-references the
+# matching szl-holdings GitHub repo's detected SPDX id. Intentional cases
+# (org-card Space, dual-license, HF-only repos) are explicitly allowlisted in
+# .github/data/hf_license_allowlist.json — anything else fails the job.
+#
+# Auth: public HF reads need no token (the script runs anonymously here). The
+# built-in GITHUB_TOKEN is enough for the GitHub SPDX cross-reference of public
+# repos. To also cover PRIVATE HF repos, add an org-scoped HF_ORG_TOKEN secret
+# and pass it via the env block + the --include-private flag.
+
+on:
+  schedule:
+    # Weekly sweep (Mondays 07:41 UTC) so drift is caught fast even when idle.
+    # Offset from license-consistency.yml (07:23) to avoid a thundering herd.
+    - cron: "41 7 * * 1"
+  workflow_dispatch: {}
+  push:
+    branches: [main]
+    paths:
+      - ".github/scripts/hf_license_consistency.py"
+      - ".github/data/hf_license_allowlist.json"
+      - ".github/workflows/hf-license-consistency.yml"
+  workflow_call: {}
+
+permissions:
+  contents: read
+
+concurrency:
+  group: hf-license-consistency-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    name: HF license claims match GitHub SPDX
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write # only to commit the refreshed report in szl-holdings/.github
+    steps:
+      - name: Harden runner
+        uses: step-security/harden-runner@9af89fc71515a100421586dfdb3dc9c984fbf411 # v2.19.4
+        with:
+          egress-policy: audit
+
+      - name: Checkout
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - name: Set up Python
+        uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6.2.0
+        with:
+          python-version: "3.12"
+
+      - name: Check HF license consistency across the org
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          # Optional: uncomment after adding an org-scoped HF token secret to
+          # also cover private HF repos (then add --include-private below).
+          # HF_ORG_TOKEN: ${{ secrets.HF_ORG_TOKEN }}
+        run: |
+          set +e
+          python3 .github/scripts/hf_license_consistency.py \
+            --report .github/data/hf_license_consistency_report.json
+          echo "CHECK_EXIT=$?" >> "$GITHUB_ENV"
+
+      - name: Commit refreshed report if changed
+        if: github.repository == 'szl-holdings/.github' && github.event_name != 'pull_request'
+        run: |
+          if git diff --quiet -- .github/data/hf_license_consistency_report.json; then
+            echo "Report unchanged; nothing to commit."
+            exit 0
+          fi
+          git config user.name "Stephen P. Lutar Jr."
+          git config user.email "stephenlutar2@gmail.com"
+          git add .github/data/hf_license_consistency_report.json
+          git commit -s -m "chore(license): refresh HF license-consistency report [skip ci]"
+          git push
+
+      - name: Fail if any HF license-claim drift
+        run: |
+          if [ "${CHECK_EXIT:-1}" != "0" ]; then
+            echo "::error::HF license-claim drift detected. See the step output above"
+            echo "::error::and .github/data/hf_license_consistency_report.json. Fix the"
+            echo "::error::HF README front-matter license:, the GitHub LICENSE, or add a"
+            echo "::error::reasoned entry to .github/data/hf_license_allowlist.json."
+            exit 1
+          fi
+          echo "✓ All public HF repos' license claims are consistent."
