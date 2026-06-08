@@ -22,16 +22,11 @@ name: Reusable — Lockfile Registry Check
 # the host back to https://registry.npmjs.org/ (tarball + integrity sha unchanged).
 
 on:
-  workflow_call:
-    inputs:
-      paths:
-        description: >-
-          Optional newline- or space-separated list of lockfile globs to scan.
-          Defaults to all package-lock.json / npm-shrinkwrap.json /
-          pnpm-lock.yaml / yarn.lock files outside node_modules.
-        required: false
-        type: string
-        default: ""
+  # No inputs: the scan always walks every committed lockfile in the caller
+  # (package-lock.json / npm-shrinkwrap.json / pnpm-lock.yaml / yarn.lock,
+  # excluding node_modules). There is never a reason to scan a subset — a
+  # poisoned host anywhere breaks install everywhere.
+  workflow_call: {}
 
 permissions:
   contents: read

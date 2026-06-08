@@ -154,7 +154,7 @@ def list_public_repos(org: str, token: str, include_archived: bool):
 def repo_lockfiles(repo_full: str, ref: str, token: str):
     """List committed lockfile paths in a repo via the recursive git tree."""
     try:
-        tree = _gh(f"/repos/{repo_full}/git/trees/{urllib.parse.quote(ref)}?recursive=1",
+        tree = _gh(f"/repos/{repo_full}/git/trees/{urllib.parse.quote(ref, safe='')}?recursive=1",
                    token)
     except urllib.error.HTTPError as e:
         if e.code in (404, 409):  # empty repo / missing ref
