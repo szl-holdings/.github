@@ -18,10 +18,10 @@ name: Public Repo Link Check
 # Severity split (matches the recurring incident exactly):
 #   * a link to a now-PRIVATE repo (the visibility-flip case) is an ERROR and
 #     FAILS the job -- surfaced as a ::error:: annotation.
-#   * a link to a DELETED/missing repo is the same 404 to a visitor but is a
-#     pre-existing backlog rather than the flip trigger, so it is surfaced as a
-#     ::warning:: annotation + in the report WITHOUT failing the job. Pass
-#     --fail-on-missing (see below) to ratchet it up once the backlog is cleared.
+#   * a link to a DELETED/missing repo is the same 404 to a visitor. The
+#     pre-existing backlog was cleared (Task #314), so --fail-on-missing is now
+#     ENABLED below and a missing target also FAILS the job (::warning:: +
+#     report). New intentional exceptions go in the allowlist.
 #
 # Knowing a target is PRIVATE (vs merely missing) needs a token that can see the
 # org's private repos: SZL_GITHUB_TOKEN if present, else the built-in token (which
@@ -78,6 +78,7 @@ jobs:
           set +e
           python3 .github/scripts/public_repo_link_check.py \
             --scan-docs \
+            --fail-on-missing \
             --report .github/data/public_repo_link_report.json
           echo "CHECK_EXIT=$?" >> "$GITHUB_ENV"
 
@@ -94,16 +95,16 @@ jobs:
           git commit -s -m "chore(links): refresh public-repo-link report [skip ci]"
           git push
 
-      - name: Fail if any public page links to a now-private repo
+      - name: Fail if any public page links to a private or deleted repo
         run: |
           if [ "${CHECK_EXIT:-1}" != "0" ]; then
-            echo "::error::A public README/docs page links to a now-PRIVATE"
-            echo "::error::szl-holdings repo (404 for anonymous visitors). See the"
-            echo "::error::annotations above and .github/data/public_repo_link_report.json."
-            echo "::error::Fix: repoint the link, re-publish the target repo, or add a"
-            echo "::error::reasoned entry to .github/data/public_repo_link_allowlist.json."
+            echo "::error::A public README/docs page links to a now-PRIVATE or"
+            echo "::error::DELETED szl-holdings repo (404 for anonymous visitors)."
+            echo "::error::See the annotations above and"
+            echo "::error::.github/data/public_repo_link_report.json."
+            echo "::error::Fix: repoint the link, de-link to plain text, re-publish"
+            echo "::error::the target repo, or add a reasoned entry to"
+            echo "::error::.github/data/public_repo_link_allowlist.json."
             exit 1
           fi
-          echo "✓ No public page links to a now-private szl-holdings repo."
-          echo "  (Links to deleted/missing repos, if any, are surfaced as"
-          echo "   ::warning:: annotations and in the report without failing.)"
+          echo "✓ No public page links to a private or deleted szl-holdings repo."
