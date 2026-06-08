@@ -2,16 +2,32 @@
   "schema": "szl.hf_license_consistency/v1",
   "org": "SZLHOLDINGS",
   "github_org": "szl-holdings",
-  "checked_at_utc": "2026-06-08T05:55:50Z",
-  "include_private": false,
+  "checked_at_utc": "2026-06-08T19:58:26Z",
+  "include_private": true,
   "github_crossref": true,
   "summary": {
-    "checked": 28,
-    "ok": 28,
+    "checked": 36,
+    "ok": 36,
     "warn": 0,
     "error": 0
   },
   "results": [
+    {
+      "repo": "SZLHOLDINGS/anatomy-alive-harness",
+      "kind": "dataset",
+      "private": true,
+      "hf_license": "apache-2.0",
+      "hf_license_norm": "Apache-2.0",
+      "hf_license_name": null,
+      "github_spdx": null,
+      "allowlisted": false,
+      "status": "OK",
+      "errors": [],
+      "warnings": [],
+      "notes": [
+        "no matching GitHub repo (cross-ref skipped)"
+      ]
+    },
     {
       "repo": "SZLHOLDINGS/canonical-formulas-v1",
       "kind": "dataset",
@@ -173,6 +189,38 @@
       ]
     },
     {
+      "repo": "SZLHOLDINGS/szl-charts",
+      "kind": "dataset",
+      "private": true,
+      "hf_license": "apache-2.0",
+      "hf_license_norm": "Apache-2.0",
+      "hf_license_name": null,
+      "github_spdx": null,
+      "allowlisted": false,
+      "status": "OK",
+      "errors": [],
+      "warnings": [],
+      "notes": [
+        "no matching GitHub repo (cross-ref skipped)"
+      ]
+    },
+    {
+      "repo": "SZLHOLDINGS/szl-evidence",
+      "kind": "dataset",
+      "private": true,
+      "hf_license": "apache-2.0",
+      "hf_license_norm": "Apache-2.0",
+      "hf_license_name": null,
+      "github_spdx": null,
+      "allowlisted": false,
+      "status": "OK",
+      "errors": [],
+      "warnings": [],
+      "notes": [
+        "no matching GitHub repo (cross-ref skipped)"
+      ]
+    },
+    {
       "repo": "SZLHOLDINGS/szl-lake",
       "kind": "dataset",
       "private": false,
@@ -185,6 +233,38 @@
       "errors": [],
       "warnings": [],
       "notes": []
+    },
+    {
+      "repo": "SZLHOLDINGS/szl-org-infra",
+      "kind": "dataset",
+      "private": true,
+      "hf_license": "apache-2.0",
+      "hf_license_norm": "Apache-2.0",
+      "hf_license_name": null,
+      "github_spdx": null,
+      "allowlisted": false,
+      "status": "OK",
+      "errors": [],
+      "warnings": [],
+      "notes": [
+        "no matching GitHub repo (cross-ref skipped)"
+      ]
+    },
+    {
+      "repo": "SZLHOLDINGS/szl-payloads",
+      "kind": "dataset",
+      "private": true,
+      "hf_license": "apache-2.0",
+      "hf_license_norm": "Apache-2.0",
+      "hf_license_name": null,
+      "github_spdx": null,
+      "allowlisted": false,
+      "status": "OK",
+      "errors": [],
+      "warnings": [],
+      "notes": [
+        "no matching GitHub repo (cross-ref skipped)"
+      ]
     },
     {
       "repo": "SZLHOLDINGS/szl-visual-identity",
@@ -219,9 +299,41 @@
       ]
     },
     {
+      "repo": "SZLHOLDINGS/test-results",
+      "kind": "dataset",
+      "private": true,
+      "hf_license": "apache-2.0",
+      "hf_license_norm": "Apache-2.0",
+      "hf_license_name": null,
+      "github_spdx": null,
+      "allowlisted": false,
+      "status": "OK",
+      "errors": [],
+      "warnings": [],
+      "notes": [
+        "no matching GitHub repo (cross-ref skipped)"
+      ]
+    },
+    {
       "repo": "SZLHOLDINGS/thesis-corpus-v18",
       "kind": "dataset",
       "private": false,
+      "hf_license": "apache-2.0",
+      "hf_license_norm": "Apache-2.0",
+      "hf_license_name": null,
+      "github_spdx": null,
+      "allowlisted": false,
+      "status": "OK",
+      "errors": [],
+      "warnings": [],
+      "notes": [
+        "no matching GitHub repo (cross-ref skipped)"
+      ]
+    },
+    {
+      "repo": "SZLHOLDINGS/thesis-formula-index",
+      "kind": "dataset",
+      "private": true,
       "hf_license": "apache-2.0",
       "hf_license_norm": "Apache-2.0",
       "hf_license_name": null,
@@ -320,6 +432,22 @@
       "private": false,
       "hf_license": "apache-2.0",
       "hf_license_norm": "Apache-2.0",
+      "hf_license_name": null,
+      "github_spdx": null,
+      "allowlisted": false,
+      "status": "OK",
+      "errors": [],
+      "warnings": [],
+      "notes": [
+        "no matching GitHub repo (cross-ref skipped)"
+      ]
+    },
+    {
+      "repo": "SZLHOLDINGS/yuyay-v3-axis-labels-v1",
+      "kind": "dataset",
+      "private": true,
+      "hf_license": "cc-by-4.0",
+      "hf_license_norm": "CC-BY-4.0",
       "hf_license_name": null,
       "github_spdx": null,
       "allowlisted": false,

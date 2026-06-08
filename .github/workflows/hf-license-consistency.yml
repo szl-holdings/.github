@@ -62,12 +62,15 @@ jobs:
       - name: Check HF license consistency across the org
         env:
           GITHUB_TOKEN: ${{ github.token }}
-          # Optional: uncomment after adding an org-scoped HF token secret to
-          # also cover private HF repos (then add --include-private below).
-          # HF_ORG_TOKEN: ${{ secrets.HF_ORG_TOKEN }}
+          # Org-scoped HF token so the sweep also covers PRIVATE HF repos
+          # (private datasets like szl-org-infra, szl-payloads, szl-evidence,
+          # szl-charts, test-results, etc. whose front-matter license: would
+          # otherwise never be verified). Public reads still work without it.
+          HF_ORG_TOKEN: ${{ secrets.HF_ORG_TOKEN }}
         run: |
           set +e
           python3 .github/scripts/hf_license_consistency.py \
+            --include-private \
             --report .github/data/hf_license_consistency_report.json
           echo "CHECK_EXIT=$?" >> "$GITHUB_ENV"
 
