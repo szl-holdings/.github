@@ -50,10 +50,15 @@ jobs:
           # of REMOVING fake SLSA L3 claims). They are not shipped artifacts or
           # customer-facing doctrine claims; flagship repos have no coordination/ dir.
           echo "=== Invariant 1: Doctrine v11 LOCKED 749/14/163 ==="
+          # NOTE: all_open_prs.json / cto_prs_opened_recent.json are GENERATED GitHub
+          # PR-title snapshots (verbatim dumps of OTHER PRs' titles, e.g. one titled
+          # "v12+v13 DOI badges") — third-party/generated data, not an SZL doctrine
+          # claim. Excluded on the same snapshot rationale as governed_loop*.json.
           M1=$(grep -rE "doctrine.*v(9|10|12|13)" \
               --include="*.md" --include="*.json" --include="*.yaml" --include="*.yml" \
               --include="*.py" --include="*.ts" --include="*.go" \
               --exclude="governed_loop*.json" --exclude="wayra_snapshot*.json" \
+              --exclude="all_open_prs.json" --exclude="cto_prs_opened_recent.json" \
               --exclude="szl_math_corpus.py" --exclude="szl_chaski.py" \
               --exclude="szl_hub.py" --exclude="run_all_json.py" \
               --exclude="OUROBOROS_RUN_ALL.py" \
