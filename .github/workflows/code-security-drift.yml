@@ -1,0 +1,107 @@
+name: Code Security Config Drift
+
+# Task #307 created an org-level GitHub *code security configuration*
+# ("SZL Holdings Managed Security", id 252588), attached it — enforced — to
+# every repo in the org, and set it as the default for new repos. Nothing
+# watched for drift afterwards. This job catches it: if a repo is detached,
+# swapped onto the legacy enterprise/global config, lands new without coverage,
+# or the default-for-new-repos changes, the check fails (and refreshes a
+# committed report snapshot). Mirrors the weekly license / dead-link guards.
+#
+# The code-security configuration endpoints require org-admin, so the built-in
+# Actions GITHUB_TOKEN is NOT sufficient — the SZL_GITHUB_TOKEN PAT secret is
+# used. A missing/insufficient token is reported as an ERROR (exit 2), never a
+# silent pass, so coverage can't look green when the check could not run.
+
+on:
+  schedule:
+    # Weekly sweep (Mondays 07:37 UTC) — offset from the other org guards.
+    - cron: "37 7 * * 1"
+  workflow_dispatch: {}
+  push:
+    branches: [main]
+    paths:
+      - ".github/scripts/code_security_drift.py"
+      - ".github/data/code_security_allowlist.json"
+      - ".github/workflows/code-security-drift.yml"
+  workflow_call: {}
+
+permissions:
+  contents: read
+
+concurrency:
+  group: code-security-drift-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    name: Managed security config attached + enforced everywhere
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write # only to commit the refreshed report in szl-holdings/.github
+    steps:
+      - name: Harden runner
+        uses: step-security/harden-runner@9af89fc71515a100421586dfdb3dc9c984fbf411 # v2.19.4
+        with:
+          egress-policy: audit
+
+      - name: Checkout
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+
+      - name: Set up Python
+        uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6.2.0
+        with:
+          python-version: "3.12"
+
+      - name: Check managed-security-config coverage across the org
+        env:
+          # org-admin PAT preferred (the built-in token can't read these endpoints)
+          SZL_GITHUB_TOKEN: ${{ secrets.SZL_GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          set +e
+          python3 .github/scripts/code_security_drift.py \
+            --report .github/data/code_security_report.json
+          echo "CHECK_EXIT=$?" >> "$GITHUB_ENV"
+
+      - name: Commit refreshed report if changed
+        # Best-effort: if main is protected (or the token can't push), this must
+        # NOT mask the real signal. The drift gate below is the source of truth.
+        continue-on-error: true
+        if: github.repository == 'szl-holdings/.github' && github.event_name != 'pull_request'
+        run: |
+          if git diff --quiet -- .github/data/code_security_report.json; then
+            echo "Report unchanged; nothing to commit."
+            exit 0
+          fi
+          git config user.name "Stephen P. Lutar Jr."
+          git config user.email "stephenlutar2@gmail.com"
+          git add .github/data/code_security_report.json
+          git commit -s -m "chore(security): refresh code-security drift report [skip ci]"
+          git push
+
+      - name: Fail if managed-security-config drift
+        run: |
+          case "${CHECK_EXIT:-2}" in
+            0)
+              echo "✓ Managed security config 252588 is enforced on every non-archived repo and is the default for new repos."
+              ;;
+            1)
+              echo "::error::Managed-security-config drift detected. A repo is not"
+              echo "::error::enforced under config 252588, is attached to a different"
+              echo "::error::configuration, or the default-for-new-repos changed. See the"
+              echo "::error::step output and .github/data/code_security_report.json."
+              echo "::error::Re-attach via POST .../configurations/252588/attach {\"scope\":\"all\"}"
+              echo "::error::or add a reasoned entry to .github/data/code_security_allowlist.json."
+              exit 1
+              ;;
+            *)
+              echo "::error::Could not complete the managed-security-config check"
+              echo "::error::(auth/API failure). The code-security endpoints need an"
+              echo "::error::org-admin token — set the SZL_GITHUB_TOKEN secret. This is"
+              echo "::error::failed (not passed) so coverage can never look green when"
+              echo "::error::the check could not actually run."
+              exit 1
+              ;;
+          esac

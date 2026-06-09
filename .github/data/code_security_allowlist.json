@@ -1,0 +1,5 @@
+{
+  "_comment": "Intentional exceptions to the managed-security-config drift check, each with a reason. Empty by default: every NON-ARCHIVED repo is expected to be attached + enforced under the org config 252588 ('SZL Holdings Managed Security'). Archived repos are skipped automatically (Dependabot does not run on them). 'default_for_new_repos_allowed' lists the acceptable scopes for the org default-for-new-repos pointing at the canonical config.",
+  "default_for_new_repos_allowed": ["all"],
+  "repos": {}
+}
