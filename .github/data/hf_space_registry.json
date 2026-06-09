@@ -1,0 +1,8 @@
+{
+  "schema": 1,
+  "_comment": "Registry mapping each szl-holdings GitHub repo that ships a Hugging Face Space (built by Dockerfile COPY) to its live HF Space. The org-wide scheduled sweep (workflows/hf-module-drift-check.yml) iterates this list and runs scripts/hf_module_drift_check.py against each pair via the git-tree API, so any NEW repo that ships an HF Space is covered automatically the moment it is added here -- no per-repo copy-paste. Convention: szl-holdings/<x> -> SZLHOLDINGS/<x> (the HF org is UPPERCASE; lowercase 307-redirects). A repo with no Dockerfile is skipped (nothing is COPY'd, so nothing can drift). Each repo's own .github/hf-module-drift-allow.json (the per-repo backlog ratchet) is fetched and honored during the sweep; a missing allowlist means an empty allowlist. Add a per-pair \"ref\" only if the Space tracks a non-main branch.",
+  "spaces": [
+    { "github": "szl-holdings/a11oy", "hf": "SZLHOLDINGS/a11oy" },
+    { "github": "szl-holdings/killinchu", "hf": "SZLHOLDINGS/killinchu" }
+  ]
+}

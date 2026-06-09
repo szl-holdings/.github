@@ -20,6 +20,7 @@ instead of redefining the same logic locally.
 | `reusable-secret-scan.yml` | TruffleHog committed-secret detection | `push`, `pull_request`, weekly cron |
 | `reusable-scorecard.yml` | OpenSSF Scorecard supply-chain hygiene | weekly cron, `branch_protection_rule` |
 | `reusable-trivy.yml` | Trivy filesystem vulnerability scan | `push`, weekly cron |
+| `reusable-hf-module-drift-check.yml` | Detect drift between a repo's source-of-truth and its live Hugging Face Space (built by Dockerfile `COPY`) | caller-chosen (e.g. weekly cron, `workflow_dispatch`) |
 
 ## Calling a reusable workflow
 
@@ -51,6 +52,25 @@ jobs:
 For maximum supply-chain hygiene, replace `@main` with a 40-char SHA from
 this repo. The org-wide pin-check exempts `szl-holdings/*` refs by design,
 but pinning is still the recommendation for non-experimental repos.
+
+
+## HF Space module drift
+
+Repos whose Hugging Face Space is built by Dockerfile `COPY` from their
+GitHub source can silently diverge from the live Space (the Space's files
+can be edited directly on HF, and hf-sync only mirrors README + the
+front-door HTML/JS). Two layers guard this:
+
+- **Org-wide sweep** — `.github/workflows/hf-module-drift-check.yml` runs
+  weekly over `.github/data/hf_space_registry.json`, comparing every
+  registered GitHub<->HF pair via the git-tree API. Adding a repo to the
+  registry is the only step needed to cover it — no per-repo copy-paste.
+- **Per-repo fail-fast** — a repo calls
+  `reusable-hf-module-drift-check.yml` to gate its own PRs/pushes/cron.
+
+Both honor the repo's own `.github/hf-module-drift-allow.json` ratchet
+(known drift warns; new drift fails) and NEVER auto-overwrite — a human
+picks the source of truth, since drift can run in either direction.
 
 ## Dependabot
 

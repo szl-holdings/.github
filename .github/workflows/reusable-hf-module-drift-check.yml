@@ -1,0 +1,101 @@
+name: Reusable — HF Module Drift Check
+
+# Per-repo guard for a repo whose Hugging Face Space is built by Dockerfile COPY
+# from its GitHub source-of-truth. The Space's files can also be edited directly
+# on HF, so a COPY'd module can silently diverge between GitHub and the live
+# Space -- in EITHER direction. This compares every COPY source's git-blob OID
+# against the live HF Space tree and, on any divergence, NAMES which side is
+# ahead (by last-commit date). It never auto-overwrites.
+#
+# A repo wires this into its own CI instead of vendoring the checker. The shared
+# checker (scripts/hf_module_drift_check.py) lives once in szl-holdings/.github;
+# the repo keeps only its own ratchet allowlist (.github/hf-module-drift-allow.json,
+# printed as warnings every run) so known drift warns and any NEW drift fails.
+# The caller chooses the cadence (the org-wide scheduled sweep,
+# hf-module-drift-check.yml, is the catch-all safety net).
+#
+# Wire it up from a consuming repo (HF repo is derived as SZLHOLDINGS/<name>
+# unless overridden):
+#   jobs:
+#     hf-drift:
+#       uses: szl-holdings/.github/.github/workflows/reusable-hf-module-drift-check.yml@main
+#   # or, for a non-conventional Space name:
+#       with:
+#         hf-repo: SZLHOLDINGS/some-other-name
+
+on:
+  workflow_call:
+    inputs:
+      hf-repo:
+        description: "HF Space repo (e.g. SZLHOLDINGS/a11oy). Empty = derive SZLHOLDINGS/<github-repo-name>."
+        required: false
+        type: string
+        default: ""
+      ref:
+        description: "Branch/ref to compare on both sides."
+        required: false
+        type: string
+        default: "main"
+
+permissions:
+  contents: read
+
+jobs:
+  hf-module-drift:
+    name: Source in sync with the live HF Space
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Harden runner
+        uses: step-security/harden-runner@9af89fc71515a100421586dfdb3dc9c984fbf411 # v2.19.4
+        with:
+          egress-policy: audit
+
+      - name: Checkout caller (GitHub source-of-truth)
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        with:
+          path: caller
+          ref: ${{ inputs.ref }}
+
+      - name: Checkout szl-holdings/.github (shared checker)
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        with:
+          repository: szl-holdings/.github
+          ref: main
+          path: tools
+
+      - name: Set up Python
+        uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6.2.0
+        with:
+          python-version: "3.12"
+
+      - name: Compare COPY'd modules against the live HF Space
+        env:
+          GITHUB_TOKEN: ${{ github.token }} # commit-date lookups (which side is ahead)
+          GH_REPO: ${{ github.repository }}
+          HF_REPO_IN: ${{ inputs.hf-repo }}
+          REF: ${{ inputs.ref }}
+        run: |
+          set -euo pipefail
+          if [ -n "${HF_REPO_IN}" ]; then
+            HF_REPO="${HF_REPO_IN}"
+          else
+            # Convention: szl-holdings/<x> -> SZLHOLDINGS/<x> (HF org is UPPERCASE).
+            HF_REPO="SZLHOLDINGS/${GH_REPO##*/}"
+          fi
+          echo "Comparing ${GH_REPO} (checkout) <-> ${HF_REPO} (live HF Space) @ ${REF}"
+          python3 tools/.github/scripts/hf_module_drift_check.py \
+            --repo-root caller \
+            --github-repo "${GH_REPO}" \
+            --hf-repo "${HF_REPO}" \
+            --ref "${REF}" \
+            --allow caller/.github/hf-module-drift-allow.json \
+            --report-out hf-module-drift-report.out.json
+
+      - name: Upload drift report
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: hf-module-drift-report
+          path: hf-module-drift-report.out.json
+          if-no-files-found: ignore

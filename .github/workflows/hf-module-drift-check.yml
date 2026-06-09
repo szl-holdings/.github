@@ -1,0 +1,114 @@
+name: HF Module Drift Check
+
+# Org-wide sweep: every szl-holdings repo that ships a Hugging Face Space is
+# built by Dockerfile COPY from its GitHub source-of-truth, but the Space's
+# files can also be edited directly on HF (hf-sync only mirrors README + the
+# front-door HTML/JS). So a COPY'd feature module can silently diverge between
+# the GitHub source of truth and the LIVE HF Space -- in EITHER direction --
+# as happened when a Space ran a newer module that GitHub never received.
+#
+# This job runs .github/scripts/hf_module_drift_check.py in --registry mode over
+# .github/data/hf_space_registry.json. For each pair it parses the Dockerfile's
+# COPY sources, compares git-blob OIDs against the live HF Space tree, and on any
+# divergence NAMES which side is ahead (by last-commit date). It never
+# auto-overwrites -- a human picks the source of truth and reconciles. Each
+# repo's own .github/hf-module-drift-allow.json (the per-repo ratchet) is fetched
+# and honored, so known/allowlisted drift only warns and any NEW drift fails.
+#
+# Adding a new HF-backed repo to the registry is the ONLY step needed to cover it
+# automatically -- no per-repo copy-paste. For a per-repo fail-fast gate on the
+# PR/push that introduces drift, a repo calls reusable-hf-module-drift-check.yml.
+#
+# Scheduled-only by design for the catch-all: HF-side edits land with NO GitHub
+# push, so the weekly cron is what actually catches them. (A push trigger would
+# add nothing but noise -- every routine deploy would fire it, and a transient
+# HF rebuild during the run would look like drift.) Self-changes still re-run so
+# the registry/script/report stay validated.
+
+on:
+  schedule:
+    # Weekly sweep (Mondays 07:11 UTC) -- staggered away from the per-repo crons
+    # (a11oy 06:37, killinchu 06:52) so the org sweep does not collide with them
+    # and trip HF's rate limiter.
+    - cron: "11 7 * * 1"
+  workflow_dispatch: {}
+  push:
+    branches: [main]
+    paths:
+      - ".github/scripts/hf_module_drift_check.py"
+      - ".github/data/hf_space_registry.json"
+      - ".github/workflows/hf-module-drift-check.yml"
+  workflow_call: {}
+
+permissions:
+  contents: read
+
+concurrency:
+  group: hf-module-drift-check-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  sweep:
+    name: Every HF-backed repo's source in sync with its live HF Space
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: write # only to commit the refreshed report in szl-holdings/.github
+    steps:
+      - name: Harden runner
+        uses: step-security/harden-runner@9af89fc71515a100421586dfdb3dc9c984fbf411 # v2.19.4
+        with:
+          egress-policy: audit
+
+      - name: Checkout
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+
+      - name: Set up Python
+        uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6.2.0
+        with:
+          python-version: "3.12"
+
+      - name: Sweep registry for GitHub <-> live HF Space module drift
+        env:
+          # The sweep reads OTHER repos' git-trees + Dockerfiles + allowlists,
+          # which the built-in GITHUB_TOKEN of this repo cannot do for private
+          # repos. SZL_GITHUB_TOKEN (org-owner) is therefore required for full
+          # coverage; it falls back to the built-in token (public repos only).
+          GITHUB_TOKEN: ${{ secrets.SZL_GITHUB_TOKEN || github.token }}
+        run: |
+          set +e
+          python3 .github/scripts/hf_module_drift_check.py \
+            --registry .github/data/hf_space_registry.json \
+            --report-out .github/data/hf_module_drift_report.json
+          echo "CHECK_EXIT=$?" >> "$GITHUB_ENV"
+
+      - name: Commit refreshed report if changed
+        # Best-effort: if main is protected (or the token can't push), this must
+        # NOT mask the real signal. The drift gate below is the source of truth.
+        continue-on-error: true
+        if: github.repository == 'szl-holdings/.github' && github.event_name != 'pull_request'
+        run: |
+          if git diff --quiet -- .github/data/hf_module_drift_report.json; then
+            echo "Report unchanged; nothing to commit."
+            exit 0
+          fi
+          git config user.name "Stephen P. Lutar Jr."
+          git config user.email "stephenlutar2@gmail.com"
+          git add .github/data/hf_module_drift_report.json
+          git commit -s -m "chore(hf-drift): refresh HF module-drift report [skip ci]"
+          git push
+
+      - name: Fail if any repo's source has drifted from its live HF Space
+        run: |
+          if [ "${CHECK_EXIT:-1}" != "0" ]; then
+            echo "::error::A COPY'd module has drifted between a szl-holdings repo"
+            echo "::error::and its live Hugging Face Space (in either direction)."
+            echo "::error::See the annotations above and"
+            echo "::error::.github/data/hf_module_drift_report.json."
+            echo "::error::A human must pick the source of truth, reconcile, and"
+            echo "::error::commit -- the guard never auto-overwrites. Intentional"
+            echo "::error::divergence is allowlisted in the repo's own"
+            echo "::error::.github/hf-module-drift-allow.json (printed as warnings)."
+            exit 1
+          fi
+          echo "✓ No unaccepted module drift between any repo and its live HF Space."
