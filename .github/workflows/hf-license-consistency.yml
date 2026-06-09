@@ -74,8 +74,14 @@ jobs:
           HF_ORG_TOKEN: ${{ secrets.HF_ORG_TOKEN }}
         run: |
           set +e
+          # --min-private is a conservative empirical floor: the org keeps
+          # several private HF repos (~8 datasets) intentionally, so requiring at
+          # least 5 catches a partial collapse of private visibility (not just a
+          # total drop to public-only) while tolerating ordinary deletion churn.
+          # Lower it only if private repos are deliberately retired below this.
           python3 .github/scripts/hf_license_consistency.py \
             --include-private \
+            --min-private 5 \
             --report .github/data/hf_license_consistency_report.json
           echo "CHECK_EXIT=$?" >> "$GITHUB_ENV"
 

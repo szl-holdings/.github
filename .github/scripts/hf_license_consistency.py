@@ -438,10 +438,15 @@ def main() -> int:
                 # the org. If whoami exposes no orgs list at all, fall back to the
                 # empirical min-private floor below rather than false-failing.
                 if orgs and target not in orgs and (whoami_name or "").lower() != target:
+                    # The persisted message stays PII-free (the report JSON is
+                    # committed to a public repo); the token identity and the
+                    # visible-org list go to stderr only, for live debugging.
                     preflight_errors.append(
-                        f"HF token identity '{whoami_name}' has no access to org "
-                        f"'{args.org}' (visible orgs={sorted(orgs)}); private "
-                        f"repos in {args.org} cannot be listed.")
+                        f"HF token has no access to org '{args.org}'; its private "
+                        f"repos cannot be listed (see job log for token identity).")
+                    print(f"  [preflight] token identity '{whoami_name}' visible "
+                          f"orgs={sorted(orgs)} (expected '{args.org}')",
+                          file=sys.stderr)
 
     repos, list_errors = list_hf_repos(args.org, hf_token, args.include_private)
     preflight_errors.extend(list_errors)
