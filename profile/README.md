@@ -24,7 +24,7 @@
 [![Lean 4 proofs](https://img.shields.io/badge/Lean%204-5%20formulas%20locked--proven-c9b787?style=flat-square)](https://github.com/szl-holdings/lutar-lean)
 [![Theorems](https://img.shields.io/badge/machine--checked-~185%20theorems-3b82f6?style=flat-square)](https://github.com/szl-holdings/lutar-lean)
 [![cosign keyless](https://img.shields.io/badge/cosign-keyless%20signed-7C3AED?style=flat-square)](https://search.sigstore.dev/)
-[![SLSA posture](https://img.shields.io/badge/SLSA-L1%20posture%20%C2%B7%20L2%20attestation-2C5F2D?style=flat-square)](https://slsa.dev/spec/v1.0/levels)
+[![SLSA posture](https://img.shields.io/badge/SLSA-L1%20honest%20%C2%B7%20L2%20build--attest%20(verify%20roadmap)-2C5F2D?style=flat-square)](https://slsa.dev/spec/v1.0/levels)
 [![License](https://img.shields.io/badge/code-Apache--2.0-5fb3a3?style=flat-square)](https://github.com/szl-holdings)
 
 </div>
