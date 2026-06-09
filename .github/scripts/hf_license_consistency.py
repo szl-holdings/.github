@@ -110,6 +110,25 @@ def _get_text(url: str, token: str | None):
         raise
 
 
+def hf_whoami(token: str | None):
+    """Return (ok, identity_dict, error_str).
+
+    Used to PROVE an ``--include-private`` run actually holds a working token
+    before we trust a "0 private drift" result. ``whoami-v2`` is the cheapest
+    authenticated call HF offers; a 401/403 means the token is
+    expired/revoked/rotated and cannot be trusted to unlock private listings.
+    """
+    if not token:
+        return False, None, "no HF token present"
+    url = f"{HF_API}/whoami-v2"
+    try:
+        return True, _get_json(url, token), None
+    except urllib.error.HTTPError as e:
+        return False, None, f"whoami-v2 returned HTTP {e.code}"
+    except Exception as e:  # noqa: BLE001 - any failure = untrustworthy token
+        return False, None, f"whoami-v2 failed: {e}"
+
+
 # --------------------------------------------------------------------------- #
 # License-string normalization (shared canon with the GitHub checker)
 # --------------------------------------------------------------------------- #
@@ -196,13 +215,23 @@ def parse_frontmatter_license(readme: str | None):
 # HF listing
 # --------------------------------------------------------------------------- #
 def list_hf_repos(org: str, token: str | None, include_private: bool):
+    """Return ``(repos, list_errors)``.
+
+    ``list_errors`` is non-empty if any HF "kind" listing call failed outright.
+    A failed listing silently drops a whole class of repos from the sweep, so it
+    must surface as loud drift — not a quietly smaller (still-green) result set.
+    """
     repos = []
+    list_errors = []
     for kind, (api_path, _) in HF_KINDS.items():
         url = f"{HF_API}/{api_path}?author={urllib.parse.quote(org)}&limit=1000"
         try:
             data = _get_json(url, token)
         except urllib.error.HTTPError as e:
-            print(f"warning: failed to list HF {api_path}: {e}", file=sys.stderr)
+            list_errors.append(f"failed to list HF {api_path}: HTTP {e.code}")
+            continue
+        except Exception as e:  # noqa: BLE001 - a dropped kind must be loud
+            list_errors.append(f"failed to list HF {api_path}: {e}")
             continue
         for x in data:
             if x.get("private") and not include_private:
@@ -213,7 +242,7 @@ def list_hf_repos(org: str, token: str | None, include_private: bool):
                 "kind": kind,
                 "private": bool(x.get("private")),
             })
-    return sorted(repos, key=lambda r: (r["kind"], r["name"].lower()))
+    return sorted(repos, key=lambda r: (r["kind"], r["name"].lower())), list_errors
 
 
 def hf_readme(repo, token: str | None):
@@ -357,6 +386,11 @@ def main() -> int:
     ap.add_argument("--report", help="Write the full JSON report to this path.")
     ap.add_argument("--include-private", action="store_true",
                     help="Also check private HF repos (needs a token with access).")
+    ap.add_argument("--min-private", type=int, default=1,
+                    help="With --include-private, require at least this many private "
+                         "repos in the HF listing. This proves the token actually "
+                         "unlocked private repos before a '0 drift' result is "
+                         "trusted; set 0 to disable the empirical floor (default: 1).")
     ap.add_argument("--no-github", action="store_true",
                     help="Skip the GitHub SPDX cross-reference.")
     ap.add_argument("--json", action="store_true", help="Print the JSON report to stdout.")
@@ -373,7 +407,54 @@ def main() -> int:
     gh_token = _gh_token()
     use_github = not args.no_github
 
-    repos = list_hf_repos(args.org, hf_token, args.include_private)
+    # --------------------------------------------------------------------- #
+    # Preflight: when --include-private is requested, PROVE the token actually
+    # unlocks private listings BEFORE trusting the result. Otherwise the HF API
+    # silently returns only PUBLIC repos and the whole sweep reports a false
+    # "0 drift" while private coverage has quietly vanished. Any failure here is
+    # loud (the job goes red).
+    # --------------------------------------------------------------------- #
+    preflight_errors: list[str] = []
+    if args.include_private:
+        if not hf_token:
+            preflight_errors.append(
+                "--include-private was requested but no HF token "
+                "(HF_ORG_TOKEN / HF_TOKEN / HF_WRITE_TOKEN) is set. The HF API "
+                "would silently list only PUBLIC repos, dropping ALL private "
+                "coverage while still reporting green.")
+        else:
+            ok, who, err = hf_whoami(hf_token)
+            if not ok:
+                preflight_errors.append(
+                    f"--include-private was requested but the HF token failed "
+                    f"validation ({err}); it cannot be trusted to unlock private "
+                    f"listings (likely expired / revoked / rotated).")
+            else:
+                whoami_name = who.get("name")
+                orgs = {(o.get("name") or "").lower()
+                        for o in (who.get("orgs") or []) if isinstance(o, dict)}
+                target = args.org.lower()
+                # A user token must belong to the org; an org token's own name is
+                # the org. If whoami exposes no orgs list at all, fall back to the
+                # empirical min-private floor below rather than false-failing.
+                if orgs and target not in orgs and (whoami_name or "").lower() != target:
+                    preflight_errors.append(
+                        f"HF token identity '{whoami_name}' has no access to org "
+                        f"'{args.org}' (visible orgs={sorted(orgs)}); private "
+                        f"repos in {args.org} cannot be listed.")
+
+    repos, list_errors = list_hf_repos(args.org, hf_token, args.include_private)
+    preflight_errors.extend(list_errors)
+
+    private_seen = sum(1 for r in repos if r.get("private"))
+    if (args.include_private and args.min_private > 0
+            and not preflight_errors and private_seen < args.min_private):
+        preflight_errors.append(
+            f"--include-private is on and the token validated, but the listing "
+            f"returned only {private_seen} private repo(s) (expected at least "
+            f"{args.min_private}). Private coverage appears to have silently "
+            f"dropped to public-only — refusing to trust this result.")
+
     results = []
     for r in repos:
         if r["id"] in ignore_repos or r["name"] in ignore_repos:
@@ -390,6 +471,11 @@ def main() -> int:
         "github_org": args.github_org,
         "checked_at_utc": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
         "include_private": args.include_private,
+        "private_repos_seen": private_seen,
+        "min_private": args.min_private if args.include_private else None,
+        "hf_token_present": bool(hf_token),
+        "preflight_ok": not preflight_errors,
+        "preflight_errors": preflight_errors,
         "github_crossref": use_github and bool(gh_token),
         "summary": {
             "checked": len(results),
@@ -410,6 +496,10 @@ def main() -> int:
         print(json.dumps(payload, indent=2))
     else:
         xref = "on" if payload["github_crossref"] else "off"
+        if args.include_private:
+            print(f"private coverage: {private_seen} private repo(s) listed "
+                  f"(HF token {'present' if hf_token else 'MISSING'}, "
+                  f"floor={args.min_private})\n")
         print(f"HF license consistency for {args.org} (GitHub cross-ref: {xref}): "
               f"{payload['summary']['ok']} OK, {len(warns)} WARN, {len(errs)} ERROR "
               f"(of {len(results)} repos checked)\n")
@@ -424,9 +514,20 @@ def main() -> int:
             for w in x["warnings"]:
                 print(f"        warn:  {w}")
 
+    if preflight_errors:
+        print("\n\u2717 PREFLIGHT FAILURE — private HF coverage cannot be trusted:",
+              file=sys.stderr)
+        for e in preflight_errors:
+            print(f"    \u2717 {e}", file=sys.stderr)
+        print("  A '0 drift' result is meaningless without verified private "
+              "coverage; failing loudly instead of reporting a false green.",
+              file=sys.stderr)
+
     if errs:
         print(f"\n{len(errs)} HF repo(s) have license-claim drift. See above / report.",
               file=sys.stderr)
+
+    if errs or preflight_errors:
         return 1
     return 0
 

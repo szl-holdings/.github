@@ -12,10 +12,13 @@ name: HF License Consistency
 # (org-card Space, dual-license, HF-only repos) are explicitly allowlisted in
 # .github/data/hf_license_allowlist.json — anything else fails the job.
 #
-# Auth: public HF reads need no token (the script runs anonymously here). The
-# built-in GITHUB_TOKEN is enough for the GitHub SPDX cross-reference of public
-# repos. To also cover PRIVATE HF repos, add an org-scoped HF_ORG_TOKEN secret
-# and pass it via the env block + the --include-private flag.
+# Auth: this sweep runs with --include-private to also cover PRIVATE HF repos,
+# which requires the org-scoped HF_ORG_TOKEN secret. The script PREFLIGHTS that
+# token (whoami + org access + an empirical "saw >=1 private repo" floor) and
+# FAILS THE JOB LOUDLY if the token is missing/expired/revoked or cannot see
+# private listings — so private coverage can never silently lapse to public-only
+# while still reporting green. The built-in GITHUB_TOKEN covers the GitHub SPDX
+# cross-reference of public repos.
 
 on:
   schedule:
@@ -65,7 +68,9 @@ jobs:
           # Org-scoped HF token so the sweep also covers PRIVATE HF repos
           # (private datasets like szl-org-infra, szl-payloads, szl-evidence,
           # szl-charts, test-results, etc. whose front-matter license: would
-          # otherwise never be verified). Public reads still work without it.
+          # otherwise never be verified). REQUIRED: with --include-private the
+          # script fails loudly (job red) if this secret is missing/expired or
+          # cannot list private repos, rather than silently checking public only.
           HF_ORG_TOKEN: ${{ secrets.HF_ORG_TOKEN }}
         run: |
           set +e
