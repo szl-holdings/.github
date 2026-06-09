@@ -1,0 +1,101 @@
+name: Reusable — Doctrine Overclaim Guard
+
+# Grep-based honesty gate, promoted org-wide so every repo that publishes
+# Lambda-uniqueness / Conjecture-1 claims inherits the SAME rule from one place
+# (mirrors the license-consistency / public-repo-link / lockfile-registry reusables).
+# Fails CI if a governed surface claims aggregator uniqueness without the
+# Theorem U / U1 / U2 qualifier (modulo equivalence under the Identifiability
+# Assumptions; strict equality only under Anchored/Normalized), or describes
+# Conjecture 1 as proven/closed. Unconditional uniqueness stays OPEN
+# (machine-checked false as stated).
+#
+# Wire it up from a consuming repo, e.g.:
+#   jobs:
+#     overclaim:
+#       uses: szl-holdings/.github/.github/workflows/reusable-overclaim-guard.yml@main
+#
+# Repos whose governed docs differ from the default set can pass `files:`
+# (space-separated). The check is a self-contained grep so it works even where
+# no python script is vendored; it greps only the CALLER's own docs (no token,
+# no network).
+
+on:
+  workflow_call:
+    inputs:
+      files:
+        description: Space-separated governed surfaces to scan (overrides the default set).
+        required: false
+        type: string
+        default: ""
+
+permissions:
+  contents: read
+
+jobs:
+  overclaim:
+    name: Governed surfaces are honest (Theorem U citation rule)
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Harden runner
+        uses: step-security/harden-runner@9af89fc71515a100421586dfdb3dc9c984fbf411 # v2.19.4
+        with:
+          egress-policy: audit
+
+      - name: Checkout caller
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+
+      - name: Lambda-uniqueness overclaim grep
+        shell: bash
+        env:
+          INPUT_FILES: ${{ inputs.files }}
+        run: |
+          set -eu
+          FAIL=0
+
+          # Governed surfaces only — the honest-taxonomy docs in the caller repo.
+          # A caller may override the candidate list via the `files:` input.
+          if [ -n "${INPUT_FILES:-}" ]; then
+            CANDIDATES="$INPUT_FILES"
+          else
+            CANDIDATES="README.md PROVEN_FORMULAS.md STATUS.md DEPENDENCY_MAP.md PAPERS_INDEX.md preprints/puriq/README.md"
+          fi
+          FILES=""
+          for f in $CANDIDATES; do
+            [ -f "$f" ] && FILES="$FILES $f"
+          done
+          if [ -z "$FILES" ]; then
+            echo "No governed surfaces present — nothing to check."
+            exit 0
+          fi
+          echo "Scanning governed surfaces:$FILES"
+
+          # Qualifiers that make a Λ-uniqueness sentence governance-safe. A line that
+          # carries any of these is exempt (it is honest / conditional / a non-claim).
+          SAFE='[Cc]onjecture|[Cc]onditional|modulo|≈Λ|≉Λ|Theorem U|TheoremU|U₁|U₂|under IA|Identifiab|Anchored|Normalized|statement-only|machine-checked|FALSE|false|not a theorem|NOT a theorem|never|stays|OPEN|open|bounty|lambda_unique_|unique aggregator|min-gate|impostor'
+
+          # A) Unconditional "Λ is unique" / "uniqueness of Λ is proven" with NO safe qualifier.
+          A=$(grep -nEi "(Λ|lambda)[^.|]{0,80}(is|are|was)[^.|]{0,40}uniqu|uniqu[a-z]*[^.|]{0,40}(of|for)[^.|]{0,20}(Λ|lambda)[^.|]{0,40}(is |are )?(proven|proved|established|a theorem)" $FILES 2>/dev/null \
+              | grep -vEi "$SAFE" || true)
+
+          # B) Conjecture 1 declared proven / closed / resolved (verb must be tightly bound
+          #    to "Conjecture 1" so meta-prose like "...what was proven and what was not" is safe).
+          B=$(grep -nEi "conjecture[ _-]?1\b[^.|]{0,25}(is |was |now |been |=|: )?(proven|proved|closed|resolved|solved|a theorem|holds unconditionally)" $FILES 2>/dev/null \
+              | grep -vEi "statement-only|machine-checked|FALSE|false|OPEN|open|not |never|stays|bounty|non-claim|unqualified|overclaim" || true)
+
+          if [ -n "$A" ]; then
+            echo "$A" | head -20
+            echo "::error::Unqualified Λ-uniqueness overclaim — cite Theorem U / U₁ / U₂ (uniqueness modulo ≈Λ under IA; strict = only under Anchored/Normalized). Unconditional uniqueness is Conjecture 1 (OPEN)."
+            FAIL=1
+          fi
+          if [ -n "$B" ]; then
+            echo "$B" | head -20
+            echo "::error::Conjecture 1 described as proven/closed — it is OPEN (statement-only, machine-checked false as stated)."
+            FAIL=1
+          fi
+
+          if [ "$FAIL" = "1" ]; then
+            echo "::error::Doctrine overclaim guard FAILED."
+            exit 1
+          fi
+          echo "Doctrine overclaim guard: governed surfaces are honest (Theorem U citation rule satisfied)."
