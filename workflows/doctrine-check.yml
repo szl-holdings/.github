@@ -28,7 +28,7 @@ jobs:
           # For these repos ONLY, the honest combined "SLSA L1 + L2" banner wording
           # in docs/footers is permitted. For every OTHER repo a bare "L2" claim
           # still fails — this keeps the gate substantive and repo-scoped.
-          VERIFIED_L2_REPOS="a11oy sentra amaru rosie killinchu"
+          VERIFIED_L2_REPOS="a11oy killinchu"  # retired codenames amaru/sentra/rosie removed 2026-06-10 — they ship nothing
           THIS_REPO="${GITHUB_REPOSITORY##*/}"
           IS_VERIFIED_L2=0
           for r in $VERIFIED_L2_REPOS; do
@@ -112,7 +112,7 @@ jobs:
           # actions/attest-build-provenance attestation in GHCR/GitHub Attestations API.
           # Unverified L2 claims and all L3 claims are banned.
           #
-          # Posture: SLSA L1 honest (L2 roadmap via Wire D). All five flagships have
+          # Posture: SLSA L1 honest (L2 roadmap via Wire D). The two shipping products (a11oy, killinchu) have
           # actions/attest-build-provenance@v2.4.0 wired in their ghcr-build-push.yml
           # workflows, BUT the L2 attestation is NOT yet earned on the deployed images:
           # `cosign verify-attestation --type slsaprovenance ghcr.io/szl-holdings/<organ>`
@@ -140,7 +140,7 @@ jobs:
           fi
 
           # RULE 2: L2 claims require evidence (attestation). Verified repos:
-          # a11oy, sentra, amaru, rosie, killinchu. These repos wire
+          # a11oy, killinchu (the two shipping products). These repos wire
           # actions/attest-build-provenance + a cosign verify-attestation honesty
           # gate in ghcr-build-push.yml and have a real attestation bundle in the
           # GitHub Attestations API for the deployed digest (confirmed 2026-06-08).
@@ -168,9 +168,9 @@ jobs:
               --exclude-dir="replit-sync" \
               . 2>/dev/null | \
               grep -vE "^(\./)?\.git/|\.lake/|node_modules/" | \
-              grep -vE "ghcr-build-push\.yml|ghcr\.io/szl-holdings/(a11oy|sentra|amaru|rosie|killinchu)" | \
+              grep -vE "ghcr-build-push\.yml|ghcr\.io/szl-holdings/(a11oy|killinchu)" | \
               grep -viE "verified|attested|attestation.*exists|attestation.*created|attestation.*uploaded" | \
-              grep -viE "(a11oy|sentra|amaru|rosie|killinchu)\.slsa-provenance|szl-(a11oy|sentra|amaru|rosie|killinchu)|L2 on [a-z0-9 ]*organ images" | \
+              grep -viE "(a11oy|killinchu)\.slsa-provenance|szl-(a11oy|killinchu)|L2 on [a-z0-9 ]*organ images" | \
               grep -viE "bundle-level.*(not|NOT).*earned|no bundle-level|L1/L2 class|L1 ?/ ?L2 class|L1/L2|COSIGN_L2_GROUND_TRUTH" | \
               grep -viE "roadmap|future|planned|historical|archived|REJECTED|path to|not yet" | \
               grep -viE "not L2|no.*L2|L2.*not|banned|prohibited" | \
@@ -180,7 +180,7 @@ jobs:
               || true)
           if [ -n "$M3_L2_UNVERIFIED" ]; then
             echo "$M3_L2_UNVERIFIED" | head -10
-            echo "::error::SLSA L2 claim without evidence — only a11oy/sentra/amaru/rosie/killinchu have verified L2 attestations. Add evidence reference or remove the claim."
+            echo "::error::SLSA L2 claim without evidence — only a11oy/killinchu (the two shipping products) have verified L2 attestations. Add evidence reference or remove the claim."
             FAIL=1
           fi
 
