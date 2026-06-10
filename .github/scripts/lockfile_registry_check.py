@@ -124,11 +124,18 @@ def is_lockfile(path: str) -> bool:
 # GitHub helpers (ORG mode)
 # --------------------------------------------------------------------------- #
 def _token() -> str:
-    for var in ("GITHUB_TOKEN", "GH_TOKEN", "SZL_GITHUB_TOKEN"):
+    # Prefer the org-owner SZL_GITHUB_TOKEN: the public-repo host scan works with
+    # any read token, but the coverage check reads classic branch protection, which
+    # needs admin on EACH repo. In GitHub Actions the built-in GITHUB_TOKEN is
+    # scoped to the current repo only, so it cannot read other repos' protection
+    # (returns 404) — if picked first it would produce false coverage gaps. When
+    # SZL_GITHUB_TOKEN is absent (forks/PRs) we fall back to the built-in token and
+    # protection reads honestly degrade to "unverifiable", never a false gap.
+    for var in ("SZL_GITHUB_TOKEN", "GH_TOKEN", "GITHUB_TOKEN"):
         v = os.environ.get(var)
         if v:
             return v
-    print("error: no GitHub token in $GITHUB_TOKEN / $GH_TOKEN / $SZL_GITHUB_TOKEN",
+    print("error: no GitHub token in $SZL_GITHUB_TOKEN / $GH_TOKEN / $GITHUB_TOKEN",
           file=sys.stderr)
     sys.exit(2)
 
@@ -283,34 +290,52 @@ def required_check_present(repo_full: str, branch: str, token: str):
 
     Returns one of "present" / "absent" / "unverifiable". The required check can
     be enforced two ways across the org — classic branch protection or a repo
-    ruleset — so both are consulted. "unverifiable" is returned only when neither
-    source can be read (token without admin), so a coverage gap is never reported
-    on a false read.
-    """
-    verifiable = False
+    ruleset — so both are consulted. "absent" (a real coverage gap) is returned
+    ONLY when BOTH mechanisms are confidently confirmed not to require the check;
+    if either mechanism cannot be read, the result is "unverifiable" so a gap is
+    never reported on a blind read.
 
+    Subtlety: the classic `.../protection/required_status_checks` sub-resource
+    returns 404 BOTH when no classic protection requires the check AND when the
+    token lacks admin on the repo (GitHub hides protection details behind a 404
+    for non-admins). A bare 404 is therefore ambiguous. We disambiguate with the
+    public `protected` boolean on the branch object: protected==false means the
+    branch genuinely has no classic protection (confident absent); protected==true
+    with a 404 sub-resource means it IS protected but we cannot see the required
+    checks (blind → unverifiable).
+    """
     # 1) Classic branch protection.
+    classic_absent = False  # confident: classic does NOT require the check
+    bq = urllib.parse.quote(branch, safe="")
     data, code = _gh_status(
-        f"/repos/{repo_full}/branches/{urllib.parse.quote(branch, safe='')}"
-        "/protection/required_status_checks", token)
+        f"/repos/{repo_full}/branches/{bq}/protection/required_status_checks", token)
     if code == 200:
-        verifiable = True
         contexts = [c.get("context") for c in (data or {}).get("checks", [])]
         if REQUIRED_CHECK_CONTEXT in contexts:
             return "present"
+        classic_absent = True
     elif code == 404:
-        # Readable, but no classic required-status-checks configured.
-        verifiable = True
+        # Ambiguous: "no classic protection" vs "no admin". Use the public
+        # `protected` flag to tell them apart.
+        binfo, bcode = _gh_status(f"/repos/{repo_full}/branches/{bq}", token)
+        if bcode == 200 and isinstance(binfo, dict):
+            if binfo.get("protected") is False:
+                classic_absent = True   # genuinely no classic protection
+            # protected==true → branch is protected but checks are hidden from a
+            # non-admin token → leave classic blind (unverifiable on this axis).
+        # If we cannot even read the branch object, classic stays blind.
 
     # 2) Repo rulesets (e.g. series-a-default-branch).
+    ruleset_absent = False  # confident: no active ruleset requires the check
     rulesets, code = _gh_status(f"/repos/{repo_full}/rulesets?includes_parents=true", token)
     if code == 200:
-        verifiable = True
+        ruleset_readable = True
         for rs in rulesets or []:
             if rs.get("enforcement") != "active":
                 continue
             detail, dcode = _gh_status(f"/repos/{repo_full}/rulesets/{rs['id']}", token)
             if dcode != 200 or not detail:
+                ruleset_readable = False  # an active ruleset we couldn't open
                 continue
             if not _ruleset_targets_branch(detail, branch):
                 continue
@@ -322,8 +347,13 @@ def required_check_present(repo_full: str, branch: str, token: str):
                             for c in params.get("required_status_checks", [])]
                 if REQUIRED_CHECK_CONTEXT in contexts:
                     return "present"
+        if ruleset_readable:
+            ruleset_absent = True
 
-    return "absent" if verifiable else "unverifiable"
+    # Real gap only when BOTH mechanisms are confidently not requiring the check.
+    if classic_absent and ruleset_absent:
+        return "absent"
+    return "unverifiable"
 
 
 def check_repo_coverage(repo_obj, token, blobs):
