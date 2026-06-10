@@ -1,0 +1,148 @@
+name: Required-check Drift (lockfile merge block)
+
+# Task #308 made the context
+#   lockfiles / No lockfile references a Replit-internal registry host
+# a REQUIRED status check on `main` for the six repos that commit lockfiles
+# (a11oy + ouroboros via the `series-a-default-branch` ruleset; platform,
+# vsp-otel, szl-uds-deployment, docs-site via classic branch protection), so a
+# red lockfile run genuinely blocks merge. But that requirement is just GitHub
+# config — an admin can drop it, or a ruleset rewrite can silently remove it,
+# and nothing would notice. The protection only matters if it stays in place.
+#
+# This job watches for that drift. For each wired repo it reads BOTH mechanisms
+# GitHub unions together (ruleset `required_status_checks` + classic
+# `branches/<default>/protection/required_status_checks`) and fails if the
+# context is no longer required via either. On drift it also pushes a clean
+# ntfy alert through the team's shared relay (SLACK_WEBHOOK_URL ->
+# a11oy.net/relay -> a11oy-uptime-notify), the same channel the box uptime
+# monitor uses, so the team is paged immediately rather than only seeing a red
+# scheduled run.
+#
+# Rulesets + classic protection require repo-admin, so the built-in Actions
+# GITHUB_TOKEN is NOT sufficient — the SZL_GITHUB_TOKEN PAT secret is used. A
+# missing/insufficient token is reported as an ERROR (exit 2), never a silent
+# pass, so the merge block can never look protected when the check could not run.
+
+on:
+  schedule:
+    # Daily (06:19 UTC) — offset from the other org guards; this protection is
+    # security-load-bearing so a weekly cadence is too slow to catch a removal.
+    - cron: "19 6 * * *"
+  workflow_dispatch: {}
+  push:
+    branches: [main]
+    paths:
+      - ".github/scripts/required_check_drift.py"
+      - ".github/data/required_check_config.json"
+      - ".github/data/required_check_allowlist.json"
+      - ".github/workflows/required-check-drift.yml"
+  workflow_call: {}
+
+permissions:
+  contents: read
+
+concurrency:
+  group: required-check-drift-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    name: Lockfile merge block still required on every wired repo
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write # only to commit the refreshed report in szl-holdings/.github
+    steps:
+      - name: Harden runner
+        uses: step-security/harden-runner@9af89fc71515a100421586dfdb3dc9c984fbf411 # v2.19.4
+        with:
+          egress-policy: audit
+
+      - name: Checkout
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+
+      - name: Set up Python
+        uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6.2.0
+        with:
+          python-version: "3.12"
+
+      - name: Verify the lockfile context is still required on every wired repo
+        env:
+          # repo-admin PAT preferred (the built-in token can't read rulesets /
+          # classic protection on the other repos)
+          SZL_GITHUB_TOKEN: ${{ secrets.SZL_GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          set +e
+          python3 .github/scripts/required_check_drift.py \
+            --config .github/data/required_check_config.json \
+            --allowlist .github/data/required_check_allowlist.json \
+            --report .github/data/required_check_report.json
+          echo "CHECK_EXIT=$?" >> "$GITHUB_ENV"
+
+      - name: Commit refreshed report if changed
+        # Best-effort: if main is protected (or the token can't push), this must
+        # NOT mask the real signal. The drift gate below is the source of truth.
+        continue-on-error: true
+        if: github.repository == 'szl-holdings/.github' && github.event_name != 'pull_request'
+        run: |
+          if git diff --quiet -- .github/data/required_check_report.json; then
+            echo "Report unchanged; nothing to commit."
+            exit 0
+          fi
+          git config user.name "Stephen P. Lutar Jr."
+          git config user.email "stephenlutar2@gmail.com"
+          git add .github/data/required_check_report.json
+          git commit -s -m "chore(security): refresh required-check drift report [skip ci]"
+          git push
+
+      - name: Alert ntfy on drift
+        # Fires only when a repo actually lost the requirement (exit 1). Routed
+        # through the shared relay so it renders cleanly in the team's ntfy app.
+        # No-ops (with a warning) if the webhook secret is unset, never masking
+        # the red job below.
+        if: env.CHECK_EXIT == '1'
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+        run: |
+          set -euo pipefail
+          if [ -z "${SLACK_WEBHOOK_URL:-}" ]; then
+            echo "::warning::SLACK_WEBHOOK_URL not set; skipping ntfy push (the red job is still the signal)."
+            exit 0
+          fi
+          drift="$(python3 -c '
+          import json
+          r = json.load(open(".github/data/required_check_report.json"))
+          print("; ".join(r.get("errors", [])) or "(see report)")
+          ')"
+          run_url="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
+          text=":rotating_light: Lockfile merge block DRIFT: the required status check 'lockfiles / No lockfile references a Replit-internal registry host' was removed from one or more repos. A poisoned lockfile can now be merged. ${drift} Run: ${run_url}"
+          payload="$(python3 -c 'import json,sys; print(json.dumps({"text": sys.argv[1]}))' "$text")"
+          code="$(curl -sS -o /dev/null -w '%{http_code}' -X POST -H 'Content-Type: application/json' -d "$payload" "$SLACK_WEBHOOK_URL" || echo 000)"
+          echo "ntfy relay responded HTTP ${code}"
+          [ "$code" = "200" ] || echo "::warning::ntfy relay returned ${code} (not 200); check the relay."
+
+      - name: Fail if drift or the check could not run
+        run: |
+          case "${CHECK_EXIT:-2}" in
+            0)
+              echo "✓ The lockfile-registry context is still a required status check on every wired repo."
+              ;;
+            1)
+              echo "::error::Required-status-check DRIFT: at least one wired repo no"
+              echo "::error::longer requires the lockfile-registry context on its default"
+              echo "::error::branch — a poisoned lockfile can now be merged. See the step"
+              echo "::error::output and .github/data/required_check_report.json. Re-add it"
+              echo "::error::via the ruleset required_status_checks rule (a11oy/ouroboros)"
+              echo "::error::or classic branches/main/protection/required_status_checks."
+              exit 1
+              ;;
+            *)
+              echo "::error::Could not complete the required-check drift watch"
+              echo "::error::(auth/API failure). Rulesets + classic protection need a"
+              echo "::error::repo-admin token — set the SZL_GITHUB_TOKEN secret. This is"
+              echo "::error::failed (not passed) so the merge block can never look"
+              echo "::error::protected when the check could not actually run."
+              exit 1
+              ;;
+          esac

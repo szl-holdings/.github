@@ -1,0 +1,4 @@
+{
+  "_comment": "Intentional, reasoned exceptions for the required-status-check drift watcher (see .github/scripts/required_check_drift.py). The watcher fails if any repo listed in required_check_config.json no longer requires the lockfile-registry context on its default branch. This allowlist is expected to stay EMPTY — there is no legitimate reason to stop requiring the lockfile merge block on a repo that commits lockfiles. 'ignore_repos' skips a wired repo by short name (e.g. 'docs-site'); add an entry only with a documented reason and a plan to re-wire.",
+  "ignore_repos": []
+}
