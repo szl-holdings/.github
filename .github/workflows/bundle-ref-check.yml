@@ -1,0 +1,147 @@
+name: Bundle Reference Check
+
+# Task #546 class of drift: a PUBLIC UDS bundle YAML (one wired into a README's
+# build/deploy/verify steps) points `packages[].repository` + `ref` at a GHCR
+# package/tag that was never published — e.g.
+# `ghcr.io/szl-holdings/packages/szl-receipts:0.3.1` (wrong org path, 403/404).
+# `uds create` / `uds deploy` then fail on the first package pull for anyone
+# following the public docs, and nothing in CI ever caught it; it was only found
+# by manual probing. (The same sweep has since caught the identical mistake on
+# the staged mesh bundle's a11oy/sentra/amaru organ refs.)
+#
+# This job runs .github/scripts/bundle_ref_check.py across every PUBLIC repo in
+# the org: it finds each `kind: UDSBundle` file (uds-bundle.yaml / .yml), parses
+# every package's repository+ref, and probes the reference against GHCR
+# (anonymous bearer token + manifest HEAD, GET confirm, authenticated retry for
+# private packages; flavor/arch-aware tag resolution). An unreachable SZL-OWNED
+# (ghcr.io/szl-holdings/...) ref FAILS the run — that is the bug class. An
+# unreachable EXTERNAL upstream ref (defenseunicorns/zarf-dev/...) is only a
+# warning, because upstreams retag / move / re-flavor on their own schedule. A
+# network fault is always a warning. Local `path:` packages are skipped.
+# Intentional/known-staged exceptions live in
+# .github/data/bundle_ref_allowlist.json (each with a reason); nothing is
+# silently passed. For a per-repo fail-fast gate that catches the mistake on the
+# PR/push that introduces it (before main), repos call
+# .github/workflows/reusable-bundle-ref-check.yml from their own CI.
+#
+# Public repo listing + git-tree + raw reads work with the built-in GITHUB_TOKEN;
+# SZL_GITHUB_TOKEN (org-owner) is used when present to authenticate GHCR for any
+# PRIVATE szl-holdings packages, but is not required for public ones.
+
+on:
+  schedule:
+    # Weekly sweep (Tuesdays 06:17 UTC) so an unpublished ref pushed anywhere in
+    # the org is caught even when idle.
+    - cron: "17 6 * * 2"
+  workflow_dispatch: {}
+  push:
+    branches: [main]
+    paths:
+      - ".github/scripts/bundle_ref_check.py"
+      - ".github/data/bundle_ref_allowlist.json"
+      - ".github/workflows/bundle-ref-check.yml"
+      - ".github/workflows/reusable-bundle-ref-check.yml"
+  workflow_call: {}
+
+permissions:
+  contents: read
+
+concurrency:
+  group: bundle-ref-check-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  selftest:
+    name: Self-test (good ref reachable, known-bad ref unreachable)
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Harden runner
+        uses: step-security/harden-runner@9af89fc71515a100421586dfdb3dc9c984fbf411 # v2.19.4
+        with:
+          egress-policy: audit
+
+      - name: Checkout
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+
+      - name: Set up Python
+        uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6.2.0
+        with:
+          python-version: "3.12"
+
+      - name: Probe a published ref and the known-bad Task #546 ref
+        env:
+          SZL_GITHUB_TOKEN: ${{ secrets.SZL_GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ github.token }}
+        run: python3 .github/scripts/bundle_ref_check.py --selftest
+
+  check:
+    name: No bundle references an unpublished SZL package
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: write # only to commit the refreshed report in szl-holdings/.github
+    steps:
+      - name: Harden runner
+        uses: step-security/harden-runner@9af89fc71515a100421586dfdb3dc9c984fbf411 # v2.19.4
+        with:
+          egress-policy: audit
+
+      - name: Checkout
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+
+      - name: Set up Python
+        uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6.2.0
+        with:
+          python-version: "3.12"
+
+      - name: Install PyYAML
+        run: python3 -m pip install --quiet pyyaml
+
+      - name: Sweep org bundle YAMLs for unpublished package references
+        env:
+          SZL_GITHUB_TOKEN: ${{ secrets.SZL_GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          set +e
+          python3 .github/scripts/bundle_ref_check.py \
+            --include-archived \
+            --report .github/data/bundle_ref_report.json
+          echo "CHECK_EXIT=$?" >> "$GITHUB_ENV"
+
+      - name: Commit refreshed report if changed
+        # Best-effort: if main is protected (or the token can't push), this must
+        # NOT mask the real signal. The gate below is the source of truth.
+        continue-on-error: true
+        if: github.repository == 'szl-holdings/.github' && github.event_name != 'pull_request'
+        run: |
+          if git diff --quiet -- .github/data/bundle_ref_report.json; then
+            echo "Report unchanged; nothing to commit."
+            exit 0
+          fi
+          git config user.name "Stephen P. Lutar Jr."
+          git config user.email "stephenlutar2@gmail.com"
+          git add .github/data/bundle_ref_report.json
+          git commit -s -m "chore(bundle-refs): refresh bundle reference report [skip ci]"
+          git push
+
+      - name: Fail on an unpublished SZL-owned bundle reference
+        run: |
+          if [ "${CHECK_EXIT:-1}" != "0" ]; then
+            echo "::error::The bundle reference sweep failed: a PUBLIC UDS bundle"
+            echo "::error::references an SZL-owned (ghcr.io/szl-holdings/...) package"
+            echo "::error::or tag that is NOT published on GHCR (403/404), so"
+            echo "::error::'uds create'/'uds deploy' would fail on the package pull"
+            echo "::error::for anyone following the public docs. Fix one of:"
+            echo "::error:: (1) publish the package/tag to GHCR;"
+            echo "::error:: (2) correct the bundle's repository/ref to a published"
+            echo "::error::     artifact (watch the org path — szl-holdings/<name>,"
+            echo "::error::     not szl-holdings/packages/<name>, was the recurring bug);"
+            echo "::error:: (3) if the ref is intentionally staged/not-yet-published,"
+            echo "::error::     add it (with a reason) to"
+            echo "::error::     .github/data/bundle_ref_allowlist.json."
+            echo "::error::See the annotations above and"
+            echo "::error::.github/data/bundle_ref_report.json."
+            exit 1
+          fi
+          echo "✓ Every SZL-owned bundle package reference resolves on GHCR."

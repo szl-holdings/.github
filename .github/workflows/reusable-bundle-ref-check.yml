@@ -1,0 +1,84 @@
+name: Reusable — Bundle Reference Check
+
+# Per-repo fail-fast guard for the Task #546 class of drift: a PUBLIC UDS bundle
+# YAML (wired into a README's build/deploy/verify steps) points
+# `packages[].repository` + `ref` at a GHCR package/tag that was never published
+# — e.g. `ghcr.io/szl-holdings/packages/szl-receipts:0.3.1` (wrong org path,
+# 403/404). `uds create` / `uds deploy` then fail on the first package pull for
+# anyone following the public docs, and nothing in CI caught it.
+#
+# A repo wires this into its own CI so a bundle that references an unpublished
+# SZL-owned package fails the PR/push that introduces it — before it lands on
+# main. It checks out the CALLER repo, fetches the guard script from
+# szl-holdings/.github, and runs it in --local mode over the caller's bundle
+# YAMLs. (The org's scheduled sweep, bundle-ref-check.yml, is the catch-all.)
+#
+# Wire it up from a consuming repo, e.g.:
+#   jobs:
+#     bundle-refs:
+#       uses: szl-holdings/.github/.github/workflows/reusable-bundle-ref-check.yml@main
+#       secrets: inherit   # optional: lets the GHCR probe authenticate for
+#                          # PRIVATE szl-holdings packages (public probe anon)
+#
+# Severity: an unreachable SZL-OWNED (ghcr.io/szl-holdings/...) ref FAILS the run;
+# an unreachable EXTERNAL upstream ref (defenseunicorns/zarf-dev/...) is a warning
+# (their retag/flavor lifecycle is out of our control); a network fault is always
+# a warning. Local `path:` packages are skipped. Intentional exceptions live in
+# the org guard's .github/data/bundle_ref_allowlist.json.
+
+on:
+  workflow_call: {}
+
+permissions:
+  contents: read
+
+jobs:
+  scan:
+    name: No bundle references an unpublished SZL package
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Harden runner
+        uses: step-security/harden-runner@9af89fc71515a100421586dfdb3dc9c984fbf411 # v2.19.4
+        with:
+          egress-policy: audit
+
+      - name: Checkout caller
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        with:
+          path: caller
+
+      - name: Checkout org guard (szl-holdings/.github)
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        with:
+          repository: szl-holdings/.github
+          ref: main
+          path: guard
+
+      - name: Set up Python
+        uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6.2.0
+        with:
+          python-version: "3.12"
+
+      - name: Install PyYAML
+        run: python3 -m pip install --quiet pyyaml
+
+      - name: Probe bundle package references against GHCR
+        env:
+          # Optional: authenticates the GHCR pull-token for PRIVATE szl-holdings
+          # packages. Public packages probe anonymously, so this is not required.
+          SZL_GITHUB_TOKEN: ${{ secrets.SZL_GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          python3 guard/.github/scripts/bundle_ref_check.py \
+            --local caller \
+            --allowlist guard/.github/data/bundle_ref_allowlist.json \
+            --report bundle_ref_report.json
+
+      - name: Upload report
+        if: always()
+        uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5.0.0
+        with:
+          name: bundle-ref-report
+          path: bundle_ref_report.json
+          if-no-files-found: ignore
