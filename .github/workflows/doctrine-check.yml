@@ -80,7 +80,7 @@ jobs:
               --exclude="OUROBOROS_RUN_ALL.py" \
               --exclude="szlBreaker.ts" --exclude="szl_breaker.py" \
               --exclude="serve.py" --exclude="szl_wire.py" --exclude="_live_serve.py" \
-              --exclude-dir="coordination" --exclude-dir="cursor-directives" --exclude-dir="corpus" \
+              --exclude-dir="coordination" --exclude-dir="cursor-directives" --exclude-dir="replit-sync" --exclude-dir="corpus" \
               --exclude-dir="resilience_observability" \
               . 2>/dev/null | \
               grep -vE "^(\./)?\.git/|\.lake/|node_modules/|/dist/|/build/" | \
@@ -101,7 +101,7 @@ jobs:
           M2=$(grep -rE "Λ.*theorem|Lambda.*theorem|lambda.*Theorem|lambdaUniqueness[^C]" \
               --include="*.md" --include="*.json" --include="*.py" --include="*.ts" --include="*.lean" \
               --exclude="OUROBOROS_RUN_ALL.py" --exclude="YACHAY_SYSTEM_PROMPT.md" \
-              --exclude-dir="__tests__" --exclude-dir="coordination" --exclude-dir="cursor-directives" --exclude-dir="corpus" \
+              --exclude-dir="__tests__" --exclude-dir="coordination" --exclude-dir="cursor-directives" --exclude-dir="replit-sync" --exclude-dir="corpus" \
               . 2>/dev/null | \
               grep -vE "Conjecture|conjecture|NOT a theorem|not a proven theorem|not a theorem" | \
               grep -vE "Never claim|never claim|Never.*theorem|don't claim|do not claim" | \
@@ -138,7 +138,7 @@ jobs:
           # RULE 1: L3 is never allowed (requires isolated/reusable-workflow builder)
           M3_L3=$(grep -rE "SLSA.*L3|SLSA Level 3" \
               --include="*.md" --include="*.json" --include="*.yaml" \
-              --exclude-dir="coordination" --exclude-dir="cursor-directives" --exclude-dir="corpus" \
+              --exclude-dir="coordination" --exclude-dir="cursor-directives" --exclude-dir="replit-sync" --exclude-dir="corpus" \
               . 2>/dev/null | \
               grep -vE "^(\./)?\.git/|\.lake/|node_modules/" | \
               grep -viE "not L3|no.*L3|L3.*not|banned|prohibited|forbidden|out of scope" | \
@@ -178,7 +178,7 @@ jobs:
           fi
           M3_L2_UNVERIFIED=$(grep -rE "SLSA.*L2|SLSA Level 2" \
               --include="*.md" --include="*.json" --include="*.yaml" \
-              --exclude-dir="coordination" --exclude-dir="cursor-directives" --exclude-dir="corpus" \
+              --exclude-dir="coordination" --exclude-dir="cursor-directives" --exclude-dir="replit-sync" --exclude-dir="corpus" \
               . 2>/dev/null | \
               grep -vE "^(\./)?\.git/|\.lake/|node_modules/" | \
               grep -vE "ghcr-build-push\.yml|ghcr\.io/szl-holdings/(a11oy|killinchu)" | \
@@ -213,7 +213,7 @@ jobs:
               --exclude-dir="vertical" \
               --exclude="defense*.yaml" --exclude="defense*.json" \
               --exclude="OPS_NOTES.md" \
-              --exclude-dir="coordination" --exclude-dir="cursor-directives" --exclude-dir="corpus" \
+              --exclude-dir="coordination" --exclude-dir="cursor-directives" --exclude-dir="replit-sync" --exclude-dir="corpus" \
               . 2>/dev/null | \
               grep -vE "out of scope|not pursuing|historical|archived|REJECTED|deprecated|proposed|roadmap" | \
               grep -viE "no iron bank|not.*iron bank|no fedramp|not.*fedramp|no cmmc|not.*cmmc|gap|vanilla|approved base|citation|NIST" | \
