@@ -20,17 +20,33 @@ an intentional case (e.g. a deliberately proprietary repo, or a dual-licensed
 data/code repo). Allowlisting is explicit and reasoned — nothing is silently
 "passed".
 
+By default only PUBLIC repos are checked. With ``--include-private`` the sweep
+also covers the org's PRIVATE repos (whose README badge / front-matter /
+CITATION.cff can still drift from the actual LICENSE, and which may later be
+flipped public). This mirrors the Hugging Face sibling checker
+(``hf_license_consistency.py``): private listing depends on the token actually
+having org access, and the GitHub API silently returns only PUBLIC repos when
+it does not — so a token that has quietly expired / been revoked / lost org
+membership would otherwise report a false "0 drift" while private coverage has
+vanished. To prevent that, ``--include-private`` runs a PREFLIGHT that proves
+the token works (``/user``), belongs to the org (``/user/memberships/orgs``),
+and that the listing returned at least ``--min-private`` private repos before a
+clean result is trusted. Any preflight failure is loud — the job goes red.
+
 Auth: reads a GitHub token from $GITHUB_TOKEN / $GH_TOKEN / $SZL_GITHUB_TOKEN.
-In GitHub Actions the built-in $GITHUB_TOKEN is enough — every repo checked is
-public, and public repo listing + contents read work fine with it.
+For a PUBLIC-only sweep the built-in $GITHUB_TOKEN is enough — public repo
+listing + contents read work fine with it. A ``--include-private`` sweep needs
+an org-scoped PAT (e.g. $SZL_GITHUB_TOKEN); the built-in $GITHUB_TOKEN is
+repo-scoped and cannot list the org's private repos.
 
 Usage:
   python license_consistency.py [--org szl-holdings] \
       [--allowlist .github/data/license_allowlist.json] \
       [--report .github/data/license_consistency_report.json] \
-      [--include-archived] [--json]
+      [--include-archived] [--include-private] [--min-private N] [--json]
 
-Exit code 0 = all consistent (warnings allowed); 1 = at least one ERROR.
+Exit code 0 = all consistent (warnings allowed); 1 = at least one ERROR
+(including a preflight failure when --include-private cannot be trusted).
 """
 from __future__ import annotations
 
@@ -39,6 +55,7 @@ import json
 import os
 import re
 import sys
+import urllib.error
 import urllib.parse
 import urllib.request
 from datetime import datetime, timezone
@@ -82,22 +99,75 @@ def _gh_text(repo: str, path: str, token: str):
     return None
 
 
-def list_public_repos(org: str, token: str, include_archived: bool):
-    repos, page = [], 1
+def gh_whoami(token: str):
+    """Return (ok, identity_dict, error_str).
+
+    Used to PROVE an ``--include-private`` run actually holds a working token
+    before we trust a "0 private drift" result. ``/user`` is the cheapest
+    authenticated call; a 401/403 means the token is expired/revoked/rotated and
+    cannot be trusted to unlock the org's private listings.
+    """
+    if not token:
+        return False, None, "no GitHub token present"
+    try:
+        return True, _gh("/user", token), None
+    except urllib.error.HTTPError as e:
+        return False, None, f"/user returned HTTP {e.code}"
+    except Exception as e:  # noqa: BLE001 - any failure = untrustworthy token
+        return False, None, f"/user failed: {e}"
+
+
+def gh_org_membership(token: str, org: str):
+    """Return (state, error).
+
+    ``state`` is the org membership state ("active"/"pending") when the token's
+    user is a member, ``"not_member"`` on a definitive 404, or ``"unknown"`` when
+    the endpoint is inaccessible (e.g. a fine-grained token that does not expose
+    membership) — in which case the caller falls back to the empirical
+    ``--min-private`` floor rather than false-failing.
+    """
+    try:
+        m = _gh(f"/user/memberships/orgs/{urllib.parse.quote(org)}", token)
+        return (m.get("state") or "unknown"), None
+    except urllib.error.HTTPError as e:
+        if e.code == 404:
+            return "not_member", f"token is not a member of org '{org}' (HTTP 404)"
+        return "unknown", f"membership check returned HTTP {e.code}"
+    except Exception as e:  # noqa: BLE001
+        return "unknown", f"membership check failed: {e}"
+
+
+def list_org_repos(org: str, token: str, include_archived: bool, include_private: bool):
+    """Return ``(repos, list_errors)``.
+
+    ``list_errors`` is non-empty if a listing page failed outright. A failed
+    listing silently drops repos from the sweep, so it must surface as loud drift
+    — not a quietly smaller (still-green) result set. Private repos are included
+    only when ``include_private`` is set (and only then can the API return them
+    at all, given a token with org access).
+    """
+    repos, page, list_errors = [], 1, []
     while True:
-        batch = _gh(f"/orgs/{org}/repos?per_page=100&page={page}&type=all", token)
+        try:
+            batch = _gh(f"/orgs/{org}/repos?per_page=100&page={page}&type=all", token)
+        except urllib.error.HTTPError as e:
+            list_errors.append(f"failed to list org repos (page {page}): HTTP {e.code}")
+            break
+        except Exception as e:  # noqa: BLE001 - a dropped page must be loud
+            list_errors.append(f"failed to list org repos (page {page}): {e}")
+            break
         if not batch:
             break
         repos.extend(batch)
         page += 1
     out = []
     for r in repos:
-        if r.get("private"):
+        if r.get("private") and not include_private:
             continue
         if r.get("archived") and not include_archived:
             continue
         out.append(r)
-    return sorted(out, key=lambda r: r["name"])
+    return sorted(out, key=lambda r: r["name"]), list_errors
 
 
 # --------------------------------------------------------------------------- #
@@ -287,6 +357,15 @@ def main() -> int:
     ap.add_argument("--report", help="Write the full JSON report to this path.")
     ap.add_argument("--include-archived", action="store_true",
                     help="Also check archived repos (they cannot be auto-fixed).")
+    ap.add_argument("--include-private", action="store_true",
+                    help="Also check the org's PRIVATE repos (needs an org-scoped "
+                         "token, e.g. $SZL_GITHUB_TOKEN; the built-in $GITHUB_TOKEN "
+                         "cannot list them).")
+    ap.add_argument("--min-private", type=int, default=1,
+                    help="With --include-private, require at least this many private "
+                         "repos in the org listing. This proves the token actually "
+                         "unlocked private repos before a '0 drift' result is trusted; "
+                         "set 0 to disable the empirical floor (default: 1).")
     ap.add_argument("--json", action="store_true", help="Print the JSON report to stdout.")
     args = ap.parse_args()
 
@@ -299,7 +378,48 @@ def main() -> int:
     allow_repos = allow.get("repos", {})
     ignore_repos = set(allow.get("ignore_repos", []))
 
-    repos = list_public_repos(args.org, token, args.include_archived)
+    # --------------------------------------------------------------------- #
+    # Preflight: when --include-private is requested, PROVE the token actually
+    # unlocks the org's private listings BEFORE trusting the result. Otherwise
+    # the GitHub API silently returns only PUBLIC repos and the whole sweep
+    # reports a false "0 drift" while private coverage has quietly vanished. Any
+    # failure here is loud (the job goes red). Mirrors the HF sibling checker.
+    # --------------------------------------------------------------------- #
+    preflight_errors: list[str] = []
+    if args.include_private:
+        ok, who, err = gh_whoami(token)
+        if not ok:
+            preflight_errors.append(
+                f"--include-private was requested but the GitHub token failed "
+                f"validation ({err}); it cannot be trusted to unlock private "
+                f"listings (likely expired / revoked / rotated / repo-scoped).")
+        else:
+            state, merr = gh_org_membership(token, args.org)
+            if state == "not_member":
+                # Persisted/printed message stays PII-free (the report JSON is
+                # committed to a public repo); the token login goes to stderr
+                # only, for live debugging.
+                preflight_errors.append(
+                    f"GitHub token has no membership in org '{args.org}'; its "
+                    f"private repos cannot be listed (see job log for token login).")
+                print(f"  [preflight] token login '{who.get('login')}' is not a "
+                      f"member of '{args.org}' ({merr})", file=sys.stderr)
+            # state in ("active", "pending", "unknown") -> fall through to the
+            # empirical min-private floor below rather than false-failing.
+
+    repos, list_errors = list_org_repos(
+        args.org, token, args.include_archived, args.include_private)
+    preflight_errors.extend(list_errors)
+
+    private_seen = sum(1 for r in repos if r.get("private"))
+    if (args.include_private and args.min_private > 0
+            and not preflight_errors and private_seen < args.min_private):
+        preflight_errors.append(
+            f"--include-private is on and the token validated, but the listing "
+            f"returned only {private_seen} private repo(s) (expected at least "
+            f"{args.min_private}). Private coverage appears to have silently "
+            f"dropped to public-only — refusing to trust this result.")
+
     results = []
     for r in repos:
         if r["name"] in ignore_repos:
@@ -313,6 +433,11 @@ def main() -> int:
         "org": args.org,
         "checked_at_utc": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
         "include_archived": args.include_archived,
+        "include_private": args.include_private,
+        "private_repos_seen": private_seen,
+        "min_private": args.min_private if args.include_private else None,
+        "preflight_ok": not preflight_errors,
+        "preflight_errors": preflight_errors,
         "summary": {
             "checked": len(results),
             "ok": sum(1 for x in results if x["status"] == "OK"),
@@ -331,9 +456,11 @@ def main() -> int:
     if args.json:
         print(json.dumps(payload, indent=2))
     else:
+        scope = "public+private" if args.include_private else "public"
+        priv = f", {private_seen} private" if args.include_private else ""
         print(f"License consistency for {args.org}: "
               f"{payload['summary']['ok']} OK, {len(warns)} WARN, {len(errs)} ERROR "
-              f"(of {len(results)} public repos checked)\n")
+              f"(of {len(results)} {scope} repos checked{priv})\n")
         for x in results:
             mark = {"OK": "\u2713", "WARN": "\u26a0", "ERROR": "\u2717"}[x["status"]]
             note = " [allowlisted]" if x["allowlisted"] else ""
@@ -343,6 +470,16 @@ def main() -> int:
                 print(f"        ERROR: {e}")
             for w in x["warnings"]:
                 print(f"        warn:  {w}")
+
+    # A preflight failure means the private-repo coverage cannot be trusted, so a
+    # clean license result is meaningless — fail loudly (job red) BEFORE the drift
+    # check, never silently degrade to public-only-but-green.
+    if preflight_errors:
+        print("\nPREFLIGHT FAILED — --include-private results cannot be trusted:",
+              file=sys.stderr)
+        for e in preflight_errors:
+            print(f"  - {e}", file=sys.stderr)
+        return 1
 
     if errs:
         print(f"\n{len(errs)} repo(s) have license-claim drift. See above / report.",
