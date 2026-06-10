@@ -4,14 +4,22 @@ name: License Consistency
 # claiming one license while the actual LICENSE file says another. For a company
 # whose thesis is provable honesty, that must never ship silently.
 #
-# This job runs .github/scripts/license_consistency.py across every PUBLIC repo in
-# the org, comparing GitHub's detected SPDX id (the truth from the LICENSE file)
-# against the license claimed in the README badge / front-matter and CITATION.cff.
+# This job runs .github/scripts/license_consistency.py across the org's repos,
+# comparing GitHub's detected SPDX id (the truth from the LICENSE file) against
+# the license claimed in the README badge / front-matter and CITATION.cff.
 # Intentional cases (proprietary, dual-license) are explicitly allowlisted in
 # .github/data/license_allowlist.json — anything else fails the job.
 #
-# Public repo listing + contents read work with the built-in GITHUB_TOKEN, so no
-# org PAT secret is needed. Other repos may also consume this via `workflow_call`.
+# Auth: this sweep runs with --include-private so it also covers the org's
+# PRIVATE repos (whose README badge / CITATION.cff can still drift, and which may
+# later be flipped public). Private listing requires the org-scoped
+# SZL_GITHUB_TOKEN secret — the built-in GITHUB_TOKEN is repo-scoped and silently
+# returns only PUBLIC repos. To stop a quietly expired / revoked / rotated token
+# from reporting a false "0 drift" while private coverage has vanished, the
+# script PREFLIGHTS the token (whoami + org membership + an empirical "saw
+# >=--min-private private repos" floor) and FAILS THE JOB LOUDLY if private repos
+# can't actually be listed. Mirrors the HF sibling checker (hf-license-consistency).
+# Other repos may also consume this via `workflow_call`.
 
 on:
   schedule:
@@ -56,10 +64,22 @@ jobs:
 
       - name: Check license consistency across the org
         env:
-          GITHUB_TOKEN: ${{ github.token }}
+          # Org-scoped PAT so --include-private can list the org's PRIVATE repos.
+          # REQUIRED: with --include-private the script fails loudly (job red) if
+          # this secret is missing / expired / revoked or cannot list private
+          # repos, rather than silently degrading to a public-only "0 drift".
+          GITHUB_TOKEN: ${{ secrets.SZL_GITHUB_TOKEN }}
         run: |
           set +e
+          # --min-private is a conservative empirical floor proving the token
+          # actually unlocked private listings. The org currently keeps a single
+          # private repo, so require at least 1: any drop to 0 means private
+          # visibility silently collapsed to public-only. Raise it if the org
+          # grows a stable set of private repos; lower to 0 only if they are all
+          # deliberately retired.
           python3 .github/scripts/license_consistency.py \
+            --include-private \
+            --min-private 1 \
             --report .github/data/license_consistency_report.json
           echo "CHECK_EXIT=$?" >> "$GITHUB_ENV"
 
