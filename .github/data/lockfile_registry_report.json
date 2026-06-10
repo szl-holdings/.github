@@ -2,11 +2,11 @@
   "schema": "szl.lockfile_registry/v1",
   "mode": "org",
   "org": "szl-holdings",
-  "checked_at_utc": "2026-06-08T21:25:27Z",
+  "checked_at_utc": "2026-06-10T13:10:56Z",
   "include_archived": true,
   "summary": {
-    "checked": 27,
-    "ok": 27,
+    "checked": 28,
+    "ok": 28,
     "error": 0
   },
   "results": [
@@ -19,6 +19,13 @@
     },
     {
       "repo": "a11oy",
+      "archived": false,
+      "default_branch": "main",
+      "status": "OK",
+      "findings": []
+    },
+    {
+      "repo": "anatomy",
       "archived": false,
       "default_branch": "main",
       "status": "OK",
@@ -198,6 +205,85 @@
       "default_branch": "main",
       "status": "OK",
       "findings": []
+    }
+  ],
+  "coverage_summary": {
+    "lockfile_repos": 6,
+    "ok": 6,
+    "gap": 0,
+    "unverifiable": 0
+  },
+  "coverage": [
+    {
+      "repo": "a11oy",
+      "default_branch": "main",
+      "lockfiles": [
+        "docs/site/package-lock.json",
+        "package-lock.json",
+        "packages/a11oy-knowledge/package-lock.json",
+        "pnpm-lock.yaml"
+      ],
+      "caller_workflow_present": true,
+      "required_check": "present",
+      "status": "OK",
+      "gaps": []
+    },
+    {
+      "repo": "docs-site",
+      "default_branch": "main",
+      "lockfiles": [
+        "package-lock.json"
+      ],
+      "caller_workflow_present": true,
+      "required_check": "present",
+      "status": "OK",
+      "gaps": []
+    },
+    {
+      "repo": "ouroboros",
+      "default_branch": "main",
+      "lockfiles": [
+        "agentic/pnpm-lock.yaml",
+        "pnpm-lock.yaml",
+        "runtime/types/pnpm-lock.yaml"
+      ],
+      "caller_workflow_present": true,
+      "required_check": "present",
+      "status": "OK",
+      "gaps": []
+    },
+    {
+      "repo": "platform",
+      "default_branch": "main",
+      "lockfiles": [
+        "pnpm-lock.yaml"
+      ],
+      "caller_workflow_present": true,
+      "required_check": "present",
+      "status": "OK",
+      "gaps": []
+    },
+    {
+      "repo": "szl-uds-deployment",
+      "default_branch": "main",
+      "lockfiles": [
+        "pepr/package-lock.json"
+      ],
+      "caller_workflow_present": true,
+      "required_check": "present",
+      "status": "OK",
+      "gaps": []
+    },
+    {
+      "repo": "vsp-otel",
+      "default_branch": "main",
+      "lockfiles": [
+        "pnpm-lock.yaml"
+      ],
+      "caller_workflow_present": true,
+      "required_check": "present",
+      "status": "OK",
+      "gaps": []
     }
   ]
 }

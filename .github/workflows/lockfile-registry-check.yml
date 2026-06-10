@@ -18,6 +18,16 @@ name: Lockfile Registry Check
 # introduces it (before it ever lands on main), repos call
 # .github/workflows/reusable-lockfile-registry-check.yml from their own CI.
 #
+# It ALSO runs a coverage check (--check-coverage): only repos that already commit
+# a lockfile were wired with the per-repo fail-fast caller and made required. A
+# repo that *later* adds its first lockfile would otherwise have neither guard,
+# silently reopening the gap. The coverage check flags any repo that commits a
+# lockfile but is missing the caller workflow
+# (.github/workflows/lockfile-registry.yml) or the required status check on its
+# default branch, so it can be wired + required like the existing ones. Reading
+# branch protection / rulesets needs the org-owner SZL_GITHUB_TOKEN; repos it
+# cannot read are reported "unverifiable" and never fail the run.
+#
 # Public repo listing + git-tree + raw contents read fine with the built-in
 # GITHUB_TOKEN; SZL_GITHUB_TOKEN is used when present (org-owner) but not required.
 
@@ -74,6 +84,7 @@ jobs:
           set +e
           python3 .github/scripts/lockfile_registry_check.py \
             --include-archived \
+            --check-coverage \
             --report .github/data/lockfile_registry_report.json
           echo "CHECK_EXIT=$?" >> "$GITHUB_ENV"
 
@@ -93,17 +104,26 @@ jobs:
           git commit -s -m "chore(lockfile): refresh lockfile-registry report [skip ci]"
           git push
 
-      - name: Fail if any lockfile references a Replit-internal registry host
+      - name: Fail on a poisoned lockfile OR an unprotected lockfile repo
         run: |
           if [ "${CHECK_EXIT:-1}" != "0" ]; then
-            echo "::error::A committed lockfile references a Replit-internal"
-            echo "::error::(*.replit.local) registry host, which breaks npm/pnpm"
-            echo "::error::install on GitHub runners. See the annotations above and"
-            echo "::error::.github/data/lockfile_registry_report.json."
-            echo "::error::Fix (safe — integrity sha is unchanged): rewrite the host"
-            echo "::error::to https://registry.npmjs.org/, e.g. run"
-            echo "::error::  python3 .github/scripts/lockfile_registry_check.py --local . --fix"
-            echo "::error::then commit the rewritten lockfile."
+            echo "::error::The lockfile registry sweep failed. One or both of:"
+            echo "::error:: (1) A committed lockfile references a Replit-internal"
+            echo "::error::     (*.replit.local) registry host, which breaks npm/pnpm"
+            echo "::error::     install on GitHub runners. Fix (safe — integrity sha is"
+            echo "::error::     unchanged): rewrite the host to https://registry.npmjs.org/,"
+            echo "::error::     e.g. run"
+            echo "::error::       python3 .github/scripts/lockfile_registry_check.py --local . --fix"
+            echo "::error::     then commit the rewritten lockfile."
+            echo "::error:: (2) A repo now commits a lockfile but is missing the per-repo"
+            echo "::error::     caller workflow (.github/workflows/lockfile-registry.yml) or"
+            echo "::error::     the required '<job> / No lockfile references a Replit-internal"
+            echo "::error::     registry host' status check on its default branch. Wire the"
+            echo "::error::     caller (uses: szl-holdings/.github/.github/workflows/"
+            echo "::error::     reusable-lockfile-registry-check.yml@main) and make that"
+            echo "::error::     check required, like the existing protected repos."
+            echo "::error::See the annotations above and"
+            echo "::error::.github/data/lockfile_registry_report.json (results + coverage)."
             exit 1
           fi
-          echo "✓ No committed lockfile references a Replit-internal registry host."
+          echo "✓ No poisoned lockfile, and every lockfile-bearing repo is wired + required."

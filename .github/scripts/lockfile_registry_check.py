@@ -81,6 +81,29 @@ PUBLIC_REGISTRY = "https://registry.npmjs.org/"
 # after `/npm/`): http://package-firewall.replit.local/npm/<path> -> registry/<path>
 _FIX_RE = re.compile(r"https?://[A-Za-z0-9_.-]+\.replit\.local/npm/", re.IGNORECASE)
 
+# --------------------------------------------------------------------------- #
+# Coverage gap detection (--check-coverage)
+# --------------------------------------------------------------------------- #
+# A repo that *commits* a lockfile must also be protected against the Replit-host
+# drift on every future PR/push: it needs (1) the per-repo fail-fast caller
+# workflow and (2) that check made REQUIRED on its default branch. The org sweep
+# below only catches a lockfile that is *already* poisoned; without coverage
+# detection a repo that adds its FIRST lockfile later would silently have neither
+# guard, reopening the gap. Coverage detection flags exactly that situation so the
+# repo can be wired + required like the existing ones.
+
+# Path of the per-repo fail-fast caller workflow (uses the reusable workflow).
+CALLER_WORKFLOW_PATH = ".github/workflows/lockfile-registry.yml"
+
+# The status-check context emitted by the reusable workflow. A reusable workflow
+# invoked via `uses:` reports its check as `<caller-job-id> / <reusable-job-name>`.
+# The convention across the org is a job id of `lockfiles`, and the reusable job
+# name is "No lockfile references a Replit-internal registry host", so the required
+# context string is the two joined with " / ". (See lockfile-registry-guard.md.)
+REQUIRED_CHECK_CONTEXT = (
+    "lockfiles / No lockfile references a Replit-internal registry host"
+)
+
 
 # --------------------------------------------------------------------------- #
 # Scanning
@@ -133,6 +156,28 @@ def _raw(repo_full: str, ref: str, path: str, token: str):
         raise
 
 
+def _gh_status(path: str, token: str):
+    """Like _gh but returns (json_or_None, http_status) instead of raising.
+
+    Used by the coverage check, which must distinguish "readable, nothing
+    configured" (e.g. 404 = no classic branch protection) from "cannot read"
+    (401/403 = the token lacks admin) so it never reports a false coverage gap.
+    """
+    req = urllib.request.Request(API + path)
+    req.add_header("Authorization", "Bearer " + token)
+    req.add_header("Accept", "application/vnd.github+json")
+    req.add_header("X-GitHub-Api-Version", "2022-11-28")
+    try:
+        with urllib.request.urlopen(req) as resp:
+            return json.load(resp), resp.status
+    except urllib.error.HTTPError as e:
+        try:
+            body = json.load(e)
+        except Exception:
+            body = None
+        return body, e.code
+
+
 def list_public_repos(org: str, token: str, include_archived: bool):
     repos, page = [], 1
     while True:
@@ -172,11 +217,35 @@ def repo_lockfiles(repo_full: str, ref: str, token: str):
     return sorted(paths)
 
 
-def check_repo(repo_obj, token, ignore_paths):
+def repo_tree_blobs(repo_full: str, ref: str, token: str):
+    """Return every (non-node_modules) blob path in a repo's default-branch tree."""
+    try:
+        tree = _gh(f"/repos/{repo_full}/git/trees/{urllib.parse.quote(ref, safe='')}?recursive=1",
+                   token)
+    except urllib.error.HTTPError as e:
+        if e.code in (404, 409):  # empty repo / missing ref
+            return []
+        raise
+    out = []
+    for node in tree.get("tree", []):
+        if node.get("type") != "blob":
+            continue
+        p = node.get("path", "")
+        if "node_modules/" in p:
+            continue
+        out.append(p)
+    return out
+
+
+def check_repo(repo_obj, token, ignore_paths, blobs=None):
     full = repo_obj["full_name"]
     ref = repo_obj.get("default_branch") or "main"
+    if blobs is None:
+        lockfiles = repo_lockfiles(full, ref, token)
+    else:
+        lockfiles = sorted(p for p in blobs if is_lockfile(p))
     findings = []
-    for path in repo_lockfiles(full, ref, token):
+    for path in lockfiles:
         if path in ignore_paths:
             continue
         text = _raw(full, ref, path, token)
@@ -192,6 +261,110 @@ def check_repo(repo_obj, token, ignore_paths):
         "default_branch": ref,
         "status": status,
         "findings": findings,
+    }
+
+
+# --------------------------------------------------------------------------- #
+# Coverage gap detection
+# --------------------------------------------------------------------------- #
+def _ruleset_targets_branch(detail: dict, branch: str) -> bool:
+    """True if a ruleset's ref-name condition applies to `branch`."""
+    cond = (detail.get("conditions") or {}).get("ref_name") or {}
+    include = cond.get("include") or []
+    exclude = cond.get("exclude") or []
+    ref = f"refs/heads/{branch}"
+    applies = ("~ALL" in include or "~DEFAULT_BRANCH" in include or ref in include)
+    blocked = ref in exclude
+    return applies and not blocked
+
+
+def required_check_present(repo_full: str, branch: str, token: str):
+    """Determine whether REQUIRED_CHECK_CONTEXT is a required check on `branch`.
+
+    Returns one of "present" / "absent" / "unverifiable". The required check can
+    be enforced two ways across the org — classic branch protection or a repo
+    ruleset — so both are consulted. "unverifiable" is returned only when neither
+    source can be read (token without admin), so a coverage gap is never reported
+    on a false read.
+    """
+    verifiable = False
+
+    # 1) Classic branch protection.
+    data, code = _gh_status(
+        f"/repos/{repo_full}/branches/{urllib.parse.quote(branch, safe='')}"
+        "/protection/required_status_checks", token)
+    if code == 200:
+        verifiable = True
+        contexts = [c.get("context") for c in (data or {}).get("checks", [])]
+        if REQUIRED_CHECK_CONTEXT in contexts:
+            return "present"
+    elif code == 404:
+        # Readable, but no classic required-status-checks configured.
+        verifiable = True
+
+    # 2) Repo rulesets (e.g. series-a-default-branch).
+    rulesets, code = _gh_status(f"/repos/{repo_full}/rulesets?includes_parents=true", token)
+    if code == 200:
+        verifiable = True
+        for rs in rulesets or []:
+            if rs.get("enforcement") != "active":
+                continue
+            detail, dcode = _gh_status(f"/repos/{repo_full}/rulesets/{rs['id']}", token)
+            if dcode != 200 or not detail:
+                continue
+            if not _ruleset_targets_branch(detail, branch):
+                continue
+            for rule in detail.get("rules", []):
+                if rule.get("type") != "required_status_checks":
+                    continue
+                params = rule.get("parameters") or {}
+                contexts = [c.get("context")
+                            for c in params.get("required_status_checks", [])]
+                if REQUIRED_CHECK_CONTEXT in contexts:
+                    return "present"
+
+    return "absent" if verifiable else "unverifiable"
+
+
+def check_repo_coverage(repo_obj, token, blobs):
+    """For a repo that COMMITS a lockfile, verify it is wired + required.
+
+    `blobs` is the repo's default-branch blob list (already fetched). Only repos
+    that actually commit a lockfile need the guard, so repos with none are not
+    flagged. Returns a coverage record, or None if the repo has no lockfile.
+    """
+    lockfiles = sorted(p for p in blobs if is_lockfile(p))
+    if not lockfiles:
+        return None
+    full = repo_obj["full_name"]
+    branch = repo_obj.get("default_branch") or "main"
+
+    caller_present = CALLER_WORKFLOW_PATH in blobs
+    required = required_check_present(full, branch, token)
+
+    gaps = []
+    if not caller_present:
+        gaps.append("missing caller workflow " + CALLER_WORKFLOW_PATH)
+    if required == "absent":
+        gaps.append(
+            f"required status check '{REQUIRED_CHECK_CONTEXT}' not enforced on "
+            f"{branch}")
+
+    if gaps:
+        status = "GAP"
+    elif required == "unverifiable":
+        status = "UNVERIFIABLE"
+    else:
+        status = "OK"
+
+    return {
+        "repo": repo_obj["name"],
+        "default_branch": branch,
+        "lockfiles": lockfiles,
+        "caller_workflow_present": caller_present,
+        "required_check": required,
+        "status": status,
+        "gaps": gaps,
     }
 
 
@@ -258,6 +431,12 @@ def main() -> int:
     ap.add_argument("--report", help="Write the full JSON report to this path.")
     ap.add_argument("--include-archived", action="store_true",
                     help="Also scan archived repos (ORG mode).")
+    ap.add_argument("--check-coverage", action="store_true",
+                    help="(ORG mode) also flag any repo that COMMITS a lockfile but "
+                         "is missing the per-repo caller workflow or the required "
+                         "status check on its default branch. Needs an org-admin "
+                         "token to read branch protection/rulesets; repos it cannot "
+                         "read are reported 'unverifiable' (never a false gap).")
     ap.add_argument("--json", action="store_true", help="Print the JSON report to stdout.")
     args = ap.parse_args()
 
@@ -322,12 +501,21 @@ def main() -> int:
 
     repos = list_public_repos(args.org, token, args.include_archived)
     results = []
+    coverage = []
     for r in repos:
         if r["name"] in ignore_repos:
             continue
-        results.append(check_repo(r, token, ignore_paths))
+        # Fetch the default-branch tree once and reuse it for the poisoned-host
+        # scan and (when enabled) the coverage check.
+        blobs = repo_tree_blobs(r["full_name"], r.get("default_branch") or "main", token)
+        results.append(check_repo(r, token, ignore_paths, blobs=blobs))
+        if args.check_coverage and not r.get("archived"):
+            cov = check_repo_coverage(r, token, blobs)
+            if cov is not None:
+                coverage.append(cov)
 
     errs = [x for x in results if x["status"] == "ERROR"]
+    cov_gaps = [c for c in coverage if c["status"] == "GAP"]
     payload = {
         "schema": "szl.lockfile_registry/v1",
         "mode": "org",
@@ -341,6 +529,14 @@ def main() -> int:
         },
         "results": results,
     }
+    if args.check_coverage:
+        payload["coverage_summary"] = {
+            "lockfile_repos": len(coverage),
+            "ok": sum(1 for c in coverage if c["status"] == "OK"),
+            "gap": len(cov_gaps),
+            "unverifiable": sum(1 for c in coverage if c["status"] == "UNVERIFIABLE"),
+        }
+        payload["coverage"] = coverage
 
     if args.report:
         os.makedirs(os.path.dirname(args.report) or ".", exist_ok=True)
@@ -360,6 +556,24 @@ def main() -> int:
             print(f"  {mark} {x['repo']}{arch}")
             for f in x["findings"]:
                 print(f"        {f['path']}: {', '.join(f['hosts'])}")
+        if args.check_coverage:
+            cs = payload["coverage_summary"]
+            print(f"\nLockfile-guard coverage: {cs['ok']} OK, {cs['gap']} GAP, "
+                  f"{cs['unverifiable']} unverifiable "
+                  f"(of {cs['lockfile_repos']} repos that commit a lockfile)")
+            cmark = {"OK": "\u2713", "GAP": "\u2717", "UNVERIFIABLE": "?"}
+            for c in coverage:
+                print(f"  {cmark[c['status']]} {c['repo']}")
+                for g in c["gaps"]:
+                    print(f"        {g}")
+
+    if cov_gaps:
+        for c in cov_gaps:
+            for g in c["gaps"]:
+                print(f"::error::{c['repo']} commits a lockfile but {g}. Wire the "
+                      f"per-repo caller workflow ({CALLER_WORKFLOW_PATH}) and make "
+                      f"the '{REQUIRED_CHECK_CONTEXT}' check required on "
+                      f"{c['default_branch']}, like the already-protected repos.")
 
     if errs:
         _emit_annotations(errs)
@@ -367,8 +581,14 @@ def main() -> int:
               f"(*.replit.local) registry host. These break npm/pnpm install on "
               f"GitHub runners. Rewrite the host to {PUBLIC_REGISTRY} (integrity "
               f"unchanged).", file=sys.stderr)
-        return 1
-    return 0
+    if cov_gaps:
+        print(f"\n{len(cov_gaps)} repo(s) commit a lockfile but are missing the "
+              f"per-repo caller workflow and/or the required status check on their "
+              f"default branch, reopening the *.replit.local gap for any future "
+              f"lockfile change. See the annotations above and the 'coverage' "
+              f"section of the report.", file=sys.stderr)
+
+    return 1 if (errs or cov_gaps) else 0
 
 
 if __name__ == "__main__":
