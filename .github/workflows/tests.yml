@@ -29,6 +29,14 @@ jobs:
       - name: HF license-consistency safety-net self-test
         run: python3 .github/scripts/test_hf_license_consistency.py
 
+      # Pins the managed-security-configuration drift checker (task #387): the
+      # auth/API-failure branch (must be exit 2, never a silent 0) and the drift
+      # branches need live org-admin calls that can't run in CI, so this stubbed,
+      # network-free unit test locks the checker's exit-code contract so a future
+      # refactor can't weaken it into a false "0 drift" green.
+      - name: Code-security drift checker self-test
+        run: python3 .github/scripts/test_code_security_drift.py
+
       # Pins the in-page (deep) anchor checks added in task #412: same-page
       # (#heading) and relative (./file.md#heading) section links rot exactly
       # like absolute-blob anchors. This stubbed, network-free unit test locks
