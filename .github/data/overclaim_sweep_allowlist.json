@@ -1,0 +1,6 @@
+{
+  "_comment": "Allowlist for the org-wide overclaim honesty sweep (.github/scripts/overclaim_sweep.py). 'ignore_repos': repo names to skip entirely. 'ignore_paths': governed-surface paths (e.g. 'README.md') to skip in EVERY repo. 'extra_surfaces': additional repo-relative Markdown paths to scan beyond the fixed governed set. Keep this empty unless a genuine, reviewed exception exists -- a non-empty allowlist hides overclaims from the gate.",
+  "ignore_repos": [],
+  "ignore_paths": [],
+  "extra_surfaces": []
+}

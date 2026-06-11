@@ -1,0 +1,120 @@
+name: Overclaim Honesty Sweep
+
+# Org-wide honesty-overclaim sweep (companion to the per-repo
+# reusable-overclaim-guard.yml caller).
+#
+# The reusable guard only protects repos that wired it into their own CI. A repo
+# that never adopted the caller — or one added to the org later — has NO honesty
+# gate at all, silently reopening the gap that the guard exists to close. This
+# sweep runs .github/scripts/overclaim_sweep.py across EVERY public repo in the
+# org and FAILS if any governed Markdown surface carries a forbidden honesty
+# overclaim, regardless of whether that repo adopted the per-repo caller.
+#
+# It scans exactly the FIXED governed-surface set the reusable guard checks
+# (README.md / PROVEN_FORMULAS.md / STATUS.md / DEPENDENCY_MAP.md /
+# PAPERS_INDEX.md / preprints/puriq/README.md), NOT every Markdown file — a
+# whole-tree scan false-positives on the org's OWN honest doctrine prose (e.g.
+# "Λ-uniqueness is Conjecture 1, not a theorem"). The grep patterns are kept
+# byte-equivalent to reusable-overclaim-guard.yml so the two never disagree.
+#
+# Forbidden claims (see lutar-lean honesty doctrine v11):
+#   * "Theorem U" / U1 / U2 asserted as PROVEN (it is REAL but CONDITIONAL).
+#   * unqualified Λ-uniqueness, or "Conjecture 1 proven" (Conjecture 1 is OPEN;
+#     machine-checked FALSE as stated).
+#
+# Public repo listing + git-tree + raw contents read fine with the built-in
+# GITHUB_TOKEN; SZL_GITHUB_TOKEN (org-owner) is used when present but not
+# required (all scanned repos are public).
+
+on:
+  schedule:
+    # Weekly sweep (Mondays 08:07 UTC) so an overclaim pushed anywhere in the
+    # org is caught fast even when idle.
+    - cron: "7 8 * * 1"
+  workflow_dispatch: {}
+  push:
+    branches: [main]
+    paths:
+      - ".github/scripts/overclaim_sweep.py"
+      - ".github/data/overclaim_sweep_allowlist.json"
+      - ".github/workflows/overclaim-sweep.yml"
+  workflow_call: {}
+
+permissions:
+  contents: read
+
+concurrency:
+  group: overclaim-sweep-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  sweep:
+    name: No governed Markdown doc carries an honesty overclaim
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write # only to commit the refreshed report in szl-holdings/.github
+    steps:
+      - name: Harden runner
+        uses: step-security/harden-runner@9af89fc71515a100421586dfdb3dc9c984fbf411 # v2.19.4
+        with:
+          egress-policy: audit
+
+      - name: Checkout
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+
+      - name: Set up Python
+        uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6.2.0
+        with:
+          python-version: "3.12"
+
+      - name: Sweep org governed Markdown for honesty overclaims
+        env:
+          # SZL_GITHUB_TOKEN (org-owner) if present lets the scan see the public
+          # repo listing without the built-in token's rate limits; the built-in
+          # token is a sufficient fallback (all scanned repos are public).
+          SZL_GITHUB_TOKEN: ${{ secrets.SZL_GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          set +e
+          python3 .github/scripts/overclaim_sweep.py \
+            --include-archived \
+            --report .github/data/overclaim_sweep_report.json
+          echo "CHECK_EXIT=$?" >> "$GITHUB_ENV"
+
+      - name: Commit refreshed report if changed
+        # Best-effort: if main is protected (or the token can't push), this must
+        # NOT mask the real signal. The fail step below is the source of truth.
+        continue-on-error: true
+        if: github.repository == 'szl-holdings/.github' && github.event_name != 'pull_request'
+        run: |
+          if git diff --quiet -- .github/data/overclaim_sweep_report.json; then
+            echo "Report unchanged; nothing to commit."
+            exit 0
+          fi
+          git config user.name "Stephen P. Lutar Jr."
+          git config user.email "stephenlutar2@gmail.com"
+          git add .github/data/overclaim_sweep_report.json
+          git commit -s -m "chore(overclaim): refresh overclaim sweep report [skip ci]"
+          git push
+
+      - name: Fail on an honesty overclaim
+        run: |
+          if [ "${CHECK_EXIT:-1}" != "0" ]; then
+            echo "::error::The org-wide overclaim honesty sweep found a forbidden"
+            echo "::error::claim in a governed Markdown surface (README.md /"
+            echo "::error::PROVEN_FORMULAS.md / STATUS.md / DEPENDENCY_MAP.md /"
+            echo "::error::PAPERS_INDEX.md / preprints/puriq/README.md)."
+            echo "::error::Forbidden: 'Theorem U' / U1 / U2 stated as PROVEN (it is"
+            echo "::error::REAL but CONDITIONAL); unqualified Λ-uniqueness; or"
+            echo "::error::'Conjecture 1 proven' (Conjecture 1 is OPEN)."
+            echo "::error::Fix: qualify the claim (Theorem U = real·conditional;"
+            echo "::error::Λ-uniqueness = Conjecture 1, OPEN) per lutar-lean honesty"
+            echo "::error::doctrine v11. A genuinely intended surface can be"
+            echo "::error::ignore-listed in"
+            echo "::error::.github/data/overclaim_sweep_allowlist.json."
+            echo "::error::See the annotations above and"
+            echo "::error::.github/data/overclaim_sweep_report.json (full results)."
+            exit 1
+          fi
+          echo "✓ No governed Markdown doc carries an honesty overclaim."
