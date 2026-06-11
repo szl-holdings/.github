@@ -28,3 +28,11 @@ jobs:
       # unit test locks the four exit-code contracts of main() in place.
       - name: HF license-consistency safety-net self-test
         run: python3 .github/scripts/test_hf_license_consistency.py
+
+      # Pins the in-page (deep) anchor checks added in task #412: same-page
+      # (#heading) and relative (./file.md#heading) section links rot exactly
+      # like absolute-blob anchors. This stubbed, network-free unit test locks
+      # the extraction/resolution/slug helpers and the broken-vs-present decision
+      # so a future refactor can't silently stop catching dead section links.
+      - name: Public-repo link-check in-page anchor self-test
+        run: python3 .github/scripts/test_public_repo_link_check.py

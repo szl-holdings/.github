@@ -32,6 +32,13 @@ unchanged):
       ERROR with --fail-on-deep. When a deep blob link to a Markdown file carries
       a `#fragment`, the target file's headings are read and the anchor is
       verified too (a renamed heading is a WARN, or ERROR with --fail-on-anchor).
+      The same anchor verification is extended to the two commonest in-repo link
+      forms — a SAME-PAGE `#heading` link (resolved against the current page's
+      own headings) and a RELATIVE `./other.md#heading` link (resolved against
+      that sibling Markdown file's headings, fetched from the same public repo).
+      These rot exactly like absolute-blob anchors when a heading is renamed; a
+      mismatch is a WARN, or ERROR with --fail-on-anchor. (They ride the same
+      --check-deep-links gate, so the default fast scan is unchanged.)
 
   --check-external
       Liveness-check EXTERNAL click-through URLs (any http(s) link that is not a
@@ -80,6 +87,7 @@ import argparse
 import base64
 import json
 import os
+import posixpath
 import re
 import sys
 import threading
@@ -438,6 +446,75 @@ def extract_extended(org: str, text: str, include_bare_external: bool):
 
 
 # --------------------------------------------------------------------------- #
+# Same-page (#frag) and relative (./other.md#frag) anchor links
+# --------------------------------------------------------------------------- #
+_MD_EXTS = (".md", ".markdown", ".mdx")
+
+
+def extract_local_anchor_links(text: str):
+    """[(kind, target_path, fragment, raw_url)] for in-repo anchor links.
+
+    These are the two commonest anchor links a doc carries, and the ones the
+    absolute-blob anchor check can't see because they have no http(s) host:
+
+      * "same-page" -> a pure ``#fragment`` link (target_path == "") whose anchor
+                       must exist in the CURRENT page's own headings.
+      * "relative"  -> a ``path.md#frag`` / ``./x.md#frag`` / ``../d/y.md#frag``
+                       link to another Markdown file in the SAME repo, whose
+                       anchor must exist in THAT file's headings.
+
+    Skipped here (handled elsewhere or carry no checkable heading anchor):
+    absolute / protocol-relative URLs (``http(s)://``, ``mailto:``, ``//host``),
+    site-root links (``/path`` — relative to github.com, not the repo tree),
+    links with no ``#fragment``, and relative links to non-Markdown files.
+    Image/badge URLs are already excluded by ``_clickthrough_urls``.
+    De-duplicated by (kind, target_path, fragment).
+    """
+    out = []
+    seen = set()
+    for url in _clickthrough_urls(text):
+        try:
+            sp = urllib.parse.urlsplit(url)
+        except ValueError:
+            continue
+        if sp.scheme or sp.netloc:
+            continue  # absolute or protocol-relative -> not an in-repo link
+        base, frag = _split_fragment(url)
+        if not frag:
+            continue  # no anchor to verify
+        base = base.split("?", 1)[0]  # drop any `?plain=1` query on the path
+        if base.startswith("/"):
+            continue  # site-root relative (github.com/...), not a repo file path
+        if base == "":
+            kind, target = "same-page", ""
+        else:
+            if not base.lower().endswith(_MD_EXTS):
+                continue  # non-Markdown target: no headings to check
+            kind, target = "relative", base
+        key = (kind, target, frag)
+        if key in seen:
+            continue
+        seen.add(key)
+        out.append((kind, target, frag, url))
+    return out
+
+
+def _resolve_relative_path(source_page: str, target: str):
+    """Resolve a relative Markdown link target against the source page's dir.
+
+    Returns the normalized repo-relative path, or None if the link would escape
+    the repository root (``../`` past the top) or resolve to an absolute path —
+    cases we cannot resolve and must not guess at (no false positives).
+    """
+    src_dir = posixpath.dirname(source_page)
+    joined = posixpath.normpath(
+        posixpath.join(src_dir, urllib.parse.unquote(target)))
+    if joined.startswith("../") or joined in ("..", "/") or joined.startswith("/"):
+        return None
+    return joined
+
+
+# --------------------------------------------------------------------------- #
 # Liveness probing (anonymous, polite, de-duplicated)
 # --------------------------------------------------------------------------- #
 class _HostThrottle:
@@ -637,7 +714,8 @@ def main() -> int:
     ap.add_argument("--check-deep-links", action="store_true",
                     help="HEAD-check DEEP links into live org repos "
                          "(blob/tree/releases/issues/...) and flag 404s; verify "
-                         "#anchors on deep Markdown blob links too.")
+                         "#anchors on deep Markdown blob links, plus same-page "
+                         "(#heading) and relative (./file.md#heading) anchors.")
     ap.add_argument("--check-external", action="store_true",
                     help="Liveness-check EXTERNAL click-through URLs (non-org "
                          "http(s) links), rate-limited and allowlistable.")
@@ -755,6 +833,8 @@ def main() -> int:
     org_findings_by_repo = {}
     deep_occ = []   # {repo, page, target_repo, base, frag, url}
     ext_occ = []    # {repo, page, base, frag, url}
+    local_occ = []  # {repo, page, kind, target, frag, url} (same-page/relative)
+    page_text = {}  # (repo, page) -> body, for same-page anchor resolution
     branch_by_repo = {r["name"]: (r.get("default_branch") or "main")
                       for r in scan_repos}
 
@@ -785,6 +865,14 @@ def main() -> int:
                     "detail": "",
                     "allowlisted": allowlisted,
                 })
+            if args.check_deep_links:
+                # Same-page (#frag) and relative (./file.md#frag) anchors are
+                # verified locally (resolved in Pass 3) — they ride the deep gate
+                # so the default fast scan is unchanged.
+                page_text[(name, path)] = text
+                for kind, target, frag, url in extract_local_anchor_links(text):
+                    local_occ.append({"repo": name, "page": path, "kind": kind,
+                                      "target": target, "frag": frag, "url": url})
             if extended_on:
                 for cat, trepo, base, frag, url in extract_extended(
                         args.org, text, include_bare_external=args.check_external):
@@ -898,6 +986,35 @@ def main() -> int:
                 "detail": f"#{frag} not a heading in {blob[2]}",
                 "allowlisted": False, "fails": args.fail_on_anchor})
 
+    # Same-page (#frag) and relative (./file.md#frag) anchors: verify the
+    # fragment against the actual headings of the source/target Markdown file.
+    for o in local_occ:
+        if _pattern_match(o["url"]):
+            continue  # allowlisted pattern -> skip
+        nf = _normalize_fragment(o["frag"])
+        if not nf or _is_line_anchor(nf):
+            continue  # empty or `#L12`/`#L1-L4` line anchors carry no heading
+        if o["kind"] == "same-page":
+            anchors = heading_anchors(page_text.get((o["repo"], o["page"]), ""))
+            where = o["page"]
+            fkind = "local-anchor"
+        else:  # relative
+            tgt = _resolve_relative_path(o["page"], o["target"])
+            if tgt is None:
+                continue  # escapes the repo root -> can't resolve, no FP
+            branch = branch_by_repo.get(o["repo"], "main")
+            anchors = _anchors_for(f"{args.org}/{o['repo']}", branch, tgt)
+            if anchors is None:
+                continue  # couldn't read the target file -> skip, no FP
+            where = tgt
+            fkind = "relative-anchor"
+        if nf not in anchors:
+            _add(o["repo"], {
+                "category": "deep", "page": o["page"], "target_repo": None,
+                "kind": fkind, "url": o["url"], "fragment": o["frag"],
+                "detail": f"#{o['frag']} not a heading in {where}",
+                "allowlisted": False, "fails": args.fail_on_anchor})
+
     for o in ext_occ:
         base = o["base"]
         if _external_allowlisted(base):
@@ -960,6 +1077,8 @@ def main() -> int:
     total_allowlisted = _count(lambda f: f["allowlisted"])
     deep_broken = _count(lambda f: f["kind"] == "deep-broken")
     deep_anchor = _count(lambda f: f["kind"] == "deep-anchor")
+    local_anchor = _count(lambda f: f["kind"] == "local-anchor")
+    relative_anchor = _count(lambda f: f["kind"] == "relative-anchor")
     deep_unreachable = _count(lambda f: f["kind"] == "deep-unreachable")
     ext_broken = _count(lambda f: f["kind"] == "external-broken")
     ext_unreachable = _count(lambda f: f["kind"] == "external-unreachable")
@@ -1019,6 +1138,8 @@ def main() -> int:
         if extended_on:
             line += (f"; deep: {deep_broken} broken/{deep_anchor} anchor/"
                      f"{deep_unreachable} unreachable of {deep_checked} checked"
+                     f"; in-page anchors: {local_anchor} same-page/"
+                     f"{relative_anchor} relative broken"
                      f"; external: {ext_broken} broken/{ext_unreachable} "
                      f"unreachable of {ext_checked} checked")
         line += f"; {s['allowlisted_links']} allowlisted)\n"
