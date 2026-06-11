@@ -18,10 +18,14 @@ name: Public Repo Link Check
 # Severity split (matches the recurring incident exactly):
 #   * a link to a now-PRIVATE repo (the visibility-flip case) is an ERROR and
 #     FAILS the job -- surfaced as a ::error:: annotation.
-#   * a link to a DELETED/missing repo is the same 404 to a visitor but is a
-#     pre-existing backlog rather than the flip trigger, so it is surfaced as a
-#     ::warning:: annotation + in the report WITHOUT failing the job. Pass
-#     --fail-on-missing (see below) to ratchet it up once the backlog is cleared.
+#   * a link to a DELETED/missing repo is the same 404 to a visitor. This was a
+#     pre-existing backlog rather than the flip trigger, so it was surfaced as a
+#     ::warning:: WITHOUT failing the job. That backlog is now cleared (0 links to
+#     missing repos org-wide), so --fail-on-missing is ENABLED below: a link to a
+#     deleted/missing repo is now an ERROR that fails the job, same as a private
+#     target. (Deep org-link rot -- 404 blob/release URLs + anchor mismatches --
+#     remains a separate, still-open backlog surfaced WARN-only; --fail-on-deep /
+#     --fail-on-anchor stay off until that is cleared too.)
 #
 # Knowing a target is PRIVATE (vs merely missing) needs a token that can see the
 # org's private repos: SZL_GITHUB_TOKEN if present, else the built-in token (which
@@ -85,9 +89,12 @@ jobs:
           GITHUB_TOKEN: ${{ github.token }}
         run: |
           set +e
-          # Deep org-link rot is deterministic (our own repos) so it runs on every
-          # cadence as WARN (no --fail-on-deep -> a pre-existing rot backlog is
-          # surfaced, never breaks the build). External liveness is opt-in only.
+          # --fail-on-missing is ON: the deleted/missing-repo backlog is cleared
+          # (0 org-wide), so a public page linking to a missing org repo now fails
+          # the build, same as a private target. Deep org-link rot (404 blob/release
+          # URLs + anchor mismatches) is deterministic but still a pre-existing
+          # backlog, so it stays WARN-only (no --fail-on-deep / --fail-on-anchor)
+          # until that is cleared. External liveness is opt-in only.
           EXTRA=""
           if [ "${{ github.event.inputs.check_external }}" = "true" ]; then
             EXTRA="--check-external"
@@ -95,6 +102,7 @@ jobs:
           python3 .github/scripts/public_repo_link_check.py \
             --scan-docs \
             --check-deep-links \
+            --fail-on-missing \
             $EXTRA \
             --report .github/data/public_repo_link_report.json
           echo "CHECK_EXIT=$?" >> "$GITHUB_ENV"
@@ -139,16 +147,18 @@ jobs:
             } >> "$GITHUB_STEP_SUMMARY"
           fi
 
-      - name: Fail if any public page links to a now-private repo
+      - name: Fail if any public page links to a private or deleted/missing repo
         run: |
           if [ "${CHECK_EXIT:-1}" != "0" ]; then
-            echo "::error::A public README/docs page links to a now-PRIVATE"
-            echo "::error::szl-holdings repo (404 for anonymous visitors). See the"
-            echo "::error::annotations above and .github/data/public_repo_link_report.json."
+            echo "::error::A public README/docs page links to a now-PRIVATE or"
+            echo "::error::DELETED/missing szl-holdings repo (404 for anonymous"
+            echo "::error::visitors). See the annotations above and"
+            echo "::error::.github/data/public_repo_link_report.json."
             echo "::error::Fix: repoint the link, re-publish the target repo, or add a"
             echo "::error::reasoned entry to .github/data/public_repo_link_allowlist.json."
             exit 1
           fi
-          echo "✓ No public page links to a now-private szl-holdings repo."
-          echo "  (Links to deleted/missing repos, if any, are surfaced as"
-          echo "   ::warning:: annotations and in the report without failing.)"
+          echo "✓ No public page links to a private or deleted/missing szl-holdings repo."
+          echo "  (Deep org-link rot -- 404 blob/release URLs + anchor mismatches --"
+          echo "   is surfaced as ::warning:: annotations and in the report without"
+          echo "   failing; --fail-on-deep / --fail-on-anchor stay off until cleared.)"
