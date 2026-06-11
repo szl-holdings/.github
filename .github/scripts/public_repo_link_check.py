@@ -285,19 +285,19 @@ _MD_LINK_RE = re.compile(r"(?<!!)\[[^\]]*\]\(\s*<?([^)>\s]+)>?", re.DOTALL)
 _HTML_A_RE = re.compile(r"<a\b[^>]*?\bhref\s*=\s*[\"']([^\"']+)[\"']", re.IGNORECASE)
 _AUTOLINK_RE = re.compile(r"<(https?://[^>\s]+)>", re.IGNORECASE)
 _BARE_URL_RE = re.compile(
-    r"(?<![\(<\"'=])\bhttps?://github\.com/szl-holdings/[^\s)\]<>\"'`]+",
+    r"(?<![\(<\"'=])\bhttps?://github\.com/szl-holdings/[^\s)\]<>\"'`}]+",
     re.IGNORECASE)
 # A general bare http(s) URL (used only for external liveness collection). Kept
 # conservative: stops at whitespace and common closing punctuation; trailing
 # sentence punctuation is trimmed by _strip_trailing_punct.
 _BARE_URL_ANY_RE = re.compile(
-    r"(?<![\(<\"'=\]])\bhttps?://[^\s)\]<>\"'`]+", re.IGNORECASE)
+    r"(?<![\(<\"'=\]])\bhttps?://[^\s)\]<>\"'`}]+", re.IGNORECASE)
 
 
 def _strip_trailing_punct(url: str) -> str:
     """Trim trailing sentence punctuation a Markdown author would not intend as
     part of the URL (e.g. a link at the end of a sentence)."""
-    return url.rstrip(".,;:!?")
+    return url.rstrip(".,;:!?}")
 
 
 def _clickthrough_urls(text: str, include_bare_external: bool = False):
@@ -321,7 +321,7 @@ def _clickthrough_urls(text: str, include_bare_external: bool = False):
         for m in rx.finditer(text):
             candidates.append(m.group(1).strip())
     for m in _BARE_URL_RE.finditer(text):
-        candidates.append(m.group(0).strip())
+        candidates.append(_strip_trailing_punct(m.group(0).strip()))
     if include_bare_external:
         for m in _BARE_URL_ANY_RE.finditer(text):
             candidates.append(_strip_trailing_punct(m.group(0).strip()))

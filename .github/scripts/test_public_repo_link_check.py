@@ -167,5 +167,37 @@ class EndToEndComposition(unittest.TestCase):
         self.assertEqual(self._broken(page, target_text=""), set())
 
 
+class BareUrlBraceStripping(unittest.TestCase):
+    """Regression (Task #412 false-positive batch): a github.com/szl-holdings URL
+    wrapped in a LaTeX/BibTeX ``\\url{...}`` field or a ``{{ template }}`` must NOT
+    capture the trailing ``}`` brace(s) as part of the URL. The a11oy cookbook
+    recipes carry ``howpublished = {\\url{https://github.com/szl-holdings/...md}},``
+    citations; the unfixed bare-URL scan grabbed ``...md}}`` and reported a bogus
+    HTTP 404 on a link whose real (brace-free) target returns 200."""
+
+    _CLEAN = ("https://github.com/szl-holdings/szl-cookbook/blob/main/"
+              "recipes/11-kitaev-surface-drift-detection.md")
+
+    def test_bibtex_url_field_org(self):
+        text = "  howpublished = {\\url{" + self._CLEAN + "}},\n"
+        urls = prl._clickthrough_urls(text)
+        self.assertIn(self._CLEAN, urls)
+        self.assertFalse(any("}" in u for u in urls), urls)
+        self.assertEqual(prl._repo_from_url(self._CLEAN), "szl-cookbook")
+
+    def test_double_brace_template_org(self):
+        text = "Cite {{" + self._CLEAN + "}} for the surface code.\n"
+        urls = prl._clickthrough_urls(text)
+        self.assertIn(self._CLEAN, urls)
+        self.assertFalse(any("}" in u for u in urls), urls)
+
+    def test_external_bare_url_brace(self):
+        ext = "https://example.com/path/to/doc"
+        text = "\\url{" + ext + "}}"
+        urls = prl._clickthrough_urls(text, include_bare_external=True)
+        self.assertIn(ext, urls)
+        self.assertFalse(any("}" in u for u in urls), urls)
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

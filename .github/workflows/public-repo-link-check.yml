@@ -113,7 +113,31 @@ jobs:
           git config user.email "stephenlutar2@gmail.com"
           git add .github/data/public_repo_link_report.json
           git commit -s -m "chore(links): refresh public-repo-link report [skip ci]"
-          git push
+          # The report refresh is housekeeping, NOT the reachability gate
+          # (that is the dedicated step below, which reads $CHECK_EXIT). If
+          # protected main rejects an unsigned Actions push (branch
+          # protection / required signed commits), fail LOUD (annotation +
+          # job summary) but do NOT red-light the run -- the gate verdict
+          # must stand on its own, and CI must never open a PR (org
+          # auto-PR lockdown).
+          if git push; then
+            echo "Refreshed link report committed to main."
+          else
+            echo "::warning::Could not push the refreshed public-repo-link"
+            echo "::warning::report to protected main (branch protection /"
+            echo "::warning::signed-commit rule). This is housekeeping only"
+            echo "::warning::and never gates reachability; the check verdict"
+            echo "::warning::in the next step still stands."
+            {
+              echo "### public-repo-link report refresh skipped (non-blocking)"
+              echo ""
+              echo "The reachability check ran (see the gate step below)."
+              echo "The auto-commit of the refreshed report file could not"
+              echo "be pushed to protected \`main\` (signed-commit / branch"
+              echo "protection). This is **non-blocking** housekeeping; the"
+              echo "gate verdict stands."
+            } >> "$GITHUB_STEP_SUMMARY"
+          fi
 
       - name: Fail if any public page links to a now-private repo
         run: |
