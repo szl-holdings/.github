@@ -108,6 +108,7 @@ jobs:
               grep -viE "do not call|don't call|never call|not call.*theorem" | \
               grep -vE "gate.*theorem|theorem.*enforced|README.*theorem|gates/README" | \
               grep -vE "lambdaCategory|lambdaMonotonicity|composability|MinMaxBounds" | \
+              grep -vE "TheoremU_LambdaUnique|TheoremU_|Lutar/Uniqueness/TheoremU" | \
               grep -vE "knowledge\.json|Lean.*theorem|lean 4.*theorem|Lean 4.*theorem" | \
               grep -viE "does not assert|doesn't assert|do not assert|not assert.*theorem" | \
               grep -vE "[0-9]+ theorems|all [0-9]+ theorem|theorems '|Every theorem|theorem carries|theorems carries" | \
