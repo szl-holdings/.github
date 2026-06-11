@@ -62,8 +62,8 @@ jobs:
         run: |
           set +e
           python3 .github/scripts/code_security_drift.py \
-            --report .github/data/code_security_report.json
-          echo "CHECK_EXIT=$?" >> "$GITHUB_ENV"
+            --report .github/data/code_security_report.json 2>&1 | tee /tmp/drift-output.txt
+          echo "CHECK_EXIT=${PIPESTATUS[0]}" >> "$GITHUB_ENV"
 
       - name: Commit refreshed report if changed
         # Best-effort: if main is protected (or the token can't push), this must
@@ -80,6 +80,54 @@ jobs:
           git add .github/data/code_security_report.json
           git commit -s -m "chore(security): refresh code-security drift report [skip ci]"
           git push
+
+      - name: Alert the team on drift / check failure (scheduled runs only)
+        # Mirrors the release-receipt + pin-drift guards: the unattended weekly
+        # cron is the only place a red X would otherwise sit unseen for days, so
+        # page the shared ntfy alert relay there. Attended runs (push to main,
+        # workflow_dispatch, workflow_call) already surface a visible check, so
+        # they stay silent — no alert noise. Fires on drift (exit 1) AND on a
+        # could-not-complete auth/API failure (exit 2), never on a clean run
+        # (exit 0). continue-on-error so a relay hiccup never masks the real
+        # signal — the drift gate below is the source of truth.
+        if: always() && github.event_name == 'schedule' && env.CHECK_EXIT != '0'
+        continue-on-error: true
+        env:
+          # Slack-compatible {"text":...} webhook pointed at the box alert relay
+          # (https://a11oy.net/relay/ntfy/<token>), same channel as the other
+          # org guards. The relay flattens the payload to clean ntfy text.
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+        run: |
+          set -u
+          if [ -z "${SLACK_WEBHOOK_URL:-}" ]; then
+            echo "::warning::SLACK_WEBHOOK_URL not set; cannot page the alert relay."
+            exit 0
+          fi
+          report=".github/data/code_security_report.json"
+          if [ "${CHECK_EXIT}" = "1" ] && [ -f "$report" ]; then
+            # Real drift: name the offending repo(s) + reason from the report.
+            text="$(jq -r '
+              "Code-security config drift detected in szl-holdings (config 252588).\n\n"
+              + ((.errors // []) | join("\n"))
+              + "\n\nFix: re-attach config 252588 (POST .../configurations/252588/attach {scope:all}) or add a reasoned entry to .github/data/code_security_allowlist.json."
+            ' "$report")"
+          else
+            # exit 2 (or report missing): the check could NOT complete — must
+            # still alert so coverage never looks green when it could not run.
+            detail="$(grep -iE 'error' /tmp/drift-output.txt 2>/dev/null | tail -n 5 | sed 's/^[[:space:]]*//')"
+            text="Code-security drift check COULD NOT COMPLETE (auth/API failure, exit ${CHECK_EXIT}). The org code-security endpoints need an org-admin SZL_GITHUB_TOKEN — coverage cannot be confirmed."
+            if [ -n "${detail}" ]; then
+              text="${text}"$'\n\n'"${detail}"
+            fi
+          fi
+          payload="$(jq -n --arg t "🚨 [szl-holdings] ${text}" '{text: $t}')"
+          code="$(curl -sS -o /tmp/alert-resp.txt -w '%{http_code}' \
+            -X POST -H 'Content-Type: application/json' \
+            --data "$payload" "$SLACK_WEBHOOK_URL" || echo 000)"
+          echo "Alert relay responded HTTP ${code}"
+          if [ "${code#2}" = "${code}" ]; then
+            echo "::warning::Alert relay did not return 2xx (got ${code}): $(cat /tmp/alert-resp.txt 2>/dev/null)"
+          fi
 
       - name: Fail if managed-security-config drift
         run: |
