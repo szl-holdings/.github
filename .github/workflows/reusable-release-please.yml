@@ -25,6 +25,16 @@ on:
         required: false
         type: string
         default: 'main'
+      config-file:
+        description: 'Path to a release-please-config.json (registers custom commit types so non-standard subjects like doctrine:/bundle:/compliance: do not crash the parser). Optional.'
+        required: false
+        type: string
+        default: ''
+      manifest-file:
+        description: 'Path to a .release-please-manifest.json. Optional; pair with config-file.'
+        required: false
+        type: string
+        default: ''
 
 permissions:
   contents: read
@@ -48,6 +58,13 @@ jobs:
         with:
           release-type: ${{ inputs.release-type }}
           target-branch: ${{ inputs.target-branch }}
+          # When a config-file/manifest-file is supplied, release-please uses the
+          # manifest-driven mode: custom commit types declared in changelog-sections
+          # are parsed instead of crashing on non-standard subjects (the
+          # "unexpected token" error seen on doctrine:/bundle:/compliance: and
+          # double-scope chore(deps)(deps): commits).
+          config-file: ${{ inputs.config-file }}
+          manifest-file: ${{ inputs.manifest-file }}
           # Note: `package-name` removed (deprecated in v5; not in valid inputs list)
           # GitHub Actions PR creation requires `Allow GitHub Actions to create PRs`
           # enabled in Settings → Actions → General.
