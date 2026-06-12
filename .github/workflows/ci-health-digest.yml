@@ -1,0 +1,47 @@
+name: CI Health Digest
+
+# Org-wide CI health sweep + recommendations. Runs daily, classifies every red
+# workflow by disposition, and upserts a SINGLE rolling tracking issue
+# ("🔴 CI Health Digest — org-wide") so the maintainer's GitHub notification
+# inbox stays to one actionable item instead of dozens of scattered failure
+# emails. See .github/scripts/ci_health_digest.py for the classification policy.
+#
+# Requires repo secret ORG_CI_READ_TOKEN (org-read PAT) — the built-in
+# GITHUB_TOKEN cannot read other repos' Actions runs. Optional SLACK_WEBHOOK_URL
+# (box ntfy relay) for a one-line push; skipped gracefully when absent.
+
+on:
+  schedule:
+    - cron: '37 13 * * *'   # daily 13:37 UTC
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+  issues: write
+
+concurrency:
+  group: ci-health-digest
+  cancel-in-progress: true
+
+jobs:
+  digest:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Harden runner
+        uses: step-security/harden-runner@0634a2670c59f64b4a01f0f96f84700a4088b9f0 # v2.12.0
+        with:
+          egress-policy: audit
+
+      - name: Checkout
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - name: Set up Python
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
+        with:
+          python-version: '3.12'
+
+      - name: Org CI health sweep + upsert digest issue
+        env:
+          ORG_CI_READ_TOKEN: ${{ secrets.ORG_CI_READ_TOKEN }}
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+        run: python3 .github/scripts/ci_health_digest.py
