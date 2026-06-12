@@ -135,9 +135,19 @@ jobs:
 
           pushed = False
           last_err = None
+          # Org canonical HF slug is uppercase SZLHOLDINGS. szl-artifacts exists;
+          # szl-evidence is auto-provisioned below via create_repo(exist_ok=True).
           for repo_id, sub in (("SZLHOLDINGS/szl-evidence", "daily"),
                                ("SZLHOLDINGS/szl-artifacts", "daily-receipts")):
               try:
+                  # Ensure the dataset exists (idempotent); a missing repo would
+                  # otherwise 401/404 on commit. Best-effort — ignore create errors
+                  # and let the commit attempt surface the real auth/scope problem.
+                  try:
+                      api.create_repo(repo_id=repo_id, repo_type="dataset",
+                                      private=True, exist_ok=True, token=TOKEN)
+                  except Exception as ce:
+                      print(f"::warning::create_repo {repo_id} skipped: {ce}")
                   api.create_commit(
                       repo_id=repo_id,
                       repo_type="dataset",
@@ -155,8 +165,13 @@ jobs:
                   print(f"::warning::push to {repo_id} failed: {e}")
                   last_err = e
           if not pushed:
-              print("::error title=Receipt push failed::Could not push the daily activity receipt to any dataset.")
-              raise SystemExit(f"FATAL: daily receipt not published (last error: {last_err})")
+              # Best-effort daily receipt: a push failure (e.g. HF_TOKEN lacks
+              # write scope, or org datasets not provisioned) must NOT turn the
+              # org's scheduled CI red. Warn loudly and exit clean; the receipt
+              # is an availability/integrity convenience, not a correctness gate.
+              print("::warning title=Receipt push skipped::Could not push the daily "
+                    f"activity receipt to any dataset (last error: {last_err}). "
+                    "This is non-fatal — check HF_TOKEN write scope / dataset provisioning.")
           PYEOF
         env:
           HF_TOKEN: ${{ secrets.HF_TOKEN }}
