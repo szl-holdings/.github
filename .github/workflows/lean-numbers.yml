@@ -18,6 +18,7 @@ on:
 
 permissions:
   contents: write
+  pull-requests: write
 
 concurrency:
   group: lean-numbers-${{ github.ref }}
@@ -43,14 +44,31 @@ jobs:
           echo "----- canonical numbers -----"
           cat .github/data/lean_numbers.json
 
-      - name: Commit updated numbers if changed
+      # Open a PR instead of pushing straight to main: main is branch-protected
+      # (requires the "Run tests" status check), so a direct bot push is rejected
+      # with GH013. A PR lets the required check run, then we auto-merge it.
+      # The canonical JSON only changes when lutar-lean main actually drifts, so
+      # this is a no-op on a quiet day (the early-exit below handles that).
+      - name: Open/refresh PR with updated numbers if changed
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           if git diff --quiet -- .github/data/lean_numbers.json; then
             echo "No change in canonical numbers; nothing to commit."
             exit 0
           fi
+          BR="chore/lean-numbers-refresh"
           git config user.name "Stephen P. Lutar Jr."
           git config user.email "stephenlutar2@gmail.com"
+          git checkout -B "$BR"
           git add .github/data/lean_numbers.json
-          git commit -s -m "chore(numbers): refresh canonical lutar-lean counts [skip ci]"
-          git push
+          git commit -s -m "chore(numbers): refresh canonical lutar-lean counts"
+          git push -f origin "$BR"
+          # Create the PR if one isn't already open for this branch.
+          if ! gh pr view "$BR" --json number >/dev/null 2>&1; then
+            gh pr create --base main --head "$BR" \
+              --title "chore(numbers): refresh canonical lutar-lean counts" \
+              --body "Automated canonical-count refresh from lutar-lean @ main. locked-proven stays 8; Λ stays Conjecture 1. No manual edits."
+          fi
+          # Best-effort auto-merge once the required check passes.
+          gh pr merge "$BR" --squash --auto || echo "auto-merge not enabled; PR left open for review."
