@@ -37,6 +37,10 @@ POLICY = [
     ("",              "Dependabot Updates", ("INFRA", "Dependabot runner state, not a workflow bug; resolves when the grouped PR opens/merges.")),
     ("",              "CodeQL",         ("INFRA", "CodeQL default-setup run; reconfigure via repo Security settings, not a workflow-file fix.")),
     ("",              "ClusterFuzzLite", ("INFRA", "PR fuzzing waits on manual approval (action_required) for outside contributions.")),
+    ("",              "Fuzz",           ("INFRA", "Scheduled fuzzing run; corpus/infra-driven, not a default-branch regression.")),
+    ("",              "Publish npm",    ("INFRA", "Manual workflow_dispatch publish — red reflects a past manual run, not branch health.")),
+    ("",              "Cosign keyless", ("INFRA", "Runs only on release events; needs a tagged release with OIDC id-token perms, not a push-time fix.")),
+    ("",              "SLSA",           ("INFRA", "Provenance/attestation signing path (dispatch/push); pending wiring, not an app-code bug.")),
 ]
 
 def api(url, method="GET", body=None):
