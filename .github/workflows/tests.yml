@@ -52,3 +52,49 @@ jobs:
       # network-free unit test locks that behaviour out of inline YAML.
       - name: Lockfile-guard coverage pager self-test
         run: python3 .github/scripts/test_lockfile_registry_check.py
+
+      # Pins the license-claim consistency guard (task #902). The
+      # --include-private false-green branches (no/invalid token, private
+      # listing silently collapsed below the empirical floor), a dropped
+      # listing page, and the ordinary drift path all need live org-admin
+      # calls that can't run in CI, so this stubbed, network-free unit test
+      # locks the guard's five exit-code contracts so a refactor can't weaken
+      # it into a public-only-but-green no-op.
+      - name: License-consistency guard self-test
+        run: python3 .github/scripts/test_license_consistency.py
+
+      # Pins the required-status-check drift guard (task #902). The auth/API
+      # failure branch (exit 2, never a silent 0 implying "all checks still
+      # required") and the DRIFT branch (a repo silently losing its required
+      # context = a re-opened merge hole) need live ruleset/protection reads,
+      # so this stubbed, network-free unit test locks the exit-code contract.
+      - name: Required-check drift guard self-test
+        run: python3 .github/scripts/test_required_check_drift.py
+
+      # Pins the honesty-overclaim sweep guard (task #902). Runs the REAL
+      # grep/scan path in --local mode (network-free) so a regex weakening or
+      # a no-op'd fail branch that let a Λ-uniqueness / Conjecture-1-proven
+      # overclaim land green org-wide cannot pass silently.
+      - name: Overclaim-sweep guard self-test
+        run: python3 .github/scripts/test_overclaim_sweep.py
+
+      # Pins the UDSBundle GHCR reference guard (task #902). The GHCR probe is
+      # stubbed so the REAL bundle parser + severity logic run network-free,
+      # locking that an unreachable SZL-OWNED ref stays an ERROR (never a
+      # downgraded warning) and that an org-sweep with no token aborts (exit 2).
+      - name: Bundle-ref guard self-test
+        run: python3 .github/scripts/test_bundle_ref_check.py
+
+      # Pins the canonical lutar-lean corpus counter (task #902). Runs offline
+      # via --repo-path: a tree with no Lutar/ must exit 2 (never emit a silent
+      # all-zero payload), and a real tree must count sorries honestly so a
+      # refactor can't make proofs look more complete than they are.
+      - name: Lean-numbers counter self-test
+        run: python3 .github/scripts/test_lean_numbers.py
+
+      # Pins the org CI health digest job (task #902). The token preflight must
+      # fail loud (exit 1) when no usable token is present rather than sweep
+      # nothing and post a false "0 red" all-clear; this stubbed, network-free
+      # unit test locks that contract.
+      - name: CI-health-digest guard self-test
+        run: python3 .github/scripts/test_ci_health_digest.py
