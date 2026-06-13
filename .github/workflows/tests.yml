@@ -44,3 +44,11 @@ jobs:
       # so a future refactor can't silently stop catching dead section links.
       - name: Public-repo link-check in-page anchor self-test
         run: python3 .github/scripts/test_public_repo_link_check.py
+
+      # Pins the lockfile-guard coverage PAGER (rising-edge alert + dedup). The
+      # alert must fire on a NEW gap, stay silent on a standing gap and when
+      # coverage is clean, and the dedup baseline must come from its own state
+      # file so a failed report commit cannot resurrect a standing gap. This
+      # network-free unit test locks that behaviour out of inline YAML.
+      - name: Lockfile-guard coverage pager self-test
+        run: python3 .github/scripts/test_lockfile_registry_check.py
