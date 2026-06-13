@@ -4,7 +4,7 @@
 > (Replit, Opus-tier coding agents, human devs).** One source of truth so parallel
 > agents ship aligned, honest, verifiable work. Authored under Doctrine v11.
 
-**Status:** ACTIVE · **Doctrine:** v11 LOCKED · **Last aligned:** 2026-06-10
+**Status:** ACTIVE · **Doctrine:** v11 LOCKED · **Last aligned:** 2026-06-13
 
 ---
 
@@ -17,7 +17,7 @@
    Current canonical (measured 2026-05-31, kernel `c7c0ba17`):
    - **749** declarations · **14** unique axioms (15 raw, 1 dup) · **163** sorries
      (112 baseline + 51 Putnam; 146 non-comment)
-   - **5** formulas locked-proven: `F1, F11, F12, F18, F19`
+   - **8** formulas locked-proven: `F1, F4, F7, F11, F12, F18, F19, F22`
    - **Λ-uniqueness = Conjecture 1** — NOT a theorem. Never write "Λ proven".
    - DOI `10.5281/zenodo.20434276`
 2. **Honesty doctrine (HONESTY OVER CHECKLIST).** SLSA posture = **L1 honest
