@@ -28,6 +28,15 @@ name: Lockfile Registry Check
 # branch protection / rulesets needs the org-owner SZL_GITHUB_TOKEN; repos it
 # cannot read are reported "unverifiable" and never fail the run.
 #
+# A coverage GAP previously only surfaced as a red scheduled run, which nobody is
+# guaranteed to notice. This workflow now also PAGES a human: when the sweep finds
+# a NEW coverage gap it pushes an actionable alert to the team's shared a11oy-uptime
+# ntfy topic (the same SLACK_WEBHOOK_URL -> a11oy.net/relay -> a11oy-uptime-notify
+# channel the other org guards use), naming each offending repo and the piece it is
+# missing. The alert is edge-triggered against the previous run's committed report,
+# so a gap that already existed does not re-alert on every scheduled sweep; coverage
+# being fully OK is a silent no-op.
+#
 # Public repo listing + git-tree + raw contents read fine with the built-in
 # GITHUB_TOKEN; SZL_GITHUB_TOKEN is used when present (org-owner) but not required.
 
@@ -73,6 +82,30 @@ jobs:
         with:
           python-version: "3.12"
 
+      - name: Capture previous coverage-gap set (edge-trigger baseline)
+        # Read the gap set recorded in the committed report from the PREVIOUS run
+        # (the file present at checkout) BEFORE the scan below overwrites it. The
+        # alert step compares this against the fresh result so only a NEWLY-gapped
+        # repo pages, never a gap that already existed (no spam on a standing gap).
+        id: prev_cov
+        run: |
+          set -uo pipefail
+          report=.github/data/lockfile_registry_report.json
+          prev=""
+          if [ -f "$report" ]; then
+            prev="$(python3 -c '
+          import json
+          try:
+              r = json.load(open(".github/data/lockfile_registry_report.json"))
+          except Exception:
+              r = {}
+          gaps = sorted(c.get("repo", "") for c in r.get("coverage", []) if c.get("status") == "GAP")
+          print(",".join(g for g in gaps if g))
+          ')"
+          fi
+          echo "prev_gap_repos=${prev}" >> "$GITHUB_OUTPUT"
+          echo "Previous coverage-gap repos: ${prev:-(none)}"
+
       - name: Scan org lockfiles for Replit-internal registry hosts
         env:
           # SZL_GITHUB_TOKEN (org-owner) if present lets the scan also see the
@@ -103,6 +136,68 @@ jobs:
           git add .github/data/lockfile_registry_report.json
           git commit -s -m "chore(lockfile): refresh lockfile-registry report [skip ci]"
           git push
+
+      - name: Alert ntfy on a NEW lockfile-guard coverage gap
+        # Pages the team when a repo NEWLY enters the coverage-gap state — it
+        # commits a lockfile but is missing its per-repo caller workflow and/or
+        # the required status check, so a *.replit.local-poisoned lockfile could
+        # merge unblocked. Routed through the shared relay (SLACK_WEBHOOK_URL ->
+        # a11oy.net/relay -> a11oy-uptime-notify), the same channel the box uptime
+        # monitor uses, so it pages immediately instead of only being a red run.
+        # Edge-triggered: a gap that already existed on the previous sweep does NOT
+        # re-alert, so a standing gap never spams. Silent no-op when coverage is
+        # fully OK or when the webhook secret is unset (the red job below remains
+        # the signal). This step never fails the job.
+        if: always() && github.event_name != 'pull_request'
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+          PREV_GAP_REPOS: ${{ steps.prev_cov.outputs.prev_gap_repos }}
+        run: |
+          set -uo pipefail
+          report=.github/data/lockfile_registry_report.json
+          if [ ! -f "$report" ]; then
+            echo "No report on disk; nothing to alert."
+            exit 0
+          fi
+          # Rising-edge gap set (current GAP repos absent on the previous sweep)
+          # plus a human-readable "repo: missing piece" list. shlex.quote keeps the
+          # eval below injection-safe.
+          assigns="$(python3 -c '
+          import json, os, shlex
+          try:
+              r = json.load(open(".github/data/lockfile_registry_report.json"))
+          except Exception:
+              r = {}
+          cur = {c.get("repo", ""): (c.get("gaps") or [])
+                 for c in r.get("coverage", []) if c.get("status") == "GAP"}
+          cur.pop("", None)
+          prev = set(x for x in os.environ.get("PREV_GAP_REPOS", "").split(",") if x)
+          new = sorted(set(cur) - prev)
+          lines = []
+          for repo in sorted(cur):
+              for g in (cur[repo] or ["(unspecified gap)"]):
+                  lines.append(repo + ": " + g)
+          print("NEW_GAPS=" + shlex.quote(",".join(new)))
+          print("GAP_DESC=" + shlex.quote("; ".join(lines)))
+          ')" || assigns=""
+          eval "$assigns"
+          NEW_GAPS="${NEW_GAPS:-}"
+          GAP_DESC="${GAP_DESC:-}"
+          if [ -z "$NEW_GAPS" ]; then
+            echo "No NEW coverage gap since the previous sweep; not alerting (edge-triggered)."
+            exit 0
+          fi
+          if [ -z "${SLACK_WEBHOOK_URL:-}" ]; then
+            echo "::warning::SLACK_WEBHOOK_URL not set; skipping ntfy push (the red job is still the signal)."
+            exit 0
+          fi
+          run_url="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
+          text=":rotating_light: Lockfile-guard COVERAGE GAP (newly detected: ${NEW_GAPS}): a repo commits a lockfile but is missing its per-repo lockfile guard, so a *.replit.local-poisoned lockfile could merge unblocked. Missing -> ${GAP_DESC}. Fix: add .github/workflows/lockfile-registry.yml (uses szl-holdings/.github reusable-lockfile-registry-check.yml@main) and make the 'lockfiles / No lockfile references a Replit-internal registry host' check required on the default branch. Run: ${run_url}"
+          payload="$(python3 -c 'import json,sys; print(json.dumps({"text": sys.argv[1]}))' "$text")"
+          code="$(curl -sS -o /dev/null -w '%{http_code}' -X POST -H 'Content-Type: application/json' -d "$payload" "$SLACK_WEBHOOK_URL" || echo 000)"
+          echo "ntfy relay responded HTTP ${code}"
+          [ "$code" = "200" ] || echo "::warning::ntfy relay returned ${code} (not 200); check the relay."
+          exit 0
 
       - name: Fail on a poisoned lockfile OR an unprotected lockfile repo
         run: |
