@@ -1,20 +1,4 @@
 {
   "_comment": "Intentional exceptions for the bundle reference checker (.github/scripts/bundle_ref_check.py). Each entry suppresses a FAILING (otherwise-unreachable) package reference found in a public UDS bundle YAML. Nothing here is hidden: every allowlisted ref still appears in .github/data/bundle_ref_report.json with state 'allowlisted'. SZL-owned unreachable refs that are NOT listed here FAIL the run -- that is the whole point of the guard. Add an entry ONLY for a ref that is intentionally not-yet-published (staged), with a concrete reason and (ideally) the path to where the real/published artifact lives, and REMOVE it once the bundle is repointed or the image is published. Each entry is {\"repository\", \"ref\", \"reason\"}; a single 'repository:ref' string is also accepted. External (non-szl-holdings) refs only warn by default and do not need an entry unless --fail-on-external is used.",
-  "allow": [
-    {
-      "repository": "ghcr.io/szl-holdings/packages/a11oy",
-      "ref": "1.0.0-alpha",
-      "reason": "Staged demo mesh bundle (uds-bundles/mesh/uds-bundle.yaml, FA-001): this packages/a11oy:1.0.0-alpha tag is intentionally not yet published. The deployable a11oy package is built/digest-pinned in szl-uds-deployment. Remove this entry when the mesh bundle is repointed at the published artifact or the image is published."
-    },
-    {
-      "repository": "ghcr.io/szl-holdings/packages/sentra",
-      "ref": "1.0.0-alpha",
-      "reason": "Staged demo mesh bundle (uds-bundles/mesh/uds-bundle.yaml, FA-001): this packages/sentra:1.0.0-alpha tag is intentionally not yet published. The deployable sentra organ image is digest-pinned in szl-uds-deployment. Remove this entry when the mesh bundle is repointed or the image is published."
-    },
-    {
-      "repository": "ghcr.io/szl-holdings/packages/amaru",
-      "ref": "1.0.0-alpha",
-      "reason": "Staged demo mesh bundle (uds-bundles/mesh/uds-bundle.yaml, FA-001): this packages/amaru:1.0.0-alpha tag is intentionally not yet published. The deployable amaru organ image is digest-pinned in szl-uds-deployment. Remove this entry when the mesh bundle is repointed or the image is published."
-    }
-  ]
+  "allow": []
 }
