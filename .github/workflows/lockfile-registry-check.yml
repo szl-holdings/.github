@@ -33,9 +33,15 @@ name: Lockfile Registry Check
 # a NEW coverage gap it pushes an actionable alert to the team's shared a11oy-uptime
 # ntfy topic (the same SLACK_WEBHOOK_URL -> a11oy.net/relay -> a11oy-uptime-notify
 # channel the other org guards use), naming each offending repo and the piece it is
-# missing. The alert is edge-triggered against the previous run's committed report,
-# so a gap that already existed does not re-alert on every scheduled sweep; coverage
-# being fully OK is a silent no-op.
+# missing. The alert is edge-triggered: the dedup baseline (the set of repos we
+# have already paged for) is persisted in a small DEDICATED state file
+# (.github/data/lockfile_gap_state.json), read from its own file rather than parsed
+# back out of the big scan report. That decoupling — plus a fetch+rebase retry on
+# the commit — is what makes dedup survive a transient failed report commit: a
+# standing gap can never re-alert just because a push lost a race. Coverage being
+# fully OK is a silent no-op. The rising-edge + dedup logic lives in tested helpers
+# in lockfile_registry_check.py (locked by test_lockfile_registry_check.py), not in
+# inline YAML.
 #
 # Public repo listing + git-tree + raw contents read fine with the built-in
 # GITHUB_TOKEN; SZL_GITHUB_TOKEN is used when present (org-owner) but not required.
@@ -67,7 +73,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
-      contents: write # only to commit the refreshed report in szl-holdings/.github
+      contents: write # only to commit the refreshed report + dedup state in szl-holdings/.github
     steps:
       - name: Harden runner
         uses: step-security/harden-runner@9af89fc71515a100421586dfdb3dc9c984fbf411 # v2.19.4
@@ -82,29 +88,19 @@ jobs:
         with:
           python-version: "3.12"
 
-      - name: Capture previous coverage-gap set (edge-trigger baseline)
-        # Read the gap set recorded in the committed report from the PREVIOUS run
-        # (the file present at checkout) BEFORE the scan below overwrites it. The
-        # alert step compares this against the fresh result so only a NEWLY-gapped
-        # repo pages, never a gap that already existed (no spam on a standing gap).
+      - name: Capture previously-alerted coverage-gap set (dedup baseline)
+        # Edge-trigger baseline = the repos we have ALREADY paged for, persisted in
+        # a small dedicated state file committed independently of the big scan
+        # report. Reading it from its own file — not by re-parsing the report — is
+        # what makes dedup survive a failed report commit: a transient push race can
+        # never resurrect a standing gap into a re-alert.
         id: prev_cov
         run: |
           set -uo pipefail
-          report=.github/data/lockfile_registry_report.json
-          prev=""
-          if [ -f "$report" ]; then
-            prev="$(python3 -c '
-          import json
-          try:
-              r = json.load(open(".github/data/lockfile_registry_report.json"))
-          except Exception:
-              r = {}
-          gaps = sorted(c.get("repo", "") for c in r.get("coverage", []) if c.get("status") == "GAP")
-          print(",".join(g for g in gaps if g))
-          ')"
-          fi
+          prev="$(python3 .github/scripts/lockfile_registry_check.py \
+                    --read-gap-state .github/data/lockfile_gap_state.json)"
           echo "prev_gap_repos=${prev}" >> "$GITHUB_OUTPUT"
-          echo "Previous coverage-gap repos: ${prev:-(none)}"
+          echo "Previously-alerted coverage-gap repos: ${prev:-(none)}"
 
       - name: Scan org lockfiles for Replit-internal registry hosts
         env:
@@ -121,22 +117,6 @@ jobs:
             --report .github/data/lockfile_registry_report.json
           echo "CHECK_EXIT=$?" >> "$GITHUB_ENV"
 
-      - name: Commit refreshed report if changed
-        # Best-effort: if main is protected (or the token can't push), this must
-        # NOT mask the real signal. The drift gate below is the source of truth.
-        continue-on-error: true
-        if: github.repository == 'szl-holdings/.github' && github.event_name != 'pull_request'
-        run: |
-          if git diff --quiet -- .github/data/lockfile_registry_report.json; then
-            echo "Report unchanged; nothing to commit."
-            exit 0
-          fi
-          git config user.name "Stephen P. Lutar Jr."
-          git config user.email "stephenlutar2@gmail.com"
-          git add .github/data/lockfile_registry_report.json
-          git commit -s -m "chore(lockfile): refresh lockfile-registry report [skip ci]"
-          git push
-
       - name: Alert ntfy on a NEW lockfile-guard coverage gap
         # Pages the team when a repo NEWLY enters the coverage-gap state — it
         # commits a lockfile but is missing its per-repo caller workflow and/or
@@ -144,10 +124,10 @@ jobs:
         # merge unblocked. Routed through the shared relay (SLACK_WEBHOOK_URL ->
         # a11oy.net/relay -> a11oy-uptime-notify), the same channel the box uptime
         # monitor uses, so it pages immediately instead of only being a red run.
-        # Edge-triggered: a gap that already existed on the previous sweep does NOT
-        # re-alert, so a standing gap never spams. Silent no-op when coverage is
-        # fully OK or when the webhook secret is unset (the red job below remains
-        # the signal). This step never fails the job.
+        # Rising-edge + dedup are computed by the unit-tested helper (--new-gaps),
+        # so a gap already on the baseline does NOT re-alert (no spam on a standing
+        # gap). Silent no-op when coverage is fully OK or when the webhook secret is
+        # unset (the red job below remains the signal). This step never fails the job.
         if: always() && github.event_name != 'pull_request'
         env:
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
@@ -159,28 +139,10 @@ jobs:
             echo "No report on disk; nothing to alert."
             exit 0
           fi
-          # Rising-edge gap set (current GAP repos absent on the previous sweep)
-          # plus a human-readable "repo: missing piece" list. shlex.quote keeps the
-          # eval below injection-safe.
-          assigns="$(python3 -c '
-          import json, os, shlex
-          try:
-              r = json.load(open(".github/data/lockfile_registry_report.json"))
-          except Exception:
-              r = {}
-          cur = {c.get("repo", ""): (c.get("gaps") or [])
-                 for c in r.get("coverage", []) if c.get("status") == "GAP"}
-          cur.pop("", None)
-          prev = set(x for x in os.environ.get("PREV_GAP_REPOS", "").split(",") if x)
-          new = sorted(set(cur) - prev)
-          lines = []
-          for repo in sorted(cur):
-              for g in (cur[repo] or ["(unspecified gap)"]):
-                  lines.append(repo + ": " + g)
-          print("NEW_GAPS=" + shlex.quote(",".join(new)))
-          print("GAP_DESC=" + shlex.quote("; ".join(lines)))
-          ')" || assigns=""
-          eval "$assigns"
+          # Rising-edge gap set computed by the (unit-tested) helper, emitted as
+          # shell-eval-safe NEW_GAPS=/GAP_DESC= assignments.
+          eval "$(python3 .github/scripts/lockfile_registry_check.py \
+                    --new-gaps --report "$report" --prev "${PREV_GAP_REPOS:-}")"
           NEW_GAPS="${NEW_GAPS:-}"
           GAP_DESC="${GAP_DESC:-}"
           if [ -z "$NEW_GAPS" ]; then
@@ -197,6 +159,44 @@ jobs:
           code="$(curl -sS -o /dev/null -w '%{http_code}' -X POST -H 'Content-Type: application/json' -d "$payload" "$SLACK_WEBHOOK_URL" || echo 000)"
           echo "ntfy relay responded HTTP ${code}"
           [ "$code" = "200" ] || echo "::warning::ntfy relay returned ${code} (not 200); check the relay."
+          exit 0
+
+      - name: Persist report + dedup state (resilient; survives a transient push race)
+        # Writes the dedup state file from the CURRENT GAP set (so a gap paged this
+        # run is on the baseline next run), then commits BOTH it and the refreshed
+        # report and pushes with a fetch+rebase retry loop. The retry is what
+        # hardens dedup: a bare push that lost a non-fast-forward race used to leave
+        # the baseline stale and re-alert a standing gap. Best-effort — if the push
+        # still cannot land, the red drift gate below stays the source of truth;
+        # this step never fails the job. Runs after the alert so the persisted
+        # baseline reflects what was just paged.
+        continue-on-error: true
+        if: always() && github.repository == 'szl-holdings/.github' && github.event_name != 'pull_request'
+        run: |
+          set -uo pipefail
+          python3 .github/scripts/lockfile_registry_check.py \
+            --write-gap-state .github/data/lockfile_gap_state.json \
+            --report .github/data/lockfile_registry_report.json >/dev/null || true
+          if git diff --quiet -- .github/data/lockfile_registry_report.json \
+                                  .github/data/lockfile_gap_state.json; then
+            echo "Report + gap-state unchanged; nothing to commit."
+            exit 0
+          fi
+          git config user.name "Stephen P. Lutar Jr."
+          git config user.email "stephenlutar2@gmail.com"
+          git add .github/data/lockfile_registry_report.json \
+                  .github/data/lockfile_gap_state.json
+          git commit -s -m "chore(lockfile): refresh registry report + dedup state [skip ci]"
+          for attempt in 1 2 3; do
+            if git push; then
+              echo "Pushed on attempt ${attempt}."
+              exit 0
+            fi
+            echo "Push attempt ${attempt} failed; rebasing on origin/${GITHUB_REF_NAME} and retrying..."
+            git fetch origin "${GITHUB_REF_NAME}" || true
+            git rebase "origin/${GITHUB_REF_NAME}" || { git rebase --abort || true; break; }
+          done
+          echo "::warning::Could not push refreshed report + gap-state after retries; baseline may be stale until the next successful run (the red drift gate remains the signal)."
           exit 0
 
       - name: Fail on a poisoned lockfile OR an unprotected lockfile repo
