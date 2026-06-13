@@ -52,6 +52,7 @@ import argparse
 import json
 import os
 import re
+import shlex
 import sys
 import urllib.error
 import urllib.parse
@@ -399,6 +400,64 @@ def check_repo_coverage(repo_obj, token, blobs):
 
 
 # --------------------------------------------------------------------------- #
+# Pager edge-trigger helpers (pure; unit-tested by test_lockfile_registry_check.py)
+#
+# The ntfy pager only fires on a RISING edge: a repo that is in coverage status
+# GAP now but was not on the previous sweep. The dedup baseline (the set of repos
+# already alerted) is persisted to a small dedicated state file, NOT inferred from
+# the big scan report, so a transient failure to commit the report can never make
+# a standing gap re-alert on every run (task: dedup survives a failed report
+# commit). Keeping this logic here — instead of inline in the workflow YAML — is
+# what lets it be locked by a network-free self-test.
+# --------------------------------------------------------------------------- #
+def _load_json(path: str) -> dict:
+    """Best-effort JSON load; missing/malformed/empty -> {} (never raises)."""
+    try:
+        with open(path, "r", encoding="utf-8") as fh:
+            data = json.load(fh)
+        return data if isinstance(data, dict) else {}
+    except Exception:
+        return {}
+
+
+def _coverage_gap_repos(report: dict):
+    """Sorted, de-duplicated repo names currently in coverage status GAP."""
+    return sorted({
+        c.get("repo", "")
+        for c in (report.get("coverage") or [])
+        if isinstance(c, dict) and c.get("status") == "GAP" and c.get("repo")
+    })
+
+
+def compute_new_gaps(report: dict, prev_gap_repos):
+    """Rising-edge coverage-gap computation for the ntfy pager.
+
+    Returns (new_gaps, gap_lines):
+      - new_gaps  = sorted repos in GAP now that were NOT in `prev_gap_repos`,
+                    so a standing gap never re-alerts (no spam).
+      - gap_lines = "repo: missing piece" strings for EVERY current GAP repo,
+                    for the human-readable alert body.
+    `prev_gap_repos` may be a comma-separated string or any iterable of names.
+    """
+    if isinstance(prev_gap_repos, str):
+        prev = {x for x in prev_gap_repos.split(",") if x}
+    else:
+        prev = {x for x in (prev_gap_repos or []) if x}
+    cur = {
+        c.get("repo", ""): (c.get("gaps") or [])
+        for c in (report.get("coverage") or [])
+        if isinstance(c, dict) and c.get("status") == "GAP"
+    }
+    cur.pop("", None)
+    new = sorted(set(cur) - prev)
+    lines = []
+    for repo in sorted(cur):
+        for g in (cur[repo] or ["(unspecified gap)"]):
+            lines.append(f"{repo}: {g}")
+    return new, lines
+
+
+# --------------------------------------------------------------------------- #
 # LOCAL mode
 # --------------------------------------------------------------------------- #
 def scan_local(root: str, fix: bool):
@@ -468,7 +527,51 @@ def main() -> int:
                          "token to read branch protection/rulesets; repos it cannot "
                          "read are reported 'unverifiable' (never a false gap).")
     ap.add_argument("--json", action="store_true", help="Print the JSON report to stdout.")
+    # Pager helper modes (consumed by lockfile-registry-check.yml; pure + tested).
+    ap.add_argument("--read-gap-state", metavar="FILE",
+                    help="Print the comma-separated repos already alerted, read from "
+                         "the dedup state FILE (missing/malformed -> empty). This is "
+                         "the edge-trigger baseline; it is independent of the scan "
+                         "report so a failed report commit cannot make a standing gap "
+                         "re-alert.")
+    ap.add_argument("--write-gap-state", metavar="FILE",
+                    help="Write the dedup state FILE from the current GAP set in "
+                         "--report, and print that set as CSV.")
+    ap.add_argument("--new-gaps", action="store_true",
+                    help="Print shell-eval-safe NEW_GAPS=/GAP_DESC= lines: repos in "
+                         "GAP in --report that are NOT in --prev, plus a description "
+                         "of every current gap.")
+    ap.add_argument("--prev", default="",
+                    help="(with --new-gaps) comma-separated previously-alerted gap repos.")
     args = ap.parse_args()
+
+    # ---------------- Pager helper modes ---------------- #
+    # Short-circuit, network-free, pure: these are what the alert workflow calls
+    # so the rising-edge + dedup logic lives in tested Python, not inline YAML.
+    if args.read_gap_state:
+        st = _load_json(args.read_gap_state)
+        repos = sorted({r for r in (st.get("alerted_gap_repos") or []) if r})
+        print(",".join(repos))
+        return 0
+    if args.write_gap_state:
+        report = _load_json(args.report) if args.report else {}
+        cur = _coverage_gap_repos(report)
+        state = {
+            "schema": "szl.lockfile_gap_state/v1",
+            "alerted_gap_repos": cur,
+            "updated_at_utc": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+        }
+        os.makedirs(os.path.dirname(args.write_gap_state) or ".", exist_ok=True)
+        with open(args.write_gap_state, "w", encoding="utf-8") as fh:
+            fh.write(json.dumps(state, indent=2) + "\n")
+        print(",".join(cur))
+        return 0
+    if args.new_gaps:
+        report = _load_json(args.report) if args.report else {}
+        new, lines = compute_new_gaps(report, args.prev)
+        print("NEW_GAPS=" + shlex.quote(",".join(new)))
+        print("GAP_DESC=" + shlex.quote("; ".join(lines)))
+        return 0
 
     # ---------------- LOCAL mode ---------------- #
     if args.local:
