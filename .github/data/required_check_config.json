@@ -1,13 +1,31 @@
 {
-  "_comment": "Wiring map for the required-status-check drift watcher (see .github/scripts/required_check_drift.py). 'required_context' is the EXACT status-check context string that must stay listed as a required check on each repo's default branch. A reusable workflow called via 'uses:' emits its check as '<caller-job-id> / <reusable-job-name>', which for lockfile-registry is 'lockfiles / No lockfile references a Replit-internal registry host' (NOT the workflow display name). 'repos' lists the six repos that actually commit lockfiles and had the requirement wired (Task #308). 'mechanism' records HOW each requirement was originally set (ruleset = the 'series-a-default-branch' branch ruleset; classic = branches/main/protection/required_status_checks) and is informational only — the checker passes a repo if the context is required via EITHER mechanism, so an intentional ruleset rename or a mechanism swap does not false-alarm. Re-add a repo here if it later starts committing a lockfile and gets wired.",
+  "_comment": "Wiring map for the required-status-check drift watcher (see .github/scripts/required_check_drift.py). 'required_context' is the EXACT status-check context string that must stay listed as a required check on each repo's default branch. A reusable workflow called via 'uses:' emits its check as '<caller-job-id> / <reusable-job-name>', which for lockfile-registry is 'lockfiles / No lockfile references a Replit-internal registry host' (NOT the workflow display name). 'repos' lists the six repos that actually commit lockfiles and had the requirement wired (Task #308). 'mechanism' records HOW each requirement was originally set (ruleset = the 'series-a-default-branch' branch ruleset; classic = branches/main/protection/required_status_checks) and is informational only \u2014 the checker passes a repo if the context is required via EITHER mechanism, so an intentional ruleset rename or a mechanism swap does not false-alarm. Re-add a repo here if it later starts committing a lockfile and gets wired.",
   "org": "szl-holdings",
   "required_context": "lockfiles / No lockfile references a Replit-internal registry host",
   "repos": {
-    "a11oy": { "mechanism": "ruleset", "ruleset_name": "series-a-default-branch" },
-    "ouroboros": { "mechanism": "ruleset", "ruleset_name": "series-a-default-branch" },
-    "platform": { "mechanism": "classic" },
-    "vsp-otel": { "mechanism": "classic" },
-    "szl-uds-deployment": { "mechanism": "classic" },
-    "docs-site": { "mechanism": "classic" }
+    "a11oy": {
+      "mechanism": "ruleset",
+      "ruleset_name": "series-a-default-branch"
+    },
+    "ouroboros": {
+      "mechanism": "ruleset",
+      "ruleset_name": "series-a-default-branch"
+    },
+    "platform": {
+      "mechanism": "ruleset",
+      "ruleset_name": "series-a-default-branch"
+    },
+    "vsp-otel": {
+      "mechanism": "ruleset",
+      "ruleset_name": "series-a-default-branch"
+    },
+    "szl-uds-deployment": {
+      "mechanism": "ruleset",
+      "ruleset_name": "lockfile-registry-check"
+    },
+    "docs-site": {
+      "mechanism": "ruleset",
+      "ruleset_name": "lockfile-registry-check"
+    }
   }
 }
