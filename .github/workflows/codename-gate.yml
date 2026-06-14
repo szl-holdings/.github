@@ -1,0 +1,97 @@
+name: G5 Codename Gate (no user-visible codenames)
+
+# Doctrine gate G5 enforcement: 0 user-visible codenames.
+#
+# Internal route keys (amaru_* / rosie_* / sentra / jarvis) are allowed as code
+# identifiers, but EVERY user-visible string must read its honest public role:
+#   amaru -> YACHAY     rosie -> Operator     sentra -> CHAPAQ     jarvis -> Operator
+#
+# This gate runs .github/scripts/codename_sweep.py (which uses the shared
+# single-source scanner szl_codename_gate.py - byte-identical to the in-app
+# szl_codename_sanitizer.js) over:
+#   - the VISIBLE text + visible attrs of the live a11oy + killinchu Spaces, and
+#   - rendered-text columns of governed surfaces passed as file args.
+# It does NOT fail on id=/class=/data-* attributes or <script> bodies, so honest
+# internal route keys never false-positive. It FAILS the build on any banned
+# user-visible token, regardless of which repo introduced it.
+#
+# Transient HF Space fetch errors (HTTP 000) are reported as WARN, never FAIL,
+# so a flaky fetch cannot mask the real signal incorrectly.
+
+on:
+  schedule:
+    # Daily sweep (07:09 UTC) so a leaked codename is caught fast.
+    - cron: "9 7 * * *"
+  workflow_dispatch: {}
+  push:
+    branches: [main]
+    paths:
+      - ".github/scripts/codename_sweep.py"
+      - ".github/scripts/szl_codename_gate.py"
+      - ".github/workflows/codename-gate.yml"
+  workflow_call: {}
+
+permissions:
+  contents: read
+
+concurrency:
+  group: codename-gate-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  gate:
+    name: No user-visible codename on any served surface
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write # only to commit the refreshed report in szl-holdings/.github
+    steps:
+      - name: Harden runner
+        uses: step-security/harden-runner@9af89fc71515a100421586dfdb3dc9c984fbf411 # v2.19.4
+        with:
+          egress-policy: audit
+
+      - name: Checkout
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+
+      - name: Set up Python
+        uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6.2.0
+        with:
+          python-version: "3.12"
+
+      - name: Sweep live + governed surfaces for user-visible codenames
+        run: |
+          set +e
+          python3 .github/scripts/codename_sweep.py \
+            --report .github/data/codename_sweep_report.json
+          echo "CHECK_EXIT=$?" >> "$GITHUB_ENV"
+
+      - name: Commit refreshed report if changed
+        continue-on-error: true
+        if: github.repository == 'szl-holdings/.github' && github.event_name != 'pull_request'
+        run: |
+          if git diff --quiet -- .github/data/codename_sweep_report.json; then
+            echo "Report unchanged; nothing to commit."
+            exit 0
+          fi
+          git config user.name "Stephen P. Lutar Jr."
+          git config user.email "stephenlutar2@gmail.com"
+          git add .github/data/codename_sweep_report.json
+          git commit -s -m "chore(g5): refresh codename sweep report [skip ci]"
+          git push
+
+      - name: Fail on a user-visible codename
+        run: |
+          if [ "${CHECK_EXIT:-1}" != "0" ]; then
+            echo "::error::Doctrine gate G5 violated: a banned codename"
+            echo "::error::(amaru / rosie / sentra / jarvis) appears in user-visible"
+            echo "::error::text on a served surface. Every user-visible string must"
+            echo "::error::read its public role: amaru->YACHAY, rosie->Operator,"
+            echo "::error::sentra->CHAPAQ, jarvis->Operator. Internal route keys in"
+            echo "::error::id=/class=/data-* attributes are fine; only rendered text"
+            echo "::error::and visible attrs (title/aria-label/alt/placeholder) fail."
+            echo "::error::See annotations above and"
+            echo "::error::.github/data/codename_sweep_report.json (full results)."
+            exit 1
+          fi
+          echo "✓ G5 PASS - 0 user-visible codenames on any served surface."
