@@ -1,0 +1,143 @@
+name: Anatomy-map cross-surface drift
+
+# The single honest "SZL Anatomy" map is shipped on THREE independently-edited,
+# independently-deployed surfaces -- the a11oy /console tab (szl-holdings/a11oy
+# pages/console.html), the killinchu /elite tab (szl-holdings/killinchu
+# killinchu_elite_console.py) and the standalone HF static Space
+# SZLHOLDINGS/anatomy (data.js + index.html, the a11oy.net/anatomy-map mirror).
+# Each has its own pipeline, so the honesty doctrine can silently DRIFT between
+# them. This sweep fetches all three and fails LOUD the moment they diverge on:
+#   * the canonical locked-8 ladder {F1,F4,F7,F11,F12,F18,F19,F22}, and
+#   * the Λ = Conjecture 1 honesty label,
+# plus a capability-for-capability comparison of the byte-shared marker block
+# between a11oy and killinchu. Mirrors the org's other registry-driven drift
+# guards (hf-module-drift-check / required-check-drift).
+#
+# Reading the a11oy / killinchu sources needs repo read access; the built-in
+# Actions token covers same-org repos, with SZL_GITHUB_TOKEN as a fallback. The
+# HF Space is public. On real drift (exit 1) an ntfy alert is pushed through the
+# team's shared relay (SLACK_WEBHOOK_URL -> a11oy.net/relay -> a11oy-uptime).
+# A fetch/auth failure is exit 2 (ERROR), never a silent pass.
+
+on:
+  schedule:
+    # Weekly sweep, Mondays 08:11 UTC -- offset from the other org guards.
+    - cron: "11 8 * * 1"
+  workflow_dispatch: {}
+  push:
+    branches: [main]
+    paths:
+      - ".github/scripts/anatomy_map_drift.py"
+      - ".github/scripts/test_anatomy_map_drift.py"
+      - ".github/data/anatomy_map_registry.json"
+      - ".github/workflows/anatomy-map-drift.yml"
+  workflow_call: {}
+
+permissions:
+  contents: read
+
+concurrency:
+  group: anatomy-map-drift-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    name: SZL anatomy map identical across a11oy / killinchu / HF Space
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write # only to commit the refreshed report in szl-holdings/.github
+    steps:
+      - name: Harden runner
+        uses: step-security/harden-runner@9af89fc71515a100421586dfdb3dc9c984fbf411 # v2.19.4
+        with:
+          egress-policy: audit
+
+      - name: Checkout
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+
+      - name: Set up Python
+        uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6.2.0
+        with:
+          python-version: "3.12"
+
+      - name: Self-test the drift guard (negative fixtures)
+        # Proves the guard actually FAILS when a surface is mutated, so a future
+        # weakening can't turn it into a silent always-green no-op.
+        run: python3 .github/scripts/test_anatomy_map_drift.py
+
+      - name: Compare the anatomy map across all surfaces
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          SZL_GITHUB_TOKEN: ${{ secrets.SZL_GITHUB_TOKEN }}
+        run: |
+          set +e
+          python3 .github/scripts/anatomy_map_drift.py \
+            --report .github/data/anatomy_map_report.json
+          echo "CHECK_EXIT=$?" >> "$GITHUB_ENV"
+
+      - name: Commit refreshed report if changed
+        # Best-effort: if main is protected (or the token can't push), this must
+        # NOT mask the real signal. The drift gate below is the source of truth.
+        continue-on-error: true
+        if: github.repository == 'szl-holdings/.github' && github.event_name != 'pull_request'
+        run: |
+          if git diff --quiet -- .github/data/anatomy_map_report.json; then
+            echo "Report unchanged; nothing to commit."
+            exit 0
+          fi
+          git config user.name "Stephen P. Lutar Jr."
+          git config user.email "stephenlutar2@gmail.com"
+          git add .github/data/anatomy_map_report.json
+          git commit -s -m "chore(anatomy): refresh anatomy-map drift report [skip ci]"
+          git push
+
+      - name: Alert ntfy on anatomy-map drift
+        # Fires only when a surface actually diverged (exit 1). Routed through
+        # the shared relay so it renders cleanly in the team's ntfy app. No-ops
+        # (with a warning) if the webhook secret is unset, never masking the red
+        # job below.
+        if: env.CHECK_EXIT == '1'
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+        run: |
+          set -euo pipefail
+          if [ -z "${SLACK_WEBHOOK_URL:-}" ]; then
+            echo "::warning::SLACK_WEBHOOK_URL not set; skipping ntfy push (the red job is still the signal)."
+            exit 0
+          fi
+          drift="$(python3 -c '
+          import json
+          r = json.load(open(".github/data/anatomy_map_report.json"))
+          print(" | ".join(r.get("findings", [])) or "(see report)")
+          ')"
+          run_url="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
+          text=":rotating_light: SZL anatomy-map DRIFT: the honest anatomy map diverged across a11oy /console, killinchu /elite and/or the SZLHOLDINGS/anatomy HF Space (locked-8 ladder, Λ=Conjecture-1 label, or capability list). ${drift} Run: ${run_url}"
+          payload="$(python3 -c 'import json,sys; print(json.dumps({"text": sys.argv[1]}))' "$text")"
+          code="$(curl -sS -o /dev/null -w '%{http_code}' -X POST -H 'Content-Type: application/json' -d "$payload" "$SLACK_WEBHOOK_URL" || echo 000)"
+          echo "ntfy relay responded HTTP ${code}"
+          [ "$code" = "200" ] || echo "::warning::ntfy relay returned ${code} (not 200); check the relay."
+
+      - name: Fail if anatomy-map drift or the check could not run
+        run: |
+          case "${CHECK_EXIT:-2}" in
+            0)
+              echo "✓ The SZL anatomy map is identical across all three surfaces."
+              ;;
+            1)
+              echo "::error::Anatomy-map drift detected -- see the step output and"
+              echo "::error::.github/data/anatomy_map_report.json. Re-sync the locked-8"
+              echo "::error::ladder {F1,F4,F7,F11,F12,F18,F19,F22}, the Λ=Conjecture-1"
+              echo "::error::label and the capability ladder across a11oy /console,"
+              echo "::error::killinchu /elite and the SZLHOLDINGS/anatomy HF Space."
+              exit 1
+              ;;
+            *)
+              echo "::error::Could not complete the anatomy-map drift check"
+              echo "::error::(a surface failed to fetch -- network/auth). Set the"
+              echo "::error::SZL_GITHUB_TOKEN secret if the a11oy/killinchu repos are"
+              echo "::error::private. Failed (not passed) so coverage can never look"
+              echo "::error::green when the check could not actually run."
+              exit 1
+              ;;
+          esac
