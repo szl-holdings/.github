@@ -1,32 +1,43 @@
 #!/usr/bin/env python3
-"""Required-status-check drift watcher for the lockfile-registry merge block.
+"""Required-status-check drift watcher for security-load-bearing merge blocks.
 
-Task #308 made the context
+Some status-check contexts are made REQUIRED on `main` so that a red run
+genuinely BLOCKS merge. Two such merge blocks are watched here:
 
-    lockfiles / No lockfile references a Replit-internal registry host
+  1. lockfile-registry (Task #308): the context
+        lockfiles / No lockfile references a Replit-internal registry host
+     on the six repos that actually commit lockfiles, so a poisoned
+     (`*.replit.local`) lockfile cannot be merged.
+  2. overclaim-honesty (Task #393): the context
+        overclaim / Governed surfaces are honest (Theorem U citation rule)
+     on lutar-lean + szl-papers, so a doc that overclaims Λ-uniqueness or
+     "Conjecture 1 proven" cannot be merged past the honesty guard.
 
-a REQUIRED status check on `main` for the six repos that actually commit
-lockfiles, so a red lockfile run genuinely blocks merge. But that requirement
-is just GitHub branch-protection config — anyone with admin can drop the
-requirement, or a future ruleset rewrite can silently remove it, and nothing
-would notice. The protection only matters if it stays in place.
+But "required" is just GitHub branch-protection config — anyone with admin can
+drop the requirement, or a ruleset/classic-protection rewrite can silently
+remove it, and nothing would notice. The protection only matters if it stays in
+place. This script makes that drift catchable on a schedule.
 
-This script makes that drift catchable on a schedule. For each wired repo it
-gathers the EFFECTIVE set of required status-check contexts on the default
-branch from BOTH mechanisms GitHub unions together:
+For each wired repo it gathers the EFFECTIVE set of required status-check
+contexts on the default branch from BOTH mechanisms GitHub unions together:
 
-  1. Branch RULESETS (the `series-a-default-branch` ruleset for a11oy +
-     ouroboros): every ACTIVE branch ruleset whose conditions target the
+  1. Branch RULESETS: every ACTIVE branch ruleset whose conditions target the
      default branch and that carries a `required_status_checks` rule.
-  2. CLASSIC branch protection (platform, vsp-otel, szl-uds-deployment,
-     docs-site): `branches/<default>/protection/required_status_checks`.
+  2. CLASSIC branch protection:
+     `branches/<default>/protection/required_status_checks`.
 
-If the required context is present via EITHER mechanism the repo is OK — that
-keeps it robust to an intentional ruleset rename or a mechanism swap (moving
-the requirement from classic to a ruleset still protects). If NO active
-mechanism makes the context required on the default branch, that is drift and
-the check fails. A `config["repos"][repo]["mechanism"]` hint is recorded in the
-report for context but is NOT used to weaken the union check.
+If the required context is present via EITHER mechanism the repo is OK for that
+check — that keeps it robust to an intentional ruleset rename or a mechanism
+swap (moving the requirement from classic to a ruleset still protects). If NO
+active mechanism makes the context required on the default branch, that is drift
+and the check fails. A per-repo `mechanism` hint is recorded in the report for
+context but is NOT used to weaken the union check.
+
+Config supports two shapes:
+  * MULTI (current): a top-level `checks` array, each entry
+    `{id, required_context, repos: {repo: {mechanism, ...}}}`.
+  * LEGACY (single check): top-level `required_context` + `repos`.
+Both normalize to the same internal list of check groups.
 
 Auth: reads a token from $SZL_GITHUB_TOKEN / $GH_TOKEN / $GITHUB_TOKEN. The
 rulesets and classic-protection endpoints require admin on each repo, so the
@@ -40,9 +51,9 @@ Usage:
       [--allowlist .github/data/required_check_allowlist.json] \
       [--report   .github/data/required_check_report.json] [--json]
 
-Exit code 0 = every wired repo still requires the context (warnings allowed);
-1 = drift (at least one repo no longer requires it); 2 = could not complete the
-check (auth/permission/API failure).
+Exit code 0 = every wired repo still requires its context (warnings allowed);
+1 = drift (at least one repo no longer requires its context); 2 = could not
+complete the check (auth/permission/API failure).
 """
 from __future__ import annotations
 
@@ -128,15 +139,15 @@ def load_json(path: str) -> dict:
 
 def load_config(path: str) -> dict:
     cfg = load_json(path)
-    if not cfg.get("required_context"):
+    has_legacy = bool(cfg.get("required_context")) and isinstance(
+        cfg.get("repos"), dict) and bool(cfg.get("repos"))
+    has_multi = isinstance(cfg.get("checks"), list) and bool(cfg.get("checks"))
+    if not (has_legacy or has_multi):
         raise CheckError(
-            f"Config {path!r} is missing 'required_context'. It must name the "
-            f"exact status-check context string that has to stay required."
-        )
-    if not isinstance(cfg.get("repos"), dict) or not cfg["repos"]:
-        raise CheckError(
-            f"Config {path!r} is missing a non-empty 'repos' map of "
-            f"repo-name -> {{mechanism: ruleset|classic}}."
+            f"Config {path!r} must either be a single check (top-level "
+            f"'required_context' + non-empty 'repos' map) or a multi-check "
+            f"config (non-empty 'checks' array of "
+            f"{{id, required_context, repos}})."
         )
     cfg.setdefault("org", "szl-holdings")
     return cfg
@@ -146,6 +157,39 @@ def load_allowlist(path: str) -> dict:
     data = load_json(path)
     data.setdefault("ignore_repos", [])
     return data
+
+
+def check_groups(cfg: dict) -> list[dict]:
+    """Normalize the legacy single-check and the multi-check config shapes into
+    a list of `{id, required_context, repos}` groups."""
+    if isinstance(cfg.get("checks"), list) and cfg.get("checks"):
+        groups = []
+        for i, c in enumerate(cfg["checks"]):
+            ctx = (c or {}).get("required_context")
+            repos = (c or {}).get("repos")
+            if not ctx:
+                raise CheckError(
+                    f"checks[{i}] is missing 'required_context'. Each entry "
+                    f"must name the exact status-check context that has to "
+                    f"stay required."
+                )
+            if not isinstance(repos, dict) or not repos:
+                raise CheckError(
+                    f"checks[{i}] ({ctx!r}) is missing a non-empty 'repos' map "
+                    f"of repo-name -> {{mechanism: ruleset|classic}}."
+                )
+            groups.append({
+                "id": c.get("id") or ctx,
+                "required_context": ctx,
+                "repos": repos,
+            })
+        return groups
+    # Legacy single-check shape.
+    return [{
+        "id": cfg.get("id") or cfg["required_context"],
+        "required_context": cfg["required_context"],
+        "repos": cfg["repos"],
+    }]
 
 
 # --------------------------------------------------------------------------- #
@@ -209,62 +253,98 @@ def run_check(args) -> dict:
     cfg = load_config(args.config)
     allow = load_allowlist(args.allowlist)
     org = cfg["org"]
-    required_context = cfg["required_context"]
+    groups = check_groups(cfg)
 
     errors: list[str] = []
     warnings: list[str] = []
-    repo_report = []
+    check_reports: list[dict] = []
 
-    for repo, spec in cfg["repos"].items():
-        entry = {
-            "repo": f"{org}/{repo}",
-            "declared_mechanism": (spec or {}).get("mechanism"),
-        }
-        if repo in allow["ignore_repos"]:
-            entry["result"] = "allowlisted"
+    # A repo can be wired for more than one check; read its rulesets / classic
+    # protection once and reuse across check groups.
+    repo_cache: dict[str, dict] = {}
+
+    def repo_state(repo: str) -> dict:
+        if repo not in repo_cache:
+            meta = gh_json(f"/repos/{org}/{repo}", token)
+            default_branch = meta.get("default_branch", "main")
+            rs_ctxs, rs_seen = ruleset_contexts(org, repo, token)
+            cl_ctxs, classic_present = classic_contexts(
+                org, repo, default_branch, token)
+            repo_cache[repo] = {
+                "default_branch": default_branch,
+                "rs_ctxs": rs_ctxs,
+                "rs_seen": rs_seen,
+                "cl_ctxs": cl_ctxs,
+                "classic_present": classic_present,
+            }
+        return repo_cache[repo]
+
+    for group in groups:
+        required_context = group["required_context"]
+        group_id = group["id"]
+        repo_report = []
+
+        for repo, spec in group["repos"].items():
+            entry = {
+                "repo": f"{org}/{repo}",
+                "declared_mechanism": (spec or {}).get("mechanism"),
+            }
+            if repo in allow["ignore_repos"]:
+                entry["result"] = "allowlisted"
+                repo_report.append(entry)
+                continue
+
+            st = repo_state(repo)
+            entry["default_branch"] = st["default_branch"]
+            entry["rulesets"] = st["rs_seen"]
+            entry["classic_protection_present"] = st["classic_present"]
+            entry["required_via_ruleset"] = required_context in st["rs_ctxs"]
+            entry["required_via_classic"] = required_context in st["cl_ctxs"]
+
+            if entry["required_via_ruleset"] or entry["required_via_classic"]:
+                entry["result"] = "ok"
+            else:
+                entry["result"] = "DRIFT"
+                errors.append(
+                    f"{org}/{repo}: the context {required_context!r} (check "
+                    f"{group_id!r}) is NO LONGER a required status check on "
+                    f"'{st['default_branch']}' via any active ruleset or "
+                    f"classic branch protection. The merge block is gone — a "
+                    f"bad change can now be merged past it. Re-add it (hint: "
+                    f"mechanism={entry['declared_mechanism']!r})."
+                )
             repo_report.append(entry)
-            continue
 
-        meta = gh_json(f"/repos/{org}/{repo}", token)
-        default_branch = meta.get("default_branch", "main")
-        entry["default_branch"] = default_branch
+        check_reports.append({
+            "id": group_id,
+            "required_context": required_context,
+            "totals": {
+                "wired_repos": len(group["repos"]),
+                "ok": sum(1 for e in repo_report if e["result"] == "ok"),
+                "drift": sum(1 for e in repo_report if e["result"] == "DRIFT"),
+                "allowlisted": sum(
+                    1 for e in repo_report if e["result"] == "allowlisted"),
+            },
+            "repos": repo_report,
+        })
 
-        rs_ctxs, rs_seen = ruleset_contexts(org, repo, token)
-        cl_ctxs, classic_present = classic_contexts(org, repo, default_branch, token)
-
-        entry["rulesets"] = rs_seen
-        entry["classic_protection_present"] = classic_present
-        entry["required_via_ruleset"] = required_context in rs_ctxs
-        entry["required_via_classic"] = required_context in cl_ctxs
-
-        if entry["required_via_ruleset"] or entry["required_via_classic"]:
-            entry["result"] = "ok"
-        else:
-            entry["result"] = "DRIFT"
-            errors.append(
-                f"{org}/{repo}: the context {required_context!r} is NO LONGER a "
-                f"required status check on '{default_branch}' via any active "
-                f"ruleset or classic branch protection. A poisoned lockfile can "
-                f"now be merged. Re-add it (see required_check_config.json hint: "
-                f"mechanism={entry['declared_mechanism']!r})."
-            )
-        repo_report.append(entry)
-
+    all_repos = [e for c in check_reports for e in c["repos"]]
     return {
         "generated_at": datetime.now(timezone.utc).isoformat(),
         "org": org,
-        "required_context": required_context,
+        "checks": check_reports,
         "totals": {
-            "wired_repos": len(cfg["repos"]),
-            "ok": sum(1 for e in repo_report if e["result"] == "ok"),
-            "drift": sum(1 for e in repo_report if e["result"] == "DRIFT"),
-            "allowlisted": sum(1 for e in repo_report if e["result"] == "allowlisted"),
+            "checks": len(check_reports),
+            "wired_repos": sum(len(g["repos"]) for g in groups),
+            "ok": sum(1 for e in all_repos if e["result"] == "ok"),
+            "drift": sum(1 for e in all_repos if e["result"] == "DRIFT"),
+            "allowlisted": sum(
+                1 for e in all_repos if e["result"] == "allowlisted"),
             "errors": len(errors),
             "warnings": len(warnings),
         },
         "errors": errors,
         "warnings": warnings,
-        "repos": repo_report,
     }
 
 
@@ -292,17 +372,19 @@ def main() -> int:
         print(json.dumps(report, indent=2))
     else:
         t = report["totals"]
-        print(f"Org: {report['org']}  Required context: {report['required_context']!r}")
+        print(f"Org: {report['org']}  checks={t['checks']}")
         print(
             f"  wired_repos={t['wired_repos']} ok={t['ok']} drift={t['drift']} "
             f"allowlisted={t['allowlisted']}"
         )
-        for e in report["repos"]:
-            print(
-                f"  - {e['repo']}: {e['result']} "
-                f"(ruleset={e.get('required_via_ruleset')}, "
-                f"classic={e.get('required_via_classic')})"
-            )
+        for c in report["checks"]:
+            print(f"  [{c['id']}] {c['required_context']!r}")
+            for e in c["repos"]:
+                print(
+                    f"    - {e['repo']}: {e['result']} "
+                    f"(ruleset={e.get('required_via_ruleset')}, "
+                    f"classic={e.get('required_via_classic')})"
+                )
         for w in report["warnings"]:
             print(f"  ::warning:: {w}")
         for e in report["errors"]:

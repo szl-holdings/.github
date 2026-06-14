@@ -2,11 +2,12 @@
 """Self-test for the required-status-check drift guard.
 
 ``required_check_drift.py`` is the thing that notices when a repo silently loses
-its REQUIRED status check (e.g. the lockfile-registry context) from main-branch
-protection — at which point a poisoned lockfile could be merged. It must fail
-LOUD: exit 2 when it cannot even read rulesets/protection (auth/API), and exit 1
-when a wired repo has actually drifted. A refactor that returned 0 in either
-case would re-open the merge hole while still looking green.
+a REQUIRED status check (the lockfile-registry context, or the overclaim-honesty
+context) from main-branch protection — at which point a bad change could be
+merged past the merge block. It must fail LOUD: exit 2 when it cannot even read
+rulesets/protection (auth/API), and exit 1 when a wired repo has actually
+drifted. A refactor that returned 0 in either case would re-open the merge hole
+while still looking green.
 
 This stubs every network/config call (``_token`` / ``load_config`` /
 ``load_allowlist`` / ``gh_json`` / ``ruleset_contexts`` / ``classic_contexts``)
@@ -16,6 +17,9 @@ so it runs with NO network, and pins:
   2. a wired repo no longer requires the context (DRIFT)       -> exit 1
   3. context required via ruleset (or classic)                 -> exit 0
   4. an allowlisted repo never counts as drift                 -> exit 0
+  5. multi-check config, all contexts required                 -> exit 0
+  6. multi-check config, one check's repo drifted              -> exit 1
+  7. check_groups normalizes both config shapes
 """
 from __future__ import annotations
 
@@ -37,6 +41,7 @@ _spec.loader.exec_module(rcd)
 
 _TOKEN_ENV = ("SZL_GITHUB_TOKEN", "GH_TOKEN", "GITHUB_TOKEN")
 _CTX = "lockfiles / No lockfile references a Replit-internal registry host"
+_CTX2 = "overclaim / Governed surfaces are honest (Theorem U citation rule)"
 
 
 def _run_main(*, token, config, allowlist=None, ruleset=(set(), []),
@@ -84,6 +89,17 @@ def _run_main(*, token, config, allowlist=None, ruleset=(set(), []),
 _CONFIG = {"org": "szl-holdings", "required_context": _CTX,
            "repos": {"a11oy": {"mechanism": "ruleset"}}}
 
+_MULTI_CONFIG = {
+    "org": "szl-holdings",
+    "checks": [
+        {"id": "lockfile-registry", "required_context": _CTX,
+         "repos": {"a11oy": {"mechanism": "ruleset"}}},
+        {"id": "overclaim-honesty", "required_context": _CTX2,
+         "repos": {"lutar-lean": {"mechanism": "classic"},
+                   "szl-papers": {"mechanism": "classic"}}},
+    ],
+}
+
 
 class TestRequiredCheckDriftGuard(unittest.TestCase):
     def test_no_token_exit_2(self):
@@ -117,6 +133,32 @@ class TestRequiredCheckDriftGuard(unittest.TestCase):
                        allowlist={"ignore_repos": ["a11oy"]},
                        ruleset=(set(), []), classic=(set(), False))
         self.assertEqual(rc, 0)
+
+    def test_multi_check_all_required_passes(self):
+        """Multi-check config where BOTH contexts are required (via classic here)
+        on their repos -> exit 0. Proves the watcher unions all check groups."""
+        rc = _run_main(token="tok", config=_MULTI_CONFIG,
+                       ruleset=(set(), []), classic=({_CTX, _CTX2}, True))
+        self.assertEqual(rc, 0)
+
+    def test_multi_check_one_context_drifts(self):
+        """Multi-check config where only the lockfile context is still required
+        and the overclaim context has been dropped -> DRIFT -> exit 1. A second
+        merge block silently vanishing must still alarm."""
+        rc = _run_main(token="tok", config=_MULTI_CONFIG,
+                       ruleset=(set(), []), classic=({_CTX}, True))
+        self.assertEqual(rc, 1)
+
+    def test_check_groups_normalizes_both_shapes(self):
+        """check_groups() must yield one group for the legacy shape and one per
+        entry for the multi shape, so run_check iterates them uniformly."""
+        legacy = rcd.check_groups(_CONFIG)
+        self.assertEqual(len(legacy), 1)
+        self.assertEqual(legacy[0]["required_context"], _CTX)
+        multi = rcd.check_groups(_MULTI_CONFIG)
+        self.assertEqual(len(multi), 2)
+        self.assertEqual({g["id"] for g in multi},
+                         {"lockfile-registry", "overclaim-honesty"})
 
 
 if __name__ == "__main__":

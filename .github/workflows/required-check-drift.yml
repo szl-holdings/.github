@@ -1,13 +1,17 @@
-name: Required-check Drift (lockfile merge block)
+name: Required-check Drift (security-load-bearing merge blocks)
 
-# Task #308 made the context
-#   lockfiles / No lockfile references a Replit-internal registry host
-# a REQUIRED status check on `main` for the six repos that commit lockfiles
-# (a11oy + ouroboros via the `series-a-default-branch` ruleset; platform,
-# vsp-otel, szl-uds-deployment, docs-site via classic branch protection), so a
-# red lockfile run genuinely blocks merge. But that requirement is just GitHub
-# config — an admin can drop it, or a ruleset rewrite can silently remove it,
-# and nothing would notice. The protection only matters if it stays in place.
+# Some status-check contexts are made REQUIRED on `main` so a red run genuinely
+# BLOCKS merge. Two such merge blocks are watched here:
+#   1. lockfile-registry (Task #308): the context
+#        lockfiles / No lockfile references a Replit-internal registry host
+#      on the six repos that commit lockfiles (a11oy, ouroboros, platform,
+#      vsp-otel, szl-uds-deployment, docs-site).
+#   2. overclaim-honesty (Task #393): the context
+#        overclaim / Governed surfaces are honest (Theorem U citation rule)
+#      on lutar-lean + szl-papers (classic protection on both).
+# But "required" is just GitHub config — an admin can drop it, or a
+# ruleset/classic-protection rewrite can silently remove it, and nothing would
+# notice. The protection only matters if it stays in place.
 #
 # This job watches for that drift. For each wired repo it reads BOTH mechanisms
 # GitHub unions together (ruleset `required_status_checks` + classic
@@ -21,7 +25,7 @@ name: Required-check Drift (lockfile merge block)
 # Rulesets + classic protection require repo-admin, so the built-in Actions
 # GITHUB_TOKEN is NOT sufficient — the SZL_GITHUB_TOKEN PAT secret is used. A
 # missing/insufficient token is reported as an ERROR (exit 2), never a silent
-# pass, so the merge block can never look protected when the check could not run.
+# pass, so a merge block can never look protected when the check could not run.
 
 on:
   schedule:
@@ -47,7 +51,7 @@ concurrency:
 
 jobs:
   check:
-    name: Lockfile merge block still required on every wired repo
+    name: Required merge blocks still enforced on every wired repo
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
@@ -66,7 +70,7 @@ jobs:
         with:
           python-version: "3.12"
 
-      - name: Verify the lockfile context is still required on every wired repo
+      - name: Verify every required merge-block context is still required on its wired repos
         env:
           # repo-admin PAT preferred (the built-in token can't read rulesets /
           # classic protection on the other repos)
@@ -97,7 +101,7 @@ jobs:
           git push
 
       - name: Alert ntfy on drift
-        # Fires only when a repo actually lost the requirement (exit 1). Routed
+        # Fires only when a repo actually lost a requirement (exit 1). Routed
         # through the shared relay so it renders cleanly in the team's ntfy app.
         # No-ops (with a warning) if the webhook secret is unset, never masking
         # the red job below.
@@ -116,7 +120,7 @@ jobs:
           print("; ".join(r.get("errors", [])) or "(see report)")
           ')"
           run_url="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
-          text=":rotating_light: Lockfile merge block DRIFT: the required status check 'lockfiles / No lockfile references a Replit-internal registry host' was removed from one or more repos. A poisoned lockfile can now be merged. ${drift} Run: ${run_url}"
+          text=":rotating_light: Required merge-block DRIFT: a security-load-bearing required status check (lockfile-registry and/or overclaim-honesty) was removed from one or more repos. A bad change can now be merged past it. ${drift} Run: ${run_url}"
           payload="$(python3 -c 'import json,sys; print(json.dumps({"text": sys.argv[1]}))' "$text")"
           code="$(curl -sS -o /dev/null -w '%{http_code}' -X POST -H 'Content-Type: application/json' -d "$payload" "$SLACK_WEBHOOK_URL" || echo 000)"
           echo "ntfy relay responded HTTP ${code}"
@@ -126,22 +130,23 @@ jobs:
         run: |
           case "${CHECK_EXIT:-2}" in
             0)
-              echo "✓ The lockfile-registry context is still a required status check on every wired repo."
+              echo "✓ Every required merge-block context is still required on every wired repo."
               ;;
             1)
               echo "::error::Required-status-check DRIFT: at least one wired repo no"
-              echo "::error::longer requires the lockfile-registry context on its default"
-              echo "::error::branch — a poisoned lockfile can now be merged. See the step"
-              echo "::error::output and .github/data/required_check_report.json. Re-add it"
-              echo "::error::via the ruleset required_status_checks rule (a11oy/ouroboros)"
-              echo "::error::or classic branches/main/protection/required_status_checks."
+              echo "::error::longer requires its security-load-bearing context (the"
+              echo "::error::lockfile-registry and/or overclaim-honesty merge block) on"
+              echo "::error::its default branch — a bad change can now be merged past it."
+              echo "::error::See the step output and .github/data/required_check_report.json."
+              echo "::error::Re-add it via the ruleset required_status_checks rule or"
+              echo "::error::classic branches/<default>/protection/required_status_checks."
               exit 1
               ;;
             *)
               echo "::error::Could not complete the required-check drift watch"
               echo "::error::(auth/API failure). Rulesets + classic protection need a"
               echo "::error::repo-admin token — set the SZL_GITHUB_TOKEN secret. This is"
-              echo "::error::failed (not passed) so the merge block can never look"
+              echo "::error::failed (not passed) so a merge block can never look"
               echo "::error::protected when the check could not actually run."
               exit 1
               ;;

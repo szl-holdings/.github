@@ -1,130 +1,248 @@
 {
-  "generated_at": "2026-06-10T12:57:39.343237+00:00",
+  "generated_at": "2026-06-14T12:18:04.229545+00:00",
   "org": "szl-holdings",
-  "required_context": "lockfiles / No lockfile references a Replit-internal registry host",
+  "checks": [
+    {
+      "id": "lockfile-registry",
+      "required_context": "lockfiles / No lockfile references a Replit-internal registry host",
+      "totals": {
+        "wired_repos": 6,
+        "ok": 6,
+        "drift": 0,
+        "allowlisted": 0
+      },
+      "repos": [
+        {
+          "repo": "szl-holdings/a11oy",
+          "declared_mechanism": "ruleset",
+          "default_branch": "main",
+          "rulesets": [
+            {
+              "id": 17630223,
+              "name": "org-default-branch-protection",
+              "enforcement": "active",
+              "targets_default_branch": true,
+              "has_required_status_checks_rule": false
+            },
+            {
+              "id": 16195484,
+              "name": "series-a-default-branch",
+              "enforcement": "active",
+              "targets_default_branch": true,
+              "has_required_status_checks_rule": true
+            }
+          ],
+          "classic_protection_present": false,
+          "required_via_ruleset": true,
+          "required_via_classic": false,
+          "result": "ok"
+        },
+        {
+          "repo": "szl-holdings/ouroboros",
+          "declared_mechanism": "ruleset",
+          "default_branch": "main",
+          "rulesets": [
+            {
+              "id": 17630223,
+              "name": "org-default-branch-protection",
+              "enforcement": "active",
+              "targets_default_branch": true,
+              "has_required_status_checks_rule": false
+            },
+            {
+              "id": 15812871,
+              "name": "Protect default branch",
+              "enforcement": "active",
+              "targets_default_branch": true,
+              "has_required_status_checks_rule": false
+            },
+            {
+              "id": 16195494,
+              "name": "series-a-default-branch",
+              "enforcement": "active",
+              "targets_default_branch": true,
+              "has_required_status_checks_rule": true
+            }
+          ],
+          "classic_protection_present": true,
+          "required_via_ruleset": true,
+          "required_via_classic": false,
+          "result": "ok"
+        },
+        {
+          "repo": "szl-holdings/platform",
+          "declared_mechanism": "ruleset",
+          "default_branch": "main",
+          "rulesets": [
+            {
+              "id": 17630223,
+              "name": "org-default-branch-protection",
+              "enforcement": "active",
+              "targets_default_branch": true,
+              "has_required_status_checks_rule": false
+            },
+            {
+              "id": 14609056,
+              "name": "Protect default branch",
+              "enforcement": "active",
+              "targets_default_branch": true,
+              "has_required_status_checks_rule": false
+            },
+            {
+              "id": 16195495,
+              "name": "series-a-default-branch",
+              "enforcement": "active",
+              "targets_default_branch": true,
+              "has_required_status_checks_rule": true
+            }
+          ],
+          "classic_protection_present": true,
+          "required_via_ruleset": true,
+          "required_via_classic": false,
+          "result": "ok"
+        },
+        {
+          "repo": "szl-holdings/vsp-otel",
+          "declared_mechanism": "ruleset",
+          "default_branch": "main",
+          "rulesets": [
+            {
+              "id": 17630223,
+              "name": "org-default-branch-protection",
+              "enforcement": "active",
+              "targets_default_branch": true,
+              "has_required_status_checks_rule": false
+            },
+            {
+              "id": 16996189,
+              "name": "series-a-default-branch",
+              "enforcement": "active",
+              "targets_default_branch": true,
+              "has_required_status_checks_rule": true
+            }
+          ],
+          "classic_protection_present": true,
+          "required_via_ruleset": true,
+          "required_via_classic": false,
+          "result": "ok"
+        },
+        {
+          "repo": "szl-holdings/szl-uds-deployment",
+          "declared_mechanism": "ruleset",
+          "default_branch": "main",
+          "rulesets": [
+            {
+              "id": 17630223,
+              "name": "org-default-branch-protection",
+              "enforcement": "active",
+              "targets_default_branch": true,
+              "has_required_status_checks_rule": false
+            },
+            {
+              "id": 17630067,
+              "name": "lockfile-registry-check",
+              "enforcement": "active",
+              "targets_default_branch": true,
+              "has_required_status_checks_rule": true
+            }
+          ],
+          "classic_protection_present": true,
+          "required_via_ruleset": true,
+          "required_via_classic": false,
+          "result": "ok"
+        },
+        {
+          "repo": "szl-holdings/docs-site",
+          "declared_mechanism": "ruleset",
+          "default_branch": "main",
+          "rulesets": [
+            {
+              "id": 17630223,
+              "name": "org-default-branch-protection",
+              "enforcement": "active",
+              "targets_default_branch": true,
+              "has_required_status_checks_rule": false
+            },
+            {
+              "id": 17630068,
+              "name": "lockfile-registry-check",
+              "enforcement": "active",
+              "targets_default_branch": true,
+              "has_required_status_checks_rule": true
+            }
+          ],
+          "classic_protection_present": true,
+          "required_via_ruleset": true,
+          "required_via_classic": false,
+          "result": "ok"
+        }
+      ]
+    },
+    {
+      "id": "overclaim-honesty",
+      "required_context": "overclaim / Governed surfaces are honest (Theorem U citation rule)",
+      "totals": {
+        "wired_repos": 2,
+        "ok": 2,
+        "drift": 0,
+        "allowlisted": 0
+      },
+      "repos": [
+        {
+          "repo": "szl-holdings/lutar-lean",
+          "declared_mechanism": "classic",
+          "default_branch": "main",
+          "rulesets": [
+            {
+              "id": 17630223,
+              "name": "org-default-branch-protection",
+              "enforcement": "active",
+              "targets_default_branch": true,
+              "has_required_status_checks_rule": false
+            },
+            {
+              "id": 16996184,
+              "name": "series-a-default-branch",
+              "enforcement": "active",
+              "targets_default_branch": true,
+              "has_required_status_checks_rule": false
+            }
+          ],
+          "classic_protection_present": true,
+          "required_via_ruleset": false,
+          "required_via_classic": true,
+          "result": "ok"
+        },
+        {
+          "repo": "szl-holdings/szl-papers",
+          "declared_mechanism": "classic",
+          "default_branch": "main",
+          "rulesets": [
+            {
+              "id": 17630223,
+              "name": "org-default-branch-protection",
+              "enforcement": "active",
+              "targets_default_branch": true,
+              "has_required_status_checks_rule": false
+            }
+          ],
+          "classic_protection_present": true,
+          "required_via_ruleset": false,
+          "required_via_classic": true,
+          "result": "ok"
+        }
+      ]
+    }
+  ],
   "totals": {
-    "wired_repos": 6,
-    "ok": 6,
+    "checks": 2,
+    "wired_repos": 8,
+    "ok": 8,
     "drift": 0,
     "allowlisted": 0,
     "errors": 0,
     "warnings": 0
   },
   "errors": [],
-  "warnings": [],
-  "repos": [
-    {
-      "repo": "szl-holdings/a11oy",
-      "declared_mechanism": "ruleset",
-      "default_branch": "main",
-      "rulesets": [
-        {
-          "id": 15812916,
-          "name": "Protect default branch",
-          "enforcement": "active",
-          "targets_default_branch": true,
-          "has_required_status_checks_rule": false
-        },
-        {
-          "id": 16195484,
-          "name": "series-a-default-branch",
-          "enforcement": "active",
-          "targets_default_branch": true,
-          "has_required_status_checks_rule": true
-        }
-      ],
-      "classic_protection_present": false,
-      "required_via_ruleset": true,
-      "required_via_classic": false,
-      "result": "ok"
-    },
-    {
-      "repo": "szl-holdings/ouroboros",
-      "declared_mechanism": "ruleset",
-      "default_branch": "main",
-      "rulesets": [
-        {
-          "id": 15812871,
-          "name": "Protect default branch",
-          "enforcement": "active",
-          "targets_default_branch": true,
-          "has_required_status_checks_rule": false
-        },
-        {
-          "id": 16195494,
-          "name": "series-a-default-branch",
-          "enforcement": "active",
-          "targets_default_branch": true,
-          "has_required_status_checks_rule": true
-        }
-      ],
-      "classic_protection_present": true,
-      "required_via_ruleset": true,
-      "required_via_classic": false,
-      "result": "ok"
-    },
-    {
-      "repo": "szl-holdings/platform",
-      "declared_mechanism": "classic",
-      "default_branch": "main",
-      "rulesets": [
-        {
-          "id": 14609056,
-          "name": "Protect default branch",
-          "enforcement": "active",
-          "targets_default_branch": true,
-          "has_required_status_checks_rule": false
-        },
-        {
-          "id": 16195495,
-          "name": "series-a-default-branch",
-          "enforcement": "active",
-          "targets_default_branch": true,
-          "has_required_status_checks_rule": false
-        }
-      ],
-      "classic_protection_present": true,
-      "required_via_ruleset": false,
-      "required_via_classic": true,
-      "result": "ok"
-    },
-    {
-      "repo": "szl-holdings/vsp-otel",
-      "declared_mechanism": "classic",
-      "default_branch": "main",
-      "rulesets": [
-        {
-          "id": 16996189,
-          "name": "series-a-default-branch",
-          "enforcement": "active",
-          "targets_default_branch": true,
-          "has_required_status_checks_rule": false
-        }
-      ],
-      "classic_protection_present": true,
-      "required_via_ruleset": false,
-      "required_via_classic": true,
-      "result": "ok"
-    },
-    {
-      "repo": "szl-holdings/szl-uds-deployment",
-      "declared_mechanism": "classic",
-      "default_branch": "main",
-      "rulesets": [],
-      "classic_protection_present": true,
-      "required_via_ruleset": false,
-      "required_via_classic": true,
-      "result": "ok"
-    },
-    {
-      "repo": "szl-holdings/docs-site",
-      "declared_mechanism": "classic",
-      "default_branch": "main",
-      "rulesets": [],
-      "classic_protection_present": true,
-      "required_via_ruleset": false,
-      "required_via_classic": true,
-      "result": "ok"
-    }
-  ]
+  "warnings": []
 }
