@@ -98,3 +98,14 @@ jobs:
       # unit test locks that contract.
       - name: CI-health-digest guard self-test
         run: python3 .github/scripts/test_ci_health_digest.py
+
+      # Pins the HF module-drift guard's content-lineage cross-check. The
+      # diverged side is named "ahead" by last-commit DATE, but a timestamp lies
+      # about lineage: a stale hand-edit can be newer by date yet diverge from
+      # the canonical shared module the other side already matches (the
+      # szl_be_hardening.py trap). This stubbed, network-free unit test locks the
+      # LINEAGE CONFLICT contract so a refactor can't drop the canonical
+      # cross-reference and let a date-trusting backport silently regress the
+      # byte-identical-across-organs invariant.
+      - name: HF module-drift lineage cross-check self-test
+        run: python3 .github/scripts/test_hf_module_drift_check.py

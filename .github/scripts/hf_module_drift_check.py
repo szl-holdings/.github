@@ -19,6 +19,21 @@ identical). For every drifted file it fetches the last-commit DATE on both sides
 and NAMES which side is ahead -- it deliberately does NOT auto-overwrite, because
 drift can run either direction.
 
+The "ahead by DATE" label is ONLY a timestamp, and a timestamp lies about
+lineage: a stale hand-edit on one side can be NEWER by date yet DIVERGE from the
+canonical shared module that the other side already matches (this happened with
+killinchu's szl_be_hardening.py -- it showed "ahead: huggingface" while the HF
+copy was a stale hand-edit and GitHub already held the canonical byte-identical
+to a11oy's). A future agent who trusted the "ahead" label and backported
+HF->GitHub would have silently regressed the canonical and broken the
+byte-identical-across-organs invariant. So when the two repos are sibling organs
+that share byte-identical modules (the other registry repos, or --sibling), each
+drifted file is also cross-referenced against the sibling organ's canonical
+GitHub copy: if the date-ahead side does NOT match the canonical while the other
+side DOES, the guard raises a LINEAGE CONFLICT and tells the human to md5-compare
+all four surfaces (this repo GH/HF + the sibling organ's GH/HF) BEFORE backporting
+-- a content-lineage signal, not just a timestamp.
+
 Three run modes:
   * CI (default):  single pair; GitHub side = the checked-out working tree
                    (--repo-root .).  Used by the per-repo reusable workflow.
@@ -364,12 +379,112 @@ def fetch_remote_allow(github_repo, ref="main",
 
 
 # --------------------------------------------------------------------------- #
+# Content-lineage cross-check (sibling-organ canonical)
+# --------------------------------------------------------------------------- #
+def classify_lineage(gh_sha, hf_oid, canonical_shas, date_ahead):
+    """Cross-reference a drifted file against the sibling organ's canonical copy.
+
+    ``date_ahead`` is the side named ahead purely by last-commit DATE
+    ("github" / "huggingface" / "tied" / "unknown", optionally suffixed "?").
+    ``canonical_shas`` is the list of git-blob sha1s for the SAME path taken from
+    the sibling organ(s)' GitHub source-of-truth (the byte-identical shared
+    module). It may be empty (no sibling ships this path -> not a shared module).
+
+    The DATE label is only a timestamp; this returns a *content-lineage* read so
+    a stale-but-newer hand-edit can't masquerade as canonical. Returns a dict:
+      canonical_state          "none" | "resolved" | "sibling-divergent"
+      canonical_sha            the agreed sibling sha (resolved state only)
+      github_matches_canonical bool | None
+      hf_matches_canonical     bool | None
+      content_ahead            which side holds the canonical content
+                               ("github" | "huggingface" | "both" | "neither")
+      lineage_conflict         True when the DATE-ahead side is NOT the side that
+                               actually matches the canonical shared module --
+                               i.e. do NOT blind-backport by date.
+    """
+    info = {
+        "canonical_state": "none",
+        "github_matches_canonical": None,
+        "hf_matches_canonical": None,
+        "content_ahead": None,
+        "lineage_conflict": False,
+    }
+    canon_set = {c for c in (canonical_shas or []) if c}
+    if not canon_set:
+        # No sibling ships this path -> nothing canonical to anchor on; the
+        # date-based "ahead" is all we have (unchanged behaviour).
+        return info
+    if len(canon_set) > 1:
+        # The shared-module invariant is broken AMONG the siblings themselves, so
+        # there is no single canonical to trust -- force a manual all-surface md5.
+        info["canonical_state"] = "sibling-divergent"
+        info["lineage_conflict"] = True
+        return info
+
+    canon = next(iter(canon_set))
+    gh_match = gh_sha == canon
+    hf_match = hf_oid == canon
+    info.update({
+        "canonical_state": "resolved",
+        "canonical_sha": canon,
+        "github_matches_canonical": gh_match,
+        "hf_matches_canonical": hf_match,
+    })
+    if gh_match and hf_match:
+        info["content_ahead"] = "both"
+    elif gh_match:
+        info["content_ahead"] = "github"
+    elif hf_match:
+        info["content_ahead"] = "huggingface"
+    else:
+        info["content_ahead"] = "neither"
+
+    base_date = (date_ahead or "").rstrip("?")
+    if info["content_ahead"] in ("github", "huggingface"):
+        # Conflict when the side that actually holds the canonical content is NOT
+        # the side the date label calls "ahead" (the szl_be_hardening.py trap).
+        if base_date in ("github", "huggingface") and base_date != info["content_ahead"]:
+            info["lineage_conflict"] = True
+    elif info["content_ahead"] == "neither":
+        # BOTH sides have diverged from canonical -> never pick a direction by
+        # date; a human must md5-compare all surfaces.
+        info["lineage_conflict"] = True
+    return info
+
+
+# --------------------------------------------------------------------------- #
 # Main comparison (single GitHub<->HF pair)
 # --------------------------------------------------------------------------- #
 def compare(args, allow=None):
     if allow is None:
         allow = load_allow_file(args.allow)
     accepted = allow.get("accepted_divergences", {})
+
+    # Sibling organs that share byte-identical modules -> their GitHub copy is the
+    # canonical reference for the content-lineage cross-check below. Empty in
+    # plain single-pair/CI mode (then we fall back to date-only, as before).
+    siblings = [s for s in (getattr(args, "siblings", None) or [])
+                if s and s != args.github_repo]
+    _sibling_tree_cache = {}
+
+    def sibling_canonical_shas(path):
+        """(shas, repos) of sibling-organ GitHub blobs for ``path`` (one per
+        sibling that ships it). Unreachable sibling -> skipped (fail open to
+        date-only; never invents a canonical)."""
+        shas, repos = [], []
+        for s in siblings:
+            tree = _sibling_tree_cache.get(s)
+            if tree is None:
+                try:
+                    tree = github_tree_remote(s, args.ref)
+                except RuntimeError:
+                    tree = {}
+                _sibling_tree_cache[s] = tree
+            sha = tree.get(path)
+            if sha:
+                shas.append(sha)
+                repos.append(s)
+        return shas, repos
 
     if args.github_remote:
         status, body, _ = _http(
@@ -452,9 +567,15 @@ def compare(args, allow=None):
             ahead = "huggingface?"
         else:
             ahead = "unknown"
-        add({"path": path, "kind": "drift", "ahead": ahead,
-             "github_sha": gh_sha, "hf_oid": hf.get("oid"),
-             "github_date": gh_date, "hf_date": hf_date}, "error")
+        entry = {"path": path, "kind": "drift", "ahead": ahead,
+                 "github_sha": gh_sha, "hf_oid": hf.get("oid"),
+                 "github_date": gh_date, "hf_date": hf_date}
+        # Content-lineage cross-check: is the date-ahead side actually canonical?
+        canonical_shas, canonical_repos = sibling_canonical_shas(path)
+        entry.update(classify_lineage(gh_sha, hf.get("oid"), canonical_shas, ahead))
+        if canonical_repos:
+            entry["canonical_repos"] = canonical_repos
+        add(entry, "error")
 
     findings.sort(key=lambda e: (e["severity"] != "error", e["path"]))
     errors = [f for f in findings if f["severity"] == "error"]
@@ -477,10 +598,27 @@ def compare(args, allow=None):
 
 def fmt(entry):
     ahead = entry.get("ahead")
-    tail = f"  ahead: {ahead}" if ahead else ""
     if entry["kind"] == "drift":
-        return (f"  DRIFT  {entry['path']}{tail}\n"
-                f"         (github {entry.get('github_date')} | hf {entry.get('hf_date')})")
+        tail = f"  ahead(date): {ahead}" if ahead else ""
+        lines = [f"  DRIFT  {entry['path']}{tail}",
+                 f"         (github {entry.get('github_date')} | hf {entry.get('hf_date')})"]
+        state = entry.get("canonical_state")
+        if state == "resolved":
+            repos = ", ".join(entry.get("canonical_repos", [])) or "sibling"
+            gm = "=" if entry.get("github_matches_canonical") else "!="
+            hm = "=" if entry.get("hf_matches_canonical") else "!="
+            lines.append(f"         canonical({repos}): github{gm}canonical  hf{hm}canonical"
+                         f"  -> content-ahead: {entry.get('content_ahead')}")
+        elif state == "sibling-divergent":
+            lines.append("         canonical: DIVERGENT among sibling organs "
+                         "-- no single source of truth")
+        if entry.get("lineage_conflict"):
+            lines.append("         !! LINEAGE CONFLICT: the side ahead by DATE is NOT the side "
+                         "that matches the canonical shared module.")
+            lines.append("            DO NOT blind-backport by date -- md5-compare all 4 surfaces "
+                         "(this repo GH/HF + the sibling organ's GH/HF) before picking a direction.")
+        return "\n".join(lines)
+    tail = f"  ahead: {ahead}" if ahead else ""
     return f"  {entry.get('kind','?').upper():13} {entry['path']}{tail} -- {entry.get('detail','')}"
 
 
@@ -498,9 +636,15 @@ def print_pair(report, errors, warns, github_repo, hf_repo, ref):
         print("\n-- DRIFT requiring a human to pick the direction (GitHub vs live HF Space) --")
         for e in errors:
             print(fmt(e))
+            lineage = ""
+            if e.get("lineage_conflict"):
+                lineage = (f" -- LINEAGE CONFLICT: date-ahead={e.get('ahead','?')} but "
+                           f"content-ahead={e.get('content_ahead','?')} (canonical "
+                           f"{e.get('canonical_state','?')}); md5-compare all 4 surfaces "
+                           f"before backporting, the newer-by-date side is NOT canonical")
             print(f"::error title=HF module drift::{github_repo}: {e['path']} ({e.get('kind')}) "
                   f"ahead={e.get('ahead','?')} -- reconcile then commit; do NOT blind-overwrite "
-                  f"(allowlist intentional divergence in hf-module-drift-allow.json)")
+                  f"(allowlist intentional divergence in hf-module-drift-allow.json){lineage}")
 
 
 # --------------------------------------------------------------------------- #
@@ -541,9 +685,15 @@ def run_registry(args):
             skipped.append({"github": gh, "hf": hf, "reason": "no-dockerfile"})
             continue
 
+        # Sibling organs = every OTHER registry repo. Their GitHub copy of a
+        # shared module is the canonical reference for the content-lineage check,
+        # so a stale-but-newer hand-edit can't be mistaken for the source of truth.
+        sib = [e.get("github") for e in entries
+               if e.get("github") and e.get("github") != gh]
         sub = argparse.Namespace(
             repo_root=args.repo_root, github_repo=gh, hf_repo=hf, ref=ref,
             allow=None, github_remote=True, report_out="", warn_only=args.warn_only,
+            siblings=sib,
         )
         allow = fetch_remote_allow(gh, ref)
         try:
@@ -608,6 +758,12 @@ def main():
                          "compares every pair via the git-tree API (no checkout)")
     ap.add_argument("--github-remote", action="store_true",
                     help="pull GitHub side from the git-tree API (test mode; no checkout)")
+    ap.add_argument("--sibling", action="append", default=[], dest="siblings",
+                    metavar="OWNER/REPO",
+                    help="a sibling organ repo whose GitHub copy of a shared module is "
+                         "canonical; repeatable. Drifted files are cross-referenced against "
+                         "it so the date-ahead side can't be mistaken for canonical. "
+                         "(Registry mode derives siblings from the other registry entries.)")
     ap.add_argument("--warn-only", action="store_true",
                     help="never exit non-zero (ratchet: land green over a backlog)")
     args = ap.parse_args()
