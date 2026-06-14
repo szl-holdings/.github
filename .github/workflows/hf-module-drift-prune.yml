@@ -1,0 +1,84 @@
+name: HF Module Drift Allowlist Auto-Prune
+
+# Companion janitor to hf-module-drift-check.yml. The drift guard records KNOWN
+# GitHub<->HF divergences in each repo's .github/hf-module-drift-allow.json
+# (accepted_divergences) so the gate lands green while a human reconciles. But
+# drift is VOLATILE -- a sibling rebuild can make the two sides byte-identical
+# again days later, and nobody goes back to delete the now-stale entry. The
+# allowlist then over-counts and HIDES whether a real divergence still remains.
+#
+# This job runs .github/scripts/hf_module_drift_prune.py --apply over the SAME
+# .github/data/hf_space_registry.json. For each pair it re-checks every
+# accepted_divergences entry and, for any whose two sides are NOW byte-identical
+# (GitHub git-blob sha == live HF Space tree oid), opens (or updates) a SIGNED
+# pull request -- against that repo -- removing JUST those entries. It NEVER
+# removes a still-divergent entry, NEVER touches ignore_paths/ignore_extensions,
+# and is FAIL-CLOSED: if it cannot reach a side for a repo it removes nothing
+# for that repo (a transient HF/GitHub outage can never silently launder a
+# suppression away).
+#
+# Scheduled-only catch-all by design (HF-side edits land with no GitHub push, so
+# the cron is what re-detects reconciliation). Self-changes re-run so the
+# script/registry/workflow stay validated.
+
+on:
+  schedule:
+    # Mondays 07:41 UTC -- after the drift sweep (07:11) and the per-repo crons
+    # (a11oy 06:37, killinchu 06:52), so a just-reconciled file is seen as such
+    # and the prune does not collide with the other jobs on HF's rate limiter.
+    - cron: "41 7 * * 1"
+  workflow_dispatch: {}
+  push:
+    branches: [main]
+    paths:
+      - ".github/scripts/hf_module_drift_prune.py"
+      - ".github/scripts/hf_module_drift_check.py"
+      - ".github/data/hf_space_registry.json"
+      - ".github/workflows/hf-module-drift-prune.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: hf-module-drift-prune-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  prune:
+    name: Auto-prune reconciled HF module-drift allowlist entries
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Harden runner
+        uses: step-security/harden-runner@9af89fc71515a100421586dfdb3dc9c984fbf411 # v2.19.4
+        with:
+          egress-policy: audit
+
+      - name: Checkout
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+
+      - name: Set up Python
+        uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6.2.0
+        with:
+          python-version: "3.12"
+
+      - name: Self-test the pruner
+        run: python3 .github/scripts/test_hf_module_drift_prune.py
+
+      - name: Open/update signed PRs removing reconciled allowlist entries
+        env:
+          # The pruner reads OTHER repos' git-trees + allowlists and opens a
+          # signed PR (createCommitOnBranch) against them, which the built-in
+          # GITHUB_TOKEN of this repo cannot do. SZL_GITHUB_TOKEN (org-owner) is
+          # required; on push-to-self (validation only) it can be absent and the
+          # step runs report-only.
+          GITHUB_TOKEN: ${{ secrets.SZL_GITHUB_TOKEN || github.token }}
+        run: |
+          APPLY=--apply
+          if [ "${{ github.event_name }}" = "push" ] && [ -z "${{ secrets.SZL_GITHUB_TOKEN }}" ]; then
+            APPLY=
+          fi
+          python3 .github/scripts/hf_module_drift_prune.py \
+            --registry .github/data/hf_space_registry.json \
+            --report-out .github/data/hf_module_drift_prune_report.json \
+            $APPLY
