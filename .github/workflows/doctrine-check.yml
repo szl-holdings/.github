@@ -115,6 +115,7 @@ jobs:
               grep -vE "KS_theorem|_theorem_[0-9]|theorem_ref|Theorem [0-9]|theorem [0-9]" | \
               grep -vE "→ ?theorem|theorem ?→|receipt.*theorem|provenance.*theorem|theorem.*DOI" | \
               grep -vE "uniqueness theorem is conditional|theorem is conditional-only|conditional.*not claimed" | \
+              grep -viE "conjecture 1|never a theorem|dress .*up as a theorem|conditional Λ theorem|conditional lambda theorem" | \
               grep -vE "^(\./)?\.git/|\.lake/|node_modules/" \
               || true)
           if [ -n "$M2" ]; then
