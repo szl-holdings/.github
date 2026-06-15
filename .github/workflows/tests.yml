@@ -122,3 +122,32 @@ jobs:
       # (NS footer, Putnam DEMO/OPEN tally) does NOT cause a false red.
       - name: Anatomy-map cross-surface drift guard self-test
         run: python3 .github/scripts/test_anatomy_map_drift.py
+
+      # Pins the HF module-drift allowlist auto-pruner. The pruner removes an
+      # accepted_divergences entry ONLY once the two sides are proven
+      # byte-identical, never touches ignore_paths/ignore_extensions, and is
+      # FAIL-CLOSED -- pruning a still-divergent entry would re-open the drift
+      # hole, and pruning on an unreachable side would launder a transient
+      # outage into a permanent suppression. The GitHub/HF tree fetchers are
+      # injected, so this network-free unit test locks that classify/serialize
+      # contract. (The test already lived in-repo but was never wired in.)
+      - name: HF module-drift pruner self-test
+        run: python3 .github/scripts/test_hf_module_drift_prune.py
+
+      # Pins the shared user-visible codename gate (Doctrine G5). The scanner is
+      # the single source of truth for both apps and CI; it must FAIL when a
+      # banned codename (amaru/rosie/sentra/jarvis) appears in user-visible text
+      # but NOT when the same token is an internal route key (id/class/data-* or
+      # <script> bodies). FILE mode is network-free, so this stubbed unit test
+      # locks the visible-vs-internal decision and the exit-code contract so a
+      # refactor can't weaken it into a false-clean or a false positive.
+      - name: Codename gate (shared scanner) self-test
+        run: python3 .github/scripts/test_szl_codename_gate.py
+
+      # Pins the org-wide codename sweep (Doctrine G5 CI companion). Real
+      # codenames in a scanned file/URL must FAIL (exit 1); a flaky/unreachable
+      # surface is by design a WARN (never a false RED, never counted clean).
+      # FILE mode is network-free and the LIVE path runs with scan_url stubbed,
+      # so this network-free unit test locks both branches.
+      - name: Codename sweep guard self-test
+        run: python3 .github/scripts/test_codename_sweep.py
