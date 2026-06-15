@@ -103,24 +103,16 @@ jobs:
             echo "::warning::SLACK_WEBHOOK_URL not set; cannot page the alert relay."
             exit 0
           fi
-          report=".github/data/code_security_report.json"
-          if [ "${CHECK_EXIT}" = "1" ] && [ -f "$report" ]; then
-            # Real drift: name the offending repo(s) + reason from the report.
-            text="$(jq -r '
-              "Code-security config drift detected in szl-holdings (config 252588).\n\n"
-              + ((.errors // []) | join("\n"))
-              + "\n\nFix: re-attach config 252588 (POST .../configurations/252588/attach {scope:all}) or add a reasoned entry to .github/data/code_security_allowlist.json."
-            ' "$report")"
-          else
-            # exit 2 (or report missing): the check could NOT complete — must
-            # still alert so coverage never looks green when it could not run.
-            detail="$(grep -iE 'error' /tmp/drift-output.txt 2>/dev/null | tail -n 5 | sed 's/^[[:space:]]*//')"
-            text="Code-security drift check COULD NOT COMPLETE (auth/API failure, exit ${CHECK_EXIT}). The org code-security endpoints need an org-admin SZL_GITHUB_TOKEN — coverage cannot be confirmed."
-            if [ -n "${detail}" ]; then
-              text="${text}"$'\n\n'"${detail}"
-            fi
-          fi
-          payload="$(jq -n --arg t "🚨 [szl-holdings] ${text}" '{text: $t}')"
+          # Message-building is extracted into build_drift_alert.py and pinned by
+          # test_build_drift_alert.py (run in tests.yml) so a future edit can't
+          # silently produce an empty/malformed alert — the drift wording names
+          # the offending repo(s), the exit-2 wording says COULD NOT COMPLETE,
+          # and neither drops its \n\n separators. The script emits the final
+          # Slack-compatible {"text": ...} payload (prefix included) to stdout.
+          payload="$(python3 .github/scripts/build_drift_alert.py \
+            --exit-code "${CHECK_EXIT}" \
+            --report .github/data/code_security_report.json \
+            --drift-output /tmp/drift-output.txt)"
           code="$(curl -sS -o /tmp/alert-resp.txt -w '%{http_code}' \
             -X POST -H 'Content-Type: application/json' \
             --data "$payload" "$SLACK_WEBHOOK_URL" || echo 000)"

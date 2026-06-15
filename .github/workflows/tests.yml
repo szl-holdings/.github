@@ -37,6 +37,16 @@ jobs:
       - name: Code-security drift checker self-test
         run: python3 .github/scripts/test_code_security_drift.py
 
+      # Pins the code-security-drift ALERT message builder (task #745). The
+      # scheduled-only ntfy alert's message logic (naming the offending repo(s)
+      # on drift exit 1, the COULD NOT COMPLETE text on auth/API failure exit 2,
+      # and the \n\n separators a prior revision silently stripped) used to live
+      # only in inline bash/jq. This network-free unit test feeds a sample report
+      # (exit 1) and an empty/missing report (exit 2) and asserts the resulting
+      # text so a future edit can't quietly produce an empty/malformed alert.
+      - name: Code-security drift alert builder self-test
+        run: python3 .github/scripts/test_build_drift_alert.py
+
       # Pins the in-page (deep) anchor checks added in task #412: same-page
       # (#heading) and relative (./file.md#heading) section links rot exactly
       # like absolute-blob anchors. This stubbed, network-free unit test locks
