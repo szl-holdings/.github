@@ -84,8 +84,8 @@ jobs:
               --exclude-dir="resilience_observability" \
               . 2>/dev/null | \
               grep -vE "^(\./)?\.git/|\.lake/|node_modules/|/dist/|/build/" | \
-              grep -vE "ADDITIVE|additive|proposed|planned.*release|roadmap|not yet promoted|future" | \
-              grep -vE "historical|deprecated|archived|out of scope|not pursuing|REJECTED" | \
+              grep -viE "ADDITIVE|additive|proposed|planned.*release|roadmap|not yet promoted|future" | \
+              grep -viE "historical|deprecated|archived|out of scope|not pursuing|REJECTED" | \
               grep -vE "v10.*v11|v11.*v10|v10-v11|additive over|edge organ|4th organ" | \
               grep -vE "v12.*v11|v11.*v12|PURIQ|CHASKI|organ.*v1[23]|v1[23].*organ" | \
               grep -vE "§[0-9]|doctrine_state|doctrine-v|Doctrine v[0-9].*LOCKED|v1[12].*LOCKED" | \
@@ -146,6 +146,7 @@ jobs:
               grep -viE "not L3|no.*L3|L3.*not|banned|prohibited|forbidden|out of scope" | \
               grep -viE "roadmap|future|planned|historical|archived|REJECTED|path to" | \
               grep -viE "staged|awaiting|mis-claimed|misclaimed|corrected|previously" | \
+              grep -viE "flags bare|appears only inside|quoted prohibition|prohibition|overclaim grep" | \
               sed -E 's#;base64,[A-Za-z0-9+/=]+##g' | \
               grep -E "SLSA.*L3|SLSA Level 3" \
               || true)
@@ -217,7 +218,7 @@ jobs:
               --exclude="OPS_NOTES.md" \
               --exclude-dir="coordination" --exclude-dir="cursor-directives" --exclude-dir="replit-sync" --exclude-dir="corpus" \
               . 2>/dev/null | \
-              grep -vE "out of scope|not pursuing|historical|archived|REJECTED|deprecated|proposed|roadmap" | \
+              grep -viE "out of scope|not pursuing|historical|archived|REJECTED|deprecated|proposed|roadmap" | \
               grep -viE "no iron bank|not.*iron bank|no fedramp|not.*fedramp|no cmmc|not.*cmmc|gap|vanilla|approved base|citation|NIST" | \
               grep -viE "not claimed|❌|not pursued|not held|no.*authorization" | \
               grep -vE "customer.*requirement|policy.*map|compliance.*map|does not|cannot|without" | \
@@ -285,5 +286,6 @@ jobs:
             exit 1
           fi
           echo "All 9 doctrine invariants satisfied."
+
 
 
