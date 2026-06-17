@@ -1,0 +1,22 @@
+# Byte-compiled / optimized / cache
+__pycache__/
+*.py[cod]
+
+# Virtual environments
+.venv/
+venv/
+
+# Secrets / keys — NEVER commit (Doctrine v11)
+*.pem
+!*.pub
+*.key
+.env
+.secret/
+
+# Local temp / OS cruft
+*.tmp
+.DS_Store
+.pytest_cache/
+
+# NOTE: coordination/**/*.log are intentional evidence-run artifacts and are
+# tracked on purpose — not ignored here.
