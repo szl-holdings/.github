@@ -119,6 +119,25 @@ def gh_headers():
     return h
 
 
+def gh_get(url, want_headers=False):
+    """GET a GitHub URL with the configured token, falling back to an
+    anonymous read on 401/403.
+
+    A fine-grained PAT (SZL_GITHUB_TOKEN) is scoped to an explicit set of
+    repos; using it against a PUBLIC repo outside that set returns 401/403
+    rather than transparently reading the public content. Since every repo
+    in this sweep is public, an auth rejection should not abort the
+    comparison -- retry the same URL without the Authorization header so the
+    public content is still fetched and the drift check actually runs.
+    """
+    headers = gh_headers()
+    status, body, hdrs = _http(url, headers=headers, want_headers=want_headers)
+    if status in (401, 403) and "Authorization" in headers:
+        anon = {k: v for k, v in headers.items() if k != "Authorization"}
+        status, body, hdrs = _http(url, headers=anon, want_headers=want_headers)
+    return status, body, hdrs
+
+
 # --------------------------------------------------------------------------- #
 # Dockerfile COPY parsing
 # --------------------------------------------------------------------------- #
@@ -218,7 +237,7 @@ def github_tree_local(repo_root):
 def github_tree_remote(github_repo, ref="main"):
     """Map path -> git blob sha, from the GitHub git-tree API (test mode)."""
     url = f"{GH_API}/repos/{github_repo}/git/trees/{ref}?recursive=1"
-    status, body, _ = _http(url, headers=gh_headers())
+    status, body, _ = gh_get(url)
     if status != 200:
         raise RuntimeError(f"GitHub tree {github_repo}@{ref}: HTTP {status}")
     j = json.loads(body)
@@ -293,7 +312,7 @@ def hf_dir_dates(hf_repo, directory, ref="main"):
 def github_file_date(github_repo, path, ref="main"):
     url = f"{GH_API}/repos/{github_repo}/commits?path={urllib.parse.quote(path)}&sha={ref}&per_page=1"
     try:
-        status, body, _ = _http(url, headers=gh_headers())
+        status, body, _ = gh_get(url)
     except RuntimeError:
         return None
     if status != 200:
@@ -365,7 +384,7 @@ def fetch_remote_allow(github_repo, ref="main",
     A repo with no allowlist is fine -> empty allow ({})."""
     url = f"{GH_RAW}/{github_repo}/{ref}/{path}"
     try:
-        status, body, _ = _http(url, headers=gh_headers())
+        status, body, _ = gh_get(url)
     except RuntimeError:
         return {}
     if status != 200 or not body.strip():
@@ -487,9 +506,8 @@ def compare(args, allow=None):
         return shas, repos
 
     if args.github_remote:
-        status, body, _ = _http(
-            f"{GH_RAW}/{args.github_repo}/{args.ref}/Dockerfile",
-            headers=gh_headers())
+        status, body, _ = gh_get(
+            f"{GH_RAW}/{args.github_repo}/{args.ref}/Dockerfile")
         if status != 200:
             raise RuntimeError(f"fetch remote Dockerfile: HTTP {status}")
         dockerfile_text = body.decode("utf-8", "replace")
@@ -674,8 +692,7 @@ def run_registry(args):
         # "...for each repo that HAS both a Dockerfile and a matching HF Space."
         # No Dockerfile -> nothing is COPY'd, so there's nothing to drift: skip.
         try:
-            dstatus, _, _ = _http(f"{GH_RAW}/{gh}/{ref}/Dockerfile",
-                                  headers=gh_headers())
+            dstatus, _, _ = gh_get(f"{GH_RAW}/{gh}/{ref}/Dockerfile")
         except RuntimeError as e:
             print(f"::warning::{gh}: could not reach Dockerfile ({e}); skipping.")
             skipped.append({"github": gh, "hf": hf, "reason": "dockerfile-unreachable"})
