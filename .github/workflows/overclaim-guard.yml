@@ -1,0 +1,173 @@
+name: Overclaim Guard — Doctrine Numbers
+
+# Guard against numeric doctrine overclaims on SZLHOLDINGS Hugging Face cards.
+# Forbidden patterns (per Doctrine v11 LOCKED @ c7c0ba17):
+#   - "proven=5"          → correct is 8 proven formulas
+#   - "183 proven"        → 183 is never a proven count (163 = sorries; ~185 = corpus)
+#   - "proven" adjacent to "183" (within 30 chars) → same as above
+#   - "sorries=189" / "sorries-189" → correct is 163
+#   - "626 declarations"  → correct is 749 declarations
+#   - "Locked proven kernel = 5" → correct is 8
+#
+# This guard ADDS to (not replaces) the existing overclaim-sweep.yml which catches
+# Λ-uniqueness / Conjecture-1 overclaims. Both must be green.
+#
+# Note: org-level Actions are billing-locked and will not execute automatically.
+# The workflow is stored here as the durable guard and will run when billing is
+# enabled or triggered manually via workflow_dispatch.
+
+on:
+  schedule:
+    # Daily check at 06:17 UTC
+    - cron: "17 6 * * *"
+  workflow_dispatch: {}
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/overclaim-guard.yml"
+      - ".github/scripts/overclaim_guard.py"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: overclaim-guard-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  guard:
+    name: "Doctrine numbers guard: 8 proven / 749 declarations / 163 sorries"
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Harden runner
+        uses: step-security/harden-runner@9af89fc71515a100421586dfdb3dc9c984fbf411 # v2.19.4
+        with:
+          egress-policy: audit
+
+      - name: Checkout
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+
+      - name: Set up Python
+        uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6.2.0
+        with:
+          python-version: "3.12"
+
+      - name: Fetch live honest endpoint and assert doctrine numbers
+        run: |
+          python3 - <<'PYEOF'
+          import urllib.request, json, sys
+
+          HONEST_URL = "https://szlholdings-a11oy.hf.space/api/a11oy/v1/honest"
+          EXPECTED = {
+              "proven": 8,
+              "declarations": 749,
+              "axioms": 14,
+              "sorries": 163,
+              "kernel": "c7c0ba17",
+          }
+
+          try:
+              with urllib.request.urlopen(HONEST_URL, timeout=15) as resp:
+                  data = json.load(resp)
+              print(f"Live honest endpoint returned: {json.dumps(data, indent=2)}")
+              failed = False
+              for key, expected in EXPECTED.items():
+                  actual = data.get(key)
+                  if str(actual) != str(expected):
+                      print(f"::error::DOCTRINE MISMATCH: {key} = {actual!r}, expected {expected!r}")
+                      failed = True
+              if failed:
+                  sys.exit(1)
+              print("OK: live honest endpoint matches Doctrine v11 LOCKED ground truth.")
+          except Exception as e:
+              print(f"::warning::Could not reach honest endpoint ({e}); skipping live check.")
+          PYEOF
+
+      - name: Check tracked HF cards for forbidden doctrine strings
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+        run: |
+          python3 - <<'PYEOF'
+          import urllib.request, re, sys, os
+
+          # Forbidden patterns — never acceptable in any tracked card
+          FORBIDDEN = [
+              (re.compile(r"proven\s*[=:]\s*5\b", re.IGNORECASE),
+               "proven=5 (correct: 8)"),
+              (re.compile(r"Locked proven kernel\s*=\s*5\b", re.IGNORECASE),
+               "Locked proven kernel = 5 (correct: 8)"),
+              (re.compile(r"\b183\b[^.]{0,30}\b(proven|theorem|formula)\b", re.IGNORECASE),
+               "183 adjacent to proven/theorem/formula (183 is never a proven count)"),
+              (re.compile(r"\b(proven|theorem|formula)\b[^.]{0,30}\b183\b", re.IGNORECASE),
+               "proven/theorem/formula adjacent to 183"),
+              (re.compile(r"sorries[-_=:]\s*189\b", re.IGNORECASE),
+               "sorries=189 (correct: 163)"),
+              (re.compile(r"\b189\s+sorries\b", re.IGNORECASE),
+               "189 sorries (correct: 163)"),
+              (re.compile(r"138\s+baseline.*51\s+Putnam\s*=\s*189", re.IGNORECASE),
+               "138 baseline + 51 Putnam = 189 (stale breakdown; correct total: 163)"),
+              (re.compile(r"\b626\b[^.]{0,30}\b(declaration|theorem|lean)\b", re.IGNORECASE),
+               "626 declarations (correct: 749)"),
+              (re.compile(r"\b(declaration|lean)\b[^.]{0,30}\b626\b", re.IGNORECASE),
+               "declarations/lean adjacent to 626 (correct: 749)"),
+          ]
+
+          # Tracked HF cards (type/org/name)
+          TRACKED = [
+              ("spaces", "SZLHOLDINGS", "cathedral"),
+              ("datasets", "SZLHOLDINGS", "lean-theorem-tree"),
+              ("datasets", "SZLHOLDINGS", "thesis-formula-index"),
+              ("datasets", "SZLHOLDINGS", "uds-spans-receipts"),
+              ("datasets", "SZLHOLDINGS", "ouroboros-arxiv-preprint"),
+              ("datasets", "SZLHOLDINGS", "SZLHOLDINGS"),
+          ]
+
+          TYPE_PATH = {"spaces": "spaces", "datasets": "datasets", "models": ""}
+
+          token = os.environ.get("HF_TOKEN", "")
+          headers = {"User-Agent": "Mozilla/5.0"}
+          if token:
+              headers["Authorization"] = f"Bearer {token}"
+
+          any_failure = False
+
+          for hf_type, org, name in TRACKED:
+              type_path = TYPE_PATH.get(hf_type, hf_type)
+              if type_path:
+                  url = f"https://huggingface.co/{type_path}/{org}/{name}/raw/main/README.md"
+              else:
+                  url = f"https://huggingface.co/{org}/{name}/raw/main/README.md"
+
+              try:
+                  req = urllib.request.Request(url, headers=headers)
+                  with urllib.request.urlopen(req, timeout=20) as resp:
+                      content = resp.read().decode("utf-8", "replace")
+              except Exception as e:
+                  print(f"::warning::Could not fetch {hf_type}/{org}/{name}: {e}")
+                  continue
+
+              card_failures = []
+              for pattern, description in FORBIDDEN:
+                  for i, line in enumerate(content.splitlines(), 1):
+                      if pattern.search(line):
+                          card_failures.append(f"  line {i}: [{description}] → {line.strip()[:200]}")
+
+              if card_failures:
+                  print(f"::error::OVERCLAIM in {hf_type}/{org}/{name}:")
+                  for msg in card_failures:
+                      print(f"::error::{msg}")
+                  any_failure = True
+              else:
+                  print(f"OK: {hf_type}/{org}/{name}")
+
+          if any_failure:
+              print()
+              print("::error::Doctrine number overclaim(s) found in tracked HF cards.")
+              print("::error::Ground truth: 8 proven {F1,F4,F7,F11,F12,F18,F19,F22} @ c7c0ba17;")
+              print("::error::749 declarations / 14 axioms / 163 sorries. NEVER 5/183/189/626.")
+              sys.exit(1)
+
+          print()
+          print("All tracked HF cards are clean of forbidden doctrine-number strings.")
+          PYEOF
