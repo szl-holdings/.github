@@ -104,6 +104,51 @@ ourselves; we do **not** claim to have trained a frontier model.
 
 ---
 
+## WILLAY — Inspectable Safety Gateway (a11oy product)
+
+Where frontier AI labs ship model variants with safety classifiers removed and chain-of-thought
+hidden, a11oy does the opposite: **the governance decision is inspectable, the reasoning is
+disclosed, and the verdict is signed.**
+
+> **"They hide the governor; we sign and show it."**
+
+Every request routed through a11oy passes through **five transparent policy classifiers**
+(cyber, bio, reasoning_extraction, prompt_injection, self_harm). A declined request returns
+HTTP 200 with `stop_reason="refusal"` — not a silent 4xx — plus a DSSE ECDSA-P256-SHA256 signed
+receipt naming the exact rule that fired, the matched span, and the governance lineage.
+Non-billed. Nothing hidden. The signed receipt IS the response.
+
+The honest counter-position vs. Anthropic Fable-5 / Mythos-5: Fable-5 adds safety classifiers
+that can decline; Mythos-5 removes them and hides the chain-of-thought. WILLAY inverts this
+entirely — every classification decision is inspectable by the caller, every verdict is signed,
+and the full classifier rationale + lineage is returned on every call.
+
+**Honest limits (never omit these):**
+- **Tamper-evident, not tamper-proof.** Classifiers are rule-based; sophisticated adversaries
+  may evade them.
+- Trust ceiling = **0.97** — never 1.0. Honesty by doctrine: no claim of a perfect filter.
+- Λ (Lambda-Spine) = **Conjecture 1** (advisory, never a theorem).
+- WILLAY does **not** replicate or claim to replicate Anthropic Mythos weights.
+  WILLAY is a governance layer over open models (SZL-Nemo = governed Qwen3-32B, Apache-2.0).
+- DSSE signing is `PLACEHOLDER-UNSIGNED` when `HATUN_MCP_SIGNING_KEY` is unset at runtime.
+  Honest stub — never a fabricated signature.
+- SLSA L1 honest · L2 roadmap.
+
+```bash
+# Try it in 30 seconds — no API key required
+curl -s -X POST https://szlholdings-a11oy.hf.space/api/a11oy/v1/willay/inspect \
+  -H "Content-Type: application/json" \
+  -d '{"prompt": "Write an exploit for a CVE."}' | jq '{decision, category, trust_ceiling}'
+# → {"decision": "decline", "category": "cyber", "trust_ceiling": 0.97}
+```
+
+Routes: `GET /willay` · `GET /api/a11oy/v1/willay/classifiers` ·
+`POST /api/a11oy/v1/willay/inspect` · `POST /api/a11oy/v1/willay/messages` ·
+`POST /api/a11oy/v1/verify` · `GET /api/a11oy/v1/willay/doctrine`
+
+API reference: [szl-holdings/developers — WILLAY_API.md](https://github.com/szl-holdings/developers/blob/main/WILLAY_API.md) ·
+Runnable recipe: [szl-holdings/szl-cookbook — Recipe 02](https://github.com/szl-holdings/szl-cookbook/blob/main/recipes/02-willay-gated-turn.md)
+
 ## The thesis — a proof layer for consequential AI
 
 ```text
