@@ -65,7 +65,7 @@ auditor and they replay it offline, trusting no one. Tamper with a single byte a
 
 | Product | What it does | Open it |
 |---|---|---|
-| **a11oy** — governed-AI command platform | One pane of glass for governed AI: ask-and-act with deny-by-default safety gates, trust scoring with confidence intervals, a live decision feed, readiness and compliance, forecasting, signed receipts, and formal-proof status. Ships **a11oy Code — Chaski**, a governed agentic coding agent. | [a11oy.net →](https://a11oy.net) · [Space →](https://huggingface.co/spaces/SZLHOLDINGS/a11oy) |
+| **a11oy** — governed-AI command platform | One pane of glass for governed AI: ask-and-act with deny-by-default safety gates, trust scoring with confidence intervals, a live decision feed, readiness and compliance, forecasting, signed receipts, and formal-proof status. Ships **a11oy Code — Chaski**, a governed agentic coding agent. | [a-11-oy.com →](https://a-11-oy.com) · [Space →](https://huggingface.co/spaces/SZLHOLDINGS/a11oy) |
 | **killinchu** — counter-UAS & maritime C2 | Autonomous-systems field tool for air and sea: live track board, multi-sensor fusion, maritime picture (sanctions screening + dark-vessel detection), engagement rules, autonomy governance, and verify-it-yourself signed engagement receipts. | [Open killinchu →](https://szlholdings-killinchu.hf.space/elite) |
 | **anatomy** — the living substrate | A 3D, navigable map of the governed organism: the organs (reasoning cortex, trust gate, receipt bus, consensus), how a decision flows through them, and where each proof and conjecture sits. | [Space →](https://huggingface.co/spaces/SZLHOLDINGS/anatomy) |
 
@@ -273,7 +273,7 @@ A third party can confirm a decision happened, exactly as recorded, with zero tr
 
 | If you want to… | Go to |
 |---|---|
-| **See the products** | [a11oy.net](https://a11oy.net) · [a11oy Space](https://huggingface.co/spaces/SZLHOLDINGS/a11oy) · [killinchu](https://szlholdings-killinchu.hf.space/elite) · [anatomy](https://huggingface.co/spaces/SZLHOLDINGS/anatomy) |
+| **See the products** | [a-11-oy.com](https://a-11-oy.com) · [a11oy Space](https://huggingface.co/spaces/SZLHOLDINGS/a11oy) · [killinchu](https://szlholdings-killinchu.hf.space/elite) · [anatomy](https://huggingface.co/spaces/SZLHOLDINGS/anatomy) |
 | **Read the math** | [lutar-lean](https://github.com/szl-holdings/lutar-lean) (Lean 4 kernel) · [szl-papers](https://github.com/szl-holdings/szl-papers) |
 | **Build on it** | [developers](https://github.com/szl-holdings/developers) · [szl-cookbook](https://github.com/szl-holdings/szl-cookbook) · [hatun-mcp](https://github.com/szl-holdings/hatun-mcp) |
 | **Deploy it** | [uds-bundles](https://github.com/szl-holdings/uds-bundles) · [szl-uds-deployment](https://github.com/szl-holdings/szl-uds-deployment) |
@@ -291,7 +291,7 @@ Open the bounty, run the kernel, break our receipts.
 
 <div align="center">
 
-Built by **Stephen P. Lutar Jr.** · Honest by design · [a11oy.net](https://a11oy.net) · [🤗 SZLHOLDINGS](https://huggingface.co/SZLHOLDINGS) · [github.com/szl-holdings](https://github.com/szl-holdings)
+Built by **Stephen P. Lutar Jr.** · Honest by design · [a-11-oy.com](https://a-11-oy.com) · [🤗 SZLHOLDINGS](https://huggingface.co/SZLHOLDINGS) · [github.com/szl-holdings](https://github.com/szl-holdings)
 
 <sub>Not affiliated with Defense Unicorns · SZL mark USPTO Serial 99831122 · no production ATO claimed · SLSA L1 · L2 attested · L3 roadmap · Λ = Conjecture 1 · Khipu = Conjecture 2 · trust never 100%</sub>
 
