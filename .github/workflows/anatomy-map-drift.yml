@@ -4,7 +4,7 @@ name: Anatomy-map cross-surface drift
 # independently-deployed surfaces -- the a11oy /console tab (szl-holdings/a11oy
 # pages/console.html), the killinchu /elite tab (szl-holdings/killinchu
 # killinchu_elite_console.py) and the standalone HF static Space
-# SZLHOLDINGS/anatomy (data.js + index.html, the a11oy.net/anatomy-map mirror).
+# SZLHOLDINGS/anatomy (data.js + index.html, the a-11-oy.com/anatomy-map mirror).
 # Each has its own pipeline, so the honesty doctrine can silently DRIFT between
 # them. This sweep fetches all three and fails LOUD the moment they diverge on:
 #   * the canonical locked-8 ladder {F1,F4,F7,F11,F12,F18,F19,F22}, and
@@ -16,7 +16,7 @@ name: Anatomy-map cross-surface drift
 # Reading the a11oy / killinchu sources needs repo read access; the built-in
 # Actions token covers same-org repos, with SZL_GITHUB_TOKEN as a fallback. The
 # HF Space is public. On real drift (exit 1) an ntfy alert is pushed through the
-# team's shared relay (SLACK_WEBHOOK_URL -> a11oy.net/relay -> a11oy-uptime).
+# team's shared relay (SLACK_WEBHOOK_URL -> a-11-oy.com/relay -> a11oy-uptime).
 # A fetch/auth failure is exit 2 (ERROR), never a silent pass.
 
 on:

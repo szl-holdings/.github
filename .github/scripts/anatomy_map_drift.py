@@ -15,7 +15,7 @@ independently-deployed surfaces:
                     (NS-aware; the killinchu variant legitimately drops the
                     trailing `NS=` footer line).
   * HF Space     SZLHOLDINGS/anatomy       data.js + index.html
-                 -> the standalone static deck (a11oy.net/anatomy-map mirror),
+                 -> the standalone static deck (a-11-oy.com/anatomy-map mirror),
                     a DIFFERENT rendering of the same honest doctrine.
 
 Because each is edited and shipped on its own pipeline, the honesty doctrine can

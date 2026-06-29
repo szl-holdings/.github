@@ -94,7 +94,7 @@ jobs:
         continue-on-error: true
         env:
           # Slack-compatible {"text":...} webhook pointed at the box alert relay
-          # (https://a11oy.net/relay/ntfy/<token>), same channel as the other
+          # (https://a-11-oy.com/relay/ntfy/<token>), same channel as the other
           # org guards. The relay flattens the payload to clean ntfy text.
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
         run: |

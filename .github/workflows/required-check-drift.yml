@@ -18,7 +18,7 @@ name: Required-check Drift (security-load-bearing merge blocks)
 # `branches/<default>/protection/required_status_checks`) and fails if the
 # context is no longer required via either. On drift it also pushes a clean
 # ntfy alert through the team's shared relay (SLACK_WEBHOOK_URL ->
-# a11oy.net/relay -> a11oy-uptime-notify), the same channel the box uptime
+# a-11-oy.com/relay -> a11oy-uptime-notify), the same channel the box uptime
 # monitor uses, so the team is paged immediately rather than only seeing a red
 # scheduled run.
 #
