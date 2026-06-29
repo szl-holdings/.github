@@ -30,7 +30,7 @@
    authority signs the chain with **Ed25519**. These are two distinct layers —
    do not "unify" them without proving cross-verification first.
 4. **Deploy boundary.** Work lives in **GitHub + Hugging Face + Replit**. Do **NOT**
-   push to Hetzner, `a11oy.net` DNS, or any production host without an explicit
+   push to Hetzner, `a-11-oy.com` DNS, or any production host without an explicit
    human approval gate. Open PRs; let CI/CD deploy. No prod changes from a
    one-line mandate.
 5. **Repo conventions (from `.github/AGENTS.md`).**

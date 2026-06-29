@@ -31,7 +31,7 @@ name: Lockfile Registry Check
 # A coverage GAP previously only surfaced as a red scheduled run, which nobody is
 # guaranteed to notice. This workflow now also PAGES a human: when the sweep finds
 # a NEW coverage gap it pushes an actionable alert to the team's shared a11oy-uptime
-# ntfy topic (the same SLACK_WEBHOOK_URL -> a11oy.net/relay -> a11oy-uptime-notify
+# ntfy topic (the same SLACK_WEBHOOK_URL -> a-11-oy.com/relay -> a11oy-uptime-notify
 # channel the other org guards use), naming each offending repo and the piece it is
 # missing. The alert is edge-triggered: the dedup baseline (the set of repos we
 # have already paged for) is persisted in a small DEDICATED state file
@@ -122,7 +122,7 @@ jobs:
         # commits a lockfile but is missing its per-repo caller workflow and/or
         # the required status check, so a *.replit.local-poisoned lockfile could
         # merge unblocked. Routed through the shared relay (SLACK_WEBHOOK_URL ->
-        # a11oy.net/relay -> a11oy-uptime-notify), the same channel the box uptime
+        # a-11-oy.com/relay -> a11oy-uptime-notify), the same channel the box uptime
         # monitor uses, so it pages immediately instead of only being a red run.
         # Rising-edge + dedup are computed by the unit-tested helper (--new-gaps),
         # so a gap already on the baseline does NOT re-alert (no spam on a standing
