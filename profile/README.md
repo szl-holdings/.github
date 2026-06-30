@@ -7,7 +7,7 @@
     Lambda-uniqueness = Conjecture 1 (unconditional uniqueness machine-checked FALSE; conditional Theorem U proven, axiom-free)
     Khipu BFT safety = Conjecture 2 (Wave23 conditional only)
     SLSA posture = L1 honest · L2 build-attested (Sigstore keyless) where attest-build-provenance runs+verifies; L3 = roadmap. No FedRAMP/Iron Bank/CMMC/ATO without "roadmap".
-  Products: a11oy (governed-AI command platform; ships a11oy Code — Chaski), killinchu (counter-UAS / maritime C2), anatomy (3D living substrate). Honest internal roles only. No banned codenames.
+  Product framing (canonical, one consistent story): a11oy = flagship Command Center; szl-router (sovereign LLM gateway), david-leads (lead-gen), killinchu (counter-UAS / maritime C2), anatomy (3D substrate map) are BUILT ON a11oy. Glossary: szl-doctrine/NAMING_CANON.md. Honest internal roles only. No banned codenames.
   Banner: profile/assets/banner-org.png (1280x640 social-preview, complete headline "Governed AI you can prove.")
 -->
 
@@ -17,12 +17,15 @@
 
 # SZL Holdings
 
-### Governed AI you can prove.
+### Governed AI you can prove — every decision comes with a signed, verifiable receipt, built on public data, running on your own hardware.
 
-**Governed autonomy with a checkable receipt for every decision.** SZL builds governed-AI
-decision infrastructure — every autonomous action carries a machine-checked, tamper-evident
-warrant: *under what authority it acted, on what trust evidence, and proof the record was not
-quietly rewritten.* Three products run on one signed substrate.
+**a11oy is the flagship Command Center.** SZL builds governed-AI decision infrastructure —
+every autonomous action carries a machine-checked, tamper-evident warrant: *under what
+authority it acted, on what trust evidence, and proof the record was not quietly rewritten.*
+a11oy is the one pane of glass; **szl-router, david-leads, killinchu, and anatomy are built on it.**
+
+> **New here?** Start with the [**canonical glossary — NAMING_CANON.md**](https://github.com/szl-holdings/szl-doctrine/blob/main/NAMING_CANON.md):
+> every SZL codename mapped to its plain-English role and owning repo.
 
 [![locked-proven](https://img.shields.io/badge/locked--proven-8%20formulas-c9b787?style=flat-square)](https://github.com/szl-holdings/lutar-lean)
 [![machine-checked](https://img.shields.io/badge/machine--checked-~185%20theorems-5fb3a3?style=flat-square)](https://github.com/szl-holdings/lutar-lean)
@@ -61,13 +64,20 @@ auditor and they replay it offline, trusting no one. Tamper with a single byte a
 
 ---
 
-## Three products, one substrate
+## The flagship Command Center — and what's built on it
 
-| Product | What it does | Open it |
+**a11oy is the flagship.** It is the governed-AI **Command Center**: one pane of glass for
+ask-and-act with deny-by-default safety gates, trust scoring with confidence intervals, a live
+decision feed, readiness and compliance, signed receipts, and formal-proof status. Everything
+below is built on that same receipt-bound substrate.
+
+| Built on a11oy | What it does | Open it |
 |---|---|---|
-| **a11oy** — governed-AI command platform | One pane of glass for governed AI: ask-and-act with deny-by-default safety gates, trust scoring with confidence intervals, a live decision feed, readiness and compliance, forecasting, signed receipts, and formal-proof status. Ships **a11oy Code — Chaski**, a governed agentic coding agent. | [a-11-oy.com →](https://a-11-oy.com) · [Space →](https://huggingface.co/spaces/SZLHOLDINGS/a11oy) |
+| **a11oy** — flagship Command Center | One pane of glass for governed AI: ask-and-act with deny-by-default safety gates, trust scoring, a live decision feed, signed receipts, and formal-proof status. Ships **a11oy Code — Chaski**, a governed agentic coding agent. | [a-11-oy.com →](https://a-11-oy.com) · [Space →](https://huggingface.co/spaces/SZLHOLDINGS/a11oy) |
+| **szl-router** — sovereign LLM gateway | OpenAI-compatible gateway that routes inference to your models/hardware and attaches a signed provenance receipt to every answer. Point any OpenAI client at it. | [szl-router →](https://github.com/szl-holdings/szl-router) |
+| **david-leads** — lead-generation | Governed outbound / lead-generation product running on the Command Center's trust scoring and signed receipts. | [david-leads →](https://github.com/szl-holdings/david-leads) |
 | **killinchu** — counter-UAS & maritime C2 | Autonomous-systems field tool for air and sea: live track board, multi-sensor fusion, maritime picture (sanctions screening + dark-vessel detection), engagement rules, autonomy governance, and verify-it-yourself signed engagement receipts. | [Open killinchu →](https://szlholdings-killinchu.hf.space/elite) |
-| **anatomy** — the living substrate | A 3D, navigable map of the governed organism: the organs (reasoning cortex, trust gate, receipt bus, consensus), how a decision flows through them, and where each proof and conjecture sits. | [Space →](https://huggingface.co/spaces/SZLHOLDINGS/anatomy) |
+| **anatomy** — the living substrate map | A 3D, navigable map of the governed organism: the organs (reasoning cortex, trust gate, receipt bus, consensus), how a decision flows through them, and where each proof and conjecture sits. | [Space →](https://huggingface.co/spaces/SZLHOLDINGS/anatomy) |
 
 **a11oy is the orchestrator.** Its reasoning, policy, and operator capabilities are one
 receipt-bound fabric, and it governs the field tool with the same trust scoring, consensus, and
@@ -273,7 +283,8 @@ A third party can confirm a decision happened, exactly as recorded, with zero tr
 
 | If you want to… | Go to |
 |---|---|
-| **See the products** | [a-11-oy.com](https://a-11-oy.com) · [a11oy Space](https://huggingface.co/spaces/SZLHOLDINGS/a11oy) · [killinchu](https://szlholdings-killinchu.hf.space/elite) · [anatomy](https://huggingface.co/spaces/SZLHOLDINGS/anatomy) |
+| **Decode a codename** | [NAMING_CANON.md](https://github.com/szl-holdings/szl-doctrine/blob/main/NAMING_CANON.md) — the canonical glossary |
+| **See the flagship + what's built on it** | [a-11-oy.com](https://a-11-oy.com) · [a11oy Space](https://huggingface.co/spaces/SZLHOLDINGS/a11oy) · [szl-router](https://github.com/szl-holdings/szl-router) · [killinchu](https://szlholdings-killinchu.hf.space/elite) · [anatomy](https://huggingface.co/spaces/SZLHOLDINGS/anatomy) |
 | **Read the math** | [lutar-lean](https://github.com/szl-holdings/lutar-lean) (Lean 4 kernel) · [szl-papers](https://github.com/szl-holdings/szl-papers) |
 | **Build on it** | [developers](https://github.com/szl-holdings/developers) · [szl-cookbook](https://github.com/szl-holdings/szl-cookbook) · [hatun-mcp](https://github.com/szl-holdings/hatun-mcp) |
 | **Deploy it** | [uds-bundles](https://github.com/szl-holdings/uds-bundles) · [szl-uds-deployment](https://github.com/szl-holdings/szl-uds-deployment) |
