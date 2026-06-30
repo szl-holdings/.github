@@ -10,8 +10,10 @@ on:
   release:
     types: [published]
 
+# Least-privilege: checkout only needs read; upload-artifact does not require
+# contents: write. Lowered from write to read to satisfy Scorecard TokenPermissionsID.
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   sbom:
