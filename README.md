@@ -2,8 +2,7 @@
 
 # 🧬 .github
 
-<!-- CII-BEST-PRACTICES-BADGE: PENDING — replace 'PENDING' with the project id once founder registers this repo at https://bestpractices.coreinfrastructure.org/ -->
-[![CII Best Practices](https://bestpractices.coreinfrastructure.org/projects/PENDING/badge)](https://bestpractices.coreinfrastructure.org/)
+<!-- CII Best Practices badge (founder-action required): register at https://bestpractices.coreinfrastructure.org/ then add the live badge here. -->
 
 **org doctrine**
 
