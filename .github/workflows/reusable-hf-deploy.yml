@@ -1,0 +1,149 @@
+name: Reusable — HF Deploy from Dockerfile
+
+# Canonical, reusable GitHub -> Hugging Face Space DEPLOYER. Replaces per-repo,
+# hand-maintained file-allowlist sync workflows (the accreted a11oy hf-sync.yml
+# CATHEDRAL_FILES anti-pattern) with ONE derivation: the exact file set pushed to
+# the Space is DERIVED from the caller Dockerfile's own `COPY` sources -- the same
+# derivation the org drift-checker (hf_module_drift_check.py) uses. The Dockerfile
+# is the single source of truth for what the image is built from, so the deploy
+# set can never silently drift from what actually builds.
+#
+# After pushing, the job WAITS for the Space to finish rebuilding and then
+# ATTESTS: it re-fetches every pushed file from the live resolve/main URL and
+# asserts sha256 == the git blob it pushed. Any mismatch FAILS the job loudly.
+# This is the "can never drift again" guard.
+#
+# Wire it from a consuming repo (HF repo derived as SZLHOLDINGS/<name> unless
+# overridden) with a thin caller:
+#   jobs:
+#     deploy:
+#       uses: szl-holdings/.github/.github/workflows/reusable-hf-deploy.yml@main
+#       secrets: inherit
+
+on:
+  workflow_call:
+    inputs:
+      hf-repo:
+        description: "HF Space repo (e.g. SZLHOLDINGS/a11oy). Empty = derive SZLHOLDINGS/<github-repo-name>."
+        required: false
+        type: string
+        default: ""
+      ref:
+        description: "Branch/ref to deploy."
+        required: false
+        type: string
+        default: "main"
+      dockerfile-path:
+        description: "Path to the Dockerfile whose COPY sources define the deploy set."
+        required: false
+        type: string
+        default: "Dockerfile"
+      include-readme:
+        description: "Mirror README.md (front-matter preserved) so the Space card stays in sync."
+        required: false
+        type: boolean
+        default: true
+      prune:
+        description: "Delete Space files under DIRECTORY COPY sources that are gone from git (never touches file/glob sources)."
+        required: false
+        type: boolean
+        default: false
+      wait-running:
+        description: "Seconds to poll the Space runtime stage for RUNNING before attesting."
+        required: false
+        type: number
+        default: 600
+    secrets:
+      HF_TOKEN:
+        description: "HF write token with org write to the target Space."
+        required: true
+
+permissions:
+  contents: read
+
+jobs:
+  hf-deploy:
+    name: Deploy derived COPY set to the live HF Space + attest
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Harden runner
+        uses: step-security/harden-runner@9af89fc71515a100421586dfdb3dc9c984fbf411 # v2.19.4
+        with:
+          egress-policy: audit
+
+      - name: Checkout caller (GitHub source-of-truth)
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          path: caller
+          ref: ${{ inputs.ref }}
+
+      - name: Checkout szl-holdings/.github (shared deployer script)
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          repository: szl-holdings/.github
+          ref: main
+          path: tools
+
+      - name: Set up Python
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+        with:
+          python-version: "3.12"
+
+      - name: Install huggingface_hub
+        run: pip install --quiet "huggingface_hub>=0.25"
+
+      - name: Resolve HF repo
+        id: hf
+        env:
+          HF_REPO_IN: ${{ inputs.hf-repo }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          if [ -n "${HF_REPO_IN}" ]; then
+            HF_REPO="${HF_REPO_IN}"
+          else
+            HF_REPO="SZLHOLDINGS/${GH_REPO##*/}"
+          fi
+          echo "hf_repo=${HF_REPO}" >> "$GITHUB_OUTPUT"
+          echo "Deploying ${GH_REPO} -> ${HF_REPO} @ ${{ inputs.ref }}"
+
+      - name: Deploy derived COPY set to the Space
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+        run: |
+          set -euo pipefail
+          if [ -z "${HF_TOKEN:-}" ]; then
+            echo "::error::HF_TOKEN secret is not set on this repo -- cannot push to the HuggingFace Space."
+            echo "::error::Founder action: add repo/org secret HF_TOKEN (HF write token with org write to SZLHOLDINGS)."
+            exit 1
+          fi
+          python3 tools/.github/scripts/hf_deploy_from_dockerfile.py \
+            --repo-root caller \
+            --github-repo "${{ github.repository }}" \
+            --hf-repo "${{ steps.hf.outputs.hf_repo }}" \
+            --ref "${{ inputs.ref }}" \
+            --dockerfile-path "${{ inputs.dockerfile-path }}" \
+            --include-readme "${{ inputs.include-readme }}" \
+            ${{ inputs.prune && '--prune' || '' }} \
+            --manifest-out hf-deploy-manifest.json
+
+      - name: Upload deploy manifest
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: hf-deploy-manifest
+          path: hf-deploy-manifest.json
+          if-no-files-found: warn
+
+      - name: Attest — live Space matches pushed git blobs (sha256)
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+        run: |
+          set -euo pipefail
+          python3 tools/.github/scripts/hf_deploy_from_dockerfile.py \
+            --attest \
+            --manifest hf-deploy-manifest.json \
+            --hf-repo "${{ steps.hf.outputs.hf_repo }}" \
+            --ref "${{ inputs.ref }}" \
+            --wait-running "${{ inputs.wait-running }}"

@@ -161,3 +161,13 @@ jobs:
       # so this network-free unit test locks both branches.
       - name: Codename sweep guard self-test
         run: python3 .github/scripts/test_codename_sweep.py
+
+      # Pins the reusable HF deployer's Dockerfile-COPY derivation (the deploy set
+      # is DERIVED from the caller Dockerfile, so the derivation IS the
+      # correctness contract). Locks: `--from=` stage copies contribute no files,
+      # a bare `COPY . <dest>` whole-context is skipped (not whole-repo-mirrored),
+      # a dotdir source (.compliance/x) survives parsing (an earlier lstrip("./")
+      # dropped 5 killinchu files), and dir/glob/file sources expand correctly.
+      # Network-free.
+      - name: HF deploy-from-Dockerfile derivation self-test
+        run: python3 .github/scripts/test_hf_deploy_from_dockerfile.py
