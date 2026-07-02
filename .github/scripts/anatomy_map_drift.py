@@ -132,6 +132,21 @@ def fetch_hf_file(repo, path, ref="main"):
     return body.decode("utf-8", "replace")
 
 
+def fetch_raw_url(url):
+    """Raw content from an arbitrary public URL.
+
+    Used for the live public-facing deployment (e.g. a-11-oy.com/anatomy-map),
+    which serves its OWN built bundle -- distinct from the GitHub source and the
+    HF Space raw files -- so it can silently drift (stale nginx/CDN build) even
+    when both repos are in sync. A non-200 raises so the check fails loud rather
+    than passing on an unreachable public site.
+    """
+    status, body = _http(url)
+    if status != 200:
+        raise RuntimeError(f"URL {url}: HTTP {status}")
+    return body.decode("utf-8", "replace")
+
+
 import urllib.parse  # noqa: E402  (kept next to its sole users above)
 
 
@@ -355,6 +370,9 @@ def fetch_surface(spec):
     elif spec["kind"] == "hf_space":
         paths = spec.get("paths") or [spec["path"]]
         texts = [fetch_hf_file(spec["repo"], p, ref) for p in paths]
+    elif spec["kind"] == "url":
+        urls = spec.get("urls") or [spec["url"]]
+        texts = [fetch_raw_url(u) for u in urls]
     else:
         raise RuntimeError(f"unknown surface kind: {spec['kind']}")
     return {"id": spec["id"], "extract": spec["extract"],
