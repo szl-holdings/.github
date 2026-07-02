@@ -1,0 +1,114 @@
+name: Reusable — Energy-Provenance Honesty Guard
+
+# Per-repo merge gate for the doctrine's load-bearing promise
+# measured-or-UNAVAILABLE: committed receipt / attestation DATA (JSON / JSONL /
+# DSSE payloads) must never carry a fabricated joule. The org-wide sweep
+# (workflows/energy-provenance-sweep.yml) already runs weekly and on pushes to
+# szl-holdings/.github itself, but a fabricated joule pushed straight into a
+# consuming repo could otherwise sit undetected for up to a week. A consuming
+# repo wires this into its own CI so an edit to its receipt data is validated
+# IMMEDIATELY, on the PR head, before merge.
+#
+# The checker (scripts/energy_provenance_check.py) + its self-test + allowlist
+# live ONCE in szl-holdings/.github, so a fix to the guard reaches every caller
+# at once (mirrors reusable-anatomy-map-drift.yml). This wrapper is read-only:
+# unlike the central sweep it never commits a report -- the red check is the
+# signal. It runs the checker in --local mode over the caller's own checkout, so
+# it needs NO token and NO network.
+#
+# Wire it up from a consuming repo:
+#   jobs:
+#     energy-provenance:
+#       uses: szl-holdings/.github/.github/workflows/reusable-energy-provenance-guard.yml@main
+
+on:
+  workflow_call:
+    inputs:
+      checker-ref:
+        description: "Ref of szl-holdings/.github to take the shared checker + allowlist from."
+        required: false
+        type: string
+        default: "main"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: reusable-energy-provenance-${{ github.repository }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  energy-provenance:
+    name: Committed receipt data is honest (measured-or-UNAVAILABLE)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Harden runner
+        uses: step-security/harden-runner@9af89fc71515a100421586dfdb3dc9c984fbf411 # v2.19.4
+        with:
+          egress-policy: audit
+
+      - name: Checkout caller (the data to scan)
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          path: caller
+
+      - name: Checkout szl-holdings/.github (shared checker + allowlist)
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          repository: szl-holdings/.github
+          ref: ${{ inputs.checker-ref }}
+          path: guard
+
+      - name: Set up Python
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+        with:
+          python-version: "3.12"
+
+      - name: Self-test the energy-provenance guard (negative fixtures)
+        # Proves the guard actually FAILS on a fabricated joule before we trust a
+        # green result, so a future weakening can't make it an always-green no-op.
+        run: python3 guard/.github/scripts/test_energy_provenance_check.py
+
+      - name: Scan the caller's committed receipt data
+        run: |
+          set +e
+          python3 guard/.github/scripts/energy_provenance_check.py \
+            --local caller \
+            --allowlist guard/.github/data/energy_provenance_allowlist.json \
+            --report energy_provenance_report.out.json
+          echo "CHECK_EXIT=$?" >> "$GITHUB_ENV"
+
+      - name: Upload energy-provenance report
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: energy-provenance-report
+          path: energy_provenance_report.out.json
+          if-no-files-found: ignore
+
+      - name: Fail on a fabricated joule
+        run: |
+          case "${CHECK_EXIT:-2}" in
+            0)
+              echo "✓ Committed receipt data is honest (measured-or-UNAVAILABLE)."
+              ;;
+            1)
+              echo "::error::Energy-provenance violation in this repo's committed"
+              echo "::error::receipt data (JSON / JSONL / a base64 DSSE payload)."
+              echo "::error::E1: a numeric \"joules\" requires \"measured\": true (else"
+              echo "::error::null / absent / \"UNAVAILABLE\"). E2: a numeric"
+              echo "::error::\"measured_joules\" must NOT carry a \"label\" starting"
+              echo "::error::\"UNAVAILABLE\". Doctrine: measured-or-UNAVAILABLE -- never"
+              echo "::error::fabricate a joule. Fix the data (measure it, or set the"
+              echo "::error::figure null / absent / UNAVAILABLE). See the uploaded"
+              echo "::error::energy_provenance_report.out.json artifact."
+              exit 1
+              ;;
+            *)
+              echo "::error::The energy-provenance check could not run (exit"
+              echo "::error::${CHECK_EXIT:-2}). Failed (not passed) so coverage can"
+              echo "::error::never look green when the check did not actually run."
+              exit 1
+              ;;
+          esac

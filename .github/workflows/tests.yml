@@ -88,6 +88,16 @@ jobs:
       - name: Overclaim-sweep guard self-test
         run: python3 .github/scripts/test_overclaim_sweep.py
 
+      # Pins the energy-provenance honesty guard. The doctrine's load-bearing
+      # promise is measured-or-UNAVAILABLE: committed receipt/attestation DATA
+      # (JSON / JSONL / DSSE payloads) must never carry a fabricated joule. Runs
+      # the REAL check_obj/scan_local/main path network-free (--local) so a
+      # weakened invariant (0-joule slipping through, a bool joule mistaken for a
+      # measurement, the base64 DSSE recursion dropped, or a no-op'd fail branch)
+      # that let a fabricated joule land green org-wide cannot pass silently.
+      - name: Energy-provenance guard self-test
+        run: python3 .github/scripts/test_energy_provenance_check.py
+
       # Pins the UDSBundle GHCR reference guard (task #902). The GHCR probe is
       # stubbed so the REAL bundle parser + severity logic run network-free,
       # locking that an unreachable SZL-OWNED ref stays an ERROR (never a

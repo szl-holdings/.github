@@ -1,0 +1,6 @@
+{
+  "_comment": "Allowlist for the org-wide energy-provenance honesty guard (.github/scripts/energy_provenance_check.py). Doctrine: measured-or-UNAVAILABLE -- a joule is a real measurement or honestly absent, NEVER fabricated. 'ignore_repos': repo names skipped entirely (ORG mode). 'ignore_paths': data paths skipped in EVERY repo, matched by repo:path, exact path, path-suffix or substring -- reserve ONLY for DELIBERATE negative / tamper-demo fixtures whose purpose is to carry a dishonest receipt so a downstream guard can prove it FAILS. 'extra_data_surfaces': additional path substrings to fetch in ORG mode beyond the receipt-ish default filter. Keep ignore_repos/ignore_paths empty unless a genuine, reviewed exception exists -- a non-empty allowlist hides fabricated joules from the gate.",
+  "ignore_repos": [],
+  "ignore_paths": [],
+  "extra_data_surfaces": []
+}

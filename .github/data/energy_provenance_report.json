@@ -1,0 +1,322 @@
+{
+  "schema": "szl.energy_provenance/v1",
+  "mode": "org",
+  "org": "szl-holdings",
+  "all_json": false,
+  "checked_at_utc": "2026-07-02T09:01:31Z",
+  "include_archived": true,
+  "summary": {
+    "checked": 34,
+    "ok": 34,
+    "error": 0,
+    "blobs_scanned": 120
+  },
+  "results": [
+    {
+      "repo": ".github",
+      "archived": false,
+      "default_branch": "main",
+      "scanned_blobs": 4,
+      "tree_truncated": false,
+      "status": "OK",
+      "findings": []
+    },
+    {
+      "repo": "a11oy",
+      "archived": false,
+      "default_branch": "main",
+      "scanned_blobs": 18,
+      "tree_truncated": false,
+      "status": "OK",
+      "findings": []
+    },
+    {
+      "repo": "anatomy",
+      "archived": false,
+      "default_branch": "main",
+      "scanned_blobs": 1,
+      "tree_truncated": false,
+      "status": "OK",
+      "findings": []
+    },
+    {
+      "repo": "developers",
+      "archived": false,
+      "default_branch": "main",
+      "scanned_blobs": 0,
+      "tree_truncated": false,
+      "status": "OK",
+      "findings": []
+    },
+    {
+      "repo": "docs-site",
+      "archived": false,
+      "default_branch": "main",
+      "scanned_blobs": 0,
+      "tree_truncated": false,
+      "status": "OK",
+      "findings": []
+    },
+    {
+      "repo": "governed-inference-meter",
+      "archived": false,
+      "default_branch": "main",
+      "scanned_blobs": 0,
+      "tree_truncated": false,
+      "status": "OK",
+      "findings": []
+    },
+    {
+      "repo": "hatun-mcp",
+      "archived": false,
+      "default_branch": "main",
+      "scanned_blobs": 0,
+      "tree_truncated": false,
+      "status": "OK",
+      "findings": []
+    },
+    {
+      "repo": "khipu-consensus",
+      "archived": false,
+      "default_branch": "main",
+      "scanned_blobs": 0,
+      "tree_truncated": false,
+      "status": "OK",
+      "findings": []
+    },
+    {
+      "repo": "khipu-sda-core",
+      "archived": false,
+      "default_branch": "main",
+      "scanned_blobs": 0,
+      "tree_truncated": false,
+      "status": "OK",
+      "findings": []
+    },
+    {
+      "repo": "killinchu",
+      "archived": false,
+      "default_branch": "main",
+      "scanned_blobs": 1,
+      "tree_truncated": false,
+      "status": "OK",
+      "findings": []
+    },
+    {
+      "repo": "lean-kernel",
+      "archived": false,
+      "default_branch": "main",
+      "scanned_blobs": 0,
+      "tree_truncated": false,
+      "status": "OK",
+      "findings": []
+    },
+    {
+      "repo": "lutar-lean",
+      "archived": false,
+      "default_branch": "main",
+      "scanned_blobs": 2,
+      "tree_truncated": false,
+      "status": "OK",
+      "findings": []
+    },
+    {
+      "repo": "ouroboros",
+      "archived": false,
+      "default_branch": "main",
+      "scanned_blobs": 0,
+      "tree_truncated": false,
+      "status": "OK",
+      "findings": []
+    },
+    {
+      "repo": "platform",
+      "archived": false,
+      "default_branch": "main",
+      "scanned_blobs": 14,
+      "tree_truncated": false,
+      "status": "OK",
+      "findings": []
+    },
+    {
+      "repo": "szl-brand",
+      "archived": false,
+      "default_branch": "main",
+      "scanned_blobs": 0,
+      "tree_truncated": false,
+      "status": "OK",
+      "findings": []
+    },
+    {
+      "repo": "szl-build-env",
+      "archived": false,
+      "default_branch": "main",
+      "scanned_blobs": 0,
+      "tree_truncated": false,
+      "status": "OK",
+      "findings": []
+    },
+    {
+      "repo": "szl-cookbook",
+      "archived": false,
+      "default_branch": "main",
+      "scanned_blobs": 0,
+      "tree_truncated": false,
+      "status": "OK",
+      "findings": []
+    },
+    {
+      "repo": "szl-doctrine",
+      "archived": false,
+      "default_branch": "main",
+      "scanned_blobs": 0,
+      "tree_truncated": false,
+      "status": "OK",
+      "findings": []
+    },
+    {
+      "repo": "szl-energy-attest",
+      "archived": false,
+      "default_branch": "main",
+      "scanned_blobs": 1,
+      "tree_truncated": false,
+      "status": "OK",
+      "findings": []
+    },
+    {
+      "repo": "szl-fleet-overlay",
+      "archived": true,
+      "default_branch": "main",
+      "scanned_blobs": 1,
+      "tree_truncated": false,
+      "status": "OK",
+      "findings": []
+    },
+    {
+      "repo": "szl-governed-norm",
+      "archived": false,
+      "default_branch": "main",
+      "scanned_blobs": 0,
+      "tree_truncated": false,
+      "status": "OK",
+      "findings": []
+    },
+    {
+      "repo": "szl-lake",
+      "archived": false,
+      "default_branch": "main",
+      "scanned_blobs": 55,
+      "tree_truncated": false,
+      "status": "OK",
+      "findings": []
+    },
+    {
+      "repo": "szl-lambda-gate",
+      "archived": false,
+      "default_branch": "main",
+      "scanned_blobs": 0,
+      "tree_truncated": false,
+      "status": "OK",
+      "findings": []
+    },
+    {
+      "repo": "szl-mesh",
+      "archived": false,
+      "default_branch": "main",
+      "scanned_blobs": 0,
+      "tree_truncated": false,
+      "status": "OK",
+      "findings": []
+    },
+    {
+      "repo": "szl-otel-mesh",
+      "archived": true,
+      "default_branch": "main",
+      "scanned_blobs": 1,
+      "tree_truncated": false,
+      "status": "OK",
+      "findings": []
+    },
+    {
+      "repo": "szl-papers",
+      "archived": false,
+      "default_branch": "main",
+      "scanned_blobs": 0,
+      "tree_truncated": false,
+      "status": "OK",
+      "findings": []
+    },
+    {
+      "repo": "szl-receipt",
+      "archived": false,
+      "default_branch": "main",
+      "scanned_blobs": 0,
+      "tree_truncated": false,
+      "status": "OK",
+      "findings": []
+    },
+    {
+      "repo": "szl-router",
+      "archived": false,
+      "default_branch": "main",
+      "scanned_blobs": 1,
+      "tree_truncated": false,
+      "status": "OK",
+      "findings": []
+    },
+    {
+      "repo": "szl-trust",
+      "archived": false,
+      "default_branch": "main",
+      "scanned_blobs": 2,
+      "tree_truncated": false,
+      "status": "OK",
+      "findings": []
+    },
+    {
+      "repo": "szl-uds-deployment",
+      "archived": true,
+      "default_branch": "main",
+      "scanned_blobs": 9,
+      "tree_truncated": false,
+      "status": "OK",
+      "findings": []
+    },
+    {
+      "repo": "uds-bundles",
+      "archived": true,
+      "default_branch": "main",
+      "scanned_blobs": 10,
+      "tree_truncated": false,
+      "status": "OK",
+      "findings": []
+    },
+    {
+      "repo": "vsp-otel",
+      "archived": false,
+      "default_branch": "main",
+      "scanned_blobs": 0,
+      "tree_truncated": false,
+      "status": "OK",
+      "findings": []
+    },
+    {
+      "repo": "warhacker-demo",
+      "archived": false,
+      "default_branch": "main",
+      "scanned_blobs": 0,
+      "tree_truncated": false,
+      "status": "OK",
+      "findings": []
+    },
+    {
+      "repo": "yarqa",
+      "archived": false,
+      "default_branch": "main",
+      "scanned_blobs": 0,
+      "tree_truncated": false,
+      "status": "OK",
+      "findings": []
+    }
+  ]
+}

@@ -1,0 +1,129 @@
+name: Energy-Provenance Honesty Sweep
+
+# Org-wide energy-provenance honesty sweep for receipt / attestation DATA
+# (companion to the per-repo reusable-energy-provenance-guard.yml caller).
+#
+# The honesty doctrine's load-bearing promise is measured-or-UNAVAILABLE: an
+# energy figure is either a REAL measurement or it is honestly absent -- a joule
+# is NEVER fabricated. The existing overclaim sweep reads only governed *Markdown*
+# prose; energy fabrication lives in *data* (receipt JSON, JSONL ledgers, DSSE
+# payloads), which no other guard inspects. This sweep is that data-scoped net:
+# it runs .github/scripts/energy_provenance_check.py across EVERY public repo in
+# the org and FAILS if any committed data blob violates a narrow, key-based
+# invariant, regardless of whether that repo adopted the per-repo caller.
+#
+# The check is KEY-BASED, not schema-based (energy is represented several honest
+# ways across the org; forcing one shape would invent a fake contract). It fires
+# ONLY where the relevant keys co-occur and stays silent otherwise:
+#   E1  {joules, measured}      -> a numeric joules REQUIRES measured == true;
+#                                  else null / absent / "UNAVAILABLE".
+#   E2  {measured_joules,label} -> a numeric measured_joules must NOT carry a
+#                                  label starting "UNAVAILABLE".
+# DSSE envelopes are base64-decoded and recursed into. It does NOT touch MODELED
+# thermodynamic free energies (different keys, prose) and does NOT flag a lone
+# `joules` with no `measured` (ambiguous).
+#
+# Public repo listing + git-tree + raw contents read fine with the built-in
+# GITHUB_TOKEN; SZL_GITHUB_TOKEN (org-owner) is used when present but not
+# required (all scanned repos are public).
+
+on:
+  schedule:
+    # Weekly sweep (Mondays 08:37 UTC), offset from the overclaim sweep (08:07)
+    # so a fabricated joule pushed anywhere in the org is caught fast when idle.
+    - cron: "37 8 * * 1"
+  workflow_dispatch: {}
+  push:
+    branches: [main]
+    paths:
+      - ".github/scripts/energy_provenance_check.py"
+      - ".github/scripts/test_energy_provenance_check.py"
+      - ".github/data/energy_provenance_allowlist.json"
+      - ".github/workflows/energy-provenance-sweep.yml"
+  workflow_call: {}
+
+permissions:
+  contents: read
+
+concurrency:
+  group: energy-provenance-sweep-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  sweep:
+    name: No committed receipt data carries a fabricated joule
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write # only to commit the refreshed report in szl-holdings/.github
+    steps:
+      - name: Harden runner
+        uses: step-security/harden-runner@9af89fc71515a100421586dfdb3dc9c984fbf411 # v2.19.4
+        with:
+          egress-policy: audit
+
+      - name: Checkout
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+
+      - name: Set up Python
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+        with:
+          python-version: "3.12"
+
+      - name: Self-test the energy-provenance guard (negative fixtures)
+        # Proves the guard actually FAILS on a fabricated joule / an
+        # UNAVAILABLE-labelled figure / a base64-hidden violation, so a future
+        # weakening can't turn it into a silent always-green no-op.
+        run: python3 .github/scripts/test_energy_provenance_check.py
+
+      - name: Sweep org receipt data for fabricated joules
+        env:
+          # SZL_GITHUB_TOKEN (org-owner) if present lets the scan see the public
+          # repo listing without the built-in token's rate limits; the built-in
+          # token is a sufficient fallback (all scanned repos are public).
+          SZL_GITHUB_TOKEN: ${{ secrets.SZL_GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          set +e
+          python3 .github/scripts/energy_provenance_check.py \
+            --include-archived \
+            --report .github/data/energy_provenance_report.json
+          echo "CHECK_EXIT=$?" >> "$GITHUB_ENV"
+
+      - name: Commit refreshed report if changed
+        # Best-effort: if main is protected (or the token can't push), this must
+        # NOT mask the real signal. The fail step below is the source of truth.
+        continue-on-error: true
+        if: github.repository == 'szl-holdings/.github' && github.event_name != 'pull_request'
+        run: |
+          if git diff --quiet -- .github/data/energy_provenance_report.json; then
+            echo "Report unchanged; nothing to commit."
+            exit 0
+          fi
+          git config user.name "Stephen P. Lutar Jr."
+          git config user.email "stephenlutar2@gmail.com"
+          git add .github/data/energy_provenance_report.json
+          git commit -s -m "chore(energy): refresh energy-provenance sweep report [skip ci]"
+          git push
+
+      - name: Fail on a fabricated joule
+        run: |
+          if [ "${CHECK_EXIT:-1}" != "0" ]; then
+            echo "::error::The org-wide energy-provenance honesty sweep found a"
+            echo "::error::fabricated / mislabelled energy figure in committed receipt"
+            echo "::error::data (JSON / JSONL / a base64 DSSE payload)."
+            echo "::error::E1: a numeric \"joules\" requires \"measured\": true (else"
+            echo "::error::null / absent / \"UNAVAILABLE\" -- a numeric joule, including"
+            echo "::error::0, while unmeasured is a fabrication)."
+            echo "::error::E2: a numeric \"measured_joules\" must NOT carry a \"label\""
+            echo "::error::starting \"UNAVAILABLE\"."
+            echo "::error::Doctrine: measured-or-UNAVAILABLE -- never fabricate a joule."
+            echo "::error::Fix the data (measure it, or set the figure null / absent /"
+            echo "::error::UNAVAILABLE). A genuine tamper-demo fixture can be"
+            echo "::error::ignore-listed in"
+            echo "::error::.github/data/energy_provenance_allowlist.json."
+            echo "::error::See the annotations above and"
+            echo "::error::.github/data/energy_provenance_report.json (full results)."
+            exit 1
+          fi
+          echo "✓ No committed receipt data carries a fabricated joule."
