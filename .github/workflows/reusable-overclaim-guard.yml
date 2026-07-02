@@ -94,8 +94,41 @@ jobs:
             FAIL=1
           fi
 
+          # C) GENERIC security/correctness overclaim absolutes (tamper-proof,
+          #    unbreakable, "100% secure", "mathematically guaranteed", "impossible
+          #    to forge", ...). Run as inline python3 (present on ubuntu-latest) so
+          #    the negation exemption can consult the PREVIOUS line — markdown
+          #    soft-wrap splits "tamper-EVIDENT, not" / "tamper-proof" across two
+          #    lines, which a line-at-a-time grep cannot see. The two regexes below
+          #    are kept BYTE-IDENTICAL to _C_TRIGGER_RE / _C_NEGATION_RE in
+          #    .github/scripts/overclaim_sweep.py (enforced by the lockstep test in
+          #    test_overclaim_sweep.py). Bare "guarantee" / bare "100%" are
+          #    deliberately NOT triggers (used honestly org-wide).
+          RULE_C_FAIL=0
+          python3 - $FILES <<'PY' || RULE_C_FAIL=$?
+          import re, sys
+          TRIG = re.compile(r"tamper[-\s]?proof|\bunbreakable\b|\bunhackable\b|\bun-?forgeable\b|bullet[-\s]?proof|provably secure|provable security|(?:absolutely|completely|perfectly|fully|totally) secure|impossible to (?:forge|break|hack|tamper|compromise|reverse)|cannot be (?:forged|broken|hacked|compromised)|100\s*%\s*(?:secure|safe|accurate|reliable|guaranteed|certain|correct|uptime|private|anonymous|unbreakable|foolproof)|mathematically guaranteed|guaranteed (?:secure|safe|unhackable|unbreakable|correct|accurate|private|tamper[-\s]?proof)|military[-\s]grade (?:encryption|security|crypto)|\brisk[-\s]?free\b|\bzero[-\s]risk\b|\bfoolproof\b", re.IGNORECASE)
+          NEG = re.compile(r"\bnot\b|\bnever\b|n't|\bwithout\b|\bnon-|tamper[-\s]?evident|less than 100|<\s?100|sub-100|below 100", re.IGNORECASE)
+          fail = 0
+          for path in sys.argv[1:]:
+              try:
+                  lines = open(path, encoding="utf-8", errors="replace").read().splitlines()
+              except OSError:
+                  continue
+              for i, line in enumerate(lines):
+                  if TRIG.search(line):
+                      prev = lines[i - 1] if i > 0 else ""
+                      if not (NEG.search(line) or NEG.search(prev)):
+                          print(f"::error::{path}:{i + 1} — generic honesty overclaim (absolute security/correctness claim). State the honest bound (tamper-EVIDENT not tamper-proof; trust never 100%; measured-or-UNAVAILABLE; no unbreakable / unforgeable / 100%-secure claims). Line: {line.strip()[:200]}")
+                          fail = 1
+          sys.exit(fail)
+          PY
+          if [ "$RULE_C_FAIL" != "0" ]; then
+            FAIL=1
+          fi
+
           if [ "$FAIL" = "1" ]; then
             echo "::error::Doctrine overclaim guard FAILED."
             exit 1
           fi
-          echo "Doctrine overclaim guard: governed surfaces are honest (Theorem U citation rule satisfied)."
+          echo "Doctrine overclaim guard: governed surfaces are honest (Theorem U citation + generic-overclaim rules satisfied)."

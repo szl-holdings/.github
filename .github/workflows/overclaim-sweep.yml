@@ -21,6 +21,11 @@ name: Overclaim Honesty Sweep
 #   * "Theorem U" / U1 / U2 asserted as PROVEN (it is REAL but CONDITIONAL).
 #   * unqualified Λ-uniqueness, or "Conjecture 1 proven" (Conjecture 1 is OPEN;
 #     machine-checked FALSE as stated).
+#   * a GENERIC security/correctness overclaim absolute — "tamper-proof",
+#     "unbreakable", "100% secure", "mathematically guaranteed", "impossible to
+#     forge", etc. — unless negated/qualified on the same or previous line
+#     (doctrine: tamper-EVIDENT not tamper-proof; trust never 100%;
+#     measured-or-UNAVAILABLE). Bare "guarantee" / bare "100%" are NOT forbidden.
 #
 # Public repo listing + git-tree + raw contents read fine with the built-in
 # GITHUB_TOKEN; SZL_GITHUB_TOKEN (org-owner) is used when present but not
@@ -106,8 +111,10 @@ jobs:
             echo "::error::PROVEN_FORMULAS.md / STATUS.md / DEPENDENCY_MAP.md /"
             echo "::error::PAPERS_INDEX.md / preprints/puriq/README.md)."
             echo "::error::Forbidden: 'Theorem U' / U1 / U2 stated as PROVEN (it is"
-            echo "::error::REAL but CONDITIONAL); unqualified Λ-uniqueness; or"
-            echo "::error::'Conjecture 1 proven' (Conjecture 1 is OPEN)."
+            echo "::error::REAL but CONDITIONAL); unqualified Λ-uniqueness;"
+            echo "::error::'Conjecture 1 proven' (Conjecture 1 is OPEN); or a generic"
+            echo "::error::security/correctness absolute (tamper-proof / unbreakable /"
+            echo "::error::100%-secure / mathematically-guaranteed / impossible-to-forge)."
             echo "::error::Fix: qualify the claim (Theorem U = real·conditional;"
             echo "::error::Λ-uniqueness = Conjecture 1, OPEN) per lutar-lean honesty"
             echo "::error::doctrine v11. A genuinely intended surface can be"

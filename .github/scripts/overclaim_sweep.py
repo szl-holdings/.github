@@ -23,6 +23,15 @@ stay in lockstep):
      tightly to "Conjecture 1" so honest meta-prose ("...what was proven and what
      was not") is not a false positive.
 
+  C) A GENERIC security/correctness overclaim absolute — "tamper-proof",
+     "unbreakable", "unforgeable", "100% secure", "mathematically guaranteed",
+     "impossible to forge", etc. Exempt when the trigger line OR its immediately
+     preceding line carries a negation / honest qualifier ("tamper-EVIDENT, not
+     tamper-proof", "trust never 100%"), so honest prose and markdown soft-wrap
+     are not false positives. Bare "guarantee" / bare "100%" are NOT triggers.
+     The honesty doctrine: measured-or-UNAVAILABLE, tamper-EVIDENT not
+     tamper-proof, trust never 100%.
+
 Two modes (mirrors lockfile_registry_check.py):
 
   * ORG mode (default): list every PUBLIC repo in the org, walk each repo's
@@ -122,21 +131,57 @@ _B_EXCLUDE_RE = re.compile(
     re.IGNORECASE,
 )
 
+# --------------------------------------------------------------------------- #
+# Rule C — GENERIC security/correctness overclaim absolutes (org honesty).
+# Rules A/B are Λ-uniqueness-specific; rule C catches the broader class the
+# honesty doctrine forbids: "tamper-proof", "unbreakable", "100% secure",
+# "mathematically guaranteed", "impossible to forge", etc. A trigger line is
+# EXEMPT when it — OR its immediately preceding line — carries a negation /
+# honest qualifier ("tamper-EVIDENT, not tamper-proof", "trust never 100%").
+# The previous-line window handles markdown soft-wrap where the negation and the
+# trigger word land on adjacent lines; a blank previous line does NOT carry the
+# exemption (a blank line is a paragraph break). Bare "guarantee" and bare
+# "100%" are deliberately NOT triggers — both are used honestly org-wide
+# ("AP guarantee", "marginal-coverage guarantee", a "| Guarantee |" header,
+# "trust never 100%").
+#
+# These two patterns are kept BYTE-IDENTICAL to the inline python3 in
+# .github/workflows/reusable-overclaim-guard.yml; the lockstep test in
+# test_overclaim_sweep.py asserts each `.pattern` appears verbatim in that yml.
+# Edit BOTH places together.
+# --------------------------------------------------------------------------- #
+_C_TRIGGER_RE = re.compile(
+    r"tamper[-\s]?proof|\bunbreakable\b|\bunhackable\b|\bun-?forgeable\b|bullet[-\s]?proof|provably secure|provable security|(?:absolutely|completely|perfectly|fully|totally) secure|impossible to (?:forge|break|hack|tamper|compromise|reverse)|cannot be (?:forged|broken|hacked|compromised)|100\s*%\s*(?:secure|safe|accurate|reliable|guaranteed|certain|correct|uptime|private|anonymous|unbreakable|foolproof)|mathematically guaranteed|guaranteed (?:secure|safe|unhackable|unbreakable|correct|accurate|private|tamper[-\s]?proof)|military[-\s]grade (?:encryption|security|crypto)|\brisk[-\s]?free\b|\bzero[-\s]risk\b|\bfoolproof\b",
+    re.IGNORECASE,
+)
+_C_NEGATION_RE = re.compile(
+    r"\bnot\b|\bnever\b|n't|\bwithout\b|\bnon-|tamper[-\s]?evident|less than 100|<\s?100|sub-100|below 100",
+    re.IGNORECASE,
+)
+
 
 def grep_overclaims(text: str):
     """Return a list of {line, type, text} overclaim hits in `text`.
 
-    `type` is "lambda_uniqueness" (A) or "conjecture1_proven" (B), mirroring the
-    two annotations the reusable guard emits.
+    `type` is "lambda_uniqueness" (A), "conjecture1_proven" (B), or
+    "generic_overclaim" (C), mirroring the annotations the reusable guard emits.
+    Rule C consults the previous line for a negation exemption (markdown
+    soft-wrap), so we scan with an explicit index rather than a bare enumerate.
     """
     hits = []
     if not text:
         return hits
-    for i, line in enumerate(text.splitlines(), start=1):
+    lines = text.splitlines()
+    for i, line in enumerate(lines):
+        ln = i + 1
         if _A_RE.search(line) and not _SAFE_RE.search(line):
-            hits.append({"line": i, "type": "lambda_uniqueness", "text": line.strip()[:300]})
+            hits.append({"line": ln, "type": "lambda_uniqueness", "text": line.strip()[:300]})
         if _B_RE.search(line) and not _B_EXCLUDE_RE.search(line):
-            hits.append({"line": i, "type": "conjecture1_proven", "text": line.strip()[:300]})
+            hits.append({"line": ln, "type": "conjecture1_proven", "text": line.strip()[:300]})
+        if _C_TRIGGER_RE.search(line):
+            prev = lines[i - 1] if i > 0 else ""
+            if not (_C_NEGATION_RE.search(line) or _C_NEGATION_RE.search(prev)):
+                hits.append({"line": ln, "type": "generic_overclaim", "text": line.strip()[:300]})
     return hits
 
 
@@ -266,10 +311,17 @@ def _emit_annotations(findings_by_repo):
                           f"Identifiability Assumptions; strict = only under "
                           f"Anchored/Normalized). Unconditional uniqueness is "
                           f"Conjecture 1 (OPEN). Line: {h['text']}")
-                else:
+                elif h["type"] == "conjecture1_proven":
                     print(f"::error::{where} — Conjecture 1 described as proven/closed; "
                           f"it is OPEN (statement-only, machine-checked false as "
                           f"stated). Line: {h['text']}")
+                else:
+                    print(f"::error::{where} — generic honesty overclaim (absolute "
+                          f"security/correctness claim). State the honest bound instead "
+                          f"(tamper-EVIDENT not tamper-proof; trust never 100%; "
+                          f"measured-or-UNAVAILABLE; no unbreakable / unforgeable / "
+                          f"100%-secure / mathematically-guaranteed claims). "
+                          f"Line: {h['text']}")
 
 
 def main() -> int:
@@ -365,11 +417,12 @@ def main() -> int:
 
     if errs:
         _emit_annotations(errs)
-        print(f"\n{len(errs)} repo(s) have a governed Markdown doc that overclaims "
-              f"Λ-uniqueness or declares Conjecture 1 proven. Cite Theorem U / U₁ / "
-              f"U₂ (uniqueness modulo ≈Λ under IA; strict = only under "
-              f"Anchored/Normalized); Conjecture 1 stays OPEN. See annotations + the "
-              f"report.", file=sys.stderr)
+        print(f"\n{len(errs)} repo(s) have a governed Markdown doc that overclaims: "
+              f"Λ-uniqueness (cite Theorem U / U₁ / U₂, modulo ≈Λ under IA; strict = "
+              f"only under Anchored/Normalized; Conjecture 1 stays OPEN), declares "
+              f"Conjecture 1 proven, or makes a generic security/correctness absolute "
+              f"(tamper-proof / unbreakable / 100%-secure / guaranteed). See "
+              f"annotations + the report.", file=sys.stderr)
 
     return 1 if errs else 0
 
