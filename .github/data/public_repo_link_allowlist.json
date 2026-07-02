@@ -1,7 +1,11 @@
 {
   "_comment": "Intentional, reasoned exceptions for the public-repo-link checker (see .github/scripts/public_repo_link_check.py). A finding is suppressed only when it appears here. For the ORG-REPO existence check: 'allow' suppresses a specific (source_repo, target) pair; 'ignore_targets' suppresses a target repo wherever it is referenced; 'ignore_source_repos' skips a source repo's pages entirely. For the optional EXTERNAL liveness check (--check-external): 'ignore_external_hosts' skips a hostname everywhere; 'ignore_external_urls' skips an exact URL. For the optional DEEP org-link check (--check-deep-links): 'ignore_deep_urls' skips an exact deep URL. 'ignore_link_patterns' is a list of regexes matched against any deep/external URL (use for whole families, e.g. doc example/localhost URLs). Every entry should explain WHY. Nothing is silently passed -- un-listed dead links fail/warn per the script's severity rules.",
   "allow": [],
-  "ignore_targets": [],
+  "_ignore_targets_reasons": {
+    "uds-mesh": "Renamed to szl-otel-mesh (now archived, still public). github.com/szl-holdings/uds-mesh HTTP 301-redirects there, so every historical reference resolves for real visitors; the old name is kept in docs intentionally.",
+    "lambda-bounty": "Bounty-program repo retired/removed (HTTP 404). Historical references in bounty docs are intentional records of a closed program."
+  },
+  "ignore_targets": ["uds-mesh", "lambda-bounty"],
   "ignore_source_repos": [],
   "ignore_external_hosts": [],
   "ignore_external_urls": [],
