@@ -66,6 +66,25 @@ jobs:
               "sorries": 163,
               "kernel": "c7c0ba17",
           }
+          # The honest endpoint nests the doctrine numbers under "doctrine_lock"
+          # (declarations / axioms / sorries / commit / locked_formula_count).
+          # Map each expected key to where it actually lives; "proven" is the
+          # locked_formula_count (8) and "kernel" is the commit (c7c0ba17).
+          SCHEMA = {
+              "proven": ("doctrine_lock", "locked_formula_count"),
+              "declarations": ("doctrine_lock", "declarations"),
+              "axioms": ("doctrine_lock", "axioms"),
+              "sorries": ("doctrine_lock", "sorries"),
+              "kernel": ("doctrine_lock", "commit"),
+          }
+
+          def resolve(payload, path):
+              cur = payload
+              for part in path:
+                  if not isinstance(cur, dict):
+                      return None
+                  cur = cur.get(part)
+              return cur
 
           try:
               with urllib.request.urlopen(HONEST_URL, timeout=15) as resp:
@@ -73,7 +92,11 @@ jobs:
               print(f"Live honest endpoint returned: {json.dumps(data, indent=2)}")
               failed = False
               for key, expected in EXPECTED.items():
-                  actual = data.get(key)
+                  # Prefer the nested doctrine_lock location; fall back to a flat
+                  # top-level key for backward-compatibility with older payloads.
+                  actual = resolve(data, SCHEMA[key])
+                  if actual is None:
+                      actual = data.get(key)
                   if str(actual) != str(expected):
                       print(f"::error::DOCTRINE MISMATCH: {key} = {actual!r}, expected {expected!r}")
                       failed = True
