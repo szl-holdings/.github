@@ -362,8 +362,10 @@ def load_registry(path):
         return json.load(fh)
 
 
-def fetch_surface(spec):
-    ref = spec.get("ref", "main")
+def fetch_surface(spec, ref_overrides=None):
+    ref_overrides = ref_overrides or {}
+    repo = spec.get("repo")
+    ref = ref_overrides.get(repo, spec.get("ref", "main")) if repo else spec.get("ref", "main")
     if spec["kind"] == "github":
         paths = spec.get("paths") or [spec["path"]]
         texts = [fetch_github_file(spec["repo"], p, ref) for p in paths]
@@ -393,6 +395,16 @@ def main(argv=None):
                          "registry are skipped. Used by the tight HF-edit "
                          "watcher to validate just the SZLHOLDINGS/anatomy "
                          "Space soon after a direct HF-side edit.")
+    ap.add_argument("--ref-override", action="append", default=None,
+                    help="REPO=REF: read this surface repo at REF instead of "
+                         "its registry ref (repeatable). The PR gate passes the "
+                         "calling repo's PR-head SHA so the PROPOSED change is "
+                         "validated while every other surface stays at main.")
+    ap.add_argument("--skip-kind", action="append", default=None,
+                    help="skip surfaces of this kind, e.g. url (repeatable). The "
+                         "PR gate skips kind=url so a transient live-CDN/nginx "
+                         "blip can't block a PR; the scheduled sweep + watcher "
+                         "still cover the mirror.")
     args = ap.parse_args(argv)
 
     reg = load_registry(args.registry)
@@ -418,10 +430,28 @@ def main(argv=None):
                   "an empty check.")
             return 2
 
+    if args.skip_kind:
+        skip = {k.strip() for k in args.skip_kind if k.strip()}
+        specs = [s for s in specs if s["kind"] not in skip]
+        if not specs:
+            print("::error::--skip-kind removed every surface; refusing to pass "
+                  "on an empty check.")
+            return 2
+
+    ref_overrides = {}
+    if args.ref_override:
+        for item in args.ref_override:
+            repo, sep, r = item.partition("=")
+            repo, r = repo.strip(), r.strip()
+            if not sep or not repo or not r:
+                print("::error::--ref-override must be REPO=REF, got: " + item)
+                return 2
+            ref_overrides[repo] = r
+
     surfaces = []
     try:
         for spec in specs:
-            surfaces.append(fetch_surface(spec))
+            surfaces.append(fetch_surface(spec, ref_overrides))
     except RuntimeError as e:
         print(f"::error::anatomy-map drift check could not fetch a surface: {e}")
         print("::error::Failing (exit 2) rather than passing -- coverage can "
