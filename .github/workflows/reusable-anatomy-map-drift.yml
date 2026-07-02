@@ -83,7 +83,16 @@ jobs:
           SZL_GITHUB_TOKEN: ${{ secrets.SZL_GITHUB_TOKEN }}
         run: |
           set +e
-          python3 .github/scripts/anatomy_map_drift.py \
+          EXTRA=""
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            # PR merge gate: validate the PROPOSED content of the calling repo
+            # (its PR-head SHA) against the other GitHub/HF source surfaces.
+            # Skip kind=url so a transient live-CDN/nginx blip can't block an
+            # unrelated PR -- the scheduled sweep + the HF/mirror watcher still
+            # cover the live mirror.
+            EXTRA="--skip-kind url --ref-override ${{ github.repository }}=${{ github.event.pull_request.head.sha }}"
+          fi
+          python3 .github/scripts/anatomy_map_drift.py $EXTRA \
             --report anatomy_map_report.out.json
           echo "CHECK_EXIT=$?" >> "$GITHUB_ENV"
 
