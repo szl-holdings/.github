@@ -1,0 +1,138 @@
+name: Anatomy-map HF-Space drift watch
+
+# The single honest "SZL Anatomy" map ships on three independently-edited
+# surfaces (a11oy /console, killinchu /elite, and the standalone HF static Space
+# SZLHOLDINGS/anatomy). The a11oy and killinchu surfaces each wire the reusable
+# push-time gate, so a GitHub-side edit to their anatomy block is validated
+# IMMEDIATELY. The HF Space, however, is edited and deployed on its OWN pipeline
+# (a direct edit in the Space repo produces NO GitHub push), so a divergence
+# there is otherwise only caught by the weekly cross-surface sweep -- up to a
+# week of undetected drift on the public a-11-oy.com/anatomy-map mirror.
+#
+# This watcher closes that latency gap. It runs the SAME checker + registry
+# (scripts/anatomy_map_drift.py, scoped to the `hf-anatomy` surface via --only)
+# on a tight schedule, so a direct HF-side edit that drops/relabels the locked-8
+# ladder {F1,F4,F7,F11,F12,F18,F19,F22} or the Λ = Conjecture 1 honesty label is
+# caught within minutes, not a week. `repository_dispatch: hf-anatomy-edited`
+# also lets a future HF org webhook trigger this instantly on a Space update.
+# The weekly cross-surface sweep (anatomy-map-drift.yml) stays as the full
+# a11oy/killinchu/HF backstop; this one is HF-only and read-only (never commits).
+#
+# On real drift (exit 1) an ntfy alert is pushed through the team's shared relay
+# (SLACK_WEBHOOK_URL -> a-11-oy.com/relay). A fetch failure is exit 2 (ERROR),
+# never a silent pass -- coverage can't look clean when the check couldn't run.
+
+on:
+  schedule:
+    # Every ~15 min, offset off the top of the hour to dodge scheduler
+    # congestion (GitHub cron is best-effort). Detection latency <= ~15 min vs
+    # the weekly sweep. Free on public repos.
+    - cron: "6,21,36,51 * * * *"
+  workflow_dispatch: {}
+  repository_dispatch:
+    # A future HF webhook (org -> repo dispatch) can fire this the moment the
+    # Space is edited, for near-instant detection.
+    types: [hf-anatomy-edited]
+  push:
+    branches: [main]
+    paths:
+      - ".github/scripts/anatomy_map_drift.py"
+      - ".github/scripts/test_anatomy_map_drift.py"
+      - ".github/data/anatomy_map_registry.json"
+      - ".github/workflows/anatomy-map-hf-drift.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: anatomy-map-hf-drift-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  hf-drift:
+    name: SZLHOLDINGS/anatomy HF Space honest (locked-8 + Λ=Conjecture-1)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Harden runner
+        uses: step-security/harden-runner@9af89fc71515a100421586dfdb3dc9c984fbf411 # v2.19.4
+        with:
+          egress-policy: audit
+
+      - name: Checkout
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+
+      - name: Set up Python
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+        with:
+          python-version: "3.12"
+
+      - name: Self-test the drift guard (negative fixtures)
+        # Proves the guard actually FAILS when a surface is mutated, so a future
+        # weakening can't turn this into a silent always-green no-op.
+        run: python3 .github/scripts/test_anatomy_map_drift.py
+
+      - name: Check the SZLHOLDINGS/anatomy HF Space
+        run: |
+          set +e
+          python3 .github/scripts/anatomy_map_drift.py \
+            --only hf-anatomy \
+            --report anatomy_map_hf_report.out.json
+          echo "CHECK_EXIT=$?" >> "$GITHUB_ENV"
+
+      - name: Upload drift report
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: anatomy-map-hf-drift-report
+          path: anatomy_map_hf_report.out.json
+          if-no-files-found: ignore
+
+      - name: Alert ntfy on HF anatomy-map drift
+        # Fires only when the HF Space actually diverged (exit 1). Routed through
+        # the shared relay so it renders in the team's ntfy app. No-ops (with a
+        # warning) if the webhook secret is unset -- never masking the red job.
+        if: env.CHECK_EXIT == '1'
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+        run: |
+          set -euo pipefail
+          if [ -z "${SLACK_WEBHOOK_URL:-}" ]; then
+            echo "::warning::SLACK_WEBHOOK_URL not set; skipping ntfy push (the red job is still the signal)."
+            exit 0
+          fi
+          drift="$(python3 -c '
+          import json
+          r = json.load(open("anatomy_map_hf_report.out.json"))
+          print(" | ".join(r.get("findings", [])) or "(see report)")
+          ')"
+          run_url="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
+          text=":rotating_light: SZL anatomy-map DRIFT (HF Space): SZLHOLDINGS/anatomy diverged from the honest doctrine (locked-8 ladder {F1,F4,F7,F11,F12,F18,F19,F22} or Λ=Conjecture-1 label) via a direct HF-side edit. ${drift} Run: ${run_url}"
+          payload="$(python3 -c 'import json,sys; print(json.dumps({"text": sys.argv[1]}))' "$text")"
+          code="$(curl -sS -o /dev/null -w '%{http_code}' -X POST -H 'Content-Type: application/json' -d "$payload" "$SLACK_WEBHOOK_URL" || echo 000)"
+          echo "ntfy relay responded HTTP ${code}"
+          [ "$code" = "200" ] || echo "::warning::ntfy relay returned ${code} (not 200); check the relay."
+
+      - name: Fail if HF anatomy-map drift or the check could not run
+        run: |
+          case "${CHECK_EXIT:-2}" in
+            0)
+              echo "✓ The SZLHOLDINGS/anatomy HF Space is honest: locked-8 ladder and Λ=Conjecture-1 label intact."
+              ;;
+            1)
+              echo "::error::HF anatomy-map drift detected on SZLHOLDINGS/anatomy --"
+              echo "::error::see the step output and the uploaded"
+              echo "::error::anatomy_map_hf_report.out.json artifact. Re-sync the"
+              echo "::error::locked-8 ladder {F1,F4,F7,F11,F12,F18,F19,F22} and the"
+              echo "::error::Λ=Conjecture-1 label on the HF Space (data.js + index.html)"
+              echo "::error::back to the honest doctrine."
+              exit 1
+              ;;
+            *)
+              echo "::error::Could not complete the HF anatomy-map drift check"
+              echo "::error::(the Space failed to fetch -- network). Failed (not"
+              echo "::error::passed) so coverage can never look green when the check"
+              echo "::error::could not actually run."
+              exit 1
+              ;;
+          esac
