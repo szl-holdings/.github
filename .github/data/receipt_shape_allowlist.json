@@ -1,0 +1,6 @@
+{
+  "_comment": "Allowlist for the org-wide receipt shape-conformance guard (scripts/receipt_shape_check.py). Reserve `ignore_paths` ONLY for DELIBERATE negative / tamper-demo fixtures whose whole purpose is to carry a malformed declared-format receipt so a downstream guard can prove it FAILS -- NEVER to silence a real broken receipt (fix the data instead). `ignore_repos` skips a whole repo; `extra_data_surfaces` adds path substrings to the ORG-mode default scan. Entries in ignore_paths match by `repo:path`, exact path, path suffix, or substring.",
+  "ignore_repos": [],
+  "ignore_paths": [],
+  "extra_data_surfaces": []
+}

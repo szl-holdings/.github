@@ -1,0 +1,138 @@
+name: Receipt-Shape Honesty Sweep
+
+# Org-wide receipt shape-conformance honesty sweep for attestation DATA
+# (companion to the per-repo reusable-receipt-shape-guard.yml caller).
+#
+# The honesty doctrine forbids fabricating a pass. A blob that DECLARES itself a
+# well-known attestation format but is structurally corrupt is a quiet way to
+# fake one: a consumer (or a badge) sees the familiar `_type` / `payloadType` and
+# assumes a real, verifiable attestation. The overclaim sweep reads governed
+# *Markdown*; the energy-provenance sweep checks *joules* in receipt data;
+# NEITHER checks whether a declared-format receipt actually has that format's
+# shape. This sweep is that net: it runs .github/scripts/receipt_shape_check.py
+# across EVERY public repo in the org and FAILS if any committed data blob that
+# declares an in-toto Statement or DSSE envelope carries a field that is PRESENT
+# with the WRONG TYPE, regardless of whether that repo adopted the per-repo caller.
+#
+# It is TYPE-conformance, not completeness, and shares the energy guard's lens:
+# FABRICATION is the sin, honest ABSENCE is not. An absent / null / empty field
+# is the honest measured-or-UNAVAILABLE state and is NEVER flagged -- the org
+# ships honest stubs on purpose (e.g. an in-toto Statement with an intentionally
+# empty digest and a "PENDING BUILD, nothing fabricated" note). It fires ONLY
+# when a blob DECLARES a format via that format's own typed discriminator:
+#   S1  in-toto Statement (_type v1 / v0.1): subject/digest/predicateType, when
+#       present, must be the right TYPE (list / dict-of-strings / string).
+#   S2  DSSE envelope (string payloadType + string payload): a non-empty payload
+#       is base64-decodable; signatures, when present, are dicts with string sigs.
+# DSSE payloads are base64-decoded and recursed into. It never requires a
+# signature (unsigned-honest is first-class) and never checks digest hex length.
+#
+# Public repo listing + git-tree + raw contents read fine with the built-in
+# GITHUB_TOKEN; SZL_GITHUB_TOKEN (org-owner) is used when present but not
+# required (all scanned repos are public).
+
+on:
+  schedule:
+    # Weekly sweep (Mondays 09:07 UTC), offset from the overclaim sweep (08:07)
+    # and the energy sweep (08:37) so a corrupt declared-format receipt pushed
+    # anywhere in the org is caught fast when the org is idle.
+    - cron: "7 9 * * 1"
+  workflow_dispatch: {}
+  push:
+    branches: [main]
+    paths:
+      - ".github/scripts/receipt_shape_check.py"
+      - ".github/scripts/test_receipt_shape_check.py"
+      - ".github/data/receipt_shape_allowlist.json"
+      - ".github/workflows/receipt-shape-sweep.yml"
+  workflow_call: {}
+
+permissions:
+  contents: read
+
+concurrency:
+  group: receipt-shape-sweep-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  sweep:
+    name: No declared-format receipt is structurally corrupt
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write # only to commit the refreshed report in szl-holdings/.github
+    steps:
+      - name: Harden runner
+        uses: step-security/harden-runner@9af89fc71515a100421586dfdb3dc9c984fbf411 # v2.19.4
+        with:
+          egress-policy: audit
+
+      - name: Checkout
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+
+      - name: Set up Python
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+        with:
+          python-version: "3.12"
+
+      - name: Self-test the receipt-shape guard (positive + negative fixtures)
+        # Proves the guard FAILS on present-but-wrong-type corruption AND stays
+        # silent on honest empty/absent fields (incl. the real uds-bundles stub),
+        # so a future change can neither turn it into an always-green no-op nor
+        # start punishing honest producers.
+        run: python3 .github/scripts/test_receipt_shape_check.py
+
+      - name: Sweep org receipt data for shape corruption
+        env:
+          # SZL_GITHUB_TOKEN (org-owner) if present lets the scan see the public
+          # repo listing without the built-in token's rate limits; the built-in
+          # token is a sufficient fallback (all scanned repos are public).
+          SZL_GITHUB_TOKEN: ${{ secrets.SZL_GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          set +e
+          python3 .github/scripts/receipt_shape_check.py \
+            --include-archived \
+            --report .github/data/receipt_shape_report.json
+          echo "CHECK_EXIT=$?" >> "$GITHUB_ENV"
+
+      - name: Commit refreshed report if changed
+        # Best-effort: if main is protected (or the token can't push), this must
+        # NOT mask the real signal. The fail step below is the source of truth.
+        continue-on-error: true
+        if: github.repository == 'szl-holdings/.github' && github.event_name != 'pull_request'
+        run: |
+          if git diff --quiet -- .github/data/receipt_shape_report.json; then
+            echo "Report unchanged; nothing to commit."
+            exit 0
+          fi
+          git config user.name "Stephen P. Lutar Jr."
+          git config user.email "stephenlutar2@gmail.com"
+          git add .github/data/receipt_shape_report.json
+          git commit -s -m "chore(receipt-shape): refresh receipt-shape sweep report [skip ci]"
+          git push
+
+      - name: Fail on a structurally corrupt declared-format receipt
+        run: |
+          if [ "${CHECK_EXIT:-1}" != "0" ]; then
+            echo "::error::The org-wide receipt-shape honesty sweep found a blob that"
+            echo "::error::DECLARES a known attestation format but carries a field that"
+            echo "::error::is PRESENT with the WRONG TYPE in committed data (JSON /"
+            echo "::error::JSONL / a base64 DSSE payload)."
+            echo "::error::S1: an in-toto Statement's \"subject\" (list) / \"digest\""
+            echo "::error::(object of string values) / \"predicateType\" (string) must,"
+            echo "::error::WHEN PRESENT, be the right type."
+            echo "::error::S2: a DSSE envelope's non-empty \"payload\" must be"
+            echo "::error::base64-decodable and \"signatures\", when present, must be a"
+            echo "::error::list of objects whose \"sig\" is a string."
+            echo "::error::This is TYPE-conformance, not completeness: an absent / null"
+            echo "::error::/ empty field is honest UNAVAILABLE and is never flagged --"
+            echo "::error::never fabricate a pass. Fix the data (supply the right type,"
+            echo "::error::or leave the field empty / absent). A genuine tamper-demo"
+            echo "::error::fixture can be ignore-listed in"
+            echo "::error::.github/data/receipt_shape_allowlist.json."
+            echo "::error::See the annotations above and"
+            echo "::error::.github/data/receipt_shape_report.json (full results)."
+            exit 1
+          fi
+          echo "✓ No declared-format receipt is structurally corrupt."

@@ -98,6 +98,17 @@ jobs:
       - name: Energy-provenance guard self-test
         run: python3 .github/scripts/test_energy_provenance_check.py
 
+      # Pins the receipt shape-conformance honesty guard. A blob that DECLARES a
+      # known attestation format (in-toto Statement / DSSE envelope) but carries a
+      # field PRESENT with the WRONG TYPE is a quiet fake. Runs the REAL
+      # check_obj/scan_local/main path network-free (--local) so a weakening
+      # (wrong-type digest/sig slipping through, the base64 DSSE recursion
+      # dropped, a no-op'd fail branch) can't pass silently -- AND so a future
+      # tightening can't start punishing honest empty/absent fields (the real
+      # uds-bundles honest stub is pinned as a must-PASS fixture).
+      - name: Receipt-shape guard self-test
+        run: python3 .github/scripts/test_receipt_shape_check.py
+
       # Pins the UDSBundle GHCR reference guard (task #902). The GHCR probe is
       # stubbed so the REAL bundle parser + severity logic run network-free,
       # locking that an unreachable SZL-OWNED ref stays an ERROR (never a
