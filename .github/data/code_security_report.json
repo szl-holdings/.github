@@ -1,254 +1,318 @@
 {
-  "generated_at": "2026-06-09T23:37:18.741721+00:00",
-  "org": "szl-holdings",
-  "canonical_config": {
-    "id": 252588,
-    "name": "SZL Holdings Managed Security",
-    "target_type": "organization",
-    "enforcement": "enforced"
+ "generated_at": "2026-07-02T21:45:30.723427+00:00",
+ "org": "szl-holdings",
+ "canonical_config": {
+  "id": 252588,
+  "name": "SZL Holdings Managed Security",
+  "target_type": "organization",
+  "enforcement": "enforced"
+ },
+ "default_for_new_repos": "all",
+ "totals": {
+  "org_repos": 37,
+  "archived": 4,
+  "enforced_under_canonical": 33,
+  "errors": 0,
+  "warnings": 0
+ },
+ "errors": [],
+ "warnings": [],
+ "repos": [
+  {
+   "repo": "szl-holdings/.github",
+   "archived": false,
+   "private": false,
+   "status_under_canonical": "enforced",
+   "attached_elsewhere": null,
+   "result": "ok"
   },
-  "default_for_new_repos": "all",
-  "totals": {
-    "org_repos": 29,
-    "archived": 1,
-    "enforced_under_canonical": 29,
-    "errors": 0,
-    "warnings": 0
+  {
+   "repo": "szl-holdings/a11oy",
+   "archived": false,
+   "private": false,
+   "status_under_canonical": "enforced",
+   "attached_elsewhere": null,
+   "result": "ok"
   },
-  "errors": [],
-  "warnings": [],
-  "repos": [
-    {
-      "repo": "szl-holdings/.github",
-      "archived": false,
-      "private": false,
-      "status_under_canonical": "enforced",
-      "attached_elsewhere": null,
-      "result": "ok"
-    },
-    {
-      "repo": "szl-holdings/a11oy",
-      "archived": false,
-      "private": false,
-      "status_under_canonical": "enforced",
-      "attached_elsewhere": null,
-      "result": "ok"
-    },
-    {
-      "repo": "szl-holdings/anatomy",
-      "archived": false,
-      "private": false,
-      "status_under_canonical": "enforced",
-      "attached_elsewhere": null,
-      "result": "ok"
-    },
-    {
-      "repo": "szl-holdings/developers",
-      "archived": false,
-      "private": false,
-      "status_under_canonical": "enforced",
-      "attached_elsewhere": null,
-      "result": "ok"
-    },
-    {
-      "repo": "szl-holdings/docs-site",
-      "archived": false,
-      "private": false,
-      "status_under_canonical": "enforced",
-      "attached_elsewhere": null,
-      "result": "ok"
-    },
-    {
-      "repo": "szl-holdings/hatun-mcp",
-      "archived": false,
-      "private": false,
-      "status_under_canonical": "enforced",
-      "attached_elsewhere": null,
-      "result": "ok"
-    },
-    {
-      "repo": "szl-holdings/khipu-consensus",
-      "archived": false,
-      "private": false,
-      "status_under_canonical": "enforced",
-      "attached_elsewhere": null,
-      "result": "ok"
-    },
-    {
-      "repo": "szl-holdings/killinchu",
-      "archived": false,
-      "private": false,
-      "status_under_canonical": "enforced",
-      "attached_elsewhere": null,
-      "result": "ok"
-    },
-    {
-      "repo": "szl-holdings/lambda-bounty",
-      "archived": true,
-      "private": false,
-      "status_under_canonical": "enforced",
-      "attached_elsewhere": null,
-      "result": "skipped_archived"
-    },
-    {
-      "repo": "szl-holdings/lean-kernel",
-      "archived": false,
-      "private": false,
-      "status_under_canonical": "enforced",
-      "attached_elsewhere": null,
-      "result": "ok"
-    },
-    {
-      "repo": "szl-holdings/lutar-lean",
-      "archived": false,
-      "private": false,
-      "status_under_canonical": "enforced",
-      "attached_elsewhere": null,
-      "result": "ok"
-    },
-    {
-      "repo": "szl-holdings/ouroboros",
-      "archived": false,
-      "private": false,
-      "status_under_canonical": "enforced",
-      "attached_elsewhere": null,
-      "result": "ok"
-    },
-    {
-      "repo": "szl-holdings/pitch-collateral",
-      "archived": false,
-      "private": true,
-      "status_under_canonical": "enforced",
-      "attached_elsewhere": null,
-      "result": "ok"
-    },
-    {
-      "repo": "szl-holdings/platform",
-      "archived": false,
-      "private": false,
-      "status_under_canonical": "enforced",
-      "attached_elsewhere": null,
-      "result": "ok"
-    },
-    {
-      "repo": "szl-holdings/szl-brand",
-      "archived": false,
-      "private": false,
-      "status_under_canonical": "enforced",
-      "attached_elsewhere": null,
-      "result": "ok"
-    },
-    {
-      "repo": "szl-holdings/szl-build-env",
-      "archived": false,
-      "private": false,
-      "status_under_canonical": "enforced",
-      "attached_elsewhere": null,
-      "result": "ok"
-    },
-    {
-      "repo": "szl-holdings/szl-cookbook",
-      "archived": false,
-      "private": false,
-      "status_under_canonical": "enforced",
-      "attached_elsewhere": null,
-      "result": "ok"
-    },
-    {
-      "repo": "szl-holdings/szl-doctrine",
-      "archived": false,
-      "private": false,
-      "status_under_canonical": "enforced",
-      "attached_elsewhere": null,
-      "result": "ok"
-    },
-    {
-      "repo": "szl-holdings/szl-fleet-overlay",
-      "archived": false,
-      "private": false,
-      "status_under_canonical": "enforced",
-      "attached_elsewhere": null,
-      "result": "ok"
-    },
-    {
-      "repo": "szl-holdings/szl-lake",
-      "archived": false,
-      "private": false,
-      "status_under_canonical": "enforced",
-      "attached_elsewhere": null,
-      "result": "ok"
-    },
-    {
-      "repo": "szl-holdings/szl-mesh",
-      "archived": false,
-      "private": false,
-      "status_under_canonical": "enforced",
-      "attached_elsewhere": null,
-      "result": "ok"
-    },
-    {
-      "repo": "szl-holdings/szl-papers",
-      "archived": false,
-      "private": false,
-      "status_under_canonical": "enforced",
-      "attached_elsewhere": null,
-      "result": "ok"
-    },
-    {
-      "repo": "szl-holdings/szl-trust",
-      "archived": false,
-      "private": false,
-      "status_under_canonical": "enforced",
-      "attached_elsewhere": null,
-      "result": "ok"
-    },
-    {
-      "repo": "szl-holdings/szl-uds-deployment",
-      "archived": false,
-      "private": false,
-      "status_under_canonical": "enforced",
-      "attached_elsewhere": null,
-      "result": "ok"
-    },
-    {
-      "repo": "szl-holdings/szlholdings-site",
-      "archived": false,
-      "private": false,
-      "status_under_canonical": "enforced",
-      "attached_elsewhere": null,
-      "result": "ok"
-    },
-    {
-      "repo": "szl-holdings/uds-bundles",
-      "archived": false,
-      "private": false,
-      "status_under_canonical": "enforced",
-      "attached_elsewhere": null,
-      "result": "ok"
-    },
-    {
-      "repo": "szl-holdings/uds-mesh",
-      "archived": false,
-      "private": false,
-      "status_under_canonical": "enforced",
-      "attached_elsewhere": null,
-      "result": "ok"
-    },
-    {
-      "repo": "szl-holdings/vsp-otel",
-      "archived": false,
-      "private": false,
-      "status_under_canonical": "enforced",
-      "attached_elsewhere": null,
-      "result": "ok"
-    },
-    {
-      "repo": "szl-holdings/warhacker-demo",
-      "archived": false,
-      "private": false,
-      "status_under_canonical": "enforced",
-      "attached_elsewhere": null,
-      "result": "ok"
-    }
-  ]
+  {
+   "repo": "szl-holdings/anatomy",
+   "archived": false,
+   "private": false,
+   "status_under_canonical": "enforced",
+   "attached_elsewhere": null,
+   "result": "ok"
+  },
+  {
+   "repo": "szl-holdings/david-leads",
+   "archived": false,
+   "private": true,
+   "status_under_canonical": "enforced",
+   "attached_elsewhere": null,
+   "result": "ok"
+  },
+  {
+   "repo": "szl-holdings/developers",
+   "archived": false,
+   "private": false,
+   "status_under_canonical": "enforced",
+   "attached_elsewhere": null,
+   "result": "ok"
+  },
+  {
+   "repo": "szl-holdings/docs-site",
+   "archived": false,
+   "private": false,
+   "status_under_canonical": "enforced",
+   "attached_elsewhere": null,
+   "result": "ok"
+  },
+  {
+   "repo": "szl-holdings/governed-inference-meter",
+   "archived": false,
+   "private": false,
+   "status_under_canonical": "enforced",
+   "attached_elsewhere": null,
+   "result": "ok"
+  },
+  {
+   "repo": "szl-holdings/hatun-mcp",
+   "archived": false,
+   "private": false,
+   "status_under_canonical": "enforced",
+   "attached_elsewhere": null,
+   "result": "ok"
+  },
+  {
+   "repo": "szl-holdings/immune",
+   "archived": false,
+   "private": false,
+   "status_under_canonical": "enforced",
+   "attached_elsewhere": null,
+   "result": "ok"
+  },
+  {
+   "repo": "szl-holdings/khipu-consensus",
+   "archived": false,
+   "private": false,
+   "status_under_canonical": "enforced",
+   "attached_elsewhere": null,
+   "result": "ok"
+  },
+  {
+   "repo": "szl-holdings/khipu-sda-core",
+   "archived": false,
+   "private": false,
+   "status_under_canonical": "enforced",
+   "attached_elsewhere": null,
+   "result": "ok"
+  },
+  {
+   "repo": "szl-holdings/killinchu",
+   "archived": false,
+   "private": false,
+   "status_under_canonical": "enforced",
+   "attached_elsewhere": null,
+   "result": "ok"
+  },
+  {
+   "repo": "szl-holdings/lean-kernel",
+   "archived": false,
+   "private": false,
+   "status_under_canonical": "enforced",
+   "attached_elsewhere": null,
+   "result": "ok"
+  },
+  {
+   "repo": "szl-holdings/lutar-lean",
+   "archived": false,
+   "private": false,
+   "status_under_canonical": "enforced",
+   "attached_elsewhere": null,
+   "result": "ok"
+  },
+  {
+   "repo": "szl-holdings/ouroboros",
+   "archived": false,
+   "private": false,
+   "status_under_canonical": "enforced",
+   "attached_elsewhere": null,
+   "result": "ok"
+  },
+  {
+   "repo": "szl-holdings/pitch-collateral",
+   "archived": false,
+   "private": true,
+   "status_under_canonical": "enforced",
+   "attached_elsewhere": null,
+   "result": "ok"
+  },
+  {
+   "repo": "szl-holdings/platform",
+   "archived": false,
+   "private": false,
+   "status_under_canonical": "enforced",
+   "attached_elsewhere": null,
+   "result": "ok"
+  },
+  {
+   "repo": "szl-holdings/szl-brand",
+   "archived": false,
+   "private": false,
+   "status_under_canonical": "enforced",
+   "attached_elsewhere": null,
+   "result": "ok"
+  },
+  {
+   "repo": "szl-holdings/szl-build-env",
+   "archived": false,
+   "private": false,
+   "status_under_canonical": "enforced",
+   "attached_elsewhere": null,
+   "result": "ok"
+  },
+  {
+   "repo": "szl-holdings/szl-cookbook",
+   "archived": false,
+   "private": false,
+   "status_under_canonical": "enforced",
+   "attached_elsewhere": null,
+   "result": "ok"
+  },
+  {
+   "repo": "szl-holdings/szl-doctrine",
+   "archived": false,
+   "private": false,
+   "status_under_canonical": "enforced",
+   "attached_elsewhere": null,
+   "result": "ok"
+  },
+  {
+   "repo": "szl-holdings/szl-energy-attest",
+   "archived": false,
+   "private": false,
+   "status_under_canonical": "enforced",
+   "attached_elsewhere": null,
+   "result": "ok"
+  },
+  {
+   "repo": "szl-holdings/szl-fleet-overlay",
+   "archived": true,
+   "private": false,
+   "status_under_canonical": "enforced",
+   "attached_elsewhere": null,
+   "result": "ok"
+  },
+  {
+   "repo": "szl-holdings/szl-governed-norm",
+   "archived": false,
+   "private": false,
+   "status_under_canonical": "enforced",
+   "attached_elsewhere": null,
+   "result": "ok"
+  },
+  {
+   "repo": "szl-holdings/szl-lake",
+   "archived": false,
+   "private": false,
+   "status_under_canonical": "enforced",
+   "attached_elsewhere": null,
+   "result": "ok"
+  },
+  {
+   "repo": "szl-holdings/szl-lambda-gate",
+   "archived": false,
+   "private": false,
+   "status_under_canonical": "enforced",
+   "attached_elsewhere": null,
+   "result": "ok"
+  },
+  {
+   "repo": "szl-holdings/szl-mesh",
+   "archived": false,
+   "private": false,
+   "status_under_canonical": "enforced",
+   "attached_elsewhere": null,
+   "result": "ok"
+  },
+  {
+   "repo": "szl-holdings/szl-otel-mesh",
+   "archived": true,
+   "private": false,
+   "status_under_canonical": "enforced",
+   "attached_elsewhere": null,
+   "result": "ok"
+  },
+  {
+   "repo": "szl-holdings/szl-papers",
+   "archived": false,
+   "private": false,
+   "status_under_canonical": "enforced",
+   "attached_elsewhere": null,
+   "result": "ok"
+  },
+  {
+   "repo": "szl-holdings/szl-receipt",
+   "archived": false,
+   "private": false,
+   "status_under_canonical": "enforced",
+   "attached_elsewhere": null,
+   "result": "ok"
+  },
+  {
+   "repo": "szl-holdings/szl-router",
+   "archived": false,
+   "private": false,
+   "status_under_canonical": "enforced",
+   "attached_elsewhere": null,
+   "result": "ok"
+  },
+  {
+   "repo": "szl-holdings/szl-trust",
+   "archived": false,
+   "private": false,
+   "status_under_canonical": "enforced",
+   "attached_elsewhere": null,
+   "result": "ok"
+  },
+  {
+   "repo": "szl-holdings/szl-uds-deployment",
+   "archived": true,
+   "private": false,
+   "status_under_canonical": "enforced",
+   "attached_elsewhere": null,
+   "result": "ok"
+  },
+  {
+   "repo": "szl-holdings/uds-bundles",
+   "archived": true,
+   "private": false,
+   "status_under_canonical": "enforced",
+   "attached_elsewhere": null,
+   "result": "ok"
+  },
+  {
+   "repo": "szl-holdings/vsp-otel",
+   "archived": false,
+   "private": false,
+   "status_under_canonical": "enforced",
+   "attached_elsewhere": null,
+   "result": "ok"
+  },
+  {
+   "repo": "szl-holdings/warhacker-demo",
+   "archived": false,
+   "private": false,
+   "status_under_canonical": "enforced",
+   "attached_elsewhere": null,
+   "result": "ok"
+  },
+  {
+   "repo": "szl-holdings/yarqa",
+   "archived": false,
+   "private": false,
+   "status_under_canonical": "enforced",
+   "attached_elsewhere": null,
+   "result": "ok"
+  }
+ ]
 }
