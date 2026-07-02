@@ -11,6 +11,11 @@
       "allowed_claims": ["CC-BY-4.0", "Apache-2.0"],
       "github_repo": "szl-lake",
       "reason": "Dual-licensed lake mirrored from szl-holdings/szl-lake: datasets under CC-BY-4.0 (the SPDX GitHub detects), code/tooling under Apache-2.0. The HF dataset card declares CC-BY-4.0; either is acceptable."
+    },
+    "SZLHOLDINGS/szl-evidence": {
+      "license_optional": true,
+      "github_repo": false,
+      "reason": "Private internal daily-evidence dataset (daily/*.json receipt snapshots) — a proprietary internal store, not a published software/data artifact, so it carries no public OSS license or dataset card by design and has no GitHub counterpart. Same license-optional rationale as the org-card README Space."
     }
   },
   "ignore_repos": []
