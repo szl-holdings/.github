@@ -31,10 +31,11 @@ name: Anatomy-map public-surface drift watch (HF Space + a-11-oy.com)
 
 on:
   schedule:
-    # Every ~15 min, offset off the top of the hour to dodge scheduler
-    # congestion (GitHub cron is best-effort). Detection latency <= ~15 min vs
-    # the weekly sweep. Free on public repos.
-    - cron: "6,21,36,51 * * * *"
+    # Every ~5 min (GitHub's minimum granularity), offset off the top of the
+    # 5-min mark to dodge scheduler congestion (GitHub cron is best-effort).
+    # Worst-case detection latency <= ~5 min vs the weekly sweep. All anatomy
+    # repos are PUBLIC, so Actions minutes are free -- tighter cadence costs nothing.
+    - cron: "2,7,12,17,22,27,32,37,42,47,52,57 * * * *"
   workflow_dispatch: {}
   repository_dispatch:
     # A future HF webhook (org -> repo dispatch) can fire this the moment the
