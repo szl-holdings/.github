@@ -369,6 +369,12 @@ def main(argv=None):
                                          "anatomy_map_registry.json"))
     ap.add_argument("--report", default=None,
                     help="path to write the JSON drift report")
+    ap.add_argument("--only", action="append", default=None,
+                    help="restrict the check to these surface id(s) "
+                         "(repeatable, or comma-separated). Others in the "
+                         "registry are skipped. Used by the tight HF-edit "
+                         "watcher to validate just the SZLHOLDINGS/anatomy "
+                         "Space soon after a direct HF-side edit.")
     args = ap.parse_args(argv)
 
     reg = load_registry(args.registry)
@@ -376,9 +382,27 @@ def main(argv=None):
     if reg.get("canonical_locked"):
         CANONICAL_LOCKED = tuple(reg["canonical_locked"])
 
+    specs = reg["surfaces"]
+    if args.only:
+        wanted = set()
+        for item in args.only:
+            wanted.update(t.strip() for t in item.split(",") if t.strip())
+        specs = [s for s in specs if s["id"] in wanted]
+        missing = wanted - {s["id"] for s in specs}
+        if missing:
+            print("::error::--only names unknown surface id(s): "
+                  + ", ".join(sorted(missing)))
+            print("::error::Failing (exit 2) rather than silently checking "
+                  "nothing -- coverage can never look clean on a typo.")
+            return 2
+        if not specs:
+            print("::error::--only matched no surfaces; refusing to pass on "
+                  "an empty check.")
+            return 2
+
     surfaces = []
     try:
-        for spec in reg["surfaces"]:
+        for spec in specs:
             surfaces.append(fetch_surface(spec))
     except RuntimeError as e:
         print(f"::error::anatomy-map drift check could not fetch a surface: {e}")
