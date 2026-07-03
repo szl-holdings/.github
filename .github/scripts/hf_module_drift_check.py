@@ -75,8 +75,38 @@ UA = {"User-Agent": "hf-module-drift-check/1.0"}
 # --------------------------------------------------------------------------- #
 # HTTP helpers (stdlib, with retry + redirect following)
 # --------------------------------------------------------------------------- #
-def _http(url, headers=None, want_headers=False, retries=7):
+# 429/backoff/inconclusive policy
+# ---------------------------------
+# HF rate-limits HARD (HTTP 429) when sibling organ repos poll its tree API at
+# once, and can also throw transient 5xx. _http already honors Retry-After and
+# otherwise backs off exponentially with jitter across `retries` attempts. If
+# the transient status PERSISTS past the whole retry budget, we must NOT crash
+# the check (that marked hf-module-drift RED on consuming repos over pure
+# rate-limiting, with no report written) and must NOT false-green (we genuinely
+# could not compare). Instead _http raises TransientHTTPError, which the CLI
+# entrypoints catch and turn into an HONEST INCONCLUSIVE result: a loudly-marked
+# report (status "inconclusive") is always written and the process exits 0 so a
+# brief HF outage doesn't fail the gate -- but the logs/report can never be
+# mistaken for a verified in-sync pass. A genuinely-unreachable non-transient
+# endpoint (or any other error) still raises plain RuntimeError and fails.
+class TransientHTTPError(RuntimeError):
+    """HF/GitHub returned 429 or 5xx that persisted past the retry budget.
+
+    Distinct from a plain RuntimeError so the CLI can tell "the remote is
+    rate-limiting / temporarily down, we could not verify" (-> honest
+    INCONCLUSIVE) apart from "the comparison genuinely failed" (-> error)."""
+
+    def __init__(self, url, code, tries, last=None):
+        self.url = url
+        self.code = code
+        self.tries = tries
+        super().__init__(
+            f"transient HTTP {code} after {tries} tries: {url}: {last}")
+
+
+def _http(url, headers=None, want_headers=False, retries=8):
     last = None
+    last_transient_code = None
     hdrs = dict(UA)
     if headers:
         hdrs.update(headers)
@@ -98,6 +128,7 @@ def _http(url, headers=None, want_headers=False, retries=7):
             # 429 / 5xx are transient (HF rate-limits hard when sibling repos
             # poll at once). Honor Retry-After, else exponential backoff + jitter.
             if e.code == 429 or 500 <= e.code < 600:
+                last_transient_code = e.code
                 ra = (e.headers or {}).get("Retry-After")
                 try:
                     delay = float(ra) if ra else min(60.0, 2.0 * (2 ** attempt))
@@ -108,6 +139,10 @@ def _http(url, headers=None, want_headers=False, retries=7):
         except (urllib.error.URLError, TimeoutError, ConnectionError) as e:
             last = e
         time.sleep(1.5 * (attempt + 1) + random.uniform(0, 0.75))
+    # Retry budget exhausted. If the last failures were transient (429/5xx),
+    # surface that distinctly so the CLI can go INCONCLUSIVE instead of RED.
+    if last_transient_code is not None:
+        raise TransientHTTPError(url, last_transient_code, retries, last)
     raise RuntimeError(f"GET failed after {retries} tries: {url}: {last}")
 
 
@@ -601,6 +636,7 @@ def compare(args, allow=None):
 
     report = {
         "schema": 1,
+        "status": "drift" if errors else "ok",
         "generated_utc": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
         "github_repo": args.github_repo,
         "hf_repo": args.hf_repo,
@@ -666,6 +702,53 @@ def print_pair(report, errors, warns, github_repo, hf_repo, ref):
 
 
 # --------------------------------------------------------------------------- #
+# Report writing + honest-inconclusive path
+# --------------------------------------------------------------------------- #
+def _write_report(path, report):
+    """Always-write helper so the artifact upload step never warns
+    'No files were found' on any exit path (ok / drift / inconclusive)."""
+    if not path:
+        return
+    with open(path, "w") as fh:
+        json.dump(report, fh, indent=2, sort_keys=True)
+        fh.write("\n")
+    print(f"\nreport written: {path}")
+
+
+def _emit_inconclusive(args, exc):
+    """A transient HF/GitHub outage (429/5xx past the retry budget) means we
+    COULD NOT verify drift. Never crash and never false-green: write a loudly
+    marked report (status 'inconclusive') and exit 0 (the workflow is binary
+    0=pass/nonzero=fail, with no native neutral) so a brief rate-limit window
+    doesn't turn the gate RED -- while the log + report make it impossible to
+    mistake for a verified in-sync pass."""
+    code = getattr(exc, "code", None)
+    reason = "hf_api_429" if code == 429 else (
+        f"api_http_{code}" if code else "api_unavailable")
+    report = {
+        "schema": 1,
+        "status": "inconclusive",
+        "reason": reason,
+        "generated_utc": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+        "github_repo": getattr(args, "github_repo", None),
+        "hf_repo": getattr(args, "hf_repo", None),
+        "ref": getattr(args, "ref", None),
+        "detail": str(exc),
+        "error_count": 0,
+        "warn_count": 0,
+        "findings": [],
+    }
+    _write_report(getattr(args, "report_out", ""), report)
+    print(f"::warning title=HF module drift INCONCLUSIVE::{report['github_repo']}: "
+          f"HuggingFace API unavailable ({exc}); could NOT verify drift")
+    print("\nhf-module-drift: INCONCLUSIVE -- HuggingFace API unavailable "
+          f"(HTTP {code or '?'} after backoff); could NOT verify drift. "
+          "This is NOT a verified in-sync pass -- re-run once HF rate-limiting "
+          "clears to actually compare GitHub <-> the live HF Space.")
+    return 0
+
+
+# --------------------------------------------------------------------------- #
 # Registry mode: org-wide sweep over a GitHub<->HF map (no checkout)
 # --------------------------------------------------------------------------- #
 def run_registry(args):
@@ -680,6 +763,7 @@ def run_registry(args):
     total_errors = 0
     scanned = 0
     skipped = []
+    inconclusive = []
 
     for ent in entries:
         gh = ent.get("github")
@@ -715,6 +799,22 @@ def run_registry(args):
         allow = fetch_remote_allow(gh, ref)
         try:
             report, errors, warns = compare(sub, allow)
+        except TransientHTTPError as e:
+            # HF/GitHub rate-limited THIS pair past the retry budget: we could
+            # not verify it. Record as INCONCLUSIVE (a warning, NOT an error) so
+            # one rate-limited pair doesn't fail the whole org sweep or get
+            # mistaken for verified-in-sync.
+            print(f"::warning title=HF module drift INCONCLUSIVE::{gh} <-> {hf}: "
+                  f"{e}; could NOT verify (transient HF/GitHub outage).")
+            inconclusive.append({"github": gh, "hf": hf, "reason": "api_unavailable",
+                                 "detail": str(e)})
+            pair_reports.append({
+                "github_repo": gh, "hf_repo": hf, "ref": ref,
+                "status": "inconclusive", "error_count": 0, "warn_count": 0,
+                "findings": [{"path": "(pair)", "kind": "inconclusive",
+                              "severity": "warn", "detail": str(e)}],
+            })
+            continue
         except RuntimeError as e:
             # A pair that cannot be compared (e.g. HF Space missing) is itself a
             # real, actionable problem -- record it as an error, don't crash the
@@ -737,22 +837,26 @@ def run_registry(args):
 
     combined = {
         "schema": 1,
+        "status": ("drift" if total_errors else
+                   "inconclusive" if inconclusive else "ok"),
         "generated_utc": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
         "registry": args.registry,
         "pairs_in_registry": len(entries),
         "pairs_scanned": scanned,
         "pairs_skipped": skipped,
+        "pairs_inconclusive": inconclusive,
         "total_error_count": total_errors,
         "pairs": sorted(pair_reports, key=lambda r: r.get("github_repo", "")),
     }
-    if args.report_out:
-        with open(args.report_out, "w") as fh:
-            json.dump(combined, fh, indent=2, sort_keys=True)
-            fh.write("\n")
-        print(f"\nreport written: {args.report_out}")
+    _write_report(args.report_out, combined)
 
+    if inconclusive:
+        print(f"\n::warning title=HF module drift INCONCLUSIVE::{len(inconclusive)} "
+              "pair(s) could NOT be verified (transient HF/GitHub outage) -- "
+              "re-run once rate-limiting clears.")
     print(f"\n== org HF module-drift sweep: {scanned} pair(s) scanned, "
-          f"{len(skipped)} skipped, {total_errors} error(s) ==")
+          f"{len(skipped)} skipped, {len(inconclusive)} inconclusive, "
+          f"{total_errors} error(s) ==")
     if total_errors and not args.warn_only:
         print("\nFAIL: drifted/one-sided COPY'd module(s) between GitHub and a live "
               "HF Space. A human must pick which side is the source of truth, "
@@ -791,14 +895,15 @@ def main():
     if not args.github_repo or not args.hf_repo:
         ap.error("--github-repo and --hf-repo are required unless --registry is given")
 
-    report, errors, warns = compare(args)
+    try:
+        report, errors, warns = compare(args)
+    except TransientHTTPError as e:
+        # HF/GitHub rate-limited or transiently down past the retry budget:
+        # honest INCONCLUSIVE (report written, exit 0) instead of crash/false-green.
+        return _emit_inconclusive(args, e)
     print_pair(report, errors, warns, args.github_repo, args.hf_repo, args.ref)
 
-    if args.report_out:
-        with open(args.report_out, "w") as fh:
-            json.dump(report, fh, indent=2, sort_keys=True)
-            fh.write("\n")
-        print(f"\nreport written: {args.report_out}")
+    _write_report(args.report_out, report)
 
     if errors and not args.warn_only:
         print(f"\nFAIL: {len(errors)} drifted/one-sided COPY'd module(s) between GitHub "

@@ -22,7 +22,10 @@ from __future__ import annotations
 
 import argparse
 import importlib.util
+import json
 import os
+import shutil
+import tempfile
 import unittest
 
 _HERE = os.path.dirname(os.path.abspath(__file__))
@@ -147,6 +150,81 @@ class TestComparePropagatesLineage(unittest.TestCase):
         rendered = drift.fmt(e)
         self.assertIn("LINEAGE CONFLICT", rendered)
         self.assertIn("md5-compare all 4 surfaces", rendered)
+
+
+class TestTransientHTTPInconclusive(unittest.TestCase):
+    """A persistent HF 429/5xx must go HONEST INCONCLUSIVE (report written,
+    exit 0), never crash and never false-green. All network stubbed."""
+
+    def setUp(self):
+        self._saved = {k: getattr(drift, k) for k in (
+            "github_tree_remote", "github_tree_local", "hf_tree",
+            "github_file_date", "hf_dir_dates", "parse_copy_sources", "_http",
+            "gh_get")}
+        self._tmp = tempfile.mkdtemp()
+
+    def tearDown(self):
+        for k, v in self._saved.items():
+            setattr(drift, k, v)
+        shutil.rmtree(self._tmp, ignore_errors=True)
+
+    def _args(self):
+        return argparse.Namespace(
+            repo_root=".", github_repo="szl-holdings/a11oy",
+            hf_repo="SZLHOLDINGS/a11oy", ref="main", allow=None,
+            github_remote=True, report_out=os.path.join(self._tmp, "r.json"),
+            warn_only=False, registry="", siblings=[])
+
+    def test_http_raises_transient_on_persistent_429(self):
+        # _http must raise the distinct TransientHTTPError (not plain RuntimeError)
+        # when 429 persists past the retry budget, so callers can go inconclusive.
+        import urllib.error
+        drift.time.sleep = lambda *_a, **_k: None  # no real backoff waits
+
+        def always_429(url, *a, **k):
+            raise urllib.error.HTTPError(url, 429, "Too Many Requests", {}, None)
+        drift.urllib.request.urlopen = always_429
+        with self.assertRaises(drift.TransientHTTPError) as ctx:
+            drift._http("https://huggingface.co/api/spaces/x/tree/main", retries=2)
+        self.assertEqual(ctx.exception.code, 429)
+
+    def test_compare_transient_becomes_inconclusive_exit0(self):
+        args = self._args()
+        drift.parse_copy_sources = lambda _txt: ["mod.py"]
+        drift.gh_get = lambda *a, **k: (200, b"COPY mod.py /app/", None)
+
+        def hf_429(*a, **k):
+            raise drift.TransientHTTPError(
+                "https://huggingface.co/api/spaces/SZLHOLDINGS/a11oy/tree/main",
+                429, 8)
+        drift.hf_tree = hf_429
+        drift.github_tree_remote = lambda repo, ref="main": {"mod.py": "abc"}
+
+        # Mirror main()'s dispatch: compare() raises -> _emit_inconclusive.
+        try:
+            drift.compare(args)
+            self.fail("expected TransientHTTPError")
+        except drift.TransientHTTPError as e:
+            rc = drift._emit_inconclusive(args, e)
+
+        self.assertEqual(rc, 0)  # NEUTRAL exit -- gate not marked red
+        with open(args.report_out) as fh:
+            report = json.load(fh)
+        self.assertEqual(report["status"], "inconclusive")
+        self.assertEqual(report["reason"], "hf_api_429")
+        self.assertEqual(report["error_count"], 0)
+        self.assertEqual(report["findings"], [])
+
+    def test_ok_report_carries_status_ok(self):
+        args = self._args()
+        drift.parse_copy_sources = lambda _txt: ["mod.py"]
+        drift.gh_get = lambda *a, **k: (200, b"COPY mod.py /app/", None)
+        drift.github_tree_remote = lambda repo, ref="main": {"mod.py": "same"}
+        drift.hf_tree = lambda repo, ref="main": {
+            "mod.py": {"oid": "same", "lfs_oid": None, "size": 1}}
+        report, errors, warns = drift.compare(args)
+        self.assertEqual(report["status"], "ok")
+        self.assertEqual(errors, [])
 
 
 if __name__ == "__main__":
