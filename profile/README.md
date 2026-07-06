@@ -25,6 +25,8 @@
 
 ## [Enter a11oy →](https://a-11-oy.com)
 
+### ◇ [Explore the Holographic Estate →](https://a-11-oy.com/holographic)
+
 </div>
 
 ---
@@ -34,6 +36,7 @@
 | Space | What it is | Open |
 |---|---|---|
 | **a11oy** — flagship | Governed-AI Command Center: ask-and-act behind deny-by-default gates, a live decision feed, and a signed receipt for every action. | **[a-11-oy.com](https://a-11-oy.com)** |
+| **Holographic Estate** — 3D showcase | The frontier tier as one live holographic lattice — ~50 live surfaces (frontier organs, energy, counter-UAS, governance, PINN, anatomy) in navigable 3D. 0 runtime CDN; WebGL2 with optional WebGPU; every value carries its honesty label. | **[a-11-oy.com/holographic](https://a-11-oy.com/holographic)** |
 | **killinchu** | Counter-UAS & maritime command *demonstration* — multi-sensor fusion with signed engagement receipts (effector link is a labeled simulation). | [demo →](https://szlholdings-killinchu.hf.space/elite) |
 | **anatomy** | Living anatomy map — the locked-8 ladder and the four honesty tiers, visualized. | [view →](https://szlholdings-anatomy.hf.space) |
 | **energy** | a11oy energy surface — joules MEASURED when a GPU lung is reachable, honest SAMPLE otherwise. | [view →](https://szlholdings-energy.hf.space) |
