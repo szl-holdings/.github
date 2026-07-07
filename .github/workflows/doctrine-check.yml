@@ -21,6 +21,20 @@ jobs:
         with:
           python-version: "3.12"
 
+      # The authoritative honesty checker (doctrine_check.py) lives ONLY in the
+      # szl-holdings/.github repo, not in leaf repos. When a leaf repo calls this
+      # reusable workflow, the checkout above pulls the CALLER tree (which has no
+      # script), so we fetch the script's home repo into a separate subpath here.
+      # `--local .` below still scans the CALLER tree (default workspace root);
+      # this second checkout only supplies the script binary. persist-credentials
+      # is disabled — we only need the tree, no token stays on disk.
+      - name: Fetch org doctrine checker
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          repository: szl-holdings/.github
+          path: _szl_doctrine
+          persist-credentials: false
+
       # ---------------------------------------------------------------------
       # AUTHORITATIVE, LINE-WRAP-TOLERANT honesty invariants (Inv 1/2/3/5/6).
       #
@@ -46,7 +60,7 @@ jobs:
       - name: SZL Doctrine Invariants (line-wrap tolerant, Inv 1/2/3/5/6)
         run: |
           set -eu
-          python3 .github/scripts/doctrine_check.py \
+          python3 _szl_doctrine/.github/scripts/doctrine_check.py \
             --local . --repo "${GITHUB_REPOSITORY:-}"
 
       - name: SZL Doctrine Invariants (bash — jq-based Inv 4/7/8/9 + legacy echo)
