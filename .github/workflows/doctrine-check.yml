@@ -16,10 +16,52 @@ jobs:
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
 
-      - name: SZL Doctrine Invariants
+      - name: Set up Python
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+        with:
+          python-version: "3.12"
+
+      # ---------------------------------------------------------------------
+      # AUTHORITATIVE, LINE-WRAP-TOLERANT honesty invariants (Inv 1/2/3/5/6).
+      #
+      # WHY: the historical inline-bash block below is LINE-BASED (grep tests
+      # one physical line at a time), so a cosmetic reflow that split an honest
+      # sentence across two lines (trigger on one line, qualifier on the next)
+      # produced a FALSE-POSITIVE doctrine failure ORG-WIDE. That actually
+      # happened (a 2-line wrap in a11oy szl_kc_atlas.py broke check/doctrine on
+      # main and every open PR; a11oy PR #768 was needed just to re-flow text
+      # back onto one line — a bandaid the next reflow re-breaks). It was also
+      # the ONLY org guard with no self-test, because its logic was un-importable
+      # inline bash.
+      #
+      # FIX (no bandaid): doctrine_check.py ports the SAME triggers/exemptions/
+      # repo-scoping but evaluates each honesty qualifier over a WHITESPACE-
+      # NORMALIZED WINDOW (the trigger line joined with its neighbours), so a
+      # soft-wrap can never again hide a qualifier from the check — while a
+      # genuine unqualified overclaim still FAILS. It is pinned by the network-
+      # free test_doctrine_check.py in tests.yml (the org's self-test-the-guard
+      # convention), which includes the exact szl_kc_atlas line-wrap regression.
+      # This step is the AUTHORITATIVE fatal gate for Inv 1/2/3/5/6.
+      # ---------------------------------------------------------------------
+      - name: SZL Doctrine Invariants (line-wrap tolerant, Inv 1/2/3/5/6)
+        run: |
+          set -eu
+          python3 .github/scripts/doctrine_check.py \
+            --local . --repo "${GITHUB_REPOSITORY:-}"
+
+      - name: SZL Doctrine Invariants (bash — jq-based Inv 4/7/8/9 + legacy echo)
         run: |
           set -eu
           FAIL=0
+          # NOTE (2026-07-07 hardening): the line-wrap-prone honesty invariants
+          # (Inv 1/2/3/5/6) are now enforced AUTHORITATIVELY and line-wrap-
+          # tolerantly by the doctrine_check.py step ABOVE (pinned by
+          # test_doctrine_check.py). Their bash counterparts below are kept for
+          # transparency but NO LONGER SET FAIL (see the `# [migrated]` markers)
+          # so a soft-wrap can't reintroduce the org-wide false positive. The
+          # jq/numeric invariants that were never line-wrap-sensitive (Inv 4
+          # Section-889 vendor count, Inv 7 kernel-commit lock, Inv 8 SBOM/
+          # signing warning, Inv 9 DSSE receipt shape) remain fatal here.
 
           # Repo-scoped SLSA L2 evidence gate. SLSA posture is L1 honest / L2 roadmap.
           # Only the two SHIPPING products (a11oy, killinchu) wire
@@ -93,8 +135,7 @@ jobs:
               || true)
           if [ -n "$M1" ]; then
             echo "$M1" | head -10
-            echo "::error::Doctrine version drift detected — only v11 allowed (ADDITIVE/proposed/roadmap/historical labels are exempt)"
-            FAIL=1
+            echo "::notice::[migrated] Inv1 now enforced line-wrap-tolerantly by doctrine_check.py above (this bash echo is advisory only)."
           fi
 
           echo "=== Invariant 2: Λ = Conjecture 1 (NEVER theorem) ==="
@@ -120,8 +161,7 @@ jobs:
               || true)
           if [ -n "$M2" ]; then
             echo "$M2" | head -10
-            echo "::error::Λ described as theorem or lambdaUniqueness used without Conjecture suffix — must be Conjecture 1"
-            FAIL=1
+            echo "::notice::[migrated] Inv2 now enforced line-wrap-tolerantly by doctrine_check.py above (this bash echo is advisory only)."
           fi
 
           echo "=== Invariant 3: SLSA claims must be honest and evidence-gated ==="
@@ -152,8 +192,7 @@ jobs:
               || true)
           if [ -n "$M3_L3" ]; then
             echo "$M3_L3" | head -10
-            echo "::error::SLSA L3 claim detected — L3 is NOT achieved (requires isolated builder/reusable workflow). Remove or scope as future roadmap."
-            FAIL=1
+            echo "::notice::[migrated] Inv3-L3 now enforced line-wrap-tolerantly by doctrine_check.py above (this bash echo is advisory only)."
           fi
 
           # RULE 2: L2 claims require evidence (attestation). Verified repos:
@@ -196,8 +235,7 @@ jobs:
               || true)
           if [ -n "$M3_L2_UNVERIFIED" ]; then
             echo "$M3_L2_UNVERIFIED" | head -10
-            echo "::error::SLSA L2 claim without evidence — only a11oy/killinchu (the two shipping products) have verified L2 attestations. Add evidence reference or remove the claim."
-            FAIL=1
+            echo "::notice::[migrated] Inv3-L2 now enforced line-wrap-tolerantly by doctrine_check.py above (this bash echo is advisory only)."
           fi
 
           echo "=== Invariant 4: Section 889 = exactly 5 vendors ==="
@@ -235,8 +273,7 @@ jobs:
           M6=$(grep -rE "^COPY \. \." --include="Dockerfile*" . 2>/dev/null || true)
           if [ -n "$M6" ]; then
             echo "$M6" | head -5
-            echo "::error::COPY . . in Dockerfile — must be per-file COPY"
-            FAIL=1
+            echo "::notice::[migrated] Inv6 now enforced by doctrine_check.py above (this bash echo is advisory only)."
           fi
 
           echo "=== Invariant 7: kernel commit c7c0ba17 not bumped ==="

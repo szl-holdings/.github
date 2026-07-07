@@ -22,6 +22,22 @@ jobs:
         with:
           python-version: "3.12"
 
+      # Pins the org-wide DOCTRINE honesty gate — the single most load-bearing
+      # check in the org, and (until now) the ONLY guard with no self-test.
+      # Its logic used to be inline LINE-BASED bash grep: a cosmetic 2-line
+      # reflow that split an honest sentence so the trigger landed on a line
+      # without its qualifier produced a FALSE-POSITIVE doctrine failure
+      # org-wide (the szl_kc_atlas incident; a11oy PR #768 was a bandaid reflow).
+      # doctrine_check.py ports the SAME triggers/exemptions but evaluates the
+      # qualifier over a whitespace-normalized WINDOW so a soft-wrap can never
+      # again break the org, while a genuine unqualified overclaim still FAILS.
+      # This network-free unit test pins that contract — including the exact
+      # szl_kc_atlas line-wrap regression and the verified-L2 repo-scoping — so a
+      # refactor can neither reintroduce the line fragility nor weaken an
+      # invariant into a false-green no-op.
+      - name: Doctrine check (line-wrap tolerant) self-test
+        run: python3 .github/scripts/test_doctrine_check.py
+
       # Pins the HF license-consistency private-coverage safety net (task #383):
       # the "valid token but private_seen < floor" false-green branch can't be
       # exercised with a live restricted token, so this stubbed, network-free
