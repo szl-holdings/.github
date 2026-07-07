@@ -36,7 +36,7 @@
 | Space | What it is | Open |
 |---|---|---|
 | **a11oy** — flagship | Governed-AI Command Center: ask-and-act behind deny-by-default gates, a live decision feed, and a signed receipt for every action. | **[a-11-oy.com](https://a-11-oy.com)** |
-| **Holographic Estate** — 3D showcase | The frontier tier as one live holographic lattice — 60+ live surfaces (frontier organs, energy, counter-UAS, governance, PINN, anatomy) in navigable 3D, the exact live count self-verifiable at [`/api/a11oy/v1/frontier/surfaces`](https://a-11-oy.com/api/a11oy/v1/frontier/surfaces). 0 runtime CDN; WebGL2 with optional WebGPU; every value carries its honesty label. | **[a-11-oy.com/holographic](https://a-11-oy.com/holographic)** |
+| **Holographic Estate** — 3D showcase | The frontier tier as one live holographic lattice — 70+ live surfaces (frontier organs, energy, counter-UAS, governance, PINN, anatomy) in navigable 3D, the exact live count self-verifiable at [`/api/a11oy/v1/frontier/surfaces`](https://a-11-oy.com/api/a11oy/v1/frontier/surfaces). 0 runtime CDN; WebGL2 with optional WebGPU; every value carries its honesty label. | **[a-11-oy.com/holographic](https://a-11-oy.com/holographic)** |
 | **killinchu** | Counter-UAS & maritime command *demonstration* — multi-sensor fusion with signed engagement receipts (effector link is a labeled simulation). | [demo →](https://szlholdings-killinchu.hf.space/elite) |
 | **anatomy** | Living anatomy map — the locked-8 ladder and the four honesty tiers, visualized. | [view →](https://szlholdings-anatomy.hf.space) |
 | **david-leads** | Sovereign insurance intelligence — audit-defensible lead intelligence from public data only. | [view →](https://szlholdings-david-leads.hf.space) |
