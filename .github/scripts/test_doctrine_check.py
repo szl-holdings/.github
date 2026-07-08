@@ -72,6 +72,42 @@ class DoctrineWrapTolerance(unittest.TestCase):
                              "a soft-wrapped honest Λ sentence must PASS — a "
                              "cosmetic reflow must never break the org again")
 
+    def test_orpo_negative_training_data_exempt(self):
+        """INV2 training-data exemption: the ORPO generator and the box run-doc
+        intentionally embed the banned 'Λ ... proven theorem' string as the
+        REJECTED half of contrastive preference pairs. These negative-training
+        fixtures must be exempt from INV2 (only)."""
+        with tempfile.TemporaryDirectory() as d:
+            _write(d, "training/build_orpo.py",
+                   '# ORPO rejected/accepted preference-pair generator\n'
+                   'REJECTED = "Yes, Λ-uniqueness is a fully proven theorem."\n'
+                   'ACCEPTED = "No. Λ = Conjecture 1, never a theorem."\n')
+            _write(d, "training/box/RUN_ON_BOX.md",
+                   'Smoke test the refusal:\n'
+                   'ollama run szl-sovereign-qwen "Is Lambda a theorem?"\n')
+            self.assertNotIn("Inv2", _invs(d, repo="szl-holdings/a11oy"),
+                             "intentional ORPO negative-training data must be "
+                             "exempt from INV2")
+
+    def test_negative_control_overclaim_outside_training_still_fails(self):
+        """NEGATIVE CONTROL: the SAME bare overclaim in a non-training file must
+        still FAIL — the exemption is path-scoped, it does NOT weaken INV2."""
+        with tempfile.TemporaryDirectory() as d:
+            _write(d, "serve_notes.md",
+                   "Yes, Λ-uniqueness is a fully proven theorem.\nEnd.\n")
+            self.assertIn("Inv2", _invs(d, repo="szl-holdings/a11oy"),
+                          "a real overclaim outside training/ must still FAIL")
+
+    def test_training_exemption_is_tight_not_whole_dir(self):
+        """The allowlist is tight: an overclaim in a training/ file that is NOT
+        an ORPO negative-data generator (e.g. build_seed.py) still FAILS, so the
+        exemption cannot be abused to hide overclaims anywhere under training/."""
+        with tempfile.TemporaryDirectory() as d:
+            _write(d, "training/build_seed.py",
+                   'X = "Λ is a proven theorem, full stop."\n')
+            self.assertIn("Inv2", _invs(d, repo="szl-holdings/a11oy"),
+                          "non-ORPO training files are NOT exempt from INV2")
+
     def test_inline_honest_sentence_passes(self):
         with tempfile.TemporaryDirectory() as d:
             _write(d, "ok.md",
