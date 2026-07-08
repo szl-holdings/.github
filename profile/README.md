@@ -16,6 +16,8 @@
 
 ### Governed AI you can prove — every decision comes with a signed, verifiable receipt.
 
+**a11oy** is the enterprise / regulated-AI platform (the code spine); **killinchu** is the defense & maritime front-end built on it. One doctrine, one receipt bus, two buyers.
+
 [![locked-proven](https://img.shields.io/badge/locked--proven-8%20formulas-3af4c8?style=flat-square)](https://github.com/szl-holdings/lutar-lean)
 [![Lean 4](https://img.shields.io/badge/Lean%204-machine--checked-5b8dee?style=flat-square)](https://github.com/szl-holdings/lutar-lean)
 [![Λ](https://img.shields.io/badge/%CE%9B-Conjecture%201%20(never%20green)-7e8aa3?style=flat-square)](https://github.com/szl-holdings/lutar-lean)
@@ -27,6 +29,8 @@
 
 ### ◇ [Explore the Holographic Estate →](https://a-11-oy.com/holographic)
 
+[**Verify a receipt →**](https://a-11-oy.com/verify) · [**Read the docs →**](https://szl-holdings.github.io/docs-site/) · [**docs-site repo →**](https://github.com/szl-holdings/docs-site)
+
 </div>
 
 ---
@@ -37,6 +41,7 @@
 |---|---|---|
 | **a11oy** — flagship | Governed-AI Command Center: ask-and-act behind deny-by-default gates, a live decision feed, and a signed receipt for every action. | **[a-11-oy.com](https://a-11-oy.com)** |
 | **Holographic Estate** — 3D showcase | The frontier tier as one live holographic lattice — 70+ live surfaces (frontier organs, energy, counter-UAS, governance, PINN, anatomy) in navigable 3D, the exact live count self-verifiable at [`/api/a11oy/v1/frontier/surfaces`](https://a-11-oy.com/api/a11oy/v1/frontier/surfaces). 0 runtime CDN; WebGL2 with optional WebGPU; every value carries its honesty label. | **[a-11-oy.com/holographic](https://a-11-oy.com/holographic)** |
+| **the Brain** | Shared governed memory + energy substrate under a11oy — a receipt-vault agents pull context from, feeding the governed agent-loop and energy allocation. Every read/write is Λ-gated (Conjecture 1, never green) and receipted. | [a-11-oy.com/brain](https://a-11-oy.com/brain) |
 | **killinchu** | Counter-UAS & maritime command *demonstration* — multi-sensor fusion with signed engagement receipts (effector link is a labeled simulation). | [demo →](https://szlholdings-killinchu.hf.space/elite) |
 | **anatomy** | Living anatomy map — the locked-8 ladder and the four honesty tiers, visualized. | [view →](https://szlholdings-anatomy.hf.space) |
 | **david-leads** | Sovereign insurance intelligence — audit-defensible lead intelligence from public data only. | [view →](https://szlholdings-david-leads.hf.space) |
