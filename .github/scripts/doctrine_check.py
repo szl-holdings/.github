@@ -163,6 +163,29 @@ INV2_EXEMPT = [
     r"dress .*up as a theorem|conditional Λ theorem|conditional lambda theorem",
 ]
 INV2_EXT = {".md", ".json", ".py", ".ts", ".lean"}
+# --- INV2 training-data exemption (NARROW, path-scoped — NOT a global disable) ---
+# a11oy's ORPO / preference-training corpus GENERATORS intentionally embed the
+# disallowed "Λ ... proven theorem" strings as the REJECTED half of contrastive
+# preference pairs: the model is trained to PREFER the honest "Λ = Conjecture 1,
+# never a theorem" completion and to REJECT the overclaim. These rejected strings
+# are negative-training FIXTURES, not product/serve/README claims, so they are
+# not real overclaims and must not trip the honesty gate.
+#
+# Scope is a tight relative-path allowlist under training/ (the ORPO generator
+# and the box run-doc that quotes the refusal smoke-test prompt). This exempts
+# ONLY those files, ONLY from INV2 — every other invariant still scans them, and
+# INV2 still fires on every non-training file. A planted real overclaim outside
+# training/ (or a non-INV2 overclaim inside it) still FAILS; see the negative
+# control in test_doctrine_check.py.
+INV2_TRAINING_EXEMPT_PREFIXES = (
+    "training/build_orpo",      # ORPO rejected/accepted preference-pair generator
+    "training/box/RUN_ON_BOX",  # box run-doc quoting the "Is Λ a theorem?" refusal test
+)
+
+
+def _inv2_training_exempt(rel: str) -> bool:
+    r = rel.replace(os.sep, "/")
+    return any(r.startswith(p) for p in INV2_TRAINING_EXEMPT_PREFIXES)
 
 INV3_L3_TRIGGER = r"SLSA.*L3|SLSA Level 3"
 INV3_L3_EXEMPT = [
@@ -231,7 +254,12 @@ def scan_local(root: str, repo: str = ""):
                     violations.append(("Inv1", rel, i + 1, line.strip()))
 
             # --- Invariant 2: Λ must be Conjecture 1, never a theorem ---
-            if ext in INV2_EXT and re.search(INV2_TRIGGER, line):
+            # Path-scoped skip for intentional ORPO negative-training data (the
+            # rejected half of preference pairs deliberately contains the banned
+            # overclaim). Only these training-data files, and only INV2, are
+            # exempt; see INV2_TRAINING_EXEMPT_PREFIXES.
+            if (ext in INV2_EXT and re.search(INV2_TRIGGER, line)
+                    and not _inv2_training_exempt(rel)):
                 win = window_text(lines, i, rel=rel)
                 if not _search(INV2_EXEMPT, win):
                     violations.append(("Inv2", rel, i + 1, line.strip()))
