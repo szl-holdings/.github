@@ -83,22 +83,31 @@ uses the `SZL_GITHUB_TOKEN` repo (or org) secret.
 
 ### Honest-degrade behavior
 
-The check distinguishes three states so a missing secret never masquerades as
-either drift or a clean pass:
+The check distinguishes these states so a token-plumbing gap (missing, expired,
+or under-scoped secret) never masquerades as either drift or a clean pass — the
+only RED is a genuine drift verified with a working token:
 
 | State | Result | CI status |
 |---|---|---|
-| Every non-archived repo enforced under `252588` | exit 0 | ✅ pass |
-| A repo detached / on another config / new & uncovered | exit 1 | ❌ fail (real drift) |
-| `SZL_GITHUB_TOKEN` present but auth/API fails (bad scope, network) | exit 2 | ❌ fail (real misconfiguration) |
-| `SZL_GITHUB_TOKEN` **not configured** | check job skipped | ⏭️ neutral (did NOT run — not a pass) |
+| Working token + every non-archived repo enforced under `252588` | exit 0 | ✅ pass |
+| Working token + a repo detached / on another config / new & uncovered | exit 1 | ❌ fail (real drift) |
+| **No usable credential** — secret missing, or invalid/expired (401), or under-scoped (403) | check job skipped | ⏭️ neutral (did NOT run — **not** a pass) |
+| Working token, but the check hits a persistent/unexpected API error mid-run | exit 2 | ❌ fail (real infra failure) |
 
-The `preflight` job maps the secret to a boolean and gates the `check` job on
-it (`secrets.*` cannot be used in a job-level `if:` directly), so with no token
-the check is **skipped (neutral grey)** — not a red failure and not a green
-pass. A genuine drift still fails when the token IS present.
+The `preflight` job decides whether the check can run and gates the `check` job
+on it (`secrets.*` cannot be used in a job-level `if:` directly). It does **not**
+just test that the secret is non-empty — an expired or under-scoped PAT is a
+non-empty string that still cannot read the endpoints. Instead it **probes the
+real code-security configurations endpoint**: only an HTTP `200` runs the check;
+a missing secret, `401` (bad/expired credentials), or `403` (insufficient scope)
+**skips it (neutral grey)** with a clear notice; a transient/unknown probe
+(network/5xx) still runs the check so its result stays authoritative. A genuine
+drift always fails when a working token is present.
 
-### Founder step — enable the check (one time)
+### Founder step — enable / refresh the token
+
+> The `SZL_GITHUB_TOKEN` secret already exists but PATs **expire**; when it
+> lapses the check degrades to a neutral skip and this same step refreshes it.
 
 1. Create a fine-grained **or** classic PAT owned by an org owner:
    - **Fine-grained PAT** scoped to the `szl-holdings` org, with the
@@ -111,8 +120,9 @@ pass. A genuine drift still fails when the token IS present.
    - *(or)* org secret visible to `.github`:
      `gh secret set SZL_GITHUB_TOKEN --org szl-holdings --visibility selected --repos .github`
 
-Once the secret exists, re-run the workflow (`gh workflow run code-security-drift.yml
---repo szl-holdings/.github`) and the neutral skip becomes a real pass/fail.
+Once a working token is in place, re-run the workflow (`gh workflow run
+code-security-drift.yml --repo szl-holdings/.github`) and the neutral skip
+becomes a real pass/fail.
 
 ## Dependabot
 

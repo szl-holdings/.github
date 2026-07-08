@@ -44,9 +44,16 @@ concurrency:
 
 jobs:
   # Honest-degrade gate. secrets.* cannot be referenced directly in a job-level
-  # `if:`, so this tiny job maps the secret to a boolean output. When the secret
-  # is absent the `check` job below is SKIPPED (neutral grey), not failed red and
-  # not passed green — the check simply did not run.
+  # `if:`, so this tiny job decides whether the drift check can actually run and
+  # exposes it as a boolean output. It does NOT just check that the secret is
+  # non-empty — an EXPIRED or under-scoped PAT is a non-empty string that still
+  # cannot read the code-security endpoints, and reporting that as red makes a
+  # token-plumbing gap look identical to genuine drift. So it PROBES the real
+  # endpoint the check needs and treats "no usable credential" (missing, 401
+  # bad/expired, or 403 insufficient scope) as a NEUTRAL skip: the `check` job
+  # is then SKIPPED (neutral grey) — not failed red and not passed green,
+  # because drift genuinely cannot be verified without a working token. A
+  # working token (200) runs the real check, where genuine drift still FAILS.
   preflight:
     name: Token preflight
     runs-on: ubuntu-latest
@@ -54,18 +61,48 @@ jobs:
     outputs:
       has_token: ${{ steps.detect.outputs.has_token }}
     steps:
-      - name: Detect whether SZL_GITHUB_TOKEN is configured
+      - name: Determine whether the drift check can authenticate
         id: detect
         env:
           SZL_GITHUB_TOKEN: ${{ secrets.SZL_GITHUB_TOKEN }}
         run: |
-          if [ -n "${SZL_GITHUB_TOKEN:-}" ]; then
-            echo "has_token=true" >> "$GITHUB_OUTPUT"
-            echo "SZL_GITHUB_TOKEN is configured — the drift check will run."
-          else
+          set -u
+          skip_notice() {
             echo "has_token=false" >> "$GITHUB_OUTPUT"
-            echo "::notice title=code-security-drift skipped::SZL_GITHUB_TOKEN is not configured. The org code-security drift check needs an org-admin PAT (fine-grained Administration:Read, or classic admin:org) to read the code-security configuration endpoints, so it is SKIPPED (neutral) rather than reported as drift. This is NOT a pass — org coverage was not verified. A founder must add the SZL_GITHUB_TOKEN secret to enable it (see WORKFLOWS.md)."
+            echo "::notice title=code-security-drift skipped::$1 The org code-security drift check needs an org-admin PAT (fine-grained Administration:Read, or classic admin:org) to read the code-security configuration endpoints, so it is SKIPPED (neutral) rather than reported as drift. This is NOT a pass — org coverage was NOT verified. A founder must set/refresh the SZL_GITHUB_TOKEN secret to enable it (see WORKFLOWS.md)."
+          }
+          if [ -z "${SZL_GITHUB_TOKEN:-}" ]; then
+            skip_notice "SZL_GITHUB_TOKEN is not configured."
+            exit 0
           fi
+          # Probe the exact endpoint the checker reads. Only a 200 proves the
+          # token can actually run the check; 401/403 mean the credential is
+          # invalid/expired/under-scoped (a non-empty but unusable secret).
+          code="$(curl -sS -o /dev/null -w '%{http_code}' \
+            -H "Authorization: token ${SZL_GITHUB_TOKEN}" \
+            -H "Accept: application/vnd.github+json" \
+            -H "X-GitHub-Api-Version: 2022-11-28" \
+            "https://api.github.com/orgs/${GITHUB_REPOSITORY_OWNER}/code-security/configurations?per_page=1" \
+            || echo 000)"
+          echo "Probe of code-security configurations endpoint returned HTTP ${code}."
+          case "${code}" in
+            200)
+              echo "has_token=true" >> "$GITHUB_OUTPUT"
+              echo "SZL_GITHUB_TOKEN authenticates — the drift check will run."
+              ;;
+            401)
+              skip_notice "SZL_GITHUB_TOKEN is set but INVALID/EXPIRED (HTTP 401 Bad credentials)."
+              ;;
+            403)
+              skip_notice "SZL_GITHUB_TOKEN is set but lacks org-admin scope (HTTP 403)."
+              ;;
+            *)
+              # Transient/unknown (network, 5xx): let the real check run so it is
+              # authoritative — a genuine persistent failure surfaces as exit 2.
+              echo "has_token=true" >> "$GITHUB_OUTPUT"
+              echo "::warning::Preflight probe was inconclusive (HTTP ${code}); running the full check so its result is authoritative."
+              ;;
+          esac
 
   check:
     name: Managed security config attached + enforced everywhere
