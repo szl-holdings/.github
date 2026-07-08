@@ -72,6 +72,48 @@ Both honor the repo's own `.github/hf-module-drift-allow.json` ratchet
 (known drift warns; new drift fails) and NEVER auto-overwrite — a human
 picks the source of truth, since drift can run in either direction.
 
+## Org code-security config drift (`code-security-drift.yml`)
+
+`code-security-drift.yml` verifies the org-level code security configuration
+"SZL Holdings Managed Security" (id `252588`) is still attached + **enforced**
+on every non-archived repo and is the default for new repos. Reading the
+code-security configuration endpoints (`/orgs/{org}/code-security/...`) requires
+**org-admin**, which the built-in Actions `GITHUB_TOKEN` does not have, so it
+uses the `SZL_GITHUB_TOKEN` repo (or org) secret.
+
+### Honest-degrade behavior
+
+The check distinguishes three states so a missing secret never masquerades as
+either drift or a clean pass:
+
+| State | Result | CI status |
+|---|---|---|
+| Every non-archived repo enforced under `252588` | exit 0 | ✅ pass |
+| A repo detached / on another config / new & uncovered | exit 1 | ❌ fail (real drift) |
+| `SZL_GITHUB_TOKEN` present but auth/API fails (bad scope, network) | exit 2 | ❌ fail (real misconfiguration) |
+| `SZL_GITHUB_TOKEN` **not configured** | check job skipped | ⏭️ neutral (did NOT run — not a pass) |
+
+The `preflight` job maps the secret to a boolean and gates the `check` job on
+it (`secrets.*` cannot be used in a job-level `if:` directly), so with no token
+the check is **skipped (neutral grey)** — not a red failure and not a green
+pass. A genuine drift still fails when the token IS present.
+
+### Founder step — enable the check (one time)
+
+1. Create a fine-grained **or** classic PAT owned by an org owner:
+   - **Fine-grained PAT** scoped to the `szl-holdings` org, with the
+     organization permission **"Administration" → Read** (this is what the
+     code-security configuration endpoints require).
+   - *(or)* **Classic PAT** with the **`admin:org`** scope (`read:org` alone is
+     **not** sufficient to read code-security configurations).
+2. Add it as a secret named `SZL_GITHUB_TOKEN`:
+   - Repo secret: `gh secret set SZL_GITHUB_TOKEN --repo szl-holdings/.github`
+   - *(or)* org secret visible to `.github`:
+     `gh secret set SZL_GITHUB_TOKEN --org szl-holdings --visibility selected --repos .github`
+
+Once the secret exists, re-run the workflow (`gh workflow run code-security-drift.yml
+--repo szl-holdings/.github`) and the neutral skip becomes a real pass/fail.
+
 ## Dependabot
 
 A default `.github/dependabot.yml` lives in this repo. Every repo without

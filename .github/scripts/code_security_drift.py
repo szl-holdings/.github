@@ -25,8 +25,16 @@ exceptions can be allowlisted with a reason.
 Auth: reads a token from $SZL_GITHUB_TOKEN / $GH_TOKEN / $GITHUB_TOKEN. The
 code-security configuration endpoints require org-admin, so the built-in
 GitHub Actions GITHUB_TOKEN is NOT sufficient — set the SZL_GITHUB_TOKEN PAT
-secret. A permission/auth/API failure is reported as an ERROR (exit 2) and
-never as a silent pass, so a missing token can never produce a false green.
+secret. Two failure modes are kept DISTINCT so a missing secret never looks
+like real drift and never looks like a pass:
+
+  * NO token configured at all -> exit 3 (NEUTRAL "not configured, skipped").
+    The check simply could not run; this is not a pass (coverage was NOT
+    verified) and not drift. The CI workflow surfaces this as a neutral/skipped
+    status, not a red failure.
+  * A token IS present but the API call fails (401/403 insufficient scope,
+    network, unexpected shape) -> exit 2 (ERROR). A configured-but-broken token
+    is a real misconfiguration and fails loudly, never a silent pass.
 
 Usage:
   python code_security_drift.py [--org szl-holdings] [--config-id 252588] \
@@ -35,7 +43,8 @@ Usage:
       [--include-archived] [--json]
 
 Exit code 0 = no drift (warnings allowed); 1 = drift detected; 2 = could not
-complete the check (auth/permission/API failure).
+complete the check (token present but auth/permission/API failure); 3 = no
+token configured (neutral skip — check did not run, NOT a pass).
 """
 from __future__ import annotations
 
@@ -49,6 +58,14 @@ from datetime import datetime, timezone
 
 API = "https://api.github.com"
 CANONICAL_CONFIG_ID = 252588
+
+# Exit-code contract (kept as named constants so the workflow and self-test
+# stay in lockstep): 0 no drift, 1 drift, 2 token-present-but-check-failed,
+# 3 no-token-configured (neutral skip — did not run, NOT a pass).
+EXIT_OK = 0
+EXIT_DRIFT = 1
+EXIT_ERROR = 2
+EXIT_NO_TOKEN = 3
 # Repo is genuinely covered when the enforced org config reports it "enforced".
 OK_STATUSES = {"enforced"}
 # Briefly-in-flight states: warn (re-check next run) rather than fail.
@@ -59,6 +76,15 @@ class CheckError(RuntimeError):
     """Raised when the check cannot be completed (auth/permission/API)."""
 
 
+class MissingTokenError(CheckError):
+    """Raised when NO token is configured at all.
+
+    Distinct from a token that IS present but fails (401/403/network): a missing
+    secret is an honest NEUTRAL skip (exit 3), never a red failure and never a
+    pass. A present-but-broken token stays a loud error (exit 2).
+    """
+
+
 # --------------------------------------------------------------------------- #
 # GitHub helpers
 
@@ -67,9 +93,10 @@ def _token() -> str:
         v = os.environ.get(name)
         if v:
             return v
-    raise CheckError(
-        "No GitHub token found. Set SZL_GITHUB_TOKEN (an org-admin PAT) — the "
-        "built-in Actions GITHUB_TOKEN cannot read code-security configurations."
+    raise MissingTokenError(
+        "No GitHub token configured. Set SZL_GITHUB_TOKEN (an org-admin PAT) — "
+        "the built-in Actions GITHUB_TOKEN cannot read code-security "
+        "configurations. Skipping (neutral): coverage was NOT verified."
     )
 
 
@@ -294,10 +321,16 @@ def main() -> int:
 
     try:
         report = run_check(args)
+    except MissingTokenError as e:
+        # No token configured: honest NEUTRAL skip. Not a pass (coverage was not
+        # verified) and not drift. The workflow renders this as a skipped status.
+        print(f"::notice::{e}", file=sys.stderr)
+        return EXIT_NO_TOKEN
     except CheckError as e:
-        # Infrastructure/auth failure — fail loudly, never a silent pass.
+        # Token present but the check could not complete (auth/permission/API) —
+        # fail loudly, never a silent pass.
         print(f"::error::{e}", file=sys.stderr)
-        return 2
+        return EXIT_ERROR
 
     if args.report:
         os.makedirs(os.path.dirname(args.report) or ".", exist_ok=True)
@@ -325,7 +358,7 @@ def main() -> int:
             print(f"  ::error:: {e}")
         print(f"  -> {len(report['errors'])} error(s), {len(report['warnings'])} warning(s)")
 
-    return 1 if report["errors"] else 0
+    return EXIT_DRIFT if report["errors"] else EXIT_OK
 
 
 if __name__ == "__main__":
