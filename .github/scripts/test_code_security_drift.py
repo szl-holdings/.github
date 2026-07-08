@@ -21,7 +21,14 @@ contract of ``main()`` so a future refactor cannot quietly regress it:
   a new uncovered repo                           -> exit 1
   default-for-new-repos changed                  -> exit 1
   canonical configuration missing                -> exit 1
-  an auth/API failure (CheckError)               -> exit 2  (never a silent 0)
+  a present-but-failing token (auth/API error)   -> exit 2  (never a silent 0)
+  NO token configured at all                     -> exit 3  (neutral skip:
+                                                    not 0/pass, not 1/red)
+
+The exit-2 vs exit-3 split is the honest-degrade contract (task #176/#158): a
+MISSING secret is a neutral skip (the check could not run — CI surfaces it as a
+skipped/neutral status, not a red failure), while a token that IS present but
+fails auth/API stays a loud error. Neither is ever a silent pass.
 
 Stdlib ``unittest`` only — no third-party test framework, so CI needs only a
 github-owned ``actions/setup-python`` to run it.
@@ -98,7 +105,7 @@ def _run_main(configs, defaults, repos, attachments, *,
 
     ``token``          -> what ``_token()`` returns (None simulates a missing
                           token, which the real ``_token()`` turns into a
-                          CheckError -> exit 2).
+                          MissingTokenError -> exit 3 neutral skip).
     ``gh_json_error``  -> if set, the first ``gh_json`` call raises this
                           exception, simulating an auth/permission/API failure.
     Returns the ``main()`` exit code. Stdout/stderr are swallowed.
@@ -111,7 +118,7 @@ def _run_main(configs, defaults, repos, attachments, *,
     try:
         if token is None:
             def _no_token():
-                raise csd.CheckError("No GitHub token found (test).")
+                raise csd.MissingTokenError("No GitHub token configured (test).")
             csd._token = _no_token
         else:
             csd._token = lambda: token
@@ -197,17 +204,30 @@ class TestDriftCheckerExitContract(unittest.TestCase):
         rc = _run_main(configs, defaults, repos, attachments)
         self.assertEqual(rc, 1)
 
-    def test_missing_token_is_exit_2_not_0(self):
-        """A missing token must fail loudly (exit 2), never a silent green."""
-        rc = _run_main(*_clean_state(), token=None)
-        self.assertEqual(rc, 2)
+    def test_missing_token_is_neutral_skip_not_pass_not_red(self):
+        """No token configured -> exit 3 (neutral skip).
 
-    def test_api_failure_is_exit_2_not_0(self):
-        """An auth/permission/API failure must be exit 2, never swallowed -> 0."""
+        Honest degrade: a missing secret must NOT look like a pass (exit 0) and
+        must NOT look like drift/failure (exit 1). It is a distinct neutral code
+        so CI can render it as a skipped status.
+        """
+        rc = _run_main(*_clean_state(), token=None)
+        self.assertEqual(rc, csd.EXIT_NO_TOKEN)
+        self.assertEqual(rc, 3)
+        self.assertNotEqual(rc, 0)  # never a fake pass
+        self.assertNotEqual(rc, 1)  # never a false "drift" red
+
+    def test_present_but_failing_token_is_exit_2_not_0(self):
+        """A present token that hits an auth/API failure stays a loud error.
+
+        Distinct from a MISSING token (exit 3): a configured-but-broken token is
+        a real misconfiguration and must be exit 2, never swallowed to 0.
+        """
         rc = _run_main(
             *_clean_state(),
             gh_json_error=csd.CheckError("GitHub API 403 (simulated auth failure)"),
         )
+        self.assertEqual(rc, csd.EXIT_ERROR)
         self.assertEqual(rc, 2)
 
     def test_archived_uncovered_repo_passes(self):
