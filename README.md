@@ -39,7 +39,7 @@
 | [`profile/README.md`](./profile/README.md) | Org profile shown at <https://github.com/szl-holdings> |
 | [`.github/ISSUE_TEMPLATE/`](./.github/ISSUE_TEMPLATE/) | Default issue templates cascaded to every repo without its own |
 | [`.github/PULL_REQUEST_TEMPLATE.md`](./.github/PULL_REQUEST_TEMPLATE.md) | Default PR template |
-| [`.github/workflows/`](./.github/workflows/) | **11 reusable workflows** — see [`WORKFLOWS.md`](./WORKFLOWS.md) |
+| [`.github/workflows/`](./.github/workflows/) | **21 reusable workflows** — see [`WORKFLOWS.md`](./WORKFLOWS.md) |
 | [`.github/dependabot.yml`](./.github/dependabot.yml) | Weekly dependency updates for this repo |
 | [`.github/CODEOWNERS`](./.github/CODEOWNERS) | Org-default ownership |
 | [`templates/`](./templates/) | Copy-paste templates for product repos (`README`, `CONTRIBUTING`, `CODE_OF_CONDUCT`, `SECURITY`) |
@@ -50,7 +50,7 @@
 
 ## Reusable workflows
 
-Eleven SHA-pinned, harden-runner-protected workflows that every product repo can call:
+Twenty-one SHA-pinned, harden-runner-protected workflows that every product repo can call:
 
 ```yaml
 jobs:
@@ -58,19 +58,46 @@ jobs:
     uses: szl-holdings/.github/.github/workflows/reusable-codeql.yml@<commit-sha>
 ```
 
+**CI & release**
+
+| Workflow | What it does |
+|---|---|
+| `reusable-node-ci.yml` | Node lint + typecheck + test + build matrix |
+| `reusable-docs-ci.yml` | Markdown lint + link-check for docs repos |
+| `reusable-release-please.yml` | Conventional-commits release automation |
+| `reusable-dco.yml` | Developer Certificate of Origin sign-off check |
+
+**Security & supply chain**
+
 | Workflow | What it does |
 |---|---|
 | `reusable-codeql.yml` | CodeQL static analysis (JS, TS, Python) |
-| `reusable-dependency-review.yml` | Block PRs that introduce vulnerable deps |
-| `reusable-trivy.yml` | Filesystem + container vuln scanning |
-| `reusable-gitleaks.yml` | Secret scanning on every PR / push |
-| `reusable-secret-scan.yml` | TruffleHog-style verified-secret scan |
-| `reusable-sbom.yml` | CycloneDX SBOM per release |
+| `reusable-dependency-review.yml` | Block PRs that introduce vulnerable or non-permissive deps |
+| `reusable-trivy.yml` | Trivy filesystem vulnerability scan |
+| `reusable-gitleaks.yml` | Gitleaks secret scanning on every PR / push |
+| `reusable-secret-scan.yml` | TruffleHog verified committed-secret scan |
+| `reusable-sbom.yml` | CycloneDX + SPDX SBOM per release |
 | `reusable-scorecard.yml` | OpenSSF Scorecard re-run + badge publish |
-| `reusable-workflow-lint.yml` | `actionlint` + zizmor lint on all workflows |
-| `reusable-release-please.yml` | Conventional-commits release automation |
-| `reusable-node-ci.yml` | Node lint + typecheck + test matrix |
-| `reusable-docs-ci.yml` | Markdown lint + link-check for docs repos |
+| `reusable-workflow-lint.yml` | `actionlint` + `zizmor` lint on all workflows |
+| `pin-check-reusable.yml` | Enforce 40-char SHA pinning on third-party Actions |
+
+**Deploy & drift**
+
+| Workflow | What it does |
+|---|---|
+| `reusable-hf-deploy.yml` | GitHub → Hugging Face Space deployer (Dockerfile-derived file set) |
+| `reusable-hf-module-drift-check.yml` | Detect drift between a repo's source and its live HF Space |
+| `reusable-anatomy-map-drift.yml` | Guard the shared SZL Anatomy map across its surfaces |
+| `reusable-bundle-ref-check.yml` | Verify UDS bundle `repository`/`ref` point at published GHCR tags |
+| `reusable-lockfile-registry-check.yml` | Reject lockfiles pinned to sandbox-internal registries |
+
+**Doctrine honesty guards**
+
+| Workflow | What it does |
+|---|---|
+| `reusable-overclaim-guard.yml` | Doctrine overclaim guard (Λ / Conjecture-1 claims) |
+| `reusable-energy-provenance-guard.yml` | Energy-provenance honesty guard (measured-or-`UNAVAILABLE`) |
+| `reusable-receipt-shape-guard.yml` | Receipt-shape honesty guard for committed attestation data |
 
 All Actions are SHA-pinned and wrapped with [`step-security/harden-runner`](https://github.com/step-security/harden-runner) using a deny-by-default egress policy. See [`WORKFLOWS.md`](./WORKFLOWS.md) for inputs, secrets, and per-workflow examples.
 
