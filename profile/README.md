@@ -22,6 +22,7 @@
 [![Lean 4](https://img.shields.io/badge/Lean%204-machine--checked-5b8dee?style=flat-square)](https://github.com/szl-holdings/lutar-lean)
 [![Λ](https://img.shields.io/badge/%CE%9B-Conjecture%201%20(never%20green)-7e8aa3?style=flat-square)](https://github.com/szl-holdings/lutar-lean)
 [![SLSA](https://img.shields.io/badge/SLSA-L1%20honest%20%C2%B7%20L2%20attested%20%C2%B7%20L3%20roadmap-d7b96b?style=flat-square)](https://slsa.dev/spec/v1.0/levels)
+[![DOI](https://img.shields.io/badge/concept%20DOI-10.5281%2Fzenodo.19944926-3af4c8?style=flat-square)](https://doi.org/10.5281/zenodo.19944926)
 
 <br/>
 
@@ -52,6 +53,6 @@
 
 **8 formulas locked-proven · Λ = Conjecture 1, never green · honest by design · public data only.**
 
-<sub>[lutar-lean](https://github.com/szl-holdings/lutar-lean) · [🤗 SZLHOLDINGS](https://huggingface.co/SZLHOLDINGS) · No production ATO claimed · SLSA L1 honest / L2 attested / L3 roadmap · trust ceiling 0.97, never 100%</sub>
+<sub>[lutar-lean](https://github.com/szl-holdings/lutar-lean) · [🤗 SZLHOLDINGS](https://huggingface.co/SZLHOLDINGS) · concept DOI [10.5281/zenodo.19944926](https://doi.org/10.5281/zenodo.19944926) · No production ATO claimed · SLSA L1 honest / L2 attested / L3 roadmap · trust ceiling 0.97, never 100%</sub>
 
 </div>
