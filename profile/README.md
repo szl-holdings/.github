@@ -52,6 +52,8 @@
 | **receipt-chain-live** | The Khipu receipt lake's sha3-256 hash chain re-verified **in your browser** — fetches the live lake keyless and recomputes every link locally (verification = MEASURED-in-your-browser; lake values REPORTED; honest UNAVAILABLE if the lake is unreachable). | [view →](https://szlholdings-receipt-chain-live.static.hf.space) |
 | **szl-provctl-live** | Provenance-DAG verify hologram for the szl-provctl kernel — in-browser hash verification over the kernel's real provenance sample (labeled as a sample, not live telemetry). | [view →](https://szlholdings-szl-provctl-live.static.hf.space) |
 | **szl-kernels-live** | The governed-kernel suite hub — every kernel hologram in one surface, LIVE/ROADMAP status fetched from the HF Spaces API at page load (REPORTED: a roadmap item only shows LIVE when its Space is actually running). | [view →](https://szlholdings-szl-kernels-live.static.hf.space) |
+| **szl-govsign-live** | The szl-govsign kernel's DSSE / in-toto signing story — real kernel source fetched live + keyless (REPORTED verbatim), PAE cross-checked against the DSSE spec vector and ECDSA P-256 sign/verify run in your browser via WebCrypto (MEASURED; demo keypair explicitly labeled NOT a production key). | [view →](https://szlholdings-szl-govsign-live.static.hf.space) |
+| **szl-blocked-live** | honest-BLOCKED as a first-class state — the szl-blocked deny-by-default lattice (HARD_DENY > advisory-Λ-tighten > HARD_ALLOW) felt interactively (labeled DEMO), kernel source passed through verbatim, EU AI Act Annex IV DRAFT-skeleton doctrine passed through exactly (NOT legal advice). | [view →](https://szlholdings-szl-blocked-live.static.hf.space) |
 
 ---
 
