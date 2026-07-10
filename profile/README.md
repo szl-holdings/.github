@@ -30,7 +30,7 @@
 
 ### ◇ [Explore the Holographic Estate →](https://a-11-oy.com/holographic)
 
-[**Verify a receipt →**](https://a-11-oy.com/verify) · [**Read the docs →**](https://szl-holdings.github.io/docs-site/) · [**docs-site repo →**](https://github.com/szl-holdings/docs-site)
+[**◆ Estate hub — every Space, live →**](https://szlholdings-szl-estate-live.static.hf.space) · [**Verify a receipt →**](https://a-11-oy.com/verify) · [**Read the docs →**](https://szl-holdings.github.io/docs-site/) · [**docs-site repo →**](https://github.com/szl-holdings/docs-site)
 
 </div>
 
@@ -40,6 +40,7 @@
 
 | Space | What it is | Open |
 |---|---|---|
+| **◆ estate hub** — one flag | The single index of the whole estate: **every** Space read from the **live** Hugging Face API at page load, each card's title & description passed through **verbatim** (REPORTED), per-Space runtime status fetched live (RUNNING = running *now*), honest **UNAVAILABLE** on any failure. New Spaces appear automatically. 0 runtime CDN. | **[open →](https://szlholdings-szl-estate-live.static.hf.space)** |
 | **a11oy** — flagship | Governed-AI Command Center: ask-and-act behind deny-by-default gates, a live decision feed, and a signed receipt for every action. | **[a-11-oy.com](https://a-11-oy.com)** |
 | **Holographic Estate** — 3D showcase | The frontier tier as one live holographic lattice — 70+ live surfaces (frontier organs, energy, counter-UAS, governance, PINN, anatomy) in navigable 3D, the exact live count self-verifiable at [`/api/a11oy/v1/frontier/surfaces`](https://a-11-oy.com/api/a11oy/v1/frontier/surfaces). 0 runtime CDN; WebGL2 with optional WebGPU; every value carries its honesty label. | **[a-11-oy.com/holographic](https://a-11-oy.com/holographic)** |
 | **the Brain** | Shared governed memory + energy substrate under a11oy — a receipt-vault agents pull context from, feeding the governed agent-loop and energy allocation. Every read/write is Λ-gated (Conjecture 1, never green) and receipted. | [a-11-oy.com/brain](https://a-11-oy.com/brain) |
