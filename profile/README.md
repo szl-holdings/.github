@@ -47,6 +47,8 @@
 | **anatomy** | Living anatomy map — the locked-8 ladder and the four honesty tiers, visualized. | [view →](https://szlholdings-anatomy.hf.space) |
 | **david-leads** | Sovereign insurance intelligence — audit-defensible lead intelligence from public data only. | [view →](https://szlholdings-david-leads.hf.space) |
 | **energy-attest-holo** | Honest energy-attestation surface: attests the sovereign mesh's live NVML meters and shows **RED / UNAVAILABLE** when none are live (the honest current state), with GB grid carbon intensity as REPORTED context. 0 runtime CDN. | [view →](https://szlholdings-energy-attest-holo.static.hf.space) |
+| **governed-norm-holo** | Inspectable rendering of the a11oy WILLAY refusal classifiers — every governed-refusal rule discloses its category, what it fires on, its rationale and its lineage. The live list is fetched keyless from a11oy `/willay/classifiers` (REPORTED; honest UNAVAILABLE if the gate is unreachable). Trust ceiling 0.97; 0 runtime CDN. | [view →](https://szlholdings-governed-norm-holo.static.hf.space) |
+| **lambda-gate-holo** | The Λ governance-trust gate as a holographic explainer: Λ = **Conjecture 1** (never a theorem, never green), status read live from the machine-checked szl-formula-ledger — unconditional uniqueness is machine-checked FALSE, only a conditional Theorem U is proven. Trust ceiling 0.97; 0 runtime CDN. | [view →](https://szlholdings-lambda-gate-holo.static.hf.space) |
 
 ---
 
