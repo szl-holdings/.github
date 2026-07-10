@@ -46,6 +46,7 @@
 | **killinchu** | Counter-UAS & maritime command *demonstration* — multi-sensor fusion with signed engagement receipts (effector link is a labeled simulation). | [demo →](https://szlholdings-killinchu.hf.space/elite) |
 | **anatomy** | Living anatomy map — the locked-8 ladder and the four honesty tiers, visualized. | [view →](https://szlholdings-anatomy.hf.space) |
 | **david-leads** | Sovereign insurance intelligence — audit-defensible lead intelligence from public data only. | [view →](https://szlholdings-david-leads.hf.space) |
+| **energy-attest-holo** | Honest energy-attestation surface: attests the sovereign mesh's live NVML meters and shows **RED / UNAVAILABLE** when none are live (the honest current state), with GB grid carbon intensity as REPORTED context. 0 runtime CDN. | [view →](https://szlholdings-energy-attest-holo.static.hf.space) |
 
 ---
 
