@@ -319,19 +319,22 @@ jobs:
           echo "=== Invariant 9: DSSE receipt format ==="
           for f in $(find . \( -name "*.dsse" -o -name "szl_receipt*.json" -o -name "dsse_*.json" -o -name "*_receipt.json" \) 2>/dev/null | grep -vE "context|schema|report" | head -3); do
             # Historical decision-receipt indexes are immutable evidence summaries,
-            # not DSSE receipts.  Recognize their exact shape instead of exempting a
-            # directory, so moving a malformed live receipt cannot bypass doctrine.
-            if jq -e '
-              type == "object" and
-              has("last_receipt") and (.last_receipt | type == "object") and
-              (.last_receipt.receipt_id | type == "string" and length > 0) and
-              (.receipt_count | type == "number" and . >= 0) and
-              (has("doctrine") | not) and
-              (has("lambda_uniqueness") | not)
-            ' "$f" >/dev/null 2>&1; then
-              echo "  $f historical decision-receipt index (DSSE invariant not applicable)"
-              continue
-            fi
+            # not DSSE receipts. Recognize only the ambiguous legacy basename plus
+            # its exact top-level shape; explicitly named DSSE files remain strict.
+            case "$f" in
+              */decision_receipt.json)
+                if jq -e '
+                  type == "object" and
+                  ((keys | sort) == ["last_receipt", "receipt_count"]) and
+                  (.last_receipt | type == "object") and
+                  (.last_receipt.receipt_id | type == "string" and length > 0) and
+                  (.receipt_count | type == "number" and . >= 1 and floor == .)
+                ' "$f" >/dev/null 2>&1; then
+                  echo "  $f historical decision-receipt index (DSSE invariant not applicable)"
+                  continue
+                fi
+                ;;
+            esac
             D=$(jq -e '.doctrine' "$f" 2>/dev/null | grep -v '"v11"' || true)
             if [ -n "$D" ]; then
               echo "  $f doctrine=$D"
