@@ -18,7 +18,7 @@ name: Reusable — HF Module Drift Check
 # unless overridden):
 #   jobs:
 #     hf-drift:
-#       uses: szl-holdings/.github/.github/workflows/reusable-hf-module-drift-check.yml@main
+#       uses: szl-holdings/.github/.github/workflows/reusable-hf-module-drift-check.yml@<full-commit-sha>
 #   # or, for a non-conventional Space name:
 #       with:
 #         hf-repo: SZLHOLDINGS/some-other-name
