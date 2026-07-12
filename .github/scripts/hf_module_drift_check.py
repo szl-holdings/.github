@@ -509,7 +509,21 @@ def classify_lineage(gh_sha, hf_oid, canonical_shas, date_ahead):
 # --------------------------------------------------------------------------- #
 # Main comparison (single GitHub<->HF pair)
 # --------------------------------------------------------------------------- #
+def effective_refs(args):
+    """Return independent GitHub and Hugging Face refs.
+
+    ``--ref`` remains the backwards-compatible common default. A pull-request
+    head SHA belongs to GitHub's revision namespace and must never be sent to
+    the Hugging Face tree API as though it were a Space revision.
+    """
+    common = getattr(args, "ref", None) or "main"
+    github_ref = getattr(args, "github_ref", None) or common
+    hf_ref = getattr(args, "hf_ref", None) or common
+    return github_ref, hf_ref
+
+
 def compare(args, allow=None):
+    github_ref, hf_ref = effective_refs(args)
     if allow is None:
         allow = load_allow_file(args.allow)
     accepted = allow.get("accepted_divergences", {})
@@ -530,6 +544,9 @@ def compare(args, allow=None):
             tree = _sibling_tree_cache.get(s)
             if tree is None:
                 try:
+                    # A commit SHA is repository-local. Sibling canonical repos
+                    # keep using the common ref (normally main), not the primary
+                    # repository's PR-head override.
                     tree = github_tree_remote(s, args.ref)
                 except RuntimeError:
                     tree = {}
@@ -542,7 +559,7 @@ def compare(args, allow=None):
 
     if args.github_remote:
         status, body, _ = gh_get(
-            f"{GH_RAW}/{args.github_repo}/{args.ref}/Dockerfile")
+            f"{GH_RAW}/{args.github_repo}/{github_ref}/Dockerfile")
         if status != 200:
             raise RuntimeError(f"fetch remote Dockerfile: HTTP {status}")
         dockerfile_text = body.decode("utf-8", "replace")
@@ -552,11 +569,11 @@ def compare(args, allow=None):
     sources = parse_copy_sources(dockerfile_text)
 
     if args.github_remote:
-        gh_files = github_tree_remote(args.github_repo, args.ref)
+        gh_files = github_tree_remote(args.github_repo, github_ref)
     else:
         gh_files = github_tree_local(args.repo_root)
 
-    hf_files = hf_tree(args.hf_repo, args.ref)
+    hf_files = hf_tree(args.hf_repo, hf_ref)
 
     targets = sorted(expand_targets(sources, gh_files, hf_files, allow))
 
@@ -607,10 +624,10 @@ def compare(args, allow=None):
             continue  # byte-identical -> in sync
 
         # Content drift -> name which side is ahead by last-commit date.
-        gh_date = github_file_date(args.github_repo, path, args.ref)
+        gh_date = github_file_date(args.github_repo, path, github_ref)
         d = os.path.dirname(path)
         if d not in _hf_date_cache:
-            _hf_date_cache[d] = hf_dir_dates(args.hf_repo, d, args.ref)
+            _hf_date_cache[d] = hf_dir_dates(args.hf_repo, d, hf_ref)
         hf_date = _hf_date_cache[d].get(path)
         if gh_date and hf_date:
             ahead = "github" if gh_date > hf_date else ("huggingface" if hf_date > gh_date else "tied")
@@ -641,6 +658,8 @@ def compare(args, allow=None):
         "github_repo": args.github_repo,
         "hf_repo": args.hf_repo,
         "ref": args.ref,
+        "github_ref": github_ref,
+        "hf_ref": hf_ref,
         "copy_sources": len(sources),
         "files_compared": len(targets),
         "error_count": len(errors),
@@ -677,7 +696,10 @@ def fmt(entry):
 
 
 def print_pair(report, errors, warns, github_repo, hf_repo, ref):
-    print(f"== HF module-drift guard: {github_repo}  <->  {hf_repo} ({ref}) ==")
+    github_ref = report.get("github_ref", ref)
+    hf_ref = report.get("hf_ref", ref)
+    print(f"== HF module-drift guard: {github_repo} ({github_ref})  <->  "
+          f"{hf_repo} ({hf_ref}) ==")
     print(f"   COPY sources: {report['copy_sources']}   files compared: {report['files_compared']}")
     print(f"   errors (drift): {len(errors)}   warnings (allowlisted/absent): {len(warns)}")
     if warns:
@@ -725,6 +747,7 @@ def _emit_inconclusive(args, exc):
     code = getattr(exc, "code", None)
     reason = "hf_api_429" if code == 429 else (
         f"api_http_{code}" if code else "api_unavailable")
+    github_ref, hf_ref = effective_refs(args)
     report = {
         "schema": 1,
         "status": "inconclusive",
@@ -733,6 +756,8 @@ def _emit_inconclusive(args, exc):
         "github_repo": getattr(args, "github_repo", None),
         "hf_repo": getattr(args, "hf_repo", None),
         "ref": getattr(args, "ref", None),
+        "github_ref": github_ref,
+        "hf_ref": hf_ref,
         "detail": str(exc),
         "error_count": 0,
         "warn_count": 0,
@@ -769,6 +794,8 @@ def run_registry(args):
         gh = ent.get("github")
         hf = ent.get("hf")
         ref = ent.get("ref", args.ref)
+        github_ref = ent.get("github_ref", ref)
+        hf_ref = ent.get("hf_ref", ref)
         if not gh or not hf:
             print(f"::warning::registry entry missing github/hf: {ent!r}")
             continue
@@ -776,13 +803,44 @@ def run_registry(args):
         # "...for each repo that HAS both a Dockerfile and a matching HF Space."
         # No Dockerfile -> nothing is COPY'd, so there's nothing to drift: skip.
         try:
-            dstatus, _, _ = gh_get(f"{GH_RAW}/{gh}/{ref}/Dockerfile")
+            dstatus, _, _ = gh_get(f"{GH_RAW}/{gh}/{github_ref}/Dockerfile")
+        except TransientHTTPError as e:
+            # A transient failure during the Dockerfile eligibility preflight
+            # means this pair was never actually classified as scannable or
+            # safely skippable. Record it as INCONCLUSIVE, not as a benign skip,
+            # so the sweep's top-level status cannot false-green.
+            print(f"::warning title=HF module drift INCONCLUSIVE::{gh} <-> {hf}: "
+                  f"Dockerfile preflight unavailable ({e}); could NOT determine "
+                  "whether this pair required a drift comparison.")
+            inconclusive.append({
+                "github": gh,
+                "hf": hf,
+                "reason": "dockerfile-preflight-api-unavailable",
+                "detail": str(e),
+            })
+            pair_reports.append({
+                "github_repo": gh,
+                "hf_repo": hf,
+                "ref": ref,
+                "github_ref": github_ref,
+                "hf_ref": hf_ref,
+                "status": "inconclusive",
+                "error_count": 0,
+                "warn_count": 0,
+                "findings": [{
+                    "path": "Dockerfile",
+                    "kind": "inconclusive",
+                    "severity": "warn",
+                    "detail": str(e),
+                }],
+            })
+            continue
         except RuntimeError as e:
             print(f"::warning::{gh}: could not reach Dockerfile ({e}); skipping.")
             skipped.append({"github": gh, "hf": hf, "reason": "dockerfile-unreachable"})
             continue
         if dstatus == 404:
-            print(f"-- {gh}: no Dockerfile at {ref}; skipping (nothing COPY'd).")
+            print(f"-- {gh}: no Dockerfile at {github_ref}; skipping (nothing COPY'd).")
             skipped.append({"github": gh, "hf": hf, "reason": "no-dockerfile"})
             continue
 
@@ -793,10 +851,11 @@ def run_registry(args):
                if e.get("github") and e.get("github") != gh]
         sub = argparse.Namespace(
             repo_root=args.repo_root, github_repo=gh, hf_repo=hf, ref=ref,
+            github_ref=github_ref, hf_ref=hf_ref,
             allow=None, github_remote=True, report_out="", warn_only=args.warn_only,
             siblings=sib,
         )
-        allow = fetch_remote_allow(gh, ref)
+        allow = fetch_remote_allow(gh, github_ref)
         try:
             report, errors, warns = compare(sub, allow)
         except TransientHTTPError as e:
@@ -810,6 +869,7 @@ def run_registry(args):
                                  "detail": str(e)})
             pair_reports.append({
                 "github_repo": gh, "hf_repo": hf, "ref": ref,
+                "github_ref": github_ref, "hf_ref": hf_ref,
                 "status": "inconclusive", "error_count": 0, "warn_count": 0,
                 "findings": [{"path": "(pair)", "kind": "inconclusive",
                               "severity": "warn", "detail": str(e)}],
@@ -823,6 +883,7 @@ def run_registry(args):
             total_errors += 1
             pair_reports.append({
                 "github_repo": gh, "hf_repo": hf, "ref": ref,
+                "github_ref": github_ref, "hf_ref": hf_ref,
                 "error_count": 1, "warn_count": 0,
                 "findings": [{"path": "(pair)", "kind": "compare-failed",
                               "severity": "error", "detail": str(e)}],
@@ -862,6 +923,11 @@ def run_registry(args):
               "HF Space. A human must pick which side is the source of truth, "
               "reconcile, and commit -- the guard never auto-overwrites.")
         return 1
+    if not total_errors and inconclusive:
+        print("\nINCONCLUSIVE: the org sweep could not verify every GitHub <-> HF "
+              "pair. This is NOT a verified in-sync pass; re-run once the "
+              "transient remote outage or rate limit clears.")
+        return 0
     print("\nOK: no unaccepted module drift between GitHub and any live HF Space.")
     return 0
 
@@ -871,7 +937,15 @@ def main():
     ap.add_argument("--repo-root", default=".", help="local checkout root (GitHub side in CI mode)")
     ap.add_argument("--github-repo", help="e.g. szl-holdings/a11oy (single-pair mode)")
     ap.add_argument("--hf-repo", help="e.g. SZLHOLDINGS/a11oy (single-pair mode)")
-    ap.add_argument("--ref", default="main")
+    ap.add_argument(
+        "--ref", default="main",
+        help="backwards-compatible common ref for both sides (default: main)")
+    ap.add_argument(
+        "--github-ref", default="",
+        help="GitHub checkout/API ref; overrides --ref for the GitHub side")
+    ap.add_argument(
+        "--hf-ref", default="",
+        help="Hugging Face revision; overrides --ref for the HF side")
     ap.add_argument("--allow", default=".github/hf-module-drift-allow.json")
     ap.add_argument("--report-out", default="")
     ap.add_argument("--registry", default="",

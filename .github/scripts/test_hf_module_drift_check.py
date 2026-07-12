@@ -21,7 +21,9 @@ conflict actually surfaces in the run output. Runs with NO network.
 from __future__ import annotations
 
 import argparse
+import contextlib
 import importlib.util
+import io
 import json
 import os
 import shutil
@@ -152,6 +154,91 @@ class TestComparePropagatesLineage(unittest.TestCase):
         self.assertIn("md5-compare all 4 surfaces", rendered)
 
 
+class TestIndependentRefs(unittest.TestCase):
+    """A GitHub PR SHA and an HF deployment revision are different namespaces."""
+
+    def setUp(self):
+        self._saved = {k: getattr(drift, k) for k in (
+            "github_tree_remote", "hf_tree", "github_file_date",
+            "hf_dir_dates", "parse_copy_sources", "gh_get")}
+
+    def tearDown(self):
+        for key, value in self._saved.items():
+            setattr(drift, key, value)
+
+    def test_common_ref_remains_backwards_compatible(self):
+        args = argparse.Namespace(ref="release")
+        self.assertEqual(drift.effective_refs(args), ("release", "release"))
+
+    def test_compare_routes_each_side_to_its_own_ref(self):
+        path = "module.py"
+        calls = []
+        drift.parse_copy_sources = lambda _text: [path]
+        drift.gh_get = lambda *a, **k: (200, b"COPY module.py /app/", None)
+
+        def github_tree(repo, ref="main"):
+            calls.append(("github-tree", ref))
+            return {path: "same"}
+
+        def hf_tree(repo, ref="main"):
+            calls.append(("hf-tree", ref))
+            return {path: {"oid": "same", "lfs_oid": None, "size": 1}}
+
+        drift.github_tree_remote = github_tree
+        drift.hf_tree = hf_tree
+        drift.github_file_date = lambda repo, p, ref="main": None
+        drift.hf_dir_dates = lambda repo, d, ref="main": {}
+        args = argparse.Namespace(
+            repo_root=".", github_repo="szl-holdings/a11oy",
+            hf_repo="SZLHOLDINGS/a11oy", ref="main",
+            github_ref="github-pr-head", hf_ref="hf-live-revision",
+            allow=None, github_remote=True, report_out="", warn_only=False,
+            siblings=[],
+        )
+
+        report, errors, warns = drift.compare(args, allow={})
+
+        self.assertEqual(errors, [])
+        self.assertEqual(warns, [])
+        self.assertIn(("github-tree", "github-pr-head"), calls)
+        self.assertIn(("hf-tree", "hf-live-revision"), calls)
+        self.assertEqual(report["github_ref"], "github-pr-head")
+        self.assertEqual(report["hf_ref"], "hf-live-revision")
+
+    def test_primary_pr_sha_is_not_reused_for_sibling_repositories(self):
+        path = "module.py"
+        calls = []
+        drift.parse_copy_sources = lambda _text: [path]
+        drift.gh_get = lambda *a, **k: (200, b"COPY module.py /app/", None)
+
+        def github_tree(repo, ref="main"):
+            calls.append((repo, ref))
+            if repo == "szl-holdings/a11oy":
+                return {path: "canonical"}
+            return {path: "canonical"}
+
+        drift.github_tree_remote = github_tree
+        drift.hf_tree = lambda repo, ref="main": {
+            path: {"oid": "stale", "lfs_oid": None, "size": 1}}
+        drift.github_file_date = lambda repo, p, ref="main": "2026-07-12T00:00:00Z"
+        drift.hf_dir_dates = lambda repo, d, ref="main": {
+            path: "2026-07-11T00:00:00Z"}
+        args = argparse.Namespace(
+            repo_root=".", github_repo="szl-holdings/a11oy",
+            hf_repo="SZLHOLDINGS/a11oy", ref="main",
+            github_ref="github-pr-head", hf_ref="hf-live-revision",
+            allow=None, github_remote=True, report_out="", warn_only=False,
+            siblings=["szl-holdings/killinchu"],
+        )
+
+        _report, errors, _warns = drift.compare(args, allow={})
+
+        self.assertEqual(len(errors), 1)
+        self.assertIn(("szl-holdings/a11oy", "github-pr-head"), calls)
+        self.assertIn(("szl-holdings/killinchu", "main"), calls)
+        self.assertNotIn(("szl-holdings/killinchu", "github-pr-head"), calls)
+
+
 class TestTransientHTTPInconclusive(unittest.TestCase):
     """A persistent HF 429/5xx must go HONEST INCONCLUSIVE (report written,
     exit 0), never crash and never false-green. All network stubbed."""
@@ -225,6 +312,122 @@ class TestTransientHTTPInconclusive(unittest.TestCase):
         report, errors, warns = drift.compare(args)
         self.assertEqual(report["status"], "ok")
         self.assertEqual(errors, [])
+
+
+class TestRegistryInconclusiveHonesty(unittest.TestCase):
+    """Registry mode must never give an inconclusive sweep a terminal OK."""
+
+    def setUp(self):
+        self._saved = {key: getattr(drift, key) for key in (
+            "gh_get", "fetch_remote_allow", "compare")}
+        self._tmp = tempfile.mkdtemp()
+        self.registry = os.path.join(self._tmp, "registry.json")
+        self.report = os.path.join(self._tmp, "report.json")
+        with open(self.registry, "w") as fh:
+            json.dump({"spaces": [{
+                "github": "szl-holdings/a11oy",
+                "hf": "SZLHOLDINGS/a11oy",
+            }]}, fh)
+
+    def tearDown(self):
+        for key, value in self._saved.items():
+            setattr(drift, key, value)
+        shutil.rmtree(self._tmp, ignore_errors=True)
+
+    def _args(self):
+        return argparse.Namespace(
+            registry=self.registry,
+            report_out=self.report,
+            repo_root=".",
+            ref="main",
+            warn_only=False,
+        )
+
+    def _run(self):
+        output = io.StringIO()
+        with contextlib.redirect_stdout(output):
+            rc = drift.run_registry(self._args())
+        with open(self.report) as fh:
+            report = json.load(fh)
+        return rc, report, output.getvalue()
+
+    def test_inconclusive_only_sweep_ends_inconclusive_not_ok(self):
+        drift.gh_get = lambda *_a, **_k: (200, b"FROM python:3.12", None)
+        drift.fetch_remote_allow = lambda *_a, **_k: {}
+
+        def transient_compare(*_a, **_k):
+            raise drift.TransientHTTPError(
+                "https://huggingface.co/api/spaces/SZLHOLDINGS/a11oy/tree/main",
+                429,
+                8,
+            )
+
+        drift.compare = transient_compare
+
+        rc, report, output = self._run()
+
+        self.assertEqual(rc, 0)
+        self.assertEqual(report["status"], "inconclusive")
+        self.assertEqual(len(report["pairs_inconclusive"]), 1)
+        self.assertIn("\nINCONCLUSIVE:", output)
+        self.assertNotIn("\nOK:", output)
+
+    def test_transient_dockerfile_preflight_is_inconclusive_not_skipped(self):
+        def transient_preflight(*_a, **_k):
+            raise drift.TransientHTTPError(
+                "https://raw.githubusercontent.com/szl-holdings/a11oy/main/Dockerfile",
+                503,
+                8,
+            )
+
+        drift.gh_get = transient_preflight
+        drift.fetch_remote_allow = lambda *_a, **_k: self.fail(
+            "allowlist fetch must not run after an inconclusive preflight")
+        drift.compare = lambda *_a, **_k: self.fail(
+            "compare must not run after an inconclusive preflight")
+
+        rc, report, output = self._run()
+
+        self.assertEqual(rc, 0)
+        self.assertEqual(report["status"], "inconclusive")
+        self.assertEqual(report["pairs_skipped"], [])
+        self.assertEqual(len(report["pairs_inconclusive"]), 1)
+        self.assertEqual(
+            report["pairs_inconclusive"][0]["reason"],
+            "dockerfile-preflight-api-unavailable",
+        )
+        self.assertEqual(report["pairs"][0]["status"], "inconclusive")
+        self.assertEqual(report["pairs"][0]["findings"][0]["path"], "Dockerfile")
+        self.assertIn("Dockerfile preflight unavailable", output)
+        self.assertIn("\nINCONCLUSIVE:", output)
+        self.assertNotIn("\nOK:", output)
+
+    def test_nontransient_dockerfile_preflight_keeps_legacy_skip_policy(self):
+        def nontransient_preflight(*_a, **_k):
+            raise RuntimeError("permanent read failure")
+
+        drift.gh_get = nontransient_preflight
+        drift.fetch_remote_allow = lambda *_a, **_k: self.fail(
+            "allowlist fetch must not run after a skipped preflight")
+        drift.compare = lambda *_a, **_k: self.fail(
+            "compare must not run after a skipped preflight")
+
+        rc, report, output = self._run()
+
+        self.assertEqual(rc, 0)
+        self.assertEqual(report["status"], "ok")
+        self.assertEqual(report["pairs_inconclusive"], [])
+        self.assertEqual(
+            report["pairs_skipped"],
+            [{
+                "github": "szl-holdings/a11oy",
+                "hf": "SZLHOLDINGS/a11oy",
+                "reason": "dockerfile-unreachable",
+            }],
+        )
+        self.assertIn("could not reach Dockerfile", output)
+        self.assertIn("\nOK:", output)
+        self.assertNotIn("\nINCONCLUSIVE:", output)
 
 
 if __name__ == "__main__":

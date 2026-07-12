@@ -18,7 +18,7 @@ name: Reusable — HF Module Drift Check
 # unless overridden):
 #   jobs:
 #     hf-drift:
-#       uses: szl-holdings/.github/.github/workflows/reusable-hf-module-drift-check.yml@main
+#       uses: szl-holdings/.github/.github/workflows/reusable-hf-module-drift-check.yml@<full-commit-sha>
 #   # or, for a non-conventional Space name:
 #       with:
 #         hf-repo: SZLHOLDINGS/some-other-name
@@ -32,10 +32,20 @@ on:
         type: string
         default: ""
       ref:
-        description: "Branch/ref to compare on both sides."
+        description: "Backwards-compatible common ref for both sides."
         required: false
         type: string
         default: "main"
+      github-ref:
+        description: "GitHub checkout/API ref. Empty preserves the common ref."
+        required: false
+        type: string
+        default: ""
+      hf-ref:
+        description: "Hugging Face revision. Empty preserves the common ref."
+        required: false
+        type: string
+        default: ""
 
 permissions:
   contents: read
@@ -55,13 +65,16 @@ jobs:
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
           path: caller
-          ref: ${{ inputs.ref }}
+          ref: ${{ inputs.github-ref != '' && inputs.github-ref || inputs.ref }}
 
-      - name: Checkout szl-holdings/.github (shared checker)
+      - name: Checkout exact reusable-workflow revision (shared checker)
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
-          repository: szl-holdings/.github
-          ref: main
+          # A reusable workflow must run the checker shipped with the exact
+          # workflow revision the caller pinned, never mutable default-branch
+          # code. GitHub exposes both values in the reusable job context.
+          repository: ${{ job.workflow_repository }}
+          ref: ${{ job.workflow_sha }}
           path: tools
 
       - name: Set up Python
@@ -75,20 +88,26 @@ jobs:
           GH_REPO: ${{ github.repository }}
           HF_REPO_IN: ${{ inputs.hf-repo }}
           REF: ${{ inputs.ref }}
+          GITHUB_REF_IN: ${{ inputs.github-ref }}
+          HF_REF_IN: ${{ inputs.hf-ref }}
         run: |
           set -euo pipefail
+          GH_SOURCE_REF="${GITHUB_REF_IN:-${REF}}"
+          HF_SOURCE_REF="${HF_REF_IN:-${REF}}"
           if [ -n "${HF_REPO_IN}" ]; then
             HF_REPO="${HF_REPO_IN}"
           else
             # Convention: szl-holdings/<x> -> SZLHOLDINGS/<x> (HF org is UPPERCASE).
             HF_REPO="SZLHOLDINGS/${GH_REPO##*/}"
           fi
-          echo "Comparing ${GH_REPO} (checkout) <-> ${HF_REPO} (live HF Space) @ ${REF}"
+          echo "Comparing ${GH_REPO} @ ${GH_SOURCE_REF} (checkout) <-> ${HF_REPO} @ ${HF_SOURCE_REF} (live HF Space)"
           python3 tools/.github/scripts/hf_module_drift_check.py \
             --repo-root caller \
             --github-repo "${GH_REPO}" \
             --hf-repo "${HF_REPO}" \
             --ref "${REF}" \
+            --github-ref "${GH_SOURCE_REF}" \
+            --hf-ref "${HF_SOURCE_REF}" \
             --allow caller/.github/hf-module-drift-allow.json \
             --report-out hf-module-drift-report.out.json
 
