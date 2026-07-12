@@ -804,6 +804,37 @@ def run_registry(args):
         # No Dockerfile -> nothing is COPY'd, so there's nothing to drift: skip.
         try:
             dstatus, _, _ = gh_get(f"{GH_RAW}/{gh}/{github_ref}/Dockerfile")
+        except TransientHTTPError as e:
+            # A transient failure during the Dockerfile eligibility preflight
+            # means this pair was never actually classified as scannable or
+            # safely skippable. Record it as INCONCLUSIVE, not as a benign skip,
+            # so the sweep's top-level status cannot false-green.
+            print(f"::warning title=HF module drift INCONCLUSIVE::{gh} <-> {hf}: "
+                  f"Dockerfile preflight unavailable ({e}); could NOT determine "
+                  "whether this pair required a drift comparison.")
+            inconclusive.append({
+                "github": gh,
+                "hf": hf,
+                "reason": "dockerfile-preflight-api-unavailable",
+                "detail": str(e),
+            })
+            pair_reports.append({
+                "github_repo": gh,
+                "hf_repo": hf,
+                "ref": ref,
+                "github_ref": github_ref,
+                "hf_ref": hf_ref,
+                "status": "inconclusive",
+                "error_count": 0,
+                "warn_count": 0,
+                "findings": [{
+                    "path": "Dockerfile",
+                    "kind": "inconclusive",
+                    "severity": "warn",
+                    "detail": str(e),
+                }],
+            })
+            continue
         except RuntimeError as e:
             print(f"::warning::{gh}: could not reach Dockerfile ({e}); skipping.")
             skipped.append({"github": gh, "hf": hf, "reason": "dockerfile-unreachable"})
@@ -892,6 +923,11 @@ def run_registry(args):
               "HF Space. A human must pick which side is the source of truth, "
               "reconcile, and commit -- the guard never auto-overwrites.")
         return 1
+    if not total_errors and inconclusive:
+        print("\nINCONCLUSIVE: the org sweep could not verify every GitHub <-> HF "
+              "pair. This is NOT a verified in-sync pass; re-run once the "
+              "transient remote outage or rate limit clears.")
+        return 0
     print("\nOK: no unaccepted module drift between GitHub and any live HF Space.")
     return 0
 
