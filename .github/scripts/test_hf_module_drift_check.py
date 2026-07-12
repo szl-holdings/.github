@@ -152,6 +152,91 @@ class TestComparePropagatesLineage(unittest.TestCase):
         self.assertIn("md5-compare all 4 surfaces", rendered)
 
 
+class TestIndependentRefs(unittest.TestCase):
+    """A GitHub PR SHA and an HF deployment revision are different namespaces."""
+
+    def setUp(self):
+        self._saved = {k: getattr(drift, k) for k in (
+            "github_tree_remote", "hf_tree", "github_file_date",
+            "hf_dir_dates", "parse_copy_sources", "gh_get")}
+
+    def tearDown(self):
+        for key, value in self._saved.items():
+            setattr(drift, key, value)
+
+    def test_common_ref_remains_backwards_compatible(self):
+        args = argparse.Namespace(ref="release")
+        self.assertEqual(drift.effective_refs(args), ("release", "release"))
+
+    def test_compare_routes_each_side_to_its_own_ref(self):
+        path = "module.py"
+        calls = []
+        drift.parse_copy_sources = lambda _text: [path]
+        drift.gh_get = lambda *a, **k: (200, b"COPY module.py /app/", None)
+
+        def github_tree(repo, ref="main"):
+            calls.append(("github-tree", ref))
+            return {path: "same"}
+
+        def hf_tree(repo, ref="main"):
+            calls.append(("hf-tree", ref))
+            return {path: {"oid": "same", "lfs_oid": None, "size": 1}}
+
+        drift.github_tree_remote = github_tree
+        drift.hf_tree = hf_tree
+        drift.github_file_date = lambda repo, p, ref="main": None
+        drift.hf_dir_dates = lambda repo, d, ref="main": {}
+        args = argparse.Namespace(
+            repo_root=".", github_repo="szl-holdings/a11oy",
+            hf_repo="SZLHOLDINGS/a11oy", ref="main",
+            github_ref="github-pr-head", hf_ref="hf-live-revision",
+            allow=None, github_remote=True, report_out="", warn_only=False,
+            siblings=[],
+        )
+
+        report, errors, warns = drift.compare(args, allow={})
+
+        self.assertEqual(errors, [])
+        self.assertEqual(warns, [])
+        self.assertIn(("github-tree", "github-pr-head"), calls)
+        self.assertIn(("hf-tree", "hf-live-revision"), calls)
+        self.assertEqual(report["github_ref"], "github-pr-head")
+        self.assertEqual(report["hf_ref"], "hf-live-revision")
+
+    def test_primary_pr_sha_is_not_reused_for_sibling_repositories(self):
+        path = "module.py"
+        calls = []
+        drift.parse_copy_sources = lambda _text: [path]
+        drift.gh_get = lambda *a, **k: (200, b"COPY module.py /app/", None)
+
+        def github_tree(repo, ref="main"):
+            calls.append((repo, ref))
+            if repo == "szl-holdings/a11oy":
+                return {path: "canonical"}
+            return {path: "canonical"}
+
+        drift.github_tree_remote = github_tree
+        drift.hf_tree = lambda repo, ref="main": {
+            path: {"oid": "stale", "lfs_oid": None, "size": 1}}
+        drift.github_file_date = lambda repo, p, ref="main": "2026-07-12T00:00:00Z"
+        drift.hf_dir_dates = lambda repo, d, ref="main": {
+            path: "2026-07-11T00:00:00Z"}
+        args = argparse.Namespace(
+            repo_root=".", github_repo="szl-holdings/a11oy",
+            hf_repo="SZLHOLDINGS/a11oy", ref="main",
+            github_ref="github-pr-head", hf_ref="hf-live-revision",
+            allow=None, github_remote=True, report_out="", warn_only=False,
+            siblings=["szl-holdings/killinchu"],
+        )
+
+        _report, errors, _warns = drift.compare(args, allow={})
+
+        self.assertEqual(len(errors), 1)
+        self.assertIn(("szl-holdings/a11oy", "github-pr-head"), calls)
+        self.assertIn(("szl-holdings/killinchu", "main"), calls)
+        self.assertNotIn(("szl-holdings/killinchu", "github-pr-head"), calls)
+
+
 class TestTransientHTTPInconclusive(unittest.TestCase):
     """A persistent HF 429/5xx must go HONEST INCONCLUSIVE (report written,
     exit 0), never crash and never false-green. All network stubbed."""
