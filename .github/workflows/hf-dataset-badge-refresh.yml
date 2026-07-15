@@ -1,0 +1,69 @@
+name: HF Dataset Badge Refresh
+
+# Keeps the verified "files-N" / "license-X" badges on every SZLHOLDINGS
+# Hugging Face dataset card in sync with reality. Several datasets grow daily
+# (killinchu-osint-corpus adds one intel shard per day, szl-evidence one
+# envelope per day), so a static count silently drifts from the live tree —
+# the opposite of the honesty standard the badges exist to signal.
+#
+# The script recomputes each dataset's recursive file count and front-matter
+# license from the LIVE tree and rewrites ONLY the badge values inside the
+# existing badge row (targeted regex on the shields.io URL). Body text is
+# never touched; a README is re-committed only when a badge value changed.
+# Badge palette/format matches the estate house style (files 5b8dee,
+# license 7e8aa3, flat-square).
+#
+# Auth: needs the org-scoped HF_ORG_TOKEN (same secret hf-license-consistency
+# uses) so PRIVATE datasets are covered too. FAIL-CLOSED: a missing/expired
+# token, an unreadable tree, or a failed commit turns the run RED — coverage
+# never silently lapses while reporting green.
+
+on:
+  schedule:
+    # Daily at 08:37 UTC — after the daily shard/envelope publishers (08:00)
+    # so the recount sees the day's new files; offset to avoid a thundering herd.
+    - cron: "37 8 * * *"
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Dry run (report drift, commit nothing)"
+        required: false
+        default: "false"
+  push:
+    branches: [main]
+    paths:
+      - ".github/scripts/hf_dataset_badge_refresh.mjs"
+      - ".github/workflows/hf-dataset-badge-refresh.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: hf-dataset-badge-refresh
+  cancel-in-progress: false
+
+jobs:
+  refresh:
+    name: Badges match the live tree
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Harden runner
+        uses: step-security/harden-runner@bf7454d06d71f1098171f2acdf0cd4708d7b5920 # v2.20.0
+        with:
+          egress-policy: audit
+
+      - name: Checkout
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+
+      - name: Refresh dataset badges from the live tree
+        env:
+          HF_TOKEN: ${{ secrets.HF_ORG_TOKEN }}
+        run: |
+          # Push-triggered runs validate in dry-run; schedule/dispatch publish
+          # (unless dispatch asked for dry_run).
+          if [ "${{ github.event_name }}" = "push" ] || [ "${{ github.event.inputs.dry_run }}" = "true" ]; then
+            node .github/scripts/hf_dataset_badge_refresh.mjs
+          else
+            node .github/scripts/hf_dataset_badge_refresh.mjs --publish
+          fi
