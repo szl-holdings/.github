@@ -23,14 +23,23 @@ jobs:
         with:
           egress-policy: audit
 
-      - name: Checkout
+      - name: Checkout caller
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          path: caller
+
+      - name: Checkout exact reusable-workflow revision (shared validator)
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          repository: ${{ job.workflow_repository }}
+          ref: ${{ job.workflow_sha }}
+          path: tools
 
       - name: Verify SHA-pins
         shell: bash
         run: |
           set -euo pipefail
-          WORKFLOW_DIR=".github/workflows"
+          WORKFLOW_DIR="caller/.github/workflows"
           VIOLATIONS=$(mktemp)
           for file in "$WORKFLOW_DIR"/*.yml "$WORKFLOW_DIR"/*.yaml; do
             [ -f "$file" ] || continue
@@ -38,7 +47,7 @@ jobs:
               ref=$(echo "$line" | sed -n 's/.*uses:[[:space:]]*\([^[:space:]#]*\).*/\1/p')
               [ -z "$ref" ] && continue
               [[ "$ref" == ./* ]] && continue
-              # Reusable workflows live in this org and may use @main — allow that
+              # Org reusable-workflow calls are validated by the next step.
               [[ "$ref" == szl-holdings/* ]] && continue
               after_at="${ref##*@}"
               if ! echo "$after_at" | grep -qE '^[0-9a-f]{40}$'; then
@@ -52,3 +61,10 @@ jobs:
             exit 1
           fi
           echo "✓ All action refs are SHA-pinned."
+
+      - name: Verify reusable-workflow targets at pinned SHAs
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: >-
+          python3 tools/.github/scripts/reusable_workflow_target_check.py
+          --workflow-dir caller/.github/workflows

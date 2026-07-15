@@ -20,6 +20,8 @@ from __future__ import annotations
 
 import importlib.util
 import os
+import tempfile
+import types
 import unittest
 
 _HERE = os.path.dirname(os.path.abspath(__file__))
@@ -145,6 +147,68 @@ class TestExpandSources(unittest.TestCase):
         targets, unresolved = dep.expand_sources(["missing/thing.py"], self.tree)
         self.assertEqual(targets, {})
         self.assertEqual(unresolved, ["missing/thing.py"])
+
+
+class TestDeriveReadmePolicy(unittest.TestCase):
+    def _derive(self, dockerfile, files, *, include_readme, readme_path="README.md"):
+        with tempfile.TemporaryDirectory() as repo_root:
+            for rel, content in {"Dockerfile": dockerfile, **files}.items():
+                path = os.path.join(repo_root, *rel.split("/"))
+                os.makedirs(os.path.dirname(path), exist_ok=True)
+                with open(path, "wb") as fh:
+                    fh.write(content.encode("utf-8"))
+            args = types.SimpleNamespace(
+                repo_root=repo_root,
+                dockerfile_path="Dockerfile",
+                include_readme=include_readme,
+                readme_path=readme_path,
+                github_repo="szl-holdings/example",
+                hf_repo="SZLHOLDINGS/example",
+                ref="main",
+            )
+            return dep.derive(args)
+
+    def test_include_readme_false_filters_explicit_copy(self):
+        manifest, files = self._derive(
+            "FROM scratch\n"
+            "COPY README.md /app/README.md\n"
+            "COPY serve.py /app/serve.py\n",
+            {"README.md": "# GitHub-only README\n", "serve.py": "pass\n"},
+            include_readme=False,
+            readme_path="./README.md",
+        )
+
+        self.assertEqual(set(files), {"serve.py"})
+        self.assertEqual(manifest["files_resolved"], 1)
+        self.assertIsNone(manifest["readme"])
+
+    def test_include_readme_false_keeps_unrelated_nested_readme(self):
+        manifest, files = self._derive(
+            "FROM scratch\n"
+            "COPY README.md /app/README.md\n"
+            "COPY docs /app/docs\n",
+            {
+                "README.md": "# Space-card-owned README\n",
+                "docs/README.md": "# App documentation\n",
+            },
+            include_readme=False,
+        )
+
+        self.assertEqual(set(files), {"docs/README.md"})
+        self.assertEqual(manifest["files_resolved"], 1)
+
+    def test_include_readme_true_merges_derived_entry_as_readme(self):
+        readme = "---\nsdk: docker\napp_port: 7860\n---\n# Space card\n"
+        manifest, files = self._derive(
+            "FROM scratch\nCOPY README.md /app/README.md\n",
+            {"README.md": readme},
+            include_readme=True,
+        )
+
+        self.assertEqual(set(files), {"README.md"})
+        self.assertEqual(files["README.md"]["copy_source"], "(readme)")
+        self.assertEqual(files["README.md"]["sha256"], dep.sha256(readme.encode()))
+        self.assertEqual(manifest["readme"], "README.md")
 
 
 class TestContentIdentity(unittest.TestCase):
