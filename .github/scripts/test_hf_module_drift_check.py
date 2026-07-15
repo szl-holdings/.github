@@ -239,6 +239,125 @@ class TestIndependentRefs(unittest.TestCase):
         self.assertNotIn(("szl-holdings/killinchu", "github-pr-head"), calls)
 
 
+class TestLFSContentIdentity(unittest.TestCase):
+    """HF LFS is a storage representation, not evidence of content drift."""
+
+    def setUp(self):
+        self._saved = {key: getattr(drift, key) for key in (
+            "github_tree_remote", "hf_tree", "github_file_sha256_remote",
+            "gh_get",
+        )}
+        self._tmp = tempfile.mkdtemp()
+        self.path = "ledger.jsonl"
+        self.data = b'{"receipt":"measured"}\n' * 4096
+        with open(os.path.join(self._tmp, "Dockerfile"), "w") as fh:
+            fh.write("COPY ledger.jsonl /app/ledger.jsonl\n")
+        with open(os.path.join(self._tmp, self.path), "wb") as fh:
+            fh.write(self.data)
+        self.lfs_sha256 = drift.hashlib.sha256(self.data).hexdigest()
+
+    def tearDown(self):
+        for key, value in self._saved.items():
+            setattr(drift, key, value)
+        shutil.rmtree(self._tmp, ignore_errors=True)
+
+    def _args(self, github_remote=False):
+        return argparse.Namespace(
+            repo_root=self._tmp,
+            github_repo="szl-holdings/a11oy",
+            hf_repo="SZLHOLDINGS/a11oy",
+            ref="main",
+            github_ref="github-pr-head",
+            hf_ref="hf-candidate",
+            allow=None,
+            github_remote=github_remote,
+            report_out="",
+            warn_only=False,
+            siblings=[],
+        )
+
+    def test_local_lfs_sha256_match_is_in_sync(self):
+        drift.hf_tree = lambda *_a, **_k: {
+            self.path: {
+                "oid": "lfs-pointer-blob",
+                "lfs_oid": self.lfs_sha256,
+                "size": len(self.data),
+            }
+        }
+
+        report, errors, warns = drift.compare(self._args(), allow={})
+
+        self.assertEqual(report["status"], "ok")
+        self.assertEqual(errors, [])
+        self.assertEqual(warns, [])
+
+    def test_local_lfs_sha256_mismatch_fails_closed(self):
+        drift.hf_tree = lambda *_a, **_k: {
+            self.path: {
+                "oid": "lfs-pointer-blob",
+                "lfs_oid": "0" * 64,
+                "size": len(self.data),
+            }
+        }
+
+        _report, errors, _warns = drift.compare(self._args(), allow={})
+
+        self.assertEqual(len(errors), 1)
+        self.assertEqual(errors[0]["kind"], "lfs-drift")
+        self.assertEqual(errors[0]["github_sha256"], self.lfs_sha256)
+
+    def test_remote_lfs_uses_github_ref_and_matching_sha256(self):
+        calls = []
+        git_blob = drift.git_blob_sha1(self.data)
+        drift.gh_get = lambda *_a, **_k: (
+            200, b"COPY ledger.jsonl /app/ledger.jsonl\n", None)
+        drift.github_tree_remote = lambda _repo, ref="main": {self.path: git_blob}
+        drift.hf_tree = lambda *_a, **_k: {
+            self.path: {
+                "oid": "lfs-pointer-blob",
+                "lfs_oid": self.lfs_sha256,
+                "size": len(self.data),
+            }
+        }
+
+        def remote_sha(repo, path, ref="main"):
+            calls.append((repo, path, ref))
+            return self.lfs_sha256
+
+        drift.github_file_sha256_remote = remote_sha
+        report, errors, warns = drift.compare(
+            self._args(github_remote=True), allow={})
+
+        self.assertEqual(report["status"], "ok")
+        self.assertEqual(errors, [])
+        self.assertEqual(warns, [])
+        self.assertEqual(
+            calls,
+            [("szl-holdings/a11oy", self.path, "github-pr-head")],
+        )
+
+    def test_oversized_remote_lfs_comparison_fails_closed_without_download(self):
+        git_blob = drift.git_blob_sha1(self.data)
+        drift.gh_get = lambda *_a, **_k: (
+            200, b"COPY ledger.jsonl /app/ledger.jsonl\n", None)
+        drift.github_tree_remote = lambda _repo, ref="main": {self.path: git_blob}
+        drift.hf_tree = lambda *_a, **_k: {
+            self.path: {
+                "oid": "lfs-pointer-blob",
+                "lfs_oid": self.lfs_sha256,
+                "size": drift.MAX_REMOTE_LFS_COMPARE_BYTES + 1,
+            }
+        }
+        drift.github_file_sha256_remote = lambda *_a, **_k: self.fail(
+            "oversized registry artifact must not be downloaded")
+
+        _report, errors, _warns = drift.compare(
+            self._args(github_remote=True), allow={})
+
+        self.assertEqual(len(errors), 1)
+        self.assertEqual(errors[0]["kind"], "lfs-unverified")
+
+
 class TestTransientHTTPInconclusive(unittest.TestCase):
     """A persistent HF 429/5xx must go HONEST INCONCLUSIVE (report written,
     exit 0), never crash and never false-green. All network stubbed."""
