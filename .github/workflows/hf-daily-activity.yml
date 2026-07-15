@@ -1,5 +1,27 @@
 name: HF Daily Activity
 
+# Daily activity receipt for the SZLHOLDINGS Hugging Face estate.
+#
+# SIGNING (2026-07-15 upgrade): the receipt payload is now signed with a REAL
+# Sigstore keyless signature minted in this CI context (ambient OIDC -> Fulcio
+# ephemeral cert -> Rekor transparency entry), then INDEPENDENTLY verified
+# in-run against the pinned workflow identity BEFORE anything is published.
+# Publish set: daily/<date>.json (plain readable payload) + daily/<date>.sigstore.json
+# (the Sigstore bundle over those exact payload bytes).
+#
+# History note: receipts up to 2026-07-14 carry the honest placeholder
+# ("signing": "hmac-stub" — an unkeyed sha256 over the DSSE PAE, integrity only,
+# no authenticity; the old inline comment called it HMAC, which overstated it).
+# Old receipts are left as-is; the cutover is visible in each payload's
+# "signing" field. Same pattern as a11oy dsse-receipts.yml (issue #203 Tier B):
+# `pip install sigstore` + inline script, NOT a third-party signing action
+# (org policy: only github-owned / verified actions).
+#
+# FAIL-CLOSED: if signing or in-run verification fails, the run goes RED and
+# nothing is published — a stub is never silently substituted. Push failures
+# after a good signature stay warn-only (availability convenience, unchanged).
+# dry_run=true rehearses build+sign+verify without publishing.
+
 on:
   schedule:
     # Run daily at 08:00 UTC
@@ -7,7 +29,7 @@ on:
   workflow_dispatch:
     inputs:
       dry_run:
-        description: 'Dry run (skip push to HF)'
+        description: 'Dry run (sign + verify, skip push to HF)'
         required: false
         default: 'false'
 
@@ -16,8 +38,11 @@ permissions:
 
 jobs:
   hf-daily-refresh:
-    name: Refresh HF org card + push activity receipt
+    name: Refresh HF org card + push signed activity receipt
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write  # REQUIRED: mints the ambient OIDC token Fulcio exchanges for a cert
     # Skip gracefully when HF_TOKEN is absent — no hard-fail, just a clear note.
     # Admin action required: add org secret HF_TOKEN (HF write token scoped to SZLHOLDINGS)
     # to re-enable. See FOUNDER_SECRETS_RUNBOOK.md.
@@ -43,7 +68,9 @@ jobs:
 
       - name: Install dependencies
         if: steps.hf-check.outputs.has_token == 'true'
-        run: pip install huggingface_hub requests
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install huggingface_hub requests "sigstore>=2.0.0"
 
       - name: Fetch live counts from HF API
         id: counts
@@ -53,12 +80,12 @@ jobs:
           import requests, json, os
 
           headers = {"Authorization": f"Bearer {os.environ['HF_TOKEN']}"}
-          
+
           spaces = requests.get("https://huggingface.co/api/spaces?author=SZLHOLDINGS&limit=50", headers=headers).json()
           datasets = requests.get("https://huggingface.co/api/datasets?author=SZLHOLDINGS&limit=50", headers=headers).json()
           models = requests.get("https://huggingface.co/api/models?author=SZLHOLDINGS&limit=50", headers=headers).json()
           collections = list(requests.get("https://huggingface.co/api/collections?namespace=SZLHOLDINGS&limit=20", headers=headers).json())
-          
+
           counts = {
               "spaces": len(spaces),
               "datasets": len(datasets),
@@ -67,8 +94,7 @@ jobs:
               "date": __import__('datetime').datetime.utcnow().strftime("%Y-%m-%d"),
           }
           print(json.dumps(counts, indent=2))
-          
-          # Write to GITHUB_OUTPUT
+
           with open(os.environ['GITHUB_OUTPUT'], 'a') as f:
               f.write(f"spaces={counts['spaces']}\n")
               f.write(f"datasets={counts['datasets']}\n")
@@ -79,24 +105,18 @@ jobs:
         env:
           HF_TOKEN: ${{ secrets.HF_TOKEN }}
 
-      - name: Build + push DSSE-wrapped daily receipt
-        if: steps.hf-check.outputs.has_token == 'true' && inputs.dry_run != 'true'
+      - name: Build daily receipt payload
+        id: build
+        if: steps.hf-check.outputs.has_token == 'true'
         run: |
           python3 << 'PYEOF'
-          import json, hashlib, base64, datetime, os, io
-          from huggingface_hub import HfApi, CommitOperationAdd
+          import json, datetime, os
 
-          TOKEN = os.environ['HF_TOKEN']
-          api = HfApi(token=TOKEN)
-          
           now = datetime.datetime.utcnow()
           date_str = now.strftime("%Y-%m-%d")
-          ts = now.isoformat() + "Z"
-          
-          # Build activity receipt payload
           payload = {
               "type": "szl/daily-activity-receipt/v1",
-              "timestamp": ts,
+              "timestamp": now.isoformat() + "Z",
               "date": date_str,
               "source": "github-actions/szl-holdings/.github/hf-daily-activity.yml",
               "counts": {
@@ -106,32 +126,63 @@ jobs:
                   "collections": int(os.environ.get('COLLECTIONS', 0)),
               },
               "mocked": False,
+              "signing": "sigstore-keyless",
+              "signature_artifact": f"{date_str}.sigstore.json",
+              "verify": (
+                  "python -m sigstore verify identity "
+                  f"--bundle {date_str}.sigstore.json "
+                  "--cert-identity https://github.com/szl-holdings/.github/"
+                  ".github/workflows/hf-daily-activity.yml@refs/heads/main "
+                  "--cert-oidc-issuer https://token.actions.githubusercontent.com "
+                  f"{date_str}.json"
+              ),
           }
-          
-          # Minimal DSSE envelope (PAE signature over payload)
-          payload_bytes = json.dumps(payload, separators=(',', ':')).encode()
-          payload_b64 = base64.b64encode(payload_bytes).decode()
-          payload_type = "application/vnd.szl.daily-activity+json"
-          pae = (
-              b"DSSEv1 "
-              + str(len(payload_type)).encode() + b" " + payload_type.encode()
-              + b" " + str(len(payload_bytes)).encode() + b" " + payload_bytes
-          )
-          sig = hashlib.sha256(pae).hexdigest()
-          
-          envelope = {
-              "payloadType": payload_type,
-              "payload": payload_b64,
-              "signatures": [{"sig": sig, "keyid": "szl-hmac-sha256-v1"}],
-          }
-          
-          # HONESTY NOTE: the `sig` above is an HMAC-SHA256 over the DSSE PAE
-          # (keyid szl-hmac-sha256-v1) — a STUB, not a real asymmetric signature.
-          # A real DSSE signature requires the org secret SZL_COSIGN_PRIVATE_PEM.
-          # The receipt is marked `"signing": "hmac-stub"` so no consumer mistakes
-          # it for a cosign signature.
-          envelope["signing"] = "hmac-stub"
-          receipt_content = json.dumps(envelope, indent=2).encode()
+          with open(f"/tmp/{date_str}.json", "wb") as f:
+              f.write(json.dumps(payload, indent=2).encode())
+          with open(os.environ['GITHUB_OUTPUT'], 'a') as f:
+              f.write(f"payload=/tmp/{date_str}.json\n")
+              f.write(f"bundle=/tmp/{date_str}.sigstore.json\n")
+          print(f"payload written: /tmp/{date_str}.json")
+          PYEOF
+        env:
+          SPACES: ${{ steps.counts.outputs.spaces }}
+          DATASETS: ${{ steps.counts.outputs.datasets }}
+          MODELS: ${{ steps.counts.outputs.models }}
+          COLLECTIONS: ${{ steps.counts.outputs.collections }}
+
+      - name: Sign receipt (real Sigstore keyless — FAIL-CLOSED)
+        if: steps.hf-check.outputs.has_token == 'true'
+        run: |
+          set -euo pipefail
+          python -m sigstore sign \
+            --bundle "${{ steps.build.outputs.bundle }}" \
+            --overwrite \
+            "${{ steps.build.outputs.payload }}"
+          echo "Sigstore bundle minted: ${{ steps.build.outputs.bundle }}"
+
+      - name: Independently verify before publish (identity-pinned — FAIL-CLOSED)
+        run: |
+          set -euo pipefail
+          python -m sigstore verify identity \
+            --bundle "${{ steps.build.outputs.bundle }}" \
+            --cert-identity "https://github.com/szl-holdings/.github/.github/workflows/hf-daily-activity.yml@refs/heads/main" \
+            --cert-oidc-issuer "https://token.actions.githubusercontent.com" \
+            "${{ steps.build.outputs.payload }}"
+          echo "In-run verification PASSED (Fulcio identity + Rekor inclusion)."
+        if: steps.hf-check.outputs.has_token == 'true'
+
+      - name: Push signed daily receipt
+        if: steps.hf-check.outputs.has_token == 'true' && inputs.dry_run != 'true'
+        run: |
+          python3 << 'PYEOF'
+          import io, os, datetime
+          from huggingface_hub import HfApi, CommitOperationAdd
+
+          TOKEN = os.environ['HF_TOKEN']
+          api = HfApi(token=TOKEN)
+          date_str = datetime.datetime.utcnow().strftime("%Y-%m-%d")
+          payload_bytes = open(os.environ['PAYLOAD'], 'rb').read()
+          bundle_bytes = open(os.environ['BUNDLE'], 'rb').read()
 
           pushed = False
           last_err = None
@@ -140,9 +191,6 @@ jobs:
           for repo_id, sub in (("SZLHOLDINGS/szl-evidence", "daily"),
                                ("SZLHOLDINGS/szl-artifacts", "daily-receipts")):
               try:
-                  # Ensure the dataset exists (idempotent); a missing repo would
-                  # otherwise 401/404 on commit. Best-effort — ignore create errors
-                  # and let the commit attempt surface the real auth/scope problem.
                   try:
                       api.create_repo(repo_id=repo_id, repo_type="dataset",
                                       private=True, exist_ok=True, token=TOKEN)
@@ -151,34 +199,32 @@ jobs:
                   api.create_commit(
                       repo_id=repo_id,
                       repo_type="dataset",
-                      operations=[CommitOperationAdd(
-                          path_in_repo=f"{sub}/{date_str}.json",
-                          path_or_fileobj=io.BytesIO(receipt_content)
-                      )],
-                      commit_message=f"feat(receipt): daily activity receipt {date_str} [automated]",
+                      operations=[
+                          CommitOperationAdd(path_in_repo=f"{sub}/{date_str}.json",
+                                             path_or_fileobj=io.BytesIO(payload_bytes)),
+                          CommitOperationAdd(path_in_repo=f"{sub}/{date_str}.sigstore.json",
+                                             path_or_fileobj=io.BytesIO(bundle_bytes)),
+                      ],
+                      commit_message=f"feat(receipt): signed daily activity receipt {date_str} [automated]",
                       token=TOKEN,
                   )
-                  print(f"Pushed daily receipt to {repo_id} for {date_str}")
+                  print(f"Pushed signed daily receipt to {repo_id} for {date_str}")
                   pushed = True
                   break
               except Exception as e:
                   print(f"::warning::push to {repo_id} failed: {e}")
                   last_err = e
           if not pushed:
-              # Best-effort daily receipt: a push failure (e.g. HF_TOKEN lacks
-              # write scope, or org datasets not provisioned) must NOT turn the
-              # org's scheduled CI red. Warn loudly and exit clean; the receipt
-              # is an availability/integrity convenience, not a correctness gate.
-              print("::warning title=Receipt push skipped::Could not push the daily "
+              # Push failure stays warn-only (availability convenience); the
+              # SIGNATURE path above is fail-closed and already succeeded.
+              print("::warning title=Receipt push skipped::Could not push the signed daily "
                     f"activity receipt to any dataset (last error: {last_err}). "
-                    "This is non-fatal — check HF_TOKEN write scope / dataset provisioning.")
+                    "Non-fatal — check HF_TOKEN write scope / dataset provisioning.")
           PYEOF
         env:
           HF_TOKEN: ${{ secrets.HF_TOKEN }}
-          SPACES: ${{ steps.counts.outputs.spaces }}
-          DATASETS: ${{ steps.counts.outputs.datasets }}
-          MODELS: ${{ steps.counts.outputs.models }}
-          COLLECTIONS: ${{ steps.counts.outputs.collections }}
+          PAYLOAD: ${{ steps.build.outputs.payload }}
+          BUNDLE: ${{ steps.build.outputs.bundle }}
 
       - name: Summary (token absent — skipped)
         if: steps.hf-check.outputs.has_token == 'false'
@@ -191,6 +237,8 @@ jobs:
         if: steps.hf-check.outputs.has_token == 'true'
         run: |
           echo "## HF Daily Activity — ${{ steps.counts.outputs.date }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Receipt signing: **Sigstore keyless (verified in-run before publish)**" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "| Metric | Count |" >> $GITHUB_STEP_SUMMARY
           echo "|--------|-------|" >> $GITHUB_STEP_SUMMARY
