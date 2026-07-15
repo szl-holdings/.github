@@ -22,6 +22,13 @@ jobs:
         with:
           python-version: "3.12"
 
+      # A full 40-character ref is not enough for a reusable workflow: the
+      # target file can be absent at that exact commit (the a11oy/docs-site
+      # pre-merge-pin startup_failure). This network-free test locks three
+      # distinct outcomes: present=0, missing=1, API/auth unavailable=2.
+      - name: Reusable-workflow pinned-target validator self-test
+        run: python3 .github/scripts/test_reusable_workflow_target_check.py
+
       # Pins the org-wide DOCTRINE honesty gate — the single most load-bearing
       # check in the org, and (until now) the ONLY guard with no self-test.
       # Its logic used to be inline LINE-BASED bash grep: a cosmetic 2-line

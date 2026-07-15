@@ -32,9 +32,11 @@ Design notes:
     with a warning rather than silently expanded.
   * Directory COPY sources expand to every tracked file under them; globs expand
     by fnmatch; explicit files are taken as-is.
-  * README front-matter is PRESERVED (the GitHub README already carries the HF
-    `sdk: docker` / `app_port` card). HF's flaky server-side `_validate_yaml` is
-    monkeypatched non-fatal (the documented a11oy `_safe_validate` shim).
+  * README is deployed iff `--include-readme` is true, even when a Dockerfile
+    explicitly COPYs it. When included, its front-matter is PRESERVED (the
+    GitHub README already carries the HF `sdk: docker` / `app_port` card). HF's
+    flaky server-side `_validate_yaml` is monkeypatched non-fatal (the documented
+    a11oy `_safe_validate` shim).
   * stdlib-only for derivation + attestation, so --dry-run and --attest run on a
     bare runner; huggingface_hub is imported lazily only for an actual push.
 """
@@ -281,6 +283,17 @@ def derive(args):
     tree = local_tree(args.repo_root)
     targets, unresolved = expand_sources(sources, tree)
 
+    # include-readme is authoritative. A README may already be in the derived
+    # set because the Dockerfile explicitly COPYs it; remove that exact path
+    # when the caller owns the Space card separately. Normalize the CLI path to
+    # the forward-slash form used by local_tree/expand_sources, without filtering
+    # unrelated nested README files.
+    readme_path = args.readme_path.replace("\\", "/")
+    while readme_path.startswith("./"):
+        readme_path = readme_path[2:]
+    if not args.include_readme:
+        targets.pop(readme_path, None)
+
     if unresolved:
         for u in unresolved:
             print(f"::warning::COPY source not found in checkout (skipped): {u}")
@@ -299,10 +312,10 @@ def derive(args):
 
     readme_rel = None
     if args.include_readme:
-        rp = os.path.join(args.repo_root, args.readme_path)
+        rp = os.path.join(args.repo_root, readme_path)
         if os.path.exists(rp):
             data = load_readme(rp)
-            readme_rel = args.readme_path
+            readme_rel = readme_path
             files[readme_rel] = {
                 "git_blob_sha1": git_blob_sha1(data),
                 "sha256": sha256(data),
