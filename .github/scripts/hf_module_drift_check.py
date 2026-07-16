@@ -13,9 +13,12 @@ newer v1.1 of a module that GitHub never received.
 
 This script parses every `COPY` source in the Dockerfile, expands directories
 and globs, then compares each file's content between the two sides by git-blob
-SHA (no full download needed for the comparison -- HF's tree API and GitHub's
-git-tree both expose the git blob OID (sha1), identical iff content is
-identical). For every drifted file it fetches the last-commit DATE on both sides
+SHA. HF's tree API and GitHub's git-tree expose the same blob OID for normal
+files. When HF stores a large file through LFS, the guard compares HF's LFS
+SHA-256 with a streamed local SHA-256 (CI mode) or a bounded GitHub raw-file
+SHA-256 (registry mode) instead of failing merely because the storage
+representation changed. For every drifted file it fetches the last-commit DATE
+on both sides
 and NAMES which side is ahead -- it deliberately does NOT auto-overwrite, because
 drift can run either direction.
 
@@ -70,6 +73,7 @@ GH_API = "https://api.github.com"
 GH_RAW = "https://raw.githubusercontent.com"
 
 UA = {"User-Agent": "hf-module-drift-check/1.0"}
+MAX_REMOTE_LFS_COMPARE_BYTES = 128 * 1024 * 1024
 
 
 # --------------------------------------------------------------------------- #
@@ -284,6 +288,28 @@ def github_tree_remote(github_repo, ref="main"):
         if e.get("type") == "blob":
             out[e["path"]] = e["sha"]
     return out
+
+
+def github_file_sha256_local(repo_root, path):
+    """SHA-256 one checked-out file without loading a large artifact at once."""
+    full = os.path.join(repo_root, *path.split("/"))
+    digest = hashlib.sha256()
+    try:
+        with open(full, "rb") as fh:
+            for chunk in iter(lambda: fh.read(1024 * 1024), b""):
+                digest.update(chunk)
+    except OSError:
+        return None
+    return digest.hexdigest()
+
+
+def github_file_sha256_remote(github_repo, path, ref="main"):
+    """SHA-256 a GitHub raw file for registry mode; auth can fall back public."""
+    url = f"{GH_RAW}/{github_repo}/{ref}/{urllib.parse.quote(path)}"
+    status, body, _ = gh_get(url)
+    if status != 200:
+        return None
+    return hashlib.sha256(body).hexdigest()
 
 
 # --------------------------------------------------------------------------- #
@@ -582,6 +608,27 @@ def compare(args, allow=None):
     # BOTH sides -- the latter is dockerfile-copy-guard's domain, not drift).
     findings = []
     _hf_date_cache = {}
+    _github_lfs_sha256_cache = {}
+
+    def github_lfs_sha256(path, hf_size):
+        """Return GitHub-side content identity for one HF-LFS target.
+
+        Local CI hashes the exact checkout in a streaming pass. Registry mode
+        has no checkout, so it fetches the GitHub raw object only when the
+        HF-declared size is within a conservative bound. Unavailable or
+        oversized comparisons remain fail-closed as ``lfs-unverified``.
+        """
+        if path in _github_lfs_sha256_cache:
+            return _github_lfs_sha256_cache[path]
+        if (args.github_remote and isinstance(hf_size, int)
+                and hf_size > MAX_REMOTE_LFS_COMPARE_BYTES):
+            value = None
+        elif args.github_remote:
+            value = github_file_sha256_remote(args.github_repo, path, github_ref)
+        else:
+            value = github_file_sha256_local(args.repo_root, path)
+        _github_lfs_sha256_cache[path] = value
+        return value
 
     def add(entry, base_severity):
         if entry["path"] in accepted:
@@ -612,12 +659,25 @@ def compare(args, allow=None):
 
         # Both present.
         if hf.get("lfs_oid"):
-            # LFS on the Space: git-blob OID vs sha256 aren't comparable cheaply.
-            # Source modules are never LFS, so this only fires for un-excluded
-            # binary assets -> flag for manual review.
-            add({"path": path, "kind": "lfs",
-                 "detail": "stored as LFS on HF Space; not cheaply comparable "
-                           "-- exclude via ignore_paths if it is a vendored asset"}, "error")
+            # HF LFS exposes the content SHA-256 rather than the normal git blob
+            # OID. Compare it to the exact GitHub bytes: storage representation
+            # alone is not drift, and evidence files must not be ignored merely
+            # because the Hub selected LFS for them.
+            github_sha256 = github_lfs_sha256(path, hf.get("size"))
+            if github_sha256 == hf.get("lfs_oid"):
+                continue
+            if github_sha256 is None:
+                add({"path": path, "kind": "lfs-unverified",
+                     "hf_lfs_sha256": hf.get("lfs_oid"),
+                     "detail": "HF stores this path as LFS, but the GitHub-side "
+                               "SHA-256 could not be computed within the bounded "
+                               "comparison; equality is unverified"}, "error")
+            else:
+                add({"path": path, "kind": "lfs-drift",
+                     "github_sha256": github_sha256,
+                     "hf_lfs_sha256": hf.get("lfs_oid"),
+                     "detail": "GitHub bytes and HF LFS object have different "
+                               "SHA-256 content identities"}, "error")
             continue
 
         if gh_sha == hf.get("oid"):
