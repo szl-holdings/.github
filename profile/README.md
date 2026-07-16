@@ -58,6 +58,18 @@
 
 ---
 
+## Live evidence
+
+Not claims — receipts. Three independent surfaces over the same signed evidence:
+
+| Surface | What it is | Open |
+|---|---|---|
+| **Quant signals wall** | Every signal & backtest as a DSSE-signed receipt, re-verified server-side against a pinned key on every request — plus the engine's **autonomous ~6-hourly paper ledger** (hash-chain-sealed; the wall MEASURES what the ledger recorded, promises nothing). ADVISORY / PAPER-ONLY: verification proves integrity + origin, never accuracy or profitability. | [a-11-oy.com/signals](https://a-11-oy.com/signals) |
+| **szl-lake dataset** | The canonical receipt corpus (khipu chains · quant family · papers · trajectories · SBOMs), mirrored GitHub ↔ Hugging Face with per-file sha256 manifests; the quant ledger is re-verified in CI against the pinned engine key before every mirror lands. | [🤗 szl-lake](https://huggingface.co/datasets/SZLHOLDINGS/szl-lake) |
+| **Autonomous ledger (raw)** | The append-only data branch written by the engine's scheduled CI — DSSE receipts + hash chain, independently walkable with the published verifier. GitHub cron is best-effort: gaps mean runs did not fire. | [szl-quant@ledger](https://github.com/szl-holdings/szl-quant/tree/ledger) |
+
+---
+
 <div align="center">
 
 **8 formulas locked-proven · Λ = Conjecture 1, never green · honest by design · public data only.**
