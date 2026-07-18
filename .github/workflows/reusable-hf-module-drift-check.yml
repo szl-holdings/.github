@@ -46,6 +46,31 @@ on:
         required: false
         type: string
         default: ""
+      mode:
+        description: "direct, or trusted-baseline for PR-safe deployed-baseline verification."
+        required: false
+        type: string
+        default: "direct"
+      deployment-lock-path:
+        description: "Repo-relative lock path read from trusted-base-ref, never the candidate checkout."
+        required: false
+        type: string
+        default: ".github/hf-deployment-lock.json"
+      trusted-base-ref:
+        description: "Exact 40-character PR base SHA that owns the deployment lock."
+        required: false
+        type: string
+        default: ""
+      candidate-ref:
+        description: "Optional exact 40-character PR head SHA; GitHub-only delta report, never deployed."
+        required: false
+        type: string
+        default: ""
+      dockerfile-path:
+        description: "Repo-relative Dockerfile path used to derive managed files."
+        required: false
+        type: string
+        default: "Dockerfile"
 
 permissions:
   contents: read
@@ -61,11 +86,56 @@ jobs:
         with:
           egress-policy: audit
 
+      - name: Validate comparison mode
+        env:
+          MODE: ${{ inputs.mode }}
+        run: |
+          set -euo pipefail
+          case "${MODE}" in
+            direct|trusted-baseline) ;;
+            *) echo "::error::mode must be direct or trusted-baseline"; exit 1 ;;
+          esac
+
       - name: Checkout caller (GitHub source-of-truth)
+        if: inputs.mode == 'direct'
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
           path: caller
           ref: ${{ inputs.github-ref != '' && inputs.github-ref || inputs.ref }}
+
+      - name: Validate trusted-baseline inputs
+        if: inputs.mode == 'trusted-baseline'
+        env:
+          TRUSTED_BASE_REF: ${{ inputs.trusted-base-ref }}
+          CANDIDATE_REF: ${{ inputs.candidate-ref }}
+          LOCK_PATH: ${{ inputs.deployment-lock-path }}
+        run: |
+          set -euo pipefail
+          sha_re='^[0-9a-f]{40}$'
+          [[ "${TRUSTED_BASE_REF}" =~ ${sha_re} ]] || {
+            echo "::error::trusted-base-ref must be an exact lowercase 40-character SHA"
+            exit 1
+          }
+          if [ -n "${CANDIDATE_REF}" ]; then
+            [[ "${CANDIDATE_REF}" =~ ${sha_re} ]] || {
+              echo "::error::candidate-ref must be an exact lowercase 40-character SHA"
+              exit 1
+            }
+          fi
+          case "${LOCK_PATH}" in
+            /*|*..*|*\\*)
+              echo "::error::deployment-lock-path must be a safe repo-relative path"
+              exit 1
+              ;;
+          esac
+
+      - name: Checkout trusted base (deployment-lock authority)
+        if: inputs.mode == 'trusted-baseline'
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          path: trusted-base
+          ref: ${{ inputs.trusted-base-ref }}
+          persist-credentials: false
 
       - name: Checkout exact reusable-workflow revision (shared checker)
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
@@ -83,6 +153,7 @@ jobs:
           python-version: "3.12"
 
       - name: Compare COPY'd modules against the live HF Space
+        if: inputs.mode == 'direct'
         env:
           GITHUB_TOKEN: ${{ github.token }} # commit-date lookups (which side is ahead)
           GH_REPO: ${{ github.repository }}
@@ -111,10 +182,39 @@ jobs:
             --allow caller/.github/hf-module-drift-allow.json \
             --report-out hf-module-drift-report.out.json
 
+      - name: Verify immutable deployed baseline and report candidate plan
+        if: inputs.mode == 'trusted-baseline'
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          HF_REPO_IN: ${{ inputs.hf-repo }}
+          TRUSTED_BASE_REF: ${{ inputs.trusted-base-ref }}
+          CANDIDATE_REF: ${{ inputs.candidate-ref }}
+          LOCK_PATH: ${{ inputs.deployment-lock-path }}
+          DOCKERFILE_PATH: ${{ inputs.dockerfile-path }}
+        run: |
+          set -euo pipefail
+          if [ -n "${HF_REPO_IN}" ]; then
+            HF_REPO="${HF_REPO_IN}"
+          else
+            HF_REPO="SZLHOLDINGS/${GH_REPO##*/}"
+          fi
+          python3 tools/.github/scripts/hf_module_drift_check.py \
+            --github-repo "${GH_REPO}" \
+            --hf-repo "${HF_REPO}" \
+            --dockerfile-path "${DOCKERFILE_PATH}" \
+            --deployment-lock "trusted-base/${LOCK_PATH}" \
+            --trusted-base-ref "${TRUSTED_BASE_REF}" \
+            --candidate-ref "${CANDIDATE_REF}" \
+            --report-out hf-module-drift-report.out.json \
+            --candidate-report-out hf-managed-candidate-plan.out.json
+
       - name: Upload drift report
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: hf-module-drift-report
-          path: hf-module-drift-report.out.json
+          path: |
+            hf-module-drift-report.out.json
+            hf-managed-candidate-plan.out.json
           if-no-files-found: ignore

@@ -239,6 +239,217 @@ class TestIndependentRefs(unittest.TestCase):
         self.assertNotIn(("szl-holdings/killinchu", "github-pr-head"), calls)
 
 
+class TestTrustedDeploymentLock(unittest.TestCase):
+    def setUp(self):
+        self.tmp = tempfile.mkdtemp()
+        self.path = os.path.join(self.tmp, "hf-deployment-lock.json")
+
+    def tearDown(self):
+        shutil.rmtree(self.tmp, ignore_errors=True)
+
+    def _write(self, **overrides):
+        payload = {
+            "schema": 1,
+            "github_repo": "szl-holdings/a11oy",
+            "github_source_sha": "1" * 40,
+            "hf_repo": "SZLHOLDINGS/a11oy",
+            "hf_commit_sha": "2" * 40,
+        }
+        payload.update(overrides)
+        with open(self.path, "w", encoding="utf-8") as fh:
+            json.dump(payload, fh)
+
+    def test_loads_exact_immutable_pair(self):
+        self._write()
+        lock = drift.load_deployment_lock(self.path)
+        self.assertEqual(lock["github_source_sha"], "1" * 40)
+        self.assertEqual(lock["hf_commit_sha"], "2" * 40)
+
+    def test_rejects_mutable_or_short_revision(self):
+        self._write(github_source_sha="main")
+        with self.assertRaisesRegex(ValueError, "40-character"):
+            drift.load_deployment_lock(self.path)
+
+
+class TestCandidateManagedDelta(unittest.TestCase):
+    BASE = "a" * 40
+    HEAD = "b" * 40
+
+    def setUp(self):
+        self._saved = {
+            "github_tree_remote": drift.github_tree_remote,
+            "fetch_github_file": drift.fetch_github_file,
+        }
+
+    def tearDown(self):
+        for key, value in self._saved.items():
+            setattr(drift, key, value)
+
+    def test_reports_managed_changes_without_treating_them_as_live_drift(self):
+        trees = {
+            self.BASE: {
+                "Dockerfile": "df-old",
+                "mod.py": "mod-old",
+                "oldonly.py": "oldonly",
+            },
+            self.HEAD: {
+                "Dockerfile": "df-new",
+                "mod.py": "mod-new",
+                "new.py": "new",
+            },
+        }
+        dockerfiles = {
+            self.BASE: (
+                b"COPY mod.py /app/\n"
+                b"COPY oldonly.py /app/\n"
+                b"COPY missing.txt /app/\n"),
+            self.HEAD: (
+                b"COPY mod.py /app/\n"
+                b"COPY new.py /app/\n"
+                b"COPY missing.txt /app/\n"),
+        }
+        drift.github_tree_remote = lambda _repo, ref="main": trees[ref]
+        drift.fetch_github_file = lambda _repo, ref, _path: dockerfiles[ref]
+
+        report = drift.candidate_managed_delta(
+            "szl-holdings/a11oy", self.BASE, self.HEAD)
+
+        self.assertEqual(report["status"], "changes")
+        self.assertEqual(report["new_unresolved_sources"], [])
+        self.assertEqual(
+            {(entry["path"], entry["kind"]) for entry in report["deltas"]},
+            {
+                ("Dockerfile", "modified"),
+                ("mod.py", "modified"),
+                ("new.py", "managed-added"),
+                ("oldonly.py", "managed-removed"),
+            },
+        )
+
+    def test_new_unresolved_copy_source_is_invalid(self):
+        tree = {"Dockerfile": "df", "mod.py": "mod"}
+        drift.github_tree_remote = lambda _repo, ref="main": tree
+        drift.fetch_github_file = lambda _repo, ref, _path: (
+            b"COPY mod.py /app/\n" if ref == self.BASE else
+            b"COPY mod.py missing-new.py /app/\n")
+
+        report = drift.candidate_managed_delta(
+            "szl-holdings/a11oy", self.BASE, self.HEAD)
+
+        self.assertEqual(report["status"], "invalid")
+        self.assertEqual(report["new_unresolved_sources"], ["missing-new.py"])
+
+
+class TestTrustedBaselineCompare(unittest.TestCase):
+    LOCKED_GH = "1" * 40
+    TRUSTED_BASE = "3" * 40
+    LOCKED_HF = "2" * 40
+
+    def setUp(self):
+        self._saved = {key: getattr(drift, key) for key in (
+            "github_ref_is_ancestor", "hf_space_state", "compare",
+            "candidate_managed_delta",
+        )}
+        self.tmp = tempfile.mkdtemp()
+        self.lock_path = os.path.join(self.tmp, "lock.json")
+        with open(self.lock_path, "w", encoding="utf-8") as fh:
+            json.dump({
+                "schema": 1,
+                "github_repo": "szl-holdings/a11oy",
+                "github_source_sha": self.LOCKED_GH,
+                "hf_repo": "SZLHOLDINGS/a11oy",
+                "hf_commit_sha": self.LOCKED_HF,
+            }, fh)
+
+    def tearDown(self):
+        for key, value in self._saved.items():
+            setattr(drift, key, value)
+        shutil.rmtree(self.tmp, ignore_errors=True)
+
+    def _args(self, candidate_ref=""):
+        return argparse.Namespace(
+            deployment_lock=self.lock_path,
+            trusted_base_ref=self.TRUSTED_BASE,
+            candidate_ref=candidate_ref,
+            github_repo="szl-holdings/a11oy",
+            hf_repo="SZLHOLDINGS/a11oy",
+            dockerfile_path="Dockerfile",
+            repo_root=".", ref="main", github_ref="", hf_ref="",
+            github_remote=False, allow=None, siblings=[],
+        )
+
+    def _stub_clean_pair(self, live_state=None):
+        calls = {}
+        drift.github_ref_is_ancestor = lambda *_a, **_k: (True, "ahead")
+        drift.hf_space_state = lambda *_a, **_k: (live_state or {
+            "head_sha": self.LOCKED_HF,
+            "runtime_sha": self.LOCKED_HF,
+            "runtime_stage": "RUNNING",
+        })
+
+        def compare(args, allow=None, include_dockerfile=False):
+            calls["refs"] = (args.github_ref, args.hf_ref)
+            calls["remote"] = args.github_remote
+            calls["allow"] = allow
+            calls["include_dockerfile"] = include_dockerfile
+            return ({"findings": []}, [], [])
+
+        drift.compare = compare
+        return calls
+
+    def test_compares_locked_pair_without_allowlist_or_candidate_live_equality(self):
+        calls = self._stub_clean_pair()
+        report, errors, warns, candidate = drift.trusted_baseline_compare(
+            self._args())
+
+        self.assertEqual(errors, [])
+        self.assertEqual(warns, [])
+        self.assertIsNone(candidate)
+        self.assertEqual(calls["refs"], (self.LOCKED_GH, self.LOCKED_HF))
+        self.assertTrue(calls["remote"])
+        self.assertEqual(calls["allow"], {})
+        self.assertTrue(calls["include_dockerfile"])
+        self.assertFalse(report["allowlist_used"])
+
+    def test_live_hf_revision_mismatch_fails_closed(self):
+        self._stub_clean_pair({
+            "head_sha": "9" * 40,
+            "runtime_sha": self.LOCKED_HF,
+            "runtime_stage": "RUNNING",
+        })
+        _report, errors, _warns, _candidate = drift.trusted_baseline_compare(
+            self._args())
+        self.assertIn("live-hf-head-mismatch", {e["kind"] for e in errors})
+
+    def test_new_candidate_unresolved_source_fails_without_deployment(self):
+        self._stub_clean_pair()
+        drift.candidate_managed_delta = lambda *_a, **_k: {
+            "status": "invalid",
+            "new_unresolved_sources": ["missing.py"],
+        }
+        _report, errors, _warns, candidate = drift.trusted_baseline_compare(
+            self._args(candidate_ref="4" * 40))
+        self.assertEqual(candidate["status"], "invalid")
+        self.assertIn(
+            "candidate-unresolved-copy-source", {e["kind"] for e in errors})
+
+
+class TestReusableWorkflowTrustedBaselineContract(unittest.TestCase):
+    def test_workflow_reads_lock_from_base_and_never_passes_candidate_as_hf_ref(self):
+        workflow_path = os.path.join(
+            _HERE, "..", "workflows", "reusable-hf-module-drift-check.yml")
+        with open(workflow_path, encoding="utf-8") as fh:
+            workflow = fh.read()
+
+        self.assertIn("if: inputs.mode == 'trusted-baseline'", workflow)
+        self.assertIn("ref: ${{ inputs.trusted-base-ref }}", workflow)
+        self.assertIn('--deployment-lock "trusted-base/${LOCK_PATH}"', workflow)
+        self.assertIn('--candidate-ref "${CANDIDATE_REF}"', workflow)
+        self.assertNotIn('--hf-ref "${CANDIDATE_REF}"', workflow)
+        # The one allowlist flag belongs to legacy direct mode only.
+        self.assertEqual(workflow.count("--allow "), 1)
+
+
 class TestLFSContentIdentity(unittest.TestCase):
     """HF LFS is a storage representation, not evidence of content drift."""
 

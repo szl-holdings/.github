@@ -37,11 +37,17 @@ side DOES, the guard raises a LINEAGE CONFLICT and tells the human to md5-compar
 all four surfaces (this repo GH/HF + the sibling organ's GH/HF) BEFORE backporting
 -- a content-lineage signal, not just a timestamp.
 
-Three run modes:
+Four run modes:
   * CI (default):  single pair; GitHub side = the checked-out working tree
                    (--repo-root .).  Used by the per-repo reusable workflow.
   * Test:          single pair; --github-remote pulls the GitHub side from the
                    git-tree API, so the check can run without a checkout.
+  * Trusted base:  --deployment-lock reads an immutable GitHub/HF revision pair
+                   from a lock file checked out from the PR BASE, never from the
+                   candidate head. It verifies the live Space still runs that
+                   exact pair, compares it without an allowlist, and separately
+                   reports the candidate's managed-file delta without deploying
+                   or requiring candidate==live equality.
   * Registry:      --registry <file> iterates a GitHub<->HF map, comparing every
                    pair via the git-tree API (no checkout). Each pair's allowlist
                    is fetched from that repo's .github/hf-module-drift-allow.json.
@@ -74,6 +80,8 @@ GH_RAW = "https://raw.githubusercontent.com"
 
 UA = {"User-Agent": "hf-module-drift-check/1.0"}
 MAX_REMOTE_LFS_COMPARE_BYTES = 128 * 1024 * 1024
+FULL_SHA_RE = re.compile(r"^[0-9a-f]{40}$")
+DEPLOYMENT_LOCK_SCHEMA = 1
 
 
 # --------------------------------------------------------------------------- #
@@ -175,6 +183,81 @@ def gh_get(url, want_headers=False):
         anon = {k: v for k, v in headers.items() if k != "Authorization"}
         status, body, hdrs = _http(url, headers=anon, want_headers=want_headers)
     return status, body, hdrs
+
+
+def require_full_sha(value, label):
+    """Return an immutable lowercase Git SHA or reject the mutable ref.
+
+    Trusted-baseline mode is a deployment evidence check. Branches and short
+    SHAs are deliberately invalid because they can move between validation and
+    comparison.
+    """
+    value = (value or "").strip()
+    if not FULL_SHA_RE.fullmatch(value):
+        raise ValueError(
+            f"{label} must be an immutable 40-character lowercase Git SHA; "
+            f"got {value!r}")
+    return value
+
+
+def load_deployment_lock(path):
+    """Load and validate a trusted GitHub<->HF deployment lock.
+
+    The workflow is responsible for checking this file out from the trusted PR
+    base. The candidate checkout is never accepted as the lock authority.
+    """
+    try:
+        with open(path, encoding="utf-8") as fh:
+            lock = json.load(fh)
+    except (OSError, json.JSONDecodeError) as exc:
+        raise ValueError(f"deployment lock {path!r} is unreadable: {exc}") from exc
+    if not isinstance(lock, dict):
+        raise ValueError("deployment lock must be a JSON object")
+    if lock.get("schema") != DEPLOYMENT_LOCK_SCHEMA:
+        raise ValueError(
+            f"deployment lock schema must be {DEPLOYMENT_LOCK_SCHEMA}; "
+            f"got {lock.get('schema')!r}")
+    for key in ("github_repo", "github_source_sha", "hf_repo", "hf_commit_sha"):
+        if not isinstance(lock.get(key), str) or not lock[key].strip():
+            raise ValueError(f"deployment lock field {key!r} must be a non-empty string")
+    lock = dict(lock)
+    lock["github_source_sha"] = require_full_sha(
+        lock["github_source_sha"], "deployment lock github_source_sha")
+    lock["hf_commit_sha"] = require_full_sha(
+        lock["hf_commit_sha"], "deployment lock hf_commit_sha")
+    return lock
+
+
+def github_ref_is_ancestor(github_repo, ancestor_sha, descendant_sha):
+    """Return (is_ancestor, compare_status) for two exact GitHub commits."""
+    ancestor_sha = require_full_sha(ancestor_sha, "ancestor GitHub SHA")
+    descendant_sha = require_full_sha(descendant_sha, "trusted base GitHub SHA")
+    if ancestor_sha == descendant_sha:
+        return True, "identical"
+    url = (f"{GH_API}/repos/{github_repo}/compare/"
+           f"{ancestor_sha}...{descendant_sha}")
+    status, body, _ = gh_get(url)
+    if status != 200:
+        raise RuntimeError(
+            f"GitHub compare {github_repo} {ancestor_sha}...{descendant_sha}: "
+            f"HTTP {status}")
+    compare_status = json.loads(body).get("status")
+    return compare_status in ("ahead", "identical"), compare_status
+
+
+def hf_space_state(hf_repo):
+    """Return the exact repository/runtime revisions for the live Space."""
+    url = f"{HF_HOST}/api/spaces/{hf_repo}"
+    status, body, _ = _http(url)
+    if status != 200:
+        raise RuntimeError(f"HF Space metadata {hf_repo}: HTTP {status}")
+    payload = json.loads(body)
+    runtime = payload.get("runtime") or {}
+    return {
+        "head_sha": payload.get("sha"),
+        "runtime_sha": runtime.get("sha"),
+        "runtime_stage": runtime.get("stage"),
+    }
 
 
 # --------------------------------------------------------------------------- #
@@ -427,6 +510,132 @@ def expand_targets(sources, gh_files, hf_files, allow):
     return {t for t in targets if not is_ignored(t, allow)}
 
 
+def fetch_github_file(github_repo, ref, path):
+    """Fetch one file from an exact GitHub revision."""
+    url = (f"{GH_RAW}/{github_repo}/{ref}/"
+           f"{urllib.parse.quote(path)}")
+    status, body, _ = gh_get(url)
+    if status != 200:
+        raise RuntimeError(
+            f"fetch {github_repo}@{ref}:{path}: HTTP {status}")
+    return body
+
+
+def expand_managed_sources(sources, tree):
+    """Expand COPY sources against one GitHub tree.
+
+    Unlike the live drift comparison, this is a one-sided deploy-plan view. It
+    returns unresolved sources explicitly so a candidate cannot add a COPY path
+    that the deployer would silently skip.
+    """
+    paths = set(tree)
+    targets = set()
+    unresolved = []
+    for src in sources:
+        source = src.rstrip("/")
+        if source in paths:
+            targets.add(source)
+            continue
+        prefix = source + "/"
+        directory_members = {p for p in paths if p.startswith(prefix)}
+        if directory_members:
+            targets |= directory_members
+            continue
+        if any(ch in source for ch in "*?["):
+            globbed = {p for p in paths if fnmatch.fnmatch(p, source)}
+            if globbed:
+                targets |= globbed
+                continue
+        unresolved.append(source)
+    return targets, sorted(set(unresolved))
+
+
+def managed_snapshot(github_repo, ref, dockerfile_path="Dockerfile"):
+    """Return one exact GitHub revision's Dockerfile-managed file snapshot."""
+    ref = require_full_sha(ref, "managed snapshot GitHub SHA")
+    tree = github_tree_remote(github_repo, ref)
+    dockerfile = fetch_github_file(github_repo, ref, dockerfile_path)
+    sources = parse_copy_sources(dockerfile.decode("utf-8", "replace"))
+    managed, unresolved = expand_managed_sources(sources, tree)
+    # The Dockerfile controls the live build even though it is not its own COPY
+    # source. Treat it as a managed control file in every candidate plan.
+    if dockerfile_path not in tree:
+        unresolved = sorted(set(unresolved + [dockerfile_path]))
+    else:
+        managed.add(dockerfile_path)
+    return {
+        "ref": ref,
+        "tree": tree,
+        "copy_sources": sources,
+        "managed_paths": managed,
+        "unresolved_sources": unresolved,
+    }
+
+
+def candidate_managed_delta(github_repo, baseline_ref, candidate_ref,
+                            dockerfile_path="Dockerfile"):
+    """Report managed-file changes without comparing or deploying the PR head.
+
+    Existing unresolved COPY sources remain visible but non-blocking. Only a
+    newly introduced unresolved source makes the candidate plan invalid; this
+    is a no-allowlist ratchet over the trusted deployed baseline.
+    """
+    baseline_ref = require_full_sha(baseline_ref, "candidate baseline GitHub SHA")
+    candidate_ref = require_full_sha(candidate_ref, "candidate GitHub SHA")
+    baseline = managed_snapshot(github_repo, baseline_ref, dockerfile_path)
+    candidate = managed_snapshot(github_repo, candidate_ref, dockerfile_path)
+    paths = sorted(baseline["managed_paths"] | candidate["managed_paths"])
+    deltas = []
+    for path in paths:
+        baseline_managed = path in baseline["managed_paths"]
+        candidate_managed = path in candidate["managed_paths"]
+        baseline_sha = baseline["tree"].get(path) if baseline_managed else None
+        candidate_sha = candidate["tree"].get(path) if candidate_managed else None
+        if not baseline_managed and candidate_managed:
+            kind = "managed-added"
+        elif baseline_managed and not candidate_managed:
+            kind = "managed-removed"
+        elif baseline_sha == candidate_sha:
+            continue
+        elif baseline_sha is None:
+            kind = "added"
+        elif candidate_sha is None:
+            kind = "deleted"
+        else:
+            kind = "modified"
+        deltas.append({
+            "path": path,
+            "kind": kind,
+            "baseline_blob_sha": baseline_sha,
+            "candidate_blob_sha": candidate_sha,
+            "baseline_managed": baseline_managed,
+            "candidate_managed": candidate_managed,
+        })
+
+    baseline_unresolved = set(baseline["unresolved_sources"])
+    candidate_unresolved = set(candidate["unresolved_sources"])
+    newly_unresolved = sorted(candidate_unresolved - baseline_unresolved)
+    report = {
+        "schema": 1,
+        "mode": "candidate-managed-delta",
+        "status": "invalid" if newly_unresolved else (
+            "changes" if deltas else "no-changes"),
+        "generated_utc": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+        "github_repo": github_repo,
+        "baseline_ref": baseline_ref,
+        "candidate_ref": candidate_ref,
+        "dockerfile_path": dockerfile_path,
+        "baseline_copy_sources": baseline["copy_sources"],
+        "candidate_copy_sources": candidate["copy_sources"],
+        "baseline_unresolved_sources": sorted(baseline_unresolved),
+        "candidate_unresolved_sources": sorted(candidate_unresolved),
+        "new_unresolved_sources": newly_unresolved,
+        "delta_count": len(deltas),
+        "deltas": deltas,
+    }
+    return report
+
+
 # --------------------------------------------------------------------------- #
 # Allowlist loading (local file or remote per-repo fetch)
 # --------------------------------------------------------------------------- #
@@ -548,8 +757,9 @@ def effective_refs(args):
     return github_ref, hf_ref
 
 
-def compare(args, allow=None):
+def compare(args, allow=None, include_dockerfile=False):
     github_ref, hf_ref = effective_refs(args)
+    dockerfile_path = getattr(args, "dockerfile_path", None) or "Dockerfile"
     if allow is None:
         allow = load_allow_file(args.allow)
     accepted = allow.get("accepted_divergences", {})
@@ -584,13 +794,11 @@ def compare(args, allow=None):
         return shas, repos
 
     if args.github_remote:
-        status, body, _ = gh_get(
-            f"{GH_RAW}/{args.github_repo}/{github_ref}/Dockerfile")
-        if status != 200:
-            raise RuntimeError(f"fetch remote Dockerfile: HTTP {status}")
+        body = fetch_github_file(
+            args.github_repo, github_ref, dockerfile_path)
         dockerfile_text = body.decode("utf-8", "replace")
     else:
-        with open(os.path.join(args.repo_root, "Dockerfile"), "rb") as fh:
+        with open(os.path.join(args.repo_root, dockerfile_path), "rb") as fh:
             dockerfile_text = fh.read().decode("utf-8", "replace")
     sources = parse_copy_sources(dockerfile_text)
 
@@ -602,6 +810,8 @@ def compare(args, allow=None):
     hf_files = hf_tree(args.hf_repo, hf_ref)
 
     targets = sorted(expand_targets(sources, gh_files, hf_files, allow))
+    if include_dockerfile and not is_ignored(dockerfile_path, allow):
+        targets = sorted(set(targets) | {dockerfile_path})
 
     # Every finding carries a severity: "error" (real GitHub<->HF divergence,
     # fails the job) or "warn" (allowlisted backlog, or a COPY source absent on
@@ -720,6 +930,7 @@ def compare(args, allow=None):
         "ref": args.ref,
         "github_ref": github_ref,
         "hf_ref": hf_ref,
+        "dockerfile_path": dockerfile_path,
         "copy_sources": len(sources),
         "files_compared": len(targets),
         "error_count": len(errors),
@@ -727,6 +938,140 @@ def compare(args, allow=None):
         "findings": findings,
     }
     return report, errors, warns
+
+
+def trusted_baseline_compare(args):
+    """Verify the deployed lock and report candidate changes independently.
+
+    The lock path must point into a checkout of ``trusted_base_ref``. This
+    function never reads an allowlist and never compares the candidate ref to
+    Hugging Face.
+    """
+    lock = load_deployment_lock(args.deployment_lock)
+    trusted_base_ref = require_full_sha(
+        args.trusted_base_ref, "trusted base GitHub SHA")
+    candidate_ref = (require_full_sha(args.candidate_ref, "candidate GitHub SHA")
+                     if args.candidate_ref else "")
+    if lock["github_repo"] != args.github_repo:
+        raise ValueError(
+            f"deployment lock github_repo {lock['github_repo']!r} does not match "
+            f"workflow repository {args.github_repo!r}")
+    if lock["hf_repo"] != args.hf_repo:
+        raise ValueError(
+            f"deployment lock hf_repo {lock['hf_repo']!r} does not match "
+            f"workflow Space {args.hf_repo!r}")
+
+    is_ancestor, ancestry_status = github_ref_is_ancestor(
+        args.github_repo, lock["github_source_sha"], trusted_base_ref)
+    live_state = hf_space_state(args.hf_repo)
+
+    baseline_args = argparse.Namespace(**vars(args))
+    baseline_args.ref = lock["github_source_sha"]
+    baseline_args.github_ref = lock["github_source_sha"]
+    baseline_args.hf_ref = lock["hf_commit_sha"]
+    baseline_args.github_remote = True
+    baseline_args.allow = ""
+    baseline_args.siblings = []
+    report, drift_errors, warns = compare(
+        baseline_args, allow={}, include_dockerfile=True)
+
+    contract_errors = []
+    if not is_ancestor:
+        contract_errors.append({
+            "path": "(deployment-lock)",
+            "kind": "locked-source-not-ancestor",
+            "severity": "error",
+            "detail": (
+                f"locked GitHub source {lock['github_source_sha']} is not an "
+                f"ancestor of trusted base {trusted_base_ref} "
+                f"(GitHub compare status {ancestry_status!r})"),
+        })
+    if live_state.get("head_sha") != lock["hf_commit_sha"]:
+        contract_errors.append({
+            "path": "(hf-head)",
+            "kind": "live-hf-head-mismatch",
+            "severity": "error",
+            "expected": lock["hf_commit_sha"],
+            "actual": live_state.get("head_sha"),
+            "detail": "live HF main no longer equals the immutable deployed lock",
+        })
+    if live_state.get("runtime_sha") != lock["hf_commit_sha"]:
+        contract_errors.append({
+            "path": "(hf-runtime)",
+            "kind": "live-hf-runtime-mismatch",
+            "severity": "error",
+            "expected": lock["hf_commit_sha"],
+            "actual": live_state.get("runtime_sha"),
+            "detail": "running Space revision does not equal the deployed lock",
+        })
+    if live_state.get("runtime_stage") != "RUNNING":
+        contract_errors.append({
+            "path": "(hf-runtime)",
+            "kind": "live-hf-runtime-not-running",
+            "severity": "error",
+            "expected": "RUNNING",
+            "actual": live_state.get("runtime_stage"),
+            "detail": "Space is not RUNNING at the locked revision",
+        })
+
+    candidate_report = None
+    if candidate_ref:
+        candidate_report = candidate_managed_delta(
+            args.github_repo,
+            lock["github_source_sha"],
+            candidate_ref,
+            getattr(args, "dockerfile_path", None) or "Dockerfile",
+        )
+        for source in candidate_report["new_unresolved_sources"]:
+            contract_errors.append({
+                "path": source,
+                "kind": "candidate-unresolved-copy-source",
+                "severity": "error",
+                "detail": (
+                    "candidate Dockerfile introduces a managed source that "
+                    "does not resolve at the exact candidate revision"),
+            })
+
+    errors = contract_errors + drift_errors
+    findings = errors + warns
+    findings.sort(key=lambda entry: (
+        entry.get("severity") != "error", entry.get("path", "")))
+    report.update({
+        "mode": "trusted-deployed-baseline",
+        "status": "drift" if errors else "ok",
+        "trusted_base_ref": trusted_base_ref,
+        "candidate_ref": candidate_ref or None,
+        "deployment_lock": {
+            "schema": lock["schema"],
+            "github_repo": lock["github_repo"],
+            "github_source_sha": lock["github_source_sha"],
+            "hf_repo": lock["hf_repo"],
+            "hf_commit_sha": lock["hf_commit_sha"],
+        },
+        "locked_source_ancestry_status": ancestry_status,
+        "live_hf": live_state,
+        "allowlist_used": False,
+        "candidate_plan_status": (
+            candidate_report["status"] if candidate_report else "not-requested"),
+        "error_count": len(errors),
+        "warn_count": len(warns),
+        "findings": findings,
+    })
+    return report, errors, warns, candidate_report
+
+
+def print_candidate_plan(report):
+    """Render a concise, non-deployment candidate managed-file plan."""
+    if not report:
+        return
+    print("\n== Candidate managed-file delta (report only; never deployed) ==")
+    print(f"   {report['baseline_ref']} -> {report['candidate_ref']}")
+    print(f"   managed deltas: {report['delta_count']}   "
+          f"new unresolved COPY sources: {len(report['new_unresolved_sources'])}")
+    for entry in report["deltas"]:
+        print(f"   {entry['kind'].upper():15} {entry['path']}")
+    for source in report["new_unresolved_sources"]:
+        print(f"::error title=Candidate COPY source unresolved::{source}")
 
 
 def fmt(entry):
@@ -789,7 +1134,7 @@ def print_pair(report, errors, warns, github_repo, hf_repo, ref):
 def _write_report(path, report):
     """Always-write helper so the artifact upload step never warns
     'No files were found' on any exit path (ok / drift / inconclusive)."""
-    if not path:
+    if not path or report is None:
         return
     with open(path, "w") as fh:
         json.dump(report, fh, indent=2, sort_keys=True)
@@ -1006,6 +1351,20 @@ def main():
     ap.add_argument(
         "--hf-ref", default="",
         help="Hugging Face revision; overrides --ref for the HF side")
+    ap.add_argument("--dockerfile-path", default="Dockerfile",
+                    help="repo-relative Dockerfile path (default: Dockerfile)")
+    ap.add_argument(
+        "--deployment-lock", default="",
+        help="trusted-base mode: deployment lock checked out from the PR base")
+    ap.add_argument(
+        "--trusted-base-ref", default="",
+        help="trusted-base mode: exact 40-character PR base GitHub SHA")
+    ap.add_argument(
+        "--candidate-ref", default="",
+        help="trusted-base mode: optional exact PR head SHA for delta reporting only")
+    ap.add_argument(
+        "--candidate-report-out", default="",
+        help="trusted-base mode: write the GitHub-only candidate managed-file plan")
     ap.add_argument("--allow", default=".github/hf-module-drift-allow.json")
     ap.add_argument("--report-out", default="")
     ap.add_argument("--registry", default="",
@@ -1028,6 +1387,54 @@ def main():
 
     if not args.github_repo or not args.hf_repo:
         ap.error("--github-repo and --hf-repo are required unless --registry is given")
+
+    if args.deployment_lock:
+        if not args.trusted_base_ref:
+            ap.error("--deployment-lock requires --trusted-base-ref")
+        if args.warn_only:
+            ap.error("--warn-only is forbidden in trusted-baseline mode")
+        try:
+            report, errors, warns, candidate_report = trusted_baseline_compare(args)
+        except TransientHTTPError as exc:
+            _emit_inconclusive(args, exc)
+            print("::error::trusted-baseline verification failed closed because "
+                  "the immutable deployed pair could not be verified")
+            return 1
+        except (OSError, RuntimeError, ValueError, json.JSONDecodeError) as exc:
+            report = {
+                "schema": 1,
+                "mode": "trusted-deployed-baseline",
+                "status": "error",
+                "generated_utc": time.strftime(
+                    "%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+                "github_repo": args.github_repo,
+                "hf_repo": args.hf_repo,
+                "trusted_base_ref": args.trusted_base_ref,
+                "candidate_ref": args.candidate_ref or None,
+                "allowlist_used": False,
+                "error_count": 1,
+                "warn_count": 0,
+                "findings": [{
+                    "path": "(deployment-lock)",
+                    "kind": "trusted-baseline-contract-error",
+                    "severity": "error",
+                    "detail": str(exc),
+                }],
+            }
+            _write_report(args.report_out, report)
+            print(f"::error title=Trusted HF baseline contract::{exc}")
+            return 1
+        print_pair(report, errors, warns, args.github_repo, args.hf_repo, args.ref)
+        print_candidate_plan(candidate_report)
+        _write_report(args.report_out, report)
+        _write_report(args.candidate_report_out, candidate_report)
+        if errors:
+            print("\nFAIL: the immutable deployed baseline or candidate deploy plan "
+                  "violated its contract. The candidate was not deployed.")
+            return 1
+        print("\nOK: immutable deployed baseline verified; candidate changes were "
+              "reported without comparing or deploying the PR head.")
+        return 0
 
     try:
         report, errors, warns = compare(args)
