@@ -28,15 +28,15 @@ jobs:
           echo "Found $JS_FILES JS/TS files"
       - name: Initialize CodeQL
         if: steps.check-code.outputs.js_files != '0'
-        uses: github/codeql-action/init@99df26d4f13ea111d4ec1a7dddef6063f76b97e9 # v4.37.0
+        uses: github/codeql-action/init@7188fc363630916deb702c7fdcf4e481b751f97a # v4.37.1
         with:
           languages: javascript-typescript
       - name: Autobuild
         if: steps.check-code.outputs.js_files != '0'
-        uses: github/codeql-action/autobuild@99df26d4f13ea111d4ec1a7dddef6063f76b97e9 # v4.37.0
+        uses: github/codeql-action/autobuild@7188fc363630916deb702c7fdcf4e481b751f97a # v4.37.1
       - name: Perform CodeQL Analysis
         if: steps.check-code.outputs.js_files != '0'
-        uses: github/codeql-action/analyze@99df26d4f13ea111d4ec1a7dddef6063f76b97e9 # v4.37.0
+        uses: github/codeql-action/analyze@7188fc363630916deb702c7fdcf4e481b751f97a # v4.37.1
       - name: CodeQL skipped (no analyzable code)
         if: steps.check-code.outputs.js_files == '0'
         run: echo "No JavaScript/TypeScript files found — CodeQL analysis not applicable for this repo type."
