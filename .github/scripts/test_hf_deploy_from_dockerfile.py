@@ -493,8 +493,14 @@ class TestReusableWorkflowContract(unittest.TestCase):
             cls.workflow = fh.read()
 
     def test_shared_deployer_checkout_is_exact_reusable_revision(self):
-        self.assertIn("repository: ${{ job.workflow_repository }}", self.workflow)
-        self.assertIn("ref: ${{ job.workflow_sha }}", self.workflow)
+        # The reusable workflow must checkout ITS OWN reviewed revision --
+        # github.job_workflow_sha is the documented context for that; the
+        # job.workflow_* forms do not exist and resolve empty.
+        self.assertIn("repository: szl-holdings/.github", self.workflow)
+        self.assertIn("ref: ${{ github.job_workflow_sha }}", self.workflow)
+        self.assertNotIn("${{ job.workflow_repository }}", self.workflow)
+        self.assertNotIn("${{ job.workflow_sha }}", self.workflow)
+        self.assertNotIn("ref: main", self.workflow)
         self.assertNotIn("repository: szl-holdings/.github\n          ref: main", self.workflow)
 
     def test_shell_consumes_inputs_through_environment(self):
