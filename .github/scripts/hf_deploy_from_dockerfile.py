@@ -16,20 +16,17 @@ can never silently drift from what the image actually builds.
 
 Two modes:
   deploy  (default): parse Dockerfile COPY sources, expand to tracked files,
-                     push them (+ README with preserved HF front-matter) to the
-                     Space via huggingface_hub create_commit (add + optional
-                     prune of managed files gone from git). Emits a manifest
-                     (path -> {git_blob_sha1, sha256, size}).
-  attest  (--attest): re-fetch every manifest path from the live Space
-                      resolve/main URL and assert sha256 == the value pushed.
-                      Fails loudly on any mismatch. This is the "can never drift
-                      again" guard that runs after the Space finishes rebuilding.
+                     push them (+ the build Dockerfile at HF-root `Dockerfile`
+                     and optional README) to the Space via huggingface_hub
+                     create_commit. Emits a source-aware manifest.
+  attest  (--attest): require the Space API to report the exact pushed HF commit
+                      in RUNNING state, re-fetch every manifest path at that
+                      immutable commit, and probe declared same-host live routes.
 
 Design notes:
-  * EXCLUDES `COPY --from=<stage>` (build-stage artifacts, not repo files) and a
-    bare `COPY . <dest>` whole-context copy (the Dockerfiles deliberately never
-    use it; a whole-repo mirror is not a curated Space deploy). Both are skipped
-    with a warning rather than silently expanded.
+  * EXCLUDES `COPY --from=<stage>` (build-stage artifacts, not repo files). A
+    bare `COPY . <dest>` whole-context copy and every unresolved COPY source are
+    hard errors: the deployer never publishes a knowingly incomplete manifest.
   * Directory COPY sources expand to every tracked file under them; globs expand
     by fnmatch; explicit files are taken as-is.
   * README is deployed iff `--include-readme` is true, even when a Dockerfile
@@ -47,6 +44,7 @@ import fnmatch
 import hashlib
 import json
 import os
+import posixpath
 import random
 import re
 import sys
@@ -57,6 +55,49 @@ import urllib.request
 
 HF_HOST = "https://huggingface.co"
 UA = {"User-Agent": "hf-deploy-from-dockerfile/1.0"}
+TERMINAL_RUNTIME_STAGES = {"BUILD_ERROR", "CONFIG_ERROR", "RUNTIME_ERROR"}
+
+
+class DeployContractError(ValueError):
+    """The requested deployment cannot produce a complete, safe manifest."""
+
+
+def normalize_repo_path(path, *, label="repository path"):
+    """Return a safe forward-slash path contained by the repository root."""
+    value = str(path or "").replace("\\", "/")
+    while value.startswith("./"):
+        value = value[2:]
+    value = posixpath.normpath(value)
+    if (value in ("", ".") or value.startswith("/") or
+            re.match(r"^[A-Za-z]:/", value)):
+        raise DeployContractError(f"{label} must be a non-empty relative path: {path!r}")
+    if value == ".." or value.startswith("../"):
+        raise DeployContractError(f"{label} escapes the repository root: {path!r}")
+    return value
+
+
+def source_file(repo_root, source_path):
+    """Resolve a manifest source path and fail if it escapes the checkout."""
+    rel = normalize_repo_path(source_path, label="source_path")
+    root = os.path.realpath(repo_root)
+    full = os.path.realpath(os.path.join(root, *rel.split("/")))
+    try:
+        contained = os.path.commonpath((root, full)) == root
+    except ValueError:
+        contained = False
+    if not contained:
+        raise DeployContractError(f"source_path escapes the repository root: {rel!r}")
+    if not os.path.isfile(full):
+        raise DeployContractError(f"source_path is not a file in the checkout: {rel!r}")
+    return rel, full
+
+
+def read_source_bytes(repo_root, target_path, meta):
+    """Read the GitHub source mapped to an HF target path."""
+    source_path = meta.get("source_path") or target_path
+    _, full = source_file(repo_root, source_path)
+    with open(full, "rb") as fh:
+        return fh.read()
 
 
 # --------------------------------------------------------------------------- #
@@ -78,8 +119,9 @@ def sha256(data: bytes) -> str:
 # --------------------------------------------------------------------------- #
 def parse_copy_sources(dockerfile_text):
     """Return COPY/ADD *source* tokens. Joins line-continuations, handles the
-    JSON-array form, drops --flag options, SKIPS `--from=` build-stage copies and
-    a bare `.` whole-context source."""
+    JSON-array form, drops --flag options, and SKIPS `--from=` build-stage
+    copies. A whole-context source is rejected because it cannot be represented
+    as a curated, independently attestable deploy set."""
     logical = []
     buf = ""
     for raw in dockerfile_text.splitlines():
@@ -97,7 +139,6 @@ def parse_copy_sources(dockerfile_text):
         logical.append(buf)
 
     sources = []
-    skipped_whole_context = False
     for line in logical:
         m = re.match(r"^\s*(COPY|ADD)\s+(.*)$", line, re.IGNORECASE)
         if not m:
@@ -106,10 +147,17 @@ def parse_copy_sources(dockerfile_text):
         if rest.startswith("["):
             try:
                 arr = json.loads(rest)
-            except json.JSONDecodeError:
-                continue
-            if len(arr) >= 2:
-                sources.extend(arr[:-1])
+            except json.JSONDecodeError as exc:
+                raise DeployContractError(
+                    f"malformed JSON-form Dockerfile instruction: {line.strip()}"
+                ) from exc
+            if not isinstance(arr, list) or len(arr) < 2 or not all(
+                isinstance(item, str) for item in arr
+            ):
+                raise DeployContractError(
+                    f"invalid JSON-form Dockerfile instruction: {line.strip()}"
+                )
+            sources.extend(arr[:-1])
             continue
         toks = rest.split()
         skip = False
@@ -120,13 +168,23 @@ def parse_copy_sources(dockerfile_text):
                     skip = True
                 continue
             clean.append(t)
-        if skip or len(clean) < 2:
+        if skip:
             continue
+        if len(clean) < 2:
+            raise DeployContractError(
+                f"COPY/ADD instruction has no complete source/destination pair: "
+                f"{line.strip()}"
+            )
         srcs = clean[:-1]
-        # Skip a whole-context copy (`COPY . <dest>`): not a curated Space deploy.
-        if any(s in (".", "./") for s in srcs):
-            skipped_whole_context = True
-            continue
+        for source in srcs:
+            normalized = source
+            while normalized.startswith("./"):
+                normalized = normalized[2:]
+            if normalized in ("", "."):
+                raise DeployContractError(
+                    "bare `COPY . <dest>` / `ADD . <dest>` is forbidden: "
+                    "the deployer requires an explicit curated source set"
+                )
         sources.extend(srcs)
 
     out, seen = [], set()
@@ -136,12 +194,14 @@ def parse_copy_sources(dockerfile_text):
         # chars, or a dotdir source like ".compliance/x" collapses to "compliance/x".
         while s.startswith("./"):
             s = s[2:]
+        if s in ("", "."):
+            raise DeployContractError(
+                "bare `COPY . <dest>` / `ADD . <dest>` is forbidden: "
+                "the deployer requires an explicit curated source set"
+            )
         if s and s not in seen:
             seen.add(s)
             out.append(s)
-    if skipped_whole_context:
-        print("::warning::skipped a bare `COPY . <dest>` whole-context copy "
-              "(deployer derives a curated per-file set, not a whole-repo mirror)")
     return out
 
 
@@ -216,21 +276,28 @@ def load_readme(path):
 
 
 # --------------------------------------------------------------------------- #
-# HF HTTP (stdlib, retry) -- for attestation + tree listing
+# HF HTTP (stdlib, retry) -- for attestation + live route closure
 # --------------------------------------------------------------------------- #
-def _http(url, headers=None, retries=6):
+class _NoRedirect(urllib.request.HTTPRedirectHandler):
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        return None
+
+
+def _http(url, headers=None, retries=6, follow_redirects=True):
     last = None
     hdrs = dict(UA)
     if headers:
         hdrs.update(headers)
+    opener = (urllib.request.build_opener() if follow_redirects else
+              urllib.request.build_opener(_NoRedirect()))
     for attempt in range(retries):
         try:
             req = urllib.request.Request(url, headers=hdrs)
-            with urllib.request.urlopen(req, timeout=45) as resp:
+            with opener.open(req, timeout=45) as resp:
                 return resp.status, resp.read()
         except urllib.error.HTTPError as e:
-            if e.code in (401, 403, 404):
-                return e.code, b""
+            if 300 <= e.code < 500:
+                return e.code, e.read()
             last = e
             if e.code == 429 or 500 <= e.code < 600:
                 ra = (e.headers or {}).get("Retry-After")
@@ -256,27 +323,135 @@ def _auth_headers():
     return {"Authorization": f"Bearer {tok}"} if tok else {}
 
 
-def hf_runtime_stage(hf_repo):
+def hf_space_state(hf_repo):
+    """Return the public Space API's exact (stage, sha) deployment identity."""
     url = f"{HF_HOST}/api/spaces/{hf_repo}"
-    try:
-        status, body = _http(url, headers=_auth_headers())
-    except RuntimeError:
-        return None
+    status, body = _http(url, headers=_auth_headers())
     if status != 200:
-        return None
+        raise RuntimeError(f"Space API returned HTTP {status}: {url}")
     try:
-        return (json.loads(body).get("runtime") or {}).get("stage")
-    except json.JSONDecodeError:
-        return None
+        payload = json.loads(body)
+    except json.JSONDecodeError as exc:
+        raise RuntimeError(f"Space API returned invalid JSON: {url}") from exc
+    return (payload.get("runtime") or {}).get("stage"), payload.get("sha")
+
+
+def normalize_smoke_paths(value=None):
+    """Validate relative live-app paths; callers can never select another host."""
+    if value is None or value == "":
+        raw_paths = ["/"]
+    elif isinstance(value, str):
+        try:
+            raw_paths = json.loads(value)
+        except json.JSONDecodeError as exc:
+            raise DeployContractError(
+                "--smoke-paths must be a JSON array of same-host absolute paths"
+            ) from exc
+    else:
+        raw_paths = value
+    if not isinstance(raw_paths, list) or not raw_paths:
+        raise DeployContractError("smoke_paths must be a non-empty JSON array")
+
+    paths, seen = [], set()
+    for raw in raw_paths:
+        if not isinstance(raw, str) or not raw:
+            raise DeployContractError("each smoke path must be a non-empty string")
+        if "\\" in raw or any(ord(ch) < 32 for ch in raw):
+            raise DeployContractError(f"unsafe smoke path: {raw!r}")
+        parsed = urllib.parse.urlsplit(raw)
+        if (parsed.scheme or parsed.netloc or not parsed.path.startswith("/") or
+                parsed.path.startswith("//") or parsed.fragment):
+            raise DeployContractError(
+                f"smoke path must be same-host, absolute-path-only, and fragment-free: {raw!r}"
+            )
+        normalized = urllib.parse.urlunsplit(("", "", parsed.path,
+                                              parsed.query, ""))
+        if normalized not in seen:
+            seen.add(normalized)
+            paths.append(normalized)
+    return paths
+
+
+def hf_live_origin(hf_repo):
+    parts = hf_repo.split("/")
+    if len(parts) != 2 or not all(parts):
+        raise DeployContractError(
+            f"HF Space id must be exactly <owner>/<name>: {hf_repo!r}"
+        )
+    subdomain = re.sub(r"[^a-z0-9-]+", "-", "-".join(parts).lower()).strip("-")
+    if not subdomain:
+        raise DeployContractError(f"HF Space id has no usable app hostname: {hf_repo!r}")
+    return f"https://{subdomain}.hf.space"
+
+
+def wait_for_expected_runtime(hf_repo, expected_sha, timeout, poll_interval=15):
+    """Require the exact pushed commit to reach the exact RUNNING stage."""
+    timeout = max(0, int(timeout or 0))
+    deadline = time.monotonic() + timeout
+    first = True
+    last_stage = last_sha = None
+    last_error = None
+    while first or time.monotonic() < deadline:
+        first = False
+        try:
+            last_stage, last_sha = hf_space_state(hf_repo)
+            last_error = None
+            print(f"   runtime stage: {last_stage}   api sha: {last_sha}")
+            if last_stage == "RUNNING" and last_sha == expected_sha:
+                return True
+            if last_sha == expected_sha and last_stage in TERMINAL_RUNTIME_STAGES:
+                print(f"::error::Space {hf_repo}@{expected_sha} is in {last_stage}.")
+                return False
+        except RuntimeError as exc:
+            last_error = str(exc)
+            print(f"::warning::Space runtime identity unavailable: {last_error}")
+
+        remaining = deadline - time.monotonic()
+        if remaining <= 0:
+            break
+        time.sleep(min(float(poll_interval), remaining))
+
+    detail = (f"last stage={last_stage!r} sha={last_sha!r}" if not last_error
+              else f"last error={last_error}")
+    print(f"::error::Timed out waiting for {hf_repo} to report exact RUNNING "
+          f"commit {expected_sha}; {detail}")
+    return False
+
+
+def probe_smoke_routes(hf_repo, smoke_paths, retries=6, delay=5):
+    """Probe only the derived Space host; redirects and empty bodies fail."""
+    paths = normalize_smoke_paths(smoke_paths)
+    origin = hf_live_origin(hf_repo)
+    failures = []
+    for path in paths:
+        url = origin + path
+        last_status = None
+        last_detail = "not attempted"
+        for attempt in range(max(1, int(retries))):
+            try:
+                status, body = _http(
+                    url, headers=_auth_headers(), retries=1,
+                    follow_redirects=False,
+                )
+                last_status = status
+                last_detail = f"HTTP {status}, {len(body)} bytes"
+                if status == 200 and body:
+                    print(f"   smoke OK: {path} (HTTP 200, {len(body)} bytes)")
+                    break
+            except RuntimeError as exc:
+                last_detail = str(exc)
+            if attempt + 1 < max(1, int(retries)):
+                time.sleep(float(delay))
+        else:
+            failures.append((path, last_status, last_detail))
+    return failures
 
 
 # --------------------------------------------------------------------------- #
 # derive: Dockerfile -> deploy manifest (no network, no push)
 # --------------------------------------------------------------------------- #
 def derive(args):
-    df_path = args.dockerfile_path
-    if not os.path.isabs(df_path):
-        df_path = os.path.join(args.repo_root, df_path)
+    dockerfile_rel, df_path = source_file(args.repo_root, args.dockerfile_path)
     with open(df_path, "rb") as fh:
         dockerfile_text = fh.read().decode("utf-8", "replace")
     sources = parse_copy_sources(dockerfile_text)
@@ -288,54 +463,71 @@ def derive(args):
     # when the caller owns the Space card separately. Normalize the CLI path to
     # the forward-slash form used by local_tree/expand_sources, without filtering
     # unrelated nested README files.
-    readme_path = args.readme_path.replace("\\", "/")
-    while readme_path.startswith("./"):
-        readme_path = readme_path[2:]
+    readme_path = normalize_repo_path(args.readme_path, label="README source path")
     if not args.include_readme:
         targets.pop(readme_path, None)
 
     if unresolved:
-        for u in unresolved:
-            print(f"::warning::COPY source not found in checkout (skipped): {u}")
+        raise DeployContractError(
+            "Dockerfile COPY/ADD sources were not found in the checkout: "
+            + ", ".join(sorted(unresolved))
+        )
 
     files = {}
     for rel, src in sorted(targets.items()):
-        full = os.path.join(args.repo_root, rel)
-        with open(full, "rb") as fh:
-            data = fh.read()
+        data = read_source_bytes(args.repo_root, rel, {"source_path": rel})
         files[rel] = {
             "git_blob_sha1": git_blob_sha1(data),
             "sha256": sha256(data),
             "size": len(data),
             "copy_source": src,
+            "source_path": rel,
         }
 
     readme_rel = None
     if args.include_readme:
-        rp = os.path.join(args.repo_root, readme_path)
-        if os.path.exists(rp):
-            data = load_readme(rp)
-            readme_rel = readme_path
-            files[readme_rel] = {
-                "git_blob_sha1": git_blob_sha1(data),
-                "sha256": sha256(data),
-                "size": len(data),
-                "copy_source": "(readme)",
-            }
-        else:
-            print(f"::warning::--include-readme set but {rp} not found")
+        _, rp = source_file(args.repo_root, readme_path)
+        data = load_readme(rp)
+        readme_rel = readme_path
+        files[readme_rel] = {
+            "git_blob_sha1": git_blob_sha1(data),
+            "sha256": sha256(data),
+            "size": len(data),
+            "copy_source": "(readme)",
+            "source_path": readme_rel,
+        }
+
+    # The Space build always consumes an HF-root Dockerfile. It is therefore a
+    # first-class deployed artifact even though Dockerfiles do not COPY
+    # themselves. `source_path` preserves nested caller layouts such as yarqa's
+    # `space/Dockerfile` while the target remains exactly `Dockerfile` on HF.
+    dockerfile_bytes = read_source_bytes(
+        args.repo_root, "Dockerfile", {"source_path": dockerfile_rel}
+    )
+    files["Dockerfile"] = {
+        "git_blob_sha1": git_blob_sha1(dockerfile_bytes),
+        "sha256": sha256(dockerfile_bytes),
+        "size": len(dockerfile_bytes),
+        "copy_source": "(dockerfile)",
+        "source_path": dockerfile_rel,
+    }
+
+    smoke_paths = normalize_smoke_paths(getattr(args, "smoke_paths", None))
 
     manifest = {
-        "schema": 1,
+        "schema": 2,
         "generated_utc": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
         "github_repo": args.github_repo,
         "hf_repo": args.hf_repo,
         "ref": args.ref,
-        "dockerfile": args.dockerfile_path,
+        "dockerfile": dockerfile_rel,
+        "dockerfile_target": "Dockerfile",
         "copy_sources": len(sources),
         "files_resolved": len(targets),
+        "files_deployed": len(files),
         "unresolved_sources": unresolved,
         "readme": readme_rel,
+        "smoke_paths": smoke_paths,
         "files": files,
     }
     return manifest, files
@@ -344,13 +536,36 @@ def derive(args):
 # --------------------------------------------------------------------------- #
 # deploy: push the derived set (add + optional prune) via huggingface_hub
 # --------------------------------------------------------------------------- #
+def build_add_operations(repo_root, files, operation_class):
+    """Build HF add operations from the exact source bytes the manifest hashed."""
+    operations = []
+    for target_path in sorted(files):
+        meta = files[target_path]
+        data = read_source_bytes(repo_root, target_path, meta)
+        # Re-hash the exact source bytes used for the operation. This closes the
+        # nested-Dockerfile class of bugs where the manifest hashed one path but
+        # the deploy operation opened another.
+        if sha256(data) != meta.get("sha256"):
+            raise DeployContractError(
+                f"source changed after manifest derivation: "
+                f"{meta.get('source_path', target_path)}"
+            )
+        operations.append(
+            operation_class(path_in_repo=target_path, path_or_fileobj=data)
+        )
+    return operations
+
+
 def deploy(args):
     manifest, files = derive(args)
     print(f"== HF deploy: {args.github_repo} -> {args.hf_repo} ({args.ref}) ==")
     print(f"   COPY sources: {manifest['copy_sources']}   files resolved: "
           f"{manifest['files_resolved']}   readme: {manifest['readme']}")
     for p in sorted(files):
-        print(f"   + {p}  ({files[p]['size']}B  blob {files[p]['git_blob_sha1'][:12]})")
+        source = files[p].get("source_path", p)
+        mapping = f"{source} -> {p}" if source != p else p
+        print(f"   + {mapping}  ({files[p]['size']}B  "
+              f"blob {files[p]['git_blob_sha1'][:12]})")
 
     if args.manifest_out:
         with open(args.manifest_out, "w") as fh:
@@ -383,23 +598,14 @@ def deploy(args):
     HfApi._validate_yaml = _safe_validate
 
     api = HfApi(token=token)
-    ops = []
-    for rel in sorted(files):
-        with open(os.path.join(args.repo_root, rel), "rb") as fh:
-            ops.append(CommitOperationAdd(path_in_repo=rel, path_or_fileobj=fh.read()))
+    ops = build_add_operations(args.repo_root, files, CommitOperationAdd)
 
     deleted = []
     if args.prune:
-        managed_dirs = {f["copy_source"] for f in files.values()
-                        if f["copy_source"] not in ("(readme)",)
-                        and "/" in f["copy_source"] + "/"  # any source
-                        }
         # Only prune within COPY sources that are DIRECTORIES (whole-dir managed),
         # never within file/glob sources -- avoids sweeping Space-only vendor blobs.
         dir_sources = set()
-        df_path = args.dockerfile_path
-        if not os.path.isabs(df_path):
-            df_path = os.path.join(args.repo_root, df_path)
+        _, df_path = source_file(args.repo_root, args.dockerfile_path)
         for src in parse_copy_sources(open(df_path, encoding="utf-8", errors="replace").read()):
             s = src.rstrip("/")
             # a dir source is one where the checkout has children under s/
@@ -441,30 +647,30 @@ def attest(args):
     with open(args.manifest) as fh:
         manifest = json.load(fh)
     hf_repo = args.hf_repo or manifest.get("hf_repo")
-    ref = args.ref or manifest.get("ref", "main")
     files = manifest.get("files", {})
     if not hf_repo or not files:
         print("::error::attest needs a manifest with hf_repo + files")
         return 2
 
-    # Wait for the Space to finish rebuilding before re-fetching.
-    if args.wait_running:
-        deadline = time.time() + args.wait_running
-        while time.time() < deadline:
-            stage = hf_runtime_stage(hf_repo)
-            print(f"   runtime stage: {stage}")
-            if stage in ("RUNNING", "RUNNING_APP_STARTING"):
-                break
-            if stage in ("BUILD_ERROR", "CONFIG_ERROR", "RUNTIME_ERROR"):
-                print(f"::error::Space {hf_repo} in {stage} -- deploy did not come up.")
-                return 1
-            time.sleep(15)
+    hf_commit_oid = str(manifest.get("hf_commit_oid") or "").lower()
+    if not re.fullmatch(r"[0-9a-f]{40}", hf_commit_oid):
+        print("::error::attest requires manifest.hf_commit_oid as an exact "
+              "40-character commit SHA")
+        return 2
+    smoke_paths = normalize_smoke_paths(manifest.get("smoke_paths", ["/"]))
+
+    # A RUNNING old revision is not this deployment. Require both exact state
+    # and exact API identity before immutable content and live routes are tested.
+    if not wait_for_expected_runtime(
+        hf_repo, hf_commit_oid, args.wait_running
+    ):
+        return 1
 
     mism, missing, ok = [], [], 0
     for path, meta in sorted(files.items()):
         want = meta.get("sha256")
         try:
-            status, body = hf_resolve(hf_repo, path, ref)
+            status, body = hf_resolve(hf_repo, path, hf_commit_oid)
         except RuntimeError as e:
             missing.append((path, f"fetch-failed: {e}"))
             continue
@@ -477,7 +683,7 @@ def attest(args):
         else:
             mism.append((path, want, got))
 
-    print(f"\n== HF deploy attestation: {hf_repo} ({ref}) ==")
+    print(f"\n== HF deploy attestation: {hf_repo} ({hf_commit_oid}) ==")
     print(f"   verified OK: {ok}   mismatched: {len(mism)}   missing: {len(missing)}")
     for p, w, g in mism:
         print(f"::error title=HF deploy drift::{p}: sha256 mismatch "
@@ -487,7 +693,19 @@ def attest(args):
     if mism or missing:
         print("\nFAIL: live Space does not match the pushed git blobs.")
         return 1
-    print("\nOK: every pushed file is byte-identical on the live Space (attested).")
+
+    route_failures = probe_smoke_routes(
+        hf_repo, smoke_paths, retries=args.smoke_retries
+    )
+    for path, status, detail in route_failures:
+        print(f"::error title=HF live route failed::{path}: expected exact HTTP "
+              f"200 with non-empty body; status={status!r}; {detail}")
+    if route_failures:
+        print("\nFAIL: declared live Space routes did not close after deployment.")
+        return 1
+
+    print("\nOK: exact HF commit is RUNNING, every pushed file is byte-identical, "
+          "and every declared live route returns HTTP 200 with content.")
     return 0
 
 
@@ -500,6 +718,10 @@ def main():
     ap.add_argument("--dockerfile-path", default="Dockerfile")
     ap.add_argument("--readme-path", default="README.md")
     ap.add_argument("--include-readme", default="true")
+    ap.add_argument(
+        "--smoke-paths", default='["/"]',
+        help="JSON array of same-host live app paths to require after deploy",
+    )
     ap.add_argument("--manifest-out", default="")
     ap.add_argument("--prune", action="store_true",
                     help="delete Space files under directory COPY sources that are "
@@ -510,7 +732,9 @@ def main():
                          "Space and assert sha256 == pushed value")
     ap.add_argument("--manifest", default="", help="manifest path (attest mode)")
     ap.add_argument("--wait-running", type=int, default=0,
-                    help="attest: seconds to poll runtime stage for RUNNING first")
+                    help="attest: seconds to require exact API sha + RUNNING stage")
+    ap.add_argument("--smoke-retries", type=int, default=6,
+                    help="attest: attempts per declared live route")
     args = ap.parse_args()
 
     args.include_readme = str(args.include_readme).lower() not in ("false", "0", "no")
@@ -521,11 +745,15 @@ def main():
                 os.path.basename(os.path.abspath(args.repo_root)))
         args.hf_repo = f"SZLHOLDINGS/{name}"
 
-    if args.attest:
-        if not args.manifest:
-            ap.error("--attest requires --manifest")
-        return attest(args)
-    return deploy(args)
+    try:
+        if args.attest:
+            if not args.manifest:
+                ap.error("--attest requires --manifest")
+            return attest(args)
+        return deploy(args)
+    except DeployContractError as exc:
+        print(f"::error title=HF deploy contract::{exc}")
+        return 2
 
 
 if __name__ == "__main__":
