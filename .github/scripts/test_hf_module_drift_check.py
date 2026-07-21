@@ -340,6 +340,102 @@ class TestCandidateManagedDelta(unittest.TestCase):
         self.assertEqual(report["new_unresolved_sources"], ["missing-new.py"])
 
 
+class TestHFMetadataConsistency(unittest.TestCase):
+    STALE = "a" * 40
+    CURRENT = "b" * 40
+
+    def setUp(self):
+        self._http = drift._http
+        self.calls = []
+
+    def tearDown(self):
+        drift._http = self._http
+
+    @staticmethod
+    def _payload(head, runtime=None, stage="RUNNING"):
+        return json.dumps({
+            "sha": head,
+            "runtime": {"sha": runtime or head, "stage": stage},
+        }).encode("utf-8")
+
+    def _install_responses(self, responses):
+        queue = list(responses)
+
+        def fake_http(url, headers=None, want_headers=False, **_kwargs):
+            self.calls.append({
+                "url": url,
+                "headers": dict(headers or {}),
+                "want_headers": want_headers,
+            })
+            response = queue.pop(0)
+            if isinstance(response, Exception):
+                raise response
+            return response
+
+        drift._http = fake_http
+
+    def test_stale_then_current_is_cdn_inconsistent_not_selected(self):
+        self._install_responses([
+            (200, self._payload(self.STALE), {"X-Cache": "HIT"}),
+            (200, self._payload(self.CURRENT), {"X-Cache": "MISS"}),
+        ])
+
+        state = drift.hf_space_state("SZLHOLDINGS/a11oy")
+
+        self.assertEqual(state["observation_status"], "cdn-inconsistent")
+        self.assertIsNone(state["head_sha"])
+        self.assertIsNone(state["runtime_sha"])
+        self.assertEqual(len(state["observations"]), 2)
+        self.assertNotEqual(self.calls[0]["url"], self.calls[1]["url"])
+        for call in self.calls:
+            self.assertTrue(call["want_headers"])
+            self.assertEqual(
+                call["headers"]["Cache-Control"],
+                "no-cache, no-store, max-age=0",
+            )
+            self.assertEqual(call["headers"]["Pragma"], "no-cache")
+
+    def test_persistent_stale_is_stable_observation_not_freshness_claim(self):
+        response = (200, self._payload(self.STALE), {"Age": "180"})
+        self._install_responses([response, response])
+
+        state = drift.hf_space_state("SZLHOLDINGS/a11oy")
+
+        self.assertEqual(state["observation_status"], "stable")
+        self.assertEqual(state["head_sha"], self.STALE)
+        self.assertEqual(state["runtime_sha"], self.STALE)
+        self.assertEqual(state["observations"][0]["response_cache"]["age"], "180")
+
+    def test_stable_split_head_and_runtime_preserves_both_exact_values(self):
+        response = (
+            200,
+            self._payload(self.CURRENT, runtime=self.STALE),
+            {"CF-Cache-Status": "DYNAMIC"},
+        )
+        self._install_responses([response, response])
+
+        state = drift.hf_space_state("SZLHOLDINGS/a11oy")
+
+        self.assertEqual(state["observation_status"], "stable")
+        self.assertEqual(state["head_sha"], self.CURRENT)
+        self.assertEqual(state["runtime_sha"], self.STALE)
+
+    def test_transient_http_returns_unavailable_with_partial_evidence(self):
+        self._install_responses([
+            (200, self._payload(self.CURRENT), {"X-Cache": "MISS"}),
+            drift.TransientHTTPError("https://huggingface.invalid", 503, 8),
+        ])
+
+        state = drift.hf_space_state("SZLHOLDINGS/a11oy")
+
+        self.assertEqual(state["observation_status"], "unavailable")
+        self.assertIsNone(state["head_sha"])
+        self.assertEqual(state["observation_count"], 2)
+        self.assertEqual(state["observations"][0]["status"], "observed")
+        self.assertEqual(state["observations"][1]["status"], "transient-http")
+        self.assertEqual(state["observations"][1]["http_status"], 503)
+
+
 class TestTrustedBaselineCompare(unittest.TestCase):
     LOCKED_GH = "1" * 40
     TRUSTED_BASE = "3" * 40
@@ -381,11 +477,33 @@ class TestTrustedBaselineCompare(unittest.TestCase):
     def _stub_clean_pair(self, live_state=None):
         calls = {}
         drift.github_ref_is_ancestor = lambda *_a, **_k: (True, "ahead")
-        drift.hf_space_state = lambda *_a, **_k: (live_state or {
-            "head_sha": self.LOCKED_HF,
-            "runtime_sha": self.LOCKED_HF,
-            "runtime_stage": "RUNNING",
-        })
+        if live_state is None:
+            live_state = {
+                "head_sha": self.LOCKED_HF,
+                "runtime_sha": self.LOCKED_HF,
+                "runtime_stage": "RUNNING",
+            }
+        live_state = dict(live_state)
+        live_state.setdefault("observation_status", "stable")
+        live_state.setdefault("observation_count", 2)
+        live_state.setdefault("required_observation_count", 2)
+        live_state.setdefault("observations", [
+            {
+                "ordinal": 1,
+                "status": "observed",
+                "head_sha": live_state.get("head_sha"),
+                "runtime_sha": live_state.get("runtime_sha"),
+                "runtime_stage": live_state.get("runtime_stage"),
+            },
+            {
+                "ordinal": 2,
+                "status": "observed",
+                "head_sha": live_state.get("head_sha"),
+                "runtime_sha": live_state.get("runtime_sha"),
+                "runtime_stage": live_state.get("runtime_stage"),
+            },
+        ])
+        drift.hf_space_state = lambda *_a, **_k: live_state
 
         def compare(args, allow=None, include_dockerfile=False):
             calls["refs"] = (args.github_ref, args.hf_ref)
@@ -420,6 +538,66 @@ class TestTrustedBaselineCompare(unittest.TestCase):
         _report, errors, _warns, _candidate = drift.trusted_baseline_compare(
             self._args())
         self.assertIn("live-hf-head-mismatch", {e["kind"] for e in errors})
+
+    def test_persistent_stale_head_and_runtime_fail_exact_lock(self):
+        self._stub_clean_pair({
+            "head_sha": "9" * 40,
+            "runtime_sha": "9" * 40,
+            "runtime_stage": "RUNNING",
+        })
+        _report, errors, _warns, _candidate = drift.trusted_baseline_compare(
+            self._args())
+        kinds = {error["kind"] for error in errors}
+        self.assertIn("live-hf-head-mismatch", kinds)
+        self.assertIn("live-hf-runtime-mismatch", kinds)
+
+    def test_split_head_runtime_has_distinct_fail_closed_error(self):
+        self._stub_clean_pair({
+            "head_sha": self.LOCKED_HF,
+            "runtime_sha": "9" * 40,
+            "runtime_stage": "RUNNING",
+        })
+        _report, errors, _warns, _candidate = drift.trusted_baseline_compare(
+            self._args())
+        kinds = {error["kind"] for error in errors}
+        self.assertIn("live-hf-head-runtime-split", kinds)
+        self.assertIn("live-hf-runtime-mismatch", kinds)
+
+    def test_cdn_inconsistency_never_greens_mixed_observations(self):
+        self._stub_clean_pair({
+            "head_sha": None,
+            "runtime_sha": None,
+            "runtime_stage": None,
+            "observation_status": "cdn-inconsistent",
+            "observation_count": 2,
+            "observations": [
+                {"ordinal": 1, "head_sha": "9" * 40},
+                {"ordinal": 2, "head_sha": self.LOCKED_HF},
+            ],
+        })
+        _report, errors, _warns, _candidate = drift.trusted_baseline_compare(
+            self._args())
+        kinds = {error["kind"] for error in errors}
+        self.assertEqual(kinds, {"live-hf-cdn-inconsistent"})
+
+    def test_transient_metadata_failure_is_explicit_error(self):
+        self._stub_clean_pair({
+            "head_sha": None,
+            "runtime_sha": None,
+            "runtime_stage": None,
+            "observation_status": "unavailable",
+            "observation_count": 2,
+            "observations": [
+                {"ordinal": 1, "status": "observed"},
+                {"ordinal": 2, "status": "transient-http", "http_status": 503},
+            ],
+        })
+        _report, errors, _warns, _candidate = drift.trusted_baseline_compare(
+            self._args())
+        self.assertEqual(
+            {error["kind"] for error in errors},
+            {"live-hf-metadata-unavailable"},
+        )
 
     def test_new_candidate_unresolved_source_fails_without_deployment(self):
         self._stub_clean_pair()
