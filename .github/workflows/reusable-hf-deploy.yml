@@ -43,6 +43,11 @@ on:
         required: false
         type: boolean
         default: true
+      smoke-paths:
+        description: "JSON array of same-host live app paths that must return exact HTTP 200 with content."
+        required: false
+        type: string
+        default: '["/"]'
       prune:
         description: "Delete Space files under DIRECTORY COPY sources that are gone from git (never touches file/glob sources)."
         required: false
@@ -78,15 +83,19 @@ jobs:
           path: caller
           ref: ${{ inputs.ref }}
 
-      - name: Checkout szl-holdings/.github (shared deployer script)
+      - name: Checkout exact reusable-workflow revision (shared deployer)
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
+          # The deployed code must be the code reviewed at the immutable
+          # reusable-workflow revision, never mutable default-branch tooling.
+          # github.job_workflow_sha = the reviewed revision of THIS reusable
+          # workflow (documented context; job.workflow_* does not exist).
           repository: szl-holdings/.github
-          ref: main
+          ref: ${{ github.job_workflow_sha }}
           path: tools
 
       - name: Set up Python
-        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
         with:
           python-version: "3.12"
 
@@ -98,6 +107,7 @@ jobs:
         env:
           HF_REPO_IN: ${{ inputs.hf-repo }}
           GH_REPO: ${{ github.repository }}
+          DEPLOY_REF: ${{ inputs.ref }}
         run: |
           set -euo pipefail
           if [ -n "${HF_REPO_IN}" ]; then
@@ -106,11 +116,18 @@ jobs:
             HF_REPO="SZLHOLDINGS/${GH_REPO##*/}"
           fi
           echo "hf_repo=${HF_REPO}" >> "$GITHUB_OUTPUT"
-          echo "Deploying ${GH_REPO} -> ${HF_REPO} @ ${{ inputs.ref }}"
+          echo "Deploying ${GH_REPO} -> ${HF_REPO} @ ${DEPLOY_REF}"
 
       - name: Deploy derived COPY set to the Space
         env:
           HF_TOKEN: ${{ secrets.HF_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+          HF_REPO: ${{ steps.hf.outputs.hf_repo }}
+          DEPLOY_REF: ${{ inputs.ref }}
+          DOCKERFILE_PATH: ${{ inputs.dockerfile-path }}
+          INCLUDE_README: ${{ inputs.include-readme }}
+          PRUNE: ${{ inputs.prune }}
+          SMOKE_PATHS: ${{ inputs.smoke-paths }}
         run: |
           set -euo pipefail
           if [ -z "${HF_TOKEN:-}" ]; then
@@ -118,14 +135,19 @@ jobs:
             echo "::error::Founder action: add repo/org secret HF_TOKEN (HF write token with org write to SZLHOLDINGS)."
             exit 1
           fi
+          PRUNE_ARGS=()
+          if [ "${PRUNE}" = "true" ]; then
+            PRUNE_ARGS+=(--prune)
+          fi
           python3 tools/.github/scripts/hf_deploy_from_dockerfile.py \
             --repo-root caller \
-            --github-repo "${{ github.repository }}" \
-            --hf-repo "${{ steps.hf.outputs.hf_repo }}" \
-            --ref "${{ inputs.ref }}" \
-            --dockerfile-path "${{ inputs.dockerfile-path }}" \
-            --include-readme "${{ inputs.include-readme }}" \
-            ${{ inputs.prune && '--prune' || '' }} \
+            --github-repo "${GH_REPO}" \
+            --hf-repo "${HF_REPO}" \
+            --ref "${DEPLOY_REF}" \
+            --dockerfile-path "${DOCKERFILE_PATH}" \
+            --include-readme "${INCLUDE_README}" \
+            --smoke-paths "${SMOKE_PATHS}" \
+            "${PRUNE_ARGS[@]}" \
             --manifest-out hf-deploy-manifest.json
 
       - name: Upload deploy manifest
@@ -139,11 +161,12 @@ jobs:
       - name: Attest — live Space matches pushed git blobs (sha256)
         env:
           HF_TOKEN: ${{ secrets.HF_TOKEN }}
+          HF_REPO: ${{ steps.hf.outputs.hf_repo }}
+          WAIT_RUNNING: ${{ inputs.wait-running }}
         run: |
           set -euo pipefail
           python3 tools/.github/scripts/hf_deploy_from_dockerfile.py \
             --attest \
             --manifest hf-deploy-manifest.json \
-            --hf-repo "${{ steps.hf.outputs.hf_repo }}" \
-            --ref "${{ inputs.ref }}" \
-            --wait-running "${{ inputs.wait-running }}"
+            --hf-repo "${HF_REPO}" \
+            --wait-running "${WAIT_RUNNING}"
