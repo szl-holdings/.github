@@ -82,6 +82,21 @@ UA = {"User-Agent": "hf-module-drift-check/1.0"}
 MAX_REMOTE_LFS_COMPARE_BYTES = 128 * 1024 * 1024
 FULL_SHA_RE = re.compile(r"^[0-9a-f]{40}$")
 DEPLOYMENT_LOCK_SCHEMA = 1
+HF_METADATA_OBSERVATIONS = 2
+HF_METADATA_REQUEST_HEADERS = {
+    "Accept": "application/json",
+    "Cache-Control": "no-cache, no-store, max-age=0",
+    "Pragma": "no-cache",
+}
+HF_METADATA_EVIDENCE_HEADERS = (
+    "age",
+    "cache-control",
+    "cf-cache-status",
+    "date",
+    "etag",
+    "via",
+    "x-cache",
+)
 
 
 # --------------------------------------------------------------------------- #
@@ -245,18 +260,150 @@ def github_ref_is_ancestor(github_repo, ancestor_sha, descendant_sha):
     return compare_status in ("ahead", "identical"), compare_status
 
 
-def hf_space_state(hf_repo):
-    """Return the exact repository/runtime revisions for the live Space."""
-    url = f"{HF_HOST}/api/spaces/{hf_repo}"
-    status, body, _ = _http(url)
-    if status != 200:
-        raise RuntimeError(f"HF Space metadata {hf_repo}: HTTP {status}")
-    payload = json.loads(body)
-    runtime = payload.get("runtime") or {}
+def _metadata_response_evidence(headers):
+    """Keep only non-sensitive cache/proxy headers in the public receipt."""
+    lowered = {str(key).lower(): value for key, value in (headers or {}).items()}
     return {
-        "head_sha": payload.get("sha"),
-        "runtime_sha": runtime.get("sha"),
-        "runtime_stage": runtime.get("stage"),
+        key: lowered[key]
+        for key in HF_METADATA_EVIDENCE_HEADERS
+        if key in lowered
+    }
+
+
+def hf_space_state(hf_repo, observation_count=HF_METADATA_OBSERVATIONS):
+    """Observe the exact Space repository/runtime revisions more than once.
+
+    HF Space metadata is served through a CDN. One response is not sufficient
+    evidence for a deployment gate because separate cache nodes can temporarily
+    expose different commits. Every observation therefore carries a unique
+    query value plus explicit no-cache request headers. The caller may accept a
+    result only when at least two observations are byte-for-byte stable on the
+    head SHA, runtime SHA, and runtime stage.
+
+    A mixed or unavailable series is returned as evidence, never collapsed into
+    a best/latest value. This prevents a stale-then-current sequence (or the
+    reverse) from being mistaken for a verified deployed baseline.
+    """
+    if observation_count < 2:
+        raise ValueError("HF metadata requires at least two observations")
+
+    base_url = f"{HF_HOST}/api/spaces/{hf_repo}"
+    observations = []
+    for ordinal in range(1, observation_count + 1):
+        request_id = f"{time.time_ns()}-{os.getpid()}-{ordinal}"
+        url = f"{base_url}?{urllib.parse.urlencode({'cache_bust': request_id})}"
+        observed_utc = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
+        try:
+            status, body, response_headers = _http(
+                url,
+                headers=HF_METADATA_REQUEST_HEADERS,
+                want_headers=True,
+            )
+        except TransientHTTPError as exc:
+            observations.append({
+                "ordinal": ordinal,
+                "observed_utc": observed_utc,
+                "request_id": request_id,
+                "status": "transient-http",
+                "http_status": exc.code,
+                "tries": exc.tries,
+                "detail": str(exc),
+            })
+            return {
+                "head_sha": None,
+                "runtime_sha": None,
+                "runtime_stage": None,
+                "observation_status": "unavailable",
+                "observation_count": len(observations),
+                "required_observation_count": observation_count,
+                "observations": observations,
+            }
+        except RuntimeError as exc:
+            observations.append({
+                "ordinal": ordinal,
+                "observed_utc": observed_utc,
+                "request_id": request_id,
+                "status": "request-error",
+                "detail": str(exc),
+            })
+            return {
+                "head_sha": None,
+                "runtime_sha": None,
+                "runtime_stage": None,
+                "observation_status": "unavailable",
+                "observation_count": len(observations),
+                "required_observation_count": observation_count,
+                "observations": observations,
+            }
+
+        if status != 200:
+            observations.append({
+                "ordinal": ordinal,
+                "observed_utc": observed_utc,
+                "request_id": request_id,
+                "status": "http-error",
+                "http_status": status,
+                "response_cache": _metadata_response_evidence(response_headers),
+            })
+            return {
+                "head_sha": None,
+                "runtime_sha": None,
+                "runtime_stage": None,
+                "observation_status": "unavailable",
+                "observation_count": len(observations),
+                "required_observation_count": observation_count,
+                "observations": observations,
+            }
+
+        try:
+            payload = json.loads(body)
+        except (TypeError, json.JSONDecodeError) as exc:
+            observations.append({
+                "ordinal": ordinal,
+                "observed_utc": observed_utc,
+                "request_id": request_id,
+                "status": "invalid-json",
+                "http_status": status,
+                "detail": str(exc),
+                "response_cache": _metadata_response_evidence(response_headers),
+            })
+            return {
+                "head_sha": None,
+                "runtime_sha": None,
+                "runtime_stage": None,
+                "observation_status": "unavailable",
+                "observation_count": len(observations),
+                "required_observation_count": observation_count,
+                "observations": observations,
+            }
+
+        runtime = payload.get("runtime") or {}
+        observations.append({
+            "ordinal": ordinal,
+            "observed_utc": observed_utc,
+            "request_id": request_id,
+            "status": "observed",
+            "http_status": status,
+            "head_sha": payload.get("sha"),
+            "runtime_sha": runtime.get("sha"),
+            "runtime_stage": runtime.get("stage"),
+            "response_cache": _metadata_response_evidence(response_headers),
+        })
+
+    identities = {
+        (entry.get("head_sha"), entry.get("runtime_sha"), entry.get("runtime_stage"))
+        for entry in observations
+    }
+    stable = len(observations) >= 2 and len(identities) == 1
+    effective = observations[0] if stable else {}
+    return {
+        "head_sha": effective.get("head_sha"),
+        "runtime_sha": effective.get("runtime_sha"),
+        "runtime_stage": effective.get("runtime_stage"),
+        "observation_status": "stable" if stable else "cdn-inconsistent",
+        "observation_count": len(observations),
+        "required_observation_count": observation_count,
+        "observations": observations,
     }
 
 
@@ -986,33 +1133,82 @@ def trusted_baseline_compare(args):
                 f"ancestor of trusted base {trusted_base_ref} "
                 f"(GitHub compare status {ancestry_status!r})"),
         })
-    if live_state.get("head_sha") != lock["hf_commit_sha"]:
+    observation_status = live_state.get("observation_status")
+    observation_count = live_state.get("observation_count", 0)
+    if observation_status == "unavailable":
         contract_errors.append({
-            "path": "(hf-head)",
-            "kind": "live-hf-head-mismatch",
+            "path": "(hf-metadata)",
+            "kind": "live-hf-metadata-unavailable",
             "severity": "error",
-            "expected": lock["hf_commit_sha"],
-            "actual": live_state.get("head_sha"),
-            "detail": "live HF main no longer equals the immutable deployed lock",
+            "expected": "two stable cache-busted metadata observations",
+            "actual": live_state.get("observations", []),
+            "detail": (
+                "HF metadata could not be observed for the full consistency "
+                "window; deployed-baseline equality is unverified"),
         })
-    if live_state.get("runtime_sha") != lock["hf_commit_sha"]:
+    elif observation_status == "cdn-inconsistent":
         contract_errors.append({
-            "path": "(hf-runtime)",
-            "kind": "live-hf-runtime-mismatch",
+            "path": "(hf-metadata)",
+            "kind": "live-hf-cdn-inconsistent",
             "severity": "error",
-            "expected": lock["hf_commit_sha"],
-            "actual": live_state.get("runtime_sha"),
-            "detail": "running Space revision does not equal the deployed lock",
+            "expected": "stable identical head/runtime observations",
+            "actual": live_state.get("observations", []),
+            "detail": (
+                "cache-busted HF metadata observations disagree; no observed "
+                "revision is accepted as authoritative"),
         })
-    if live_state.get("runtime_stage") != "RUNNING":
+    elif observation_status != "stable" or observation_count < 2:
         contract_errors.append({
-            "path": "(hf-runtime)",
-            "kind": "live-hf-runtime-not-running",
+            "path": "(hf-metadata)",
+            "kind": "live-hf-metadata-insufficient",
             "severity": "error",
-            "expected": "RUNNING",
-            "actual": live_state.get("runtime_stage"),
-            "detail": "Space is not RUNNING at the locked revision",
+            "expected": "at least two stable metadata observations",
+            "actual": {
+                "observation_status": observation_status,
+                "observation_count": observation_count,
+            },
+            "detail": "single or untyped metadata evidence cannot satisfy the lock",
         })
+    else:
+        if live_state.get("head_sha") != live_state.get("runtime_sha"):
+            contract_errors.append({
+                "path": "(hf-runtime)",
+                "kind": "live-hf-head-runtime-split",
+                "severity": "error",
+                "expected": "repository head and running revision must be identical",
+                "actual": {
+                    "head_sha": live_state.get("head_sha"),
+                    "runtime_sha": live_state.get("runtime_sha"),
+                },
+                "detail": "HF repository head and running Space revision disagree",
+            })
+        if live_state.get("head_sha") != lock["hf_commit_sha"]:
+            contract_errors.append({
+                "path": "(hf-head)",
+                "kind": "live-hf-head-mismatch",
+                "severity": "error",
+                "expected": lock["hf_commit_sha"],
+                "actual": live_state.get("head_sha"),
+                "detail": "live HF main no longer equals the immutable deployed lock",
+            })
+        if live_state.get("runtime_sha") != lock["hf_commit_sha"]:
+            contract_errors.append({
+                "path": "(hf-runtime)",
+                "kind": "live-hf-runtime-mismatch",
+                "severity": "error",
+                "expected": lock["hf_commit_sha"],
+                "actual": live_state.get("runtime_sha"),
+                "detail": "running Space revision does not equal the deployed lock",
+            })
+        if live_state.get("runtime_stage") != "RUNNING":
+            contract_errors.append({
+                "path": "(hf-runtime)",
+                "kind": "live-hf-runtime-not-running",
+                "severity": "error",
+                "expected": "RUNNING",
+                "actual": live_state.get("runtime_stage"),
+                "detail": "Space is not RUNNING at the locked revision",
+            })
 
     candidate_report = None
     if candidate_ref:
