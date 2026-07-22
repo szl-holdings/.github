@@ -1,6 +1,6 @@
 name: Patch HF kernel publisher NumPy runtime final
 
-# Second branch touch after workflow registration; executes the exact narrow repair.
+# Third branch touch after workflow registration; executes the exact narrow repair.
 on:
   push:
     branches:
