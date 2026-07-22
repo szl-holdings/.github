@@ -1,0 +1,152 @@
+name: Operational Estate Green-Light v2
+
+on:
+  push:
+    branches: [ops/greenlight-finalize-20260722]
+    paths:
+      - .github/scripts/operational_greenlight_v2.py
+      - .github/workflows/operational-greenlight-v2.yml
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+  issues: write
+
+concurrency:
+  group: operational-estate-greenlight-v2-20260722
+  cancel-in-progress: false
+
+env:
+  SZL_GITHUB_TOKEN: ${{ secrets.SZL_GITHUB_TOKEN }}
+  HF_ORG_TOKEN: ${{ secrets.HF_ORG_TOKEN || secrets.HF_ORG_TOKEN1 }}
+  HF_TOKEN: ${{ secrets.HF_TOKEN }}
+  GH_TOKEN: ${{ github.token }}
+
+jobs:
+  greenlight:
+    name: Verify, remediate, and close the exact operational estate gates
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+    steps:
+      - name: Checkout exact controller branch
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ops/greenlight-finalize-20260722
+          persist-credentials: false
+          fetch-depth: 1
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12"
+
+      - name: Validate controller and exact boundaries
+        run: |
+          set -euo pipefail
+          python -m py_compile .github/scripts/operational_greenlight_v2.py
+          python - <<'PY'
+          import importlib.util
+          from pathlib import Path
+
+          path = Path('.github/scripts/operational_greenlight_v2.py')
+          spec = importlib.util.spec_from_file_location('operational_greenlight_v2', path)
+          module = importlib.util.module_from_spec(spec)
+          assert spec and spec.loader
+          spec.loader.exec_module(module)
+          assert len(module.SOURCE_PRS) == 6
+          assert len(module.COMMAND_CENTERS) == 5
+          assert len(module.BRAIN_EXPECTED_FILES) == 39
+          assert set(module.DOMAIN_SPECS) == {'a-11-oy.com', 'a11oy.net'}
+          assert module.ISSUE_TITLES['final'] == '[final-estate-reconciliation] SZL Holdings operational estate'
+          assert module.REPL_ID == '34870515-2d52-4ad8-9636-40cc3ced1771'
+          print('validated exact operational green-light v2 contract')
+          PY
+          git diff --check
+
+      - name: Verify required credentials without exposing them
+        id: credentials
+        shell: bash
+        run: |
+          set -euo pipefail
+          missing=()
+          if [ -z "${SZL_GITHUB_TOKEN:-}" ]; then missing+=(SZL_GITHUB_TOKEN); fi
+          if [ -z "${HF_ORG_TOKEN:-}" ] && [ -z "${HF_TOKEN:-}" ]; then missing+=(HF_ORG_TOKEN/HF_ORG_TOKEN1/HF_TOKEN); fi
+          mkdir -p reports
+          if [ "${#missing[@]}" -gt 0 ]; then
+            printf -v joined '%s, ' "${missing[@]}"
+            joined="${joined%, }"
+            echo 'present=false' >> "$GITHUB_OUTPUT"
+            cat > reports/operational-greenlight-v2-latest.json <<JSON
+          {
+            "schema": "szl.operational-greenlight-controller/v2",
+            "generated_at": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
+            "ok": false,
+            "errors": ["Required credentials are missing: ${joined}"]
+          }
+          JSON
+          else
+            echo 'present=true' >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Execute evidence-driven convergence
+        if: steps.credentials.outputs.present == 'true'
+        id: execute
+        shell: bash
+        run: |
+          set +e
+          python .github/scripts/operational_greenlight_v2.py \
+            --report reports/operational-greenlight-v2-latest.json \
+            --cycles 3 \
+            --wait-seconds 300
+          code=$?
+          echo "exit_code=${code}" >> "$GITHUB_OUTPUT"
+          exit 0
+
+      - name: Upload immutable controller report
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: operational-greenlight-v2-${{ github.run_id }}
+          path: reports/operational-greenlight-v2-latest.json
+          if-no-files-found: error
+          retention-days: 90
+
+      - name: Publish exact current gate summary
+        if: always()
+        shell: bash
+        run: |
+          python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          path = Path('reports/operational-greenlight-v2-latest.json')
+          with open(os.environ['GITHUB_STEP_SUMMARY'], 'a', encoding='utf-8') as out:
+              out.write('## Operational estate green-light v2\n\n')
+              if not path.exists():
+                  out.write('No controller report was produced.\n')
+              else:
+                  report = json.loads(path.read_text(encoding='utf-8'))
+                  final = report.get('final') or {}
+                  out.write(f"Overall: **{final.get('overall_state', 'OPEN')}**\n\n")
+                  out.write('| Required gate | State |\n|---|---|\n')
+                  for gate, state in (final.get('required_gates') or {}).items():
+                      out.write(f"| `{gate}` | {'PASS' if state else 'OPEN'} |\n")
+                  if report.get('errors'):
+                      out.write('\n### Exact blockers\n\n')
+                      for error in report['errors']:
+                          out.write(f'- {error}\n')
+          PY
+
+      - name: Enforce real green result
+        if: always()
+        shell: bash
+        run: |
+          if [ "${{ steps.credentials.outputs.present }}" != "true" ]; then exit 2; fi
+          code="${{ steps.execute.outputs.exit_code }}"
+          if [ -z "$code" ]; then code=2; fi
+          if [ "$code" -ne 0 ]; then
+            echo "::error::One or more exact estate gates remain open. The deterministic controller and final-estate issues contain the evidence."
+            exit "$code"
+          fi
+          echo 'The final estate issue is closed at OPERATIONAL_VERIFIED.'
