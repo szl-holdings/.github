@@ -1,0 +1,162 @@
+name: Hugging Face Estate Green-Light Final
+
+on:
+  push:
+    branches: [ops/greenlight-finalize-20260722]
+    paths:
+      - .github/scripts/hf_estate_greenlight_final.py
+      - .github/workflows/hf-estate-greenlight-final.yml
+  workflow_dispatch:
+    inputs:
+      publish:
+        description: Publish and reconcile the four managed command-center clones
+        required: true
+        default: true
+        type: boolean
+
+permissions:
+  contents: read
+  issues: write
+
+concurrency:
+  group: hugging-face-estate-greenlight-final-20260722
+  cancel-in-progress: false
+
+env:
+  HF_ORG_TOKEN: ${{ secrets.HF_ORG_TOKEN || secrets.HF_ORG_TOKEN1 }}
+  HF_TOKEN: ${{ secrets.HF_TOKEN }}
+  SZL_GITHUB_TOKEN: ${{ secrets.SZL_GITHUB_TOKEN }}
+  HF_HUB_DISABLE_PROGRESS_BARS: "1"
+  GH_TOKEN: ${{ github.token }}
+
+jobs:
+  finalize:
+    name: Publish and verify collections, buckets, and five command centers
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    steps:
+      - name: Checkout exact finalizer branch
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ops/greenlight-finalize-20260722
+          persist-credentials: false
+          fetch-depth: 1
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12"
+
+      - name: Install supported Hugging Face client
+        run: |
+          python -m pip install --disable-pip-version-check "huggingface_hub>=1.4,<2"
+
+      - name: Validate supported-client finalizer
+        run: |
+          set -euo pipefail
+          python -m py_compile .github/scripts/hf_estate_greenlight_final.py
+          python - <<'PY'
+          import importlib.util
+          from pathlib import Path
+
+          path = Path('.github/scripts/hf_estate_greenlight_final.py')
+          spec = importlib.util.spec_from_file_location('hf_estate_greenlight_final', path)
+          module = importlib.util.module_from_spec(spec)
+          assert spec and spec.loader
+          spec.loader.exec_module(module)
+          assert len(module.COMMAND_CENTERS) == 5
+          assert module.ISSUE_TITLE == '[hf-estate-report] official API publish and verification'
+          source = path.read_text(encoding='utf-8')
+          assert 'list_collections' in source
+          assert 'list_buckets' in source
+          assert 'bucket_info' in source
+          assert 'upload_folder' in source
+          print('validated supported-API Hugging Face finalizer')
+          PY
+          git diff --check
+
+      - name: Verify credentials without exposing them
+        id: credentials
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p reports
+          missing=()
+          if [ -z "${HF_ORG_TOKEN:-}" ] && [ -z "${HF_TOKEN:-}" ]; then missing+=(HF_ORG_TOKEN/HF_ORG_TOKEN1/HF_TOKEN); fi
+          if [ -z "${SZL_GITHUB_TOKEN:-}" ]; then missing+=(SZL_GITHUB_TOKEN); fi
+          if [ "${#missing[@]}" -gt 0 ]; then
+            printf -v joined '%s, ' "${missing[@]}"
+            joined="${joined%, }"
+            echo 'present=false' >> "$GITHUB_OUTPUT"
+            cat > reports/hf-estate-greenlight-final.json <<JSON
+          {
+            "schema": "szl.hf-estate-official-api-greenlight/v1",
+            "generated_at": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
+            "publish": true,
+            "ok": false,
+            "summary": {"error": 1, "errors": ["Required credentials are missing: ${joined}"]}
+          }
+          JSON
+          else
+            echo 'present=true' >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Execute publish-mode supported-client finalizer
+        if: steps.credentials.outputs.present == 'true'
+        id: execute
+        shell: bash
+        run: |
+          set +e
+          python .github/scripts/hf_estate_greenlight_final.py \
+            --report reports/hf-estate-greenlight-final.json \
+            --publish
+          code=$?
+          echo "exit_code=${code}" >> "$GITHUB_OUTPUT"
+          exit 0
+
+      - name: Upload immutable Hub report
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: hf-estate-greenlight-final-${{ github.run_id }}
+          path: reports/hf-estate-greenlight-final.json
+          if-no-files-found: error
+          retention-days: 90
+
+      - name: Publish concise Hub summary
+        if: always()
+        shell: bash
+        run: |
+          python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          path = Path('reports/hf-estate-greenlight-final.json')
+          with open(os.environ['GITHUB_STEP_SUMMARY'], 'a', encoding='utf-8') as out:
+              out.write('## Hugging Face estate green-light\n\n')
+              if not path.exists():
+                  out.write('No report was produced.\n')
+              else:
+                  report = json.loads(path.read_text(encoding='utf-8'))
+                  summary = report.get('summary') or {}
+                  out.write(f"Overall: **{'PASS' if report.get('ok') else 'OPEN'}**\n\n")
+                  out.write(f"Publish mode: `{report.get('publish')}`\n\n")
+                  out.write('| Asset | Count |\n|---|---:|\n')
+                  for key in ('models', 'datasets', 'spaces', 'kernels', 'collections', 'buckets'):
+                      out.write(f"| {key} | {summary.get(key, 0)} |\n")
+                  out.write(f"\nVerified command centers: `{summary.get('command_centers_verified', 0)}/5`.\n")
+                  if summary.get('errors'):
+                      out.write('\n### Exact blockers\n\n')
+                      for error in summary['errors']:
+                          out.write(f'- {error}\n')
+          PY
+
+      - name: Enforce real Hub result
+        if: always()
+        shell: bash
+        run: |
+          if [ "${{ steps.credentials.outputs.present }}" != "true" ]; then exit 2; fi
+          code="${{ steps.execute.outputs.exit_code }}"
+          if [ -z "$code" ]; then code=2; fi
+          exit "$code"
