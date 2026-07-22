@@ -1,0 +1,316 @@
+name: Redeploy canonical A11oy from protected main
+
+# One-shot recovery lane. It dispatches the existing a11oy/hf-sync.yml at an
+# exact protected-main revision, waits for the deployer's own parity/attestation
+# gates, and then independently verifies one public RUNNING canonical Space and
+# absence of all four retired clone IDs.
+on:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/redeploy-a11oy-protected-main.yml
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+  issues: write
+
+concurrency:
+  group: redeploy-a11oy-protected-main
+  cancel-in-progress: false
+
+jobs:
+  redeploy:
+    name: Dispatch, attest, and verify canonical A11oy
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    env:
+      SZL_GITHUB_TOKEN: ${{ secrets.SZL_GITHUB_TOKEN }}
+      HF_ORG_TOKEN: ${{ secrets.HF_ORG_TOKEN || secrets.HF_ORG_TOKEN1 }}
+      HF_TOKEN: ${{ secrets.HF_TOKEN }}
+      EXPECTED_A11OY_MAIN: 389c26224437b5e38da44396e1c8bae5ee061557
+      REPORT_ISSUE_TITLE: '[a11oy-canonical-redeploy] protected-main restoration'
+    steps:
+      - name: Checkout organization control plane
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 1
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: '3.12'
+
+      - name: Install pinned Hub client
+        run: |
+          python -m pip install --disable-pip-version-check \
+            'huggingface_hub>=1.3,<2'
+
+      - name: Dispatch exact protected-main deploy and verify live singleton
+        id: recovery
+        shell: bash
+        run: |
+          set +e
+          mkdir -p reports
+          python - <<'PY'
+          from __future__ import annotations
+
+          import json
+          import os
+          import time
+          import urllib.error
+          import urllib.parse
+          import urllib.request
+          from datetime import datetime, timezone
+          from pathlib import Path
+          from typing import Any
+
+          from huggingface_hub import HfApi
+
+          GH_API = 'https://api.github.com'
+          GH_REPO = 'szl-holdings/a11oy'
+          WORKFLOW = 'hf-sync.yml'
+          HF_SPACE = 'SZLHOLDINGS/a11oy'
+          CLONES = [f'SZLHOLDINGS/a11oy-clone-{index}' for index in range(1, 5)]
+          EXPECTED = os.environ['EXPECTED_A11OY_MAIN']
+          REPORT = Path('reports/a11oy-protected-main-redeploy.json')
+          report: dict[str, Any] = {
+              'schema': 'szl.a11oy-protected-main-redeploy/v1',
+              'generated_at': datetime.now(timezone.utc).isoformat(),
+              'expected_github_source_sha': EXPECTED,
+              'github_repository': GH_REPO,
+              'huggingface_space': HF_SPACE,
+              'clone_ids': CLONES,
+              'dispatch': None,
+              'live': None,
+              'ok': False,
+              'errors': [],
+          }
+
+          def gh(method: str, path: str, payload: dict[str, Any] | None = None) -> Any:
+              token = os.environ.get('SZL_GITHUB_TOKEN', '').strip()
+              if not token:
+                  raise RuntimeError('SZL_GITHUB_TOKEN is not configured')
+              body = None if payload is None else json.dumps(payload).encode('utf-8')
+              request = urllib.request.Request(
+                  GH_API + path,
+                  data=body,
+                  method=method,
+                  headers={
+                      'Accept': 'application/vnd.github+json',
+                      'Authorization': f'Bearer {token}',
+                      'X-GitHub-Api-Version': '2022-11-28',
+                      'User-Agent': 'szl-a11oy-protected-main-redeploy/1.0',
+                      **({'Content-Type': 'application/json'} if body is not None else {}),
+                  },
+              )
+              try:
+                  with urllib.request.urlopen(request, timeout=45) as response:
+                      raw = response.read()
+              except urllib.error.HTTPError as exc:
+                  detail = exc.read().decode('utf-8', 'replace')[:4000]
+                  raise RuntimeError(
+                      f'GitHub API {method} {path} failed HTTP {exc.code}: {detail}'
+                  ) from exc
+              return json.loads(raw.decode('utf-8')) if raw else None
+
+          try:
+              if len(EXPECTED) != 40:
+                  raise RuntimeError('EXPECTED_A11OY_MAIN is not a full SHA')
+              int(EXPECTED, 16)
+
+              branch = gh('GET', f'/repos/{GH_REPO}/branches/main')
+              observed_main = str(((branch.get('commit') or {}).get('sha')) or '')
+              if observed_main != EXPECTED:
+                  raise RuntimeError(
+                      f'a11oy/main moved: expected {EXPECTED}, observed {observed_main}'
+                  )
+
+              dispatched_at = datetime.now(timezone.utc)
+              gh(
+                  'POST',
+                  f'/repos/{GH_REPO}/actions/workflows/{WORKFLOW}/dispatches',
+                  {'ref': 'main'},
+              )
+
+              run: dict[str, Any] | None = None
+              discovery_deadline = time.monotonic() + 180
+              while time.monotonic() < discovery_deadline:
+                  time.sleep(5)
+                  payload = gh(
+                      'GET',
+                      f'/repos/{GH_REPO}/actions/workflows/{WORKFLOW}/runs'
+                      '?event=workflow_dispatch&branch=main&per_page=20',
+                  )
+                  for candidate in payload.get('workflow_runs') or []:
+                      created_raw = str(candidate.get('created_at') or '')
+                      try:
+                          created = datetime.fromisoformat(created_raw.replace('Z', '+00:00'))
+                      except ValueError:
+                          continue
+                      if (
+                          candidate.get('head_sha') == EXPECTED
+                          and created >= dispatched_at
+                      ):
+                          run = candidate
+                          break
+                  if run:
+                      break
+              if not run:
+                  raise RuntimeError('dispatched hf-sync run was not discovered')
+
+              run_id = int(run['id'])
+              run_url = str(run.get('html_url') or '')
+              completion_deadline = time.monotonic() + 6600
+              while time.monotonic() < completion_deadline:
+                  current = gh('GET', f'/repos/{GH_REPO}/actions/runs/{run_id}')
+                  if current.get('status') == 'completed':
+                      run = current
+                      break
+                  time.sleep(15)
+              if run.get('status') != 'completed':
+                  raise RuntimeError(f'hf-sync run {run_id} did not complete in time')
+              if run.get('conclusion') != 'success':
+                  raise RuntimeError(
+                      f'hf-sync run {run_id} concluded {run.get("conclusion")}'
+                  )
+
+              report['dispatch'] = {
+                  'workflow': WORKFLOW,
+                  'run_id': run_id,
+                  'run_url': run_url,
+                  'head_sha': run.get('head_sha'),
+                  'status': run.get('status'),
+                  'conclusion': run.get('conclusion'),
+              }
+
+              hf_token = (
+                  os.environ.get('HF_ORG_TOKEN')
+                  or os.environ.get('HF_TOKEN')
+                  or ''
+              ).strip()
+              if not hf_token:
+                  raise RuntimeError('HF_ORG_TOKEN/HF_TOKEN is not configured')
+              api = HfApi(token=hf_token)
+
+              live_deadline = time.monotonic() + 1800
+              info = None
+              while time.monotonic() < live_deadline:
+                  info = api.space_info(HF_SPACE)
+                  runtime = getattr(info, 'runtime', None)
+                  stage_value = getattr(runtime, 'stage', None)
+                  stage_value = getattr(stage_value, 'value', stage_value)
+                  stage = str(stage_value or 'UNKNOWN').split('.')[-1].upper()
+                  sha = str(getattr(info, 'sha', '') or '')
+                  if stage == 'RUNNING' and len(sha) == 40:
+                      break
+                  time.sleep(15)
+              if info is None:
+                  raise RuntimeError('canonical Space metadata was not returned')
+
+              runtime = getattr(info, 'runtime', None)
+              stage_value = getattr(runtime, 'stage', None)
+              stage_value = getattr(stage_value, 'value', stage_value)
+              stage = str(stage_value or 'UNKNOWN').split('.')[-1].upper()
+              sha = str(getattr(info, 'sha', '') or '')
+              private = getattr(info, 'private', None)
+              files = set(api.list_repo_files(HF_SPACE, repo_type='space'))
+              clone_existence = {
+                  clone: bool(api.repo_exists(clone, repo_type='space'))
+                  for clone in CLONES
+              }
+              if stage != 'RUNNING':
+                  raise RuntimeError(f'canonical Space stage is {stage}, not RUNNING')
+              if len(sha) != 40:
+                  raise RuntimeError(f'canonical Space SHA is not immutable: {sha!r}')
+              int(sha, 16)
+              if private is True:
+                  raise RuntimeError('canonical Space is private')
+              if 'Dockerfile' not in files:
+                  raise RuntimeError('canonical Space is missing Dockerfile')
+              remaining = [clone for clone, exists in clone_existence.items() if exists]
+              if remaining:
+                  raise RuntimeError(f'retired clone repositories still exist: {remaining}')
+
+              report['live'] = {
+                  'repo_id': HF_SPACE,
+                  'sha': sha,
+                  'stage': stage,
+                  'private': private,
+                  'dockerfile_present': True,
+                  'file_count': len(files),
+                  'clone_existence': clone_existence,
+              }
+              report['ok'] = True
+          except Exception as exc:  # noqa: BLE001
+              report['errors'].append(f'{type(exc).__name__}: {exc}')
+          finally:
+              REPORT.write_text(
+                  json.dumps(report, indent=2, sort_keys=True) + '\n',
+                  encoding='utf-8',
+              )
+
+          print(json.dumps(report, indent=2, sort_keys=True))
+          raise SystemExit(0 if report['ok'] else 1)
+          PY
+          code=$?
+          echo "exit_code=${code}" >> "$GITHUB_OUTPUT"
+          exit 0
+
+      - name: Upload immutable recovery receipt
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: a11oy-protected-main-redeploy-${{ github.run_id }}
+          path: reports/a11oy-protected-main-redeploy.json
+          if-no-files-found: error
+          retention-days: 90
+
+      - name: Persist recovery receipt
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -f reports/a11oy-protected-main-redeploy.json
+          {
+            echo '<!-- szl-a11oy-protected-main-redeploy -->'
+            echo '# A11oy protected-main restoration'
+            echo
+            echo "- Control run: ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
+            echo "- Control revision: \`${GITHUB_SHA}\`"
+            echo
+            echo '```json'
+            cat reports/a11oy-protected-main-redeploy.json
+            echo '```'
+          } > /tmp/a11oy-redeploy.md
+          issue_number="$(gh issue list \
+            --repo "$GITHUB_REPOSITORY" \
+            --state all \
+            --search "${REPORT_ISSUE_TITLE} in:title" \
+            --json number,title \
+            --jq ".[] | select(.title == env.REPORT_ISSUE_TITLE) | .number" \
+            | head -n1)"
+          if [ -n "$issue_number" ]; then
+            gh issue edit "$issue_number" \
+              --repo "$GITHUB_REPOSITORY" \
+              --body-file /tmp/a11oy-redeploy.md
+          else
+            gh issue create \
+              --repo "$GITHUB_REPOSITORY" \
+              --title "$REPORT_ISSUE_TITLE" \
+              --body-file /tmp/a11oy-redeploy.md
+          fi
+
+      - name: Enforce fail-closed result
+        if: always()
+        run: |
+          code="${{ steps.recovery.outputs.exit_code }}"
+          if [ -z "$code" ]; then code=2; fi
+          if [ "$code" -ne 0 ]; then
+            echo "::error::A11oy protected-main redeploy failed with exit ${code}"
+            exit "$code"
+          fi
+          echo 'A11oy protected-main redeploy verified.'
