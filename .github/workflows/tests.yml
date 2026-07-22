@@ -1,3 +1,6 @@
+Exit code: 0
+Wall time: 0.3 seconds
+Output:
 name: Tests
 
 on:
@@ -29,7 +32,7 @@ jobs:
       - name: Reusable-workflow pinned-target validator self-test
         run: python3 .github/scripts/test_reusable_workflow_target_check.py
 
-      # Pins the org-wide DOCTRINE honesty gate — the single most load-bearing
+      # Pins the org-wide DOCTRINE honesty gate â€” the single most load-bearing
       # check in the org, and (until now) the ONLY guard with no self-test.
       # Its logic used to be inline LINE-BASED bash grep: a cosmetic 2-line
       # reflow that split an honest sentence so the trigger landed on a line
@@ -38,8 +41,8 @@ jobs:
       # doctrine_check.py ports the SAME triggers/exemptions but evaluates the
       # qualifier over a whitespace-normalized WINDOW so a soft-wrap can never
       # again break the org, while a genuine unqualified overclaim still FAILS.
-      # This network-free unit test pins that contract — including the exact
-      # szl_kc_atlas line-wrap regression and the verified-L2 repo-scoping — so a
+      # This network-free unit test pins that contract â€” including the exact
+      # szl_kc_atlas line-wrap regression and the verified-L2 repo-scoping â€” so a
       # refactor can neither reintroduce the line fragility nor weaken an
       # invariant into a false-green no-op.
       - name: Doctrine check (line-wrap tolerant) self-test
@@ -106,7 +109,7 @@ jobs:
 
       # Pins the honesty-overclaim sweep guard (task #902). Runs the REAL
       # grep/scan path in --local mode (network-free) so a regex weakening or
-      # a no-op'd fail branch that let a Λ-uniqueness / Conjecture-1-proven
+      # a no-op'd fail branch that let a Î›-uniqueness / Conjecture-1-proven
       # overclaim land green org-wide cannot pass silently.
       - name: Overclaim-sweep guard self-test
         run: python3 .github/scripts/test_overclaim_sweep.py
@@ -167,10 +170,10 @@ jobs:
       # Pins the SZL anatomy-map cross-surface drift guard. The single honest
       # anatomy map ships on three independently-deployed surfaces (a11oy
       # /console, killinchu /elite, the SZLHOLDINGS/anatomy HF Space); the guard
-      # must FAIL when any surface drifts on the locked-8 ladder
-      # {F1,F4,F7,F11,F12,F18,F19,F22}, the Λ=Conjecture-1 honesty label, or the
+      # must FAIL when any surface drifts on the locked-five ladder
+      # {F1,F11,F12,F18,F19}; EXPERIMENTAL / NOT LOCKED {F4,F7,F22}, the Î›=Conjecture-1 honesty label, or the
       # shared capability list. This network-free unit test drives the REAL
-      # evaluate() path with mutated fixtures (swapped F-id, dropped Λ, one-sided
+      # evaluate() path with mutated fixtures (swapped F-id, dropped Î›, one-sided
       # capability edit, missing block) so a refactor can't weaken the guard into
       # an always-green no-op, and confirms the documented per-surface variance
       # (NS footer, Putnam DEMO/OPEN tally) does NOT cause a false red.
@@ -215,3 +218,4 @@ jobs:
       # Network-free.
       - name: HF deploy-from-Dockerfile derivation self-test
         run: python3 .github/scripts/test_hf_deploy_from_dockerfile.py
+
