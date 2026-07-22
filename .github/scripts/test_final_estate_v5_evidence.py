@@ -15,6 +15,8 @@ from final_estate_v5_core import (
     latest_report,
 )
 from final_estate_v5_evidence import (
+    PUBLICATION_SCHEMA,
+    READINESS_SCHEMA,
     evaluate_release_revision_consistency,
     evaluate_replit_decommission,
     validate_official_inventory,
@@ -38,6 +40,58 @@ def issue_with_report(report: dict[str, Any], *, state: str = "closed") -> dict[
         "body": "```json\n" + json.dumps(report, sort_keys=True) + "\n```\n",
         "html_url": "https://github.com/example/issues/1",
         "updated_at": "2026-07-22T00:00:00Z",
+    }
+
+
+def readiness_report() -> dict[str, Any]:
+    return {
+        "schema": READINESS_SCHEMA,
+        "publish": True,
+        "summary": {"error": 0, "warning": 0},
+        "results": {
+            "dataset": {
+                "viewer_http_status": 200,
+                "revision": "b" * 40,
+                "remote_file_count": 393,
+            },
+            "kernels": {
+                repo_id: {
+                    "revision": chr(99 + index) * 40,
+                    "remote_file_count": 10,
+                    "selfcheck": {"ok": True},
+                }
+                for index, repo_id in enumerate(sorted(KERNEL_IDS))
+            },
+        },
+    }
+
+
+def publication_report() -> dict[str, Any]:
+    ready = readiness_report()
+    return {
+        "schema": PUBLICATION_SCHEMA,
+        "publish": True,
+        "kernel_transport": "authenticated-kernel-hub-git",
+        "summary": {"error": 0, "warning": 0},
+        "runtime": {"numpy": "2.2.6", "torch": "2.7.1+cpu"},
+        "sources": {
+            "szl_lake": "a" * 40,
+            "szl_energy_attest": "b" * 40,
+            "szl_lambda_gate": "c" * 40,
+        },
+        "results": {
+            "dataset": dict(ready["results"]["dataset"]),
+            "kernels": {
+                repo_id: {
+                    **dict(ready["results"]["kernels"][repo_id]),
+                    "transport": "authenticated-kernel-hub-git",
+                    "build_variants_preserved": True,
+                    "card_contract_byte_parity": True,
+                    "build_tree_sha256": "f" * 64,
+                }
+                for repo_id in KERNEL_IDS
+            },
+        },
     }
 
 
@@ -86,78 +140,24 @@ more
         report["counts"]["buckets"] = 0
         self.assertFalse(validate_official_inventory(report)[0])
 
-    def test_readiness_requires_viewer_and_exact_selfchecks(self) -> None:
-        report = {
-            "schema": "szl.hf-release-finalization/v1",
-            "publish": True,
-            "summary": {"error": 0, "warning": 0},
-            "results": {
-                "dataset": {
-                    "viewer_http_status": 200,
-                    "revision": "b" * 40,
-                    "remote_file_count": 393,
-                },
-                "kernels": {
-                    repo_id: {
-                        "revision": "c" * 40,
-                        "remote_file_count": 10,
-                        "selfcheck": {"ok": True},
-                    }
-                    for repo_id in KERNEL_IDS
-                },
-            },
-        }
+    def test_readiness_requires_actual_schema_viewer_and_exact_selfchecks(self) -> None:
+        report = readiness_report()
         self.assertTrue(validate_release_readiness(report)[0])
+        report["schema"] = "szl.hf-release-finalization/v1"
+        self.assertFalse(validate_release_readiness(report)[0])
+        report["schema"] = READINESS_SCHEMA
         report["results"]["kernels"][next(iter(KERNEL_IDS))].pop("selfcheck")
         self.assertFalse(validate_release_readiness(report)[0])
 
     def test_publication_requires_supported_git_transport_and_build_hashes(self) -> None:
-        report = {
-            "schema": "szl.hf-release-finalization/v2",
-            "publish": True,
-            "kernel_transport": "authenticated-kernel-hub-git",
-            "summary": {"error": 0, "warning": 0},
-            "runtime": {"numpy": "2.2.6", "torch": "2.7.1+cpu"},
-            "sources": {
-                "szl_lake": "a" * 40,
-                "szl_energy_attest": "b" * 40,
-                "szl_lambda_gate": "c" * 40,
-            },
-            "results": {
-                "dataset": {
-                    "viewer_http_status": 200,
-                    "revision": "d" * 40,
-                    "remote_file_count": 393,
-                },
-                "kernels": {
-                    repo_id: {
-                        "revision": "e" * 40,
-                        "transport": "authenticated-kernel-hub-git",
-                        "remote_file_count": 10,
-                        "build_variants_preserved": True,
-                        "card_contract_byte_parity": True,
-                        "build_tree_sha256": "f" * 64,
-                        "selfcheck": {"passed": True},
-                    }
-                    for repo_id in KERNEL_IDS
-                },
-            },
-        }
+        report = publication_report()
         self.assertTrue(validate_release_publication(report)[0])
         report["results"]["kernels"][next(iter(KERNEL_IDS))]["transport"] = "unsupported"
         self.assertFalse(validate_release_publication(report)[0])
 
-    def test_readiness_and_publication_revisions_must_match(self) -> None:
-        readiness = {
-            "results": {
-                "dataset": {"revision": "a" * 40},
-                "kernels": {
-                    repo_id: {"revision": chr(98 + index) * 40}
-                    for index, repo_id in enumerate(sorted(KERNEL_IDS))
-                },
-            }
-        }
-        publication = json.loads(json.dumps(readiness))
+    def test_readiness_and_publication_revisions_and_schemas_must_match(self) -> None:
+        readiness = readiness_report()
+        publication = publication_report()
         issues = {
             EVIDENCE_ISSUES["hf_release_readiness"]: issue_with_report(readiness),
             EVIDENCE_ISSUES["hf_release_publication"]: issue_with_report(publication),
@@ -167,6 +167,15 @@ more
         )
         publication["results"]["dataset"]["revision"] = "f" * 40
         issues[EVIDENCE_ISSUES["hf_release_publication"]] = issue_with_report(publication)
+        self.assertFalse(
+            evaluate_release_revision_consistency(FakeIssueClient(issues)).ok
+        )
+        publication = publication_report()
+        readiness["schema"] = "wrong"
+        issues = {
+            EVIDENCE_ISSUES["hf_release_readiness"]: issue_with_report(readiness),
+            EVIDENCE_ISSUES["hf_release_publication"]: issue_with_report(publication),
+        }
         self.assertFalse(
             evaluate_release_revision_consistency(FakeIssueClient(issues)).ok
         )
