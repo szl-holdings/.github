@@ -1,10 +1,13 @@
 #!/usr/bin/env python3
-"""Update exact pull-request branches to their exact protected base revisions.
+"""Update exact pull-request branches to exact protected branch heads.
 
-The manifest pins repository, PR number, current head SHA, target branch, and base
-SHA. Every target is preflighted before any write. The GitHub update-branch API
-performs a normal base merge into the PR branch; this script never force-pushes,
-rewrites commits, changes protection, or merges the pull request itself.
+The manifest pins repository, PR number, current PR head SHA, target branch, and
+the current protected branch head SHA. GitHub's pull-request payload preserves a
+base snapshot from PR creation, so the live branch head is verified separately
+through the branch endpoint before the normal ``update-branch`` operation.
+
+This script never force-pushes, rewrites commits, changes protection, or merges
+the pull request itself. Merge conflicts fail closed in GitHub's API.
 """
 from __future__ import annotations
 
@@ -37,7 +40,7 @@ def request(token: str, method: str, path: str, payload: dict[str, Any] | None =
             "Accept": "application/vnd.github+json",
             "Authorization": f"Bearer {token}",
             "X-GitHub-Api-Version": API_VERSION,
-            "User-Agent": "szl-exact-pr-branch-update/1.0",
+            "User-Agent": "szl-exact-pr-branch-update/2.0",
             **({"Content-Type": "application/json"} if body is not None else {}),
         },
     )
@@ -73,12 +76,27 @@ def load_manifest(path: Path) -> dict[str, Any]:
     return data
 
 
-def pr_path(repository: str, number: int) -> str:
+def repo_parts(repository: str) -> tuple[str, str]:
     owner, repo = repository.split("/", 1)
-    return (
-        f"/repos/{urllib.parse.quote(owner, safe='')}/"
-        f"{urllib.parse.quote(repo, safe='')}/pulls/{number}"
-    )
+    return urllib.parse.quote(owner, safe=""), urllib.parse.quote(repo, safe="")
+
+
+def pr_path(repository: str, number: int) -> str:
+    owner, repo = repo_parts(repository)
+    return f"/repos/{owner}/{repo}/pulls/{number}"
+
+
+def branch_path(repository: str, branch: str) -> str:
+    owner, repo = repo_parts(repository)
+    return f"/repos/{owner}/{repo}/branches/{urllib.parse.quote(branch, safe='')}"
+
+
+def current_branch_head(token: str, repository: str, branch: str) -> str:
+    payload = request(token, "GET", branch_path(repository, branch))
+    value = str(((payload.get("commit") or {}).get("sha")) or "")
+    if len(value) != 40:
+        raise GateError(f"{repository}@{branch} did not expose an immutable head SHA")
+    return value
 
 
 def preflight(token: str, target: dict[str, Any]) -> dict[str, Any]:
@@ -86,55 +104,57 @@ def preflight(token: str, target: dict[str, Any]) -> dict[str, Any]:
     number = int(target["pull_request"])
     expected_head = str(target["expected_head_sha"])
     expected_base_branch = str(target["expected_base_branch"])
-    expected_base = str(target["expected_base_sha"])
+    expected_base_head = str(target["expected_base_sha"])
     pr = request(token, "GET", pr_path(repository, number))
     if pr.get("state") != "open" or pr.get("draft"):
         raise GateError(f"{repository}#{number} is not an open non-draft PR")
     actual_head = str((pr.get("head") or {}).get("sha") or "")
     actual_base_branch = str((pr.get("base") or {}).get("ref") or "")
-    actual_base = str((pr.get("base") or {}).get("sha") or "")
+    pr_base_snapshot = str((pr.get("base") or {}).get("sha") or "")
     if actual_head != expected_head:
         raise GateError(f"{repository}#{number} head moved: expected {expected_head}, got {actual_head}")
     if actual_base_branch != expected_base_branch:
         raise GateError(
             f"{repository}#{number} targets {actual_base_branch!r}, expected {expected_base_branch!r}"
         )
-    if actual_base != expected_base:
-        raise GateError(f"{repository}#{number} base moved: expected {expected_base}, got {actual_base}")
-    if pr.get("mergeable") is False:
-        raise GateError(f"{repository}#{number} is not mergeable")
+    actual_base_head = current_branch_head(token, repository, expected_base_branch)
+    if actual_base_head != expected_base_head:
+        raise GateError(
+            f"{repository}@{expected_base_branch} moved: expected {expected_base_head}, got {actual_base_head}"
+        )
     return {
         "repository": repository,
         "pull_request": number,
         "head_before": actual_head,
         "base_branch": actual_base_branch,
-        "base_sha": actual_base,
+        "pr_base_snapshot": pr_base_snapshot,
+        "protected_base_head": actual_base_head,
         "purpose": target.get("purpose"),
     }
 
 
-def update(token: str, target: dict[str, Any], before: dict[str, Any]) -> dict[str, Any]:
+def update(token: str, before: dict[str, Any]) -> dict[str, Any]:
     repository = before["repository"]
     number = before["pull_request"]
-    endpoint = pr_path(repository, number) + "/update-branch"
     response = request(
         token,
         "PUT",
-        endpoint,
+        pr_path(repository, number) + "/update-branch",
         {"expected_head_sha": before["head_before"]},
     )
-    deadline = time.monotonic() + 90
+    deadline = time.monotonic() + 120
     last: dict[str, Any] | None = None
     while time.monotonic() < deadline:
         time.sleep(3)
         last = request(token, "GET", pr_path(repository, number))
         head_after = str((last.get("head") or {}).get("sha") or "")
-        base_after = str((last.get("base") or {}).get("sha") or "")
+        protected_after = current_branch_head(token, repository, before["base_branch"])
+        if protected_after != before["protected_base_head"]:
+            raise GateError(
+                f"{repository}@{before['base_branch']} moved during update: "
+                f"{before['protected_base_head']} -> {protected_after}"
+            )
         if head_after and head_after != before["head_before"]:
-            if base_after != before["base_sha"]:
-                raise GateError(
-                    f"{repository}#{number} base changed during update: {before['base_sha']} -> {base_after}"
-                )
             return {
                 **before,
                 "head_after": head_after,
@@ -155,7 +175,7 @@ def main() -> int:
     args = parser.parse_args()
 
     report: dict[str, Any] = {
-        "schema": "szl.exact-pr-branch-update-report/v1",
+        "schema": "szl.exact-pr-branch-update-report/v2",
         "generated_at": datetime.now(timezone.utc).isoformat(),
         "execute": bool(args.execute),
         "identity": None,
@@ -172,10 +192,7 @@ def main() -> int:
         prepared = [preflight(token, target) for target in manifest["targets"]]
         report["targets"] = prepared
         if args.execute:
-            report["targets"] = [
-                update(token, target, before)
-                for target, before in zip(manifest["targets"], prepared, strict=True)
-            ]
+            report["targets"] = [update(token, before) for before in prepared]
         report["ok"] = True
         code = 0
     except Exception as exc:  # noqa: BLE001
