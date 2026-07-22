@@ -6,8 +6,8 @@ import pathlib
 import sys
 import tempfile
 import unittest
+import unittest.mock
 from types import SimpleNamespace
-from unittest import mock
 
 HERE = pathlib.Path(__file__).resolve().parent
 if str(HERE) not in sys.path:
@@ -111,14 +111,18 @@ class KernelGitFinalizerTests(unittest.TestCase):
 
     def test_report_normalizes_immutable_revision_schema(self):
         instance = object.__new__(finalizer.KernelGitFinalizer)
-        with mock.patch.object(finalizer.retry.RetryingFinalizer, "report", return_value={
-            "schema": "old",
-            "results": {
-                "dataset": {"after_sha": "a" * 40},
-                "kernels": {"k": {"after_sha": "b" * 40}},
+        with unittest.mock.patch.object(
+            finalizer.retry.RetryingFinalizer,
+            "report",
+            return_value={
+                "schema": "old",
+                "results": {
+                    "dataset": {"after_sha": "a" * 40},
+                    "kernels": {"k": {"after_sha": "b" * 40}},
+                },
+                "boundaries": [],
             },
-            "boundaries": [],
-        }), mock.patch.object(
+        ), unittest.mock.patch.object(
             finalizer.KernelGitFinalizer,
             "_runtime",
             return_value={"numpy": "2.2.6", "torch": "2.7.1+cpu"},
