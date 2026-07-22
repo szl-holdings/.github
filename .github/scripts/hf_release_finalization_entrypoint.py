@@ -75,7 +75,6 @@ def get_with_viewer_retry(
     if attempts < 1:
         raise ValueError("attempts must be positive")
 
-    last_detail = "no response"
     for attempt in range(1, attempts + 1):
         _VIEWER_STATS["attempts"] = attempt
         try:
