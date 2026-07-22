@@ -34,7 +34,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 120
     env:
-      HF_ORG_TOKEN: ${{ secrets.HF_ORG_TOKEN }}
+      HF_ORG_TOKEN: ${{ secrets.HF_ORG_TOKEN || secrets.HF_ORG_TOKEN1 }}
       HF_TOKEN: ${{ secrets.HF_TOKEN }}
       TARGET_BRANCH: ${{ github.event_name == 'pull_request' && github.head_ref || github.ref_name }}
     steps:
@@ -75,7 +75,7 @@ jobs:
                 "target": "SZLHOLDINGS",
                 "action": "credential-preflight",
                 "status": "error",
-                "detail": "Neither GitHub Actions secret HF_ORG_TOKEN nor HF_TOKEN is configured for this repository."
+                "detail": "No supported Hugging Face Actions secret is configured for this repository."
               }
             ],
             "summary": {
@@ -89,7 +89,7 @@ jobs:
             ]
           }
           JSON
-            echo "::error::Neither HF_ORG_TOKEN nor HF_TOKEN is configured."
+            echo "::error::No supported Hugging Face Actions secret is configured."
           else
             echo "has_token=true" >> "$GITHUB_OUTPUT"
           fi
