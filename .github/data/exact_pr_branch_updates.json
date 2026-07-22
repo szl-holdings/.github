@@ -1,0 +1,13 @@
+{
+  "schema": "szl.exact-pr-branch-update/v1",
+  "targets": [
+    {
+      "repository": "szl-holdings/a11oy",
+      "pull_request": 1028,
+      "expected_head_sha": "50e56a2b58e990658e6eff58566e7f8afef05396",
+      "expected_base_branch": "main",
+      "expected_base_sha": "383e4c5c8143622d8943763080dc737703df07d2",
+      "purpose": "Rebase trusted HF deployment-lock authority onto the repaired SDA contract PR"
+    }
+  ]
+}
