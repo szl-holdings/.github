@@ -1,8 +1,7 @@
-name: HF Estate Canonicalization
+name: HF Estate Command Centers
 
-# Organization-wide Hugging Face maintenance with one canonical A11oy Space.
-# Pull requests are read-only dry runs. A protected-main push or an explicitly
-# published manual dispatch performs the exact clone retirement and estate sync.
+# Organization-wide Hugging Face maintenance with one canonical A11oy production
+# Space and four public, synchronized recovery/showcase command centers.
 on:
   push:
     branches: [main]
@@ -21,7 +20,7 @@ on:
   workflow_dispatch:
     inputs:
       publish:
-        description: Apply canonicalization rather than produce a dry-run report
+        description: Apply the estate reconciliation rather than run a dry run
         required: false
         default: "true"
 
@@ -29,21 +28,22 @@ permissions:
   contents: write
 
 concurrency:
-  group: hf-estate-canonicalization-${{ github.event_name }}-${{ github.ref }}
+  group: hf-estate-command-centers-${{ github.event_name }}-${{ github.ref }}
   cancel-in-progress: false
 
 jobs:
-  canonicalize:
-    name: Canonicalize SZLHOLDINGS Hub estate
+  reconcile:
+    name: Retain four public A11oy command centers
     runs-on: ubuntu-latest
     timeout-minutes: 120
     env:
       HF_ORG_TOKEN: ${{ secrets.HF_ORG_TOKEN || secrets.HF_ORG_TOKEN1 }}
       HF_TOKEN: ${{ secrets.HF_TOKEN }}
+      HF_HUB_DISABLE_PROGRESS_BARS: "1"
       TARGET_BRANCH: ${{ github.event_name == 'pull_request' && github.head_ref || github.ref_name }}
     steps:
       - name: Checkout triggering revision
-        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ github.event_name == 'pull_request' && github.head_ref || github.ref_name }}
           fetch-depth: 1
@@ -70,7 +70,7 @@ jobs:
             "canonical_flagship_space": {
               "repo_id": "SZLHOLDINGS/a11oy"
             },
-            "retired_clone_ids": [
+            "managed_clone_ids": [
               "SZLHOLDINGS/a11oy-clone-1",
               "SZLHOLDINGS/a11oy-clone-2",
               "SZLHOLDINGS/a11oy-clone-3",
@@ -114,7 +114,7 @@ jobs:
             "huggingface_hub>=1.3,<2" \
             "requests>=2.32,<3"
 
-      - name: Verify canonical one-Space contract
+      - name: Verify command-center estate contract
         if: steps.credentials.outputs.has_token == 'true'
         run: |
           python -m py_compile \
@@ -123,7 +123,7 @@ jobs:
             .github/scripts/test_hf_estate_canonicalize.py
           python .github/scripts/test_hf_estate_canonicalize.py
 
-      - name: Execute canonical estate reconciliation
+      - name: Execute command-center estate reconciliation
         if: steps.credentials.outputs.has_token == 'true'
         id: estate
         shell: bash
@@ -146,7 +146,7 @@ jobs:
         if: always() && github.event_name == 'pull_request'
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: hf-estate-canonicalization-dry-run-${{ github.run_id }}
+          name: hf-estate-command-centers-dry-run-${{ github.run_id }}
           path: reports/hf-estate-upgrade-latest.json
           if-no-files-found: error
           retention-days: 30
@@ -167,7 +167,7 @@ jobs:
             echo "Report is unchanged."
             exit 0
           fi
-          git commit -s -m "chore(hf): record canonical estate report [skip ci]"
+          git commit -s -m "chore(hf): record command-center estate report [skip ci]"
           git push origin "HEAD:${TARGET_BRANCH}"
 
       - name: Publish job summary
@@ -181,7 +181,7 @@ jobs:
 
           path = Path("reports/hf-estate-upgrade-latest.json")
           with open(os.environ["GITHUB_STEP_SUMMARY"], "a", encoding="utf-8") as out:
-              out.write("## Hugging Face estate canonicalization\n\n")
+              out.write("## Hugging Face command-center estate\n\n")
               if not path.exists():
                   out.write("No report was produced.\n")
               else:
@@ -194,7 +194,18 @@ jobs:
                       f"at `{canonical.get('sha', 'UNVERIFIED')}` "
                       f"({canonical.get('stage', 'UNKNOWN')})\n\n"
                   )
-                  out.write("| Inventory | Count |\n|---|---:|\n")
+                  clones = report.get("managed_clone_snapshots", {})
+                  out.write("| Retained clone | Visibility | Runtime | Revision |\n")
+                  out.write("|---|---|---|---|\n")
+                  for repo_id in report.get("managed_clone_ids", []):
+                      item = clones.get(repo_id, {})
+                      visibility = "public" if item.get("private") is False else "unknown"
+                      out.write(
+                          f"| `{repo_id}` | {visibility} | "
+                          f"{item.get('stage', 'UNKNOWN')} | "
+                          f"`{item.get('sha', 'UNVERIFIED')}` |\n"
+                      )
+                  out.write("\n| Inventory | Count |\n|---|---:|\n")
                   for key, value in report.get("counts", {}).items():
                       out.write(f"| {key} | {value} |\n")
                   out.write("\n| Result | Count |\n|---|---:|\n")
@@ -212,6 +223,6 @@ jobs:
           code="${{ steps.estate.outputs.exit_code }}"
           if [ -z "$code" ]; then code=2; fi
           if [ "$code" -ne 0 ]; then
-            echo "::error::Estate canonicalization completed with exit code $code; inspect the committed report."
+            echo "::error::Estate reconciliation completed with exit code $code; inspect the committed report."
             exit "$code"
           fi
