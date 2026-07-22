@@ -1,4 +1,5 @@
 name: Diagnose HF release finalization
+# Temporary read-only diagnostic; remove after .github#264 is repaired.
 
 on:
   push:
