@@ -1,0 +1,41 @@
+{
+  "schema": "szl.owner-authorized-merge-wave/v1",
+  "base_branch": "main",
+  "targets": [
+    {
+      "repository": "szl-holdings/platform",
+      "pull_request": 458,
+      "expected_head_sha": "9798feff9af3d6b0d8737abd70f71a1db1755a65",
+      "merge_method": "squash",
+      "purpose": "Canonical SDA receipt-verifier widget repair"
+    },
+    {
+      "repository": "szl-holdings/szl-energy-attest",
+      "pull_request": 23,
+      "expected_head_sha": "c6acdb921ffc4b79c1c94268aa913c0812cdba6b",
+      "merge_method": "squash",
+      "purpose": "Immutable trusted governed-inference-meter Kernel Hub contract"
+    },
+    {
+      "repository": "szl-holdings/szl-lambda-gate",
+      "pull_request": 19,
+      "expected_head_sha": "d392c90dcb4867387561c77a35e6eba5ec169482",
+      "merge_method": "squash",
+      "purpose": "Immutable trusted governed-norm Kernel Hub contract"
+    },
+    {
+      "repository": "szl-holdings/szl-lake",
+      "pull_request": 36,
+      "expected_head_sha": "067c159569d0ca22105b4a378c30c19fe55595c1",
+      "merge_method": "squash",
+      "purpose": "Hugging Face dataset card and viewer-schema repair"
+    },
+    {
+      "repository": "szl-holdings/david-leads",
+      "pull_request": 32,
+      "expected_head_sha": "4fbfc7088d3ca87aea5fa7e484cc016a31f2d59e",
+      "merge_method": "squash",
+      "purpose": "Mobile operator-first lead command and open-box decision traces"
+    }
+  ]
+}
