@@ -6,12 +6,14 @@ on:
     paths:
       - .github/data/owner_authorized_merge_wave.json
       - .github/scripts/owner_authorized_merge_wave.py
+      - .github/scripts/owner_authorized_merge_wave_v2.py
       - .github/workflows/owner-authorized-merge-wave.yml
   push:
     branches: [main]
     paths:
       - .github/data/owner_authorized_merge_wave.json
       - .github/scripts/owner_authorized_merge_wave.py
+      - .github/scripts/owner_authorized_merge_wave_v2.py
       - .github/workflows/owner-authorized-merge-wave.yml
   workflow_dispatch:
     inputs:
@@ -42,7 +44,9 @@ jobs:
       - name: Compile and validate manifest
         run: |
           set -euo pipefail
-          python -m py_compile .github/scripts/owner_authorized_merge_wave.py
+          python -m py_compile \
+            .github/scripts/owner_authorized_merge_wave.py \
+            .github/scripts/owner_authorized_merge_wave_v2.py
           python - <<'PY'
           import json
           from pathlib import Path
@@ -100,7 +104,7 @@ jobs:
         shell: bash
         run: |
           set +e
-          python .github/scripts/owner_authorized_merge_wave.py \
+          python .github/scripts/owner_authorized_merge_wave_v2.py \
             --manifest .github/data/owner_authorized_merge_wave.json \
             --report owner-authorized-merge-report.json \
             --execute
