@@ -3,11 +3,11 @@
   "base_branch": "main",
   "targets": [
     {
-      "repository": "szl-holdings/platform",
-      "pull_request": 458,
-      "expected_head_sha": "9798feff9af3d6b0d8737abd70f71a1db1755a65",
+      "repository": "szl-holdings/a11oy",
+      "pull_request": 1031,
+      "expected_head_sha": "50dfd0fe8682e3063035f35c8f22eb38fbc0c358",
       "merge_method": "squash",
-      "purpose": "Canonical SDA receipt-verifier widget repair"
+      "purpose": "Relock the current verified Hugging Face deployment authority"
     }
   ]
 }
