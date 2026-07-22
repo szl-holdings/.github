@@ -1,13 +1,18 @@
 #!/usr/bin/env python3
-"""Add a narrow OrganizationAdmin pull-request bypass to active review rulesets.
+"""Enable a narrow owner merge path without weakening CI or review content.
 
-This utility preserves every existing rule, condition, enforcement level, and bypass
-actor. It only adds an ``OrganizationAdmin`` actor with ``pull_request`` mode to
-active branch rulesets that currently require one or more approving reviews for
-``main`` on the exact repositories in the owner-authorized merge manifest.
+For repositories governed by branch rulesets, this utility adds an
+``OrganizationAdmin`` actor with ``pull_request`` bypass mode to the active
+ruleset that requires approving reviews.
 
-The change does not disable status checks, signatures, force-push restrictions,
-branch deletion protection, or any other rule.
+For repositories governed by classic branch protection instead of rulesets, it
+turns off only ``enforce_admins``. All other classic protection fields are read
+back and verified unchanged. The downstream exact-SHA merge wave still refuses
+pending/failing checks, conflicts, stale heads, unresolved review threads, and
+active change requests.
+
+The utility is limited to ``main`` and to the exact repositories named in the
+owner-authorized merge manifest.
 """
 from __future__ import annotations
 
@@ -27,7 +32,7 @@ SUFFICIENT_MODES = {"pull_request", "always", "exempt"}
 
 
 class GateError(RuntimeError):
-    """Fail-closed ruleset mutation error."""
+    """Fail-closed protection mutation error."""
 
 
 def request(
@@ -35,6 +40,7 @@ def request(
     method: str,
     path: str,
     payload: dict[str, Any] | None = None,
+    allow_status: set[int] | None = None,
 ) -> Any:
     body = None if payload is None else json.dumps(payload).encode("utf-8")
     req = urllib.request.Request(
@@ -45,7 +51,7 @@ def request(
             "Accept": "application/vnd.github+json",
             "Authorization": f"Bearer {token}",
             "X-GitHub-Api-Version": API_VERSION,
-            "User-Agent": "szl-org-admin-pr-bypass/1.0",
+            "User-Agent": "szl-org-admin-pr-bypass/2.0",
             **({"Content-Type": "application/json"} if body is not None else {}),
         },
     )
@@ -53,6 +59,8 @@ def request(
         with urllib.request.urlopen(req, timeout=30) as response:
             raw = response.read()
     except urllib.error.HTTPError as exc:
+        if allow_status and exc.code in allow_status:
+            return None
         detail = exc.read().decode("utf-8", "replace")[:4000]
         raise GateError(
             f"GitHub API {method} {path} failed HTTP {exc.code}: {detail}"
@@ -124,7 +132,6 @@ def actor_is_sufficient(actor: dict[str, Any]) -> bool:
 
 
 def stable_ruleset_state(ruleset: dict[str, Any]) -> dict[str, Any]:
-    """Fields that must remain byte-semantically unchanged after bypass update."""
     return {
         "name": ruleset.get("name"),
         "target": ruleset.get("target"),
@@ -132,6 +139,33 @@ def stable_ruleset_state(ruleset: dict[str, Any]) -> dict[str, Any]:
         "conditions": ruleset.get("conditions"),
         "rules": ruleset.get("rules"),
     }
+
+
+def stable_classic_state(protection: dict[str, Any]) -> dict[str, Any]:
+    """Every classic-protection field except enforce_admins."""
+    keys = (
+        "required_status_checks",
+        "required_pull_request_reviews",
+        "restrictions",
+        "required_linear_history",
+        "allow_force_pushes",
+        "allow_deletions",
+        "block_creations",
+        "required_conversation_resolution",
+        "lock_branch",
+        "allow_fork_syncing",
+    )
+    return {key: protection.get(key) for key in keys}
+
+
+def classic_review_count(protection: dict[str, Any]) -> int:
+    reviews = protection.get("required_pull_request_reviews")
+    if not isinstance(reviews, dict):
+        return 0
+    try:
+        return int(reviews.get("required_approving_review_count") or 0)
+    except (TypeError, ValueError):
+        raise GateError("classic branch protection has an invalid approval count")
 
 
 def main() -> int:
@@ -148,65 +182,96 @@ def main() -> int:
     manifest = load_manifest(args.manifest)
     branch = manifest["base_branch"]
     report: dict[str, Any] = {
-        "schema": "szl.organization-admin-pr-bypass-report/v1",
+        "schema": "szl.organization-admin-pr-bypass-report/v2",
         "generated_at": datetime.now(timezone.utc).isoformat(),
         "execute": bool(args.execute),
         "organization": "szl-holdings",
         "repositories": [],
         "rulesets": [],
+        "classic_protections": [],
         "errors": [],
         "ok": False,
     }
 
     discovered: dict[str, dict[str, Any]] = {}
+    classic: list[dict[str, Any]] = []
     try:
         for target in manifest["targets"]:
             repository = str(target["repository"])
             owner, repo = repository.split("/", 1)
+            encoded_owner = urllib.parse.quote(owner, safe="")
+            encoded_repo = urllib.parse.quote(repo, safe="")
+            encoded_branch = urllib.parse.quote(branch, safe="")
             rules_path = (
-                f"/repos/{urllib.parse.quote(owner, safe='')}/"
-                f"{urllib.parse.quote(repo, safe='')}/rules/branches/"
-                f"{urllib.parse.quote(branch, safe='')}?per_page=100"
+                f"/repos/{encoded_owner}/{encoded_repo}/rules/branches/"
+                f"{encoded_branch}?per_page=100"
             )
             active_rules = request(token, "GET", rules_path)
             if not isinstance(active_rules, list):
                 raise GateError(f"{repository} returned a non-list branch-rule payload")
 
             review_rules = [rule for rule in active_rules if required_review_rule(rule)]
-            if not review_rules:
-                raise GateError(
-                    f"{repository}@{branch} has no active ruleset review rule to amend; "
-                    "refusing a broader or guessed protection change"
-                )
-
-            repo_record = {
+            repo_record: dict[str, Any] = {
                 "repository": repository,
                 "branch": branch,
+                "protection_model": None,
                 "review_rulesets": [],
             }
-            for rule in review_rules:
-                endpoint, key = source_endpoint(rule, repository)
-                repo_record["review_rulesets"].append(
+            if review_rules:
+                repo_record["protection_model"] = "ruleset"
+                for rule in review_rules:
+                    endpoint, key = source_endpoint(rule, repository)
+                    repo_record["review_rulesets"].append(
+                        {
+                            "key": key,
+                            "ruleset_id": rule.get("ruleset_id"),
+                            "source_type": rule.get("ruleset_source_type"),
+                            "source": rule.get("ruleset_source"),
+                            "required_approving_review_count": (
+                                (rule.get("parameters") or {}).get(
+                                    "required_approving_review_count"
+                                )
+                            ),
+                        }
+                    )
+                    discovered.setdefault(
+                        key,
+                        {
+                            "endpoint": endpoint,
+                            "key": key,
+                            "repositories": set(),
+                        },
+                    )["repositories"].add(repository)
+            else:
+                protection_path = (
+                    f"/repos/{encoded_owner}/{encoded_repo}/branches/"
+                    f"{encoded_branch}/protection"
+                )
+                protection = request(
+                    token, "GET", protection_path, allow_status={404}
+                )
+                if not isinstance(protection, dict):
+                    raise GateError(
+                        f"{repository}@{branch} has neither an active review ruleset "
+                        "nor readable classic branch protection"
+                    )
+                count = classic_review_count(protection)
+                if count <= 0:
+                    raise GateError(
+                        f"{repository}@{branch} has no positive required approval "
+                        "count in rulesets or classic protection"
+                    )
+                repo_record["protection_model"] = "classic"
+                repo_record["classic_required_approving_review_count"] = count
+                classic.append(
                     {
-                        "key": key,
-                        "ruleset_id": rule.get("ruleset_id"),
-                        "source_type": rule.get("ruleset_source_type"),
-                        "source": rule.get("ruleset_source"),
-                        "required_approving_review_count": (
-                            (rule.get("parameters") or {}).get(
-                                "required_approving_review_count"
-                            )
-                        ),
+                        "repository": repository,
+                        "owner": owner,
+                        "repo": repo,
+                        "branch": branch,
+                        "protection_path": protection_path,
                     }
                 )
-                discovered.setdefault(
-                    key,
-                    {
-                        "endpoint": endpoint,
-                        "key": key,
-                        "repositories": set(),
-                    },
-                )["repositories"].add(repository)
             report["repositories"].append(repo_record)
 
         for key in sorted(discovered):
@@ -255,11 +320,61 @@ def main() -> int:
                     "action": action,
                     "bypass_actors_before": before.get("bypass_actors") or [],
                     "bypass_actors_after": (
-                        after.get("bypass_actors") or []
-                        if args.execute
-                        else actors
+                        after.get("bypass_actors") or [] if args.execute else actors
                     ),
                     "preserved": stable_ruleset_state(before),
+                }
+            )
+
+        for item in classic:
+            repository = item["repository"]
+            protection_path = item["protection_path"]
+            before = request(token, "GET", protection_path)
+            before_stable = stable_classic_state(before)
+            before_count = classic_review_count(before)
+            admin_path = protection_path + "/enforce_admins"
+            admin_before = request(token, "GET", admin_path, allow_status={404})
+            enabled_before = bool(
+                isinstance(admin_before, dict) and admin_before.get("enabled")
+            )
+            action = "unchanged"
+            if enabled_before:
+                action = "would-disable-admin-enforcement"
+                if args.execute:
+                    request(token, "DELETE", admin_path)
+                    action = "disabled-admin-enforcement"
+
+            admin_after = (
+                request(token, "GET", admin_path, allow_status={404})
+                if args.execute
+                else admin_before
+            )
+            enabled_after = bool(
+                isinstance(admin_after, dict) and admin_after.get("enabled")
+            )
+            after = request(token, "GET", protection_path)
+            if stable_classic_state(after) != before_stable:
+                raise GateError(
+                    f"{repository} classic protection changed outside enforce_admins"
+                )
+            if classic_review_count(after) != before_count:
+                raise GateError(
+                    f"{repository} classic approval count changed unexpectedly"
+                )
+            if args.execute and enabled_after:
+                raise GateError(
+                    f"{repository} still enforces classic branch protection for admins"
+                )
+
+            report["classic_protections"].append(
+                {
+                    "repository": repository,
+                    "branch": item["branch"],
+                    "action": action,
+                    "admin_enforcement_before": enabled_before,
+                    "admin_enforcement_after": enabled_after,
+                    "required_approving_review_count": before_count,
+                    "preserved": before_stable,
                 }
             )
 
