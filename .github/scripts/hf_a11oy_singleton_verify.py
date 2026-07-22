@@ -128,7 +128,7 @@ class CanonicalA11oyVerifier:
                 self.counts[kind] = -1
                 self.record(ORG, f"inventory:{kind}", "warning", repr(exc)[:240])
         try:
-            self.counts["collections"] = len(list(self.api.list_collections(owner=ORG, limit=100)))
+            self.counts["collections"] = len(list(self.api.list_collections(owner=ORG, limit=99)))
             self.record(ORG, "inventory:collections", "validated",
                         f"count={self.counts['collections']}")
         except Exception as exc:  # noqa: BLE001
@@ -249,7 +249,7 @@ class CanonicalA11oyVerifier:
 
     def remove_stale_collection_references(self) -> None:
         clone_ids = set(HISTORICAL_CLONE_IDS)
-        for summary in self.api.list_collections(owner=ORG, limit=100):
+        for summary in self.api.list_collections(owner=ORG, limit=99):
             collection = self.api.get_collection(summary.slug)
             for item in collection.items:
                 if item.item_type != "space" or item.item_id not in clone_ids:
