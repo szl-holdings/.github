@@ -1,0 +1,100 @@
+name: HF Dataset Server Diagnostics
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - .github/scripts/hf_dataset_server_diagnose.py
+      - .github/scripts/test_hf_dataset_server_diagnose.py
+      - .github/workflows/hf-dataset-server-diagnostics.yml
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+concurrency:
+  group: hf-dataset-server-diagnostics-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  diagnose:
+    name: Lake source and Dataset Server stages
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      HF_ORG_TOKEN: ${{ secrets.HF_ORG_TOKEN || secrets.HF_ORG_TOKEN1 }}
+      HF_TOKEN: ${{ secrets.HF_TOKEN }}
+      HF_HUB_DISABLE_PROGRESS_BARS: "1"
+    steps:
+      - name: Checkout diagnostic
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 1
+
+      - name: Require read credential
+        run: |
+          set -euo pipefail
+          if [ -z "${HF_ORG_TOKEN:-}" ] && [ -z "${HF_TOKEN:-}" ]; then
+            echo "::error::No supported Hugging Face credential is configured."
+            exit 2
+          fi
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12"
+
+      - name: Install diagnostic clients
+        run: |
+          python -m pip install --disable-pip-version-check \
+            "huggingface_hub>=1.3,<2" \
+            "requests>=2.32,<3" \
+            "pyarrow>=18,<24"
+
+      - name: Verify read-only diagnostic contract
+        run: |
+          python -m py_compile \
+            .github/scripts/hf_dataset_server_diagnose.py \
+            .github/scripts/test_hf_dataset_server_diagnose.py
+          python .github/scripts/test_hf_dataset_server_diagnose.py
+          git diff --check
+
+      - name: Capture current Dataset Server state
+        run: |
+          python .github/scripts/hf_dataset_server_diagnose.py \
+            --generation "${GITHUB_SHA}"
+
+      - name: Upload immutable diagnostic
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: hf-dataset-server-diagnostic-${{ github.run_id }}
+          path: reports/hf-dataset-server-diagnostic-latest.json
+          if-no-files-found: error
+          retention-days: 90
+
+      - name: Publish diagnostic summary
+        if: always()
+        shell: python
+        run: |
+          import json
+          import os
+          from pathlib import Path
+          path = Path('reports/hf-dataset-server-diagnostic-latest.json')
+          with open(os.environ['GITHUB_STEP_SUMMARY'], 'a', encoding='utf-8') as out:
+              out.write('## SZL Lake Dataset Server diagnostic\n\n')
+              if not path.exists():
+                  out.write('No diagnostic report was produced.\n')
+              else:
+                  report = json.loads(path.read_text())
+                  out.write(f"- revision: `{report.get('revision', 'UNKNOWN')}`\n")
+                  out.write(f"- source status: `{report.get('status', 'UNKNOWN')}`\n")
+                  out.write(f"- viewer ready: `{report.get('viewer_ready')}`\n")
+                  out.write(f"- remote Parquets readable: `{report.get('remote_parquets', {}).get('all_readable')}`\n")
+                  out.write(f"- schemas equal: `{report.get('remote_parquets', {}).get('schema_equal')}`\n")
+                  out.write('\n| Endpoint | HTTP | Error |\n|---|---:|---|\n')
+                  for name, item in report.get('dataset_server', {}).items():
+                      payload = item.get('json') or {}
+                      error = payload.get('error') if isinstance(payload, dict) else item.get('transport_error')
+                      out.write(f"| `{name}` | `{item.get('http_status', 'N/A')}` | `{str(error or '')[:160]}` |\n")
