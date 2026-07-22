@@ -1,6 +1,10 @@
 name: Execute final HF publisher NumPy repair
 
 on:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/execute-hf-publisher-numpy-patch.yml
   issue_comment:
     types: [created]
   workflow_dispatch: {}
@@ -15,13 +19,14 @@ concurrency:
 jobs:
   repair:
     if: >-
+      github.event_name == 'push' ||
       github.event_name == 'workflow_dispatch' ||
       (github.actor == 'stephenlutar2-hash' &&
        github.event.comment.body == '/execute-hf-publisher-numpy-repair')
     runs-on: ubuntu-latest
     timeout-minutes: 15
     env:
-      TARGET_BRANCH: fix/hf-kernel-publisher-numpy-runtime-v3-20260722
+      TARGET_BRANCH: fix/hf-kernel-publisher-numpy-runtime-v4-20260722
     steps:
       - name: Checkout protected main
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
