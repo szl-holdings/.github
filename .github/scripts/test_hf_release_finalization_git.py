@@ -152,6 +152,23 @@ class KernelGitFinalizerTests(unittest.TestCase):
         ):
             self.assertNotIn(forbidden, source)
 
+    def test_pr_verification_is_credentialless_and_read_only(self):
+        workflows = HERE.parent / "workflows"
+        publication = (workflows / "hf-release-finalization.yml").read_text(encoding="utf-8")
+        pull_request = (workflows / "hf-release-finalization-pr.yml").read_text(encoding="utf-8")
+
+        self.assertNotIn("pull_request:", publication)
+        self.assertIn("workflow_dispatch:", publication)
+        self.assertIn("group: hf-release-finalization-publication", publication)
+        self.assertIn("issues: write", publication)
+        self.assertIn("actions: write", publication)
+
+        self.assertIn("pull_request:", pull_request)
+        self.assertNotIn("secrets.", pull_request)
+        self.assertNotIn("issues: write", pull_request)
+        self.assertNotIn("actions: write", pull_request)
+        self.assertIn("permissions:\n  contents: read", pull_request)
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)
