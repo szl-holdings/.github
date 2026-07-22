@@ -45,283 +45,283 @@
     {
       "action": "managed-marker",
       "detail": "",
-      "status": "dry-run",
+      "status": "updated",
       "target": "SZLHOLDINGS/SZL-Khipu-1.5B"
     },
     {
       "action": "managed-marker",
       "detail": "",
-      "status": "dry-run",
+      "status": "updated",
       "target": "SZLHOLDINGS/a11oy-v19-substrate"
     },
     {
       "action": "managed-marker",
       "detail": "",
-      "status": "dry-run",
+      "status": "updated",
       "target": "SZLHOLDINGS/szl-governed-norm"
     },
     {
       "action": "managed-marker",
       "detail": "",
-      "status": "dry-run",
+      "status": "updated",
       "target": "SZLHOLDINGS/szl-lambda-gate"
     },
     {
       "action": "managed-marker",
       "detail": "",
-      "status": "dry-run",
+      "status": "updated",
       "target": "SZLHOLDINGS/governed-inference-meter"
     },
     {
       "action": "managed-marker",
       "detail": "",
-      "status": "dry-run",
+      "status": "updated",
       "target": "SZLHOLDINGS/szl-kernels"
     },
     {
       "action": "managed-marker",
       "detail": "",
-      "status": "dry-run",
+      "status": "updated",
       "target": "SZLHOLDINGS/szl-blocked"
     },
     {
       "action": "managed-marker",
       "detail": "",
-      "status": "dry-run",
+      "status": "updated",
       "target": "SZLHOLDINGS/szl-govsign"
     },
     {
       "action": "managed-marker",
       "detail": "",
-      "status": "dry-run",
+      "status": "updated",
       "target": "SZLHOLDINGS/szl-provctl"
     },
     {
       "action": "managed-marker",
       "detail": "",
-      "status": "dry-run",
+      "status": "updated",
       "target": "SZLHOLDINGS/szl-nemo"
     },
     {
       "action": "managed-marker",
       "detail": "",
-      "status": "dry-run",
+      "status": "updated",
       "target": "SZLHOLDINGS/szl-invariants"
     },
     {
       "action": "managed-marker",
       "detail": "",
-      "status": "dry-run",
+      "status": "updated",
       "target": "SZLHOLDINGS/szl-ouroboros"
     },
     {
       "action": "managed-marker",
       "detail": "",
-      "status": "dry-run",
+      "status": "updated",
       "target": "SZLHOLDINGS/szl-formulas"
     },
     {
       "action": "managed-marker",
       "detail": "",
-      "status": "dry-run",
+      "status": "updated",
       "target": "SZLHOLDINGS/SZL-Forge-1.5B-ReceiptAgent"
     },
     {
       "action": "managed-marker",
       "detail": "",
-      "status": "dry-run",
+      "status": "updated",
       "target": "SZLHOLDINGS/SZL-Khipu-1.5B-GGUF"
     },
     {
       "action": "managed-marker",
       "detail": "",
-      "status": "dry-run",
+      "status": "updated",
       "target": "SZLHOLDINGS/killinchu-osint-corpus"
     },
     {
       "action": "managed-marker",
       "detail": "",
-      "status": "dry-run",
+      "status": "updated",
       "target": "SZLHOLDINGS/thesis-v18-formal-verification"
     },
     {
       "action": "managed-marker",
       "detail": "",
-      "status": "dry-run",
+      "status": "updated",
       "target": "SZLHOLDINGS/uds-spans-receipts"
     },
     {
       "action": "managed-marker",
       "detail": "",
-      "status": "dry-run",
+      "status": "updated",
       "target": "SZLHOLDINGS/uds-governance-receipts"
     },
     {
       "action": "managed-marker",
       "detail": "",
-      "status": "dry-run",
+      "status": "updated",
       "target": "SZLHOLDINGS/szl-org-infra"
     },
     {
       "action": "managed-marker",
       "detail": "",
-      "status": "dry-run",
+      "status": "updated",
       "target": "SZLHOLDINGS/SZLHOLDINGS"
     },
     {
       "action": "managed-marker",
       "detail": "",
-      "status": "dry-run",
+      "status": "updated",
       "target": "SZLHOLDINGS/why-we-lead"
     },
     {
       "action": "managed-marker",
       "detail": "",
-      "status": "dry-run",
+      "status": "updated",
       "target": "SZLHOLDINGS/ouroboros-arxiv-preprint"
     },
     {
       "action": "managed-marker",
       "detail": "",
-      "status": "dry-run",
+      "status": "updated",
       "target": "SZLHOLDINGS/szl-artifacts"
     },
     {
       "action": "managed-marker",
       "detail": "",
-      "status": "dry-run",
+      "status": "updated",
       "target": "SZLHOLDINGS/anatomy-alive-harness"
     },
     {
       "action": "managed-marker",
       "detail": "",
-      "status": "dry-run",
+      "status": "updated",
       "target": "SZLHOLDINGS/thesis-formula-index"
     },
     {
       "action": "managed-marker",
       "detail": "",
-      "status": "dry-run",
+      "status": "updated",
       "target": "SZLHOLDINGS/lean-theorem-tree"
     },
     {
       "action": "managed-marker",
       "detail": "",
-      "status": "dry-run",
+      "status": "updated",
       "target": "SZLHOLDINGS/rag-corpus-v1"
     },
     {
       "action": "managed-marker",
       "detail": "",
-      "status": "dry-run",
+      "status": "updated",
       "target": "SZLHOLDINGS/lean-proofs-v1"
     },
     {
       "action": "managed-marker",
       "detail": "",
-      "status": "dry-run",
+      "status": "updated",
       "target": "SZLHOLDINGS/canonical-formulas-v1"
     },
     {
       "action": "managed-marker",
       "detail": "",
-      "status": "dry-run",
+      "status": "updated",
       "target": "SZLHOLDINGS/thesis-corpus-v18"
     },
     {
       "action": "managed-marker",
       "detail": "",
-      "status": "dry-run",
+      "status": "updated",
       "target": "SZLHOLDINGS/doctrine-v10-v11"
     },
     {
       "action": "managed-marker",
       "detail": "",
-      "status": "dry-run",
+      "status": "updated",
       "target": "SZLHOLDINGS/k-verify-benchmark-v1"
     },
     {
       "action": "managed-marker",
       "detail": "",
-      "status": "dry-run",
+      "status": "updated",
       "target": "SZLHOLDINGS/yuyay-v3-axis-labels-v1"
     },
     {
       "action": "managed-marker",
       "detail": "",
-      "status": "dry-run",
+      "status": "updated",
       "target": "SZLHOLDINGS/uds-bundles-v1"
     },
     {
       "action": "managed-marker",
       "detail": "",
-      "status": "dry-run",
+      "status": "updated",
       "target": "SZLHOLDINGS/readiness-runs"
     },
     {
       "action": "managed-marker",
       "detail": "",
-      "status": "dry-run",
+      "status": "updated",
       "target": "SZLHOLDINGS/szl-lake"
     },
     {
       "action": "managed-marker",
       "detail": "",
-      "status": "dry-run",
+      "status": "updated",
       "target": "SZLHOLDINGS/a11oy-verifiable-corpus"
     },
     {
       "action": "managed-marker",
       "detail": "",
-      "status": "dry-run",
+      "status": "updated",
       "target": "SZLHOLDINGS/legacy-archive"
     },
     {
       "action": "managed-marker",
       "detail": "",
-      "status": "dry-run",
+      "status": "updated",
       "target": "SZLHOLDINGS/szl-evidence"
     },
     {
       "action": "managed-marker",
       "detail": "",
-      "status": "dry-run",
+      "status": "updated",
       "target": "SZLHOLDINGS/governed-receipts-bench"
     },
     {
       "action": "managed-marker",
       "detail": "",
-      "status": "dry-run",
+      "status": "updated",
       "target": "SZLHOLDINGS/energy-attested-runs"
     },
     {
       "action": "managed-marker",
       "detail": "",
-      "status": "dry-run",
+      "status": "updated",
       "target": "SZLHOLDINGS/alloy-sovereign-eval-runs"
     },
     {
       "action": "managed-marker",
       "detail": "",
-      "status": "dry-run",
+      "status": "updated",
       "target": "SZLHOLDINGS/szl-1-doctrine-sft"
     },
     {
       "action": "managed-marker",
       "detail": "",
-      "status": "dry-run",
+      "status": "updated",
       "target": "SZLHOLDINGS/szl-second-brain-inrepo"
     },
     {
       "action": "managed-marker",
       "detail": "",
-      "status": "dry-run",
+      "status": "updated",
       "target": "SZLHOLDINGS/szl-quant-sft-v1"
     },
     {
       "action": "managed-marker",
       "detail": "",
-      "status": "dry-run",
+      "status": "updated",
       "target": "SZLHOLDINGS/test-results"
     },
     {
@@ -333,7 +333,7 @@
     {
       "action": "managed-marker",
       "detail": "",
-      "status": "dry-run",
+      "status": "updated",
       "target": "SZLHOLDINGS/README"
     },
     {
@@ -411,7 +411,7 @@
     {
       "action": "managed-marker",
       "detail": "",
-      "status": "dry-run",
+      "status": "updated",
       "target": "SZLHOLDINGS/energy-attested-runs"
     },
     {
@@ -423,7 +423,7 @@
     {
       "action": "managed-marker",
       "detail": "",
-      "status": "dry-run",
+      "status": "updated",
       "target": "SZLHOLDINGS/governed-receipt-verifier"
     },
     {
@@ -435,7 +435,7 @@
     {
       "action": "managed-marker",
       "detail": "",
-      "status": "dry-run",
+      "status": "updated",
       "target": "SZLHOLDINGS/guardrail-receipt"
     },
     {
@@ -447,7 +447,7 @@
     {
       "action": "managed-marker",
       "detail": "",
-      "status": "dry-run",
+      "status": "updated",
       "target": "SZLHOLDINGS/governed-norm-holo"
     },
     {
@@ -459,7 +459,7 @@
     {
       "action": "managed-marker",
       "detail": "",
-      "status": "dry-run",
+      "status": "updated",
       "target": "SZLHOLDINGS/lambda-gate-holo"
     },
     {
@@ -471,7 +471,7 @@
     {
       "action": "managed-marker",
       "detail": "",
-      "status": "dry-run",
+      "status": "updated",
       "target": "SZLHOLDINGS/energy-attest-holo"
     },
     {
@@ -483,7 +483,7 @@
     {
       "action": "managed-marker",
       "detail": "",
-      "status": "dry-run",
+      "status": "updated",
       "target": "SZLHOLDINGS/receipt-chain-live"
     },
     {
@@ -495,7 +495,7 @@
     {
       "action": "managed-marker",
       "detail": "",
-      "status": "dry-run",
+      "status": "updated",
       "target": "SZLHOLDINGS/szl-provctl-live"
     },
     {
@@ -507,7 +507,7 @@
     {
       "action": "managed-marker",
       "detail": "",
-      "status": "dry-run",
+      "status": "updated",
       "target": "SZLHOLDINGS/szl-kernels-live"
     },
     {
@@ -519,7 +519,7 @@
     {
       "action": "managed-marker",
       "detail": "",
-      "status": "dry-run",
+      "status": "updated",
       "target": "SZLHOLDINGS/szl-govsign-live"
     },
     {
@@ -531,7 +531,7 @@
     {
       "action": "managed-marker",
       "detail": "",
-      "status": "dry-run",
+      "status": "updated",
       "target": "SZLHOLDINGS/szl-blocked-live"
     },
     {
@@ -543,7 +543,7 @@
     {
       "action": "managed-marker",
       "detail": "",
-      "status": "dry-run",
+      "status": "updated",
       "target": "SZLHOLDINGS/szl-estate-live"
     },
     {
@@ -555,7 +555,7 @@
     {
       "action": "managed-marker",
       "detail": "",
-      "status": "dry-run",
+      "status": "updated",
       "target": "SZLHOLDINGS/szl-forge-lab"
     },
     {
@@ -566,26 +566,26 @@
     },
     {
       "action": "flagship-clone",
-      "detail": "source=SZLHOLDINGS/a11oy",
-      "status": "dry-run",
+      "detail": "HfHubHTTPError(\"(Request ID: Root=1-6a6059c1-05a79bfd21006f85065c69b6;d7bd569e-9b20-4659-8ab3-1a208d75e9aa)\\n\\n429 Too Many Requests: you have reached your 'api' rate limit.\\nRetry after 233 seconds (2926/3000 requests remaining in current 300s window).\\nUrl: https://huggingface.co/api/spaces/SZLHOLDINGS/a11oy/duplicate.\\nYou have exceeded the rate limit for repository duplication (15 per day). Yo",
+      "status": "error",
       "target": "SZLHOLDINGS/a11oy-clone-1"
     },
     {
       "action": "flagship-clone",
-      "detail": "source=SZLHOLDINGS/a11oy",
-      "status": "dry-run",
+      "detail": "HfHubHTTPError(\"(Request ID: Root=1-6a6059c1-2943c7116dc7ff6a5cb39d97;27ec378b-e7ac-4197-bd4b-2eb26b7d833d)\\n\\n429 Too Many Requests: you have reached your 'api' rate limit.\\nRetry after 233 seconds (2924/3000 requests remaining in current 300s window).\\nUrl: https://huggingface.co/api/spaces/SZLHOLDINGS/a11oy/duplicate.\\nYou have exceeded the rate limit for repository duplication (15 per day). Yo",
+      "status": "error",
       "target": "SZLHOLDINGS/a11oy-clone-2"
     },
     {
       "action": "flagship-clone",
-      "detail": "source=SZLHOLDINGS/a11oy",
-      "status": "dry-run",
+      "detail": "HfHubHTTPError(\"(Request ID: Root=1-6a6059c1-33f643db72124def7236d7e6;18ac8813-904f-4058-b93d-5146e788878c)\\n\\n429 Too Many Requests: you have reached your 'api' rate limit.\\nRetry after 233 seconds (2922/3000 requests remaining in current 300s window).\\nUrl: https://huggingface.co/api/spaces/SZLHOLDINGS/a11oy/duplicate.\\nYou have exceeded the rate limit for repository duplication (15 per day). Yo",
+      "status": "error",
       "target": "SZLHOLDINGS/a11oy-clone-3"
     },
     {
       "action": "flagship-clone",
-      "detail": "source=SZLHOLDINGS/a11oy",
-      "status": "dry-run",
+      "detail": "HfHubHTTPError(\"(Request ID: Root=1-6a6059c1-2560b3b722e7024177f8ffff;8a7878e2-d8a2-4397-8a59-96cea5f321b3)\\n\\n429 Too Many Requests: you have reached your 'api' rate limit.\\nRetry after 233 seconds (2920/3000 requests remaining in current 300s window).\\nUrl: https://huggingface.co/api/spaces/SZLHOLDINGS/a11oy/duplicate.\\nYou have exceeded the rate limit for repository duplication (15 per day). Yo",
+      "status": "error",
       "target": "SZLHOLDINGS/a11oy-clone-4"
     },
     {
@@ -602,8 +602,8 @@
     },
     {
       "action": "collection",
-      "detail": "would create",
-      "status": "dry-run",
+      "detail": "BadRequestError('(Request ID: Root=1-6a6059c1-42cc25467858ffb656e299ee;4105124f-9462-417c-9f33-79cf6dd2d816)\\n\\nBad request:\\n* Too big: expected string to have <150 characters * at description\\n\u2716 Too big: expected string to have <150 characters\\n  \u2192 at description')",
+      "status": "error",
       "target": "SZL Holdings \u2014 Models & Kernel Contracts"
     },
     {
@@ -615,421 +615,421 @@
     {
       "action": "collection-add:SZL Holdings \u2014 Spaces",
       "detail": "",
-      "status": "dry-run",
+      "status": "ok",
       "target": "SZLHOLDINGS/README"
     },
     {
       "action": "collection-add:SZL Holdings \u2014 Spaces",
       "detail": "",
-      "status": "dry-run",
+      "status": "ok",
       "target": "SZLHOLDINGS/a11oy"
     },
     {
       "action": "collection-add:SZL Holdings \u2014 Spaces",
-      "detail": "",
-      "status": "dry-run",
+      "detail": "HfHubHTTPError(\"Client error '404 Not Found' for url 'https://huggingface.co/api/collections/SZLHOLDINGS/szl-holdings-spaces-6a6053493e2dbe1deddd1f2d/items' (Request ID: Root=1-6a6059c2-77f39d395998e9b646d6cfe6;50a2f8db-711c-4dfb-8707-f4b11a8bb00c)\\n",
+      "status": "warning",
       "target": "SZLHOLDINGS/a11oy-clone-1"
     },
     {
       "action": "collection-add:SZL Holdings \u2014 Spaces",
-      "detail": "",
-      "status": "dry-run",
+      "detail": "HfHubHTTPError(\"Client error '404 Not Found' for url 'https://huggingface.co/api/collections/SZLHOLDINGS/szl-holdings-spaces-6a6053493e2dbe1deddd1f2d/items' (Request ID: Root=1-6a6059c2-0f227ef256a2bdf911fb299f;cf66793a-75f6-4fdb-b166-333af9369b91)\\n",
+      "status": "warning",
       "target": "SZLHOLDINGS/a11oy-clone-2"
     },
     {
       "action": "collection-add:SZL Holdings \u2014 Spaces",
-      "detail": "",
-      "status": "dry-run",
+      "detail": "HfHubHTTPError(\"Client error '404 Not Found' for url 'https://huggingface.co/api/collections/SZLHOLDINGS/szl-holdings-spaces-6a6053493e2dbe1deddd1f2d/items' (Request ID: Root=1-6a6059c2-4ca79dbc7a29196c49cd4de5;9c284d89-db95-4f33-ace6-a11b476afe3f)\\n",
+      "status": "warning",
       "target": "SZLHOLDINGS/a11oy-clone-3"
     },
     {
       "action": "collection-add:SZL Holdings \u2014 Spaces",
-      "detail": "",
-      "status": "dry-run",
+      "detail": "HfHubHTTPError(\"Client error '404 Not Found' for url 'https://huggingface.co/api/collections/SZLHOLDINGS/szl-holdings-spaces-6a6053493e2dbe1deddd1f2d/items' (Request ID: Root=1-6a6059c2-2044ce1e6992dd3955b99829;9885a5cc-f766-4174-acb9-7e956af846c0)\\n",
+      "status": "warning",
       "target": "SZLHOLDINGS/a11oy-clone-4"
     },
     {
       "action": "collection-add:SZL Holdings \u2014 Spaces",
       "detail": "",
-      "status": "dry-run",
+      "status": "ok",
       "target": "SZLHOLDINGS/anatomy"
     },
     {
       "action": "collection-add:SZL Holdings \u2014 Spaces",
       "detail": "",
-      "status": "dry-run",
+      "status": "ok",
       "target": "SZLHOLDINGS/cosmos"
     },
     {
       "action": "collection-add:SZL Holdings \u2014 Spaces",
       "detail": "",
-      "status": "dry-run",
+      "status": "ok",
       "target": "SZLHOLDINGS/david-leads"
     },
     {
       "action": "collection-add:SZL Holdings \u2014 Spaces",
       "detail": "",
-      "status": "dry-run",
+      "status": "ok",
       "target": "SZLHOLDINGS/energy-attest-holo"
     },
     {
       "action": "collection-add:SZL Holdings \u2014 Spaces",
       "detail": "",
-      "status": "dry-run",
+      "status": "ok",
       "target": "SZLHOLDINGS/energy-attested-runs"
     },
     {
       "action": "collection-add:SZL Holdings \u2014 Spaces",
       "detail": "",
-      "status": "dry-run",
+      "status": "ok",
       "target": "SZLHOLDINGS/governed-norm-holo"
     },
     {
       "action": "collection-add:SZL Holdings \u2014 Spaces",
       "detail": "",
-      "status": "dry-run",
+      "status": "ok",
       "target": "SZLHOLDINGS/governed-receipt-verifier"
     },
     {
       "action": "collection-add:SZL Holdings \u2014 Spaces",
       "detail": "",
-      "status": "dry-run",
+      "status": "ok",
       "target": "SZLHOLDINGS/guardrail-receipt"
     },
     {
       "action": "collection-add:SZL Holdings \u2014 Spaces",
       "detail": "",
-      "status": "dry-run",
+      "status": "ok",
       "target": "SZLHOLDINGS/hatun-mcp"
     },
     {
       "action": "collection-add:SZL Holdings \u2014 Spaces",
       "detail": "",
-      "status": "dry-run",
+      "status": "ok",
       "target": "SZLHOLDINGS/holographic"
     },
     {
       "action": "collection-add:SZL Holdings \u2014 Spaces",
       "detail": "",
-      "status": "dry-run",
+      "status": "ok",
       "target": "SZLHOLDINGS/immune"
     },
     {
       "action": "collection-add:SZL Holdings \u2014 Spaces",
       "detail": "",
-      "status": "dry-run",
+      "status": "ok",
       "target": "SZLHOLDINGS/killinchu"
     },
     {
       "action": "collection-add:SZL Holdings \u2014 Spaces",
       "detail": "",
-      "status": "dry-run",
+      "status": "ok",
       "target": "SZLHOLDINGS/lambda-gate-holo"
     },
     {
       "action": "collection-add:SZL Holdings \u2014 Spaces",
       "detail": "",
-      "status": "dry-run",
+      "status": "ok",
       "target": "SZLHOLDINGS/llm-router-live"
     },
     {
       "action": "collection-add:SZL Holdings \u2014 Spaces",
       "detail": "",
-      "status": "dry-run",
+      "status": "ok",
       "target": "SZLHOLDINGS/receipt-chain-live"
     },
     {
       "action": "collection-add:SZL Holdings \u2014 Spaces",
       "detail": "",
-      "status": "dry-run",
+      "status": "ok",
       "target": "SZLHOLDINGS/sda"
     },
     {
       "action": "collection-add:SZL Holdings \u2014 Spaces",
       "detail": "",
-      "status": "dry-run",
+      "status": "ok",
       "target": "SZLHOLDINGS/szl-blocked-live"
     },
     {
       "action": "collection-add:SZL Holdings \u2014 Spaces",
       "detail": "",
-      "status": "dry-run",
+      "status": "ok",
       "target": "SZLHOLDINGS/szl-estate-live"
     },
     {
       "action": "collection-add:SZL Holdings \u2014 Spaces",
       "detail": "",
-      "status": "dry-run",
+      "status": "ok",
       "target": "SZLHOLDINGS/szl-forge-lab"
     },
     {
       "action": "collection-add:SZL Holdings \u2014 Spaces",
       "detail": "",
-      "status": "dry-run",
+      "status": "ok",
       "target": "SZLHOLDINGS/szl-govsign-live"
     },
     {
       "action": "collection-add:SZL Holdings \u2014 Spaces",
       "detail": "",
-      "status": "dry-run",
+      "status": "ok",
       "target": "SZLHOLDINGS/szl-kernels-live"
     },
     {
       "action": "collection-add:SZL Holdings \u2014 Spaces",
       "detail": "",
-      "status": "dry-run",
+      "status": "ok",
       "target": "SZLHOLDINGS/szl-model-inference-lab"
     },
     {
       "action": "collection-add:SZL Holdings \u2014 Spaces",
       "detail": "",
-      "status": "dry-run",
+      "status": "ok",
       "target": "SZLHOLDINGS/szl-provctl-live"
     },
     {
       "action": "collection-add:SZL Holdings \u2014 Spaces",
       "detail": "",
-      "status": "dry-run",
+      "status": "ok",
       "target": "SZLHOLDINGS/yarqa"
     },
     {
       "action": "collection-add:SZL Holdings \u2014 Datasets & Evidence",
       "detail": "",
-      "status": "dry-run",
+      "status": "ok",
       "target": "SZLHOLDINGS/killinchu-osint-corpus"
     },
     {
       "action": "collection-add:SZL Holdings \u2014 Datasets & Evidence",
       "detail": "",
-      "status": "dry-run",
+      "status": "ok",
       "target": "SZLHOLDINGS/thesis-v18-formal-verification"
     },
     {
       "action": "collection-add:SZL Holdings \u2014 Datasets & Evidence",
       "detail": "",
-      "status": "dry-run",
+      "status": "ok",
       "target": "SZLHOLDINGS/uds-spans-receipts"
     },
     {
       "action": "collection-add:SZL Holdings \u2014 Datasets & Evidence",
       "detail": "",
-      "status": "dry-run",
+      "status": "ok",
       "target": "SZLHOLDINGS/uds-governance-receipts"
     },
     {
       "action": "collection-add:SZL Holdings \u2014 Datasets & Evidence",
       "detail": "",
-      "status": "dry-run",
+      "status": "ok",
       "target": "SZLHOLDINGS/szl-org-infra"
     },
     {
       "action": "collection-add:SZL Holdings \u2014 Datasets & Evidence",
       "detail": "",
-      "status": "dry-run",
+      "status": "ok",
       "target": "SZLHOLDINGS/SZLHOLDINGS"
     },
     {
       "action": "collection-add:SZL Holdings \u2014 Datasets & Evidence",
       "detail": "",
-      "status": "dry-run",
+      "status": "ok",
       "target": "SZLHOLDINGS/why-we-lead"
     },
     {
       "action": "collection-add:SZL Holdings \u2014 Datasets & Evidence",
       "detail": "",
-      "status": "dry-run",
+      "status": "ok",
       "target": "SZLHOLDINGS/ouroboros-arxiv-preprint"
     },
     {
       "action": "collection-add:SZL Holdings \u2014 Datasets & Evidence",
       "detail": "",
-      "status": "dry-run",
+      "status": "ok",
       "target": "SZLHOLDINGS/szl-artifacts"
     },
     {
       "action": "collection-add:SZL Holdings \u2014 Datasets & Evidence",
       "detail": "",
-      "status": "dry-run",
+      "status": "ok",
       "target": "SZLHOLDINGS/anatomy-alive-harness"
     },
     {
       "action": "collection-add:SZL Holdings \u2014 Datasets & Evidence",
       "detail": "",
-      "status": "dry-run",
+      "status": "ok",
       "target": "SZLHOLDINGS/thesis-formula-index"
     },
     {
       "action": "collection-add:SZL Holdings \u2014 Datasets & Evidence",
       "detail": "",
-      "status": "dry-run",
+      "status": "ok",
       "target": "SZLHOLDINGS/lean-theorem-tree"
     },
     {
       "action": "collection-add:SZL Holdings \u2014 Datasets & Evidence",
       "detail": "",
-      "status": "dry-run",
+      "status": "ok",
       "target": "SZLHOLDINGS/rag-corpus-v1"
     },
     {
       "action": "collection-add:SZL Holdings \u2014 Datasets & Evidence",
       "detail": "",
-      "status": "dry-run",
+      "status": "ok",
       "target": "SZLHOLDINGS/lean-proofs-v1"
     },
     {
       "action": "collection-add:SZL Holdings \u2014 Datasets & Evidence",
       "detail": "",
-      "status": "dry-run",
+      "status": "ok",
       "target": "SZLHOLDINGS/canonical-formulas-v1"
     },
     {
       "action": "collection-add:SZL Holdings \u2014 Datasets & Evidence",
       "detail": "",
-      "status": "dry-run",
+      "status": "ok",
       "target": "SZLHOLDINGS/thesis-corpus-v18"
     },
     {
       "action": "collection-add:SZL Holdings \u2014 Datasets & Evidence",
       "detail": "",
-      "status": "dry-run",
+      "status": "ok",
       "target": "SZLHOLDINGS/doctrine-v10-v11"
     },
     {
       "action": "collection-add:SZL Holdings \u2014 Datasets & Evidence",
       "detail": "",
-      "status": "dry-run",
+      "status": "ok",
       "target": "SZLHOLDINGS/k-verify-benchmark-v1"
     },
     {
       "action": "collection-add:SZL Holdings \u2014 Datasets & Evidence",
       "detail": "",
-      "status": "dry-run",
+      "status": "ok",
       "target": "SZLHOLDINGS/yuyay-v3-axis-labels-v1"
     },
     {
       "action": "collection-add:SZL Holdings \u2014 Datasets & Evidence",
       "detail": "",
-      "status": "dry-run",
+      "status": "ok",
       "target": "SZLHOLDINGS/uds-bundles-v1"
     },
     {
       "action": "collection-add:SZL Holdings \u2014 Datasets & Evidence",
       "detail": "",
-      "status": "dry-run",
+      "status": "ok",
       "target": "SZLHOLDINGS/readiness-runs"
     },
     {
       "action": "collection-add:SZL Holdings \u2014 Datasets & Evidence",
       "detail": "",
-      "status": "dry-run",
+      "status": "ok",
       "target": "SZLHOLDINGS/szl-lake"
     },
     {
       "action": "collection-add:SZL Holdings \u2014 Datasets & Evidence",
       "detail": "",
-      "status": "dry-run",
+      "status": "ok",
       "target": "SZLHOLDINGS/a11oy-verifiable-corpus"
     },
     {
       "action": "collection-add:SZL Holdings \u2014 Datasets & Evidence",
       "detail": "",
-      "status": "dry-run",
+      "status": "ok",
       "target": "SZLHOLDINGS/legacy-archive"
     },
     {
       "action": "collection-add:SZL Holdings \u2014 Datasets & Evidence",
       "detail": "",
-      "status": "dry-run",
+      "status": "ok",
       "target": "SZLHOLDINGS/szl-evidence"
     },
     {
       "action": "collection-add:SZL Holdings \u2014 Datasets & Evidence",
       "detail": "",
-      "status": "dry-run",
+      "status": "ok",
       "target": "SZLHOLDINGS/governed-receipts-bench"
     },
     {
       "action": "collection-add:SZL Holdings \u2014 Datasets & Evidence",
       "detail": "",
-      "status": "dry-run",
+      "status": "ok",
       "target": "SZLHOLDINGS/energy-attested-runs"
     },
     {
       "action": "collection-add:SZL Holdings \u2014 Datasets & Evidence",
       "detail": "",
-      "status": "dry-run",
+      "status": "ok",
       "target": "SZLHOLDINGS/alloy-sovereign-eval-runs"
     },
     {
       "action": "collection-add:SZL Holdings \u2014 Datasets & Evidence",
       "detail": "",
-      "status": "dry-run",
+      "status": "ok",
       "target": "SZLHOLDINGS/szl-1-doctrine-sft"
     },
     {
       "action": "collection-add:SZL Holdings \u2014 Datasets & Evidence",
       "detail": "",
-      "status": "dry-run",
+      "status": "ok",
       "target": "SZLHOLDINGS/szl-second-brain-inrepo"
     },
     {
       "action": "collection-add:SZL Holdings \u2014 Datasets & Evidence",
       "detail": "",
-      "status": "dry-run",
+      "status": "ok",
       "target": "SZLHOLDINGS/szl-quant-sft-v1"
     },
     {
       "action": "collection-add:SZL Holdings \u2014 Datasets & Evidence",
       "detail": "",
-      "status": "dry-run",
+      "status": "ok",
       "target": "SZLHOLDINGS/test-results"
     },
     {
       "action": "collection-add:SZL Holdings \u2014 Canonical Estate",
       "detail": "",
-      "status": "dry-run",
+      "status": "ok",
       "target": "SZLHOLDINGS/a11oy"
     },
     {
       "action": "collection-add:SZL Holdings \u2014 Canonical Estate",
       "detail": "",
-      "status": "dry-run",
+      "status": "ok",
       "target": "SZLHOLDINGS/a11oy-v19-substrate"
     },
     {
       "action": "collection-add:SZL Holdings \u2014 Canonical Estate",
       "detail": "",
-      "status": "dry-run",
+      "status": "ok",
       "target": "SZLHOLDINGS/szl-lake"
     },
     {
       "action": "collection-add:SZL Holdings \u2014 Canonical Estate",
       "detail": "",
-      "status": "dry-run",
+      "status": "ok",
       "target": "SZLHOLDINGS/szl-evidence"
     },
     {
       "action": "collection-add:SZL Holdings \u2014 Canonical Estate",
-      "detail": "",
-      "status": "dry-run",
+      "detail": "HfHubHTTPError(\"Client error '404 Not Found' for url 'https://huggingface.co/api/collections/SZLHOLDINGS/szl-holdings-canonical-estate-6a6053498f1195071c8f73c2/items' (Request ID: Root=1-6a6059ca-4b55f5de6490e1bc1adbe4df;109531ae-ff87-40b5-a2fb-816c7",
+      "status": "warning",
       "target": "SZLHOLDINGS/a11oy-clone-1"
     },
     {
       "action": "collection-add:SZL Holdings \u2014 Canonical Estate",
-      "detail": "",
-      "status": "dry-run",
+      "detail": "HfHubHTTPError(\"Client error '404 Not Found' for url 'https://huggingface.co/api/collections/SZLHOLDINGS/szl-holdings-canonical-estate-6a6053498f1195071c8f73c2/items' (Request ID: Root=1-6a6059ca-51a32eaf39eba11517331c01;294c8d76-f5ae-495b-8db2-0567c",
+      "status": "warning",
       "target": "SZLHOLDINGS/a11oy-clone-2"
     },
     {
       "action": "collection-add:SZL Holdings \u2014 Canonical Estate",
-      "detail": "",
-      "status": "dry-run",
+      "detail": "HfHubHTTPError(\"Client error '404 Not Found' for url 'https://huggingface.co/api/collections/SZLHOLDINGS/szl-holdings-canonical-estate-6a6053498f1195071c8f73c2/items' (Request ID: Root=1-6a6059ca-0f69a6b24c1813480a91273e;fc28593d-af44-4a8a-a96b-fdc79",
+      "status": "warning",
       "target": "SZLHOLDINGS/a11oy-clone-3"
     },
     {
       "action": "collection-add:SZL Holdings \u2014 Canonical Estate",
-      "detail": "",
-      "status": "dry-run",
+      "detail": "HfHubHTTPError(\"Client error '404 Not Found' for url 'https://huggingface.co/api/collections/SZLHOLDINGS/szl-holdings-canonical-estate-6a6053498f1195071c8f73c2/items' (Request ID: Root=1-6a6059ca-0dd4b628642c100f200aaab5;37fca0a9-606a-4200-8074-0cb3a",
+      "status": "warning",
       "target": "SZLHOLDINGS/a11oy-clone-4"
     },
     {
@@ -1097,6 +1097,12 @@
       "detail": "",
       "status": "updated",
       "target": "reports/hf-estate-upgrade-latest.json"
+    },
+    {
+      "action": "publish-report",
+      "detail": "",
+      "status": "updated",
+      "target": "SZLHOLDINGS/szl-evidence"
     }
   ],
   "boundaries": [
@@ -1125,15 +1131,15 @@
     "models": 15,
     "spaces": 26
   },
-  "generated_at": "2026-07-22T05:38:15.227575+00:00",
-  "generation": "adfc10eaffc200f1844e1344c7a48129c00df91f",
+  "generated_at": "2026-07-22T05:49:00.637987+00:00",
+  "generation": "a5f761b7e307b5c6da4b940f1d0630500f4082bd",
   "organization": "SZLHOLDINGS",
-  "publish": false,
+  "publish": true,
   "schema": "szl.hf-estate-upgrade-report/v1",
   "summary": {
-    "dry_run": 136,
-    "error": 0,
-    "ok": 45,
-    "warning": 2
+    "dry_run": 0,
+    "error": 5,
+    "ok": 169,
+    "warning": 10
   }
 }
