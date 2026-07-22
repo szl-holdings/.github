@@ -20,6 +20,9 @@ from final_estate_v5_core import (
     summary_clean,
 )
 
+READINESS_SCHEMA = "szl.hf-release-readiness/v1"
+PUBLICATION_SCHEMA = "szl.hf-release-finalization/v2"
+
 
 def validate_official_inventory(report: Mapping[str, Any]) -> tuple[bool, str]:
     counts = report.get("counts") or {}
@@ -87,7 +90,7 @@ def validate_release_readiness(report: Mapping[str, Any]) -> tuple[bool, str]:
         for repo_id in KERNEL_IDS
     )
     ok = (
-        report.get("schema") == "szl.hf-release-finalization/v1"
+        report.get("schema") == READINESS_SCHEMA
         and report.get("publish") is True
         and summary_clean(report)
         and dataset_ok
@@ -138,7 +141,7 @@ def validate_release_publication(report: Mapping[str, Any]) -> tuple[bool, str]:
         and all(SHA40.fullmatch(str(sources[key] or "")) is not None for key in source_keys)
     )
     ok = (
-        report.get("schema") == "szl.hf-release-finalization/v2"
+        report.get("schema") == PUBLICATION_SCHEMA
         and report.get("publish") is True
         and report.get("kernel_transport") == "authenticated-kernel-hub-git"
         and summary_clean(report)
@@ -227,20 +230,26 @@ def evaluate_release_revision_consistency(client: GitHubClient) -> Gate:
             set(readiness_kernel_revisions) == KERNEL_IDS
             and readiness_kernel_revisions == publication_kernel_revisions
         )
+        schemas_current = (
+            readiness.get("schema") == READINESS_SCHEMA
+            and publication.get("schema") == PUBLICATION_SCHEMA
+        )
         issues_closed = (
             readiness_issue.get("state") == "closed"
             and publication_issue.get("state") == "closed"
         )
         return Gate(
             "evidence:hf_release_revision_consistency",
-            dataset_match and kernels_match and issues_closed,
+            dataset_match and kernels_match and schemas_current and issues_closed,
             (
-                f"issues_closed={issues_closed}; dataset_match={dataset_match}; "
-                f"kernels_match={kernels_match}"
+                f"issues_closed={issues_closed}; schemas_current={schemas_current}; "
+                f"dataset_match={dataset_match}; kernels_match={kernels_match}"
             ),
             {
                 "readiness_issue_url": readiness_issue.get("html_url") or readiness_issue.get("url"),
                 "publication_issue_url": publication_issue.get("html_url") or publication_issue.get("url"),
+                "readiness_schema": readiness.get("schema"),
+                "publication_schema": publication.get("schema"),
                 "dataset_revision": readiness_dataset_revision,
                 "kernel_revisions": readiness_kernel_revisions,
             },
