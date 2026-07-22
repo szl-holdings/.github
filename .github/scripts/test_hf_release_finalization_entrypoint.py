@@ -5,7 +5,6 @@ import importlib
 import pathlib
 import sys
 import unittest
-from unittest import mock
 
 HERE = pathlib.Path(__file__).resolve().parent
 if str(HERE) not in sys.path:
@@ -33,7 +32,9 @@ class ViewerRetryEntrypointTests(unittest.TestCase):
 
     def test_non_viewer_request_delegates_once(self) -> None:
         expected = Response(200, {"ok": True})
-        with mock.patch.object(entrypoint, "_ORIGINAL_GET", return_value=expected) as get:
+        with unittest.mock.patch.object(
+            entrypoint, "_ORIGINAL_GET", return_value=expected
+        ) as get:
             observed = entrypoint.get_with_viewer_retry("https://example.test/data")
         self.assertIs(observed, expected)
         get.assert_called_once_with("https://example.test/data")
@@ -49,11 +50,11 @@ class ViewerRetryEntrypointTests(unittest.TestCase):
                 Response(200, {"rows": [], "features": []}),
             ]
         )
-        with mock.patch.object(
+        with unittest.mock.patch.object(
             entrypoint,
             "_ORIGINAL_GET",
             side_effect=lambda *_args, **_kwargs: next(responses),
-        ), mock.patch.object(entrypoint.time, "sleep") as sleep:
+        ), unittest.mock.patch.object(entrypoint.time, "sleep") as sleep:
             observed = entrypoint.get_with_viewer_retry(
                 entrypoint.finalizer.VIEWER_URL,
                 attempts=3,
@@ -71,11 +72,11 @@ class ViewerRetryEntrypointTests(unittest.TestCase):
                 Response(200, {"rows": [1]}),
             ]
         )
-        with mock.patch.object(
+        with unittest.mock.patch.object(
             entrypoint,
             "_ORIGINAL_GET",
             side_effect=lambda *_args, **_kwargs: next(responses),
-        ), mock.patch.object(entrypoint.time, "sleep"):
+        ), unittest.mock.patch.object(entrypoint.time, "sleep"):
             observed = entrypoint.get_with_viewer_retry(
                 entrypoint.finalizer.VIEWER_URL,
                 attempts=2,
@@ -85,9 +86,9 @@ class ViewerRetryEntrypointTests(unittest.TestCase):
 
     def test_non_transient_404_returns_without_sleep(self) -> None:
         response = Response(404, {"error": "missing"})
-        with mock.patch.object(
+        with unittest.mock.patch.object(
             entrypoint, "_ORIGINAL_GET", return_value=response
-        ) as get, mock.patch.object(entrypoint.time, "sleep") as sleep:
+        ) as get, unittest.mock.patch.object(entrypoint.time, "sleep") as sleep:
             observed = entrypoint.get_with_viewer_retry(
                 entrypoint.finalizer.VIEWER_URL,
                 attempts=3,
@@ -98,18 +99,21 @@ class ViewerRetryEntrypointTests(unittest.TestCase):
         self.assertEqual(entrypoint._VIEWER_STATS["attempts"], 1)
 
     def test_network_failure_is_bounded_and_fails_closed(self) -> None:
-        with mock.patch.object(
+        with unittest.mock.patch.object(
             entrypoint,
             "_ORIGINAL_GET",
             side_effect=entrypoint.requests.ConnectionError("offline"),
-        ) as get, mock.patch.object(entrypoint.time, "sleep") as sleep:
+        ) as get, unittest.mock.patch.object(entrypoint.time, "sleep") as sleep:
             with self.assertRaisesRegex(RuntimeError, "did not converge"):
                 entrypoint.get_with_viewer_retry(
                     entrypoint.finalizer.VIEWER_URL,
                     attempts=3,
                 )
         self.assertEqual(get.call_count, 3)
-        self.assertEqual(sleep.call_args_list, [mock.call(15), mock.call(30)])
+        self.assertEqual(
+            sleep.call_args_list,
+            [unittest.mock.call(15), unittest.mock.call(30)],
+        )
         self.assertEqual(entrypoint._VIEWER_STATS["transient_retries"], 2)
 
     def test_report_contains_retry_evidence(self) -> None:
