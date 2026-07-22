@@ -1,0 +1,183 @@
+name: HF Release Readiness v2
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - .github/scripts/hf_release_readiness_v2.py
+      - .github/scripts/test_hf_release_readiness_v2.py
+      - .github/workflows/hf-release-readiness-v2.yml
+  pull_request:
+    branches: [main]
+    paths:
+      - .github/scripts/hf_release_readiness_v2.py
+      - .github/scripts/test_hf_release_readiness_v2.py
+      - .github/workflows/hf-release-readiness-v2.yml
+  schedule:
+    - cron: '7,37 * * * *'
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+  issues: write
+
+concurrency:
+  group: hf-release-readiness-v2-${{ github.event_name }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    name: Lake Viewer and exact torch27 kernel selfchecks
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      HF_ORG_TOKEN: ${{ secrets.HF_ORG_TOKEN || secrets.HF_ORG_TOKEN1 }}
+      HF_TOKEN: ${{ secrets.HF_TOKEN }}
+      HF_HUB_DISABLE_PROGRESS_BARS: '1'
+      GH_TOKEN: ${{ github.token }}
+      REPORT_PATH: reports/hf-release-readiness-v2-latest.json
+    steps:
+      - name: Checkout verifier
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 1
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: '3.12'
+
+      - name: Install exact CPU runtime and supported Hub clients
+        run: |
+          set -euo pipefail
+          python -m pip install --disable-pip-version-check \
+            --index-url https://download.pytorch.org/whl/cpu \
+            'torch==2.7.1'
+          python -m pip install --disable-pip-version-check \
+            'huggingface_hub>=1.3,<2' \
+            'kernels==0.16.0' \
+            'requests>=2.32,<3'
+
+      - name: Verify fail-closed source contract
+        run: |
+          set -euo pipefail
+          python -m py_compile \
+            .github/scripts/hf_release_readiness_v2.py \
+            .github/scripts/test_hf_release_readiness_v2.py
+          python .github/scripts/test_hf_release_readiness_v2.py
+          python - <<'PY'
+          import torch
+          assert torch.__version__.startswith('2.7.1'), torch.__version__
+          assert not torch.cuda.is_available(), 'readiness runner must use the CPU runtime'
+          print('torch runtime:', torch.__version__)
+          PY
+          git diff --check
+
+      - name: Verify current immutable Hub state
+        if: github.event_name != 'pull_request'
+        id: readiness
+        shell: bash
+        run: |
+          set +e
+          python .github/scripts/hf_release_readiness_v2.py \
+            --report "$REPORT_PATH" \
+            --generation "$GITHUB_SHA" \
+            --attempts 30 \
+            --retry-seconds 20
+          code=$?
+          echo "exit_code=${code}" >> "$GITHUB_OUTPUT"
+          exit 0
+
+      - name: Write pull-request evidence without external mutation
+        if: github.event_name == 'pull_request'
+        shell: bash
+        run: |
+          mkdir -p reports
+          python - <<'PY'
+          import json
+          import os
+          from datetime import datetime, timezone
+          from pathlib import Path
+          Path(os.environ['REPORT_PATH']).write_text(
+              json.dumps({
+                  'schema': 'szl.hf-release-readiness/v2-prerelease',
+                  'generation': os.environ.get('GITHUB_SHA'),
+                  'generated_at': datetime.now(timezone.utc).isoformat(),
+                  'publish': False,
+                  'source_tests': 'PASSED',
+                  'summary': {'ok': 1, 'warning': 0, 'error': 0},
+                  'boundary': 'No Hugging Face or issue mutation occurs on pull_request.',
+              }, indent=2, sort_keys=True) + '\n',
+              encoding='utf-8',
+          )
+          PY
+
+      - name: Upload immutable readiness report
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: hf-release-readiness-v2-${{ github.run_id }}
+          path: ${{ env.REPORT_PATH }}
+          if-no-files-found: error
+          retention-days: 90
+
+      - name: Persist and close deterministic evidence issues
+        if: always() && github.event_name != 'pull_request'
+        shell: bash
+        env:
+          EXIT_CODE: ${{ steps.readiness.outputs.exit_code }}
+        run: |
+          set -euo pipefail
+          test -f "$REPORT_PATH"
+          write_issue() {
+            title="$1"
+            marker="$2"
+            body="$(mktemp)"
+            {
+              echo "<!-- ${marker} -->"
+              echo "# ${title}"
+              echo
+              echo "- Run: ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
+              echo "- Source revision: \`${GITHUB_SHA}\`"
+              echo
+              echo '```json'
+              cat "$REPORT_PATH"
+              echo '```'
+            } > "$body"
+            number="$(gh issue list --repo "$GITHUB_REPOSITORY" --state all \
+              --search "${title} in:title" --json number,title \
+              --jq ".[] | select(.title == \"${title}\") | .number" | head -n1)"
+            if [ -n "$number" ]; then
+              gh issue edit "$number" --repo "$GITHUB_REPOSITORY" --body-file "$body"
+            else
+              gh issue create --repo "$GITHUB_REPOSITORY" --title "$title" \
+                --body-file "$body" >/dev/null
+              number="$(gh issue list --repo "$GITHUB_REPOSITORY" --state all \
+                --search "${title} in:title" --json number,title \
+                --jq ".[] | select(.title == \"${title}\") | .number" | head -n1)"
+            fi
+            if [ "${EXIT_CODE:-2}" = '0' ]; then
+              gh issue close "$number" --repo "$GITHUB_REPOSITORY" --reason completed \
+                --comment 'The live Lake Viewer returned HTTP 200 and both exact immutable kernel revisions passed selfcheck() under the pinned CPU torch27 runtime.' || true
+            else
+              gh issue reopen "$number" --repo "$GITHUB_REPOSITORY" || true
+            fi
+            rm -f "$body"
+          }
+          write_issue '[hf-release-finalization-report] Lake viewer and kernel selfchecks' \
+            'szl-hf-release-finalization-report'
+          write_issue '[hf-kernel-card-publish] first-class card contracts' \
+            'szl-hf-kernel-card-publish'
+
+      - name: Enforce real readiness result
+        if: always() && github.event_name != 'pull_request'
+        env:
+          EXIT_CODE: ${{ steps.readiness.outputs.exit_code }}
+        run: |
+          code="${EXIT_CODE:-2}"
+          if [ "$code" -ne 0 ]; then
+            echo "::error::HF release readiness v2 failed with exit ${code}."
+            exit "$code"
+          fi
+          echo 'Lake Viewer and both exact kernel selfchecks are operational.'
