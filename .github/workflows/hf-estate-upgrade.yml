@@ -1,6 +1,6 @@
 name: HF Estate — Canonical A11oy Verification
 
-# Permanent post-migration enforcement. Protected GitHub source is authoritative;
+# Permanent post-migration enforcement. Exact protected GitHub main is authoritative;
 # historical clone repositories must remain absent and are never adoption inputs.
 on:
   push:
@@ -62,23 +62,19 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
 
-      - name: Bind latest deploy-triggering A11oy revision
+      - name: Bind exact protected A11oy main revision
         id: source
         shell: bash
         run: |
           set -euo pipefail
-          expected="$(git -C a11oy-source log -1 --format=%H -- \
-            Dockerfile serve.py \
-            ':(glob)**/*.py' \
-            console pages web static static-vendor numerics src schemas corpus model_release \
-            ':(glob)*.html' knowledge.json README.md .github/workflows/hf-sync.yml)"
+          expected="$(git -C a11oy-source rev-parse HEAD)"
           if ! [[ "$expected" =~ ^[0-9a-f]{40}$ ]]; then
-            echo "::error::Could not derive exact deploy-triggering A11oy source revision."
+            echo "::error::Could not resolve exact protected A11oy main revision."
             exit 2
           fi
           echo "sha=$expected" >> "$GITHUB_OUTPUT"
           echo "A11OY_EXPECTED_GITHUB_SHA=$expected" >> "$GITHUB_ENV"
-          echo "Expected protected A11oy source: \`$expected\`" >> "$GITHUB_STEP_SUMMARY"
+          echo "Expected protected A11oy main: \`$expected\`" >> "$GITHUB_STEP_SUMMARY"
 
       - name: Determine execution mode
         id: mode
