@@ -26,11 +26,9 @@ LOUD on.
 
 What is asserted on EVERY surface (the non-negotiable honesty invariants):
 
-  1. The locked-proven formula set is EXACTLY the canonical five
-     {F1, F11, F12, F18, F19}. Not four, not six, not a swapped id.
-  2. The experimental source-present set is EXACTLY {F4, F7, F22} and is
-     explicitly labelled EXPERIMENTAL / NOT LOCKED.
-  3. The Λ = Conjecture 1 honesty label is present (Λ uniqueness is a
+  1. The locked-proven formula set is EXACTLY the canonical 8
+     {F1, F4, F7, F11, F12, F18, F19, F22}. Not 7, not 9, not a swapped id.
+  2. The Λ = Conjecture 1 honesty label is present (Λ uniqueness is a
      conjecture, never a theorem / never a pass-fail oracle).
 
 Plus, for the two surfaces that embed the byte-shared marker block (a11oy +
@@ -66,9 +64,8 @@ GH_API = "https://api.github.com"
 HF_HOST = "https://huggingface.co"
 UA = {"User-Agent": "anatomy-map-drift/1.0"}
 
-# Canonical formula maturity partition. The sets are exact and disjoint.
-CANONICAL_LOCKED = ("F1", "F11", "F12", "F18", "F19")
-CANONICAL_EXPERIMENTAL = ("F4", "F7", "F22")
+# The one canonical locked-proven set. Doctrine v11, kernel c7c0ba17.
+CANONICAL_LOCKED = ("F1", "F4", "F7", "F11", "F12", "F18", "F19", "F22")
 
 # Marker delimiters of the shared anatomy block (a11oy + killinchu).
 _BLOCK_START = "anatomy-map-tab-patch ::"
@@ -173,54 +170,37 @@ def _normalize_lambda(text):
     return text.replace("\\u039b", "Λ").replace("\\u039B", "Λ")
 
 
-# A run of >=5 comma-separated F-ids (the locked ladder, never the 3-id
-# experimental set). Tolerant of whitespace AND the quoted JS-array form.
+# A run of >=5 comma-separated F-ids (the locked LADDER, never a 3-id subset
+# like khipu's "F4, F7, F22"). Tolerant of whitespace AND the quoted JS-array
+# form ('F1', 'F4', ...) used by the HF Space's data.js.
 _FGROUP = re.compile(r"F\d+(?:['\"\s]*,['\"\s]*F\d+){4,}")
-_ANY_FGROUP = re.compile(r"F\d+(?:['\"\s]*,['\"\s]*F\d+)+")
-# Anchors that specifically denote the locked-five declaration.
+# Anchors that specifically denote the locked-EIGHT declaration (the "8" / "-8"
+# / "_proven" / "proven" qualifier disambiguates it from a plain "(locked)"
+# subset annotation).
 _LOCKED_ANCHOR = re.compile(
-    r"5\s*LOCKED|LOCKED[-\s]?5|locked[-\s]?five|locked_proven|locked[-\s]?proven|Locked\s+proven",
-    re.IGNORECASE,
-)
-_EXPERIMENTAL_ANCHOR = re.compile(
-    r"EXPERIMENTAL[^.\n]{0,80}NOT[-\s]?LOCKED|NOT[-\s]?LOCKED[^.\n]{0,80}EXPERIMENTAL",
+    r"8\s*LOCKED|LOCKED[-\s]?8|locked[-\s]?8|locked_proven|locked[-\s]?proven|Locked\s+proven",
     re.IGNORECASE,
 )
 
 
 def parse_locked_groups(text):
-    """Every locked-five formula group declared in ``text``.
+    """Every locked-EIGHT formula group declared in ``text``.
 
     Returns a list of tuples (sorted F-id tuple). The honest invariant is that
-    every such group equals the canonical five; a returned group that differs (a
-    swapped/dropped/added id) is drift. An empty list means the locked ladder
+    every such group equals the canonical 8; a returned group that differs (a
+    swapped/dropped/added id) is drift. An empty list means the locked-8 ladder
     declaration VANISHED from this surface -> also drift.
     """
     anchors = [(m.start(), m.end()) for m in _LOCKED_ANCHOR.finditer(text)]
     groups = []
     # Match the F-id group against the FULL text (never a sliced window, which
     # would truncate a group straddling the boundary and read as a phantom
-    # "dropped id"), then keep only groups that sit near a locked-five anchor.
+    # "dropped id"), then keep only groups that sit near a locked-8 anchor.
     for g in _FGROUP.finditer(text):
         gs = g.start()
         for (a_start, a_end) in anchors:
             if (a_start - 160) <= gs <= (a_end + 220):
                 ids = tuple(re.findall(r"F\d+", g.group(0)))
-                groups.append(_sorted_fids(ids))
-                break
-    return groups
-
-
-def parse_experimental_groups(text):
-    """Every exact 3-id group near an EXPERIMENTAL / NOT LOCKED declaration."""
-    anchors = [(m.start(), m.end()) for m in _EXPERIMENTAL_ANCHOR.finditer(text)]
-    groups = []
-    for group in _ANY_FGROUP.finditer(text):
-        ids = tuple(re.findall(r"F\d+", group.group(0)))
-        if len(ids) != 3:
-            continue
-        for anchor_start, anchor_end in anchors:
-            if (anchor_start - 220) <= group.start() <= (anchor_end + 220):
                 groups.append(_sorted_fids(ids))
                 break
     return groups
@@ -245,7 +225,7 @@ def parse_capabilities(block_text):
     Returns a list of (key, status, formulas) triples taken from the CAPS array
     (`k:'..'`, `s:'..'`, `f:'..'`). Used to compare a11oy<->killinchu, which
     embed the byte-shared block, so a one-sided edit to the capability/formula
-    list is caught even when the locked-five + Λ invariants still hold.
+    list is caught even when the locked-8 + Λ invariants still hold.
     """
     keys = re.findall(r"\bk:\s*'((?:[^'\\]|\\.)*)'", block_text)
     stats = re.findall(r"\bs:\s*'((?:[^'\\]|\\.)*)'", block_text)
@@ -273,7 +253,6 @@ def fingerprint(surface):
             out["errors"].append("anatomy marker block not found "
                                  f"({_BLOCK_START} .. {_BLOCK_END})")
             out["locked_groups"] = []
-            out["experimental_groups"] = []
             out["lambda_conjecture"] = False
             out["capabilities"] = None
             return out
@@ -283,7 +262,6 @@ def fingerprint(surface):
         scan = text
         out["capabilities"] = None
     out["locked_groups"] = parse_locked_groups(scan)
-    out["experimental_groups"] = parse_experimental_groups(scan)
     out["lambda_conjecture"] = has_lambda_conjecture(scan)
     return out
 
@@ -295,9 +273,6 @@ def evaluate(surfaces):
     fetched). Pure / network-free so the self-test can drive it with fixtures.
     """
     canon = _sorted_fids(CANONICAL_LOCKED)
-    canon_experimental = _sorted_fids(CANONICAL_EXPERIMENTAL)
-    if set(canon) & set(canon_experimental):
-        raise ValueError("locked and experimental formula sets must be disjoint")
     findings = []
     fps = [fingerprint(s) for s in surfaces]
 
@@ -306,25 +281,14 @@ def evaluate(surfaces):
             findings.append(f"[{fp['id']}] {e}")
         groups = fp["locked_groups"]
         if not groups:
-            findings.append(f"[{fp['id']}] no locked-five formula declaration "
+            findings.append(f"[{fp['id']}] no locked-8 formula declaration "
                             "found (the honesty ladder vanished from this surface)")
         for g in groups:
             if g != canon:
                 findings.append(
                     f"[{fp['id']}] locked-formula set drift: declares "
-                    f"{{{', '.join(g)}}} but the canonical locked-five is "
+                    f"{{{', '.join(g)}}} but the canonical locked-8 is "
                     f"{{{', '.join(canon)}}}")
-        experimental_groups = fp["experimental_groups"]
-        if not experimental_groups:
-            findings.append(
-                f"[{fp['id']}] no EXPERIMENTAL / NOT LOCKED formula declaration "
-                "found for the source-present experimental set")
-        for group in experimental_groups:
-            if group != canon_experimental:
-                findings.append(
-                    f"[{fp['id']}] experimental-formula set drift: declares "
-                    f"{{{', '.join(group)}}} but the canonical experimental "
-                    f"NOT LOCKED set is {{{', '.join(canon_experimental)}}}")
         if not fp["lambda_conjecture"]:
             findings.append(f"[{fp['id']}] Λ = Conjecture 1 honesty label is "
                             "missing (Λ uniqueness must never read as proven)")
@@ -344,25 +308,6 @@ def evaluate(surfaces):
             for sid, s in declared.items())
         findings.append("locked-formula set disagrees ACROSS surfaces: " + rendered)
 
-    declared_experimental = {}
-    for fp in fps:
-        unique = {group for group in fp["experimental_groups"]}
-        if unique:
-            declared_experimental[fp["id"]] = unique
-    all_experimental_sets = (
-        set().union(*declared_experimental.values())
-        if declared_experimental else set()
-    )
-    if len(all_experimental_sets) > 1:
-        rendered = "; ".join(
-            f"{surface_id}={{{', '.join(next(iter(groups)))}}}"
-            if len(groups) == 1 else f"{surface_id}=<multiple>"
-            for surface_id, groups in declared_experimental.items()
-        )
-        findings.append(
-            "experimental-formula set disagrees ACROSS surfaces: " + rendered
-        )
-
     # Capability-ladder agreement between the marker-block surfaces.
     cap_surfaces = [fp for fp in fps if fp["capabilities"] is not None]
     if len(cap_surfaces) >= 2:
@@ -376,14 +321,10 @@ def evaluate(surfaces):
 
     report = {
         "canonical_locked": list(canon),
-        "canonical_experimental": list(canon_experimental),
         "surfaces": [
             {
                 "id": fp["id"],
                 "locked_groups": [list(g) for g in fp["locked_groups"]],
-                "experimental_groups": [
-                    list(g) for g in fp["experimental_groups"]
-                ],
                 "lambda_conjecture": fp["lambda_conjecture"],
                 "capability_count": (len(fp["capabilities"])
                                      if fp["capabilities"] is not None else None),
@@ -467,11 +408,9 @@ def main(argv=None):
     args = ap.parse_args(argv)
 
     reg = load_registry(args.registry)
-    global CANONICAL_LOCKED, CANONICAL_EXPERIMENTAL
+    global CANONICAL_LOCKED
     if reg.get("canonical_locked"):
         CANONICAL_LOCKED = tuple(reg["canonical_locked"])
-    if reg.get("canonical_experimental"):
-        CANONICAL_EXPERIMENTAL = tuple(reg["canonical_experimental"])
 
     specs = reg["surfaces"]
     if args.only:
@@ -529,16 +468,14 @@ def main(argv=None):
 
     if code == 0:
         print("✓ SZL anatomy map is consistent across all surfaces: "
-              f"locked-five = {{{', '.join(report['canonical_locked'])}}}, "
-              "experimental/not-locked = "
-              f"{{{', '.join(report['canonical_experimental'])}}}, "
+              f"locked-8 = {{{', '.join(report['canonical_locked'])}}}, "
               "Λ = Conjecture 1 on every surface, capability ladder in sync.")
     else:
         print("::error::SZL anatomy-map DRIFT detected:")
         for f in report["findings"]:
             print(f"::error::  - {f}")
-        print("::error::Re-sync the divergent surface(s) so the locked-five ladder "
-              "{F1,F11,F12,F18,F19}; EXPERIMENTAL / NOT LOCKED {F4,F7,F22}, the Λ=Conjecture-1 label, and the "
+        print("::error::Re-sync the divergent surface(s) so the locked-8 ladder "
+              "{F1,F4,F7,F11,F12,F18,F19,F22}, the Λ=Conjecture-1 label, and the "
               "capability ladder match on a11oy /console, killinchu /elite, and "
               "the SZLHOLDINGS/anatomy HF Space.")
     return code

@@ -7,7 +7,7 @@ name: Anatomy-map cross-surface drift
 # SZLHOLDINGS/anatomy (data.js + index.html, the a-11-oy.com/anatomy-map mirror).
 # Each has its own pipeline, so the honesty doctrine can silently DRIFT between
 # them. This sweep fetches all three and fails LOUD the moment they diverge on:
-#   * the canonical locked-five ladder {F1,F11,F12,F18,F19}; EXPERIMENTAL / NOT LOCKED {F4,F7,F22}, and
+#   * the canonical locked-8 ladder {F1,F4,F7,F11,F12,F18,F19,F22}, and
 #   * the Λ = Conjecture 1 honesty label,
 # plus a capability-for-capability comparison of the byte-shared marker block
 # between a11oy and killinchu. Mirrors the org's other registry-driven drift
@@ -112,7 +112,7 @@ jobs:
           print(" | ".join(r.get("findings", [])) or "(see report)")
           ')"
           run_url="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
-          text=":rotating_light: SZL anatomy-map DRIFT: the honest anatomy map diverged across a11oy /console, killinchu /elite and/or the SZLHOLDINGS/anatomy HF Space (locked-five ladder, experimental/not-locked set, Λ=Conjecture-1 label, or capability list). ${drift} Run: ${run_url}"
+          text=":rotating_light: SZL anatomy-map DRIFT: the honest anatomy map diverged across a11oy /console, killinchu /elite and/or the SZLHOLDINGS/anatomy HF Space (locked-8 ladder, Λ=Conjecture-1 label, or capability list). ${drift} Run: ${run_url}"
           payload="$(python3 -c 'import json,sys; print(json.dumps({"text": sys.argv[1]}))' "$text")"
           code="$(curl -sS -o /dev/null -w '%{http_code}' -X POST -H 'Content-Type: application/json' -d "$payload" "$SLACK_WEBHOOK_URL" || echo 000)"
           echo "ntfy relay responded HTTP ${code}"
@@ -126,8 +126,8 @@ jobs:
               ;;
             1)
               echo "::error::Anatomy-map drift detected -- see the step output and"
-              echo "::error::.github/data/anatomy_map_report.json. Re-sync the locked-five"
-              echo "::error::ladder {F1,F11,F12,F18,F19}; EXPERIMENTAL / NOT LOCKED {F4,F7,F22}, the Λ=Conjecture-1"
+              echo "::error::.github/data/anatomy_map_report.json. Re-sync the locked-8"
+              echo "::error::ladder {F1,F4,F7,F11,F12,F18,F19,F22}, the Λ=Conjecture-1"
               echo "::error::label and the capability ladder across a11oy /console,"
               echo "::error::killinchu /elite and the SZLHOLDINGS/anatomy HF Space."
               exit 1
@@ -141,4 +141,3 @@ jobs:
               exit 1
               ;;
           esac
-
