@@ -293,7 +293,6 @@ def main() -> int:
         "errors": [],
     }
     token = os.environ.get("SZL_GITHUB_TOKEN", "").strip()
-    code = 1
     try:
         if not token:
             raise GateError("SZL_GITHUB_TOKEN is not configured")
