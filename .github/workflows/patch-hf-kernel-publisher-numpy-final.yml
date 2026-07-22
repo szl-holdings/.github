@@ -1,10 +1,14 @@
 name: Patch HF kernel publisher NumPy runtime final
 
-# Third branch touch after workflow registration; executes the exact narrow repair.
+# Run from the same-repository PR so the temporary bootstrap removes itself.
 on:
   push:
     branches:
       - fix/hf-kernel-publisher-numpy-runtime-final-20260722
+    paths:
+      - .github/workflows/patch-hf-kernel-publisher-numpy-final.yml
+  pull_request:
+    branches: [main]
     paths:
       - .github/workflows/patch-hf-kernel-publisher-numpy-final.yml
   workflow_dispatch: {}
@@ -18,6 +22,7 @@ concurrency:
 
 jobs:
   patch:
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -38,15 +43,15 @@ jobs:
           path = Path('.github/workflows/hf-kernel-card-publish-v2.yml')
           text = path.read_text(encoding='utf-8')
 
-          old_packages = '''          python -m pip install --disable-pip-version-check \
-            "huggingface_hub>=1.3,<2" \
-            "kernels==0.16.0" \
+          old_packages = '''          python -m pip install --disable-pip-version-check \\
+            "huggingface_hub>=1.3,<2" \\
+            "kernels==0.16.0" \\
             "pytest>=8,<9"
 '''
-          new_packages = '''          python -m pip install --disable-pip-version-check \
-            "huggingface_hub>=1.3,<2" \
-            "kernels==0.16.0" \
-            "numpy==2.2.6" \
+          new_packages = '''          python -m pip install --disable-pip-version-check \\
+            "huggingface_hub>=1.3,<2" \\
+            "kernels==0.16.0" \\
+            "numpy==2.2.6" \\
             "pytest>=8,<9"
 '''
           if text.count(old_packages) != 1:
