@@ -49,9 +49,6 @@ def _epoch(value: Any) -> float:
     return parsed.timestamp()
 
 
-_modified_epoch = _epoch
-
-
 def _stage(detail: dict[str, Any]) -> str:
     runtime = detail.get("runtime") or {}
     value = runtime.get("stage") or runtime.get("status") or "UNKNOWN"
