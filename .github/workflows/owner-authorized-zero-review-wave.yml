@@ -1,0 +1,235 @@
+name: Owner-authorized zero-review exact merge wave
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - .github/data/owner_authorized_merge_wave.json
+      - .github/scripts/owner_authorized_merge_wave.py
+      - .github/scripts/owner_authorized_merge_wave_v2.py
+      - .github/scripts/set_exact_merge_review_count_zero.py
+      - .github/workflows/owner-authorized-zero-review-wave.yml
+  push:
+    branches: [main]
+    paths:
+      - .github/data/owner_authorized_merge_wave.json
+      - .github/scripts/owner_authorized_merge_wave.py
+      - .github/scripts/owner_authorized_merge_wave_v2.py
+      - .github/scripts/set_exact_merge_review_count_zero.py
+      - .github/workflows/owner-authorized-zero-review-wave.yml
+  workflow_dispatch:
+    inputs:
+      execute:
+        description: Set approval counts to zero and merge the exact green manifest
+        required: true
+        default: false
+        type: boolean
+
+permissions:
+  contents: read
+  issues: write
+
+concurrency:
+  group: owner-authorized-zero-review-wave
+  cancel-in-progress: false
+
+jobs:
+  validate:
+    name: Validate zero-review exact merge implementation
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: '3.12'
+      - name: Compile and validate exact manifest
+        run: |
+          set -euo pipefail
+          python -m py_compile \
+            .github/scripts/owner_authorized_merge_wave.py \
+            .github/scripts/owner_authorized_merge_wave_v2.py \
+            .github/scripts/set_exact_merge_review_count_zero.py
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          manifest = json.loads(Path('.github/data/owner_authorized_merge_wave.json').read_text())
+          assert manifest['schema'] == 'szl.owner-authorized-merge-wave/v1'
+          assert manifest['base_branch'] == 'main'
+          targets = manifest['targets']
+          assert targets and len(targets) == len({(t['repository'], t['pull_request']) for t in targets})
+          for target in targets:
+              assert len(target['expected_head_sha']) == 40
+              int(target['expected_head_sha'], 16)
+              assert target['merge_method'] in {'squash', 'merge', 'rebase'}
+          print(f'validated {len(targets)} exact targets')
+          PY
+
+  execute:
+    name: Set exact approval counts to zero, then merge green heads
+    if: >-
+      github.event_name == 'push' ||
+      (github.event_name == 'workflow_dispatch' && inputs.execute)
+    needs: validate
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      SZL_GITHUB_TOKEN: ${{ secrets.SZL_GITHUB_TOKEN }}
+      GH_TOKEN: ${{ github.token }}
+      REPORT_ISSUE_TITLE: '[merge-wave-report] owner-authorized exact-SHA wave'
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: '3.12'
+      - name: Verify repo-admin secret is configured
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "${SZL_GITHUB_TOKEN:-}" || {
+            cat > review-count-zero-report.json <<JSON
+          {
+            "schema": "szl.exact-merge-review-count-report/v1",
+            "generated_at": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
+            "execute": true,
+            "ok": false,
+            "errors": ["GateError: SZL_GITHUB_TOKEN is not configured"]
+          }
+          JSON
+            cat > owner-authorized-merge-report.json <<JSON
+          {
+            "schema": "szl.owner-authorized-merge-report/v1",
+            "generated_at": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
+            "execute": true,
+            "ok": false,
+            "targets": [],
+            "errors": ["GateError: SZL_GITHUB_TOKEN is not configured"]
+          }
+          JSON
+            echo 'EXECUTION_EXIT=2' >> "$GITHUB_ENV"
+            exit 0
+          }
+      - name: Set exact required approval counts to zero
+        if: env.EXECUTION_EXIT == ''
+        shell: bash
+        run: |
+          set +e
+          python .github/scripts/set_exact_merge_review_count_zero.py \
+            --manifest .github/data/owner_authorized_merge_wave.json \
+            --report review-count-zero-report.json \
+            --execute
+          code=$?
+          if [ "$code" -ne 0 ]; then
+            python - <<'PY'
+          import json
+          from datetime import datetime, timezone
+          from pathlib import Path
+          path = Path('review-count-zero-report.json')
+          detail = path.read_text(encoding='utf-8') if path.exists() else 'review-count report missing'
+          Path('owner-authorized-merge-report.json').write_text(
+              json.dumps({
+                  'schema': 'szl.owner-authorized-merge-report/v1',
+                  'generated_at': datetime.now(timezone.utc).isoformat(),
+                  'execute': True,
+                  'ok': False,
+                  'targets': [],
+                  'errors': ['GateError: exact review-count migration failed', detail],
+              }, indent=2) + '\n',
+              encoding='utf-8',
+          )
+          PY
+            echo "EXECUTION_EXIT=$code" >> "$GITHUB_ENV"
+          fi
+          exit 0
+      - name: Execute fail-closed exact-head merge wave
+        if: env.EXECUTION_EXIT == ''
+        shell: bash
+        run: |
+          set +e
+          python .github/scripts/owner_authorized_merge_wave_v2.py \
+            --manifest .github/data/owner_authorized_merge_wave.json \
+            --report owner-authorized-merge-report.json \
+            --execute
+          code=$?
+          echo "EXECUTION_EXIT=$code" >> "$GITHUB_ENV"
+          exit 0
+      - name: Upload immutable reports
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: owner-authorized-zero-review-merge-report
+          path: |
+            review-count-zero-report.json
+            owner-authorized-merge-report.json
+          if-no-files-found: error
+      - name: Persist reports in deterministic issue
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -f review-count-zero-report.json
+          test -f owner-authorized-merge-report.json
+          run_url="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
+          {
+            echo '<!-- szl-owner-authorized-merge-report -->'
+            echo '# Owner-authorized exact-SHA merge wave'
+            echo
+            echo "- Run: ${run_url}"
+            echo "- Source revision: \`${GITHUB_SHA}\`"
+            echo "- Event: \`${GITHUB_EVENT_NAME}\`"
+            echo
+            echo '## Required approval count migration'
+            echo '```json'
+            cat review-count-zero-report.json
+            echo '```'
+            echo
+            echo '## Merge report'
+            echo '```json'
+            cat owner-authorized-merge-report.json
+            echo '```'
+          } > /tmp/merge-wave-issue.md
+          issue_number="$(gh issue list \
+            --repo "$GITHUB_REPOSITORY" \
+            --state all \
+            --search "${REPORT_ISSUE_TITLE} in:title" \
+            --json number,title \
+            --jq ".[] | select(.title == env.REPORT_ISSUE_TITLE) | .number" \
+            | head -n1)"
+          if [ -n "$issue_number" ]; then
+            gh issue edit "$issue_number" --repo "$GITHUB_REPOSITORY" --body-file /tmp/merge-wave-issue.md
+            if [ "${EXECUTION_EXIT:-1}" = "0" ]; then
+              gh issue close "$issue_number" \
+                --repo "$GITHUB_REPOSITORY" \
+                --reason completed \
+                --comment 'Exact green heads merged after the owner-authorized approval-count migration.' || true
+            else
+              gh issue reopen "$issue_number" --repo "$GITHUB_REPOSITORY" || true
+            fi
+          else
+            gh issue create --repo "$GITHUB_REPOSITORY" --title "$REPORT_ISSUE_TITLE" --body-file /tmp/merge-wave-issue.md
+          fi
+      - name: Add reports to job summary
+        if: always()
+        run: |
+          {
+            echo '## Required approval count migration'
+            echo '```json'
+            cat review-count-zero-report.json
+            echo '```'
+            echo
+            echo '## Exact-head merge wave'
+            echo '```json'
+            cat owner-authorized-merge-report.json
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+      - name: Enforce fail-closed result
+        if: always()
+        run: |
+          code="${EXECUTION_EXIT:-2}"
+          if [ "$code" -ne 0 ]; then
+            echo "::error::Zero-review exact-head wave failed closed with exit ${code}; see issue #218 and the uploaded artifact."
+            exit "$code"
+          fi
+          echo 'Owner-authorized zero-review exact-head wave completed successfully.'
