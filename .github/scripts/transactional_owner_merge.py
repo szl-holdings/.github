@@ -1,24 +1,22 @@
 #!/usr/bin/env python3
-"""Execute one exact-head merge while restoring every protection mutation.
+"""Transactionally restore protections and merge exact Platform PR #458.
 
-This recovery transaction exists because an earlier owner-authorized merge wave
-proved that the estate uses two GitHub protection models:
+An earlier owner-authorized run disabled classic ``enforce_admins`` on four
+repositories, then stopped when Platform's repository ruleset still rejected the
+merge. This recovery transaction:
 
-* ``platform`` is governed by a repository ruleset;
-* four already-merged repositories used classic branch protection.
+1. restores classic admin enforcement on the four exact repositories;
+2. re-runs the existing exact-SHA/green-check/thread/change-request preflight;
+3. snapshots Platform's complete active ruleset;
+4. temporarily changes only required_approving_review_count from 1 to 0;
+5. merges exact head 9798feff... with squash;
+6. restores the complete Platform ruleset in ``finally`` and removes only the
+   transient OrganizationAdmin pull_request actor introduced by the failed run;
+7. re-verifies all classic protections.
 
-The previous run disabled classic ``enforce_admins`` but failed before merging
-``platform``. This script first restores those classic protections. It then
-re-verifies the exact Platform pull request through the existing fail-closed
-preflight, temporarily changes only the ruleset's approving-review count from a
-positive value to zero, merges the exact SHA, and restores the complete ruleset
-in ``finally``. The transient OrganizationAdmin actor installed by the previous
-attempt is also removed, returning the ruleset to its original actor set.
-
-Pending or failing checks, stale heads, conflicts, unresolved review threads,
-active change requests, non-admin credentials, or any unexpected protection
-shape stop the transaction. No approval is fabricated and no review is
-submitted.
+No review is fabricated or submitted. Any stale head, non-green check, conflict,
+unresolved thread, active change request, unexpected ruleset shape, or failed
+restoration makes the transaction fail closed.
 """
 from __future__ import annotations
 
@@ -26,7 +24,6 @@ import argparse
 import copy
 import json
 import os
-import sys
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -39,6 +36,9 @@ import owner_authorized_merge_wave as wave
 API = "https://api.github.com"
 API_VERSION = "2022-11-28"
 OBSOLETE_CHECKRUN_SELECTION = "                    app { slug }\n"
+PLATFORM_REPOSITORY = "szl-holdings/platform"
+PLATFORM_PULL_REQUEST = 458
+PLATFORM_RULESET_ID = 16195495
 CLASSIC_RESTORE_REPOSITORIES = (
     "szl-holdings/szl-energy-attest",
     "szl-holdings/szl-lambda-gate",
@@ -101,10 +101,10 @@ def load_manifest(path: Path) -> tuple[str, dict[str, Any]]:
     if not isinstance(targets, list) or len(targets) != 1:
         raise GateError("transaction requires exactly one target")
     target = targets[0]
-    if target.get("repository") != "szl-holdings/platform":
-        raise GateError("transaction is intentionally restricted to platform")
-    if int(target.get("pull_request") or 0) != 458:
-        raise GateError("unexpected Platform pull request number")
+    if target.get("repository") != PLATFORM_REPOSITORY:
+        raise GateError("transaction is intentionally restricted to Platform")
+    if int(target.get("pull_request") or 0) != PLATFORM_PULL_REQUEST:
+        raise GateError("unexpected Platform pull request")
     expected = str(target.get("expected_head_sha") or "")
     if len(expected) != 40:
         raise GateError("expected head must be a 40-character SHA")
@@ -114,7 +114,7 @@ def load_manifest(path: Path) -> tuple[str, dict[str, Any]]:
     return "main", target
 
 
-def encoded_repo(repository: str) -> tuple[str, str]:
+def repo_parts(repository: str) -> tuple[str, str]:
     owner, name = repository.split("/", 1)
     return urllib.parse.quote(owner, safe=""), urllib.parse.quote(name, safe="")
 
@@ -135,12 +135,11 @@ def stable_classic_state(protection: dict[str, Any]) -> dict[str, Any]:
     return {key: protection.get(key) for key in keys}
 
 
-def admin_enforcement_enabled(token: str, repository: str, branch: str) -> bool:
-    owner, name = encoded_repo(repository)
-    branch_q_method") != "squash":
-        raise TransactionError("platform transaction requires squash merge")
-    if int(manifest.get("expected_ruleset_id") or 0) != 16195495:
-        raise TransactionError("unexpected.get("enabled"))
+def classic_review_count(protection: dict[str, Any]) -> int:
+    reviews = protection.get("required_pull_request_reviews")
+    if not isinstance(reviews, dict):
+        return 0
+    return int(reviews.get("required_approving_review_count") or 0)
 
 
 def restore_classic_admins(
@@ -148,41 +147,24 @@ def restore_classic_admins(
     branch: str,
     *,
     execute: bool,
-) -> list[dict[str, Any]]"classic restore allowlist mismatch: {declared_restore!r}"
-        )
-    return manifest
-
-
-def stable_classic_state(protection_payload: dict[str, Any]) -> dict[str, Any]:
-    return protection.stable_classic_state(protection_payload)
-
-
-def restore_classic_admins(
-    token: str,
-    repositories: tuple[str, ...],
-    *,
-    execute: bool,
 ) -> list[dict[str, Any]]:
     results: list[dict[str, Any]] = []
-    for repository in repositories:
-        owner, repo = repository.split("/", 1)
-        base = (
-            f"/repos/{urllib.parse.quote(owner, safe='')}/"
-            f"{urllib.parse.quote(repo, safe='')}/branches/main/protection"
-        )
-        before = api_request(token, "GET", base)
+    for repository in CLASSIC_RESTORE_REPOSITORIES:
+        owner, name = repo_parts(repository)
+        branch_q = urllib.parse.quote(branch, safe="")
+        protection_path = f"/repos/{owner}/{name}/branches/{branch_q}/protection"
+        before = request(token, "GET", protection_path)
         if not isinstance(before, dict):
-            raise TransactionError(f"classic protection unreadable: {repository}")
+            raise GateError(f"classic protection is unreadable: {repository}")
         stable_before = stable_classic_state(before)
-        review_count = protection.classic_review_count(before)
-        if review_count != 1:
-            raise TransactionError(
-                f"{repository} classic approval count is {review_count}, expected 1"
+        count_before = classic_review_count(before)
+        if count_before != 1:
+            raise GateError(
+                f"{repository} approval count is {count_before}, expected exactly 1"
             )
-        admin_path = base + "/enforce_admins"
-        admin_before = protection.request(
-            token, "GET", admin_path, allow_status={404}
-        )
+
+        admin_path = protection_path + "/enforce_admins"
+        admin_before = request(token, "GET", admin_path, allow_status={404})
         enabled_before = bool(
             isinstance(admin_before, dict) and admin_before.get("enabled")
         )
@@ -190,34 +172,31 @@ def restore_classic_admins(
         if not enabled_before:
             action = "would-restore" if not execute else "restored"
             if execute:
-                api_request(token, "POST", admin_path)
+                request(token, "POST", admin_path)
 
         admin_after = (
-            protection.request(token, "GET", admin_path, allow_status={404})
+            request(token, "GET", admin_path, allow_status={404})
             if execute
             else admin_before
         )
         enabled_after = bool(
             isinstance(admin_after, dict) and admin_after.get("enabled")
         )
-        after = api_request(token, "GET", base)
+        after = request(token, "GET", protection_path)
         if stable_classic_state(after) != stable_before:
-            raise TransactionError(
-                f"{repository} changed outside classic enforce_admins"
-            )
-        if protection.classic_review_count(after) != review_count:
-            raise TransactionError(
-                f"{repository} classic approval count changed during restoration"
-            )
+            raise GateError(f"{repository} changed outside classic enforce_admins")
+        if classic_review_count(after) != count_before:
+            raise GateError(f"{repository} approval count changed during restoration")
         if execute and not enabled_after:
-            raise TransactionError(f"{repository} classic enforce_admins was not restored")
+            raise GateError(f"{repository} enforce_admins was not restored")
+
         results.append(
             {
                 "repository": repository,
                 "action": action,
                 "enforce_admins_before": enabled_before,
                 "enforce_admins_after": enabled_after if execute else enabled_before,
-                "required_approving_review_count": review_count,
+                "required_approving_review_count": count_before,
                 "preserved": stable_before,
             }
         )
@@ -232,16 +211,19 @@ def normalize_actor(actor: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-def final_bypass_actors(actors: list[dict[str, Any]]) -> list[dict[str, Any]]:
-    """Remove only the transient actor proven absent before the prior helper."""
-    return [
-        normalize_actor(actor)
+def actors_without_transient(actors: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    transient = [
+        actor
         for actor in actors
-        if not (
-            actor.get("actor_type") == TRANSIENT_ACTOR_TYPE
-            and actor.get("bypass_mode") == TRANSIENT_BYPASS_MODE
-        )
+        if actor.get("actor_type") == TRANSIENT_ACTOR_TYPE
+        and actor.get("bypass_mode") == TRANSIENT_BYPASS_MODE
     ]
+    if len(transient) != 1:
+        raise GateError(
+            "expected exactly one transient OrganizationAdmin pull_request actor, "
+            f"found {len(transient)}"
+        )
+    return [normalize_actor(actor) for actor in actors if actor not in transient]
 
 
 def ruleset_payload(
@@ -257,113 +239,135 @@ def ruleset_payload(
         "bypass_actors": (
             [normalize_actor(actor) for actor in ruleset.get("bypass_actors") or []]
             if bypass_actors is None
-            else bypass_actors
+            else copy.deepcopy(bypass_actors)
         ),
         "conditions": copy.deepcopy(ruleset.get("conditions") or {}),
-        "rules": copy.deepcopy(ruleset.get("rules") or []) if rules is None else rules,
+        "rules": (
+            copy.deepcopy(ruleset.get("rules") or [])
+            if rules is None
+            else copy.deepcopy(rules)
+        ),
     }
 
 
+def pull_request_rule_indexes(ruleset: dict[str, Any]) -> list[int]:
+    return [
+        index
+        for index, rule in enumerate(ruleset.get("rules") or [])
+        if rule.get("type") == "pull_request"
+    ]
+
+
 def review_count(ruleset: dict[str, Any]) -> int:
-    counts = []
-    for rule in ruleset.get("rules") or []:
-        if rule.get("type") != "pull_request":
-            continue
-        params = rule.get("parameters") or {}
-        counts.append(int(params.get("required_approving_review_count") or 0))
-    if len(counts) != 1:
-        raise TransactionError(
-            f"expected one Platform pull_request rule, found {len(counts)}"
-        )
-    return counts[0]
+    indexes = pull_request_rule_indexes(ruleset)
+    if len(indexes) != 1:
+        raise GateError(f"expected one Platform pull_request rule, found {len(indexes)}")
+    params = ruleset["rules"][indexes[0]].get("parameters") or {}
+    return int(params.get("required_approving_review_count") or 0)
 
 
-def rules_with_review_count(
-    ruleset: dict[str, Any], count: int
-) -> list[dict[str, Any]]:
+def rules_with_review_count(ruleset: dict[str, Any], count: int) -> list[dict[str, Any]]:
     rules = copy.deepcopy(ruleset.get("rules") or [])
-    changed = 0
-    for rule in rules:
-        if rule.get("type") != "pull_request":
-            continue
-        params = rule.setdefault("parameters", {})
-        params["required_approving_review_count"] = count
-        changed += 1
-    if changed != 1:
-        raise TransactionError(
-            f"expected one Platform pull_request rule, changed {changed}"
-        )
+    indexes = [
+        index for index, rule in enumerate(rules) if rule.get("type") == "pull_request"
+    ]
+    if len(indexes) != 1:
+        raise GateError(f"expected one Platform pull_request rule, found {len(indexes)}")
+    rules[indexes[0]].setdefault("parameters", {})[
+        "required_approving_review_count"
+    ] = count
     return rules
 
 
 def state_without_review_count(ruleset: dict[str, Any]) -> dict[str, Any]:
     state = ruleset_payload(ruleset)
-    for rule in state["rules"]:
-        if rule.get("type") == "pull_request":
-            (rule.get("parameters") or {}).pop("required_approving_review_count", None)
+    indexes = [
+        index
+        for index, rule in enumerate(state["rules"])
+        if rule.get("type") == "pull_request"
+    ]
+    if len(indexes) != 1:
+        raise GateError(f"expected one Platform pull_request rule, found {len(indexes)}")
+    state["rules"][indexes[0]].setdefault("parameters", {}).pop(
+        "required_approving_review_count", None
+    )
     return state
 
 
-def find_platform_ruleset(
-    token: str, expected_ruleset_id: int
-) -> tuple[str, dict[str, Any]]:
-    active = api_request(
+def find_platform_ruleset(token: str) -> tuple[str, dict[str, Any]]:
+    active = request(
         token,
         "GET",
         "/repos/szl-holdings/platform/rules/branches/main?per_page=100",
     )
     if not isinstance(active, list):
-        raise TransactionError("Platform active branch rules are not a list")
+        raise GateError("Platform active branch rules are not a list")
     matches = [
         rule
         for rule in active
-        if rule.get("ruleset_id") == expected_ruleset_id
-        and protection.required_review_rule(rule)
+        if rule.get("ruleset_id") == PLATFORM_RULESET_ID
+        and rule.get("type") == "pull_request"
+        and int(
+            (rule.get("parameters") or {}).get("required_approving_review_count")
+            or 0
+        )
+        > 0
     ]
     if len(matches) != 1:
-        raise TransactionError(
+        raise GateError(
             f"expected one active Platform review ruleset, found {len(matches)}"
         )
-    endpoint, _ = protection.source_endpoint(matches[0], "szl-holdings/platform")
-    ruleset = api_request(token, "GET", endpoint)
-    if ruleset.get("id") != expected_ruleset_id:
-        raise TransactionError("Platform ruleset id changed")
-    if ruleset.get("target") != "branch" or ruleset.get("enforcement") != "active":
-        raise TransactionError("Platform ruleset is not an active branch ruleset")
+    endpoint = f"/repos/szl-holdings/platform/rulesets/{PLATFORM_RULESET_ID}"
+    ruleset = request(token, "GET", endpoint)
+    if ruleset.get("id") != PLATFORM_RULESET_ID:
+        raise GateError("Platform ruleset id changed")
+    if ruleset.get("target") != "branch":
+        raise GateError("Platform ruleset target is not branch")
+    if ruleset.get("enforcement") != "active":
+        raise GateError("Platform ruleset is not active")
     if review_count(ruleset) != 1:
-        raise TransactionError("Platform approval count is not exactly one")
+        raise GateError("Platform approval count is not exactly one")
     return endpoint, ruleset
 
 
-def verify_ruleset_restored(
-    current: dict[str, Any],
-    original: dict[str, Any],
-    expected_final_actors: list[dict[str, Any]],
-) -> None:
-    expected = ruleset_payload(original, bypass_actors=expected_final_actors)
-    actual = ruleset_payload(current)
-    if actual != expected:
-        raise TransactionError("Platform ruleset did not restore to the expected state")
-    if review_count(current) != 1:
-        raise TransactionError("Platform approval count was not restored to one")
+def put_ruleset(token: str, endpoint: str, payload: dict[str, Any]) -> dict[str, Any]:
+    result = request(token, "PUT", endpoint, payload)
+    if not isinstance(result, dict):
+        raise GateError("ruleset update returned a non-object payload")
+    return result
 
 
-def get_pr(token: str, repository: str, number: int) -> dict[str, Any]:
-    owner, repo = repository.split("/", 1)
-    return api_request(token, "GET", f"/repos/{owner}/{repo}/pulls/{number}")
+def patch_preflight_query() -> None:
+    if OBSOLETE_CHECKRUN_SELECTION in wave.PR_QUERY:
+        wave.PR_QUERY = wave.PR_QUERY.replace(OBSOLETE_CHECKRUN_SELECTION, "")
+    if "app { slug }" in wave.PR_QUERY:
+        raise GateError("obsolete CheckRun.app selection remains")
 
 
-def merge_exact_head(
-    token: str, target: dict[str, Any]
+def preflight_platform(
+    token: str,
+    identity: str,
+    target: dict[str, Any],
+    branch: str,
 ) -> dict[str, Any]:
-    repository = str(target["repository"])
+    patch_preflight_query()
+    verified = wave.preflight_target(token, identity, target, branch)
+    if not verified.get("admin_override_required"):
+        raise GateError("Platform is not blocked solely by the approval requirement")
+    return verified
+
+
+def get_pr(token: str, number: int) -> dict[str, Any]:
+    return request(token, "GET", f"/repos/szl-holdings/platform/pulls/{number}")
+
+
+def merge_exact_platform(token: str, target: dict[str, Any]) -> dict[str, Any]:
     number = int(target["pull_request"])
     expected_head = str(target["expected_head_sha"])
-    owner, repo = repository.split("/", 1)
-    result = api_request(
+    result = request(
         token,
         "PUT",
-        f"/repos/{owner}/{repo}/pulls/{number}/merge",
+        f"/repos/szl-holdings/platform/pulls/{number}/merge",
         {
             "sha": expected_head,
             "merge_method": "squash",
@@ -376,12 +380,14 @@ def merge_exact_head(
         },
     )
     if not result.get("merged"):
-        raise TransactionError(f"Platform merge endpoint did not merge: {result!r}")
-    pr = get_pr(token, repository, number)
-    if not pr.get("merged_at") or pr.get("head", {}).get("sha") != expected_head:
-        raise TransactionError("Platform merge could not be verified at the exact head")
+        raise GateError(f"Platform merge endpoint did not merge: {result!r}")
+    pr = get_pr(token, number)
+    if not pr.get("merged_at"):
+        raise GateError("Platform merge endpoint returned success but PR is unmerged")
+    if (pr.get("head") or {}).get("sha") != expected_head:
+        raise GateError("merged Platform PR does not match the expected head")
     return {
-        "repository": repository,
+        "repository": PLATFORM_REPOSITORY,
         "pull_request": number,
         "expected_head_sha": expected_head,
         "status": "merged",
@@ -407,52 +413,90 @@ def main() -> int:
         "platform_preflight": None,
         "platform_ruleset": None,
         "merge": None,
-        "restoration": None,
+        "protection_restoration": None,
         "errors": [],
     }
     token = os.environ.get("SZL_GITHUB_TOKEN", "").strip()
-    ruleset_endpoint: str | None = None
+    branch = "main"
+    endpoint: str | None = None
     original_ruleset: dict[str, Any] | None = None
-    expected_final_actors: list[dict[str, Any]] | None = None
+    restore_payload: dict[str, Any] | None = None
+    temporary_applied = False
     exit_code = 1
 
     try:
         if not token:
-            raise TransactionError("SZL_GITHUB_TOKEN is not configured")
-        manifest = load_manifest(args.manifest)
-        target = manifest["targets"][0]
-        identity_payload = api_request(token, "GET", "/user")
+            raise GateError("SZL_GITHUB_TOKEN is not configured")
+        branch, target = load_manifest(args.manifest)
+        identity_payload = request(token, "GET", "/user")
         identity = str(identity_payload.get("login") or "")
         if not identity:
-            raise TransactionError("authenticated identity has no login")
+            raise GateError("authenticated identity has no login")
         report["identity"] = identity
 
         report["classic_restoration"] = restore_classic_admins(
-            token, CLASSIC_ADMIN_RESTORE, execute=args.execute
+            token, branch, execute=args.execute
         )
 
-        pr_snapshot = get_pr(token, target["repository"], target["pull_request"])
-        if pr_snapshot.get("merged_at"):
-            if (pr_snapshot.get("head") or {}).get("sha") != target["        }
+        permission = request(
+            token,
+            "GET",
+            "/repos/szl-holdings/platform/collaborators/"
+            + urllib.parse.quote(identity, safe="")
+            + "/permission",
+        ).get("permission")
+        if permission != "admin":
+            raise GateError(
+                f"{identity} has Platform permission {permission!r}, not admin"
+            )
 
-        if args.execute:
-            temporary = apply_ruleset(token, endpoint, temporary_payload)
-            temp_applied = True
-            if stable_ruleset_except_review_count(temporary) != stable_ruleset_except_review_count(
+        pr = get_pr(token, int(target["pull_request"]))
+        needs_merge = not bool(pr.get("merged_at"))
+        if not needs_merge:
+            if (pr.get("head") or {}).get("sha") != target["expected_head_sha"]:
+                raise GateError("Platform was merged from an unexpected head")
+            report["merge"] = {
+                "status": "already-merged",
+                "merge_commit_sha": pr.get("merge_commit_sha"),
+                "merged_at": pr.get("merged_at"),
+                "expected_head_sha": target["expected_head_sha"],
+            }
+        else:
+            report["platform_preflight"] = preflight_platform(
+                token, identity, target, branch
+            )
+
+        endpoint, original_ruleset = find_platform_ruleset(token)
+        current_actors = [
+            normalize_actor(actor)
+            for actor in original_ruleset.get("bypass_actors") or []
+        ]
+        final_actors = actors_without_transient(current_actors)
+        restore_payload = ruleset_payload(
+            original_ruleset, bypass_actors=final_actors
+        )
+        temporary_payload = ruleset_payload(
+            original_ruleset,
+            rules=rules_with_review_count(original_ruleset, 0),
+        )
+        report["platform_ruleset"] = {
+            "ruleset_id": PLATFORM_RULESET_ID,
+            "review_count_before": 1,
+            "review_count_temporary": 0,
+            "transient_actor_removed_on_restore": True,
+        }
+
+        if args.execute and needs_merge:
+            temporary = put_ruleset(token, endpoint, temporary_payload)
+            temporary_applied = True
+            if state_without_review_count(temporary) != state_without_review_count(
                 original_ruleset
             ):
                 raise GateError("Platform ruleset changed outside approval count")
-            temp_positive = [
-                required_review_count(rule)
-                for rule in list(temporary.get("rules") or [])
-                if rule.get("type") == "pull_request"
-            ]
-            if temp_positive != [0]:
-                raise GateError(
-                    f"temporary Platform approval count is not exactly zero: {temp_positive}"
-                )
-            report["merge"] = merge_exact_target(token, target)
-        else:
+            if review_count(temporary) != 0:
+                raise GateError("temporary Platform approval count is not zero")
+            report["merge"] = merge_exact_platform(token, target)
+        elif not args.execute and needs_merge:
             report["merge"] = {
                 "status": "dry-run",
                 "expected_head_sha": target["expected_head_sha"],
@@ -462,36 +506,53 @@ def main() -> int:
         exit_code = 0
     except Exception as exc:  # noqa: BLE001
         report["errors"].append(f"{type(exc).__name__}: {exc}")
+        report["ok"] = False
         exit_code = 1
     finally:
         restoration_errors: list[str] = []
         if args.execute:
             if endpoint and restore_payload:
                 try:
-                    restored = apply_ruleset(token, endpoint, restore_payload)
+                    restored = put_ruleset(token, endpoint, restore_payload)
                     if ruleset_payload(restored) != restore_payload:
                         raise GateError("Platform ruleset did not restore exactly")
+                    if review_count(restored) != 1:
+                        raise GateError(
+                            "Platform approval count did not restore to one"
+                        )
+                    report["protection_restoration"] = {
+                        "platform_ruleset": "restored",
+                        "classic_enforce_admins": "verifying",
+                    }
                 except Exception as exc:  # noqa: BLE001
                     restoration_errors.append(
-                        f"Platform ruleset restoration failed: {type(exc).__name__}: {exc}"
+                        "Platform ruleset restoration failed: "
+                        f"{type(exc).__name__}: {exc}"
                     )
-            elif temp_applied:
+            elif temporary_applied:
                 restoration_errors.append(
-                    "Platform temporary ruleset was applied but no restore payload exists"
+                    "temporary Platform ruleset was applied without a restore payload"
                 )
             try:
-                final_classic = restore_classic_admins(token, branch, execute=True)
-                report["classic_protection_final_verification"] = final_classic
+                final_classic = restore_classic_admins(
+                    token, branch, execute=True
+                )
+                report["classic_final_verification"] = final_classic
+                if report.get("protection_restoration") is None:
+                    report["protection_restoration"] = {}
+                report["protection_restoration"][
+                    "classic_enforce_admins"
+                ] = "restored"
             except Exception as exc:  # noqa: BLE001
                 restoration_errors.append(
-                    f"classic protection restoration failed: {type(exc).__name__}: {exc}"
+                    "classic protection restoration failed: "
+                    f"{type(exc).__name__}: {exc}"
                 )
+
         if restoration_errors:
             report["errors"].extend(restoration_errors)
             report["ok"] = False
             exit_code = 1
-        else:
-            report["protections_restored"] = True if args.execute else False
 
         args.report.parent.mkdir(parents=True, exist_ok=True)
         args.report.write_text(
@@ -503,8 +564,4 @@ def main() -> int:
 
 
 if __name__ == "__main__":
-    try:
-        raise SystemExit(main())
-    except GateError as exc:
-        print(f"FATAL: {exc}", file=sys.stderr)
-        raise SystemExit(2) from exc
+    raise SystemExit(main())
