@@ -1,5 +1,6 @@
 name: Execute bounded Dataset Viewer retry repair
 
+# Second protected-main touch after workflow registration; executes the exact repair.
 on:
   push:
     branches: [main]
