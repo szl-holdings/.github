@@ -23,6 +23,7 @@ on:
 
 permissions:
   contents: read
+  issues: write
 
 concurrency:
   group: owner-authorized-merge-wave
@@ -67,6 +68,8 @@ jobs:
     timeout-minutes: 15
     env:
       SZL_GITHUB_TOKEN: ${{ secrets.SZL_GITHUB_TOKEN }}
+      GH_TOKEN: ${{ github.token }}
+      REPORT_ISSUE_TITLE: '[merge-wave-report] owner-authorized exact-SHA wave'
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
@@ -78,15 +81,32 @@ jobs:
         run: |
           set -euo pipefail
           test -n "${SZL_GITHUB_TOKEN:-}" || {
-            echo '::error::SZL_GITHUB_TOKEN is not configured for the organization control repository.'
-            exit 2
+            mkdir -p reports
+            cat > owner-authorized-merge-report.json <<JSON
+          {
+            "schema": "szl.owner-authorized-merge-report/v1",
+            "generated_at": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
+            "execute": true,
+            "ok": false,
+            "targets": [],
+            "errors": ["GateError: SZL_GITHUB_TOKEN is not configured"]
+          }
+          JSON
+            echo 'EXECUTION_EXIT=2' >> "$GITHUB_ENV"
+            exit 0
           }
       - name: Execute fail-closed merge wave
+        if: env.EXECUTION_EXIT == ''
+        shell: bash
         run: |
+          set +e
           python .github/scripts/owner_authorized_merge_wave.py \
             --manifest .github/data/owner_authorized_merge_wave.json \
             --report owner-authorized-merge-report.json \
             --execute
+          code=$?
+          echo "EXECUTION_EXIT=$code" >> "$GITHUB_ENV"
+          exit 0
       - name: Upload immutable merge report
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
@@ -94,6 +114,50 @@ jobs:
           name: owner-authorized-merge-report
           path: owner-authorized-merge-report.json
           if-no-files-found: error
+      - name: Persist report in deterministic GitHub issue
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -f owner-authorized-merge-report.json
+          run_url="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
+          {
+            echo '<!-- szl-owner-authorized-merge-report -->'
+            echo '# Owner-authorized exact-SHA merge wave'
+            echo
+            echo "- Run: ${run_url}"
+            echo "- Source revision: \`${GITHUB_SHA}\`"
+            echo "- Event: \`${GITHUB_EVENT_NAME}\`"
+            echo
+            echo '```json'
+            cat owner-authorized-merge-report.json
+            echo '```'
+          } > /tmp/merge-wave-issue.md
+          issue_number="$(gh issue list \
+            --repo "$GITHUB_REPOSITORY" \
+            --state all \
+            --search "${REPORT_ISSUE_TITLE} in:title" \
+            --json number,title \
+            --jq ".[] | select(.title == env.REPORT_ISSUE_TITLE) | .number" \
+            | head -n1)"
+          if [ -n "$issue_number" ]; then
+            gh issue edit "$issue_number" \
+              --repo "$GITHUB_REPOSITORY" \
+              --body-file /tmp/merge-wave-issue.md
+            if [ "${EXECUTION_EXIT:-1}" = "0" ]; then
+              gh issue close "$issue_number" \
+                --repo "$GITHUB_REPOSITORY" \
+                --reason completed \
+                --comment 'Exact-head merge wave completed successfully; report updated above.' || true
+            else
+              gh issue reopen "$issue_number" --repo "$GITHUB_REPOSITORY" || true
+            fi
+          else
+            gh issue create \
+              --repo "$GITHUB_REPOSITORY" \
+              --title "$REPORT_ISSUE_TITLE" \
+              --body-file /tmp/merge-wave-issue.md
+          fi
       - name: Add report to job summary
         if: always()
         run: |
@@ -105,3 +169,12 @@ jobs:
               echo '```'
             } >> "$GITHUB_STEP_SUMMARY"
           fi
+      - name: Enforce fail-closed result
+        if: always()
+        run: |
+          code="${EXECUTION_EXIT:-2}"
+          if [ "$code" -ne 0 ]; then
+            echo "::error::Owner-authorized merge wave failed closed with exit ${code}; see the durable report issue and uploaded artifact."
+            exit "$code"
+          fi
+          echo 'Owner-authorized exact-SHA merge wave completed successfully.'
