@@ -55,10 +55,10 @@ class SingleA11oyEstateContractTests(unittest.TestCase):
         self.assertIn("delete_repo(", source)
 
     def test_timestamp_ordering(self) -> None:
-        older = single._modified_epoch("2026-07-22T01:00:00Z")
-        newer = single._modified_epoch("2026-07-22T02:00:00+00:00")
+        older = single._epoch("2026-07-22T01:00:00Z")
+        newer = single._epoch("2026-07-22T02:00:00+00:00")
         self.assertGreater(newer, older)
-        self.assertEqual(single._modified_epoch("not-a-time"), 0.0)
+        self.assertEqual(single._epoch("not-a-time"), 0.0)
 
     def test_workflow_has_one_single_space_publisher(self) -> None:
         workflow_dir = SCRIPT_DIR.parent / "workflows"
