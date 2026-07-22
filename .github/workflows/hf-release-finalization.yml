@@ -5,13 +5,17 @@ on:
     branches: [main]
     paths:
       - .github/scripts/hf_release_finalization.py
+      - .github/scripts/hf_release_finalization_entrypoint.py
       - .github/scripts/test_hf_release_finalization.py
+      - .github/scripts/test_hf_release_finalization_entrypoint.py
       - .github/workflows/hf-release-finalization.yml
   pull_request:
     branches: [main]
     paths:
       - .github/scripts/hf_release_finalization.py
+      - .github/scripts/hf_release_finalization_entrypoint.py
       - .github/scripts/test_hf_release_finalization.py
+      - .github/scripts/test_hf_release_finalization_entrypoint.py
       - .github/workflows/hf-release-finalization.yml
   workflow_dispatch:
     inputs:
@@ -106,13 +110,16 @@ jobs:
             "pyarrow>=18,<24" \
             "PyYAML>=6,<7"
 
-      - name: Verify controller safety contract
+      - name: Verify controller safety and transient-retry contracts
         working-directory: controller
         run: |
           python -m py_compile \
             .github/scripts/hf_release_finalization.py \
-            .github/scripts/test_hf_release_finalization.py
+            .github/scripts/hf_release_finalization_entrypoint.py \
+            .github/scripts/test_hf_release_finalization.py \
+            .github/scripts/test_hf_release_finalization_entrypoint.py
           python .github/scripts/test_hf_release_finalization.py
+          python .github/scripts/test_hf_release_finalization_entrypoint.py
 
       - name: Verify merged source contracts before any Hub write
         run: |
@@ -147,7 +154,7 @@ jobs:
         shell: bash
         run: |
           set +e
-          python .github/scripts/hf_release_finalization.py \
+          python .github/scripts/hf_release_finalization_entrypoint.py \
             --publish \
             --generation "${GITHUB_SHA}" \
             --lake-root ../lake \
@@ -173,7 +180,7 @@ jobs:
               "generated_at": datetime.now(timezone.utc).isoformat(),
               "publish": False,
               "source_verification": "PASSED",
-              "summary": {"ok": 4, "warning": 0, "error": 0, "dry_run": 1},
+              "summary": {"ok": 5, "warning": 0, "error": 0, "dry_run": 1},
               "boundary": "No Hugging Face mutation occurs on pull_request events.",
           }
           Path("reports/hf-release-finalization-latest.json").write_text(
@@ -227,6 +234,12 @@ jobs:
                   out.write(f"Publish: `{report.get('publish')}`\n\n")
                   for key, value in report.get("summary", {}).items():
                       out.write(f"- {key}: `{value}`\n")
+                  retry = report.get("dataset_viewer_retry") or {}
+                  if retry:
+                      out.write(
+                          f"- Dataset Viewer attempts: `{retry.get('attempts')}`; "
+                          f"transient retries: `{retry.get('transient_retries')}`\n"
+                      )
                   for repo_id, item in report.get("results", {}).get("kernels", {}).items():
                       out.write(f"- kernel `{repo_id}`: `{item.get('after_sha')}` selfcheck passed\n")
                   dataset = report.get("results", {}).get("dataset")
