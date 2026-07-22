@@ -85,11 +85,11 @@ jobs:
       - name: Install current supported kernel clients
         run: |
           python -m pip install --disable-pip-version-check \
-            "huggingface_hub>=1.16,<2" \
+            "huggingface_hub>=1.3,<2" \
             "kernels==0.16.0" \
             "pytest>=8,<9"
 
-      - name: Verify source-owned kernel contracts
+      - name: Verify source-owned kernel contracts and publisher scope
         run: |
           set -euo pipefail
           PYTHONPATH=energy python -m pytest -q energy/tests/test_hf_kernel_contract.py
@@ -97,7 +97,9 @@ jobs:
             python -m pytest -q lambda-gate/tests/test_hf_governed_norm_contract.py
           python - <<'PY'
           from pathlib import Path
-          text = Path('controller/.github/workflows/hf-kernel-card-publish.yml').read_text()
+
+          workflow = Path('controller/.github/workflows/hf-kernel-card-publish.yml')
+          text = workflow.read_text(encoding='utf-8')
           required = {
               'SZLHOLDINGS/governed-inference-meter': Path('energy/hf-kernels/governed-inference-meter'),
               'SZLHOLDINGS/szl-governed-norm': Path('lambda-gate/hf-kernels/szl-governed-norm'),
@@ -105,12 +107,15 @@ jobs:
           for repo_id, root in required.items():
               assert (root / 'README.md').is_file(), repo_id
               assert (root / 'contract.json').is_file(), repo_id
-          assert 'README.md contract.json' in text
-          assert 'delete_repo' not in text
-          assert 'update_repo_settings' not in text
-          assert 'set_space_hardware' not in text
-          forbidden_url_secret = 'HF_PUBLISH_TOKEN' + '}@'
-          assert forbidden_url_secret not in text
+          assert "git -C \"$work/repo\" add -- README.md contract.json" in text
+          for forbidden in (
+              'delete_' + 'repo',
+              'update_repo_' + 'settings',
+              'set_space_' + 'hardware',
+          ):
+              assert forbidden not in text
+          token_in_url = 'HF_PUBLISH_TOKEN' + '}@'
+          assert token_in_url not in text
           print('kernel card publisher scope is exact and credential-safe')
           PY
           git -C controller diff --check
@@ -124,7 +129,7 @@ jobs:
             exit 2
           }
 
-      - name: Authenticate and preflight existing first-class kernels
+      - name: Authenticate organization publisher
         if: steps.mode.outputs.publish == 'true'
         id: auth
         shell: bash
@@ -133,28 +138,28 @@ jobs:
           python - <<'PY' >> "$GITHUB_OUTPUT"
           import os
           from huggingface_hub import HfApi
-          api = HfApi(token=os.environ['HF_PUBLISH_TOKEN'])
-          who = api.whoami()
-          match = next((item for item in who.get('orgs', [])
-                        if str(item.get('name') or item.get('fullname') or '').upper() == 'SZLHOLDINGS'), None)
+
+          who = HfApi(token=os.environ['HF_PUBLISH_TOKEN']).whoami()
+          match = next(
+              (
+                  item for item in who.get('orgs', [])
+                  if str(item.get('name') or item.get('fullname') or '').upper() == 'SZLHOLDINGS'
+              ),
+              None,
+          )
           if match is None:
               raise SystemExit('authenticated identity is not a member of SZLHOLDINGS')
           role = str(match.get('roleInOrg') or match.get('role') or '').lower()
           if role and role not in {'admin', 'write', 'contributor'}:
               raise SystemExit(f'identity is not write-capable: {role}')
-          username = str(who.get('name') or who.get('fullname') or 'hf-user').replace('\n', '')
+          username = str(who.get('name') or 'hf-user').replace('\n', '')
           print(f'username={username}')
-          for repo_id in ('SZLHOLDINGS/governed-inference-meter', 'SZLHOLDINGS/szl-governed-norm'):
-              info = api.kernel_info(repo_id)
-              sha = str(getattr(info, 'sha', '') or '')
-              files = set(api.list_repo_files(repo_id, repo_type='kernel', revision=sha))
-              if len(sha) != 40 or not any(path.startswith('build/') for path in files):
-                  raise SystemExit(f'kernel preflight failed: {repo_id}@{sha}')
-              print(f'preflight_{repo_id.rsplit("/", 1)[1].replace("-", "_")}={sha}')
+          print(f'role={role or "unknown"}')
           PY
 
       - name: Publish only README.md and contract.json through kernel Git transport
         if: steps.mode.outputs.publish == 'true'
+        id: transport
         shell: bash
         env:
           HF_USERNAME: ${{ steps.auth.outputs.username }}
@@ -173,21 +178,32 @@ jobs:
           export GIT_ASKPASS="$askpass"
           export GIT_TERMINAL_PROMPT=0
           export GIT_LFS_SKIP_SMUDGE=1
+          trap 'rm -f "$askpass"' EXIT
 
           publish_kernel() {
             repo_id="$1"
             source_dir="$2"
+            slug="$3"
             work="$(mktemp -d)"
+
             git clone --depth 1 --branch main \
               "https://huggingface.co/kernels/${repo_id}" "$work/repo"
+            before="$(git -C "$work/repo" rev-parse HEAD)"
+            git -C "$work/repo" ls-files 'build/*' | grep -q . || {
+              echo "::error::${repo_id} has no retained build variants before publication."
+              exit 2
+            }
+
             cp "$source_dir/README.md" "$work/repo/README.md"
             cp "$source_dir/contract.json" "$work/repo/contract.json"
             python - "$work/repo/contract.json" "$repo_id" <<'PY'
-          import json, sys
+          import json
+          import sys
           payload = json.load(open(sys.argv[1], encoding='utf-8'))
           if payload.get('repo_id') != sys.argv[2] or payload.get('repo_type') != 'kernel':
               raise SystemExit('kernel contract identity mismatch')
           PY
+
             git -C "$work/repo" config user.name 'szl-release-bot'
             git -C "$work/repo" config user.email \
               '41898282+github-actions[bot]@users.noreply.github.com'
@@ -199,67 +215,74 @@ jobs:
                 -m 'Signed-off-by: github-actions[bot] <41898282+github-actions[bot]@users.noreply.github.com>'
               git -C "$work/repo" push origin HEAD:main
             fi
+
+            git clone --depth 1 --branch main \
+              "https://huggingface.co/kernels/${repo_id}" "$work/verify"
+            after="$(git -C "$work/verify" rev-parse HEAD)"
+            cmp "$source_dir/README.md" "$work/verify/README.md"
+            cmp "$source_dir/contract.json" "$work/verify/contract.json"
+            files="$(git -C "$work/verify" ls-files | wc -l | tr -d ' ')"
+            git -C "$work/verify" ls-files 'build/*' | grep -q . || {
+              echo "::error::${repo_id} lost its build variants."
+              exit 2
+            }
+
+            echo "${slug}_before=${before}" >> "$GITHUB_OUTPUT"
+            echo "${slug}_after=${after}" >> "$GITHUB_OUTPUT"
+            echo "${slug}_files=${files}" >> "$GITHUB_OUTPUT"
             rm -rf "$work"
           }
 
           publish_kernel \
             'SZLHOLDINGS/governed-inference-meter' \
-            'energy/hf-kernels/governed-inference-meter'
+            'energy/hf-kernels/governed-inference-meter' \
+            'gim'
           publish_kernel \
             'SZLHOLDINGS/szl-governed-norm' \
-            'lambda-gate/hf-kernels/szl-governed-norm'
-          rm -f "$askpass"
+            'lambda-gate/hf-kernels/szl-governed-norm' \
+            'norm'
 
-      - name: Read back exact immutable kernel revisions and run selfchecks
+      - name: Run exact-revision kernel selfchecks and write report
         if: steps.mode.outputs.publish == 'true'
         id: verify
         env:
           ENERGY_SHA: ${{ steps.sources.outputs.energy_sha }}
           LAMBDA_SHA: ${{ steps.sources.outputs.lambda_sha }}
+          GIM_BEFORE: ${{ steps.transport.outputs.gim_before }}
+          GIM_AFTER: ${{ steps.transport.outputs.gim_after }}
+          GIM_FILES: ${{ steps.transport.outputs.gim_files }}
+          NORM_BEFORE: ${{ steps.transport.outputs.norm_before }}
+          NORM_AFTER: ${{ steps.transport.outputs.norm_after }}
+          NORM_FILES: ${{ steps.transport.outputs.norm_files }}
         run: |
           set +e
           mkdir -p controller/reports
           python - <<'PY'
-          import hashlib
           import json
           import os
           from datetime import datetime, timezone
           from pathlib import Path
-          from huggingface_hub import HfApi, hf_hub_download
           from kernels import get_kernel
 
-          api = HfApi(token=os.environ['HF_PUBLISH_TOKEN'])
           specs = {
-              'SZLHOLDINGS/governed-inference-meter': Path('energy/hf-kernels/governed-inference-meter'),
-              'SZLHOLDINGS/szl-governed-norm': Path('lambda-gate/hf-kernels/szl-governed-norm'),
+              'SZLHOLDINGS/governed-inference-meter': {
+                  'before': os.environ['GIM_BEFORE'],
+                  'after': os.environ['GIM_AFTER'],
+                  'files': int(os.environ['GIM_FILES']),
+              },
+              'SZLHOLDINGS/szl-governed-norm': {
+                  'before': os.environ['NORM_BEFORE'],
+                  'after': os.environ['NORM_AFTER'],
+                  'files': int(os.environ['NORM_FILES']),
+              },
           }
           results = {}
           failures = []
-          for repo_id, source_dir in specs.items():
+          for repo_id, item in specs.items():
               try:
-                  info = api.kernel_info(repo_id)
-                  revision = str(getattr(info, 'sha', '') or '')
+                  revision = item['after']
                   if len(revision) != 40:
                       raise RuntimeError(f'missing immutable revision: {revision!r}')
-                  files = set(api.list_repo_files(repo_id, repo_type='kernel', revision=revision))
-                  required = {'README.md', 'contract.json'}
-                  if not required.issubset(files) or not any(path.startswith('build/') for path in files):
-                      raise RuntimeError(f'incomplete kernel tree: {sorted(required - files)}')
-                  digests = {}
-                  for name in sorted(required):
-                      local = Path(hf_hub_download(
-                          repo_id=repo_id,
-                          repo_type='kernel',
-                          filename=name,
-                          revision=revision,
-                          token=os.environ['HF_PUBLISH_TOKEN'],
-                          force_download=True,
-                      ))
-                      expected = (source_dir / name).read_bytes()
-                      observed = local.read_bytes()
-                      if observed != expected:
-                          raise RuntimeError(f'byte mismatch: {name}')
-                      digests[name] = hashlib.sha256(observed).hexdigest()
                   module = get_kernel(repo_id, revision=revision, trust_remote_code=True)
                   check = getattr(module, 'selfcheck', None)
                   if not callable(check):
@@ -268,13 +291,16 @@ jobs:
                   if outcome is False or (isinstance(outcome, dict) and outcome.get('ok') is False):
                       raise RuntimeError(f'selfcheck failed: {outcome}')
                   results[repo_id] = {
+                      'before_revision': item['before'],
                       'revision': revision,
-                      'remote_file_count': len(files),
-                      'digests': digests,
+                      'remote_file_count': item['files'],
+                      'card_contract_byte_parity': True,
+                      'build_variants_preserved': True,
                       'selfcheck': outcome,
                   }
               except Exception as exc:
                   failures.append(f'{repo_id}: {type(exc).__name__}: {exc}')
+
           report = {
               'schema': 'szl.hf-kernel-card-publish/v1',
               'generated_at': datetime.now(timezone.utc).isoformat(),
@@ -309,7 +335,8 @@ jobs:
         run: |
           mkdir -p controller/reports
           python - <<'PY'
-          import json, os
+          import json
+          import os
           from datetime import datetime, timezone
           from pathlib import Path
           Path('controller/reports/hf-kernel-card-publish-latest.json').write_text(
