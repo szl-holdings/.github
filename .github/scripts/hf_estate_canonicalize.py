@@ -98,11 +98,17 @@ class SingleA11oyUpgrade(legacy.EstateUpgrade):
         self,
     ) -> tuple[dict[str, Any], dict[str, dict[str, Any]]]:
         snapshots = {repo_id: self._snapshot(repo_id) for repo_id in CANDIDATES}
-        valid = [item for item in snapshots.values() if item.get("valid")]
-        if not valid:
-            raise RuntimeError("No valid canonical-or-clone A11oy Docker Space exists")
+        eligible = [
+            item
+            for item in snapshots.values()
+            if item.get("valid") and item.get("stage") == "RUNNING"
+        ]
+        if not eligible:
+            raise RuntimeError(
+                "No RUNNING valid canonical-or-clone A11oy Docker Space exists"
+            )
         selected = max(
-            valid,
+            eligible,
             key=lambda item: (
                 float(item.get("modified_epoch") or 0.0),
                 item["repo_id"] == legacy.FLAGSHIP_SPACE,
