@@ -13,6 +13,9 @@ on:
       - .github/scripts/hf_release_readiness_verify.py
       - .github/scripts/test_hf_release_readiness_verify.py
       - .github/workflows/hf-release-readiness.yml
+      - .github/workflows/hf-release-readiness-v2.yml
+      - .github/scripts/hf_release_readiness_v2.py
+      - .github/scripts/test_hf_release_readiness_v2.py
   schedule:
     - cron: '17,47 * * * *'
   workflow_dispatch:
@@ -32,7 +35,7 @@ concurrency:
 
 jobs:
   verify:
-    name: Lake viewer HTTP 200 and exact kernel selfchecks
+    name: Lake viewer HTTP 200 and exact torch27 kernel selfchecks
     runs-on: ubuntu-latest
     timeout-minutes: 45
     env:
@@ -72,15 +75,29 @@ jobs:
         with:
           python-version: "3.12"
 
-      - name: Install pinned verification clients
+      - name: Install exact CPU runtime and supported Hub clients
         run: |
+          set -euo pipefail
           python -m pip install --disable-pip-version-check \
+            --index-url https://download.pytorch.org/whl/cpu \
+            "torch==2.7.1"
+          python -m pip install --disable-pip-version-check \
+            "numpy==2.2.6" \
             "huggingface_hub>=1.3,<2" \
             "kernels==0.16.0" \
             "requests>=2.32,<3"
+          python - <<'PY'
+          import numpy as np
+          import torch
+          assert np.__version__ == '2.2.6', np.__version__
+          assert torch.__version__.split('+', 1)[0] == '2.7.1', torch.__version__
+          assert not torch.cuda.is_available(), 'readiness verification must use CPU PyTorch'
+          print('verified release-readiness runtime:', torch.__version__, np.__version__)
+          PY
 
       - name: Verify bounded readiness contract
         run: |
+          set -euo pipefail
           python -m py_compile \
             .github/scripts/hf_release_readiness_verify.py \
             .github/scripts/test_hf_release_readiness_verify.py
@@ -163,6 +180,7 @@ jobs:
               and dataset.get('viewer_http_status') == 200
               and len(kernels) == 2
               and all(item.get('revision') for item in kernels.values())
+              and all(item.get('selfcheck') not in (None, False) for item in kernels.values())
           )
           raise SystemExit(0 if ok else 1)
           PY
@@ -170,7 +188,7 @@ jobs:
             gh issue close "$issue_number" \
               --repo "$GITHUB_REPOSITORY" \
               --reason completed \
-              --comment 'The live Lake viewer returned HTTP 200 and both exact kernel revisions passed selfcheck().' || true
+              --comment 'The live Lake viewer returned HTTP 200 and both exact kernel revisions passed selfcheck() under the pinned NumPy 2.2.6 and CPU PyTorch 2.7.1 runtime.' || true
           else
             gh issue reopen "$issue_number" --repo "$GITHUB_REPOSITORY" || true
           fi
@@ -181,7 +199,7 @@ jobs:
           {
             echo '## Pull-request validation boundary'
             echo
-            echo 'Deterministic compile and contract tests passed. Live Hugging Face Viewer and kernel evidence is intentionally deferred to the protected-main push and recurring schedule so external asynchronous state cannot block code review.'
+            echo 'Deterministic compile, runtime, and contract tests passed. Live Hugging Face Viewer and kernel evidence is intentionally deferred to the protected-main push and recurring schedule so external asynchronous state cannot block code review.'
           } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Publish schedule boundary
