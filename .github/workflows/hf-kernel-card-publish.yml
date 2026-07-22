@@ -1,0 +1,390 @@
+name: HF First-Class Kernel Card Publish
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/hf-kernel-card-publish.yml
+  pull_request:
+    branches: [main]
+    paths:
+      - .github/workflows/hf-kernel-card-publish.yml
+  schedule:
+    - cron: '13 */6 * * *'
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+  issues: write
+  actions: write
+
+concurrency:
+  group: hf-kernel-card-publish-${{ github.event_name }}-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    name: Publish and read back reviewed kernel cards
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      HF_PUBLISH_TOKEN: ${{ secrets.HF_ORG_TOKEN || secrets.HF_ORG_TOKEN1 || secrets.HF_TOKEN }}
+      HF_HUB_DISABLE_PROGRESS_BARS: "1"
+      GH_TOKEN: ${{ github.token }}
+      REPORT_ISSUE_TITLE: '[hf-kernel-card-publish] first-class card contracts'
+    steps:
+      - name: Checkout workflow source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 1
+          path: controller
+
+      - name: Checkout merged energy-kernel source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: szl-holdings/szl-energy-attest
+          ref: main
+          persist-credentials: false
+          fetch-depth: 0
+          path: energy
+
+      - name: Checkout merged governed-norm source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: szl-holdings/szl-lambda-gate
+          ref: main
+          persist-credentials: false
+          fetch-depth: 0
+          path: lambda-gate
+
+      - name: Bind exact reviewed source lineage
+        id: sources
+        shell: bash
+        run: |
+          set -euo pipefail
+          git -C energy merge-base --is-ancestor 14c1d8fdbb19dbd69f4dfc365d7f74d515bc4bdb HEAD
+          git -C lambda-gate merge-base --is-ancestor 8b95ca47571fda65a52b0b6189677ec089a6e503 HEAD
+          echo "energy_sha=$(git -C energy rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+          echo "lambda_sha=$(git -C lambda-gate rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
+      - name: Determine execution mode
+        id: mode
+        shell: bash
+        run: |
+          set -euo pipefail
+          publish=true
+          if [ "$GITHUB_EVENT_NAME" = "pull_request" ]; then publish=false; fi
+          echo "publish=${publish}" >> "$GITHUB_OUTPUT"
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12"
+
+      - name: Install current supported kernel clients
+        run: |
+          python -m pip install --disable-pip-version-check \
+            "huggingface_hub>=1.16,<2" \
+            "kernels==0.16.0" \
+            "pytest>=8,<9"
+
+      - name: Verify source-owned kernel contracts
+        run: |
+          set -euo pipefail
+          PYTHONPATH=energy python -m pytest -q energy/tests/test_hf_kernel_contract.py
+          PYTHONPATH=lambda-gate/torch-ext:lambda-gate \
+            python -m pytest -q lambda-gate/tests/test_hf_governed_norm_contract.py
+          python - <<'PY'
+          from pathlib import Path
+          text = Path('controller/.github/workflows/hf-kernel-card-publish.yml').read_text()
+          required = {
+              'SZLHOLDINGS/governed-inference-meter': Path('energy/hf-kernels/governed-inference-meter'),
+              'SZLHOLDINGS/szl-governed-norm': Path('lambda-gate/hf-kernels/szl-governed-norm'),
+          }
+          for repo_id, root in required.items():
+              assert (root / 'README.md').is_file(), repo_id
+              assert (root / 'contract.json').is_file(), repo_id
+          assert 'README.md contract.json' in text
+          assert 'delete_repo' not in text
+          assert 'update_repo_settings' not in text
+          assert 'set_space_hardware' not in text
+          forbidden_url_secret = 'HF_PUBLISH_TOKEN' + '}@'
+          assert forbidden_url_secret not in text
+          print('kernel card publisher scope is exact and credential-safe')
+          PY
+          git -C controller diff --check
+
+      - name: Require authenticated kernel publisher
+        if: steps.mode.outputs.publish == 'true'
+        run: |
+          set -euo pipefail
+          test -n "${HF_PUBLISH_TOKEN:-}" || {
+            echo "::error::No supported Hugging Face organization write token is configured."
+            exit 2
+          }
+
+      - name: Authenticate and preflight existing first-class kernels
+        if: steps.mode.outputs.publish == 'true'
+        id: auth
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY' >> "$GITHUB_OUTPUT"
+          import os
+          from huggingface_hub import HfApi
+          api = HfApi(token=os.environ['HF_PUBLISH_TOKEN'])
+          who = api.whoami()
+          match = next((item for item in who.get('orgs', [])
+                        if str(item.get('name') or item.get('fullname') or '').upper() == 'SZLHOLDINGS'), None)
+          if match is None:
+              raise SystemExit('authenticated identity is not a member of SZLHOLDINGS')
+          role = str(match.get('roleInOrg') or match.get('role') or '').lower()
+          if role and role not in {'admin', 'write', 'contributor'}:
+              raise SystemExit(f'identity is not write-capable: {role}')
+          username = str(who.get('name') or who.get('fullname') or 'hf-user').replace('\n', '')
+          print(f'username={username}')
+          for repo_id in ('SZLHOLDINGS/governed-inference-meter', 'SZLHOLDINGS/szl-governed-norm'):
+              info = api.kernel_info(repo_id)
+              sha = str(getattr(info, 'sha', '') or '')
+              files = set(api.list_repo_files(repo_id, repo_type='kernel', revision=sha))
+              if len(sha) != 40 or not any(path.startswith('build/') for path in files):
+                  raise SystemExit(f'kernel preflight failed: {repo_id}@{sha}')
+              print(f'preflight_{repo_id.rsplit("/", 1)[1].replace("-", "_")}={sha}')
+          PY
+
+      - name: Publish only README.md and contract.json through kernel Git transport
+        if: steps.mode.outputs.publish == 'true'
+        shell: bash
+        env:
+          HF_USERNAME: ${{ steps.auth.outputs.username }}
+        run: |
+          set -euo pipefail
+          askpass="$(mktemp)"
+          cat > "$askpass" <<'SH'
+          #!/bin/sh
+          case "$1" in
+            *Username*) printf '%s\n' "${HF_USERNAME:-hf-user}" ;;
+            *Password*) printf '%s\n' "${HF_PUBLISH_TOKEN:?missing token}" ;;
+            *) exit 1 ;;
+          esac
+          SH
+          chmod 700 "$askpass"
+          export GIT_ASKPASS="$askpass"
+          export GIT_TERMINAL_PROMPT=0
+          export GIT_LFS_SKIP_SMUDGE=1
+
+          publish_kernel() {
+            repo_id="$1"
+            source_dir="$2"
+            work="$(mktemp -d)"
+            git clone --depth 1 --branch main \
+              "https://huggingface.co/kernels/${repo_id}" "$work/repo"
+            cp "$source_dir/README.md" "$work/repo/README.md"
+            cp "$source_dir/contract.json" "$work/repo/contract.json"
+            python - "$work/repo/contract.json" "$repo_id" <<'PY'
+          import json, sys
+          payload = json.load(open(sys.argv[1], encoding='utf-8'))
+          if payload.get('repo_id') != sys.argv[2] or payload.get('repo_type') != 'kernel':
+              raise SystemExit('kernel contract identity mismatch')
+          PY
+            git -C "$work/repo" config user.name 'szl-release-bot'
+            git -C "$work/repo" config user.email \
+              '41898282+github-actions[bot]@users.noreply.github.com'
+            if [ -n "$(git -C "$work/repo" status --porcelain -- README.md contract.json)" ]; then
+              git -C "$work/repo" add -- README.md contract.json
+              git -C "$work/repo" commit \
+                -m "release(card): publish reviewed kernel contract ${GITHUB_SHA:0:12}" \
+                -m 'Card/contract-only update from protected GitHub source; existing build variants are preserved.' \
+                -m 'Signed-off-by: github-actions[bot] <41898282+github-actions[bot]@users.noreply.github.com>'
+              git -C "$work/repo" push origin HEAD:main
+            fi
+            rm -rf "$work"
+          }
+
+          publish_kernel \
+            'SZLHOLDINGS/governed-inference-meter' \
+            'energy/hf-kernels/governed-inference-meter'
+          publish_kernel \
+            'SZLHOLDINGS/szl-governed-norm' \
+            'lambda-gate/hf-kernels/szl-governed-norm'
+          rm -f "$askpass"
+
+      - name: Read back exact immutable kernel revisions and run selfchecks
+        if: steps.mode.outputs.publish == 'true'
+        id: verify
+        env:
+          ENERGY_SHA: ${{ steps.sources.outputs.energy_sha }}
+          LAMBDA_SHA: ${{ steps.sources.outputs.lambda_sha }}
+        run: |
+          set +e
+          mkdir -p controller/reports
+          python - <<'PY'
+          import hashlib
+          import json
+          import os
+          from datetime import datetime, timezone
+          from pathlib import Path
+          from huggingface_hub import HfApi, hf_hub_download
+          from kernels import get_kernel
+
+          api = HfApi(token=os.environ['HF_PUBLISH_TOKEN'])
+          specs = {
+              'SZLHOLDINGS/governed-inference-meter': Path('energy/hf-kernels/governed-inference-meter'),
+              'SZLHOLDINGS/szl-governed-norm': Path('lambda-gate/hf-kernels/szl-governed-norm'),
+          }
+          results = {}
+          failures = []
+          for repo_id, source_dir in specs.items():
+              try:
+                  info = api.kernel_info(repo_id)
+                  revision = str(getattr(info, 'sha', '') or '')
+                  if len(revision) != 40:
+                      raise RuntimeError(f'missing immutable revision: {revision!r}')
+                  files = set(api.list_repo_files(repo_id, repo_type='kernel', revision=revision))
+                  required = {'README.md', 'contract.json'}
+                  if not required.issubset(files) or not any(path.startswith('build/') for path in files):
+                      raise RuntimeError(f'incomplete kernel tree: {sorted(required - files)}')
+                  digests = {}
+                  for name in sorted(required):
+                      local = Path(hf_hub_download(
+                          repo_id=repo_id,
+                          repo_type='kernel',
+                          filename=name,
+                          revision=revision,
+                          token=os.environ['HF_PUBLISH_TOKEN'],
+                          force_download=True,
+                      ))
+                      expected = (source_dir / name).read_bytes()
+                      observed = local.read_bytes()
+                      if observed != expected:
+                          raise RuntimeError(f'byte mismatch: {name}')
+                      digests[name] = hashlib.sha256(observed).hexdigest()
+                  module = get_kernel(repo_id, revision=revision, trust_remote_code=True)
+                  check = getattr(module, 'selfcheck', None)
+                  if not callable(check):
+                      raise RuntimeError('selfcheck() missing')
+                  outcome = check()
+                  if outcome is False or (isinstance(outcome, dict) and outcome.get('ok') is False):
+                      raise RuntimeError(f'selfcheck failed: {outcome}')
+                  results[repo_id] = {
+                      'revision': revision,
+                      'remote_file_count': len(files),
+                      'digests': digests,
+                      'selfcheck': outcome,
+                  }
+              except Exception as exc:
+                  failures.append(f'{repo_id}: {type(exc).__name__}: {exc}')
+          report = {
+              'schema': 'szl.hf-kernel-card-publish/v1',
+              'generated_at': datetime.now(timezone.utc).isoformat(),
+              'generation': os.environ.get('GITHUB_SHA'),
+              'publish': True,
+              'source_revisions': {
+                  'szl-energy-attest': os.environ.get('ENERGY_SHA'),
+                  'szl-lambda-gate': os.environ.get('LAMBDA_SHA'),
+              },
+              'results': results,
+              'failures': failures,
+              'summary': {'ok': len(results), 'warning': 0, 'error': len(failures)},
+              'boundaries': [
+                  'Only README.md and contract.json are changed.',
+                  'Existing build variants, visibility, and hardware are preserved.',
+                  'No model, dataset, Space, weight, training, or promotion state is mutated.',
+              ],
+          }
+          Path('controller/reports/hf-kernel-card-publish-latest.json').write_text(
+              json.dumps(report, indent=2, sort_keys=True, default=str) + '\n',
+              encoding='utf-8',
+          )
+          print(json.dumps(report, indent=2, sort_keys=True, default=str))
+          raise SystemExit(1 if failures else 0)
+          PY
+          code=$?
+          echo "exit_code=${code}" >> "$GITHUB_OUTPUT"
+          exit 0
+
+      - name: Write deterministic pull-request evidence
+        if: steps.mode.outputs.publish != 'true'
+        run: |
+          mkdir -p controller/reports
+          python - <<'PY'
+          import json, os
+          from datetime import datetime, timezone
+          from pathlib import Path
+          Path('controller/reports/hf-kernel-card-publish-latest.json').write_text(
+              json.dumps({
+                  'schema': 'szl.hf-kernel-card-publish/v1-prerelease',
+                  'generated_at': datetime.now(timezone.utc).isoformat(),
+                  'generation': os.environ.get('GITHUB_SHA'),
+                  'publish': False,
+                  'source_verification': 'PASSED',
+                  'summary': {'ok': 3, 'warning': 0, 'error': 0},
+                  'boundary': 'No Hugging Face mutation occurs on pull_request events.',
+              }, indent=2, sort_keys=True) + '\n',
+              encoding='utf-8',
+          )
+          PY
+
+      - name: Upload immutable kernel publication evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: hf-kernel-card-publish-${{ github.run_id }}
+          path: controller/reports/hf-kernel-card-publish-latest.json
+          if-no-files-found: error
+          retention-days: 90
+
+      - name: Persist deterministic kernel publication issue
+        if: always() && steps.mode.outputs.publish == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          report=controller/reports/hf-kernel-card-publish-latest.json
+          test -f "$report"
+          {
+            echo '<!-- szl-hf-kernel-card-publish -->'
+            echo '# First-class kernel card publication'
+            echo
+            echo "- Run: ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
+            echo "- Source revision: \`${GITHUB_SHA}\`"
+            echo
+            echo '```json'
+            cat "$report"
+            echo '```'
+          } > /tmp/hf-kernel-card-publish.md
+          issue_number="$(gh issue list --repo "$GITHUB_REPOSITORY" --state all \
+            --search "${REPORT_ISSUE_TITLE} in:title" --json number,title \
+            --jq ".[] | select(.title == env.REPORT_ISSUE_TITLE) | .number" | head -n1)"
+          if [ -n "$issue_number" ]; then
+            gh issue edit "$issue_number" --repo "$GITHUB_REPOSITORY" \
+              --body-file /tmp/hf-kernel-card-publish.md
+          else
+            gh issue create --repo "$GITHUB_REPOSITORY" --title "$REPORT_ISSUE_TITLE" \
+              --body-file /tmp/hf-kernel-card-publish.md >/dev/null
+            issue_number="$(gh issue list --repo "$GITHUB_REPOSITORY" --state all \
+              --search "${REPORT_ISSUE_TITLE} in:title" --json number,title \
+              --jq ".[] | select(.title == env.REPORT_ISSUE_TITLE) | .number" | head -n1)"
+          fi
+          if [ "${{ steps.verify.outputs.exit_code }}" = "0" ]; then
+            gh issue close "$issue_number" --repo "$GITHUB_REPOSITORY" --reason completed \
+              --comment 'Both first-class kernel card contracts were published, read back byte-for-byte, and passed selfcheck() at immutable revisions.' || true
+          else
+            gh issue reopen "$issue_number" --repo "$GITHUB_REPOSITORY" || true
+          fi
+
+      - name: Trigger immediate independent release readiness
+        if: steps.mode.outputs.publish == 'true' && steps.verify.outputs.exit_code == '0'
+        run: |
+          gh workflow run hf-release-readiness.yml --repo "$GITHUB_REPOSITORY" --ref main -f publish=true
+
+      - name: Enforce fail-closed kernel publication result
+        if: always() && steps.mode.outputs.publish == 'true'
+        run: |
+          code="${{ steps.verify.outputs.exit_code }}"
+          if [ -z "$code" ]; then code=2; fi
+          if [ "$code" -ne 0 ]; then
+            echo "::error::First-class kernel card publication failed with exit ${code}."
+            exit "$code"
+          fi
+          echo 'Both first-class kernel card contracts are present and selfchecking.'
