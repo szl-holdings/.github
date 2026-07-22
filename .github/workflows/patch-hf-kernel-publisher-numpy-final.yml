@@ -1,0 +1,99 @@
+name: Patch HF kernel publisher NumPy runtime final
+
+on:
+  push:
+    branches:
+      - fix/hf-kernel-publisher-numpy-runtime-final-20260722
+    paths:
+      - .github/workflows/patch-hf-kernel-publisher-numpy-final.yml
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+
+concurrency:
+  group: patch-hf-kernel-publisher-numpy-runtime-final
+  cancel-in-progress: false
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout exact repair branch
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: fix/hf-kernel-publisher-numpy-runtime-final-20260722
+          fetch-depth: 0
+          persist-credentials: true
+
+      - name: Add the exact NumPy runtime required by governed norm
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+
+          path = Path('.github/workflows/hf-kernel-card-publish-v2.yml')
+          text = path.read_text(encoding='utf-8')
+
+          old_packages = '''          python -m pip install --disable-pip-version-check \\
+            "huggingface_hub>=1.3,<2" \\
+            "kernels==0.16.0" \\
+            "pytest>=8,<9"
+'''
+          new_packages = '''          python -m pip install --disable-pip-version-check \\
+            "huggingface_hub>=1.3,<2" \\
+            "kernels==0.16.0" \\
+            "numpy==2.2.6" \\
+            "pytest>=8,<9"
+'''
+          if text.count(old_packages) != 1:
+              raise SystemExit('expected the current client install block exactly once')
+          text = text.replace(old_packages, new_packages, 1)
+
+          old_runtime = '''          import torch
+          assert torch.__version__.split('+', 1)[0] == '2.7.1', torch.__version__
+          assert not torch.cuda.is_available()
+          print('verified CPU PyTorch runtime:', torch.__version__)
+'''
+          new_runtime = '''          import numpy as np
+          import torch
+          assert np.__version__ == '2.2.6', np.__version__
+          assert torch.__version__.split('+', 1)[0] == '2.7.1', torch.__version__
+          assert not torch.cuda.is_available()
+          print('verified CPU PyTorch and NumPy runtime:', torch.__version__, np.__version__)
+'''
+          if text.count(old_runtime) != 1:
+              raise SystemExit('expected the current torch runtime assertion block exactly once')
+          text = text.replace(old_runtime, new_runtime, 1)
+
+          if text.count('"numpy==2.2.6"') != 1:
+              raise SystemExit('NumPy pin must appear exactly once')
+          path.write_text(text, encoding='utf-8')
+          PY
+
+          python - <<'PY'
+          from pathlib import Path
+          text = Path('.github/workflows/hf-kernel-card-publish-v2.yml').read_text(encoding='utf-8')
+          assert '"numpy==2.2.6"' in text
+          assert "assert np.__version__ == '2.2.6'" in text
+          assert 'delete_repo(' not in text
+          assert 'update_repo_settings(' not in text
+          print('publisher NumPy runtime patch is narrow and fail-closed')
+          PY
+          git diff --check
+
+      - name: Commit the production workflow only
+        shell: bash
+        run: |
+          set -euo pipefail
+          git rm .github/workflows/patch-hf-kernel-publisher-numpy-final.yml
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add .github/workflows/hf-kernel-card-publish-v2.yml
+          git commit \
+            -m 'fix(hf): install NumPy for governed-norm publisher selfcheck' \
+            -m 'Pin NumPy 2.2.6 next to the existing CPU torch27 runtime so the exact immutable governed-norm receipt check can execute.' \
+            -m 'Signed-off-by: github-actions[bot] <41898282+github-actions[bot]@users.noreply.github.com>'
+          git push origin HEAD:fix/hf-kernel-publisher-numpy-runtime-final-20260722
