@@ -119,10 +119,20 @@ jobs:
             .github/scripts/hf_module_drift_check.py
           python .github/scripts/test_hf_a11oy_singleton_verify.py
           git diff --check
-          if grep -R -n -E \
+
+          # Scan only executable workflow and non-test Python sources. Regression
+          # tests intentionally name the retired files and forbidden operations.
+          mapfile -t executable_sources < <(
+            {
+              find .github/workflows -maxdepth 1 -type f -name '*.yml' -print
+              find .github/scripts -maxdepth 1 -type f -name '*.py' \
+                ! -name 'test_*' -print
+            } | sort
+          )
+          if grep -n -E \
             'hf_estate_canonicalize\.py|select-newest-a11oy-source|duplicate_repo\(' \
-            .github/workflows .github/scripts; then
-            echo "::error::Clone migration or recreation logic still exists."
+            "${executable_sources[@]}"; then
+            echo "::error::Clone migration or recreation logic still exists in executable sources."
             exit 2
           fi
 
