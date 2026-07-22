@@ -66,10 +66,20 @@ class SingleA11oyEstateContractTests(unittest.TestCase):
         self.assertNotIn("managed_clone_ids", workflow)
         self.assertNotIn("create four", workflow.lower())
 
-    def test_one_time_finalizer_cannot_run_hf_publisher_twice(self) -> None:
-        self.assertFalse(
-            (SCRIPT_DIR.parent / "workflows" / "estate-finalization.yml").exists()
+    def test_no_secondary_hf_or_clone_restoration_lane(self) -> None:
+        workflows = SCRIPT_DIR.parent / "workflows"
+        self.assertFalse((workflows / "estate-finalization.yml").exists())
+        self.assertFalse((workflows / "restore-public-a11oy-clones.yml").exists())
+        rendered = "\n".join(
+            path.read_text(encoding="utf-8")
+            for path in sorted(workflows.glob("*.yml"))
         )
+        for forbidden in (
+            "Restore four public A11oy command centers",
+            "fix/restore-four-public-a11oy-command-centers",
+            "RESTORE_REVISION: c2549d77d900ad3df86794b3e8b2098ad908cf97",
+        ):
+            self.assertNotIn(forbidden, rendered)
 
 
 if __name__ == "__main__":
