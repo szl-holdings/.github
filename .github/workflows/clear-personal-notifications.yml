@@ -10,6 +10,7 @@ on:
 
 permissions:
   contents: read
+  issues: write
 
 concurrency:
   group: github-personal-notification-clearance
@@ -17,11 +18,12 @@ concurrency:
 
 jobs:
   clear:
-    name: Count, clear, and verify zero unread notifications
+    name: Count, clear, publish receipt, and reverify zero unread
     runs-on: ubuntu-latest
     timeout-minutes: 15
     env:
       GH_NOTIFICATIONS_TOKEN: ${{ secrets.GH_NOTIFICATIONS_TOKEN || secrets.SZL_GITHUB_TOKEN }}
+      RECEIPT_TITLE: '[notification-clearance] personal GitHub inbox zero'
     steps:
       - name: Checkout control plane
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -51,12 +53,66 @@ jobs:
           echo "exit_code=${code}" >> "$GITHUB_OUTPUT"
           exit 0
 
-      - name: Upload count-only clearance receipt
+      - name: Persist count-only receipt in deterministic issue
+        if: steps.clearance.outputs.exit_code == '0'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -f github-notification-clearance.json
+          run_url="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
+          {
+            echo '<!-- szl-github-notification-clearance -->'
+            echo '# GitHub notification inbox clearance'
+            echo
+            echo "- Run: ${run_url}"
+            echo "- Source revision: \`${GITHUB_SHA}\`"
+            echo '- Notification subjects, repository names, URLs, and token material were not recorded.'
+            echo
+            echo '```json'
+            cat github-notification-clearance.json
+            echo '```'
+          } > /tmp/notification-clearance.md
+
+          issue_number="$(gh issue list \
+            --repo "$GITHUB_REPOSITORY" \
+            --state all \
+            --search "${RECEIPT_TITLE} in:title" \
+            --json number,title \
+            --jq ".[] | select(.title == env.RECEIPT_TITLE) | .number" \
+            | head -n1)"
+          if [ -n "$issue_number" ]; then
+            gh issue edit "$issue_number" \
+              --repo "$GITHUB_REPOSITORY" \
+              --body-file /tmp/notification-clearance.md
+          else
+            gh issue create \
+              --repo "$GITHUB_REPOSITORY" \
+              --title "$RECEIPT_TITLE" \
+              --body-file /tmp/notification-clearance.md
+          fi
+
+      - name: Clear receipt-generated notification and prove zero again
+        id: post_receipt
+        if: steps.clearance.outputs.exit_code == '0'
+        shell: bash
+        run: |
+          set +e
+          python .github/scripts/clear_personal_notifications.py \
+            --report github-notification-post-receipt-clearance.json
+          code=$?
+          echo "exit_code=${code}" >> "$GITHUB_OUTPUT"
+          exit 0
+
+      - name: Upload count-only clearance receipts
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: github-notification-clearance-${{ github.run_id }}
-          path: github-notification-clearance.json
+          path: |
+            github-notification-clearance.json
+            github-notification-post-receipt-clearance.json
           if-no-files-found: error
           retention-days: 30
 
@@ -69,34 +125,49 @@ jobs:
           import os
           from pathlib import Path
 
-          path = Path('github-notification-clearance.json')
           with open(os.environ['GITHUB_STEP_SUMMARY'], 'a', encoding='utf-8') as out:
               out.write('## GitHub notification inbox clearance\n\n')
-              if not path.exists():
-                  out.write('No clearance report was produced.\n')
-              else:
+              for label, filename in (
+                  ('Initial clearance', 'github-notification-clearance.json'),
+                  ('Post-receipt verification', 'github-notification-post-receipt-clearance.json'),
+              ):
+                  path = Path(filename)
+                  out.write(f'### {label}\n\n')
+                  if not path.exists():
+                      out.write('No report was produced.\n\n')
+                      continue
                   report = json.loads(path.read_text(encoding='utf-8'))
                   out.write(f"Status: **{report.get('status', 'UNKNOWN')}**\n\n")
                   out.write(f"Authenticated identity: `{report.get('identity', 'UNAVAILABLE')}`\n\n")
                   out.write(f"Unread before: **{report.get('before_unread_count', 'UNAVAILABLE')}**\n\n")
                   out.write(f"Unread after: **{report.get('after_unread_count', 'UNAVAILABLE')}**\n\n")
-                  out.write('Notification subjects, repository names, URLs, and token material were not recorded.\n')
+              out.write('Notification content and token material were not recorded.\n')
           PY
 
-      - name: Enforce zero unread result
+      - name: Enforce exact zero unread result
         if: always()
         run: |
-          code="${{ steps.clearance.outputs.exit_code }}"
-          if [ -z "$code" ]; then code=2; fi
-          if [ "$code" -ne 0 ]; then
-            echo "::error::Notification clearance failed closed with exit ${code}; inspect the count-only artifact."
-            exit "$code"
+          first="${{ steps.clearance.outputs.exit_code }}"
+          second="${{ steps.post_receipt.outputs.exit_code }}"
+          if [ -z "$first" ]; then first=2; fi
+          if [ -z "$second" ]; then second=2; fi
+          if [ "$first" -ne 0 ] || [ "$second" -ne 0 ]; then
+            echo "::error::Notification clearance failed closed: initial=${first}, post-receipt=${second}."
+            exit 1
           fi
           python - <<'PY'
           import json
           from pathlib import Path
-          report = json.loads(Path('github-notification-clearance.json').read_text())
-          assert report['status'] == 'CLEARED'
-          assert report['after_unread_count'] == 0
-          print(f"Cleared {report['cleared_count']} unread notifications; verified final count 0.")
+
+          initial = json.loads(Path('github-notification-clearance.json').read_text())
+          final = json.loads(Path('github-notification-post-receipt-clearance.json').read_text())
+          assert initial['status'] == 'CLEARED'
+          assert initial['after_unread_count'] == 0
+          assert final['status'] == 'CLEARED'
+          assert final['after_unread_count'] == 0
+          print(
+              'Notification inbox verified at zero after receipt publication; '
+              f"initially cleared {initial['cleared_count']} thread(s), "
+              f"then cleared {final['cleared_count']} receipt-generated/concurrent thread(s)."
+          )
           PY
