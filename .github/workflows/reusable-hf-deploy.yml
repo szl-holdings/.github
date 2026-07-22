@@ -1,24 +1,9 @@
 name: Reusable — HF Deploy from Dockerfile
 
-# Canonical, reusable GitHub -> Hugging Face Space DEPLOYER. Replaces per-repo,
-# hand-maintained file-allowlist sync workflows (the accreted a11oy hf-sync.yml
-# CATHEDRAL_FILES anti-pattern) with ONE derivation: the exact file set pushed to
-# the Space is DERIVED from the caller Dockerfile's own `COPY` sources -- the same
-# derivation the org drift-checker (hf_module_drift_check.py) uses. The Dockerfile
-# is the single source of truth for what the image is built from, so the deploy
-# set can never silently drift from what actually builds.
-#
-# After pushing, the job WAITS for the Space to finish rebuilding and then
-# ATTESTS: it re-fetches every pushed file from the live resolve/main URL and
-# asserts sha256 == the git blob it pushed. Any mismatch FAILS the job loudly.
-# This is the "can never drift again" guard.
-#
-# Wire it from a consuming repo (HF repo derived as SZLHOLDINGS/<name> unless
-# overridden) with a thin caller:
-#   jobs:
-#     deploy:
-#       uses: szl-holdings/.github/.github/workflows/reusable-hf-deploy.yml@main
-#       secrets: inherit
+# Canonical, reusable GitHub -> Hugging Face Space deployer. The pushed file set
+# is derived from the caller Dockerfile COPY sources, never a hand-maintained
+# allowlist. Optional source binding records the exact checked-out Git SHA in one
+# non-secret Space variable and verifies it through the running build-info route.
 
 on:
   workflow_call:
@@ -39,7 +24,7 @@ on:
         type: string
         default: "Dockerfile"
       include-readme:
-        description: "Mirror README.md (front-matter preserved) so the Space card stays in sync."
+        description: "Mirror README.md so the Space card remains source-controlled."
         required: false
         type: boolean
         default: true
@@ -49,7 +34,7 @@ on:
         type: string
         default: '["/"]'
       prune:
-        description: "Delete Space files under DIRECTORY COPY sources that are gone from git (never touches file/glob sources)."
+        description: "Delete Space files under directory COPY sources that are gone from git."
         required: false
         type: boolean
         default: false
@@ -58,9 +43,19 @@ on:
         required: false
         type: number
         default: 600
+      source-revision-variable:
+        description: "Optional non-secret Space variable that receives the exact checked-out Git SHA."
+        required: false
+        type: string
+        default: ""
+      source-revision-probe-path:
+        description: "Required with source-revision-variable: same-host GET path exposing build.state and build.revision."
+        required: false
+        type: string
+        default: ""
     secrets:
       HF_TOKEN:
-        description: "HF write token with org write to the target Space."
+        description: "HF write token with organization write access to the target Space."
         required: true
 
 permissions:
@@ -68,7 +63,7 @@ permissions:
 
 jobs:
   hf-deploy:
-    name: Deploy derived COPY set to the live HF Space + attest
+    name: Deploy derived COPY set, bind source, and attest live state
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
@@ -77,48 +72,74 @@ jobs:
         with:
           egress-policy: audit
 
-      - name: Checkout caller (GitHub source-of-truth)
+      - name: Checkout caller source of truth
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
           path: caller
           ref: ${{ inputs.ref }}
+          persist-credentials: false
+          fetch-depth: 1
 
-      - name: Checkout exact reusable-workflow revision (shared deployer)
+      - name: Checkout exact reusable-workflow revision
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
-          # The deployed code must be the code reviewed at the immutable
-          # reusable-workflow revision, never mutable default-branch tooling.
-          # github.job_workflow_sha = the reviewed revision of THIS reusable
-          # workflow (documented context; job.workflow_* does not exist).
           repository: szl-holdings/.github
           ref: ${{ github.job_workflow_sha }}
           path: tools
+          persist-credentials: false
+          fetch-depth: 1
 
       - name: Set up Python
         uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
         with:
           python-version: "3.12"
 
-      - name: Install huggingface_hub
-        run: pip install --quiet "huggingface_hub>=0.25"
+      - name: Install exact supported deployment clients
+        run: >-
+          python -m pip install --disable-pip-version-check
+          "huggingface_hub==1.19.0"
+          "requests==2.32.5"
 
-      - name: Resolve HF repo
+      - name: Resolve target and exact checked-out source
         id: hf
         env:
           HF_REPO_IN: ${{ inputs.hf-repo }}
           GH_REPO: ${{ github.repository }}
           DEPLOY_REF: ${{ inputs.ref }}
+          SOURCE_REVISION_VARIABLE: ${{ inputs.source-revision-variable }}
+          SOURCE_REVISION_PROBE_PATH: ${{ inputs.source-revision-probe-path }}
         run: |
           set -euo pipefail
-          if [ -n "${HF_REPO_IN}" ]; then
-            HF_REPO="${HF_REPO_IN}"
+          if [ -n "$HF_REPO_IN" ]; then
+            HF_REPO="$HF_REPO_IN"
           else
             HF_REPO="SZLHOLDINGS/${GH_REPO##*/}"
           fi
+          SOURCE_SHA="$(git -C caller rev-parse HEAD)"
+          test "$(printf '%s' "$SOURCE_SHA" | wc -c)" -eq 40
+          if { [ -n "$SOURCE_REVISION_VARIABLE" ] && [ -z "$SOURCE_REVISION_PROBE_PATH" ]; } || \
+             { [ -z "$SOURCE_REVISION_VARIABLE" ] && [ -n "$SOURCE_REVISION_PROBE_PATH" ]; }; then
+            echo '::error::source-revision-variable and source-revision-probe-path must be supplied together.'
+            exit 2
+          fi
+          SOURCE_BINDING=false
+          if [ -n "$SOURCE_REVISION_VARIABLE" ]; then SOURCE_BINDING=true; fi
           echo "hf_repo=${HF_REPO}" >> "$GITHUB_OUTPUT"
-          echo "Deploying ${GH_REPO} -> ${HF_REPO} @ ${DEPLOY_REF}"
+          echo "source_sha=${SOURCE_SHA}" >> "$GITHUB_OUTPUT"
+          echo "source_binding=${SOURCE_BINDING}" >> "$GITHUB_OUTPUT"
+          echo "Deploying ${GH_REPO} -> ${HF_REPO} @ ${DEPLOY_REF} (${SOURCE_SHA})"
 
-      - name: Deploy derived COPY set to the Space
+      - name: Require governed publisher
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+        run: |
+          set -euo pipefail
+          test -n "${HF_TOKEN:-}" || {
+            echo '::error::HF_TOKEN is not configured for the reusable deployer.'
+            exit 2
+          }
+
+      - name: Deploy Dockerfile-derived files to the Space
         env:
           HF_TOKEN: ${{ secrets.HF_TOKEN }}
           GH_REPO: ${{ github.repository }}
@@ -130,35 +151,38 @@ jobs:
           SMOKE_PATHS: ${{ inputs.smoke-paths }}
         run: |
           set -euo pipefail
-          if [ -z "${HF_TOKEN:-}" ]; then
-            echo "::error::HF_TOKEN secret is not set on this repo -- cannot push to the HuggingFace Space."
-            echo "::error::Founder action: add repo/org secret HF_TOKEN (HF write token with org write to SZLHOLDINGS)."
-            exit 1
-          fi
           PRUNE_ARGS=()
-          if [ "${PRUNE}" = "true" ]; then
-            PRUNE_ARGS+=(--prune)
-          fi
+          if [ "$PRUNE" = "true" ]; then PRUNE_ARGS+=(--prune); fi
           python3 tools/.github/scripts/hf_deploy_from_dockerfile.py \
             --repo-root caller \
-            --github-repo "${GH_REPO}" \
-            --hf-repo "${HF_REPO}" \
-            --ref "${DEPLOY_REF}" \
-            --dockerfile-path "${DOCKERFILE_PATH}" \
-            --include-readme "${INCLUDE_README}" \
+            --github-repo "$GH_REPO" \
+            --hf-repo "$HF_REPO" \
+            --ref "$DEPLOY_REF" \
+            --dockerfile-path "$DOCKERFILE_PATH" \
+            --include-readme "$INCLUDE_README" \
             --smoke-paths "${SMOKE_PATHS}" \
             "${PRUNE_ARGS[@]}" \
             --manifest-out hf-deploy-manifest.json
 
-      - name: Upload deploy manifest
-        if: always()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
-        with:
-          name: hf-deploy-manifest
-          path: hf-deploy-manifest.json
-          if-no-files-found: warn
+      - name: Bind exact source revision after publication
+        if: steps.hf.outputs.source_binding == 'true'
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+          HF_REPO: ${{ steps.hf.outputs.hf_repo }}
+          SOURCE_SHA: ${{ steps.hf.outputs.source_sha }}
+          SOURCE_REVISION_VARIABLE: ${{ inputs.source-revision-variable }}
+          SOURCE_REVISION_PROBE_PATH: ${{ inputs.source-revision-probe-path }}
+        run: |
+          set -euo pipefail
+          python3 tools/.github/scripts/hf_space_source_binding.py \
+            --mode bind \
+            --repo-id "$HF_REPO" \
+            --variable "$SOURCE_REVISION_VARIABLE" \
+            --revision "$SOURCE_SHA" \
+            --probe-path "$SOURCE_REVISION_PROBE_PATH" \
+            --output hf-source-binding-bind.json
 
-      - name: Attest — live Space matches pushed git blobs (sha256)
+      - name: Attest exact running commit, bytes, and smoke routes
         env:
           HF_TOKEN: ${{ secrets.HF_TOKEN }}
           HF_REPO: ${{ steps.hf.outputs.hf_repo }}
@@ -168,5 +192,35 @@ jobs:
           python3 tools/.github/scripts/hf_deploy_from_dockerfile.py \
             --attest \
             --manifest hf-deploy-manifest.json \
-            --hf-repo "${HF_REPO}" \
+            --hf-repo "$HF_REPO" \
             --wait-running "${WAIT_RUNNING}"
+
+      - name: Verify running application source identity
+        if: steps.hf.outputs.source_binding == 'true'
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+          HF_REPO: ${{ steps.hf.outputs.hf_repo }}
+          SOURCE_SHA: ${{ steps.hf.outputs.source_sha }}
+          SOURCE_REVISION_VARIABLE: ${{ inputs.source-revision-variable }}
+          SOURCE_REVISION_PROBE_PATH: ${{ inputs.source-revision-probe-path }}
+        run: |
+          set -euo pipefail
+          python3 tools/.github/scripts/hf_space_source_binding.py \
+            --mode verify \
+            --repo-id "$HF_REPO" \
+            --variable "$SOURCE_REVISION_VARIABLE" \
+            --revision "$SOURCE_SHA" \
+            --probe-path "$SOURCE_REVISION_PROBE_PATH" \
+            --output hf-source-binding-verify.json
+
+      - name: Upload immutable deployment evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: hf-deploy-evidence
+          path: |
+            hf-deploy-manifest.json
+            hf-source-binding-bind.json
+            hf-source-binding-verify.json
+          if-no-files-found: warn
+          retention-days: 90
