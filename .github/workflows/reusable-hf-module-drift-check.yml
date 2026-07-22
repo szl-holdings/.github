@@ -1,27 +1,10 @@
 name: Reusable — HF Module Drift Check
 
 # Per-repo guard for a repo whose Hugging Face Space is built by Dockerfile COPY
-# from its GitHub source-of-truth. The Space's files can also be edited directly
-# on HF, so a COPY'd module can silently diverge between GitHub and the live
-# Space -- in EITHER direction. This compares every COPY source's git-blob OID
-# against the live HF Space tree and, on any divergence, NAMES which side is
-# ahead (by last-commit date). It never auto-overwrites.
-#
-# A repo wires this into its own CI instead of vendoring the checker. The shared
-# checker (scripts/hf_module_drift_check.py) lives once in szl-holdings/.github;
-# the repo keeps only its own ratchet allowlist (.github/hf-module-drift-allow.json,
-# printed as warnings every run) so known drift warns and any NEW drift fails.
-# The caller chooses the cadence (the org-wide scheduled sweep,
-# hf-module-drift-check.yml, is the catch-all safety net).
-#
-# Wire it up from a consuming repo (HF repo is derived as SZLHOLDINGS/<name>
-# unless overridden):
-#   jobs:
-#     hf-drift:
-#       uses: szl-holdings/.github/.github/workflows/reusable-hf-module-drift-check.yml@<full-commit-sha>
-#   # or, for a non-conventional Space name:
-#       with:
-#         hf-repo: SZLHOLDINGS/some-other-name
+# from its GitHub source-of-truth. It supports direct live comparison, a legacy
+# committed-lock baseline, and a stronger source-bound live baseline for Spaces
+# that expose their exact protected Git SHA through a read-only build-info route.
+# No mode auto-overwrites either side.
 
 on:
   workflow_call:
@@ -47,17 +30,17 @@ on:
         type: string
         default: ""
       mode:
-        description: "direct, or trusted-baseline for PR-safe deployed-baseline verification."
+        description: "direct, trusted-baseline, or source-bound-baseline for PR-safe immutable deployment verification."
         required: false
         type: string
         default: "direct"
       deployment-lock-path:
-        description: "Repo-relative lock path read from trusted-base-ref, never the candidate checkout."
+        description: "Legacy trusted-baseline mode: repo-relative lock path read from trusted-base-ref."
         required: false
         type: string
         default: ".github/hf-deployment-lock.json"
       trusted-base-ref:
-        description: "Exact 40-character PR base SHA that owns the deployment lock."
+        description: "Exact 40-character PR base SHA."
         required: false
         type: string
         default: ""
@@ -71,6 +54,11 @@ on:
         required: false
         type: string
         default: "Dockerfile"
+      source-probe-path:
+        description: "Source-bound mode: same-host read-only JSON path exposing build.state and exact build.revision."
+        required: false
+        type: string
+        default: "/api/build-info"
 
 permissions:
   contents: read
@@ -92,23 +80,26 @@ jobs:
         run: |
           set -euo pipefail
           case "${MODE}" in
-            direct|trusted-baseline) ;;
-            *) echo "::error::mode must be direct or trusted-baseline"; exit 1 ;;
+            direct|trusted-baseline|source-bound-baseline) ;;
+            *) echo "::error::mode must be direct, trusted-baseline, or source-bound-baseline"; exit 1 ;;
           esac
 
-      - name: Checkout caller (GitHub source-of-truth)
+      - name: Checkout caller for direct comparison
         if: inputs.mode == 'direct'
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
           path: caller
           ref: ${{ inputs.github-ref != '' && inputs.github-ref || inputs.ref }}
+          persist-credentials: false
 
-      - name: Validate trusted-baseline inputs
-        if: inputs.mode == 'trusted-baseline'
+      - name: Validate immutable PR-baseline inputs
+        if: inputs.mode == 'trusted-baseline' || inputs.mode == 'source-bound-baseline'
         env:
+          MODE: ${{ inputs.mode }}
           TRUSTED_BASE_REF: ${{ inputs.trusted-base-ref }}
           CANDIDATE_REF: ${{ inputs.candidate-ref }}
           LOCK_PATH: ${{ inputs.deployment-lock-path }}
+          SOURCE_PROBE_PATH: ${{ inputs.source-probe-path }}
         run: |
           set -euo pipefail
           sha_re='^[0-9a-f]{40}$'
@@ -122,14 +113,21 @@ jobs:
               exit 1
             }
           fi
-          case "${LOCK_PATH}" in
-            /*|*..*|*\\*)
-              echo "::error::deployment-lock-path must be a safe repo-relative path"
-              exit 1
-              ;;
-          esac
+          if [ "${MODE}" = 'trusted-baseline' ]; then
+            case "${LOCK_PATH}" in
+              /*|*..*|*\*)
+                echo "::error::deployment-lock-path must be a safe repo-relative path"
+                exit 1
+                ;;
+            esac
+          else
+            case "${SOURCE_PROBE_PATH}" in
+              /*) ;;
+              *) echo "::error::source-probe-path must be a same-host absolute path"; exit 1 ;;
+            esac
+          fi
 
-      - name: Checkout trusted base (deployment-lock authority)
+      - name: Checkout trusted base lock authority
         if: inputs.mode == 'trusted-baseline'
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
@@ -137,15 +135,13 @@ jobs:
           ref: ${{ inputs.trusted-base-ref }}
           persist-credentials: false
 
-      - name: Checkout exact reusable-workflow revision (shared checker)
+      - name: Checkout exact reusable-workflow revision
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
-          # A reusable workflow must run the checker shipped with the exact
-          # workflow revision the caller pinned, never mutable default-branch
-          # code. GitHub exposes both values in the reusable job context.
           repository: ${{ job.workflow_repository }}
           ref: ${{ job.workflow_sha }}
           path: tools
+          persist-credentials: false
 
       - name: Set up Python
         uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
@@ -155,7 +151,7 @@ jobs:
       - name: Compare COPY'd modules against the live HF Space
         if: inputs.mode == 'direct'
         env:
-          GITHUB_TOKEN: ${{ github.token }} # commit-date lookups (which side is ahead)
+          GITHUB_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
           HF_REPO_IN: ${{ inputs.hf-repo }}
           REF: ${{ inputs.ref }}
@@ -168,10 +164,9 @@ jobs:
           if [ -n "${HF_REPO_IN}" ]; then
             HF_REPO="${HF_REPO_IN}"
           else
-            # Convention: szl-holdings/<x> -> SZLHOLDINGS/<x> (HF org is UPPERCASE).
             HF_REPO="SZLHOLDINGS/${GH_REPO##*/}"
           fi
-          echo "Comparing ${GH_REPO} @ ${GH_SOURCE_REF} (checkout) <-> ${HF_REPO} @ ${HF_SOURCE_REF} (live HF Space)"
+          echo "Comparing ${GH_REPO} @ ${GH_SOURCE_REF} <-> ${HF_REPO} @ ${HF_SOURCE_REF}"
           python3 tools/.github/scripts/hf_module_drift_check.py \
             --repo-root caller \
             --github-repo "${GH_REPO}" \
@@ -182,7 +177,7 @@ jobs:
             --allow caller/.github/hf-module-drift-allow.json \
             --report-out hf-module-drift-report.out.json
 
-      - name: Verify immutable deployed baseline and report candidate plan
+      - name: Verify committed immutable deployed baseline and report candidate plan
         if: inputs.mode == 'trusted-baseline'
         env:
           GITHUB_TOKEN: ${{ github.token }}
@@ -209,6 +204,33 @@ jobs:
             --report-out hf-module-drift-report.out.json \
             --candidate-report-out hf-managed-candidate-plan.out.json
 
+      - name: Verify source-bound immutable live baseline and report candidate plan
+        if: inputs.mode == 'source-bound-baseline'
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          HF_REPO_IN: ${{ inputs.hf-repo }}
+          TRUSTED_BASE_REF: ${{ inputs.trusted-base-ref }}
+          CANDIDATE_REF: ${{ inputs.candidate-ref }}
+          DOCKERFILE_PATH: ${{ inputs.dockerfile-path }}
+          SOURCE_PROBE_PATH: ${{ inputs.source-probe-path }}
+        run: |
+          set -euo pipefail
+          if [ -n "${HF_REPO_IN}" ]; then
+            HF_REPO="${HF_REPO_IN}"
+          else
+            HF_REPO="SZLHOLDINGS/${GH_REPO##*/}"
+          fi
+          python3 tools/.github/scripts/hf_source_bound_baseline.py \
+            --github-repo "${GH_REPO}" \
+            --hf-repo "${HF_REPO}" \
+            --trusted-base-ref "${TRUSTED_BASE_REF}" \
+            --candidate-ref "${CANDIDATE_REF}" \
+            --dockerfile-path "${DOCKERFILE_PATH}" \
+            --source-probe-path "${SOURCE_PROBE_PATH}" \
+            --report-out hf-module-drift-report.out.json \
+            --candidate-report-out hf-managed-candidate-plan.out.json
+
       - name: Upload drift report
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
@@ -218,3 +240,4 @@ jobs:
             hf-module-drift-report.out.json
             hf-managed-candidate-plan.out.json
           if-no-files-found: ignore
+          retention-days: 90
