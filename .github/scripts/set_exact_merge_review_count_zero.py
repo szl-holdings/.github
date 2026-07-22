@@ -1,17 +1,18 @@
 #!/usr/bin/env python3
-"""Set required approval count to zero for the exact owner-authorized merge wave.
+"""Set required approval counts to zero for the exact merge manifest.
 
-This is intentionally narrower than disabling branch protection. For each exact
-repository in ``owner_authorized_merge_wave.json`` and only for ``main``:
+The utility checks both GitHub protection layers independently because a branch
+can be covered by a ruleset and classic branch protection at the same time.
+For each exact repository in the owner-authorized manifest and only for `main`:
 
-* active rulesets keep every rule and parameter unchanged except
-  ``pull_request.required_approving_review_count`` becomes ``0``;
-* classic branch protection keeps the pull-request review protection object and
-  changes only ``required_approving_review_count`` to ``0``.
+* every active ruleset pull-request rule keeps all parameters unchanged except
+  `required_approving_review_count` becomes `0`;
+* classic pull-request review protection remains present and keeps all settings
+  unchanged except `required_approving_review_count` becomes `0`.
 
-Status checks, signed-commit requirements, linear history, force-push and branch
--deletion restrictions, review-thread resolution, code-owner settings, stale-
-review behavior, and all other controls are preserved and verified by readback.
+All non-review rules, status checks, signatures, linear-history constraints,
+force-push/deletion restrictions, review-thread resolution, code-owner settings,
+and stale-review behavior are preserved and verified by readback.
 """
 from __future__ import annotations
 
@@ -51,7 +52,7 @@ def request(
             "Accept": "application/vnd.github+json",
             "Authorization": f"Bearer {token}",
             "X-GitHub-Api-Version": API_VERSION,
-            "User-Agent": "szl-zero-review-count/1.0",
+            "User-Agent": "szl-zero-review-count/2.0",
             **({"Content-Type": "application/json"} if body is not None else {}),
         },
     )
@@ -91,8 +92,8 @@ def approval_count(value: Any) -> int:
         raise GateError(f"invalid required approval count: {value!r}") from exc
 
 
-def active_review_rules(active_rules: list[dict[str, Any]]) -> list[dict[str, Any]]:
-    result = []
+def positive_review_rules(active_rules: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    result: list[dict[str, Any]] = []
     for rule in active_rules:
         if rule.get("type") != "pull_request":
             continue
@@ -140,7 +141,9 @@ def ruleset_non_rule_state(ruleset: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-def zero_ruleset_review_counts(rules: list[dict[str, Any]]) -> tuple[list[dict[str, Any]], int]:
+def zero_ruleset_review_counts(
+    rules: list[dict[str, Any]],
+) -> tuple[list[dict[str, Any]], int]:
     expected = copy.deepcopy(rules)
     changed = 0
     for rule in expected:
@@ -173,7 +176,7 @@ def classic_non_review_state(protection: dict[str, Any]) -> dict[str, Any]:
 def classic_review_state_without_count(protection: dict[str, Any]) -> dict[str, Any]:
     review = protection.get("required_pull_request_reviews")
     if not isinstance(review, dict):
-        raise GateError("classic pull-request review protection is missing")
+        return {}
     return {
         key: value
         for key, value in review.items()
@@ -202,7 +205,7 @@ def main() -> int:
     manifest = load_manifest(args.manifest)
     branch = manifest["base_branch"]
     report: dict[str, Any] = {
-        "schema": "szl.exact-merge-review-count-report/v1",
+        "schema": "szl.exact-merge-review-count-report/v2",
         "generated_at": datetime.now(timezone.utc).isoformat(),
         "execute": bool(args.execute),
         "organization": "szl-holdings",
@@ -222,6 +225,14 @@ def main() -> int:
             encoded_owner = urllib.parse.quote(owner, safe="")
             encoded_repo = urllib.parse.quote(repo, safe="")
             encoded_branch = urllib.parse.quote(branch, safe="")
+
+            record: dict[str, Any] = {
+                "repository": repository,
+                "branch": branch,
+                "positive_protection_layers": [],
+                "rulesets": [],
+            }
+
             rules_path = (
                 f"/repos/{encoded_owner}/{encoded_repo}/rules/branches/"
                 f"{encoded_branch}?per_page=100"
@@ -229,49 +240,36 @@ def main() -> int:
             active = request(token, "GET", rules_path)
             if not isinstance(active, list):
                 raise GateError(f"{repository} returned a non-list branch-rule payload")
-            review_rules = active_review_rules(active)
-            record: dict[str, Any] = {
-                "repository": repository,
-                "branch": branch,
-                "protection_model": None,
-            }
-            if review_rules:
-                record["protection_model"] = "ruleset"
-                record["rulesets"] = []
-                for rule in review_rules:
-                    endpoint, key = ruleset_endpoint(rule, repository)
-                    record["rulesets"].append(key)
-                    discovered.setdefault(
-                        key,
-                        {
-                            "endpoint": endpoint,
-                            "repositories": set(),
-                        },
-                    )["repositories"].add(repository)
-            else:
-                protection_path = (
-                    f"/repos/{encoded_owner}/{encoded_repo}/branches/"
-                    f"{encoded_branch}/protection"
-                )
-                protection = request(token, "GET", protection_path, allow_status={404})
-                if not isinstance(protection, dict):
-                    raise GateError(
-                        f"{repository}@{branch} has neither a review ruleset nor "
-                        "readable classic branch protection"
-                    )
+            for rule in positive_review_rules(active):
+                endpoint, key = ruleset_endpoint(rule, repository)
+                record["positive_protection_layers"].append("ruleset")
+                record["rulesets"].append(key)
+                discovered.setdefault(
+                    key,
+                    {"endpoint": endpoint, "repositories": set()},
+                )["repositories"].add(repository)
+
+            protection_path = (
+                f"/repos/{encoded_owner}/{encoded_repo}/branches/"
+                f"{encoded_branch}/protection"
+            )
+            protection = request(token, "GET", protection_path, allow_status={404})
+            if isinstance(protection, dict):
                 count = classic_count(protection)
-                if count <= 0:
-                    raise GateError(
-                        f"{repository}@{branch} does not currently require an approval"
+                record["classic_required_approving_review_count"] = count
+                if count > 0:
+                    record["positive_protection_layers"].append("classic")
+                    classic.append(
+                        {
+                            "repository": repository,
+                            "protection_path": protection_path,
+                        }
                     )
-                record["protection_model"] = "classic"
-                record["required_approving_review_count_before"] = count
-                classic.append(
-                    {
-                        "repository": repository,
-                        "protection_path": protection_path,
-                    }
-                )
+
+            if not record["positive_protection_layers"]:
+                record["status"] = "already-zero-or-no-review-requirement"
+            else:
+                record["status"] = "mutation-required"
             report["repositories"].append(record)
 
         for key in sorted(discovered):
@@ -281,21 +279,28 @@ def main() -> int:
             if before.get("target") != "branch" or before.get("enforcement") != "active":
                 raise GateError(f"{key} is not an active branch ruleset")
             expected_rules, changed = zero_ruleset_review_counts(before.get("rules") or [])
-            if changed <= 0:
-                raise GateError(f"{key} exposed no positive review count at update time")
-            if args.execute:
-                request(token, "PUT", endpoint, {"rules": expected_rules})
-                time.sleep(1)
+            action = "already-zero"
+            if changed > 0:
+                action = (
+                    "set-review-count-zero"
+                    if args.execute
+                    else "would-set-review-count-zero"
+                )
+                if args.execute:
+                    request(token, "PUT", endpoint, {"rules": expected_rules})
+                    time.sleep(1)
             after = request(token, "GET", endpoint) if args.execute else before
             if ruleset_non_rule_state(after) != ruleset_non_rule_state(before):
                 raise GateError(f"{key} changed outside rules")
-            if args.execute and after.get("rules") != expected_rules:
-                raise GateError(f"{key} rules readback differs from the exact expected mutation")
+            if args.execute and changed > 0 and after.get("rules") != expected_rules:
+                raise GateError(
+                    f"{key} rules readback differs from the exact expected mutation"
+                )
             report["rulesets"].append(
                 {
                     "key": key,
                     "repositories": sorted(item["repositories"]),
-                    "action": "set-review-count-zero" if args.execute else "would-set-review-count-zero",
+                    "action": action,
                     "rules_before": before.get("rules") or [],
                     "rules_after": expected_rules,
                     "preserved": ruleset_non_rule_state(before),
@@ -307,19 +312,23 @@ def main() -> int:
             protection_path = item["protection_path"]
             before = request(token, "GET", protection_path)
             count_before = classic_count(before)
-            if count_before <= 0:
-                raise GateError(f"{repository} approval count moved before mutation")
             non_review_before = classic_non_review_state(before)
             review_before = classic_review_state_without_count(before)
-            review_path = protection_path + "/required_pull_request_reviews"
-            if args.execute:
-                request(
-                    token,
-                    "PATCH",
-                    review_path,
-                    {"required_approving_review_count": 0},
+            action = "already-zero"
+            if count_before > 0:
+                action = (
+                    "set-review-count-zero"
+                    if args.execute
+                    else "would-set-review-count-zero"
                 )
-                time.sleep(1)
+                if args.execute:
+                    request(
+                        token,
+                        "PATCH",
+                        protection_path + "/required_pull_request_reviews",
+                        {"required_approving_review_count": 0},
+                    )
+                    time.sleep(1)
             after = request(token, "GET", protection_path) if args.execute else before
             if args.execute:
                 if classic_count(after) != 0:
@@ -334,7 +343,7 @@ def main() -> int:
                 {
                     "repository": repository,
                     "branch": branch,
-                    "action": "set-review-count-zero" if args.execute else "would-set-review-count-zero",
+                    "action": action,
                     "required_approving_review_count_before": count_before,
                     "required_approving_review_count_after": 0,
                     "preserved_non_review_state": non_review_before,
