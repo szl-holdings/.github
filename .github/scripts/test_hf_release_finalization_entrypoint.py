@@ -5,6 +5,7 @@ import importlib
 import pathlib
 import sys
 import unittest
+import unittest.mock
 
 HERE = pathlib.Path(__file__).resolve().parent
 if str(HERE) not in sys.path:
