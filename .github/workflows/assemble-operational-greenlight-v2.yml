@@ -1,0 +1,369 @@
+name: Assemble Operational Green-Light v2
+
+on:
+  push:
+    branches: [ops/operational-greenlight-v2-main]
+    paths:
+      - .github/workflows/assemble-operational-greenlight-v2.yml
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+
+concurrency:
+  group: assemble-operational-greenlight-v2-main
+  cancel-in-progress: false
+
+jobs:
+  assemble:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout clean branch
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ops/operational-greenlight-v2-main
+          persist-credentials: true
+          fetch-depth: 0
+
+      - name: Import only vetted controller scripts
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch origin ops/greenlight-finalize-20260722
+          git checkout origin/ops/greenlight-finalize-20260722 -- \
+            .github/scripts/operational_greenlight_v2.py \
+            .github/scripts/hf_estate_greenlight_final.py \
+            .github/scripts/discover_replit_receipt.py \
+            .github/scripts/hf_domain_receipt_publish.py
+
+      - name: Create scheduled supported-API Hub finalizer
+        shell: bash
+        run: |
+          cat > .github/workflows/hf-estate-greenlight-final-main.yml <<'YAML'
+          name: Hugging Face Estate Green-Light Final
+
+          on:
+            push:
+              branches: [main]
+              paths:
+                - .github/scripts/hf_estate_greenlight_final.py
+                - .github/workflows/hf-estate-greenlight-final-main.yml
+            schedule:
+              - cron: "11 */6 * * *"
+            workflow_dispatch: {}
+
+          permissions:
+            contents: read
+            issues: write
+
+          concurrency:
+            group: hugging-face-estate-greenlight-final-main
+            cancel-in-progress: false
+
+          env:
+            HF_ORG_TOKEN: ${{ secrets.HF_ORG_TOKEN || secrets.HF_ORG_TOKEN1 }}
+            HF_TOKEN: ${{ secrets.HF_TOKEN }}
+            SZL_GITHUB_TOKEN: ${{ secrets.SZL_GITHUB_TOKEN }}
+            HF_HUB_DISABLE_PROGRESS_BARS: "1"
+            GH_TOKEN: ${{ github.token }}
+
+          jobs:
+            finalize:
+              runs-on: ubuntu-latest
+              timeout-minutes: 180
+              steps:
+                - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+                  with:
+                    persist-credentials: false
+                    fetch-depth: 1
+                - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+                  with:
+                    python-version: "3.12"
+                - name: Install supported Hugging Face client
+                  run: python -m pip install --disable-pip-version-check "huggingface_hub>=1.4,<2"
+                - name: Validate implementation
+                  run: |
+                    set -euo pipefail
+                    python -m py_compile .github/scripts/hf_estate_greenlight_final.py
+                    git diff --check
+                - name: Execute publish-mode finalizer
+                  id: execute
+                  shell: bash
+                  run: |
+                    mkdir -p reports
+                    set +e
+                    python .github/scripts/hf_estate_greenlight_final.py \
+                      --report reports/hf-estate-greenlight-final.json \
+                      --publish
+                    code=$?
+                    echo "exit_code=${code}" >> "$GITHUB_OUTPUT"
+                    exit 0
+                - name: Upload immutable report
+                  if: always()
+                  uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+                  with:
+                    name: hf-estate-greenlight-final-${{ github.run_id }}
+                    path: reports/hf-estate-greenlight-final.json
+                    if-no-files-found: error
+                    retention-days: 90
+                - name: Enforce real result
+                  if: always()
+                  run: |
+                    code="${{ steps.execute.outputs.exit_code }}"
+                    if [ -z "$code" ]; then code=2; fi
+                    exit "$code"
+          YAML
+
+      - name: Create scheduled Replit receipt verifier
+        shell: bash
+        run: |
+          cat > .github/workflows/discover-replit-receipt-main.yml <<'YAML'
+          name: Discover Unified Control Hub Receipt
+
+          on:
+            push:
+              branches: [main]
+              paths:
+                - .github/scripts/discover_replit_receipt.py
+                - .github/workflows/discover-replit-receipt-main.yml
+            schedule:
+              - cron: "*/30 * * * *"
+            workflow_dispatch: {}
+
+          permissions:
+            contents: read
+            issues: write
+
+          concurrency:
+            group: discover-unified-control-hub-receipt-main
+            cancel-in-progress: false
+
+          env:
+            SZL_GITHUB_TOKEN: ${{ secrets.SZL_GITHUB_TOKEN }}
+            GH_TOKEN: ${{ github.token }}
+
+          jobs:
+            discover:
+              runs-on: ubuntu-latest
+              timeout-minutes: 20
+              steps:
+                - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+                  with:
+                    persist-credentials: false
+                    fetch-depth: 1
+                - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+                  with:
+                    python-version: "3.12"
+                - name: Validate implementation
+                  run: |
+                    set -euo pipefail
+                    python -m py_compile .github/scripts/discover_replit_receipt.py
+                    git diff --check
+                - name: Discover and bind receipt
+                  id: execute
+                  shell: bash
+                  run: |
+                    mkdir -p reports
+                    set +e
+                    python .github/scripts/discover_replit_receipt.py \
+                      --report reports/replit-receipt-discovery-latest.json \
+                      --attempts 3 \
+                      --interval-seconds 120
+                    code=$?
+                    echo "exit_code=${code}" >> "$GITHUB_OUTPUT"
+                    exit 0
+                - name: Upload immutable report
+                  if: always()
+                  uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+                  with:
+                    name: replit-receipt-discovery-${{ github.run_id }}
+                    path: reports/replit-receipt-discovery-latest.json
+                    if-no-files-found: error
+                    retention-days: 90
+                - name: Enforce verified receipt
+                  if: always()
+                  run: |
+                    code="${{ steps.execute.outputs.exit_code }}"
+                    if [ -z "$code" ]; then code=2; fi
+                    exit "$code"
+          YAML
+
+      - name: Create scheduled A11oy domain receipt publisher
+        shell: bash
+        run: |
+          cat > .github/workflows/hf-domain-receipt-publish-main.yml <<'YAML'
+          name: Publish A11oy Public Domain Receipt
+
+          on:
+            push:
+              branches: [main]
+              paths:
+                - .github/scripts/hf_domain_receipt_publish.py
+                - .github/workflows/hf-domain-receipt-publish-main.yml
+            schedule:
+              - cron: "41 */6 * * *"
+            workflow_dispatch: {}
+
+          permissions:
+            contents: read
+
+          concurrency:
+            group: publish-a11oy-public-domain-receipt-main
+            cancel-in-progress: false
+
+          env:
+            HF_ORG_TOKEN: ${{ secrets.HF_ORG_TOKEN || secrets.HF_ORG_TOKEN1 }}
+            HF_TOKEN: ${{ secrets.HF_TOKEN }}
+            HF_HUB_DISABLE_PROGRESS_BARS: "1"
+
+          jobs:
+            publish:
+              runs-on: ubuntu-latest
+              timeout-minutes: 120
+              steps:
+                - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+                  with:
+                    persist-credentials: false
+                    fetch-depth: 1
+                - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+                  with:
+                    python-version: "3.12"
+                - name: Install supported Hugging Face client
+                  run: python -m pip install --disable-pip-version-check "huggingface_hub>=1.4,<2"
+                - name: Validate implementation
+                  run: |
+                    set -euo pipefail
+                    python -m py_compile .github/scripts/hf_domain_receipt_publish.py
+                    git diff --check
+                - name: Publish immutable domain receipt
+                  id: execute
+                  shell: bash
+                  run: |
+                    mkdir -p reports
+                    set +e
+                    python .github/scripts/hf_domain_receipt_publish.py \
+                      --report reports/hf-domain-receipt-publication.json
+                    code=$?
+                    echo "exit_code=${code}" >> "$GITHUB_OUTPUT"
+                    exit 0
+                - name: Upload immutable report
+                  if: always()
+                  uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+                  with:
+                    name: hf-domain-receipt-publication-${{ github.run_id }}
+                    path: reports/hf-domain-receipt-publication.json
+                    if-no-files-found: error
+                    retention-days: 90
+                - name: Enforce public receipt
+                  if: always()
+                  run: |
+                    code="${{ steps.execute.outputs.exit_code }}"
+                    if [ -z "$code" ]; then code=2; fi
+                    exit "$code"
+          YAML
+
+      - name: Create scheduled final estate controller
+        shell: bash
+        run: |
+          cat > .github/workflows/operational-greenlight-v2-main.yml <<'YAML'
+          name: Operational Estate Green-Light v2
+
+          on:
+            push:
+              branches: [main]
+              paths:
+                - .github/scripts/operational_greenlight_v2.py
+                - .github/workflows/operational-greenlight-v2-main.yml
+            schedule:
+              - cron: "17 * * * *"
+            workflow_dispatch: {}
+
+          permissions:
+            contents: read
+            issues: write
+
+          concurrency:
+            group: operational-estate-greenlight-v2-main
+            cancel-in-progress: false
+
+          env:
+            SZL_GITHUB_TOKEN: ${{ secrets.SZL_GITHUB_TOKEN }}
+            HF_ORG_TOKEN: ${{ secrets.HF_ORG_TOKEN || secrets.HF_ORG_TOKEN1 }}
+            HF_TOKEN: ${{ secrets.HF_TOKEN }}
+            GH_TOKEN: ${{ github.token }}
+
+          jobs:
+            greenlight:
+              runs-on: ubuntu-latest
+              timeout-minutes: 360
+              steps:
+                - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+                  with:
+                    persist-credentials: false
+                    fetch-depth: 1
+                - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+                  with:
+                    python-version: "3.12"
+                - name: Validate implementation
+                  run: |
+                    set -euo pipefail
+                    python -m py_compile .github/scripts/operational_greenlight_v2.py
+                    git diff --check
+                - name: Execute evidence-driven convergence
+                  id: execute
+                  shell: bash
+                  run: |
+                    mkdir -p reports
+                    set +e
+                    python .github/scripts/operational_greenlight_v2.py \
+                      --report reports/operational-greenlight-v2-latest.json \
+                      --cycles 2 \
+                      --wait-seconds 300
+                    code=$?
+                    echo "exit_code=${code}" >> "$GITHUB_OUTPUT"
+                    exit 0
+                - name: Upload immutable report
+                  if: always()
+                  uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+                  with:
+                    name: operational-greenlight-v2-${{ github.run_id }}
+                    path: reports/operational-greenlight-v2-latest.json
+                    if-no-files-found: error
+                    retention-days: 90
+                - name: Enforce final state
+                  if: always()
+                  run: |
+                    code="${{ steps.execute.outputs.exit_code }}"
+                    if [ -z "$code" ]; then code=2; fi
+                    exit "$code"
+          YAML
+
+      - name: Validate assembled files and remove bootstrap
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m py_compile \
+            .github/scripts/operational_greenlight_v2.py \
+            .github/scripts/hf_estate_greenlight_final.py \
+            .github/scripts/discover_replit_receipt.py \
+            .github/scripts/hf_domain_receipt_publish.py
+          git rm .github/workflows/assemble-operational-greenlight-v2.yml
+          git diff --check
+
+      - name: Commit clean control plane
+        shell: bash
+        run: |
+          set -euo pipefail
+          git add .github/scripts .github/workflows
+          if git diff --cached --quiet; then
+            echo 'Control plane is already assembled.'
+            exit 0
+          fi
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git commit \
+            -m 'ops(greenlight): install scheduled evidence-driven control plane' \
+            -m 'Retain only supported-API Hugging Face, public-domain receipt, Replit receipt, and final estate verification lanes.' \
+            -m 'Signed-off-by: github-actions[bot] <41898282+github-actions[bot]@users.noreply.github.com>'
+          git push origin HEAD:ops/operational-greenlight-v2-main
