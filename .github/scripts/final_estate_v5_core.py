@@ -87,11 +87,8 @@ PROBES = {
         "json",
         required_keys=("honest", "matrix_available", "probe_verdict_available", "view"),
     ),
-    "a11oy_3d_estate": ProbeSpec(
-        "https://szlholdings-a11oy.hf.space/static/3d/estate.html", True, "html"
-    ),
-    "a11oy_3d_brain": ProbeSpec(
-        "https://szlholdings-a11oy.hf.space/static/3d/brain.html", True, "html"
+    "a11oy_holographic": ProbeSpec(
+        "https://szlholdings-a11oy.hf.space/static/3d/holographic.html", True, "html"
     ),
 }
 

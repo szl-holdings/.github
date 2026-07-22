@@ -127,11 +127,18 @@ class FinalEstateProbeV5Tests(unittest.TestCase):
     def test_readiness_query_url_has_valid_https_origin(self) -> None:
         self.assertIsNotNone(https_origin(PROBES["a11oy_readiness"].url))
 
-    def test_real_3d_routes_replace_dead_holographic_filename(self) -> None:
+    def test_3d_probe_matches_the_dockerfile_shipped_console_surface(self) -> None:
         urls = {spec.url for spec in PROBES.values()}
-        self.assertFalse(any(url.endswith("/holographic.html") for url in urls))
-        self.assertIn("https://szlholdings-a11oy.hf.space/static/3d/estate.html", urls)
-        self.assertIn("https://szlholdings-a11oy.hf.space/static/3d/brain.html", urls)
+        self.assertIn(
+            "https://szlholdings-a11oy.hf.space/static/3d/holographic.html", urls
+        )
+        self.assertFalse(any(url.endswith("/estate.html") for url in urls))
+        self.assertFalse(any(url.endswith("/brain.html") for url in urls))
+        self.assertEqual(
+            PROBES["a11oy_holographic"].url,
+            "https://szlholdings-a11oy.hf.space/static/3d/holographic.html",
+        )
+        self.assertTrue(PROBES["a11oy_holographic"].require_head)
 
     def test_issue_body_is_machine_readable_and_marks_decommission(self) -> None:
         report = {
