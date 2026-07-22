@@ -1,0 +1,130 @@
+name: One-shot — permanently disable legacy A11oy clone creator
+
+on:
+  push:
+    branches: [fix/permanent-no-clone-base-publisher]
+    paths:
+      - .github/workflows/one-shot-disable-legacy-clone-creator.yml
+
+permissions:
+  contents: write
+
+jobs:
+  harden:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout exact hardening branch
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          ref: fix/permanent-no-clone-base-publisher
+          fetch-depth: 0
+
+      - name: Remove all base-publisher clone creation code
+        shell: python
+        run: |
+          from pathlib import Path
+          import re
+
+          script = Path('.github/scripts/hf_estate_upgrade.py')
+          text = script.read_text(encoding='utf-8')
+          text = text.replace(
+              '- creates/refreshes four private CPU-basic clones of the flagship a11oy Space;\n',
+              '- permanently disables A11oy clone creation; experimental work belongs in branches or expiring previews;\n',
+              1,
+          )
+          old = 'CLONE_IDS = [f"{ORG}/a11oy-clone-{index}" for index in range(1, 5)]'
+          if text.count(old) != 1:
+              raise SystemExit('legacy CLONE_IDS declaration drifted')
+          text = text.replace(old, 'CLONE_IDS: list[str] = []', 1)
+
+          replacement = '''    def create_or_refresh_clones(self) -> None:
+                  """Permanent no-clone policy for the canonical A11oy estate."""
+                  self.record(
+                      FLAGSHIP_SPACE,
+                      "a11oy-clone-policy",
+                      "ok",
+                      "disabled: use Git branches, pull requests, or expiring previews",
+                  )
+
+          '''
+          replacement = replacement.replace('          ', '')
+          text, count = re.subn(
+              r'    def _sync_existing_clone\(self, source: str, destination: str\) -> None:\n.*?(?=    def _ensure_collection)',
+              replacement,
+              text,
+              count=1,
+              flags=re.S,
+          )
+          if count != 1:
+              raise SystemExit('legacy clone methods were not found exactly once')
+
+          old_report = '            "clone_ids": CLONE_IDS,\n'
+          if text.count(old_report) != 1:
+              raise SystemExit('legacy clone report field drifted')
+          text = text.replace(
+              old_report,
+              '            "clone_ids": [],\n            "clone_creation_enabled": False,\n',
+              1,
+          )
+          script.write_text(text, encoding='utf-8', newline='\n')
+
+          tests = Path('.github/scripts/test_hf_estate_canonicalize.py')
+          test_text = tests.read_text(encoding='utf-8')
+          anchor = '''    def test_source_contains_no_clone_creation_or_publication_path(self) -> None:
+          '''.replace('          ', '')
+          if test_text.count(anchor) != 1:
+              raise SystemExit('test insertion anchor drifted')
+          new_test = '''    def test_base_publisher_has_no_clone_creation_capability(self) -> None:
+                  source = (SCRIPT_DIR / "hf_estate_upgrade.py").read_text(encoding="utf-8")
+                  self.assertEqual(single.legacy.CLONE_IDS, [])
+                  self.assertIn("CLONE_IDS: list[str] = []", source)
+                  self.assertIn('"clone_creation_enabled": False', source)
+                  for forbidden in (
+                      "duplicate_repo(",
+                      "duplicate_space(",
+                      "_sync_existing_clone",
+                      "space_sleep_time=",
+                      '"clone-refresh"',
+                      '"flagship-clone"',
+                  ):
+                      self.assertNotIn(forbidden, source)
+
+          '''.replace('          ', '')
+          test_text = test_text.replace(anchor, new_test + anchor, 1)
+          tests.write_text(test_text, encoding='utf-8', newline='\n')
+
+      - name: Verify permanent no-clone contract
+        run: |
+          set -euo pipefail
+          python -m pip install --disable-pip-version-check --quiet \
+            "huggingface_hub>=1.3,<2" \
+            "requests>=2.32,<3"
+          python -m py_compile \
+            .github/scripts/hf_estate_upgrade.py \
+            .github/scripts/hf_estate_canonicalize.py \
+            .github/scripts/test_hf_estate_canonicalize.py
+          python .github/scripts/test_hf_estate_canonicalize.py
+          python - <<'PY'
+          from pathlib import Path
+          source = Path('.github/scripts/hf_estate_upgrade.py').read_text()
+          assert 'duplicate_repo(' not in source
+          assert '_sync_existing_clone' not in source
+          assert 'CLONE_IDS: list[str] = []' in source
+          assert 'clone_creation_enabled": False' in source
+          print('base publisher permanent no-clone contract: PASS')
+          PY
+          git diff --check
+
+      - name: Commit hardening and self-remove
+        run: |
+          set -euo pipefail
+          rm .github/workflows/one-shot-disable-legacy-clone-creator.yml
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add --all
+          git commit \
+            -m 'fix(hf): permanently remove legacy A11oy clone creation' \
+            -m 'Make the generic estate publisher itself no-clone, not merely the canonical wrapper: clear the clone set, remove duplicate/sync code, publish an explicit disabled policy, and add regression coverage.' \
+            -m 'Signed-off-by: github-actions[bot] <41898282+github-actions[bot]@users.noreply.github.com>'
+          git push origin HEAD:fix/permanent-no-clone-base-publisher
