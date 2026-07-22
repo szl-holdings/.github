@@ -1,6 +1,7 @@
 name: HF Estate Upgrade
 
 # Organization-wide, non-destructive Hub maintenance.
+# Dedicated deployment-branch trigger: 2026-07-22T05:44Z.
 on:
   push:
     branches:
