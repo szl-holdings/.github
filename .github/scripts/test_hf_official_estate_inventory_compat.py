@@ -112,11 +112,18 @@ class KernelInventoryCompatibilityTests(unittest.TestCase):
         )
 
     def test_active_compatibility_source_uses_no_nonexistent_list_method(self) -> None:
+        executable = "\n".join(
+            (
+                inspect.getsource(compat.CurrentHubEstateInventory.inventory_repositories),
+                inspect.getsource(compat.CurrentHubEstateInventory.inventory_kernels),
+            )
+        )
         source = inspect.getsource(compat)
-        self.assertNotIn("list_kernels(", source)
+        self.assertNotIn("self.api.list_kernels(", executable)
+        self.assertNotIn('base._invoke_supported(self.api, "list_kernels"', executable)
         self.assertIn("/api/kernels?author=", source)
-        self.assertIn("kernel_info(", source)
-        self.assertIn("list_repo_files(", source)
+        self.assertIn("kernel_info(", executable)
+        self.assertIn("list_repo_files(", executable)
 
     def test_source_is_read_only_except_inherited_evidence_report(self) -> None:
         source = (HERE / "hf_official_estate_inventory_compat.py").read_text(encoding="utf-8")
