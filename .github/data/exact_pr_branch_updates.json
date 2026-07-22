@@ -3,11 +3,11 @@
   "targets": [
     {
       "repository": "szl-holdings/a11oy",
-      "pull_request": 1028,
-      "expected_head_sha": "50e56a2b58e990658e6eff58566e7f8afef05396",
+      "pull_request": 1003,
+      "expected_head_sha": "12e48dfa683ee3ed279a90a2738c2519a0ce5df5",
       "expected_base_branch": "main",
-      "expected_base_sha": "383e4c5c8143622d8943763080dc737703df07d2",
-      "purpose": "Rebase trusted HF deployment-lock authority onto the repaired SDA contract PR"
+      "expected_base_sha": "7338cb4f72b50184bcdaaf61f6e2205ab8d54d54",
+      "purpose": "Rebase the honest Brain capabilities manifest onto current protected main"
     }
   ]
 }
