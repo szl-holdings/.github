@@ -1,0 +1,145 @@
+name: Operational Estate Convergence
+
+on:
+  push:
+    branches: [ops/greenlight-finalize-20260722]
+    paths:
+      - .github/scripts/greenlight_converge.py
+      - .github/workflows/greenlight-converge.yml
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+  issues: write
+
+concurrency:
+  group: operational-estate-convergence-20260722
+  cancel-in-progress: false
+
+env:
+  SZL_GITHUB_TOKEN: ${{ secrets.SZL_GITHUB_TOKEN }}
+  GH_TOKEN: ${{ github.token }}
+
+jobs:
+  converge:
+    name: Re-run exact protected producers until final evidence is green
+    runs-on: ubuntu-latest
+    timeout-minutes: 350
+    steps:
+      - name: Checkout convergence branch
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ops/greenlight-finalize-20260722
+          persist-credentials: false
+          fetch-depth: 1
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12"
+
+      - name: Validate convergence implementation
+        run: |
+          set -euo pipefail
+          python -m py_compile .github/scripts/greenlight_converge.py
+          python - <<'PY'
+          import importlib.util
+          from pathlib import Path
+
+          path = Path('.github/scripts/greenlight_converge.py')
+          spec = importlib.util.spec_from_file_location('greenlight_converge', path)
+          module = importlib.util.module_from_spec(spec)
+          assert spec and spec.loader
+          spec.loader.exec_module(module)
+          assert len(module.SOURCE_PRS) == 6
+          assert set(module.WORKFLOWS) == {'hf', 'brain', 'state_plane', 'nemo', 'sweep', 'final'}
+          assert module.REPLIT_ISSUE_TITLE == '[replit-deployment-receipt] Unified Control Hub'
+          print('validated convergence manifest')
+          PY
+          git diff --check
+
+      - name: Verify admin credential without exposing it
+        id: credential
+        shell: bash
+        run: |
+          if [ -n "${SZL_GITHUB_TOKEN:-}" ]; then
+            echo 'present=true' >> "$GITHUB_OUTPUT"
+          else
+            echo 'present=false' >> "$GITHUB_OUTPUT"
+            mkdir -p reports
+            cat > reports/greenlight-convergence-latest.json <<JSON
+          {
+            "schema": "szl.greenlight-convergence/v1",
+            "generated_at": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
+            "ok": false,
+            "errors": ["GateError: SZL_GITHUB_TOKEN is not configured"]
+          }
+          JSON
+          fi
+
+      - name: Execute evidence convergence loop
+        if: steps.credential.outputs.present == 'true'
+        id: execute
+        shell: bash
+        run: |
+          set +e
+          python .github/scripts/greenlight_converge.py \
+            --report reports/greenlight-convergence-latest.json \
+            --cycles 4 \
+            --wait-seconds 300
+          code=$?
+          echo "exit_code=${code}" >> "$GITHUB_OUTPUT"
+          exit 0
+
+      - name: Upload immutable convergence report
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: operational-estate-convergence-${{ github.run_id }}
+          path: reports/greenlight-convergence-latest.json
+          if-no-files-found: error
+          retention-days: 90
+
+      - name: Publish convergence summary
+        if: always()
+        shell: bash
+        run: |
+          python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          path = Path('reports/greenlight-convergence-latest.json')
+          with open(os.environ['GITHUB_STEP_SUMMARY'], 'a', encoding='utf-8') as out:
+              out.write('## Operational estate convergence\n\n')
+              if not path.exists():
+                  out.write('No convergence report was produced.\n')
+              else:
+                  report = json.loads(path.read_text(encoding='utf-8'))
+                  out.write(f"Overall: **{'PASS' if report.get('ok') else 'OPEN'}**\n\n")
+                  receipt = report.get('receipt_handoff') or {}
+                  out.write(f"Replit receipt: `{receipt.get('receipt_url') or 'not discovered'}`\n\n")
+                  out.write('| Cycle | Failed gates |\n|---:|---|\n')
+                  for cycle in report.get('cycles') or []:
+                      failed = ', '.join(cycle.get('failed_gates') or []) or 'none recorded'
+                      out.write(f"| {cycle.get('cycle')} | {failed} |\n")
+                  if report.get('errors'):
+                      out.write('\n### Exact blockers\n\n')
+                      for error in report['errors']:
+                          out.write(f'- {error}\n')
+          PY
+
+      - name: Enforce real final state
+        if: always()
+        shell: bash
+        run: |
+          if [ "${{ steps.credential.outputs.present }}" != "true" ]; then
+            exit 2
+          fi
+          code="${{ steps.execute.outputs.exit_code }}"
+          if [ -z "$code" ]; then code=2; fi
+          if [ "$code" -ne 0 ]; then
+            echo "::error::The final estate remains partially open; inspect [greenlight-convergence] for exact gates."
+            exit "$code"
+          fi
+          echo 'The protected final-estate report is OPERATIONAL_VERIFIED.'
