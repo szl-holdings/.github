@@ -1,5 +1,6 @@
 name: Repair transient Hugging Face Dataset Viewer retry
 
+# Exact branch retrigger after protected main advanced.
 on:
   push:
     branches:
