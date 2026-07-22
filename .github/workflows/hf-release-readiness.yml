@@ -13,6 +13,8 @@ on:
       - .github/scripts/hf_release_readiness_verify.py
       - .github/scripts/test_hf_release_readiness_verify.py
       - .github/workflows/hf-release-readiness.yml
+  schedule:
+    - cron: '17,47 * * * *'
   workflow_dispatch:
     inputs:
       publish:
@@ -170,6 +172,11 @@ jobs:
           else
             gh issue reopen "$issue_number" --repo "$GITHUB_REPOSITORY" || true
           fi
+
+      - name: Publish schedule boundary
+        if: github.event_name == 'schedule'
+        run: |
+          echo 'This scheduled run is read-only for the Lake and kernel assets; only immutable evidence and the deterministic GitHub issue may be updated.' >> "$GITHUB_STEP_SUMMARY"
 
       - name: Enforce fail-closed readiness result
         if: always()
