@@ -10,8 +10,8 @@ name: Reusable — Anatomy-map Drift Check
 # a11oy or killinchu repo could otherwise sit undetected for up to a week.
 #
 # A consuming repo wires this into its own CI so an edit to its anatomy block is
-# validated IMMEDIATELY against the canonical locked-8 ladder
-# {F1,F4,F7,F11,F12,F18,F19,F22} and the Λ=Conjecture-1 honesty label (plus, for
+# validated IMMEDIATELY against the canonical locked-five ladder
+# {F1,F11,F12,F18,F19}; EXPERIMENTAL / NOT LOCKED {F4,F7,F22} and the Λ=Conjecture-1 honesty label (plus, for
 # the two marker-block surfaces, a capability-for-capability comparison). The
 # checker (scripts/anatomy_map_drift.py) + registry live ONCE in
 # szl-holdings/.github, so a fix to the guard reaches every surface at once. The
@@ -52,7 +52,7 @@ concurrency:
 
 jobs:
   anatomy-map-drift:
-    name: Anatomy map honest & in sync (locked-8 + Λ=Conjecture-1)
+    name: Anatomy map honest & in sync (locked-five + experimental-three + Λ=Conjecture-1)
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -113,7 +113,7 @@ jobs:
             1)
               echo "::error::Anatomy-map drift detected -- see the step output and"
               echo "::error::the uploaded anatomy_map_report.out.json artifact. Re-sync"
-              echo "::error::the locked-8 ladder {F1,F4,F7,F11,F12,F18,F19,F22}, the"
+              echo "::error::the locked-five ladder {F1,F11,F12,F18,F19}; EXPERIMENTAL / NOT LOCKED {F4,F7,F22}, the"
               echo "::error::Λ=Conjecture-1 label and the capability ladder across a11oy"
               echo "::error::/console, killinchu /elite and the SZLHOLDINGS/anatomy HF Space."
               exit 1
@@ -127,3 +127,4 @@ jobs:
               exit 1
               ;;
           esac
+

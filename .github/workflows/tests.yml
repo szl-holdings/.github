@@ -167,8 +167,8 @@ jobs:
       # Pins the SZL anatomy-map cross-surface drift guard. The single honest
       # anatomy map ships on three independently-deployed surfaces (a11oy
       # /console, killinchu /elite, the SZLHOLDINGS/anatomy HF Space); the guard
-      # must FAIL when any surface drifts on the locked-8 ladder
-      # {F1,F4,F7,F11,F12,F18,F19,F22}, the Λ=Conjecture-1 honesty label, or the
+      # must FAIL when any surface drifts on the locked-five ladder
+      # {F1,F11,F12,F18,F19}; EXPERIMENTAL / NOT LOCKED {F4,F7,F22}, the Λ=Conjecture-1 honesty label, or the
       # shared capability list. This network-free unit test drives the REAL
       # evaluate() path with mutated fixtures (swapped F-id, dropped Λ, one-sided
       # capability edit, missing block) so a refactor can't weaken the guard into
@@ -215,3 +215,4 @@ jobs:
       # Network-free.
       - name: HF deploy-from-Dockerfile derivation self-test
         run: python3 .github/scripts/test_hf_deploy_from_dockerfile.py
+
