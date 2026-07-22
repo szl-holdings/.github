@@ -9,6 +9,11 @@ on:
     paths:
       - .github/scripts/hf_estate_upgrade.py
       - .github/workflows/hf-estate-upgrade.yml
+  pull_request:
+    branches: [main]
+    paths:
+      - .github/scripts/hf_estate_upgrade.py
+      - .github/workflows/hf-estate-upgrade.yml
   workflow_dispatch:
     inputs:
       publish:
@@ -20,7 +25,7 @@ permissions:
   contents: write
 
 concurrency:
-  group: hf-estate-upgrade
+  group: hf-estate-upgrade-${{ github.event_name }}-${{ github.ref }}
   cancel-in-progress: false
 
 jobs:
@@ -31,11 +36,12 @@ jobs:
     env:
       HF_ORG_TOKEN: ${{ secrets.HF_ORG_TOKEN }}
       HF_TOKEN: ${{ secrets.HF_TOKEN }}
+      TARGET_BRANCH: ${{ github.event_name == 'pull_request' && github.head_ref || github.ref_name }}
     steps:
       - name: Checkout triggering revision
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
-          ref: ${{ github.ref_name }}
+          ref: ${{ github.event_name == 'pull_request' && github.head_ref || github.ref_name }}
           fetch-depth: 1
 
       - name: Record credential preflight
@@ -43,6 +49,9 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          publish=true
+          if [ "${{ github.event_name }}" = "pull_request" ]; then publish=false; fi
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ "${{ inputs.publish }}" != "true" ]; then publish=false; fi
           if [ -z "${HF_ORG_TOKEN:-}" ] && [ -z "${HF_TOKEN:-}" ]; then
             echo "has_token=false" >> "$GITHUB_OUTPUT"
             mkdir -p reports
@@ -51,7 +60,7 @@ jobs:
             "schema": "szl.hf-estate-upgrade-report/v1",
             "organization": "SZLHOLDINGS",
             "generation": "${GITHUB_SHA}",
-            "publish": true,
+            "publish": ${publish},
             "generated_at": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
             "counts": {},
             "clone_ids": [
@@ -105,7 +114,9 @@ jobs:
         run: |
           set +e
           publish_flag="--publish"
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ "${{ inputs.publish }}" != "true" ]; then
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            publish_flag=""
+          elif [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ "${{ inputs.publish }}" != "true" ]; then
             publish_flag=""
           fi
           python .github/scripts/hf_estate_upgrade.py \
@@ -131,8 +142,8 @@ jobs:
             echo "Report is unchanged."
             exit 0
           fi
-          git commit -m "chore(hf): record estate upgrade report [skip ci]"
-          git push origin "HEAD:${GITHUB_REF_NAME}"
+          git commit -s -m "chore(hf): record estate upgrade report [skip ci]"
+          git push origin "HEAD:${TARGET_BRANCH}"
 
       - name: Publish job summary
         if: always()
