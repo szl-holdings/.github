@@ -204,7 +204,6 @@ def validate_receipt(
         receipt_origin = normalized_origin(str(production_url))
     except (TypeError, ValueError):
         missing.append("production_url")
-        receipt_origin = ""
     else:
         if receipt_origin != final_origin:
             missing.append("production_url binding")
