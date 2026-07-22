@@ -1,0 +1,125 @@
+name: Final Estate Reconciliation v5
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - .github/scripts/final_estate_reconciliation_v5.py
+      - .github/scripts/final_estate_v5_core.py
+      - .github/scripts/final_estate_v5_evidence.py
+      - .github/scripts/final_estate_v5_probes.py
+      - .github/scripts/test_final_estate_v5_evidence.py
+      - .github/scripts/test_final_estate_v5_probes.py
+      - .github/workflows/final-estate-reconciliation-v5.yml
+      - .github/workflows/final-estate-reconciliation-v5-pr.yml
+  schedule:
+    - cron: '17 * * * *'
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+  issues: write
+
+concurrency:
+  group: final-estate-reconciliation-v5-active-estate
+  cancel-in-progress: true
+
+env:
+  GITHUB_TOKEN: ${{ github.token }}
+  GH_TOKEN: ${{ github.token }}
+  REPORT_PATH: reports/final-estate-reconciliation-v5.json
+
+jobs:
+  reconcile:
+    name: Active immutable evidence, contract-aware probes, and public PR closure
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout reconciler
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 1
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: '3.12'
+
+      - name: Install bounded verifier dependency
+        run: python -m pip install --disable-pip-version-check 'requests==2.32.5'
+
+      - name: Compile and test every active-estate contract
+        run: |
+          set -euo pipefail
+          python -m py_compile \
+            .github/scripts/final_estate_reconciliation_v5.py \
+            .github/scripts/final_estate_v5_core.py \
+            .github/scripts/final_estate_v5_evidence.py \
+            .github/scripts/final_estate_v5_probes.py \
+            .github/scripts/test_final_estate_v5_evidence.py \
+            .github/scripts/test_final_estate_v5_probes.py
+          python .github/scripts/test_final_estate_v5_evidence.py
+          python .github/scripts/test_final_estate_v5_probes.py
+          git diff --check
+
+      - name: Evaluate and publish the current active estate
+        id: estate
+        shell: bash
+        run: |
+          set +e
+          python .github/scripts/final_estate_reconciliation_v5.py \
+            --output "$REPORT_PATH" \
+            --publish-issue \
+            --enforce
+          code=$?
+          echo "exit_code=${code}" >> "$GITHUB_OUTPUT"
+          exit 0
+
+      - name: Upload immutable reconciliation evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: final-estate-reconciliation-v5-${{ github.run_id }}
+          path: ${{ env.REPORT_PATH }}
+          if-no-files-found: error
+          retention-days: 90
+
+      - name: Publish human-readable summary
+        if: always()
+        shell: python
+        run: |
+          import json
+          import os
+          from pathlib import Path
+
+          path = Path(os.environ['REPORT_PATH'])
+          with open(os.environ['GITHUB_STEP_SUMMARY'], 'a', encoding='utf-8') as out:
+              out.write('## SZL active-estate reconciliation v5\n\n')
+              if not path.exists():
+                  out.write('No report was produced.\n')
+              else:
+                  report = json.loads(path.read_text(encoding='utf-8'))
+                  out.write(f"- status: `{report.get('status')}`\n")
+                  out.write(f"- passed: `{report.get('summary', {}).get('ok')}`\n")
+                  out.write(f"- failed: `{report.get('summary', {}).get('error')}`\n")
+                  out.write('- Replit Unified Control Hub: `DECOMMISSIONED_NOT_IN_ACTIVE_ESTATE`\n\n')
+                  out.write('| Gate | Result | Detail |\n|---|---|---|\n')
+                  for gate in report.get('gates', []):
+                      detail = str(gate.get('detail', '')).replace('|', '\\|').replace('\n', ' ')
+                      out.write(
+                          f"| `{gate.get('name')}` | "
+                          f"`{'PASS' if gate.get('ok') else 'FAIL'}` | {detail} |\n"
+                      )
+
+      - name: Enforce the terminal active-estate result
+        if: always()
+        env:
+          EXIT_CODE: ${{ steps.estate.outputs.exit_code }}
+        run: |
+          code="${EXIT_CODE:-2}"
+          if [ "$code" -ne 0 ]; then
+            echo "::error::The active estate is not OPERATIONAL_VERIFIED. See the deterministic reconciliation issue."
+            exit "$code"
+          fi
+          echo 'The active public estate is OPERATIONAL_VERIFIED.'
