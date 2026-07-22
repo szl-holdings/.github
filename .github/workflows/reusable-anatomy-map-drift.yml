@@ -52,7 +52,10 @@ concurrency:
 
 jobs:
   anatomy-map-drift:
-    name: Anatomy map honest & in sync (locked-five + experimental-three + Λ=Conjecture-1)
+    # Compatibility note: protected branches across the estate still require
+    # this historical context string. The implementation below enforces the
+    # newer locked-five + experimental-three taxonomy; only the label is legacy.
+    name: Anatomy map honest & in sync (locked-8 + Λ=Conjecture-1)
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -127,4 +130,3 @@ jobs:
               exit 1
               ;;
           esac
-
