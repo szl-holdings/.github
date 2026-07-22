@@ -1,0 +1,95 @@
+name: Discover Unified Control Hub Receipt
+
+on:
+  push:
+    branches: [ops/greenlight-finalize-20260722]
+    paths:
+      - .github/scripts/discover_replit_receipt.py
+      - .github/workflows/discover-replit-receipt.yml
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+  issues: write
+
+concurrency:
+  group: discover-unified-control-hub-receipt-20260722
+  cancel-in-progress: false
+
+env:
+  SZL_GITHUB_TOKEN: ${{ secrets.SZL_GITHUB_TOKEN }}
+  GH_TOKEN: ${{ github.token }}
+
+jobs:
+  discover:
+    name: Wait for, verify, and bind the public Replit receipt
+    runs-on: ubuntu-latest
+    timeout-minutes: 350
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ops/greenlight-finalize-20260722
+          persist-credentials: false
+          fetch-depth: 1
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12"
+      - name: Validate discovery implementation
+        run: |
+          set -euo pipefail
+          python -m py_compile .github/scripts/discover_replit_receipt.py
+          python - <<'PY'
+          import importlib.util
+          from pathlib import Path
+
+          path = Path('.github/scripts/discover_replit_receipt.py')
+          spec = importlib.util.spec_from_file_location('discover_replit_receipt', path)
+          module = importlib.util.module_from_spec(spec)
+          assert spec and spec.loader
+          spec.loader.exec_module(module)
+          assert module.REPL_ID == '34870515-2d52-4ad8-9636-40cc3ced1771'
+          assert module.ISSUE_TITLE == '[replit-deployment-receipt] Unified Control Hub'
+          assert module.FINAL_WORKFLOW == 'final-estate-reconciliation.yml'
+          print('validated exact Replit receipt discovery contract')
+          PY
+          git diff --check
+      - name: Verify credential
+        id: credential
+        shell: bash
+        run: |
+          if [ -n "${SZL_GITHUB_TOKEN:-}" ]; then
+            echo 'present=true' >> "$GITHUB_OUTPUT"
+          else
+            echo 'present=false' >> "$GITHUB_OUTPUT"
+            mkdir -p reports
+            printf '%s\n' '{"schema":"szl.replit-deployment-receipt-discovery/v1","ok":false,"errors":["SZL_GITHUB_TOKEN is not configured"]}' > reports/replit-receipt-discovery-latest.json
+          fi
+      - name: Discover and verify deployed receipt
+        if: steps.credential.outputs.present == 'true'
+        id: execute
+        shell: bash
+        run: |
+          set +e
+          python .github/scripts/discover_replit_receipt.py \
+            --report reports/replit-receipt-discovery-latest.json \
+            --attempts 60 \
+            --interval-seconds 300
+          code=$?
+          echo "exit_code=${code}" >> "$GITHUB_OUTPUT"
+          exit 0
+      - name: Upload immutable discovery report
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: replit-deployment-receipt-discovery-${{ github.run_id }}
+          path: reports/replit-receipt-discovery-latest.json
+          if-no-files-found: error
+          retention-days: 90
+      - name: Enforce verified public receipt
+        if: always()
+        shell: bash
+        run: |
+          if [ "${{ steps.credential.outputs.present }}" != "true" ]; then exit 2; fi
+          code="${{ steps.execute.outputs.exit_code }}"
+          if [ -z "$code" ]; then code=2; fi
+          exit "$code"
