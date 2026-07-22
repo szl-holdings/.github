@@ -1,13 +1,14 @@
-name: HF First-Class Kernel Card Publish
+name: HF First-Class Kernel Card Publish v2
 
 on:
   push:
     branches: [main]
     paths:
-      - .github/workflows/hf-kernel-card-publish.yml
+      - .github/workflows/hf-kernel-card-publish-v2.yml
   pull_request:
     branches: [main]
     paths:
+      - .github/workflows/hf-kernel-card-publish-v2.yml
       - .github/workflows/hf-kernel-card-publish.yml
   schedule:
     - cron: '13 */6 * * *'
@@ -19,21 +20,21 @@ permissions:
   actions: write
 
 concurrency:
-  group: hf-kernel-card-publish-${{ github.event_name }}-${{ github.ref }}
+  group: hf-kernel-card-publish-v2-${{ github.event_name }}-${{ github.ref }}
   cancel-in-progress: false
 
 jobs:
   publish:
-    name: Publish and read back reviewed kernel cards
+    name: Publish, read back, and selfcheck exact kernel revisions
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 60
     env:
       HF_PUBLISH_TOKEN: ${{ secrets.HF_ORG_TOKEN || secrets.HF_ORG_TOKEN1 || secrets.HF_TOKEN }}
       HF_HUB_DISABLE_PROGRESS_BARS: "1"
       GH_TOKEN: ${{ github.token }}
       REPORT_ISSUE_TITLE: '[hf-kernel-card-publish] first-class card contracts'
     steps:
-      - name: Checkout workflow source
+      - name: Checkout controller
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
@@ -82,82 +83,91 @@ jobs:
         with:
           python-version: "3.12"
 
-      - name: Install current supported kernel clients
+      - name: Install supported Hub clients and exact torch27 CPU runtime
         run: |
+          set -euo pipefail
           python -m pip install --disable-pip-version-check \
             "huggingface_hub>=1.3,<2" \
             "kernels==0.16.0" \
             "pytest>=8,<9"
+          python -m pip install --disable-pip-version-check \
+            --index-url https://download.pytorch.org/whl/cpu \
+            "torch==2.7.1"
+          python - <<'PY'
+          import torch
+          assert torch.__version__.split('+', 1)[0] == '2.7.1', torch.__version__
+          assert not torch.cuda.is_available()
+          print('verified CPU PyTorch runtime:', torch.__version__)
+          PY
 
-      - name: Verify source-owned kernel contracts and publisher scope
+      - name: Verify source-owned kernel contracts and narrow mutation scope
         run: |
           set -euo pipefail
           PYTHONPATH=energy python -m pytest -q energy/tests/test_hf_kernel_contract.py
           PYTHONPATH=lambda-gate/torch-ext:lambda-gate \
             python -m pytest -q lambda-gate/tests/test_hf_governed_norm_contract.py
           python - <<'PY'
+          import json
           from pathlib import Path
 
-          workflow = Path('controller/.github/workflows/hf-kernel-card-publish.yml')
-          text = workflow.read_text(encoding='utf-8')
-          required = {
+          specs = {
               'SZLHOLDINGS/governed-inference-meter': Path('energy/hf-kernels/governed-inference-meter'),
               'SZLHOLDINGS/szl-governed-norm': Path('lambda-gate/hf-kernels/szl-governed-norm'),
           }
-          for repo_id, root in required.items():
-              assert (root / 'README.md').is_file(), repo_id
-              assert (root / 'contract.json').is_file(), repo_id
-          assert "git -C \"$work/repo\" add -- README.md contract.json" in text
+          for repo_id, root in specs.items():
+              card = root / 'README.md'
+              contract = root / 'contract.json'
+              assert card.is_file(), repo_id
+              assert contract.is_file(), repo_id
+              payload = json.loads(contract.read_text(encoding='utf-8'))
+              assert payload['repo_id'] == repo_id
+              assert payload['repo_type'] == 'kernel'
+          workflow = Path('controller/.github/workflows/hf-kernel-card-publish-v2.yml').read_text(encoding='utf-8')
+          assert 'git -C "$work/repo" add -- README.md contract.json' in workflow
           for forbidden in (
               'delete_' + 'repo',
               'update_repo_' + 'settings',
               'set_space_' + 'hardware',
+              'request_space_' + 'hardware',
           ):
-              assert forbidden not in text
-          token_in_url = 'HF_PUBLISH_TOKEN' + '}@'
-          assert token_in_url not in text
-          print('kernel card publisher scope is exact and credential-safe')
+              assert forbidden not in workflow
+          assert ('HF_PUBLISH_TOKEN' + '}@') not in workflow
+          print('source contracts and card/contract-only boundary passed')
           PY
           git -C controller diff --check
 
-      - name: Require authenticated kernel publisher
+      - name: Require authenticated organization publisher
         if: steps.mode.outputs.publish == 'true'
+        id: auth
+        shell: bash
         run: |
           set -euo pipefail
           test -n "${HF_PUBLISH_TOKEN:-}" || {
             echo "::error::No supported Hugging Face organization write token is configured."
             exit 2
           }
-
-      - name: Authenticate organization publisher
-        if: steps.mode.outputs.publish == 'true'
-        id: auth
-        shell: bash
-        run: |
-          set -euo pipefail
           python - <<'PY' >> "$GITHUB_OUTPUT"
           import os
           from huggingface_hub import HfApi
 
           who = HfApi(token=os.environ['HF_PUBLISH_TOKEN']).whoami()
-          match = next(
+          org = next(
               (
                   item for item in who.get('orgs', [])
                   if str(item.get('name') or item.get('fullname') or '').upper() == 'SZLHOLDINGS'
               ),
               None,
           )
-          if match is None:
+          if org is None:
               raise SystemExit('authenticated identity is not a member of SZLHOLDINGS')
-          role = str(match.get('roleInOrg') or match.get('role') or '').lower()
+          role = str(org.get('roleInOrg') or org.get('role') or '').lower()
           if role and role not in {'admin', 'write', 'contributor'}:
               raise SystemExit(f'identity is not write-capable: {role}')
-          username = str(who.get('name') or 'hf-user').replace('\n', '')
-          print(f'username={username}')
+          print(f"username={str(who.get('name') or 'hf-user').replace(chr(10), '')}")
           print(f'role={role or "unknown"}')
           PY
 
-      - name: Publish only README.md and contract.json through kernel Git transport
+      - name: Publish only reviewed card and contract files through Kernel Hub Git
         if: steps.mode.outputs.publish == 'true'
         id: transport
         shell: bash
@@ -196,14 +206,6 @@ jobs:
 
             cp "$source_dir/README.md" "$work/repo/README.md"
             cp "$source_dir/contract.json" "$work/repo/contract.json"
-            python - "$work/repo/contract.json" "$repo_id" <<'PY'
-          import json
-          import sys
-          payload = json.load(open(sys.argv[1], encoding='utf-8'))
-          if payload.get('repo_id') != sys.argv[2] or payload.get('repo_type') != 'kernel':
-              raise SystemExit('kernel contract identity mismatch')
-          PY
-
             git -C "$work/repo" config user.name 'szl-release-bot'
             git -C "$work/repo" config user.email \
               '41898282+github-actions[bot]@users.noreply.github.com'
@@ -242,7 +244,7 @@ jobs:
             'lambda-gate/hf-kernels/szl-governed-norm' \
             'norm'
 
-      - name: Run exact-revision kernel selfchecks and write report
+      - name: Run exact-revision selfchecks and write immutable report
         if: steps.mode.outputs.publish == 'true'
         id: verify
         env:
@@ -302,7 +304,7 @@ jobs:
                   failures.append(f'{repo_id}: {type(exc).__name__}: {exc}')
 
           report = {
-              'schema': 'szl.hf-kernel-card-publish/v1',
+              'schema': 'szl.hf-kernel-card-publish/v2',
               'generated_at': datetime.now(timezone.utc).isoformat(),
               'generation': os.environ.get('GITHUB_SHA'),
               'publish': True,
@@ -310,11 +312,12 @@ jobs:
                   'szl-energy-attest': os.environ.get('ENERGY_SHA'),
                   'szl-lambda-gate': os.environ.get('LAMBDA_SHA'),
               },
+              'runtime': {'torch': '2.7.1+cpu'},
               'results': results,
               'failures': failures,
               'summary': {'ok': len(results), 'warning': 0, 'error': len(failures)},
               'boundaries': [
-                  'Only README.md and contract.json are changed.',
+                  'Only README.md and contract.json may be changed.',
                   'Existing build variants, visibility, and hardware are preserved.',
                   'No model, dataset, Space, weight, training, or promotion state is mutated.',
               ],
@@ -341,12 +344,13 @@ jobs:
           from pathlib import Path
           Path('controller/reports/hf-kernel-card-publish-latest.json').write_text(
               json.dumps({
-                  'schema': 'szl.hf-kernel-card-publish/v1-prerelease',
+                  'schema': 'szl.hf-kernel-card-publish/v2-prerelease',
                   'generated_at': datetime.now(timezone.utc).isoformat(),
                   'generation': os.environ.get('GITHUB_SHA'),
                   'publish': False,
+                  'runtime': {'torch': '2.7.1+cpu'},
                   'source_verification': 'PASSED',
-                  'summary': {'ok': 3, 'warning': 0, 'error': 0},
+                  'summary': {'ok': 4, 'warning': 0, 'error': 0},
                   'boundary': 'No Hugging Face mutation occurs on pull_request events.',
               }, indent=2, sort_keys=True) + '\n',
               encoding='utf-8',
@@ -395,7 +399,7 @@ jobs:
           fi
           if [ "${{ steps.verify.outputs.exit_code }}" = "0" ]; then
             gh issue close "$issue_number" --repo "$GITHUB_REPOSITORY" --reason completed \
-              --comment 'Both first-class kernel card contracts were published, read back byte-for-byte, and passed selfcheck() at immutable revisions.' || true
+              --comment 'Both first-class kernel card contracts were present, read back byte-for-byte, and passed selfcheck() at immutable revisions under the pinned torch27 CPU runtime.' || true
           else
             gh issue reopen "$issue_number" --repo "$GITHUB_REPOSITORY" || true
           fi
@@ -405,7 +409,7 @@ jobs:
         run: |
           gh workflow run hf-release-readiness.yml --repo "$GITHUB_REPOSITORY" --ref main -f publish=true
 
-      - name: Enforce fail-closed kernel publication result
+      - name: Enforce fail-closed publication result
         if: always() && steps.mode.outputs.publish == 'true'
         run: |
           code="${{ steps.verify.outputs.exit_code }}"
