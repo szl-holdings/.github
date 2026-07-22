@@ -1,0 +1,93 @@
+name: Synchronize exact SDA shared source into Killinchu PR
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/sync-killinchu-sda-pr.yml
+
+permissions:
+  contents: read
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      SZL_GITHUB_TOKEN: ${{ secrets.SZL_GITHUB_TOKEN }}
+      SOURCE_REPOSITORY: szl-holdings/a11oy
+      SOURCE_REVISION: 50e56a2b58e990658e6eff58566e7f8afef05396
+      TARGET_REPOSITORY: szl-holdings/killinchu
+      TARGET_BRANCH: agent/sda-space-contract-sync-20260722
+    steps:
+      - name: Verify owner-authorized token
+        run: |
+          set -euo pipefail
+          test -n "${SZL_GITHUB_TOKEN:-}" || {
+            echo '::error::SZL_GITHUB_TOKEN is not configured.'
+            exit 2
+          }
+      - name: Fetch immutable A11oy shared source
+        env:
+          GH_TOKEN: ${{ env.SZL_GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          gh api \
+            -H 'Accept: application/vnd.github+json' \
+            -H 'X-GitHub-Api-Version: 2022-11-28' \
+            "repos/${SOURCE_REPOSITORY}/contents/szl_spaces_surface.py?ref=${SOURCE_REVISION}" \
+            --jq .content | tr -d '\n' | base64 --decode > /tmp/szl_spaces_surface.py
+          grep -Fq 'SPACE_API_CONTRACTS' /tmp/szl_spaces_surface.py
+          grep -Fq '"name": "energy-attested-runs", "slug": "energy-attested-runs", "title": "Energy-Attested Inference Runs", "sdk": "static"' /tmp/szl_spaces_surface.py
+          grep -Fq '"name": "guardrail-receipt", "slug": "guardrail-receipt", "title": "Guardrail Decision-Receipt", "sdk": "static"' /tmp/szl_spaces_surface.py
+          grep -Fq '"name": "szl-forge-lab", "slug": "szl-forge-lab", "title": "SZL Forge Lab", "sdk": "static"' /tmp/szl_spaces_surface.py
+      - name: Checkout and repair Killinchu feature branch
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: ${{ env.TARGET_REPOSITORY }}
+          ref: ${{ env.TARGET_BRANCH }}
+          token: ${{ env.SZL_GITHUB_TOKEN }}
+          fetch-depth: 0
+      - name: Install exact shared source and verify contract
+        shell: bash
+        run: |
+          set -euo pipefail
+          cp /tmp/szl_spaces_surface.py szl_spaces_surface.py
+          rm -f .github/workflows/sync-a11oy-sda-space-contract.yml
+          python -m py_compile szl_spaces_surface.py
+          python - <<'PY'
+          import hashlib
+          import importlib.util
+          from pathlib import Path
+
+          path = Path('szl_spaces_surface.py')
+          spec = importlib.util.spec_from_file_location('shared_spaces', path)
+          module = importlib.util.module_from_spec(spec)
+          spec.loader.exec_module(module)
+          assert len(module.SPACES) == 26
+          assert len({item['name'] for item in module.SPACES}) == 26
+          assert module.SPACE_API_CONTRACTS['sda'][1]['url'] == 'https://a-11-oy.com/api/a11oy/v1/verify/receipt'
+          assert len(module.SPACE_API_CONTRACTS['anatomy']) == 4
+          assert len(module.SPACE_API_CONTRACTS['sda']) == 3
+          for name in ('energy-attested-runs', 'guardrail-receipt', 'szl-forge-lab'):
+              record = next(item for item in module.SPACES if item['name'] == name)
+              assert record['sdk'] == 'static'
+              assert module.hf_url(name).endswith('.static.hf.space')
+          print('sha256=' + hashlib.sha256(path.read_bytes()).hexdigest())
+          print('exact Killinchu shared SDA/Space contract: PASS')
+          PY
+      - name: Commit and push exact branch repair
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add szl_spaces_surface.py .github/workflows/sync-a11oy-sda-space-contract.yml
+          test -n "$(git diff --cached --name-only)" || {
+            echo '::error::No Killinchu branch repair was produced.'
+            exit 1
+          }
+          git commit \
+            -m 'fix(spaces): sync exact SDA contract health surface' \
+            -m 'Mirror A11oy 50e56a2b58e990658e6eff58566e7f8afef05396 byte-for-byte so both runtimes enforce the same exact Anatomy and SDA dependency contracts and static Space identities.' \
+            -m 'Signed-off-by: github-actions[bot] <41898282+github-actions[bot]@users.noreply.github.com>'
+          git push origin "HEAD:${TARGET_BRANCH}"
