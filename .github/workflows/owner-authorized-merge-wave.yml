@@ -7,6 +7,7 @@ on:
       - .github/data/owner_authorized_merge_wave.json
       - .github/scripts/owner_authorized_merge_wave.py
       - .github/scripts/owner_authorized_merge_wave_v2.py
+      - .github/scripts/ensure_org_admin_pr_bypass.py
       - .github/workflows/owner-authorized-merge-wave.yml
   push:
     branches: [main]
@@ -14,6 +15,7 @@ on:
       - .github/data/owner_authorized_merge_wave.json
       - .github/scripts/owner_authorized_merge_wave.py
       - .github/scripts/owner_authorized_merge_wave_v2.py
+      - .github/scripts/ensure_org_admin_pr_bypass.py
       - .github/workflows/owner-authorized-merge-wave.yml
   workflow_dispatch:
     inputs:
@@ -46,7 +48,8 @@ jobs:
           set -euo pipefail
           python -m py_compile \
             .github/scripts/owner_authorized_merge_wave.py \
-            .github/scripts/owner_authorized_merge_wave_v2.py
+            .github/scripts/owner_authorized_merge_wave_v2.py \
+            .github/scripts/ensure_org_admin_pr_bypass.py
           python - <<'PY'
           import json
           from pathlib import Path
@@ -69,7 +72,7 @@ jobs:
       (github.event_name == 'workflow_dispatch' && inputs.execute)
     needs: static-validation
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 20
     env:
       SZL_GITHUB_TOKEN: ${{ secrets.SZL_GITHUB_TOKEN }}
       GH_TOKEN: ${{ github.token }}
@@ -99,6 +102,38 @@ jobs:
             echo 'EXECUTION_EXIT=2' >> "$GITHUB_ENV"
             exit 0
           }
+      - name: Ensure narrow OrganizationAdmin pull-request bypass
+        if: env.EXECUTION_EXIT == ''
+        shell: bash
+        run: |
+          set +e
+          python .github/scripts/ensure_org_admin_pr_bypass.py \
+            --manifest .github/data/owner_authorized_merge_wave.json \
+            --report owner-admin-pr-bypass-report.json \
+            --execute
+          code=$?
+          if [ "$code" -ne 0 ]; then
+            python - <<'PY'
+          import json
+          from datetime import datetime, timezone
+          from pathlib import Path
+          bypass_path = Path('owner-admin-pr-bypass-report.json')
+          detail = bypass_path.read_text(encoding='utf-8') if bypass_path.exists() else 'bypass report missing'
+          Path('owner-authorized-merge-report.json').write_text(
+              json.dumps({
+                  'schema': 'szl.owner-authorized-merge-report/v1',
+                  'generated_at': datetime.now(timezone.utc).isoformat(),
+                  'execute': True,
+                  'ok': False,
+                  'targets': [],
+                  'errors': ['GateError: narrow OrganizationAdmin pull-request bypass failed', detail],
+              }, indent=2) + '\n',
+              encoding='utf-8',
+          )
+          PY
+            echo "EXECUTION_EXIT=$code" >> "$GITHUB_ENV"
+          fi
+          exit 0
       - name: Execute fail-closed merge wave
         if: env.EXECUTION_EXIT == ''
         shell: bash
@@ -116,7 +151,9 @@ jobs:
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: owner-authorized-merge-report
-          path: owner-authorized-merge-report.json
+          path: |
+            owner-admin-pr-bypass-report.json
+            owner-authorized-merge-report.json
           if-no-files-found: error
       - name: Persist report in deterministic GitHub issue
         if: always()
@@ -133,6 +170,16 @@ jobs:
             echo "- Source revision: \`${GITHUB_SHA}\`"
             echo "- Event: \`${GITHUB_EVENT_NAME}\`"
             echo
+            echo '## Ruleset bypass report'
+            if [ -f owner-admin-pr-bypass-report.json ]; then
+              echo '```json'
+              cat owner-admin-pr-bypass-report.json
+              echo '```'
+            else
+              echo 'No ruleset bypass report was produced.'
+            fi
+            echo
+            echo '## Merge report'
             echo '```json'
             cat owner-authorized-merge-report.json
             echo '```'
@@ -165,14 +212,25 @@ jobs:
       - name: Add report to job summary
         if: always()
         run: |
-          if [ -f owner-authorized-merge-report.json ]; then
-            {
-              echo '## Owner-authorized merge wave'
+          {
+            echo '## Organization administrator PR bypass'
+            if [ -f owner-admin-pr-bypass-report.json ]; then
+              echo '```json'
+              cat owner-admin-pr-bypass-report.json
+              echo '```'
+            else
+              echo 'No bypass report was produced.'
+            fi
+            echo
+            echo '## Owner-authorized merge wave'
+            if [ -f owner-authorized-merge-report.json ]; then
               echo '```json'
               cat owner-authorized-merge-report.json
               echo '```'
-            } >> "$GITHUB_STEP_SUMMARY"
-          fi
+            else
+              echo 'No merge report was produced.'
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
       - name: Enforce fail-closed result
         if: always()
         run: |
