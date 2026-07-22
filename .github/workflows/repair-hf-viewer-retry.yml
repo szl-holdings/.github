@@ -1,10 +1,14 @@
 name: Repair transient Hugging Face Dataset Viewer retry
 
-# Exact branch retrigger after protected main advanced.
 on:
   push:
     branches:
       - fix/hf-viewer-transient-retry
+    paths:
+      - .github/workflows/repair-hf-viewer-retry.yml
+  pull_request:
+    branches:
+      - main
     paths:
       - .github/workflows/repair-hf-viewer-retry.yml
 
@@ -17,6 +21,7 @@ concurrency:
 
 jobs:
   repair:
+    if: github.event_name == 'push' || github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -39,14 +44,95 @@ jobs:
               text = text.replace('import os\n', 'import os\nimport time\n', 1)
 
           marker = '    def finalize_dataset(self) -> None:\n'
-          helper = '''    def _wait_for_dataset_viewer(\n        self,\n        attempts: int = 12,\n    ) -> tuple[requests.Response, dict[str, Any], int]:\n        """Wait for the post-publication Viewer contract without accepting failure.\n\n        Hugging Face may briefly return 429/5xx or an explicit busy/not-ready\n        payload while it materializes a newly published configuration. Only those\n        transient states are retried. Success still requires a final HTTP 200 JSON\n        object with no error field.\n        """\n        if attempts < 1:\n            raise ValueError("attempts must be positive")\n        retryable_statuses = {429, 500, 502, 503, 504}\n        transient_markers = ("busy", "not ready", "retry", "processing", "loading")\n        last_detail = "no response"\n        for attempt in range(1, attempts + 1):\n            try:\n                response = requests.get(\n                    VIEWER_URL,\n                    headers={\n                        "Accept": "application/json",\n                        "Cache-Control": "no-cache",\n                        "User-Agent": "szl-hf-release-finalizer/1.1",\n                    },\n                    timeout=90,\n                )\n            except requests.RequestException as exc:\n                last_detail = f"{type(exc).__name__}: {exc}"\n                retryable = True\n            else:\n                payload: Any = None\n                if response.status_code == 200:\n                    try:\n                        payload = response.json()\n                    except ValueError as exc:\n                        raise RuntimeError(\n                            f"Dataset Viewer returned invalid JSON: {exc}"\n                        ) from exc\n                    if isinstance(payload, dict) and not payload.get("error"):\n                        return response, payload, attempt\n                    error_text = str(\n                        payload.get("error") if isinstance(payload, dict) else payload\n                    )\n                    last_detail = f"HTTP 200 error payload: {error_text[:300]}"\n                    lowered = error_text.lower()\n                    retryable = any(marker in lowered for marker in transient_markers)\n                else:\n                    last_detail = (\n                        f"HTTP {response.status_code}: {response.text[:300]}"\n                    )\n                    retryable = response.status_code in retryable_statuses\n\n            if not retryable:\n                raise RuntimeError(\n                    f"Dataset Viewer contract failed non-transiently: {last_detail}"\n                )\n            if attempt == attempts:\n                raise RuntimeError(\n                    "Dataset Viewer contract did not converge after "\n                    f"{attempts} attempts: {last_detail}"\n                )\n            delay = min(15 * attempt, 60)\n            self.record(\n                DATASET_ID,\n                "dataset-viewer-wait",\n                "warning",\n                f"attempt={attempt}/{attempts}; retry_in={delay}s; {last_detail}",\n            )\n            time.sleep(delay)\n\n'''
+          helper = '''    def _wait_for_dataset_viewer(
+        self,
+        attempts: int = 12,
+    ) -> tuple[requests.Response, dict[str, Any], int]:
+        """Wait for the post-publication Viewer contract without accepting failure.
+
+        Hugging Face may briefly return 429/5xx or an explicit busy/not-ready
+        payload while it materializes a newly published configuration. Only those
+        transient states are retried. Success still requires a final HTTP 200 JSON
+        object with no error field.
+        """
+        if attempts < 1:
+            raise ValueError("attempts must be positive")
+        retryable_statuses = {429, 500, 502, 503, 504}
+        transient_markers = ("busy", "not ready", "retry", "processing", "loading")
+        last_detail = "no response"
+        for attempt in range(1, attempts + 1):
+            try:
+                response = requests.get(
+                    VIEWER_URL,
+                    headers={
+                        "Accept": "application/json",
+                        "Cache-Control": "no-cache",
+                        "User-Agent": "szl-hf-release-finalizer/1.1",
+                    },
+                    timeout=90,
+                )
+            except requests.RequestException as exc:
+                last_detail = f"{type(exc).__name__}: {exc}"
+                retryable = True
+            else:
+                payload: Any = None
+                if response.status_code == 200:
+                    try:
+                        payload = response.json()
+                    except ValueError as exc:
+                        raise RuntimeError(
+                            f"Dataset Viewer returned invalid JSON: {exc}"
+                        ) from exc
+                    if isinstance(payload, dict) and not payload.get("error"):
+                        return response, payload, attempt
+                    error_text = str(
+                        payload.get("error") if isinstance(payload, dict) else payload
+                    )
+                    last_detail = f"HTTP 200 error payload: {error_text[:300]}"
+                    lowered = error_text.lower()
+                    retryable = any(marker in lowered for marker in transient_markers)
+                else:
+                    last_detail = (
+                        f"HTTP {response.status_code}: {response.text[:300]}"
+                    )
+                    retryable = response.status_code in retryable_statuses
+
+            if not retryable:
+                raise RuntimeError(
+                    f"Dataset Viewer contract failed non-transiently: {last_detail}"
+                )
+            if attempt == attempts:
+                raise RuntimeError(
+                    "Dataset Viewer contract did not converge after "
+                    f"{attempts} attempts: {last_detail}"
+                )
+            delay = min(15 * attempt, 60)
+            self.record(
+                DATASET_ID,
+                "dataset-viewer-wait",
+                "warning",
+                f"attempt={attempt}/{attempts}; retry_in={delay}s; {last_detail}",
+            )
+            time.sleep(delay)
+
+'''
           if helper not in text:
               if text.count(marker) != 1:
                   raise SystemExit('expected finalize_dataset marker exactly once')
               text = text.replace(marker, helper + marker, 1)
 
-          old = '''        response = requests.get(VIEWER_URL, timeout=90)\n        if response.status_code != 200:\n            raise RuntimeError(\n                f"Dataset Viewer contract did not return HTTP 200: {response.status_code} "\n                f"{response.text[:300]}"\n            )\n        payload = response.json()\n        if not isinstance(payload, dict) or payload.get("error"):\n            raise RuntimeError(f"Dataset Viewer returned an error payload: {payload}")\n'''
-          new = '''        response, payload, viewer_attempts = self._wait_for_dataset_viewer()\n'''
+          old = '''        response = requests.get(VIEWER_URL, timeout=90)
+        if response.status_code != 200:
+            raise RuntimeError(
+                f"Dataset Viewer contract did not return HTTP 200: {response.status_code} "
+                f"{response.text[:300]}"
+            )
+        payload = response.json()
+        if not isinstance(payload, dict) or payload.get("error"):
+            raise RuntimeError(f"Dataset Viewer returned an error payload: {payload}")
+'''
+          new = '''        response, payload, viewer_attempts = self._wait_for_dataset_viewer()
+'''
           if old in text:
               text = text.replace(old, new, 1)
           elif new not in text:
@@ -68,11 +154,13 @@ jobs:
           python -m py_compile .github/scripts/hf_release_finalization.py
           python - <<'PY'
           import importlib.util
+          import sys
           from pathlib import Path
 
           path = Path('.github/scripts/hf_release_finalization.py')
           spec = importlib.util.spec_from_file_location('finalizer', path)
           module = importlib.util.module_from_spec(spec)
+          sys.modules[spec.name] = module
           spec.loader.exec_module(module)
 
           class Response:
