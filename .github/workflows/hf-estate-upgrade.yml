@@ -1,36 +1,40 @@
-name: HF Estate — Single A11oy Canonicalization
+name: HF Estate — Sole Governed A11oy
 
-# Keep exactly one governed A11oy Space. The publisher selects the newest valid
-# content among SZLHOLDINGS/a11oy and the four historical clone IDs, adopts it
-# into SZLHOLDINGS/a11oy, then removes every clone and its collection references.
+# One source of truth: compare canonical and historical clone content, adopt the
+# newest verified divergent tree into SZLHOLDINGS/a11oy, prove the exact public
+# Docker runtime and safe routes, then delete every clone and collection pointer.
 on:
   push:
     branches: [main]
     paths:
       - .github/scripts/hf_estate_upgrade.py
       - .github/scripts/hf_estate_canonicalize.py
+      - .github/scripts/hf_estate_single_canonical_v2.py
       - .github/scripts/test_hf_estate_canonicalize.py
+      - .github/scripts/test_hf_estate_single_canonical_v2.py
       - .github/workflows/hf-estate-upgrade.yml
   pull_request:
     branches: [main]
     paths:
       - .github/scripts/hf_estate_upgrade.py
       - .github/scripts/hf_estate_canonicalize.py
+      - .github/scripts/hf_estate_single_canonical_v2.py
       - .github/scripts/test_hf_estate_canonicalize.py
+      - .github/scripts/test_hf_estate_single_canonical_v2.py
       - .github/workflows/hf-estate-upgrade.yml
   workflow_dispatch:
     inputs:
       publish:
-        description: Adopt newest A11oy content and delete all clones
+        description: Adopt newest verified content and permanently retire all clones
         required: false
         default: "true"
 
 permissions:
-  contents: read
+  contents: write
   issues: write
 
 concurrency:
-  group: hf-single-a11oy-${{ github.event_name }}-${{ github.ref }}
+  group: hf-sole-a11oy-${{ github.event_name }}-${{ github.ref }}
   cancel-in-progress: false
 
 jobs:
@@ -39,20 +43,22 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 120
     env:
-      HF_ORG_TOKEN: ${{ secrets.HF_ORG_TOKEN || secrets.HF_ORG_TOKEN1 }}
+      HF_ORG_TOKEN1: ${{ secrets.HF_ORG_TOKEN1 }}
+      HF_ORG_TOKEN: ${{ secrets.HF_ORG_TOKEN }}
       HF_TOKEN: ${{ secrets.HF_TOKEN }}
       HF_HUB_DISABLE_PROGRESS_BARS: "1"
       GH_TOKEN: ${{ github.token }}
-      REPORT_ISSUE_TITLE: '[hf-canonicalization-report] single A11oy Space'
+      TARGET_BRANCH: ${{ github.event_name == 'pull_request' && github.head_ref || github.ref_name }}
+      REPORT_ISSUE_TITLE: '[hf-estate-report] single canonical A11oy'
     steps:
       - name: Checkout triggering revision
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          persist-credentials: false
+          ref: ${{ github.event_name == 'pull_request' && github.head_ref || github.ref_name }}
           fetch-depth: 1
 
-      - name: Determine execution mode
-        id: mode
+      - name: Determine execution mode and credential
+        id: preflight
         shell: bash
         run: |
           set -euo pipefail
@@ -61,44 +67,97 @@ jobs:
           if [ "${GITHUB_EVENT_NAME}" = "workflow_dispatch" ] && [ "${{ inputs.publish }}" != "true" ]; then publish=false; fi
           echo "publish=${publish}" >> "$GITHUB_OUTPUT"
 
-      - name: Verify Hugging Face credential without exposing it
-        shell: bash
-        run: |
-          set -euo pipefail
-          if [ -z "${HF_ORG_TOKEN:-}" ] && [ -z "${HF_TOKEN:-}" ]; then
-            echo "::error::No Hugging Face organization write credential is configured"
-            exit 2
+          if [ -n "${HF_ORG_TOKEN1:-}" ]; then
+            echo "credential=HF_ORG_TOKEN1" >> "$GITHUB_OUTPUT"
+          elif [ -n "${HF_ORG_TOKEN:-}" ]; then
+            echo "credential=HF_ORG_TOKEN" >> "$GITHUB_OUTPUT"
+          elif [ -n "${HF_TOKEN:-}" ]; then
+            echo "credential=HF_TOKEN" >> "$GITHUB_OUTPUT"
+          else
+            echo "credential=missing" >> "$GITHUB_OUTPUT"
+            mkdir -p reports
+            cat > reports/hf-estate-upgrade-latest.json <<JSON
+          {
+            "schema": "szl.hf-single-canonical-estate-report/v2",
+            "organization": "SZLHOLDINGS",
+            "generation": "${GITHUB_SHA}",
+            "publish": ${publish},
+            "generated_at": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
+            "inventory_contract": "huggingface_hub-supported-api/v2",
+            "clone_recreation": "PERMANENTLY_DISABLED",
+            "counts": {},
+            "canonical_flagship_space": {
+              "repo_id": "SZLHOLDINGS/a11oy"
+            },
+            "selected_newest_source": null,
+            "retired_clone_ids": [
+              "SZLHOLDINGS/a11oy-clone-1",
+              "SZLHOLDINGS/a11oy-clone-2",
+              "SZLHOLDINGS/a11oy-clone-3",
+              "SZLHOLDINGS/a11oy-clone-4"
+            ],
+            "live_route_verification": {},
+            "collection_validation": {},
+            "bucket_snapshots": {},
+            "actions": [
+              {
+                "target": "SZLHOLDINGS",
+                "action": "credential-preflight",
+                "status": "error",
+                "detail": "HF_ORG_TOKEN1/HF_ORG_TOKEN/HF_TOKEN is not configured."
+              }
+            ],
+            "summary": {
+              "ok": 0,
+              "warning": 0,
+              "error": 1,
+              "dry_run": 0
+            },
+            "boundaries": [
+              "No Hugging Face mutation was attempted without an authenticated organization write token."
+            ]
+          }
+          JSON
           fi
 
       - name: Set up Python
+        if: steps.preflight.outputs.credential != 'missing'
         uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
           python-version: "3.12"
 
-      - name: Install pinned Hub client range
+      - name: Install Hub client with Collections and Buckets APIs
+        if: steps.preflight.outputs.credential != 'missing'
         run: |
           python -m pip install --disable-pip-version-check \
-            "huggingface_hub>=1.3,<2" \
+            "huggingface_hub>=1.10,<2" \
             "requests>=2.32,<3"
 
-      - name: Verify permanent no-clone contract
+      - name: Prove single-canonical and no-recreation contracts
+        if: steps.preflight.outputs.credential != 'missing'
         run: |
           set -euo pipefail
           python -m py_compile \
             .github/scripts/hf_estate_upgrade.py \
             .github/scripts/hf_estate_canonicalize.py \
-            .github/scripts/test_hf_estate_canonicalize.py
+            .github/scripts/hf_estate_single_canonical_v2.py \
+            .github/scripts/test_hf_estate_canonicalize.py \
+            .github/scripts/test_hf_estate_single_canonical_v2.py
           python .github/scripts/test_hf_estate_canonicalize.py
+          python .github/scripts/test_hf_estate_single_canonical_v2.py
           git diff --check
 
-      - name: Reconcile single A11oy Space
+      - name: Compare, adopt, verify, and retire clones
+        if: steps.preflight.outputs.credential != 'missing'
         id: estate
         shell: bash
         run: |
           set +e
           args=(--generation "${GITHUB_SHA}")
-          if [ "${{ steps.mode.outputs.publish }}" = "true" ]; then args+=(--publish); fi
-          python .github/scripts/hf_estate_canonicalize.py "${args[@]}"
+          if [ "${{ steps.preflight.outputs.publish }}" = "true" ]; then
+            args+=(--publish)
+          fi
+          python .github/scripts/hf_estate_single_canonical_v2.py "${args[@]}"
           code=$?
           echo "exit_code=${code}" >> "$GITHUB_OUTPUT"
           exit 0
@@ -107,28 +166,52 @@ jobs:
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: hf-single-a11oy-${{ github.run_id }}
+          name: hf-single-canonical-a11oy-${{ github.run_id }}
           path: reports/hf-estate-upgrade-latest.json
-          if-no-files-found: error
+          if-no-files-found: warn
           retention-days: 90
 
-      - name: Persist published result in deterministic issue
-        if: always() && steps.mode.outputs.publish == 'true'
+      - name: Commit the latest publish-mode report
+        if: always() && github.event_name != 'pull_request'
         shell: bash
         run: |
           set -euo pipefail
-          test -f reports/hf-estate-upgrade-latest.json
+          if [ ! -f reports/hf-estate-upgrade-latest.json ]; then
+            echo "::warning::No estate report was produced."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add reports/hf-estate-upgrade-latest.json
+          if git diff --cached --quiet; then
+            echo "Report is unchanged."
+            exit 0
+          fi
+          git commit -s -m "chore(hf): record single-canonical estate report [skip ci]"
+          git push origin "HEAD:${TARGET_BRANCH}"
+
+      - name: Persist result in deterministic issue
+        if: always() && github.event_name != 'pull_request'
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ ! -f reports/hf-estate-upgrade-latest.json ]; then
+            exit 0
+          fi
+          run_url="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
           {
-            echo '<!-- szl-hf-single-a11oy-report -->'
-            echo '# Single governed A11oy Space'
+            echo '<!-- szl-hf-single-canonical-report -->'
+            echo '# Hugging Face estate — single canonical A11oy'
             echo
-            echo "- Run: ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
+            echo "- Run: ${run_url}"
             echo "- Source revision: \`${GITHUB_SHA}\`"
+            echo "- Credential selected: \`${{ steps.preflight.outputs.credential }}\`"
             echo
             echo '```json'
             cat reports/hf-estate-upgrade-latest.json
             echo '```'
-          } > /tmp/hf-single-a11oy.md
+          } > /tmp/hf-single-canonical.md
+
           issue_number="$(gh issue list \
             --repo "$GITHUB_REPOSITORY" \
             --state all \
@@ -139,12 +222,46 @@ jobs:
           if [ -n "$issue_number" ]; then
             gh issue edit "$issue_number" \
               --repo "$GITHUB_REPOSITORY" \
-              --body-file /tmp/hf-single-a11oy.md
+              --body-file /tmp/hf-single-canonical.md
           else
             gh issue create \
               --repo "$GITHUB_REPOSITORY" \
               --title "$REPORT_ISSUE_TITLE" \
-              --body-file /tmp/hf-single-a11oy.md
+              --body-file /tmp/hf-single-canonical.md >/dev/null
+            issue_number="$(gh issue list \
+              --repo "$GITHUB_REPOSITORY" \
+              --state all \
+              --search "${REPORT_ISSUE_TITLE} in:title" \
+              --json number,title \
+              --jq ".[] | select(.title == env.REPORT_ISSUE_TITLE) | .number" \
+              | head -n1)"
+          fi
+
+          if python - <<'PY'
+          import json
+          from pathlib import Path
+          report = json.loads(Path("reports/hf-estate-upgrade-latest.json").read_text())
+          canonical = report.get("canonical_flagship_space", {})
+          routes = report.get("live_route_verification", {})
+          retired = report.get("retired_clone_ids", [])
+          ok = (
+              report.get("summary", {}).get("error") == 0
+              and canonical.get("stage") == "RUNNING"
+              and canonical.get("private") is False
+              and canonical.get("sdk") == "docker"
+              and canonical.get("sha") == canonical.get("runtime_sha")
+              and routes.get("checked") == 6
+              and len(retired) == 4
+          )
+          raise SystemExit(0 if ok else 1)
+          PY
+          then
+            gh issue close "$issue_number" \
+              --repo "$GITHUB_REPOSITORY" \
+              --reason completed \
+              --comment 'Canonical A11oy is public, Docker-backed, RUNNING at the exact runtime revision; safe routes passed; every historical clone and collection reference is absent; clone recreation is disabled.' || true
+          else
+            gh issue reopen "$issue_number" --repo "$GITHUB_REPOSITORY" || true
           fi
 
       - name: Publish job summary
@@ -158,7 +275,7 @@ jobs:
 
           path = Path("reports/hf-estate-upgrade-latest.json")
           with open(os.environ["GITHUB_STEP_SUMMARY"], "a", encoding="utf-8") as out:
-              out.write("## Single governed A11oy Space\n\n")
+              out.write("## Hugging Face estate — sole governed A11oy\n\n")
               if not path.exists():
                   out.write("No report was produced.\n")
               else:
@@ -166,30 +283,42 @@ jobs:
                   selected = report.get("selected_newest_source") or {}
                   canonical = report.get("canonical_flagship_space") or {}
                   out.write(
-                      f"Selected newest source: `{selected.get('repo_id', 'UNKNOWN')}` "
-                      f"at `{selected.get('sha', 'UNKNOWN')}`.\n\n"
+                      f"Selected source: `{selected.get('repo_id', 'UNKNOWN')}` "
+                      f"at `{selected.get('sha', 'UNKNOWN')}` with tree "
+                      f"`{str(selected.get('tree_digest', 'UNKNOWN'))[:16]}`.\n\n"
                   )
                   out.write(
-                      f"Surviving canonical Space: `{canonical.get('repo_id', 'UNKNOWN')}` "
-                      f"at `{canonical.get('sha', 'UNKNOWN')}` "
-                      f"({canonical.get('stage', 'UNKNOWN')}).\n\n"
+                      f"Canonical A11oy: `{canonical.get('repo_id', 'UNKNOWN')}` "
+                      f"repository/runtime `{canonical.get('sha', 'UNKNOWN')}` / "
+                      f"`{canonical.get('runtime_sha', 'UNKNOWN')}` "
+                      f"({canonical.get('stage', 'UNKNOWN')}, "
+                      f"{canonical.get('sdk', 'UNKNOWN')}, "
+                      f"public={canonical.get('private') is False}).\n\n"
                   )
                   out.write("Retired clone IDs:\n")
                   for repo_id in report.get("retired_clone_ids", []):
                       out.write(f"- `{repo_id}`\n")
-                  out.write("\n")
-                  out.write("```json\n")
-                  out.write(json.dumps(report.get("summary", {}), indent=2))
-                  out.write("\n```\n")
+                  routes = report.get("live_route_verification", {})
+                  out.write(f"\nSafe routes passed: {routes.get('checked', 0)}\n\n")
+                  out.write("| Inventory | Count |\n|---|---:|\n")
+                  for key, value in report.get("counts", {}).items():
+                      out.write(f"| {key} | {value} |\n")
+                  out.write("\n| Result | Count |\n|---|---:|\n")
+                  for key, value in report.get("summary", {}).items():
+                      out.write(f"| {key} | {value} |\n")
           PY
 
       - name: Enforce fail-closed completion
         if: always()
+        shell: bash
         run: |
+          if [ "${{ steps.preflight.outputs.credential }}" = "missing" ]; then
+            exit 2
+          fi
           code="${{ steps.estate.outputs.exit_code }}"
           if [ -z "$code" ]; then code=2; fi
           if [ "$code" -ne 0 ]; then
-            echo "::error::Single-A11oy reconciliation failed with exit ${code}"
+            echo "::error::Single-canonical estate reconciliation completed with exit code $code."
             exit "$code"
           fi
-          echo 'Single-A11oy reconciliation completed successfully.'
+          echo 'Single-canonical A11oy reconciliation completed successfully.'
