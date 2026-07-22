@@ -1,0 +1,72 @@
+name: Patch HF governed-norm selfcheck runtime
+
+on:
+  push:
+    branches: [fix/hf-governed-norm-selfcheck-runtime-20260722]
+    paths:
+      - .github/workflows/patch-hf-kernel-torch-runtime.yml
+
+permissions:
+  contents: write
+
+concurrency:
+  group: patch-hf-kernel-torch-runtime
+  cancel-in-progress: false
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout exact repair branch
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: fix/hf-governed-norm-selfcheck-runtime-20260722
+          fetch-depth: 0
+      - name: Pin the CPU runtime required by the published torch27 kernel
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+
+          path = Path('.github/workflows/hf-kernel-card-publish.yml')
+          text = path.read_text(encoding='utf-8')
+          old = '''      - name: Install current supported kernel clients
+                  run: |
+                    python -m pip install --disable-pip-version-check \\
+                      "huggingface_hub>=1.3,<2" \\
+                      "kernels==0.16.0" \\
+                      "pytest>=8,<9"
+          '''.replace('          ', '', 1)
+          new = '''      - name: Install current supported kernel clients
+                  run: |
+                    python -m pip install --disable-pip-version-check \\
+                      "huggingface_hub>=1.3,<2" \\
+                      "kernels==0.16.0" \\
+                      "pytest>=8,<9"
+                    python -m pip install --disable-pip-version-check \\
+                      --index-url https://download.pytorch.org/whl/cpu \\
+                      "torch==2.7.1"
+          '''.replace('          ', '', 1)
+          if text.count(old) != 1:
+              raise SystemExit('expected kernel client install block exactly once')
+          text = text.replace(old, new, 1)
+          path.write_text(text, encoding='utf-8')
+          PY
+          grep -F -- '"torch==2.7.1"' .github/workflows/hf-kernel-card-publish.yml
+          grep -F -- '--index-url https://download.pytorch.org/whl/cpu' \
+            .github/workflows/hf-kernel-card-publish.yml
+          git diff --check
+      - name: Commit production change and remove bootstrap
+        run: |
+          set -euo pipefail
+          rm .github/workflows/patch-hf-kernel-torch-runtime.yml
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add .github/workflows/hf-kernel-card-publish.yml \
+            .github/workflows/patch-hf-kernel-torch-runtime.yml
+          git commit \
+            -m 'fix(hf): install governed-norm torch27 selfcheck runtime' \
+            -m 'Pin CPU PyTorch 2.7.1 so the exact published szl-governed-norm kernel can execute selfcheck without changing kernel bytes or build variants.' \
+            -m 'Signed-off-by: github-actions[bot] <41898282+github-actions[bot]@users.noreply.github.com>'
+          git push origin HEAD:fix/hf-governed-norm-selfcheck-runtime-20260722
