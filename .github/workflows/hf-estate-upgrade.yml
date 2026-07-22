@@ -1,7 +1,7 @@
-name: HF Estate Command Centers
+name: HF Estate — Canonical A11oy Only
 
-# Organization-wide Hugging Face maintenance with one canonical A11oy production
-# Space and four public, synchronized recovery/showcase command centers.
+# Organization-wide Hugging Face maintenance with one governed production
+# Space: SZLHOLDINGS/a11oy. Historical clone repositories are retired.
 on:
   push:
     branches: [main]
@@ -33,7 +33,7 @@ concurrency:
 
 jobs:
   reconcile:
-    name: Retain four public A11oy command centers
+    name: Keep one canonical A11oy Space
     runs-on: ubuntu-latest
     timeout-minutes: 120
     env:
@@ -70,12 +70,8 @@ jobs:
             "canonical_flagship_space": {
               "repo_id": "SZLHOLDINGS/a11oy"
             },
-            "managed_clone_ids": [
-              "SZLHOLDINGS/a11oy-clone-1",
-              "SZLHOLDINGS/a11oy-clone-2",
-              "SZLHOLDINGS/a11oy-clone-3",
-              "SZLHOLDINGS/a11oy-clone-4"
-            ],
+            "managed_clone_ids": [],
+            "retired_clone_ids": [],
             "collections": {},
             "actions": [
               {
@@ -114,7 +110,7 @@ jobs:
             "huggingface_hub>=1.3,<2" \
             "requests>=2.32,<3"
 
-      - name: Verify command-center estate contract
+      - name: Verify canonical-only estate contract
         if: steps.credentials.outputs.has_token == 'true'
         run: |
           python -m py_compile \
@@ -123,7 +119,7 @@ jobs:
             .github/scripts/test_hf_estate_canonicalize.py
           python .github/scripts/test_hf_estate_canonicalize.py
 
-      - name: Execute command-center estate reconciliation
+      - name: Execute canonical-only estate reconciliation
         if: steps.credentials.outputs.has_token == 'true'
         id: estate
         shell: bash
@@ -181,7 +177,7 @@ jobs:
 
           path = Path("reports/hf-estate-upgrade-latest.json")
           with open(os.environ["GITHUB_STEP_SUMMARY"], "a", encoding="utf-8") as out:
-              out.write("## Hugging Face command-center estate\n\n")
+              out.write("## Hugging Face canonical A11oy estate\n\n")
               if not path.exists():
                   out.write("No report was produced.\n")
               else:
@@ -194,17 +190,10 @@ jobs:
                       f"at `{canonical.get('sha', 'UNVERIFIED')}` "
                       f"({canonical.get('stage', 'UNKNOWN')})\n\n"
                   )
-                  clones = report.get("managed_clone_snapshots", {})
-                  out.write("| Retained clone | Visibility | Runtime | Revision |\n")
-                  out.write("|---|---|---|---|\n")
-                  for repo_id in report.get("managed_clone_ids", []):
-                      item = clones.get(repo_id, {})
-                      visibility = "public" if item.get("private") is False else "unknown"
-                      out.write(
-                          f"| `{repo_id}` | {visibility} | "
-                          f"{item.get('stage', 'UNKNOWN')} | "
-                          f"`{item.get('sha', 'UNVERIFIED')}` |\n"
-                      )
+                  out.write(
+                      f"Retired clone IDs: `{len(report.get('retired_clone_ids', []))}`; "
+                      f"deleted/planned: `{len(report.get('deleted_clone_snapshots', []))}`\n\n"
+                  )
                   out.write("\n| Inventory | Count |\n|---|---:|\n")
                   for key, value in report.get("counts", {}).items():
                       out.write(f"| {key} | {value} |\n")

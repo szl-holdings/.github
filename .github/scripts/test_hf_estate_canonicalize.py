@@ -10,77 +10,49 @@ SCRIPT_DIR = pathlib.Path(__file__).resolve().parent
 if str(SCRIPT_DIR) not in sys.path:
     sys.path.insert(0, str(SCRIPT_DIR))
 
-command_centers = importlib.import_module("hf_estate_canonicalize")
+estate = importlib.import_module("hf_estate_canonicalize")
 
 
-class CommandCenterEstateContractTests(unittest.TestCase):
-    def test_exact_public_clone_keep_set(self) -> None:
+class SingleA11oyEstateContractTests(unittest.TestCase):
+    def test_only_canonical_space_is_retained(self) -> None:
         self.assertEqual(
-            command_centers.MANAGED_CLONE_IDS,
-            (
-                "SZLHOLDINGS/a11oy-clone-1",
-                "SZLHOLDINGS/a11oy-clone-2",
-                "SZLHOLDINGS/a11oy-clone-3",
-                "SZLHOLDINGS/a11oy-clone-4",
+            estate.RETIRED_CLONE_IDS,
+            tuple(
+                f"SZLHOLDINGS/a11oy-clone-{index}"
+                for index in range(1, 5)
             ),
         )
         self.assertEqual(
-            command_centers.KEEP_SPACE_IDS,
-            frozenset(
-                {
-                    "SZLHOLDINGS/a11oy",
-                    "SZLHOLDINGS/a11oy-clone-1",
-                    "SZLHOLDINGS/a11oy-clone-2",
-                    "SZLHOLDINGS/a11oy-clone-3",
-                    "SZLHOLDINGS/a11oy-clone-4",
-                }
-            ),
+            estate.KEEP_SPACE_IDS,
+            frozenset({"SZLHOLDINGS/a11oy"}),
         )
+        self.assertEqual(estate.legacy.CLONE_IDS, [])
 
-    def test_inherited_collection_builder_keeps_clones(self) -> None:
-        self.assertEqual(
-            command_centers.legacy.CLONE_IDS,
-            list(command_centers.MANAGED_CLONE_IDS),
-        )
-
-    def test_quota_safe_clone_path(self) -> None:
+    def test_no_clone_creation_path_remains(self) -> None:
         source = (SCRIPT_DIR / "hf_estate_canonicalize.py").read_text(
             encoding="utf-8"
         )
         self.assertNotIn("duplicate_repo(", source)
-        self.assertNotIn("duplicate_space(", source)
-        self.assertIn("create_repo(", source)
-        self.assertIn("update_repo_settings", source)
-        self.assertIn("delete-surplus-duplicate", source)
+        self.assertNotIn("create_repo(", source)
+        self.assertNotIn("update_repo_settings", source)
+        self.assertIn("delete_repo(", source)
+        self.assertIn("delete-retired-clone", source)
 
-    def test_narrow_name_match_does_not_select_unrelated_spaces(self) -> None:
-        self.assertIsNotNone(
-            command_centers.DUPLICATE_NAME.fullmatch(
-                "SZLHOLDINGS/a11oy-copy-99"
-            )
+    def test_legacy_clone_factory_is_retired(self) -> None:
+        source = (SCRIPT_DIR / "hf_estate_upgrade.py").read_text(
+            encoding="utf-8"
         )
-        self.assertIsNotNone(
-            command_centers.DUPLICATE_NAME.fullmatch(
-                "SZLHOLDINGS/a11oy-duplicate-2"
-            )
-        )
-        self.assertIsNone(
-            command_centers.DUPLICATE_NAME.fullmatch(
-                "SZLHOLDINGS/a11oy-research-lab"
-            )
-        )
-        self.assertIn(
-            "SZLHOLDINGS/a11oy-clone-1",
-            command_centers.KEEP_SPACE_IDS,
-        )
+        self.assertIn("CLONE_IDS: list[str] = []", source)
+        self.assertNotIn("a11oy-clone-", source)
+        self.assertIn("canonical-only; no clones created", source)
 
-    def test_workflow_executes_command_center_reconciler(self) -> None:
+    def test_workflow_is_canonical_only(self) -> None:
         workflow = (
             SCRIPT_DIR.parent / "workflows" / "hf-estate-upgrade.yml"
         ).read_text(encoding="utf-8")
-        self.assertIn("hf_estate_canonicalize.py", workflow)
-        self.assertIn("Retain four public A11oy command centers", workflow)
-        self.assertNotIn("retired_clone_ids", workflow)
+        self.assertIn("Keep one canonical A11oy Space", workflow)
+        self.assertNotIn("Retain four", workflow)
+        self.assertNotIn("a11oy-clone-1", workflow)
 
     def test_runtime_stage_normalization(self) -> None:
         class Runtime:
@@ -89,7 +61,7 @@ class CommandCenterEstateContractTests(unittest.TestCase):
         class Info:
             runtime = Runtime()
 
-        self.assertEqual(command_centers._runtime_stage(Info()), "RUNNING")
+        self.assertEqual(estate._runtime_stage(Info()), "RUNNING")
 
 
 if __name__ == "__main__":

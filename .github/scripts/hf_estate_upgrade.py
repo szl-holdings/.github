@@ -8,7 +8,7 @@ The publisher:
 - writes the marker to static Spaces and unhealthy dynamic Spaces only, so
   healthy paid runtimes are not needlessly rebuilt;
 - factory-restarts unhealthy non-static Spaces;
-- creates/refreshes four private CPU-basic clones of the flagship a11oy Space;
+- never creates or refreshes duplicate A11oy Spaces; the canonical Space is SZLHOLDINGS/a11oy;
 - creates four canonical collections and adds every supported asset;
 - publishes a signed-by-CI evidence report to the private szl-evidence dataset.
 
@@ -40,7 +40,7 @@ HF_BASE = "https://huggingface.co"
 FLAGSHIP_SPACE = f"{ORG}/a11oy"
 EVIDENCE_DATASET = f"{ORG}/szl-evidence"
 MANAGED_PATH = "SZL_ESTATE_MANAGED.json"
-CLONE_IDS = [f"{ORG}/a11oy-clone-{index}" for index in range(1, 5)]
+CLONE_IDS: list[str] = []
 UNHEALTHY_STAGES = {
     "BUILD_ERROR",
     "RUNTIME_ERROR",
@@ -348,35 +348,8 @@ class EstateUpgrade:
         )
 
     def create_or_refresh_clones(self) -> None:
-        for clone_id in CLONE_IDS:
-            if not self.publish:
-                self.record(clone_id, "flagship-clone", "dry-run", f"source={FLAGSHIP_SPACE}")
-                continue
-            try:
-                exists = self.api.repo_exists(clone_id, repo_type="space")
-                if not exists:
-                    self.api.duplicate_repo(
-                        from_id=FLAGSHIP_SPACE,
-                        to_id=clone_id,
-                        repo_type="space",
-                        visibility="private",
-                        exist_ok=True,
-                        space_hardware="cpu-basic",
-                        space_sleep_time=300,
-                    )
-                    self.record(clone_id, "flagship-clone", "created", "private cpu-basic")
-                else:
-                    self._sync_existing_clone(FLAGSHIP_SPACE, clone_id)
-                clone_info = self.api.space_info(clone_id)
-                self._upload_marker(
-                    repo_id=clone_id,
-                    repo_type="space",
-                    observed_sha=getattr(clone_info, "sha", None),
-                    runtime={"stage": getattr(getattr(clone_info, "runtime", None), "stage", None)},
-                    clone_of=FLAGSHIP_SPACE,
-                )
-            except Exception as exc:
-                self.record(clone_id, "flagship-clone", "error", repr(exc)[:400])
+        """Clone creation is retired; canonical A11oy is the only retained Space."""
+        self.record(FLAGSHIP_SPACE, "clone-policy", "ok", "canonical-only; no clones created")
 
     def _ensure_collection(self, title: str, spec: dict[str, str]) -> str | None:
         existing = list(self.api.list_collections(owner=ORG, limit=100))
