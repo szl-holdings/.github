@@ -1,7 +1,9 @@
 name: HF Estate Upgrade
 
-# Organization-wide, non-destructive Hub maintenance.
-# Dedicated deployment-branch trigger: 2026-07-22T05:44Z.
+# Organization-wide, non-destructive Hub maintenance. The normal publisher runs
+# first. A narrow repair phase then creates the four private flagship clones
+# without the daily-limited duplicate endpoint and reconciles Hub-valid
+# collection metadata before the final evidence report is committed.
 on:
   push:
     branches:
@@ -9,11 +11,13 @@ on:
       - agent/hf-estate-upgrade-20260722
     paths:
       - .github/scripts/hf_estate_upgrade.py
+      - .github/scripts/hf_estate_repair.py
       - .github/workflows/hf-estate-upgrade.yml
   pull_request:
     branches: [main]
     paths:
       - .github/scripts/hf_estate_upgrade.py
+      - .github/scripts/hf_estate_repair.py
       - .github/workflows/hf-estate-upgrade.yml
   workflow_dispatch:
     inputs:
@@ -37,10 +41,11 @@ jobs:
     env:
       HF_ORG_TOKEN: ${{ secrets.HF_ORG_TOKEN }}
       HF_TOKEN: ${{ secrets.HF_TOKEN }}
+      HF_HUB_DISABLE_PROGRESS_BARS: "1"
       TARGET_BRANCH: ${{ github.event_name == 'pull_request' && github.head_ref || github.ref_name }}
     steps:
       - name: Checkout triggering revision
-        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ github.event_name == 'pull_request' && github.head_ref || github.ref_name }}
           fetch-depth: 1
@@ -79,12 +84,7 @@ jobs:
                 "detail": "Neither GitHub Actions secret HF_ORG_TOKEN nor HF_TOKEN is configured for this repository."
               }
             ],
-            "summary": {
-              "ok": 0,
-              "warning": 0,
-              "error": 1,
-              "dry_run": 0
-            },
+            "summary": {"ok": 0, "warning": 0, "error": 1, "dry_run": 0},
             "boundaries": [
               "No Hugging Face mutation was attempted without an authenticated org-scoped write token."
             ]
@@ -123,6 +123,22 @@ jobs:
           python .github/scripts/hf_estate_upgrade.py \
             ${publish_flag} \
             --generation "${GITHUB_SHA}"
+          code=$?
+          echo "exit_code=${code}" >> "$GITHUB_OUTPUT"
+          exit 0
+
+      - name: Repair quota-limited clones and collection metadata
+        if: >-
+          steps.credentials.outputs.has_token == 'true' &&
+          github.event_name != 'pull_request' &&
+          (github.event_name != 'workflow_dispatch' || inputs.publish == 'true')
+        id: repair
+        shell: bash
+        run: |
+          set +e
+          python .github/scripts/hf_estate_repair.py \
+            --generation "${GITHUB_SHA}" \
+            --runtime-timeout 1800
           code=$?
           echo "exit_code=${code}" >> "$GITHUB_OUTPUT"
           exit 0
@@ -178,7 +194,14 @@ jobs:
           if [ "${{ steps.credentials.outputs.has_token }}" != "true" ]; then
             exit 2
           fi
-          code="${{ steps.estate.outputs.exit_code }}"
+          publish=true
+          if [ "${{ github.event_name }}" = "pull_request" ]; then publish=false; fi
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ "${{ inputs.publish }}" != "true" ]; then publish=false; fi
+          if [ "$publish" = "true" ]; then
+            code="${{ steps.repair.outputs.exit_code }}"
+          else
+            code="${{ steps.estate.outputs.exit_code }}"
+          fi
           if [ -z "$code" ]; then code=2; fi
           if [ "$code" -ne 0 ]; then
             echo "::error::Estate upgrade completed with exit code $code; inspect the committed report."
