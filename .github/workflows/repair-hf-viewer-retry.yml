@@ -1,0 +1,122 @@
+name: Repair transient Hugging Face Dataset Viewer retry
+
+on:
+  push:
+    branches:
+      - fix/hf-viewer-transient-retry
+    paths:
+      - .github/workflows/repair-hf-viewer-retry.yml
+
+permissions:
+  contents: write
+
+concurrency:
+  group: repair-hf-viewer-retry
+  cancel-in-progress: false
+
+jobs:
+  repair:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout exact repair branch
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: fix/hf-viewer-transient-retry
+          fetch-depth: 0
+
+      - name: Add bounded transient retry and verify behavior
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+
+          path = Path('.github/scripts/hf_release_finalization.py')
+          text = path.read_text(encoding='utf-8')
+          if 'import time\n' not in text:
+              text = text.replace('import os\n', 'import os\nimport time\n', 1)
+
+          marker = '    def finalize_dataset(self) -> None:\n'
+          helper = '''    def _wait_for_dataset_viewer(\n        self,\n        attempts: int = 12,\n    ) -> tuple[requests.Response, dict[str, Any], int]:\n        """Wait for the post-publication Viewer contract without accepting failure.\n\n        Hugging Face may briefly return 429/5xx or an explicit busy/not-ready\n        payload while it materializes a newly published configuration. Only those\n        transient states are retried. Success still requires a final HTTP 200 JSON\n        object with no error field.\n        """\n        if attempts < 1:\n            raise ValueError("attempts must be positive")\n        retryable_statuses = {429, 500, 502, 503, 504}\n        transient_markers = ("busy", "not ready", "retry", "processing", "loading")\n        last_detail = "no response"\n        for attempt in range(1, attempts + 1):\n            try:\n                response = requests.get(\n                    VIEWER_URL,\n                    headers={\n                        "Accept": "application/json",\n                        "Cache-Control": "no-cache",\n                        "User-Agent": "szl-hf-release-finalizer/1.1",\n                    },\n                    timeout=90,\n                )\n            except requests.RequestException as exc:\n                last_detail = f"{type(exc).__name__}: {exc}"\n                retryable = True\n            else:\n                payload: Any = None\n                if response.status_code == 200:\n                    try:\n                        payload = response.json()\n                    except ValueError as exc:\n                        raise RuntimeError(\n                            f"Dataset Viewer returned invalid JSON: {exc}"\n                        ) from exc\n                    if isinstance(payload, dict) and not payload.get("error"):\n                        return response, payload, attempt\n                    error_text = str(\n                        payload.get("error") if isinstance(payload, dict) else payload\n                    )\n                    last_detail = f"HTTP 200 error payload: {error_text[:300]}"\n                    lowered = error_text.lower()\n                    retryable = any(marker in lowered for marker in transient_markers)\n                else:\n                    last_detail = (\n                        f"HTTP {response.status_code}: {response.text[:300]}"\n                    )\n                    retryable = response.status_code in retryable_statuses\n\n            if not retryable:\n                raise RuntimeError(\n                    f"Dataset Viewer contract failed non-transiently: {last_detail}"\n                )\n            if attempt == attempts:\n                raise RuntimeError(\n                    "Dataset Viewer contract did not converge after "\n                    f"{attempts} attempts: {last_detail}"\n                )\n            delay = min(15 * attempt, 60)\n            self.record(\n                DATASET_ID,\n                "dataset-viewer-wait",\n                "warning",\n                f"attempt={attempt}/{attempts}; retry_in={delay}s; {last_detail}",\n            )\n            time.sleep(delay)\n\n'''
+          if helper not in text:
+              if text.count(marker) != 1:
+                  raise SystemExit('expected finalize_dataset marker exactly once')
+              text = text.replace(marker, helper + marker, 1)
+
+          old = '''        response = requests.get(VIEWER_URL, timeout=90)\n        if response.status_code != 200:\n            raise RuntimeError(\n                f"Dataset Viewer contract did not return HTTP 200: {response.status_code} "\n                f"{response.text[:300]}"\n            )\n        payload = response.json()\n        if not isinstance(payload, dict) or payload.get("error"):\n            raise RuntimeError(f"Dataset Viewer returned an error payload: {payload}")\n'''
+          new = '''        response, payload, viewer_attempts = self._wait_for_dataset_viewer()\n'''
+          if old in text:
+              text = text.replace(old, new, 1)
+          elif new not in text:
+              raise SystemExit('expected Viewer verification block was not found')
+
+          text = text.replace(
+              'f"after={after}; files={len(remote_files)}; viewer=HTTP-200",',
+              'f"after={after}; files={len(remote_files)}; viewer=HTTP-200; attempts={viewer_attempts}",',
+              1,
+          )
+          text = text.replace(
+              '"viewer_http_status": response.status_code,\n',
+              '"viewer_http_status": response.status_code,\n            "viewer_attempts": viewer_attempts,\n',
+              1,
+          )
+          path.write_text(text, encoding='utf-8')
+          PY
+
+          python -m py_compile .github/scripts/hf_release_finalization.py
+          python - <<'PY'
+          import importlib.util
+          from pathlib import Path
+
+          path = Path('.github/scripts/hf_release_finalization.py')
+          spec = importlib.util.spec_from_file_location('finalizer', path)
+          module = importlib.util.module_from_spec(spec)
+          spec.loader.exec_module(module)
+
+          class Response:
+              def __init__(self, status, payload, text=''):
+                  self.status_code = status
+                  self._payload = payload
+                  self.text = text or str(payload)
+              def json(self):
+                  return self._payload
+
+          sequence = iter([
+              Response(500, {'error': 'The server is busier than usual and not ready. Please retry later.'}),
+              Response(200, {'rows': [], 'features': []}),
+          ])
+          module.requests.get = lambda *args, **kwargs: next(sequence)
+          module.time.sleep = lambda _seconds: None
+          finalizer = object.__new__(module.Finalizer)
+          finalizer.actions = []
+          response, payload, attempts = finalizer._wait_for_dataset_viewer(attempts=3)
+          assert response.status_code == 200
+          assert payload == {'rows': [], 'features': []}
+          assert attempts == 2
+          assert len(finalizer.actions) == 1
+
+          module.requests.get = lambda *args, **kwargs: Response(404, {'error': 'missing'})
+          try:
+              finalizer._wait_for_dataset_viewer(attempts=3)
+          except RuntimeError as exc:
+              assert 'non-transiently' in str(exc)
+          else:
+              raise AssertionError('404 must fail without retry')
+          PY
+          git diff --check
+
+      - name: Commit repair and remove bootstrap
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -f .github/workflows/repair-hf-viewer-retry.yml
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add .github/scripts/hf_release_finalization.py \
+            .github/workflows/repair-hf-viewer-retry.yml
+          git commit \
+            -m 'fix(hf): retry transient Dataset Viewer materialization' \
+            -m 'Retry only bounded 429/5xx or explicit busy/not-ready responses after publication while retaining a mandatory final HTTP 200 non-error JSON contract.' \
+            -m 'Signed-off-by: github-actions[bot] <41898282+github-actions[bot]@users.noreply.github.com>'
+          git push origin HEAD:fix/hf-viewer-transient-retry
