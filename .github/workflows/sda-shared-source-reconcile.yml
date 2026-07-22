@@ -1,0 +1,156 @@
+name: Reconcile A11oy and Killinchu SDA shared source
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - .github/data/sda_shared_source_reconcile.json
+      - .github/scripts/sda_shared_source_reconcile.py
+      - .github/workflows/sda-shared-source-reconcile.yml
+  push:
+    branches: [main]
+    paths:
+      - .github/data/sda_shared_source_reconcile.json
+      - .github/scripts/sda_shared_source_reconcile.py
+      - .github/workflows/sda-shared-source-reconcile.yml
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+  issues: write
+
+concurrency:
+  group: sda-shared-source-reconcile
+  cancel-in-progress: false
+
+jobs:
+  static-validation:
+    name: Validate exact SDA reconciliation implementation
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: '3.12'
+      - name: Compile script and validate immutable manifest
+        run: |
+          set -euo pipefail
+          python -m py_compile .github/scripts/sda_shared_source_reconcile.py
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          manifest = json.loads(Path('.github/data/sda_shared_source_reconcile.json').read_text())
+          assert manifest['schema'] == 'szl.sda-shared-source-reconcile/v1'
+          assert manifest['a11oy']['pull_request'] == 1028
+          assert len(manifest['a11oy']['expected_head_sha']) == 40
+          assert len(manifest['killinchu']['expected_main_sha']) == 40
+          assert manifest['shared_path'] == 'szl_spaces_surface.py'
+          assert set(manifest['static_spaces']) == {
+              'energy-attested-runs', 'guardrail-receipt', 'szl-forge-lab'
+          }
+          print('manifest validated')
+          PY
+
+  execute:
+    name: Repair A11oy branch and open exact Killinchu companion
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+    needs: static-validation
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      SZL_GITHUB_TOKEN: ${{ secrets.SZL_GITHUB_TOKEN }}
+      GH_TOKEN: ${{ github.token }}
+      REPORT_ISSUE_TITLE: '[sda-reconcile-report] exact A11oy and Killinchu shared source'
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: '3.12'
+      - name: Install focused test dependencies
+        run: python -m pip install --disable-pip-version-check pytest fastapi starlette httpx
+      - name: Verify admin secret exists without exposing it
+        run: |
+          set -euo pipefail
+          test -n "${SZL_GITHUB_TOKEN:-}" || {
+            cat > sda-shared-source-reconcile-report.json <<JSON
+          {
+            "schema": "szl.sda-shared-source-reconcile-report/v1",
+            "generated_at": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
+            "ok": false,
+            "actions": [],
+            "errors": ["ReconcileError: SZL_GITHUB_TOKEN is not configured"]
+          }
+          JSON
+            echo 'EXECUTION_EXIT=2' >> "$GITHUB_ENV"
+            exit 0
+          }
+      - name: Execute exact reconciliation
+        if: env.EXECUTION_EXIT == ''
+        shell: bash
+        run: |
+          set +e
+          # Correct a source-only email typo before execution; no repository file
+          # is modified by this local normalization.
+          sed -i 's/stephenlutar@gmail.com/stephenlutar2@gmail.com/g' \
+            .github/scripts/sda_shared_source_reconcile.py
+          python .github/scripts/sda_shared_source_reconcile.py \
+            --manifest .github/data/sda_shared_source_reconcile.json \
+            --report sda-shared-source-reconcile-report.json
+          code=$?
+          echo "EXECUTION_EXIT=$code" >> "$GITHUB_ENV"
+          exit 0
+      - name: Upload immutable reconciliation report
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: sda-shared-source-reconcile-report
+          path: sda-shared-source-reconcile-report.json
+          if-no-files-found: error
+      - name: Persist reconciliation report in deterministic issue
+        if: always()
+        run: |
+          set -euo pipefail
+          test -f sda-shared-source-reconcile-report.json
+          run_url="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
+          {
+            echo '<!-- szl-sda-shared-source-reconcile-report -->'
+            echo '# Exact A11oy and Killinchu SDA reconciliation'
+            echo
+            echo "- Run: ${run_url}"
+            echo "- Control revision: \`${GITHUB_SHA}\`"
+            echo
+            echo '```json'
+            cat sda-shared-source-reconcile-report.json
+            echo '```'
+          } > /tmp/sda-reconcile-issue.md
+          issue_number="$(gh issue list \
+            --repo "$GITHUB_REPOSITORY" \
+            --state all \
+            --search "${REPORT_ISSUE_TITLE} in:title" \
+            --json number,title \
+            --jq ".[] | select(.title == env.REPORT_ISSUE_TITLE) | .number" \
+            | head -n1)"
+          if [ -n "$issue_number" ]; then
+            gh issue edit "$issue_number" --repo "$GITHUB_REPOSITORY" --body-file /tmp/sda-reconcile-issue.md
+            if [ "${EXECUTION_EXIT:-1}" = "0" ]; then
+              gh issue close "$issue_number" --repo "$GITHUB_REPOSITORY" --reason completed \
+                --comment 'Exact shared-source reconciliation completed; report updated above.' || true
+            else
+              gh issue reopen "$issue_number" --repo "$GITHUB_REPOSITORY" || true
+            fi
+          else
+            gh issue create --repo "$GITHUB_REPOSITORY" --title "$REPORT_ISSUE_TITLE" \
+              --body-file /tmp/sda-reconcile-issue.md
+          fi
+      - name: Enforce fail-closed result
+        if: always()
+        run: |
+          code="${EXECUTION_EXIT:-2}"
+          if [ "$code" -ne 0 ]; then
+            echo "::error::SDA shared-source reconciliation failed closed with exit ${code}; see the durable report issue."
+            exit "$code"
+          fi
+          echo 'Exact A11oy and Killinchu shared-source reconciliation completed.'
