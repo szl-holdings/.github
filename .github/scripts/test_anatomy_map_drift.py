@@ -3,27 +3,26 @@
 
 ``anatomy_map_drift.py`` fails the run when the single honest anatomy map
 diverges across its three surfaces (a11oy /console, killinchu /elite, the
-SZLHOLDINGS/anatomy HF Space) on the canonical locked-five ladder
-{F1,F11,F12,F18,F19}; EXPERIMENTAL / NOT LOCKED {F4,F7,F22}, the Λ=Conjecture-1 honesty label, or the
+SZLHOLDINGS/anatomy HF Space) on the canonical locked-8 ladder
+{F1,F4,F7,F11,F12,F18,F19,F22}, the Λ=Conjecture-1 honesty label, or the
 shared capability ladder.
 
 These fixtures drive the REAL ``evaluate()`` path network-free, with fixture
 text trimmed from the actual surfaces, and pin that the guard:
 
   1. PASSES when all three surfaces are honest and in sync          (exit 0)
-  2. FAILS when one surface swaps a locked formula id (F19 -> F23)  (exit 1)
+  2. FAILS when one surface swaps a locked formula id (F22 -> F23)  (exit 1)
   3. FAILS when one surface drops the Λ=Conjecture-1 label          (exit 1)
   4. FAILS when the capability ladder is edited on ONE side only    (exit 1)
   5. FAILS when the marker block is missing entirely                (exit 1)
 
 It also pins the pure extractors so a future refactor can't quietly stop
-matching either maturity set, the Λ label, the capability list, or the markers
+matching the locked ladder, the Λ label, the capability list, or the markers
 (which would turn the guard into an always-green no-op).
 """
 from __future__ import annotations
 
 import importlib.util
-import json
 import os
 import unittest
 
@@ -37,9 +36,8 @@ _spec.loader.exec_module(amd)
 
 # --- The byte-shared marker block (trimmed, faithful to the real surfaces). --
 def _block(*, putnam="0 REAL / 10 DEMO / 2 OPEN", ns_footer=True,
-           locked="F1, F11, F12, F18, F19",
-           experimental="F4, F7, F22",
-           math_f="F1, F11, F12, F18, F19 (locked-five) · F4, F7, F22 (EXPERIMENTAL / NOT LOCKED)",
+           locked="F1, F4, F7, F11, F12, F18, F19, F22",
+           math_f="F1, F4, F7, F11, F12, F18, F19, F22 (locked-8)",
            lambda_label="\\u039b uniqueness = <b>Conjecture 1</b>",
            drop_math_cap=False, drop_lambda=False):
     caps = [
@@ -50,20 +48,19 @@ def _block(*, putnam="0 REAL / 10 DEMO / 2 OPEN", ns_footer=True,
     if not drop_math_cap:
         caps.append(
             "{k:'math', n:'Math \\u00b7 AP-12 generator + Putnam benchmark', s:'LIVE-GATED', "
-            f"p:'Putnam 2025: {putnam} (doctrine v11). The locked-five ladder and the EXPERIMENTAL / NOT LOCKED set remain explicit; \\u039B=Conjecture 1 is unchanged.', "
+            f"p:'Putnam 2025: {putnam} (doctrine v11). The locked-8 ladder and \\u039b=Conjecture 1 are unchanged.', "
             f"e:'/api/math', f:'{math_f}'}}")
     footer = ("+'Static honest snapshot \\u00b7 NS='+esc(NS)+' \\u00b7 no fabricated live pills.</div>';"
               if ns_footer else
               "+'Static honest snapshot \\u00b7no fabricated live pills.</div>';")
     block = (
         "/* anatomy-map-tab-patch :: SZL Anatomy \u2014 single honest map ::\n"
-        "   5 LOCKED formulas {F1,F11,F12,F18,F19}; EXPERIMENTAL / NOT LOCKED {F4,F7,F22}; \u039b = Conjecture 1. */\n"
+        "   8 LOCKED formulas {F1,F4,F7,F11,F12,F18,F19,F22}; \u039b = Conjecture 1. */\n"
         "(function(){\n"
         "  var NS=(window.__rd_ns||'a11oy');\n"
         "  var CAPS=[" + ",\n".join(caps) + "];\n"
         "  function render(host){ var h='';\n"
-        "    h+='Honesty: <b>5 LOCKED</b> kernel-verified formulas {" + locked + "}; "
-        "<b>EXPERIMENTAL / NOT LOCKED</b> source-present formulas {" + experimental + "}; "
+        "    h+='Honesty: <b>8 LOCKED</b> kernel-verified formulas {" + locked + "}; "
         + lambda_label + " (advisory, never a pass/fail oracle).';\n"
         "    " + footer + "\n"
         "  }\n"
@@ -79,19 +76,15 @@ def _block(*, putnam="0 REAL / 10 DEMO / 2 OPEN", ns_footer=True,
 
 
 # --- The HF static deck (trimmed, faithful to data.js + index.html). --------
-def _hf(*, locked="'F1', 'F11', 'F12', 'F18', 'F19'",
-        experimental="'F4', 'F7', 'F22'",
+def _hf(*, locked="'F1', 'F4', 'F7', 'F11', 'F12', 'F18', 'F19', 'F22'",
         lambda_label="Unconditional \u039b stays Conjecture 1."):
     return (
         "const KERNEL = { locked_sha:'c7c0ba17',\n"
         "  locked_proven: [" + locked + "],\n"
-        "  experimental_not_locked: [" + experimental + "],\n"
         "  cut2:'CUT-2 lambda_unique_of_separable. " + lambda_label + "' };\n"
         "/* index.html */\n"
-        "<span class=vf-tier-locked>5 LOCKED-proven (kernel-verified)</span> "
-        "{F1, F11, F12, F18, F19} @ c7c0ba17.\n"
-        "<span>EXPERIMENTAL / NOT LOCKED {" + experimental.replace("'", "")
-        + "}</span>.\n"
+        "<span class=vf-tier-locked>8 LOCKED-proven (kernel-verified)</span> "
+        "{F1, F4, F7, F11, F12, F18, F19, F22} @ c7c0ba17.\n"
         "<strong>\u039b = Conjecture 1.</strong> Unconditional uniqueness stays open.\n"
     )
 
@@ -109,16 +102,6 @@ def _surfaces(a11oy=None, killinchu=None, hf=None):
 
 
 class TestExtractors(unittest.TestCase):
-    def test_registry_declares_exact_disjoint_maturity_sets(self):
-        registry_path = os.path.join(_HERE, "..", "data", "anatomy_map_registry.json")
-        with open(registry_path, encoding="utf-8") as handle:
-            registry = json.load(handle)
-        locked = tuple(registry["canonical_locked"])
-        experimental = tuple(registry["canonical_experimental"])
-        self.assertEqual(locked, ("F1", "F11", "F12", "F18", "F19"))
-        self.assertEqual(experimental, ("F4", "F7", "F22"))
-        self.assertFalse(set(locked) & set(experimental))
-
     def test_marker_block_found_and_bounded(self):
         b = amd.extract_marker_block("noise\n" + _block() + "\ntrailing")
         self.assertIsNotNone(b)
@@ -136,16 +119,10 @@ class TestExtractors(unittest.TestCase):
             self.assertEqual(g, canon)
 
     def test_locked_groups_ignore_three_id_subset(self):
-        # The experimental three must never be parsed as the locked-five set.
+        # khipu's "F4, F7, F22 (locked)" must NOT be read as a locked-8 decl.
         groups = amd.parse_locked_groups(
-            "EXPERIMENTAL / NOT LOCKED {F4, F7, F22}; "
-            "5 LOCKED {F1, F11, F12, F18, F19}")
+            "f:'F4, F7, F22 (locked)' and 8 LOCKED {F1, F4, F7, F11, F12, F18, F19, F22}")
         self.assertEqual(len(groups), 1)
-
-    def test_experimental_group_is_exact(self):
-        groups = amd.parse_experimental_groups(_block())
-        self.assertTrue(groups)
-        self.assertTrue(all(group == ("F4", "F7", "F22") for group in groups))
 
     def test_lambda_conjecture_detected_both_forms(self):
         self.assertTrue(amd.has_lambda_conjecture("\\u039b uniqueness = Conjecture 1"))
@@ -166,28 +143,13 @@ class TestEvaluate(unittest.TestCase):
         self.assertTrue(report["ok"])
 
     def test_fails_on_swapped_locked_id(self):
-        # Mutate just the a11oy side: swap F19 -> F23 in the locked ladder.
-        bad = _block(
-            locked="F1, F11, F12, F18, F23",
-            math_f="F1, F11, F12, F18, F23 (locked-five) · "
-                   "F4, F7, F22 (EXPERIMENTAL / NOT LOCKED)",
-        )
+        # Mutate just the a11oy side: swap F22 -> F23 in the locked ladder.
+        bad = _block(locked="F1, F4, F7, F11, F12, F18, F19, F23",
+                     math_f="F1, F4, F7, F11, F12, F18, F19, F23 (locked-8)")
         report, code = amd.evaluate(_surfaces(a11oy=bad))
         self.assertEqual(code, 1)
         self.assertTrue(any("locked-formula set drift" in f for f in report["findings"]))
         self.assertTrue(any("disagrees ACROSS surfaces" in f for f in report["findings"]))
-
-    def test_fails_closed_on_legacy_locked_eight_promotion(self):
-        legacy = _block(
-            locked="F1, F4, F7, F11, F12, F18, F19, F22",
-            math_f="F1, F4, F7, F11, F12, F18, F19, F22 (locked)",
-        )
-        report, code = amd.evaluate(_surfaces(a11oy=legacy))
-        self.assertEqual(code, 1)
-        self.assertTrue(any(
-            "locked-formula set drift" in finding
-            for finding in report["findings"]
-        ))
 
     def test_fails_on_missing_lambda_label(self):
         bad = _block(drop_lambda=True)
@@ -210,29 +172,11 @@ class TestEvaluate(unittest.TestCase):
         self.assertTrue(any("marker block not found" in f for f in report["findings"]))
 
     def test_fails_on_hf_locked_drift(self):
-        bad_hf = _hf(locked="'F1', 'F11', 'F12', 'F18', 'F23'")
+        bad_hf = _hf(locked="'F1', 'F4', 'F7', 'F11', 'F12', 'F18', 'F19', 'F23'")
         report, code = amd.evaluate(_surfaces(hf=bad_hf))
         self.assertEqual(code, 1)
         self.assertTrue(any("hf-anatomy" in f and "locked-formula set drift" in f
                             for f in report["findings"]))
-
-    def test_fails_when_experimental_set_is_missing(self):
-        bad_hf = _hf(experimental="")
-        report, code = amd.evaluate(_surfaces(hf=bad_hf))
-        self.assertEqual(code, 1)
-        self.assertTrue(any(
-            "no EXPERIMENTAL / NOT LOCKED" in finding
-            for finding in report["findings"]
-        ))
-
-    def test_fails_when_experimental_id_is_swapped(self):
-        bad = _block(experimental="F4, F7, F23")
-        report, code = amd.evaluate(_surfaces(killinchu=bad))
-        self.assertEqual(code, 1)
-        self.assertTrue(any(
-            "experimental-formula set drift" in finding
-            for finding in report["findings"]
-        ))
 
     def test_expected_variance_does_not_trip(self):
         # The documented NS-footer drop + the volatile Putnam DEMO/OPEN tally are
