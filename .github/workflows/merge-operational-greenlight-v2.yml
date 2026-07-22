@@ -1,0 +1,77 @@
+name: Merge Clean Operational Green-Light v2
+
+on:
+  push:
+    branches: [ops/greenlight-finalize-20260722]
+    paths:
+      - .github/scripts/merge_operational_greenlight_v2.py
+      - .github/workflows/merge-operational-greenlight-v2.yml
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+  issues: write
+
+concurrency:
+  group: merge-clean-operational-greenlight-v2
+  cancel-in-progress: false
+
+env:
+  SZL_GITHUB_TOKEN: ${{ secrets.SZL_GITHUB_TOKEN }}
+
+jobs:
+  merge:
+    runs-on: ubuntu-latest
+    timeout-minutes: 200
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ops/greenlight-finalize-20260722
+          persist-credentials: false
+          fetch-depth: 1
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12"
+      - name: Validate exact merger
+        run: |
+          set -euo pipefail
+          python -m py_compile .github/scripts/merge_operational_greenlight_v2.py
+          python - <<'PY'
+          import importlib.util
+          from pathlib import Path
+          path = Path('.github/scripts/merge_operational_greenlight_v2.py')
+          spec = importlib.util.spec_from_file_location('merge_operational_greenlight_v2', path)
+          module = importlib.util.module_from_spec(spec)
+          assert spec and spec.loader
+          spec.loader.exec_module(module)
+          assert len(module.EXPECTED_PATHS) == 8
+          assert module.HEAD_BRANCH == 'ops/operational-greenlight-v2-main'
+          print('validated exact clean-control-plane merge scope')
+          PY
+          git diff --check
+      - name: Execute exact merge
+        id: execute
+        shell: bash
+        run: |
+          mkdir -p reports
+          set +e
+          python .github/scripts/merge_operational_greenlight_v2.py \
+            --report reports/merge-operational-greenlight-v2.json \
+            --timeout 10800
+          code=$?
+          echo "exit_code=${code}" >> "$GITHUB_OUTPUT"
+          exit 0
+      - name: Upload immutable merge report
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: merge-operational-greenlight-v2-${{ github.run_id }}
+          path: reports/merge-operational-greenlight-v2.json
+          if-no-files-found: error
+          retention-days: 90
+      - name: Enforce exact merge result
+        if: always()
+        run: |
+          code="${{ steps.execute.outputs.exit_code }}"
+          if [ -z "$code" ]; then code=2; fi
+          exit "$code"
