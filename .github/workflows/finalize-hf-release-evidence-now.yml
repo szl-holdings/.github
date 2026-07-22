@@ -79,15 +79,20 @@ jobs:
         with:
           python-version: "3.12"
 
-      - name: Install pinned release clients and test dependencies
+      - name: Install pinned CPU runtime, release clients, and test dependencies
         run: |
+          set -euo pipefail
           python -m pip install --disable-pip-version-check \
-            "huggingface_hub>=1.3,<2" \
-            "kernels==0.16.0" \
-            "requests>=2.32,<3" \
-            "pytest>=8,<9" \
-            "pyarrow>=18,<24" \
-            "PyYAML>=6,<7"
+            --index-url https://download.pytorch.org/whl/cpu \
+            'torch==2.7.1'
+          python -m pip install --disable-pip-version-check \
+            'numpy==2.2.6' \
+            'huggingface_hub>=1.3,<2' \
+            'kernels==0.16.0' \
+            'requests>=2.32,<3' \
+            'pytest>=8,<9' \
+            'pyarrow>=18,<24' \
+            'PyYAML>=6,<7'
 
       - name: Verify source lineage and contracts
         shell: bash
@@ -104,6 +109,15 @@ jobs:
           PYTHONPATH=energy python -m pytest -q energy/tests/test_hf_kernel_contract.py
           PYTHONPATH=lambda-gate/torch-ext:lambda-gate \
             python -m pytest -q lambda-gate/tests/test_hf_governed_norm_contract.py
+          python - <<'PY'
+          import numpy
+          import torch
+          assert numpy.__version__ == '2.2.6', numpy.__version__
+          assert torch.__version__.startswith('2.7.1'), torch.__version__
+          assert not torch.cuda.is_available(), 'release finalizer must use the CPU runtime'
+          print('numpy runtime:', numpy.__version__)
+          print('torch runtime:', torch.__version__)
+          PY
 
       - name: Publish and independently read back exact Hub revisions
         id: release
