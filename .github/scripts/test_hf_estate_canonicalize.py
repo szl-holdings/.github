@@ -10,13 +10,13 @@ SCRIPT_DIR = pathlib.Path(__file__).resolve().parent
 if str(SCRIPT_DIR) not in sys.path:
     sys.path.insert(0, str(SCRIPT_DIR))
 
-command_centers = importlib.import_module("hf_estate_canonicalize")
+single = importlib.import_module("hf_estate_canonicalize")
 
 
-class CommandCenterEstateContractTests(unittest.TestCase):
-    def test_exact_public_clone_keep_set(self) -> None:
+class SingleA11oyEstateContractTests(unittest.TestCase):
+    def test_exact_historical_clone_set(self) -> None:
         self.assertEqual(
-            command_centers.MANAGED_CLONE_IDS,
+            single.HISTORICAL_CLONE_IDS,
             (
                 "SZLHOLDINGS/a11oy-clone-1",
                 "SZLHOLDINGS/a11oy-clone-2",
@@ -25,71 +25,81 @@ class CommandCenterEstateContractTests(unittest.TestCase):
             ),
         )
         self.assertEqual(
-            command_centers.KEEP_SPACE_IDS,
-            frozenset(
-                {
-                    "SZLHOLDINGS/a11oy",
-                    "SZLHOLDINGS/a11oy-clone-1",
-                    "SZLHOLDINGS/a11oy-clone-2",
-                    "SZLHOLDINGS/a11oy-clone-3",
-                    "SZLHOLDINGS/a11oy-clone-4",
-                }
-            ),
+            single.CANDIDATE_IDS,
+            ("SZLHOLDINGS/a11oy", *single.HISTORICAL_CLONE_IDS),
         )
 
-    def test_inherited_collection_builder_keeps_clones(self) -> None:
-        self.assertEqual(
-            command_centers.legacy.CLONE_IDS,
-            list(command_centers.MANAGED_CLONE_IDS),
-        )
+    def test_inherited_clone_creator_is_disabled(self) -> None:
+        self.assertEqual(single.legacy.CLONE_IDS, [])
 
-    def test_quota_safe_clone_path(self) -> None:
+    def test_active_source_has_no_clone_creation_or_restoration_path(self) -> None:
         source = (SCRIPT_DIR / "hf_estate_canonicalize.py").read_text(
             encoding="utf-8"
         )
-        self.assertNotIn("duplicate_repo(", source)
-        self.assertNotIn("duplicate_space(", source)
-        self.assertIn("create_repo(", source)
-        self.assertIn("update_repo_settings", source)
-        self.assertIn("delete-surplus-duplicate", source)
+        for forbidden in (
+            "duplicate_repo(",
+            "duplicate_space(",
+            "_create_missing_clone",
+            "update_repo_settings",
+            "clone-visibility",
+            "clone-refresh",
+            "MANAGED_CLONE_IDS",
+            "KEEP_SPACE_IDS",
+            "Retain four public",
+            "restore-four-public-a11oy",
+        ):
+            self.assertNotIn(forbidden, source)
+        self.assertIn("select-newest-a11oy-source", source)
+        self.assertIn("retire-a11oy-clone", source)
+        self.assertIn("delete_repo(", source)
 
-    def test_narrow_name_match_does_not_select_unrelated_spaces(self) -> None:
-        self.assertIsNotNone(
-            command_centers.DUPLICATE_NAME.fullmatch(
-                "SZLHOLDINGS/a11oy-copy-99"
-            )
-        )
-        self.assertIsNotNone(
-            command_centers.DUPLICATE_NAME.fullmatch(
-                "SZLHOLDINGS/a11oy-duplicate-2"
-            )
-        )
-        self.assertIsNone(
-            command_centers.DUPLICATE_NAME.fullmatch(
-                "SZLHOLDINGS/a11oy-research-lab"
-            )
-        )
-        self.assertIn(
-            "SZLHOLDINGS/a11oy-clone-1",
-            command_centers.KEEP_SPACE_IDS,
-        )
+    def test_timestamp_ordering(self) -> None:
+        older = single._modified_epoch("2026-07-22T01:00:00Z")
+        newer = single._modified_epoch("2026-07-22T02:00:00+00:00")
+        self.assertGreater(newer, older)
+        self.assertEqual(single._modified_epoch("not-a-time"), 0.0)
 
-    def test_workflow_executes_command_center_reconciler(self) -> None:
-        workflow = (
-            SCRIPT_DIR.parent / "workflows" / "hf-estate-upgrade.yml"
-        ).read_text(encoding="utf-8")
+    def test_workflow_has_one_single_space_publisher(self) -> None:
+        workflow_dir = SCRIPT_DIR.parent / "workflows"
+        workflow = (workflow_dir / "hf-estate-upgrade.yml").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn("sole governed A11oy Space", workflow)
         self.assertIn("hf_estate_canonicalize.py", workflow)
-        self.assertIn("Retain four public A11oy command centers", workflow)
-        self.assertNotIn("retired_clone_ids", workflow)
+        self.assertNotIn("Retain four public A11oy command centers", workflow)
+        self.assertNotIn("managed_clone_ids", workflow)
+        self.assertNotIn("restore-public-a11oy-clones", workflow)
 
-    def test_runtime_stage_normalization(self) -> None:
-        class Runtime:
-            stage = "SpaceStage.RUNNING"
+        publisher_hits = []
+        for path in workflow_dir.glob("*.yml"):
+            text = path.read_text(encoding="utf-8")
+            if "hf_estate_canonicalize.py" in text:
+                publisher_hits.append(path.name)
+            self.assertNotIn(
+                "python .github/scripts/hf_estate_upgrade.py",
+                text,
+                msg=f"base clone-capable publisher invoked directly in {path.name}",
+            )
+            self.assertNotIn(
+                "restore-four-public-a11oy-command-centers",
+                text,
+                msg=f"stale restoration branch in {path.name}",
+            )
+            self.assertNotIn(
+                "c2549d77d900ad3df86794b3e8b2098ad908cf97",
+                text,
+                msg=f"stale four-clone restore revision in {path.name}",
+            )
+        self.assertEqual(publisher_hits, ["hf-estate-upgrade.yml"])
 
-        class Info:
-            runtime = Runtime()
-
-        self.assertEqual(command_centers._runtime_stage(Info()), "RUNNING")
+    def test_no_clone_restore_workflow_exists(self) -> None:
+        workflow_dir = SCRIPT_DIR.parent / "workflows"
+        forbidden = (
+            "restore-public-a11oy-clones.yml",
+            "estate-finalization.yml",
+        )
+        for name in forbidden:
+            self.assertFalse((workflow_dir / name).exists(), name)
 
 
 if __name__ == "__main__":
