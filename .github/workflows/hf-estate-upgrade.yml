@@ -1,23 +1,27 @@
-name: HF Estate Upgrade
+name: HF Estate Canonicalization
 
-# Organization-wide, non-destructive Hub maintenance.
+# Organization-wide Hugging Face maintenance with one canonical A11oy Space.
+# Pull requests are read-only dry runs. A protected-main push or an explicitly
+# published manual dispatch performs the exact clone retirement and estate sync.
 on:
   push:
-    branches:
-      - main
-      - agent/hf-estate-upgrade-20260722
+    branches: [main]
     paths:
       - .github/scripts/hf_estate_upgrade.py
+      - .github/scripts/hf_estate_canonicalize.py
+      - .github/scripts/test_hf_estate_canonicalize.py
       - .github/workflows/hf-estate-upgrade.yml
   pull_request:
     branches: [main]
     paths:
       - .github/scripts/hf_estate_upgrade.py
+      - .github/scripts/hf_estate_canonicalize.py
+      - .github/scripts/test_hf_estate_canonicalize.py
       - .github/workflows/hf-estate-upgrade.yml
   workflow_dispatch:
     inputs:
       publish:
-        description: Apply the upgrade rather than produce a dry-run report
+        description: Apply canonicalization rather than produce a dry-run report
         required: false
         default: "true"
 
@@ -25,12 +29,12 @@ permissions:
   contents: write
 
 concurrency:
-  group: hf-estate-upgrade-${{ github.event_name }}-${{ github.ref }}
+  group: hf-estate-canonicalization-${{ github.event_name }}-${{ github.ref }}
   cancel-in-progress: false
 
 jobs:
-  upgrade:
-    name: Upgrade SZLHOLDINGS Hub estate
+  canonicalize:
+    name: Canonicalize SZLHOLDINGS Hub estate
     runs-on: ubuntu-latest
     timeout-minutes: 120
     env:
@@ -63,7 +67,10 @@ jobs:
             "publish": ${publish},
             "generated_at": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
             "counts": {},
-            "clone_ids": [
+            "canonical_flagship_space": {
+              "repo_id": "SZLHOLDINGS/a11oy"
+            },
+            "retired_clone_ids": [
               "SZLHOLDINGS/a11oy-clone-1",
               "SZLHOLDINGS/a11oy-clone-2",
               "SZLHOLDINGS/a11oy-clone-3",
@@ -107,7 +114,16 @@ jobs:
             "huggingface_hub>=1.3,<2" \
             "requests>=2.32,<3"
 
-      - name: Execute estate upgrade
+      - name: Verify canonical one-Space contract
+        if: steps.credentials.outputs.has_token == 'true'
+        run: |
+          python -m py_compile \
+            .github/scripts/hf_estate_upgrade.py \
+            .github/scripts/hf_estate_canonicalize.py \
+            .github/scripts/test_hf_estate_canonicalize.py
+          python .github/scripts/test_hf_estate_canonicalize.py
+
+      - name: Execute canonical estate reconciliation
         if: steps.credentials.outputs.has_token == 'true'
         id: estate
         shell: bash
@@ -119,15 +135,24 @@ jobs:
           elif [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ "${{ inputs.publish }}" != "true" ]; then
             publish_flag=""
           fi
-          python .github/scripts/hf_estate_upgrade.py \
+          python .github/scripts/hf_estate_canonicalize.py \
             ${publish_flag} \
             --generation "${GITHUB_SHA}"
           code=$?
           echo "exit_code=${code}" >> "$GITHUB_OUTPUT"
           exit 0
 
+      - name: Upload pull-request dry-run evidence
+        if: always() && github.event_name == 'pull_request'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: hf-estate-canonicalization-dry-run-${{ github.run_id }}
+          path: reports/hf-estate-upgrade-latest.json
+          if-no-files-found: error
+          retention-days: 30
+
       - name: Commit the evidence report
-        if: always()
+        if: always() && github.event_name != 'pull_request'
         shell: bash
         run: |
           set -euo pipefail
@@ -142,7 +167,7 @@ jobs:
             echo "Report is unchanged."
             exit 0
           fi
-          git commit -s -m "chore(hf): record estate upgrade report [skip ci]"
+          git commit -s -m "chore(hf): record canonical estate report [skip ci]"
           git push origin "HEAD:${TARGET_BRANCH}"
 
       - name: Publish job summary
@@ -156,12 +181,19 @@ jobs:
 
           path = Path("reports/hf-estate-upgrade-latest.json")
           with open(os.environ["GITHUB_STEP_SUMMARY"], "a", encoding="utf-8") as out:
-              out.write("## Hugging Face estate upgrade\n\n")
+              out.write("## Hugging Face estate canonicalization\n\n")
               if not path.exists():
                   out.write("No report was produced.\n")
               else:
                   report = json.loads(path.read_text(encoding="utf-8"))
                   out.write(f"Generation: `{report.get('generation')}`\n\n")
+                  canonical = report.get("canonical_flagship_space", {})
+                  out.write(
+                      "Canonical A11oy: "
+                      f"`{canonical.get('repo_id', 'UNKNOWN')}` "
+                      f"at `{canonical.get('sha', 'UNVERIFIED')}` "
+                      f"({canonical.get('stage', 'UNKNOWN')})\n\n"
+                  )
                   out.write("| Inventory | Count |\n|---|---:|\n")
                   for key, value in report.get("counts", {}).items():
                       out.write(f"| {key} | {value} |\n")
@@ -180,6 +212,6 @@ jobs:
           code="${{ steps.estate.outputs.exit_code }}"
           if [ -z "$code" ]; then code=2; fi
           if [ "$code" -ne 0 ]; then
-            echo "::error::Estate upgrade completed with exit code $code; inspect the committed report."
+            echo "::error::Estate canonicalization completed with exit code $code; inspect the committed report."
             exit "$code"
           fi

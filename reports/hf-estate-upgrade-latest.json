@@ -20,7 +20,7 @@
     },
     {
       "action": "inventory:spaces",
-      "detail": "count=26",
+      "detail": "count=30",
       "status": "ok",
       "target": "SZLHOLDINGS"
     },
@@ -565,26 +565,128 @@
       "target": "SZLHOLDINGS/szl-model-inference-lab"
     },
     {
-      "action": "flagship-clone",
-      "detail": "source=SZLHOLDINGS/a11oy",
+      "action": "space-health",
+      "detail": "sdk=docker stage=RUNNING",
+      "status": "ok",
+      "target": "SZLHOLDINGS/a11oy-clone-1"
+    },
+    {
+      "action": "space-health",
+      "detail": "sdk=docker stage=RUNNING",
+      "status": "ok",
+      "target": "SZLHOLDINGS/a11oy-clone-2"
+    },
+    {
+      "action": "space-health",
+      "detail": "sdk=docker stage=RUNNING",
+      "status": "ok",
+      "target": "SZLHOLDINGS/a11oy-clone-3"
+    },
+    {
+      "action": "space-health",
+      "detail": "sdk=docker stage=RUNNING_APP_STARTING",
+      "status": "ok",
+      "target": "SZLHOLDINGS/a11oy-clone-4"
+    },
+    {
+      "action": "canonical-space-preflight",
+      "detail": "stage=RUNNING; sha=ce45517588dcbb19076917653dd87f3c20ed0db8; private=False",
+      "status": "validated",
+      "target": "SZLHOLDINGS/a11oy"
+    },
+    {
+      "action": "clone-preflight",
+      "detail": "existing exact retired clone; private=True; stage=RUNNING; sha=9e71bb0a7a8a0fdfdc67c0ec3b4a04b2c7be78b4",
+      "status": "ok",
+      "target": "SZLHOLDINGS/a11oy-clone-1"
+    },
+    {
+      "action": "clone-preflight",
+      "detail": "existing exact retired clone; private=True; stage=RUNNING; sha=c7cf189da4eabde68e6413615e702a7a3b2f85a4",
+      "status": "ok",
+      "target": "SZLHOLDINGS/a11oy-clone-2"
+    },
+    {
+      "action": "clone-preflight",
+      "detail": "existing exact retired clone; private=True; stage=RUNNING; sha=e15ff6ce6b0db003d6102227907f30e2db7e3f1c",
+      "status": "ok",
+      "target": "SZLHOLDINGS/a11oy-clone-3"
+    },
+    {
+      "action": "clone-preflight",
+      "detail": "existing exact retired clone; private=True; stage=RUNNING_APP_STARTING; sha=ea643786a2565a0577fe4e6e23360b104b670ec3",
+      "status": "ok",
+      "target": "SZLHOLDINGS/a11oy-clone-4"
+    },
+    {
+      "action": "collection-remove-clone",
+      "detail": "",
+      "status": "dry-run",
+      "target": "SZLHOLDINGS/szl-holdings-canonical-estate-6a6053498f1195071c8f73c2:SZLHOLDINGS/a11oy-clone-1"
+    },
+    {
+      "action": "collection-remove-clone",
+      "detail": "",
+      "status": "dry-run",
+      "target": "SZLHOLDINGS/szl-holdings-canonical-estate-6a6053498f1195071c8f73c2:SZLHOLDINGS/a11oy-clone-2"
+    },
+    {
+      "action": "collection-remove-clone",
+      "detail": "",
+      "status": "dry-run",
+      "target": "SZLHOLDINGS/szl-holdings-canonical-estate-6a6053498f1195071c8f73c2:SZLHOLDINGS/a11oy-clone-3"
+    },
+    {
+      "action": "collection-remove-clone",
+      "detail": "",
+      "status": "dry-run",
+      "target": "SZLHOLDINGS/szl-holdings-canonical-estate-6a6053498f1195071c8f73c2:SZLHOLDINGS/a11oy-clone-4"
+    },
+    {
+      "action": "collection-remove-clone",
+      "detail": "",
+      "status": "dry-run",
+      "target": "SZLHOLDINGS/szl-holdings-spaces-6a6053493e2dbe1deddd1f2d:SZLHOLDINGS/a11oy-clone-1"
+    },
+    {
+      "action": "collection-remove-clone",
+      "detail": "",
+      "status": "dry-run",
+      "target": "SZLHOLDINGS/szl-holdings-spaces-6a6053493e2dbe1deddd1f2d:SZLHOLDINGS/a11oy-clone-2"
+    },
+    {
+      "action": "collection-remove-clone",
+      "detail": "",
+      "status": "dry-run",
+      "target": "SZLHOLDINGS/szl-holdings-spaces-6a6053493e2dbe1deddd1f2d:SZLHOLDINGS/a11oy-clone-3"
+    },
+    {
+      "action": "collection-remove-clone",
+      "detail": "",
+      "status": "dry-run",
+      "target": "SZLHOLDINGS/szl-holdings-spaces-6a6053493e2dbe1deddd1f2d:SZLHOLDINGS/a11oy-clone-4"
+    },
+    {
+      "action": "retire-flagship-clone",
+      "detail": "would delete exact legacy private duplicate",
       "status": "dry-run",
       "target": "SZLHOLDINGS/a11oy-clone-1"
     },
     {
-      "action": "flagship-clone",
-      "detail": "source=SZLHOLDINGS/a11oy",
+      "action": "retire-flagship-clone",
+      "detail": "would delete exact legacy private duplicate",
       "status": "dry-run",
       "target": "SZLHOLDINGS/a11oy-clone-2"
     },
     {
-      "action": "flagship-clone",
-      "detail": "source=SZLHOLDINGS/a11oy",
+      "action": "retire-flagship-clone",
+      "detail": "would delete exact legacy private duplicate",
       "status": "dry-run",
       "target": "SZLHOLDINGS/a11oy-clone-3"
     },
     {
-      "action": "flagship-clone",
-      "detail": "source=SZLHOLDINGS/a11oy",
+      "action": "retire-flagship-clone",
+      "detail": "would delete exact legacy private duplicate",
       "status": "dry-run",
       "target": "SZLHOLDINGS/a11oy-clone-4"
     },
@@ -602,9 +704,9 @@
     },
     {
       "action": "collection",
-      "detail": "would create",
-      "status": "dry-run",
-      "target": "SZL Holdings \u2014 Models & Kernel Contracts"
+      "detail": "existing",
+      "status": "ok",
+      "target": "SZLHOLDINGS/szl-holdings-models-and-kernel-contracts-6a605eaece7ff15ea2af6f74"
     },
     {
       "action": "collection",
@@ -623,30 +725,6 @@
       "detail": "",
       "status": "dry-run",
       "target": "SZLHOLDINGS/a11oy"
-    },
-    {
-      "action": "collection-add:SZL Holdings \u2014 Spaces",
-      "detail": "",
-      "status": "dry-run",
-      "target": "SZLHOLDINGS/a11oy-clone-1"
-    },
-    {
-      "action": "collection-add:SZL Holdings \u2014 Spaces",
-      "detail": "",
-      "status": "dry-run",
-      "target": "SZLHOLDINGS/a11oy-clone-2"
-    },
-    {
-      "action": "collection-add:SZL Holdings \u2014 Spaces",
-      "detail": "",
-      "status": "dry-run",
-      "target": "SZLHOLDINGS/a11oy-clone-3"
-    },
-    {
-      "action": "collection-add:SZL Holdings \u2014 Spaces",
-      "detail": "",
-      "status": "dry-run",
-      "target": "SZLHOLDINGS/a11oy-clone-4"
     },
     {
       "action": "collection-add:SZL Holdings \u2014 Spaces",
@@ -791,6 +869,96 @@
       "detail": "",
       "status": "dry-run",
       "target": "SZLHOLDINGS/yarqa"
+    },
+    {
+      "action": "collection-add:SZL Holdings \u2014 Models & Kernel Contracts",
+      "detail": "",
+      "status": "dry-run",
+      "target": "SZLHOLDINGS/SZL-Khipu-1.5B"
+    },
+    {
+      "action": "collection-add:SZL Holdings \u2014 Models & Kernel Contracts",
+      "detail": "",
+      "status": "dry-run",
+      "target": "SZLHOLDINGS/a11oy-v19-substrate"
+    },
+    {
+      "action": "collection-add:SZL Holdings \u2014 Models & Kernel Contracts",
+      "detail": "",
+      "status": "dry-run",
+      "target": "SZLHOLDINGS/szl-governed-norm"
+    },
+    {
+      "action": "collection-add:SZL Holdings \u2014 Models & Kernel Contracts",
+      "detail": "",
+      "status": "dry-run",
+      "target": "SZLHOLDINGS/szl-lambda-gate"
+    },
+    {
+      "action": "collection-add:SZL Holdings \u2014 Models & Kernel Contracts",
+      "detail": "",
+      "status": "dry-run",
+      "target": "SZLHOLDINGS/governed-inference-meter"
+    },
+    {
+      "action": "collection-add:SZL Holdings \u2014 Models & Kernel Contracts",
+      "detail": "",
+      "status": "dry-run",
+      "target": "SZLHOLDINGS/szl-kernels"
+    },
+    {
+      "action": "collection-add:SZL Holdings \u2014 Models & Kernel Contracts",
+      "detail": "",
+      "status": "dry-run",
+      "target": "SZLHOLDINGS/szl-blocked"
+    },
+    {
+      "action": "collection-add:SZL Holdings \u2014 Models & Kernel Contracts",
+      "detail": "",
+      "status": "dry-run",
+      "target": "SZLHOLDINGS/szl-govsign"
+    },
+    {
+      "action": "collection-add:SZL Holdings \u2014 Models & Kernel Contracts",
+      "detail": "",
+      "status": "dry-run",
+      "target": "SZLHOLDINGS/szl-provctl"
+    },
+    {
+      "action": "collection-add:SZL Holdings \u2014 Models & Kernel Contracts",
+      "detail": "",
+      "status": "dry-run",
+      "target": "SZLHOLDINGS/szl-nemo"
+    },
+    {
+      "action": "collection-add:SZL Holdings \u2014 Models & Kernel Contracts",
+      "detail": "",
+      "status": "dry-run",
+      "target": "SZLHOLDINGS/szl-invariants"
+    },
+    {
+      "action": "collection-add:SZL Holdings \u2014 Models & Kernel Contracts",
+      "detail": "",
+      "status": "dry-run",
+      "target": "SZLHOLDINGS/szl-ouroboros"
+    },
+    {
+      "action": "collection-add:SZL Holdings \u2014 Models & Kernel Contracts",
+      "detail": "",
+      "status": "dry-run",
+      "target": "SZLHOLDINGS/szl-formulas"
+    },
+    {
+      "action": "collection-add:SZL Holdings \u2014 Models & Kernel Contracts",
+      "detail": "",
+      "status": "dry-run",
+      "target": "SZLHOLDINGS/SZL-Forge-1.5B-ReceiptAgent"
+    },
+    {
+      "action": "collection-add:SZL Holdings \u2014 Models & Kernel Contracts",
+      "detail": "",
+      "status": "dry-run",
+      "target": "SZLHOLDINGS/SZL-Khipu-1.5B-GGUF"
     },
     {
       "action": "collection-add:SZL Holdings \u2014 Datasets & Evidence",
@@ -1009,30 +1177,6 @@
       "target": "SZLHOLDINGS/szl-evidence"
     },
     {
-      "action": "collection-add:SZL Holdings \u2014 Canonical Estate",
-      "detail": "",
-      "status": "dry-run",
-      "target": "SZLHOLDINGS/a11oy-clone-1"
-    },
-    {
-      "action": "collection-add:SZL Holdings \u2014 Canonical Estate",
-      "detail": "",
-      "status": "dry-run",
-      "target": "SZLHOLDINGS/a11oy-clone-2"
-    },
-    {
-      "action": "collection-add:SZL Holdings \u2014 Canonical Estate",
-      "detail": "",
-      "status": "dry-run",
-      "target": "SZLHOLDINGS/a11oy-clone-3"
-    },
-    {
-      "action": "collection-add:SZL Holdings \u2014 Canonical Estate",
-      "detail": "",
-      "status": "dry-run",
-      "target": "SZLHOLDINGS/a11oy-clone-4"
-    },
-    {
       "action": "kernel-contract",
       "detail": "sha=8a99694472bab97b9e00bd3ef1a1fd73cfaabc4a",
       "status": "validated",
@@ -1100,21 +1244,25 @@
     }
   ],
   "boundaries": [
-    "No repository was deleted, renamed, or made more public.",
-    "No model weights or dataset payloads were changed.",
-    "No paid hardware tier was changed.",
-    "Healthy dynamic Spaces were not rewritten or restarted.",
-    "Kernel repositories were validated; first-class kernel publishing remains governed by kernel-builder release workflows."
+    "SZLHOLDINGS/a11oy is the only canonical A11oy Space.",
+    "Only the four exact allowlisted a11oy-clone-1..4 repositories may be deleted.",
+    "Clone deletion requires a RUNNING public canonical Space at an immutable revision with Dockerfile present.",
+    "No model weights or dataset payloads are changed.",
+    "No paid hardware tier is changed.",
+    "Healthy dynamic Spaces are not rewritten or restarted.",
+    "Kernel repositories are validated; first-class kernel publishing remains governed by kernel-builder release workflows."
   ],
-  "clone_ids": [
-    "SZLHOLDINGS/a11oy-clone-1",
-    "SZLHOLDINGS/a11oy-clone-2",
-    "SZLHOLDINGS/a11oy-clone-3",
-    "SZLHOLDINGS/a11oy-clone-4"
-  ],
+  "canonical_flagship_space": {
+    "dockerfile_present": true,
+    "private": false,
+    "repo_id": "SZLHOLDINGS/a11oy",
+    "sha": "ce45517588dcbb19076917653dd87f3c20ed0db8",
+    "stage": "RUNNING"
+  },
   "collections": {
     "SZL Holdings \u2014 Canonical Estate": "SZLHOLDINGS/szl-holdings-canonical-estate-6a6053498f1195071c8f73c2",
     "SZL Holdings \u2014 Datasets & Evidence": "SZLHOLDINGS/szl-holdings-datasets-and-evidence-6a605349b7137fa34ac94728",
+    "SZL Holdings \u2014 Models & Kernel Contracts": "SZLHOLDINGS/szl-holdings-models-and-kernel-contracts-6a605eaece7ff15ea2af6f74",
     "SZL Holdings \u2014 Spaces": "SZLHOLDINGS/szl-holdings-spaces-6a6053493e2dbe1deddd1f2d"
   },
   "counts": {
@@ -1125,15 +1273,47 @@
     "models": 15,
     "spaces": 26
   },
-  "generated_at": "2026-07-22T05:38:15.227575+00:00",
-  "generation": "adfc10eaffc200f1844e1344c7a48129c00df91f",
+  "generated_at": "2026-07-22T06:34:06.003563+00:00",
+  "generation": "1578aa3cecdee90ba0a03f31080b9eaa9d58ae23",
   "organization": "SZLHOLDINGS",
   "publish": false,
+  "retired_clone_ids": [
+    "SZLHOLDINGS/a11oy-clone-1",
+    "SZLHOLDINGS/a11oy-clone-2",
+    "SZLHOLDINGS/a11oy-clone-3",
+    "SZLHOLDINGS/a11oy-clone-4"
+  ],
+  "retired_clone_snapshots": {
+    "SZLHOLDINGS/a11oy-clone-1": {
+      "exists": true,
+      "private": true,
+      "sha": "9e71bb0a7a8a0fdfdc67c0ec3b4a04b2c7be78b4",
+      "stage": "RUNNING"
+    },
+    "SZLHOLDINGS/a11oy-clone-2": {
+      "exists": true,
+      "private": true,
+      "sha": "c7cf189da4eabde68e6413615e702a7a3b2f85a4",
+      "stage": "RUNNING"
+    },
+    "SZLHOLDINGS/a11oy-clone-3": {
+      "exists": true,
+      "private": true,
+      "sha": "e15ff6ce6b0db003d6102227907f30e2db7e3f1c",
+      "stage": "RUNNING"
+    },
+    "SZLHOLDINGS/a11oy-clone-4": {
+      "exists": true,
+      "private": true,
+      "sha": "ea643786a2565a0577fe4e6e23360b104b670ec3",
+      "stage": "RUNNING_APP_STARTING"
+    }
+  },
   "schema": "szl.hf-estate-upgrade-report/v1",
   "summary": {
-    "dry_run": 136,
+    "dry_run": 150,
     "error": 0,
-    "ok": 45,
+    "ok": 55,
     "warning": 2
   }
 }
