@@ -1,27 +1,28 @@
-name: HF Estate — Single A11oy Canonicalization
+name: HF Estate — Canonical A11oy Verification
 
-# Keep exactly one governed A11oy Space. The publisher selects the newest valid
-# content among SZLHOLDINGS/a11oy and the four historical clone IDs, adopts it
-# into SZLHOLDINGS/a11oy, then removes every clone and its collection references.
+# Permanent post-migration enforcement. Protected GitHub source is authoritative;
+# historical clone repositories must remain absent and are never adoption inputs.
 on:
   push:
     branches: [main]
     paths:
-      - .github/scripts/hf_estate_upgrade.py
-      - .github/scripts/hf_estate_canonicalize.py
-      - .github/scripts/test_hf_estate_canonicalize.py
+      - .github/scripts/hf_a11oy_singleton_verify.py
+      - .github/scripts/test_hf_a11oy_singleton_verify.py
+      - .github/scripts/hf_module_drift_check.py
       - .github/workflows/hf-estate-upgrade.yml
   pull_request:
     branches: [main]
     paths:
-      - .github/scripts/hf_estate_upgrade.py
-      - .github/scripts/hf_estate_canonicalize.py
-      - .github/scripts/test_hf_estate_canonicalize.py
+      - .github/scripts/hf_a11oy_singleton_verify.py
+      - .github/scripts/test_hf_a11oy_singleton_verify.py
+      - .github/scripts/hf_module_drift_check.py
       - .github/workflows/hf-estate-upgrade.yml
+  schedule:
+    - cron: '23 */6 * * *'
   workflow_dispatch:
     inputs:
       publish:
-        description: Adopt newest A11oy content and delete all clones
+        description: Verify singleton topology and refresh evidence
         required: false
         default: "true"
 
@@ -30,26 +31,54 @@ permissions:
   issues: write
 
 concurrency:
-  group: hf-single-a11oy-${{ github.event_name }}-${{ github.ref }}
+  group: hf-canonical-a11oy-verification-${{ github.event_name }}-${{ github.ref }}
   cancel-in-progress: false
 
 jobs:
-  reconcile:
-    name: Enforce the sole governed A11oy Space
+  verify:
+    name: Verify one canonical A11oy Space
     runs-on: ubuntu-latest
-    timeout-minutes: 120
+    timeout-minutes: 180
     env:
       HF_ORG_TOKEN: ${{ secrets.HF_ORG_TOKEN || secrets.HF_ORG_TOKEN1 }}
       HF_TOKEN: ${{ secrets.HF_TOKEN }}
       HF_HUB_DISABLE_PROGRESS_BARS: "1"
       GH_TOKEN: ${{ github.token }}
+      GITHUB_TOKEN: ${{ github.token }}
       REPORT_ISSUE_TITLE: '[hf-canonicalization-report] single A11oy Space'
     steps:
-      - name: Checkout triggering revision
+      - name: Checkout singleton verifier
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
           fetch-depth: 1
+
+      - name: Checkout authoritative protected A11oy source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: szl-holdings/a11oy
+          ref: main
+          path: a11oy-source
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Bind latest deploy-triggering A11oy revision
+        id: source
+        shell: bash
+        run: |
+          set -euo pipefail
+          expected="$(git -C a11oy-source log -1 --format=%H -- \
+            Dockerfile serve.py \
+            ':(glob)**/*.py' \
+            console pages web static static-vendor numerics src schemas corpus model_release \
+            ':(glob)*.html' knowledge.json README.md .github/workflows/hf-sync.yml)"
+          if ! [[ "$expected" =~ ^[0-9a-f]{40}$ ]]; then
+            echo "::error::Could not derive exact deploy-triggering A11oy source revision."
+            exit 2
+          fi
+          echo "sha=$expected" >> "$GITHUB_OUTPUT"
+          echo "A11OY_EXPECTED_GITHUB_SHA=$expected" >> "$GITHUB_ENV"
+          echo "Expected protected A11oy source: \`$expected\`" >> "$GITHUB_STEP_SUMMARY"
 
       - name: Determine execution mode
         id: mode
@@ -85,34 +114,64 @@ jobs:
         run: |
           set -euo pipefail
           python -m py_compile \
-            .github/scripts/hf_estate_upgrade.py \
-            .github/scripts/hf_estate_canonicalize.py \
-            .github/scripts/test_hf_estate_canonicalize.py
-          python .github/scripts/test_hf_estate_canonicalize.py
+            .github/scripts/hf_a11oy_singleton_verify.py \
+            .github/scripts/test_hf_a11oy_singleton_verify.py \
+            .github/scripts/hf_module_drift_check.py
+          python .github/scripts/test_hf_a11oy_singleton_verify.py
           git diff --check
+          if grep -R -n -E \
+            'hf_estate_canonicalize\.py|select-newest-a11oy-source|duplicate_repo\(' \
+            .github/workflows .github/scripts; then
+            echo "::error::Clone migration or recreation logic still exists."
+            exit 2
+          fi
 
-      - name: Reconcile single A11oy Space
+      - name: Prove Dockerfile-derived byte parity with canonical Space
+        shell: bash
+        run: |
+          set -euo pipefail
+          python .github/scripts/hf_module_drift_check.py \
+            --repo-root a11oy-source \
+            --github-repo szl-holdings/a11oy \
+            --hf-repo SZLHOLDINGS/a11oy \
+            --github-ref "${{ steps.source.outputs.sha }}" \
+            --hf-ref main \
+            --allow a11oy-source/.github/hf-module-drift-allow.json \
+            --report-out hf-canonical-a11oy-drift.json
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          report = json.loads(Path('hf-canonical-a11oy-drift.json').read_text())
+          errors = report.get('errors') or report.get('drift_errors') or []
+          if errors:
+              raise SystemExit(f'Canonical byte parity failed: {errors}')
+          print(json.dumps({'status': report.get('status') or 'checker-exit-zero'}, indent=2))
+          PY
+
+      - name: Verify canonical runtime, routes, collections, and clone absence
         id: estate
         shell: bash
         run: |
           set +e
           args=(--generation "${GITHUB_SHA}")
           if [ "${{ steps.mode.outputs.publish }}" = "true" ]; then args+=(--publish); fi
-          python .github/scripts/hf_estate_canonicalize.py "${args[@]}"
+          python .github/scripts/hf_a11oy_singleton_verify.py "${args[@]}"
           code=$?
           echo "exit_code=${code}" >> "$GITHUB_OUTPUT"
           exit 0
 
-      - name: Upload immutable reconciliation report
+      - name: Upload immutable singleton evidence
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: hf-single-a11oy-${{ github.run_id }}
-          path: reports/hf-estate-upgrade-latest.json
+          name: hf-canonical-a11oy-${{ github.run_id }}
+          path: |
+            reports/hf-estate-upgrade-latest.json
+            hf-canonical-a11oy-drift.json
           if-no-files-found: error
           retention-days: 90
 
-      - name: Persist published result in deterministic issue
+      - name: Persist current result in deterministic issue
         if: always() && steps.mode.outputs.publish == 'true'
         shell: bash
         run: |
@@ -123,7 +182,8 @@ jobs:
             echo '# Single governed A11oy Space'
             echo
             echo "- Run: ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
-            echo "- Source revision: \`${GITHUB_SHA}\`"
+            echo "- Verifier revision: \`${GITHUB_SHA}\`"
+            echo "- Expected A11oy source: \`${{ steps.source.outputs.sha }}\`"
             echo
             echo '```json'
             cat reports/hf-estate-upgrade-latest.json
@@ -137,14 +197,9 @@ jobs:
             --jq ".[] | select(.title == env.REPORT_ISSUE_TITLE) | .number" \
             | head -n1)"
           if [ -n "$issue_number" ]; then
-            gh issue edit "$issue_number" \
-              --repo "$GITHUB_REPOSITORY" \
-              --body-file /tmp/hf-single-a11oy.md
+            gh issue edit "$issue_number" --repo "$GITHUB_REPOSITORY" --body-file /tmp/hf-single-a11oy.md
           else
-            gh issue create \
-              --repo "$GITHUB_REPOSITORY" \
-              --title "$REPORT_ISSUE_TITLE" \
-              --body-file /tmp/hf-single-a11oy.md
+            gh issue create --repo "$GITHUB_REPOSITORY" --title "$REPORT_ISSUE_TITLE" --body-file /tmp/hf-single-a11oy.md
           fi
 
       - name: Publish job summary
@@ -155,32 +210,26 @@ jobs:
           import json
           import os
           from pathlib import Path
-
-          path = Path("reports/hf-estate-upgrade-latest.json")
-          with open(os.environ["GITHUB_STEP_SUMMARY"], "a", encoding="utf-8") as out:
-              out.write("## Single governed A11oy Space\n\n")
+          path = Path('reports/hf-estate-upgrade-latest.json')
+          with open(os.environ['GITHUB_STEP_SUMMARY'], 'a', encoding='utf-8') as out:
+              out.write('## Canonical A11oy verification\n\n')
               if not path.exists():
-                  out.write("No report was produced.\n")
+                  out.write('No report was produced.\n')
               else:
-                  report = json.loads(path.read_text(encoding="utf-8"))
-                  selected = report.get("selected_newest_source") or {}
-                  canonical = report.get("canonical_flagship_space") or {}
-                  out.write(
-                      f"Selected newest source: `{selected.get('repo_id', 'UNKNOWN')}` "
-                      f"at `{selected.get('sha', 'UNKNOWN')}`.\n\n"
-                  )
-                  out.write(
-                      f"Surviving canonical Space: `{canonical.get('repo_id', 'UNKNOWN')}` "
-                      f"at `{canonical.get('sha', 'UNKNOWN')}` "
-                      f"({canonical.get('stage', 'UNKNOWN')}).\n\n"
-                  )
-                  out.write("Retired clone IDs:\n")
-                  for repo_id in report.get("retired_clone_ids", []):
-                      out.write(f"- `{repo_id}`\n")
-                  out.write("\n")
-                  out.write("```json\n")
-                  out.write(json.dumps(report.get("summary", {}), indent=2))
-                  out.write("\n```\n")
+                  report = json.loads(path.read_text(encoding='utf-8'))
+                  canonical = report.get('canonical_flagship_space') or {}
+                  out.write(f"- Space: `{canonical.get('repo_id', 'UNKNOWN')}`\n")
+                  out.write(f"- Hub revision: `{canonical.get('sha', 'UNKNOWN')}`\n")
+                  out.write(f"- Runtime: `{canonical.get('stage', 'UNKNOWN')}`\n")
+                  out.write(f"- GitHub source: `{report.get('expected_github_source_sha', 'UNKNOWN')}`\n")
+                  out.write(f"- Clone creation enabled: `{report.get('singleton_policy', {}).get('clone_creation_enabled')}`\n")
+                  out.write(f"- Clone adoption enabled: `{report.get('singleton_policy', {}).get('clone_adoption_enabled')}`\n")
+                  out.write('\n| Historical clone | Absent |\n|---|---|\n')
+                  for repo_id, absent in report.get('clone_absence', {}).items():
+                      out.write(f"| `{repo_id}` | `{absent}` |\n")
+                  out.write('\n```json\n')
+                  out.write(json.dumps(report.get('summary', {}), indent=2))
+                  out.write('\n```\n')
           PY
 
       - name: Enforce fail-closed completion
@@ -189,7 +238,7 @@ jobs:
           code="${{ steps.estate.outputs.exit_code }}"
           if [ -z "$code" ]; then code=2; fi
           if [ "$code" -ne 0 ]; then
-            echo "::error::Single-A11oy reconciliation failed with exit ${code}"
+            echo "::error::Canonical-A11oy verification failed with exit ${code}"
             exit "$code"
           fi
-          echo 'Single-A11oy reconciliation completed successfully.'
+          echo 'Canonical A11oy is current, byte-aligned, public, Docker-backed, RUNNING, route-verified, and clone-free.'
