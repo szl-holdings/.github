@@ -1,0 +1,44 @@
+name: Repair HF official inventory branch
+
+on:
+  push:
+    branches: [hf/estate-official-api-v2]
+    paths:
+      - .github/workflows/repair-hf-estate-official-inventory.yml
+
+permissions:
+  contents: write
+
+jobs:
+  repair:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          ref: hf/estate-official-api-v2
+          fetch-depth: 0
+      - name: Repair deterministic issue command and self-remove
+        shell: python
+        run: |
+          from pathlib import Path
+          path = Path('.github/workflows/hf-estate-official-inventory.yml')
+          text = path.read_text(encoding='utf-8')
+          old = 'gh issue create "$GITHUB_REPOSITORY" --title "$title" --body-file /tmp/report.md'
+          new = 'gh issue create --repo "$GITHUB_REPOSITORY" --title "$title" --body-file /tmp/report.md'
+          if text.count(old) != 1:
+              raise SystemExit('expected exactly one incorrect gh issue create command')
+          path.write_text(text.replace(old, new), encoding='utf-8', newline='\n')
+          Path('.github/workflows/repair-hf-estate-official-inventory.yml').unlink()
+      - name: Commit repaired branch
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add .github/workflows/hf-estate-official-inventory.yml \
+            .github/workflows/repair-hf-estate-official-inventory.yml
+          git commit \
+            -m 'fix(hf): persist official inventory report issue' \
+            -m 'Use the explicit repository option for deterministic issue creation and remove the one-shot repair workflow.' \
+            -m 'Signed-off-by: github-actions[bot] <41898282+github-actions[bot]@users.noreply.github.com>'
+          git push origin HEAD:hf/estate-official-api-v2
