@@ -62,23 +62,30 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
 
-      - name: Bind latest deploy-triggering A11oy revision
+      - name: Bind protected build identity and deployable content identity
         id: source
         shell: bash
         run: |
           set -euo pipefail
-          expected="$(git -C a11oy-source log -1 --format=%H -- \
+          main_sha="$(git -C a11oy-source rev-parse HEAD)"
+          deploy_sha="$(git -C a11oy-source log -1 --format=%H -- \
             Dockerfile serve.py \
             ':(glob)**/*.py' \
             console pages web static static-vendor numerics src schemas corpus model_release \
             ':(glob)*.html' knowledge.json README.md .github/workflows/hf-sync.yml)"
-          if ! [[ "$expected" =~ ^[0-9a-f]{40}$ ]]; then
-            echo "::error::Could not derive exact deploy-triggering A11oy source revision."
-            exit 2
-          fi
-          echo "sha=$expected" >> "$GITHUB_OUTPUT"
-          echo "A11OY_EXPECTED_GITHUB_SHA=$expected" >> "$GITHUB_ENV"
-          echo "Expected protected A11oy source: \`$expected\`" >> "$GITHUB_STEP_SUMMARY"
+          for value in "$main_sha" "$deploy_sha"; do
+            if ! [[ "$value" =~ ^[0-9a-f]{40}$ ]]; then
+              echo "::error::Could not derive exact protected A11oy identity."
+              exit 2
+            fi
+          done
+          echo "main_sha=$main_sha" >> "$GITHUB_OUTPUT"
+          echo "deploy_sha=$deploy_sha" >> "$GITHUB_OUTPUT"
+          echo "A11OY_EXPECTED_GITHUB_SHA=$main_sha" >> "$GITHUB_ENV"
+          {
+            echo "Protected A11oy build identity: \`$main_sha\`"
+            echo "Deployable content identity: \`$deploy_sha\`"
+          } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Determine execution mode
         id: mode
@@ -146,7 +153,7 @@ jobs:
             --repo-root a11oy-source \
             --github-repo szl-holdings/a11oy \
             --hf-repo SZLHOLDINGS/a11oy \
-            --github-ref "${{ steps.source.outputs.sha }}" \
+            --github-ref "${{ steps.source.outputs.deploy_sha }}" \
             --hf-ref main \
             --allow a11oy-source/.github/hf-module-drift-allow.json \
             --report-out hf-canonical-a11oy-drift.json
@@ -195,7 +202,8 @@ jobs:
             echo
             echo "- Run: ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
             echo "- Verifier revision: \`${GITHUB_SHA}\`"
-            echo "- Expected A11oy source: \`${{ steps.source.outputs.sha }}\`"
+            echo "- Protected build identity: \`${{ steps.source.outputs.main_sha }}\`"
+            echo "- Deployable content identity: \`${{ steps.source.outputs.deploy_sha }}\`"
             echo
             echo '```json'
             cat reports/hf-estate-upgrade-latest.json
@@ -233,7 +241,7 @@ jobs:
                   out.write(f"- Space: `{canonical.get('repo_id', 'UNKNOWN')}`\n")
                   out.write(f"- Hub revision: `{canonical.get('sha', 'UNKNOWN')}`\n")
                   out.write(f"- Runtime: `{canonical.get('stage', 'UNKNOWN')}`\n")
-                  out.write(f"- GitHub source: `{report.get('expected_github_source_sha', 'UNKNOWN')}`\n")
+                  out.write(f"- GitHub build identity: `{report.get('expected_github_source_sha', 'UNKNOWN')}`\n")
                   out.write(f"- Clone creation enabled: `{report.get('singleton_policy', {}).get('clone_creation_enabled')}`\n")
                   out.write(f"- Clone adoption enabled: `{report.get('singleton_policy', {}).get('clone_adoption_enabled')}`\n")
                   out.write('\n| Historical clone | Absent |\n|---|---|\n')
