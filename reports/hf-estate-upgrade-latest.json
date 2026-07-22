@@ -565,30 +565,6 @@
       "target": "SZLHOLDINGS/szl-model-inference-lab"
     },
     {
-      "action": "flagship-clone",
-      "detail": "HfHubHTTPError(\"(Request ID: Root=1-6a6059c1-05a79bfd21006f85065c69b6;d7bd569e-9b20-4659-8ab3-1a208d75e9aa)\\n\\n429 Too Many Requests: you have reached your 'api' rate limit.\\nRetry after 233 seconds (2926/3000 requests remaining in current 300s window).\\nUrl: https://huggingface.co/api/spaces/SZLHOLDINGS/a11oy/duplicate.\\nYou have exceeded the rate limit for repository duplication (15 per day). Yo",
-      "status": "error",
-      "target": "SZLHOLDINGS/a11oy-clone-1"
-    },
-    {
-      "action": "flagship-clone",
-      "detail": "HfHubHTTPError(\"(Request ID: Root=1-6a6059c1-2943c7116dc7ff6a5cb39d97;27ec378b-e7ac-4197-bd4b-2eb26b7d833d)\\n\\n429 Too Many Requests: you have reached your 'api' rate limit.\\nRetry after 233 seconds (2924/3000 requests remaining in current 300s window).\\nUrl: https://huggingface.co/api/spaces/SZLHOLDINGS/a11oy/duplicate.\\nYou have exceeded the rate limit for repository duplication (15 per day). Yo",
-      "status": "error",
-      "target": "SZLHOLDINGS/a11oy-clone-2"
-    },
-    {
-      "action": "flagship-clone",
-      "detail": "HfHubHTTPError(\"(Request ID: Root=1-6a6059c1-33f643db72124def7236d7e6;18ac8813-904f-4058-b93d-5146e788878c)\\n\\n429 Too Many Requests: you have reached your 'api' rate limit.\\nRetry after 233 seconds (2922/3000 requests remaining in current 300s window).\\nUrl: https://huggingface.co/api/spaces/SZLHOLDINGS/a11oy/duplicate.\\nYou have exceeded the rate limit for repository duplication (15 per day). Yo",
-      "status": "error",
-      "target": "SZLHOLDINGS/a11oy-clone-3"
-    },
-    {
-      "action": "flagship-clone",
-      "detail": "HfHubHTTPError(\"(Request ID: Root=1-6a6059c1-2560b3b722e7024177f8ffff;8a7878e2-d8a2-4397-8a59-96cea5f321b3)\\n\\n429 Too Many Requests: you have reached your 'api' rate limit.\\nRetry after 233 seconds (2920/3000 requests remaining in current 300s window).\\nUrl: https://huggingface.co/api/spaces/SZLHOLDINGS/a11oy/duplicate.\\nYou have exceeded the rate limit for repository duplication (15 per day). Yo",
-      "status": "error",
-      "target": "SZLHOLDINGS/a11oy-clone-4"
-    },
-    {
       "action": "collection",
       "detail": "existing",
       "status": "ok",
@@ -599,12 +575,6 @@
       "detail": "existing",
       "status": "ok",
       "target": "SZLHOLDINGS/szl-holdings-spaces-6a6053493e2dbe1deddd1f2d"
-    },
-    {
-      "action": "collection",
-      "detail": "BadRequestError('(Request ID: Root=1-6a6059c1-42cc25467858ffb656e299ee;4105124f-9462-417c-9f33-79cf6dd2d816)\\n\\nBad request:\\n* Too big: expected string to have <150 characters * at description\\n\u2716 Too big: expected string to have <150 characters\\n  \u2192 at description')",
-      "status": "error",
-      "target": "SZL Holdings \u2014 Models & Kernel Contracts"
     },
     {
       "action": "collection",
@@ -626,25 +596,25 @@
     },
     {
       "action": "collection-add:SZL Holdings \u2014 Spaces",
-      "detail": "HfHubHTTPError(\"Client error '404 Not Found' for url 'https://huggingface.co/api/collections/SZLHOLDINGS/szl-holdings-spaces-6a6053493e2dbe1deddd1f2d/items' (Request ID: Root=1-6a6059c2-77f39d395998e9b646d6cfe6;50a2f8db-711c-4dfb-8707-f4b11a8bb00c)\\n",
+      "detail": "HfHubHTTPError(\"Client error '404 Not Found' for url 'https://huggingface.co/api/collections/SZLHOLDINGS/szl-holdings-spaces-6a6053493e2dbe1deddd1f2d/items' (Request ID: Root=1-6a605c85-33e308003347198251d132a3;0e4ff0eb-d6ce-4e76-8ff6-455dd48c086b)\\n",
       "status": "warning",
       "target": "SZLHOLDINGS/a11oy-clone-1"
     },
     {
       "action": "collection-add:SZL Holdings \u2014 Spaces",
-      "detail": "HfHubHTTPError(\"Client error '404 Not Found' for url 'https://huggingface.co/api/collections/SZLHOLDINGS/szl-holdings-spaces-6a6053493e2dbe1deddd1f2d/items' (Request ID: Root=1-6a6059c2-0f227ef256a2bdf911fb299f;cf66793a-75f6-4fdb-b166-333af9369b91)\\n",
+      "detail": "HfHubHTTPError(\"Client error '404 Not Found' for url 'https://huggingface.co/api/collections/SZLHOLDINGS/szl-holdings-spaces-6a6053493e2dbe1deddd1f2d/items' (Request ID: Root=1-6a605c85-09a0461d4e1fc83f6490cf5d;f959fe35-06f1-4bfe-ab0e-cae6a8c347e3)\\n",
       "status": "warning",
       "target": "SZLHOLDINGS/a11oy-clone-2"
     },
     {
       "action": "collection-add:SZL Holdings \u2014 Spaces",
-      "detail": "HfHubHTTPError(\"Client error '404 Not Found' for url 'https://huggingface.co/api/collections/SZLHOLDINGS/szl-holdings-spaces-6a6053493e2dbe1deddd1f2d/items' (Request ID: Root=1-6a6059c2-4ca79dbc7a29196c49cd4de5;9c284d89-db95-4f33-ace6-a11b476afe3f)\\n",
+      "detail": "HfHubHTTPError(\"Client error '404 Not Found' for url 'https://huggingface.co/api/collections/SZLHOLDINGS/szl-holdings-spaces-6a6053493e2dbe1deddd1f2d/items' (Request ID: Root=1-6a605c85-20ab9f901e3557b62a040246;26f0c5e4-1404-407d-be5a-2dc607d874dc)\\n",
       "status": "warning",
       "target": "SZLHOLDINGS/a11oy-clone-3"
     },
     {
       "action": "collection-add:SZL Holdings \u2014 Spaces",
-      "detail": "HfHubHTTPError(\"Client error '404 Not Found' for url 'https://huggingface.co/api/collections/SZLHOLDINGS/szl-holdings-spaces-6a6053493e2dbe1deddd1f2d/items' (Request ID: Root=1-6a6059c2-2044ce1e6992dd3955b99829;9885a5cc-f766-4174-acb9-7e956af846c0)\\n",
+      "detail": "HfHubHTTPError(\"Client error '404 Not Found' for url 'https://huggingface.co/api/collections/SZLHOLDINGS/szl-holdings-spaces-6a6053493e2dbe1deddd1f2d/items' (Request ID: Root=1-6a605c85-2170d8892090664307a6833d;ffec7dbf-cabf-4a37-b85a-47d446947298)\\n",
       "status": "warning",
       "target": "SZLHOLDINGS/a11oy-clone-4"
     },
@@ -1010,25 +980,25 @@
     },
     {
       "action": "collection-add:SZL Holdings \u2014 Canonical Estate",
-      "detail": "HfHubHTTPError(\"Client error '404 Not Found' for url 'https://huggingface.co/api/collections/SZLHOLDINGS/szl-holdings-canonical-estate-6a6053498f1195071c8f73c2/items' (Request ID: Root=1-6a6059ca-4b55f5de6490e1bc1adbe4df;109531ae-ff87-40b5-a2fb-816c7",
+      "detail": "HfHubHTTPError(\"Client error '404 Not Found' for url 'https://huggingface.co/api/collections/SZLHOLDINGS/szl-holdings-canonical-estate-6a6053498f1195071c8f73c2/items' (Request ID: Root=1-6a605c93-20ee5de91c60d6312bca046d;b90b5361-989e-49f4-ad49-4ad5c",
       "status": "warning",
       "target": "SZLHOLDINGS/a11oy-clone-1"
     },
     {
       "action": "collection-add:SZL Holdings \u2014 Canonical Estate",
-      "detail": "HfHubHTTPError(\"Client error '404 Not Found' for url 'https://huggingface.co/api/collections/SZLHOLDINGS/szl-holdings-canonical-estate-6a6053498f1195071c8f73c2/items' (Request ID: Root=1-6a6059ca-51a32eaf39eba11517331c01;294c8d76-f5ae-495b-8db2-0567c",
+      "detail": "HfHubHTTPError(\"Client error '404 Not Found' for url 'https://huggingface.co/api/collections/SZLHOLDINGS/szl-holdings-canonical-estate-6a6053498f1195071c8f73c2/items' (Request ID: Root=1-6a605c93-439d37931e1afa0c623b6e3a;c1942c5c-efac-412c-96bc-0d6b1",
       "status": "warning",
       "target": "SZLHOLDINGS/a11oy-clone-2"
     },
     {
       "action": "collection-add:SZL Holdings \u2014 Canonical Estate",
-      "detail": "HfHubHTTPError(\"Client error '404 Not Found' for url 'https://huggingface.co/api/collections/SZLHOLDINGS/szl-holdings-canonical-estate-6a6053498f1195071c8f73c2/items' (Request ID: Root=1-6a6059ca-0f69a6b24c1813480a91273e;fc28593d-af44-4a8a-a96b-fdc79",
+      "detail": "HfHubHTTPError(\"Client error '404 Not Found' for url 'https://huggingface.co/api/collections/SZLHOLDINGS/szl-holdings-canonical-estate-6a6053498f1195071c8f73c2/items' (Request ID: Root=1-6a605c93-1d777ede0a5e062c1bdb6d49;d2f90fbf-f889-4774-a4c5-20dc2",
       "status": "warning",
       "target": "SZLHOLDINGS/a11oy-clone-3"
     },
     {
       "action": "collection-add:SZL Holdings \u2014 Canonical Estate",
-      "detail": "HfHubHTTPError(\"Client error '404 Not Found' for url 'https://huggingface.co/api/collections/SZLHOLDINGS/szl-holdings-canonical-estate-6a6053498f1195071c8f73c2/items' (Request ID: Root=1-6a6059ca-0dd4b628642c100f200aaab5;37fca0a9-606a-4200-8074-0cb3a",
+      "detail": "HfHubHTTPError(\"Client error '404 Not Found' for url 'https://huggingface.co/api/collections/SZLHOLDINGS/szl-holdings-canonical-estate-6a6053498f1195071c8f73c2/items' (Request ID: Root=1-6a605c94-65f2e7f3590195556acb5a5a;16761fdd-5acf-42ef-9bde-b6e90",
       "status": "warning",
       "target": "SZLHOLDINGS/a11oy-clone-4"
     },
@@ -1103,6 +1073,60 @@
       "detail": "",
       "status": "updated",
       "target": "SZLHOLDINGS/szl-evidence"
+    },
+    {
+      "action": "flagship-clone",
+      "detail": "source=SZLHOLDINGS/a11oy@ce45517588dcbb19076917653dd87f3c20ed0db8; private=true; hardware=cpu-basic; public_variables=9",
+      "status": "created",
+      "target": "SZLHOLDINGS/a11oy-clone-1"
+    },
+    {
+      "action": "flagship-clone",
+      "detail": "source=SZLHOLDINGS/a11oy@ce45517588dcbb19076917653dd87f3c20ed0db8; private=true; hardware=cpu-basic; public_variables=9",
+      "status": "created",
+      "target": "SZLHOLDINGS/a11oy-clone-2"
+    },
+    {
+      "action": "flagship-clone",
+      "detail": "source=SZLHOLDINGS/a11oy@ce45517588dcbb19076917653dd87f3c20ed0db8; private=true; hardware=cpu-basic; public_variables=9",
+      "status": "created",
+      "target": "SZLHOLDINGS/a11oy-clone-3"
+    },
+    {
+      "action": "flagship-clone",
+      "detail": "source=SZLHOLDINGS/a11oy@ce45517588dcbb19076917653dd87f3c20ed0db8; private=true; hardware=cpu-basic; public_variables=9",
+      "status": "created",
+      "target": "SZLHOLDINGS/a11oy-clone-4"
+    },
+    {
+      "action": "clone-runtime",
+      "detail": "stage=RUNNING",
+      "status": "ok",
+      "target": "SZLHOLDINGS/a11oy-clone-1"
+    },
+    {
+      "action": "clone-runtime",
+      "detail": "stage=RUNNING",
+      "status": "ok",
+      "target": "SZLHOLDINGS/a11oy-clone-2"
+    },
+    {
+      "action": "clone-runtime",
+      "detail": "stage=RUNNING",
+      "status": "ok",
+      "target": "SZLHOLDINGS/a11oy-clone-3"
+    },
+    {
+      "action": "clone-runtime",
+      "detail": "stage=RUNNING",
+      "status": "ok",
+      "target": "SZLHOLDINGS/a11oy-clone-4"
+    },
+    {
+      "action": "estate-repair",
+      "detail": "BadRequestError: (Request ID: Root=1-6a605eae-0e82a8c65060ef061102563b;e6833477-45e5-45b7-816e-08408455486f)\n\nBad request:\n* Invalid option: expected one of \"orange\"|\"blue\"|\"green\"|\"purple\"|\"pink\"|\"indigo\" * at theme\n\u2716 Invalid option: expected one of \"orange\"|\"blue\"|\"green\"|\"purple\"|\"pink\"|\"indigo\"\n  \u2192 at theme",
+      "status": "error",
+      "target": "SZLHOLDINGS"
     }
   ],
   "boundaries": [
@@ -1110,7 +1134,9 @@
     "No model weights or dataset payloads were changed.",
     "No paid hardware tier was changed.",
     "Healthy dynamic Spaces were not rewritten or restarted.",
-    "Kernel repositories were validated; first-class kernel publishing remains governed by kernel-builder release workflows."
+    "Kernel repositories were validated; first-class kernel publishing remains governed by kernel-builder release workflows.",
+    "Four private cpu-basic clones are synchronized from an immutable source Space revision without using the daily-limited duplication endpoint.",
+    "Only public Space variables are copied; secret values are never read or propagated."
   ],
   "clone_ids": [
     "SZLHOLDINGS/a11oy-clone-1",
@@ -1125,21 +1151,29 @@
   },
   "counts": {
     "buckets": 0,
-    "collections": 0,
+    "collections": 12,
     "datasets": 32,
     "kernels": 10,
     "models": 15,
-    "spaces": 26
+    "spaces": 30
   },
-  "generated_at": "2026-07-22T05:49:00.637987+00:00",
-  "generation": "a5f761b7e307b5c6da4b940f1d0630500f4082bd",
+  "generated_at": "2026-07-22T06:09:50.854156+00:00",
+  "generation": "aa08b69b460f754a72102dac722bcf25ad1fbb5e",
   "organization": "SZLHOLDINGS",
   "publish": true,
+  "repair": {
+    "clone_strategy": "create_repo+snapshot_download+upload_folder",
+    "completed_at": "2026-07-22T06:09:51.159134+00:00",
+    "schema": "szl.hf-estate-repair/v1",
+    "secret_values_copied": false,
+    "source_revision": "ce45517588dcbb19076917653dd87f3c20ed0db8",
+    "source_space": "SZLHOLDINGS/a11oy"
+  },
   "schema": "szl.hf-estate-upgrade-report/v1",
   "summary": {
     "dry_run": 0,
-    "error": 5,
-    "ok": 169,
+    "error": 1,
+    "ok": 177,
     "warning": 10
   }
 }
