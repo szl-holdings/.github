@@ -61,6 +61,16 @@ class A11oySingletonVerifierContractTests(unittest.TestCase):
         self.assertTrue(verifier.contains_value(payload, expected))
         self.assertFalse(verifier.contains_value(payload, "b" * 40))
 
+    def test_collections_listing_stays_below_hub_limit_edge(self) -> None:
+        source = (SCRIPT_DIR / "hf_a11oy_singleton_verify.py").read_text(
+            encoding="utf-8"
+        )
+        self.assertEqual(
+            source.count("self.api.list_collections(owner=ORG, limit=99)"),
+            2,
+        )
+        self.assertNotIn("self.api.list_collections(owner=ORG, limit=100)", source)
+
     def test_workflow_invokes_only_post_migration_verifier(self) -> None:
         workflow = (
             SCRIPT_DIR.parent / "workflows" / "hf-estate-upgrade.yml"
