@@ -93,7 +93,7 @@ class OfficialEstateInventoryContractTests(unittest.TestCase):
         self.assertNotIn("/api/collections", source)
         self.assertNotIn("/api/buckets", source)
         self.assertIn('"list_collections"', source)
-        self.assertIn('"get_collection"', source)
+        self.assertIn("get_collection(", source)
         self.assertIn('"list_buckets"', source)
         self.assertIn('"bucket_info"', source)
 
