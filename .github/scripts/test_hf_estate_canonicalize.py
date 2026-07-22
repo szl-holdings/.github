@@ -50,6 +50,7 @@ class SingleA11oyEstateContractTests(unittest.TestCase):
         ):
             self.assertNotIn(forbidden, source)
         self.assertIn("select-newest-a11oy-source", source)
+        self.assertIn('item.get("stage") == "RUNNING"', source)
         self.assertIn("retire-a11oy-clone", source)
         self.assertIn("delete_repo(", source)
 
