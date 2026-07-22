@@ -1,5 +1,6 @@
 name: Install final NumPy kernel publisher repair
 
+# Registered on protected main; this second reviewed touch executes the installer.
 on:
   push:
     branches: [main]
