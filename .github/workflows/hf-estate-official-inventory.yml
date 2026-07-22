@@ -1,0 +1,179 @@
+name: HF Estate Official Inventory
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - .github/scripts/hf_estate_official_inventory.py
+      - .github/scripts/test_hf_estate_official_inventory.py
+      - .github/workflows/hf-estate-official-inventory.yml
+  push:
+    branches: [main]
+    paths:
+      - .github/scripts/hf_estate_official_inventory.py
+      - .github/scripts/test_hf_estate_official_inventory.py
+      - .github/workflows/hf-estate-official-inventory.yml
+  workflow_dispatch:
+    inputs:
+      publish:
+        description: Apply the estate reconciliation and publish evidence
+        required: true
+        default: true
+        type: boolean
+
+permissions:
+  contents: read
+  issues: write
+
+concurrency:
+  group: hf-estate-official-inventory
+  cancel-in-progress: false
+
+jobs:
+  verify-and-publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 150
+    env:
+      HF_ORG_TOKEN: ${{ secrets.HF_ORG_TOKEN || secrets.HF_ORG_TOKEN1 }}
+      HF_TOKEN: ${{ secrets.HF_TOKEN }}
+    steps:
+      - name: Checkout exact revision
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: '3.12'
+
+      - name: Install supported Hub client
+        run: |
+          python -m pip install --disable-pip-version-check \
+            'huggingface_hub>=1.3,<2' \
+            'requests>=2.32,<3'
+
+      - name: Compile and test official inventory contract
+        run: |
+          set -euo pipefail
+          python -m py_compile \
+            .github/scripts/hf_estate_upgrade.py \
+            .github/scripts/hf_estate_canonicalize.py \
+            .github/scripts/hf_estate_official_inventory.py \
+            .github/scripts/test_hf_estate_official_inventory.py
+          python .github/scripts/test_hf_estate_official_inventory.py
+          git diff --check
+
+      - name: Determine execution mode
+        id: mode
+        shell: bash
+        run: |
+          publish=false
+          if [ "$GITHUB_EVENT_NAME" = push ]; then
+            publish=true
+          elif [ "$GITHUB_EVENT_NAME" = workflow_dispatch ] && [ '${{ inputs.publish }}' = true ]; then
+            publish=true
+          fi
+          echo "publish=$publish" >> "$GITHUB_OUTPUT"
+
+      - name: Require authenticated organization credential
+        if: steps.mode.outputs.publish == 'true'
+        run: |
+          if [ -z "${HF_ORG_TOKEN:-}" ] && [ -z "${HF_TOKEN:-}" ]; then
+            echo '::error::No Hugging Face organization write credential is configured.'
+            exit 2
+          fi
+
+      - name: Execute supported-client estate publisher
+        if: steps.mode.outputs.publish == 'true'
+        id: estate
+        shell: bash
+        run: |
+          set +e
+          python .github/scripts/hf_estate_official_inventory.py \
+            --publish \
+            --generation "$GITHUB_SHA"
+          code=$?
+          echo "exit_code=$code" >> "$GITHUB_OUTPUT"
+          exit 0
+
+      - name: Enforce zero-error, zero-warning public command-center state
+        if: steps.mode.outputs.publish == 'true'
+        shell: python
+        run: |
+          import json
+          from pathlib import Path
+
+          path = Path('reports/hf-estate-upgrade-latest.json')
+          report = json.loads(path.read_text(encoding='utf-8'))
+          summary = report.get('summary') or {}
+          if int(summary.get('error') or 0) != 0:
+              raise SystemExit(f"estate report has errors: {summary}")
+          if int(summary.get('warning') or 0) != 0:
+              raise SystemExit(f"estate report has warnings: {summary}")
+
+          snapshots = report.get('managed_clone_snapshots') or {}
+          expected = {f'SZLHOLDINGS/a11oy-clone-{index}' for index in range(1, 5)}
+          if set(snapshots) != expected:
+              raise SystemExit(f"managed clone set mismatch: {sorted(snapshots)}")
+          for repo_id, snapshot in snapshots.items():
+              if snapshot.get('private') is not False:
+                  raise SystemExit(f"{repo_id} is not public: {snapshot}")
+              if str(snapshot.get('stage') or '').upper() != 'RUNNING':
+                  raise SystemExit(f"{repo_id} is not RUNNING: {snapshot}")
+              sha = str(snapshot.get('sha') or '')
+              if len(sha) != 40:
+                  raise SystemExit(f"{repo_id} lacks immutable revision: {snapshot}")
+
+          canonical = report.get('canonical_flagship_space') or {}
+          if canonical.get('repo_id') != 'SZLHOLDINGS/a11oy':
+              raise SystemExit(f"canonical Space mismatch: {canonical}")
+          if canonical.get('private') is not False or canonical.get('stage') != 'RUNNING':
+              raise SystemExit(f"canonical Space is not public/RUNNING: {canonical}")
+          print('official inventory and five-Space A11oy topology: PASS')
+
+      - name: Upload immutable report
+        if: always() && steps.mode.outputs.publish == 'true'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: hf-estate-official-inventory-${{ github.run_id }}
+          path: reports/hf-estate-upgrade-latest.json
+          if-no-files-found: error
+          retention-days: 90
+
+      - name: Persist report in deterministic issue
+        if: always() && steps.mode.outputs.publish == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          title='[hf-official-inventory-report] canonical A11oy + four public command centers'
+          test -f reports/hf-estate-upgrade-latest.json
+          {
+            echo '<!-- szl-hf-official-inventory-report -->'
+            echo "# $title"
+            echo
+            echo "- Run: ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
+            echo "- Source revision: \`${GITHUB_SHA}\`"
+            echo
+            echo '```json'
+            cat reports/hf-estate-upgrade-latest.json
+            echo '```'
+          } > /tmp/report.md
+          number="$(gh issue list --repo "$GITHUB_REPOSITORY" --state all --search "$title in:title" --json number,title --jq ".[] | select(.title == \"$title\") | .number" | head -n1)"
+          if [ -n "$number" ]; then
+            gh issue edit "$number" --repo "$GITHUB_REPOSITORY" --body-file /tmp/report.md
+          else
+            gh issue create "$GITHUB_REPOSITORY" --title "$title" --body-file /tmp/report.md
+          fi
+
+      - name: Enforce publisher result
+        if: always() && steps.mode.outputs.publish == 'true'
+        run: |
+          code='${{ steps.estate.outputs.exit_code }}'
+          if [ -z "$code" ]; then code=2; fi
+          if [ "$code" -ne 0 ]; then
+            echo "::error::Official estate publisher exited $code"
+            exit "$code"
+          fi
