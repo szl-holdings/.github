@@ -1,0 +1,102 @@
+name: GitHub Notification Inbox Zero
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - .github/scripts/clear_personal_notifications.py
+      - .github/workflows/clear-personal-notifications.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: github-personal-notification-clearance
+  cancel-in-progress: false
+
+jobs:
+  clear:
+    name: Count, clear, and verify zero unread notifications
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      GH_NOTIFICATIONS_TOKEN: ${{ secrets.GH_NOTIFICATIONS_TOKEN || secrets.SZL_GITHUB_TOKEN }}
+    steps:
+      - name: Checkout control plane
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: '3.12'
+
+      - name: Validate notification clearer
+        run: |
+          set -euo pipefail
+          python -m py_compile .github/scripts/clear_personal_notifications.py
+          test -n "${GH_NOTIFICATIONS_TOKEN:-}" || {
+            echo '::error::No user token is configured. Add GH_NOTIFICATIONS_TOKEN with Notifications: read/write, or grant that permission to SZL_GITHUB_TOKEN.'
+            exit 2
+          }
+
+      - name: Clear authenticated user notification inbox
+        id: clearance
+        shell: bash
+        run: |
+          set +e
+          python .github/scripts/clear_personal_notifications.py \
+            --report github-notification-clearance.json
+          code=$?
+          echo "exit_code=${code}" >> "$GITHUB_OUTPUT"
+          exit 0
+
+      - name: Upload count-only clearance receipt
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: github-notification-clearance-${{ github.run_id }}
+          path: github-notification-clearance.json
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Publish count-only summary
+        if: always()
+        shell: bash
+        run: |
+          python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          path = Path('github-notification-clearance.json')
+          with open(os.environ['GITHUB_STEP_SUMMARY'], 'a', encoding='utf-8') as out:
+              out.write('## GitHub notification inbox clearance\n\n')
+              if not path.exists():
+                  out.write('No clearance report was produced.\n')
+              else:
+                  report = json.loads(path.read_text(encoding='utf-8'))
+                  out.write(f"Status: **{report.get('status', 'UNKNOWN')}**\n\n")
+                  out.write(f"Authenticated identity: `{report.get('identity', 'UNAVAILABLE')}`\n\n")
+                  out.write(f"Unread before: **{report.get('before_unread_count', 'UNAVAILABLE')}**\n\n")
+                  out.write(f"Unread after: **{report.get('after_unread_count', 'UNAVAILABLE')}**\n\n")
+                  out.write('Notification subjects, repository names, URLs, and token material were not recorded.\n')
+          PY
+
+      - name: Enforce zero unread result
+        if: always()
+        run: |
+          code="${{ steps.clearance.outputs.exit_code }}"
+          if [ -z "$code" ]; then code=2; fi
+          if [ "$code" -ne 0 ]; then
+            echo "::error::Notification clearance failed closed with exit ${code}; inspect the count-only artifact."
+            exit "$code"
+          fi
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          report = json.loads(Path('github-notification-clearance.json').read_text())
+          assert report['status'] == 'CLEARED'
+          assert report['after_unread_count'] == 0
+          print(f"Cleared {report['cleared_count']} unread notifications; verified final count 0.")
+          PY
