@@ -1,9 +1,12 @@
 name: Apply canonical-only A11oy repair
 
-# Second push intentionally triggers this already-registered branch workflow.
 on:
   push:
     branches: [fix/remove-a11oy-clones]
+    paths:
+      - .github/workflows/apply-single-a11oy-repair.yml
+  pull_request:
+    branches: [main]
     paths:
       - .github/workflows/apply-single-a11oy-repair.yml
 
