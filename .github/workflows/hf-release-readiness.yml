@@ -59,6 +59,7 @@ jobs:
           echo "publish=${publish}" >> "$GITHUB_OUTPUT"
 
       - name: Require governed Hugging Face credential
+        if: steps.mode.outputs.publish == 'true'
         run: |
           set -euo pipefail
           if [ -z "${HF_ORG_TOKEN:-}" ] && [ -z "${HF_TOKEN:-}" ]; then
@@ -87,19 +88,20 @@ jobs:
           git diff --check
 
       - name: Verify published revisions without rewriting them
+        if: steps.mode.outputs.publish == 'true'
         id: readiness
         shell: bash
         run: |
           set +e
-          args=(--generation "${GITHUB_SHA}")
-          if [ "${{ steps.mode.outputs.publish }}" = "true" ]; then args+=(--publish); fi
-          python .github/scripts/hf_release_readiness_verify.py "${args[@]}"
+          python .github/scripts/hf_release_readiness_verify.py \
+            --generation "${GITHUB_SHA}" \
+            --publish
           code=$?
           echo "exit_code=${code}" >> "$GITHUB_OUTPUT"
           exit 0
 
       - name: Upload immutable readiness evidence
-        if: always()
+        if: always() && steps.mode.outputs.publish == 'true'
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: hf-release-readiness-${{ github.run_id }}
@@ -173,13 +175,22 @@ jobs:
             gh issue reopen "$issue_number" --repo "$GITHUB_REPOSITORY" || true
           fi
 
+      - name: Publish pull-request boundary
+        if: steps.mode.outputs.publish != 'true'
+        run: |
+          {
+            echo '## Pull-request validation boundary'
+            echo
+            echo 'Deterministic compile and contract tests passed. Live Hugging Face Viewer and kernel evidence is intentionally deferred to the protected-main push and recurring schedule so external asynchronous state cannot block code review.'
+          } >> "$GITHUB_STEP_SUMMARY"
+
       - name: Publish schedule boundary
         if: github.event_name == 'schedule'
         run: |
           echo 'This scheduled run is read-only for the Lake and kernel assets; only immutable evidence and the deterministic GitHub issue may be updated.' >> "$GITHUB_STEP_SUMMARY"
 
       - name: Enforce fail-closed readiness result
-        if: always()
+        if: always() && steps.mode.outputs.publish == 'true'
         run: |
           code="${{ steps.readiness.outputs.exit_code }}"
           if [ -z "$code" ]; then code=2; fi
