@@ -1,0 +1,35 @@
+name: Refresh HF release finalizer on current main
+
+on:
+  push:
+    branches: [agent/hf-release-finalization-20260722]
+    paths:
+      - .github/workflows/refresh-hf-release-finalization.yml
+
+permissions:
+  contents: write
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: agent/hf-release-finalization-20260722
+          fetch-depth: 0
+      - name: Merge current protected main and self-remove
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git fetch origin main
+          git merge --no-ff origin/main \
+            -m 'chore: refresh HF release finalizer on current main' \
+            -m 'Signed-off-by: github-actions[bot] <41898282+github-actions[bot]@users.noreply.github.com>'
+          rm .github/workflows/refresh-hf-release-finalization.yml
+          git add .github/workflows/refresh-hf-release-finalization.yml
+          git commit \
+            -m 'chore: remove completed finalizer refresh lane' \
+            -m 'Signed-off-by: github-actions[bot] <41898282+github-actions[bot]@users.noreply.github.com>'
+          git push origin HEAD:agent/hf-release-finalization-20260722
