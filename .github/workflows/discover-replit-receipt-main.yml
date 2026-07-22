@@ -1,0 +1,160 @@
+name: Discover Unified Control Hub Receipt
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - .github/scripts/discover_replit_receipt.py
+      - .github/scripts/test_discover_replit_receipt.py
+      - .github/workflows/discover-replit-receipt-main.yml
+  pull_request:
+    branches: [main]
+    paths:
+      - .github/scripts/discover_replit_receipt.py
+      - .github/scripts/test_discover_replit_receipt.py
+      - .github/workflows/discover-replit-receipt-main.yml
+  schedule:
+    - cron: '*/30 * * * *'
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+  issues: write
+
+concurrency:
+  group: discover-unified-control-hub-receipt-${{ github.event_name }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    name: Public GET/HEAD, provenance, tests, mobile and readiness
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      GH_TOKEN: ${{ github.token }}
+      REPORT_PATH: reports/replit-receipt-discovery-latest.json
+      REPLIT_PRODUCTION_URL: ${{ vars.REPLIT_PRODUCTION_URL }}
+    steps:
+      - name: Checkout verifier
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 1
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: '3.12'
+
+      - name: Verify fail-closed source contract
+        run: |
+          set -euo pipefail
+          python -m py_compile \
+            .github/scripts/discover_replit_receipt.py \
+            .github/scripts/test_discover_replit_receipt.py
+          python .github/scripts/test_discover_replit_receipt.py
+          git diff --check
+
+      - name: Discover and validate public deployment receipt
+        if: github.event_name != 'pull_request'
+        id: discovery
+        shell: bash
+        run: |
+          set +e
+          python .github/scripts/discover_replit_receipt.py \
+            --report "$REPORT_PATH" \
+            --attempts 3 \
+            --interval-seconds 20 \
+            --timeout 20
+          code=$?
+          echo "exit_code=${code}" >> "$GITHUB_OUTPUT"
+          exit 0
+
+      - name: Write pull-request evidence without external calls
+        if: github.event_name == 'pull_request'
+        shell: bash
+        run: |
+          mkdir -p reports
+          python - <<'PY'
+          import json
+          import os
+          from datetime import datetime, timezone
+          from pathlib import Path
+          Path(os.environ['REPORT_PATH']).write_text(
+              json.dumps({
+                  'schema': 'szl.replit-public-status/v1-prerelease',
+                  'generated_at': datetime.now(timezone.utc).isoformat(),
+                  'source_revision': os.environ.get('GITHUB_SHA'),
+                  'publish': False,
+                  'source_tests': 'PASSED',
+                  'summary': {'ok': 1, 'warning': 0, 'error': 0},
+                  'boundary': 'No Replit endpoint or GitHub issue mutation occurs on pull_request.',
+              }, indent=2, sort_keys=True) + '\n',
+              encoding='utf-8',
+          )
+          PY
+
+      - name: Upload immutable discovery report
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: replit-receipt-discovery-${{ github.run_id }}
+          path: ${{ env.REPORT_PATH }}
+          if-no-files-found: error
+          retention-days: 90
+
+      - name: Persist deterministic deployment issue
+        if: always() && github.event_name != 'pull_request'
+        shell: bash
+        env:
+          EXIT_CODE: ${{ steps.discovery.outputs.exit_code }}
+        run: |
+          set -euo pipefail
+          test -f "$REPORT_PATH"
+          title='[replit-deployment-receipt] Unified Control Hub'
+          marker='szl-replit-public-status'
+          body="$(mktemp)"
+          {
+            echo "<!-- ${marker} -->"
+            echo '# Unified Control Hub deployment receipt'
+            echo
+            echo "- Run: ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
+            echo "- Verifier source revision: \`${GITHUB_SHA}\`"
+            echo
+            echo '```json'
+            cat "$REPORT_PATH"
+            echo '```'
+          } > "$body"
+
+          number="$(gh issue list --repo "$GITHUB_REPOSITORY" --state all \
+            --search "${title} in:title" --json number,title \
+            --jq ".[] | select(.title == \"${title}\") | .number" | head -n1)"
+          if [ -n "$number" ]; then
+            gh issue edit "$number" --repo "$GITHUB_REPOSITORY" --body-file "$body"
+          else
+            gh issue create --repo "$GITHUB_REPOSITORY" --title "$title" \
+              --body-file "$body" >/dev/null
+            number="$(gh issue list --repo "$GITHUB_REPOSITORY" --state all \
+              --search "${title} in:title" --json number,title \
+              --jq ".[] | select(.title == \"${title}\") | .number" | head -n1)"
+          fi
+
+          if [ "${EXIT_CODE:-2}" = '0' ]; then
+            gh issue close "$number" --repo "$GITHUB_REPOSITORY" --reason completed \
+              --comment 'The public Unified Control Hub passed GET and HEAD receipt validation with bound source/deployment revisions, explicit test and mobile evidence, and ready backend/frontend checks.' || true
+          else
+            gh issue reopen "$number" --repo "$GITHUB_REPOSITORY" || true
+          fi
+          rm -f "$body"
+
+      - name: Enforce real deployment result
+        if: always() && github.event_name != 'pull_request'
+        env:
+          EXIT_CODE: ${{ steps.discovery.outputs.exit_code }}
+        run: |
+          code="${EXIT_CODE:-2}"
+          if [ "$code" -ne 0 ]; then
+            echo "::error::Unified Control Hub has no complete public deployment receipt."
+            exit "$code"
+          fi
+          echo 'Unified Control Hub is public, revision-bound, tested, mobile-verified and operational.'
