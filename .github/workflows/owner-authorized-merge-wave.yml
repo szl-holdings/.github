@@ -1,0 +1,107 @@
+name: Owner-authorized exact-SHA merge wave
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - .github/data/owner_authorized_merge_wave.json
+      - .github/scripts/owner_authorized_merge_wave.py
+      - .github/workflows/owner-authorized-merge-wave.yml
+  push:
+    branches: [main]
+    paths:
+      - .github/data/owner_authorized_merge_wave.json
+      - .github/scripts/owner_authorized_merge_wave.py
+      - .github/workflows/owner-authorized-merge-wave.yml
+  workflow_dispatch:
+    inputs:
+      execute:
+        description: Execute the exact manifest instead of verification-only mode
+        required: true
+        default: false
+        type: boolean
+
+permissions:
+  contents: read
+
+concurrency:
+  group: owner-authorized-merge-wave
+  cancel-in-progress: false
+
+jobs:
+  static-validation:
+    name: Validate exact merge-wave implementation
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: '3.12'
+      - name: Compile and validate manifest
+        run: |
+          set -euo pipefail
+          python -m py_compile .github/scripts/owner_authorized_merge_wave.py
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          manifest = json.loads(Path('.github/data/owner_authorized_merge_wave.json').read_text())
+          assert manifest['schema'] == 'szl.owner-authorized-merge-wave/v1'
+          assert manifest['base_branch'] == 'main'
+          targets = manifest['targets']
+          assert targets and len(targets) == len({(t['repository'], t['pull_request']) for t in targets})
+          for target in targets:
+              assert len(target['expected_head_sha']) == 40
+              int(target['expected_head_sha'], 16)
+              assert target['merge_method'] in {'squash', 'merge', 'rebase'}
+          print(f'validated {len(targets)} exact merge targets')
+          PY
+
+  execute:
+    name: Preflight all targets, then merge exact heads
+    if: >-
+      github.event_name == 'push' ||
+      (github.event_name == 'workflow_dispatch' && inputs.execute)
+    needs: static-validation
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      SZL_GITHUB_TOKEN: ${{ secrets.SZL_GITHUB_TOKEN }}
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: '3.12'
+      - name: Verify secret is configured without exposing it
+        run: |
+          set -euo pipefail
+          test -n "${SZL_GITHUB_TOKEN:-}" || {
+            echo '::error::SZL_GITHUB_TOKEN is not configured for the organization control repository.'
+            exit 2
+          }
+      - name: Execute fail-closed merge wave
+        run: |
+          python .github/scripts/owner_authorized_merge_wave.py \
+            --manifest .github/data/owner_authorized_merge_wave.json \
+            --report owner-authorized-merge-report.json \
+            --execute
+      - name: Upload immutable merge report
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: owner-authorized-merge-report
+          path: owner-authorized-merge-report.json
+          if-no-files-found: error
+      - name: Add report to job summary
+        if: always()
+        run: |
+          if [ -f owner-authorized-merge-report.json ]; then
+            {
+              echo '## Owner-authorized merge wave'
+              echo '```json'
+              cat owner-authorized-merge-report.json
+              echo '```'
+            } >> "$GITHUB_STEP_SUMMARY"
+          fi
