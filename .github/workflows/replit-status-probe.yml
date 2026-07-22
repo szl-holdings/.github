@@ -1,0 +1,64 @@
+name: Probe Unified Control Hub Public Status
+
+on:
+  push:
+    branches: [ops/greenlight-finalize-20260722]
+    paths:
+      - .github/scripts/replit_status_probe.py
+      - .github/workflows/replit-status-probe.yml
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+  issues: write
+
+concurrency:
+  group: probe-unified-control-hub-public-status
+  cancel-in-progress: false
+
+env:
+  SZL_GITHUB_TOKEN: ${{ secrets.SZL_GITHUB_TOKEN }}
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ops/greenlight-finalize-20260722
+          persist-credentials: false
+          fetch-depth: 1
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12"
+      - name: Validate public status probe
+        run: |
+          set -euo pipefail
+          python -m py_compile .github/scripts/replit_status_probe.py
+          git diff --check
+      - name: Probe and persist exact state
+        id: execute
+        shell: bash
+        run: |
+          mkdir -p reports
+          set +e
+          python .github/scripts/replit_status_probe.py \
+            --report reports/replit-public-status.json
+          code=$?
+          echo "exit_code=${code}" >> "$GITHUB_OUTPUT"
+          exit 0
+      - name: Upload immutable status report
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: replit-public-status-${{ github.run_id }}
+          path: reports/replit-public-status.json
+          if-no-files-found: error
+          retention-days: 90
+      - name: Enforce terminal deployment receipt
+        if: always()
+        run: |
+          code="${{ steps.execute.outputs.exit_code }}"
+          if [ -z "$code" ]; then code=2; fi
+          exit "$code"
