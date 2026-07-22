@@ -1,0 +1,149 @@
+name: Operational Green-Light Finalizer
+
+on:
+  push:
+    branches: [ops/greenlight-finalize-20260722]
+    paths:
+      - .github/scripts/greenlight_finalize.py
+      - .github/workflows/greenlight-finalize.yml
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+  issues: write
+
+concurrency:
+  group: operational-green-light-finalizer-20260722
+  cancel-in-progress: false
+
+env:
+  SZL_GITHUB_TOKEN: ${{ secrets.SZL_GITHUB_TOKEN }}
+  GH_TOKEN: ${{ github.token }}
+
+jobs:
+  finalize:
+    name: Merge exact lanes, run protected publishers, and verify final estate
+    runs-on: ubuntu-latest
+    timeout-minutes: 590
+    steps:
+      - name: Checkout exact finalizer branch
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ops/greenlight-finalize-20260722
+          persist-credentials: false
+          fetch-depth: 1
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12"
+
+      - name: Validate finalizer implementation
+        run: |
+          set -euo pipefail
+          python -m py_compile .github/scripts/greenlight_finalize.py
+          python - <<'PY'
+          import importlib.util
+          from pathlib import Path
+
+          path = Path('.github/scripts/greenlight_finalize.py')
+          spec = importlib.util.spec_from_file_location('greenlight_finalize', path)
+          module = importlib.util.module_from_spec(spec)
+          assert spec and spec.loader
+          spec.loader.exec_module(module)
+          assert len(module.SOURCE_TARGETS) == 6
+          assert module.SOURCE_TARGETS[0]['number'] == 244
+          assert module.SOURCE_TARGETS[-1]['number'] == 1036
+          assert module.FINAL_RECONCILIATION[1] == 'final-estate-reconciliation.yml'
+          print('validated exact six-lane finalizer manifest')
+          PY
+          git diff --check
+
+      - name: Verify admin credential without exposing it
+        id: credential
+        shell: bash
+        run: |
+          if [ -n "${SZL_GITHUB_TOKEN:-}" ]; then
+            echo 'present=true' >> "$GITHUB_OUTPUT"
+          else
+            echo 'present=false' >> "$GITHUB_OUTPUT"
+            mkdir -p reports
+            cat > reports/greenlight-finalizer-latest.json <<JSON
+          {
+            "schema": "szl.greenlight-finalizer/v1",
+            "generated_at": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
+            "ok": false,
+            "errors": ["GateError: SZL_GITHUB_TOKEN is not configured"]
+          }
+          JSON
+          fi
+
+      - name: Execute exact operational finalizer
+        if: steps.credential.outputs.present == 'true'
+        id: execute
+        shell: bash
+        run: |
+          set +e
+          python .github/scripts/greenlight_finalize.py \
+            --report reports/greenlight-finalizer-latest.json \
+            --source-timeout 10800
+          code=$?
+          echo "exit_code=${code}" >> "$GITHUB_OUTPUT"
+          exit 0
+
+      - name: Upload immutable finalizer report
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: operational-green-light-finalizer-${{ github.run_id }}
+          path: reports/greenlight-finalizer-latest.json
+          if-no-files-found: error
+          retention-days: 90
+
+      - name: Publish concise finalizer summary
+        if: always()
+        shell: bash
+        run: |
+          python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          path = Path('reports/greenlight-finalizer-latest.json')
+          with open(os.environ['GITHUB_STEP_SUMMARY'], 'a', encoding='utf-8') as out:
+              out.write('## Operational green-light finalizer\n\n')
+              if not path.exists():
+                  out.write('No report was produced.\n')
+              else:
+                  report = json.loads(path.read_text(encoding='utf-8'))
+                  out.write(f"Overall: **{'PASS' if report.get('ok') else 'OPEN'}**\n\n")
+                  out.write('| Source lane | State |\n|---|---|\n')
+                  for item in report.get('source_targets') or []:
+                      out.write(f"| `{item.get('repository')}#{item.get('pull_request')}` | {item.get('status')} |\n")
+                  out.write('\n| Protected workflow | Conclusion |\n|---|---|\n')
+                  for item in report.get('dependency_workflows') or []:
+                      out.write(f"| `{item.get('workflow')}` | {item.get('conclusion')} |\n")
+                  for key in ('organization_sweep', 'final_reconciliation'):
+                      item = report.get(key) or {}
+                      if item:
+                          out.write(f"| `{item.get('workflow')}` | {item.get('conclusion')} |\n")
+                  if report.get('errors'):
+                      out.write('\n### Exact blockers\n\n')
+                      for error in report['errors']:
+                          out.write(f'- {error}\n')
+          PY
+
+      - name: Enforce real result
+        if: always()
+        shell: bash
+        run: |
+          if [ "${{ steps.credential.outputs.present }}" != "true" ]; then
+            exit 2
+          fi
+          code="${{ steps.execute.outputs.exit_code }}"
+          if [ -z "$code" ]; then code=2; fi
+          if [ "$code" -ne 0 ]; then
+            echo "::error::The operational queue is not fully green; inspect the durable [greenlight-finalizer] issue and artifact."
+            exit "$code"
+          fi
+          echo 'All exact source lanes and protected operational workflows completed successfully.'
