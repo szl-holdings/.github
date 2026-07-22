@@ -1,0 +1,22 @@
+{
+  "schema": "szl.sda-shared-source-reconcile/v1",
+  "a11oy": {
+    "repository": "szl-holdings/a11oy",
+    "pull_request": 1028,
+    "branch": "agent/hf-space-api-route-repair-20260722",
+    "expected_head_sha": "b045e69ea6eeaac6c54cad5de64d5baad983f6cd",
+    "temporary_workflow": ".github/workflows/repair-sda-sdk-sync.yml"
+  },
+  "killinchu": {
+    "repository": "szl-holdings/killinchu",
+    "expected_main_sha": "0292bfe6717e40bd99b715bc0cbc147314168e79",
+    "branch": "agent/sda-api-contract-sync-20260722",
+    "pull_request_title": "fix(spaces): mirror exact SDA API contracts"
+  },
+  "shared_path": "szl_spaces_surface.py",
+  "static_spaces": [
+    "energy-attested-runs",
+    "guardrail-receipt",
+    "szl-forge-lab"
+  ]
+}
