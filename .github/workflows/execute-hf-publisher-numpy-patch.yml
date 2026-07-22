@@ -16,7 +16,7 @@ jobs:
   repair:
     if: >-
       github.event_name == 'workflow_dispatch' ||
-      (github.event.issue.number == 275 &&
+      (github.actor == 'stephenlutar2-hash' &&
        github.event.comment.body == '/execute-hf-publisher-numpy-repair')
     runs-on: ubuntu-latest
     timeout-minutes: 15
