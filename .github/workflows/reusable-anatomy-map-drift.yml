@@ -1,7 +1,4 @@
-Exit code: 0
-Wall time: 0.2 seconds
-Output:
-name: Reusable â€” Anatomy-map Drift Check
+name: Reusable — Anatomy-map Drift Check
 
 # Push-time honesty gate for the single SZL Anatomy map. The map is shipped on
 # THREE independently-edited surfaces -- the a11oy /console tab (szl-holdings/a11oy
@@ -14,7 +11,7 @@ name: Reusable â€” Anatomy-map Drift Check
 #
 # A consuming repo wires this into its own CI so an edit to its anatomy block is
 # validated IMMEDIATELY against the canonical locked-five ladder
-# {F1,F11,F12,F18,F19}; EXPERIMENTAL / NOT LOCKED {F4,F7,F22} and the Î›=Conjecture-1 honesty label (plus, for
+# {F1,F11,F12,F18,F19}; EXPERIMENTAL / NOT LOCKED {F4,F7,F22} and the Λ=Conjecture-1 honesty label (plus, for
 # the two marker-block surfaces, a capability-for-capability comparison). The
 # checker (scripts/anatomy_map_drift.py) + registry live ONCE in
 # szl-holdings/.github, so a fix to the guard reaches every surface at once. The
@@ -55,7 +52,7 @@ concurrency:
 
 jobs:
   anatomy-map-drift:
-    name: Anatomy map honest & in sync (locked-five + experimental-three + Î›=Conjecture-1)
+    name: Anatomy map honest & in sync (locked-five + experimental-three + Λ=Conjecture-1)
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -111,13 +108,13 @@ jobs:
         run: |
           case "${CHECK_EXIT:-2}" in
             0)
-              echo "âœ“ The SZL anatomy map is identical across all three surfaces."
+              echo "✓ The SZL anatomy map is identical across all three surfaces."
               ;;
             1)
               echo "::error::Anatomy-map drift detected -- see the step output and"
               echo "::error::the uploaded anatomy_map_report.out.json artifact. Re-sync"
               echo "::error::the locked-five ladder {F1,F11,F12,F18,F19}; EXPERIMENTAL / NOT LOCKED {F4,F7,F22}, the"
-              echo "::error::Î›=Conjecture-1 label and the capability ladder across a11oy"
+              echo "::error::Λ=Conjecture-1 label and the capability ladder across a11oy"
               echo "::error::/console, killinchu /elite and the SZLHOLDINGS/anatomy HF Space."
               exit 1
               ;;
