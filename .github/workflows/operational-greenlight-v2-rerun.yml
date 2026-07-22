@@ -1,0 +1,84 @@
+name: Operational Estate Green-Light v2 Rerun
+
+on:
+  push:
+    branches: [ops/greenlight-finalize-20260722]
+    paths:
+      - .github/workflows/operational-greenlight-v2-rerun.yml
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+  issues: write
+
+concurrency:
+  group: operational-estate-greenlight-v2-rerun-20260722
+  cancel-in-progress: false
+
+env:
+  SZL_GITHUB_TOKEN: ${{ secrets.SZL_GITHUB_TOKEN }}
+  HF_ORG_TOKEN: ${{ secrets.HF_ORG_TOKEN || secrets.HF_ORG_TOKEN1 }}
+  HF_TOKEN: ${{ secrets.HF_TOKEN }}
+  GH_TOKEN: ${{ github.token }}
+
+jobs:
+  converge:
+    name: Re-evaluate after publisher and Replit deployment convergence
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ops/greenlight-finalize-20260722
+          persist-credentials: false
+          fetch-depth: 1
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12"
+      - name: Allow publisher and deployment producers to settle
+        run: sleep 600
+      - name: Validate controller
+        run: |
+          set -euo pipefail
+          python -m py_compile .github/scripts/operational_greenlight_v2.py
+          git diff --check
+      - name: Verify credentials
+        id: credentials
+        shell: bash
+        run: |
+          mkdir -p reports
+          if { [ -n "${SZL_GITHUB_TOKEN:-}" ] && { [ -n "${HF_ORG_TOKEN:-}" ] || [ -n "${HF_TOKEN:-}" ]; }; }; then
+            echo 'present=true' >> "$GITHUB_OUTPUT"
+          else
+            echo 'present=false' >> "$GITHUB_OUTPUT"
+            printf '%s\n' '{"schema":"szl.operational-greenlight-controller/v2","ok":false,"errors":["Required credentials are missing"]}' > reports/operational-greenlight-v2-rerun.json
+          fi
+      - name: Execute post-publisher convergence
+        if: steps.credentials.outputs.present == 'true'
+        id: execute
+        shell: bash
+        run: |
+          set +e
+          python .github/scripts/operational_greenlight_v2.py \
+            --report reports/operational-greenlight-v2-rerun.json \
+            --cycles 2 \
+            --wait-seconds 300
+          code=$?
+          echo "exit_code=${code}" >> "$GITHUB_OUTPUT"
+          exit 0
+      - name: Upload immutable rerun report
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: operational-greenlight-v2-rerun-${{ github.run_id }}
+          path: reports/operational-greenlight-v2-rerun.json
+          if-no-files-found: error
+          retention-days: 90
+      - name: Enforce real final state
+        if: always()
+        shell: bash
+        run: |
+          if [ "${{ steps.credentials.outputs.present }}" != "true" ]; then exit 2; fi
+          code="${{ steps.execute.outputs.exit_code }}"
+          if [ -z "$code" ]; then code=2; fi
+          exit "$code"
