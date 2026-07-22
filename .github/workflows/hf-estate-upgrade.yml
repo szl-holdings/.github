@@ -32,7 +32,7 @@ permissions:
 
 concurrency:
   group: hf-canonical-a11oy-verification-${{ github.event_name }}-${{ github.ref }}
-  cancel-in-progress: false
+  cancel-in-progress: true
 
 jobs:
   verify:
