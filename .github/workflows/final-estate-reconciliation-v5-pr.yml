@@ -1,0 +1,98 @@
+name: Final Estate Reconciliation v5 — Pull Request Verification
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - .github/scripts/final_estate_reconciliation_v5.py
+      - .github/scripts/final_estate_v5_core.py
+      - .github/scripts/final_estate_v5_evidence.py
+      - .github/scripts/final_estate_v5_probes.py
+      - .github/scripts/test_final_estate_v5_evidence.py
+      - .github/scripts/test_final_estate_v5_probes.py
+      - .github/workflows/final-estate-reconciliation-v5.yml
+      - .github/workflows/final-estate-reconciliation-v5-pr.yml
+      - .github/scripts/final_estate_reconciliation_v4.py
+      - .github/scripts/test_final_estate_reconciliation_v4.py
+      - .github/workflows/final-estate-reconciliation-v4.yml
+
+permissions:
+  contents: read
+
+concurrency:
+  group: final-estate-reconciliation-v5-pr-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+env:
+  REPORT_PATH: reports/final-estate-reconciliation-v5-prerelease.json
+
+jobs:
+  verify:
+    name: Credentialless active-estate source contract
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout proposed reconciler
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 1
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: '3.12'
+
+      - name: Install bounded verifier dependency
+        run: python -m pip install --disable-pip-version-check 'requests==2.32.5'
+
+      - name: Compile and test without credentials or write permissions
+        run: |
+          set -euo pipefail
+          python -m py_compile \
+            .github/scripts/final_estate_reconciliation_v5.py \
+            .github/scripts/final_estate_v5_core.py \
+            .github/scripts/final_estate_v5_evidence.py \
+            .github/scripts/final_estate_v5_probes.py \
+            .github/scripts/test_final_estate_v5_evidence.py \
+            .github/scripts/test_final_estate_v5_probes.py
+          python .github/scripts/test_final_estate_v5_evidence.py
+          python .github/scripts/test_final_estate_v5_probes.py
+          git diff --check
+
+      - name: Write immutable pull-request boundary evidence
+        run: |
+          mkdir -p reports
+          python - <<'PY'
+          import json
+          import os
+          from datetime import datetime, timezone
+          from pathlib import Path
+
+          report = {
+              'schema': 'szl.final-estate-reconciliation/v5-prerelease',
+              'generation': os.environ.get('GITHUB_SHA'),
+              'generated_at': datetime.now(timezone.utc).isoformat(),
+              'publish': False,
+              'source_tests': 'PASSED',
+              'summary': {'ok': 1, 'warning': 0, 'error': 0},
+              'boundaries': [
+                  'No custom credential is available to this pull-request workflow.',
+                  'No GitHub issue-write permission is granted.',
+                  'No public probe or issue mutation is required to validate source changes.',
+              ],
+          }
+          Path('reports/final-estate-reconciliation-v5-prerelease.json').write_text(
+              json.dumps(report, indent=2, sort_keys=True) + '\n',
+              encoding='utf-8',
+          )
+          PY
+
+      - name: Upload immutable pull-request evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: final-estate-reconciliation-v5-pr-${{ github.run_id }}
+          path: ${{ env.REPORT_PATH }}
+          if-no-files-found: error
+          retention-days: 30
