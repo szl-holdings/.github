@@ -1,57 +1,52 @@
-name: Patch HF kernel publisher NumPy runtime final
+name: Install final NumPy kernel publisher repair
 
-# Run from the same-repository PR so the temporary bootstrap removes itself.
 on:
   push:
-    branches:
-      - fix/hf-kernel-publisher-numpy-runtime-final-20260722
-    paths:
-      - .github/workflows/patch-hf-kernel-publisher-numpy-final.yml
-  pull_request:
     branches: [main]
     paths:
       - .github/workflows/patch-hf-kernel-publisher-numpy-final.yml
-  workflow_dispatch: {}
 
 permissions:
   contents: write
 
 concurrency:
-  group: patch-hf-kernel-publisher-numpy-runtime-final
+  group: install-final-numpy-kernel-publisher-repair
   cancel-in-progress: false
 
 jobs:
-  patch:
-    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+  install:
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    env:
+      TARGET_BRANCH: fix/hf-kernel-publisher-numpy-product-20260722
     steps:
-      - name: Checkout exact repair branch
+      - name: Checkout protected main
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: fix/hf-kernel-publisher-numpy-runtime-final-20260722
+          ref: main
           fetch-depth: 0
           persist-credentials: true
 
-      - name: Add the exact NumPy runtime required by governed norm
+      - name: Build exact product branch
         shell: bash
         run: |
           set -euo pipefail
+          git switch -C "$TARGET_BRANCH" origin/main
           python - <<'PY'
           from pathlib import Path
 
           path = Path('.github/workflows/hf-kernel-card-publish-v2.yml')
           text = path.read_text(encoding='utf-8')
 
-          old_packages = '''          python -m pip install --disable-pip-version-check \\
-            "huggingface_hub>=1.3,<2" \\
-            "kernels==0.16.0" \\
+          old_packages = '''          python -m pip install --disable-pip-version-check \
+            "huggingface_hub>=1.3,<2" \
+            "kernels==0.16.0" \
             "pytest>=8,<9"
 '''
-          new_packages = '''          python -m pip install --disable-pip-version-check \\
-            "huggingface_hub>=1.3,<2" \\
-            "kernels==0.16.0" \\
-            "numpy==2.2.6" \\
+          new_packages = '''          python -m pip install --disable-pip-version-check \
+            "huggingface_hub>=1.3,<2" \
+            "kernels==0.16.0" \
+            "numpy==2.2.6" \
             "pytest>=8,<9"
 '''
           if text.count(old_packages) != 1:
@@ -88,18 +83,15 @@ jobs:
           assert 'update_repo_settings(' not in text
           print('publisher NumPy runtime patch is narrow and fail-closed')
           PY
-          git diff --check
 
-      - name: Commit the production workflow only
-        shell: bash
-        run: |
-          set -euo pipefail
           git rm .github/workflows/patch-hf-kernel-publisher-numpy-final.yml
+          git diff --check
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git add .github/workflows/hf-kernel-card-publish-v2.yml
+          git diff --cached --check
           git commit \
             -m 'fix(hf): install NumPy for governed-norm publisher selfcheck' \
             -m 'Pin NumPy 2.2.6 next to the existing CPU torch27 runtime so the exact immutable governed-norm receipt check can execute.' \
             -m 'Signed-off-by: github-actions[bot] <41898282+github-actions[bot]@users.noreply.github.com>'
-          git push origin HEAD:fix/hf-kernel-publisher-numpy-runtime-final-20260722
+          git push --force-with-lease origin "HEAD:$TARGET_BRANCH"
