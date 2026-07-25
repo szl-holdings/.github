@@ -36,6 +36,29 @@
 
 ---
 
+## Start here: product, proof, and source
+
+This is the shortest diligence path through the public estate. Runtime
+availability, model quality, formal proof, and supply-chain evidence are
+separate claims; inspect each at its owning source.
+
+| Inspect | Authoritative public surface | What it establishes |
+|---|---|---|
+| **Product** | [a-11-oy.com](https://a-11-oy.com) · [a11oy source](https://github.com/szl-holdings/a11oy) | Governed runtime, public interfaces, route contracts, and implementation |
+| **System architecture** | [platform](https://github.com/szl-holdings/platform) · [architecture](https://github.com/szl-holdings/a11oy/blob/main/docs/architecture.md) | Monorepo integration boundaries and the a11oy execution spine |
+| **Defense demonstration** | [killinchu](https://github.com/szl-holdings/killinchu) · [live demo](https://szlholdings-killinchu.hf.space/elite) | Counter-UAS and maritime demonstration surfaces; simulated effectors remain labeled |
+| **Formal evidence** | [lutar-lean](https://github.com/szl-holdings/lutar-lean) | Lean/mathlib sources for exactly eight locked-proven formulas and the explicit conjecture boundary |
+| **Receipt contract** | [governed-receipt-spec](https://github.com/szl-holdings/governed-receipt-spec) · [verify](https://a-11-oy.com/verify) | Portable receipt schema plus an independent verification entry point |
+| **Models and data** | [SZLHOLDINGS on Hugging Face](https://huggingface.co/SZLHOLDINGS) · [szl-lake](https://huggingface.co/datasets/SZLHOLDINGS/szl-lake) | Published artifacts, cards, licenses, datasets, and model-specific evaluation boundaries |
+
+For technical review, begin with the
+[architecture](https://github.com/szl-holdings/a11oy/blob/main/docs/architecture.md),
+[security policy](https://github.com/szl-holdings/.github/blob/main/SECURITY.md),
+and [contribution contract](https://github.com/szl-holdings/.github/blob/main/CONTRIBUTING.md).
+Claims without a reproducible artifact or current receipt remain unverified.
+
+---
+
 ## Spaces
 
 | Space | What it is | Open |
