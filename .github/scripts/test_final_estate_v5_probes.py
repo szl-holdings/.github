@@ -7,7 +7,13 @@ import unittest
 from typing import Any
 
 from final_estate_reconciliation_v5 import issue_body
-from final_estate_v5_core import PROBES, REPORT_MARKER, REPORT_SCHEMA, https_origin
+from final_estate_v5_core import (
+    PROBES,
+    REPORT_MARKER,
+    REPORT_SCHEMA,
+    GitHubClient,
+    https_origin,
+)
 from final_estate_v5_probes import safe_probe
 
 HERE = pathlib.Path(__file__).resolve().parent
@@ -53,6 +59,29 @@ class FakeSession:
 
 
 class FinalEstateProbeV5Tests(unittest.TestCase):
+    def test_open_public_prs_discard_issue_shaped_search_items(self) -> None:
+        client = GitHubClient(None)
+        response = FakeResponse(
+            status_code=200,
+            url="https://api.github.com/search/issues",
+            content_type="application/json",
+            payload={
+                "items": [
+                    {
+                        "number": 309,
+                        "title": "real pull request",
+                        "pull_request": {"url": "https://api.github.com/pulls/309"},
+                    },
+                    {"number": 310, "title": "ordinary issue"},
+                ]
+            },
+        )
+        client.request = lambda *_args, **_kwargs: response  # type: ignore[method-assign]
+
+        values = client.open_public_pull_requests()
+
+        self.assertEqual([item["number"] for item in values], [309])
+
     def test_get_only_api_accepts_observed_head_405(self) -> None:
         spec = PROBES["a11oy_livez"]
         session = FakeSession(
@@ -130,13 +159,13 @@ class FinalEstateProbeV5Tests(unittest.TestCase):
     def test_3d_probe_matches_the_dockerfile_shipped_console_surface(self) -> None:
         urls = {spec.url for spec in PROBES.values()}
         self.assertIn(
-            "https://szlholdings-a11oy.hf.space/static/3d/holographic.html", urls
+            "https://szlholdings-a11oy.hf.space/holographic", urls
         )
         self.assertFalse(any(url.endswith("/estate.html") for url in urls))
         self.assertFalse(any(url.endswith("/brain.html") for url in urls))
         self.assertEqual(
             PROBES["a11oy_holographic"].url,
-            "https://szlholdings-a11oy.hf.space/static/3d/holographic.html",
+            "https://szlholdings-a11oy.hf.space/holographic",
         )
         self.assertTrue(PROBES["a11oy_holographic"].require_head)
 

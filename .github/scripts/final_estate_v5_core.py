@@ -88,7 +88,7 @@ PROBES = {
         required_keys=("honest", "matrix_available", "probe_verdict_available", "view"),
     ),
     "a11oy_holographic": ProbeSpec(
-        "https://szlholdings-a11oy.hf.space/static/3d/holographic.html", True, "html"
+        "https://szlholdings-a11oy.hf.space/holographic", True, "html"
     ),
 }
 
@@ -159,7 +159,14 @@ class GitHubClient:
             values = payload.get("items") or []
             if not isinstance(values, list):
                 raise RuntimeError("GitHub pull-request search items are not a list")
-            output.extend(item for item in values if isinstance(item, dict))
+            # GitHub's search response uses the issues schema for both issues
+            # and pull requests.  Treat an item as a pull request only when the
+            # discriminator is present rather than trusting the query string.
+            output.extend(
+                item
+                for item in values
+                if isinstance(item, dict) and "pull_request" in item
+            )
             if len(values) < 100:
                 return output
         raise RuntimeError("public pull-request search exceeded 1,000 results")
