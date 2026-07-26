@@ -1,0 +1,120 @@
+name: Enqueue PR 325 — Active Admission Rules Only
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - .github/scripts/enqueue_pr325_required_checks_only.py
+      - .github/workflows/enqueue-pr325-required-checks-pr.yml
+
+permissions:
+  contents: read
+
+concurrency:
+  group: enqueue-pr325-active-rules-${{ github.event.pull_request.number }}
+  cancel-in-progress: false
+
+env:
+  REPORT_PATH: reports/pr325-required-check-enqueue.json
+
+jobs:
+  enqueue:
+    name: Validate active safeguards and enter protected merge queue
+    if: >-
+      github.repository == 'szl-holdings/.github' &&
+      github.event.pull_request.number == 324 &&
+      github.event.pull_request.head.repo.full_name == 'szl-holdings/.github' &&
+      github.event.pull_request.head.ref == 'diag/merge-queue-state-v1'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout the exact reviewed controller
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+          fetch-depth: 1
+
+      - name: Compile and constrain the mutation envelope
+        run: |
+          set -euo pipefail
+          python -m py_compile \
+            .github/scripts/request_exact_clean_merge_queue.py \
+            .github/scripts/enqueue_exact_clean_pull_requests.py \
+            .github/scripts/enqueue_pr325_required_checks_only.py
+          python - <<'PY'
+          from pathlib import Path
+
+          source = Path(
+              ".github/scripts/enqueue_pr325_required_checks_only.py"
+          ).read_text(encoding="utf-8")
+          required = (
+              "number=325",
+              "93a5138742497345cca21b8bd1a385d3b499c579",
+              "527fd000c5189f7b1ca4e56b7993d1daa952308a",
+              "required_signatures",
+              "required_linear_history",
+              "required_status_checks",
+              "required_review_thread_resolution",
+              "enqueue._enqueue",
+              "expectedHeadOid",
+              "jump=false",
+              "Unrelated non-required check runs are not promoted",
+              "Secret values, lengths, hashes, prefixes, identities",
+          )
+          forbidden = (
+              "mergePullRequest(input:",
+              "MergePullRequestInput!",
+              '"PUT", f"repos/{REPOSITORY}/pulls/',
+              '"merge_method"',
+              "statuses/",
+              "check-runs/{",
+              "rulesets/",
+              "branches/main/protection",
+              "git/refs",
+              "/reviews",
+              "secrets/",
+              "print(token",
+              "len(token",
+              "hashlib",
+          )
+          for marker in required:
+              assert marker in source, marker
+          for marker in forbidden:
+              assert marker not in source, marker
+          PY
+          git diff --check
+
+      - name: Select a governed credential and enqueue the exact signed head
+        id: queue
+        env:
+          SZL_GITHUB_TOKEN: ${{ secrets.SZL_GITHUB_TOKEN }}
+          GH_NOTIFICATIONS_TOKEN: ${{ secrets.GH_NOTIFICATIONS_TOKEN }}
+        shell: bash
+        run: |
+          set +e
+          python .github/scripts/enqueue_pr325_required_checks_only.py
+          code=$?
+          echo "exit_code=${code}" >> "$GITHUB_OUTPUT"
+          exit 0
+
+      - name: Upload immutable enqueue evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: pr325-required-check-enqueue-${{ github.run_id }}
+          path: ${{ env.REPORT_PATH }}
+          if-no-files-found: error
+          retention-days: 90
+
+      - name: Enforce protected queue admission
+        if: always()
+        env:
+          EXIT_CODE: ${{ steps.queue.outputs.exit_code }}
+        run: |
+          code="${EXIT_CODE:-2}"
+          if [ "$code" -ne 0 ]; then
+            echo "::error::Exact PR #325 queue admission failed closed. No immediate merge or protection change was attempted."
+            exit "$code"
+          fi
+          echo "Exact signed PR #325 entered GitHub's protected merge queue or was merged by that queue."
