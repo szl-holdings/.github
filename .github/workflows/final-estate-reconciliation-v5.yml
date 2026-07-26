@@ -10,10 +10,13 @@ on:
       - .github/scripts/final_estate_v5_probes.py
       - .github/scripts/test_final_estate_v5_evidence.py
       - .github/scripts/test_final_estate_v5_probes.py
+      - .github/scripts/test_final_estate_v5_upstream.py
       - .github/workflows/final-estate-reconciliation-v5.yml
       - .github/workflows/final-estate-reconciliation-v5-pr.yml
-  schedule:
-    - cron: '17 * * * *'
+  workflow_run:
+    workflows:
+      - "HF Release Readiness Terminal"
+    types: [completed]
   workflow_dispatch: {}
 
 permissions:
@@ -28,6 +31,10 @@ env:
   GITHUB_TOKEN: ${{ github.token }}
   GH_TOKEN: ${{ github.token }}
   REPORT_PATH: reports/final-estate-reconciliation-v5.json
+  EVIDENCE_GENERATION: ${{ github.event.workflow_run.head_sha || github.sha }}
+  UPSTREAM_WORKFLOW: ${{ github.event.workflow_run.name || '' }}
+  UPSTREAM_RUN_URL: ${{ github.event.workflow_run.html_url || '' }}
+  UPSTREAM_CONCLUSION: ${{ github.event.workflow_run.conclusion || '' }}
 
 jobs:
   reconcile:
@@ -35,19 +42,20 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
-      - name: Checkout reconciler
+      - name: Checkout reconciler at the readiness source revision
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          ref: ${{ env.EVIDENCE_GENERATION }}
           persist-credentials: false
           fetch-depth: 1
 
       - name: Set up Python
         uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
-          python-version: '3.12'
+          python-version: "3.12"
 
       - name: Install bounded verifier dependency
-        run: python -m pip install --disable-pip-version-check 'requests==2.32.5'
+        run: python -m pip install --disable-pip-version-check "requests==2.32.5"
 
       - name: Compile and test every active-estate contract
         run: |
@@ -58,9 +66,11 @@ jobs:
             .github/scripts/final_estate_v5_evidence.py \
             .github/scripts/final_estate_v5_probes.py \
             .github/scripts/test_final_estate_v5_evidence.py \
-            .github/scripts/test_final_estate_v5_probes.py
+            .github/scripts/test_final_estate_v5_probes.py \
+            .github/scripts/test_final_estate_v5_upstream.py
           python .github/scripts/test_final_estate_v5_evidence.py
           python .github/scripts/test_final_estate_v5_probes.py
+          python .github/scripts/test_final_estate_v5_upstream.py
           git diff --check
 
       - name: Evaluate and publish the current active estate
@@ -93,20 +103,32 @@ jobs:
           import os
           from pathlib import Path
 
-          path = Path(os.environ['REPORT_PATH'])
-          with open(os.environ['GITHUB_STEP_SUMMARY'], 'a', encoding='utf-8') as out:
-              out.write('## SZL active-estate reconciliation v5\n\n')
+          path = Path(os.environ["REPORT_PATH"])
+          with open(os.environ["GITHUB_STEP_SUMMARY"], "a", encoding="utf-8") as out:
+              out.write("## SZL active-estate reconciliation v5\n\n")
+              if os.environ.get("UPSTREAM_RUN_URL"):
+                  out.write(f"- readiness run: {os.environ['UPSTREAM_RUN_URL']}\n")
+                  out.write(
+                      f"- readiness conclusion: `{os.environ.get('UPSTREAM_CONCLUSION')}`\n"
+                  )
               if not path.exists():
-                  out.write('No report was produced.\n')
+                  out.write("No report was produced.\n")
               else:
-                  report = json.loads(path.read_text(encoding='utf-8'))
+                  report = json.loads(path.read_text(encoding="utf-8"))
                   out.write(f"- status: `{report.get('status')}`\n")
                   out.write(f"- passed: `{report.get('summary', {}).get('ok')}`\n")
                   out.write(f"- failed: `{report.get('summary', {}).get('error')}`\n")
-                  out.write('- Replit Unified Control Hub: `DECOMMISSIONED_NOT_IN_ACTIVE_ESTATE`\n\n')
-                  out.write('| Gate | Result | Detail |\n|---|---|---|\n')
-                  for gate in report.get('gates', []):
-                      detail = str(gate.get('detail', '')).replace('|', '\\|').replace('\n', ' ')
+                  out.write(
+                      "- Replit Unified Control Hub: "
+                      "`DECOMMISSIONED_NOT_IN_ACTIVE_ESTATE`\n\n"
+                  )
+                  out.write("| Gate | Result | Detail |\n|---|---|---|\n")
+                  for gate in report.get("gates", []):
+                      detail = (
+                          str(gate.get("detail", ""))
+                          .replace("|", "\\|")
+                          .replace("\n", " ")
+                      )
                       out.write(
                           f"| `{gate.get('name')}` | "
                           f"`{'PASS' if gate.get('ok') else 'FAIL'}` | {detail} |\n"
@@ -122,4 +144,4 @@ jobs:
             echo "::error::The active estate is not OPERATIONAL_VERIFIED. See the deterministic reconciliation issue."
             exit "$code"
           fi
-          echo 'The active public estate is OPERATIONAL_VERIFIED.'
+          echo "The active public estate is OPERATIONAL_VERIFIED."
