@@ -1,0 +1,196 @@
+name: PR 331 Queue Admission — Read-Only Diagnostics
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - .github/workflows/pr331-queue-state-diagnostics-pr.yml
+
+permissions:
+  actions: read
+  checks: read
+  contents: read
+  pull-requests: read
+
+concurrency:
+  group: pr331-queue-diagnostics-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+env:
+  REPORT_PATH: reports/pr331-queue-admission.json
+
+jobs:
+  diagnose:
+    name: Exact protected admission state
+    if: >-
+      github.repository == 'szl-holdings/.github' &&
+      github.event.pull_request.number == 327 &&
+      github.event.pull_request.head.repo.full_name == 'szl-holdings/.github' &&
+      github.event.pull_request.head.ref == 'diag/ci-health-digest-state-v1'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - name: Query exact PR, rules, checks, and merge-group state
+        shell: python
+        run: |
+          from __future__ import annotations
+
+          import json
+          import os
+          import subprocess
+          from datetime import datetime, timezone
+          from pathlib import Path
+          from typing import Any
+
+          repository = os.environ["GITHUB_REPOSITORY"]
+          owner, name = repository.split("/", 1)
+          head_sha = "098cbb15c70330a57b7a8d858d47c4ef3eb847f5"
+
+          def invoke(arguments: list[str], *, payload: dict[str, Any] | None = None):
+              process = subprocess.run(
+                  ["gh", "api", *arguments],
+                  input=json.dumps(payload) if payload is not None else None,
+                  capture_output=True,
+                  text=True,
+                  check=False,
+                  env=os.environ,
+              )
+              raw = process.stdout.strip()
+              try:
+                  value: Any = json.loads(raw) if raw else None
+              except json.JSONDecodeError:
+                  value = raw[:4000]
+              return {
+                  "ok": process.returncode == 0,
+                  "returncode": process.returncode,
+                  "payload": value,
+                  "stderr": process.stderr.strip()[:2000],
+              }
+
+          query = """
+          query($owner: String!, $name: String!, $number: Int!) {
+            repository(owner: $owner, name: $name) {
+              pullRequest(number: $number) {
+                number url state isDraft headRefOid baseRefOid
+                mergeable mergeStateStatus reviewDecision
+                autoMergeRequest { enabledAt mergeMethod enabledBy { login } }
+                mergeQueueEntry { id position state enqueuedAt }
+                reviewThreads(first: 100) { totalCount nodes { isResolved } }
+              }
+            }
+          }
+          """
+          graph = invoke(
+              ["graphql", "--input", "-"],
+              payload={
+                  "query": query,
+                  "variables": {"owner": owner, "name": name, "number": 331},
+              },
+          )
+          rules = invoke(["--method", "GET", f"repos/{repository}/rules/branches/main"])
+          checks = invoke(
+              [
+                  "--method",
+                  "GET",
+                  f"repos/{repository}/commits/{head_sha}/check-runs?filter=latest&per_page=100",
+              ]
+          )
+          statuses = invoke(
+              ["--method", "GET", f"repos/{repository}/commits/{head_sha}/status"]
+          )
+          branches = invoke(
+              ["--method", "GET", f"repos/{repository}/branches?per_page=100"]
+          )
+          merge_group_runs = invoke(
+              [
+                  "--method",
+                  "GET",
+                  f"repos/{repository}/actions/runs?event=merge_group&per_page=100",
+              ]
+          )
+
+          check_payload = checks.get("payload")
+          if isinstance(check_payload, dict):
+              checks["payload"] = [
+                  {
+                      "id": item.get("id"),
+                      "name": item.get("name"),
+                      "status": item.get("status"),
+                      "conclusion": item.get("conclusion"),
+                      "app_id": (item.get("app") or {}).get("id"),
+                      "app_slug": (item.get("app") or {}).get("slug"),
+                  }
+                  for item in check_payload.get("check_runs", [])
+                  if isinstance(item, dict)
+              ]
+          status_payload = statuses.get("payload")
+          if isinstance(status_payload, dict):
+              statuses["payload"] = [
+                  {
+                      "context": item.get("context"),
+                      "state": item.get("state"),
+                      "creator": (item.get("creator") or {}).get("login"),
+                  }
+                  for item in status_payload.get("statuses", [])
+                  if isinstance(item, dict)
+              ]
+          branch_payload = branches.get("payload")
+          if isinstance(branch_payload, list):
+              branches["payload"] = [
+                  {
+                      "name": item.get("name"),
+                      "sha": (item.get("commit") or {}).get("sha"),
+                  }
+                  for item in branch_payload
+                  if str(item.get("name") or "").startswith("gh-readonly-queue/")
+              ]
+          run_payload = merge_group_runs.get("payload")
+          if isinstance(run_payload, dict):
+              merge_group_runs["payload"] = [
+                  {
+                      "id": item.get("id"),
+                      "name": item.get("name"),
+                      "status": item.get("status"),
+                      "conclusion": item.get("conclusion"),
+                      "head_branch": item.get("head_branch"),
+                      "head_sha": item.get("head_sha"),
+                      "created_at": item.get("created_at"),
+                  }
+                  for item in run_payload.get("workflow_runs", [])[:20]
+                  if isinstance(item, dict)
+              ]
+
+          report = {
+              "schema": "szl.pr331-queue-admission/v1",
+              "generated_at": datetime.now(timezone.utc).isoformat(),
+              "generation": os.environ.get("GITHUB_SHA"),
+              "target": {"pull_request": 331, "head_sha": head_sha},
+              "graphql": graph,
+              "active_rules": rules,
+              "checks": checks,
+              "statuses": statuses,
+              "queue_branches": branches,
+              "merge_group_runs": merge_group_runs,
+              "boundaries": [
+                  "Read-only GitHub control-plane metadata only.",
+                  "No merge, queue, review, check, status, branch, rule, or secret mutation.",
+              ],
+          }
+          path = Path(os.environ["REPORT_PATH"])
+          path.parent.mkdir(parents=True, exist_ok=True)
+          path.write_text(
+              json.dumps(report, indent=2, sort_keys=True) + "\n",
+              encoding="utf-8",
+          )
+          print(json.dumps(report, indent=2, sort_keys=True))
+
+      - name: Upload immutable queue diagnostics
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: pr331-queue-admission-${{ github.run_id }}
+          path: ${{ env.REPORT_PATH }}
+          if-no-files-found: error
+          retention-days: 30
