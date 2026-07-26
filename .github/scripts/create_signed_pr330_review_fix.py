@@ -2,11 +2,11 @@
 """Create a one-commit GitHub-signed branch that addresses PR #330 review.
 
 The source PR remains read-only. Exactly two unused imports and one dead initial
-assignment are removed from ``ci_health_digest.py``. All other source bytes are
-copied from the reviewed PR head. Candidate modules and tests execute before the
-signed commit is created. The resulting commit must have the exact protected
-main parent, a valid GitHub signature, and a source-to-candidate diff containing
-only the reviewed Python file.
+assignment are removed from ``ci_health_digest.py``. The one unit test that
+previously instantiated the imported type through that implementation module is
+updated to instantiate it from its owning HTTP module. All other source bytes
+are copied from the reviewed PR head. Candidate modules and tests execute before
+the signed commit is created.
 """
 from __future__ import annotations
 
@@ -25,6 +25,8 @@ SOURCE_PR = 330
 SOURCE_HEAD = "7e1b59748b58bf7093b1b36dc9036ffbb03c7d10"
 SOURCE_BASE = "7d6a15026edab70ca99f059897dc3bdeee10f6df"
 TARGET_PATH = ".github/scripts/ci_health_digest.py"
+TEST_PATH = ".github/scripts/test_ci_health_digest.py"
+ALLOWED_DIFF_PATHS = {TARGET_PATH, TEST_PATH}
 BRANCH = f"fix/ci-health-digest-review-fixed-{SOURCE_HEAD[:12]}"
 REPORT_PATH = Path(
     os.environ.get(
@@ -140,34 +142,64 @@ def source_files() -> tuple[dict[str, bytes], list[str]]:
             files[path] = base64.b64decode(encoded, validate=True)
         except Exception as exc:  # noqa: BLE001
             raise ReviewFixError(f"source file {path} is not valid base64") from exc
-    if TARGET_PATH not in files:
-        raise ReviewFixError(f"source PR does not contain {TARGET_PATH}")
+    missing = sorted(ALLOWED_DIFF_PATHS - set(files))
+    if missing:
+        raise ReviewFixError(f"source PR lacks required review-fix paths: {missing}")
     return files, sorted(set(removed))
 
 
-def apply_review_fix(source: bytes) -> tuple[bytes, dict[str, Any]]:
+def replace_once(text: str, old: str, new: str, *, label: str) -> str:
+    if text.count(old) != 1:
+        raise ReviewFixError(
+            f"expected exactly one {label} marker, observed {text.count(old)}"
+        )
+    return text.replace(old, new, 1)
+
+
+def apply_review_fixes(files: dict[str, bytes]) -> dict[str, Any]:
     try:
-        text = source.decode("utf-8")
+        implementation = files[TARGET_PATH].decode("utf-8")
+        tests = files[TEST_PATH].decode("utf-8")
     except UnicodeDecodeError as exc:
-        raise ReviewFixError("target source is not UTF-8") from exc
+        raise ReviewFixError("review-fix source is not UTF-8") from exc
+
+    source_hashes = {
+        path: hashlib.sha256(files[path]).hexdigest()
+        for path in sorted(ALLOWED_DIFF_PATHS)
+    }
     for marker in ("    ReaderSelection,\n", "    list_repositories,\n"):
-        if text.count(marker) != 1:
-            raise ReviewFixError(f"expected exactly one unused import marker: {marker!r}")
-        text = text.replace(marker, "", 1)
+        implementation = replace_once(
+            implementation,
+            marker,
+            "",
+            label=f"unused import {marker.strip()}",
+        )
     dead = "    exit_code = 2\n"
-    if text.count(dead) != 2:
+    if implementation.count(dead) != 2:
         raise ReviewFixError(
             "expected one dead initialization and one live failure assignment"
         )
-    text = text.replace(dead, "", 1)
-    if text.count(dead) != 1:
+    implementation = implementation.replace(dead, "", 1)
+    if implementation.count(dead) != 1:
         raise ReviewFixError("review fix removed the live failure assignment")
-    corrected = text.encode("utf-8")
-    return corrected, {
+
+    tests = replace_once(
+        tests,
+        "        selected = chd.ReaderSelection(\n",
+        "        selected = http.ReaderSelection(\n",
+        label="ReaderSelection ownership test",
+    )
+    files[TARGET_PATH] = implementation.encode("utf-8")
+    files[TEST_PATH] = tests.encode("utf-8")
+    return {
         "removed_unused_imports": ["ReaderSelection", "list_repositories"],
         "removed_dead_initialization": True,
-        "source_sha256": hashlib.sha256(source).hexdigest(),
-        "corrected_sha256": hashlib.sha256(corrected).hexdigest(),
+        "updated_type_owner_reference": "chd.ReaderSelection -> http.ReaderSelection",
+        "source_sha256": source_hashes,
+        "corrected_sha256": {
+            path: hashlib.sha256(files[path]).hexdigest()
+            for path in sorted(ALLOWED_DIFF_PATHS)
+        },
     }
 
 
@@ -207,10 +239,14 @@ def run_candidate_tests(files: dict[str, bytes]) -> dict[str, Any]:
         raise ReviewFixError(
             f"candidate tests failed: {(test_process.stderr or test_process.stdout)[:3000]}"
         )
+    output = test_process.stderr or test_process.stdout
+    if "Ran 13 tests" not in output or "OK" not in output:
+        raise ReviewFixError("candidate test runner did not prove all 13 tests")
     return {
         "python_compile": "passed",
         "unit_tests": "passed",
-        "test_output_tail": (test_process.stderr or test_process.stdout)[-1000:],
+        "test_count": 13,
+        "test_output_tail": output[-1000:],
     }
 
 
@@ -271,7 +307,7 @@ def create_signed_commit(files: dict[str, bytes], removed: list[str]) -> str:
                         "headline": "fix(ci): make organization health digest fail closed",
                         "body": (
                             "Addresses both actionable review threads from PR #330 "
-                            "without changing runtime behavior.\n\n"
+                            "and updates the dependent test to use the owning type.\n\n"
                             f"Source-PR: #{SOURCE_PR}\n"
                             f"Source-Head: {SOURCE_HEAD}\n\n"
                             "Signed-off-by: Stephen Lutar <stephenlutar2@gmail.com>"
@@ -293,9 +329,7 @@ def create_signed_commit(files: dict[str, bytes], removed: list[str]) -> str:
 
 
 def compare_source_candidate(candidate: str) -> list[dict[str, Any]]:
-    value = get(
-        f"repos/{REPOSITORY}/compare/{SOURCE_HEAD}...{candidate}"
-    )
+    value = get(f"repos/{REPOSITORY}/compare/{SOURCE_HEAD}...{candidate}")
     files = value.get("files") if isinstance(value, dict) else None
     if not isinstance(files, list):
         raise ReviewFixError("source/candidate comparison has no file inventory")
@@ -309,17 +343,18 @@ def compare_source_candidate(candidate: str) -> list[dict[str, Any]]:
         for item in files
         if isinstance(item, dict)
     ]
-    if [item.get("filename") for item in compact] != [TARGET_PATH]:
+    observed = {str(item.get("filename")) for item in compact}
+    if observed != ALLOWED_DIFF_PATHS:
         raise ReviewFixError(
-            f"source/candidate diff escaped the reviewed path: {compact}"
+            f"source/candidate diff escaped the reviewed paths: {compact}"
         )
-    return compact
+    return sorted(compact, key=lambda item: str(item.get("filename")))
 
 
 def main() -> int:
     REPORT_PATH.parent.mkdir(parents=True, exist_ok=True)
     report: dict[str, Any] = {
-        "schema": "szl.signed-review-fix/v1",
+        "schema": "szl.signed-review-fix/v2",
         "generated_at": datetime.now(timezone.utc).isoformat(),
         "repository": REPOSITORY,
         "source_pr": SOURCE_PR,
@@ -329,17 +364,17 @@ def main() -> int:
         "status": "FAILED_CLOSED",
         "boundaries": [
             "The source pull request and branch are read-only.",
-            "Only two unused imports and one dead initialization may change.",
-            "Candidate compilation and unit tests must pass before commit creation.",
+            "Only two unused imports, one dead initialization, and the dependent type-owner test reference may change.",
+            "Candidate compilation and all 13 unit tests must pass before commit creation.",
             "The replacement must be GitHub-signed with the exact protected-main parent.",
+            "The source/candidate comparison must contain exactly the two reviewed Python paths.",
             "No rule, protection, review, status, check result, secret, or protected ref is changed.",
         ],
     }
     try:
         verify_source_pr()
         files, removed = source_files()
-        corrected, fix_receipt = apply_review_fix(files[TARGET_PATH])
-        files[TARGET_PATH] = corrected
+        fix_receipt = apply_review_fixes(files)
         tests = run_candidate_tests(files)
         existing = ref_sha(BRANCH)
         if existing is None:
