@@ -1,6 +1,6 @@
 {
   "repository_class": "organization-governance",
-  "operator_model": "solo",
+  "operator_model": "single-human-blocked",
   "ui_surface": false,
   "lean_surface": true,
   "lean_sorry_baseline": 4,

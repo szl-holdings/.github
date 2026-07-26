@@ -61,8 +61,10 @@ def ground_truth() -> None:
     parameters = pull_rules[0].get("parameters")
     if not isinstance(parameters, dict):
         fail("pull-request parameters are missing")
-    if parameters.get("required_approving_review_count") != 0:
-        fail("solo policy must not claim a human approval")
+    if parameters.get("required_approving_review_count") != 1:
+        fail("one independent approval must be required")
+    if parameters.get("require_last_push_approval") is not True:
+        fail("the independent reviewer must approve the latest push")
 
 
 def labels() -> None:
@@ -83,13 +85,12 @@ def labels() -> None:
 def schema() -> None:
     gates = load_json(".governance/gates.json")
     profile = load_json(".governance/repository-profile.json")
-    manifest = load_json(".governance/github-app-manifest.json")
+    load_json(".governance/ruleset-main.json")
+    load_json(".governance/ruleset-release.json")
     if len(gates) != 8:
         fail("the canonical gate map must contain eight gates")
-    if profile.get("operator_model") != "solo":
-        fail("repository profile must declare the solo operator model")
-    if manifest.get("name") != "qillqaq-attestor":
-        fail("attestor manifest identity changed")
+    if profile.get("operator_model") != "single-human-blocked":
+        fail("repository profile must expose the independent-review blocker")
 
 
 def adversarial() -> None:
@@ -108,17 +109,10 @@ def verify_all() -> None:
 
 
 def provenance() -> None:
-    manifest = load_json(".governance/github-app-manifest.json")
-    permissions = manifest.get("default_permissions")
-    if not isinstance(permissions, dict):
-        fail("App permissions are missing")
-    if permissions.get("contents") != "read":
-        fail("the App must not have write access to repository contents")
-    if permissions.get("merge_queues") != "write":
-        fail("the App requires only dedicated queue authority")
+    if (ROOT / ".github/workflows/attest-and-approve.yml").exists():
+        fail("an owner-controlled approval workflow must not be active")
     for relative in (
         ".github/workflows/gates.yml",
-        ".github/workflows/attest-and-approve.yml",
         ".github/workflows/forge9-staging.yml",
     ):
         for number, line in enumerate(
