@@ -97,7 +97,7 @@ class RepositoryCoverageTests(unittest.TestCase):
             http,
             "request_json",
             return_value=(200, []),
-        ):
+        ), patch.object(http, "validate_canonical_inventory"):
             with self.assertRaisesRegex(http.DigestError, "below reviewed floor"):
                 http.list_repositories("present-token")
 
@@ -106,7 +106,7 @@ class RepositoryCoverageTests(unittest.TestCase):
             http,
             "request_json",
             return_value=(200, list(repositories(56))),
-        ):
+        ), patch.object(http, "validate_canonical_inventory"):
             with self.assertRaisesRegex(http.DigestError, "observed=56 floor=57"):
                 http.list_repositories("present-token")
 
@@ -115,10 +115,77 @@ class RepositoryCoverageTests(unittest.TestCase):
             http,
             "request_json",
             return_value=(200, list(repositories(57, archived=5))),
-        ):
+        ), patch.object(http, "validate_canonical_inventory") as canonical:
             observed = http.list_repositories("present-token")
         self.assertEqual(len(observed), 57)
         self.assertEqual(sum(bool(item["archived"]) for item in observed), 5)
+        canonical.assert_called_once()
+
+
+class CanonicalInventoryTests(unittest.TestCase):
+    def test_exact_code_security_inventory_match_passes(self):
+        estate = repositories(2)
+        payloads = [
+            (
+                200,
+                [
+                    {
+                        "id": http.CANONICAL_CONFIG_ID,
+                        "name": "SZL Holdings Managed Security",
+                        "target_type": "organization",
+                        "enforcement": "enforced",
+                    }
+                ],
+            ),
+            (
+                200,
+                [
+                    {
+                        "repository": {"full_name": "szl-holdings/repo-000"},
+                        "status": "enforced",
+                    },
+                    {
+                        "repository": {"full_name": "szl-holdings/repo-001"},
+                        "status": "enforced",
+                    },
+                ],
+            ),
+        ]
+        with patch.object(http, "request_json", side_effect=payloads):
+            result = http.validate_canonical_inventory("token", estate)
+        self.assertTrue(result["inventory_match"])
+        self.assertEqual(result["repository_count"], 2)
+
+    def test_repository_missing_from_canonical_inventory_fails(self):
+        estate = repositories(2)
+        payloads = [
+            (
+                200,
+                [
+                    {
+                        "id": http.CANONICAL_CONFIG_ID,
+                        "name": "SZL Holdings Managed Security",
+                        "target_type": "organization",
+                        "enforcement": "enforced",
+                    }
+                ],
+            ),
+            (
+                200,
+                [
+                    {
+                        "repository": {"full_name": "szl-holdings/repo-000"},
+                        "status": "enforced",
+                    }
+                ],
+            ),
+        ]
+        with patch.object(http, "request_json", side_effect=payloads):
+            with self.assertRaisesRegex(
+                http.DigestError,
+                "does not match canonical code-security inventory",
+            ):
+                http.validate_canonical_inventory("token", estate)
 
 
 class IssueAndReportTests(unittest.TestCase):
@@ -267,6 +334,7 @@ class WorkflowContractTests(unittest.TestCase):
             "actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1",
             "permission-actions: read",
             "permission-contents: read",
+            "permission-organization-administration: read",
             "DIGEST_APP_TOKEN: ${{ steps.app-token.outputs.token }}",
             "SZL_GITHUB_TOKEN: ${{ secrets.SZL_GITHUB_TOKEN }}",
             "CI_DIGEST_ISSUE_TOKEN: ${{ github.token }}",
