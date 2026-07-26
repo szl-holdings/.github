@@ -172,6 +172,7 @@ def verify_manifest() -> None:
         "commit_statuses": "write",
         "contents": "read",
         "metadata": "read",
+        "organization_administration": "read",
         "pull_requests": "write",
     }
     if permissions != expected:
