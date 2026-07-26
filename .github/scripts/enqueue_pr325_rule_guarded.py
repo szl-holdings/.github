@@ -2,6 +2,7 @@
 """Assert the active PR rule parameters before exact PR #325 enqueue."""
 from __future__ import annotations
 
+import os
 import sys
 from pathlib import Path
 from typing import Any
@@ -38,15 +39,37 @@ def validate_pull_request_rule(rules: Any) -> dict[str, Any]:
     return matching[-1]
 
 
+def select_rule_read_credential() -> tuple[str, str]:
+    for name in controller.CANDIDATE_ENV_NAMES:
+        token = os.environ.get(name) or ""
+        if not token:
+            continue
+        capability = controller.capability_probe(token)
+        if (
+            capability.get("user_api_authenticated") is True
+            and capability.get("repository_api_authenticated") is True
+            and capability.get("graphql_authenticated") is True
+            and capability.get("viewer_permission")
+            in controller.ALLOWED_VIEWER_PERMISSIONS
+        ):
+            return name, token
+    raise controller.AdmissionError(
+        "no governed credential can read the active PR admission rule"
+    )
+
+
 def main() -> int:
-    rules = preflight._rest(controller.REPOSITORY, "rules/branches/main")
-    parameters = validate_pull_request_rule(rules)
-    # The underlying controller independently verifies zero unresolved threads,
-    # exact required checks, signature, linear history, immutable head/base, and
-    # the enqueuePullRequest(expectedHeadOid, jump=false) mutation envelope.
+    secret_name, token = select_rule_read_credential()
+    with controller.credential(token):
+        rules = preflight._rest(controller.REPOSITORY, "rules/branches/main")
+        parameters = validate_pull_request_rule(rules)
+    # The underlying controller independently reselects and probes a governed
+    # credential, then verifies zero unresolved threads, exact required checks,
+    # signature, linear history, immutable head/base, and the
+    # enqueuePullRequest(expectedHeadOid, jump=false) mutation envelope.
     print(
-        "Active pull_request admission rule verified: "
-        f"required_review_thread_resolution="
+        "Active pull_request admission rule verified with governed credential "
+        f"{secret_name}: required_review_thread_resolution="
         f"{parameters.get('required_review_thread_resolution')}"
     )
     return controller.main()
