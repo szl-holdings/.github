@@ -9,8 +9,8 @@ that do not yet exist would lock a repository without producing evidence.
 - Every active ruleset has an empty `bypass_actors` array.
 - The estate does not claim independent human review while it has one human
   member. GitHub's human approval count is zero by design.
-- Eight fail-closed checks, App-pinned staging, signed commits, an App-owned
-  required attestation status, and merge queue execution replace the impossible
+- Eight fail-closed checks, App-pinned staging, signed commits, App-owned
+  attestation evidence, and merge queue execution replace the impossible
   second-human requirement.
 - The ordinary `GITHUB_TOKEN` cannot approve pull request reviews.
 - The attestor uses a GitHub App installation token minted from a private key.
@@ -30,7 +30,21 @@ people with write permission. The App therefore publishes
 checks. On pull-request heads, the App also records and verifies an exact-head
 review before publishing the status. On merge-group heads, it independently
 attests the synthesized queue commit so the queue cannot reuse stale PR-head
-evidence. Both rulesets require that status and pin it to App ID `4395545`.
+evidence. The non-queued release ruleset requires that status and pins it to
+App ID `4395545`.
+
+The default-branch queue records the same App-owned status as evidence but does
+not make it a required check. Live pilot testing proved that a required status
+published by a `workflow_run` attestor creates a circular dependency: the queue
+waits for the status before dispatching the `merge_group` workflows whose
+completion triggers that attestor. Making the status non-required removes that
+deterministic cycle, but it does not by itself prove delivery: later pilot
+entries still received no `merge_group` Actions runs despite using the exact
+historical ruleset version that had dispatched them successfully. The observed
+provider blocker is recorded in
+`pilots/2026-07-26-merge-group-delivery-blocker.md`. A separately hosted,
+webhook-driven App service would be required to make the App status itself a
+queue-blocking control without the workflow cycle.
 
 GitHub rejected queue entry while a separate `required_deployments` rule was
 active even though the exact-head `staging` deployment was successful. The
@@ -64,7 +78,8 @@ separate, identity-bound release control.
 1. Merge this bootstrap using the documented one-time solo bootstrap record.
 2. Create `staging` and keep the manual reviewer on `production`.
 3. Apply `ruleset-main.json` to the default branch. GitHub does not allow a
-   merge-queue ruleset to contain wildcard refs.
+   merge-queue ruleset to contain wildcard refs. Its required checks are the
+   eight gates and App-pinned staging; the App status remains signed evidence.
 4. Apply `ruleset-release.json` separately to `release/*`; it retains the gates,
    signatures, App-pinned staging, and App attestation status without a queue.
 5. Verify the active gate, staging, attestor, BAP, and queue on a pilot PR.
