@@ -210,7 +210,10 @@ def repository_reds(
 ) -> tuple[str, tuple[RedRun, ...], int]:
     name = str(repository["name"])
     default_branch = str(repository["default_branch"])
-    workflows = list_workflows(token, name)
+    workflows = tuple(
+        item for item in list_workflows(token, name)
+        if item.get("state") == "active"
+    )
 
     def inspect(workflow: Mapping[str, Any]) -> RedRun | None:
         run = latest_run(token, name, default_branch, workflow)
