@@ -12,6 +12,7 @@ from dataclasses import dataclass
 from typing import Any, Mapping, Sequence
 
 ORG = "szl-holdings"
+CANONICAL_CONFIG_ID = 252588
 TRANSIENT_HTTP = {429, 500, 502, 503, 504}
 
 
@@ -153,45 +154,143 @@ def repository_floor() -> int:
     return floor
 
 
-def list_repositories(token: str) -> tuple[dict[str, Any], ...]:
-    repositories: list[dict[str, Any]] = []
-    seen: set[str] = set()
+def _paginated_list(
+    token: str,
+    base_url: str,
+    *,
+    operation: str,
+) -> tuple[dict[str, Any], ...]:
+    values: list[dict[str, Any]] = []
     page = 1
+    separator = "&" if "?" in base_url else "?"
     while True:
         _, payload = request_json(
             token,
-            (
-                f"https://api.github.com/orgs/{ORG}/repos"
-                f"?per_page=100&type=all&page={page}"
-            ),
-            operation=f"list organization repositories page {page}",
+            f"{base_url}{separator}per_page=100&page={page}",
+            operation=f"{operation} page {page}",
         )
         if not isinstance(payload, list):
             raise DigestError(
-                f"organization repository page {page} returned "
+                f"{operation} page {page} returned "
                 f"{type(payload).__name__}, not a list"
             )
         for item in payload:
             if not isinstance(item, dict):
                 raise DigestError(
-                    f"organization repository page {page} contains a malformed entry"
+                    f"{operation} page {page} contains a malformed entry"
                 )
-            name = str(item.get("name") or "").strip()
-            if not name:
-                raise DigestError("organization repository entry has no name")
-            if name in seen:
-                raise DigestError(
-                    f"duplicate repository returned by GitHub: {name}"
-                )
-            seen.add(name)
-            repositories.append(item)
+            values.append(item)
         if len(payload) < 100:
-            break
+            return tuple(values)
         page += 1
         if page > 100:
+            raise DigestError(f"{operation} exceeded 100 pages")
+
+
+def validate_canonical_inventory(
+    token: str,
+    repositories: Sequence[Mapping[str, Any]],
+) -> dict[str, Any]:
+    _, configurations = request_json(
+        token,
+        f"https://api.github.com/orgs/{ORG}/code-security/configurations",
+        operation="read organization code-security configurations",
+    )
+    if not isinstance(configurations, list):
+        raise DigestError("code-security configuration inventory is malformed")
+    canonical = next(
+        (
+            item
+            for item in configurations
+            if isinstance(item, dict)
+            and item.get("id") == CANONICAL_CONFIG_ID
+        ),
+        None,
+    )
+    if canonical is None:
+        raise DigestError(
+            f"canonical code-security configuration {CANONICAL_CONFIG_ID} is missing"
+        )
+    if canonical.get("target_type") != "organization":
+        raise DigestError(
+            "canonical code-security configuration is not organization-scoped"
+        )
+    if canonical.get("enforcement") != "enforced":
+        raise DigestError(
+            "canonical code-security configuration is not enforced"
+        )
+
+    attachments = _paginated_list(
+        token,
+        (
+            f"https://api.github.com/orgs/{ORG}/code-security/"
+            f"configurations/{CANONICAL_CONFIG_ID}/repositories"
+        ),
+        operation="read canonical code-security repository inventory",
+    )
+    attached_status: dict[str, str | None] = {}
+    for item in attachments:
+        repository = item.get("repository") or {}
+        full_name = str(repository.get("full_name") or "").strip()
+        if not full_name:
             raise DigestError(
-                "organization repository pagination exceeded 100 pages"
+                "canonical code-security repository entry has no full name"
             )
+        if full_name in attached_status:
+            raise DigestError(
+                f"canonical repository inventory contains duplicate {full_name}"
+            )
+        attached_status[full_name] = (
+            str(item.get("status")) if item.get("status") is not None else None
+        )
+
+    observed_names = {
+        str(item.get("full_name") or f"{ORG}/{item.get('name')}")
+        for item in repositories
+    }
+    attached_names = set(attached_status)
+    if observed_names != attached_names:
+        missing_from_org_listing = sorted(attached_names - observed_names)
+        missing_from_canonical = sorted(observed_names - attached_names)
+        raise DigestError(
+            "organization repository inventory does not match canonical "
+            "code-security inventory: "
+            f"missing_from_org_listing={missing_from_org_listing}; "
+            f"missing_from_canonical={missing_from_canonical}"
+        )
+    return {
+        "configuration_id": CANONICAL_CONFIG_ID,
+        "configuration_name": canonical.get("name"),
+        "repository_count": len(attached_names),
+        "inventory_match": True,
+        "status_counts": {
+            status or "missing": sum(
+                1 for value in attached_status.values() if value == status
+            )
+            for status in set(attached_status.values())
+        },
+    }
+
+
+def list_repositories(token: str) -> tuple[dict[str, Any], ...]:
+    repositories = list(
+        _paginated_list(
+            token,
+            f"https://api.github.com/orgs/{ORG}/repos?type=all",
+            operation="list organization repositories",
+        )
+    )
+    seen: set[str] = set()
+    for item in repositories:
+        name = str(item.get("name") or "").strip()
+        full_name = str(item.get("full_name") or f"{ORG}/{name}").strip()
+        if not name or not full_name:
+            raise DigestError("organization repository entry has no identity")
+        if full_name in seen:
+            raise DigestError(
+                f"duplicate repository returned by GitHub: {full_name}"
+            )
+        seen.add(full_name)
 
     floor = repository_floor()
     if len(repositories) < floor:
@@ -207,6 +306,7 @@ def list_repositories(token: str) -> tuple[dict[str, Any], ...]:
             raise DigestError(
                 f"active repository {item.get('name')!r} lacks a default branch"
             )
+    validate_canonical_inventory(token, repositories)
     return tuple(repositories)
 
 
@@ -282,6 +382,7 @@ def select_reader() -> ReaderSelection:
                 "present": True,
                 "result": "selected",
                 "repository_count": len(repositories),
+                "canonical_inventory_match": True,
                 "value_recorded": False,
             }
         )
