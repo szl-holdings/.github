@@ -4,12 +4,15 @@ name: Code Security Config Drift
 # "SZL Holdings Managed Security" (id 252588) remains enforced on every
 # non-archived repository and remains the default for new repositories.
 #
-# Authentication is fail-closed and non-personal. The workflow mints a short-lived
-# qillqaq GitHub App installation token with organization Administration:read.
-# No PAT is read, no missing-credential state is converted into a neutral skip,
-# and no generated report is pushed directly to protected main. Every invocation
-# uploads an immutable report artifact, including a bounded failure report when
-# token minting, source verification, or the API check cannot complete.
+# Authentication is fail-closed and migration-safe:
+#   1. Prefer a short-lived qillqaq GitHub App installation token with
+#      organization Administration:read.
+#   2. Until GitHub activates that newly requested installation permission,
+#      use the existing governed SZL_GITHUB_TOKEN only for this exact read-only
+#      organization endpoint.
+#
+# Neither credential value is printed, hashed, persisted, or copied into the
+# evidence artifact. Missing/invalid credentials and API failures are terminal.
 
 on:
   schedule:
@@ -65,8 +68,9 @@ jobs:
           python .github/scripts/test_code_security_drift.py
           git diff --check
 
-      - name: Mint least-privilege qillqaq organization token
+      - name: Mint preferred qillqaq organization token
         id: app-token
+        continue-on-error: true
         uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
         with:
           client-id: ${{ vars.QILLQAQ_CLIENT_ID }}
@@ -77,14 +81,37 @@ jobs:
       - name: Check managed-security-config coverage across the organization
         id: drift
         env:
-          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          APP_TOKEN: ${{ steps.app-token.outputs.token }}
+          APP_TOKEN_OUTCOME: ${{ steps.app-token.outcome }}
+          SZL_GITHUB_TOKEN: ${{ secrets.SZL_GITHUB_TOKEN }}
         shell: bash
         run: |
           set +e
           mkdir -p "$(dirname "$REPORT_PATH")"
-          python .github/scripts/code_security_drift.py \
-            --report "$REPORT_PATH" 2>&1 | tee /tmp/drift-output.txt
-          code=${PIPESTATUS[0]}
+          : > /tmp/drift-output.txt
+
+          auth_mode="unavailable"
+          selected_token=""
+          if [ "${APP_TOKEN_OUTCOME:-failure}" = "success" ] && [ -n "${APP_TOKEN:-}" ]; then
+            auth_mode="github_app"
+            selected_token="$APP_TOKEN"
+          elif [ -n "${SZL_GITHUB_TOKEN:-}" ]; then
+            auth_mode="governed_pat_fallback"
+            selected_token="$SZL_GITHUB_TOKEN"
+          fi
+          echo "auth_mode=${auth_mode}" >> "$GITHUB_OUTPUT"
+
+          if [ "$auth_mode" = "unavailable" ]; then
+            echo "No governed organization-read credential is available." | tee /tmp/drift-output.txt
+            code=3
+          else
+            SZL_GITHUB_TOKEN="$selected_token" \
+              python .github/scripts/code_security_drift.py \
+                --report "$REPORT_PATH" 2>&1 | tee /tmp/drift-output.txt
+            code=${PIPESTATUS[0]}
+          fi
+
+          unset selected_token APP_TOKEN SZL_GITHUB_TOKEN
           echo "exit_code=${code}" >> "$GITHUB_OUTPUT"
           exit 0
 
@@ -92,6 +119,7 @@ jobs:
         if: always()
         env:
           APP_TOKEN_OUTCOME: ${{ steps.app-token.outcome }}
+          AUTH_MODE: ${{ steps.drift.outputs.auth_mode }}
           DRIFT_EXIT: ${{ steps.drift.outputs.exit_code }}
         shell: python
         run: |
@@ -102,6 +130,13 @@ jobs:
 
           path = Path(os.environ["REPORT_PATH"])
           now = datetime.now(timezone.utc).isoformat()
+          exit_text = str(os.environ.get("DRIFT_EXIT") or "3")
+          exit_code = int(exit_text) if exit_text.isdigit() else 2
+          auth_mode = os.environ.get("AUTH_MODE") or "unavailable"
+          credential_name = {
+              "github_app": "qillqaq_app_installation",
+              "governed_pat_fallback": "SZL_GITHUB_TOKEN",
+          }.get(auth_mode)
           run_url = None
           if all(
               os.environ.get(key)
@@ -118,6 +153,20 @@ jobs:
               "run_id": os.environ.get("GITHUB_RUN_ID"),
               "run_url": run_url,
           }
+          authentication = {
+              "mode": auth_mode,
+              "credential_name": credential_name,
+              "app_token_outcome": (
+                  os.environ.get("APP_TOKEN_OUTCOME") or "not_completed"
+              ),
+              "authorized_endpoint_completed": exit_code in {0, 1},
+              "value_recorded": False,
+          }
+          if auth_mode == "governed_pat_fallback":
+              authentication["migration_state"] = (
+                  "qillqaq_organization_permission_activation_pending"
+              )
+
           if path.is_file() and path.stat().st_size:
               report = json.loads(path.read_text(encoding="utf-8"))
               errors = report.get("errors") or []
@@ -128,14 +177,10 @@ jobs:
                   report.get("org") or os.environ.get("GITHUB_REPOSITORY_OWNER"),
               )
               report.setdefault("generation", os.environ.get("GITHUB_SHA"))
-              report.setdefault(
-                  "status",
-                  "DRIFT_DETECTED" if errors else "VERIFIED",
-              )
+              report["status"] = "DRIFT_DETECTED" if errors else "VERIFIED"
+              report["authentication"] = authentication
               report["workflow"] = workflow
           else:
-              exit_text = str(os.environ.get("DRIFT_EXIT") or "2")
-              exit_code = int(exit_text) if exit_text.isdigit() else 2
               report = {
                   "schema": "szl.code-security-drift/v2",
                   "generated_at": now,
@@ -143,12 +188,10 @@ jobs:
                   "generation": os.environ.get("GITHUB_SHA"),
                   "canonical_configuration_id": 252588,
                   "status": "NOT_VERIFIED",
-                  "app_token_outcome": (
-                      os.environ.get("APP_TOKEN_OUTCOME") or "not_completed"
-                  ),
+                  "authentication": authentication,
                   "exit_code": exit_code,
                   "workflow": workflow,
-                  "detail": "The authenticated organization drift check did not produce its ordinary report. See the bound workflow logs; no credential value is recorded.",
+                  "detail": "The organization drift check did not produce its ordinary report. See the bound workflow logs; no credential value is recorded.",
               }
           path.parent.mkdir(parents=True, exist_ok=True)
           path.write_text(
@@ -182,7 +225,10 @@ jobs:
                   report = json.loads(path.read_text(encoding="utf-8"))
                   errors = report.get("errors") or []
                   warnings = report.get("warnings") or []
+                  authentication = report.get("authentication") or {}
                   out.write(f"- status: `{report.get('status')}`\n")
+                  out.write(f"- authentication mode: `{authentication.get('mode')}`\n")
+                  out.write("- credential value recorded: `false`\n")
                   out.write("- canonical configuration: `252588`\n")
                   out.write(f"- errors: `{len(errors)}`\n")
                   out.write(f"- warnings: `{len(warnings)}`\n")
@@ -192,7 +238,7 @@ jobs:
                       out.write(f"- enforced under canonical: `{totals.get('enforced_under_canonical')}`\n")
 
       - name: Alert the team on drift or check failure
-        if: always() && github.event_name == 'schedule' && (steps.app-token.outcome != 'success' || steps.drift.outputs.exit_code != '0')
+        if: always() && github.event_name == 'schedule' && steps.drift.outputs.exit_code != '0'
         continue-on-error: true
         env:
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
@@ -218,23 +264,30 @@ jobs:
       - name: Enforce the authenticated organization result
         if: always()
         env:
-          APP_TOKEN_OUTCOME: ${{ steps.app-token.outcome }}
+          AUTH_MODE: ${{ steps.drift.outputs.auth_mode }}
           CHECK_EXIT: ${{ steps.drift.outputs.exit_code }}
         run: |
-          if [ "${APP_TOKEN_OUTCOME:-not_completed}" != "success" ]; then
-            echo "::error::The qillqaq organization token was not minted successfully. The drift state is NOT_VERIFIED."
-            exit 1
-          fi
-          case "${CHECK_EXIT:-2}" in
+          case "${CHECK_EXIT:-3}" in
             0)
               echo "Managed security config 252588 is enforced on every non-archived repo and is the default for new repos."
+              if [ "${AUTH_MODE:-unavailable}" = "governed_pat_fallback" ]; then
+                echo "::warning::Verified with governed SZL_GITHUB_TOKEN while qillqaq organization-permission activation remains pending."
+              fi
               ;;
             1)
               echo "::error::Managed-security-config drift detected. See the immutable report artifact."
               exit 1
               ;;
+            2)
+              echo "::error::The credential was present but the organization drift check could not complete."
+              exit 1
+              ;;
+            3)
+              echo "::error::SZL_GITHUB_TOKEN is missing or unavailable and the preferred App token was not minted."
+              exit 1
+              ;;
             *)
-              echo "::error::The authenticated organization drift check could not complete. This is fail-closed, not a neutral skip."
+              echo "::error::The organization drift check returned an unknown fail-closed result."
               exit 1
               ;;
           esac
