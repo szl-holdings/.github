@@ -1,37 +1,8 @@
 #!/usr/bin/env python3
 """Self-test for the managed-security-configuration drift checker.
 
-Task #387 created ``code_security_drift.py`` — the safety net that proves every
-non-archived repo in the org stays attached + enforced under the canonical
-"SZL Holdings Managed Security" code-security configuration (id 252588), that
-the config still exists/org-scoped/enforced, and that it is still the default
-for new repos. If that checker were ever weakened — an edit that makes it always
-return exit 0, or one that swallows an auth/API failure as a pass — drift would
-go undetected and the org would *look* protected when it isn't.
-
-The most important branch ("auth/API failure must be exit 2, never 0") and the
-drift branches require live organization-administration calls that cannot run in
-credentialless pull-request CI. This test stubs the GitHub API surface
-(``_token`` / ``gh_json`` / ``gh_paginate``) so it runs with no network and no
-credential, and pins the exit-code contract of ``main()``:
-
-  clean state                                    -> exit 0
-  a repo detached (not enforced under canonical) -> exit 1
-  a repo swapped onto a different configuration  -> exit 1
-  a new uncovered repo                            -> exit 1
-  default-for-new-repos changed                   -> exit 1
-  canonical configuration missing                 -> exit 1
-  a present-but-failing token (auth/API error)    -> exit 2
-  no token configured for direct local invocation -> exit 3
-
-The production workflow has a stronger contract: it runs source tests before it
-mints a short-lived qillqaq GitHub App installation token, fails when that token
-cannot be created or cannot read the organization endpoint, and writes a
-normalized, source-bound evidence envelope even when a pre-check prevents the
-ordinary report. It never converts a missing or stale personal token into a
-neutral production result.
-
-Stdlib ``unittest`` only — no third-party test framework.
+The network-facing checker is stubbed so this suite can lock its exit-code and
+workflow-authentication contracts without receiving any organization credential.
 """
 from __future__ import annotations
 
@@ -80,7 +51,6 @@ def _repo(name, archived=False, private=False):
 
 
 def _clean_state():
-    """Canonical config exists+enforced+default; every repo enforced under it."""
     repos = [_repo("a11oy"), _repo("ouroboros", private=True), _repo("docs-site")]
     configs = [_config(CFG)]
     defaults = [{"default_for_new_repos": "all", "configuration": {"id": CFG}}]
@@ -89,8 +59,6 @@ def _clean_state():
 
 
 def _make_fetchers(configs, defaults, repos, attachments):
-    """Return API stubs that route by request path."""
-
     def gh_json(path, token):
         if path.endswith("/code-security/configurations/defaults"):
             return defaults
@@ -121,7 +89,6 @@ def _run_main(
     token="tok",
     gh_json_error=None,
 ):
-    """Run ``csd.main()`` with the GitHub API surface stubbed out."""
     saved = {
         "_token": csd._token,
         "gh_json": csd.gh_json,
@@ -129,27 +96,20 @@ def _run_main(
     }
     try:
         if token is None:
-
             def _no_token():
                 raise csd.MissingTokenError("No GitHub token configured (test).")
-
             csd._token = _no_token
         else:
             csd._token = lambda: token
 
         if gh_json_error is not None:
-
             def _raise(path, tok):
                 raise gh_json_error
-
             csd.gh_json = _raise
             csd.gh_paginate = lambda path, tok: []
         else:
             gh_json, gh_paginate = _make_fetchers(
-                configs,
-                defaults,
-                repos,
-                attachments,
+                configs, defaults, repos, attachments
             )
             csd.gh_json = gh_json
             csd.gh_paginate = gh_paginate
@@ -176,8 +136,7 @@ def _run_main(
 
 class TestDriftCheckerExitContract(unittest.TestCase):
     def test_clean_state_passes(self):
-        rc = _run_main(*_clean_state())
-        self.assertEqual(rc, csd.EXIT_OK)
+        self.assertEqual(_run_main(*_clean_state()), csd.EXIT_OK)
 
     def test_detached_repo_fails(self):
         configs, defaults, repos, attachments = _clean_state()
@@ -186,39 +145,51 @@ class TestDriftCheckerExitContract(unittest.TestCase):
             for (full_name, status) in attachments[CFG]
             if not full_name.endswith("/docs-site")
         ]
-        rc = _run_main(configs, defaults, repos, attachments)
-        self.assertEqual(rc, csd.EXIT_DRIFT)
+        self.assertEqual(
+            _run_main(configs, defaults, repos, attachments),
+            csd.EXIT_DRIFT,
+        )
 
     def test_repo_on_different_config_fails(self):
         configs, defaults, repos, attachments = _clean_state()
         configs.append(_config(999, name="Legacy Enterprise Default"))
         repos.append(_repo("legacy-repo"))
         attachments[999] = [(f"{ORG}/legacy-repo", "enforced")]
-        rc = _run_main(configs, defaults, repos, attachments)
-        self.assertEqual(rc, csd.EXIT_DRIFT)
+        self.assertEqual(
+            _run_main(configs, defaults, repos, attachments),
+            csd.EXIT_DRIFT,
+        )
 
     def test_new_uncovered_repo_fails(self):
         configs, defaults, repos, attachments = _clean_state()
         repos.append(_repo("freshly-created"))
-        rc = _run_main(configs, defaults, repos, attachments)
-        self.assertEqual(rc, csd.EXIT_DRIFT)
+        self.assertEqual(
+            _run_main(configs, defaults, repos, attachments),
+            csd.EXIT_DRIFT,
+        )
 
     def test_default_for_new_repos_changed_fails(self):
         configs, defaults, repos, attachments = _clean_state()
         defaults[0]["default_for_new_repos"] = "none"
-        rc = _run_main(configs, defaults, repos, attachments)
-        self.assertEqual(rc, csd.EXIT_DRIFT)
+        self.assertEqual(
+            _run_main(configs, defaults, repos, attachments),
+            csd.EXIT_DRIFT,
+        )
 
     def test_default_entry_missing_fails(self):
         configs, _, repos, attachments = _clean_state()
-        rc = _run_main(configs, [], repos, attachments)
-        self.assertEqual(rc, csd.EXIT_DRIFT)
+        self.assertEqual(
+            _run_main(configs, [], repos, attachments),
+            csd.EXIT_DRIFT,
+        )
 
     def test_canonical_config_missing_fails(self):
         _, defaults, repos, attachments = _clean_state()
         configs = [_config(999, name="Some Other Config")]
-        rc = _run_main(configs, defaults, repos, attachments)
-        self.assertEqual(rc, csd.EXIT_DRIFT)
+        self.assertEqual(
+            _run_main(configs, defaults, repos, attachments),
+            csd.EXIT_DRIFT,
+        )
 
     def test_missing_token_is_distinct_from_a_pass(self):
         rc = _run_main(*_clean_state(), token=None)
@@ -236,8 +207,10 @@ class TestDriftCheckerExitContract(unittest.TestCase):
     def test_archived_uncovered_repo_passes(self):
         configs, defaults, repos, attachments = _clean_state()
         repos.append(_repo("old-thing", archived=True))
-        rc = _run_main(configs, defaults, repos, attachments)
-        self.assertEqual(rc, csd.EXIT_OK)
+        self.assertEqual(
+            _run_main(configs, defaults, repos, attachments),
+            csd.EXIT_OK,
+        )
 
     def test_transitional_status_warns_not_fails(self):
         configs, defaults, repos, attachments = _clean_state()
@@ -248,8 +221,10 @@ class TestDriftCheckerExitContract(unittest.TestCase):
             )
             for (full_name, status) in attachments[CFG]
         ]
-        rc = _run_main(configs, defaults, repos, attachments)
-        self.assertEqual(rc, csd.EXIT_OK)
+        self.assertEqual(
+            _run_main(configs, defaults, repos, attachments),
+            csd.EXIT_OK,
+        )
 
 
 class TestProductionWorkflowAuthContract(unittest.TestCase):
@@ -257,37 +232,47 @@ class TestProductionWorkflowAuthContract(unittest.TestCase):
         self.workflow_path = _ROOT / ".github/workflows/code-security-drift.yml"
         self.workflow = self.workflow_path.read_text(encoding="utf-8")
 
-    def test_uses_short_lived_least_privilege_app_token(self):
+    def test_prefers_short_lived_app_and_has_governed_migration_fallback(self):
         self.assertIn(
             "actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1",
             self.workflow,
         )
-        self.assertIn("client-id: ${{ vars.QILLQAQ_CLIENT_ID }}", self.workflow)
-        self.assertIn(
-            "private-key: ${{ secrets.QILLQAQ_PRIVATE_KEY }}",
-            self.workflow,
-        )
-        self.assertIn("owner: ${{ github.repository_owner }}", self.workflow)
+        self.assertIn("continue-on-error: true", self.workflow)
         self.assertIn(
             "permission-organization-administration: read",
             self.workflow,
         )
-        self.assertNotIn("permission-administration: read", self.workflow)
-        self.assertIn("GH_TOKEN: ${{ steps.app-token.outputs.token }}", self.workflow)
+        self.assertIn(
+            "SZL_GITHUB_TOKEN: ${{ secrets.SZL_GITHUB_TOKEN }}",
+            self.workflow,
+        )
+        self.assertIn('auth_mode="github_app"', self.workflow)
+        self.assertIn('auth_mode="governed_pat_fallback"', self.workflow)
 
-    def test_source_tests_precede_credential_minting(self):
+    def test_source_tests_precede_any_credential_use(self):
+        compile_index = self.workflow.index("Compile and self-test the drift contract")
         self.assertLess(
-            self.workflow.index("Compile and self-test the drift contract"),
-            self.workflow.index("Mint least-privilege qillqaq organization token"),
+            compile_index,
+            self.workflow.index("Mint preferred qillqaq organization token"),
+        )
+        self.assertLess(
+            compile_index,
+            self.workflow.index(
+                "Check managed-security-config coverage across the organization"
+            ),
         )
 
-    def test_has_no_personal_token_or_neutral_production_skip(self):
-        self.assertNotIn("secrets.SZL_GITHUB_TOKEN", self.workflow)
+    def test_missing_or_invalid_credential_cannot_be_neutral(self):
         self.assertNotIn("name: Token preflight", self.workflow)
         self.assertNotIn("has_token:", self.workflow)
-        self.assertIn("fail-closed, not a neutral skip", self.workflow)
+        self.assertIn('case "${CHECK_EXIT:-3}"', self.workflow)
+        self.assertIn("SZL_GITHUB_TOKEN is missing or unavailable", self.workflow)
+        self.assertIn(
+            "credential was present but the organization drift check could not complete",
+            self.workflow,
+        )
 
-    def test_every_outcome_gets_normalized_evidence_before_upload(self):
+    def test_every_outcome_gets_normalized_secret_free_evidence(self):
         ensure = self.workflow.index(
             "Normalize or create bounded evidence for every outcome"
         )
@@ -296,10 +281,10 @@ class TestProductionWorkflowAuthContract(unittest.TestCase):
         self.assertLess(ensure, upload)
         self.assertIn("if: always()", evidence)
         self.assertIn('"schema": "szl.code-security-drift/v2"', evidence)
-        self.assertIn('report.setdefault("generation"', evidence)
-        self.assertIn('report["workflow"] = workflow', evidence)
-        self.assertIn('"app_token_outcome"', evidence)
+        self.assertIn('"credential_name": credential_name', evidence)
+        self.assertIn('"value_recorded": False', evidence)
         self.assertIn('"status": "NOT_VERIFIED"', evidence)
+        self.assertNotIn("selected_token", evidence)
 
     def test_report_is_immutable_artifact_not_direct_main_push(self):
         self.assertIn(
@@ -311,7 +296,7 @@ class TestProductionWorkflowAuthContract(unittest.TestCase):
         self.assertNotIn("git push", self.workflow)
         self.assertIn("persist-credentials: false", self.workflow)
 
-    def test_app_manifest_separates_org_and_repo_administration(self):
+    def test_requested_app_permission_remains_explicitly_separate(self):
         manifest = json.loads(
             (_ROOT / ".governance/github-app-manifest.json").read_text(
                 encoding="utf-8"

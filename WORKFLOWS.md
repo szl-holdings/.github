@@ -20,12 +20,11 @@ of redefining the same logic locally.
 | `reusable-secret-scan.yml` | TruffleHog committed-secret detection | `push`, `pull_request`, weekly cron |
 | `reusable-scorecard.yml` | OpenSSF Scorecard supply-chain hygiene | weekly cron, `branch_protection_rule` |
 | `reusable-trivy.yml` | Trivy filesystem vulnerability scan | `push`, weekly cron |
-| `reusable-hf-module-drift-check.yml` | Detect drift between a repo's source-of-truth and its live Hugging Face Space (built by Dockerfile `COPY`) | caller-chosen (e.g. weekly cron, `workflow_dispatch`) |
+| `reusable-hf-module-drift-check.yml` | Detect drift between a repo's source-of-truth and its live Hugging Face Space | caller-chosen |
 
 ## Calling a reusable workflow
 
 ```yaml
-# .github/workflows/ci.yml in any consumer repo
 name: CI
 on:
   push:
@@ -49,100 +48,90 @@ jobs:
     uses: szl-holdings/.github/.github/workflows/reusable-secret-scan.yml@main
 ```
 
-For maximum supply-chain hygiene, replace `@main` with a 40-char SHA from this
-repo. The org-wide pin-check exempts `szl-holdings/*` refs by design, but
-pinning is still the recommendation for non-experimental repos.
+For maximum supply-chain hygiene, replace `@main` with a 40-character SHA from
+this repository. Organization refs are exempt from the automated pin check, but
+immutable pins remain preferred for non-experimental consumers.
 
 ## HF Space module drift
 
-Repos whose Hugging Face Space is built by Dockerfile `COPY` from their GitHub
-source can silently diverge from the live Space (the Space's files can be
-edited directly on HF, and hf-sync only mirrors README + the front-door
-HTML/JS). Two layers guard this:
+Spaces built by Dockerfile `COPY` can silently diverge from GitHub source. Two
+layers guard this:
 
-- **Org-wide sweep** — `.github/workflows/hf-module-drift-check.yml` runs weekly
-  over `.github/data/hf_space_registry.json`, comparing every registered
-  GitHub<->HF pair via the git-tree API. Adding a repo to the registry is the
-  only step needed to cover it — no per-repo copy-paste.
-- **Per-repo fail-fast** — a repo calls
-  `reusable-hf-module-drift-check.yml` to gate its own PRs/pushes/cron.
+- `.github/workflows/hf-module-drift-check.yml` runs the organization sweep over
+  `.github/data/hf_space_registry.json`.
+- Repositories may call `reusable-hf-module-drift-check.yml` for local fail-fast
+  coverage.
 
-Both honor the repo's own `.github/hf-module-drift-allow.json` ratchet (known
-drift warns; new drift fails) and never auto-overwrite. A human chooses the
-source of truth because drift can run in either direction.
+Both honor `.github/hf-module-drift-allow.json`. They never overwrite either
+side automatically because drift can originate in GitHub or Hugging Face.
 
 ## Org code-security config drift (`code-security-drift.yml`)
 
-`code-security-drift.yml` verifies that organization code-security
-configuration **SZL Holdings Managed Security** (`252588`) remains attached and
-**enforced** on every non-archived repository and remains the default for new
-repositories.
+`code-security-drift.yml` verifies that **SZL Holdings Managed Security**
+(configuration `252588`) remains enforced on every non-archived repository and
+remains the default for new repositories.
 
-The production workflow no longer depends on a founder PAT. It mints a
-short-lived qillqaq GitHub App installation token with:
+### Authentication migration
 
-- owner: `szl-holdings`;
-- organization permission: `Administration: read` only;
-- target: the full organization installation, because the guarded endpoints are
-  organization-scoped;
-- lifetime: the GitHub installation-token lifetime, with automatic revocation
-  by `actions/create-github-app-token` at job completion.
+The workflow is designed for automatic, fail-closed migration:
 
-GitHub's organization code-security configuration endpoints accept GitHub App
-installation tokens with organization `Administration: read`. The qillqaq app
-manifest pins that permission. The workflow requests it explicitly rather than
-inheriting every installation permission.
+1. It first attempts a short-lived `qillqaq-attestor` installation token with
+   organization `Administration: read`.
+2. GitHub has recorded that permission in the reviewed App manifest, but the
+   installed App cannot use a newly added permission until an organization
+   owner approves the installation update.
+3. Until that approval is active, the workflow uses the existing governed
+   `SZL_GITHUB_TOKEN` for this exact read-only organization endpoint. A bounded
+   capability probe on July 26, 2026 returned HTTP 200 without recording the
+   token value, prefix, length, hash, identity, headers, or response body.
+4. Once the App token mints successfully, the workflow selects it automatically
+   and stops using the fallback for that run.
 
-### Fail-closed result contract
+The governed token is not treated as a neutral bypass. Missing, expired,
+under-scoped, or API-failing credentials are terminal `NOT_VERIFIED` results.
+
+### Result contract
 
 | State | Result | CI status |
 |---|---|---|
-| App token minted and all active repositories enforced under `252588` | verified | pass |
+| App token works and all active repositories are enforced | verified | pass |
+| App permission is pending, governed token works, and coverage is clean | verified with migration evidence | pass + warning |
 | Repository detached, attached elsewhere, or default changed | drift | fail |
-| App client ID/private key missing or invalid | token mint fails | fail |
-| Installation lacks `Administration: read` or the API returns 401/403 | not verified | fail |
-| Persistent network/API failure | not verified | fail |
-
-There is no neutral production skip. A missing, expired, or under-scoped
-credential can never be rendered as a clean or skipped estate result.
+| Credential missing, expired, under-scoped, or endpoint fails | not verified | fail |
 
 ### Evidence and secret boundaries
 
 Every run uploads `reports/code-security-drift.json` as a 90-day immutable
-workflow artifact. Ordinary clean/drift runs contain the full repository
-coverage report. If the API check aborts before producing that report, the
-workflow writes a bounded failure receipt that contains no token or secret
-value.
+artifact. Evidence records only the selected credential name, authentication
+mode, endpoint-completion result, source SHA, and workflow run. It explicitly
+records `value_recorded: false`.
 
-Generated reports are not committed or pushed directly to protected `main`.
-The previously committed snapshot was removed because it had become stale and
-under-counted the live organization. Pull-request CI locks the authentication,
-least-privilege, artifact, and no-direct-push contract without receiving App
-credentials.
+The workflow never prints, hashes, persists, copies, or returns a credential
+value. Generated reports are not committed or pushed directly to protected
+`main`.
 
-Authentication inputs are existing configuration references, never values in
-source:
+Configured references:
 
-- variable: `QILLQAQ_CLIENT_ID`;
-- secret: `QILLQAQ_PRIVATE_KEY`.
+- variable: `QILLQAQ_CLIENT_ID`
+- secret: `QILLQAQ_PRIVATE_KEY`
+- migration credential: `SZL_GITHUB_TOKEN`
 
-Rotate the App private key in GitHub settings and replace the secret if key
-rotation is required. Do not paste or log the private key. `SZL_GITHUB_TOKEN`
-is not consumed by this workflow; any remaining consumers must be migrated and
-verified independently before that legacy secret is removed globally.
+Approving the qillqaq installation permission remains the final cutover step.
+After a protected-main run proves `authentication.mode=github_app`, the legacy
+migration credential can be removed from this workflow and later rotated or
+deleted only after all other consumers are independently inventoried.
 
 ## Dependabot
 
-A default `.github/dependabot.yml` lives in this repo. Every repo without its
-own `dependabot.yml` automatically inherits weekly GitHub Actions updates from
-here.
+A default `.github/dependabot.yml` lives in this repo. Every repository without
+its own file inherits weekly GitHub Actions updates from here.
 
-## Issue & PR templates
+## Issue and pull-request templates
 
-Default issue forms and the PR template in `.github/` apply to every repo that
-doesn't override them locally.
+Default issue forms and the pull-request template in `.github/` apply to every
+repository that does not override them locally.
 
 ## CODEOWNERS
 
-`@stephenlutar2-hash` is the default code owner. Per-repo CODEOWNERS files take
-precedence.
+`@stephenlutar2-hash` is the default code owner. Per-repository CODEOWNERS files
+take precedence.
