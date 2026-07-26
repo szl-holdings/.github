@@ -21,16 +21,10 @@ env:
   TARGETS_JSON: >-
     [
       {
-        "number": 322,
-        "expected_head_sha": "a71c4e3cc3d46779243515a038cccdf5220cb951",
-        "expected_base_sha": "a03122857a1bc77f348c3db01d0be00ca39e6d69",
-        "headline": "fix(hf): serialize publication readiness and estate evidence"
-      },
-      {
-        "number": 323,
-        "expected_head_sha": "1f28f614f364bebd07e1dbf6e0cf8dac86d23227",
-        "expected_base_sha": "a03122857a1bc77f348c3db01d0be00ca39e6d69",
-        "headline": "fix(security): replace stale drift PAT with qillqaq app auth"
+        "number": 325,
+        "expected_head_sha": "41dbeec4859c3c4a71b0ea5db33a037c297c5420",
+        "expected_base_sha": "527fd000c5189f7b1ca4e56b7993d1daa952308a",
+        "headline": "fix(security): keep drift verification live during app activation"
       }
     ]
 
@@ -141,4 +135,4 @@ jobs:
             echo "::error::Controlled signed-history recovery failed closed. No protection was weakened."
             exit "$code"
           fi
-          echo "Both declared PR branches now contain one tree-identical GitHub-signed commit."
+          echo "The declared PR branch now contains one tree-identical GitHub-signed commit."
