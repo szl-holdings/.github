@@ -1,0 +1,183 @@
+name: CI Health Digest State — Read-Only Diagnostics
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - .github/workflows/ci-health-digest-state-diagnostics-pr.yml
+
+permissions:
+  actions: read
+  contents: read
+  issues: read
+
+concurrency:
+  group: ci-health-digest-state-diag-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  inspect:
+    name: Latest digest runs, jobs, artifacts, and rolling issue
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      GH_TOKEN: ${{ github.token }}
+      REPORT_PATH: reports/ci-health-digest-state.json
+    steps:
+      - name: Query read-only Actions and issue state
+        id: query
+        shell: python
+        run: |
+          import json
+          import os
+          import re
+          import subprocess
+          from datetime import datetime, timezone
+          from pathlib import Path
+
+          repository = os.environ["GITHUB_REPOSITORY"]
+
+          def api(path):
+              proc = subprocess.run(
+                  ["gh", "api", path],
+                  check=False,
+                  capture_output=True,
+                  text=True,
+                  env=os.environ,
+              )
+              try:
+                  payload = json.loads(proc.stdout) if proc.stdout.strip() else None
+              except json.JSONDecodeError:
+                  payload = proc.stdout[:4000]
+              return {
+                  "ok": proc.returncode == 0,
+                  "returncode": proc.returncode,
+                  "payload": payload,
+                  "stderr": proc.stderr.strip()[:3000],
+              }
+
+          runs_result = api(
+              f"repos/{repository}/actions/workflows/ci-health-digest.yml/runs?per_page=20"
+          )
+          raw_runs = (
+              runs_result["payload"].get("workflow_runs", [])
+              if runs_result["ok"] and isinstance(runs_result["payload"], dict)
+              else []
+          )
+          runs = []
+          for item in raw_runs:
+              run_id = item.get("id")
+              jobs_result = api(f"repos/{repository}/actions/runs/{run_id}/jobs?per_page=100")
+              artifacts_result = api(
+                  f"repos/{repository}/actions/runs/{run_id}/artifacts?per_page=100"
+              )
+              jobs_payload = jobs_result.get("payload")
+              artifacts_payload = artifacts_result.get("payload")
+              runs.append(
+                  {
+                      "id": run_id,
+                      "event": item.get("event"),
+                      "status": item.get("status"),
+                      "conclusion": item.get("conclusion"),
+                      "head_branch": item.get("head_branch"),
+                      "head_sha": item.get("head_sha"),
+                      "run_number": item.get("run_number"),
+                      "run_attempt": item.get("run_attempt"),
+                      "created_at": item.get("created_at"),
+                      "updated_at": item.get("updated_at"),
+                      "html_url": item.get("html_url"),
+                      "jobs": [
+                          {
+                              "id": job.get("id"),
+                              "name": job.get("name"),
+                              "status": job.get("status"),
+                              "conclusion": job.get("conclusion"),
+                              "steps": [
+                                  {
+                                      "name": step.get("name"),
+                                      "status": step.get("status"),
+                                      "conclusion": step.get("conclusion"),
+                                      "number": step.get("number"),
+                                  }
+                                  for step in job.get("steps", [])
+                              ],
+                          }
+                          for job in (
+                              jobs_payload.get("jobs", [])
+                              if jobs_result["ok"] and isinstance(jobs_payload, dict)
+                              else []
+                          )
+                      ],
+                      "artifacts": [
+                          {
+                              "id": artifact.get("id"),
+                              "name": artifact.get("name"),
+                              "size_in_bytes": artifact.get("size_in_bytes"),
+                              "digest": artifact.get("digest"),
+                              "expired": artifact.get("expired"),
+                          }
+                          for artifact in (
+                              artifacts_payload.get("artifacts", [])
+                              if artifacts_result["ok"] and isinstance(artifacts_payload, dict)
+                              else []
+                          )
+                      ],
+                  }
+              )
+
+          issue_result = api(f"repos/{repository}/issues/158")
+          issue = issue_result.get("payload")
+          report = {
+              "schema": "szl.ci-health-digest-state-diagnostics/v1",
+              "generated_at": datetime.now(timezone.utc).isoformat(),
+              "repository": repository,
+              "workflow_query_ok": runs_result["ok"],
+              "workflow_query_error": runs_result.get("stderr"),
+              "runs": runs,
+              "issue": (
+                  {
+                      "number": issue.get("number"),
+                      "title": issue.get("title"),
+                      "state": issue.get("state"),
+                      "updated_at": issue.get("updated_at"),
+                      "body_preview": str(issue.get("body") or "")[:3000],
+                  }
+                  if issue_result["ok"] and isinstance(issue, dict)
+                  else {"error": issue_result.get("stderr")}
+              ),
+          }
+          path = Path(os.environ["REPORT_PATH"])
+          path.parent.mkdir(parents=True, exist_ok=True)
+          path.write_text(json.dumps(report, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+
+          latest = runs[0] if runs else None
+          if latest:
+              conclusion = re.sub(
+                  r"[^a-z0-9]+",
+                  "-",
+                  str(latest.get("conclusion") or latest.get("status") or "unknown").lower(),
+              ).strip("-")
+              failed_steps = sum(
+                  1
+                  for job in latest["jobs"]
+                  for step in job["steps"]
+                  if step.get("conclusion") == "failure"
+              )
+              slug = (
+                  f"ci-digest-r{latest['id']}-{conclusion}"
+                  f"-j{len(latest['jobs'])}-f{failed_steps}-a{len(latest['artifacts'])}"
+              )
+          else:
+              slug = "ci-digest-no-runs"
+          with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as output:
+              output.write(f"slug={slug}\n")
+          print(json.dumps({"slug": slug, "latest": latest}, indent=2, sort_keys=True))
+
+      - name: Upload immutable diagnostic evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: ${{ steps.query.outputs.slug || format('ci-digest-diag-{0}', github.run_id) }}
+          path: ${{ env.REPORT_PATH }}
+          if-no-files-found: error
+          retention-days: 30
