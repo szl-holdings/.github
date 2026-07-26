@@ -9,9 +9,9 @@ on:
 
 permissions:
   actions: read
-  contents: read
+  contents: write
   id-token: write
-  pull-requests: read
+  pull-requests: write
 
 concurrency:
   group: forge9-attest-${{ github.event.workflow_run.head_sha }}
@@ -204,20 +204,12 @@ jobs:
           [ "$COUNT" -ge 1 ] \
             || { echo "::error::App approval was not recorded for the exact head SHA"; exit 1; }
 
-      - name: Enqueue after attestation
+      - name: Request protected merge queue after attestation
         env:
-          GH_TOKEN: ${{ steps.app-token.outputs.token }}
-          PR_NODE_ID: ${{ steps.pr.outputs.node_id }}
+          GH_TOKEN: ${{ github.token }}
+          PR: ${{ steps.pr.outputs.number }}
+          REPOSITORY: ${{ github.repository }}
         run: |
           set -euo pipefail
-          ENTRY=$(gh api graphql \
-            -f query='mutation($id: ID!) {
-              enqueuePullRequest(input: {pullRequestId: $id}) {
-                mergeQueueEntry { id }
-              }
-            }' \
-            -F id="$PR_NODE_ID" \
-            --jq '.data.enqueuePullRequest.mergeQueueEntry.id')
-          [ -n "$ENTRY" ] \
-            || { echo "::error::GitHub did not return a merge queue entry"; exit 1; }
-          echo "Enqueued merge queue entry $ENTRY"
+          gh pr merge "$PR" --repo "$REPOSITORY" --auto --squash
+          echo "Requested the protected merge queue for PR $PR"

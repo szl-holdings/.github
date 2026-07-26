@@ -146,7 +146,6 @@ def verify_manifest() -> None:
         "checks": "read",
         "commit_statuses": "read",
         "contents": "read",
-        "merge_queues": "write",
         "metadata": "read",
         "pull_requests": "write",
     }
@@ -154,6 +153,8 @@ def verify_manifest() -> None:
         fail("GitHub App permissions differ from the reviewed minimum")
     if "id_token" in permissions or "id-token" in permissions:
         fail("OIDC is a workflow permission, not an App permission")
+    if "merge_queues" in permissions:
+        fail("the App does not require merge-queue authority")
 
 
 def verify_gate_contract() -> None:
@@ -218,6 +219,12 @@ def verify_gate_contract() -> None:
         fail("attestor must resolve PRs targeting main")
     if 'startswith("release/")' in attestor_template:
         fail("release PRs cannot be enqueued into the default-branch merge queue")
+    if "GH_TOKEN: ${{ github.token }}" not in attestor_template:
+        fail("the protected queue request must use the ephemeral workflow token")
+    if 'gh pr merge "$PR" --repo "$REPOSITORY" --auto --squash' not in (
+        attestor_template
+    ):
+        fail("the attestor must use GitHub's supported merge-queue CLI path")
 
     release = load_json(GOVERNANCE / "ruleset-release.json")
     if not isinstance(release, dict):

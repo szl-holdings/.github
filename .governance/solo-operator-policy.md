@@ -10,7 +10,9 @@ therefore does not claim independent human review.
 - Eight repository-specific, fail-closed checks must pass for the exact head.
 - A successful `staging` deployment is required.
 - `qillqaq-attestor[bot]` verifies the gates, creates a signed merge BAP, and
-  enqueues the exact pull request through the merge queue.
+  records an approval for the exact head.
+- The ephemeral repository token requests the protected merge queue only after
+  the App attestation succeeds; it cannot approve or bypass the ruleset.
 - The App has read-only Contents access and cannot alter repository code.
 - Ruleset bypass actors remain empty.
 

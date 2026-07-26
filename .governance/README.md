@@ -26,10 +26,13 @@ ruleset keeps code-owner review disabled. The App review is machine attestation,
 not a human approval, and is not counted toward a human-review requirement.
 
 The App needs `Administration: read` to inspect repository Actions policy and
-rulesets. It keeps `Contents: read` and uses the dedicated
-`Merge queues: write` permission to enqueue through GraphQL; it never calls the
-direct merge endpoint. `id-token: write` is a workflow permission, not a GitHub
-App permission.
+rulesets. It keeps `Contents: read` and does not receive merge or queue
+authority. GitHub rejected the GraphQL enqueue mutation for the installation
+token even with the merge-queue permission. After the App signs the BAP and
+records its approval, the repository-scoped ephemeral `GITHUB_TOKEN` uses
+GitHub's supported `gh pr merge` path to request the protected queue. That token
+cannot approve reviews and cannot bypass the ruleset. `id-token: write` is a
+workflow permission, not a GitHub App permission.
 
 The production environment is referenced explicitly by the attestor because
 environment secrets are unavailable otherwise. It has no deployment reviewer;

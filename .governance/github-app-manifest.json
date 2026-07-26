@@ -12,7 +12,6 @@
     "checks": "read",
     "commit_statuses": "read",
     "contents": "read",
-    "merge_queues": "write",
     "metadata": "read",
     "pull_requests": "write"
   },

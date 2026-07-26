@@ -11,6 +11,9 @@
 - GitHub merge queues cannot be enabled in a ruleset that targets wildcard
   refs. `forge9-main` queues the default branch; `forge9-release` protects
   `release/*` with the same gates and staging requirement but no queue.
+- GitHub rejected `enqueuePullRequest` for the App installation token despite
+  its live merge-queue grant. The App retains attestation and approval duties;
+  the ephemeral repository token requests the protected queue after attestation.
 - Three archived repositories retain historical ruleset state that cannot be
   edited while archived. They have no active release path.
 

@@ -116,8 +116,13 @@ def provenance() -> None:
         fail("App permissions are missing")
     if permissions.get("contents") != "read":
         fail("the App must not have write access to repository contents")
-    if permissions.get("merge_queues") != "write":
-        fail("the App requires only dedicated queue authority")
+    if "merge_queues" in permissions:
+        fail("the App must not retain unused merge-queue authority")
+    attestor = (
+        ROOT / ".github/workflows/attest-and-approve.yml"
+    ).read_text(encoding="utf-8")
+    if "GH_TOKEN: ${{ github.token }}" not in attestor:
+        fail("the queue request must use the ephemeral workflow token")
     for relative in (
         ".github/workflows/gates.yml",
         ".github/workflows/attest-and-approve.yml",
