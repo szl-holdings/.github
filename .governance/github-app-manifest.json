@@ -13,6 +13,7 @@
     "commit_statuses": "write",
     "contents": "read",
     "metadata": "read",
+    "organization_administration": "read",
     "pull_requests": "write"
   },
   "default_events": []

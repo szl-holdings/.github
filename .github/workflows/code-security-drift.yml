@@ -1,39 +1,28 @@
 name: Code Security Config Drift
 
-# Task #307 created an org-level GitHub *code security configuration*
-# ("SZL Holdings Managed Security", id 252588), attached it — enforced — to
-# every repo in the org, and set it as the default for new repos. Nothing
-# watched for drift afterwards. This job catches it: if a repo is detached,
-# swapped onto the legacy enterprise/global config, lands new without coverage,
-# or the default-for-new-repos changes, the check fails (and refreshes a
-# committed report snapshot). Mirrors the weekly license / dead-link guards.
+# Verifies that the org-level GitHub code-security configuration
+# "SZL Holdings Managed Security" (id 252588) remains enforced on every
+# non-archived repository and remains the default for new repositories.
 #
-# The code-security configuration endpoints require org-admin, so the built-in
-# Actions GITHUB_TOKEN is NOT sufficient — the SZL_GITHUB_TOKEN PAT secret is
-# used. The two missing-vs-broken token cases are kept DISTINCT so a missing
-# secret never looks like real drift and never looks like a pass:
-#   * NO SZL_GITHUB_TOKEN configured -> the `check` job is SKIPPED (neutral) via
-#     the `preflight` gate below. This is honest degrade: the check did not run,
-#     so it is neither a red failure nor a green pass (coverage NOT verified).
-#   * A token IS present but the API call fails (401/403 insufficient scope,
-#     network) -> the checker exits 2 and this job FAILS loudly. A
-#     configured-but-broken token is a real misconfiguration, never a silent
-#     pass. A genuine drift (a repo not enforced under 252588) still FAILS.
-# Minimal token scope + the single founder step to add the secret are documented
-# in WORKFLOWS.md ("code-security-drift" section).
+# Authentication is fail-closed and non-personal. The workflow mints a short-lived
+# qillqaq GitHub App installation token with organization Administration:read.
+# No PAT is read, no missing-credential state is converted into a neutral skip,
+# and no generated report is pushed directly to protected main. Every invocation
+# uploads an immutable report artifact, including a bounded failure report when
+# token minting, source verification, or the API check cannot complete.
 
 on:
   schedule:
-    # Weekly sweep (Mondays 07:37 UTC) — offset from the other org guards.
     - cron: "37 7 * * 1"
   workflow_dispatch: {}
   push:
     branches: [main]
     paths:
       - ".github/scripts/code_security_drift.py"
+      - ".github/scripts/test_code_security_drift.py"
       - ".github/data/code_security_allowlist.json"
       - ".github/workflows/code-security-drift.yml"
-  workflow_call: {}
+      - ".governance/github-app-manifest.json"
 
 permissions:
   contents: read
@@ -42,76 +31,14 @@ concurrency:
   group: code-security-drift-${{ github.ref }}
   cancel-in-progress: true
 
-jobs:
-  # Honest-degrade gate. secrets.* cannot be referenced directly in a job-level
-  # `if:`, so this tiny job decides whether the drift check can actually run and
-  # exposes it as a boolean output. It does NOT just check that the secret is
-  # non-empty — an EXPIRED or under-scoped PAT is a non-empty string that still
-  # cannot read the code-security endpoints, and reporting that as red makes a
-  # token-plumbing gap look identical to genuine drift. So it PROBES the real
-  # endpoint the check needs and treats "no usable credential" (missing, 401
-  # bad/expired, or 403 insufficient scope) as a NEUTRAL skip: the `check` job
-  # is then SKIPPED (neutral grey) — not failed red and not passed green,
-  # because drift genuinely cannot be verified without a working token. A
-  # working token (200) runs the real check, where genuine drift still FAILS.
-  preflight:
-    name: Token preflight
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    outputs:
-      has_token: ${{ steps.detect.outputs.has_token }}
-    steps:
-      - name: Determine whether the drift check can authenticate
-        id: detect
-        env:
-          SZL_GITHUB_TOKEN: ${{ secrets.SZL_GITHUB_TOKEN }}
-        run: |
-          set -u
-          skip_notice() {
-            echo "has_token=false" >> "$GITHUB_OUTPUT"
-            echo "::notice title=code-security-drift skipped::$1 The org code-security drift check needs an org-admin PAT (fine-grained Administration:Read, or classic admin:org) to read the code-security configuration endpoints, so it is SKIPPED (neutral) rather than reported as drift. This is NOT a pass — org coverage was NOT verified. A founder must set/refresh the SZL_GITHUB_TOKEN secret to enable it (see WORKFLOWS.md)."
-          }
-          if [ -z "${SZL_GITHUB_TOKEN:-}" ]; then
-            skip_notice "SZL_GITHUB_TOKEN is not configured."
-            exit 0
-          fi
-          # Probe the exact endpoint the checker reads. Only a 200 proves the
-          # token can actually run the check; 401/403 mean the credential is
-          # invalid/expired/under-scoped (a non-empty but unusable secret).
-          code="$(curl -sS -o /dev/null -w '%{http_code}' \
-            -H "Authorization: token ${SZL_GITHUB_TOKEN}" \
-            -H "Accept: application/vnd.github+json" \
-            -H "X-GitHub-Api-Version: 2022-11-28" \
-            "https://api.github.com/orgs/${GITHUB_REPOSITORY_OWNER}/code-security/configurations?per_page=1" \
-            || echo 000)"
-          echo "Probe of code-security configurations endpoint returned HTTP ${code}."
-          case "${code}" in
-            200)
-              echo "has_token=true" >> "$GITHUB_OUTPUT"
-              echo "SZL_GITHUB_TOKEN authenticates — the drift check will run."
-              ;;
-            401)
-              skip_notice "SZL_GITHUB_TOKEN is set but INVALID/EXPIRED (HTTP 401 Bad credentials)."
-              ;;
-            403)
-              skip_notice "SZL_GITHUB_TOKEN is set but lacks org-admin scope (HTTP 403)."
-              ;;
-            *)
-              # Transient/unknown (network, 5xx): let the real check run so it is
-              # authoritative — a genuine persistent failure surfaces as exit 2.
-              echo "has_token=true" >> "$GITHUB_OUTPUT"
-              echo "::warning::Preflight probe was inconclusive (HTTP ${code}); running the full check so its result is authoritative."
-              ;;
-          esac
+env:
+  REPORT_PATH: reports/code-security-drift.json
 
+jobs:
   check:
     name: Managed security config attached + enforced everywhere
-    needs: preflight
-    if: needs.preflight.outputs.has_token == 'true'
     runs-on: ubuntu-latest
-    timeout-minutes: 10
-    permissions:
-      contents: write # only to commit the refreshed report in szl-holdings/.github
+    timeout-minutes: 15
     steps:
       - name: Harden runner
         uses: step-security/harden-runner@bf7454d06d71f1098171f2acdf0cd4708d7b5920 # v2.20.0
@@ -120,107 +47,194 @@ jobs:
 
       - name: Checkout
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
+          fetch-depth: 1
 
       - name: Set up Python
         uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
           python-version: "3.12"
 
-      - name: Check managed-security-config coverage across the org
+      - name: Compile and self-test the drift contract
+        run: |
+          set -euo pipefail
+          python -m py_compile \
+            .github/scripts/code_security_drift.py \
+            .github/scripts/test_code_security_drift.py
+          python .github/scripts/test_code_security_drift.py
+          git diff --check
+
+      - name: Mint least-privilege qillqaq organization token
+        id: app-token
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        with:
+          client-id: ${{ vars.QILLQAQ_CLIENT_ID }}
+          private-key: ${{ secrets.QILLQAQ_PRIVATE_KEY }}
+          owner: ${{ github.repository_owner }}
+          permission-organization-administration: read
+
+      - name: Check managed-security-config coverage across the organization
+        id: drift
         env:
-          # org-admin PAT preferred (the built-in token can't read these endpoints)
-          SZL_GITHUB_TOKEN: ${{ secrets.SZL_GITHUB_TOKEN }}
-          GITHUB_TOKEN: ${{ github.token }}
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+        shell: bash
         run: |
           set +e
-          python3 .github/scripts/code_security_drift.py \
-            --report .github/data/code_security_report.json 2>&1 | tee /tmp/drift-output.txt
-          echo "CHECK_EXIT=${PIPESTATUS[0]}" >> "$GITHUB_ENV"
+          mkdir -p "$(dirname "$REPORT_PATH")"
+          python .github/scripts/code_security_drift.py \
+            --report "$REPORT_PATH" 2>&1 | tee /tmp/drift-output.txt
+          code=${PIPESTATUS[0]}
+          echo "exit_code=${code}" >> "$GITHUB_OUTPUT"
+          exit 0
 
-      - name: Commit refreshed report if changed
-        # Best-effort: if main is protected (or the token can't push), this must
-        # NOT mask the real signal. The drift gate below is the source of truth.
-        continue-on-error: true
-        if: github.repository == 'szl-holdings/.github' && github.event_name != 'pull_request'
+      - name: Normalize or create bounded evidence for every outcome
+        if: always()
+        env:
+          APP_TOKEN_OUTCOME: ${{ steps.app-token.outcome }}
+          DRIFT_EXIT: ${{ steps.drift.outputs.exit_code }}
+        shell: python
         run: |
-          if git diff --quiet -- .github/data/code_security_report.json; then
-            echo "Report unchanged; nothing to commit."
-            exit 0
-          fi
-          git config user.name "Stephen P. Lutar Jr."
-          git config user.email "stephenlutar2@gmail.com"
-          git add .github/data/code_security_report.json
-          git commit -s -m "chore(security): refresh code-security drift report [skip ci]"
-          git push
+          import json
+          import os
+          from datetime import datetime, timezone
+          from pathlib import Path
 
-      - name: Alert the team on drift / check failure (scheduled runs only)
-        # Mirrors the release-receipt + pin-drift guards: the unattended weekly
-        # cron is the only place a red X would otherwise sit unseen for days, so
-        # page the shared ntfy alert relay there. Attended runs (push to main,
-        # workflow_dispatch, workflow_call) already surface a visible check, so
-        # they stay silent — no alert noise. Fires on drift (exit 1) AND on a
-        # could-not-complete auth/API failure (exit 2), never on a clean run
-        # (exit 0). continue-on-error so a relay hiccup never masks the real
-        # signal — the drift gate below is the source of truth.
-        if: always() && github.event_name == 'schedule' && env.CHECK_EXIT != '0'
+          path = Path(os.environ["REPORT_PATH"])
+          now = datetime.now(timezone.utc).isoformat()
+          run_url = None
+          if all(
+              os.environ.get(key)
+              for key in ("GITHUB_SERVER_URL", "GITHUB_REPOSITORY", "GITHUB_RUN_ID")
+          ):
+              run_url = (
+                  f"{os.environ['GITHUB_SERVER_URL']}/"
+                  f"{os.environ['GITHUB_REPOSITORY']}/actions/runs/"
+                  f"{os.environ['GITHUB_RUN_ID']}"
+              )
+          workflow = {
+              "event": os.environ.get("GITHUB_EVENT_NAME"),
+              "repository": os.environ.get("GITHUB_REPOSITORY"),
+              "run_id": os.environ.get("GITHUB_RUN_ID"),
+              "run_url": run_url,
+          }
+          if path.is_file() and path.stat().st_size:
+              report = json.loads(path.read_text(encoding="utf-8"))
+              errors = report.get("errors") or []
+              report.setdefault("schema", "szl.code-security-drift/v2")
+              report.setdefault("generated_at", now)
+              report.setdefault(
+                  "organization",
+                  report.get("org") or os.environ.get("GITHUB_REPOSITORY_OWNER"),
+              )
+              report.setdefault("generation", os.environ.get("GITHUB_SHA"))
+              report.setdefault(
+                  "status",
+                  "DRIFT_DETECTED" if errors else "VERIFIED",
+              )
+              report["workflow"] = workflow
+          else:
+              exit_text = str(os.environ.get("DRIFT_EXIT") or "2")
+              exit_code = int(exit_text) if exit_text.isdigit() else 2
+              report = {
+                  "schema": "szl.code-security-drift/v2",
+                  "generated_at": now,
+                  "organization": os.environ.get("GITHUB_REPOSITORY_OWNER"),
+                  "generation": os.environ.get("GITHUB_SHA"),
+                  "canonical_configuration_id": 252588,
+                  "status": "NOT_VERIFIED",
+                  "app_token_outcome": (
+                      os.environ.get("APP_TOKEN_OUTCOME") or "not_completed"
+                  ),
+                  "exit_code": exit_code,
+                  "workflow": workflow,
+                  "detail": "The authenticated organization drift check did not produce its ordinary report. See the bound workflow logs; no credential value is recorded.",
+              }
+          path.parent.mkdir(parents=True, exist_ok=True)
+          path.write_text(
+              json.dumps(report, indent=2, sort_keys=True) + "\n",
+              encoding="utf-8",
+          )
+
+      - name: Upload immutable drift evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: code-security-drift-${{ github.run_id }}
+          path: ${{ env.REPORT_PATH }}
+          if-no-files-found: error
+          retention-days: 90
+
+      - name: Publish human-readable summary
+        if: always()
+        shell: python
+        run: |
+          import json
+          import os
+          from pathlib import Path
+
+          path = Path(os.environ["REPORT_PATH"])
+          with open(os.environ["GITHUB_STEP_SUMMARY"], "a", encoding="utf-8") as out:
+              out.write("## Organization code-security drift\n\n")
+              if not path.exists():
+                  out.write("- status: `NOT_VERIFIED`\n- report: missing\n")
+              else:
+                  report = json.loads(path.read_text(encoding="utf-8"))
+                  errors = report.get("errors") or []
+                  warnings = report.get("warnings") or []
+                  out.write(f"- status: `{report.get('status')}`\n")
+                  out.write("- canonical configuration: `252588`\n")
+                  out.write(f"- errors: `{len(errors)}`\n")
+                  out.write(f"- warnings: `{len(warnings)}`\n")
+                  totals = report.get("totals") or {}
+                  if totals:
+                      out.write(f"- organization repositories: `{totals.get('org_repos')}`\n")
+                      out.write(f"- enforced under canonical: `{totals.get('enforced_under_canonical')}`\n")
+
+      - name: Alert the team on drift or check failure
+        if: always() && github.event_name == 'schedule' && (steps.app-token.outcome != 'success' || steps.drift.outputs.exit_code != '0')
         continue-on-error: true
         env:
-          # Slack-compatible {"text":...} webhook pointed at the box alert relay
-          # (https://a-11-oy.com/relay/ntfy/<token>), same channel as the other
-          # org guards. The relay flattens the payload to clean ntfy text.
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+          CHECK_EXIT: ${{ steps.drift.outputs.exit_code }}
         run: |
           set -u
           if [ -z "${SLACK_WEBHOOK_URL:-}" ]; then
             echo "::warning::SLACK_WEBHOOK_URL not set; cannot page the alert relay."
             exit 0
           fi
-          # Message-building is extracted into build_drift_alert.py and pinned by
-          # test_build_drift_alert.py (run in tests.yml) so a future edit can't
-          # silently produce an empty/malformed alert — the drift wording names
-          # the offending repo(s), the exit-2 wording says COULD NOT COMPLETE,
-          # and neither drops its \n\n separators. The script emits the final
-          # Slack-compatible {"text": ...} payload (prefix included) to stdout.
-          payload="$(python3 .github/scripts/build_drift_alert.py \
-            --exit-code "${CHECK_EXIT}" \
-            --report .github/data/code_security_report.json \
+          payload="$(python .github/scripts/build_drift_alert.py \
+            --exit-code "${CHECK_EXIT:-2}" \
+            --report "$REPORT_PATH" \
             --drift-output /tmp/drift-output.txt)"
           code="$(curl -sS -o /tmp/alert-resp.txt -w '%{http_code}' \
             -X POST -H 'Content-Type: application/json' \
             --data "$payload" "$SLACK_WEBHOOK_URL" || echo 000)"
           echo "Alert relay responded HTTP ${code}"
           if [ "${code#2}" = "${code}" ]; then
-            echo "::warning::Alert relay did not return 2xx (got ${code}): $(cat /tmp/alert-resp.txt 2>/dev/null)"
+            echo "::warning::Alert relay did not return 2xx (got ${code})."
           fi
 
-      - name: Fail if managed-security-config drift
+      - name: Enforce the authenticated organization result
+        if: always()
+        env:
+          APP_TOKEN_OUTCOME: ${{ steps.app-token.outcome }}
+          CHECK_EXIT: ${{ steps.drift.outputs.exit_code }}
         run: |
+          if [ "${APP_TOKEN_OUTCOME:-not_completed}" != "success" ]; then
+            echo "::error::The qillqaq organization token was not minted successfully. The drift state is NOT_VERIFIED."
+            exit 1
+          fi
           case "${CHECK_EXIT:-2}" in
             0)
-              echo "✓ Managed security config 252588 is enforced on every non-archived repo and is the default for new repos."
+              echo "Managed security config 252588 is enforced on every non-archived repo and is the default for new repos."
               ;;
             1)
-              echo "::error::Managed-security-config drift detected. A repo is not"
-              echo "::error::enforced under config 252588, is attached to a different"
-              echo "::error::configuration, or the default-for-new-repos changed. See the"
-              echo "::error::step output and .github/data/code_security_report.json."
-              echo "::error::Re-attach via POST .../configurations/252588/attach {\"scope\":\"all\"}"
-              echo "::error::or add a reasoned entry to .github/data/code_security_allowlist.json."
+              echo "::error::Managed-security-config drift detected. See the immutable report artifact."
               exit 1
               ;;
-            3)
-              # Defensive: this job only runs when the preflight gate saw a token,
-              # so exit 3 (no token) should not reach here. Treat it as a neutral
-              # skip rather than red — honest degrade, never a fake pass.
-              echo "::notice::SZL_GITHUB_TOKEN not configured; org code-security"
-              echo "::notice::drift check skipped (neutral). Coverage NOT verified."
-              ;;
             *)
-              echo "::error::Could not complete the managed-security-config check"
-              echo "::error::(the token is present but the API call failed — likely"
-              echo "::error::insufficient scope; needs an org-admin PAT). This is"
-              echo "::error::failed (not passed) so coverage can never look green when"
-              echo "::error::the check could not actually run."
+              echo "::error::The authenticated organization drift check could not complete. This is fail-closed, not a neutral skip."
               exit 1
               ;;
           esac

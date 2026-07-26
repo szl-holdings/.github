@@ -13,6 +13,9 @@ venv/
 .env
 .secret/
 
+# Generated local evidence (workflow artifacts are canonical)
+reports/code-security-drift.json
+
 # Local temp / OS cruft
 *.tmp
 .DS_Store
