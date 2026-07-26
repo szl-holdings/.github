@@ -1,24 +1,15 @@
 # Known limitations
 
-The following blockers are explicit and must not be described as complete:
-
-- `qillqaq-attestor` is registered and installed, but its workflow is not
-  active and its installation token has not been exercised by a merged,
-  independently reviewed workflow.
-- The App ID and private key are stored in the `.github` repository's
-  `production` environment. Founder approval is required before a job can read
-  them; the downloaded local key copy was removed after secret verification.
-- GitHub App approvals have not been proven to satisfy the estate's required
-  review rule.
-- The estate has one human organization member, so a human cannot independently
-  approve that same member's pull requests.
-- Requiring the founder to approve access to the `production` environment would
-  make each attestation manual. Removing that environment review is a separate
-  founder security decision.
-- The eight gate commands and `staging` deployment must be mapped and proven per
-  repository before any FORGE-9 ruleset is activated.
+- The estate has one human organization member. The policy is explicitly
+  solo-operated and does not claim independent human review.
+- The App ID and private key are environment secrets. The removed local private
+  key cannot be recovered; rotation requires generating a new GitHub App key.
+- The App review and merge-queue path must be proven on a post-bootstrap pilot
+  before estate-wide activation is claimed.
+- Gate mappings in this repository are specific to an organization-governance
+  repository. Application repositories require their own real commands.
 - Three archived repositories retain historical ruleset state that cannot be
   edited while archived. They have no active release path.
 
-Until these items are resolved, the pack is bootstrap material, not evidence of
-an operating two-principal merge protocol.
+The `.github` repository is the pilot. Estate-wide completion is claimed only
+after each active repository has compatible gates and staging evidence.

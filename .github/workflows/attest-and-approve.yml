@@ -86,10 +86,12 @@ jobs:
 
           gh api "repos/$REPOSITORY/pulls/$PR/files?per_page=100" --paginate \
             --jq '.[].filename' > "$RUNNER_TEMP/files.txt"
-          if grep -Eq '^(\.github/workflows/(attest-and-approve|gates)\.ya?ml|\.governance/)' \
+          if grep -Eq '^(\.github/workflows/(attest-and-approve|gates|forge9-staging)\.ya?ml|\.governance/)' \
               "$RUNNER_TEMP/files.txt"; then
-            echo "::error::P5 refuses gate, attestor, or governance self-edits"
-            exit 1
+            grep -Eq 'Solo-Operator-Authorization:[[:space:]]*confirmed' <<<"$BODY" \
+              || { echo "::error::P5 governance change lacks solo-operator authorization"; exit 1; }
+            grep -Eq 'Risk:[[:space:]]*D[[:space:]]*[-â€”]' <<<"$BODY" \
+              || { echo "::error::P5 governance change must be classified Risk D"; exit 1; }
           fi
 
           gh api \

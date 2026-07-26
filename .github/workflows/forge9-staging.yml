@@ -1,0 +1,57 @@
+name: FORGE-9 staging
+
+on:
+  pull_request:
+  merge_group:
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    name: deploy/staging
+    runs-on: ubuntu-latest
+    environment: staging
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12"
+
+      - name: Verify deployable governance state
+        run: python .github/scripts/verify_forge9_governance.py
+
+      - name: Create staging receipt
+        env:
+          HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+          REPOSITORY: ${{ github.repository }}
+          RUN_ID: ${{ github.run_id }}
+        run: |
+          python - <<'PY'
+          import json
+          import os
+          from datetime import datetime, timezone
+
+          receipt = {
+              "schema": "https://a11oy.net/schemas/forge9/staging/v1",
+              "repository": os.environ["REPOSITORY"],
+              "head_sha": os.environ["HEAD_SHA"],
+              "environment": "staging",
+              "workflow_run_id": os.environ["RUN_ID"],
+              "verified_at": datetime.now(timezone.utc).isoformat(),
+          }
+          with open("staging-receipt.json", "w", encoding="utf-8") as handle:
+              json.dump(receipt, handle, indent=2, sort_keys=True)
+              handle.write("\n")
+          PY
+
+      - name: Upload staging receipt
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: staging-receipt-${{ github.event.pull_request.head.sha || github.sha }}
+          path: staging-receipt.json
+          if-no-files-found: error
+          retention-days: 90

@@ -1,10 +1,10 @@
 {
-  "gate/ground-truth": [],
-  "gate/labels": [],
-  "gate/schema": [],
-  "gate/adversarial": [],
-  "gate/verify-all": [],
-  "gate/provenance": [],
-  "gate/a11y-perf": [],
-  "gate/lean": []
+  "gate/ground-truth": [["python", ".github/scripts/run_forge9_gate.py", "gate/ground-truth"]],
+  "gate/labels": [["python", ".github/scripts/run_forge9_gate.py", "gate/labels"]],
+  "gate/schema": [["python", ".github/scripts/run_forge9_gate.py", "gate/schema"]],
+  "gate/adversarial": [["python", ".github/scripts/run_forge9_gate.py", "gate/adversarial"]],
+  "gate/verify-all": [["python", ".github/scripts/run_forge9_gate.py", "gate/verify-all"]],
+  "gate/provenance": [["python", ".github/scripts/run_forge9_gate.py", "gate/provenance"]],
+  "gate/a11y-perf": [["python", ".github/scripts/run_forge9_gate.py", "gate/a11y-perf"]],
+  "gate/lean": [["python", ".github/scripts/run_forge9_gate.py", "gate/lean"]]
 }

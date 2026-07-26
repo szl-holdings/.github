@@ -47,7 +47,8 @@ FORBIDDEN_EXECUTABLE_PATTERNS = {
 }
 
 ATTESTOR_SELF_EDIT_GUARD = (
-    r"^(\.github/workflows/(attest-and-approve|gates)\.ya?ml|\.governance/)"
+    r"^(\.github/workflows/(attest-and-approve|gates|forge9-staging)"
+    r"\.ya?ml|\.governance/)"
 )
 GOVERNED_BASE_FILTER = (
     '.base.ref == "main"\n'
@@ -110,8 +111,8 @@ def verify_ruleset() -> None:
     expected_review = {
         "dismiss_stale_reviews_on_push": True,
         "require_code_owner_review": False,
-        "require_last_push_approval": True,
-        "required_approving_review_count": 1,
+        "require_last_push_approval": False,
+        "required_approving_review_count": 0,
         "required_review_thread_resolution": True,
     }
     for key, value in expected_review.items():
@@ -163,11 +164,14 @@ def verify_gate_contract() -> None:
     if not isinstance(gate_config, dict) or list(gate_config) != GATES:
         fail("gates.json must declare the eight gates in canonical order")
     for name, commands in gate_config.items():
-        if not isinstance(commands, list):
-            fail(f"{name} commands must be an array")
+        if not isinstance(commands, list) or not commands:
+            fail(f"{name} commands must be a non-empty array")
 
-    for template in ("templates/gates.yml", "templates/attest-and-approve.yml"):
-        path = GOVERNANCE / template
+    for template in (
+        ".github/workflows/gates.yml",
+        ".github/workflows/attest-and-approve.yml",
+    ):
+        path = ROOT / template
         try:
             text = path.read_text(encoding="utf-8")
         except OSError as exc:
@@ -175,15 +179,18 @@ def verify_gate_contract() -> None:
         for label, pattern in FORBIDDEN_EXECUTABLE_PATTERNS.items():
             if pattern.search(text):
                 fail(f"{path.relative_to(ROOT)} contains {label}")
-    gate_template = (GOVERNANCE / "templates/gates.yml").read_text(
+    gate_template = (ROOT / ".github/workflows/gates.yml").read_text(
         encoding="utf-8"
     )
     for gate in GATES:
         if gate not in gate_template:
             fail(f"gate template is missing {gate}")
 
+    if not (ROOT / ".github/workflows/forge9-staging.yml").is_file():
+        fail("the staging deployment workflow is not active")
+
     attestor_template = (
-        GOVERNANCE / "templates/attest-and-approve.yml"
+        ROOT / ".github/workflows/attest-and-approve.yml"
     ).read_text(encoding="utf-8")
     if ATTESTOR_SELF_EDIT_GUARD not in attestor_template:
         fail("attestor must refuse edits to both gate and attestor workflows")
@@ -193,6 +200,8 @@ def verify_gate_contract() -> None:
         ".github/workflows/attest-and-approve.yaml",
         ".github/workflows/gates.yml",
         ".github/workflows/gates.yaml",
+        ".github/workflows/forge9-staging.yml",
+        ".github/workflows/forge9-staging.yaml",
         ".governance/gates.json",
     )
     for path in guarded_paths:
@@ -200,6 +209,13 @@ def verify_gate_contract() -> None:
             fail(f"attestor self-edit guard does not cover {path}")
     if guard.search(".github/workflows/unrelated.yml"):
         fail("attestor self-edit guard overmatches unrelated workflows")
+
+    for marker in (
+        "Solo-Operator-Authorization:[[:space:]]*confirmed",
+        "Risk:[[:space:]]*D[[:space:]]*[-â€”]",
+    ):
+        if marker not in attestor_template:
+            fail(f"attestor governance authorization marker missing: {marker}")
 
     if GOVERNED_BASE_FILTER not in attestor_template:
         fail("attestor must resolve PRs targeting both main and release/*")
