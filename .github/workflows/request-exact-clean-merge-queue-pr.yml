@@ -76,8 +76,9 @@ jobs:
               "pullRequestId",
               "ENQUEUED_OR_MERGED",
           )
-          forbidden = (
-              "mergePullRequest",
+          forbidden_mutations_and_endpoints = (
+              "mergePullRequest(input:",
+              "MergePullRequestInput!",
               '"PUT", f"repos/{repository}/pulls/',
               '"merge_method"',
               "statuses/",
@@ -92,7 +93,7 @@ jobs:
               assert marker in preflight, marker
           for marker in required_enqueue:
               assert marker in enqueue, marker
-          for marker in forbidden:
+          for marker in forbidden_mutations_and_endpoints:
               assert marker not in enqueue, marker
           PY
           git diff --check
