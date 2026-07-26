@@ -10,8 +10,8 @@ Acceptance requires immutable live GitHub evidence that:
   App-pinned `attestation/qillqaq` status;
 - the attestor's repository-scoped workflow token requests the protected queue
   without a manual enqueue;
-- the same gates, staging status, and App-pinned attestation pass again on the
-  synthetic merge-group commit; and
+- the same gates and staging status pass on the synthetic merge-group commit,
+  and the App publishes independently signed attestation evidence for it; and
 - the final rule-suite evaluation passes with no bypass actor or protection
   override.
 

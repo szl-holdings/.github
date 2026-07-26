@@ -79,15 +79,40 @@ def ground_truth() -> None:
         fail("required status-check parameters are missing")
     required = status_parameters.get("required_status_checks", [])
     if {
-        "context": "attestation/qillqaq",
-        "integration_id": 4395545,
-    } not in required:
-        fail("the App-owned attestation status is not required")
-    if {
         "context": "deploy/staging",
         "integration_id": 15368,
     } not in required:
         fail("the GitHub Actions staging check is not required")
+    if {
+        "context": "attestation/qillqaq",
+        "integration_id": 4395545,
+    } in required:
+        fail("the workflow-run attestation status would deadlock the main queue")
+
+    release = load_json(".governance/ruleset-release.json")
+    release_rules = release.get("rules")
+    if not isinstance(release_rules, list):
+        fail("release ruleset rules are missing")
+    release_status = next(
+        (
+            item
+            for item in release_rules
+            if isinstance(item, dict)
+            and item.get("type") == "required_status_checks"
+        ),
+        None,
+    )
+    if not isinstance(release_status, dict):
+        fail("release required status checks are missing")
+    release_parameters = release_status.get("parameters")
+    if not isinstance(release_parameters, dict):
+        fail("release status-check parameters are missing")
+    release_required = release_parameters.get("required_status_checks", [])
+    if {
+        "context": "attestation/qillqaq",
+        "integration_id": 4395545,
+    } not in release_required:
+        fail("the non-queued release ruleset must require the App attestation")
 
 
 def labels() -> None:
@@ -142,7 +167,7 @@ def provenance() -> None:
     if permissions.get("contents") != "read":
         fail("the App must not have write access to repository contents")
     if permissions.get("commit_statuses") != "write":
-        fail("the App must be able to publish its required attestation status")
+        fail("the App must be able to publish its attestation status")
     if "merge_queues" in permissions:
         fail("the App must not retain unused merge-queue authority")
     attestor = (

@@ -145,17 +145,17 @@ def verify_ruleset() -> None:
     contexts = [
         item.get("context") for item in required if isinstance(item, dict)
     ]
-    if contexts != GATES + [
-        STAGING_STATUS["context"],
-        ATTESTATION_STATUS["context"],
-    ]:
-        fail("required checks must contain the gates, staging, and attestation")
-    if required[-2:] != [STAGING_STATUS, ATTESTATION_STATUS]:
-        fail("staging and attestation checks must be pinned to their Apps")
+    if contexts != GATES + [STAGING_STATUS["context"]]:
+        fail("main required checks must contain the gates and staging")
+    if required[-1:] != [STAGING_STATUS]:
+        fail("main staging check must be pinned to GitHub Actions")
+    if ATTESTATION_STATUS in required:
+        fail(
+            "main must not require the workflow-run attestation status because "
+            "that circular dependency prevents merge_group dispatch"
+        )
     if any(item.get("type") == "required_deployments" for item in typed_rules):
         fail("queue-incompatible required_deployments rule must not be present")
-    if required[-1] != ATTESTATION_STATUS:
-        fail("attestation status must be pinned to the qillqaq App")
 
 
 def verify_manifest() -> None:
