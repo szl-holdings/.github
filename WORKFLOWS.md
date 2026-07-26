@@ -78,58 +78,64 @@ configuration **SZL Holdings Managed Security** (`252588`) remains attached and
 **enforced** on every non-archived repository and remains the default for new
 repositories.
 
-The production workflow no longer depends on a founder PAT. It mints a
-short-lived qillqaq GitHub App installation token with:
+### Governed credential order
 
-- owner: `szl-holdings`;
-- organization permission: `Administration: read` only;
-- target: the full organization installation, because the guarded endpoints are
-  organization-scoped;
-- lifetime: the GitHub installation-token lifetime, with automatic revocation
-  by `actions/create-github-app-token` at job completion.
+The workflow uses a bounded two-candidate credential chain:
 
-GitHub's organization code-security configuration endpoints accept GitHub App
-installation tokens with organization `Administration: read`. The qillqaq app
-manifest pins that permission. The workflow requests it explicitly rather than
-inheriting every installation permission.
+1. **Preferred:** a short-lived qillqaq GitHub App installation token requesting
+   organization `Administration: read`.
+2. **Fallback:** the existing governed `SZL_GITHUB_TOKEN` repository secret.
+
+The fallback is temporary compatibility, not a silent downgrade. It remains in
+use only until the organization approves qillqaq's tracked
+`organization_administration: read` permission. Every configured candidate must
+return HTTP `200` from the exact organization code-security configurations
+endpoint before the checker receives it. The selector records only the
+credential class and authorization outcome; it never records a value, length,
+prefix, hash, identity, header, scope response, or response body.
+
+The App remains preferred because its token is short-lived and automatically
+revoked by `actions/create-github-app-token`. The fallback is already governed,
+is currently authorized for the exact read endpoint, and is never used when the
+App candidate succeeds.
 
 ### Fail-closed result contract
 
 | State | Result | CI status |
 |---|---|---|
-| App token minted and all active repositories enforced under `252588` | verified | pass |
+| App authorized and every active repository enforced under `252588` | verified using `qillqaq_app` | pass |
+| App unavailable but governed fallback authorized and estate clean | verified using `szl_github_token` | pass |
 | Repository detached, attached elsewhere, or default changed | drift | fail |
-| App client ID/private key missing or invalid | token mint fails | fail |
-| Installation lacks `Administration: read` or the API returns 401/403 | not verified | fail |
-| Persistent network/API failure | not verified | fail |
+| No configured candidate returns HTTP `200` from the exact endpoint | not verified | fail |
+| Checker or persistent network/API failure | not verified | fail |
 
-There is no neutral production skip. A missing, expired, or under-scoped
-credential can never be rendered as a clean or skipped estate result.
+There is no neutral production skip. Missing, expired, under-scoped, or
+unreachable credentials cannot be rendered as clean or skipped estate results.
 
 ### Evidence and secret boundaries
 
 Every run uploads `reports/code-security-drift.json` as a 90-day immutable
-workflow artifact. Ordinary clean/drift runs contain the full repository
-coverage report. If the API check aborts before producing that report, the
-workflow writes a bounded failure receipt that contains no token or secret
-value.
+workflow artifact. Clean and drift runs contain the full repository coverage
+report plus the selected credential class. If selection or the API check aborts,
+the workflow writes a bounded `NOT_VERIFIED` receipt containing no secret
+material.
 
 Generated reports are not committed or pushed directly to protected `main`.
-The previously committed snapshot was removed because it had become stale and
-under-counted the live organization. Pull-request CI locks the authentication,
-least-privilege, artifact, and no-direct-push contract without receiving App
-credentials.
+The previous committed snapshot was removed because it had become stale and
+under-counted the live organization. Pull-request CI locks credential order,
+endpoint verification, fail-closed behavior, artifact publication, and the
+no-direct-push contract without receiving credentials.
 
-Authentication inputs are existing configuration references, never values in
-source:
+Authentication inputs are configuration references, never values in source:
 
 - variable: `QILLQAQ_CLIENT_ID`;
-- secret: `QILLQAQ_PRIVATE_KEY`.
+- secret: `QILLQAQ_PRIVATE_KEY`;
+- fallback secret: `SZL_GITHUB_TOKEN`.
 
-Rotate the App private key in GitHub settings and replace the secret if key
-rotation is required. Do not paste or log the private key. `SZL_GITHUB_TOKEN`
-is not consumed by this workflow; any remaining consumers must be migrated and
-verified independently before that legacy secret is removed globally.
+Rotate the App private key or governed fallback in GitHub settings without
+printing either value. Do not delete `SZL_GITHUB_TOKEN` until qillqaq's added
+organization permission is approved and a protected-main run proves the App
+path selected `qillqaq_app`.
 
 ## Dependabot
 
