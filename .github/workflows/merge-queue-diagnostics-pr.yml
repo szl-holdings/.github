@@ -7,6 +7,7 @@ on:
       - .github/scripts/merge_queue_diagnostics.py
       - .github/scripts/merge_queue_blocker_diagnostics.py
       - .github/scripts/stale_check_diagnostics.py
+      - .github/scripts/post_merge_evidence_diagnostics.py
       - .github/workflows/merge-queue-diagnostics-pr.yml
 
 permissions:
@@ -23,13 +24,15 @@ env:
   STATE_REPORT_PATH: reports/merge-queue-state.json
   BLOCKER_REPORT_PATH: reports/merge-queue-blocker.json
   STALE_REPORT_PATH: reports/stale-check-diagnostics.json
+  POST_MERGE_REPORT_PATH: reports/post-merge-evidence.json
+  POST_MERGE_SUMMARY_PATH: reports/post-merge-summary.json
   TARGET_PULL_REQUESTS: "325"
 
 jobs:
   diagnose:
-    name: GitHub queue, rules, checks, and delivery state
+    name: GitHub queue, rules, checks, delivery, and protected-main evidence
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 15
     env:
       GH_TOKEN: ${{ github.token }}
     steps:
@@ -52,6 +55,9 @@ jobs:
       - name: Trace every non-terminal check run to its owner
         run: python .github/scripts/stale_check_diagnostics.py
 
+      - name: Decode current protected-main workflow artifacts
+        run: python .github/scripts/post_merge_evidence_diagnostics.py
+
       - name: Encode decisive findings in the artifact identity
         id: findings
         shell: python
@@ -67,6 +73,10 @@ jobs:
           stale = json.loads(
               Path(os.environ["STALE_REPORT_PATH"]).read_text(encoding="utf-8")
           )
+          post = json.loads(
+              Path(os.environ["POST_MERGE_SUMMARY_PATH"]).read_text(encoding="utf-8")
+          )
+          security = post.get("security") or {}
           parts = [
               "mqb",
               f"qb{len(blocker.get('queue_branches') or [])}",
@@ -93,6 +103,20 @@ jobs:
               parts.append(
                   f"p{number}-{state}-m{missing}-n{non_success}-u{unverified}-t{unresolved if unresolved is not None else 'x'}-c{non_terminal}-qe{int(graph.get('mergeQueueEntry') is not None)}"
               )
+          auth = re.sub(
+              r"[^a-z0-9]+",
+              "-",
+              str(security.get("authentication_mode") or "missing").lower(),
+          ).strip("-")
+          parts.extend(
+              [
+                  f"sec{str(security.get('status') or 'missing').lower()}",
+                  f"auth{auth}",
+                  f"repos{security.get('org_repos') if security.get('org_repos') is not None else 'x'}",
+                  f"err{security.get('error_count') if security.get('error_count') is not None else 'x'}",
+                  f"val{int(security.get('value_recorded') is False)}",
+              ]
+          )
           slug = "-".join(parts)[:220]
           with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as output:
               output.write(f"summary_slug={slug}\n")
@@ -107,5 +131,7 @@ jobs:
             ${{ env.STATE_REPORT_PATH }}
             ${{ env.BLOCKER_REPORT_PATH }}
             ${{ env.STALE_REPORT_PATH }}
+            ${{ env.POST_MERGE_REPORT_PATH }}
+            ${{ env.POST_MERGE_SUMMARY_PATH }}
           if-no-files-found: error
           retention-days: 30
