@@ -1,0 +1,87 @@
+name: Post-Merge Protected Main — Read-Only Monitor
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - .github/scripts/post_merge_monitor.py
+      - .github/workflows/post-merge-monitor-pr.yml
+
+permissions:
+  actions: read
+  contents: read
+  issues: read
+  pull-requests: read
+
+concurrency:
+  group: post-merge-monitor-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+env:
+  REPORT_PATH: reports/post-merge-monitor.json
+
+jobs:
+  monitor:
+    name: Protected main, post-merge workflows, issues, and PR receipts
+    if: >-
+      github.repository == 'szl-holdings/.github' &&
+      github.event.pull_request.number == 324 &&
+      github.event.pull_request.head.repo.full_name == 'szl-holdings/.github' &&
+      github.event.pull_request.head.ref == 'diag/merge-queue-state-v1'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - name: Checkout read-only monitor
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+          fetch-depth: 1
+
+      - name: Compile and constrain the monitor
+        run: |
+          set -euo pipefail
+          python -m py_compile .github/scripts/post_merge_monitor.py
+          python - <<'PY'
+          from pathlib import Path
+
+          source = Path('.github/scripts/post_merge_monitor.py').read_text(
+              encoding='utf-8'
+          )
+          required = (
+              '527fd000c5189f7b1ca4e56b7993d1daa952308a',
+              'TARGET_ISSUES = (176, 257, 298, 301, 321)',
+              'TARGET_PULLS = (322, 323)',
+              'actions/runs?head_sha=',
+              'git/ref/heads/main',
+          )
+          forbidden = (
+              '--method", "POST',
+              '--method", "PATCH',
+              '--method", "PUT',
+              '--method", "DELETE',
+              'secrets/',
+              'git/refs/',
+              'statuses/',
+              'check-runs/',
+          )
+          for marker in required:
+              assert marker in source, marker
+          for marker in forbidden:
+              assert marker not in source, marker
+          PY
+          git diff --check
+
+      - name: Read the current protected-main convergence state
+        run: python .github/scripts/post_merge_monitor.py
+
+      - name: Upload immutable monitor evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: post-merge-monitor-${{ github.run_id }}
+          path: ${{ env.REPORT_PATH }}
+          if-no-files-found: error
+          retention-days: 90
