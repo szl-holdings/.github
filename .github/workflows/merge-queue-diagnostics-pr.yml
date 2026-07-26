@@ -6,6 +6,7 @@ on:
     paths:
       - .github/scripts/merge_queue_diagnostics.py
       - .github/scripts/merge_queue_blocker_diagnostics.py
+      - .github/scripts/stale_check_diagnostics.py
       - .github/workflows/merge-queue-diagnostics-pr.yml
 
 permissions:
@@ -21,6 +22,7 @@ concurrency:
 env:
   STATE_REPORT_PATH: reports/merge-queue-state.json
   BLOCKER_REPORT_PATH: reports/merge-queue-blocker.json
+  STALE_REPORT_PATH: reports/stale-check-diagnostics.json
   TARGET_PULL_REQUESTS: "322,323"
 
 jobs:
@@ -47,6 +49,9 @@ jobs:
           REPORT_PATH: ${{ env.BLOCKER_REPORT_PATH }}
         run: python .github/scripts/merge_queue_blocker_diagnostics.py
 
+      - name: Trace every non-terminal check run to its owner
+        run: python .github/scripts/stale_check_diagnostics.py
+
       - name: Encode decisive findings in the artifact identity
         id: findings
         shell: python
@@ -56,16 +61,19 @@ jobs:
           import re
           from pathlib import Path
 
-          report = json.loads(
+          blocker = json.loads(
               Path(os.environ["BLOCKER_REPORT_PATH"]).read_text(encoding="utf-8")
+          )
+          stale = json.loads(
+              Path(os.environ["STALE_REPORT_PATH"]).read_text(encoding="utf-8")
           )
           parts = [
               "mqb",
-              f"qb{len(report.get('queue_branches') or [])}",
-              f"mgr{len(report.get('merge_group_runs') or [])}",
+              f"qb{len(blocker.get('queue_branches') or [])}",
+              f"mgr{len(blocker.get('merge_group_runs') or [])}",
           ]
           for number in ("322", "323"):
-              target = report["targets"][number]
+              target = blocker["targets"][number]
               rest = target["rest"]
               graph = target["graphql"].get("pull_request") or {}
               missing = len(target["required_checks"].get("missing") or [])
@@ -74,13 +82,16 @@ jobs:
               )
               unverified = len(target.get("unverified_commits") or [])
               unresolved = target["graphql"].get("unresolved_review_threads")
+              non_terminal = len(
+                  stale["targets"][number].get("non_terminal_checks") or []
+              )
               state = re.sub(
                   r"[^a-z0-9]+",
                   "-",
                   str(rest.get("mergeable_state") or "unknown").lower(),
               ).strip("-")
               parts.append(
-                  f"p{number}-{state}-m{missing}-n{non_success}-u{unverified}-t{unresolved if unresolved is not None else 'x'}-qe{int(graph.get('mergeQueueEntry') is not None)}"
+                  f"p{number}-{state}-m{missing}-n{non_success}-u{unverified}-t{unresolved if unresolved is not None else 'x'}-c{non_terminal}-qe{int(graph.get('mergeQueueEntry') is not None)}"
               )
           slug = "-".join(parts)[:220]
           with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as output:
@@ -95,5 +106,6 @@ jobs:
           path: |
             ${{ env.STATE_REPORT_PATH }}
             ${{ env.BLOCKER_REPORT_PATH }}
+            ${{ env.STALE_REPORT_PATH }}
           if-no-files-found: error
           retention-days: 30
