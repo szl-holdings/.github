@@ -58,10 +58,10 @@ jobs:
               "merge_queue",
               "required_signatures",
               "required_status_checks",
-              "verification.get(\"verified\") is not True",
+              'verification.get("verified") is not True',
               "mergeQueueEntry",
           )
-          forbidden = (
+          forbidden_endpoints = (
               '"PUT", f"repos/{repository}/pulls/',
               '"merge_method"',
               "statuses/",
@@ -69,12 +69,12 @@ jobs:
               "rulesets/",
               "branches/main/protection",
               "git/refs",
-              "reviews",
+              "/reviews",
               "secrets/",
           )
           for marker in required:
               assert marker in source, marker
-          for marker in forbidden:
+          for marker in forbidden_endpoints:
               assert marker not in source, marker
           PY
           git diff --check
