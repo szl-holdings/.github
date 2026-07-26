@@ -5,6 +5,7 @@ on:
     branches: [main]
     paths:
       - .github/scripts/enqueue_pr325_required_checks_only.py
+      - .github/scripts/enqueue_pr325_rule_guarded.py
       - .github/workflows/enqueue-pr325-required-checks-pr.yml
 
 permissions:
@@ -41,26 +42,35 @@ jobs:
           python -m py_compile \
             .github/scripts/request_exact_clean_merge_queue.py \
             .github/scripts/enqueue_exact_clean_pull_requests.py \
-            .github/scripts/enqueue_pr325_required_checks_only.py
+            .github/scripts/enqueue_pr325_required_checks_only.py \
+            .github/scripts/enqueue_pr325_rule_guarded.py
           python - <<'PY'
           from pathlib import Path
 
           source = Path(
               ".github/scripts/enqueue_pr325_required_checks_only.py"
           ).read_text(encoding="utf-8")
-          required = (
+          guard = Path(
+              ".github/scripts/enqueue_pr325_rule_guarded.py"
+          ).read_text(encoding="utf-8")
+          required_source = (
               "number=325",
               "93a5138742497345cca21b8bd1a385d3b499c579",
               "527fd000c5189f7b1ca4e56b7993d1daa952308a",
               "required_signatures",
               "required_linear_history",
               "required_status_checks",
-              "required_review_thread_resolution",
               "enqueue._enqueue",
               "expectedHeadOid",
               "jump=false",
               "Unrelated non-required check runs are not promoted",
               "Secret values, lengths, hashes, prefixes, identities",
+          )
+          required_guard = (
+              "required_review_thread_resolution",
+              "required_approving_review_count",
+              "allowed_merge_methods",
+              "controller.main()",
           )
           forbidden = (
               "mergePullRequest(input:",
@@ -78,10 +88,13 @@ jobs:
               "len(token",
               "hashlib",
           )
-          for marker in required:
+          for marker in required_source:
               assert marker in source, marker
+          for marker in required_guard:
+              assert marker in guard, marker
           for marker in forbidden:
               assert marker not in source, marker
+              assert marker not in guard, marker
           PY
           git diff --check
 
@@ -93,7 +106,7 @@ jobs:
         shell: bash
         run: |
           set +e
-          python .github/scripts/enqueue_pr325_required_checks_only.py
+          python .github/scripts/enqueue_pr325_rule_guarded.py
           code=$?
           echo "exit_code=${code}" >> "$GITHUB_OUTPUT"
           exit 0
