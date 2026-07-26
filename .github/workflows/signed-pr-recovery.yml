@@ -1,0 +1,52 @@
+name: Signed PR Recovery — GitHub createCommitOnBranch
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - .github/scripts/signed_pr_recovery.py
+      - .github/workflows/signed-pr-recovery.yml
+
+permissions:
+  contents: write
+  pull-requests: read
+
+concurrency:
+  group: signed-pr-recovery-${{ github.event.pull_request.number }}
+  cancel-in-progress: false
+
+env:
+  REPORT_PATH: reports/signed-pr-recovery.json
+
+jobs:
+  recover:
+    name: Rebuild exact trees as GitHub-signed commits
+    if: github.event.pull_request.head.ref == 'diag/merge-queue-state-v1'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - name: Checkout recovery controller
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 1
+
+      - name: Compile the recovery controller
+        run: |
+          set -euo pipefail
+          python -m py_compile .github/scripts/signed_pr_recovery.py
+          git diff --check
+
+      - name: Create and verify signed recovery branches
+        run: python .github/scripts/signed_pr_recovery.py
+
+      - name: Upload immutable recovery evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: signed-pr-recovery-${{ github.run_id }}
+          path: ${{ env.REPORT_PATH }}
+          if-no-files-found: error
+          retention-days: 90
