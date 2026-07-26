@@ -3,15 +3,17 @@
 
 The digest has two distinct credentials:
 
-* a read identity that must prove access to the complete installed organization
+* a governed organization read identity that must prove access to the complete
   estate and GitHub Actions metadata; and
 * the ephemeral repository ``GITHUB_TOKEN`` used only to update the deterministic
   digest issue in ``szl-holdings/.github``.
 
-The read identity is App-first. A short-lived qillqaq installation token is
-preferred, with the governed ``ORG_CI_READ_TOKEN`` retained as a bounded
-migration fallback. The built-in workflow token is never accepted as the org
-read identity because it cannot prove private cross-repository coverage.
+The already verified ``SZL_GITHUB_TOKEN`` is the primary organization read
+identity. The stale legacy ``ORG_CI_READ_TOKEN`` is retained only as a bounded
+migration fallback and is never allowed to turn an authentication failure into a
+zero-repository green result. The built-in workflow token is not accepted as the
+organization read identity because it cannot prove private cross-repository
+coverage.
 
 Every API error, coverage-floor violation, partial sweep, and issue-write failure
 is terminal. No credential value, prefix, length, hash, identity response, or
@@ -132,7 +134,12 @@ def utc_now() -> str:
 
 def _safe_detail(value: object) -> str:
     text = str(value or "").replace("\x00", "").strip()
-    text = re.sub(r"(token|authorization|bearer)\s+[^\s]+", r"\1 [REDACTED]", text, flags=re.I)
+    text = re.sub(
+        r"(token|authorization|bearer)\s+[^\s]+",
+        r"\1 [REDACTED]",
+        text,
+        flags=re.I,
+    )
     return text[:300]
 
 
@@ -147,7 +154,11 @@ def api_json(
 ) -> Any:
     if not token:
         raise ApiError(method, path, "NO_CREDENTIAL")
-    data = json.dumps(payload, sort_keys=True).encode("utf-8") if payload is not None else None
+    data = (
+        json.dumps(payload, sort_keys=True).encode("utf-8")
+        if payload is not None
+        else None
+    )
     request = urllib.request.Request(
         f"https://api.github.com{path}",
         method=method,
@@ -172,11 +183,19 @@ def api_json(
                 try:
                     return json.loads(raw.decode("utf-8"))
                 except json.JSONDecodeError as exc:
-                    raise ApiError(method, path, int(response.status), "non-JSON response") from exc
+                    raise ApiError(
+                        method,
+                        path,
+                        int(response.status),
+                        "non-JSON response",
+                    ) from exc
         except urllib.error.HTTPError as exc:
             detail = _safe_detail(exc.read().decode("utf-8", errors="replace"))
             last_error = ApiError(method, path, exc.code, detail)
-            if exc.code not in {429, 500, 502, 503, 504} or attempt + 1 >= retries:
+            if (
+                exc.code not in {429, 500, 502, 503, 504}
+                or attempt + 1 >= retries
+            ):
                 raise last_error from exc
         except (urllib.error.URLError, TimeoutError, OSError) as exc:
             last_error = ApiError(method, path, "NETWORK", _safe_detail(exc))
@@ -217,8 +236,12 @@ def _paginate_object_list(token: str, path: str, key: str) -> list[Any]:
 
 def load_repositories(mode: str, token: str) -> list[dict[str, Any]]:
     if mode == "github_app":
-        raw = _paginate_object_list(token, "/installation/repositories", "repositories")
-    elif mode == "governed_pat_fallback":
+        raw = _paginate_object_list(
+            token,
+            "/installation/repositories",
+            "repositories",
+        )
+    elif mode in {"governed_pat", "legacy_pat_fallback"}:
         raw = _paginate_list(token, f"/orgs/{ORG}/repos?type=all")
     else:
         raise DigestError(f"unsupported read identity mode {mode!r}")
@@ -231,8 +254,13 @@ def load_repositories(mode: str, token: str) -> list[dict[str, Any]]:
 def verify_actions_read(token: str, repository_full_name: str) -> None:
     encoded = urllib.parse.quote(repository_full_name, safe="/")
     result = api_json(token, f"/repos/{encoded}/actions/runs?per_page=1")
-    if not isinstance(result, dict) or not isinstance(result.get("workflow_runs"), list):
-        raise DigestError(f"Actions read probe returned an unexpected shape for {repository_full_name}")
+    if not isinstance(result, dict) or not isinstance(
+        result.get("workflow_runs"),
+        list,
+    ):
+        raise DigestError(
+            f"Actions read probe returned an unexpected shape for {repository_full_name}"
+        )
 
 
 def assess_identity(
@@ -252,15 +280,18 @@ def assess_identity(
     private = sum(bool(repo.get("private")) for repo in repos)
     if total < EXPECTED_TOTAL_FLOOR:
         raise DigestError(
-            f"{credential_name} exposed {total} repositories; expected at least {EXPECTED_TOTAL_FLOOR}"
+            f"{credential_name} exposed {total} repositories; expected at least "
+            f"{EXPECTED_TOTAL_FLOOR}"
         )
     if active < EXPECTED_ACTIVE_FLOOR:
         raise DigestError(
-            f"{credential_name} exposed {active} active repositories; expected at least {EXPECTED_ACTIVE_FLOOR}"
+            f"{credential_name} exposed {active} active repositories; expected at "
+            f"least {EXPECTED_ACTIVE_FLOOR}"
         )
     if private < EXPECTED_PRIVATE_FLOOR:
         raise DigestError(
-            f"{credential_name} exposed {private} private repositories; expected at least {EXPECTED_PRIVATE_FLOOR}"
+            f"{credential_name} exposed {private} private repositories; expected at "
+            f"least {EXPECTED_PRIVATE_FLOOR}"
         )
 
     by_name = {
@@ -276,7 +307,9 @@ def assess_identity(
         probes.append(private_names[0])
     for repository_full_name in probes:
         if repository_full_name not in by_name:
-            raise DigestError(f"required repository {repository_full_name} is absent from inventory")
+            raise DigestError(
+                f"required repository {repository_full_name} is absent from inventory"
+            )
         actions_probe(token, repository_full_name)
 
     return ReadIdentity(
@@ -297,9 +330,13 @@ def select_read_identity(
 ) -> tuple[ReadIdentity, tuple[str, ...]]:
     if candidates is None:
         candidates = (
-            ("github_app", "QILLQAQ_APP_TOKEN", os.environ.get("QILLQAQ_TOKEN", "")),
             (
-                "governed_pat_fallback",
+                "governed_pat",
+                "SZL_GITHUB_TOKEN",
+                os.environ.get("SZL_GITHUB_TOKEN", ""),
+            ),
+            (
+                "legacy_pat_fallback",
                 "ORG_CI_READ_TOKEN",
                 os.environ.get("ORG_CI_READ_TOKEN", ""),
             ),
@@ -310,7 +347,9 @@ def select_read_identity(
             return assess_identity(mode, credential_name, token), tuple(errors)
         except DigestError as exc:
             errors.append(f"{credential_name}: {exc}")
-    raise DigestError("no complete organization CI read identity is usable; " + "; ".join(errors))
+    raise DigestError(
+        "no complete organization CI read identity is usable; " + "; ".join(errors)
+    )
 
 
 def _object_items(token: str, path: str, key: str) -> list[dict[str, Any]]:
@@ -322,24 +361,41 @@ def _object_items(token: str, path: str, key: str) -> list[dict[str, Any]]:
 
 def list_workflows(token: str, repo: str) -> list[dict[str, Any]]:
     encoded = urllib.parse.quote(repo, safe="/")
-    return _object_items(token, f"/repos/{encoded}/actions/workflows", "workflows")
+    return _object_items(
+        token,
+        f"/repos/{encoded}/actions/workflows",
+        "workflows",
+    )
 
 
-def latest_completed_run(token: str, repo: str, workflow_id: int) -> dict[str, Any] | None:
+def latest_completed_run(
+    token: str,
+    repo: str,
+    workflow_id: int,
+) -> dict[str, Any] | None:
     encoded = urllib.parse.quote(repo, safe="/")
     result = api_json(
         token,
         f"/repos/{encoded}/actions/workflows/{workflow_id}/runs?per_page=20",
     )
-    if not isinstance(result, dict) or not isinstance(result.get("workflow_runs"), list):
-        raise DigestError(f"workflow run response is malformed for {repo}:{workflow_id}")
+    if not isinstance(result, dict) or not isinstance(
+        result.get("workflow_runs"),
+        list,
+    ):
+        raise DigestError(
+            f"workflow run response is malformed for {repo}:{workflow_id}"
+        )
     for run in result["workflow_runs"]:
         if isinstance(run, dict) and run.get("status") == "completed":
             return run
     return None
 
 
-def classify_red(repo: str, workflow: Mapping[str, Any], run: Mapping[str, Any]) -> tuple[str, str]:
+def classify_red(
+    repo: str,
+    workflow: Mapping[str, Any],
+    run: Mapping[str, Any],
+) -> tuple[str, str]:
     del repo
     name = str(workflow.get("name") or "")
     event = str(run.get("event") or "")
@@ -351,9 +407,18 @@ def classify_red(repo: str, workflow: Mapping[str, Any], run: Mapping[str, Any])
         created = datetime.min.replace(tzinfo=timezone.utc)
 
     if any(pattern.lower() in name.lower() for pattern in FOUNDER_PATTERNS):
-        return "FOUNDER_GATED", "requires a founder-controlled deployment, registry, or owner-host credential"
-    if event == "release" or any(pattern.lower() in name.lower() for pattern in INFRA_PATTERNS):
-        return "INFRA", "release/deployment/supply-chain lane; verify only when that lane is intentionally exercised"
+        return (
+            "FOUNDER_GATED",
+            "requires a founder-controlled deployment, registry, or owner-host credential",
+        )
+    if event == "release" or any(
+        pattern.lower() in name.lower() for pattern in INFRA_PATTERNS
+    ):
+        return (
+            "INFRA",
+            "release/deployment/supply-chain lane; verify only when that lane is "
+            "intentionally exercised",
+        )
     if created < datetime.now(timezone.utc) - timedelta(days=STALE_DAYS):
         return "INFRA", f"latest completed failure is older than {STALE_DAYS} days"
     if actor == "dependabot[bot]":
@@ -364,31 +429,52 @@ def classify_red(repo: str, workflow: Mapping[str, Any], run: Mapping[str, Any])
 def sweep_repository(repo: Mapping[str, Any], token: str) -> RepoSweep:
     full_name = str(repo.get("full_name") or "")
     if not full_name:
-        return RepoSweep(repo="<missing>", workflows=0, reds=(), error="repository lacks full_name")
+        return RepoSweep(
+            repo="<missing>",
+            workflows=0,
+            reds=(),
+            error="repository lacks full_name",
+        )
     try:
         workflows = list_workflows(token, full_name)
         reds: list[RedRun] = []
         for workflow in workflows:
             name = str(workflow.get("name") or "")
-            if name in IGNORE_NAMES or str(workflow.get("state") or "") == "disabled_manually":
+            if name in IGNORE_NAMES or str(workflow.get("state") or "") == (
+                "disabled_manually"
+            ):
                 continue
             workflow_id = workflow.get("id")
             if not isinstance(workflow_id, int):
-                raise DigestError(f"workflow {name!r} in {full_name} lacks an integer id")
+                raise DigestError(
+                    f"workflow {name!r} in {full_name} lacks an integer id"
+                )
             run = latest_completed_run(token, full_name, workflow_id)
-            if not run or run.get("conclusion") not in {"failure", "cancelled", "timed_out", "action_required"}:
+            if not run or run.get("conclusion") not in {
+                "failure",
+                "cancelled",
+                "timed_out",
+                "action_required",
+            }:
                 continue
             category, reason = classify_red(full_name, workflow, run)
             run_id = run.get("id")
             if not isinstance(run_id, int):
-                raise DigestError(f"workflow {name!r} in {full_name} returned a run without an integer id")
+                raise DigestError(
+                    f"workflow {name!r} in {full_name} returned a run without an "
+                    "integer id"
+                )
             reds.append(
                 RedRun(
                     repo=full_name.split("/", 1)[-1],
                     workflow=name,
                     workflow_id=workflow_id,
                     run_id=run_id,
-                    run_number=run.get("run_number") if isinstance(run.get("run_number"), int) else None,
+                    run_number=(
+                        run.get("run_number")
+                        if isinstance(run.get("run_number"), int)
+                        else None
+                    ),
                     conclusion=str(run.get("conclusion") or "unknown"),
                     event=str(run.get("event") or "unknown"),
                     created_at=str(run.get("created_at") or ""),
@@ -397,16 +483,31 @@ def sweep_repository(repo: Mapping[str, Any], token: str) -> RepoSweep:
                     reason=reason,
                 )
             )
-        return RepoSweep(repo=full_name, workflows=len(workflows), reds=tuple(reds))
+        return RepoSweep(
+            repo=full_name,
+            workflows=len(workflows),
+            reds=tuple(reds),
+        )
     except DigestError as exc:
-        return RepoSweep(repo=full_name, workflows=0, reds=(), error=str(exc))
+        return RepoSweep(
+            repo=full_name,
+            workflows=0,
+            reds=(),
+            error=str(exc),
+        )
 
 
-def sweep_all(identity: ReadIdentity) -> tuple[list[RepoSweep], list[RedRun], list[str]]:
-    active = [repo for repo in identity.repositories if not bool(repo.get("archived"))]
+def sweep_all(
+    identity: ReadIdentity,
+) -> tuple[list[RepoSweep], list[RedRun], list[str]]:
+    active = [
+        repo for repo in identity.repositories if not bool(repo.get("archived"))
+    ]
     sweeps: list[RepoSweep] = []
     with concurrent.futures.ThreadPoolExecutor(max_workers=MAX_WORKERS) as pool:
-        futures = [pool.submit(sweep_repository, repo, identity.token) for repo in active]
+        futures = [
+            pool.submit(sweep_repository, repo, identity.token) for repo in active
+        ]
         for future in concurrent.futures.as_completed(futures):
             sweeps.append(future.result())
     sweeps.sort(key=lambda item: item.repo)
@@ -414,7 +515,9 @@ def sweep_all(identity: ReadIdentity) -> tuple[list[RepoSweep], list[RedRun], li
         (red for sweep in sweeps for red in sweep.reds),
         key=lambda item: (item.category, item.repo, item.workflow),
     )
-    errors = [f"{sweep.repo}: {sweep.error}" for sweep in sweeps if sweep.error]
+    errors = [
+        f"{sweep.repo}: {sweep.error}" for sweep in sweeps if sweep.error
+    ]
     return sweeps, reds, errors
 
 
@@ -429,13 +532,17 @@ def _table(rows: Iterable[RedRun]) -> str:
     for item in items:
         workflow = f"[{item.workflow}]({item.url})" if item.url else item.workflow
         lines.append(
-            f"| `{item.repo}` | {workflow} | `{item.conclusion}` (run #{item.run_number or '?'}) | "
-            f"`{item.event}` | `{item.created_at}` | {item.reason} |"
+            f"| `{item.repo}` | {workflow} | `{item.conclusion}` "
+            f"(run #{item.run_number or '?'}) | `{item.event}` | "
+            f"`{item.created_at}` | {item.reason} |"
         )
     return "\n".join(lines) + "\n"
 
 
-def build_report(identity: ReadIdentity, auth_failures: Sequence[str]) -> dict[str, Any]:
+def build_report(
+    identity: ReadIdentity,
+    auth_failures: Sequence[str],
+) -> dict[str, Any]:
     sweeps, reds, errors = sweep_all(identity)
     actionable = [item for item in reds if item.category == "ACTIONABLE"]
     founder = [item for item in reds if item.category == "FOUNDER_GATED"]
@@ -500,15 +607,23 @@ def render_issue(report: Mapping[str, Any]) -> tuple[str, str, bool]:
     icon = "🔴" if should_open else ("🟠" if red_count else "🟢")
     title = f"{icon} CI Health Digest — org-wide"
 
-    reds = [RedRun(**item) for item in report.get("reds", []) if isinstance(item, dict)]
+    reds = [
+        RedRun(**item)
+        for item in report.get("reds", [])
+        if isinstance(item, dict)
+    ]
     actionable = [item for item in reds if item.category == "ACTIONABLE"]
     founder = [item for item in reds if item.category == "FOUNDER_GATED"]
     infra = [item for item in reds if item.category == "INFRA"]
     run_url = None
-    if all(os.environ.get(key) for key in ("GITHUB_SERVER_URL", "GITHUB_REPOSITORY", "GITHUB_RUN_ID")):
+    if all(
+        os.environ.get(key)
+        for key in ("GITHUB_SERVER_URL", "GITHUB_REPOSITORY", "GITHUB_RUN_ID")
+    ):
         run_url = (
-            f"{os.environ['GITHUB_SERVER_URL']}/{os.environ['GITHUB_REPOSITORY']}"
-            f"/actions/runs/{os.environ['GITHUB_RUN_ID']}"
+            f"{os.environ['GITHUB_SERVER_URL']}/"
+            f"{os.environ['GITHUB_REPOSITORY']}/actions/runs/"
+            f"{os.environ['GITHUB_RUN_ID']}"
         )
 
     lines = [
@@ -519,12 +634,16 @@ def render_issue(report: Mapping[str, Any]) -> tuple[str, str, bool]:
         f"- Generated: `{report.get('generated_at')}`",
         f"- Source generation: `{report.get('generation')}`",
         f"- Run: {run_url or 'not available'}",
-        f"- Read identity: `{authentication.get('mode')}` / `{authentication.get('credential_name')}`",
+        f"- Read identity: `{authentication.get('mode')}` / "
+        f"`{authentication.get('credential_name')}`",
         "- Credential value recorded: `false`",
-        f"- Repository coverage: **{coverage.get('repositories')} total / {coverage.get('active')} active / {coverage.get('private')} private / {coverage.get('archived')} archived**",
+        f"- Repository coverage: **{coverage.get('repositories')} total / "
+        f"{coverage.get('active')} active / {coverage.get('private')} private / "
+        f"{coverage.get('archived')} archived**",
         f"- Active repositories swept: **{coverage.get('swept_active')}**",
         f"- Workflows inspected: **{coverage.get('workflow_count')}**",
-        f"- Latest red workflows: **{red_count}** — **{actionable_count} actionable**, {len(founder)} founder-gated, {len(infra)} historical/infra",
+        f"- Latest red workflows: **{red_count}** — **{actionable_count} "
+        f"actionable**, {len(founder)} founder-gated, {len(infra)} historical/infra",
         "",
     ]
     if report.get("query_errors"):
@@ -544,19 +663,29 @@ def render_issue(report: Mapping[str, Any]) -> tuple[str, str, bool]:
             _table(infra),
             "## Contract",
             "",
-            "The issue stays open only for incomplete verification or current actionable failures. Historical release/deployment failures remain visible here but do not keep the work queue open. A failed read, incomplete estate, or failed issue update can never look green.",
+            "The issue stays open only for incomplete verification or current "
+            "actionable failures. Historical release/deployment failures remain "
+            "visible here but do not keep the work queue open. A failed read, "
+            "incomplete estate, or failed issue update can never look green.",
             "",
         ]
     )
     return title, "\n".join(lines), should_open
 
 
-def upsert_issue(write_token: str, report: Mapping[str, Any]) -> dict[str, Any]:
+def upsert_issue(
+    write_token: str,
+    report: Mapping[str, Any],
+) -> dict[str, Any]:
     if not write_token:
         raise DigestError("GITHUB_TOKEN is missing for deterministic issue update")
     title, body, should_open = render_issue(report)
     state = "open" if should_open else "closed"
-    payload: dict[str, Any] = {"title": title, "body": body, "state": state}
+    payload: dict[str, Any] = {
+        "title": title,
+        "body": body,
+        "state": state,
+    }
     if state == "closed":
         payload["state_reason"] = "completed"
     try:
@@ -578,10 +707,15 @@ def upsert_issue(write_token: str, report: Mapping[str, Any]) -> dict[str, Any]:
             expected=(201,),
         )
     if not isinstance(result, dict) or not isinstance(result.get("number"), int):
-        raise DigestError("deterministic issue update returned an unexpected response")
+        raise DigestError(
+            "deterministic issue update returned an unexpected response"
+        )
     observed_state = str(result.get("state") or "")
     if observed_state != state:
-        raise DigestError(f"digest issue state mismatch: expected {state}, observed {observed_state}")
+        raise DigestError(
+            f"digest issue state mismatch: expected {state}, observed "
+            f"{observed_state}"
+        )
     return {
         "number": result["number"],
         "title": result.get("title"),
@@ -594,7 +728,10 @@ def upsert_issue(write_token: str, report: Mapping[str, Any]) -> dict[str, Any]:
 
 def write_report(path: Path, report: Mapping[str, Any]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(report, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    path.write_text(
+        json.dumps(report, indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
 
 
 def write_summary(report: Mapping[str, Any]) -> None:
@@ -616,7 +753,9 @@ def write_summary(report: Mapping[str, Any]) -> None:
         handle.write(f"- query errors: `{summary.get('query_errors')}`\n")
         issue = report.get("issue") or {}
         if issue:
-            handle.write(f"- issue: `{issue.get('state')}` #{issue.get('number')}\n")
+            handle.write(
+                f"- issue: `{issue.get('state')}` #{issue.get('number')}\n"
+            )
         handle.write("- credential value recorded: `false`\n")
 
 
@@ -666,7 +805,10 @@ def failure_report(message: str) -> dict[str, Any]:
 
 def main(argv: Sequence[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--report", default="reports/ci-health-digest.json")
+    parser.add_argument(
+        "--report",
+        default="reports/ci-health-digest.json",
+    )
     args = parser.parse_args(argv)
     report_path = Path(args.report)
     write_token = os.environ.get("GITHUB_TOKEN", "")
@@ -674,8 +816,10 @@ def main(argv: Sequence[str] | None = None) -> int:
     try:
         identity, auth_failures = select_read_identity()
         print(
-            f"authenticated mode={identity.mode} repos={identity.total_repositories} "
-            f"active={identity.active_repositories} private={identity.private_repositories}"
+            f"authenticated mode={identity.mode} "
+            f"repos={identity.total_repositories} "
+            f"active={identity.active_repositories} "
+            f"private={identity.private_repositories}"
         )
         report = build_report(identity, auth_failures)
     except DigestError as exc:
@@ -684,7 +828,10 @@ def main(argv: Sequence[str] | None = None) -> int:
         try:
             report["issue"] = upsert_issue(write_token, report)
         except DigestError as issue_exc:
-            report["issue"] = {"error": str(issue_exc), "value_recorded": False}
+            report["issue"] = {
+                "error": str(issue_exc),
+                "value_recorded": False,
+            }
         write_report(report_path, report)
         write_summary(report)
         print(f"FATAL: {exc}", file=sys.stderr)
@@ -695,9 +842,14 @@ def main(argv: Sequence[str] | None = None) -> int:
         report["issue"] = upsert_issue(write_token, report)
     except DigestError as exc:
         report["status"] = "NOT_VERIFIED"
-        report["summary"]["query_errors"] = int(report["summary"].get("query_errors", 0)) + 1
+        report["summary"]["query_errors"] = (
+            int(report["summary"].get("query_errors", 0)) + 1
+        )
         report["query_errors"].append(str(exc))
-        report["issue"] = {"error": str(exc), "value_recorded": False}
+        report["issue"] = {
+            "error": str(exc),
+            "value_recorded": False,
+        }
         write_report(report_path, report)
         write_summary(report)
         print(f"FATAL: {exc}", file=sys.stderr)
