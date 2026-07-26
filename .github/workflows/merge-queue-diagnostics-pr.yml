@@ -5,6 +5,7 @@ on:
     branches: [main]
     paths:
       - .github/scripts/merge_queue_diagnostics.py
+      - .github/scripts/merge_queue_blocker_diagnostics.py
       - .github/workflows/merge-queue-diagnostics-pr.yml
 
 permissions:
@@ -18,7 +19,8 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  REPORT_PATH: reports/merge-queue-state.json
+  STATE_REPORT_PATH: reports/merge-queue-state.json
+  BLOCKER_REPORT_PATH: reports/merge-queue-blocker.json
   TARGET_PULL_REQUESTS: "322,323"
 
 jobs:
@@ -35,8 +37,15 @@ jobs:
           persist-credentials: false
           fetch-depth: 1
 
-      - name: Query GitHub read-only control-plane state
+      - name: Query broad read-only control-plane state
+        env:
+          REPORT_PATH: ${{ env.STATE_REPORT_PATH }}
         run: python .github/scripts/merge_queue_diagnostics.py
+
+      - name: Isolate the exact pre-enqueue blocker
+        env:
+          REPORT_PATH: ${{ env.BLOCKER_REPORT_PATH }}
+        run: python .github/scripts/merge_queue_blocker_diagnostics.py
 
       - name: Encode decisive findings in the artifact identity
         id: findings
@@ -48,51 +57,30 @@ jobs:
           from pathlib import Path
 
           report = json.loads(
-              Path(os.environ["REPORT_PATH"]).read_text(encoding="utf-8")
+              Path(os.environ["BLOCKER_REPORT_PATH"]).read_text(encoding="utf-8")
           )
-          control = report["control_plane"]
-
-          def count(result):
-              payload = result.get("payload")
-              return len(payload) if result.get("ok") and isinstance(payload, list) else -1
-
           parts = [
-              "mq",
-              f"q{count(control['queue_branches'])}",
-              f"r{count(control['merge_group_runs'])}",
-              f"rules{int(bool(control['active_rules_main'].get('ok')))}",
-              f"protect{int(bool(control['main_protection'].get('ok')))}",
+              "mqb",
+              f"qb{len(report.get('queue_branches') or [])}",
+              f"mgr{len(report.get('merge_group_runs') or [])}",
           ]
           for number in ("322", "323"):
               target = report["targets"][number]
-              rest = target["rest"].get("payload")
-              graph = target["graphql"].get("payload")
-              pull = None
-              if isinstance(graph, dict):
-                  pull = (
-                      (graph.get("data") or {})
-                      .get("repository", {})
-                      .get("pullRequest")
-                  )
-              rest_auto = int(
-                  isinstance(rest, dict) and rest.get("auto_merge") is not None
+              rest = target["rest"]
+              graph = target["graphql"].get("pull_request") or {}
+              missing = len(target["required_checks"].get("missing") or [])
+              non_success = len(
+                  target["required_checks"].get("non_success") or []
               )
-              graph_auto = int(
-                  isinstance(pull, dict)
-                  and pull.get("autoMergeRequest") is not None
-              )
-              queue_entry = int(
-                  isinstance(pull, dict)
-                  and pull.get("mergeQueueEntry") is not None
-              )
-              state = (
-                  str(rest.get("mergeable_state") or "unknown")
-                  if isinstance(rest, dict)
-                  else "unreadable"
-              )
-              state = re.sub(r"[^a-z0-9]+", "-", state.lower()).strip("-")
+              unverified = len(target.get("unverified_commits") or [])
+              unresolved = target["graphql"].get("unresolved_review_threads")
+              state = re.sub(
+                  r"[^a-z0-9]+",
+                  "-",
+                  str(rest.get("mergeable_state") or "unknown").lower(),
+              ).strip("-")
               parts.append(
-                  f"p{number}-ro{rest_auto}-go{graph_auto}-qe{queue_entry}-gq{int(bool(target['graphql'].get('ok')))}-{state}"
+                  f"p{number}-{state}-m{missing}-n{non_success}-u{unverified}-t{unresolved if unresolved is not None else 'x'}-qe{int(graph.get('mergeQueueEntry') is not None)}"
               )
           slug = "-".join(parts)[:220]
           with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as output:
@@ -103,7 +91,9 @@ jobs:
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: ${{ steps.findings.outputs.summary_slug || format('mq-not-encoded-{0}', github.run_id) }}
-          path: ${{ env.REPORT_PATH }}
+          name: ${{ steps.findings.outputs.summary_slug || format('mqb-not-encoded-{0}', github.run_id) }}
+          path: |
+            ${{ env.STATE_REPORT_PATH }}
+            ${{ env.BLOCKER_REPORT_PATH }}
           if-no-files-found: error
           retention-days: 30
