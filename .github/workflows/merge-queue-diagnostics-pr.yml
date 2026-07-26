@@ -1,0 +1,248 @@
+name: Merge Queue State — Read-Only Diagnostics
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - .github/workflows/merge-queue-diagnostics-pr.yml
+
+permissions:
+  actions: read
+  checks: read
+  contents: read
+  pull-requests: read
+
+concurrency:
+  group: merge-queue-diagnostics-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+env:
+  REPORT_PATH: reports/merge-queue-state.json
+  TARGET_PULL_REQUESTS: "322,323"
+
+jobs:
+  diagnose:
+    name: GitHub queue, rules, checks, and delivery state
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - name: Query GitHub read-only control-plane state
+        shell: python
+        run: |
+          from __future__ import annotations
+
+          import json
+          import os
+          import subprocess
+          from datetime import datetime, timezone
+          from pathlib import Path
+          from typing import Any
+
+          repository = os.environ["GITHUB_REPOSITORY"]
+          owner, name = repository.split("/", 1)
+          targets = [
+              int(value)
+              for value in os.environ["TARGET_PULL_REQUESTS"].split(",")
+              if value.strip()
+          ]
+
+          def invoke(arguments: list[str]) -> dict[str, Any]:
+              process = subprocess.run(
+                  ["gh", "api", *arguments],
+                  check=False,
+                  capture_output=True,
+                  text=True,
+                  env=os.environ,
+              )
+              stdout = process.stdout.strip()
+              try:
+                  payload: Any = json.loads(stdout) if stdout else None
+              except json.JSONDecodeError:
+                  payload = stdout[:4000]
+              return {
+                  "ok": process.returncode == 0,
+                  "returncode": process.returncode,
+                  "payload": payload,
+                  "stderr": process.stderr.strip()[:2000],
+              }
+
+          def rest(path: str) -> dict[str, Any]:
+              return invoke(["--method", "GET", path])
+
+          graphql_query = """
+          query($owner: String!, $name: String!, $number: Int!) {
+            repository(owner: $owner, name: $name) {
+              pullRequest(number: $number) {
+                id
+                number
+                url
+                state
+                isDraft
+                headRefOid
+                baseRefName
+                mergeable
+                mergeStateStatus
+                reviewDecision
+                autoMergeRequest {
+                  enabledAt
+                  mergeMethod
+                  enabledBy { login }
+                }
+                mergeQueueEntry {
+                  position
+                  state
+                }
+              }
+            }
+          }
+          """
+
+          introspection_query = """
+          query {
+            pullRequestType: __type(name: "PullRequest") {
+              fields { name }
+            }
+            mergeQueueEntryType: __type(name: "MergeQueueEntry") {
+              fields { name }
+            }
+          }
+          """
+
+          report: dict[str, Any] = {
+              "schema": "szl.merge-queue-diagnostics/v1",
+              "generated_at": datetime.now(timezone.utc).isoformat(),
+              "generation": os.environ.get("GITHUB_SHA"),
+              "repository": repository,
+              "workflow": {
+                  "event": os.environ.get("GITHUB_EVENT_NAME"),
+                  "run_id": os.environ.get("GITHUB_RUN_ID"),
+                  "run_url": (
+                      f"{os.environ.get('GITHUB_SERVER_URL')}/{repository}/actions/runs/"
+                      f"{os.environ.get('GITHUB_RUN_ID')}"
+                  ),
+              },
+              "targets": {},
+              "control_plane": {},
+          }
+
+          report["control_plane"]["graphql_schema"] = invoke(
+              ["graphql", "-f", f"query={introspection_query}"]
+          )
+          report["control_plane"]["active_rules_main"] = rest(
+              f"repos/{repository}/rules/branches/main"
+          )
+          report["control_plane"]["main_protection"] = rest(
+              f"repos/{repository}/branches/main/protection"
+          )
+          report["control_plane"]["recent_rule_suites"] = rest(
+              f"repos/{repository}/rulesets/rule-suites?ref=refs/heads/main&per_page=20"
+          )
+
+          branch_response = rest(f"repos/{repository}/branches?per_page=100")
+          if branch_response["ok"] and isinstance(branch_response["payload"], list):
+              branch_response["payload"] = [
+                  {
+                      "name": item.get("name"),
+                      "sha": (item.get("commit") or {}).get("sha"),
+                      "protected": item.get("protected"),
+                  }
+                  for item in branch_response["payload"]
+                  if str(item.get("name") or "").startswith("gh-readonly-queue/")
+              ]
+          report["control_plane"]["queue_branches"] = branch_response
+
+          merge_group_runs = rest(
+              f"repos/{repository}/actions/runs?event=merge_group&per_page=100"
+          )
+          if merge_group_runs["ok"] and isinstance(merge_group_runs["payload"], dict):
+              merge_group_runs["payload"] = [
+                  {
+                      "id": item.get("id"),
+                      "name": item.get("name"),
+                      "event": item.get("event"),
+                      "status": item.get("status"),
+                      "conclusion": item.get("conclusion"),
+                      "head_branch": item.get("head_branch"),
+                      "head_sha": item.get("head_sha"),
+                      "created_at": item.get("created_at"),
+                      "html_url": item.get("html_url"),
+                  }
+                  for item in merge_group_runs["payload"].get("workflow_runs", [])
+              ]
+          report["control_plane"]["merge_group_runs"] = merge_group_runs
+
+          for number in targets:
+              pr_rest = rest(f"repos/{repository}/pulls/{number}")
+              target: dict[str, Any] = {"rest": pr_rest}
+              head_sha = None
+              if pr_rest["ok"] and isinstance(pr_rest["payload"], dict):
+                  payload = pr_rest["payload"]
+                  head_sha = (payload.get("head") or {}).get("sha")
+                  pr_rest["payload"] = {
+                      "number": payload.get("number"),
+                      "state": payload.get("state"),
+                      "draft": payload.get("draft"),
+                      "mergeable": payload.get("mergeable"),
+                      "mergeable_state": payload.get("mergeable_state"),
+                      "rebaseable": payload.get("rebaseable"),
+                      "auto_merge": payload.get("auto_merge"),
+                      "head": payload.get("head"),
+                      "base": payload.get("base"),
+                      "updated_at": payload.get("updated_at"),
+                  }
+
+              target["graphql"] = invoke(
+                  [
+                      "graphql",
+                      "-f",
+                      f"query={graphql_query}",
+                      "-F",
+                      f"owner={owner}",
+                      "-F",
+                      f"name={name}",
+                      "-F",
+                      f"number={number}",
+                  ]
+              )
+              if head_sha:
+                  check_suites = rest(
+                      f"repos/{repository}/commits/{head_sha}/check-suites?per_page=100"
+                  )
+                  if check_suites["ok"] and isinstance(check_suites["payload"], dict):
+                      check_suites["payload"] = [
+                          {
+                              "id": item.get("id"),
+                              "status": item.get("status"),
+                              "conclusion": item.get("conclusion"),
+                              "head_branch": item.get("head_branch"),
+                              "head_sha": item.get("head_sha"),
+                              "app": (item.get("app") or {}).get("slug"),
+                              "latest_check_runs_count": item.get(
+                                  "latest_check_runs_count"
+                              ),
+                              "url": item.get("url"),
+                          }
+                          for item in check_suites["payload"].get("check_suites", [])
+                      ]
+                  target["check_suites"] = check_suites
+                  target["combined_status"] = rest(
+                      f"repos/{repository}/commits/{head_sha}/status"
+                  )
+              report["targets"][str(number)] = target
+
+          path = Path(os.environ["REPORT_PATH"])
+          path.parent.mkdir(parents=True, exist_ok=True)
+          rendered = json.dumps(report, indent=2, sort_keys=True)
+          path.write_text(rendered + "\n", encoding="utf-8")
+          print(rendered)
+
+      - name: Upload immutable diagnostic evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: merge-queue-diagnostics-${{ github.run_id }}
+          path: ${{ env.REPORT_PATH }}
+          if-no-files-found: error
+          retention-days: 30
