@@ -51,3 +51,12 @@ is recorded in `KNOWN_LIMITATIONS.md`.
    deployment are already green.
 
 Never apply the ruleset before steps 2 through 7 are complete.
+
+## Live bootstrap state
+
+As of 2026-07-25, `qillqaq-attestor` is registered as App ID `4395545`
+and installed as installation `149057850` on all current and future
+`szl-holdings` repositories. The `.github` repository's `production`
+environment stores the App ID and private key and requires founder review.
+No attestor workflow, eight-gate workflow, staging deployment requirement, or
+FORGE-9 ruleset has been activated.

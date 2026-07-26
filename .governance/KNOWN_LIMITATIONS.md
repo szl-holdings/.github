@@ -2,8 +2,12 @@
 
 The following blockers are explicit and must not be described as complete:
 
-- `qillqaq-attestor` is not yet registered or installed.
-- No private key or App ID has been placed in the `production` environment.
+- `qillqaq-attestor` is registered and installed, but its workflow is not
+  active and its installation token has not been exercised by a merged,
+  independently reviewed workflow.
+- The App ID and private key are stored in the `.github` repository's
+  `production` environment. Founder approval is required before a job can read
+  them; the downloaded local key copy was removed after secret verification.
 - GitHub App approvals have not been proven to satisfy the estate's required
   review rule.
 - The estate has one human organization member, so a human cannot independently
