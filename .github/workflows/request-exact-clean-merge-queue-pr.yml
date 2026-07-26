@@ -7,6 +7,7 @@ on:
       - .github/scripts/request_exact_clean_merge_queue.py
       - .github/scripts/enqueue_exact_clean_pull_requests.py
       - .github/scripts/enqueue_with_governed_user_tokens.py
+      - .github/scripts/enqueue_pr325_with_governed_token.py
       - .github/workflows/request-exact-clean-merge-queue-pr.yml
 
 permissions:
@@ -43,7 +44,8 @@ jobs:
           python -m py_compile \
             .github/scripts/request_exact_clean_merge_queue.py \
             .github/scripts/enqueue_exact_clean_pull_requests.py \
-            .github/scripts/enqueue_with_governed_user_tokens.py
+            .github/scripts/enqueue_with_governed_user_tokens.py \
+            .github/scripts/enqueue_pr325_with_governed_token.py
           python - <<'PY'
           from pathlib import Path
 
@@ -56,9 +58,10 @@ jobs:
           selector = Path(
               ".github/scripts/enqueue_with_governed_user_tokens.py"
           ).read_text(encoding="utf-8")
+          target = Path(
+              ".github/scripts/enqueue_pr325_with_governed_token.py"
+          ).read_text(encoding="utf-8")
           required_preflight = (
-              "52ab3fc1a17b5366010dd1bcfe8f6dcb5db4a286",
-              "fb8a1c2435db5bff99be51faefc9781309d0f9a4",
               "merge_queue",
               "required_signatures",
               "required_status_checks",
@@ -78,6 +81,12 @@ jobs:
               "Secret values, lengths, hashes, prefixes, identities",
               "selected_secret_name",
               "ENQUEUED_OR_MERGED",
+          )
+          required_target = (
+              "number=325",
+              "93a5138742497345cca21b8bd1a385d3b499c579",
+              "527fd000c5189f7b1ca4e56b7993d1daa952308a",
+              "controller.main()",
           )
           forbidden = (
               "mergePullRequest(input:",
@@ -101,12 +110,15 @@ jobs:
               assert marker in enqueue, marker
           for marker in required_selector:
               assert marker in selector, marker
+          for marker in required_target:
+              assert marker in target, marker
           for marker in forbidden:
               assert marker not in selector, marker
+              assert marker not in target, marker
           PY
           git diff --check
 
-      - name: Select a governed credential and enqueue both exact signed heads
+      - name: Select a governed credential and enqueue the exact signed head
         id: queue
         env:
           GH_NOTIFICATIONS_TOKEN: ${{ secrets.GH_NOTIFICATIONS_TOKEN }}
@@ -114,7 +126,7 @@ jobs:
         shell: bash
         run: |
           set +e
-          python .github/scripts/enqueue_with_governed_user_tokens.py
+          python .github/scripts/enqueue_pr325_with_governed_token.py
           code=$?
           echo "exit_code=${code}" >> "$GITHUB_OUTPUT"
           exit 0
@@ -135,7 +147,7 @@ jobs:
         run: |
           code="${EXIT_CODE:-2}"
           if [ "$code" -ne 0 ]; then
-            echo "::error::No existing governed user-token secret could enqueue both exact signed heads. No immediate merge or protection change was attempted."
+            echo "::error::No existing governed user-token secret could enqueue the exact signed PR #325 head. No immediate merge or protection change was attempted."
             exit "$code"
           fi
-          echo "Both exact signed heads entered GitHub's protected merge queue or were merged by that queue."
+          echo "The exact signed PR #325 head entered GitHub's protected merge queue or was merged by that queue."
