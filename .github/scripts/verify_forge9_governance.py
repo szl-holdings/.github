@@ -50,7 +50,10 @@ ATTESTOR_SELF_EDIT_GUARD = (
     r"^(\.github/workflows/(attest-and-approve|gates|forge9-staging)"
     r"\.ya?ml|\.governance/)"
 )
-GOVERNED_BASE_FILTER = '.base.ref == "main"'
+GOVERNED_BASE_FILTER = (
+    '.base.ref == "main"\n'
+    '                  or (.base.ref | startswith("release/"))'
+)
 
 
 def fail(message: str) -> None:
@@ -108,8 +111,8 @@ def verify_ruleset() -> None:
     expected_review = {
         "dismiss_stale_reviews_on_push": True,
         "require_code_owner_review": False,
-        "require_last_push_approval": False,
-        "required_approving_review_count": 0,
+        "require_last_push_approval": True,
+        "required_approving_review_count": 1,
         "required_review_thread_resolution": True,
     }
     for key, value in expected_review.items():
@@ -216,9 +219,9 @@ def verify_gate_contract() -> None:
             fail(f"attestor governance authorization marker missing: {marker}")
 
     if GOVERNED_BASE_FILTER not in attestor_template:
-        fail("attestor must resolve PRs targeting main")
-    if 'startswith("release/")' in attestor_template:
-        fail("release PRs cannot be enqueued into the default-branch merge queue")
+        fail("attestor must resolve PRs targeting main and release/*")
+    if "environment: production" in attestor_template:
+        fail("the merge attestor must not consume the production deployment gate")
     if "GH_TOKEN: ${{ github.token }}" not in attestor_template:
         fail("the protected queue request must use the ephemeral workflow token")
     if 'gh pr merge "$PR" --repo "$REPOSITORY" --auto --squash' not in (
@@ -229,6 +232,13 @@ def verify_gate_contract() -> None:
     release = load_json(GOVERNANCE / "ruleset-release.json")
     if not isinstance(release, dict):
         fail("ruleset-release.json must contain an object")
+    if (
+        release.get("name") != "forge9-release"
+        or release.get("enforcement") != "active"
+    ):
+        fail("release ruleset name or enforcement changed")
+    if release.get("bypass_actors") != []:
+        fail("release bypass_actors must be an explicit empty array")
     release_conditions = release.get("conditions", {})
     release_refs = (
         release_conditions.get("ref_name", {})
@@ -240,12 +250,68 @@ def verify_gate_contract() -> None:
         or release_refs.get("include") != ["refs/heads/release/*"]
     ):
         fail("release ruleset must target release/*")
-    release_rules = release.get("rules", [])
-    if not isinstance(release_rules, list) or any(
-        isinstance(item, dict) and item.get("type") == "merge_queue"
-        for item in release_rules
-    ):
+    release_rules = release.get("rules")
+    if not isinstance(release_rules, list):
+        fail("release ruleset rules must be an array")
+    typed_release_rules = [
+        item for item in release_rules if isinstance(item, dict)
+    ]
+    if any(item.get("type") == "merge_queue" for item in typed_release_rules):
         fail("release wildcard ruleset must not contain a merge queue")
+    for kind in (
+        "deletion",
+        "non_fast_forward",
+        "required_linear_history",
+        "required_signatures",
+        "required_deployments",
+        "commit_message_pattern",
+    ):
+        rule(typed_release_rules, kind)
+
+    release_pull_request = rule(
+        typed_release_rules, "pull_request"
+    ).get("parameters", {})
+    if not isinstance(release_pull_request, dict):
+        fail("release pull_request parameters missing")
+    expected_release_review = {
+        "dismiss_stale_reviews_on_push": True,
+        "require_code_owner_review": False,
+        "require_last_push_approval": True,
+        "required_approving_review_count": 1,
+        "required_review_thread_resolution": True,
+    }
+    for key, value in expected_release_review.items():
+        if release_pull_request.get(key) != value:
+            fail(f"release pull_request.{key} must be {value!r}")
+    if release_pull_request.get("allowed_merge_methods") != ["squash"]:
+        fail("release ruleset must allow only squash merges")
+
+    release_checks = rule(
+        typed_release_rules, "required_status_checks"
+    ).get("parameters", {})
+    release_required = (
+        release_checks.get("required_status_checks", [])
+        if isinstance(release_checks, dict)
+        else []
+    )
+    release_contexts = [
+        item.get("context")
+        for item in release_required
+        if isinstance(item, dict)
+    ]
+    if release_contexts != GATES:
+        fail("release status checks do not match the eight canonical gates")
+
+    release_deployments = rule(
+        typed_release_rules, "required_deployments"
+    ).get("parameters", {})
+    if not isinstance(release_deployments, dict):
+        fail("release required_deployments parameters missing")
+    if (
+        release_deployments.get("required_deployment_environments")
+        != ["staging"]
+    ):
+        fail("release ruleset must require the staging deployment")
 
 
 def verify_legacy_paths_removed() -> None:

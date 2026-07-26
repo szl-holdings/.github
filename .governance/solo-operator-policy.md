@@ -17,13 +17,14 @@ therefore does not claim independent human review.
 - Ruleset bypass actors remain empty.
 
 The App is a distinct machine identity, not an independent human reviewer.
-The ruleset therefore requires zero human approvals; its protection comes from
-the mandatory checks, deployment, signed evidence, and queue.
+The ruleset requires one App approval for the exact latest push. Its protection
+comes from that mechanically constrained approval together with the mandatory
+checks, deployment, signed evidence, and queue.
 
-The merge queue and App enqueue path apply to the default branch. GitHub does
-not support wildcard refs in a merge-queue ruleset, so `release/*` uses a
-separate ruleset with the same gates, signatures, staging, and pull-request
-requirements but no queue.
+The merge queue applies to the default branch. GitHub does not support wildcard
+refs in a merge-queue ruleset, so `release/*` uses a separate ruleset with the
+same gates, signatures, staging, and exact-head App approval but no queue. The
+same attestor submits release pull requests to their protected auto-merge path.
 
 ## Governance changes
 
@@ -41,8 +42,7 @@ request cannot weaken its own evaluator before approval.
 
 ## Bootstrap record
 
-PR #312 is the one-time bootstrap that installs the evaluator itself. It may be
-merged only after all pre-existing hosted checks are green and the organization
-ruleset is changed transparently from one impossible human approval to the
-solo-operator model. No bypass actor, force merge, or administrator override is
-permitted. The final ruleset is applied immediately after the workflows land.
+PR #316 is the signed one-time bootstrap that installed the evaluator itself.
+It merged only after all pre-existing hosted checks were green and without a
+bypass actor, force merge, or administrator override. The repository-specific
+rulesets require the distinct App approval for subsequent changes.

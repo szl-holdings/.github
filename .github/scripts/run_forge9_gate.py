@@ -61,8 +61,10 @@ def ground_truth() -> None:
     parameters = pull_rules[0].get("parameters")
     if not isinstance(parameters, dict):
         fail("pull-request parameters are missing")
-    if parameters.get("required_approving_review_count") != 0:
-        fail("solo policy must not claim a human approval")
+    if parameters.get("required_approving_review_count") != 1:
+        fail("the exact-head App approval must be required")
+    if parameters.get("require_last_push_approval") is not True:
+        fail("the attestor must approve the most recent push")
 
 
 def labels() -> None:

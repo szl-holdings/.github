@@ -8,9 +8,9 @@ that do not yet exist would lock a repository without producing evidence.
 
 - Every active ruleset has an empty `bypass_actors` array.
 - The estate does not claim independent human review while it has one human
-  member. Human approval count is zero by design.
-- Eight fail-closed checks, staging deployment, signed commits, App attestation,
-  and merge queue execution replace the impossible human-review requirement.
+  member. One exact-head approval is required from the App machine identity.
+- Eight fail-closed checks, staging deployment, signed commits, App approval,
+  and merge queue execution replace the impossible second-human requirement.
 - The ordinary `GITHUB_TOKEN` cannot approve pull request reviews.
 - The attestor uses a GitHub App installation token minted from a private key.
   GitHub Actions OIDC is used only for keyless Sigstore signing.
@@ -23,7 +23,8 @@ that do not yet exist would lock a repository without producing evidence.
 
 GitHub Apps cannot be organization team members or CODEOWNERS. Consequently the
 ruleset keeps code-owner review disabled. The App review is machine attestation,
-not a human approval, and is not counted toward a human-review requirement.
+not a human review. It is nevertheless a required approval from a distinct,
+least-privileged principal and must cover the most recent push.
 
 The App needs `Administration: read` to inspect repository Actions policy and
 rulesets. It keeps `Contents: read` and does not receive merge or queue
@@ -34,19 +35,18 @@ GitHub's supported `gh pr merge` path to request the protected queue. That token
 cannot approve reviews and cannot bypass the ruleset. `id-token: write` is a
 workflow permission, not a GitHub App permission.
 
-The production environment is referenced explicitly by the attestor because
-environment secrets are unavailable otherwise. It has no deployment reviewer;
-the minimally privileged App credential is usable only by the default-branch
-attestor workflow.
+The attestor uses repository Actions secrets and does not enter the `production`
+environment. Production deployment approval therefore remains a separate,
+identity-bound release control.
 
 ## Activation order
 
 1. Merge this bootstrap using the documented one-time solo bootstrap record.
-2. Remove the manual reviewer from `production` and create `staging`.
+2. Create `staging` and keep the manual reviewer on `production`.
 3. Apply `ruleset-main.json` to the default branch. GitHub does not allow a
    merge-queue ruleset to contain wildcard refs.
 4. Apply `ruleset-release.json` separately to `release/*`; it retains the gates,
-   signatures, staging, and pull-request protections without a merge queue.
+   signatures, staging, and exact-head App approval without a merge queue.
 5. Verify the active gate, staging, attestor, BAP, and queue on a pilot PR.
 6. Roll out only to active repositories with mapped gates and staging evidence.
 
@@ -56,6 +56,6 @@ Never apply either ruleset before its checks and deployment exist.
 
 As of 2026-07-25, `qillqaq-attestor` is registered as App ID `4395545`
 and installed as installation `149057850` on all current and future
-`szl-holdings` repositories. The `.github` repository's `production`
-environment stores the App ID and private key. This branch activates the
-attestor, eight-gate workflow, and staging deployment workflow.
+`szl-holdings` repositories. The `.github` repository stores the App ID and
+private key as Actions secrets. This branch activates the attestor, eight-gate
+workflow, and staging deployment workflow.

@@ -21,7 +21,6 @@ jobs:
   attest:
     if: github.event.workflow_run.conclusion == 'success'
     runs-on: ubuntu-latest
-    environment: production
     steps:
       - name: Mint the independent App token
         id: app-token
@@ -49,12 +48,15 @@ jobs:
               '.[] | select(
                 .state == "open"
                 and .head.sha == $sha
-                and .base.ref == "main"
+                and (
+                  .base.ref == "main"
+                  or (.base.ref | startswith("release/"))
+                )
               ) | .number' \
               "$RUNNER_TEMP/pulls.json"
           )
           if [ "${#PRS[@]}" -ne 1 ]; then
-            echo "::error::expected exactly one open main PR for $HEAD_SHA; found ${#PRS[@]}"
+            echo "::error::expected exactly one open main or release/* PR for $HEAD_SHA; found ${#PRS[@]}"
             exit 1
           fi
           PR="${PRS[0]}"
@@ -204,7 +206,7 @@ jobs:
           [ "$COUNT" -ge 1 ] \
             || { echo "::error::App approval was not recorded for the exact head SHA"; exit 1; }
 
-      - name: Request protected merge queue after attestation
+      - name: Request protected merge after attestation
         env:
           GH_TOKEN: ${{ github.token }}
           PR: ${{ steps.pr.outputs.number }}
@@ -212,4 +214,4 @@ jobs:
         run: |
           set -euo pipefail
           gh pr merge "$PR" --repo "$REPOSITORY" --auto --squash
-          echo "Requested the protected merge queue for PR $PR"
+          echo "Requested the protected merge path for PR $PR"
