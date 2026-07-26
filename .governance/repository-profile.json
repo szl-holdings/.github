@@ -1,0 +1,9 @@
+{
+  "repository_class": "organization-governance",
+  "operator_model": "solo",
+  "ui_surface": false,
+  "lean_surface": true,
+  "lean_sorry_baseline": 4,
+  "lean_version": "4.8.0",
+  "staging_environment": "staging"
+}
