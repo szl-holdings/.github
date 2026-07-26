@@ -1,8 +1,10 @@
 #!/usr/bin/env python3
 """Reconcile the active SZL public estate from immutable evidence and safe probes.
 
-Replit Unified Control Hub is explicitly decommissioned from the active estate. Its
-closed issue is verified as a scope decision; no Replit operational claim is made.
+Replit Unified Control Hub is explicitly decommissioned from the active estate.
+Its closed issue is verified as a scope decision; no Replit operational claim is
+made. When invoked by the readiness workflow, a failed upstream conclusion is a
+first-class fail-closed gate so stale issue evidence cannot be reused as green.
 """
 from __future__ import annotations
 
@@ -21,6 +23,7 @@ from final_estate_v5_core import (
     REPLIT_DECOMMISSION_ISSUE,
     REPORT_MARKER,
     REPORT_SCHEMA,
+    Gate,
     GitHubClient,
 )
 from final_estate_v5_evidence import (
@@ -35,11 +38,40 @@ from final_estate_v5_probes import (
 )
 
 
+def evaluate_upstream_readiness() -> Gate:
+    workflow = str(os.environ.get("UPSTREAM_WORKFLOW") or "").strip()
+    conclusion = str(os.environ.get("UPSTREAM_CONCLUSION") or "").strip().lower()
+    run_url = str(os.environ.get("UPSTREAM_RUN_URL") or "").strip()
+    if not workflow:
+        return Gate(
+            "workflow:hf_release_readiness_terminal",
+            True,
+            "direct invocation; deterministic issue evidence remains authoritative",
+            {
+                "event": os.environ.get("GITHUB_EVENT_NAME") or "local",
+                "workflow_run_bound": False,
+            },
+        )
+    ok = conclusion == "success"
+    return Gate(
+        "workflow:hf_release_readiness_terminal",
+        ok,
+        f"workflow={workflow}; conclusion={conclusion or 'missing'}",
+        {
+            "workflow": workflow,
+            "conclusion": conclusion or None,
+            "run_url": run_url or None,
+            "workflow_run_bound": True,
+        },
+    )
+
+
 def evaluate(client: GitHubClient) -> dict[str, Any]:
-    gates = [
+    gates = [evaluate_upstream_readiness()]
+    gates.extend(
         evaluate_issue_gate(client, name, repo, number)
         for name, (repo, number) in EVIDENCE_ISSUES.items()
-    ]
+    )
     gates.append(evaluate_release_revision_consistency(client))
     gates.append(evaluate_replit_decommission(client))
     source_gate, source_sha = evaluate_a11oy_source(client)
@@ -78,6 +110,7 @@ def evaluate(client: GitHubClient) -> dict[str, Any]:
         },
         "boundaries": [
             "This controller performs GitHub evidence reads, contract-aware public probes, and one deterministic issue update only.",
+            "A failed upstream HF Release Readiness Terminal workflow is an explicit fail-closed gate; stale evidence cannot substitute for a completed run.",
             "API routes may be GET-only; HEAD is required only for document/static surfaces whose contract declares it.",
             "It does not mutate any Hugging Face asset, deployment, visibility, hardware, model, dataset, kernel, collection, bucket, branch rule, training state, weight, qualification, or promotion state.",
             "Replit Unified Control Hub is decommissioned from the active estate and receives no operational claim.",
@@ -104,13 +137,18 @@ def issue_body(report: Mapping[str, Any], run_url: str | None) -> str:
         lines.append(
             f"| `{gate['name']}` | `{'PASS' if gate['ok'] else 'FAIL'}` | {detail} |"
         )
-    lines.extend(["", "```json", json.dumps(report, indent=2, sort_keys=True), "```", ""])
+    lines.extend(
+        ["", "```json", json.dumps(report, indent=2, sort_keys=True), "```", ""]
+    )
     return "\n".join(lines)
 
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--output", default="reports/final-estate-reconciliation-v5.json")
+    parser.add_argument(
+        "--output",
+        default="reports/final-estate-reconciliation-v5.json",
+    )
     parser.add_argument("--publish-issue", action="store_true")
     parser.add_argument("--enforce", action="store_true")
     args = parser.parse_args()
@@ -119,7 +157,10 @@ def main() -> int:
     report = evaluate(client)
     output = Path(args.output)
     output.parent.mkdir(parents=True, exist_ok=True)
-    output.write_text(json.dumps(report, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    output.write_text(
+        json.dumps(report, indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
     print(json.dumps(report, indent=2, sort_keys=True))
     if args.publish_issue:
         run_url = None
@@ -131,7 +172,10 @@ def main() -> int:
                 f"{os.environ['GITHUB_SERVER_URL']}/{os.environ['GITHUB_REPOSITORY']}"
                 f"/actions/runs/{os.environ['GITHUB_RUN_ID']}"
             )
-        client.upsert_report_issue(issue_body(report, run_url), report["operational_verified"])
+        client.upsert_report_issue(
+            issue_body(report, run_url),
+            report["operational_verified"],
+        )
     return 1 if args.enforce and not report["operational_verified"] else 0
 
 

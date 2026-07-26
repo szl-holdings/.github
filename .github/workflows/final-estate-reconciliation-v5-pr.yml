@@ -10,6 +10,7 @@ on:
       - .github/scripts/final_estate_v5_probes.py
       - .github/scripts/test_final_estate_v5_evidence.py
       - .github/scripts/test_final_estate_v5_probes.py
+      - .github/scripts/test_final_estate_v5_upstream.py
       - .github/workflows/final-estate-reconciliation-v5.yml
       - .github/workflows/final-estate-reconciliation-v5-pr.yml
       - .github/scripts/final_estate_reconciliation_v4.py
@@ -41,10 +42,10 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
-          python-version: '3.12'
+          python-version: "3.12"
 
       - name: Install bounded verifier dependency
-        run: python -m pip install --disable-pip-version-check 'requests==2.32.5'
+        run: python -m pip install --disable-pip-version-check "requests==2.32.5"
 
       - name: Compile and test without credentials or write permissions
         run: |
@@ -55,9 +56,11 @@ jobs:
             .github/scripts/final_estate_v5_evidence.py \
             .github/scripts/final_estate_v5_probes.py \
             .github/scripts/test_final_estate_v5_evidence.py \
-            .github/scripts/test_final_estate_v5_probes.py
+            .github/scripts/test_final_estate_v5_probes.py \
+            .github/scripts/test_final_estate_v5_upstream.py
           python .github/scripts/test_final_estate_v5_evidence.py
           python .github/scripts/test_final_estate_v5_probes.py
+          python .github/scripts/test_final_estate_v5_upstream.py
           git diff --check
 
       - name: Write immutable pull-request boundary evidence
@@ -70,21 +73,21 @@ jobs:
           from pathlib import Path
 
           report = {
-              'schema': 'szl.final-estate-reconciliation/v5-prerelease',
-              'generation': os.environ.get('GITHUB_SHA'),
-              'generated_at': datetime.now(timezone.utc).isoformat(),
-              'publish': False,
-              'source_tests': 'PASSED',
-              'summary': {'ok': 1, 'warning': 0, 'error': 0},
-              'boundaries': [
-                  'No custom credential is available to this pull-request workflow.',
-                  'No GitHub issue-write permission is granted.',
-                  'No public probe or issue mutation is required to validate source changes.',
+              "schema": "szl.final-estate-reconciliation/v5-prerelease",
+              "generation": os.environ.get("GITHUB_SHA"),
+              "generated_at": datetime.now(timezone.utc).isoformat(),
+              "publish": False,
+              "source_tests": "PASSED",
+              "summary": {"ok": 1, "warning": 0, "error": 0},
+              "boundaries": [
+                  "No custom credential is available to this pull-request workflow.",
+                  "No GitHub issue-write permission is granted.",
+                  "No public probe or issue mutation is required to validate source changes.",
               ],
           }
-          Path('reports/final-estate-reconciliation-v5-prerelease.json').write_text(
-              json.dumps(report, indent=2, sort_keys=True) + '\n',
-              encoding='utf-8',
+          Path(os.environ["REPORT_PATH"]).write_text(
+              json.dumps(report, indent=2, sort_keys=True) + "\n",
+              encoding="utf-8",
           )
           PY
 

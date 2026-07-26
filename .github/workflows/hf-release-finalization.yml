@@ -12,19 +12,20 @@ on:
       - .github/scripts/test_hf_release_finalization.py
       - .github/scripts/test_hf_release_finalization_entrypoint.py
       - .github/scripts/test_hf_release_finalization_git.py
+      - .github/scripts/hf_release_readiness_terminal.py
+      - .github/scripts/test_hf_release_readiness_terminal.py
       - .github/workflows/hf-release-finalization.yml
-  workflow_dispatch:
-    inputs:
-      publish:
-        description: Publish the reviewed Lake and first-class Kernel card contracts
-        required: false
-        type: boolean
-        default: true
+      - .github/workflows/hf-release-readiness-terminal.yml
+      - .github/workflows/hf-release-readiness-terminal-pr.yml
+  schedule:
+    - cron: "3 */6 * * *"
+  repository_dispatch:
+    types: [hf-release-source-updated]
+  workflow_dispatch: {}
 
 permissions:
   contents: read
   issues: write
-  actions: write
 
 concurrency:
   group: hf-release-finalization-publication
@@ -99,14 +100,31 @@ jobs:
       - name: Install exact CPU runtime and supported clients
         run: |
           set -euo pipefail
-          python -m pip install --disable-pip-version-check --index-url https://download.pytorch.org/whl/cpu 'torch==2.7.1'
-          python -m pip install --disable-pip-version-check 'numpy==2.2.6' 'huggingface_hub==1.19.0' 'kernels==0.16.0' 'requests==2.32.5' 'pytest>=8,<9' 'pyarrow>=18,<24' 'PyYAML>=6,<7'
+          python -m pip install --disable-pip-version-check \
+            --index-url https://download.pytorch.org/whl/cpu \
+            "torch==2.7.1"
+          python -m pip install --disable-pip-version-check \
+            "numpy==2.2.6" \
+            "huggingface_hub==1.19.0" \
+            "kernels==0.16.0" \
+            "requests==2.32.5" \
+            "pytest>=8,<9" \
+            "pyarrow>=18,<24" \
+            "PyYAML>=6,<7"
 
       - name: Verify transport, finalizer, and source contracts
         working-directory: controller
         run: |
           set -euo pipefail
-          python -m py_compile .github/scripts/kernel_hub_git.py .github/scripts/hf_release_finalization.py .github/scripts/hf_release_finalization_entrypoint.py .github/scripts/hf_release_finalization_git.py .github/scripts/test_kernel_hub_git.py .github/scripts/test_hf_release_finalization.py .github/scripts/test_hf_release_finalization_entrypoint.py .github/scripts/test_hf_release_finalization_git.py
+          python -m py_compile \
+            .github/scripts/kernel_hub_git.py \
+            .github/scripts/hf_release_finalization.py \
+            .github/scripts/hf_release_finalization_entrypoint.py \
+            .github/scripts/hf_release_finalization_git.py \
+            .github/scripts/test_kernel_hub_git.py \
+            .github/scripts/test_hf_release_finalization.py \
+            .github/scripts/test_hf_release_finalization_entrypoint.py \
+            .github/scripts/test_hf_release_finalization_git.py
           PYTHONPATH=.github/scripts python .github/scripts/test_kernel_hub_git.py
           PYTHONPATH=.github/scripts python .github/scripts/test_hf_release_finalization.py
           PYTHONPATH=.github/scripts python .github/scripts/test_hf_release_finalization_entrypoint.py
@@ -114,11 +132,11 @@ jobs:
           python - <<'PY'
           import numpy
           import torch
-          assert numpy.__version__ == '2.2.6', numpy.__version__
-          assert torch.__version__.startswith('2.7.1'), torch.__version__
-          assert not torch.cuda.is_available(), 'release runner must remain CPU-only'
-          print('numpy runtime:', numpy.__version__)
-          print('torch runtime:', torch.__version__)
+          assert numpy.__version__ == "2.2.6", numpy.__version__
+          assert torch.__version__.startswith("2.7.1"), torch.__version__
+          assert not torch.cuda.is_available(), "release runner must remain CPU-only"
+          print("numpy runtime:", numpy.__version__)
+          print("torch runtime:", torch.__version__)
           PY
           git diff --check
 
@@ -127,25 +145,14 @@ jobs:
           set -euo pipefail
           python lake/scripts/test_hf_dataset_contract.py
           PYTHONPATH=energy python -m pytest -q energy/tests/test_hf_kernel_contract.py
-          PYTHONPATH=lambda-gate/torch-ext:lambda-gate python -m pytest -q lambda-gate/tests/test_hf_governed_norm_contract.py
-
-      - name: Determine execution mode
-        id: mode
-        shell: bash
-        run: |
-          set -euo pipefail
-          publish=true
-          if [ "$GITHUB_EVENT_NAME" = 'workflow_dispatch' ] && [ "${{ inputs.publish }}" != 'true' ]; then
-            publish=false
-          fi
-          echo "publish=${publish}" >> "$GITHUB_OUTPUT"
+          PYTHONPATH=lambda-gate/torch-ext:lambda-gate \
+            python -m pytest -q lambda-gate/tests/test_hf_governed_norm_contract.py
 
       - name: Require governed organization publisher
-        if: steps.mode.outputs.publish == 'true'
         run: |
           set -euo pipefail
           if [ -z "${HF_ORG_TOKEN:-}" ] && [ -z "${HF_TOKEN:-}" ]; then
-            echo '::error::No supported Hugging Face organization write token is configured.'
+            echo "::error::No supported Hugging Face organization write token is configured."
             exit 2
           fi
 
@@ -159,11 +166,15 @@ jobs:
           SZL_LAMBDA_GATE_SHA: ${{ steps.sources.outputs.lambda_sha }}
         run: |
           set +e
-          args=(--generation "$GITHUB_SHA" --lake-root ../lake --energy-root ../energy --lambda-root ../lambda-gate)
-          if [ "${{ steps.mode.outputs.publish }}" = 'true' ]; then
-            args=(--publish "${args[@]}")
-          fi
-          PYTHONPATH=.github/scripts python .github/scripts/hf_release_finalization_git.py "${args[@]}"
+          args=(
+            --publish
+            --generation "$GITHUB_SHA"
+            --lake-root ../lake
+            --energy-root ../energy
+            --lambda-root ../lambda-gate
+          )
+          PYTHONPATH=.github/scripts \
+            python .github/scripts/hf_release_finalization_git.py "${args[@]}"
           code=$?
           echo "exit_code=${code}" >> "$GITHUB_OUTPUT"
           exit 0
@@ -178,7 +189,7 @@ jobs:
           retention-days: 90
 
       - name: Persist deterministic publication issue
-        if: always() && steps.mode.outputs.publish == 'true'
+        if: always()
         working-directory: controller
         shell: bash
         env:
@@ -197,22 +208,38 @@ jobs:
             cat "$REPORT_PATH"
             echo '```'
           } > /tmp/hf-release-publication.md
-          issue="$(gh issue list --repo "$GITHUB_REPOSITORY" --state all --search "${REPORT_ISSUE_TITLE} in:title" --json number,title --jq ".[] | select(.title == env.REPORT_ISSUE_TITLE) | .number" | head -n1)"
+          issue="$(gh issue list \
+            --repo "$GITHUB_REPOSITORY" \
+            --state all \
+            --search "${REPORT_ISSUE_TITLE} in:title" \
+            --json number,title \
+            --jq ".[] | select(.title == env.REPORT_ISSUE_TITLE) | .number" \
+            | head -n1)"
           if [ -n "$issue" ]; then
-            gh issue edit "$issue" --repo "$GITHUB_REPOSITORY" --body-file /tmp/hf-release-publication.md
+            gh issue edit "$issue" \
+              --repo "$GITHUB_REPOSITORY" \
+              --body-file /tmp/hf-release-publication.md
           else
-            issue_url="$(gh issue create --repo "$GITHUB_REPOSITORY" --title "$REPORT_ISSUE_TITLE" --body-file /tmp/hf-release-publication.md)"
+            issue_url="$(gh issue create \
+              --repo "$GITHUB_REPOSITORY" \
+              --title "$REPORT_ISSUE_TITLE" \
+              --body-file /tmp/hf-release-publication.md)"
             issue="${issue_url##*/}"
           fi
-          if [ "${EXIT_CODE:-2}" = '0' ]; then
-            gh issue close "$issue" --repo "$GITHUB_REPOSITORY" --reason completed --comment 'The reviewed Lake payload and both first-class Kernel card contracts passed supported transport, immutable revision, build preservation, byte-parity, and selfcheck verification.' || true
+          if [ "${EXIT_CODE:-2}" = "0" ]; then
+            gh issue close "$issue" \
+              --repo "$GITHUB_REPOSITORY" \
+              --reason completed \
+              --comment 'The reviewed Lake payload and both first-class Kernel card contracts passed supported transport, immutable revision, build preservation, byte-parity, and selfcheck verification.' || true
           else
             gh issue reopen "$issue" --repo "$GITHUB_REPOSITORY" || true
           fi
 
-      - name: Trigger independent read-only readiness
-        if: steps.mode.outputs.publish == 'true' && steps.release.outputs.exit_code == '0'
-        run: gh workflow run hf-release-readiness.yml --repo "$GITHUB_REPOSITORY" --ref main -f publish=true
+      - name: Record deterministic downstream handoff
+        if: always()
+        run: |
+          echo "HF Release Readiness Terminal is triggered by workflow_run after this workflow completes."
+          echo "No ad hoc workflow dispatch or timer race is used."
 
       - name: Enforce fail-closed controller result
         if: always()
@@ -224,8 +251,4 @@ jobs:
             echo "::error::HF release finalization failed with exit ${code}."
             exit "$code"
           fi
-          if [ "${{ steps.mode.outputs.publish }}" = 'true' ]; then
-            echo 'Lake and both first-class Kernel contracts are operational through supported transports.'
-          else
-            echo 'Read-only finalization verification completed without publication.'
-          fi
+          echo "Lake and both first-class Kernel contracts are operational through supported transports."

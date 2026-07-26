@@ -104,7 +104,10 @@ class KernelGitFinalizerTests(unittest.TestCase):
                 "SZLHOLDINGS/example",
                 {"source_root": "energy", "source_dir": "hf-kernels/example"},
             )
-            self.assertEqual(instance.kernel_transport.snapshot_calls, ["SZLHOLDINGS/example"])
+            self.assertEqual(
+                instance.kernel_transport.snapshot_calls,
+                ["SZLHOLDINGS/example"],
+            )
             self.assertFalse(instance.kernel_transport.publish_calls)
         finally:
             tmp.cleanup()
@@ -154,14 +157,23 @@ class KernelGitFinalizerTests(unittest.TestCase):
 
     def test_pr_verification_is_credentialless_and_read_only(self):
         workflows = HERE.parent / "workflows"
-        publication = (workflows / "hf-release-finalization.yml").read_text(encoding="utf-8")
-        pull_request = (workflows / "hf-release-finalization-pr.yml").read_text(encoding="utf-8")
+        publication = (workflows / "hf-release-finalization.yml").read_text(
+            encoding="utf-8"
+        )
+        pull_request = (workflows / "hf-release-finalization-pr.yml").read_text(
+            encoding="utf-8"
+        )
 
         self.assertNotIn("pull_request:", publication)
         self.assertIn("workflow_dispatch:", publication)
         self.assertIn("group: hf-release-finalization-publication", publication)
         self.assertIn("issues: write", publication)
-        self.assertIn("actions: write", publication)
+        self.assertNotIn("actions: write", publication)
+        self.assertNotIn("gh workflow run hf-release-readiness", publication)
+        self.assertIn(
+            "HF Release Readiness Terminal is triggered by workflow_run",
+            publication,
+        )
 
         self.assertIn("pull_request:", pull_request)
         self.assertNotIn("secrets.", pull_request)
