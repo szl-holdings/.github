@@ -25,9 +25,10 @@ authenticated review as the required approval. This must be proven in a pilot
 repository before the estate ruleset is activated.
 
 The App needs `Administration: read` to inspect repository Actions policy and
-rulesets. It also needs `Contents: write` if it will enqueue or merge a pull
-request; GitHub's merge endpoint does not permit a read-only Contents grant.
-`id-token: write` is a workflow permission, not a GitHub App permission.
+rulesets. It keeps `Contents: read` and uses the dedicated
+`Merge queues: write` permission to enqueue through GraphQL; it never calls the
+direct merge endpoint. `id-token: write` is a workflow permission, not a GitHub
+App permission.
 
 The production environment is referenced explicitly by the attestor because
 environment secrets are unavailable otherwise. A required human environment

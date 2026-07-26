@@ -138,7 +138,9 @@ def verify_manifest() -> None:
         "actions": "read",
         "administration": "read",
         "checks": "read",
-        "contents": "write",
+        "commit_statuses": "read",
+        "contents": "read",
+        "merge_queues": "write",
         "metadata": "read",
         "pull_requests": "write",
     }
