@@ -57,8 +57,8 @@ Never apply either ruleset before its checks and deployment exist.
 
 ## Live bootstrap state
 
-As of 2026-07-25, `qillqaq-attestor` is registered as App ID `4395545`
-and installed as installation `149057850` on all current and future
+As of 2026-07-26, `qillqaq-attestor` is registered as App ID `4395545`
+and installed as installation `149069502` on all current and future
 `szl-holdings` repositories. The `.github` repository stores the App ID and
 private key as Actions secrets. This branch activates the attestor, eight-gate
 workflow, and staging deployment workflow.
