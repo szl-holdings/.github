@@ -18,6 +18,11 @@ The App is a distinct machine identity, not an independent human reviewer.
 The ruleset therefore requires zero human approvals; its protection comes from
 the mandatory checks, deployment, signed evidence, and queue.
 
+The merge queue and App enqueue path apply to the default branch. GitHub does
+not support wildcard refs in a merge-queue ruleset, so `release/*` uses a
+separate ruleset with the same gates, signatures, staging, and pull-request
+requirements but no queue.
+
 ## Governance changes
 
 A pull request that edits the gate workflow, attestor workflow, or

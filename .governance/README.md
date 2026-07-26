@@ -40,11 +40,14 @@ attestor workflow.
 
 1. Merge this bootstrap using the documented one-time solo bootstrap record.
 2. Remove the manual reviewer from `production` and create `staging`.
-3. Verify the active gate, staging, and attestor workflows on a pilot PR.
-4. Apply `ruleset-main.json` to the pilot and verify its live state.
-5. Roll out only to active repositories with mapped gates and staging evidence.
+3. Apply `ruleset-main.json` to the default branch. GitHub does not allow a
+   merge-queue ruleset to contain wildcard refs.
+4. Apply `ruleset-release.json` separately to `release/*`; it retains the gates,
+   signatures, staging, and pull-request protections without a merge queue.
+5. Verify the active gate, staging, attestor, BAP, and queue on a pilot PR.
+6. Roll out only to active repositories with mapped gates and staging evidence.
 
-Never apply the ruleset before steps 2 through 7 are complete.
+Never apply either ruleset before its checks and deployment exist.
 
 ## Live bootstrap state
 

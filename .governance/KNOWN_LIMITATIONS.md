@@ -8,6 +8,9 @@
   before estate-wide activation is claimed.
 - Gate mappings in this repository are specific to an organization-governance
   repository. Application repositories require their own real commands.
+- GitHub merge queues cannot be enabled in a ruleset that targets wildcard
+  refs. `forge9-main` queues the default branch; `forge9-release` protects
+  `release/*` with the same gates and staging requirement but no queue.
 - Three archived repositories retain historical ruleset state that cannot be
   edited while archived. They have no active release path.
 

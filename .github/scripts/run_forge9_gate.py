@@ -84,6 +84,8 @@ def schema() -> None:
     gates = load_json(".governance/gates.json")
     profile = load_json(".governance/repository-profile.json")
     manifest = load_json(".governance/github-app-manifest.json")
+    load_json(".governance/ruleset-main.json")
+    load_json(".governance/ruleset-release.json")
     if len(gates) != 8:
         fail("the canonical gate map must contain eight gates")
     if profile.get("operator_model") != "solo":

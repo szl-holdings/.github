@@ -50,10 +50,7 @@ ATTESTOR_SELF_EDIT_GUARD = (
     r"^(\.github/workflows/(attest-and-approve|gates|forge9-staging)"
     r"\.ya?ml|\.governance/)"
 )
-GOVERNED_BASE_FILTER = (
-    '.base.ref == "main"\n'
-    '                  or (.base.ref | startswith("release/"))'
-)
+GOVERNED_BASE_FILTER = '.base.ref == "main"'
 
 
 def fail(message: str) -> None:
@@ -87,8 +84,8 @@ def verify_ruleset() -> None:
     conditions = data.get("conditions", {})
     refs = conditions.get("ref_name", {}) if isinstance(conditions, dict) else {}
     include = refs.get("include", []) if isinstance(refs, dict) else []
-    if include != ["~DEFAULT_BRANCH", "refs/heads/release/*"]:
-        fail("ruleset must target the default branch and release/*")
+    if include != ["~DEFAULT_BRANCH"]:
+        fail("merge-queue ruleset must target only the default branch")
 
     rules = data.get("rules")
     if not isinstance(rules, list):
@@ -218,9 +215,30 @@ def verify_gate_contract() -> None:
             fail(f"attestor governance authorization marker missing: {marker}")
 
     if GOVERNED_BASE_FILTER not in attestor_template:
-        fail("attestor must resolve PRs targeting both main and release/*")
-    if '.base.ref == "main") | .number' in attestor_template:
-        fail("attestor still hard-codes PR resolution to main only")
+        fail("attestor must resolve PRs targeting main")
+    if 'startswith("release/")' in attestor_template:
+        fail("release PRs cannot be enqueued into the default-branch merge queue")
+
+    release = load_json(GOVERNANCE / "ruleset-release.json")
+    if not isinstance(release, dict):
+        fail("ruleset-release.json must contain an object")
+    release_conditions = release.get("conditions", {})
+    release_refs = (
+        release_conditions.get("ref_name", {})
+        if isinstance(release_conditions, dict)
+        else {}
+    )
+    if (
+        not isinstance(release_refs, dict)
+        or release_refs.get("include") != ["refs/heads/release/*"]
+    ):
+        fail("release ruleset must target release/*")
+    release_rules = release.get("rules", [])
+    if not isinstance(release_rules, list) or any(
+        isinstance(item, dict) and item.get("type") == "merge_queue"
+        for item in release_rules
+    ):
+        fail("release wildcard ruleset must not contain a merge queue")
 
 
 def verify_legacy_paths_removed() -> None:

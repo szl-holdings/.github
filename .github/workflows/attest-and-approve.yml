@@ -49,15 +49,12 @@ jobs:
               '.[] | select(
                 .state == "open"
                 and .head.sha == $sha
-                and (
-                  .base.ref == "main"
-                  or (.base.ref | startswith("release/"))
-                )
+                and .base.ref == "main"
               ) | .number' \
               "$RUNNER_TEMP/pulls.json"
           )
           if [ "${#PRS[@]}" -ne 1 ]; then
-            echo "::error::expected exactly one open governed PR (main or release/*) for $HEAD_SHA; found ${#PRS[@]}"
+            echo "::error::expected exactly one open main PR for $HEAD_SHA; found ${#PRS[@]}"
             exit 1
           fi
           PR="${PRS[0]}"
