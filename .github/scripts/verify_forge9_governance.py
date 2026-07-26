@@ -22,6 +22,10 @@ GATES = [
     "gate/a11y-perf",
     "gate/lean",
 ]
+ATTESTATION_STATUS = {
+    "context": "attestation/qillqaq",
+    "integration_id": 4395545,
+}
 
 LEGACY_PATHS = [
     ".github/workflows/owner-authorized-merge-wave.yml",
@@ -111,8 +115,8 @@ def verify_ruleset() -> None:
     expected_review = {
         "dismiss_stale_reviews_on_push": True,
         "require_code_owner_review": False,
-        "require_last_push_approval": True,
-        "required_approving_review_count": 1,
+        "require_last_push_approval": False,
+        "required_approving_review_count": 0,
         "required_review_thread_resolution": True,
     }
     for key, value in expected_review.items():
@@ -126,8 +130,10 @@ def verify_ruleset() -> None:
     contexts = [
         item.get("context") for item in required if isinstance(item, dict)
     ]
-    if contexts != GATES:
-        fail("required status checks do not match the eight canonical gates")
+    if contexts != GATES + [ATTESTATION_STATUS["context"]]:
+        fail("required status checks must contain the eight gates and attestation")
+    if required[-1] != ATTESTATION_STATUS:
+        fail("attestation status must be pinned to the qillqaq App")
 
     deployments = rule(typed_rules, "required_deployments").get("parameters", {})
     if not isinstance(deployments, dict):
@@ -147,7 +153,7 @@ def verify_manifest() -> None:
         "actions": "read",
         "administration": "read",
         "checks": "read",
-        "commit_statuses": "read",
+        "commit_statuses": "write",
         "contents": "read",
         "metadata": "read",
         "pull_requests": "write",
@@ -224,6 +230,13 @@ def verify_gate_contract() -> None:
         fail("the merge attestor must not consume the production deployment gate")
     if "GH_TOKEN: ${{ github.token }}" not in attestor_template:
         fail("the protected queue request must use the ephemeral workflow token")
+    for marker in (
+        "Publish required App attestation status",
+        "context=attestation/qillqaq",
+        "GH_TOKEN: ${{ steps.app-token.outputs.token }}",
+    ):
+        if marker not in attestor_template:
+            fail(f"attestor status publication is missing {marker!r}")
     if 'gh pr merge "$PR" --repo "$REPOSITORY" --auto --squash' not in (
         attestor_template
     ):
@@ -276,8 +289,8 @@ def verify_gate_contract() -> None:
     expected_release_review = {
         "dismiss_stale_reviews_on_push": True,
         "require_code_owner_review": False,
-        "require_last_push_approval": True,
-        "required_approving_review_count": 1,
+        "require_last_push_approval": False,
+        "required_approving_review_count": 0,
         "required_review_thread_resolution": True,
     }
     for key, value in expected_release_review.items():
@@ -299,8 +312,10 @@ def verify_gate_contract() -> None:
         for item in release_required
         if isinstance(item, dict)
     ]
-    if release_contexts != GATES:
-        fail("release status checks do not match the eight canonical gates")
+    if release_contexts != GATES + [ATTESTATION_STATUS["context"]]:
+        fail("release checks must contain the eight gates and attestation")
+    if release_required[-1] != ATTESTATION_STATUS:
+        fail("release attestation status must be pinned to the qillqaq App")
 
     release_deployments = rule(
         typed_release_rules, "required_deployments"

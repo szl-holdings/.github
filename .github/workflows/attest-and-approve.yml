@@ -206,6 +206,22 @@ jobs:
           [ "$COUNT" -ge 1 ] \
             || { echo "::error::App approval was not recorded for the exact head SHA"; exit 1; }
 
+      - name: Publish required App attestation status
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
+          REPOSITORY: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          gh api \
+            --method POST \
+            "repos/$REPOSITORY/statuses/$HEAD_SHA" \
+            -f state=success \
+            -f context=attestation/qillqaq \
+            -f description="Signed BAP and exact-head App review verified" \
+            -f target_url="https://github.com/$REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+          echo "Published attestation/qillqaq for $HEAD_SHA"
+
       - name: Request protected merge after attestation
         env:
           GH_TOKEN: ${{ github.token }}

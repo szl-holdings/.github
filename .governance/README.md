@@ -8,9 +8,10 @@ that do not yet exist would lock a repository without producing evidence.
 
 - Every active ruleset has an empty `bypass_actors` array.
 - The estate does not claim independent human review while it has one human
-  member. One exact-head approval is required from the App machine identity.
-- Eight fail-closed checks, staging deployment, signed commits, App approval,
-  and merge queue execution replace the impossible second-human requirement.
+  member. GitHub's human approval count is zero by design.
+- Eight fail-closed checks, staging deployment, signed commits, an App-owned
+  required attestation status, and merge queue execution replace the impossible
+  second-human requirement.
 - The ordinary `GITHUB_TOKEN` cannot approve pull request reviews.
 - The attestor uses a GitHub App installation token minted from a private key.
   GitHub Actions OIDC is used only for keyless Sigstore signing.
@@ -23,8 +24,10 @@ that do not yet exist would lock a repository without producing evidence.
 
 GitHub Apps cannot be organization team members or CODEOWNERS. Consequently the
 ruleset keeps code-owner review disabled. The App review is machine attestation,
-not a human review. It is nevertheless a required approval from a distinct,
-least-privileged principal and must cover the most recent push.
+not a human review, and GitHub does not count it toward required approvals from
+people with write permission. The App therefore publishes
+`attestation/qillqaq` only after the exact-head review and signed BAP are
+verified. Both rulesets require that status and pin it to App ID `4395545`.
 
 The App needs `Administration: read` to inspect repository Actions policy and
 rulesets. It keeps `Contents: read` and does not receive merge or queue
@@ -46,7 +49,7 @@ identity-bound release control.
 3. Apply `ruleset-main.json` to the default branch. GitHub does not allow a
    merge-queue ruleset to contain wildcard refs.
 4. Apply `ruleset-release.json` separately to `release/*`; it retains the gates,
-   signatures, staging, and exact-head App approval without a merge queue.
+   signatures, staging, and App attestation status without a merge queue.
 5. Verify the active gate, staging, attestor, BAP, and queue on a pilot PR.
 6. Roll out only to active repositories with mapped gates and staging evidence.
 

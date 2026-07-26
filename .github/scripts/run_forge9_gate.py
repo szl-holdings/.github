@@ -61,10 +61,28 @@ def ground_truth() -> None:
     parameters = pull_rules[0].get("parameters")
     if not isinstance(parameters, dict):
         fail("pull-request parameters are missing")
-    if parameters.get("required_approving_review_count") != 1:
-        fail("the exact-head App approval must be required")
-    if parameters.get("require_last_push_approval") is not True:
-        fail("the attestor must approve the most recent push")
+    if parameters.get("required_approving_review_count") != 0:
+        fail("solo policy cannot require an unavailable human reviewer")
+    status_rule = next(
+        (
+            item
+            for item in rules
+            if isinstance(item, dict)
+            and item.get("type") == "required_status_checks"
+        ),
+        None,
+    )
+    if not isinstance(status_rule, dict):
+        fail("required status checks are missing")
+    status_parameters = status_rule.get("parameters")
+    if not isinstance(status_parameters, dict):
+        fail("required status-check parameters are missing")
+    required = status_parameters.get("required_status_checks", [])
+    if {
+        "context": "attestation/qillqaq",
+        "integration_id": 4395545,
+    } not in required:
+        fail("the App-owned attestation status is not required")
 
 
 def labels() -> None:
@@ -118,6 +136,8 @@ def provenance() -> None:
         fail("App permissions are missing")
     if permissions.get("contents") != "read":
         fail("the App must not have write access to repository contents")
+    if permissions.get("commit_statuses") != "write":
+        fail("the App must be able to publish its required attestation status")
     if "merge_queues" in permissions:
         fail("the App must not retain unused merge-queue authority")
     attestor = (

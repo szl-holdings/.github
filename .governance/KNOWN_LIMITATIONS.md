@@ -2,6 +2,9 @@
 
 - The estate has one human organization member. The policy is explicitly
   solo-operated and does not claim independent human review.
+- GitHub records the App review but does not count it toward approval rules that
+  require a person with write permission. The enforceable equivalent is the
+  App-owned `attestation/qillqaq` required status, pinned to App ID `4395545`.
 - The App ID and private key are repository Actions secrets. The removed local
   private key cannot be recovered; rotation requires generating a new App key.
 - The App review and merge-queue path must be proven on a post-bootstrap pilot
@@ -10,7 +13,7 @@
   repository. Application repositories require their own real commands.
 - GitHub merge queues cannot be enabled in a ruleset that targets wildcard
   refs. `forge9-main` queues the default branch; `forge9-release` protects
-  `release/*` with the same gates, staging, and App approval but no queue.
+  `release/*` with the same gates, staging, and App attestation but no queue.
 - GitHub rejected `enqueuePullRequest` for the App installation token despite
   its live merge-queue grant. The App retains attestation and approval duties;
   the ephemeral repository token requests the protected queue after attestation.

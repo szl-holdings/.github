@@ -32,8 +32,8 @@
         ],
         "dismiss_stale_reviews_on_push": true,
         "require_code_owner_review": false,
-        "require_last_push_approval": true,
-        "required_approving_review_count": 1,
+        "require_last_push_approval": false,
+        "required_approving_review_count": 0,
         "required_review_thread_resolution": true
       }
     },
@@ -65,6 +65,10 @@
           },
           {
             "context": "gate/lean"
+          },
+          {
+            "context": "attestation/qillqaq",
+            "integration_id": 4395545
           }
         ],
         "strict_required_status_checks_policy": true
