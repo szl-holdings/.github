@@ -2,7 +2,6 @@
 """Network-free self-tests for the fail-closed CI health digest."""
 from __future__ import annotations
 
-import importlib.util
 import json
 import os
 from pathlib import Path
@@ -13,13 +12,11 @@ from unittest.mock import patch
 
 HERE = Path(__file__).resolve().parent
 ROOT = HERE.parents[1]
-MODULE_PATH = HERE / "ci_health_digest.py"
+if str(HERE) not in sys.path:
+    sys.path.insert(0, str(HERE))
 
-spec = importlib.util.spec_from_file_location("ci_health_digest", MODULE_PATH)
-assert spec and spec.loader
-chd = importlib.util.module_from_spec(spec)
-sys.modules[spec.name] = chd
-spec.loader.exec_module(chd)
+import ci_health_digest as chd
+import ci_health_digest_http as http
 
 
 def repositories(count: int, *, archived: int = 0):
@@ -42,12 +39,12 @@ class ReaderSelectionTests(unittest.TestCase):
             os.environ,
             {"DIGEST_APP_TOKEN": "app", "SZL_GITHUB_TOKEN": "pat"},
             clear=False,
-        ), patch.object(chd, "list_repositories", return_value=estate), patch.object(
-            chd,
-            "_request_json",
+        ), patch.object(http, "list_repositories", return_value=estate), patch.object(
+            http,
+            "request_json",
             return_value=(200, {"workflows": []}),
         ):
-            selected = chd.select_reader()
+            selected = http.select_reader()
         self.assertEqual(selected.mode, "github_app")
         self.assertEqual(selected.credential_name, "qillqaq_app_installation")
         self.assertEqual(len(selected.repositories), 57)
@@ -58,7 +55,7 @@ class ReaderSelectionTests(unittest.TestCase):
 
         def inventory(token):
             if token == "app":
-                raise chd.ApiError(
+                raise http.ApiError(
                     operation="inventory",
                     status=403,
                     detail_class="unauthorized",
@@ -69,12 +66,12 @@ class ReaderSelectionTests(unittest.TestCase):
             os.environ,
             {"DIGEST_APP_TOKEN": "app", "SZL_GITHUB_TOKEN": "pat"},
             clear=False,
-        ), patch.object(chd, "list_repositories", side_effect=inventory), patch.object(
-            chd,
-            "_request_json",
+        ), patch.object(http, "list_repositories", side_effect=inventory), patch.object(
+            http,
+            "request_json",
             return_value=(200, {"workflows": []}),
         ):
-            selected = chd.select_reader()
+            selected = http.select_reader()
         self.assertEqual(selected.mode, "governed_pat_fallback")
         self.assertEqual(selected.attempts[0]["result"], "rejected")
         self.assertEqual(selected.attempts[0]["failure_class"], "unauthorized")
@@ -86,8 +83,8 @@ class ReaderSelectionTests(unittest.TestCase):
             {"DIGEST_APP_TOKEN": "", "SZL_GITHUB_TOKEN": ""},
             clear=False,
         ):
-            with self.assertRaises(chd.ReaderSelectionError) as context:
-                chd.select_reader()
+            with self.assertRaises(http.ReaderSelectionError) as context:
+                http.select_reader()
         self.assertEqual(len(context.exception.attempts), 2)
         self.assertTrue(
             all(item["result"] == "not_configured" for item in context.exception.attempts)
@@ -97,29 +94,29 @@ class ReaderSelectionTests(unittest.TestCase):
 class RepositoryCoverageTests(unittest.TestCase):
     def test_present_token_with_zero_repositories_fails_closed(self):
         with patch.dict(os.environ, {"ORG_REPOSITORY_FLOOR": "57"}, clear=False), patch.object(
-            chd,
-            "_request_json",
+            http,
+            "request_json",
             return_value=(200, []),
         ):
-            with self.assertRaisesRegex(chd.DigestError, "below reviewed floor"):
-                chd.list_repositories("present-token")
+            with self.assertRaisesRegex(http.DigestError, "below reviewed floor"):
+                http.list_repositories("present-token")
 
     def test_partial_repository_listing_fails_closed(self):
         with patch.dict(os.environ, {"ORG_REPOSITORY_FLOOR": "57"}, clear=False), patch.object(
-            chd,
-            "_request_json",
+            http,
+            "request_json",
             return_value=(200, list(repositories(56))),
         ):
-            with self.assertRaisesRegex(chd.DigestError, "observed=56 floor=57"):
-                chd.list_repositories("present-token")
+            with self.assertRaisesRegex(http.DigestError, "observed=56 floor=57"):
+                http.list_repositories("present-token")
 
     def test_complete_repository_listing_passes(self):
         with patch.dict(os.environ, {"ORG_REPOSITORY_FLOOR": "57"}, clear=False), patch.object(
-            chd,
-            "_request_json",
+            http,
+            "request_json",
             return_value=(200, list(repositories(57, archived=5))),
         ):
-            observed = chd.list_repositories("present-token")
+            observed = http.list_repositories("present-token")
         self.assertEqual(len(observed), 57)
         self.assertEqual(sum(bool(item["archived"]) for item in observed), 5)
 
