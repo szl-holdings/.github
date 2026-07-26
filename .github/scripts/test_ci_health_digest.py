@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import importlib.util
 import json
-import os
 from pathlib import Path
 import tempfile
 import unittest
@@ -58,8 +57,8 @@ def estate(*, total: int = 57, private: int = 3, archived: int = 5):
 def identity(token: str = "secret-read-token") -> chd.ReadIdentity:
     repos = estate()
     return chd.ReadIdentity(
-        mode="github_app",
-        credential_name="QILLQAQ_APP_TOKEN",
+        mode="governed_pat",
+        credential_name="SZL_GITHUB_TOKEN",
         token=token,
         repositories=tuple(repos),
         total_repositories=57,
@@ -82,8 +81,8 @@ def verified_report(*, reds=(), errors=()):
         "organization": chd.ORG,
         "status": "VERIFIED" if not errors else "NOT_VERIFIED",
         "authentication": {
-            "mode": "github_app",
-            "credential_name": "QILLQAQ_APP_TOKEN",
+            "mode": "governed_pat",
+            "credential_name": "SZL_GITHUB_TOKEN",
             "authorized_endpoint_completed": True,
             "action_probes": ["szl-holdings/.github", "szl-holdings/private-0"],
             "rejected_candidates": [],
@@ -118,16 +117,16 @@ def verified_report(*, reds=(), errors=()):
 
 
 class ReadIdentityTests(unittest.TestCase):
-    def test_complete_app_identity_is_accepted_and_probes_private_actions(self):
+    def test_complete_governed_identity_probes_private_actions(self):
         probes = []
         observed = chd.assess_identity(
-            "github_app",
-            "QILLQAQ_APP_TOKEN",
+            "governed_pat",
+            "SZL_GITHUB_TOKEN",
             "masked-token",
             repository_loader=lambda mode, token: estate(),
             actions_probe=lambda token, repo: probes.append(repo),
         )
-        self.assertEqual(observed.mode, "github_app")
+        self.assertEqual(observed.mode, "governed_pat")
         self.assertEqual(observed.total_repositories, 57)
         self.assertEqual(observed.active_repositories, 52)
         self.assertEqual(observed.private_repositories, 3)
@@ -139,7 +138,7 @@ class ReadIdentityTests(unittest.TestCase):
     def test_partial_public_only_identity_is_rejected(self):
         with self.assertRaisesRegex(chd.DigestError, "private repositories"):
             chd.assess_identity(
-                "governed_pat_fallback",
+                "legacy_pat_fallback",
                 "ORG_CI_READ_TOKEN",
                 "masked-token",
                 repository_loader=lambda mode, token: estate(private=0),
@@ -149,28 +148,49 @@ class ReadIdentityTests(unittest.TestCase):
     def test_repository_floor_is_terminal(self):
         with self.assertRaisesRegex(chd.DigestError, "expected at least"):
             chd.assess_identity(
-                "github_app",
-                "QILLQAQ_APP_TOKEN",
+                "governed_pat",
+                "SZL_GITHUB_TOKEN",
                 "masked-token",
-                repository_loader=lambda mode, token: estate(total=56, private=3, archived=4),
+                repository_loader=lambda mode, token: estate(
+                    total=56,
+                    private=3,
+                    archived=4,
+                ),
                 actions_probe=lambda token, repo: None,
             )
 
-    def test_app_is_preferred_and_pat_is_a_bounded_fallback(self):
-        fallback = identity("fallback-token")
+    def test_verified_governed_token_is_primary_and_legacy_is_bounded_fallback(self):
+        fallback = chd.ReadIdentity(
+            mode="legacy_pat_fallback",
+            credential_name="ORG_CI_READ_TOKEN",
+            token="fallback-token",
+            repositories=identity().repositories,
+            total_repositories=57,
+            active_repositories=52,
+            archived_repositories=5,
+            private_repositories=3,
+            action_probes=("szl-holdings/.github", "szl-holdings/private-0"),
+        )
         with patch.object(
             chd,
             "assess_identity",
-            side_effect=[chd.DigestError("app unavailable"), fallback],
+            side_effect=[chd.DigestError("primary unavailable"), fallback],
         ):
             selected, failures = chd.select_read_identity(
                 (
-                    ("github_app", "QILLQAQ_APP_TOKEN", "app-token"),
-                    ("governed_pat_fallback", "ORG_CI_READ_TOKEN", "pat-token"),
+                    ("governed_pat", "SZL_GITHUB_TOKEN", "primary-token"),
+                    (
+                        "legacy_pat_fallback",
+                        "ORG_CI_READ_TOKEN",
+                        "legacy-token",
+                    ),
                 )
             )
         self.assertIs(selected, fallback)
-        self.assertEqual(failures, ("QILLQAQ_APP_TOKEN: app unavailable",))
+        self.assertEqual(
+            failures,
+            ("SZL_GITHUB_TOKEN: primary unavailable",),
+        )
 
     def test_no_complete_read_identity_is_terminal(self):
         with patch.object(
@@ -178,11 +198,18 @@ class ReadIdentityTests(unittest.TestCase):
             "assess_identity",
             side_effect=chd.DigestError("unauthorized"),
         ):
-            with self.assertRaisesRegex(chd.DigestError, "no complete organization"):
+            with self.assertRaisesRegex(
+                chd.DigestError,
+                "no complete organization",
+            ):
                 chd.select_read_identity(
                     (
-                        ("github_app", "QILLQAQ_APP_TOKEN", ""),
-                        ("governed_pat_fallback", "ORG_CI_READ_TOKEN", ""),
+                        ("governed_pat", "SZL_GITHUB_TOKEN", ""),
+                        (
+                            "legacy_pat_fallback",
+                            "ORG_CI_READ_TOKEN",
+                            "",
+                        ),
                     )
                 )
 
@@ -230,7 +257,12 @@ class ClassificationAndIssueTests(unittest.TestCase):
         with patch.object(
             chd,
             "api_json",
-            side_effect=chd.ApiError("PATCH", "/issues/158", 401, "Bad credentials"),
+            side_effect=chd.ApiError(
+                "PATCH",
+                "/issues/158",
+                401,
+                "Bad credentials",
+            ),
         ):
             with self.assertRaises(chd.ApiError):
                 chd.upsert_issue("write-token", verified_report())
@@ -317,16 +349,20 @@ class WorkflowContractTests(unittest.TestCase):
         self.assertIn("github.event_name != 'pull_request'", self.workflow)
         self.assertIn("test_ci_health_digest.py", self.workflow)
 
-    def test_app_first_and_fallback_are_separate_from_issue_write_token(self):
-        self.assertIn("actions/create-github-app-token@", self.workflow)
-        self.assertIn("permission-actions: read", self.workflow)
-        self.assertIn("QILLQAQ_TOKEN: ${{ steps.app-token.outputs.token }}", self.workflow)
-        self.assertIn("ORG_CI_READ_TOKEN: ${{ secrets.ORG_CI_READ_TOKEN }}", self.workflow)
+    def test_governed_primary_and_legacy_fallback_are_separate_from_issue_write(self):
+        self.assertIn(
+            "SZL_GITHUB_TOKEN: ${{ secrets.SZL_GITHUB_TOKEN }}",
+            self.workflow,
+        )
+        self.assertIn(
+            "ORG_CI_READ_TOKEN: ${{ secrets.ORG_CI_READ_TOKEN }}",
+            self.workflow,
+        )
         self.assertIn("GITHUB_TOKEN: ${{ github.token }}", self.workflow)
-        self.assertIn("QILLQAQ_TOKEN", self.source)
+        self.assertIn("SZL_GITHUB_TOKEN", self.source)
         self.assertIn("ORG_CI_READ_TOKEN", self.source)
         self.assertNotIn(
-            '("governed_pat_fallback", "GITHUB_TOKEN"',
+            '("governed_pat", "GITHUB_TOKEN"',
             self.source,
         )
 
@@ -336,13 +372,10 @@ class WorkflowContractTests(unittest.TestCase):
         self.assertIn("Enforce authenticated digest result", self.workflow)
         self.assertNotIn("NTFY_BASE_URL", self.workflow)
 
-    def test_app_manifest_has_actions_read(self):
-        manifest = json.loads(
-            (ROOT / ".governance" / "github-app-manifest.json").read_text(
-                encoding="utf-8"
-            )
-        )
-        self.assertEqual(manifest["default_permissions"]["actions"], "read")
+    def test_no_new_content_write_or_direct_push_exists(self):
+        self.assertNotIn("contents: write", self.workflow)
+        self.assertNotIn("git push", self.workflow)
+        self.assertIn("issues: write", self.workflow)
 
 
 if __name__ == "__main__":
