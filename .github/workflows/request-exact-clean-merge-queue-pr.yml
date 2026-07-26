@@ -5,6 +5,7 @@ on:
     branches: [main]
     paths:
       - .github/scripts/request_exact_clean_merge_queue.py
+      - .github/scripts/enqueue_exact_clean_pull_requests.py
       - .github/workflows/request-exact-clean-merge-queue-pr.yml
 
 permissions:
@@ -15,7 +16,7 @@ concurrency:
   cancel-in-progress: false
 
 env:
-  REPORT_PATH: reports/exact-clean-merge-queue-request.json
+  REPORT_PATH: reports/exact-clean-enqueue.json
 
 jobs:
   request:
@@ -44,28 +45,39 @@ jobs:
           owner: ${{ github.repository_owner }}
           repositories: ${{ github.event.repository.name }}
 
-      - name: Compile and constrain the queue request
+      - name: Compile and constrain the exact queue mutation
         run: |
           set -euo pipefail
-          python -m py_compile .github/scripts/request_exact_clean_merge_queue.py
+          python -m py_compile \
+            .github/scripts/request_exact_clean_merge_queue.py \
+            .github/scripts/enqueue_exact_clean_pull_requests.py
           python - <<'PY'
           from pathlib import Path
 
-          source = Path(
+          preflight = Path(
               ".github/scripts/request_exact_clean_merge_queue.py"
           ).read_text(encoding="utf-8")
-          required = (
+          enqueue = Path(
+              ".github/scripts/enqueue_exact_clean_pull_requests.py"
+          ).read_text(encoding="utf-8")
+          required_preflight = (
               "52ab3fc1a17b5366010dd1bcfe8f6dcb5db4a286",
               "fb8a1c2435db5bff99be51faefc9781309d0f9a4",
-              '"--auto"',
-              '"--squash"',
               "merge_queue",
               "required_signatures",
               "required_status_checks",
               'verification.get("verified") is not True',
               "mergeQueueEntry",
           )
-          forbidden_endpoints = (
+          required_enqueue = (
+              "enqueuePullRequest",
+              "expectedHeadOid",
+              '"jump": False',
+              "pullRequestId",
+              "ENQUEUED_OR_MERGED",
+          )
+          forbidden = (
+              "mergePullRequest",
               '"PUT", f"repos/{repository}/pulls/',
               '"merge_method"',
               "statuses/",
@@ -76,21 +88,23 @@ jobs:
               "/reviews",
               "secrets/",
           )
-          for marker in required:
-              assert marker in source, marker
-          for marker in forbidden_endpoints:
-              assert marker not in source, marker
+          for marker in required_preflight:
+              assert marker in preflight, marker
+          for marker in required_enqueue:
+              assert marker in enqueue, marker
+          for marker in forbidden:
+              assert marker not in enqueue, marker
           PY
           git diff --check
 
-      - name: Request GitHub's protected merge queue
+      - name: Enqueue both exact signed heads
         id: queue
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
         shell: bash
         run: |
           set +e
-          python .github/scripts/request_exact_clean_merge_queue.py
+          python .github/scripts/enqueue_exact_clean_pull_requests.py
           code=$?
           echo "exit_code=${code}" >> "$GITHUB_OUTPUT"
           exit 0
@@ -99,7 +113,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: exact-clean-merge-queue-request-${{ github.run_id }}
+          name: exact-clean-enqueue-${{ github.run_id }}
           path: ${{ env.REPORT_PATH }}
           if-no-files-found: error
           retention-days: 90
@@ -111,7 +125,7 @@ jobs:
         run: |
           code="${EXIT_CODE:-2}"
           if [ "$code" -ne 0 ]; then
-            echo "::error::Exact clean queue request failed closed. No immediate merge or protection change was attempted."
+            echo "::error::Exact enqueuePullRequest operation failed closed. No immediate merge or protection change was attempted."
             exit "$code"
           fi
           echo "Both exact signed heads entered GitHub's protected merge queue or were merged by that queue."
