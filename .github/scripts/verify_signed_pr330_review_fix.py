@@ -95,7 +95,7 @@ def tree_sha(commit_sha: str) -> str:
     return sha
 
 
-def tree_map(commit_sha: str) -> tuple[str, dict[str, tuple[str, str, str]]]:
+def blob_map(commit_sha: str) -> tuple[str, dict[str, tuple[str, str]]]:
     root = tree_sha(commit_sha)
     value = get(f"repos/{REPOSITORY}/git/trees/{root}?recursive=1")
     if not isinstance(value, dict) or value.get("truncated") is True:
@@ -103,17 +103,20 @@ def tree_map(commit_sha: str) -> tuple[str, dict[str, tuple[str, str, str]]]:
     entries = value.get("tree")
     if not isinstance(entries, list):
         raise VerificationError(f"tree inventory for {commit_sha} is malformed")
-    mapping: dict[str, tuple[str, str, str]] = {}
+    mapping: dict[str, tuple[str, str]] = {}
     for item in entries:
         if not isinstance(item, dict):
             raise VerificationError("tree inventory contains a malformed entry")
+        if item.get("type") != "blob":
+            continue
         path = str(item.get("path") or "")
-        kind = str(item.get("type") or "")
         mode = str(item.get("mode") or "")
         sha = str(item.get("sha") or "")
         if not path or len(sha) != 40:
-            raise VerificationError("tree inventory entry lacks a path or SHA")
-        mapping[path] = (kind, mode, sha)
+            raise VerificationError("blob inventory entry lacks a path or SHA")
+        mapping[path] = (mode, sha)
+    if not mapping:
+        raise VerificationError(f"blob inventory for {commit_sha} is empty")
     return root, mapping
 
 
@@ -142,9 +145,9 @@ def verify_source_pr() -> None:
         raise VerificationError("source PR base moved")
 
 
-def direct_tree_diff(
-    source: dict[str, tuple[str, str, str]],
-    candidate: dict[str, tuple[str, str, str]],
+def direct_blob_diff(
+    source: dict[str, tuple[str, str]],
+    candidate: dict[str, tuple[str, str]],
 ) -> dict[str, dict[str, Any]]:
     differences: dict[str, dict[str, Any]] = {}
     for path in sorted(set(source) | set(candidate)):
@@ -157,13 +160,13 @@ def direct_tree_diff(
     return differences
 
 
-def verify_review_content(candidate_tree: dict[str, tuple[str, str, str]]) -> dict[str, Any]:
+def verify_review_content(candidate_blobs: dict[str, tuple[str, str]]) -> dict[str, Any]:
     files: dict[str, bytes] = {}
     for path in PYTHON_PATHS:
-        entry = candidate_tree.get(path)
-        if entry is None or entry[0] != "blob":
+        entry = candidate_blobs.get(path)
+        if entry is None:
             raise VerificationError(f"candidate tree lacks Python file {path}")
-        files[path] = blob_bytes(entry[2])
+        files[path] = blob_bytes(entry[1])
     try:
         implementation = files[TARGET_PATH].decode("utf-8")
         tests = files[TEST_PATH].decode("utf-8")
@@ -228,7 +231,7 @@ def verify_review_content(candidate_tree: dict[str, tuple[str, str, str]]) -> di
 def main() -> int:
     REPORT_PATH.parent.mkdir(parents=True, exist_ok=True)
     report: dict[str, Any] = {
-        "schema": "szl.signed-review-fix-verification/v1",
+        "schema": "szl.signed-review-fix-verification/v2",
         "generated_at": datetime.now(timezone.utc).isoformat(),
         "repository": REPOSITORY,
         "source_pr": SOURCE_PR,
@@ -238,8 +241,8 @@ def main() -> int:
         "status": "FAILED_CLOSED",
         "boundaries": [
             "Read-only verification of an existing candidate branch.",
-            "Direct tree-object comparison is used; sibling-commit three-dot comparison is not used.",
-            "Exactly two reviewed Python paths may differ from the source PR tree.",
+            "Direct blob-object comparison is used; directory tree hash cascades are ignored.",
+            "Exactly two reviewed Python file blobs may differ from the source PR tree.",
             "No branch, pull request, rule, status, check, review, or secret is mutated.",
         ],
     }
@@ -251,15 +254,15 @@ def main() -> int:
             raise VerificationError(f"candidate signature is not verified: {signature}")
         if signature["parents"] != [SOURCE_BASE]:
             raise VerificationError(f"candidate parent mismatch: {signature['parents']}")
-        source_tree_sha, source_tree = tree_map(SOURCE_HEAD)
-        candidate_tree_sha, candidate_tree = tree_map(candidate_sha)
-        differences = direct_tree_diff(source_tree, candidate_tree)
+        source_tree_sha, source_blobs = blob_map(SOURCE_HEAD)
+        candidate_tree_sha, candidate_blobs = blob_map(candidate_sha)
+        differences = direct_blob_diff(source_blobs, candidate_blobs)
         if set(differences) != ALLOWED_TREE_DIFFS:
             raise VerificationError(
-                "direct source/candidate tree differences escaped the reviewed paths: "
+                "direct source/candidate blob differences escaped the reviewed paths: "
                 f"{sorted(differences)}"
             )
-        content_receipt = verify_review_content(candidate_tree)
+        content_receipt = verify_review_content(candidate_blobs)
         report.update(
             {
                 "status": "SIGNED_REVIEW_FIX_VERIFIED",
@@ -267,7 +270,7 @@ def main() -> int:
                 "signature": signature,
                 "source_tree": source_tree_sha,
                 "candidate_tree": candidate_tree_sha,
-                "direct_tree_differences": differences,
+                "direct_blob_differences": differences,
                 "review_fix": content_receipt,
             }
         )
