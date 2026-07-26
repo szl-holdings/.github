@@ -37,10 +37,14 @@ The default-branch queue records the same App-owned status as evidence but does
 not make it a required check. Live pilot testing proved that a required status
 published by a `workflow_run` attestor creates a circular dependency: the queue
 waits for the status before dispatching the `merge_group` workflows whose
-completion triggers that attestor. Making the status non-required on the queued
-branch lets GitHub dispatch the merge-group gates. A separately hosted,
+completion triggers that attestor. Making the status non-required removes that
+deterministic cycle, but it does not by itself prove delivery: later pilot
+entries still received no `merge_group` Actions runs despite using the exact
+historical ruleset version that had dispatched them successfully. The observed
+provider blocker is recorded in
+`pilots/2026-07-26-merge-group-delivery-blocker.md`. A separately hosted,
 webhook-driven App service would be required to make the App status itself a
-queue-blocking control without that cycle.
+queue-blocking control without the workflow cycle.
 
 GitHub rejected queue entry while a separate `required_deployments` rule was
 active even though the exact-head `staging` deployment was successful. The

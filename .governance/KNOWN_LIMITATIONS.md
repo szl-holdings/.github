@@ -22,6 +22,13 @@
   dependency. The main ruleset therefore requires the gates and App-pinned
   staging while preserving the App status, review, and signed BAP as evidence.
   A separately hosted webhook service is needed for a queue-blocking App status.
+- After that deterministic cycle was removed, GitHub still stopped delivering
+  `merge_group` Actions runs for new synthetic queue heads. The active nine-
+  check rule is API-identical to historical version `44456196`, which dispatched
+  successfully for PR #317. Multiple PR #319 queue heads had zero check suites
+  after queue and workflow registration refreshes. This is an external blocker,
+  not a passed pilot; see
+  `pilots/2026-07-26-merge-group-delivery-blocker.md`.
 - GitHub rejected `enqueuePullRequest` for the App installation token despite
   its live merge-queue grant. The App retains attestation and approval duties;
   the ephemeral repository token requests the protected queue after attestation.
@@ -38,5 +45,7 @@
 - Twelve archived repositories retain historical ruleset state that cannot be
   edited while archived. They have no active release path.
 
-The `.github` repository is the pilot. Estate-wide completion is claimed only
-after each active repository has compatible gates and staging evidence.
+The `.github` repository is the pilot. Its activation is not complete until
+GitHub delivers and passes the required merge-group checks. Estate-wide
+completion is claimed only after each active repository has compatible gates
+and staging evidence.
