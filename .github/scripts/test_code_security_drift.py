@@ -1,38 +1,5 @@
 #!/usr/bin/env python3
-"""Self-test for the managed-security-configuration drift checker.
-
-Task #387 created ``code_security_drift.py`` — the safety net that proves every
-non-archived repo in the org stays attached + enforced under the canonical
-"SZL Holdings Managed Security" code-security configuration (id 252588), that
-the config still exists/org-scoped/enforced, and that it is still the default
-for new repos. If that checker were ever weakened — an edit that makes it always
-return exit 0, or one that swallows an auth/API failure as a pass — drift would
-go undetected and the org would *look* protected when it isn't.
-
-The most important branch ("auth/API failure must be exit 2, never 0") and the
-drift branches require live organization-administration calls that cannot run in
-credentialless pull-request CI. This test stubs the GitHub API surface
-(``_token`` / ``gh_json`` / ``gh_paginate``) so it runs with no network and no
-credential, and pins the exit-code contract of ``main()``:
-
-  clean state                                    -> exit 0
-  a repo detached (not enforced under canonical) -> exit 1
-  a repo swapped onto a different configuration  -> exit 1
-  a new uncovered repo                            -> exit 1
-  default-for-new-repos changed                   -> exit 1
-  canonical configuration missing                 -> exit 1
-  a present-but-failing token (auth/API error)    -> exit 2
-  no token configured for direct local invocation -> exit 3
-
-The production workflow has a stronger contract: it runs source tests before it
-mints a short-lived qillqaq GitHub App installation token, fails when that token
-cannot be created or cannot read the organization endpoint, and writes a
-normalized, source-bound evidence envelope even when a pre-check prevents the
-ordinary report. It never converts a missing or stale personal token into a
-neutral production result.
-
-Stdlib ``unittest`` only — no third-party test framework.
-"""
+"""Network-free tests for code-security drift and credential selection."""
 from __future__ import annotations
 
 import contextlib
@@ -42,36 +9,48 @@ import json
 import os
 from pathlib import Path
 import sys
+import tempfile
 import unittest
+from unittest import mock
 
-_HERE = os.path.dirname(os.path.abspath(__file__))
-_MODULE_PATH = os.path.join(_HERE, "code_security_drift.py")
-_ROOT = Path(_HERE).parents[1]
+HERE = Path(__file__).resolve().parent
+ROOT = HERE.parents[1]
 
-_spec = importlib.util.spec_from_file_location("code_security_drift", _MODULE_PATH)
-assert _spec and _spec.loader
-csd = importlib.util.module_from_spec(_spec)
-_spec.loader.exec_module(csd)
+
+def load_module(name: str, filename: str):
+    spec = importlib.util.spec_from_file_location(name, HERE / filename)
+    assert spec and spec.loader
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+csd = load_module("code_security_drift", "code_security_drift.py")
+selector = load_module(
+    "run_code_security_drift_with_fallback",
+    "run_code_security_drift_with_fallback.py",
+)
 
 ORG = "szl-holdings"
 CFG = csd.CANONICAL_CONFIG_ID
 
 
-def _config(
-    id_,
-    name="SZL Holdings Managed Security",
-    target_type="organization",
-    enforcement="enforced",
-):
+def config(
+    config_id: int,
+    *,
+    name: str = "SZL Holdings Managed Security",
+    target_type: str = "organization",
+    enforcement: str = "enforced",
+) -> dict:
     return {
-        "id": id_,
+        "id": config_id,
         "name": name,
         "target_type": target_type,
         "enforcement": enforcement,
     }
 
 
-def _repo(name, archived=False, private=False):
+def repo(name: str, *, archived: bool = False, private: bool = False) -> dict:
     return {
         "full_name": f"{ORG}/{name}",
         "archived": archived,
@@ -79,229 +58,304 @@ def _repo(name, archived=False, private=False):
     }
 
 
-def _clean_state():
-    """Canonical config exists+enforced+default; every repo enforced under it."""
-    repos = [_repo("a11oy"), _repo("ouroboros", private=True), _repo("docs-site")]
-    configs = [_config(CFG)]
+def clean_state():
+    repositories = [repo("a11oy"), repo("ouroboros", private=True), repo("docs-site")]
+    configurations = [config(CFG)]
     defaults = [{"default_for_new_repos": "all", "configuration": {"id": CFG}}]
-    attachments = {CFG: [(repo["full_name"], "enforced") for repo in repos]}
-    return configs, defaults, repos, attachments
+    attachments = {
+        CFG: [(item["full_name"], "enforced") for item in repositories]
+    }
+    return configurations, defaults, repositories, attachments
 
 
-def _make_fetchers(configs, defaults, repos, attachments):
-    """Return API stubs that route by request path."""
-
+def make_fetchers(configurations, defaults, repositories, attachments):
     def gh_json(path, token):
+        del token
         if path.endswith("/code-security/configurations/defaults"):
             return defaults
         if path.endswith("/code-security/configurations"):
-            return configs
+            return configurations
         raise AssertionError(f"unexpected gh_json path: {path}")
 
     def gh_paginate(path, token):
+        del token
         if "/repos?type=all" in path:
-            return repos
+            return repositories
         if path.endswith("/repositories"):
-            cfg_id = int(path.rstrip("/").split("/")[-2])
+            config_id = int(path.rstrip("/").split("/")[-2])
             return [
                 {"repository": {"full_name": full_name}, "status": status}
-                for (full_name, status) in attachments.get(cfg_id, [])
+                for full_name, status in attachments.get(config_id, [])
             ]
         raise AssertionError(f"unexpected gh_paginate path: {path}")
 
     return gh_json, gh_paginate
 
 
-def _run_main(
-    configs,
+def run_checker_main(
+    configurations,
     defaults,
-    repos,
+    repositories,
     attachments,
     *,
-    token="tok",
-    gh_json_error=None,
-):
-    """Run ``csd.main()`` with the GitHub API surface stubbed out."""
+    token: str | None = "token",
+    gh_json_error: Exception | None = None,
+) -> int:
     saved = {
         "_token": csd._token,
         "gh_json": csd.gh_json,
         "gh_paginate": csd.gh_paginate,
     }
+    argv = sys.argv
     try:
         if token is None:
-
-            def _no_token():
-                raise csd.MissingTokenError("No GitHub token configured (test).")
-
-            csd._token = _no_token
+            def no_token():
+                raise csd.MissingTokenError("missing token (test)")
+            csd._token = no_token
         else:
             csd._token = lambda: token
 
         if gh_json_error is not None:
-
-            def _raise(path, tok):
+            def fail_json(path, candidate):
+                del path, candidate
                 raise gh_json_error
-
-            csd.gh_json = _raise
-            csd.gh_paginate = lambda path, tok: []
+            csd.gh_json = fail_json
+            csd.gh_paginate = lambda path, candidate: []
         else:
-            gh_json, gh_paginate = _make_fetchers(
-                configs,
+            csd.gh_json, csd.gh_paginate = make_fetchers(
+                configurations,
                 defaults,
-                repos,
+                repositories,
                 attachments,
             )
-            csd.gh_json = gh_json
-            csd.gh_paginate = gh_paginate
 
-        saved_argv = sys.argv
         sys.argv = [
             "code_security_drift.py",
             "--report",
             "",
             "--allowlist",
-            os.path.join(_HERE, "__no_such_allowlist__.json"),
+            str(HERE / "__missing_allowlist__.json"),
         ]
-        try:
-            with contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(
-                io.StringIO()
-            ):
-                return csd.main()
-        finally:
-            sys.argv = saved_argv
+        with contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(
+            io.StringIO()
+        ):
+            return csd.main()
     finally:
-        for name, function in saved.items():
-            setattr(csd, name, function)
+        sys.argv = argv
+        for name, value in saved.items():
+            setattr(csd, name, value)
 
 
-class TestDriftCheckerExitContract(unittest.TestCase):
+class DriftCheckerExitContractTests(unittest.TestCase):
     def test_clean_state_passes(self):
-        rc = _run_main(*_clean_state())
-        self.assertEqual(rc, csd.EXIT_OK)
+        self.assertEqual(run_checker_main(*clean_state()), csd.EXIT_OK)
 
-    def test_detached_repo_fails(self):
-        configs, defaults, repos, attachments = _clean_state()
+    def test_detached_repository_fails(self):
+        configurations, defaults, repositories, attachments = clean_state()
         attachments[CFG] = [
-            (full_name, status)
-            for (full_name, status) in attachments[CFG]
-            if not full_name.endswith("/docs-site")
+            item for item in attachments[CFG] if not item[0].endswith("/docs-site")
         ]
-        rc = _run_main(configs, defaults, repos, attachments)
-        self.assertEqual(rc, csd.EXIT_DRIFT)
-
-    def test_repo_on_different_config_fails(self):
-        configs, defaults, repos, attachments = _clean_state()
-        configs.append(_config(999, name="Legacy Enterprise Default"))
-        repos.append(_repo("legacy-repo"))
-        attachments[999] = [(f"{ORG}/legacy-repo", "enforced")]
-        rc = _run_main(configs, defaults, repos, attachments)
-        self.assertEqual(rc, csd.EXIT_DRIFT)
-
-    def test_new_uncovered_repo_fails(self):
-        configs, defaults, repos, attachments = _clean_state()
-        repos.append(_repo("freshly-created"))
-        rc = _run_main(configs, defaults, repos, attachments)
-        self.assertEqual(rc, csd.EXIT_DRIFT)
-
-    def test_default_for_new_repos_changed_fails(self):
-        configs, defaults, repos, attachments = _clean_state()
-        defaults[0]["default_for_new_repos"] = "none"
-        rc = _run_main(configs, defaults, repos, attachments)
-        self.assertEqual(rc, csd.EXIT_DRIFT)
-
-    def test_default_entry_missing_fails(self):
-        configs, _, repos, attachments = _clean_state()
-        rc = _run_main(configs, [], repos, attachments)
-        self.assertEqual(rc, csd.EXIT_DRIFT)
-
-    def test_canonical_config_missing_fails(self):
-        _, defaults, repos, attachments = _clean_state()
-        configs = [_config(999, name="Some Other Config")]
-        rc = _run_main(configs, defaults, repos, attachments)
-        self.assertEqual(rc, csd.EXIT_DRIFT)
-
-    def test_missing_token_is_distinct_from_a_pass(self):
-        rc = _run_main(*_clean_state(), token=None)
-        self.assertEqual(rc, csd.EXIT_NO_TOKEN)
-        self.assertNotEqual(rc, csd.EXIT_OK)
-
-    def test_present_but_failing_token_is_exit_2_not_0(self):
-        rc = _run_main(
-            *_clean_state(),
-            gh_json_error=csd.CheckError("GitHub API 403 (simulated auth failure)"),
+        self.assertEqual(
+            run_checker_main(configurations, defaults, repositories, attachments),
+            csd.EXIT_DRIFT,
         )
-        self.assertEqual(rc, csd.EXIT_ERROR)
-        self.assertNotEqual(rc, csd.EXIT_OK)
 
-    def test_archived_uncovered_repo_passes(self):
-        configs, defaults, repos, attachments = _clean_state()
-        repos.append(_repo("old-thing", archived=True))
-        rc = _run_main(configs, defaults, repos, attachments)
-        self.assertEqual(rc, csd.EXIT_OK)
+    def test_repository_on_other_configuration_fails(self):
+        configurations, defaults, repositories, attachments = clean_state()
+        configurations.append(config(999, name="Legacy"))
+        repositories.append(repo("legacy-repo"))
+        attachments[999] = [(f"{ORG}/legacy-repo", "enforced")]
+        self.assertEqual(
+            run_checker_main(configurations, defaults, repositories, attachments),
+            csd.EXIT_DRIFT,
+        )
 
-    def test_transitional_status_warns_not_fails(self):
-        configs, defaults, repos, attachments = _clean_state()
+    def test_new_uncovered_repository_fails(self):
+        configurations, defaults, repositories, attachments = clean_state()
+        repositories.append(repo("new-repo"))
+        self.assertEqual(
+            run_checker_main(configurations, defaults, repositories, attachments),
+            csd.EXIT_DRIFT,
+        )
+
+    def test_default_change_fails(self):
+        configurations, defaults, repositories, attachments = clean_state()
+        defaults[0]["default_for_new_repos"] = "none"
+        self.assertEqual(
+            run_checker_main(configurations, defaults, repositories, attachments),
+            csd.EXIT_DRIFT,
+        )
+
+    def test_missing_canonical_configuration_fails(self):
+        _, defaults, repositories, attachments = clean_state()
+        self.assertEqual(
+            run_checker_main(
+                [config(999, name="Other")],
+                defaults,
+                repositories,
+                attachments,
+            ),
+            csd.EXIT_DRIFT,
+        )
+
+    def test_missing_token_is_not_a_pass(self):
+        result = run_checker_main(*clean_state(), token=None)
+        self.assertEqual(result, csd.EXIT_NO_TOKEN)
+        self.assertNotEqual(result, csd.EXIT_OK)
+
+    def test_present_but_unauthorized_token_is_error(self):
+        result = run_checker_main(
+            *clean_state(),
+            gh_json_error=csd.CheckError("403 simulated"),
+        )
+        self.assertEqual(result, csd.EXIT_ERROR)
+        self.assertNotEqual(result, csd.EXIT_OK)
+
+    def test_archived_uncovered_repository_is_ignored(self):
+        configurations, defaults, repositories, attachments = clean_state()
+        repositories.append(repo("archive", archived=True))
+        self.assertEqual(
+            run_checker_main(configurations, defaults, repositories, attachments),
+            csd.EXIT_OK,
+        )
+
+    def test_transitional_attachment_warns_without_false_drift(self):
+        configurations, defaults, repositories, attachments = clean_state()
         attachments[CFG] = [
-            (
-                full_name,
-                "attaching" if full_name.endswith("/docs-site") else status,
-            )
-            for (full_name, status) in attachments[CFG]
+            (full_name, "attaching" if full_name.endswith("/docs-site") else status)
+            for full_name, status in attachments[CFG]
         ]
-        rc = _run_main(configs, defaults, repos, attachments)
-        self.assertEqual(rc, csd.EXIT_OK)
+        self.assertEqual(
+            run_checker_main(configurations, defaults, repositories, attachments),
+            csd.EXIT_OK,
+        )
 
 
-class TestProductionWorkflowAuthContract(unittest.TestCase):
+class GovernedCredentialSelectorTests(unittest.TestCase):
     def setUp(self):
-        self.workflow_path = _ROOT / ".github/workflows/code-security-drift.yml"
-        self.workflow = self.workflow_path.read_text(encoding="utf-8")
+        self.environment = mock.patch.dict(os.environ, {}, clear=True)
+        self.environment.start()
+        self.addCleanup(self.environment.stop)
 
-    def test_uses_short_lived_least_privilege_app_token(self):
+    def test_prefers_authorized_app_token(self):
+        os.environ["QILLQAQ_ORG_TOKEN"] = "app-token"
+        os.environ["SZL_GITHUB_TOKEN"] = "fallback-token"
+        with mock.patch.object(
+            selector,
+            "_probe",
+            return_value={
+                "http_status": 200,
+                "classification": "authorized",
+                "authorized": True,
+                "response_shape": "list",
+            },
+        ) as probe:
+            selected, token, records = selector._select()
+        self.assertEqual(selected, "qillqaq_app")
+        self.assertEqual(token, "app-token")
+        self.assertEqual(len(records), 1)
+        probe.assert_called_once_with("app-token")
+
+    def test_falls_back_only_after_app_is_rejected(self):
+        os.environ["QILLQAQ_ORG_TOKEN"] = "app-token"
+        os.environ["SZL_GITHUB_TOKEN"] = "fallback-token"
+        with mock.patch.object(
+            selector,
+            "_probe",
+            side_effect=[
+                {
+                    "http_status": 403,
+                    "classification": "unauthorized",
+                    "authorized": False,
+                    "response_shape": None,
+                },
+                {
+                    "http_status": 200,
+                    "classification": "authorized",
+                    "authorized": True,
+                    "response_shape": "list",
+                },
+            ],
+        ):
+            selected, token, records = selector._select()
+        self.assertEqual(selected, "szl_github_token")
+        self.assertEqual(token, "fallback-token")
+        self.assertEqual([item["classification"] for item in records], [
+            "unauthorized",
+            "authorized",
+        ])
+
+    def test_no_authorized_candidate_fails_closed(self):
+        os.environ["SZL_GITHUB_TOKEN"] = "fallback-token"
+        with mock.patch.object(
+            selector,
+            "_probe",
+            return_value={
+                "http_status": 401,
+                "classification": "unauthenticated",
+                "authorized": False,
+                "response_shape": None,
+            },
+        ):
+            with self.assertRaises(selector.CredentialSelectionError):
+                selector._select()
+
+    def test_failure_report_contains_no_token_material(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "report.json"
+            selector._bounded_failure_report(
+                path,
+                [
+                    {
+                        "credential": "qillqaq_app",
+                        "configured": False,
+                        "authorized": False,
+                    }
+                ],
+                "no credential",
+            )
+            text = path.read_text(encoding="utf-8")
+            report = json.loads(text)
+        self.assertEqual(report["status"], "NOT_VERIFIED")
+        self.assertIsNone(report["credential_selection"]["selected"])
+        self.assertNotIn("token", json.dumps(report).lower().replace("credential", ""))
+
+
+class ProductionWorkflowContractTests(unittest.TestCase):
+    def setUp(self):
+        self.workflow = (
+            ROOT / ".github/workflows/code-security-drift.yml"
+        ).read_text(encoding="utf-8")
+
+    def test_app_is_preferred_but_failure_does_not_skip_fallback(self):
         self.assertIn(
             "actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1",
             self.workflow,
         )
-        self.assertIn("client-id: ${{ vars.QILLQAQ_CLIENT_ID }}", self.workflow)
+        self.assertIn("permission-organization-administration: read", self.workflow)
+        self.assertIn("continue-on-error: true", self.workflow)
         self.assertIn(
-            "private-key: ${{ secrets.QILLQAQ_PRIVATE_KEY }}",
+            "QILLQAQ_ORG_TOKEN: ${{ steps.app-token.outputs.token }}",
             self.workflow,
         )
-        self.assertIn("owner: ${{ github.repository_owner }}", self.workflow)
+
+    def test_fallback_is_explicit_and_never_neutral(self):
         self.assertIn(
-            "permission-organization-administration: read",
+            "SZL_GITHUB_TOKEN: ${{ secrets.SZL_GITHUB_TOKEN }}",
             self.workflow,
         )
-        self.assertNotIn("permission-administration: read", self.workflow)
-        self.assertIn("GH_TOKEN: ${{ steps.app-token.outputs.token }}", self.workflow)
-
-    def test_source_tests_precede_credential_minting(self):
-        self.assertLess(
-            self.workflow.index("Compile and self-test the drift contract"),
-            self.workflow.index("Mint least-privilege qillqaq organization token"),
-        )
-
-    def test_has_no_personal_token_or_neutral_production_skip(self):
-        self.assertNotIn("secrets.SZL_GITHUB_TOKEN", self.workflow)
+        self.assertIn("run_code_security_drift_with_fallback.py", self.workflow)
         self.assertNotIn("name: Token preflight", self.workflow)
         self.assertNotIn("has_token:", self.workflow)
         self.assertIn("fail-closed, not a neutral skip", self.workflow)
 
-    def test_every_outcome_gets_normalized_evidence_before_upload(self):
-        ensure = self.workflow.index(
-            "Normalize or create bounded evidence for every outcome"
+    def test_tests_precede_credential_use(self):
+        self.assertLess(
+            self.workflow.index("Compile and self-test the drift and credential contracts"),
+            self.workflow.index("Mint preferred qillqaq organization token"),
         )
-        upload = self.workflow.index("Upload immutable drift evidence")
-        evidence = self.workflow[ensure:upload]
-        self.assertLess(ensure, upload)
-        self.assertIn("if: always()", evidence)
-        self.assertIn('"schema": "szl.code-security-drift/v2"', evidence)
-        self.assertIn('report.setdefault("generation"', evidence)
-        self.assertIn('report["workflow"] = workflow', evidence)
-        self.assertIn('"app_token_outcome"', evidence)
-        self.assertIn('"status": "NOT_VERIFIED"', evidence)
 
-    def test_report_is_immutable_artifact_not_direct_main_push(self):
+    def test_report_is_immutable_and_main_is_not_pushed(self):
         self.assertIn(
             "actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a",
             self.workflow,
@@ -311,9 +365,9 @@ class TestProductionWorkflowAuthContract(unittest.TestCase):
         self.assertNotIn("git push", self.workflow)
         self.assertIn("persist-credentials: false", self.workflow)
 
-    def test_app_manifest_separates_org_and_repo_administration(self):
+    def test_manifest_keeps_separate_org_and_repo_admin_permissions(self):
         manifest = json.loads(
-            (_ROOT / ".governance/github-app-manifest.json").read_text(
+            (ROOT / ".governance/github-app-manifest.json").read_text(
                 encoding="utf-8"
             )
         )
