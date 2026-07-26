@@ -1,11 +1,10 @@
 #!/usr/bin/env python3
-"""Approve only the exact PR workflow runs created by signed-history recovery.
+"""Approve only exact PR workflow runs created by signed-history recovery.
 
-GitHub marks workflow runs triggered by the GitHub-created replacement commits
-as ``action_required``. This controller approves those runs without changing,
-forging, or waiving any check result. Every run must be a pull-request run at one
-of the two declared immutable signed heads and use an explicitly allowed
-workflow name.
+GitHub marks workflow runs triggered by the GitHub-created replacement commit as
+``action_required``. This controller approves those runs without changing,
+forging, or waiving any check result. Every run must be a pull-request run at the
+declared immutable signed head and use an explicitly allowed workflow name.
 """
 from __future__ import annotations
 
@@ -20,8 +19,7 @@ from typing import Any
 
 REPORT_SCHEMA = "szl.signed-recovery-run-approval/v1"
 TARGETS = {
-    "52ab3fc1a17b5366010dd1bcfe8f6dcb5db4a286": 322,
-    "fb8a1c2435db5bff99be51faefc9781309d0f9a4": 323,
+    "93a5138742497345cca21b8bd1a385d3b499c579": 325,
 }
 ALLOWED_WORKFLOWS = {
     "ci",
@@ -175,8 +173,8 @@ def main() -> int:
             )
 
         # Require GitHub to acknowledge every approval by leaving the
-        # action_required state. Actual check conclusions are produced only by
-        # their own workflows and are never altered here.
+        # action_required state. Actual conclusions still come only from each
+        # workflow and are never altered here.
         remaining = {record["run_id"] for record in records}
         for _ in range(20):
             complete: set[int] = set()
@@ -209,7 +207,7 @@ def main() -> int:
             "error": error,
             "runs": records,
             "boundaries": [
-                "Only pull_request runs at the two declared GitHub-signed heads are eligible.",
+                "Only pull_request runs at the declared GitHub-signed head are eligible.",
                 "Only explicitly allowed workflow names are eligible.",
                 "This controller approves execution; it does not create, alter, or waive any check conclusion.",
                 "No secret value is recorded.",
