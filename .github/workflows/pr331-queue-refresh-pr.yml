@@ -1,0 +1,143 @@
+name: PR 331 Queue Entry — Read-Only Refresh
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - .github/workflows/pr331-queue-refresh-pr.yml
+
+permissions:
+  actions: read
+  contents: read
+  pull-requests: read
+
+concurrency:
+  group: pr331-queue-refresh-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+env:
+  REPORT_PATH: reports/pr331-queue-refresh.json
+
+jobs:
+  refresh:
+    name: Live GraphQL queue entry and merge-group delivery
+    if: >-
+      github.repository == 'szl-holdings/.github' &&
+      github.event.pull_request.number == 327 &&
+      github.event.pull_request.head.repo.full_name == 'szl-holdings/.github' &&
+      github.event.pull_request.head.ref == 'diag/ci-health-digest-state-v1'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - name: Query live queue state
+        shell: python
+        run: |
+          import json
+          import os
+          import subprocess
+          from datetime import datetime, timezone
+          from pathlib import Path
+
+          repo = os.environ["GITHUB_REPOSITORY"]
+          owner, name = repo.split("/", 1)
+          query = """
+          query($owner: String!, $name: String!, $number: Int!) {
+            repository(owner: $owner, name: $name) {
+              pullRequest(number: $number) {
+                state headRefOid baseRefOid mergeable mergeStateStatus reviewDecision
+                autoMergeRequest { enabledAt mergeMethod enabledBy { login } }
+                mergeQueueEntry { id position state enqueuedAt }
+                reviewThreads(first: 100) { totalCount nodes { isResolved } }
+              }
+            }
+          }
+          """
+
+          def run(args, payload=None):
+              process = subprocess.run(
+                  ["gh", "api", *args],
+                  input=json.dumps(payload) if payload is not None else None,
+                  capture_output=True,
+                  text=True,
+                  check=False,
+                  env=os.environ,
+              )
+              raw = process.stdout.strip()
+              try:
+                  value = json.loads(raw) if raw else None
+              except json.JSONDecodeError:
+                  value = raw[:4000]
+              return {
+                  "ok": process.returncode == 0,
+                  "payload": value,
+                  "stderr": process.stderr.strip()[:2000],
+              }
+
+          graph = run(
+              ["graphql", "--input", "-"],
+              {
+                  "query": query,
+                  "variables": {"owner": owner, "name": name, "number": 331},
+              },
+          )
+          branches = run(["--method", "GET", f"repos/{repo}/branches?per_page=100"])
+          branch_payload = branches.get("payload")
+          queue_branches = []
+          if isinstance(branch_payload, list):
+              queue_branches = [
+                  {
+                      "name": item.get("name"),
+                      "sha": (item.get("commit") or {}).get("sha"),
+                  }
+                  for item in branch_payload
+                  if str(item.get("name") or "").startswith("gh-readonly-queue/")
+              ]
+          runs = run(
+              [
+                  "--method",
+                  "GET",
+                  f"repos/{repo}/actions/runs?event=merge_group&per_page=100",
+              ]
+          )
+          run_payload = runs.get("payload")
+          merge_runs = []
+          if isinstance(run_payload, dict):
+              merge_runs = [
+                  {
+                      "id": item.get("id"),
+                      "name": item.get("name"),
+                      "status": item.get("status"),
+                      "conclusion": item.get("conclusion"),
+                      "head_branch": item.get("head_branch"),
+                      "head_sha": item.get("head_sha"),
+                      "created_at": item.get("created_at"),
+                  }
+                  for item in run_payload.get("workflow_runs", [])
+                  if isinstance(item, dict)
+                  and str(item.get("head_branch") or "").startswith(
+                      "gh-readonly-queue/main/pr-331-"
+                  )
+              ]
+          report = {
+              "schema": "szl.pr331-queue-refresh/v1",
+              "generated_at": datetime.now(timezone.utc).isoformat(),
+              "graphql": graph,
+              "queue_branches": queue_branches,
+              "merge_group_runs": merge_runs,
+              "boundaries": ["Read-only queue and Actions metadata only."],
+          }
+          path = Path(os.environ["REPORT_PATH"])
+          path.parent.mkdir(parents=True, exist_ok=True)
+          path.write_text(json.dumps(report, indent=2, sort_keys=True) + "\n")
+          print(json.dumps(report, indent=2, sort_keys=True))
+
+      - name: Upload immutable refresh evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: pr331-queue-refresh-${{ github.run_id }}
+          path: ${{ env.REPORT_PATH }}
+          if-no-files-found: error
+          retention-days: 30
