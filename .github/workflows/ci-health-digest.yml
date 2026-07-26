@@ -2,10 +2,11 @@ name: CI Health Digest
 
 # Org-wide CI health sweep + one rolling issue. Authentication is App-first,
 # migration-safe, and fail-closed. The short-lived qillqaq installation token is
-# accepted only after it proves the reviewed repository floor and Actions-read
-# capability. Until that path is active, the existing governed
-# SZL_GITHUB_TOKEN is used read-only. The ephemeral workflow token writes only
-# issue #158 (or its exact-title replacement) in this repository.
+# accepted only after it proves the reviewed repository floor, canonical
+# code-security inventory parity, and Actions-read capability. Until that path
+# is active, the existing governed SZL_GITHUB_TOKEN is used read-only. The
+# ephemeral workflow token writes only issue #158 (or its exact-title
+# replacement) in this repository.
 
 on:
   schedule:
@@ -76,6 +77,7 @@ jobs:
           owner: ${{ github.repository_owner }}
           permission-actions: read
           permission-contents: read
+          permission-organization-administration: read
 
       - name: Sweep the verified organization estate and publish issue evidence
         id: digest
