@@ -18,6 +18,7 @@ SOURCE_BASE = "7d6a15026edab70ca99f059897dc3bdeee10f6df"
 CANDIDATE_BRANCH = "fix/ci-health-digest-review-fixed-7e1b59748b58"
 TARGET_PATH = ".github/scripts/ci_health_digest.py"
 TEST_PATH = ".github/scripts/test_ci_health_digest.py"
+WORKFLOW_PATH = ".github/workflows/ci-health-digest.yml"
 ALLOWED_TREE_DIFFS = {TARGET_PATH, TEST_PATH}
 PYTHON_PATHS = (
     TARGET_PATH,
@@ -25,6 +26,7 @@ PYTHON_PATHS = (
     ".github/scripts/ci_health_digest_sweep.py",
     TEST_PATH,
 )
+CANDIDATE_TEST_PATHS = PYTHON_PATHS + (WORKFLOW_PATH,)
 REPORT_PATH = Path(
     os.environ.get(
         "REPORT_PATH",
@@ -162,10 +164,10 @@ def direct_blob_diff(
 
 def verify_review_content(candidate_blobs: dict[str, tuple[str, str]]) -> dict[str, Any]:
     files: dict[str, bytes] = {}
-    for path in PYTHON_PATHS:
+    for path in CANDIDATE_TEST_PATHS:
         entry = candidate_blobs.get(path)
         if entry is None:
-            raise VerificationError(f"candidate tree lacks Python file {path}")
+            raise VerificationError(f"candidate tree lacks test fixture {path}")
         files[path] = blob_bytes(entry[1])
     try:
         implementation = files[TARGET_PATH].decode("utf-8")
@@ -221,6 +223,7 @@ def verify_review_content(candidate_blobs: dict[str, tuple[str, str]]) -> dict[s
         "removed_unused_imports": ["ReaderSelection", "list_repositories"],
         "failure_assignment_count": 1,
         "dependent_test_type_owner": "http.ReaderSelection",
+        "unchanged_workflow_fixture_present": True,
         "python_compile": "passed",
         "unit_tests": "passed",
         "test_count": 13,
@@ -231,7 +234,7 @@ def verify_review_content(candidate_blobs: dict[str, tuple[str, str]]) -> dict[s
 def main() -> int:
     REPORT_PATH.parent.mkdir(parents=True, exist_ok=True)
     report: dict[str, Any] = {
-        "schema": "szl.signed-review-fix-verification/v2",
+        "schema": "szl.signed-review-fix-verification/v3",
         "generated_at": datetime.now(timezone.utc).isoformat(),
         "repository": REPOSITORY,
         "source_pr": SOURCE_PR,
@@ -243,6 +246,7 @@ def main() -> int:
             "Read-only verification of an existing candidate branch.",
             "Direct blob-object comparison is used; directory tree hash cascades are ignored.",
             "Exactly two reviewed Python file blobs may differ from the source PR tree.",
+            "The unchanged workflow blob is reconstructed only as a unit-test fixture.",
             "No branch, pull request, rule, status, check, review, or secret is mutated.",
         ],
     }
