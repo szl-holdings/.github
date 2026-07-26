@@ -1,19 +1,23 @@
 name: CI Health Digest
 
-# Org-wide CI health sweep + recommendations. Runs daily, classifies every red
-# workflow by disposition, and upserts a SINGLE rolling tracking issue
-# ("🔴 CI Health Digest — org-wide") so the maintainer's GitHub notification
-# inbox stays to one actionable item instead of dozens of scattered failure
-# emails. See .github/scripts/ci_health_digest.py for the classification policy.
-#
-# Requires repo secret ORG_CI_READ_TOKEN (org-read PAT) — the built-in
-# GITHUB_TOKEN cannot read other repos' Actions runs. Optional SLACK_WEBHOOK_URL
-# (box ntfy relay) for a one-line push; skipped gracefully when absent.
+# Org-wide CI health sweep + one rolling issue. Authentication is App-first,
+# migration-safe, and fail-closed. The short-lived qillqaq installation token is
+# accepted only after it proves the reviewed repository floor and Actions-read
+# capability. Until that path is active, the existing governed
+# SZL_GITHUB_TOKEN is used read-only. The ephemeral workflow token writes only
+# issue #158 (or its exact-title replacement) in this repository.
 
 on:
   schedule:
-    - cron: '37 13 * * *'   # daily 13:37 UTC
+    - cron: "37 13 * * *"
   workflow_dispatch: {}
+  push:
+    branches: [main]
+    paths:
+      - .github/scripts/ci_health_digest.py
+      - .github/scripts/test_ci_health_digest.py
+      - .github/workflows/ci-health-digest.yml
+      - .governance/github-app-manifest.json
 
 permissions:
   contents: read
@@ -23,9 +27,15 @@ concurrency:
   group: ci-health-digest
   cancel-in-progress: true
 
+env:
+  REPORT_PATH: reports/ci-health-digest.json
+  ORG_REPOSITORY_FLOOR: "57"
+
 jobs:
   digest:
+    name: Authenticated organization sweep and rolling evidence issue
     runs-on: ubuntu-latest
+    timeout-minutes: 45
     steps:
       - name: Harden runner
         uses: step-security/harden-runner@bf7454d06d71f1098171f2acdf0cd4708d7b5920 # v2.20.0
@@ -34,14 +44,68 @@ jobs:
 
       - name: Checkout
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
+          fetch-depth: 1
 
       - name: Set up Python
         uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
-          python-version: '3.12'
+          python-version: "3.12"
 
-      - name: Org CI health sweep + upsert digest issue
+      - name: Compile and self-test the complete-coverage contract
+        run: |
+          set -euo pipefail
+          python -m py_compile \
+            .github/scripts/ci_health_digest.py \
+            .github/scripts/test_ci_health_digest.py
+          python .github/scripts/test_ci_health_digest.py
+          git diff --check
+
+      - name: Mint preferred qillqaq organization reader
+        id: app-token
+        continue-on-error: true
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        with:
+          client-id: ${{ vars.QILLQAQ_CLIENT_ID }}
+          private-key: ${{ secrets.QILLQAQ_PRIVATE_KEY }}
+          owner: ${{ github.repository_owner }}
+          permission-actions: read
+          permission-contents: read
+
+      - name: Sweep the verified organization estate and publish issue evidence
+        id: digest
         env:
-          ORG_CI_READ_TOKEN: ${{ secrets.ORG_CI_READ_TOKEN }}
+          DIGEST_APP_TOKEN: ${{ steps.app-token.outputs.token }}
+          APP_TOKEN_OUTCOME: ${{ steps.app-token.outcome }}
+          SZL_GITHUB_TOKEN: ${{ secrets.SZL_GITHUB_TOKEN }}
+          CI_DIGEST_ISSUE_TOKEN: ${{ github.token }}
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
-        run: python3 .github/scripts/ci_health_digest.py
+        shell: bash
+        run: |
+          set +e
+          python .github/scripts/ci_health_digest.py --report "$REPORT_PATH"
+          code=$?
+          echo "exit_code=${code}" >> "$GITHUB_OUTPUT"
+          exit 0
+
+      - name: Upload immutable digest evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: ci-health-digest-${{ github.run_id }}
+          path: ${{ env.REPORT_PATH }}
+          if-no-files-found: error
+          retention-days: 90
+
+      - name: Enforce complete authenticated coverage
+        if: always()
+        env:
+          EXIT_CODE: ${{ steps.digest.outputs.exit_code }}
+        run: |
+          code="${EXIT_CODE:-2}"
+          if [ "$code" -ne 0 ]; then
+            echo "::error::CI health digest is NOT VERIFIED. The rolling issue contains the fail-closed receipt."
+            exit "$code"
+          fi
+          echo "Organization CI health digest is current, authenticated, and evidence-bound."
