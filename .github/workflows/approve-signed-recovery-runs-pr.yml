@@ -1,0 +1,103 @@
+name: Approve Signed-Recovery PR Runs — Controlled
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - .github/scripts/approve_signed_recovery_runs.py
+      - .github/workflows/approve-signed-recovery-runs-pr.yml
+
+permissions:
+  actions: write
+  contents: read
+  pull-requests: read
+
+concurrency:
+  group: approve-signed-recovery-runs-${{ github.event.pull_request.number }}
+  cancel-in-progress: false
+
+env:
+  REPORT_PATH: reports/signed-recovery-run-approval.json
+
+jobs:
+  approve:
+    name: Approve exact action-required runs without waiving checks
+    if: >-
+      github.repository == 'szl-holdings/.github' &&
+      github.event.pull_request.number == 324 &&
+      github.event.pull_request.head.repo.full_name == 'szl-holdings/.github' &&
+      github.event.pull_request.head.ref == 'diag/merge-queue-state-v1'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - name: Checkout the reviewed approval controller
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+          fetch-depth: 1
+
+      - name: Compile and constrain the approval envelope
+        run: |
+          set -euo pipefail
+          python -m py_compile .github/scripts/approve_signed_recovery_runs.py
+          python - <<'PY'
+          from pathlib import Path
+
+          source = Path(
+              ".github/scripts/approve_signed_recovery_runs.py"
+          ).read_text(encoding="utf-8")
+          required = (
+              "52ab3fc1a17b5366010dd1bcfe8f6dcb5db4a286",
+              "fb8a1c2435db5bff99be51faefc9781309d0f9a4",
+              "/approve",
+              "action_required",
+              "ALLOWED_WORKFLOWS",
+          )
+          forbidden = (
+              "statuses/",
+              "reviews",
+              "rulesets/",
+              "branches/main/protection",
+              "git/refs",
+              "secrets/",
+          )
+          for marker in required:
+              assert marker in source, marker
+          for marker in forbidden:
+              assert marker not in source, marker
+          PY
+          git diff --check
+
+      - name: Approve only the exact quarantined runs
+        id: approval
+        shell: bash
+        run: |
+          set +e
+          python .github/scripts/approve_signed_recovery_runs.py
+          code=$?
+          echo "exit_code=${code}" >> "$GITHUB_OUTPUT"
+          exit 0
+
+      - name: Upload immutable approval evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: signed-recovery-run-approval-${{ github.run_id }}
+          path: ${{ env.REPORT_PATH }}
+          if-no-files-found: error
+          retention-days: 90
+
+      - name: Enforce controlled approval
+        if: always()
+        env:
+          EXIT_CODE: ${{ steps.approval.outputs.exit_code }}
+        run: |
+          code="${EXIT_CODE:-2}"
+          if [ "$code" -ne 0 ]; then
+            echo "::error::Exact signed-recovery run approval failed closed."
+            exit "$code"
+          fi
+          echo "All exact action-required runs were released to execute their own checks."
