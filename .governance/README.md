@@ -39,6 +39,12 @@ pinned to GitHub Actions App ID `15368`. The staging workflow still creates the
 deployment and runs for both pull requests and merge groups, so the queue must
 reverify staging against the synthesized merge-group commit.
 
+GitHub's squash merge queue evaluates the generated commit's complete
+multi-line PR message against metadata restrictions. The conventional-commit
+rule therefore constrains the first line to 100 characters and explicitly
+allows a following message body; a one-line end anchor rejects every normal
+queue-generated commit with a populated PR body.
+
 The App needs `Administration: read` to inspect repository Actions policy and
 rulesets. It keeps `Contents: read` and does not receive merge or queue
 authority. GitHub rejected the GraphQL enqueue mutation for the installation

@@ -30,6 +30,10 @@ STAGING_STATUS = {
     "context": "deploy/staging",
     "integration_id": 15368,
 }
+COMMIT_MESSAGE_PATTERN = (
+    r"^(feat|fix|docs|chore|refactor|test|perf|build|ci|revert)"
+    r"(\([a-z0-9._/-]+\))?!?: [^\r\n]{1,100}(\r?\n(.|\r|\n)*)?$"
+)
 
 LEGACY_PATHS = [
     ".github/workflows/owner-authorized-merge-wave.yml",
@@ -111,6 +115,14 @@ def verify_ruleset() -> None:
         "commit_message_pattern",
     ):
         rule(typed_rules, kind)
+    main_metadata = rule(typed_rules, "commit_message_pattern").get(
+        "parameters", {}
+    )
+    if (
+        not isinstance(main_metadata, dict)
+        or main_metadata.get("pattern") != COMMIT_MESSAGE_PATTERN
+    ):
+        fail("main commit pattern must accept a queue-generated message body")
 
     pull_request = rule(typed_rules, "pull_request").get("parameters", {})
     if not isinstance(pull_request, dict):
@@ -294,6 +306,14 @@ def verify_gate_contract() -> None:
         "commit_message_pattern",
     ):
         rule(typed_release_rules, kind)
+    release_metadata = rule(
+        typed_release_rules, "commit_message_pattern"
+    ).get("parameters", {})
+    if (
+        not isinstance(release_metadata, dict)
+        or release_metadata.get("pattern") != COMMIT_MESSAGE_PATTERN
+    ):
+        fail("release commit pattern must accept a squash message body")
 
     release_pull_request = rule(
         typed_release_rules, "pull_request"

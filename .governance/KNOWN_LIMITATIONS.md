@@ -25,6 +25,9 @@
 - Required statuses also apply to the synthesized merge-group commit. The
   attestor therefore signs and publishes a second BAP for that SHA; App review
   and the queue request remain PR-head-only operations.
+- Commit metadata rules evaluate the full squash message, including the PR
+  body. The rulesets enforce the conventional first line and allow the
+  remaining body so GitHub's queue-generated commit can pass.
 - Three archived repositories retain historical ruleset state that cannot be
   edited while archived. They have no active release path.
 
