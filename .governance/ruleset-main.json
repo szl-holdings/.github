@@ -67,6 +67,10 @@
             "context": "gate/lean"
           },
           {
+            "context": "deploy/staging",
+            "integration_id": 15368
+          },
+          {
             "context": "attestation/qillqaq",
             "integration_id": 4395545
           }
@@ -84,14 +88,6 @@
         "merge_method": "SQUASH",
         "min_entries_to_merge": 1,
         "min_entries_to_merge_wait_minutes": 5
-      }
-    },
-    {
-      "type": "required_deployments",
-      "parameters": {
-        "required_deployment_environments": [
-          "staging"
-        ]
       }
     },
     {

@@ -8,7 +8,8 @@ therefore does not claim independent human review.
 - Pull requests are mandatory and direct pushes remain blocked.
 - Commits must be signed, linear, DCO-signed, and conventionally named.
 - Eight repository-specific, fail-closed checks must pass for the exact head.
-- A successful `staging` deployment is required.
+- The `deploy/staging` check is required and pinned to GitHub Actions App ID
+  `15368`; the workflow also emits the staging deployment record.
 - `qillqaq-attestor[bot]` verifies the gates, creates a signed merge BAP, and
   records an approval for the exact head.
 - The App then publishes `attestation/qillqaq`; the ruleset pins this required
@@ -26,7 +27,7 @@ the mandatory checks, deployment, and queue.
 
 The merge queue applies to the default branch. GitHub does not support wildcard
 refs in a merge-queue ruleset, so `release/*` uses a separate ruleset with the
-same gates, signatures, staging, and App-owned attestation status but no queue. The
+same gates, signatures, App-pinned staging, and App-owned attestation status but no queue. The
 same attestor submits release pull requests to their protected auto-merge path.
 
 ## Governance changes

@@ -9,7 +9,7 @@ that do not yet exist would lock a repository without producing evidence.
 - Every active ruleset has an empty `bypass_actors` array.
 - The estate does not claim independent human review while it has one human
   member. GitHub's human approval count is zero by design.
-- Eight fail-closed checks, staging deployment, signed commits, an App-owned
+- Eight fail-closed checks, App-pinned staging, signed commits, an App-owned
   required attestation status, and merge queue execution replace the impossible
   second-human requirement.
 - The ordinary `GITHUB_TOKEN` cannot approve pull request reviews.
@@ -28,6 +28,13 @@ not a human review, and GitHub does not count it toward required approvals from
 people with write permission. The App therefore publishes
 `attestation/qillqaq` only after the exact-head review and signed BAP are
 verified. Both rulesets require that status and pin it to App ID `4395545`.
+
+GitHub rejected queue entry while a separate `required_deployments` rule was
+active even though the exact-head `staging` deployment was successful. The
+enforceable queue-compatible control is the required `deploy/staging` check,
+pinned to GitHub Actions App ID `15368`. The staging workflow still creates the
+deployment and runs for both pull requests and merge groups, so the queue must
+reverify staging against the synthesized merge-group commit.
 
 The App needs `Administration: read` to inspect repository Actions policy and
 rulesets. It keeps `Contents: read` and does not receive merge or queue
@@ -49,7 +56,7 @@ identity-bound release control.
 3. Apply `ruleset-main.json` to the default branch. GitHub does not allow a
    merge-queue ruleset to contain wildcard refs.
 4. Apply `ruleset-release.json` separately to `release/*`; it retains the gates,
-   signatures, staging, and App attestation status without a merge queue.
+   signatures, App-pinned staging, and App attestation status without a queue.
 5. Verify the active gate, staging, attestor, BAP, and queue on a pilot PR.
 6. Roll out only to active repositories with mapped gates and staging evidence.
 

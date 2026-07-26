@@ -67,19 +67,15 @@
             "context": "gate/lean"
           },
           {
+            "context": "deploy/staging",
+            "integration_id": 15368
+          },
+          {
             "context": "attestation/qillqaq",
             "integration_id": 4395545
           }
         ],
         "strict_required_status_checks_policy": true
-      }
-    },
-    {
-      "type": "required_deployments",
-      "parameters": {
-        "required_deployment_environments": [
-          "staging"
-        ]
       }
     },
     {

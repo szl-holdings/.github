@@ -17,6 +17,10 @@
 - GitHub rejected `enqueuePullRequest` for the App installation token despite
   its live merge-queue grant. The App retains attestation and approval duties;
   the ephemeral repository token requests the protected queue after attestation.
+- GitHub also rejected queue entry when `required_deployments` was active even
+  with a successful exact-head `staging` deployment. Staging is therefore
+  enforced by the `deploy/staging` required check pinned to GitHub Actions; the
+  workflow still creates deployment evidence and reruns on `merge_group`.
 - Three archived repositories retain historical ruleset state that cannot be
   edited while archived. They have no active release path.
 

@@ -83,6 +83,11 @@ def ground_truth() -> None:
         "integration_id": 4395545,
     } not in required:
         fail("the App-owned attestation status is not required")
+    if {
+        "context": "deploy/staging",
+        "integration_id": 15368,
+    } not in required:
+        fail("the GitHub Actions staging check is not required")
 
 
 def labels() -> None:

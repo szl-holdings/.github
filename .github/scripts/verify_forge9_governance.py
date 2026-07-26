@@ -26,6 +26,10 @@ ATTESTATION_STATUS = {
     "context": "attestation/qillqaq",
     "integration_id": 4395545,
 }
+STAGING_STATUS = {
+    "context": "deploy/staging",
+    "integration_id": 15368,
+}
 
 LEGACY_PATHS = [
     ".github/workflows/owner-authorized-merge-wave.yml",
@@ -104,7 +108,6 @@ def verify_ruleset() -> None:
         "required_linear_history",
         "required_signatures",
         "merge_queue",
-        "required_deployments",
         "commit_message_pattern",
     ):
         rule(typed_rules, kind)
@@ -130,16 +133,17 @@ def verify_ruleset() -> None:
     contexts = [
         item.get("context") for item in required if isinstance(item, dict)
     ]
-    if contexts != GATES + [ATTESTATION_STATUS["context"]]:
-        fail("required status checks must contain the eight gates and attestation")
+    if contexts != GATES + [
+        STAGING_STATUS["context"],
+        ATTESTATION_STATUS["context"],
+    ]:
+        fail("required checks must contain the gates, staging, and attestation")
+    if required[-2:] != [STAGING_STATUS, ATTESTATION_STATUS]:
+        fail("staging and attestation checks must be pinned to their Apps")
+    if any(item.get("type") == "required_deployments" for item in typed_rules):
+        fail("queue-incompatible required_deployments rule must not be present")
     if required[-1] != ATTESTATION_STATUS:
         fail("attestation status must be pinned to the qillqaq App")
-
-    deployments = rule(typed_rules, "required_deployments").get("parameters", {})
-    if not isinstance(deployments, dict):
-        fail("required_deployments parameters missing")
-    if deployments.get("required_deployment_environments") != ["staging"]:
-        fail("staging must be the required deployment")
 
 
 def verify_manifest() -> None:
@@ -276,7 +280,6 @@ def verify_gate_contract() -> None:
         "non_fast_forward",
         "required_linear_history",
         "required_signatures",
-        "required_deployments",
         "commit_message_pattern",
     ):
         rule(typed_release_rules, kind)
@@ -312,21 +315,18 @@ def verify_gate_contract() -> None:
         for item in release_required
         if isinstance(item, dict)
     ]
-    if release_contexts != GATES + [ATTESTATION_STATUS["context"]]:
-        fail("release checks must contain the eight gates and attestation")
-    if release_required[-1] != ATTESTATION_STATUS:
-        fail("release attestation status must be pinned to the qillqaq App")
-
-    release_deployments = rule(
-        typed_release_rules, "required_deployments"
-    ).get("parameters", {})
-    if not isinstance(release_deployments, dict):
-        fail("release required_deployments parameters missing")
-    if (
-        release_deployments.get("required_deployment_environments")
-        != ["staging"]
+    if release_contexts != GATES + [
+        STAGING_STATUS["context"],
+        ATTESTATION_STATUS["context"],
+    ]:
+        fail("release checks must contain gates, staging, and attestation")
+    if release_required[-2:] != [STAGING_STATUS, ATTESTATION_STATUS]:
+        fail("release staging and attestation checks must be App-pinned")
+    if any(
+        item.get("type") == "required_deployments"
+        for item in typed_release_rules
     ):
-        fail("release ruleset must require the staging deployment")
+        fail("release must use the merge-compatible staging status check")
 
 
 def verify_legacy_paths_removed() -> None:
