@@ -57,6 +57,11 @@ For technical review, begin with the
 and [contribution contract](https://github.com/szl-holdings/.github/blob/main/CONTRIBUTING.md).
 Claims without a reproducible artifact or current receipt remain unverified.
 
+Repository lifecycle is explicit: 12 public archives are frozen records, not
+deleted work. Use the
+[estate lifecycle map](https://github.com/szl-holdings/.github/blob/main/docs/ESTATE_LIFECYCLE.md)
+to find each canonical active successor and its retention rationale.
+
 ---
 
 ## Spaces
