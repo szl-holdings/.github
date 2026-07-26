@@ -46,6 +46,14 @@ FORBIDDEN_EXECUTABLE_PATTERNS = {
     "privileged pull request trigger": re.compile(r"\bpull_request_target\s*:"),
 }
 
+ATTESTOR_SELF_EDIT_GUARD = (
+    r"^(\.github/workflows/(attest-and-approve|gates)\.ya?ml|\.governance/)"
+)
+GOVERNED_BASE_FILTER = (
+    '.base.ref == "main"\n'
+    '                  or (.base.ref | startswith("release/"))'
+)
+
 
 def fail(message: str) -> None:
     print(f"FORGE-9 invariant failed: {message}", file=sys.stderr)
@@ -173,6 +181,30 @@ def verify_gate_contract() -> None:
     for gate in GATES:
         if gate not in gate_template:
             fail(f"gate template is missing {gate}")
+
+    attestor_template = (
+        GOVERNANCE / "templates/attest-and-approve.yml"
+    ).read_text(encoding="utf-8")
+    if ATTESTOR_SELF_EDIT_GUARD not in attestor_template:
+        fail("attestor must refuse edits to both gate and attestor workflows")
+    guard = re.compile(ATTESTOR_SELF_EDIT_GUARD)
+    guarded_paths = (
+        ".github/workflows/attest-and-approve.yml",
+        ".github/workflows/attest-and-approve.yaml",
+        ".github/workflows/gates.yml",
+        ".github/workflows/gates.yaml",
+        ".governance/gates.json",
+    )
+    for path in guarded_paths:
+        if not guard.search(path):
+            fail(f"attestor self-edit guard does not cover {path}")
+    if guard.search(".github/workflows/unrelated.yml"):
+        fail("attestor self-edit guard overmatches unrelated workflows")
+
+    if GOVERNED_BASE_FILTER not in attestor_template:
+        fail("attestor must resolve PRs targeting both main and release/*")
+    if '.base.ref == "main") | .number' in attestor_template:
+        fail("attestor still hard-codes PR resolution to main only")
 
 
 def verify_legacy_paths_removed() -> None:

@@ -46,11 +46,18 @@ jobs:
             > "$RUNNER_TEMP/pulls.json"
           mapfile -t PRS < <(
             jq -r --arg sha "$HEAD_SHA" \
-              '.[] | select(.state == "open" and .head.sha == $sha and .base.ref == "main") | .number' \
+              '.[] | select(
+                .state == "open"
+                and .head.sha == $sha
+                and (
+                  .base.ref == "main"
+                  or (.base.ref | startswith("release/"))
+                )
+              ) | .number' \
               "$RUNNER_TEMP/pulls.json"
           )
           if [ "${#PRS[@]}" -ne 1 ]; then
-            echo "::error::expected exactly one open main PR for $HEAD_SHA; found ${#PRS[@]}"
+            echo "::error::expected exactly one open governed PR (main or release/*) for $HEAD_SHA; found ${#PRS[@]}"
             exit 1
           fi
           PR="${PRS[0]}"
@@ -79,9 +86,9 @@ jobs:
 
           gh api "repos/$REPOSITORY/pulls/$PR/files?per_page=100" --paginate \
             --jq '.[].filename' > "$RUNNER_TEMP/files.txt"
-          if grep -Eq '^(\.github/workflows/attest-and-approve\.ya?ml|\.governance/)' \
+          if grep -Eq '^(\.github/workflows/(attest-and-approve|gates)\.ya?ml|\.governance/)' \
               "$RUNNER_TEMP/files.txt"; then
-            echo "::error::P5 refuses attestor or governance self-edits"
+            echo "::error::P5 refuses gate, attestor, or governance self-edits"
             exit 1
           fi
 
