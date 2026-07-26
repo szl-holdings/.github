@@ -238,9 +238,17 @@ def verify_gate_contract() -> None:
         "Publish required App attestation status",
         "context=attestation/qillqaq",
         "GH_TOKEN: ${{ steps.app-token.outputs.token }}",
+        'SOURCE_EVENT: ${{ github.event.workflow_run.event }}',
+        'if [ "$SOURCE_EVENT" = "merge_group" ]; then',
+        '[[ "$HEAD_BRANCH" == gh-readonly-queue/main/* ]]',
+        "subject_kind: $subject_kind",
     ):
         if marker not in attestor_template:
             fail(f"attestor status publication is missing {marker!r}")
+    if attestor_template.count(
+        "if: steps.subject.outputs.kind == 'pull_request'"
+    ) != 2:
+        fail("only PR-head attestations may approve or request a queue entry")
     if 'gh pr merge "$PR" --repo "$REPOSITORY" --auto --squash' not in (
         attestor_template
     ):

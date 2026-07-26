@@ -26,8 +26,11 @@ GitHub Apps cannot be organization team members or CODEOWNERS. Consequently the
 ruleset keeps code-owner review disabled. The App review is machine attestation,
 not a human review, and GitHub does not count it toward required approvals from
 people with write permission. The App therefore publishes
-`attestation/qillqaq` only after the exact-head review and signed BAP are
-verified. Both rulesets require that status and pin it to App ID `4395545`.
+`attestation/qillqaq` only after a signed BAP verifies the successful gate
+checks. On pull-request heads, the App also records and verifies an exact-head
+review before publishing the status. On merge-group heads, it independently
+attests the synthesized queue commit so the queue cannot reuse stale PR-head
+evidence. Both rulesets require that status and pin it to App ID `4395545`.
 
 GitHub rejected queue entry while a separate `required_deployments` rule was
 active even though the exact-head `staging` deployment was successful. The
@@ -65,7 +68,7 @@ Never apply either ruleset before its checks and deployment exist.
 ## Live bootstrap state
 
 As of 2026-07-26, `qillqaq-attestor` is registered as App ID `4395545`
-and installed as installation `149069502` on all current and future
+and installed as installation `149072489` on all current and future
 `szl-holdings` repositories. The `.github` repository stores the App ID and
 private key as Actions secrets. This branch activates the attestor, eight-gate
 workflow, and staging deployment workflow.

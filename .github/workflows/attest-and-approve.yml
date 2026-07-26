@@ -31,14 +31,27 @@ jobs:
           owner: ${{ github.repository_owner }}
           repositories: ${{ github.event.repository.name }}
 
-      - name: Resolve exactly one pull request
-        id: pr
+      - name: Resolve the attestation subject
+        id: subject
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
           HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
+          HEAD_BRANCH: ${{ github.event.workflow_run.head_branch }}
+          SOURCE_EVENT: ${{ github.event.workflow_run.event }}
           REPOSITORY: ${{ github.repository }}
         run: |
           set -euo pipefail
+          if [ "$SOURCE_EVENT" = "merge_group" ]; then
+            [[ "$HEAD_BRANCH" == gh-readonly-queue/main/* ]] \
+              || { echo "::error::unexpected merge-group branch: $HEAD_BRANCH"; exit 1; }
+            echo "kind=merge_group" >> "$GITHUB_OUTPUT"
+            echo "number=" >> "$GITHUB_OUTPUT"
+            echo "node_id=" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          [ "$SOURCE_EVENT" = "pull_request" ] \
+            || { echo "::error::unsupported source event: $SOURCE_EVENT"; exit 1; }
+
           gh api \
             -H "Accept: application/vnd.github+json" \
             "repos/$REPOSITORY/commits/$HEAD_SHA/pulls?per_page=100" \
@@ -61,6 +74,7 @@ jobs:
           fi
           PR="${PRS[0]}"
           gh api "repos/$REPOSITORY/pulls/$PR" > "$RUNNER_TEMP/pr.json"
+          echo "kind=pull_request" >> "$GITHUB_OUTPUT"
           echo "number=$PR" >> "$GITHUB_OUTPUT"
           echo "node_id=$(jq -r .node_id "$RUNNER_TEMP/pr.json")" >> "$GITHUB_OUTPUT"
 
@@ -68,10 +82,12 @@ jobs:
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
           HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
-          PR: ${{ steps.pr.outputs.number }}
+          SUBJECT_KIND: ${{ steps.subject.outputs.kind }}
+          PR: ${{ steps.subject.outputs.number }}
           REPOSITORY: ${{ github.repository }}
         run: |
           set -euo pipefail
+          if [ "$SUBJECT_KIND" = "pull_request" ]; then
           BODY=$(jq -r '.body // ""' "$RUNNER_TEMP/pr.json")
 
           grep -Eq 'Satisfies:[[:space:]]*(AT-[0-9]+|C-[0-9]+)' <<<"$BODY" \
@@ -91,6 +107,7 @@ jobs:
               || { echo "::error::P5 governance change lacks solo-operator authorization"; exit 1; }
             grep -Eq 'Risk:[[:space:]]*D[[:space:]]*[-â€”]' <<<"$BODY" \
               || { echo "::error::P5 governance change must be classified Risk D"; exit 1; }
+          fi
           fi
 
           gh api \
@@ -141,7 +158,8 @@ jobs:
       - name: Build and sign the merge BAP
         env:
           HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
-          PR: ${{ steps.pr.outputs.number }}
+          SUBJECT_KIND: ${{ steps.subject.outputs.kind }}
+          PR: ${{ steps.subject.outputs.number }}
           REPOSITORY: ${{ github.repository }}
           RUN_ID: ${{ github.run_id }}
         run: |
@@ -149,7 +167,8 @@ jobs:
           jq -n \
             --arg schema "https://a11oy.net/schemas/forge9/merge-bap/v1" \
             --arg repository "$REPOSITORY" \
-            --argjson pull_request "$PR" \
+            --arg subject_kind "$SUBJECT_KIND" \
+            --arg pull_request "$PR" \
             --arg head_sha "$HEAD_SHA" \
             --arg principal "spiffe://a11oy.net/ns/ci/sa/qillqaq-attestor" \
             --arg policy_id "merge-gate-v1" \
@@ -159,7 +178,13 @@ jobs:
             '{
               schema: $schema,
               repository: $repository,
-              pull_request: $pull_request,
+              subject_kind: $subject_kind,
+              pull_request: (
+                if $pull_request == ""
+                then null
+                else ($pull_request | tonumber)
+                end
+              ),
               head_sha: $head_sha,
               principal: $principal,
               policy_id: $policy_id,
@@ -190,10 +215,11 @@ jobs:
           retention-days: 90
 
       - name: Approve as the App and verify the review identity
+        if: steps.subject.outputs.kind == 'pull_request'
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
           HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
-          PR: ${{ steps.pr.outputs.number }}
+          PR: ${{ steps.subject.outputs.number }}
           REPOSITORY: ${{ github.repository }}
         run: |
           set -euo pipefail
@@ -210,22 +236,29 @@ jobs:
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
           HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
+          SUBJECT_KIND: ${{ steps.subject.outputs.kind }}
           REPOSITORY: ${{ github.repository }}
         run: |
           set -euo pipefail
+          if [ "$SUBJECT_KIND" = "pull_request" ]; then
+            DESCRIPTION="Signed BAP and exact-head App review verified"
+          else
+            DESCRIPTION="Signed BAP verified for merge-group gates"
+          fi
           gh api \
             --method POST \
             "repos/$REPOSITORY/statuses/$HEAD_SHA" \
             -f state=success \
             -f context=attestation/qillqaq \
-            -f description="Signed BAP and exact-head App review verified" \
+            -f description="$DESCRIPTION" \
             -f target_url="https://github.com/$REPOSITORY/actions/runs/$GITHUB_RUN_ID"
           echo "Published attestation/qillqaq for $HEAD_SHA"
 
       - name: Request protected merge after attestation
+        if: steps.subject.outputs.kind == 'pull_request'
         env:
           GH_TOKEN: ${{ github.token }}
-          PR: ${{ steps.pr.outputs.number }}
+          PR: ${{ steps.subject.outputs.number }}
           REPOSITORY: ${{ github.repository }}
         run: |
           set -euo pipefail

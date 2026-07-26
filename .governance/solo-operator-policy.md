@@ -13,7 +13,8 @@ therefore does not claim independent human review.
 - `qillqaq-attestor[bot]` verifies the gates, creates a signed merge BAP, and
   records an approval for the exact head.
 - The App then publishes `attestation/qillqaq`; the ruleset pins this required
-  status to App ID `4395545`.
+  status to App ID `4395545`. The App repeats gate verification, BAP signing,
+  and status publication for the synthesized merge-group commit before merge.
 - The ephemeral repository token requests the protected merge queue only after
   the App attestation succeeds; it cannot approve or bypass the ruleset.
 - The App has read-only Contents access and cannot alter repository code.

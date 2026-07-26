@@ -21,6 +21,9 @@
   with a successful exact-head `staging` deployment. Staging is therefore
   enforced by the `deploy/staging` required check pinned to GitHub Actions; the
   workflow still creates deployment evidence and reruns on `merge_group`.
+- Required statuses also apply to the synthesized merge-group commit. The
+  attestor therefore signs and publishes a second BAP for that SHA; App review
+  and the queue request remain PR-head-only operations.
 - Three archived repositories retain historical ruleset state that cannot be
   edited while archived. They have no active release path.
 
