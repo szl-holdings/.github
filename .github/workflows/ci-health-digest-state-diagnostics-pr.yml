@@ -17,44 +17,61 @@ concurrency:
 
 jobs:
   inspect:
-    name: Latest digest runs, jobs, artifacts, and rolling issue
+    name: Latest digest runs, logs, artifacts, and rolling issue
     runs-on: ubuntu-latest
     timeout-minutes: 10
     env:
       GH_TOKEN: ${{ github.token }}
       REPORT_PATH: reports/ci-health-digest-state.json
     steps:
-      - name: Query read-only Actions and issue state
+      - name: Query read-only Actions, logs, and issue state
         id: query
         shell: python
         run: |
+          import io
           import json
           import os
           import re
           import subprocess
+          import zipfile
           from datetime import datetime, timezone
           from pathlib import Path
 
           repository = os.environ["GITHUB_REPOSITORY"]
 
-          def api(path):
+          def api(path, *, binary=False):
               proc = subprocess.run(
                   ["gh", "api", path],
                   check=False,
                   capture_output=True,
-                  text=True,
                   env=os.environ,
               )
-              try:
-                  payload = json.loads(proc.stdout) if proc.stdout.strip() else None
-              except json.JSONDecodeError:
-                  payload = proc.stdout[:4000]
+              if binary:
+                  payload = proc.stdout
+              else:
+                  text = proc.stdout.decode("utf-8", errors="replace")
+                  try:
+                      payload = json.loads(text) if text.strip() else None
+                  except json.JSONDecodeError:
+                      payload = text[:4000]
               return {
                   "ok": proc.returncode == 0,
                   "returncode": proc.returncode,
                   "payload": payload,
-                  "stderr": proc.stderr.strip()[:3000],
+                  "stderr": proc.stderr.decode("utf-8", errors="replace").strip()[:3000],
               }
+
+          def decode_logs(raw):
+              if not raw:
+                  return ""
+              try:
+                  with zipfile.ZipFile(io.BytesIO(raw)) as archive:
+                      chunks = []
+                      for name in sorted(archive.namelist()):
+                          chunks.append(archive.read(name).decode("utf-8", errors="replace"))
+                      return "\n".join(chunks)
+              except zipfile.BadZipFile:
+                  return raw.decode("utf-8", errors="replace")
 
           runs_result = api(
               f"repos/{repository}/actions/workflows/ci-health-digest.yml/runs?per_page=20"
@@ -125,15 +142,46 @@ jobs:
                   }
               )
 
+          latest = runs[0] if runs else None
+          terminal_lines = []
+          log_query = {"ok": False, "stderr": "no latest job"}
+          if latest and latest["jobs"]:
+              latest_job_id = latest["jobs"][0].get("id")
+              log_query = api(
+                  f"repos/{repository}/actions/jobs/{latest_job_id}/logs",
+                  binary=True,
+              )
+              text = decode_logs(log_query.get("payload") if log_query["ok"] else b"")
+              patterns = (
+                  "sweeping ",
+                  "updated #",
+                  "created #",
+                  "HTTP 401",
+                  "HTTP 403",
+                  "No ORG_CI_READ_TOKEN",
+                  "done:",
+                  "ntfy:",
+                  "Bad credentials",
+                  "Resource not accessible",
+              )
+              terminal_lines = [
+                  line[-2000:]
+                  for line in text.splitlines()
+                  if any(pattern in line for pattern in patterns)
+              ][-100:]
+
           issue_result = api(f"repos/{repository}/issues/158")
           issue = issue_result.get("payload")
           report = {
-              "schema": "szl.ci-health-digest-state-diagnostics/v1",
+              "schema": "szl.ci-health-digest-state-diagnostics/v2",
               "generated_at": datetime.now(timezone.utc).isoformat(),
               "repository": repository,
               "workflow_query_ok": runs_result["ok"],
               "workflow_query_error": runs_result.get("stderr"),
               "runs": runs,
+              "latest_log_query_ok": log_query.get("ok"),
+              "latest_log_query_error": log_query.get("stderr"),
+              "latest_terminal_lines": terminal_lines,
               "issue": (
                   {
                       "number": issue.get("number"),
@@ -150,7 +198,6 @@ jobs:
           path.parent.mkdir(parents=True, exist_ok=True)
           path.write_text(json.dumps(report, indent=2, sort_keys=True) + "\n", encoding="utf-8")
 
-          latest = runs[0] if runs else None
           if latest:
               conclusion = re.sub(
                   r"[^a-z0-9]+",
@@ -163,15 +210,20 @@ jobs:
                   for step in job["steps"]
                   if step.get("conclusion") == "failure"
               )
+              log_state = "auth" if any(
+                  marker in line
+                  for line in terminal_lines
+                  for marker in ("HTTP 401", "HTTP 403", "Bad credentials")
+              ) else "logs"
               slug = (
                   f"ci-digest-r{latest['id']}-{conclusion}"
-                  f"-j{len(latest['jobs'])}-f{failed_steps}-a{len(latest['artifacts'])}"
+                  f"-j{len(latest['jobs'])}-f{failed_steps}-a{len(latest['artifacts'])}-{log_state}"
               )
           else:
               slug = "ci-digest-no-runs"
           with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as output:
               output.write(f"slug={slug}\n")
-          print(json.dumps({"slug": slug, "latest": latest}, indent=2, sort_keys=True))
+          print(json.dumps({"slug": slug, "terminal_lines": terminal_lines}, indent=2, sort_keys=True))
 
       - name: Upload immutable diagnostic evidence
         if: always()
