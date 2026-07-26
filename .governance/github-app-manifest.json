@@ -10,9 +10,8 @@
     "actions": "read",
     "administration": "read",
     "checks": "read",
-    "commit_statuses": "read",
+    "commit_statuses": "write",
     "contents": "read",
-    "merge_queues": "write",
     "metadata": "read",
     "pull_requests": "write"
   },

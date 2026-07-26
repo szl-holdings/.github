@@ -8,9 +8,10 @@ that do not yet exist would lock a repository without producing evidence.
 
 - Every active ruleset has an empty `bypass_actors` array.
 - The estate does not claim independent human review while it has one human
-  member. Human approval count is zero by design.
-- Eight fail-closed checks, staging deployment, signed commits, App attestation,
-  and merge queue execution replace the impossible human-review requirement.
+  member. GitHub's human approval count is zero by design.
+- Eight fail-closed checks, App-pinned staging, signed commits, an App-owned
+  required attestation status, and merge queue execution replace the impossible
+  second-human requirement.
 - The ordinary `GITHUB_TOKEN` cannot approve pull request reviews.
 - The attestor uses a GitHub App installation token minted from a private key.
   GitHub Actions OIDC is used only for keyless Sigstore signing.
@@ -23,33 +24,58 @@ that do not yet exist would lock a repository without producing evidence.
 
 GitHub Apps cannot be organization team members or CODEOWNERS. Consequently the
 ruleset keeps code-owner review disabled. The App review is machine attestation,
-not a human approval, and is not counted toward a human-review requirement.
+not a human review, and GitHub does not count it toward required approvals from
+people with write permission. The App therefore publishes
+`attestation/qillqaq` only after a signed BAP verifies the successful gate
+checks. On pull-request heads, the App also records and verifies an exact-head
+review before publishing the status. On merge-group heads, it independently
+attests the synthesized queue commit so the queue cannot reuse stale PR-head
+evidence. Both rulesets require that status and pin it to App ID `4395545`.
+
+GitHub rejected queue entry while a separate `required_deployments` rule was
+active even though the exact-head `staging` deployment was successful. The
+enforceable queue-compatible control is the required `deploy/staging` check,
+pinned to GitHub Actions App ID `15368`. The staging workflow still creates the
+deployment and runs for both pull requests and merge groups, so the queue must
+reverify staging against the synthesized merge-group commit.
+
+GitHub's squash merge queue evaluates the generated commit's complete
+multi-line PR message against metadata restrictions. The conventional-commit
+rule therefore constrains the first line to 100 characters and explicitly
+allows a following message body; a one-line end anchor rejects every normal
+queue-generated commit with a populated PR body.
 
 The App needs `Administration: read` to inspect repository Actions policy and
-rulesets. It keeps `Contents: read` and uses the dedicated
-`Merge queues: write` permission to enqueue through GraphQL; it never calls the
-direct merge endpoint. `id-token: write` is a workflow permission, not a GitHub
-App permission.
+rulesets. It keeps `Contents: read` and does not receive merge or queue
+authority. GitHub rejected the GraphQL enqueue mutation for the installation
+token even with the merge-queue permission. After the App signs the BAP and
+records its approval, the repository-scoped ephemeral `GITHUB_TOKEN` uses
+GitHub's supported `gh pr merge` path to request the protected queue. That token
+cannot approve reviews and cannot bypass the ruleset. `id-token: write` is a
+workflow permission, not a GitHub App permission.
 
-The production environment is referenced explicitly by the attestor because
-environment secrets are unavailable otherwise. It has no deployment reviewer;
-the minimally privileged App credential is usable only by the default-branch
-attestor workflow.
+The attestor uses a repository Actions variable for the public App client ID
+and a repository Actions secret for the private key. It does not enter the
+`production` environment. Production deployment approval therefore remains a
+separate, identity-bound release control.
 
 ## Activation order
 
 1. Merge this bootstrap using the documented one-time solo bootstrap record.
-2. Remove the manual reviewer from `production` and create `staging`.
-3. Verify the active gate, staging, and attestor workflows on a pilot PR.
-4. Apply `ruleset-main.json` to the pilot and verify its live state.
-5. Roll out only to active repositories with mapped gates and staging evidence.
+2. Create `staging` and keep the manual reviewer on `production`.
+3. Apply `ruleset-main.json` to the default branch. GitHub does not allow a
+   merge-queue ruleset to contain wildcard refs.
+4. Apply `ruleset-release.json` separately to `release/*`; it retains the gates,
+   signatures, App-pinned staging, and App attestation status without a queue.
+5. Verify the active gate, staging, attestor, BAP, and queue on a pilot PR.
+6. Roll out only to active repositories with mapped gates and staging evidence.
 
-Never apply the ruleset before steps 2 through 7 are complete.
+Never apply either ruleset before its checks and deployment exist.
 
 ## Live bootstrap state
 
-As of 2026-07-25, `qillqaq-attestor` is registered as App ID `4395545`
-and installed as installation `149057850` on all current and future
-`szl-holdings` repositories. The `.github` repository's `production`
-environment stores the App ID and private key. This branch activates the
-attestor, eight-gate workflow, and staging deployment workflow.
+As of 2026-07-26, `qillqaq-attestor` is registered as App ID `4395545`
+and installed as installation `149072489` on all current and future
+`szl-holdings` repositories. The `.github` repository stores the App client ID
+as an Actions variable and the private key as an Actions secret. This branch
+activates the attestor, eight-gate workflow, and staging deployment workflow.

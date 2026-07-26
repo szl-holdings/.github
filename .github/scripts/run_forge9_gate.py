@@ -62,7 +62,32 @@ def ground_truth() -> None:
     if not isinstance(parameters, dict):
         fail("pull-request parameters are missing")
     if parameters.get("required_approving_review_count") != 0:
-        fail("solo policy must not claim a human approval")
+        fail("solo policy cannot require an unavailable human reviewer")
+    status_rule = next(
+        (
+            item
+            for item in rules
+            if isinstance(item, dict)
+            and item.get("type") == "required_status_checks"
+        ),
+        None,
+    )
+    if not isinstance(status_rule, dict):
+        fail("required status checks are missing")
+    status_parameters = status_rule.get("parameters")
+    if not isinstance(status_parameters, dict):
+        fail("required status-check parameters are missing")
+    required = status_parameters.get("required_status_checks", [])
+    if {
+        "context": "attestation/qillqaq",
+        "integration_id": 4395545,
+    } not in required:
+        fail("the App-owned attestation status is not required")
+    if {
+        "context": "deploy/staging",
+        "integration_id": 15368,
+    } not in required:
+        fail("the GitHub Actions staging check is not required")
 
 
 def labels() -> None:
@@ -84,6 +109,8 @@ def schema() -> None:
     gates = load_json(".governance/gates.json")
     profile = load_json(".governance/repository-profile.json")
     manifest = load_json(".governance/github-app-manifest.json")
+    load_json(".governance/ruleset-main.json")
+    load_json(".governance/ruleset-release.json")
     if len(gates) != 8:
         fail("the canonical gate map must contain eight gates")
     if profile.get("operator_model") != "solo":
@@ -114,8 +141,15 @@ def provenance() -> None:
         fail("App permissions are missing")
     if permissions.get("contents") != "read":
         fail("the App must not have write access to repository contents")
-    if permissions.get("merge_queues") != "write":
-        fail("the App requires only dedicated queue authority")
+    if permissions.get("commit_statuses") != "write":
+        fail("the App must be able to publish its required attestation status")
+    if "merge_queues" in permissions:
+        fail("the App must not retain unused merge-queue authority")
+    attestor = (
+        ROOT / ".github/workflows/attest-and-approve.yml"
+    ).read_text(encoding="utf-8")
+    if "GH_TOKEN: ${{ github.token }}" not in attestor:
+        fail("the queue request must use the ephemeral workflow token")
     for relative in (
         ".github/workflows/gates.yml",
         ".github/workflows/attest-and-approve.yml",
