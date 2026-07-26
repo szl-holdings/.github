@@ -1,15 +1,14 @@
 name: Code Security Config Drift
 
-# Verifies that the org-level GitHub code-security configuration
-# "SZL Holdings Managed Security" (id 252588) remains enforced on every
-# non-archived repository and remains the default for new repositories.
+# Verifies that organization code-security configuration 252588 remains enforced
+# on every non-archived repository and remains the default for new repositories.
 #
-# Authentication is fail-closed and non-personal. The workflow mints a short-lived
-# qillqaq GitHub App installation token with organization Administration:read.
-# No PAT is read, no missing-credential state is converted into a neutral skip,
-# and no generated report is pushed directly to protected main. Every invocation
-# uploads an immutable report artifact, including a bounded failure report when
-# token minting, source verification, or the API check cannot complete.
+# Authentication is fail-closed. A short-lived qillqaq App token with organization
+# Administration:read is preferred. Until the organization approves that tracked
+# App permission, the existing governed SZL_GITHUB_TOKEN is an explicit fallback.
+# Every configured candidate must return HTTP 200 from the exact read-only endpoint
+# before the checker receives it. Values, lengths, prefixes, hashes, identities,
+# headers, scopes, and response bodies are never recorded.
 
 on:
   schedule:
@@ -19,6 +18,7 @@ on:
     branches: [main]
     paths:
       - ".github/scripts/code_security_drift.py"
+      - ".github/scripts/run_code_security_drift_with_fallback.py"
       - ".github/scripts/test_code_security_drift.py"
       - ".github/data/code_security_allowlist.json"
       - ".github/workflows/code-security-drift.yml"
@@ -56,17 +56,19 @@ jobs:
         with:
           python-version: "3.12"
 
-      - name: Compile and self-test the drift contract
+      - name: Compile and self-test the drift and credential contracts
         run: |
           set -euo pipefail
           python -m py_compile \
             .github/scripts/code_security_drift.py \
+            .github/scripts/run_code_security_drift_with_fallback.py \
             .github/scripts/test_code_security_drift.py
           python .github/scripts/test_code_security_drift.py
           git diff --check
 
-      - name: Mint least-privilege qillqaq organization token
+      - name: Mint preferred qillqaq organization token
         id: app-token
+        continue-on-error: true
         uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
         with:
           client-id: ${{ vars.QILLQAQ_CLIENT_ID }}
@@ -74,16 +76,17 @@ jobs:
           owner: ${{ github.repository_owner }}
           permission-organization-administration: read
 
-      - name: Check managed-security-config coverage across the organization
+      - name: Select an authorized governed credential and check the organization
         id: drift
         env:
-          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          QILLQAQ_ORG_TOKEN: ${{ steps.app-token.outputs.token }}
+          SZL_GITHUB_TOKEN: ${{ secrets.SZL_GITHUB_TOKEN }}
         shell: bash
         run: |
           set +e
           mkdir -p "$(dirname "$REPORT_PATH")"
-          python .github/scripts/code_security_drift.py \
-            --report "$REPORT_PATH" 2>&1 | tee /tmp/drift-output.txt
+          python .github/scripts/run_code_security_drift_with_fallback.py \
+            2>&1 | tee /tmp/drift-output.txt
           code=${PIPESTATUS[0]}
           echo "exit_code=${code}" >> "$GITHUB_OUTPUT"
           exit 0
@@ -117,10 +120,12 @@ jobs:
               "repository": os.environ.get("GITHUB_REPOSITORY"),
               "run_id": os.environ.get("GITHUB_RUN_ID"),
               "run_url": run_url,
+              "preferred_app_token_outcome": (
+                  os.environ.get("APP_TOKEN_OUTCOME") or "not_completed"
+              ),
           }
           if path.is_file() and path.stat().st_size:
               report = json.loads(path.read_text(encoding="utf-8"))
-              errors = report.get("errors") or []
               report.setdefault("schema", "szl.code-security-drift/v2")
               report.setdefault("generated_at", now)
               report.setdefault(
@@ -128,10 +133,6 @@ jobs:
                   report.get("org") or os.environ.get("GITHUB_REPOSITORY_OWNER"),
               )
               report.setdefault("generation", os.environ.get("GITHUB_SHA"))
-              report.setdefault(
-                  "status",
-                  "DRIFT_DETECTED" if errors else "VERIFIED",
-              )
               report["workflow"] = workflow
           else:
               exit_text = str(os.environ.get("DRIFT_EXIT") or "2")
@@ -143,12 +144,11 @@ jobs:
                   "generation": os.environ.get("GITHUB_SHA"),
                   "canonical_configuration_id": 252588,
                   "status": "NOT_VERIFIED",
-                  "app_token_outcome": (
-                      os.environ.get("APP_TOKEN_OUTCOME") or "not_completed"
-                  ),
+                  "credential_selection": {"selected": None},
+                  "summary": {"ok": 0, "warning": 0, "error": 1},
                   "exit_code": exit_code,
                   "workflow": workflow,
-                  "detail": "The authenticated organization drift check did not produce its ordinary report. See the bound workflow logs; no credential value is recorded.",
+                  "detail": "The governed credential selector did not produce its ordinary report. See the bound workflow logs; no credential value is recorded.",
               }
           path.parent.mkdir(parents=True, exist_ok=True)
           path.write_text(
@@ -182,17 +182,25 @@ jobs:
                   report = json.loads(path.read_text(encoding="utf-8"))
                   errors = report.get("errors") or []
                   warnings = report.get("warnings") or []
+                  selection = report.get("credential_selection") or {}
                   out.write(f"- status: `{report.get('status')}`\n")
                   out.write("- canonical configuration: `252588`\n")
+                  out.write(
+                      f"- credential class: `{selection.get('selected')}`\n"
+                  )
                   out.write(f"- errors: `{len(errors)}`\n")
                   out.write(f"- warnings: `{len(warnings)}`\n")
                   totals = report.get("totals") or {}
                   if totals:
-                      out.write(f"- organization repositories: `{totals.get('org_repos')}`\n")
-                      out.write(f"- enforced under canonical: `{totals.get('enforced_under_canonical')}`\n")
+                      out.write(
+                          f"- organization repositories: `{totals.get('org_repos')}`\n"
+                      )
+                      out.write(
+                          f"- enforced under canonical: `{totals.get('enforced_under_canonical')}`\n"
+                      )
 
       - name: Alert the team on drift or check failure
-        if: always() && github.event_name == 'schedule' && (steps.app-token.outcome != 'success' || steps.drift.outputs.exit_code != '0')
+        if: always() && github.event_name == 'schedule' && steps.drift.outputs.exit_code != '0'
         continue-on-error: true
         env:
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
@@ -218,13 +226,8 @@ jobs:
       - name: Enforce the authenticated organization result
         if: always()
         env:
-          APP_TOKEN_OUTCOME: ${{ steps.app-token.outcome }}
           CHECK_EXIT: ${{ steps.drift.outputs.exit_code }}
         run: |
-          if [ "${APP_TOKEN_OUTCOME:-not_completed}" != "success" ]; then
-            echo "::error::The qillqaq organization token was not minted successfully. The drift state is NOT_VERIFIED."
-            exit 1
-          fi
           case "${CHECK_EXIT:-2}" in
             0)
               echo "Managed security config 252588 is enforced on every non-archived repo and is the default for new repos."
@@ -234,7 +237,7 @@ jobs:
               exit 1
               ;;
             *)
-              echo "::error::The authenticated organization drift check could not complete. This is fail-closed, not a neutral skip."
+              echo "::error::No governed credential completed the organization drift check. This is fail-closed, not a neutral skip."
               exit 1
               ;;
           esac
