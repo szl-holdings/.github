@@ -1,0 +1,112 @@
+name: Refresh PR 331 Native Queue — Controlled
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - .github/scripts/refresh_pr331_native_queue.py
+      - .github/workflows/refresh-pr331-native-queue-pr.yml
+
+permissions:
+  contents: read
+
+concurrency:
+  group: refresh-pr331-native-queue-${{ github.event.pull_request.number }}
+  cancel-in-progress: false
+
+env:
+  REPORT_PATH: reports/pr331-native-queue-refresh.json
+
+jobs:
+  refresh:
+    name: Exact-head native dequeue and re-enqueue
+    if: >-
+      github.repository == 'szl-holdings/.github' &&
+      github.event.pull_request.number == 327 &&
+      github.event.pull_request.head.repo.full_name == 'szl-holdings/.github' &&
+      github.event.pull_request.head.ref == 'diag/ci-health-digest-state-v1'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout the exact reviewed controller
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+          fetch-depth: 1
+
+      - name: Compile and constrain the native queue envelope
+        run: |
+          set -euo pipefail
+          python -m py_compile .github/scripts/refresh_pr331_native_queue.py
+          python - <<'PY'
+          from pathlib import Path
+
+          source = Path(
+              ".github/scripts/refresh_pr331_native_queue.py"
+          ).read_text(encoding="utf-8")
+          required = (
+              "TARGET_PR = 331",
+              "098cbb15c70330a57b7a8d858d47c4ef3eb847f5",
+              "7d6a15026edab70ca99f059897dc3bdeee10f6df",
+              "dequeuePullRequest",
+              "enqueuePullRequest",
+              '"expectedHeadOid": EXPECTED_HEAD',
+              '"jump": False',
+              "required_review_thread_resolution",
+              "attestation/qillqaq",
+              "credential_value_recorded",
+          )
+          forbidden = (
+              "mergePullRequest",
+              "gh pr merge",
+              "--admin",
+              '"merge_method"',
+              "rulesets/",
+              "branches/main/protection",
+              "check-runs/{",
+              '"force": True',
+              "secrets/",
+              "print(token",
+              "len(token",
+              "hashlib",
+          )
+          for marker in required:
+              assert marker in source, marker
+          for marker in forbidden:
+              assert marker not in source, marker
+          PY
+          git diff --check
+
+      - name: Refresh only the exact protected queue entry
+        id: queue
+        env:
+          SZL_GITHUB_TOKEN: ${{ secrets.SZL_GITHUB_TOKEN }}
+        shell: bash
+        run: |
+          set +e
+          python .github/scripts/refresh_pr331_native_queue.py
+          code=$?
+          echo "exit_code=${code}" >> "$GITHUB_OUTPUT"
+          exit 0
+
+      - name: Upload immutable queue-refresh evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: pr331-native-queue-refresh-${{ github.run_id }}
+          path: ${{ env.REPORT_PATH }}
+          if-no-files-found: error
+          retention-days: 90
+
+      - name: Enforce native queue delivery
+        if: always()
+        env:
+          EXIT_CODE: ${{ steps.queue.outputs.exit_code }}
+        run: |
+          code="${EXIT_CODE:-2}"
+          if [ "$code" -ne 0 ]; then
+            echo "::error::Exact native queue refresh failed closed. No immediate merge or protection change was attempted."
+            exit "$code"
+          fi
+          echo "PR #331 was re-enqueued through the supported native queue mutation."
