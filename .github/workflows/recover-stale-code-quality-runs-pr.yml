@@ -1,0 +1,108 @@
+name: Recover Stale Code Quality Runs — Controlled
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - .github/scripts/recover_stale_code_quality_runs.py
+      - .github/workflows/recover-stale-code-quality-runs-pr.yml
+
+permissions:
+  actions: write
+  contents: read
+  pull-requests: read
+
+concurrency:
+  group: recover-stale-code-quality-${{ github.event.pull_request.number }}
+  cancel-in-progress: false
+
+env:
+  REPORT_PATH: reports/stale-code-quality-recovery.json
+
+jobs:
+  recover:
+    name: Cancel and rerun only the two exact stale dynamic analyses
+    if: >-
+      github.repository == 'szl-holdings/.github' &&
+      github.event.pull_request.number == 324 &&
+      github.event.pull_request.head.repo.full_name == 'szl-holdings/.github' &&
+      github.event.pull_request.head.ref == 'diag/merge-queue-state-v1'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - name: Checkout the reviewed recovery controller
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+          fetch-depth: 1
+
+      - name: Compile and constrain the exact lifecycle operation
+        run: |
+          set -euo pipefail
+          python -m py_compile .github/scripts/recover_stale_code_quality_runs.py
+          python - <<'PY'
+          from pathlib import Path
+
+          source = Path(
+              ".github/scripts/recover_stale_code_quality_runs.py"
+          ).read_text(encoding="utf-8")
+          required = (
+              "30215896212",
+              "89829927288",
+              "30215898894",
+              "89829933795",
+              "285762202",
+              "actions/runs/{target.run_id}/cancel",
+              "actions/runs/{target.run_id}/rerun",
+              "Perform CodeQL Analysis",
+              "MIN_STALE_SECONDS = 300",
+          )
+          forbidden = (
+              "check-runs/",
+              "statuses/",
+              "rulesets/",
+              "branches/main/protection",
+              "git/refs",
+              "reviews",
+              "secrets/",
+          )
+          for marker in required:
+              assert marker in source, marker
+          for marker in forbidden:
+              assert marker not in source, marker
+          PY
+          git diff --check
+
+      - name: Execute the bounded cancel and rerun lifecycle
+        id: recovery
+        shell: bash
+        run: |
+          set +e
+          python .github/scripts/recover_stale_code_quality_runs.py
+          code=$?
+          echo "exit_code=${code}" >> "$GITHUB_OUTPUT"
+          exit 0
+
+      - name: Upload immutable recovery evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: stale-code-quality-recovery-${{ github.run_id }}
+          path: ${{ env.REPORT_PATH }}
+          if-no-files-found: error
+          retention-days: 90
+
+      - name: Enforce the recovery result
+        if: always()
+        env:
+          EXIT_CODE: ${{ steps.recovery.outputs.exit_code }}
+        run: |
+          code="${EXIT_CODE:-2}"
+          if [ "$code" -ne 0 ]; then
+            echo "::error::Exact stale Code Quality recovery failed closed."
+            exit "$code"
+          fi
+          echo "The two stale dynamic Code Quality runs were released through their supported rerun lifecycle."
