@@ -1,0 +1,111 @@
+name: Request Exact Clean Merge Queue — Controlled
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - .github/scripts/request_exact_clean_merge_queue.py
+      - .github/workflows/request-exact-clean-merge-queue-pr.yml
+
+permissions:
+  actions: read
+  checks: read
+  contents: read
+  pull-requests: write
+
+concurrency:
+  group: request-exact-clean-merge-queue-${{ github.event.pull_request.number }}
+  cancel-in-progress: false
+
+env:
+  REPORT_PATH: reports/exact-clean-merge-queue-request.json
+
+jobs:
+  request:
+    name: Enter the protected queue without immediate merge or bypass
+    if: >-
+      github.repository == 'szl-holdings/.github' &&
+      github.event.pull_request.number == 324 &&
+      github.event.pull_request.head.repo.full_name == 'szl-holdings/.github' &&
+      github.event.pull_request.head.ref == 'diag/merge-queue-state-v1'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - name: Checkout the reviewed queue controller
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+          fetch-depth: 1
+
+      - name: Compile and constrain the queue request
+        run: |
+          set -euo pipefail
+          python -m py_compile .github/scripts/request_exact_clean_merge_queue.py
+          python - <<'PY'
+          from pathlib import Path
+
+          source = Path(
+              ".github/scripts/request_exact_clean_merge_queue.py"
+          ).read_text(encoding="utf-8")
+          required = (
+              "52ab3fc1a17b5366010dd1bcfe8f6dcb5db4a286",
+              "fb8a1c2435db5bff99be51faefc9781309d0f9a4",
+              '"--auto"',
+              '"--squash"',
+              "merge_queue",
+              "required_signatures",
+              "required_status_checks",
+              "verification.get(\"verified\") is not True",
+              "mergeQueueEntry",
+          )
+          forbidden = (
+              '"PUT", f"repos/{repository}/pulls/',
+              '"merge_method"',
+              "statuses/",
+              "check-runs/{",
+              "rulesets/",
+              "branches/main/protection",
+              "git/refs",
+              "reviews",
+              "secrets/",
+          )
+          for marker in required:
+              assert marker in source, marker
+          for marker in forbidden:
+              assert marker not in source, marker
+          PY
+          git diff --check
+
+      - name: Request GitHub's protected merge queue
+        id: queue
+        shell: bash
+        run: |
+          set +e
+          python .github/scripts/request_exact_clean_merge_queue.py
+          code=$?
+          echo "exit_code=${code}" >> "$GITHUB_OUTPUT"
+          exit 0
+
+      - name: Upload immutable queue-request evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: exact-clean-merge-queue-request-${{ github.run_id }}
+          path: ${{ env.REPORT_PATH }}
+          if-no-files-found: error
+          retention-days: 90
+
+      - name: Enforce the queue-request result
+        if: always()
+        env:
+          EXIT_CODE: ${{ steps.queue.outputs.exit_code }}
+        run: |
+          code="${EXIT_CODE:-2}"
+          if [ "$code" -ne 0 ]; then
+            echo "::error::Exact clean queue request failed closed. No immediate merge or protection change was attempted."
+            exit "$code"
+          fi
+          echo "Both exact signed heads entered GitHub's protected merge queue or were merged by that queue."
