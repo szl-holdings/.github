@@ -50,8 +50,7 @@ jobs:
               ".github/scripts/approve_signed_recovery_runs.py"
           ).read_text(encoding="utf-8")
           required = (
-              "52ab3fc1a17b5366010dd1bcfe8f6dcb5db4a286",
-              "fb8a1c2435db5bff99be51faefc9781309d0f9a4",
+              "93a5138742497345cca21b8bd1a385d3b499c579",
               "/approve",
               "action_required",
               "ALLOWED_WORKFLOWS",
