@@ -1,186 +1,357 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: Apache-2.0
-# © 2026 SZL Holdings — org CI-health digest + recommendations.
-#
-# Sweeps every active (non-archived) repo in the szl-holdings org, finds the
-# latest workflow run per workflow on the repo's default branch, classifies any
-# red ones by DISPOSITION, and upserts a SINGLE rolling tracking issue in
-# szl-holdings/.github so the maintainer's notification inbox stays to one
-# actionable item instead of dozens of scattered run-failure emails.
-#
-# Honest by construction: it never marks a known-intentional red as "broken",
-# and never claims a founder-gated item is fixable in CI. Dispositions:
-#   ACTIONABLE     — a real bug a maintainer/agent should fix.
-#   FOUNDER-GATED  — blocked on a founder-only secret / account / legal action.
-#   INTENTIONAL    — designed to be red (e.g. a proof gate rejecting an OPEN
-#                    conjecture); leaving it red is correct.
-#   INFRA          — needs dedicated infra / is dispatch-only (low/no noise).
-#
-# Pure stdlib (urllib + json) so it runs with no pip step. Auth: ORG_CI_READ_TOKEN
-# (org-read PAT). Optional ntfy via SLACK_WEBHOOK_URL (box relay); skipped if absent.
+"""Fail-closed organization-wide GitHub Actions health digest.
 
-import os, json, sys, urllib.request, urllib.error
-from concurrent.futures import ThreadPoolExecutor
+The short-lived qillqaq App reader is preferred, with the existing governed
+``SZL_GITHUB_TOKEN`` as an explicit migration fallback. A reader is accepted
+only after it proves the reviewed repository floor and Actions-read capability.
+The ephemeral workflow token writes only the one rolling issue in this repo.
+"""
+from __future__ import annotations
 
-ORG = "szl-holdings"
-TOKEN = os.environ.get("ORG_CI_READ_TOKEN") or os.environ.get("GITHUB_TOKEN")
+import argparse
+import json
+import os
+import urllib.error
+import urllib.request
+from dataclasses import asdict
+from datetime import datetime, timezone
+from pathlib import Path
+from typing import Any, Mapping, Sequence
+
+from ci_health_digest_http import (
+    ORG,
+    ApiError,
+    DigestError,
+    ReaderSelectionError,
+    request_json as _request_json,
+    select_reader,
+)
+from ci_health_digest_sweep import (
+    build_body,
+    build_failure_body,
+    sweep,
+)
+
+ISSUE_REPOSITORY = f"{ORG}/.github"
 ISSUE_TITLE = "🔴 CI Health Digest — org-wide"
 ISSUE_LABEL = "ci-health"
-RED = ("failure", "startup_failure", "timed_out", "action_required")
+REPORT_SCHEMA = "szl.ci-health-digest/v2"
 
-# (repo, workflow-name substring) -> (disposition, note). First match wins.
-# Keep this the SINGLE place where a red is reclassified away from ACTIONABLE,
-# with a reason. Do NOT silence a real bug here.
-POLICY = [
-    ("lambda-bounty", "verify-proof",   ("INTENTIONAL", "Proof gate rejects the still-OPEN Λ (Conjecture 1) by design — red is the honest verdict.")),
-    ("szl-doctrine",  "secret-health",  ("FOUNDER-GATED", "Needs org secret SECRET_HEALTH_TOKEN (founder least-priv PAT). Cannot be minted in CI.")),
-    ("",              "Dependabot Updates", ("INFRA", "Dependabot runner state, not a workflow bug; resolves when the grouped PR opens/merges.")),
-    ("",              "CodeQL",         ("INFRA", "CodeQL default-setup run; reconfigure via repo Security settings, not a workflow-file fix.")),
-    ("",              "ClusterFuzzLite", ("INFRA", "PR fuzzing waits on manual approval (action_required) for outside contributions.")),
-    ("",              "Fuzz",           ("INFRA", "Scheduled fuzzing run; corpus/infra-driven, not a default-branch regression.")),
-    ("",              "Publish npm",    ("INFRA", "Manual workflow_dispatch publish — red reflects a past manual run, not branch health.")),
-    ("",              "Cosign keyless", ("INFRA", "Runs only on release events; needs a tagged release with OIDC id-token perms, not a push-time fix.")),
-    ("",              "SLSA",           ("INFRA", "Provenance/attestation signing path (dispatch/push); pending wiring, not an app-code bug.")),
-]
 
-def api(url, method="GET", body=None):
-    data = json.dumps(body).encode() if body is not None else None
-    req = urllib.request.Request(url, data=data, method=method, headers={
-        "Authorization": "Bearer " + TOKEN, "Accept": "application/vnd.github+json"})
-    try:
-        r = urllib.request.urlopen(req, timeout=30)
-        return r.status, (json.loads(r.read()) if r.length != 0 else {})
-    except urllib.error.HTTPError as e:
-        return e.code, e.read()[:300].decode("utf-8", "replace")
+def _issue_token() -> str:
+    token = (
+        os.environ.get("CI_DIGEST_ISSUE_TOKEN")
+        or os.environ.get("GITHUB_TOKEN")
+        or ""
+    )
+    if not token:
+        raise DigestError(
+            "no repository-scoped issue-write token is configured"
+        )
+    return token
 
-def classify(repo, wf):
-    for rp, sub, verdict in POLICY:
-        if (not rp or rp == repo) and sub.lower() in wf.lower():
-            return verdict
-    return ("ACTIONABLE", "")
 
-def list_repos():
-    repos, page = [], 1
-    while True:
-        st, r = api("https://api.github.com/orgs/%s/repos?per_page=100&type=all&page=%d" % (ORG, page))
-        if not isinstance(r, list) or not r:
-            break
-        repos += r
-        if len(r) < 100:
-            break
-        page += 1
-    return [(x["name"], x["default_branch"]) for x in repos if not x.get("archived")]
-
-def repo_reds(item):
-    name, default = item
-    out = []
-    st, wfs = api("https://api.github.com/repos/%s/%s/actions/workflows?per_page=100" % (ORG, name))
-    if not isinstance(wfs, dict):
-        return name, out
-    def latest(w):
-        if w.get("state") != "active":
-            return None
-        for q in ("&branch=" + default, ""):
-            st, rr = api("https://api.github.com/repos/%s/%s/actions/workflows/%d/runs?per_page=1%s" % (ORG, name, w["id"], q))
-            runs = rr.get("workflow_runs", []) if isinstance(rr, dict) else []
-            if runs:
-                r = runs[0]
-                if r["conclusion"] in RED:
-                    return (w["name"], r["conclusion"], r["run_number"], r.get("event"), r.get("html_url"))
-                return None
-        return None
-    with ThreadPoolExecutor(max_workers=8) as ex:
-        for res in ex.map(latest, wfs.get("workflows", [])):
-            if res:
-                out.append(res)
-    return name, out
-
-def build_body(reds):
-    from datetime import datetime, timezone
-    buckets = {"ACTIONABLE": [], "FOUNDER-GATED": [], "INTENTIONAL": [], "INFRA": []}
-    total = 0
-    for repo in sorted(reds):
-        for (wf, concl, num, ev, url) in reds[repo]:
-            disp, note = classify(repo, wf)
-            buckets[disp].append((repo, wf, concl, num, ev, url, note))
-            total += 1
-    now = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
-    lines = ["_Auto-generated by `.github/workflows/ci-health-digest.yml`. Last sweep: **%s**._" % now, ""]
-    act = len(buckets["ACTIONABLE"])
-    lines += ["**%d red workflow(s)** across the org — **%d ACTIONABLE**, %d founder-gated, %d intentional, %d infra." % (
-        total, act, len(buckets["FOUNDER-GATED"]), len(buckets["INTENTIONAL"]), len(buckets["INFRA"])), ""]
-    order = [("ACTIONABLE", "### 🛠 Actionable — fix these (root-cause, no bandaids)"),
-             ("FOUNDER-GATED", "### 🔑 Founder-gated — needs a founder secret/action"),
-             ("INFRA", "### ⚙️ Infra / low-noise — reconfigure or ignore"),
-             ("INTENTIONAL", "### ✅ Intentional — red is correct, leave as-is")]
-    for key, hdr in order:
-        rows = buckets[key]
-        if not rows:
-            continue
-        lines.append(hdr)
-        lines.append("")
-        lines.append("| Repo | Workflow | Result | Trigger | Note |")
-        lines.append("|---|---|---|---|---|")
-        for repo, wf, concl, num, ev, url, note in sorted(rows):
-            wfc = "[%s](%s)" % (wf, url) if url else wf
-            lines.append("| `%s` | %s | %s (run#%s) | %s | %s |" % (repo, wfc, concl, num, ev or "", note))
-        lines.append("")
-    if total == 0:
-        lines = ["_Last sweep: **%s**._" % now, "", "## ✅ All clear — no red workflows on any default branch.", ""]
-    lines.append("---")
-    lines.append("<sub>Dispositions are policy-classified in `.github/scripts/ci_health_digest.py` (`POLICY`). "
-                 "Reclassify a red only with a documented reason; never silence a real bug.</sub>")
-    return "\n".join(lines), act, total
-
-def upsert_issue(body):
-    # find existing open issue by exact title
-    st, issues = api("https://api.github.com/repos/%s/.github/issues?state=open&labels=%s&per_page=50" % (ORG, ISSUE_LABEL))
-    existing = None
-    if isinstance(issues, list):
-        for i in issues:
-            if i.get("title") == ISSUE_TITLE and "pull_request" not in i:
-                existing = i
-                break
+def upsert_issue(
+    body: str,
+    *,
+    red_total: int | None,
+) -> dict[str, Any]:
+    token = _issue_token()
+    _, issues = _request_json(
+        token,
+        (
+            f"https://api.github.com/repos/{ISSUE_REPOSITORY}/issues"
+            f"?state=all&labels={ISSUE_LABEL}&per_page=100"
+        ),
+        operation="find rolling CI health issue",
+    )
+    if not isinstance(issues, list):
+        raise DigestError(
+            "rolling issue search returned a malformed payload"
+        )
+    existing = next(
+        (
+            issue
+            for issue in issues
+            if isinstance(issue, dict)
+            and issue.get("title") == ISSUE_TITLE
+            and "pull_request" not in issue
+        ),
+        None,
+    )
+    desired_state = "closed" if red_total == 0 else "open"
     if existing:
-        st, _ = api("https://api.github.com/repos/%s/.github/issues/%d" % (ORG, existing["number"]), "PATCH", {"body": body})
-        return "updated #%d (HTTP %s)" % (existing["number"], st)
-    st, r = api("https://api.github.com/repos/%s/.github/issues" % ORG, "POST",
-                {"title": ISSUE_TITLE, "body": body, "labels": [ISSUE_LABEL]})
-    return "created #%s (HTTP %s)" % (r.get("number") if isinstance(r, dict) else "?", st)
+        number = int(existing["number"])
+        patch: dict[str, Any] = {"body": body, "state": desired_state}
+        if desired_state == "closed":
+            patch["state_reason"] = "completed"
+        _, result = _request_json(
+            token,
+            f"https://api.github.com/repos/{ISSUE_REPOSITORY}/issues/{number}",
+            method="PATCH",
+            body=patch,
+            operation=f"update rolling CI health issue #{number}",
+            expected={200},
+        )
+        action = "updated"
+    else:
+        _, result = _request_json(
+            token,
+            f"https://api.github.com/repos/{ISSUE_REPOSITORY}/issues",
+            method="POST",
+            body={
+                "title": ISSUE_TITLE,
+                "body": body,
+                "labels": [ISSUE_LABEL],
+            },
+            operation="create rolling CI health issue",
+            expected={201},
+        )
+        number = (
+            int(result.get("number") or 0)
+            if isinstance(result, dict)
+            else 0
+        )
+        action = "created"
+        if desired_state == "closed" and number:
+            _, result = _request_json(
+                token,
+                (
+                    f"https://api.github.com/repos/{ISSUE_REPOSITORY}/"
+                    f"issues/{number}"
+                ),
+                method="PATCH",
+                body={"state": "closed", "state_reason": "completed"},
+                operation=(
+                    f"close clean rolling CI health issue #{number}"
+                ),
+                expected={200},
+            )
+    if not isinstance(result, dict) or not result.get("number"):
+        raise DigestError(
+            "rolling issue mutation returned no issue identity"
+        )
+    return {
+        "action": action,
+        "number": int(result["number"]),
+        "state": result.get("state"),
+        "url": result.get("html_url"),
+        "updated_at": result.get("updated_at"),
+    }
 
-def maybe_ntfy(act, total):
-    hook = os.environ.get("SLACK_WEBHOOK_URL")
+
+def maybe_notify(actionable: int, total: int) -> dict[str, Any]:
+    hook = os.environ.get("SLACK_WEBHOOK_URL") or ""
     if not hook:
-        print("ntfy: skipped (SLACK_WEBHOOK_URL absent)")
-        return
-    msg = "SZL CI Health: %d actionable / %d red workflows org-wide." % (act, total)
-    try:
-        req = urllib.request.Request(hook, data=json.dumps({"text": msg}).encode(),
-                                     headers={"Content-Type": "application/json"}, method="POST")
-        urllib.request.urlopen(req, timeout=15)
-        print("ntfy: sent")
-    except Exception as e:
-        print("ntfy: failed (non-fatal):", str(e)[:80])
+        return {"attempted": False, "result": "not_configured"}
+    message = (
+        f"SZL CI Health: {actionable} actionable / "
+        f"{total} red workflows org-wide."
+    )
+    attempts: list[dict[str, Any]] = []
+    payloads = (
+        (
+            json.dumps({"text": message}).encode("utf-8"),
+            "application/json",
+            "slack_json",
+        ),
+        (
+            message.encode("utf-8"),
+            "text/plain; charset=utf-8",
+            "plain_text",
+        ),
+    )
+    for data, content_type, mode in payloads:
+        request = urllib.request.Request(
+            hook,
+            data=data,
+            headers={"Content-Type": content_type},
+            method="POST",
+        )
+        try:
+            with urllib.request.urlopen(request, timeout=15) as response:
+                status = int(response.status)
+                attempts.append({"mode": mode, "http_status": status})
+                if 200 <= status < 300:
+                    return {
+                        "attempted": True,
+                        "result": "sent",
+                        "delivery_mode": mode,
+                        "http_status": status,
+                        "attempts": attempts,
+                    }
+        except urllib.error.HTTPError as exc:
+            attempts.append(
+                {"mode": mode, "http_status": int(exc.code)}
+            )
+            if mode == "slack_json" and int(exc.code) in {405, 415}:
+                continue
+            break
+        except Exception as exc:  # noqa: BLE001
+            attempts.append(
+                {"mode": mode, "failure_type": type(exc).__name__}
+            )
+            break
+    return {
+        "attempted": True,
+        "result": "failed_non_terminal",
+        "attempts": attempts,
+    }
 
-def main():
-    if not TOKEN:
-        print("::error::No ORG_CI_READ_TOKEN/GITHUB_TOKEN available."); sys.exit(1)
-    repos = list_repos()
-    print("sweeping %d active repos..." % len(repos))
-    reds = {}
-    with ThreadPoolExecutor(max_workers=10) as ex:
-        for name, out in ex.map(repo_reds, repos):
-            if out:
-                reds[name] = out
-    body, act, total = build_body(reds)
-    print(upsert_issue(body))
-    maybe_ntfy(act, total)
-    # Write a job summary too.
-    summ = os.environ.get("GITHUB_STEP_SUMMARY")
-    if summ:
-        with open(summ, "a") as f:
-            f.write("# CI Health Digest\n\n%s\n" % body)
-    print("done: %d actionable / %d red" % (act, total))
+
+def _write_summary(body: str, report: Mapping[str, Any]) -> None:
+    path = os.environ.get("GITHUB_STEP_SUMMARY")
+    if not path:
+        return
+    with open(path, "a", encoding="utf-8") as summary:
+        summary.write("# CI Health Digest\n\n")
+        summary.write(f"- status: `{report.get('status')}`\n")
+        authentication = report.get("authentication") or {}
+        summary.write(
+            f"- authentication: `{authentication.get('mode')}`\n"
+        )
+        coverage = report.get("coverage") or {}
+        if coverage:
+            summary.write(
+                "- coverage: "
+                f"`{coverage.get('queried_active_repositories')}` active repos / "
+                f"`{coverage.get('active_workflows')}` workflows\n"
+            )
+        summary.write("\n")
+        summary.write(body)
+        summary.write("\n")
+
+
+def main(argv: Sequence[str] | None = None) -> int:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument(
+        "--report",
+        default=(
+            os.environ.get("REPORT_PATH")
+            or "reports/ci-health-digest.json"
+        ),
+    )
+    args = parser.parse_args(argv)
+    report_path = Path(args.report)
+    report_path.parent.mkdir(parents=True, exist_ok=True)
+
+    report: dict[str, Any] = {
+        "schema": REPORT_SCHEMA,
+        "generated_at": datetime.now(timezone.utc).isoformat(),
+        "generation": os.environ.get("GITHUB_SHA"),
+        "organization": ORG,
+        "status": "NOT_VERIFIED",
+        "authentication": {
+            "mode": "unavailable",
+            "credential_name": None,
+            "value_recorded": False,
+            "attempts": [],
+        },
+        "coverage": None,
+        "red_runs": {},
+        "summary": {"actionable": 0, "red_total": 0},
+        "issue": None,
+        "notification": None,
+        "boundaries": [
+            (
+                "An organization reader is accepted only after proving the "
+                "reviewed repository floor."
+            ),
+            "Every active repository and workflow API read is fail-closed.",
+            (
+                "The ephemeral repository token writes only the one rolling "
+                "digest issue."
+            ),
+            (
+                "No credential value, length, prefix, hash, identity, or "
+                "header is recorded."
+            ),
+            (
+                "A failed sweep opens the rolling issue as NOT VERIFIED and "
+                "exits non-zero."
+            ),
+        ],
+    }
+    body = ""
+    reader_attempts: Sequence[Mapping[str, Any]] = ()
+
+    try:
+        reader = select_reader()
+        reader_attempts = reader.attempts
+        report["authentication"] = {
+            "mode": reader.mode,
+            "credential_name": reader.credential_name,
+            "value_recorded": False,
+            "attempts": list(reader.attempts),
+            "app_token_outcome": (
+                os.environ.get("APP_TOKEN_OUTCOME") or "not_recorded"
+            ),
+        }
+        reds, coverage = sweep(reader.token, reader.repositories)
+        body, actionable, red_total, dispositions = build_body(
+            reds,
+            coverage=coverage,
+            authentication_mode=reader.mode,
+        )
+        issue = upsert_issue(body, red_total=red_total)
+        notification = maybe_notify(actionable, red_total)
+        report.update(
+            {
+                "status": "VERIFIED",
+                "coverage": coverage,
+                "red_runs": {
+                    repository: [asdict(item) for item in items]
+                    for repository, items in reds.items()
+                },
+                "summary": {
+                    "actionable": actionable,
+                    "red_total": red_total,
+                    "dispositions": dispositions,
+                },
+                "issue": issue,
+                "notification": notification,
+            }
+        )
+        exit_code = 0
+    except Exception as exc:  # noqa: BLE001
+        if isinstance(exc, ReaderSelectionError):
+            reader_attempts = exc.attempts
+            report["authentication"]["attempts"] = list(exc.attempts)
+        report["fatal"] = {
+            "type": type(exc).__name__,
+            "detail_class": (
+                exc.detail_class
+                if isinstance(exc, ApiError)
+                else "coverage_or_execution_failure"
+            ),
+        }
+        body = build_failure_body(
+            error=exc,
+            attempts=reader_attempts,
+        )
+        try:
+            report["issue"] = upsert_issue(body, red_total=None)
+        except Exception as issue_exc:  # noqa: BLE001
+            report["issue_error"] = {
+                "type": type(issue_exc).__name__,
+                "detail_class": (
+                    issue_exc.detail_class
+                    if isinstance(issue_exc, ApiError)
+                    else "issue_publication_failure"
+                ),
+            }
+        exit_code = 2
+
+    report["generated_at"] = datetime.now(timezone.utc).isoformat()
+    report_path.write_text(
+        json.dumps(report, indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
+    _write_summary(body, report)
+    print(json.dumps(report, indent=2, sort_keys=True))
+    return exit_code
+
 
 if __name__ == "__main__":
-    main()
+    raise SystemExit(main())
