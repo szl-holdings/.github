@@ -238,6 +238,7 @@ def verify_gate_contract() -> None:
         "Publish required App attestation status",
         "context=attestation/qillqaq",
         "GH_TOKEN: ${{ steps.app-token.outputs.token }}",
+        "client-id: ${{ vars.QILLQAQ_CLIENT_ID }}",
         'SOURCE_EVENT: ${{ github.event.workflow_run.event }}',
         'if [ "$SOURCE_EVENT" = "merge_group" ]; then',
         '[[ "$HEAD_BRANCH" == gh-readonly-queue/main/* ]]',
@@ -245,6 +246,8 @@ def verify_gate_contract() -> None:
     ):
         if marker not in attestor_template:
             fail(f"attestor status publication is missing {marker!r}")
+    if "app-id:" in attestor_template:
+        fail("the attestor must use the supported GitHub App client-id input")
     if attestor_template.count(
         "if: steps.subject.outputs.kind == 'pull_request'"
     ) != 2:

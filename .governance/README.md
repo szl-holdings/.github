@@ -48,9 +48,10 @@ GitHub's supported `gh pr merge` path to request the protected queue. That token
 cannot approve reviews and cannot bypass the ruleset. `id-token: write` is a
 workflow permission, not a GitHub App permission.
 
-The attestor uses repository Actions secrets and does not enter the `production`
-environment. Production deployment approval therefore remains a separate,
-identity-bound release control.
+The attestor uses a repository Actions variable for the public App client ID
+and a repository Actions secret for the private key. It does not enter the
+`production` environment. Production deployment approval therefore remains a
+separate, identity-bound release control.
 
 ## Activation order
 
@@ -69,6 +70,6 @@ Never apply either ruleset before its checks and deployment exist.
 
 As of 2026-07-26, `qillqaq-attestor` is registered as App ID `4395545`
 and installed as installation `149072489` on all current and future
-`szl-holdings` repositories. The `.github` repository stores the App ID and
-private key as Actions secrets. This branch activates the attestor, eight-gate
-workflow, and staging deployment workflow.
+`szl-holdings` repositories. The `.github` repository stores the App client ID
+as an Actions variable and the private key as an Actions secret. This branch
+activates the attestor, eight-gate workflow, and staging deployment workflow.

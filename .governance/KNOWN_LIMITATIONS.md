@@ -5,8 +5,9 @@
 - GitHub records the App review but does not count it toward approval rules that
   require a person with write permission. The enforceable equivalent is the
   App-owned `attestation/qillqaq` required status, pinned to App ID `4395545`.
-- The App ID and private key are repository Actions secrets. The removed local
-  private key cannot be recovered; rotation requires generating a new App key.
+- The public App client ID is a repository Actions variable and the private key
+  is a repository Actions secret. The removed local private key cannot be
+  recovered; rotation requires generating a new App key.
 - The App review and merge-queue path must be proven on a post-bootstrap pilot
   before estate-wide activation is claimed.
 - Gate mappings in this repository are specific to an organization-governance
