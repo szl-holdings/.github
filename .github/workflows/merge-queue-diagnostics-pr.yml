@@ -38,11 +38,72 @@ jobs:
       - name: Query GitHub read-only control-plane state
         run: python .github/scripts/merge_queue_diagnostics.py
 
+      - name: Encode decisive findings in the artifact identity
+        id: findings
+        shell: python
+        run: |
+          import json
+          import os
+          import re
+          from pathlib import Path
+
+          report = json.loads(
+              Path(os.environ["REPORT_PATH"]).read_text(encoding="utf-8")
+          )
+          control = report["control_plane"]
+
+          def count(result):
+              payload = result.get("payload")
+              return len(payload) if result.get("ok") and isinstance(payload, list) else -1
+
+          parts = [
+              "mq",
+              f"q{count(control['queue_branches'])}",
+              f"r{count(control['merge_group_runs'])}",
+              f"rules{int(bool(control['active_rules_main'].get('ok')))}",
+              f"protect{int(bool(control['main_protection'].get('ok')))}",
+          ]
+          for number in ("322", "323"):
+              target = report["targets"][number]
+              rest = target["rest"].get("payload")
+              graph = target["graphql"].get("payload")
+              pull = None
+              if isinstance(graph, dict):
+                  pull = (
+                      (graph.get("data") or {})
+                      .get("repository", {})
+                      .get("pullRequest")
+                  )
+              rest_auto = int(
+                  isinstance(rest, dict) and rest.get("auto_merge") is not None
+              )
+              graph_auto = int(
+                  isinstance(pull, dict)
+                  and pull.get("autoMergeRequest") is not None
+              )
+              queue_entry = int(
+                  isinstance(pull, dict)
+                  and pull.get("mergeQueueEntry") is not None
+              )
+              state = (
+                  str(rest.get("mergeable_state") or "unknown")
+                  if isinstance(rest, dict)
+                  else "unreadable"
+              )
+              state = re.sub(r"[^a-z0-9]+", "-", state.lower()).strip("-")
+              parts.append(
+                  f"p{number}-ro{rest_auto}-go{graph_auto}-qe{queue_entry}-gq{int(bool(target['graphql'].get('ok')))}-{state}"
+              )
+          slug = "-".join(parts)[:220]
+          with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as output:
+              output.write(f"summary_slug={slug}\n")
+          print(slug)
+
       - name: Upload immutable diagnostic evidence
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: merge-queue-diagnostics-${{ github.run_id }}
+          name: ${{ steps.findings.outputs.summary_slug || format('mq-not-encoded-{0}', github.run_id) }}
           path: ${{ env.REPORT_PATH }}
           if-no-files-found: error
           retention-days: 30
