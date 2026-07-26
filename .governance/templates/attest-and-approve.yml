@@ -68,19 +68,14 @@ jobs:
           set -euo pipefail
           BODY=$(jq -r '.body // ""' "$RUNNER_TEMP/pr.json")
 
-          grep -Eq 'Satisfies:[[:space:]]*(AT-[0-9]+|C[0-9]+)' <<<"$BODY" \
-            || { echo "::error::P1 missing Satisfies: AT-n or Cn"; exit 1; }
+          grep -Eq 'Satisfies:[[:space:]]*(AT-[0-9]+|C-[0-9]+)' <<<"$BODY" \
+            || { echo "::error::P1 missing Satisfies: AT-n or C-n"; exit 1; }
           grep -Eq 'Rollback:[[:space:]]*\S' <<<"$BODY" \
             || { echo "::error::P2 missing Rollback"; exit 1; }
           grep -Eq 'Labels:[[:space:]]*\S' <<<"$BODY" \
             || { echo "::error::P3 missing Labels"; exit 1; }
-
-          mapfile -t RISK_LABELS < <(jq -r '.labels[].name | select(startswith("risk:"))' "$RUNNER_TEMP/pr.json")
-          mapfile -t DOMAIN_LABELS < <(jq -r '.labels[].name | select(startswith("domain:"))' "$RUNNER_TEMP/pr.json")
-          [ "${#RISK_LABELS[@]}" -eq 1 ] \
-            || { echo "::error::P3 requires exactly one risk:* label"; exit 1; }
-          [ "${#DOMAIN_LABELS[@]}" -eq 1 ] \
-            || { echo "::error::P3 requires exactly one domain:* label"; exit 1; }
+          grep -Eq 'Risk:[[:space:]]*[ABCD][[:space:]]*[-—]' <<<"$BODY" \
+            || { echo "::error::missing Risk: A-D classification"; exit 1; }
 
           gh api "repos/$REPOSITORY/pulls/$PR/files?per_page=100" --paginate \
             --jq '.[].filename' > "$RUNNER_TEMP/files.txt"
