@@ -1,0 +1,10 @@
+{
+  "gate/ground-truth": [],
+  "gate/labels": [],
+  "gate/schema": [],
+  "gate/adversarial": [],
+  "gate/verify-all": [],
+  "gate/provenance": [],
+  "gate/a11y-perf": [],
+  "gate/lean": []
+}

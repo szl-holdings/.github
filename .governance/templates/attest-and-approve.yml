@@ -1,0 +1,213 @@
+name: FORGE-9 attest and approve
+
+on:
+  workflow_run:
+    workflows:
+      - FORGE-9 gates
+    types:
+      - completed
+
+permissions:
+  actions: read
+  contents: read
+  id-token: write
+  pull-requests: read
+
+concurrency:
+  group: forge9-attest-${{ github.event.workflow_run.head_sha }}
+  cancel-in-progress: false
+
+jobs:
+  attest:
+    if: github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - name: Mint the independent App token
+        id: app-token
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        with:
+          app-id: ${{ secrets.QILLQAQ_APP_ID }}
+          private-key: ${{ secrets.QILLQAQ_PRIVATE_KEY }}
+          owner: ${{ github.repository_owner }}
+          repositories: ${{ github.event.repository.name }}
+
+      - name: Resolve exactly one pull request
+        id: pr
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
+          REPOSITORY: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          gh api \
+            -H "Accept: application/vnd.github+json" \
+            "repos/$REPOSITORY/commits/$HEAD_SHA/pulls?per_page=100" \
+            > "$RUNNER_TEMP/pulls.json"
+          mapfile -t PRS < <(
+            jq -r --arg sha "$HEAD_SHA" \
+              '.[] | select(.state == "open" and .head.sha == $sha and .base.ref == "main") | .number' \
+              "$RUNNER_TEMP/pulls.json"
+          )
+          if [ "${#PRS[@]}" -ne 1 ]; then
+            echo "::error::expected exactly one open main PR for $HEAD_SHA; found ${#PRS[@]}"
+            exit 1
+          fi
+          PR="${PRS[0]}"
+          gh api "repos/$REPOSITORY/pulls/$PR" > "$RUNNER_TEMP/pr.json"
+          echo "number=$PR" >> "$GITHUB_OUTPUT"
+          echo "node_id=$(jq -r .node_id "$RUNNER_TEMP/pr.json")" >> "$GITHUB_OUTPUT"
+
+      - name: Verify gates and preconditions P1-P7
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
+          PR: ${{ steps.pr.outputs.number }}
+          REPOSITORY: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          BODY=$(jq -r '.body // ""' "$RUNNER_TEMP/pr.json")
+
+          grep -Eq 'Satisfies:[[:space:]]*(AT-[0-9]+|C[0-9]+)' <<<"$BODY" \
+            || { echo "::error::P1 missing Satisfies: AT-n or Cn"; exit 1; }
+          grep -Eq 'Rollback:[[:space:]]*\S' <<<"$BODY" \
+            || { echo "::error::P2 missing Rollback"; exit 1; }
+          grep -Eq 'Labels:[[:space:]]*\S' <<<"$BODY" \
+            || { echo "::error::P3 missing Labels"; exit 1; }
+
+          mapfile -t RISK_LABELS < <(jq -r '.labels[].name | select(startswith("risk:"))' "$RUNNER_TEMP/pr.json")
+          mapfile -t DOMAIN_LABELS < <(jq -r '.labels[].name | select(startswith("domain:"))' "$RUNNER_TEMP/pr.json")
+          [ "${#RISK_LABELS[@]}" -eq 1 ] \
+            || { echo "::error::P3 requires exactly one risk:* label"; exit 1; }
+          [ "${#DOMAIN_LABELS[@]}" -eq 1 ] \
+            || { echo "::error::P3 requires exactly one domain:* label"; exit 1; }
+
+          gh api "repos/$REPOSITORY/pulls/$PR/files?per_page=100" --paginate \
+            --jq '.[].filename' > "$RUNNER_TEMP/files.txt"
+          if grep -Eq '^(\.github/workflows/attest-and-approve\.ya?ml|\.governance/)' \
+              "$RUNNER_TEMP/files.txt"; then
+            echo "::error::P5 refuses attestor or governance self-edits"
+            exit 1
+          fi
+
+          gh api \
+            -H "Accept: application/vnd.github+json" \
+            "repos/$REPOSITORY/commits/$HEAD_SHA/check-runs?filter=latest&per_page=100" \
+            > "$RUNNER_TEMP/check-runs.json"
+          REQUIRED=(
+            gate/ground-truth
+            gate/labels
+            gate/schema
+            gate/adversarial
+            gate/verify-all
+            gate/provenance
+            gate/a11y-perf
+            gate/lean
+          )
+          for CHECK in "${REQUIRED[@]}"; do
+            COUNT=$(jq --arg check "$CHECK" \
+              '[.check_runs[] | select(.name == $check and .conclusion == "success")] | length' \
+              "$RUNNER_TEMP/check-runs.json")
+            [ "$COUNT" -ge 1 ] \
+              || { echo "::error::required check is not green: $CHECK"; exit 1; }
+          done
+
+          HAS_QUEUE=0
+          gh api "repos/$REPOSITORY/rulesets?per_page=100" --paginate \
+            --jq '.[].id' > "$RUNNER_TEMP/ruleset-ids.txt"
+          [ -s "$RUNNER_TEMP/ruleset-ids.txt" ] \
+            || { echo "::error::P6 found no rulesets"; exit 1; }
+          while read -r ID; do
+            gh api "repos/$REPOSITORY/rulesets/$ID" > "$RUNNER_TEMP/ruleset-$ID.json"
+            BYPASS=$(jq '.bypass_actors | length' "$RUNNER_TEMP/ruleset-$ID.json")
+            [ "$BYPASS" -eq 0 ] \
+              || { echo "::error::P6 ruleset $ID has $BYPASS bypass actors"; exit 1; }
+            if jq -e '.rules[] | select(.type == "merge_queue")' \
+                "$RUNNER_TEMP/ruleset-$ID.json" >/dev/null; then
+              HAS_QUEUE=1
+            fi
+          done < "$RUNNER_TEMP/ruleset-ids.txt"
+          [ "$HAS_QUEUE" -eq 1 ] \
+            || { echo "::error::merge queue rule is not active"; exit 1; }
+
+          CAN_APPROVE=$(gh api "repos/$REPOSITORY/actions/permissions/workflow" \
+            --jq '.can_approve_pull_request_reviews')
+          [ "$CAN_APPROVE" = "false" ] \
+            || { echo "::error::P7 default GITHUB_TOKEN can approve reviews"; exit 1; }
+
+      - name: Build and sign the merge BAP
+        env:
+          HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
+          PR: ${{ steps.pr.outputs.number }}
+          REPOSITORY: ${{ github.repository }}
+          RUN_ID: ${{ github.run_id }}
+        run: |
+          set -euo pipefail
+          jq -n \
+            --arg schema "https://a11oy.net/schemas/forge9/merge-bap/v1" \
+            --arg repository "$REPOSITORY" \
+            --argjson pull_request "$PR" \
+            --arg head_sha "$HEAD_SHA" \
+            --arg principal "spiffe://a11oy.net/ns/ci/sa/qillqaq-attestor" \
+            --arg policy_id "merge-gate-v1" \
+            --arg run_id "$RUN_ID" \
+            --arg issued_at "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+            --slurpfile checks "$RUNNER_TEMP/check-runs.json" \
+            '{
+              schema: $schema,
+              repository: $repository,
+              pull_request: $pull_request,
+              head_sha: $head_sha,
+              principal: $principal,
+              policy_id: $policy_id,
+              workflow_run_id: $run_id,
+              issued_at: $issued_at,
+              checks: [
+                $checks[0].check_runs[]
+                | select(.name | startswith("gate/"))
+                | {name, conclusion, details_url}
+              ],
+              breakglass: null
+            }' > merge-receipt.json
+
+      - name: Install Cosign
+        uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2
+
+      - name: Sign the merge BAP with Actions OIDC
+        run: cosign sign-blob --yes --bundle merge-receipt.bundle merge-receipt.json
+
+      - name: Upload the signed merge BAP
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: merge-receipt-${{ github.event.workflow_run.head_sha }}
+          path: |
+            merge-receipt.json
+            merge-receipt.bundle
+          if-no-files-found: error
+          retention-days: 90
+
+      - name: Approve as the App and verify the review identity
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
+          PR: ${{ steps.pr.outputs.number }}
+          REPOSITORY: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          DIGEST=$(sha256sum merge-receipt.json | cut -d' ' -f1)
+          gh api -X POST "repos/$REPOSITORY/pulls/$PR/reviews" \
+            -f event=APPROVE \
+            -f body="ATTESTED. All Section 18 gates green. Merge BAP sha256: $DIGEST"
+          COUNT=$(gh api "repos/$REPOSITORY/pulls/$PR/reviews?per_page=100" --paginate \
+            --jq "[.[] | select(.user.login == \"qillqaq-attestor[bot]\" and .state == \"APPROVED\" and .commit_id == \"$HEAD_SHA\")] | length")
+          [ "$COUNT" -ge 1 ] \
+            || { echo "::error::App approval was not recorded for the exact head SHA"; exit 1; }
+
+      - name: Enqueue after attestation
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          PR: ${{ steps.pr.outputs.number }}
+          REPOSITORY: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          gh pr merge "$PR" --repo "$REPOSITORY"
