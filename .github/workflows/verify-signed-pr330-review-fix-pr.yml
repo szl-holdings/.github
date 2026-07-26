@@ -20,7 +20,7 @@ env:
 
 jobs:
   verify:
-    name: Direct tree, signature, content, and tests
+    name: Direct blob, signature, content, and tests
     if: >-
       github.repository == 'szl-holdings/.github' &&
       github.event.pull_request.number == 327 &&
@@ -53,7 +53,7 @@ jobs:
               "7e1b59748b58bf7093b1b36dc9036ffbb03c7d10",
               "7d6a15026edab70ca99f059897dc3bdeee10f6df",
               "fix/ci-health-digest-review-fixed-7e1b59748b58",
-              "direct_tree_diff",
+              "direct_blob_diff",
               "ALLOWED_TREE_DIFFS",
               "candidate signature is not verified",
               "Ran 13 tests",
@@ -94,7 +94,7 @@ jobs:
           if-no-files-found: error
           retention-days: 90
 
-      - name: Enforce direct-tree verification
+      - name: Enforce direct-blob verification
         if: always()
         env:
           EXIT_CODE: ${{ steps.verification.outputs.exit_code }}
@@ -104,4 +104,4 @@ jobs:
             echo "::error::Signed review-fix verification failed closed."
             exit "$code"
           fi
-          echo "Signed review-fix branch passed direct-tree and test verification."
+          echo "Signed review-fix branch passed direct-blob and test verification."
