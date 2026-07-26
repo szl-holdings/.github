@@ -1,0 +1,56 @@
+#!/usr/bin/env python3
+"""Assert the active PR rule parameters before exact PR #325 enqueue."""
+from __future__ import annotations
+
+import sys
+from pathlib import Path
+from typing import Any
+
+HERE = Path(__file__).resolve().parent
+if str(HERE) not in sys.path:
+    sys.path.insert(0, str(HERE))
+
+import enqueue_pr325_required_checks_only as controller
+import request_exact_clean_merge_queue as preflight
+
+
+def validate_pull_request_rule(rules: Any) -> dict[str, Any]:
+    if not isinstance(rules, list):
+        raise controller.AdmissionError("active rules response is not a list")
+    candidates = [
+        item.get("parameters") or {}
+        for item in rules
+        if isinstance(item, dict) and item.get("type") == "pull_request"
+    ]
+    matching = [
+        parameters
+        for parameters in candidates
+        if parameters.get("required_review_thread_resolution") is True
+        and int(parameters.get("required_approving_review_count") or 0) == 0
+        and "squash" in (parameters.get("allowed_merge_methods") or [])
+    ]
+    if not matching:
+        raise controller.AdmissionError(
+            "active pull_request rule does not preserve "
+            "required_review_thread_resolution=true, zero mandatory approvals, "
+            "and squash admission"
+        )
+    return matching[-1]
+
+
+def main() -> int:
+    rules = preflight._rest(controller.REPOSITORY, "rules/branches/main")
+    parameters = validate_pull_request_rule(rules)
+    # The underlying controller independently verifies zero unresolved threads,
+    # exact required checks, signature, linear history, immutable head/base, and
+    # the enqueuePullRequest(expectedHeadOid, jump=false) mutation envelope.
+    print(
+        "Active pull_request admission rule verified: "
+        f"required_review_thread_resolution="
+        f"{parameters.get('required_review_thread_resolution')}"
+    )
+    return controller.main()
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
