@@ -23,7 +23,7 @@ env:
   STATE_REPORT_PATH: reports/merge-queue-state.json
   BLOCKER_REPORT_PATH: reports/merge-queue-blocker.json
   STALE_REPORT_PATH: reports/stale-check-diagnostics.json
-  TARGET_PULL_REQUESTS: "322,323"
+  TARGET_PULL_REQUESTS: "325"
 
 jobs:
   diagnose:
@@ -72,7 +72,7 @@ jobs:
               f"qb{len(blocker.get('queue_branches') or [])}",
               f"mgr{len(blocker.get('merge_group_runs') or [])}",
           ]
-          for number in ("322", "323"):
+          for number in ("325",):
               target = blocker["targets"][number]
               rest = target["rest"]
               graph = target["graphql"].get("pull_request") or {}
