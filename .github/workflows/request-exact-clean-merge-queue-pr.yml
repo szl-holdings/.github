@@ -8,10 +8,7 @@ on:
       - .github/workflows/request-exact-clean-merge-queue-pr.yml
 
 permissions:
-  actions: read
-  checks: read
   contents: read
-  pull-requests: write
 
 concurrency:
   group: request-exact-clean-merge-queue-${{ github.event.pull_request.number }}
@@ -30,8 +27,6 @@ jobs:
       github.event.pull_request.head.ref == 'diag/merge-queue-state-v1'
     runs-on: ubuntu-latest
     timeout-minutes: 10
-    env:
-      GH_TOKEN: ${{ github.token }}
     steps:
       - name: Checkout the reviewed queue controller
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -39,6 +34,15 @@ jobs:
           ref: ${{ github.event.pull_request.head.sha }}
           persist-credentials: false
           fetch-depth: 1
+
+      - name: Mint the reviewed qillqaq machine identity
+        id: app-token
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        with:
+          client-id: ${{ vars.QILLQAQ_CLIENT_ID }}
+          private-key: ${{ secrets.QILLQAQ_PRIVATE_KEY }}
+          owner: ${{ github.repository_owner }}
+          repositories: ${{ github.event.repository.name }}
 
       - name: Compile and constrain the queue request
         run: |
@@ -81,6 +85,8 @@ jobs:
 
       - name: Request GitHub's protected merge queue
         id: queue
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
         shell: bash
         run: |
           set +e
