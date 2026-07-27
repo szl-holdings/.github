@@ -1,0 +1,232 @@
+name: CI Health Post-Merge Failure — Read-Only Diagnostics
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - .github/workflows/ci-health-postmerge-diagnostics-pr.yml
+
+permissions:
+  actions: read
+  contents: read
+
+concurrency:
+  group: ci-health-postmerge-diag-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+env:
+  TARGET_SHA: fa4b719adf5bdfcc970b2b32d49c35871b1b3fe9
+  REPORT_PATH: reports/ci-health-postmerge-diagnostics.json
+
+jobs:
+  inspect:
+    name: Production run, failure lines, and registry path shapes
+    if: >-
+      github.repository == 'szl-holdings/.github' &&
+      github.event.pull_request.head.ref == 'diag/sign-pr333-v1'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - name: Query Actions read-only
+        id: query
+        shell: python
+        run: |
+          import io
+          import json
+          import os
+          import re
+          import subprocess
+          import zipfile
+          from datetime import datetime, timezone
+          from pathlib import Path
+
+          repository = os.environ["GITHUB_REPOSITORY"]
+          target = os.environ["TARGET_SHA"]
+
+          def api(path, *, binary=False):
+              process = subprocess.run(
+                  ["gh", "api", "--method", "GET", path],
+                  capture_output=True,
+                  check=False,
+                  env=os.environ,
+              )
+              if binary:
+                  payload = process.stdout
+              else:
+                  text = process.stdout.decode("utf-8", errors="replace")
+                  try:
+                      payload = json.loads(text) if text.strip() else None
+                  except json.JSONDecodeError:
+                      payload = text[:5000]
+              return {
+                  "ok": process.returncode == 0,
+                  "returncode": process.returncode,
+                  "payload": payload,
+                  "stderr": process.stderr.decode("utf-8", errors="replace").strip()[:3000],
+              }
+
+          def logs_text(raw):
+              if not raw:
+                  return ""
+              try:
+                  with zipfile.ZipFile(io.BytesIO(raw)) as archive:
+                      return "\n".join(
+                          archive.read(name).decode("utf-8", errors="replace")
+                          for name in sorted(archive.namelist())
+                      )
+              except zipfile.BadZipFile:
+                  return raw.decode("utf-8", errors="replace")
+
+          runs_result = api(
+              f"repos/{repository}/actions/workflows/ci-health-digest.yml/runs?per_page=30"
+          )
+          raw_runs = (
+              (runs_result.get("payload") or {}).get("workflow_runs", [])
+              if runs_result.get("ok")
+              and isinstance(runs_result.get("payload"), dict)
+              else []
+          )
+          selected = next(
+              (
+                  run
+                  for run in raw_runs
+                  if isinstance(run, dict) and run.get("head_sha") == target
+              ),
+              None,
+          )
+          run_record = None
+          failure_lines = []
+          if selected:
+              run_id = int(selected.get("id") or 0)
+              jobs_result = api(
+                  f"repos/{repository}/actions/runs/{run_id}/jobs?per_page=100"
+              )
+              jobs_payload = jobs_result.get("payload")
+              jobs = (
+                  jobs_payload.get("jobs", [])
+                  if jobs_result.get("ok") and isinstance(jobs_payload, dict)
+                  else []
+              )
+              for job in jobs:
+                  if not isinstance(job, dict):
+                      continue
+                  log_result = api(
+                      f"repos/{repository}/actions/jobs/{job.get('id')}/logs",
+                      binary=True,
+                  )
+                  text = logs_text(
+                      log_result.get("payload") if log_result.get("ok") else b""
+                  )
+                  patterns = (
+                      "DigestError",
+                      "ApiError",
+                      "invalid workflow path",
+                      "workflow lookup",
+                      "malformed",
+                      "escaped",
+                      "Traceback",
+                      "NOT VERIFIED",
+                      "Failure class",
+                      "failed:",
+                  )
+                  failure_lines.extend(
+                      line[-3000:]
+                      for line in text.splitlines()
+                      if any(pattern in line for pattern in patterns)
+                  )
+              run_record = {
+                  "id": run_id,
+                  "status": selected.get("status"),
+                  "conclusion": selected.get("conclusion"),
+                  "event": selected.get("event"),
+                  "head_branch": selected.get("head_branch"),
+                  "head_sha": selected.get("head_sha"),
+                  "created_at": selected.get("created_at"),
+                  "updated_at": selected.get("updated_at"),
+                  "html_url": selected.get("html_url"),
+                  "jobs": [
+                      {
+                          "id": job.get("id"),
+                          "name": job.get("name"),
+                          "status": job.get("status"),
+                          "conclusion": job.get("conclusion"),
+                          "steps": [
+                              {
+                                  "name": step.get("name"),
+                                  "conclusion": step.get("conclusion"),
+                              }
+                              for step in job.get("steps", [])
+                          ],
+                      }
+                      for job in jobs
+                      if isinstance(job, dict)
+                  ],
+              }
+
+          workflows_result = api(
+              f"repos/{repository}/actions/workflows?per_page=100"
+          )
+          workflow_payload = workflows_result.get("payload")
+          workflows = (
+              workflow_payload.get("workflows", [])
+              if workflows_result.get("ok") and isinstance(workflow_payload, dict)
+              else []
+          )
+          non_file_paths = [
+              {
+                  "id": item.get("id"),
+                  "name": item.get("name"),
+                  "path": item.get("path"),
+                  "state": item.get("state"),
+              }
+              for item in workflows
+              if isinstance(item, dict)
+              and not str(item.get("path") or "").lstrip("/").startswith(
+                  ".github/workflows/"
+              )
+          ]
+
+          report = {
+              "schema": "szl.ci-health-postmerge-diagnostics/v1",
+              "generated_at": datetime.now(timezone.utc).isoformat(),
+              "repository": repository,
+              "target_sha": target,
+              "runs_query_ok": runs_result.get("ok"),
+              "runs_query_error": runs_result.get("stderr"),
+              "run": run_record,
+              "failure_lines": failure_lines[-200:],
+              "workflow_registry_query_ok": workflows_result.get("ok"),
+              "workflow_registry_error": workflows_result.get("stderr"),
+              "non_file_workflow_paths": non_file_paths,
+              "credential_value_recorded": False,
+              "mutation": False,
+          }
+          path = Path(os.environ["REPORT_PATH"])
+          path.parent.mkdir(parents=True, exist_ok=True)
+          path.write_text(
+              json.dumps(report, indent=2, sort_keys=True) + "\n",
+              encoding="utf-8",
+          )
+          conclusion = re.sub(
+              r"[^a-z0-9]+",
+              "-",
+              str((run_record or {}).get("conclusion") or "no-run").lower(),
+          ).strip("-")
+          slug = (
+              f"ci-health-postmerge-{conclusion}"
+              f"-l{len(failure_lines)}-p{len(non_file_paths)}"
+          )[:200]
+          with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as output:
+              output.write(f"slug={slug}\n")
+          print(json.dumps({"slug": slug, "failure_lines": failure_lines[-50:], "non_file_paths": non_file_paths}, indent=2))
+
+      - name: Upload immutable diagnostic evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: ${{ steps.query.outputs.slug || format('ci-health-postmerge-diag-{0}', github.run_id) }}
+          path: ${{ env.REPORT_PATH }}
+          if-no-files-found: error
+          retention-days: 30
