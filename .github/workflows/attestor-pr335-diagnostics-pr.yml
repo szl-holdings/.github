@@ -1,0 +1,162 @@
+name: PR 335 Attestor — Read-Only Diagnostics
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - .github/workflows/attestor-pr335-diagnostics-pr.yml
+
+permissions:
+  actions: read
+  contents: read
+
+concurrency:
+  group: pr335-attestor-diagnostics-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+env:
+  TARGET_SHA: 12170d2c02eb0e567f458ebf54de0dfcb5937bf0
+  REPORT_PATH: reports/pr335-attestor-diagnostics.json
+
+jobs:
+  inspect:
+    name: Attestor workflow-run delivery and jobs
+    if: >-
+      github.repository == 'szl-holdings/.github' &&
+      github.event.pull_request.head.ref == 'diag/sign-pr333-v1'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - name: Query the default-branch attestor read-only
+        id: query
+        shell: python
+        run: |
+          import json
+          import os
+          import re
+          import subprocess
+          from datetime import datetime, timezone
+          from pathlib import Path
+
+          repository = os.environ["GITHUB_REPOSITORY"]
+          target = os.environ["TARGET_SHA"]
+
+          def api(path):
+              process = subprocess.run(
+                  ["gh", "api", "--method", "GET", path],
+                  capture_output=True,
+                  text=True,
+                  check=False,
+                  env=os.environ,
+              )
+              raw = process.stdout.strip()
+              try:
+                  payload = json.loads(raw) if raw else None
+              except json.JSONDecodeError:
+                  payload = raw[:3000]
+              return {
+                  "ok": process.returncode == 0,
+                  "returncode": process.returncode,
+                  "payload": payload,
+                  "stderr": process.stderr.strip()[:2000],
+              }
+
+          runs_result = api(
+              f"repos/{repository}/actions/workflows/attest-and-approve.yml/runs?per_page=100"
+          )
+          raw_runs = (
+              (runs_result.get("payload") or {}).get("workflow_runs", [])
+              if runs_result.get("ok")
+              and isinstance(runs_result.get("payload"), dict)
+              else []
+          )
+          matches = []
+          for run in raw_runs:
+              if not isinstance(run, dict) or run.get("head_sha") != target:
+                  continue
+              run_id = int(run.get("id") or 0)
+              jobs_result = api(
+                  f"repos/{repository}/actions/runs/{run_id}/jobs?per_page=100"
+              )
+              jobs_payload = jobs_result.get("payload")
+              jobs = (
+                  jobs_payload.get("jobs", [])
+                  if jobs_result.get("ok") and isinstance(jobs_payload, dict)
+                  else []
+              )
+              matches.append(
+                  {
+                      "id": run_id,
+                      "name": run.get("name"),
+                      "event": run.get("event"),
+                      "status": run.get("status"),
+                      "conclusion": run.get("conclusion"),
+                      "head_branch": run.get("head_branch"),
+                      "head_sha": run.get("head_sha"),
+                      "created_at": run.get("created_at"),
+                      "updated_at": run.get("updated_at"),
+                      "html_url": run.get("html_url"),
+                      "jobs_query_ok": jobs_result.get("ok"),
+                      "jobs_query_error": jobs_result.get("stderr"),
+                      "jobs": [
+                          {
+                              "id": job.get("id"),
+                              "name": job.get("name"),
+                              "status": job.get("status"),
+                              "conclusion": job.get("conclusion"),
+                              "steps": [
+                                  {
+                                      "name": step.get("name"),
+                                      "status": step.get("status"),
+                                      "conclusion": step.get("conclusion"),
+                                      "number": step.get("number"),
+                                  }
+                                  for step in job.get("steps", [])
+                              ],
+                          }
+                          for job in jobs
+                          if isinstance(job, dict)
+                      ],
+                  }
+              )
+
+          report = {
+              "schema": "szl.attestor-delivery-diagnostics/v1",
+              "generated_at": datetime.now(timezone.utc).isoformat(),
+              "repository": repository,
+              "target_sha": target,
+              "runs_query_ok": runs_result.get("ok"),
+              "runs_query_error": runs_result.get("stderr"),
+              "matching_runs": matches,
+              "credential_value_recorded": False,
+              "mutation": False,
+          }
+          path = Path(os.environ["REPORT_PATH"])
+          path.parent.mkdir(parents=True, exist_ok=True)
+          path.write_text(
+              json.dumps(report, indent=2, sort_keys=True) + "\n",
+              encoding="utf-8",
+          )
+          conclusions = "-".join(
+              re.sub(
+                  r"[^a-z0-9]+",
+                  "-",
+                  str(item.get("conclusion") or item.get("status") or "unknown").lower(),
+              ).strip("-")
+              for item in matches
+          ) or "none"
+          slug = f"pr335-attestor-r{len(matches)}-{conclusions}"[:200]
+          with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as output:
+              output.write(f"slug={slug}\n")
+          print(json.dumps({"slug": slug, "matching_runs": matches}, indent=2))
+
+      - name: Upload immutable diagnostic evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: ${{ steps.query.outputs.slug || format('pr335-attestor-diag-{0}', github.run_id) }}
+          path: ${{ env.REPORT_PATH }}
+          if-no-files-found: error
+          retention-days: 30
