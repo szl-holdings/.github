@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Prevent resurrection of the completed fixed-SHA SDA reconciliation one-shot."""
+# Any change to this tombstone re-runs the exact-head FORGE-9 gates and App attestation.
 from __future__ import annotations
 
 from pathlib import Path
