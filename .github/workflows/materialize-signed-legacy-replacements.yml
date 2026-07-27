@@ -1,0 +1,229 @@
+name: Materialize Signed Legacy Replacements
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - .github/workflows/materialize-signed-legacy-replacements.yml
+
+permissions:
+  contents: write
+
+concurrency:
+  group: materialize-signed-legacy-replacements
+  cancel-in-progress: false
+
+jobs:
+  materialize:
+    name: Publish two signed exact-tree replacement commits
+    if: >-
+      github.repository == 'szl-holdings/.github' &&
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      github.event.pull_request.head.ref == 'diag/enqueue-legacy-green-prs-v1'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      GH_TOKEN: ${{ github.token }}
+      REPOSITORY: ${{ github.repository }}
+      EXPECTED_MAIN: 5aa61bb92ba4a1cd1b59c09c4f82b902d1bf7917
+    steps:
+      - name: Checkout controller
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
+          fetch-depth: 1
+
+      - name: Verify clean target branches
+        run: |
+          set -euo pipefail
+          current_main="$(gh api "repos/$REPOSITORY/branches/main" --jq .commit.sha)"
+          test "$current_main" = "$EXPECTED_MAIN" \
+            || { echo "::error::protected main moved from expected bootstrap commit"; exit 1; }
+          for branch in \
+            chore/retire-completed-sda-reconcile-v2-signed \
+            fix/governed-secret-health-v3-signed; do
+            test "$(gh api "repos/$REPOSITORY/branches/$branch" --jq .commit.sha)" = "$EXPECTED_MAIN" \
+              || { echo "::error::$branch is not cleanly rooted at expected main"; exit 1; }
+          done
+
+      - name: Create signed exact-tree replacement commits
+        id: commits
+        shell: python
+        run: |
+          from __future__ import annotations
+
+          import base64
+          import json
+          import os
+          import urllib.error
+          import urllib.parse
+          import urllib.request
+          from typing import Any
+
+          repository = os.environ['REPOSITORY']
+          token = os.environ['GH_TOKEN']
+          expected_main = os.environ['EXPECTED_MAIN']
+
+          replacements = [
+              {
+                  'source_ref': '81416537a6a6bce01c7482084c1ed13c8a0da4bb',
+                  'target_branch': 'chore/retire-completed-sda-reconcile-v2-signed',
+                  'headline': 'chore(sda): retire completed fixed-SHA reconciliation',
+                  'additions': [
+                      '.github/scripts/test_sda_reconcile_retired.py',
+                      '.github/workflows/sda-reconcile-retirement.yml',
+                  ],
+                  'deletions': [
+                      '.github/data/sda_shared_source_reconcile.json',
+                      '.github/scripts/sda_shared_source_reconcile.py',
+                      '.github/workflows/sda-shared-source-reconcile.yml',
+                  ],
+              },
+              {
+                  'source_ref': '942c4318c8717bb44708dd6eab9fae1030746811',
+                  'target_branch': 'fix/governed-secret-health-v3-signed',
+                  'headline': 'fix(secrets): centralize governed name audit',
+                  'additions': [
+                      '.github/data/required_actions_secrets.json',
+                      '.github/scripts/secret_health.py',
+                      '.github/scripts/test_secret_health.py',
+                      '.github/workflows/secret-health.yml',
+                  ],
+                  'deletions': [],
+              },
+          ]
+
+          def request(url: str, *, data: dict[str, Any] | None = None) -> Any:
+              req = urllib.request.Request(
+                  url,
+                  data=(json.dumps(data).encode('utf-8') if data is not None else None),
+                  method=('POST' if data is not None else 'GET'),
+                  headers={
+                      'Authorization': f'Bearer {token}',
+                      'Accept': 'application/vnd.github+json',
+                      'Content-Type': 'application/json',
+                      'X-GitHub-Api-Version': '2022-11-28',
+                      'User-Agent': 'szl-signed-legacy-replacement/1',
+                  },
+              )
+              try:
+                  with urllib.request.urlopen(req, timeout=90) as response:
+                      return json.loads(response.read())
+              except urllib.error.HTTPError as exc:
+                  body = exc.read().decode('utf-8', 'replace')[:2000]
+                  raise SystemExit(f'HTTP {exc.code}: {body}') from exc
+
+          def source_bytes(path: str, ref: str) -> bytes:
+              quoted = urllib.parse.quote(path, safe='/')
+              payload = request(
+                  f'https://api.github.com/repos/{repository}/contents/{quoted}?ref={ref}'
+              )
+              if payload.get('type') != 'file' or payload.get('encoding') != 'base64':
+                  raise SystemExit(f'unsupported source payload for {path}@{ref}')
+              return base64.b64decode(payload['content'])
+
+          mutation = '''
+          mutation($input: CreateCommitOnBranchInput!) {
+            createCommitOnBranch(input: $input) {
+              commit { oid url }
+            }
+          }
+          '''
+          results = []
+          for item in replacements:
+              additions = [
+                  {
+                      'path': path,
+                      'contents': base64.b64encode(
+                          source_bytes(path, item['source_ref'])
+                      ).decode('ascii'),
+                  }
+                  for path in item['additions']
+              ]
+              variables = {
+                  'input': {
+                      'branch': {
+                          'repositoryNameWithOwner': repository,
+                          'branchName': item['target_branch'],
+                      },
+                      'message': {
+                          'headline': item['headline'],
+                          'body': 'Signed-off-by: Stephen Lutar <stephenlutar2@gmail.com>',
+                      },
+                      'expectedHeadOid': expected_main,
+                      'fileChanges': {
+                          'additions': additions,
+                          'deletions': [{'path': path} for path in item['deletions']],
+                      },
+                  }
+              }
+              payload = request(
+                  'https://api.github.com/graphql',
+                  data={'query': mutation, 'variables': variables},
+              )
+              if payload.get('errors'):
+                  raise SystemExit(json.dumps(payload['errors'], indent=2))
+              commit = payload['data']['createCommitOnBranch']['commit']
+              results.append({
+                  'target_branch': item['target_branch'],
+                  'source_ref': item['source_ref'],
+                  'commit': commit,
+                  'additions': item['additions'],
+                  'deletions': item['deletions'],
+              })
+
+          with open('signed-legacy-replacements.json', 'w', encoding='utf-8') as out:
+              json.dump(results, out, indent=2, sort_keys=True)
+              out.write('\n')
+          print(json.dumps(results, indent=2, sort_keys=True))
+          with open(os.environ['GITHUB_OUTPUT'], 'a', encoding='utf-8') as output:
+              output.write(f"sda_sha={results[0]['commit']['oid']}\n")
+              output.write(f"secret_sha={results[1]['commit']['oid']}\n")
+
+      - name: Verify signatures and exact affected-path parity
+        env:
+          SDA_SHA: ${{ steps.commits.outputs.sda_sha }}
+          SECRET_SHA: ${{ steps.commits.outputs.secret_sha }}
+        run: |
+          set -euo pipefail
+          for sha in "$SDA_SHA" "$SECRET_SHA"; do
+            test "$(gh api "repos/$REPOSITORY/commits/$sha" --jq .commit.verification.verified)" = 'true'
+            test "$(gh api "repos/$REPOSITORY/commits/$sha" --jq .commit.verification.reason)" = 'valid'
+          done
+
+          compare_file() {
+            source_ref="$1"
+            target_ref="$2"
+            path="$3"
+            source_sha="$(gh api "repos/$REPOSITORY/contents/$path?ref=$source_ref" --jq .sha)"
+            target_sha="$(gh api "repos/$REPOSITORY/contents/$path?ref=$target_ref" --jq .sha)"
+            test "$source_sha" = "$target_sha"
+          }
+
+          compare_file 81416537a6a6bce01c7482084c1ed13c8a0da4bb "$SDA_SHA" .github/scripts/test_sda_reconcile_retired.py
+          compare_file 81416537a6a6bce01c7482084c1ed13c8a0da4bb "$SDA_SHA" .github/workflows/sda-reconcile-retirement.yml
+          for path in \
+            .github/data/sda_shared_source_reconcile.json \
+            .github/scripts/sda_shared_source_reconcile.py \
+            .github/workflows/sda-shared-source-reconcile.yml; do
+            if gh api "repos/$REPOSITORY/contents/$path?ref=$SDA_SHA" >/dev/null 2>&1; then
+              echo "::error::retired path remains in signed replacement: $path"
+              exit 1
+            fi
+          done
+
+          for path in \
+            .github/data/required_actions_secrets.json \
+            .github/scripts/secret_health.py \
+            .github/scripts/test_secret_health.py \
+            .github/workflows/secret-health.yml; do
+            compare_file 942c4318c8717bb44708dd6eab9fae1030746811 "$SECRET_SHA" "$path"
+          done
+
+      - name: Upload immutable replacement receipt
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: signed-legacy-replacements-${{ github.run_id }}
+          path: signed-legacy-replacements.json
+          if-no-files-found: error
+          retention-days: 90
