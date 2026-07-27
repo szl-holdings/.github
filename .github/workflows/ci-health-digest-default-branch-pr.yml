@@ -1,4 +1,4 @@
-name: CI Health Digest — Default-Branch Evidence Verification
+name: CI Health Digest — Evidence Provenance Verification
 
 on:
   pull_request:
@@ -16,12 +16,12 @@ permissions:
   contents: read
 
 concurrency:
-  group: ci-health-default-branch-pr-${{ github.event.pull_request.number }}
+  group: ci-health-evidence-provenance-pr-${{ github.event.pull_request.number }}
   cancel-in-progress: true
 
 jobs:
   verify:
-    name: Default-branch workflow and run provenance
+    name: Default-branch files and GitHub-managed dynamic workflows
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -49,7 +49,7 @@ jobs:
           python .github/scripts/test_ci_health_digest_default_branch.py
           git diff --check
 
-      - name: Prove no arbitrary-branch fallback or credential path exists
+      - name: Prove source and dynamic evidence lanes cannot collapse
         shell: python
         run: |
           from pathlib import Path
@@ -63,6 +63,11 @@ jobs:
               "excluded_non_default_workflows",
               "branch={branch}",
               "never falls back",
+              "DYNAMIC_WORKFLOW_PREFIX = \"dynamic/\"",
+              "latest_dynamic_run",
+              "github_managed_dynamic_workflows",
+              "github_managed_dynamic",
+              "protected_default_branch",
           )
           forbidden = (
               "for branch_suffix in",
