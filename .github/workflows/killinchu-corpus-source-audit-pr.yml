@@ -1,0 +1,251 @@
+name: Killinchu Corpus Sources — Exact Read-Only Audit
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - .github/workflows/killinchu-corpus-source-audit-pr.yml
+
+permissions:
+  contents: read
+
+concurrency:
+  group: killinchu-corpus-source-audit-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+env:
+  DATASET_ID: SZLHOLDINGS/killinchu-osint-corpus
+  REPORT_PATH: reports/killinchu-corpus-source-audit.json
+  MAX_TOTAL_BYTES: "104857600"
+  MAX_RECORDS: "2000000"
+
+jobs:
+  inspect:
+    name: Immutable NDJSON source and kind inventory
+    if: >-
+      github.repository == 'szl-holdings/.github' &&
+      github.event.pull_request.head.ref == 'diag/sign-pr333-v1'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      HF_ORG_TOKEN: ${{ secrets.HF_ORG_TOKEN || secrets.HF_ORG_TOKEN1 }}
+      HF_HUB_DISABLE_PROGRESS_BARS: "1"
+    steps:
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12"
+
+      - name: Install exact read-only client
+        run: |
+          set -euo pipefail
+          python -m pip install --disable-pip-version-check \
+            "huggingface_hub==1.19.0"
+
+      - name: Audit all bounded corpus records at one revision
+        shell: python
+        run: |
+          from __future__ import annotations
+
+          import hashlib
+          import json
+          import os
+          import re
+          from collections import Counter
+          from datetime import datetime, timezone
+          from pathlib import Path
+
+          from huggingface_hub import HfApi, hf_hub_download
+
+          dataset_id = os.environ["DATASET_ID"]
+          token = os.environ.get("HF_ORG_TOKEN") or ""
+          if not token:
+              raise RuntimeError("no supported Hugging Face organization token is configured")
+          max_total_bytes = int(os.environ["MAX_TOTAL_BYTES"])
+          max_records = int(os.environ["MAX_RECORDS"])
+
+          api = HfApi(token=token)
+          info = api.dataset_info(dataset_id)
+          revision = str(getattr(info, "sha", "") or "").lower()
+          if not re.fullmatch(r"[0-9a-f]{40}", revision):
+              raise RuntimeError(f"dataset lacks an immutable revision: {revision!r}")
+
+          entries = list(
+              api.list_repo_tree(
+                  dataset_id,
+                  repo_type="dataset",
+                  revision=revision,
+                  recursive=True,
+                  expand=True,
+              )
+          )
+          files = []
+          for entry in entries:
+              path = str(getattr(entry, "path", "") or "")
+              if not path.startswith("intel/") or not path.endswith(".ndjson"):
+                  continue
+              size = int(getattr(entry, "size", 0) or 0)
+              if size < 0:
+                  raise RuntimeError(f"negative file size for {path}")
+              files.append({"path": path, "declared_size": size})
+          files.sort(key=lambda item: item["path"])
+          if not files:
+              raise RuntimeError("no intel/*.ndjson files exist at the bound revision")
+          declared_total = sum(item["declared_size"] for item in files)
+          if declared_total > max_total_bytes:
+              raise RuntimeError(
+                  f"declared corpus size {declared_total} exceeds diagnostic cap {max_total_bytes}"
+              )
+
+          counts = Counter()
+          source_urls = Counter()
+          payload_source_fields = Counter()
+          first_ts = None
+          last_ts = None
+          record_count = 0
+          actual_total = 0
+          content_hash = hashlib.sha256()
+          malformed = []
+
+          for file_info in files:
+              path = file_info["path"]
+              local = hf_hub_download(
+                  repo_id=dataset_id,
+                  repo_type="dataset",
+                  filename=path,
+                  revision=revision,
+                  token=token,
+              )
+              raw = Path(local).read_bytes()
+              actual_total += len(raw)
+              if actual_total > max_total_bytes:
+                  raise RuntimeError(
+                      f"downloaded corpus size exceeds diagnostic cap {max_total_bytes}"
+                  )
+              content_hash.update(path.encode("utf-8"))
+              content_hash.update(b"\0")
+              content_hash.update(raw)
+              file_info["actual_size"] = len(raw)
+              file_info["sha256"] = hashlib.sha256(raw).hexdigest()
+              file_records = 0
+              for line_number, raw_line in enumerate(raw.splitlines(), start=1):
+                  if not raw_line.strip():
+                      continue
+                  record_count += 1
+                  file_records += 1
+                  if record_count > max_records:
+                      raise RuntimeError(
+                          f"record count exceeds diagnostic cap {max_records}"
+                      )
+                  try:
+                      record = json.loads(raw_line)
+                  except Exception as exc:  # noqa: BLE001
+                      malformed.append(
+                          {
+                              "path": path,
+                              "line": line_number,
+                              "type": type(exc).__name__,
+                          }
+                      )
+                      continue
+                  if not isinstance(record, dict):
+                      malformed.append(
+                          {"path": path, "line": line_number, "type": "non_object"}
+                      )
+                      continue
+                  source = str(record.get("source") or "<missing>")[:300]
+                  kind = str(record.get("kind") or "<missing>")[:300]
+                  counts[(kind, source)] += 1
+                  timestamp = str(record.get("ts") or "")
+                  if timestamp:
+                      first_ts = timestamp if first_ts is None or timestamp < first_ts else first_ts
+                      last_ts = timestamp if last_ts is None or timestamp > last_ts else last_ts
+                  for key in ("source_url", "url", "upstream_url"):
+                      value = record.get(key)
+                      if isinstance(value, str) and value:
+                          source_urls[value[:1000]] += 1
+                  payload = record.get("payload")
+                  if isinstance(payload, dict):
+                      for key in (
+                          "source",
+                          "source_url",
+                          "url",
+                          "upstream",
+                          "provider",
+                          "license",
+                      ):
+                          value = payload.get(key)
+                          if isinstance(value, (str, int, float, bool)) and str(value):
+                              payload_source_fields[(key, str(value)[:1000])] += 1
+              file_info["records"] = file_records
+
+          report = {
+              "schema": "szl.hf-corpus-source-audit/v1",
+              "generated_at": datetime.now(timezone.utc).isoformat(),
+              "repo_id": dataset_id,
+              "repo_type": "dataset",
+              "revision": revision,
+              "file_count": len(files),
+              "declared_total_bytes": declared_total,
+              "actual_total_bytes": actual_total,
+              "record_count": record_count,
+              "first_timestamp": first_ts,
+              "last_timestamp": last_ts,
+              "corpus_sha256": content_hash.hexdigest(),
+              "kind_source_counts": [
+                  {"kind": kind, "source": source, "count": count}
+                  for (kind, source), count in sorted(counts.items())
+              ],
+              "record_source_urls": [
+                  {"value": value, "count": count}
+                  for value, count in sorted(source_urls.items())
+              ],
+              "payload_source_fields": [
+                  {"field": field, "value": value, "count": count}
+                  for (field, value), count in sorted(payload_source_fields.items())
+              ],
+              "malformed_records": malformed[:200],
+              "files": files,
+              "diagnostic": {
+                  "mutation": False,
+                  "exact_revision_bound": True,
+                  "credential_name": "HF_ORG_TOKEN_or_HF_ORG_TOKEN1",
+                  "credential_value_recorded": False,
+                  "raw_record_values_recorded": False,
+              },
+          }
+          if malformed:
+              raise RuntimeError(
+                  f"corpus contains {len(malformed)} malformed records; report written before failure"
+              )
+          report_path = Path(os.environ["REPORT_PATH"])
+          report_path.parent.mkdir(parents=True, exist_ok=True)
+          report_path.write_text(
+              json.dumps(report, indent=2, sort_keys=True) + "\n",
+              encoding="utf-8",
+          )
+          print(
+              json.dumps(
+                  {
+                      "repo_id": dataset_id,
+                      "revision": revision,
+                      "file_count": len(files),
+                      "record_count": record_count,
+                      "kind_source_counts": report["kind_source_counts"],
+                      "record_source_urls": report["record_source_urls"],
+                      "payload_source_fields": report["payload_source_fields"],
+                      "credential_value_recorded": False,
+                  },
+                  indent=2,
+                  sort_keys=True,
+              )
+          )
+
+      - name: Upload immutable source inventory
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: killinchu-corpus-source-audit-${{ github.run_id }}
+          path: ${{ env.REPORT_PATH }}
+          if-no-files-found: error
+          retention-days: 30
