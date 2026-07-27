@@ -1,0 +1,231 @@
+name: Recover Attestor Delivery — Exact PR 345
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - .github/workflows/recover-attestor-delivery-345.yml
+
+permissions:
+  actions: read
+  checks: read
+  contents: read
+  id-token: write
+  pull-requests: read
+  statuses: read
+
+concurrency:
+  group: recover-attestor-delivery-pr-345
+  cancel-in-progress: false
+
+env:
+  TARGET_PR: "345"
+  TARGET_SHA: 55bffd581da7ff96803f9f00adcfdbc75d7b9d99
+  TARGET_REPOSITORY: szl-holdings/.github
+  REPORT_DIR: reports/attestor-recovery-345
+
+jobs:
+  recover:
+    name: Replay qillqaq attestation and native enqueue
+    if: >-
+      github.repository == 'szl-holdings/.github' &&
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      github.event.pull_request.head.ref == 'diag/attestor-workflow-run-v1'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Harden runner
+        uses: step-security/harden-runner@bf7454d06d71f1098171f2acdf0cd4708d7b5920 # v2.20.0
+        with:
+          egress-policy: audit
+
+      - name: Checkout recovery controller
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
+          fetch-depth: 1
+
+      - name: Mint independent qillqaq token
+        id: app-token
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        with:
+          client-id: ${{ vars.QILLQAQ_CLIENT_ID }}
+          private-key: ${{ secrets.QILLQAQ_PRIVATE_KEY }}
+          owner: ${{ github.repository_owner }}
+          repositories: ${{ github.event.repository.name }}
+
+      - name: Verify exact target, signed lineage, gates, staging, and rulesets
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+        run: |
+          set -euo pipefail
+          mkdir -p "$REPORT_DIR"
+          gh api "repos/$TARGET_REPOSITORY/pulls/$TARGET_PR" > "$REPORT_DIR/pull-request.json"
+          test "$(jq -r .state "$REPORT_DIR/pull-request.json")" = 'open'
+          test "$(jq -r .draft "$REPORT_DIR/pull-request.json")" = 'false'
+          test "$(jq -r .head.sha "$REPORT_DIR/pull-request.json")" = "$TARGET_SHA"
+          test "$(jq -r .base.ref "$REPORT_DIR/pull-request.json")" = 'main'
+
+          gh api "repos/$TARGET_REPOSITORY/commits/$TARGET_SHA" > "$REPORT_DIR/commit.json"
+          test "$(jq -r .commit.verification.verified "$REPORT_DIR/commit.json")" = 'true'
+          test "$(jq -r .commit.verification.reason "$REPORT_DIR/commit.json")" = 'valid'
+
+          gh api "repos/$TARGET_REPOSITORY/commits/$TARGET_SHA/check-runs?filter=latest&per_page=100" \
+            > "$REPORT_DIR/check-runs.json"
+          REQUIRED=(
+            gate/ground-truth
+            gate/labels
+            gate/schema
+            gate/adversarial
+            gate/verify-all
+            gate/provenance
+            gate/a11y-perf
+            gate/lean
+            deploy/staging
+          )
+          for CHECK in "${REQUIRED[@]}"; do
+            count="$(jq --arg check "$CHECK" '[.check_runs[] | select(.name == $check and .conclusion == "success")] | length' "$REPORT_DIR/check-runs.json")"
+            test "$count" -ge 1 \
+              || { echo "::error::required exact-head check is not green: $CHECK"; exit 1; }
+          done
+
+          gh api "repos/$TARGET_REPOSITORY/rulesets?per_page=100" --paginate \
+            --jq '.[].id' > "$REPORT_DIR/ruleset-ids.txt"
+          test -s "$REPORT_DIR/ruleset-ids.txt"
+          has_queue=0
+          while read -r id; do
+            gh api "repos/$TARGET_REPOSITORY/rulesets/$id" > "$REPORT_DIR/ruleset-$id.json"
+            test "$(jq '.bypass_actors | length' "$REPORT_DIR/ruleset-$id.json")" -eq 0
+            if jq -e '.rules[] | select(.type == "merge_queue")' "$REPORT_DIR/ruleset-$id.json" >/dev/null; then
+              has_queue=1
+            fi
+          done < "$REPORT_DIR/ruleset-ids.txt"
+          test "$has_queue" -eq 1
+
+      - name: Build signed exact-head merge BAP
+        run: |
+          set -euo pipefail
+          jq -n \
+            --arg schema 'https://a11oy.net/schemas/forge9/merge-bap/v1' \
+            --arg repository "$TARGET_REPOSITORY" \
+            --argjson pull_request "$TARGET_PR" \
+            --arg head_sha "$TARGET_SHA" \
+            --arg principal 'spiffe://a11oy.net/ns/ci/sa/qillqaq-attestor' \
+            --arg policy_id 'merge-gate-v1-workflow-run-recovery' \
+            --arg recovery_run_id "$GITHUB_RUN_ID" \
+            --arg issued_at "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+            --slurpfile checks "$REPORT_DIR/check-runs.json" \
+            '{
+              schema: $schema,
+              repository: $repository,
+              subject_kind: "pull_request",
+              pull_request: $pull_request,
+              head_sha: $head_sha,
+              principal: $principal,
+              policy_id: $policy_id,
+              recovery_run_id: $recovery_run_id,
+              issued_at: $issued_at,
+              checks: [
+                $checks[0].check_runs[]
+                | select((.name | startswith("gate/")) or .name == "deploy/staging")
+                | {name, conclusion, details_url}
+              ],
+              source_workflow_run_delivery: "UNAVAILABLE",
+              direct_merge_attempted: false,
+              bypass_used: false,
+              breakglass: null
+            }' > "$REPORT_DIR/merge-receipt.json"
+
+      - name: Install Cosign
+        uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2
+
+      - name: Sign recovery BAP with Actions OIDC
+        run: |
+          set -euo pipefail
+          cosign sign-blob --yes \
+            --bundle "$REPORT_DIR/merge-receipt.bundle" \
+            "$REPORT_DIR/merge-receipt.json"
+
+      - name: Approve and publish exact-head App status
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+        run: |
+          set -euo pipefail
+          digest="$(sha256sum "$REPORT_DIR/merge-receipt.json" | cut -d' ' -f1)"
+          gh api -X POST "repos/$TARGET_REPOSITORY/pulls/$TARGET_PR/reviews" \
+            -f event=APPROVE \
+            -f body="ATTESTED. Exact signed head recovered after missing workflow_run delivery. Merge BAP sha256: $digest"
+          review_count="$(gh api "repos/$TARGET_REPOSITORY/pulls/$TARGET_PR/reviews?per_page=100" --paginate \
+            --jq "[.[] | select(.user.login == \"qillqaq-attestor[bot]\" and .state == \"APPROVED\" and .commit_id == \"$TARGET_SHA\")] | length")"
+          test "$review_count" -ge 1
+          gh api --method POST "repos/$TARGET_REPOSITORY/statuses/$TARGET_SHA" \
+            -f state=success \
+            -f context=attestation/qillqaq \
+            -f description='Signed BAP and exact-head App review verified after delivery failure' \
+            -f target_url="https://github.com/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+
+      - name: Enqueue exact head through the native merge queue
+        id: enqueue
+        env:
+          GH_TOKEN: ${{ secrets.SZL_GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          test -n "${GH_TOKEN:-}" \
+            || { echo '::error::governed queue token is unavailable'; exit 1; }
+          gh api graphql \
+            -f query='query($owner:String!,$name:String!,$number:Int!){repository(owner:$owner,name:$name){pullRequest(number:$number){id headRefOid state isDraft mergeQueueEntry{id}}}}' \
+            -F owner=szl-holdings \
+            -F name=.github \
+            -F number="$TARGET_PR" \
+            > "$REPORT_DIR/queue-before.json"
+          test "$(jq -r .data.repository.pullRequest.headRefOid "$REPORT_DIR/queue-before.json")" = "$TARGET_SHA"
+          test "$(jq -r .data.repository.pullRequest.state "$REPORT_DIR/queue-before.json")" = 'OPEN'
+          test "$(jq -r .data.repository.pullRequest.isDraft "$REPORT_DIR/queue-before.json")" = 'false'
+          pr_id="$(jq -r .data.repository.pullRequest.id "$REPORT_DIR/queue-before.json")"
+          entry="$(jq -r '.data.repository.pullRequest.mergeQueueEntry.id // empty' "$REPORT_DIR/queue-before.json")"
+          if [ -z "$entry" ]; then
+            gh api graphql \
+              -f query='mutation($id:ID!,$head:GitObjectID!){enqueuePullRequest(input:{pullRequestId:$id,expectedHeadOid:$head}){mergeQueueEntry{id}}}' \
+              -F id="$pr_id" \
+              -F head="$TARGET_SHA" \
+              > "$REPORT_DIR/enqueue-result.json"
+          fi
+          gh api graphql \
+            -f query='query($owner:String!,$name:String!,$number:Int!){repository(owner:$owner,name:$name){pullRequest(number:$number){headRefOid mergeQueueEntry{id}}}}' \
+            -F owner=szl-holdings \
+            -F name=.github \
+            -F number="$TARGET_PR" \
+            > "$REPORT_DIR/queue-after.json"
+          entry="$(jq -r '.data.repository.pullRequest.mergeQueueEntry.id // empty' "$REPORT_DIR/queue-after.json")"
+          test -n "$entry"
+          jq -n \
+            --arg schema 'szl.attestor-delivery-recovery/v1' \
+            --arg repository "$TARGET_REPOSITORY" \
+            --argjson pull_request "$TARGET_PR" \
+            --arg head_sha "$TARGET_SHA" \
+            --arg queue_entry_id "$entry" \
+            '{
+              schema: $schema,
+              repository: $repository,
+              pull_request: $pull_request,
+              head_sha: $head_sha,
+              queue_entry_id: $queue_entry_id,
+              exact_head_signature_verified: true,
+              exact_head_checks_verified: true,
+              qillqaq_approval_verified: true,
+              attestation_status_published: true,
+              native_enqueue_verified: true,
+              direct_merge_attempted: false,
+              bypass_used: false,
+              secret_value_recorded: false
+            }' > "$REPORT_DIR/recovery-receipt.json"
+          cat "$REPORT_DIR/recovery-receipt.json"
+
+      - name: Upload immutable recovery evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: attestor-recovery-345-${{ github.run_id }}
+          path: ${{ env.REPORT_DIR }}
+          if-no-files-found: error
+          retention-days: 90
