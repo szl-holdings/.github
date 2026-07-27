@@ -1,0 +1,239 @@
+name: Enqueue Legacy Green PRs — Exact Handoff
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - .github/workflows/enqueue-legacy-green-prs.yml
+
+permissions:
+  actions: read
+  checks: read
+  contents: read
+  pull-requests: read
+  statuses: read
+
+concurrency:
+  group: enqueue-legacy-green-prs
+  cancel-in-progress: false
+
+env:
+  TARGET_REPOSITORY: szl-holdings/.github
+  REPORT_DIR: reports/legacy-enqueue
+
+jobs:
+  enqueue:
+    name: Verify signed histories and enqueue exact approved heads
+    if: >-
+      github.repository == 'szl-holdings/.github' &&
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      github.event.pull_request.head.ref == 'diag/enqueue-legacy-green-prs-v1'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Harden runner
+        uses: step-security/harden-runner@bf7454d06d71f1098171f2acdf0cd4708d7b5920 # v2.20.0
+        with:
+          egress-policy: audit
+
+      - name: Checkout recovery controller
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
+          fetch-depth: 1
+
+      - name: Mint qillqaq read identity
+        id: app-token
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        with:
+          client-id: ${{ vars.QILLQAQ_CLIENT_ID }}
+          private-key: ${{ secrets.QILLQAQ_PRIVATE_KEY }}
+          owner: ${{ github.repository_owner }}
+          repositories: ${{ github.event.repository.name }}
+
+      - name: Verify histories, exact approvals, statuses, and checks
+        id: verify
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+        shell: python
+        run: |
+          from __future__ import annotations
+
+          import json
+          import os
+          import subprocess
+          from pathlib import Path
+          from typing import Any
+
+          targets = {
+              341: '81416537a6a6bce01c7482084c1ed13c8a0da4bb',
+              342: '942c4318c8717bb44708dd6eab9fae1030746811',
+          }
+          repository = os.environ['TARGET_REPOSITORY']
+          required_checks = {
+              'gate/ground-truth',
+              'gate/labels',
+              'gate/schema',
+              'gate/adversarial',
+              'gate/verify-all',
+              'gate/provenance',
+              'gate/a11y-perf',
+              'gate/lean',
+              'deploy/staging',
+          }
+
+          def api(path: str) -> Any:
+              process = subprocess.run(
+                  ['gh', 'api', '--method', 'GET', path],
+                  check=False,
+                  capture_output=True,
+                  text=True,
+                  env=os.environ,
+              )
+              if process.returncode:
+                  raise RuntimeError(f'{path}: {process.stderr.strip()[:500]}')
+              return json.loads(process.stdout)
+
+          report: dict[str, Any] = {
+              'schema': 'szl.legacy-green-enqueue-preflight/v1',
+              'repository': repository,
+              'targets': {},
+              'all_ready': True,
+              'secret_value_recorded': False,
+              'mutation_performed': False,
+          }
+          for number, expected_head in targets.items():
+              pr = api(f'repos/{repository}/pulls/{number}')
+              commits = api(f'repos/{repository}/pulls/{number}/commits?per_page=100')
+              reviews = api(f'repos/{repository}/pulls/{number}/reviews?per_page=100')
+              statuses = api(f'repos/{repository}/commits/{expected_head}/status')
+              checks = api(f'repos/{repository}/commits/{expected_head}/check-runs?filter=latest&per_page=100')
+
+              unsigned = [
+                  {
+                      'sha': item.get('sha'),
+                      'reason': ((item.get('commit') or {}).get('verification') or {}).get('reason'),
+                  }
+                  for item in commits
+                  if ((item.get('commit') or {}).get('verification') or {}).get('verified') is not True
+              ]
+              approval_count = sum(
+                  1
+                  for item in reviews
+                  if (item.get('user') or {}).get('login') in {
+                      'qillqaq-attestor[bot]', 'qillqaq-attestor'
+                  }
+                  and item.get('state') == 'APPROVED'
+                  and item.get('commit_id') == expected_head
+              )
+              status_count = sum(
+                  1
+                  for item in statuses.get('statuses', [])
+                  if item.get('context') == 'attestation/qillqaq'
+                  and item.get('state') == 'success'
+              )
+              successful_checks = {
+                  item.get('name')
+                  for item in checks.get('check_runs', [])
+                  if item.get('conclusion') == 'success'
+              }
+              missing_checks = sorted(required_checks - successful_checks)
+              ready = (
+                  pr.get('state') == 'open'
+                  and pr.get('draft') is False
+                  and (pr.get('head') or {}).get('sha') == expected_head
+                  and (pr.get('base') or {}).get('ref') == 'main'
+                  and not unsigned
+                  and approval_count >= 1
+                  and status_count >= 1
+                  and not missing_checks
+              )
+              report['targets'][str(number)] = {
+                  'expected_head': expected_head,
+                  'observed_head': (pr.get('head') or {}).get('sha'),
+                  'open': pr.get('state') == 'open',
+                  'draft': pr.get('draft'),
+                  'commit_count': len(commits),
+                  'unsigned_commits': unsigned,
+                  'exact_qillqaq_approvals': approval_count,
+                  'attestation_statuses': status_count,
+                  'missing_required_checks': missing_checks,
+                  'ready': ready,
+              }
+              report['all_ready'] = report['all_ready'] and ready
+
+          path = Path(os.environ['REPORT_DIR']) / 'preflight.json'
+          path.parent.mkdir(parents=True, exist_ok=True)
+          path.write_text(json.dumps(report, indent=2, sort_keys=True) + '\n', encoding='utf-8')
+          print(json.dumps(report, indent=2, sort_keys=True))
+          with open(os.environ['GITHUB_OUTPUT'], 'a', encoding='utf-8') as output:
+              output.write(f"all_ready={str(report['all_ready']).lower()}\n")
+
+      - name: Enqueue each exact head through GitHub's native queue
+        if: steps.verify.outputs.all_ready == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.SZL_GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          test -n "${GH_TOKEN:-}" || { echo '::error::governed queue token unavailable'; exit 1; }
+          mkdir -p "$REPORT_DIR"
+          jq -n '{schema:"szl.legacy-green-enqueue/v1", targets:{}, direct_merge_attempted:false, bypass_used:false, secret_value_recorded:false}' \
+            > "$REPORT_DIR/enqueue-receipt.json"
+          while read -r number head; do
+            gh api graphql \
+              -f query='query($owner:String!,$name:String!,$number:Int!){repository(owner:$owner,name:$name){pullRequest(number:$number){id headRefOid state isDraft mergeQueueEntry{id}}}}' \
+              -F owner=szl-holdings \
+              -F name=.github \
+              -F number="$number" \
+              > "$REPORT_DIR/pr-$number-before.json"
+            test "$(jq -r .data.repository.pullRequest.headRefOid "$REPORT_DIR/pr-$number-before.json")" = "$head"
+            test "$(jq -r .data.repository.pullRequest.state "$REPORT_DIR/pr-$number-before.json")" = 'OPEN'
+            test "$(jq -r .data.repository.pullRequest.isDraft "$REPORT_DIR/pr-$number-before.json")" = 'false'
+            pr_id="$(jq -r .data.repository.pullRequest.id "$REPORT_DIR/pr-$number-before.json")"
+            entry="$(jq -r '.data.repository.pullRequest.mergeQueueEntry.id // empty' "$REPORT_DIR/pr-$number-before.json")"
+            if [ -z "$entry" ]; then
+              set +e
+              gh api graphql \
+                -f query='mutation($id:ID!,$head:GitObjectID!){enqueuePullRequest(input:{pullRequestId:$id,expectedHeadOid:$head}){mergeQueueEntry{id}}}' \
+                -F id="$pr_id" \
+                -F head="$head" \
+                > "$REPORT_DIR/pr-$number-enqueue.json" 2> "$REPORT_DIR/pr-$number-enqueue-error.txt"
+              code=$?
+              set -e
+              if [ "$code" -ne 0 ]; then
+                cat "$REPORT_DIR/pr-$number-enqueue-error.txt"
+                exit "$code"
+              fi
+            fi
+            gh api graphql \
+              -f query='query($owner:String!,$name:String!,$number:Int!){repository(owner:$owner,name:$name){pullRequest(number:$number){headRefOid mergeQueueEntry{id}}}}' \
+              -F owner=szl-holdings \
+              -F name=.github \
+              -F number="$number" \
+              > "$REPORT_DIR/pr-$number-after.json"
+            entry="$(jq -r '.data.repository.pullRequest.mergeQueueEntry.id // empty' "$REPORT_DIR/pr-$number-after.json")"
+            test -n "$entry"
+            jq --arg number "$number" --arg head "$head" --arg entry "$entry" \
+              '.targets[$number] = {head_sha:$head, queue_entry_id:$entry, native_enqueue_verified:true}' \
+              "$REPORT_DIR/enqueue-receipt.json" > "$REPORT_DIR/enqueue-receipt.tmp"
+            mv "$REPORT_DIR/enqueue-receipt.tmp" "$REPORT_DIR/enqueue-receipt.json"
+          done <<'TARGETS'
+          341 81416537a6a6bce01c7482084c1ed13c8a0da4bb
+          342 942c4318c8717bb44708dd6eab9fae1030746811
+          TARGETS
+          cat "$REPORT_DIR/enqueue-receipt.json"
+
+      - name: Fail closed when a target is not queue-eligible
+        if: steps.verify.outputs.all_ready != 'true'
+        run: |
+          echo '::error::At least one exact legacy PR is not fully signed, attested, and green.'
+          exit 1
+
+      - name: Upload immutable handoff evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: legacy-green-enqueue-${{ github.run_id }}
+          path: ${{ env.REPORT_DIR }}
+          if-no-files-found: error
+          retention-days: 90
