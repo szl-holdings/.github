@@ -1,0 +1,116 @@
+name: Create Signed PR 336 Replacement — Controlled
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - .github/scripts/create_signed_pr336_replacement.py
+      - .github/workflows/create-signed-pr336-replacement-pr.yml
+
+permissions:
+  contents: write
+  pull-requests: read
+
+concurrency:
+  group: create-signed-pr336-replacement-${{ github.event.pull_request.number }}
+  cancel-in-progress: false
+
+env:
+  REPORT_PATH: reports/pr336-signed-tree-normalization.json
+
+jobs:
+  normalize:
+    name: Exact-tree GitHub-signed replacement branch
+    if: >-
+      github.repository == 'szl-holdings/.github' &&
+      github.event.pull_request.head.repo.full_name == 'szl-holdings/.github' &&
+      github.event.pull_request.head.ref == 'diag/sign-pr333-v1'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - name: Checkout the exact diagnostic controller
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+          fetch-depth: 1
+
+      - name: Compile and constrain the normalization envelope
+        run: |
+          set -euo pipefail
+          python -m py_compile \
+            .github/scripts/create_signed_pr333_replacement.py \
+            .github/scripts/create_signed_pr336_replacement.py
+          python - <<'PY'
+          from pathlib import Path
+
+          core = Path(
+              ".github/scripts/create_signed_pr333_replacement.py"
+          ).read_text(encoding="utf-8")
+          configured = Path(
+              ".github/scripts/create_signed_pr336_replacement.py"
+          ).read_text(encoding="utf-8")
+          source = core + "\n" + configured
+          required = (
+              "core.SOURCE_PR = 336",
+              "94cd5f7c14151dbd42f7b0d5e62470136bd3cb44",
+              "fa4b719adf5bdfcc970b2b32d49c35871b1b3fe9",
+              "fix/ci-health-github-managed-dynamic-v1-signed-94cd5f7c1415",
+              "createCommitOnBranch",
+              "expectedHeadOid",
+              "SIGNED_TREE_IDENTICAL",
+              "candidate signature is not valid",
+              "credential_value_recorded",
+          )
+          forbidden = (
+              "mergePullRequest",
+              "enqueuePullRequest",
+              "statuses/",
+              "check-runs/",
+              "rulesets/",
+              "branches/main/protection",
+              '"force": True',
+              "secrets/",
+              "print(token",
+              "len(token",
+              "hashlib",
+          )
+          for marker in required:
+              assert marker in source, marker
+          for marker in forbidden:
+              assert marker not in source, marker
+          PY
+          git diff --check
+
+      - name: Create and verify the exact signed replacement
+        id: normalization
+        shell: bash
+        run: |
+          set +e
+          python .github/scripts/create_signed_pr336_replacement.py
+          code=$?
+          echo "exit_code=${code}" >> "$GITHUB_OUTPUT"
+          exit 0
+
+      - name: Upload immutable normalization evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: pr336-signed-tree-normalization-${{ github.run_id }}
+          path: ${{ env.REPORT_PATH }}
+          if-no-files-found: error
+          retention-days: 90
+
+      - name: Enforce exact signed normalization
+        if: always()
+        env:
+          EXIT_CODE: ${{ steps.normalization.outputs.exit_code }}
+        run: |
+          code="${EXIT_CODE:-2}"
+          if [ "$code" -ne 0 ]; then
+            echo "::error::PR #336 signed normalization failed closed. No source, protection, queue, or merge mutation was attempted."
+            exit "$code"
+          fi
+          echo "PR #336 now has a tree-identical, exact-parent, GitHub-signed replacement branch."
