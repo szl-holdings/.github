@@ -62,7 +62,7 @@ jobs:
               "/contents/",
               "excluded_non_default_workflows",
               "branch={branch}",
-              "No source-controlled workflow ever falls back",
+              "workflow ever falls back",
               "DYNAMIC_WORKFLOW_PREFIX = \"dynamic/\"",
               "latest_dynamic_run",
               "github_managed_dynamic_workflows",
