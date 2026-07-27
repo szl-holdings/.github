@@ -1,0 +1,209 @@
+name: Frontier Current State — Exact Main Controls
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - .github/workflows/frontier-current-state-pr.yml
+
+permissions:
+  contents: read
+  issues: write
+
+concurrency:
+  group: frontier-current-state-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  execute:
+    name: Current main health, license, and public-link controls
+    if: >-
+      github.repository == 'szl-holdings/.github' &&
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      github.event.pull_request.head.ref == 'diag/frontier-current-state-v1'
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      REPORT_DIR: reports/frontier-current-state
+    steps:
+      - name: Checkout the exact protected-main base
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.base.sha }}
+          persist-credentials: false
+          fetch-depth: 1
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: '3.12'
+
+      - name: Compile current control implementations
+        run: |
+          set -euo pipefail
+          mkdir -p "$REPORT_DIR"
+          python -m py_compile \
+            .github/scripts/ci_health_digest.py \
+            .github/scripts/ci_health_digest_http.py \
+            .github/scripts/ci_health_digest_sweep.py \
+            .github/scripts/hf_license_consistency.py \
+            .github/scripts/license_consistency.py \
+            .github/scripts/public_repo_link_check.py
+          python .github/scripts/test_ci_health_digest.py
+          python .github/scripts/test_ci_health_digest_default_branch.py
+          python .github/scripts/test_hf_license_consistency.py
+          python .github/scripts/test_license_consistency.py
+          python .github/scripts/test_public_repo_link_check.py
+
+      - name: Mint preferred qillqaq organization reader
+        id: app-token
+        continue-on-error: true
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        with:
+          client-id: ${{ vars.QILLQAQ_CLIENT_ID }}
+          private-key: ${{ secrets.QILLQAQ_PRIVATE_KEY }}
+          owner: ${{ github.repository_owner }}
+          permission-actions: read
+          permission-contents: read
+          permission-organization-administration: read
+
+      - name: Refresh the live organization CI digest from exact main
+        id: ci-health
+        continue-on-error: true
+        env:
+          REPORT_PATH: ${{ env.REPORT_DIR }}/ci-health-digest.json
+          ORG_REPOSITORY_FLOOR: '57'
+          DIGEST_APP_TOKEN: ${{ steps.app-token.outputs.token }}
+          APP_TOKEN_OUTCOME: ${{ steps.app-token.outcome }}
+          SZL_GITHUB_TOKEN: ${{ secrets.SZL_GITHUB_TOKEN }}
+          CI_DIGEST_ISSUE_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set +e
+          python .github/scripts/ci_health_digest.py --report "$REPORT_PATH"
+          code=$?
+          echo "exit_code=$code" >> "$GITHUB_OUTPUT"
+          exit 0
+
+      - name: Run current private-inclusive Hugging Face license control
+        id: hf-license
+        continue-on-error: true
+        env:
+          HF_ORG_TOKEN: ${{ secrets.HF_ORG_TOKEN || secrets.HF_ORG_TOKEN1 }}
+          GITHUB_TOKEN: ${{ secrets.SZL_GITHUB_TOKEN }}
+        shell: bash
+        run: |
+          set +e
+          python .github/scripts/hf_license_consistency.py \
+            --include-private \
+            --min-private 5 \
+            --report "$REPORT_DIR/hf-license-consistency.json"
+          code=$?
+          echo "exit_code=$code" >> "$GITHUB_OUTPUT"
+          exit 0
+
+      - name: Run current private-inclusive GitHub license control
+        id: github-license
+        continue-on-error: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.SZL_GITHUB_TOKEN }}
+        shell: bash
+        run: |
+          set +e
+          python .github/scripts/license_consistency.py \
+            --include-private \
+            --min-private 1 \
+            --report "$REPORT_DIR/github-license-consistency.json"
+          code=$?
+          echo "exit_code=$code" >> "$GITHUB_OUTPUT"
+          exit 0
+
+      - name: Run current public repository link control
+        id: public-links
+        continue-on-error: true
+        env:
+          SZL_GITHUB_TOKEN: ${{ secrets.SZL_GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.SZL_GITHUB_TOKEN }}
+        shell: bash
+        run: |
+          set +e
+          python .github/scripts/public_repo_link_check.py \
+            --scan-docs \
+            --check-deep-links \
+            --fail-on-missing \
+            --report "$REPORT_DIR/public-repo-link-report.json"
+          code=$?
+          echo "exit_code=$code" >> "$GITHUB_OUTPUT"
+          exit 0
+
+      - name: Normalize one bounded current-state receipt
+        if: always()
+        env:
+          APP_TOKEN_OUTCOME: ${{ steps.app-token.outcome }}
+          CI_HEALTH_EXIT: ${{ steps.ci-health.outputs.exit_code }}
+          HF_LICENSE_EXIT: ${{ steps.hf-license.outputs.exit_code }}
+          GITHUB_LICENSE_EXIT: ${{ steps.github-license.outputs.exit_code }}
+          PUBLIC_LINKS_EXIT: ${{ steps.public-links.outputs.exit_code }}
+          SOURCE_SHA: ${{ github.event.pull_request.base.sha }}
+        shell: python
+        run: |
+          import json
+          import os
+          from datetime import datetime, timezone
+          from pathlib import Path
+
+          root = Path(os.environ['REPORT_DIR'])
+
+          def read(name):
+              path = root / name
+              if not path.is_file():
+                  return {'present': False}
+              try:
+                  value = json.loads(path.read_text(encoding='utf-8'))
+              except Exception as exc:
+                  return {'present': True, 'read_error': type(exc).__name__}
+              return {'present': True, 'report': value}
+
+          receipt = {
+              'schema': 'szl.frontier-current-state/v1',
+              'generated_at': datetime.now(timezone.utc).isoformat(),
+              'source_revision': os.environ['SOURCE_SHA'],
+              'credential_value_recorded': False,
+              'mutation_boundary': {
+                  'repository_content': False,
+                  'rulesets_or_protection': False,
+                  'workflow_results': False,
+                  'rolling_ci_issue': True,
+              },
+              'app_token_outcome': os.environ.get('APP_TOKEN_OUTCOME'),
+              'exit_codes': {
+                  'ci_health': int(os.environ.get('CI_HEALTH_EXIT') or 2),
+                  'hf_license': int(os.environ.get('HF_LICENSE_EXIT') or 2),
+                  'github_license': int(os.environ.get('GITHUB_LICENSE_EXIT') or 2),
+                  'public_links': int(os.environ.get('PUBLIC_LINKS_EXIT') or 2),
+              },
+              'evidence': {
+                  'ci_health': read('ci-health-digest.json'),
+                  'hf_license': read('hf-license-consistency.json'),
+                  'github_license': read('github-license-consistency.json'),
+                  'public_links': read('public-repo-link-report.json'),
+              },
+          }
+          (root / 'frontier-current-state.json').write_text(
+              json.dumps(receipt, indent=2, sort_keys=True) + '\n',
+              encoding='utf-8',
+          )
+          print(json.dumps({
+              'source_revision': receipt['source_revision'],
+              'exit_codes': receipt['exit_codes'],
+              'credential_value_recorded': False,
+          }, indent=2, sort_keys=True))
+
+      - name: Upload immutable current-state evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: frontier-current-state-${{ github.run_id }}
+          path: ${{ env.REPORT_DIR }}
+          if-no-files-found: error
+          retention-days: 90
