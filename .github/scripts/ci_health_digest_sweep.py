@@ -1,6 +1,14 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: Apache-2.0
-"""Complete workflow sweep and honest digest rendering."""
+"""Complete default-branch workflow sweep and honest digest rendering.
+
+GitHub's Actions workflow registry can retain entries for workflow files that
+exist only on feature branches, closed pull-request branches, or other refs.
+Those registrations are not part of protected default-branch health. This
+module therefore proves that every inspected workflow file exists at the
+repository's current default branch and reads runs only through an explicit
+``branch=<default>`` filter. It never falls back to an arbitrary branch run.
+"""
 from __future__ import annotations
 
 import json
@@ -12,6 +20,7 @@ from typing import Any, Mapping, Sequence
 
 from ci_health_digest_http import (
     ORG,
+    ApiError,
     DigestError,
     repository_floor,
     request_json,
@@ -117,6 +126,7 @@ def list_workflows(
     token: str,
     repository: str,
 ) -> tuple[dict[str, Any], ...]:
+    """Return the complete GitHub workflow registry for one repository."""
     workflows: list[dict[str, Any]] = []
     expected_total: int | None = None
     page = 1
@@ -164,12 +174,75 @@ def list_workflows(
     return tuple(workflows)
 
 
+def _workflow_path(workflow: Mapping[str, Any], *, repository: str) -> str:
+    path = str(workflow.get("path") or "").strip().lstrip("/")
+    if (
+        not path.startswith(".github/workflows/")
+        or path.endswith("/")
+        or ".." in path.split("/")
+        or not path.lower().endswith((".yml", ".yaml"))
+    ):
+        raise DigestError(
+            f"active workflow in {repository} has an invalid workflow path: {path!r}"
+        )
+    return path
+
+
+def workflow_exists_on_default_branch(
+    token: str,
+    repository: str,
+    default_branch: str,
+    workflow: Mapping[str, Any],
+) -> bool:
+    """Prove that the registered workflow file exists at the default branch.
+
+    A 404 means the Actions registry entry belongs to another ref and is safely
+    excluded from default-branch health. Every other API or payload failure is
+    terminal because the evidence boundary could not be proved.
+    """
+    path = _workflow_path(workflow, repository=repository)
+    encoded_path = urllib.parse.quote(path, safe="/")
+    encoded_ref = urllib.parse.quote(default_branch, safe="")
+    try:
+        _, payload = request_json(
+            token,
+            (
+                f"https://api.github.com/repos/{ORG}/{repository}/contents/"
+                f"{encoded_path}?ref={encoded_ref}"
+            ),
+            operation=(
+                f"prove default-branch workflow path "
+                f"{repository}/{path}@{default_branch}"
+            ),
+        )
+    except ApiError as exc:
+        if exc.status == 404:
+            return False
+        raise
+    if not isinstance(payload, dict):
+        raise DigestError(
+            f"default-branch workflow lookup for {repository}/{path} is malformed"
+        )
+    if payload.get("type") != "file" or payload.get("path") != path:
+        raise DigestError(
+            f"default-branch workflow lookup for {repository}/{path} "
+            "did not resolve the exact file"
+        )
+    sha = str(payload.get("sha") or "")
+    if len(sha) != 40:
+        raise DigestError(
+            f"default-branch workflow {repository}/{path} lacks an immutable blob"
+        )
+    return True
+
+
 def latest_run(
     token: str,
     repository: str,
     default_branch: str,
     workflow: Mapping[str, Any],
 ) -> Mapping[str, Any] | None:
+    """Read only the latest run explicitly bound to the default branch."""
     if workflow.get("state") != "active":
         return None
     workflow_id = workflow.get("id")
@@ -177,43 +250,67 @@ def latest_run(
         raise DigestError(
             f"active workflow in {repository} lacks a numeric id"
         )
-    for branch_suffix in (
-        f"&branch={urllib.parse.quote(default_branch, safe='')}",
-        "",
-    ):
-        _, payload = request_json(
-            token,
-            (
-                f"https://api.github.com/repos/{ORG}/{repository}/actions/"
-                f"workflows/{workflow_id}/runs?per_page=1{branch_suffix}"
-            ),
-            operation=f"read latest run for {repository}/{workflow_id}",
+    branch = urllib.parse.quote(default_branch, safe="")
+    _, payload = request_json(
+        token,
+        (
+            f"https://api.github.com/repos/{ORG}/{repository}/actions/"
+            f"workflows/{workflow_id}/runs?per_page=1&branch={branch}"
+        ),
+        operation=(
+            f"read latest default-branch run for "
+            f"{repository}/{workflow_id}@{default_branch}"
+        ),
+    )
+    runs = payload.get("workflow_runs") if isinstance(payload, dict) else None
+    if not isinstance(runs, list):
+        raise DigestError(
+            f"workflow-run inventory for {repository}/{workflow_id} is malformed"
         )
-        runs = payload.get("workflow_runs") if isinstance(payload, dict) else None
-        if not isinstance(runs, list):
-            raise DigestError(
-                f"workflow-run inventory for {repository}/{workflow_id} is malformed"
-            )
-        if runs:
-            run = runs[0]
-            if not isinstance(run, dict):
-                raise DigestError(
-                    f"latest workflow run for {repository}/{workflow_id} is malformed"
-                )
-            return run
-    return None
+    if not runs:
+        return None
+    run = runs[0]
+    if not isinstance(run, dict):
+        raise DigestError(
+            f"latest workflow run for {repository}/{workflow_id} is malformed"
+        )
+    observed_branch = str(run.get("head_branch") or "")
+    if observed_branch and observed_branch != default_branch:
+        raise DigestError(
+            f"branch-filtered workflow run for {repository}/{workflow_id} "
+            f"escaped {default_branch!r}: {observed_branch!r}"
+        )
+    return run
 
 
 def repository_reds(
     token: str,
     repository: Mapping[str, Any],
-) -> tuple[str, tuple[RedRun, ...], int]:
+) -> tuple[str, tuple[RedRun, ...], int, int, int]:
     name = str(repository["name"])
     default_branch = str(repository["default_branch"])
-    workflows = tuple(
-        item for item in list_workflows(token, name)
+    registered = tuple(
+        item
+        for item in list_workflows(token, name)
         if item.get("state") == "active"
     )
+
+    with ThreadPoolExecutor(max_workers=8) as executor:
+        existence = tuple(
+            executor.map(
+                lambda item: workflow_exists_on_default_branch(
+                    token,
+                    name,
+                    default_branch,
+                    item,
+                ),
+                registered,
+            )
+        )
+    workflows = tuple(
+        item for item, present in zip(registered, existence) if present
+    )
+    excluded = len(registered) - len(workflows)
 
     def inspect(workflow: Mapping[str, Any]) -> RedRun | None:
         run = latest_run(token, name, default_branch, workflow)
@@ -242,7 +339,7 @@ def repository_reds(
         for result in executor.map(inspect, workflows):
             if result is not None:
                 results.append(result)
-    return name, tuple(results), len(workflows)
+    return name, tuple(results), len(workflows), len(registered), excluded
 
 
 def sweep(
@@ -251,13 +348,20 @@ def sweep(
 ) -> tuple[dict[str, tuple[RedRun, ...]], dict[str, int]]:
     active = tuple(item for item in repositories if not item.get("archived"))
     reds: dict[str, tuple[RedRun, ...]] = {}
-    workflow_count = 0
+    default_branch_workflows = 0
+    registered_active_workflows = 0
+    excluded_non_default_workflows = 0
     with ThreadPoolExecutor(max_workers=8) as executor:
-        for name, repository_results, count in executor.map(
-            lambda item: repository_reds(token, item),
-            active,
-        ):
-            workflow_count += count
+        for (
+            name,
+            repository_results,
+            default_count,
+            registered_count,
+            excluded_count,
+        ) in executor.map(lambda item: repository_reds(token, item), active):
+            default_branch_workflows += default_count
+            registered_active_workflows += registered_count
+            excluded_non_default_workflows += excluded_count
             if repository_results:
                 reds[name] = repository_results
     coverage = {
@@ -265,7 +369,10 @@ def sweep(
         "active_repositories": len(active),
         "archived_repositories": len(repositories) - len(active),
         "queried_active_repositories": len(active),
-        "active_workflows": workflow_count,
+        "active_workflows": default_branch_workflows,
+        "default_branch_workflows": default_branch_workflows,
+        "registered_active_workflows": registered_active_workflows,
+        "excluded_non_default_workflows": excluded_non_default_workflows,
         "repository_floor": repository_floor(),
     }
     return reds, coverage
@@ -301,7 +408,11 @@ def build_body(
             "Coverage: **{organization_repositories} repositories** "
             "({active_repositories} active, {archived_repositories} archived); "
             "**{queried_active_repositories} active repositories queried**; "
-            "**{active_workflows} active workflows inspected**."
+            "**{default_branch_workflows} protected-default-branch workflows "
+            "inspected**. GitHub registered **{registered_active_workflows}** "
+            "active workflow entries; **{excluded_non_default_workflows}** were "
+            "excluded because their files are absent from the repository default "
+            "branch."
         ).format(**coverage),
         "",
         (
@@ -374,7 +485,9 @@ def build_body(
         [
             "---",
             (
-                "<sub>Dispositions are policy-classified in "
+                "<sub>The digest includes only workflow files proven present on "
+                "each repository's protected default branch and only runs bound "
+                "to that branch. Dispositions are policy-classified in "
                 "`.github/scripts/ci_health_digest_sweep.py` (`POLICY`). "
                 "Reclassify a red only with a documented reason; never silence "
                 "a real defect.</sub>"
