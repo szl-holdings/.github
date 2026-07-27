@@ -41,8 +41,8 @@ jobs:
         run: |
           from pathlib import Path
 
-          path = Path('.github/scripts/materialize_attestor_delivery_repair.py')
-          source = path.read_text(encoding='utf-8')
+          generator_path = Path('.github/scripts/materialize_attestor_delivery_repair.py')
+          source = generator_path.read_text(encoding='utf-8')
           replacements = (
               (
                   'echo "Protected Merge Queue Enqueue owns native enqueuePullRequest delivery."',
@@ -62,32 +62,22 @@ jobs:
               if count != 1:
                   raise SystemExit(f'expected one exact source-contract marker, found {count}: {old}')
               source = source.replace(old, new, 1)
+          generator_path.write_text(source, encoding='utf-8')
 
-          old_guard_patch = '''    source = source.replace(
-              r'^(\\.github/workflows/(attest-and-approve|gates|forge9-staging)'
-              r'\\.ya?ml|\\.governance/)',
-              r'^(\\.github/workflows/(attest-and-approve|gates|forge9-staging|merge-queue-enqueue)'
-              r'\\.ya?ml|\\.governance/)',
-              1,
-          )
-          '''
-          new_guard_patch = '''    old_guard = r''' + "'''" + '''ATTESTOR_SELF_EDIT_GUARD = (
-              r"^(\\.github/workflows/(attest-and-approve|gates|forge9-staging)"
-              r"\\.ya?ml|\\.governance/)"
-          )''' + "'''" + '''
-              new_guard = r''' + "'''" + '''ATTESTOR_SELF_EDIT_GUARD = (
-              r"^(\\.github/workflows/(attest-and-approve|gates|forge9-staging|merge-queue-enqueue)"
-              r"\\.ya?ml|\\.governance/)"
-          )''' + "'''" + '''
-              if old_guard not in source:
-                  raise SystemExit("governance verifier self-edit guard changed unexpectedly")
-              source = source.replace(old_guard, new_guard, 1)
-          '''
-          count = source.count(old_guard_patch)
+          verifier_path = Path('.github/scripts/verify_forge9_governance.py')
+          verifier = verifier_path.read_text(encoding='utf-8')
+          old_guard = r'''ATTESTOR_SELF_EDIT_GUARD = (
+              r"^(\.github/workflows/(attest-and-approve|gates|forge9-staging)"
+              r"\.ya?ml|\.governance/)"
+          )'''
+          new_guard = r'''ATTESTOR_SELF_EDIT_GUARD = (
+              r"^(\.github/workflows/(attest-and-approve|gates|forge9-staging|merge-queue-enqueue)"
+              r"\.ya?ml|\.governance/)"
+          )'''
+          count = verifier.count(old_guard)
           if count != 1:
-              raise SystemExit(f'expected one verifier guard patch block, found {count}')
-          source = source.replace(old_guard_patch, new_guard_patch, 1)
-          path.write_text(source, encoding='utf-8')
+              raise SystemExit(f'expected one verifier self-edit guard, found {count}')
+          verifier_path.write_text(verifier.replace(old_guard, new_guard, 1), encoding='utf-8')
 
       - name: Build, test, and publish the signed permanent tree
         shell: bash
