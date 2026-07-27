@@ -36,6 +36,34 @@ jobs:
           persist-credentials: false
           fetch-depth: 1
 
+      - name: Reconcile exact source-contract predicates
+        shell: python
+        run: |
+          from pathlib import Path
+
+          path = Path('.github/scripts/materialize_attestor_delivery_repair.py')
+          source = path.read_text(encoding='utf-8')
+          replacements = (
+              (
+                  'echo "Protected Merge Queue Enqueue owns native enqueuePullRequest delivery."',
+                  'echo "Protected Merge Queue Enqueue owns the native queue mutation."',
+              ),
+              (
+                  'self.assertNotIn("pull_request_target", self.attestor)',
+                  'self.assertNotIn("\\n  pull_request_target:", self.attestor)',
+              ),
+              (
+                  'if "pull_request_target" in attestor_template:',
+                  'if "\\n  pull_request_target:" in attestor_template:',
+              ),
+          )
+          for old, new in replacements:
+              count = source.count(old)
+              if count != 1:
+                  raise SystemExit(f'expected one exact source-contract marker, found {count}: {old}')
+              source = source.replace(old, new, 1)
+          path.write_text(source, encoding='utf-8')
+
       - name: Build, test, and publish the signed permanent tree
         shell: bash
         run: |
