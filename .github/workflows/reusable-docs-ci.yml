@@ -41,7 +41,7 @@ jobs:
         with:
           egress-policy: audit
       - name: Checkout
-        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Validate CITATION.cff
         shell: bash
         run: |
@@ -138,7 +138,7 @@ jobs:
         with:
           egress-policy: audit
       - name: Checkout
-        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: markdownlint-cli2
         # CI-HYGIENE 2026-06-03: DavidAnson/markdownlint-cli2-action replaced with npx.
         # isVerifiedOwner=false — blocked by szl-holdings org policy. npx uses the
@@ -162,7 +162,7 @@ jobs:
         with:
           egress-policy: audit
       - name: Checkout
-        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: lychee link check
         # CI-HYGIENE 2026-06-03: lycheeverse/lychee-action removed — isVerifiedOwner=false
         # in GitHub Marketplace; blocked by szl-holdings org allowed_actions policy.
@@ -185,7 +185,7 @@ jobs:
         with:
           egress-policy: audit
       - name: Checkout
-        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Verify required governance files
         shell: bash
         env:
