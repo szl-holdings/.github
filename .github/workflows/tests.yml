@@ -153,6 +153,12 @@ jobs:
       - name: CI-health-digest guard self-test
         run: python3 .github/scripts/test_ci_health_digest.py
 
+      # Replit Unified Control Hub is decommissioned from the active estate.
+      # This guard prevents its 30-minute public-receipt poller, endpoint
+      # variables, or executable verifier from silently returning.
+      - name: Replit active-estate decommission self-test
+        run: python3 .github/scripts/test_replit_decommission.py
+
       # Pins the HF module-drift guard's content-lineage cross-check. The
       # diverged side is named "ahead" by last-commit DATE, but a timestamp lies
       # about lineage: a stale hand-edit can be newer by date yet diverge from
