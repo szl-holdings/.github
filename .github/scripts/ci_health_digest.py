@@ -223,6 +223,28 @@ def _write_summary(body: str, report: Mapping[str, Any]) -> None:
         summary.write("\n")
 
 
+def _normalize_coverage(coverage: Mapping[str, Any]) -> dict[str, Any]:
+    """Keep the v2 receipt additive for legacy fixtures and consumers."""
+    normalized = dict(coverage)
+    default_count = int(
+        normalized.get(
+            "default_branch_workflows",
+            normalized.get("active_workflows", 0),
+        )
+    )
+    registered_count = int(
+        normalized.get("registered_active_workflows", default_count)
+    )
+    normalized.setdefault("active_workflows", default_count)
+    normalized.setdefault("default_branch_workflows", default_count)
+    normalized.setdefault("registered_active_workflows", registered_count)
+    normalized.setdefault(
+        "excluded_non_default_workflows",
+        max(registered_count - default_count, 0),
+    )
+    return normalized
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
@@ -258,7 +280,7 @@ def main(argv: Sequence[str] | None = None) -> int:
                 "An organization reader is accepted only after proving the "
                 "reviewed repository floor."
             ),
-            "Every active repository and workflow API read is fail-closed.",
+            "Every protected-default-branch workflow API read is fail-closed.",
             (
                 "The ephemeral repository token writes only the one rolling "
                 "digest issue."
@@ -289,6 +311,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             ),
         }
         reds, coverage = sweep(reader.token, reader.repositories)
+        coverage = _normalize_coverage(coverage)
         body, actionable, red_total, dispositions = build_body(
             reds,
             coverage=coverage,

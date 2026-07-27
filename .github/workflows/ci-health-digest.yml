@@ -7,6 +7,11 @@ name: CI Health Digest
 # is active, the existing governed SZL_GITHUB_TOKEN is used read-only. The
 # ephemeral workflow token writes only issue #158 (or its exact-title
 # replacement) in this repository.
+#
+# Default-branch evidence boundary: GitHub's Actions registry can retain workflow
+# entries from feature or closed-PR branches. The digest proves every inspected
+# workflow file exists at the repository's current default branch and never
+# falls back to a run from another branch.
 
 on:
   schedule:
@@ -19,7 +24,9 @@ on:
       - .github/scripts/ci_health_digest_http.py
       - .github/scripts/ci_health_digest_sweep.py
       - .github/scripts/test_ci_health_digest.py
+      - .github/scripts/test_ci_health_digest_default_branch.py
       - .github/workflows/ci-health-digest.yml
+      - .github/workflows/ci-health-digest-default-branch-pr.yml
       - .governance/github-app-manifest.json
 
 permissions:
@@ -63,8 +70,10 @@ jobs:
             .github/scripts/ci_health_digest.py \
             .github/scripts/ci_health_digest_http.py \
             .github/scripts/ci_health_digest_sweep.py \
-            .github/scripts/test_ci_health_digest.py
+            .github/scripts/test_ci_health_digest.py \
+            .github/scripts/test_ci_health_digest_default_branch.py
           python .github/scripts/test_ci_health_digest.py
+          python .github/scripts/test_ci_health_digest_default_branch.py
           git diff --check
 
       - name: Mint preferred qillqaq organization reader
@@ -114,4 +123,4 @@ jobs:
             echo "::error::CI health digest is NOT VERIFIED. The rolling issue contains the fail-closed receipt."
             exit "$code"
           fi
-          echo "Organization CI health digest is current, authenticated, and evidence-bound."
+          echo "Organization CI health digest is current, authenticated, default-branch-bound, and evidence-bound."
