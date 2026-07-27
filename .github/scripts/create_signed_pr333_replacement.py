@@ -7,7 +7,7 @@ main base, creates the commit through GitHub's ``createCommitOnBranch``
 mutation, and verifies tree parity, parentage, and GitHub signature.
 
 It never merges, enqueues, publishes statuses, edits checks or reviews, changes
-rulesets/protections, or reads/records a credential value.
+rulesets or protections, or reads or records a credential value.
 """
 from __future__ import annotations
 
