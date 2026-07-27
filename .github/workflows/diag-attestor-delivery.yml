@@ -1,0 +1,181 @@
+name: Attestor Workflow-Run — Read-Only Diagnostics
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - .github/workflows/diag-attestor-delivery.yml
+
+permissions:
+  actions: read
+  contents: read
+  pull-requests: read
+
+concurrency:
+  group: attestor-delivery-diagnostic
+  cancel-in-progress: true
+
+env:
+  TARGET_SHA: 55bffd581da7ff96803f9f00adcfdbc75d7b9d99
+  TARGET_PR: "345"
+  REPORT_PATH: reports/attestor-delivery.json
+
+jobs:
+  diagnose:
+    name: Resolve FORGE-9 to attestor delivery chain
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - name: Query exact read-only Actions and PR state
+        shell: python
+        run: |
+          from __future__ import annotations
+
+          import json
+          import os
+          import subprocess
+          from datetime import datetime, timezone
+          from pathlib import Path
+          from typing import Any
+
+          repository = os.environ['GITHUB_REPOSITORY']
+          target_sha = os.environ['TARGET_SHA']
+          target_pr = int(os.environ['TARGET_PR'])
+
+          def api(path: str) -> dict[str, Any]:
+              process = subprocess.run(
+                  ['gh', 'api', '--method', 'GET', path],
+                  check=False,
+                  capture_output=True,
+                  text=True,
+                  env=os.environ,
+              )
+              raw = process.stdout.strip()
+              try:
+                  payload: Any = json.loads(raw) if raw else None
+              except json.JSONDecodeError:
+                  payload = raw[:4000]
+              return {
+                  'ok': process.returncode == 0,
+                  'returncode': process.returncode,
+                  'payload': payload,
+                  'stderr': process.stderr.strip()[:2000],
+              }
+
+          forge = api(
+              f'repos/{repository}/actions/workflows/gates.yml/runs?event=pull_request&per_page=100'
+          )
+          attest = api(
+              f'repos/{repository}/actions/workflows/attest-and-approve.yml/runs?per_page=100'
+          )
+          pr = api(f'repos/{repository}/pulls/{target_pr}')
+          reviews = api(f'repos/{repository}/pulls/{target_pr}/reviews?per_page=100')
+          statuses = api(f'repos/{repository}/commits/{target_sha}/status')
+          checks = api(f'repos/{repository}/commits/{target_sha}/check-runs?per_page=100')
+
+          def compact_runs(result: dict[str, Any]) -> list[dict[str, Any]]:
+              payload = result.get('payload')
+              runs = payload.get('workflow_runs', []) if isinstance(payload, dict) else []
+              return [
+                  {
+                      'id': item.get('id'),
+                      'name': item.get('name'),
+                      'event': item.get('event'),
+                      'status': item.get('status'),
+                      'conclusion': item.get('conclusion'),
+                      'head_sha': item.get('head_sha'),
+                      'head_branch': item.get('head_branch'),
+                      'run_attempt': item.get('run_attempt'),
+                      'created_at': item.get('created_at'),
+                      'updated_at': item.get('updated_at'),
+                      'html_url': item.get('html_url'),
+                  }
+                  for item in runs
+                  if item.get('head_sha') == target_sha
+              ]
+
+          forge_runs = compact_runs(forge)
+          attestor_runs = compact_runs(attest)
+          review_payload = reviews.get('payload')
+          exact_reviews = [
+              {
+                  'id': item.get('id'),
+                  'state': item.get('state'),
+                  'commit_id': item.get('commit_id'),
+                  'user': (item.get('user') or {}).get('login'),
+                  'submitted_at': item.get('submitted_at'),
+              }
+              for item in (review_payload if isinstance(review_payload, list) else [])
+              if item.get('commit_id') == target_sha
+          ]
+          status_payload = statuses.get('payload')
+          exact_statuses = [
+              {
+                  'context': item.get('context'),
+                  'state': item.get('state'),
+                  'creator': (item.get('creator') or {}).get('login'),
+                  'target_url': item.get('target_url'),
+              }
+              for item in (
+                  status_payload.get('statuses', [])
+                  if isinstance(status_payload, dict)
+                  else []
+              )
+          ]
+          checks_payload = checks.get('payload')
+          exact_checks = [
+              {
+                  'name': item.get('name'),
+                  'status': item.get('status'),
+                  'conclusion': item.get('conclusion'),
+                  'app': (item.get('app') or {}).get('slug'),
+                  'details_url': item.get('details_url'),
+              }
+              for item in (
+                  checks_payload.get('check_runs', [])
+                  if isinstance(checks_payload, dict)
+                  else []
+              )
+          ]
+
+          report = {
+              'schema': 'szl.attestor-delivery-diagnostic/v1',
+              'generated_at': datetime.now(timezone.utc).isoformat(),
+              'repository': repository,
+              'target_pr': target_pr,
+              'target_sha': target_sha,
+              'forge_runs': forge_runs,
+              'attestor_runs': attestor_runs,
+              'exact_head_reviews': exact_reviews,
+              'combined_statuses': exact_statuses,
+              'check_runs': exact_checks,
+              'pr_read_ok': pr['ok'],
+              'api_errors': {
+                  key: value.get('stderr')
+                  for key, value in {
+                      'forge': forge,
+                      'attest': attest,
+                      'pr': pr,
+                      'reviews': reviews,
+                      'statuses': statuses,
+                      'checks': checks,
+                  }.items()
+                  if not value.get('ok')
+              },
+              'mutation_performed': False,
+              'custom_secret_used': False,
+          }
+          path = Path(os.environ['REPORT_PATH'])
+          path.parent.mkdir(parents=True, exist_ok=True)
+          path.write_text(json.dumps(report, indent=2, sort_keys=True) + '\n', encoding='utf-8')
+          print(json.dumps(report, indent=2, sort_keys=True))
+
+      - name: Upload immutable diagnostic evidence
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: attestor-delivery-${{ github.run_id }}
+          path: ${{ env.REPORT_PATH }}
+          if-no-files-found: error
+          retention-days: 30
