@@ -50,11 +50,11 @@ jobs:
               ),
               (
                   'self.assertNotIn("pull_request_target", self.attestor)',
-                  'self.assertNotIn("\\n  pull_request_target:", self.attestor)',
+                  'self.assertNotIn("pull_request_target:", self.attestor)',
               ),
               (
                   'if "pull_request_target" in attestor_template:',
-                  'if "\\n  pull_request_target:" in attestor_template:',
+                  'if "pull_request_target:" in attestor_template:',
               ),
           )
           for old, new in replacements:
