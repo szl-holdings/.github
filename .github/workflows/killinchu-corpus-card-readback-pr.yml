@@ -1,0 +1,183 @@
+name: Killinchu Corpus Card — Exact Read-Only Readback
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - .github/workflows/killinchu-corpus-card-readback-pr.yml
+
+permissions:
+  contents: read
+
+concurrency:
+  group: killinchu-corpus-card-readback-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+env:
+  DATASET_ID: SZLHOLDINGS/killinchu-osint-corpus
+  REPORT_PATH: reports/killinchu-corpus-card-readback.json
+  CARD_PATH: reports/killinchu-osint-corpus-README.md
+
+jobs:
+  inspect:
+    name: Immutable README front matter and rights statements
+    if: >-
+      github.repository == 'szl-holdings/.github' &&
+      github.event.pull_request.head.ref == 'diag/sign-pr333-v1'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      HF_ORG_TOKEN: ${{ secrets.HF_ORG_TOKEN || secrets.HF_ORG_TOKEN1 }}
+      HF_HUB_DISABLE_PROGRESS_BARS: "1"
+    steps:
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12"
+
+      - name: Install exact read-only client
+        run: |
+          set -euo pipefail
+          python -m pip install --disable-pip-version-check \
+            "huggingface_hub==1.19.0" \
+            "PyYAML==6.0.2"
+
+      - name: Read exact card and extract bounded rights evidence
+        id: readback
+        shell: python
+        run: |
+          from __future__ import annotations
+
+          import hashlib
+          import json
+          import os
+          import re
+          from datetime import datetime, timezone
+          from pathlib import Path
+
+          import yaml
+          from huggingface_hub import HfApi, hf_hub_download
+
+          dataset_id = os.environ["DATASET_ID"]
+          token = os.environ.get("HF_ORG_TOKEN") or ""
+          if not token:
+              raise RuntimeError("no supported Hugging Face organization token is configured")
+
+          api = HfApi(token=token)
+          info = api.dataset_info(dataset_id)
+          revision = str(getattr(info, "sha", "") or "").lower()
+          if not re.fullmatch(r"[0-9a-f]{40}", revision):
+              raise RuntimeError(f"dataset lacks an immutable revision: {revision!r}")
+          siblings = sorted(
+              str(getattr(item, "rfilename", "") or "")
+              for item in (getattr(info, "siblings", None) or [])
+          )
+          if "README.md" not in siblings:
+              raise RuntimeError("dataset tree lacks README.md")
+
+          local = hf_hub_download(
+              repo_id=dataset_id,
+              repo_type="dataset",
+              filename="README.md",
+              revision=revision,
+              token=token,
+          )
+          raw = Path(local).read_bytes()
+          if len(raw) > 1_048_576:
+              raise RuntimeError("README.md exceeds the 1 MiB diagnostic boundary")
+          text = raw.decode("utf-8")
+
+          frontmatter = {}
+          body = text
+          if text.startswith("---\n"):
+              end = text.find("\n---\n", 4)
+              if end < 0:
+                  raise RuntimeError("README front matter is not terminated")
+              parsed = yaml.safe_load(text[4:end]) or {}
+              if not isinstance(parsed, dict):
+                  raise RuntimeError("README front matter is not a mapping")
+              frontmatter = parsed
+              body = text[end + 5 :]
+
+          terms = (
+              "license",
+              "licence",
+              "rights",
+              "copyright",
+              "public source",
+              "third-party",
+              "third party",
+              "terms of use",
+              "redistribut",
+              "attribution",
+              "responsib",
+              "claim",
+          )
+          lines = text.splitlines()
+          relevant = []
+          for index, line in enumerate(lines, start=1):
+              lowered = line.lower()
+              if any(term in lowered for term in terms):
+                  relevant.append({"line": index, "text": line[:1000]})
+          if len(relevant) > 200:
+              relevant = relevant[:200]
+
+          report = {
+              "schema": "szl.hf-card-readback/v1",
+              "generated_at": datetime.now(timezone.utc).isoformat(),
+              "repo_id": dataset_id,
+              "repo_type": "dataset",
+              "revision": revision,
+              "private": bool(getattr(info, "private", False)),
+              "gated": getattr(info, "gated", None),
+              "tree_file_count": len([path for path in siblings if path]),
+              "readme": {
+                  "path": "README.md",
+                  "bytes": len(raw),
+                  "sha256": hashlib.sha256(raw).hexdigest(),
+                  "line_count": len(lines),
+                  "frontmatter": frontmatter,
+                  "rights_relevant_lines": relevant,
+                  "body_preview": body[:12000],
+              },
+              "diagnostic": {
+                  "mutation": False,
+                  "credential_name": "HF_ORG_TOKEN_or_HF_ORG_TOKEN1",
+                  "credential_value_recorded": False,
+                  "exact_revision_bound": True,
+              },
+          }
+          report_path = Path(os.environ["REPORT_PATH"])
+          report_path.parent.mkdir(parents=True, exist_ok=True)
+          report_path.write_text(
+              json.dumps(report, indent=2, sort_keys=True, default=str) + "\n",
+              encoding="utf-8",
+          )
+          card_path = Path(os.environ["CARD_PATH"])
+          card_path.parent.mkdir(parents=True, exist_ok=True)
+          card_path.write_bytes(raw)
+          print(
+              json.dumps(
+                  {
+                      "repo_id": dataset_id,
+                      "revision": revision,
+                      "frontmatter": frontmatter,
+                      "rights_relevant_lines": relevant,
+                      "credential_value_recorded": False,
+                  },
+                  indent=2,
+                  sort_keys=True,
+                  default=str,
+              )
+          )
+
+      - name: Upload immutable card evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: killinchu-corpus-card-readback-${{ github.run_id }}
+          path: |
+            ${{ env.REPORT_PATH }}
+            ${{ env.CARD_PATH }}
+          if-no-files-found: error
+          retention-days: 30
