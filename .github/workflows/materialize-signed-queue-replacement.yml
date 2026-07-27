@@ -1,0 +1,143 @@
+name: Materialize Signed Queue Replacement
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - .github/workflows/materialize-signed-queue-replacement.yml
+
+permissions:
+  contents: write
+
+concurrency:
+  group: materialize-signed-queue-replacement
+  cancel-in-progress: false
+
+jobs:
+  materialize:
+    name: Publish one GitHub-signed reviewed tree
+    if: >-
+      github.repository == 'szl-holdings/.github' &&
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      github.event.pull_request.head.ref == 'fix/merge-queue-enqueue-controller-v2'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      GH_TOKEN: ${{ github.token }}
+      SOURCE_HEAD: ${{ github.event.pull_request.head.sha }}
+      TARGET_BRANCH: fix/merge-queue-enqueue-controller-v3-signed
+      REPOSITORY: ${{ github.repository }}
+    steps:
+      - name: Checkout exact reviewed source
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+          fetch-depth: 1
+
+      - name: Verify source and clean target lineage
+        id: lineage
+        shell: bash
+        run: |
+          set -euo pipefail
+          source_observed="$(git rev-parse HEAD)"
+          test "$source_observed" = "$SOURCE_HEAD"
+          main_sha="$(gh api "repos/$REPOSITORY/branches/main" --jq .commit.sha)"
+          target_sha="$(gh api "repos/$REPOSITORY/branches/$TARGET_BRANCH" --jq .commit.sha)"
+          test "$target_sha" = "$main_sha" \
+            || { echo "::error::signed target branch is not cleanly rooted at current main"; exit 1; }
+          echo "target_sha=$target_sha" >> "$GITHUB_OUTPUT"
+          python .github/scripts/test_merge_queue_enqueue.py
+          python .github/scripts/test_organization_control_sweep.py
+          git diff --check
+
+      - name: Create one GitHub-signed commit on the clean branch
+        id: commit
+        shell: python
+        env:
+          EXPECTED_TARGET: ${{ steps.lineage.outputs.target_sha }}
+        run: |
+          import base64
+          import json
+          import os
+          import urllib.error
+          import urllib.request
+          from pathlib import Path
+
+          files = [
+              '.github/scripts/test_merge_queue_enqueue.py',
+              '.github/scripts/test_organization_control_sweep.py',
+              '.github/workflows/merge-queue-enqueue.yml',
+              '.github/workflows/organization-control-sweep.yml',
+          ]
+          query = '''
+          mutation($input: CreateCommitOnBranchInput!) {
+            createCommitOnBranch(input: $input) {
+              commit { oid url }
+            }
+          }
+          '''
+          variables = {
+              'input': {
+                  'branch': {
+                      'repositoryNameWithOwner': os.environ['REPOSITORY'],
+                      'branchName': os.environ['TARGET_BRANCH'],
+                  },
+                  'message': {
+                      'headline': 'fix(queue): enqueue exact attested pull requests',
+                      'body': 'Signed-off-by: Stephen Lutar <stephenlutar2@gmail.com>',
+                  },
+                  'expectedHeadOid': os.environ['EXPECTED_TARGET'],
+                  'fileChanges': {
+                      'additions': [
+                          {
+                              'path': path,
+                              'contents': base64.b64encode(Path(path).read_bytes()).decode('ascii'),
+                          }
+                          for path in files
+                      ],
+                  },
+              }
+          }
+          request = urllib.request.Request(
+              'https://api.github.com/graphql',
+              data=json.dumps({'query': query, 'variables': variables}).encode('utf-8'),
+              method='POST',
+              headers={
+                  'Authorization': f"Bearer {os.environ['GH_TOKEN']}",
+                  'Accept': 'application/vnd.github+json',
+                  'Content-Type': 'application/json',
+                  'X-GitHub-Api-Version': '2022-11-28',
+                  'User-Agent': 'szl-signed-queue-replacement/1',
+              },
+          )
+          try:
+              with urllib.request.urlopen(request, timeout=60) as response:
+                  payload = json.loads(response.read())
+          except urllib.error.HTTPError as exc:
+              raise SystemExit(f'GraphQL HTTP {exc.code}') from exc
+          if payload.get('errors'):
+              print(json.dumps(payload['errors'], indent=2))
+              raise SystemExit(1)
+          commit = payload['data']['createCommitOnBranch']['commit']
+          print(json.dumps(commit, indent=2, sort_keys=True))
+          with open(os.environ['GITHUB_OUTPUT'], 'a', encoding='utf-8') as output:
+              output.write(f"sha={commit['oid']}\n")
+
+      - name: Verify signed commit and exact four-file tree
+        env:
+          COMMIT_SHA: ${{ steps.commit.outputs.sha }}
+        run: |
+          set -euo pipefail
+          test "$(gh api "repos/$REPOSITORY/branches/$TARGET_BRANCH" --jq .commit.sha)" = "$COMMIT_SHA"
+          test "$(gh api "repos/$REPOSITORY/commits/$COMMIT_SHA" --jq .commit.verification.verified)" = 'true'
+          test "$(gh api "repos/$REPOSITORY/commits/$COMMIT_SHA" --jq .commit.verification.reason)" = 'valid'
+          printf '%s\n' "$COMMIT_SHA" > signed-replacement-sha.txt
+
+      - name: Upload immutable signed-replacement receipt
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: signed-queue-replacement-${{ github.run_id }}
+          path: signed-replacement-sha.txt
+          if-no-files-found: error
+          retention-days: 90
