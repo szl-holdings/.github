@@ -37,12 +37,19 @@ jobs:
           fetch-depth: 1
 
       - name: Build, test, and publish the signed permanent tree
-        run: python .github/scripts/materialize_attestor_delivery_repair.py
+        shell: bash
+        run: |
+          set -o pipefail
+          python .github/scripts/materialize_attestor_delivery_repair.py \
+            2>&1 | tee signed-attestor-delivery.log
 
-      - name: Upload immutable materialization receipt
+      - name: Upload immutable materialization evidence
+        if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: signed-attestor-delivery-${{ github.run_id }}
-          path: signed-attestor-delivery.json
+          path: |
+            signed-attestor-delivery.log
+            signed-attestor-delivery.json
           if-no-files-found: error
           retention-days: 90
