@@ -1,0 +1,296 @@
+name: Organization Control Sweep
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - .github/workflows/organization-control-sweep.yml
+      - .github/scripts/test_organization_control_sweep.py
+      - .github/scripts/ci_health_digest.py
+      - .github/scripts/ci_health_digest_http.py
+      - .github/scripts/ci_health_digest_sweep.py
+      - .github/scripts/license_consistency.py
+      - .github/scripts/hf_license_consistency.py
+      - .github/scripts/public_repo_link_check.py
+      - .github/data/license_allowlist.json
+      - .github/data/hf_license_allowlist.json
+      - .github/data/public_repo_link_allowlist.json
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/organization-control-sweep.yml
+      - .github/scripts/test_organization_control_sweep.py
+      - .github/scripts/ci_health_digest.py
+      - .github/scripts/ci_health_digest_http.py
+      - .github/scripts/ci_health_digest_sweep.py
+      - .github/scripts/license_consistency.py
+      - .github/scripts/hf_license_consistency.py
+      - .github/scripts/public_repo_link_check.py
+      - .github/data/license_allowlist.json
+      - .github/data/hf_license_allowlist.json
+      - .github/data/public_repo_link_allowlist.json
+  schedule:
+    - cron: "13 8 * * 1"
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+  issues: write
+
+concurrency:
+  group: organization-control-sweep-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  contract:
+    name: Compile and test all control contracts
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Harden runner
+        uses: step-security/harden-runner@bf7454d06d71f1098171f2acdf0cd4708d7b5920 # v2.20.0
+        with:
+          egress-policy: audit
+      - name: Checkout exact source
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
+          fetch-depth: 1
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12"
+      - name: Compile and execute network-free control tests
+        run: |
+          set -euo pipefail
+          python -m py_compile \
+            .github/scripts/ci_health_digest.py \
+            .github/scripts/ci_health_digest_http.py \
+            .github/scripts/ci_health_digest_sweep.py \
+            .github/scripts/license_consistency.py \
+            .github/scripts/hf_license_consistency.py \
+            .github/scripts/public_repo_link_check.py \
+            .github/scripts/test_organization_control_sweep.py
+          python .github/scripts/test_ci_health_digest.py
+          python .github/scripts/test_ci_health_digest_default_branch.py
+          python .github/scripts/test_license_consistency.py
+          python .github/scripts/test_hf_license_consistency.py
+          python .github/scripts/test_public_repo_link_check.py
+          python .github/scripts/test_organization_control_sweep.py
+          git diff --check
+
+  organization-health:
+    name: Authenticated organization health
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Harden runner
+        uses: step-security/harden-runner@bf7454d06d71f1098171f2acdf0cd4708d7b5920 # v2.20.0
+        with:
+          egress-policy: audit
+      - name: Checkout current protected main
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
+          fetch-depth: 1
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12"
+      - name: Mint preferred qillqaq organization reader
+        id: app-token
+        continue-on-error: true
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        with:
+          client-id: ${{ vars.QILLQAQ_CLIENT_ID }}
+          private-key: ${{ secrets.QILLQAQ_PRIVATE_KEY }}
+          owner: ${{ github.repository_owner }}
+          permission-actions: read
+          permission-contents: read
+          permission-organization-administration: read
+      - name: Execute current organization-health controller
+        id: health
+        env:
+          DIGEST_APP_TOKEN: ${{ steps.app-token.outputs.token }}
+          APP_TOKEN_OUTCOME: ${{ steps.app-token.outcome }}
+          SZL_GITHUB_TOKEN: ${{ secrets.SZL_GITHUB_TOKEN }}
+          CI_DIGEST_ISSUE_TOKEN: ${{ github.token }}
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+        run: |
+          set +e
+          mkdir -p reports/organization-control-sweep
+          python .github/scripts/ci_health_digest.py \
+            --report reports/organization-control-sweep/ci-health-digest.json
+          code=$?
+          echo "exit_code=$code" >> "$GITHUB_OUTPUT"
+          exit 0
+      - name: Upload immutable organization-health evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: organization-health-${{ github.run_id }}
+          path: reports/organization-control-sweep/ci-health-digest.json
+          if-no-files-found: error
+          retention-days: 90
+      - name: Enforce organization-health result
+        if: always()
+        env:
+          EXIT_CODE: ${{ steps.health.outputs.exit_code }}
+        run: |
+          code="${EXIT_CODE:-2}"
+          test "$code" = '0' || { echo "::error::organization health is not verified"; exit "$code"; }
+          echo 'Organization health is verified from current protected main.'
+
+  github-license:
+    name: GitHub license consistency
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Harden runner
+        uses: step-security/harden-runner@bf7454d06d71f1098171f2acdf0cd4708d7b5920 # v2.20.0
+        with:
+          egress-policy: audit
+      - name: Checkout current protected main
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
+          fetch-depth: 1
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12"
+      - name: Execute private-inclusive GitHub license control
+        id: license
+        env:
+          GITHUB_TOKEN: ${{ secrets.SZL_GITHUB_TOKEN }}
+        run: |
+          set +e
+          mkdir -p reports/organization-control-sweep
+          python .github/scripts/license_consistency.py \
+            --include-private \
+            --min-private 1 \
+            --report reports/organization-control-sweep/github-license.json
+          code=$?
+          echo "exit_code=$code" >> "$GITHUB_OUTPUT"
+          exit 0
+      - name: Upload immutable GitHub-license evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: github-license-${{ github.run_id }}
+          path: reports/organization-control-sweep/github-license.json
+          if-no-files-found: error
+          retention-days: 90
+      - name: Enforce GitHub-license result
+        if: always()
+        env:
+          EXIT_CODE: ${{ steps.license.outputs.exit_code }}
+        run: |
+          code="${EXIT_CODE:-2}"
+          test "$code" = '0' || { echo "::error::GitHub license consistency is red"; exit "$code"; }
+          echo 'GitHub license consistency is verified from current protected main.'
+
+  hugging-face-license:
+    name: Hugging Face license consistency
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Harden runner
+        uses: step-security/harden-runner@bf7454d06d71f1098171f2acdf0cd4708d7b5920 # v2.20.0
+        with:
+          egress-policy: audit
+      - name: Checkout current protected main
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
+          fetch-depth: 1
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12"
+      - name: Execute private-inclusive Hugging Face license control
+        id: license
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          HF_ORG_TOKEN: ${{ secrets.HF_ORG_TOKEN }}
+        run: |
+          set +e
+          mkdir -p reports/organization-control-sweep
+          python .github/scripts/hf_license_consistency.py \
+            --include-private \
+            --min-private 5 \
+            --report reports/organization-control-sweep/hugging-face-license.json
+          code=$?
+          echo "exit_code=$code" >> "$GITHUB_OUTPUT"
+          exit 0
+      - name: Upload immutable Hugging Face-license evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: hugging-face-license-${{ github.run_id }}
+          path: reports/organization-control-sweep/hugging-face-license.json
+          if-no-files-found: error
+          retention-days: 90
+      - name: Enforce Hugging Face-license result
+        if: always()
+        env:
+          EXIT_CODE: ${{ steps.license.outputs.exit_code }}
+        run: |
+          code="${EXIT_CODE:-2}"
+          test "$code" = '0' || { echo "::error::Hugging Face license consistency is red"; exit "$code"; }
+          echo 'Hugging Face license consistency is verified from current protected main.'
+
+  public-links:
+    name: Public repository link reachability
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Harden runner
+        uses: step-security/harden-runner@bf7454d06d71f1098171f2acdf0cd4708d7b5920 # v2.20.0
+        with:
+          egress-policy: audit
+      - name: Checkout current protected main
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
+          fetch-depth: 1
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12"
+      - name: Execute deterministic public-link control
+        id: links
+        env:
+          SZL_GITHUB_TOKEN: ${{ secrets.SZL_GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          set +e
+          mkdir -p reports/organization-control-sweep
+          python .github/scripts/public_repo_link_check.py \
+            --scan-docs \
+            --check-deep-links \
+            --fail-on-missing \
+            --report reports/organization-control-sweep/public-links.json
+          code=$?
+          echo "exit_code=$code" >> "$GITHUB_OUTPUT"
+          exit 0
+      - name: Upload immutable public-link evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: public-links-${{ github.run_id }}
+          path: reports/organization-control-sweep/public-links.json
+          if-no-files-found: error
+          retention-days: 90
+      - name: Enforce public-link result
+        if: always()
+        env:
+          EXIT_CODE: ${{ steps.links.outputs.exit_code }}
+        run: |
+          code="${EXIT_CODE:-2}"
+          test "$code" = '0' || { echo "::error::public-link reachability is red"; exit "$code"; }
+          echo 'Public-link reachability is verified from current protected main.'

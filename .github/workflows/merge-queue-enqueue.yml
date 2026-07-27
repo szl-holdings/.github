@@ -1,0 +1,181 @@
+name: Protected Merge Queue Enqueue
+
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, reopened, synchronize, ready_for_review, edited]
+
+permissions:
+  contents: read
+  pull-requests: read
+  statuses: read
+  checks: read
+
+concurrency:
+  group: merge-queue-enqueue-${{ github.event.pull_request.number }}-${{ github.event.pull_request.head.sha }}
+  cancel-in-progress: true
+
+jobs:
+  enqueue:
+    name: Enqueue exact attested head without direct merge
+    if: >-
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      github.event.pull_request.draft == false
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      GH_TOKEN: ${{ secrets.SZL_GITHUB_TOKEN }}
+      REPOSITORY: ${{ github.repository }}
+      PR: ${{ github.event.pull_request.number }}
+      EXPECTED_HEAD: ${{ github.event.pull_request.head.sha }}
+    steps:
+      - name: Harden runner
+        uses: step-security/harden-runner@bf7454d06d71f1098171f2acdf0cd4708d7b5920 # v2.20.0
+        with:
+          egress-policy: audit
+
+      - name: Checkout the exact controller source
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+          fetch-depth: 1
+
+      - name: Verify the enqueue-only source contract
+        run: |
+          set -euo pipefail
+          mkdir -p reports/merge-queue-enqueue
+          printf '%s\n' '{"schema":"szl.merge-queue-enqueue-contract/v1","stage":"source-contract","result":"STARTED"}' \
+            > reports/merge-queue-enqueue/contract.json
+          python .github/scripts/test_merge_queue_enqueue.py
+          git diff --check
+
+      - name: Wait for exact-head App attestation and enqueue
+        id: enqueue
+        shell: bash
+        run: |
+          set -euo pipefail
+          [ -n "${GH_TOKEN:-}" ] \
+            || { echo "::error::governed SZL_GITHUB_TOKEN is unavailable"; exit 1; }
+
+          OWNER="${REPOSITORY%%/*}"
+          NAME="${REPOSITORY#*/}"
+          mkdir -p reports/merge-queue-enqueue
+
+          attested=0
+          for attempt in $(seq 1 120); do
+            gh api "repos/$REPOSITORY/pulls/$PR" \
+              > reports/merge-queue-enqueue/pull-request.json
+            CURRENT_HEAD="$(jq -r .head.sha reports/merge-queue-enqueue/pull-request.json)"
+            CURRENT_STATE="$(jq -r '.state | ascii_upcase' reports/merge-queue-enqueue/pull-request.json)"
+            CURRENT_DRAFT="$(jq -r .draft reports/merge-queue-enqueue/pull-request.json)"
+
+            [ "$CURRENT_HEAD" = "$EXPECTED_HEAD" ] \
+              || { echo "::error::pull request head moved from $EXPECTED_HEAD to $CURRENT_HEAD"; exit 1; }
+            [ "$CURRENT_STATE" = 'OPEN' ] \
+              || { echo "::error::pull request state is $CURRENT_STATE, not OPEN"; exit 1; }
+            [ "$CURRENT_DRAFT" = 'false' ] \
+              || { echo "::error::pull request returned to draft"; exit 1; }
+
+            gh api "repos/$REPOSITORY/commits/$EXPECTED_HEAD/status" \
+              > reports/merge-queue-enqueue/commit-status.json
+            STATUS_COUNT="$(jq '[.statuses[] | select(.context == "attestation/qillqaq" and .state == "success")] | length' reports/merge-queue-enqueue/commit-status.json)"
+
+            gh api "repos/$REPOSITORY/pulls/$PR/reviews?per_page=100" \
+              > reports/merge-queue-enqueue/reviews.json
+            APPROVAL_COUNT="$(jq --arg head "$EXPECTED_HEAD" '[.[] | select(
+              (.user.login == "qillqaq-attestor[bot]" or .user.login == "qillqaq-attestor")
+              and .state == "APPROVED"
+              and .commit_id == $head
+            )] | length' reports/merge-queue-enqueue/reviews.json)"
+
+            if [ "$STATUS_COUNT" -ge 1 ] && [ "$APPROVAL_COUNT" -ge 1 ]; then
+              attested=1
+              break
+            fi
+            sleep 10
+          done
+          [ "$attested" -eq 1 ] \
+            || { echo "::error::exact-head qillqaq attestation did not arrive"; exit 1; }
+
+          gh api graphql \
+            -f query='query($owner:String!,$name:String!,$number:Int!){repository(owner:$owner,name:$name){pullRequest(number:$number){id headRefOid isDraft state mergeQueueEntry{id}}}}' \
+            -F owner="$OWNER" \
+            -F name="$NAME" \
+            -F number="$PR" \
+            > reports/merge-queue-enqueue/queue-before.json
+
+          PULL_REQUEST_ID="$(jq -r .data.repository.pullRequest.id reports/merge-queue-enqueue/queue-before.json)"
+          GRAPH_HEAD="$(jq -r .data.repository.pullRequest.headRefOid reports/merge-queue-enqueue/queue-before.json)"
+          GRAPH_DRAFT="$(jq -r .data.repository.pullRequest.isDraft reports/merge-queue-enqueue/queue-before.json)"
+          GRAPH_STATE="$(jq -r .data.repository.pullRequest.state reports/merge-queue-enqueue/queue-before.json)"
+          QUEUE_ENTRY="$(jq -r '.data.repository.pullRequest.mergeQueueEntry.id // empty' reports/merge-queue-enqueue/queue-before.json)"
+
+          [ "$GRAPH_HEAD" = "$EXPECTED_HEAD" ] \
+            || { echo "::error::GraphQL head mismatch"; exit 1; }
+          [ "$GRAPH_DRAFT" = 'false' ] \
+            || { echo "::error::GraphQL reports draft state"; exit 1; }
+          [ "$GRAPH_STATE" = 'OPEN' ] \
+            || { echo "::error::GraphQL state is $GRAPH_STATE, not OPEN"; exit 1; }
+
+          if [ -n "$QUEUE_ENTRY" ]; then
+            RESULT='ALREADY_QUEUED'
+          else
+            set +e
+            gh api graphql \
+              -f query='mutation($id:ID!,$head:GitObjectID!){enqueuePullRequest(input:{pullRequestId:$id,expectedHeadOid:$head}){mergeQueueEntry{id}}}' \
+              -F id="$PULL_REQUEST_ID" \
+              -F head="$EXPECTED_HEAD" \
+              > reports/merge-queue-enqueue/enqueue-result.json 2> reports/merge-queue-enqueue/enqueue-error.txt
+            enqueue_code=$?
+            set -e
+
+            gh api graphql \
+              -f query='query($owner:String!,$name:String!,$number:Int!){repository(owner:$owner,name:$name){pullRequest(number:$number){headRefOid mergeQueueEntry{id}}}}' \
+              -F owner="$OWNER" \
+              -F name="$NAME" \
+              -F number="$PR" \
+              > reports/merge-queue-enqueue/queue-after.json
+            QUEUE_ENTRY="$(jq -r '.data.repository.pullRequest.mergeQueueEntry.id // empty' reports/merge-queue-enqueue/queue-after.json)"
+            if [ "$enqueue_code" -ne 0 ] && [ -z "$QUEUE_ENTRY" ]; then
+              echo "::error::enqueuePullRequest failed and no queue entry exists"
+              cat reports/merge-queue-enqueue/enqueue-error.txt
+              exit "$enqueue_code"
+            fi
+            [ -n "$QUEUE_ENTRY" ] \
+              || { echo "::error::enqueue mutation returned no queue entry"; exit 1; }
+            RESULT='ENQUEUED'
+          fi
+
+          jq -n \
+            --arg schema 'szl.merge-queue-enqueue/v1' \
+            --arg repository "$REPOSITORY" \
+            --argjson pull_request "$PR" \
+            --arg head_sha "$EXPECTED_HEAD" \
+            --arg result "$RESULT" \
+            --arg queue_entry_id "$QUEUE_ENTRY" \
+            '{
+              schema: $schema,
+              repository: $repository,
+              pull_request: $pull_request,
+              head_sha: $head_sha,
+              result: $result,
+              queue_entry_id: $queue_entry_id,
+              exact_head_attestation_verified: true,
+              exact_head_app_approval_verified: true,
+              direct_merge_attempted: false,
+              bypass_used: false,
+              merge_performed: false,
+              token_value_recorded: false
+            }' > reports/merge-queue-enqueue/receipt.json
+          cat reports/merge-queue-enqueue/receipt.json
+          echo "result=$RESULT" >> "$GITHUB_OUTPUT"
+
+      - name: Upload immutable enqueue receipt
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: merge-queue-enqueue-${{ github.run_id }}
+          path: reports/merge-queue-enqueue
+          if-no-files-found: error
+          retention-days: 90
