@@ -38,7 +38,9 @@ class MergeQueueEnqueueContractTests(unittest.TestCase):
             "EXPECTED_HEAD",
             "headRefOid",
             "isDraft",
-            "state == \"OPEN\"",
+            "GRAPH_STATE",
+            "CURRENT_STATE",
+            "'OPEN'",
         )
         for marker in required:
             self.assertIn(marker, self.source, marker)
