@@ -1,0 +1,194 @@
+name: CI Health 5c991 — Read-Only Production Readback
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - .github/workflows/ci-health-5c991-readback-pr.yml
+
+permissions:
+  actions: read
+  contents: read
+  issues: read
+
+concurrency:
+  group: ci-health-5c991-readback-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+env:
+  TARGET_SHA: 5c991c4b0430e227db02d9e752e15152a1e2027b
+  REPORT_PATH: reports/ci-health-5c991-readback.json
+
+jobs:
+  inspect:
+    name: Exact production run, jobs, artifacts, and rolling issue
+    if: >-
+      github.repository == 'szl-holdings/.github' &&
+      github.event.pull_request.head.ref == 'diag/sign-pr333-v1'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - name: Query GitHub read-only control plane
+        id: query
+        shell: python
+        run: |
+          import json
+          import os
+          import re
+          import subprocess
+          from datetime import datetime, timezone
+          from pathlib import Path
+
+          repository = os.environ["GITHUB_REPOSITORY"]
+          target = os.environ["TARGET_SHA"]
+
+          def api(path):
+              process = subprocess.run(
+                  ["gh", "api", "--method", "GET", path],
+                  capture_output=True,
+                  text=True,
+                  check=False,
+                  env=os.environ,
+              )
+              raw = process.stdout.strip()
+              try:
+                  payload = json.loads(raw) if raw else None
+              except json.JSONDecodeError:
+                  payload = raw[:4000]
+              return {
+                  "ok": process.returncode == 0,
+                  "returncode": process.returncode,
+                  "payload": payload,
+                  "stderr": process.stderr.strip()[:2000],
+              }
+
+          runs_result = api(
+              f"repos/{repository}/actions/workflows/ci-health-digest.yml/runs?per_page=50"
+          )
+          workflow_runs = (
+              (runs_result.get("payload") or {}).get("workflow_runs", [])
+              if runs_result.get("ok")
+              and isinstance(runs_result.get("payload"), dict)
+              else []
+          )
+          selected = [
+              run
+              for run in workflow_runs
+              if isinstance(run, dict) and run.get("head_sha") == target
+          ]
+          runs = []
+          for run in selected:
+              run_id = int(run.get("id") or 0)
+              jobs_result = api(
+                  f"repos/{repository}/actions/runs/{run_id}/jobs?per_page=100"
+              )
+              artifacts_result = api(
+                  f"repos/{repository}/actions/runs/{run_id}/artifacts?per_page=100"
+              )
+              jobs_payload = jobs_result.get("payload")
+              artifacts_payload = artifacts_result.get("payload")
+              runs.append(
+                  {
+                      "id": run_id,
+                      "status": run.get("status"),
+                      "conclusion": run.get("conclusion"),
+                      "event": run.get("event"),
+                      "head_branch": run.get("head_branch"),
+                      "head_sha": run.get("head_sha"),
+                      "created_at": run.get("created_at"),
+                      "updated_at": run.get("updated_at"),
+                      "html_url": run.get("html_url"),
+                      "jobs_query_ok": jobs_result.get("ok"),
+                      "jobs": [
+                          {
+                              "id": job.get("id"),
+                              "name": job.get("name"),
+                              "status": job.get("status"),
+                              "conclusion": job.get("conclusion"),
+                              "steps": [
+                                  {
+                                      "name": step.get("name"),
+                                      "status": step.get("status"),
+                                      "conclusion": step.get("conclusion"),
+                                  }
+                                  for step in job.get("steps", [])
+                              ],
+                          }
+                          for job in (
+                              jobs_payload.get("jobs", [])
+                              if jobs_result.get("ok")
+                              and isinstance(jobs_payload, dict)
+                              else []
+                          )
+                      ],
+                      "artifacts_query_ok": artifacts_result.get("ok"),
+                      "artifacts": [
+                          {
+                              "id": artifact.get("id"),
+                              "name": artifact.get("name"),
+                              "size_in_bytes": artifact.get("size_in_bytes"),
+                              "digest": artifact.get("digest"),
+                              "expired": artifact.get("expired"),
+                          }
+                          for artifact in (
+                              artifacts_payload.get("artifacts", [])
+                              if artifacts_result.get("ok")
+                              and isinstance(artifacts_payload, dict)
+                              else []
+                          )
+                      ],
+                  }
+              )
+
+          issue_result = api(f"repos/{repository}/issues/158")
+          issue = issue_result.get("payload")
+          report = {
+              "schema": "szl.ci-health-production-readback/v1",
+              "generated_at": datetime.now(timezone.utc).isoformat(),
+              "repository": repository,
+              "target_sha": target,
+              "runs_query_ok": runs_result.get("ok"),
+              "runs_query_error": runs_result.get("stderr"),
+              "runs": runs,
+              "issue_query_ok": issue_result.get("ok"),
+              "issue": (
+                  {
+                      "number": issue.get("number"),
+                      "state": issue.get("state"),
+                      "updated_at": issue.get("updated_at"),
+                      "body_preview": str(issue.get("body") or "")[:5000],
+                  }
+                  if issue_result.get("ok") and isinstance(issue, dict)
+                  else {"error": issue_result.get("stderr")}
+              ),
+              "credential_value_recorded": False,
+              "mutation": False,
+          }
+          path = Path(os.environ["REPORT_PATH"])
+          path.parent.mkdir(parents=True, exist_ok=True)
+          path.write_text(
+              json.dumps(report, indent=2, sort_keys=True) + "\n",
+              encoding="utf-8",
+          )
+          state = "none"
+          if runs:
+              state = re.sub(
+                  r"[^a-z0-9]+",
+                  "-",
+                  str(runs[0].get("conclusion") or runs[0].get("status") or "unknown").lower(),
+              ).strip("-")
+          slug = f"ci-health-5c991-r{len(runs)}-{state}"[:180]
+          with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as output:
+              output.write(f"slug={slug}\n")
+          print(json.dumps({"slug": slug, "runs": runs, "issue": report["issue"]}, indent=2))
+
+      - name: Upload immutable production readback
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: ${{ steps.query.outputs.slug || format('ci-health-5c991-readback-{0}', github.run_id) }}
+          path: ${{ env.REPORT_PATH }}
+          if-no-files-found: error
+          retention-days: 30
