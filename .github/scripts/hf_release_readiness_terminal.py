@@ -4,8 +4,8 @@
 The release publisher owns all Hugging Face mutation. This terminal verifier
 runs only after that publisher completes, binds every observation to immutable
 revisions, verifies the Dataset Viewer while the dataset revision is stable,
-reads Kernel trees through the first-class Kernel REST endpoint, executes each
-Kernel selfcheck at the exact observed revision, and updates one deterministic
+reads Kernel trees through credential-safe authenticated Git, executes each
+Kernel selfcheck from an exact-revision local checkout, and updates one deterministic
 GitHub evidence issue.
 
 No generic ``huggingface_hub`` repository helper is called with the unsupported
@@ -25,6 +25,7 @@ from typing import Any, Mapping
 
 import requests
 from huggingface_hub import HfApi
+from kernel_hub_git import KernelHubGitTransport
 
 REPORT_SCHEMA = "szl.hf-release-readiness/v1"
 PRERELEASE_SCHEMA = "szl.hf-release-readiness/v1-prerelease"
@@ -116,7 +117,13 @@ def _workflow_context() -> dict[str, str]:
 
 
 class TerminalReadiness:
-    def __init__(self, *, token: str, generation: str) -> None:
+    def __init__(
+        self,
+        *,
+        token: str,
+        generation: str,
+        kernel_transport: KernelHubGitTransport | None = None,
+    ) -> None:
         if not token:
             raise ValueError("a non-empty Hugging Face token is required")
         self.generation = _immutable_revision(
@@ -125,6 +132,7 @@ class TerminalReadiness:
         )
         self.token = token
         self.api = HfApi(token=token)
+        self.kernel_transport = kernel_transport or KernelHubGitTransport(token=token)
         self.actions: list[Action] = []
         self.results: dict[str, Any] = {}
 
@@ -222,44 +230,8 @@ class TerminalReadiness:
             f"revision={revision}; files={len(files)}; metadata_stable=true",
         )
 
-    def _kernel_tree_paths(self, repo_id: str, revision: str) -> tuple[str, ...]:
-        owner, name = repo_id.split("/", 1)
-        url = (
-            f"https://huggingface.co/api/kernels/{owner}/{name}/tree/"
-            f"{revision}?recursive=true"
-        )
-        response = requests.get(
-            url,
-            headers=_headers(
-                self.token,
-                user_agent="szl-hf-release-readiness-terminal/2",
-            ),
-            timeout=90,
-        )
-        if response.status_code != 200:
-            raise RuntimeError(
-                f"kernel tree readback failed for {repo_id}@{revision}: "
-                f"HTTP {response.status_code} {response.text[:300]}"
-            )
-        try:
-            payload = response.json()
-        except ValueError as exc:
-            raise RuntimeError(f"kernel tree did not return JSON for {repo_id}") from exc
-        if not isinstance(payload, list):
-            raise RuntimeError(f"kernel tree payload is not a list for {repo_id}")
-        paths = tuple(
-            sorted(
-                {
-                    str(item.get("path") or "")
-                    for item in payload
-                    if isinstance(item, dict)
-                    and item.get("type") in {"file", "blob"}
-                    and str(item.get("path") or "")
-                }
-            )
-        )
-        if not paths:
-            raise RuntimeError(f"kernel tree contains no files for {repo_id}@{revision}")
+    @staticmethod
+    def _validate_kernel_paths(repo_id: str, revision: str, paths: tuple[str, ...]) -> None:
         missing = {"README.md", "contract.json"} - set(paths)
         if missing:
             raise RuntimeError(
@@ -269,33 +241,31 @@ class TerminalReadiness:
             raise RuntimeError(
                 f"kernel build variants are missing for {repo_id}@{revision}"
             )
-        return paths
 
     def verify_kernel(self, repo_id: str) -> None:
-        revision = _immutable_revision(
-            getattr(self.api.kernel_info(repo_id), "sha", ""),
-            label=repo_id,
-        )
-        paths = self._kernel_tree_paths(repo_id, revision)
+        before = self.kernel_transport.snapshot(repo_id)
+        revision = _immutable_revision(before.revision, label=repo_id)
+        paths = before.files
+        self._validate_kernel_paths(repo_id, revision, paths)
 
-        from kernels import get_kernel
+        from kernels import get_local_kernel
 
-        module = get_kernel(repo_id, revision=revision, trust_remote_code=True)
-        check = getattr(module, "selfcheck", None)
-        if not callable(check):
-            raise RuntimeError(f"{repo_id}@{revision} does not expose selfcheck()")
-        result = check()
+        with self.kernel_transport.materialize_revision(repo_id, revision) as repo:
+            module = get_local_kernel(repo, backend="cpu")
+            check = getattr(module, "selfcheck", None)
+            if not callable(check):
+                raise RuntimeError(f"{repo_id}@{revision} does not expose selfcheck()")
+            result = check()
         if not _selfcheck_passed(result):
             raise RuntimeError(f"{repo_id}@{revision} selfcheck did not pass: {result}")
 
-        revision_after = _immutable_revision(
-            getattr(self.api.kernel_info(repo_id), "sha", ""),
-            label=repo_id,
-        )
-        if revision_after != revision:
+        after = self.kernel_transport.snapshot(repo_id)
+        revision_after = _immutable_revision(after.revision, label=repo_id)
+        if revision_after != revision or after.build_tree_sha256 != before.build_tree_sha256:
             raise RuntimeError(
-                f"kernel revision moved during selfcheck: {repo_id}; "
-                f"before={revision}; after={revision_after}"
+                f"kernel source moved during selfcheck: {repo_id}; "
+                f"before={revision}/{before.build_tree_sha256}; "
+                f"after={revision_after}/{after.build_tree_sha256}"
             )
 
         self.results.setdefault("kernels", {})[repo_id] = {
@@ -303,6 +273,8 @@ class TerminalReadiness:
             "remote_file_count": len(paths),
             "build_variants_present": True,
             "metadata_stable": True,
+            "build_tree_sha256": before.build_tree_sha256,
+            "transport": "exact-revision-authenticated-kernel-hub-git-local",
             "selfcheck": result,
         }
         self.record(
@@ -334,8 +306,8 @@ class TerminalReadiness:
             "boundaries": [
                 "This terminal verifier performs no Hugging Face mutation.",
                 "The Lake file inventory is bound to one immutable dataset revision and the Viewer is checked while that revision remains stable.",
-                "First-class Kernel trees are read through the exact-revision Kernel REST endpoint; generic repository helpers never receive repo_type=kernel.",
-                "Kernel selfcheck is executed at the exact immutable revision and metadata must remain stable through verification.",
+                "First-class Kernel metadata and complete trees are read through credential-safe authenticated Git; generic repository helpers never receive repo_type=kernel.",
+                "Kernel selfcheck is executed from an exact-revision authenticated Git checkout, and both revision and build tree must remain stable through verification.",
                 "No model weights are trained, merged, relabeled, uploaded, deployed, or promoted.",
             ],
         }

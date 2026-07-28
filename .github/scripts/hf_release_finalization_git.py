@@ -46,17 +46,26 @@ class KernelGitFinalizer(retry.RetryingFinalizer):
         return {"numpy": numpy.__version__, "torch": torch.__version__}
 
     def _kernel_metadata_revision(self, repo_id: str) -> tuple[str, str]:
-        try:
-            revision = str(getattr(self.api.kernel_info(repo_id), "sha", "") or "")
-            source = "kernel-api+git"
-        except ValueError as exc:
-            if str(exc) != "min() iterable argument is empty":
-                raise
-            revision = self.kernel_transport.snapshot(repo_id).revision
-            source = "authenticated-kernel-hub-git-fallback"
+        revision = self.kernel_transport.snapshot(repo_id).revision
+        source = "authenticated-kernel-hub-git"
         if len(revision) != 40:
             raise RuntimeError(f"Kernel metadata lacks an immutable revision: {repo_id}")
         return revision, source
+
+    def _kernel_selfcheck(self, repo_id: str, revision: str) -> Any:
+        from kernels import get_local_kernel
+
+        with self.kernel_transport.materialize_revision(repo_id, revision) as repo:
+            module = get_local_kernel(repo, backend="cpu")
+            check = getattr(module, "selfcheck", None)
+            if not callable(check):
+                raise RuntimeError(f"{repo_id}@{revision} does not expose selfcheck()")
+            result = check()
+        if result is False:
+            raise RuntimeError(f"{repo_id}@{revision} selfcheck returned false")
+        if isinstance(result, dict) and result.get("ok") is False:
+            raise RuntimeError(f"{repo_id}@{revision} selfcheck failed: {result}")
+        return result
 
     def finalize_kernel(self, repo_id: str, spec: Mapping[str, str]) -> None:
         source_dir = self.roots[spec["source_root"]] / spec["source_dir"]
@@ -112,6 +121,7 @@ class KernelGitFinalizer(retry.RetryingFinalizer):
             "revision": publication.revision,
             "transport": "authenticated-kernel-hub-git",
             "metadata_revision_source": metadata_source,
+            "selfcheck_transport": "exact-revision-authenticated-kernel-hub-git-local",
             "changed": publication.changed,
             "remote_file_count": publication.remote_file_count,
             "build_variants_preserved": publication.build_variants_preserved,
@@ -147,7 +157,7 @@ class KernelGitFinalizer(retry.RetryingFinalizer):
             "First-class Kernels use credential-safe authenticated Git.",
             "Generic repository helpers are never called with repo_type=kernel.",
             "Only README.md and contract.json may change in Kernel repositories.",
-            "The complete Kernel build tree and immutable revision binding are verified.",
+            "The complete Kernel build tree, immutable revision binding, and exact-revision local selfcheck are verified through authenticated Git.",
             "No model, Space, visibility, hardware, training, weight, qualification, or promotion state is mutated.",
         ]
         return report

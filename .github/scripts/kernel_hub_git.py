@@ -3,8 +3,8 @@
 
 The generic ``huggingface_hub`` repository helpers currently accept model,
 dataset, and Space repository types. First-class Kernel repositories therefore
-use their native Git endpoint for card/contract publication while metadata is
-bound independently through ``HfApi.kernel_info`` by the caller.
+use their native Git endpoint for metadata, exact-revision execution, and
+card/contract publication.
 
 Only ``README.md`` and ``contract.json`` may change. The complete remote tree is
 inventoried with ``git ls-tree`` without checking out kernel build blobs, and the
@@ -132,7 +132,14 @@ class KernelHubGitTransport:
         env: Mapping[str, str] | None = None,
         check: bool = True,
     ) -> subprocess.CompletedProcess[str]:
-        command = [self.git_bin, "-c", "protocol.file.allow=always", *args]
+        command = [
+            self.git_bin,
+            "-c",
+            "protocol.file.allow=always",
+            "-c",
+            "core.autocrlf=false",
+            *args,
+        ]
         try:
             result = subprocess.run(
                 command,
@@ -204,6 +211,40 @@ class KernelHubGitTransport:
             repo, _ = self._fetch_main(repo_id, Path(raw))
             return self._snapshot_from_repo(repo_id, repo)
 
+    @contextmanager
+    def materialize_revision(
+        self,
+        repo_id: str,
+        expected_revision: str,
+    ) -> Iterator[Path]:
+        """Check out the complete current Kernel tree at one exact revision."""
+
+        expected = str(expected_revision or "").strip().lower()
+        if not SHA40.fullmatch(expected):
+            raise KernelGitError(
+                f"Kernel materialization requires an immutable revision: {repo_id}@{expected!r}"
+            )
+        with tempfile.TemporaryDirectory(
+            prefix="szl-kernel-materialize-",
+            dir=self.temp_root,
+        ) as raw:
+            repo, _ = self._fetch_main(repo_id, Path(raw))
+            observed = self._git(["rev-parse", "FETCH_HEAD"], cwd=repo).stdout.strip().lower()
+            if observed != expected:
+                raise KernelGitError(
+                    "Kernel main moved before materialization: "
+                    f"expected {expected}, observed {observed}; repo={repo_id}"
+                )
+            with self._auth_environment() as env:
+                self._git(["checkout", "-q", "--detach", "FETCH_HEAD"], cwd=repo, env=env)
+            checked_out = self._git(["rev-parse", "HEAD"], cwd=repo).stdout.strip().lower()
+            if checked_out != expected:
+                raise KernelGitError(
+                    "Kernel checkout revision mismatch: "
+                    f"expected {expected}, observed {checked_out}; repo={repo_id}"
+                )
+            yield repo
+
     def _sparse_checkout(self, repo_id: str, root: Path) -> Path:
         repo, _ = self._fetch_main(repo_id, root)
         with self._auth_environment() as env:
@@ -240,7 +281,15 @@ class KernelHubGitTransport:
             with self._auth_environment() as env:
                 for path in sorted(ALLOWED_PATHS):
                     result = subprocess.run(
-                        [self.git_bin, "-c", "protocol.file.allow=always", "show", f"FETCH_HEAD:{path}"],
+                        [
+                            self.git_bin,
+                            "-c",
+                            "protocol.file.allow=always",
+                            "-c",
+                            "core.autocrlf=false",
+                            "show",
+                            f"FETCH_HEAD:{path}",
+                        ],
                         cwd=repo,
                         env=env,
                         capture_output=True,

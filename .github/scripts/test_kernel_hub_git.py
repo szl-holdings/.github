@@ -151,6 +151,32 @@ class KernelHubGitTransportTests(unittest.TestCase):
             }
         self.assertEqual(visible, {"README.md", "contract.json"})
 
+    def test_materialize_revision_checks_out_complete_exact_tree(self) -> None:
+        expected = self.head()
+        with self.transport.materialize_revision(self.repo_id, expected) as repo:
+            self.assertEqual(
+                git("rev-parse", "HEAD", cwd=repo).stdout.strip(),
+                expected,
+            )
+            visible = {
+                str(path.relative_to(repo)).replace("\\", "/")
+                for path in repo.rglob("*")
+                if path.is_file() and ".git" not in path.parts
+            }
+            self.assertEqual(
+                visible,
+                {
+                    "README.md",
+                    "contract.json",
+                    "build/torch27-cpu/__init__.py",
+                },
+            )
+
+    def test_materialize_revision_rejects_moved_main(self) -> None:
+        with self.assertRaisesRegex(KernelGitError, "main moved before materialization"):
+            with self.transport.materialize_revision(self.repo_id, "0" * 40):
+                self.fail("mismatched revision must not be materialized")
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)

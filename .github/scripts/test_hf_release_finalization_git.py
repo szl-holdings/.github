@@ -7,6 +7,7 @@ import sys
 import tempfile
 import unittest
 import unittest.mock
+from contextlib import contextmanager
 from types import SimpleNamespace
 
 HERE = pathlib.Path(__file__).resolve().parent
@@ -18,11 +19,13 @@ from kernel_hub_git import KernelPublication, KernelSnapshot
 
 
 class FakeTransport:
-    def __init__(self, publication=None, snapshot=None):
+    def __init__(self, publication=None, snapshot=None, materialized_path=None):
         self.publication = publication
         self.snapshot_value = snapshot
+        self.materialized_path = materialized_path
         self.publish_calls = []
         self.snapshot_calls = []
+        self.materialize_calls = []
 
     def publish(self, **kwargs):
         self.publish_calls.append(kwargs)
@@ -31,6 +34,11 @@ class FakeTransport:
     def snapshot(self, repo_id):
         self.snapshot_calls.append(repo_id)
         return self.snapshot_value
+
+    @contextmanager
+    def materialize_revision(self, repo_id, revision):
+        self.materialize_calls.append((repo_id, revision))
+        yield self.materialized_path
 
 
 class FakeApi:
@@ -69,7 +77,16 @@ class KernelGitFinalizerTests(unittest.TestCase):
         instance.generation = "d" * 40
         instance.roots = {"energy": root / "energy"}
         instance.api = FakeApi()
-        instance.kernel_transport = FakeTransport(publication=publication)
+        instance.kernel_transport = FakeTransport(
+            publication=publication,
+            snapshot=KernelSnapshot(
+                repo_id="SZLHOLDINGS/example",
+                revision="a" * 40,
+                files=("README.md", "contract.json", "build/cpu/__init__.py"),
+                build_tree_sha256="c" * 64,
+                remote_url="https://huggingface.co/kernels/SZLHOLDINGS/example",
+            ),
+        )
         instance.actions = []
         instance.results = {}
         instance._kernel_selfcheck = lambda repo_id, revision: {"ok": True}
@@ -91,9 +108,8 @@ class KernelGitFinalizerTests(unittest.TestCase):
         finally:
             tmp.cleanup()
 
-    def test_empty_kernel_api_builds_fall_back_to_authenticated_git(self):
+    def test_kernel_metadata_is_bound_directly_to_authenticated_git(self):
         tmp, instance = self.make_instance()
-        instance.api = FakeApi(error=ValueError("min() iterable argument is empty"))
         instance.kernel_transport.snapshot_value = KernelSnapshot(
             repo_id="SZLHOLDINGS/example",
             revision="a" * 40,
@@ -111,21 +127,54 @@ class KernelGitFinalizerTests(unittest.TestCase):
             result = instance.results["kernels"]["SZLHOLDINGS/example"]
             self.assertEqual(
                 result["metadata_revision_source"],
-                "authenticated-kernel-hub-git-fallback",
+                "authenticated-kernel-hub-git",
             )
         finally:
             tmp.cleanup()
 
-    def test_unrelated_kernel_api_value_error_still_fails_closed(self):
+    def test_kernel_metadata_does_not_call_broken_kernel_api(self):
         tmp, instance = self.make_instance()
         instance.api = FakeApi(error=ValueError("malformed kernel metadata"))
+        instance.kernel_transport.snapshot_value = KernelSnapshot(
+            repo_id="SZLHOLDINGS/example",
+            revision="a" * 40,
+            files=("README.md", "contract.json", "build/cpu/__init__.py"),
+            build_tree_sha256="c" * 64,
+            remote_url="https://huggingface.co/kernels/SZLHOLDINGS/example",
+        )
         try:
-            with self.assertRaisesRegex(ValueError, "malformed kernel metadata"):
-                instance.finalize_kernel(
-                    "SZLHOLDINGS/example",
-                    {"source_root": "energy", "source_dir": "hf-kernels/example"},
-                )
-            self.assertFalse(instance.kernel_transport.publish_calls)
+            instance.finalize_kernel(
+                "SZLHOLDINGS/example",
+                {"source_root": "energy", "source_dir": "hf-kernels/example"},
+            )
+            self.assertEqual(len(instance.kernel_transport.publish_calls), 1)
+        finally:
+            tmp.cleanup()
+
+    def test_kernel_selfcheck_loads_exact_materialized_revision(self):
+        tmp, instance = self.make_instance()
+        repo = pathlib.Path(tmp.name) / "materialized"
+        repo.mkdir()
+        instance.kernel_transport.materialized_path = repo
+        instance._kernel_selfcheck = finalizer.KernelGitFinalizer._kernel_selfcheck.__get__(
+            instance,
+            finalizer.KernelGitFinalizer,
+        )
+        get_local_kernel = unittest.mock.Mock(
+            return_value=SimpleNamespace(selfcheck=lambda: {"ok": True})
+        )
+        try:
+            with unittest.mock.patch.dict(
+                sys.modules,
+                {"kernels": SimpleNamespace(get_local_kernel=get_local_kernel)},
+            ):
+                result = instance._kernel_selfcheck("SZLHOLDINGS/example", "b" * 40)
+            self.assertEqual(result, {"ok": True})
+            self.assertEqual(
+                instance.kernel_transport.materialize_calls,
+                [("SZLHOLDINGS/example", "b" * 40)],
+            )
+            get_local_kernel.assert_called_once_with(repo, backend="cpu")
         finally:
             tmp.cleanup()
 
@@ -147,7 +196,7 @@ class KernelGitFinalizerTests(unittest.TestCase):
             )
             self.assertEqual(
                 instance.kernel_transport.snapshot_calls,
-                ["SZLHOLDINGS/example"],
+                ["SZLHOLDINGS/example", "SZLHOLDINGS/example"],
             )
             self.assertFalse(instance.kernel_transport.publish_calls)
         finally:

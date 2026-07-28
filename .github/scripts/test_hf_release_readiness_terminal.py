@@ -5,7 +5,11 @@ import importlib
 import json
 import pathlib
 import sys
+import tempfile
 import unittest
+import unittest.mock
+from contextlib import contextmanager
+from types import SimpleNamespace
 
 HERE = pathlib.Path(__file__).resolve().parent
 ROOT = HERE.parents[1]
@@ -13,6 +17,24 @@ if str(HERE) not in sys.path:
     sys.path.insert(0, str(HERE))
 
 terminal = importlib.import_module("hf_release_readiness_terminal")
+from kernel_hub_git import KernelSnapshot
+
+
+class FakeKernelTransport:
+    def __init__(self, *, snapshot: KernelSnapshot, repo: pathlib.Path) -> None:
+        self.snapshot_value = snapshot
+        self.repo = repo
+        self.snapshot_calls: list[str] = []
+        self.materialize_calls: list[tuple[str, str]] = []
+
+    def snapshot(self, repo_id: str) -> KernelSnapshot:
+        self.snapshot_calls.append(repo_id)
+        return self.snapshot_value
+
+    @contextmanager
+    def materialize_revision(self, repo_id: str, revision: str):
+        self.materialize_calls.append((repo_id, revision))
+        yield self.repo
 
 
 class TerminalReleaseReadinessTests(unittest.TestCase):
@@ -70,6 +92,45 @@ class TerminalReleaseReadinessTests(unittest.TestCase):
         )
         self.assertFalse(terminal._selfcheck_passed({"checks": {}}))
 
+    def test_kernel_verification_uses_one_exact_git_revision(self) -> None:
+        repo_id = "SZLHOLDINGS/example"
+        revision = "b" * 40
+        with tempfile.TemporaryDirectory() as raw:
+            repo = pathlib.Path(raw)
+            transport = FakeKernelTransport(
+                snapshot=KernelSnapshot(
+                    repo_id=repo_id,
+                    revision=revision,
+                    files=("README.md", "contract.json", "build/cpu/__init__.py"),
+                    build_tree_sha256="c" * 64,
+                    remote_url="https://huggingface.co/kernels/SZLHOLDINGS/example",
+                ),
+                repo=repo,
+            )
+            verifier = terminal.TerminalReadiness(
+                token="test-token",
+                generation="a" * 40,
+                kernel_transport=transport,
+            )
+            get_local_kernel = unittest.mock.Mock(
+                return_value=SimpleNamespace(selfcheck=lambda: {"ok": True})
+            )
+            with unittest.mock.patch.dict(
+                sys.modules,
+                {"kernels": SimpleNamespace(get_local_kernel=get_local_kernel)},
+            ):
+                verifier.verify_kernel(repo_id)
+
+        self.assertEqual(transport.snapshot_calls, [repo_id, repo_id])
+        self.assertEqual(transport.materialize_calls, [(repo_id, revision)])
+        get_local_kernel.assert_called_once_with(repo, backend="cpu")
+        result = verifier.results["kernels"][repo_id]
+        self.assertEqual(result["revision"], revision)
+        self.assertEqual(
+            result["transport"],
+            "exact-revision-authenticated-kernel-hub-git-local",
+        )
+
     def test_issue_body_contains_machine_readable_readiness_report(self) -> None:
         report = {
             "schema": terminal.REPORT_SCHEMA,
@@ -108,8 +169,8 @@ class TerminalReleaseReadinessTests(unittest.TestCase):
         for token in forbidden:
             self.assertNotIn(token, source)
         self.assertIn('repo_type="dataset"', source)
-        self.assertIn("revision=revision", source)
-        self.assertIn("/api/kernels/", source)
+        self.assertIn("materialize_revision(repo_id, revision)", source)
+        self.assertNotIn("/api/kernels/", source)
 
     def test_report_shape_matches_final_estate_reconciler(self) -> None:
         report = {
