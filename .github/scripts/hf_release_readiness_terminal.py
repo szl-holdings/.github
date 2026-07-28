@@ -25,6 +25,7 @@ from typing import Any, Mapping
 
 import requests
 from huggingface_hub import HfApi
+from kernel_hub_git import KernelHubGitTransport
 
 REPORT_SCHEMA = "szl.hf-release-readiness/v1"
 PRERELEASE_SCHEMA = "szl.hf-release-readiness/v1-prerelease"
@@ -116,7 +117,13 @@ def _workflow_context() -> dict[str, str]:
 
 
 class TerminalReadiness:
-    def __init__(self, *, token: str, generation: str) -> None:
+    def __init__(
+        self,
+        *,
+        token: str,
+        generation: str,
+        kernel_transport: KernelHubGitTransport | None = None,
+    ) -> None:
         if not token:
             raise ValueError("a non-empty Hugging Face token is required")
         self.generation = _immutable_revision(
@@ -125,6 +132,9 @@ class TerminalReadiness:
         )
         self.token = token
         self.api = HfApi(token=token)
+        self.kernel_transport = kernel_transport or KernelHubGitTransport(
+            token=token
+        )
         self.actions: list[Action] = []
         self.results: dict[str, Any] = {}
 
@@ -278,13 +288,37 @@ class TerminalReadiness:
         )
         paths = self._kernel_tree_paths(repo_id, revision)
 
-        from kernels import get_kernel
+        from kernels import get_kernel, get_local_kernel
 
-        module = get_kernel(repo_id, revision=revision, trust_remote_code=True)
-        check = getattr(module, "selfcheck", None)
-        if not callable(check):
-            raise RuntimeError(f"{repo_id}@{revision} does not expose selfcheck()")
-        result = check()
+        try:
+            module = get_kernel(
+                repo_id,
+                revision=revision,
+                trust_remote_code=True,
+            )
+            selfcheck_transport = "kernel-api"
+        except ValueError as exc:
+            if str(exc) != "min() iterable argument is empty":
+                raise
+            with self.kernel_transport.materialize_build(
+                repo_id,
+                revision,
+            ) as repo:
+                module = get_local_kernel(repo)
+                check = getattr(module, "selfcheck", None)
+                if not callable(check):
+                    raise RuntimeError(
+                        f"{repo_id}@{revision} does not expose selfcheck()"
+                    )
+                result = check()
+            selfcheck_transport = "authenticated-kernel-hub-git-fallback"
+        else:
+            check = getattr(module, "selfcheck", None)
+            if not callable(check):
+                raise RuntimeError(
+                    f"{repo_id}@{revision} does not expose selfcheck()"
+                )
+            result = check()
         if not _selfcheck_passed(result):
             raise RuntimeError(f"{repo_id}@{revision} selfcheck did not pass: {result}")
 
@@ -304,6 +338,7 @@ class TerminalReadiness:
             "build_variants_present": True,
             "metadata_stable": True,
             "selfcheck": result,
+            "selfcheck_transport": selfcheck_transport,
         }
         self.record(
             repo_id,
@@ -335,7 +370,7 @@ class TerminalReadiness:
                 "This terminal verifier performs no Hugging Face mutation.",
                 "The Lake file inventory is bound to one immutable dataset revision and the Viewer is checked while that revision remains stable.",
                 "First-class Kernel trees are read through the exact-revision Kernel REST endpoint; generic repository helpers never receive repo_type=kernel.",
-                "Kernel selfcheck is executed at the exact immutable revision and metadata must remain stable through verification.",
+                "Kernel selfcheck is executed at the exact immutable revision through the Kernel API or authenticated read-only Kernel Git fallback, and metadata must remain stable through verification.",
                 "No model weights are trained, merged, relabeled, uploaded, deployed, or promoted.",
             ],
         }

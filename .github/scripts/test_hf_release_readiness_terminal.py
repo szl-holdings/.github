@@ -5,7 +5,10 @@ import importlib
 import json
 import pathlib
 import sys
+import types
 import unittest
+from contextlib import contextmanager
+from unittest.mock import Mock, patch
 
 HERE = pathlib.Path(__file__).resolve().parent
 ROOT = HERE.parents[1]
@@ -69,6 +72,87 @@ class TerminalReleaseReadinessTests(unittest.TestCase):
             terminal._selfcheck_passed({"checks": {"a": True, "b": False}})
         )
         self.assertFalse(terminal._selfcheck_passed({"checks": {}}))
+
+    def test_empty_kernel_metadata_uses_exact_git_fallback(self) -> None:
+        revision = "b" * 40
+        repo_id = terminal.KERNEL_IDS[0]
+        repo_root = pathlib.Path("exact-kernel-root")
+
+        class FakeApi:
+            def kernel_info(self, observed_repo_id: str) -> object:
+                self.last_repo_id = observed_repo_id
+                return types.SimpleNamespace(sha=revision)
+
+        class FakeTransport:
+            def __init__(self) -> None:
+                self.calls: list[tuple[str, str]] = []
+
+            @contextmanager
+            def materialize_build(
+                self,
+                observed_repo_id: str,
+                observed_revision: str,
+            ):
+                self.calls.append((observed_repo_id, observed_revision))
+                yield repo_root
+
+        module = types.SimpleNamespace(selfcheck=Mock(return_value={"ok": True}))
+        fake_kernels = types.SimpleNamespace(
+            get_kernel=Mock(
+                side_effect=ValueError("min() iterable argument is empty")
+            ),
+            get_local_kernel=Mock(return_value=module),
+        )
+        transport = FakeTransport()
+        verifier = terminal.TerminalReadiness(
+            token="test-token",
+            generation="a" * 40,
+            kernel_transport=transport,
+        )
+        verifier.api = FakeApi()
+        verifier._kernel_tree_paths = Mock(return_value=("README.md", "build/cpu/x"))
+
+        with patch.dict(sys.modules, {"kernels": fake_kernels}):
+            verifier.verify_kernel(repo_id)
+
+        fake_kernels.get_kernel.assert_called_once_with(
+            repo_id,
+            revision=revision,
+            trust_remote_code=True,
+        )
+        fake_kernels.get_local_kernel.assert_called_once_with(repo_root)
+        self.assertEqual(transport.calls, [(repo_id, revision)])
+        result = verifier.results["kernels"][repo_id]
+        self.assertEqual(
+            result["selfcheck_transport"],
+            "authenticated-kernel-hub-git-fallback",
+        )
+        self.assertEqual(result["selfcheck"], {"ok": True})
+
+    def test_unrelated_kernel_loader_error_fails_closed(self) -> None:
+        revision = "b" * 40
+        repo_id = terminal.KERNEL_IDS[0]
+        transport = Mock()
+        verifier = terminal.TerminalReadiness(
+            token="test-token",
+            generation="a" * 40,
+            kernel_transport=transport,
+        )
+        verifier.api = types.SimpleNamespace(
+            kernel_info=Mock(return_value=types.SimpleNamespace(sha=revision))
+        )
+        verifier._kernel_tree_paths = Mock(return_value=("README.md", "build/cpu/x"))
+        fake_kernels = types.SimpleNamespace(
+            get_kernel=Mock(side_effect=ValueError("unexpected metadata failure")),
+            get_local_kernel=Mock(),
+        )
+
+        with patch.dict(sys.modules, {"kernels": fake_kernels}):
+            with self.assertRaisesRegex(ValueError, "unexpected metadata failure"):
+                verifier.verify_kernel(repo_id)
+
+        transport.materialize_build.assert_not_called()
+        fake_kernels.get_local_kernel.assert_not_called()
 
     def test_issue_body_contains_machine_readable_readiness_report(self) -> None:
         report = {
