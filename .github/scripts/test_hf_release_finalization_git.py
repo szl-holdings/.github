@@ -7,6 +7,7 @@ import sys
 import tempfile
 import unittest
 import unittest.mock
+from contextlib import contextmanager
 from types import SimpleNamespace
 
 HERE = pathlib.Path(__file__).resolve().parent
@@ -23,6 +24,7 @@ class FakeTransport:
         self.snapshot_value = snapshot
         self.publish_calls = []
         self.snapshot_calls = []
+        self.materialize_calls = []
 
     def publish(self, **kwargs):
         self.publish_calls.append(kwargs)
@@ -31,6 +33,11 @@ class FakeTransport:
     def snapshot(self, repo_id):
         self.snapshot_calls.append(repo_id)
         return self.snapshot_value
+
+    @contextmanager
+    def materialize_build(self, repo_id, revision):
+        self.materialize_calls.append((repo_id, revision))
+        yield pathlib.Path("materialized-kernel")
 
 
 class FakeApi:
@@ -45,7 +52,7 @@ class FakeApi:
 
 
 class KernelGitFinalizerTests(unittest.TestCase):
-    def make_instance(self, *, publish=True):
+    def make_instance(self, *, publish=True, stub_selfcheck=True):
         tmp = tempfile.TemporaryDirectory()
         root = pathlib.Path(tmp.name)
         source = root / "energy" / "hf-kernels" / "example"
@@ -72,7 +79,8 @@ class KernelGitFinalizerTests(unittest.TestCase):
         instance.kernel_transport = FakeTransport(publication=publication)
         instance.actions = []
         instance.results = {}
-        instance._kernel_selfcheck = lambda repo_id, revision: {"ok": True}
+        if stub_selfcheck:
+            instance._kernel_selfcheck = lambda repo_id, revision: {"ok": True}
         return tmp, instance
 
     def test_kernel_publication_delegates_to_git_transport(self):
@@ -126,6 +134,87 @@ class KernelGitFinalizerTests(unittest.TestCase):
                     {"source_root": "energy", "source_dir": "hf-kernels/example"},
                 )
             self.assertFalse(instance.kernel_transport.publish_calls)
+        finally:
+            tmp.cleanup()
+
+    def test_controller_selfcheck_falls_back_to_exact_git_build(self):
+        tmp, instance = self.make_instance(stub_selfcheck=False)
+        module = SimpleNamespace(selfcheck=lambda: {"ok": True, "source": "git"})
+        fake_kernels = SimpleNamespace(
+            get_kernel=unittest.mock.Mock(
+                side_effect=ValueError("min() iterable argument is empty")
+            ),
+            get_local_kernel=unittest.mock.Mock(return_value=module),
+        )
+        try:
+            with unittest.mock.patch.dict(sys.modules, {"kernels": fake_kernels}):
+                instance.finalize_kernel(
+                    "SZLHOLDINGS/example",
+                    {"source_root": "energy", "source_dir": "hf-kernels/example"},
+                )
+
+            self.assertEqual(
+                instance.kernel_transport.materialize_calls,
+                [("SZLHOLDINGS/example", "b" * 40)],
+            )
+            fake_kernels.get_local_kernel.assert_called_once_with(
+                pathlib.Path("materialized-kernel")
+            )
+            result = instance.results["kernels"]["SZLHOLDINGS/example"]
+            self.assertEqual(
+                result["selfcheck_transport"],
+                "authenticated-kernel-hub-git-fallback",
+            )
+            self.assertEqual(result["selfcheck"], {"ok": True, "source": "git"})
+        finally:
+            tmp.cleanup()
+
+    def test_controller_selfcheck_rejects_unrelated_value_error(self):
+        tmp, instance = self.make_instance(stub_selfcheck=False)
+        fake_kernels = SimpleNamespace(
+            get_kernel=unittest.mock.Mock(
+                side_effect=ValueError("malformed build metadata")
+            ),
+            get_local_kernel=unittest.mock.Mock(),
+        )
+        try:
+            with unittest.mock.patch.dict(sys.modules, {"kernels": fake_kernels}):
+                with self.assertRaisesRegex(ValueError, "malformed build metadata"):
+                    instance.finalize_kernel(
+                        "SZLHOLDINGS/example",
+                        {"source_root": "energy", "source_dir": "hf-kernels/example"},
+                    )
+            self.assertFalse(instance.kernel_transport.materialize_calls)
+        finally:
+            tmp.cleanup()
+
+    def test_selfcheck_fallback_is_revision_bound_and_metadata_api_free(self):
+        tmp, instance = self.make_instance(stub_selfcheck=False)
+        instance.api = unittest.mock.Mock()
+        module = SimpleNamespace(selfcheck=lambda: {"ok": True})
+        fake_kernels = SimpleNamespace(
+            get_kernel=unittest.mock.Mock(
+                side_effect=ValueError("min() iterable argument is empty")
+            ),
+            get_local_kernel=unittest.mock.Mock(return_value=module),
+        )
+        try:
+            with unittest.mock.patch.dict(sys.modules, {"kernels": fake_kernels}):
+                result = finalizer.KernelGitFinalizer._kernel_selfcheck(
+                    instance,
+                    "SZLHOLDINGS/example",
+                    "e" * 40,
+                )
+
+            self.assertEqual(result, {"ok": True})
+            self.assertEqual(instance.api.mock_calls, [])
+            self.assertEqual(
+                instance.kernel_transport.materialize_calls,
+                [("SZLHOLDINGS/example", "e" * 40)],
+            )
+            fake_kernels.get_local_kernel.assert_called_once_with(
+                pathlib.Path("materialized-kernel")
+            )
         finally:
             tmp.cleanup()
 
