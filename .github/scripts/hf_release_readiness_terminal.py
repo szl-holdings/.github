@@ -25,6 +25,7 @@ from typing import Any, Mapping
 
 import requests
 from huggingface_hub import HfApi
+from kernel_hub_git import KernelHubGitTransport
 
 REPORT_SCHEMA = "szl.hf-release-readiness/v1"
 PRERELEASE_SCHEMA = "szl.hf-release-readiness/v1-prerelease"
@@ -125,6 +126,7 @@ class TerminalReadiness:
         )
         self.token = token
         self.api = HfApi(token=token)
+        self.kernel_transport = KernelHubGitTransport(token=token)
         self.actions: list[Action] = []
         self.results: dict[str, Any] = {}
 
@@ -271,27 +273,51 @@ class TerminalReadiness:
             )
         return paths
 
-    def verify_kernel(self, repo_id: str) -> None:
-        revision = _immutable_revision(
-            getattr(self.api.kernel_info(repo_id), "sha", ""),
-            label=repo_id,
-        )
-        paths = self._kernel_tree_paths(repo_id, revision)
+    def _kernel_revision(self, repo_id: str) -> tuple[str, str]:
+        try:
+            revision = getattr(self.api.kernel_info(repo_id), "sha", "")
+            source = "kernel-api"
+        except ValueError as exc:
+            if str(exc) != "min() iterable argument is empty":
+                raise
+            revision = self.kernel_transport.snapshot(repo_id).revision
+            source = "authenticated-kernel-hub-git-fallback"
+        return _immutable_revision(revision, label=repo_id), source
 
-        from kernels import get_kernel
+    def _kernel_selfcheck(self, repo_id: str, revision: str) -> tuple[Any, str]:
+        from kernels import get_kernel, get_local_kernel
 
-        module = get_kernel(repo_id, revision=revision, trust_remote_code=True)
-        check = getattr(module, "selfcheck", None)
-        if not callable(check):
+        try:
+            module = get_kernel(
+                repo_id,
+                revision=revision,
+                trust_remote_code=True,
+            )
+        except ValueError as exc:
+            if str(exc) != "min() iterable argument is empty":
+                raise
+            with self.kernel_transport.materialize_build(repo_id, revision) as repo:
+                module = get_local_kernel(repo)
+                result = module.selfcheck() if callable(getattr(module, "selfcheck", None)) else None
+            transport = "authenticated-kernel-hub-git-fallback"
+        else:
+            check = getattr(module, "selfcheck", None)
+            result = check() if callable(check) else None
+            transport = "kernel-api"
+
+        if result is None:
             raise RuntimeError(f"{repo_id}@{revision} does not expose selfcheck()")
-        result = check()
         if not _selfcheck_passed(result):
             raise RuntimeError(f"{repo_id}@{revision} selfcheck did not pass: {result}")
+        return result, transport
 
-        revision_after = _immutable_revision(
-            getattr(self.api.kernel_info(repo_id), "sha", ""),
-            label=repo_id,
-        )
+    def verify_kernel(self, repo_id: str) -> None:
+        revision, metadata_source = self._kernel_revision(repo_id)
+        paths = self._kernel_tree_paths(repo_id, revision)
+
+        result, selfcheck_transport = self._kernel_selfcheck(repo_id, revision)
+
+        revision_after, metadata_source_after = self._kernel_revision(repo_id)
         if revision_after != revision:
             raise RuntimeError(
                 f"kernel revision moved during selfcheck: {repo_id}; "
@@ -303,13 +329,17 @@ class TerminalReadiness:
             "remote_file_count": len(paths),
             "build_variants_present": True,
             "metadata_stable": True,
+            "metadata_revision_source": metadata_source,
+            "metadata_revision_source_after": metadata_source_after,
             "selfcheck": result,
+            "selfcheck_transport": selfcheck_transport,
         }
         self.record(
             repo_id,
             "kernel-tree-and-selfcheck",
             "validated",
-            f"revision={revision}; files={len(paths)}; metadata_stable=true",
+            f"revision={revision}; files={len(paths)}; metadata_stable=true; "
+            f"metadata_source={metadata_source}; selfcheck_transport={selfcheck_transport}",
         )
 
     def report(self) -> dict[str, Any]:

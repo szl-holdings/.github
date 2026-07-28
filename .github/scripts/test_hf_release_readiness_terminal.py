@@ -6,6 +6,9 @@ import json
 import pathlib
 import sys
 import unittest
+import unittest.mock
+from contextlib import contextmanager
+from types import SimpleNamespace
 
 HERE = pathlib.Path(__file__).resolve().parent
 ROOT = HERE.parents[1]
@@ -69,6 +72,89 @@ class TerminalReleaseReadinessTests(unittest.TestCase):
             terminal._selfcheck_passed({"checks": {"a": True, "b": False}})
         )
         self.assertFalse(terminal._selfcheck_passed({"checks": {}}))
+
+    def test_empty_kernel_metadata_uses_exact_git_revision(self) -> None:
+        verifier = terminal.TerminalReadiness(
+            token="test-token",
+            generation="a" * 40,
+        )
+        verifier.api = SimpleNamespace(
+            kernel_info=lambda repo_id: (_ for _ in ()).throw(
+                ValueError("min() iterable argument is empty")
+            )
+        )
+        verifier.kernel_transport = SimpleNamespace(
+            snapshot=lambda repo_id: SimpleNamespace(revision="b" * 40)
+        )
+        revision, source = verifier._kernel_revision("SZLHOLDINGS/example")
+        self.assertEqual(revision, "b" * 40)
+        self.assertEqual(source, "authenticated-kernel-hub-git-fallback")
+
+    def test_unrelated_kernel_metadata_error_fails_closed(self) -> None:
+        verifier = terminal.TerminalReadiness(
+            token="test-token",
+            generation="a" * 40,
+        )
+        verifier.api = SimpleNamespace(
+            kernel_info=lambda repo_id: (_ for _ in ()).throw(
+                ValueError("malformed kernel metadata")
+            )
+        )
+        with self.assertRaisesRegex(ValueError, "malformed kernel metadata"):
+            verifier._kernel_revision("SZLHOLDINGS/example")
+
+    def test_empty_kernel_loader_uses_exact_git_build(self) -> None:
+        verifier = terminal.TerminalReadiness(
+            token="test-token",
+            generation="a" * 40,
+        )
+        materialize_calls = []
+
+        @contextmanager
+        def materialize_build(repo_id, revision):
+            materialize_calls.append((repo_id, revision))
+            yield pathlib.Path("materialized-kernel")
+
+        verifier.kernel_transport = SimpleNamespace(
+            materialize_build=materialize_build
+        )
+        module = SimpleNamespace(selfcheck=lambda: {"ok": True})
+        kernels = SimpleNamespace(
+            get_kernel=unittest.mock.Mock(
+                side_effect=ValueError("min() iterable argument is empty")
+            ),
+            get_local_kernel=unittest.mock.Mock(return_value=module),
+        )
+        with unittest.mock.patch.dict(sys.modules, {"kernels": kernels}):
+            result, source = verifier._kernel_selfcheck(
+                "SZLHOLDINGS/example",
+                "b" * 40,
+            )
+        self.assertEqual(result, {"ok": True})
+        self.assertEqual(source, "authenticated-kernel-hub-git-fallback")
+        self.assertEqual(
+            materialize_calls,
+            [("SZLHOLDINGS/example", "b" * 40)],
+        )
+        kernels.get_local_kernel.assert_called_once_with(
+            pathlib.Path("materialized-kernel")
+        )
+
+    def test_unrelated_kernel_loader_error_fails_closed(self) -> None:
+        verifier = terminal.TerminalReadiness(
+            token="test-token",
+            generation="a" * 40,
+        )
+        kernels = SimpleNamespace(
+            get_kernel=unittest.mock.Mock(
+                side_effect=ValueError("malformed build metadata")
+            ),
+            get_local_kernel=unittest.mock.Mock(),
+        )
+        with unittest.mock.patch.dict(sys.modules, {"kernels": kernels}):
+            with self.assertRaisesRegex(ValueError, "malformed build metadata"):
+                verifier._kernel_selfcheck("SZLHOLDINGS/example", "b" * 40)
+        kernels.get_local_kernel.assert_not_called()
 
     def test_issue_body_contains_machine_readable_readiness_report(self) -> None:
         report = {
