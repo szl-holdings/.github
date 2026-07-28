@@ -45,24 +45,33 @@ class KernelGitFinalizer(retry.RetryingFinalizer):
             raise RuntimeError("release finalizer must use the CPU PyTorch runtime")
         return {"numpy": numpy.__version__, "torch": torch.__version__}
 
+    def _kernel_metadata_revision(self, repo_id: str) -> tuple[str, str]:
+        try:
+            revision = str(getattr(self.api.kernel_info(repo_id), "sha", "") or "")
+            source = "kernel-api+git"
+        except ValueError as exc:
+            if str(exc) != "min() iterable argument is empty":
+                raise
+            revision = self.kernel_transport.snapshot(repo_id).revision
+            source = "authenticated-kernel-hub-git-fallback"
+        if len(revision) != 40:
+            raise RuntimeError(f"Kernel metadata lacks an immutable revision: {repo_id}")
+        return revision, source
+
     def finalize_kernel(self, repo_id: str, spec: Mapping[str, str]) -> None:
         source_dir = self.roots[spec["source_root"]] / spec["source_dir"]
         for filename in ("README.md", "contract.json"):
             if not (source_dir / filename).is_file():
                 raise RuntimeError(f"Kernel source contract is incomplete: {source_dir}")
 
-        metadata_before = str(getattr(self.api.kernel_info(repo_id), "sha", "") or "")
-        if len(metadata_before) != 40:
-            raise RuntimeError(f"Kernel metadata lacks an immutable revision: {repo_id}")
+        metadata_before, metadata_source = self._kernel_metadata_revision(repo_id)
 
         if self.publish:
             publication = self.kernel_transport.publish(
                 repo_id=repo_id,
                 source_dir=source_dir,
                 metadata_revision=metadata_before,
-                metadata_revision_after=lambda: str(
-                    getattr(self.api.kernel_info(repo_id), "sha", "") or ""
-                ),
+                metadata_revision_after=lambda: self._kernel_metadata_revision(repo_id)[0],
                 generation=self.generation,
             )
             action_status = "updated" if publication.changed else "validated"
@@ -93,7 +102,8 @@ class KernelGitFinalizer(retry.RetryingFinalizer):
             "kernel-card-publish",
             action_status,
             f"before={publication.before_revision}; after={publication.revision}; "
-            f"changed={publication.changed}; transport=git",
+            f"changed={publication.changed}; transport=git; "
+            f"metadata_source={metadata_source}",
         )
         selfcheck = self._kernel_selfcheck(repo_id, publication.revision)
         self.results.setdefault("kernels", {})[repo_id] = {
@@ -101,6 +111,7 @@ class KernelGitFinalizer(retry.RetryingFinalizer):
             "after_sha": publication.revision,
             "revision": publication.revision,
             "transport": "authenticated-kernel-hub-git",
+            "metadata_revision_source": metadata_source,
             "changed": publication.changed,
             "remote_file_count": publication.remote_file_count,
             "build_variants_preserved": publication.build_variants_preserved,
