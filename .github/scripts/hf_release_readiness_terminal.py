@@ -250,7 +250,7 @@ class TerminalReadiness:
 
         from kernels import get_local_kernel
 
-        with self.kernel_transport.materialize_revision(repo_id, revision) as repo:
+        with self.kernel_transport.materialize_build(repo_id, revision) as repo:
             module = get_local_kernel(repo, backend="cpu")
             check = getattr(module, "selfcheck", None)
             if not callable(check):

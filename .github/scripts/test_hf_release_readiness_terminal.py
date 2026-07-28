@@ -32,7 +32,7 @@ class FakeKernelTransport:
         return self.snapshot_value
 
     @contextmanager
-    def materialize_revision(self, repo_id: str, revision: str):
+    def materialize_build(self, repo_id: str, revision: str):
         self.materialize_calls.append((repo_id, revision))
         yield self.repo
 
@@ -169,7 +169,7 @@ class TerminalReleaseReadinessTests(unittest.TestCase):
         for token in forbidden:
             self.assertNotIn(token, source)
         self.assertIn('repo_type="dataset"', source)
-        self.assertIn("materialize_revision(repo_id, revision)", source)
+        self.assertIn("materialize_build(repo_id, revision)", source)
         self.assertNotIn("/api/kernels/", source)
 
     def test_report_shape_matches_final_estate_reconciler(self) -> None:

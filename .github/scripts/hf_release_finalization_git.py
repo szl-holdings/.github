@@ -52,20 +52,24 @@ class KernelGitFinalizer(retry.RetryingFinalizer):
             raise RuntimeError(f"Kernel metadata lacks an immutable revision: {repo_id}")
         return revision, source
 
-    def _kernel_selfcheck(self, repo_id: str, revision: str) -> Any:
-        from kernels import get_local_kernel
-
-        with self.kernel_transport.materialize_revision(repo_id, revision) as repo:
-            module = get_local_kernel(repo, backend="cpu")
-            check = getattr(module, "selfcheck", None)
-            if not callable(check):
-                raise RuntimeError(f"{repo_id}@{revision} does not expose selfcheck()")
-            result = check()
+    @staticmethod
+    def _execute_selfcheck(repo_id: str, revision: str, module: Any) -> Any:
+        check = getattr(module, "selfcheck", None)
+        if not callable(check):
+            raise RuntimeError(f"{repo_id}@{revision} does not expose selfcheck()")
+        result = check()
         if result is False:
             raise RuntimeError(f"{repo_id}@{revision} selfcheck returned false")
         if isinstance(result, dict) and result.get("ok") is False:
             raise RuntimeError(f"{repo_id}@{revision} selfcheck failed: {result}")
         return result
+
+    def _kernel_selfcheck(self, repo_id: str, revision: str) -> Any:
+        from kernels import get_local_kernel
+
+        with self.kernel_transport.materialize_build(repo_id, revision) as repo:
+            module = get_local_kernel(repo, backend="cpu")
+            return self._execute_selfcheck(repo_id, revision, module)
 
     def finalize_kernel(self, repo_id: str, spec: Mapping[str, str]) -> None:
         source_dir = self.roots[spec["source_root"]] / spec["source_dir"]

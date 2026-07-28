@@ -212,12 +212,12 @@ class KernelHubGitTransport:
             return self._snapshot_from_repo(repo_id, repo)
 
     @contextmanager
-    def materialize_revision(
+    def materialize_build(
         self,
         repo_id: str,
         expected_revision: str,
     ) -> Iterator[Path]:
-        """Check out the complete current Kernel tree at one exact revision."""
+        """Yield the exact remote build tree without using the Kernel metadata API."""
 
         expected = str(expected_revision or "").strip().lower()
         if not SHA40.fullmatch(expected):
@@ -225,23 +225,34 @@ class KernelHubGitTransport:
                 f"Kernel materialization requires an immutable revision: {repo_id}@{expected!r}"
             )
         with tempfile.TemporaryDirectory(
-            prefix="szl-kernel-materialize-",
+            prefix="szl-kernel-build-",
             dir=self.temp_root,
         ) as raw:
             repo, _ = self._fetch_main(repo_id, Path(raw))
             observed = self._git(["rev-parse", "FETCH_HEAD"], cwd=repo).stdout.strip().lower()
             if observed != expected:
                 raise KernelGitError(
-                    "Kernel main moved before materialization: "
+                    "Kernel main moved before exact build materialization: "
                     f"expected {expected}, observed {observed}; repo={repo_id}"
                 )
             with self._auth_environment() as env:
-                self._git(["checkout", "-q", "--detach", "FETCH_HEAD"], cwd=repo, env=env)
+                self._git(["sparse-checkout", "init", "--no-cone"], cwd=repo, env=env)
+                self._git(["sparse-checkout", "set", "build"], cwd=repo, env=env)
+                self._git(
+                    ["checkout", "-q", "--detach", "FETCH_HEAD"],
+                    cwd=repo,
+                    env=env,
+                )
             checked_out = self._git(["rev-parse", "HEAD"], cwd=repo).stdout.strip().lower()
             if checked_out != expected:
                 raise KernelGitError(
                     "Kernel checkout revision mismatch: "
                     f"expected {expected}, observed {checked_out}; repo={repo_id}"
+                )
+            build = repo / "build"
+            if not build.is_dir() or not any(path.is_file() for path in build.rglob("*")):
+                raise KernelGitError(
+                    f"Kernel repository has no materialized build variants: {repo_id}"
                 )
             yield repo
 

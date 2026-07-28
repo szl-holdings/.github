@@ -36,7 +36,7 @@ class FakeTransport:
         return self.snapshot_value
 
     @contextmanager
-    def materialize_revision(self, repo_id, revision):
+    def materialize_build(self, repo_id, revision):
         self.materialize_calls.append((repo_id, revision))
         yield self.materialized_path
 
@@ -53,7 +53,7 @@ class FakeApi:
 
 
 class KernelGitFinalizerTests(unittest.TestCase):
-    def make_instance(self, *, publish=True):
+    def make_instance(self, *, publish=True, stub_selfcheck=True):
         tmp = tempfile.TemporaryDirectory()
         root = pathlib.Path(tmp.name)
         source = root / "energy" / "hf-kernels" / "example"
@@ -89,7 +89,8 @@ class KernelGitFinalizerTests(unittest.TestCase):
         )
         instance.actions = []
         instance.results = {}
-        instance._kernel_selfcheck = lambda repo_id, revision: {"ok": True}
+        if stub_selfcheck:
+            instance._kernel_selfcheck = lambda repo_id, revision: {"ok": True}
         return tmp, instance
 
     def test_kernel_publication_delegates_to_git_transport(self):
