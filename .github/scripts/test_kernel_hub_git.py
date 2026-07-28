@@ -151,6 +151,29 @@ class KernelHubGitTransportTests(unittest.TestCase):
             }
         self.assertEqual(visible, {"README.md", "contract.json"})
 
+    def test_exact_build_materialization_is_read_only_and_revision_bound(self) -> None:
+        before = self.head()
+        with self.transport.materialize_build(self.repo_id, before) as repo:
+            visible = {
+                str(path.relative_to(repo)).replace("\\", "/")
+                for path in repo.rglob("*")
+                if path.is_file() and ".git" not in path.parts
+            }
+            self.assertEqual(
+                visible,
+                {"build/torch27-cpu/__init__.py"},
+            )
+            self.assertEqual(
+                (repo / "build" / "torch27-cpu" / "__init__.py").read_text(),
+                "BUILD = 'immutable'\n",
+            )
+        self.assertEqual(before, self.head())
+
+    def test_exact_build_materialization_rejects_moved_main(self) -> None:
+        with self.assertRaisesRegex(KernelGitError, "main moved"):
+            with self.transport.materialize_build(self.repo_id, "0" * 40):
+                self.fail("mismatched revision must not materialize")
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)
