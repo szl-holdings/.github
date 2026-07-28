@@ -34,10 +34,13 @@ class FakeTransport:
 
 
 class FakeApi:
-    def __init__(self, revision="a" * 40):
+    def __init__(self, revision="a" * 40, error=None):
         self.revision = revision
+        self.error = error
 
     def kernel_info(self, repo_id):
+        if self.error is not None:
+            raise self.error
         return SimpleNamespace(sha=self.revision)
 
 
@@ -85,6 +88,44 @@ class KernelGitFinalizerTests(unittest.TestCase):
             self.assertEqual(result["revision"], "b" * 40)
             self.assertTrue(result["build_variants_preserved"])
             self.assertTrue(result["card_contract_byte_parity"])
+        finally:
+            tmp.cleanup()
+
+    def test_empty_kernel_api_builds_fall_back_to_authenticated_git(self):
+        tmp, instance = self.make_instance()
+        instance.api = FakeApi(error=ValueError("min() iterable argument is empty"))
+        instance.kernel_transport.snapshot_value = KernelSnapshot(
+            repo_id="SZLHOLDINGS/example",
+            revision="a" * 40,
+            files=("README.md", "contract.json", "build/cpu/__init__.py"),
+            build_tree_sha256="c" * 64,
+            remote_url="https://huggingface.co/kernels/SZLHOLDINGS/example",
+        )
+        try:
+            instance.finalize_kernel(
+                "SZLHOLDINGS/example",
+                {"source_root": "energy", "source_dir": "hf-kernels/example"},
+            )
+            call = instance.kernel_transport.publish_calls[0]
+            self.assertEqual(call["metadata_revision"], "a" * 40)
+            result = instance.results["kernels"]["SZLHOLDINGS/example"]
+            self.assertEqual(
+                result["metadata_revision_source"],
+                "authenticated-kernel-hub-git-fallback",
+            )
+        finally:
+            tmp.cleanup()
+
+    def test_unrelated_kernel_api_value_error_still_fails_closed(self):
+        tmp, instance = self.make_instance()
+        instance.api = FakeApi(error=ValueError("malformed kernel metadata"))
+        try:
+            with self.assertRaisesRegex(ValueError, "malformed kernel metadata"):
+                instance.finalize_kernel(
+                    "SZLHOLDINGS/example",
+                    {"source_root": "energy", "source_dir": "hf-kernels/example"},
+                )
+            self.assertFalse(instance.kernel_transport.publish_calls)
         finally:
             tmp.cleanup()
 
