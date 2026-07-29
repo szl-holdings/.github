@@ -254,6 +254,9 @@ class TerminalReleaseReadinessTests(unittest.TestCase):
         finalization = (
             ROOT / ".github/workflows/hf-release-finalization.yml"
         ).read_text(encoding="utf-8")
+        kernel_publication = (
+            ROOT / ".github/workflows/hf-kernel-card-publish-v2.yml"
+        ).read_text(encoding="utf-8")
         readiness = (
             ROOT / ".github/workflows/hf-release-readiness-terminal.yml"
         ).read_text(encoding="utf-8")
@@ -266,7 +269,15 @@ class TerminalReleaseReadinessTests(unittest.TestCase):
 
         self.assertIn("schedule:", finalization)
         self.assertNotIn("gh workflow run hf-release-readiness", finalization)
+        self.assertNotIn(
+            "gh workflow run hf-release-readiness.yml", kernel_publication
+        )
+        self.assertIn(
+            "gh workflow run hf-release-readiness-terminal.yml",
+            kernel_publication,
+        )
         self.assertIn("workflow_run:", readiness)
+        self.assertIn("workflow_dispatch: {}", readiness)
         self.assertIn("HF Release Finalization — Supported Kernel Git", readiness)
         self.assertNotIn("pull_request:", readiness)
         self.assertNotIn("secrets.", readiness_pr)

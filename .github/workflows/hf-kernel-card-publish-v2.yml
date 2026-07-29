@@ -412,7 +412,9 @@ jobs:
       - name: Trigger immediate independent release readiness
         if: steps.mode.outputs.publish == 'true' && steps.verify.outputs.exit_code == '0'
         run: |
-          gh workflow run hf-release-readiness.yml --repo "$GITHUB_REPOSITORY" --ref main -f publish=true
+          gh workflow run hf-release-readiness-terminal.yml \
+            --repo "$GITHUB_REPOSITORY" \
+            --ref main
 
       - name: Enforce fail-closed publication result
         if: always() && steps.mode.outputs.publish == 'true'
