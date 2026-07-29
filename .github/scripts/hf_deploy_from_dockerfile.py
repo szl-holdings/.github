@@ -556,6 +556,66 @@ def build_add_operations(repo_root, files, operation_class):
     return operations
 
 
+def fetch_github_json(url, token):
+    """Fetch one authenticated GitHub API object."""
+    request = urllib.request.Request(
+        url,
+        headers={
+            "Accept": "application/vnd.github+json",
+            "Authorization": f"Bearer {token}",
+            "X-GitHub-Api-Version": "2022-11-28",
+        },
+    )
+    with urllib.request.urlopen(request, timeout=20) as response:
+        return json.load(response)
+
+
+def require_current_default_branch_tip(args):
+    """Fail unless the deployment source is the caller's current default tip."""
+    if not getattr(args, "require_default_branch_tip", False):
+        return
+
+    token = os.environ.get("GITHUB_TOKEN", "")
+    api_url = os.environ.get("GITHUB_API_URL", "https://api.github.com").rstrip("/")
+    caller_ref = os.environ.get("GITHUB_REF", "")
+    source_sha = str(args.ref or "").lower()
+    if not token:
+        raise DeployContractError(
+            "GITHUB_TOKEN is required by --require-default-branch-tip"
+        )
+    if not re.fullmatch(r"[0-9a-f]{40}", source_sha):
+        raise DeployContractError(
+            "--require-default-branch-tip requires ref to be an exact commit SHA"
+        )
+
+    repository = fetch_github_json(
+        f"{api_url}/repos/{args.github_repo}",
+        token,
+    )
+    default_branch = str(repository.get("default_branch") or "")
+    if not default_branch:
+        raise DeployContractError(
+            "GitHub repository response omitted the default branch"
+        )
+    expected_ref = f"refs/heads/{default_branch}"
+    if caller_ref != expected_ref:
+        raise DeployContractError(
+            "refusing production deploy from non-default branch: "
+            f"caller_ref={caller_ref!r} expected_ref={expected_ref!r}"
+        )
+
+    tip = fetch_github_json(
+        f"{api_url}/repos/{args.github_repo}/commits/{default_branch}",
+        token,
+    )
+    current_sha = str(tip.get("sha") or "").lower()
+    if current_sha != source_sha:
+        raise DeployContractError(
+            "refusing stale production deploy at mutation boundary: "
+            f"current_sha={current_sha!r} source_sha={source_sha!r}"
+        )
+
+
 def deploy(args):
     manifest, files = derive(args)
     print(f"== HF deploy: {args.github_repo} -> {args.hf_repo} ({args.ref}) ==")
@@ -620,6 +680,10 @@ def deploy(args):
                 ops.append(CommitOperationDelete(path_in_repo=p))
                 deleted.append(p)
 
+    # Keep this immediately adjacent to the first remote mutation. In
+    # particular, do not move it into a separately scheduled preflight job:
+    # a caller's default branch can advance between jobs.
+    require_current_default_branch_tip(args)
     commit = api.create_commit(
         repo_id=args.hf_repo, repo_type="space", operations=ops,
         commit_message=f"deploy(hf): sync {args.github_repo}@{args.ref} derived COPY set",
@@ -727,6 +791,14 @@ def main():
                     help="delete Space files under directory COPY sources that are "
                          "gone from git main (never touches file/glob sources)")
     ap.add_argument("--dry-run", action="store_true")
+    ap.add_argument(
+        "--require-default-branch-tip",
+        action="store_true",
+        help=(
+            "fail immediately before the HF commit unless --ref is the exact "
+            "current tip of the caller repository's default branch"
+        ),
+    )
     ap.add_argument("--attest", action="store_true",
                     help="verification mode: re-fetch manifest files from the live "
                          "Space and assert sha256 == pushed value")
