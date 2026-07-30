@@ -601,7 +601,7 @@ class TestDefaultBranchTipGuard(unittest.TestCase):
                 os.environ,
                 {
                     "GITHUB_TOKEN": "test-token",
-                    "GITHUB_REF": "refs/heads/release#prod",
+                    "GITHUB_REF": "refs/heads/release#prod/hotfix",
                 },
                 clear=True,
             ),
@@ -609,7 +609,7 @@ class TestDefaultBranchTipGuard(unittest.TestCase):
                 dep,
                 "fetch_github_json",
                 side_effect=[
-                    {"default_branch": "release#prod"},
+                    {"default_branch": "release#prod/hotfix"},
                     {"sha": "a" * 40},
                 ],
             ) as fetch,
@@ -617,7 +617,7 @@ class TestDefaultBranchTipGuard(unittest.TestCase):
             dep.require_current_default_branch_tip(self._args())
         self.assertTrue(
             fetch.call_args_list[1].args[0].endswith(
-                "/commits/release%23prod"
+                "/commits/release%23prod%2Fhotfix"
             )
         )
 
