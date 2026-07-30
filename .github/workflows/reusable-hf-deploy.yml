@@ -155,6 +155,7 @@ jobs:
           INCLUDE_README: ${{ inputs.include-readme }}
           PRUNE: ${{ inputs.prune }}
           REQUIRE_DEFAULT_BRANCH_TIP: ${{ inputs.require-default-branch-tip }}
+          SOURCE_SHA: ${{ steps.hf.outputs.source_sha }}
           SMOKE_PATHS: ${{ inputs.smoke-paths }}
         run: |
           set -euo pipefail
@@ -169,6 +170,7 @@ jobs:
             --github-repo "$GH_REPO" \
             --hf-repo "$HF_REPO" \
             --ref "$DEPLOY_REF" \
+            --source-sha "$SOURCE_SHA" \
             --dockerfile-path "$DOCKERFILE_PATH" \
             --include-readme "$INCLUDE_README" \
             --smoke-paths "${SMOKE_PATHS}" \

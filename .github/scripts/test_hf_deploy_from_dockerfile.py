@@ -533,6 +533,8 @@ class TestReusableWorkflowContract(unittest.TestCase):
             "REQUIRE_DEFAULT_BRANCH_TIP: ${{ inputs.require-default-branch-tip }}",
             "TIP_GUARD_ARGS+=(--require-default-branch-tip)",
             "GITHUB_TOKEN: ${{ github.token }}",
+            "SOURCE_SHA: ${{ steps.hf.outputs.source_sha }}",
+            '--source-sha "$SOURCE_SHA"',
         ):
             self.assertIn(contract, self.workflow)
 
@@ -541,7 +543,8 @@ class TestDefaultBranchTipGuard(unittest.TestCase):
     def _args(self, *, source_sha="a" * 40, enabled=True):
         return types.SimpleNamespace(
             github_repo="szl-holdings/killinchu",
-            ref=source_sha,
+            ref="main",
+            source_sha=source_sha,
             require_default_branch_tip=enabled,
         )
 

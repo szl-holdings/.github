@@ -578,14 +578,14 @@ def require_current_default_branch_tip(args):
     token = os.environ.get("GITHUB_TOKEN", "")
     api_url = os.environ.get("GITHUB_API_URL", "https://api.github.com").rstrip("/")
     caller_ref = os.environ.get("GITHUB_REF", "")
-    source_sha = str(args.ref or "").lower()
+    source_sha = str(getattr(args, "source_sha", "") or "").lower()
     if not token:
         raise DeployContractError(
             "GITHUB_TOKEN is required by --require-default-branch-tip"
         )
     if not re.fullmatch(r"[0-9a-f]{40}", source_sha):
         raise DeployContractError(
-            "--require-default-branch-tip requires ref to be an exact commit SHA"
+            "--require-default-branch-tip requires --source-sha to be exact"
         )
 
     repository = fetch_github_json(
@@ -779,6 +779,11 @@ def main():
     ap.add_argument("--github-repo", default=os.environ.get("GITHUB_REPOSITORY", ""))
     ap.add_argument("--hf-repo", default="")
     ap.add_argument("--ref", default="main")
+    ap.add_argument(
+        "--source-sha",
+        default="",
+        help="exact checked-out source SHA used by mutation-boundary guards",
+    )
     ap.add_argument("--dockerfile-path", default="Dockerfile")
     ap.add_argument("--readme-path", default="README.md")
     ap.add_argument("--include-readme", default="true")
