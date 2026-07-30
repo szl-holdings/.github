@@ -595,6 +595,32 @@ class TestDefaultBranchTipGuard(unittest.TestCase):
                 dep.require_current_default_branch_tip(self._args())
         fetch.assert_called_once()
 
+    def test_default_branch_is_encoded_as_one_path_component(self):
+        with (
+            mock.patch.dict(
+                os.environ,
+                {
+                    "GITHUB_TOKEN": "test-token",
+                    "GITHUB_REF": "refs/heads/release#prod",
+                },
+                clear=True,
+            ),
+            mock.patch.object(
+                dep,
+                "fetch_github_json",
+                side_effect=[
+                    {"default_branch": "release#prod"},
+                    {"sha": "a" * 40},
+                ],
+            ) as fetch,
+        ):
+            dep.require_current_default_branch_tip(self._args())
+        self.assertTrue(
+            fetch.call_args_list[1].args[0].endswith(
+                "/commits/release%23prod"
+            )
+        )
+
     def test_stale_sha_fails_at_mutation_boundary(self):
         with (
             mock.patch.dict(
