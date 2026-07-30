@@ -604,8 +604,9 @@ def require_current_default_branch_tip(args):
             f"caller_ref={caller_ref!r} expected_ref={expected_ref!r}"
         )
 
+    encoded_default_branch = urllib.parse.quote(default_branch, safe="")
     tip = fetch_github_json(
-        f"{api_url}/repos/{args.github_repo}/commits/{default_branch}",
+        f"{api_url}/repos/{args.github_repo}/commits/{encoded_default_branch}",
         token,
     )
     current_sha = str(tip.get("sha") or "").lower()

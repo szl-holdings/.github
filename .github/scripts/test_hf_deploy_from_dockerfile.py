@@ -616,6 +616,36 @@ class TestDefaultBranchTipGuard(unittest.TestCase):
             ):
                 dep.require_current_default_branch_tip(self._args())
 
+    def test_default_branch_is_encoded_as_one_path_component(self):
+        with (
+            mock.patch.dict(
+                os.environ,
+                {
+                    "GITHUB_TOKEN": "test-token",
+                    "GITHUB_API_URL": "https://api.github.test",
+                    "GITHUB_REF": "refs/heads/release#prod/hotfix",
+                },
+                clear=True,
+            ),
+            mock.patch.object(
+                dep,
+                "fetch_github_json",
+                side_effect=[
+                    {"default_branch": "release#prod/hotfix"},
+                    {"sha": "a" * 40},
+                ],
+            ) as fetch,
+        ):
+            dep.require_current_default_branch_tip(self._args())
+        self.assertEqual(
+            mock.call(
+                "https://api.github.test/repos/szl-holdings/killinchu/"
+                "commits/release%23prod%2Fhotfix",
+                "test-token",
+            ),
+            fetch.call_args_list[1],
+        )
+
 
 class TestContentIdentity(unittest.TestCase):
     def test_git_blob_sha1_matches_git(self):
