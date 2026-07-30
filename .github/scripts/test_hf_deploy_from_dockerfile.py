@@ -527,6 +527,121 @@ class TestReusableWorkflowContract(unittest.TestCase):
         attest_block = self.workflow.split("--attest", 1)[1]
         self.assertNotIn("--ref", attest_block)
 
+    def test_default_branch_tip_guard_is_optional_and_forwarded(self):
+        for contract in (
+            "require-default-branch-tip:",
+            "REQUIRE_DEFAULT_BRANCH_TIP: ${{ inputs.require-default-branch-tip }}",
+            "TIP_GUARD_ARGS+=(--require-default-branch-tip)",
+            "GITHUB_TOKEN: ${{ github.token }}",
+            "SOURCE_SHA: ${{ steps.hf.outputs.source_sha }}",
+            '--source-sha "$SOURCE_SHA"',
+        ):
+            self.assertIn(contract, self.workflow)
+
+
+class TestDefaultBranchTipGuard(unittest.TestCase):
+    def _args(self, *, source_sha="a" * 40, enabled=True):
+        return types.SimpleNamespace(
+            github_repo="szl-holdings/killinchu",
+            ref="main",
+            source_sha=source_sha,
+            require_default_branch_tip=enabled,
+        )
+
+    def test_disabled_guard_needs_no_github_context(self):
+        with mock.patch.object(dep, "fetch_github_json") as fetch:
+            dep.require_current_default_branch_tip(self._args(enabled=False))
+        fetch.assert_not_called()
+
+    def test_exact_default_branch_tip_passes(self):
+        with (
+            mock.patch.dict(
+                os.environ,
+                {
+                    "GITHUB_TOKEN": "test-token",
+                    "GITHUB_API_URL": "https://api.github.test",
+                    "GITHUB_REF": "refs/heads/main",
+                },
+                clear=True,
+            ),
+            mock.patch.object(
+                dep,
+                "fetch_github_json",
+                side_effect=[{"default_branch": "main"}, {"sha": "a" * 40}],
+            ) as fetch,
+        ):
+            dep.require_current_default_branch_tip(self._args())
+        self.assertEqual(fetch.call_count, 2)
+
+    def test_non_default_branch_fails_before_tip_lookup(self):
+        with (
+            mock.patch.dict(
+                os.environ,
+                {
+                    "GITHUB_TOKEN": "test-token",
+                    "GITHUB_REF": "refs/heads/release",
+                },
+                clear=True,
+            ),
+            mock.patch.object(
+                dep,
+                "fetch_github_json",
+                return_value={"default_branch": "main"},
+            ) as fetch,
+        ):
+            with self.assertRaisesRegex(
+                dep.DeployContractError, "non-default branch"
+            ):
+                dep.require_current_default_branch_tip(self._args())
+        fetch.assert_called_once()
+
+    def test_default_branch_is_encoded_as_one_path_component(self):
+        with (
+            mock.patch.dict(
+                os.environ,
+                {
+                    "GITHUB_TOKEN": "test-token",
+                    "GITHUB_REF": "refs/heads/release#prod",
+                },
+                clear=True,
+            ),
+            mock.patch.object(
+                dep,
+                "fetch_github_json",
+                side_effect=[
+                    {"default_branch": "release#prod"},
+                    {"sha": "a" * 40},
+                ],
+            ) as fetch,
+        ):
+            dep.require_current_default_branch_tip(self._args())
+        self.assertTrue(
+            fetch.call_args_list[1].args[0].endswith(
+                "/commits/release%23prod"
+            )
+        )
+
+    def test_stale_sha_fails_at_mutation_boundary(self):
+        with (
+            mock.patch.dict(
+                os.environ,
+                {
+                    "GITHUB_TOKEN": "test-token",
+                    "GITHUB_REF": "refs/heads/main",
+                },
+                clear=True,
+            ),
+            mock.patch.object(
+                dep,
+                "fetch_github_json",
+                side_effect=[{"default_branch": "main"}, {"sha": "b" * 40}],
+            ),
+        ):
+            with self.assertRaisesRegex(
+                dep.DeployContractError, "stale production deploy"
+            ):
+                dep.require_current_default_branch_tip(self._args())
+
 
 class TestContentIdentity(unittest.TestCase):
     def test_git_blob_sha1_matches_git(self):

@@ -53,6 +53,11 @@ on:
         required: false
         type: string
         default: ""
+      require-default-branch-tip:
+        description: "Fail before the Hugging Face commit unless ref is the caller repository's exact current default-branch tip."
+        required: false
+        type: boolean
+        default: false
     secrets:
       HF_TOKEN:
         description: "HF write token with organization write access to the target Space."
@@ -142,26 +147,35 @@ jobs:
       - name: Deploy Dockerfile-derived files to the Space
         env:
           HF_TOKEN: ${{ secrets.HF_TOKEN }}
+          GITHUB_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
           HF_REPO: ${{ steps.hf.outputs.hf_repo }}
           DEPLOY_REF: ${{ inputs.ref }}
           DOCKERFILE_PATH: ${{ inputs.dockerfile-path }}
           INCLUDE_README: ${{ inputs.include-readme }}
           PRUNE: ${{ inputs.prune }}
+          REQUIRE_DEFAULT_BRANCH_TIP: ${{ inputs.require-default-branch-tip }}
+          SOURCE_SHA: ${{ steps.hf.outputs.source_sha }}
           SMOKE_PATHS: ${{ inputs.smoke-paths }}
         run: |
           set -euo pipefail
           PRUNE_ARGS=()
           if [ "$PRUNE" = "true" ]; then PRUNE_ARGS+=(--prune); fi
+          TIP_GUARD_ARGS=()
+          if [ "$REQUIRE_DEFAULT_BRANCH_TIP" = "true" ]; then
+            TIP_GUARD_ARGS+=(--require-default-branch-tip)
+          fi
           python3 tools/.github/scripts/hf_deploy_from_dockerfile.py \
             --repo-root caller \
             --github-repo "$GH_REPO" \
             --hf-repo "$HF_REPO" \
             --ref "$DEPLOY_REF" \
+            --source-sha "$SOURCE_SHA" \
             --dockerfile-path "$DOCKERFILE_PATH" \
             --include-readme "$INCLUDE_README" \
             --smoke-paths "${SMOKE_PATHS}" \
             "${PRUNE_ARGS[@]}" \
+            "${TIP_GUARD_ARGS[@]}" \
             --manifest-out hf-deploy-manifest.json
 
       - name: Bind exact source revision after publication
