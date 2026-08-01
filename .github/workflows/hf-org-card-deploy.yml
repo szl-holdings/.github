@@ -8,6 +8,8 @@ on:
       - "huggingface/org-card.manifest.json"
       - "profile/assets/evidence-lattice-v2.webp"
       - ".github/scripts/hf_static_space_deploy.py"
+      - ".github/scripts/hf_org_card_embed_check.py"
+      - ".github/scripts/test_hf_org_card_embed_check.py"
       - ".github/workflows/hf-org-card-deploy.yml"
   workflow_dispatch:
 
@@ -45,8 +47,17 @@ jobs:
           -s .github/scripts
           -p test_hf_static_space_deploy.py
 
+      - name: Test embedded org-card contract
+        run: >-
+          python -m unittest discover
+          -s .github/scripts
+          -p test_hf_org_card_embed_check.py
+
       - name: Verify public front-door contract
         run: python .github/scripts/public_front_door_check.py
+
+      - name: Verify embedded org-card contract
+        run: python .github/scripts/hf_org_card_embed_check.py
 
       - name: Install exact Hub client
         run: python -m pip install --disable-pip-version-check "huggingface_hub==1.19.0"
