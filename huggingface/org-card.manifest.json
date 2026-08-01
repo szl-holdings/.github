@@ -50,9 +50,14 @@
     {
       "source": "profile/assets/hf-card-evidence.svg",
       "destination": "assets/hf-card-evidence.svg"
+    },
+    {
+      "source": "profile/assets/evidence-lattice-v2.webp",
+      "destination": "assets/evidence-lattice-v2.webp"
     }
   ],
   "prune": true,
+  "allowed_deletions": [],
   "smoke": {
     "path": "/",
     "required_marker": "data-szl-surface=\"company-front-door\""
