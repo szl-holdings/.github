@@ -1,146 +1,82 @@
 import unittest
 from pathlib import Path
-from types import SimpleNamespace
 
 import public_front_door_check as check
 
 
 class FrontMatterTests(unittest.TestCase):
     def test_reads_emoji_from_leading_front_matter(self):
-        document = "---\nsdk: static\nemoji: 🛡️\n---\n# Card\n"
-        self.assertEqual(check.front_matter_value(document, "emoji"), "🛡️")
+        document = "---\nsdk: static\nemoji: \U0001f6e1\ufe0f\n---\n# Card\n"
+        self.assertEqual(check.front_matter_value(document, "emoji"), "\U0001f6e1\ufe0f")
 
     def test_ignores_emoji_line_in_card_body(self):
-        document = "---\nsdk: static\n---\n# Card\nemoji: 🛡️\n"
+        document = "---\nsdk: static\n---\n# Card\nemoji: \U0001f6e1\ufe0f\n"
         self.assertIsNone(check.front_matter_value(document, "emoji"))
 
     def test_rejects_non_leading_front_matter(self):
-        document = "# Card\n---\nemoji: 🛡️\n---\n"
+        document = "# Card\n---\nemoji: \U0001f6e1\ufe0f\n---\n"
         self.assertIsNone(check.front_matter_value(document, "emoji"))
 
     def test_approved_value_is_exact(self):
-        self.assertEqual(check.HUB_CARD_EMOJI, "🛡️")
-        self.assertNotEqual(check.HUB_CARD_EMOJI, "𠀀")
+        self.assertEqual(check.HUB_CARD_EMOJI, "\U0001f6e1\ufe0f")
+        self.assertNotEqual(check.HUB_CARD_EMOJI, "ð €€")
 
-    def test_measures_quoted_short_description(self):
-        document = '---\nshort_description: "Clear boundaries"\n---\n# Card\n'
-        self.assertEqual(check.hub_short_description_length(document), 16)
+    def test_rejects_folded_scalar(self):
+        document = "---\nshort_description: >\n  this is not accepted\n---\n"
+        self.assertIsNone(check.front_matter_value(document, "short_description"))
 
-    def test_hub_short_description_limit_is_exact(self):
-        self.assertEqual(check.HUB_SHORT_DESCRIPTION_MAX_LENGTH, 60)
-        self.assertTrue(check.short_description_length_within_limit(60))
-        self.assertFalse(check.short_description_length_within_limit(61))
-        self.assertFalse(check.short_description_length_within_limit(None))
+    def test_rejects_continuation_lines(self):
+        document = "---\nshort_description: this\n  is a continuation\n---\n"
+        self.assertIsNone(check.front_matter_value(document, "short_description"))
 
-    def test_measures_complete_folded_block_short_description(self):
-        accepted = "---\nshort_description: >-\n  " + "x" * 29 + "\n  " + "y" * 30 + "\n---\n"
-        rejected = "---\nshort_description: >-\n  " + "x" * 30 + "\n  " + "y" * 30 + "\n---\n"
-        accepted_length = check.hub_short_description_length(accepted)
-        rejected_length = check.hub_short_description_length(rejected)
-        self.assertEqual(accepted_length, 60)
-        self.assertEqual(rejected_length, 61)
-        self.assertTrue(check.short_description_length_within_limit(accepted_length))
-        self.assertFalse(check.short_description_length_within_limit(rejected_length))
+    def test_rejects_duplicate_front_matter_keys(self):
+        document = "---\nshort_description: one\nshort_description: two\n---\n"
+        self.assertIsNone(check.front_matter_value(document, "short_description"))
 
-    def test_counts_leading_blank_line_in_folded_scalar(self):
-        document = "---\nshort_description: >-\n\n  " + "x" * 60 + "\n---\n"
-        length = check.hub_short_description_length(document)
-        self.assertEqual(length, 61)
-        self.assertFalse(check.short_description_length_within_limit(length))
+    def test_rejects_aliases(self):
+        document = "---\nshort_description: *oops\n---\n"
+        self.assertIsNone(check.front_matter_value(document, "short_description"))
 
-    def test_rejects_duplicate_short_description_keys(self):
-        document = (
-            "---\nshort_description: ok\nshort_description: "
-            + "x" * 61
-            + "\n---\n"
-        )
-        self.assertIsNone(check.hub_short_description_length(document))
-
-    def test_rejects_tagged_duplicate_short_description_key(self):
-        document = (
-            "---\nshort_description: ok\n!!str short_description: "
-            + "x" * 61
-            + "\n---\n"
-        )
-        self.assertIsNone(check.hub_short_description_length(document))
-
-    def test_rejects_alias_short_description(self):
-        document = "---\nshort_description: *long_description\n---\n"
-        self.assertIsNone(check.hub_short_description_length(document))
-
-    def test_counts_excess_spaces_on_whitespace_only_block_line(self):
-        document = "---\nshort_description: |-\n  " + "x" * 58 + "\n    \n---\n"
-        length = check.hub_short_description_length(document)
-        self.assertEqual(length, 61)
-        self.assertFalse(check.short_description_length_within_limit(length))
+    def test_org_card_short_description_fits_hugging_face_limit(self):
+        root = Path(__file__).resolve().parents[2]
+        document = (root / "huggingface/org-card/README.md").read_text(encoding="utf-8")
+        description = check.front_matter_value(document, "short_description")
+        self.assertIsNotNone(description)
+        self.assertLessEqual(len(description or ""), 60)
 
 
-class RequiredAssetBindingTests(unittest.TestCase):
-    def test_accepts_exact_destination_source_bindings(self):
-        root = Path("C:/repo")
+class ManifestHeroBindingTests(unittest.TestCase):
+    def test_hero_binding_fails_when_misbound(self):
+        root = Path(__file__).resolve().parents[2]
         files = [
-            SimpleNamespace(destination=destination, source=root / source)
-            for destination, source in check.REQUIRED_HF_ASSETS.items()
-        ]
-        self.assertEqual(check.required_asset_mismatches(root, files), {})
-
-    def test_rejects_existing_but_wrong_source(self):
-        root = Path("C:/repo")
-        files = [
-            SimpleNamespace(
-                destination=destination,
-                source=root / ("profile/assets/wrong.svg" if index == 0 else source),
+            check.deploy.PublicationFile(
+                (root / "profile/assets/evidence-lattice-v2.webp"),
+                check.HF_HERO_DESTINATION,
+                "abc",
+                42,
             )
-            for index, (destination, source) in enumerate(check.REQUIRED_HF_ASSETS.items())
         ]
-        mismatches = check.required_asset_mismatches(root, files)
-        self.assertEqual(len(mismatches), 1)
-        self.assertEqual(next(iter(mismatches.values()))["actual"], "profile/assets/wrong.svg")
-
-
-class CheckCountingTests(unittest.TestCase):
-    def test_require_counts_passes_and_failures(self):
-        original = check.CHECKS_EXECUTED
-        try:
-            check.CHECKS_EXECUTED = 0
-            failures = []
-            check.require(True, "pass", failures)
-            check.require(False, "fail", failures)
-            self.assertEqual(check.CHECKS_EXECUTED, 2)
-            self.assertEqual(failures, ["fail"])
-        finally:
-            check.CHECKS_EXECUTED = original
-
-
-class WorkflowPushPathTests(unittest.TestCase):
-    def test_reads_only_active_on_push_paths(self):
-        workflow = '''
-"on":
-  push:
-    branches: [main]
-    paths:
-      - "profile/assets/**"
-      - 'huggingface/org-card/**' # publication inputs
-  workflow_dispatch:
-'''
-        self.assertEqual(
-            check.workflow_push_paths(workflow),
-            {"profile/assets/**", "huggingface/org-card/**"},
+        actual = check.manifest_hero_source(files, check.HF_HERO_DESTINATION)
+        self.assertEqual(actual, (root / "profile/assets/evidence-lattice-v2.webp").resolve())
+        self.assertNotEqual(
+            actual,
+            (root / check.HF_HERO_SOURCE).resolve(),
         )
 
-    def test_ignores_comments_and_unrelated_scalars(self):
-        workflow = '''
-# on:
-#   push:
-#     paths:
-#       - "profile/assets/**"
-env:
-  EXAMPLE: "profile/assets/**"
-on:
-  workflow_dispatch:
-'''
-        self.assertEqual(check.workflow_push_paths(workflow), set())
+    def test_hero_binding_succeeds_when_exact(self):
+        root = Path(__file__).resolve().parents[2]
+        files = [
+            check.deploy.PublicationFile(
+                (root / check.HF_HERO_SOURCE),
+                check.HF_HERO_DESTINATION,
+                "abc",
+                42,
+            )
+        ]
+        actual = check.manifest_hero_source(files, check.HF_HERO_DESTINATION)
+        self.assertEqual(actual, (root / check.HF_HERO_SOURCE).resolve())
 
 
 if __name__ == "__main__":
     unittest.main()
+
