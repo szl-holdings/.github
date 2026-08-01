@@ -80,6 +80,22 @@ label and, where appropriate, a timestamp and source.
 - Avoid fake terminal decoration, ornamental grids, and glowing effects when
   they do not explain a product behavior.
 
+### SZL composition principles
+
+The visual language is original to SZL. It may learn from the clarity of
+mission-technology companies, frontier research laboratories, and accelerated
+computing platforms, but it does not copy their assets, layouts, trademarks,
+or product language.
+
+- Lead with a consequential mission sentence, not a feature inventory.
+- Show one system relationship before presenting a wall of modules.
+- Pair an operator action with an evidence action in the first viewport.
+- Use restrained color and reserve bright accents for control or evidence.
+- Keep investor narrative, operator workflow, and developer reference as
+  distinct reading paths that converge on the same source of truth.
+- Treat architecture diagrams as interface: every node has a named boundary,
+  owner, and verification path.
+
 ## Narrative sequence
 
 An investor-facing product page should follow this order:
@@ -181,6 +197,12 @@ Every Space states its source repository, pinned model and dataset revisions,
 runtime status behavior, data retention or privacy behavior, limitations, and
 a reproducible local path. A visible demo is not evidence of production
 readiness.
+
+Static Spaces expose a same-host `deployment.json` generated during
+publication. It identifies the exact protected Git source revision and the
+hash of every managed source file. Deployment is not complete until the
+running route returns that revision and the primary smoke marker. A Hub commit,
+`RUNNING` stage, or HTTP 200 alone is insufficient.
 
 Use the templates in [`templates/`](../templates/README.md) as the adoption
 baseline.

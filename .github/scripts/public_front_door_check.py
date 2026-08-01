@@ -1,0 +1,109 @@
+#!/usr/bin/env python3
+"""Fail-closed checks for the shared GitHub and Hugging Face front doors."""
+
+from __future__ import annotations
+
+import json
+import sys
+from html.parser import HTMLParser
+from pathlib import Path
+
+import hf_static_space_deploy as deploy
+
+
+REQUIRED_LINKS = {
+    "https://a-11-oy.com",
+    "https://a11oy.net",
+    "https://github.com/szl-holdings",
+    "https://huggingface.co/SZLHOLDINGS",
+}
+BANNED_COPY = {
+    "every model ships with signed receipts",
+    "70+ live surfaces",
+    "trust ceiling 0.97",
+    "all models operational",
+}
+
+
+class SurfaceParser(HTMLParser):
+    def __init__(self) -> None:
+        super().__init__()
+        self.links: set[str] = set()
+        self.h1_count = 0
+        self.main_count = 0
+        self.body_marker = ""
+        self.external_assets: list[str] = []
+
+    def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
+        values = dict(attrs)
+        if tag == "a" and values.get("href"):
+            self.links.add(str(values["href"]))
+        if tag == "h1":
+            self.h1_count += 1
+        if tag == "main":
+            self.main_count += 1
+        if tag == "body":
+            self.body_marker = str(values.get("data-szl-surface", ""))
+        if tag == "script" and str(values.get("src", "")).startswith(("http://", "https://")):
+            self.external_assets.append(str(values["src"]))
+        if tag == "link" and str(values.get("href", "")).startswith(("http://", "https://")):
+            self.external_assets.append(str(values["href"]))
+
+
+def require(condition: bool, message: str, failures: list[str]) -> None:
+    if not condition:
+        failures.append(message)
+
+
+def main() -> int:
+    root = Path(__file__).resolve().parents[2]
+    profile = (root / "profile/README.md").read_text(encoding="utf-8")
+    hub_card = (root / "huggingface/org-card/README.md").read_text(encoding="utf-8")
+    html = (root / "huggingface/org-card/index.html").read_text(encoding="utf-8")
+    svg = (root / "profile/assets/estate-command-system.svg").read_text(encoding="utf-8")
+    manifest_path = root / "huggingface/org-card.manifest.json"
+    failures: list[str] = []
+
+    for url in REQUIRED_LINKS:
+        require(url in profile, f"GitHub profile missing canonical link: {url}", failures)
+        require(url in hub_card, f"Hugging Face card missing canonical link: {url}", failures)
+    require("./assets/estate-command-system.svg" in profile, "profile does not use canonical hero", failures)
+    require("deployment.json" in hub_card, "Hub card does not expose served source binding", failures)
+
+    combined = f"{profile}\n{hub_card}\n{html}".lower()
+    for phrase in BANNED_COPY:
+        require(phrase not in combined, f"unsupported public copy remains: {phrase}", failures)
+
+    parser = SurfaceParser()
+    parser.feed(html)
+    require(parser.h1_count == 1, "static front door must contain exactly one h1", failures)
+    require(parser.main_count == 1, "static front door must contain exactly one main landmark", failures)
+    require(parser.body_marker == "company-front-door", "static front door marker is missing", failures)
+    require(not parser.external_assets, f"runtime external assets are forbidden: {parser.external_assets}", failures)
+    require("prefers-reduced-motion" in html, "reduced-motion contract is missing", failures)
+    require("@media (max-width: 640px)" in html, "mobile breakpoint contract is missing", failures)
+    require("Skip to main content" in html, "keyboard skip link is missing", failures)
+
+    require("<title" in svg and "<desc" in svg, "hero SVG needs an accessible title and description", failures)
+    require("<script" not in svg.lower(), "hero SVG must not execute scripts", failures)
+
+    try:
+        contract, files = deploy.load_contract(root, manifest_path)
+        destinations = {item.destination for item in files}
+        require(contract.get("prune") is True, "org-card publication must prune unmanaged legacy files", failures)
+        require("assets/estate-command-system.svg" in destinations, "manifest must publish canonical hero", failures)
+    except Exception as exc:
+        failures.append(f"publication manifest invalid: {type(exc).__name__}: {exc}")
+
+    report = {
+        "schema": "szl.public-front-door-check/v1",
+        "state": "PASS" if not failures else "FAIL",
+        "checks": 15 + len(REQUIRED_LINKS) * 2 + len(BANNED_COPY),
+        "failures": failures,
+    }
+    print(json.dumps(report, indent=2, sort_keys=True))
+    return 1 if failures else 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

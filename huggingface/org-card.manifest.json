@@ -1,0 +1,36 @@
+{
+  "schema": "szl.hf-static-publication/v1",
+  "target": {
+    "repo_id": "SZLHOLDINGS/README",
+    "repo_type": "space",
+    "live_base_url": "https://szlholdings-readme.static.hf.space"
+  },
+  "source_repository": "szl-holdings/.github",
+  "files": [
+    {
+      "source": "huggingface/org-card/.gitattributes",
+      "destination": ".gitattributes"
+    },
+    {
+      "source": "huggingface/org-card/README.md",
+      "destination": "README.md"
+    },
+    {
+      "source": "huggingface/org-card/HONEST_DISCLOSURE.md",
+      "destination": "HONEST_DISCLOSURE.md"
+    },
+    {
+      "source": "huggingface/org-card/index.html",
+      "destination": "index.html"
+    },
+    {
+      "source": "profile/assets/estate-command-system.svg",
+      "destination": "assets/estate-command-system.svg"
+    }
+  ],
+  "prune": true,
+  "smoke": {
+    "path": "/",
+    "required_marker": "data-szl-surface=\"company-front-door\""
+  }
+}
