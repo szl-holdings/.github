@@ -571,6 +571,19 @@
       font-size: 10px;
     }
 
+    #szl-hf-org-card .szl-hf-truth-pill {
+      display: inline-flex;
+      margin-top: 14px;
+      padding: 6px 10px;
+      border-radius: 999px;
+      border: 1px solid rgba(88, 214, 199, .42);
+      color: var(--szl-hf-teal-soft);
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      font-size: 11px;
+      letter-spacing: .12em;
+      text-transform: uppercase;
+    }
+
     #szl-hf-org-card .szl-hf-label--measured {
       border-color: rgba(88, 214, 199, .48);
       color: var(--szl-hf-teal-soft);
@@ -786,6 +799,32 @@
         --szl-hf-quiet: #bdc6d1;
       }
     }
+
+    @media (forced-colors: active) {
+      #szl-hf-org-card,
+      #szl-hf-org-card * {
+        forced-color-adjust: auto;
+      }
+
+      #szl-hf-org-card .szl-hf-button,
+      #szl-hf-org-card .szl-hf-nav-link,
+      #szl-hf-org-card .szl-hf-surface-card,
+      #szl-hf-org-card .szl-hf-status-panel,
+      #szl-hf-org-card .szl-hf-truth-pill {
+        border-color: CanvasText;
+      }
+
+      #szl-hf-org-card .szl-hf-button--primary {
+        background: ButtonFace;
+      }
+
+      #szl-hf-org-card .szl-hf-surface-card:hover,
+      #szl-hf-org-card .szl-hf-nav-link:hover,
+      #szl-hf-org-card .szl-hf-button:hover {
+        background: Highlight;
+        color: HighlightText;
+      }
+    }
   </style>
 </head>
 <body data-szl-surface="company-front-door" style="margin:0;background:#071019">
@@ -811,6 +850,7 @@
       <div class="szl-hf-frame szl-hf-hero">
         <div>
           <div class="szl-hf-eyebrow">Governed AI infrastructure</div>
+          <p class="szl-hf-truth-pill">HISTORICAL</p>
           <h1 class="szl-hf-title">Autonomy, <span class="szl-hf-title-emphasis">under authority.</span></h1>
           <p class="szl-hf-lede">Models, software, and evidence for systems that must explain, constrain, and verify action.</p>
           <ul class="szl-hf-boundaries" aria-label="Public evidence boundaries">
