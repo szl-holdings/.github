@@ -4,7 +4,7 @@ emoji: 🛡️
 colorFrom: gray
 colorTo: yellow
 sdk: static
-short_description: Models, evidence, and governed demonstrations with explicit boundaries
+short_description: Models, evidence, and demonstrations with clear boundaries
 pinned: true
 license: apache-2.0
 thumbnail: "https://huggingface.co/spaces/SZLHOLDINGS/README/resolve/main/assets/hf-portfolio-map.svg"

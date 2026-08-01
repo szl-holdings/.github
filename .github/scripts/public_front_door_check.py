@@ -24,6 +24,7 @@ BANNED_COPY = {
     "all models operational",
 }
 HUB_CARD_EMOJI = "🛡️"
+HUB_SHORT_DESCRIPTION_MAX_LENGTH = 60
 REQUIRED_HF_ASSETS = {
     "assets/estate-command-system.svg": "profile/assets/estate-command-system.svg",
     "assets/estate-banner-v2.svg": "profile/assets/estate-banner-v2.svg",
@@ -62,6 +63,17 @@ def _yaml_scalar(value: str) -> str:
     if len(value) >= 2 and value[0] == value[-1] == "'":
         return value[1:-1].replace("''", "'")
     return value
+
+
+def hub_short_description(document: str) -> str | None:
+    """Return the normalized Hub card short description, when present."""
+    value = front_matter_value(document, "short_description")
+    return None if value is None else _yaml_scalar(value)
+
+
+def short_description_within_limit(value: str | None) -> bool:
+    """Return whether a Hub short description satisfies its hard limit."""
+    return value is not None and len(value) <= HUB_SHORT_DESCRIPTION_MAX_LENGTH
 
 
 def _without_yaml_comment(value: str) -> str:
@@ -205,6 +217,18 @@ def main() -> int:
     require(
         front_matter_value(hub_card, "thumbnail") is not None,
         "Hub card front matter is missing a portfolio thumbnail",
+        failures,
+    )
+    short_description = hub_short_description(hub_card)
+    require(
+        short_description is not None,
+        "Hub card front matter is missing short_description",
+        failures,
+    )
+    require(
+        short_description is None
+        or short_description_within_limit(short_description),
+        "Hub card short_description exceeds the Hugging Face 60-character limit",
         failures,
     )
     combined = f"{profile}\n{hub_card}\n{html}".lower()

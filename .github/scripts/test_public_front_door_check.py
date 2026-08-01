@@ -22,6 +22,16 @@ class FrontMatterTests(unittest.TestCase):
         self.assertEqual(check.HUB_CARD_EMOJI, "🛡️")
         self.assertNotEqual(check.HUB_CARD_EMOJI, "𠀀")
 
+    def test_normalizes_quoted_short_description(self):
+        document = '---\nshort_description: "Clear boundaries"\n---\n# Card\n'
+        self.assertEqual(check.hub_short_description(document), "Clear boundaries")
+
+    def test_hub_short_description_limit_is_exact(self):
+        self.assertEqual(check.HUB_SHORT_DESCRIPTION_MAX_LENGTH, 60)
+        self.assertTrue(check.short_description_within_limit("x" * 60))
+        self.assertFalse(check.short_description_within_limit("x" * 61))
+        self.assertFalse(check.short_description_within_limit(None))
+
 
 class RequiredAssetBindingTests(unittest.TestCase):
     def test_accepts_exact_destination_source_bindings(self):
