@@ -7,6 +7,13 @@
   <meta name="theme-color" content="#070b12">
   <meta name="description" content="SZL Holdings publishes governed AI models, evidence, software, and demonstrations with explicit operational boundaries.">
   <title>SZL Holdings - Autonomy, under authority</title>
+  <meta property="og:title" content="SZL Holdings - Autonomy, under authority">
+  <meta property="og:description" content="Governed decision infrastructure for actions that must survive scrutiny.">
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://szlholdings-readme.static.hf.space/">
+  <meta property="og:image" content="https://szlholdings-readme.static.hf.space/assets/evidence-lattice-v2.webp">
+  <meta property="og:image:alt" content="A bounded signal path entering a holographic verification lattice">
+  <meta name="twitter:card" content="summary_large_image">
   <style>
     :root {
       --void: #070b12;
@@ -65,19 +72,66 @@
     nav a.primary-link { border: 1px solid rgba(215, 181, 94, .48); color: var(--gold-hi); }
 
     main { overflow: hidden; }
-    .hero { padding: clamp(72px, 10vw, 132px) 0 84px; display: grid; grid-template-columns: 1.08fr .92fr; gap: 64px; align-items: center; }
+    .hero {
+      position: relative;
+      isolation: isolate;
+      min-height: min(720px, calc(100vh - 104px));
+      margin: 48px auto 96px;
+      padding: clamp(64px, 8vw, 108px);
+      display: flex;
+      align-items: center;
+      overflow: hidden;
+      border: 1px solid rgba(124, 232, 218, .22);
+      border-radius: 32px;
+      background: #070b12;
+      box-shadow: 0 46px 120px rgba(0, 0, 0, .46), inset 0 1px rgba(255, 255, 255, .05);
+    }
+    .hero::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      z-index: 1;
+      background:
+        linear-gradient(90deg, rgba(5, 9, 16, .99) 0%, rgba(5, 9, 16, .94) 36%, rgba(5, 9, 16, .42) 66%, rgba(5, 9, 16, .10) 100%),
+        linear-gradient(0deg, rgba(5, 9, 16, .46), transparent 48%);
+    }
+    .hero::after {
+      content: "";
+      position: absolute;
+      inset: 14px;
+      z-index: 3;
+      pointer-events: none;
+      border: 1px solid rgba(169, 197, 255, .09);
+      border-radius: 22px;
+    }
+    .hero-copy { position: relative; z-index: 2; max-width: 690px; }
+    .hero-art {
+      position: absolute;
+      inset: 0;
+      z-index: 0;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      object-position: center;
+      opacity: .94;
+      filter: saturate(.88) contrast(1.08);
+    }
     .eyebrow { color: var(--teal); font-family: var(--mono); font-size: 12px; font-weight: 700; letter-spacing: .17em; text-transform: uppercase; }
+    .hero .eyebrow { display: inline-flex; align-items: center; gap: 10px; border: 1px solid rgba(71, 215, 196, .25); border-radius: 999px; padding: 8px 12px; background: rgba(7, 16, 23, .72); }
+    .hero .eyebrow::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: var(--teal); box-shadow: 0 0 18px rgba(71, 215, 196, .78); }
     h1, h2 { font-family: var(--display); }
-    h1 { margin: 20px 0; max-width: 780px; font-size: clamp(48px, 7vw, 88px); line-height: .98; letter-spacing: -.055em; text-wrap: balance; }
-    h1 span { color: var(--gold-hi); }
+    h1 { margin: 24px 0; max-width: 780px; font-size: clamp(54px, 7vw, 92px); line-height: .94; letter-spacing: -.062em; text-wrap: balance; }
+    h1 span { color: var(--gold-hi); text-shadow: 0 0 44px rgba(230, 202, 130, .16); }
     .lede { max-width: 650px; color: var(--muted); font-size: clamp(18px, 2.2vw, 23px); }
+    .hero .lede { color: #d0d7e0; text-wrap: pretty; }
     .microcopy { color: var(--quiet); font-family: var(--mono); font-size: 12px; }
     .actions { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 34px; }
-    .button { display: inline-flex; min-height: 48px; align-items: center; justify-content: center; border: 1px solid var(--line); border-radius: 999px; padding: 0 20px; text-decoration: none; font-size: 14px; font-weight: 720; }
-    .button.primary { background: var(--gold); border-color: var(--gold); color: #101216; }
-    .button.primary:hover { background: var(--gold-hi); }
+    .button { display: inline-flex; min-height: 48px; align-items: center; justify-content: center; border: 1px solid var(--line); border-radius: 999px; padding: 0 21px; text-decoration: none; font-size: 14px; font-weight: 760; transition: transform .2s ease, border-color .2s ease, background .2s ease; }
+    .button:hover { transform: translateY(-2px); }
+    .button.primary { background: linear-gradient(120deg, #7ce8da, #a9c5ff); border-color: #9ee2e4; color: #071019; box-shadow: 0 12px 38px rgba(71, 215, 196, .18); }
+    .button.primary:hover { background: linear-gradient(120deg, #a3f2e8, #c2d4ff); }
     .button.secondary:hover { border-color: var(--teal); color: var(--teal-hi); }
-    .hero-visual { width: 100%; filter: drop-shadow(0 28px 80px rgba(0, 0, 0, .34)); }
+    .hero .button.secondary { background: rgba(10, 17, 28, .76); border-color: rgba(169, 197, 255, .32); color: #dce6f4; backdrop-filter: blur(12px); }
 
     section { padding: 82px 0; border-top: 1px solid rgba(132, 149, 171, .15); scroll-margin-top: 84px; }
     .section-head { display: grid; grid-template-columns: .85fr 1.15fr; gap: 48px; align-items: start; margin-bottom: 36px; }
@@ -141,9 +195,10 @@
     .footer-links a:hover { color: var(--ink); }
 
     @media (max-width: 900px) {
-      .hero, .section-head, .truth { grid-template-columns: 1fr; }
-      .hero { gap: 42px; }
-      .hero-visual { max-width: 640px; }
+      .section-head, .truth { grid-template-columns: 1fr; }
+      .hero { min-height: 680px; padding: clamp(42px, 8vw, 72px); }
+      .hero::before { background: linear-gradient(90deg, rgba(5, 9, 16, .98), rgba(5, 9, 16, .72) 72%, rgba(5, 9, 16, .34)); }
+      .hero-art { object-position: 62% center; }
       .paths { grid-template-columns: 1fr; }
       .cards li, .cards li:nth-child(4), .cards li:nth-child(5) { grid-column: span 3; }
       .steps { grid-template-columns: repeat(3, 1fr); }
@@ -155,8 +210,11 @@
       .brand { margin-bottom: 4px; }
       nav { width: 100%; justify-content: flex-start; gap: 4px; overflow-x: auto; padding: 2px 0 8px; scrollbar-width: thin; }
       nav a { flex: 0 0 auto; }
-      .hero { padding-top: 52px; }
-      h1 { font-size: clamp(42px, 15vw, 68px); }
+      .hero { min-height: min(720px, calc(100svh - 88px)); margin: 24px auto 64px; padding: 52px 24px; border-radius: 24px; }
+      .hero::before { background: linear-gradient(0deg, rgba(5, 9, 16, .99), rgba(5, 9, 16, .78) 70%, rgba(5, 9, 16, .38)); }
+      .hero::after { inset: 9px; border-radius: 17px; }
+      .hero-art { object-position: 68% center; opacity: .72; }
+      h1 { font-size: clamp(48px, 14vw, 70px); }
       .actions .button { width: 100%; }
       .cards { grid-template-columns: 1fr; }
       .cards li, .cards li:nth-child(4), .cards li:nth-child(5) { grid-column: auto; }
@@ -167,8 +225,8 @@
     }
     @media (prefers-reduced-motion: reduce) {
       html { scroll-behavior: auto; }
-      .card { transition: none; }
-      .card:hover { transform: none; }
+      .button, .card { transition: none; }
+      .button:hover, .card:hover { transform: none; }
     }
     @media (prefers-contrast: more) {
       :root { --line: #718197; --muted: #d0d7e0; --quiet: #b5bfcc; }
@@ -198,7 +256,7 @@
 
   <main id="main" tabindex="-1">
     <div class="shell hero">
-      <div>
+      <div class="hero-copy">
         <div class="eyebrow">Governed decision infrastructure</div>
         <h1>Autonomy,<br><span>under authority.</span></h1>
         <p class="lede">Models, evidence, and public demonstrations for systems that must explain, constrain, and verify action.</p>
@@ -209,7 +267,8 @@
           <a class="button secondary" href="https://github.com/szl-holdings">View source</a>
         </div>
       </div>
-      <img class="hero-visual" src="assets/hf-portfolio-map.svg" alt="Four portfolio paths connected by one governed decision loop">
+      <img class="hero-art" src="assets/evidence-lattice-v2.webp"
+           alt="" width="1800" height="776" fetchpriority="high" decoding="async">
     </div>
 
     <section id="paths" aria-labelledby="paths-title">

@@ -2,25 +2,25 @@
 title: SZL Holdings - Governed Decision Infrastructure
 emoji: 🛡️
 colorFrom: gray
-colorTo: yellow
+colorTo: indigo
 sdk: static
-short_description: Control before action. Evidence after.
+short_description: Governed models, evidence, and demonstrations
+thumbnail: https://huggingface.co/spaces/SZLHOLDINGS/README/resolve/main/assets/evidence-lattice-v2.webp
 pinned: true
 license: apache-2.0
-thumbnail: "https://huggingface.co/spaces/SZLHOLDINGS/README/resolve/main/assets/hf-portfolio-map.svg"
 ---
 
 <!-- markdownlint-disable MD013 MD033 MD041 -->
 
 <p align="center">
-  <img src="https://huggingface.co/spaces/SZLHOLDINGS/README/resolve/main/assets/hf-portfolio-map.svg"
-       alt="SZL Holdings portfolio: command, intelligence, models and data, and evidence connected by one governed decision loop"
+  <img src="https://huggingface.co/spaces/SZLHOLDINGS/README/resolve/main/assets/evidence-lattice-v2.webp"
+       alt="A bounded signal path entering a holographic verification lattice"
        width="100%" />
 </p>
 
 <div align="center">
 
-# Models, evidence, and governed demonstrations
+## Models, evidence, and governed demonstrations
 
 SZL Holdings publishes AI artifacts for systems that must reason, operate
 inside declared authority, and return evidence another party can inspect.
@@ -160,6 +160,12 @@ and deployed with an exact source-revision manifest. Inspect
 [`deployment.json`](https://szlholdings-readme.static.hf.space/deployment.json)
 for the served source binding.
 
+Run the static front door locally from the source repository:
+
+```bash
+python -m http.server 8000 --directory huggingface/org-card
+```
+
 - [Security policy](https://github.com/szl-holdings/.github/security/policy)
 - [Trust posture](https://github.com/szl-holdings/.github/blob/main/TRUST.md)
 - [Support](https://github.com/szl-holdings/.github/blob/main/SUPPORT.md)
@@ -169,7 +175,7 @@ for the served source binding.
 
 <div align="center">
 
-**Govern | execute | prove**
+Govern | execute | prove
 
 [a-11-oy.com](https://a-11-oy.com) |
 [a11oy.net](https://a11oy.net) |

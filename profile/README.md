@@ -2,11 +2,11 @@
 
 <div align="center">
 
-<img src="./assets/estate-command-system.svg"
-     alt="SZL Holdings - autonomy, under authority"
+<img src="./assets/evidence-lattice-v2.webp"
+     alt="A bounded signal path entering a holographic verification lattice"
      width="100%" />
 
-# Governed decision infrastructure
+# Governed AI for decisions that must survive scrutiny
 
 SZL Holdings builds systems that can reason, act within authority, and return
 evidence that another party can verify.
@@ -22,12 +22,37 @@ evidence that another party can verify.
 
 ## Start with your question
 
-| You are here to... | Start here | Then verify |
-| --- | --- | --- |
-| Understand the company | [Category and product map](#the-company) | [Evidence registry](https://a11oy.net) |
-| Evaluate technical diligence | [Artifact map](#artifact-map) | [Current state](#current-state) |
-| Integrate the platform | [Developer path](#developer-path) | [Documentation](https://holdings.a-11-oy.com/docs-site/) |
-| Inspect public AI artifacts | [Hugging Face organization](https://huggingface.co/SZLHOLDINGS) | [Current Hugging Face front door](https://huggingface.co/spaces/SZLHOLDINGS/README) |
+<table>
+<tr>
+<td width="33%" valign="top">
+
+<strong>Investor</strong><br><br>
+Understand the category, product boundaries, research lineage, and trust
+posture.
+
+<a href="#investor-path">Evaluate the company -></a>
+
+</td>
+<td width="33%" valign="top">
+
+<strong>Developer</strong><br><br>
+Choose an artifact class, inspect its contract, and reproduce the integration
+path.
+
+<a href="#developer-path">Build with SZL -></a>
+
+</td>
+<td width="33%" valign="top">
+
+<strong>Evaluator</strong><br><br>
+Separate evidence, runtime state, and authorization before drawing a
+conclusion.
+
+<a href="#current-state">Inspect current evidence -></a>
+
+</td>
+</tr>
+</table>
 
 ## The company
 
@@ -151,7 +176,7 @@ performance, compliance, or authorization to deploy.
 
 <div align="center">
 
-**Govern | execute | prove**
+Govern | execute | prove
 
 [a-11-oy.com](https://a-11-oy.com) |
 [a11oy.net](https://a11oy.net) |

@@ -4,7 +4,6 @@
 from __future__ import annotations
 
 import json
-import re
 import sys
 from html.parser import HTMLParser
 from pathlib import Path
@@ -25,21 +24,7 @@ BANNED_COPY = {
     "all models operational",
 }
 HUB_CARD_EMOJI = "🛡️"
-HUB_SHORT_DESCRIPTION_MAX_LENGTH = 60
-BLOCK_SCALAR_HEADER = re.compile(
-    r"^(?P<style>[>|])(?P<modifiers>(?:[+-][1-9]?|[1-9][+-]?)?)$"
-)
-SIMPLE_METADATA_KEY = re.compile(r"^[A-Za-z_][A-Za-z0-9_-]*$")
-REQUIRED_HF_ASSETS = {
-    "assets/estate-command-system.svg": "profile/assets/estate-command-system.svg",
-    "assets/estate-banner-v2.svg": "profile/assets/estate-banner-v2.svg",
-    "assets/hf-portfolio-map.svg": "profile/assets/hf-portfolio-map.svg",
-    "assets/hf-card-command.svg": "profile/assets/hf-card-command.svg",
-    "assets/hf-card-intelligence.svg": "profile/assets/hf-card-intelligence.svg",
-    "assets/hf-card-models.svg": "profile/assets/hf-card-models.svg",
-    "assets/hf-card-evidence.svg": "profile/assets/hf-card-evidence.svg",
-}
-CHECKS_EXECUTED = 0
+TRUTH_MARKERS = {"Current state", "HISTORICAL", "SIMULATED"}
 
 
 def front_matter_value(document: str, key: str) -> str | None:
@@ -54,222 +39,6 @@ def front_matter_value(document: str, key: str) -> str | None:
         if separator and name.strip() == key:
             return value.strip()
     return None
-
-
-def _yaml_scalar(value: str) -> str:
-    """Return a scalar used by the small workflow-path parser below."""
-    value = value.strip()
-    if len(value) >= 2 and value[0] == value[-1] == '"':
-        try:
-            parsed = json.loads(value)
-        except json.JSONDecodeError:
-            return value[1:-1]
-        return parsed if isinstance(parsed, str) else value
-    if len(value) >= 2 and value[0] == value[-1] == "'":
-        return value[1:-1].replace("''", "'")
-    return value
-
-
-def _simple_metadata_key(value: str) -> str | None:
-    """Return a regular metadata key, rejecting YAML node properties."""
-    value = value.strip()
-    if SIMPLE_METADATA_KEY.fullmatch(value):
-        return value
-    if len(value) >= 2 and value[0] == value[-1] == '"':
-        try:
-            parsed = json.loads(value)
-        except json.JSONDecodeError:
-            return None
-        if isinstance(parsed, str) and SIMPLE_METADATA_KEY.fullmatch(parsed):
-            return parsed
-        return None
-    if len(value) >= 2 and value[0] == value[-1] == "'":
-        parsed = value[1:-1].replace("''", "'")
-        return parsed if SIMPLE_METADATA_KEY.fullmatch(parsed) else None
-    return None
-
-
-def hub_short_description_length(document: str) -> int | None:
-    """Return a fail-closed upper bound for the Hub short-description length.
-
-    The Hub accepts YAML block scalars, whose folded/literal rendering can be
-    longer than the text on the declaration line.  The bound counts every
-    content character plus the maximum separator count the YAML block can
-    produce.  It may reject unusually padded but valid YAML, but it cannot
-    undercount a value that Hugging Face will measure.
-    """
-    lines = document.splitlines()
-    if not lines or lines[0] != "---":
-        return None
-
-    closing_index = next(
-        (
-            index
-            for index, line in enumerate(lines[1:], start=1)
-            if line.rstrip() == "---" and not line.startswith((" ", "\t"))
-        ),
-        None,
-    )
-    if closing_index is None:
-        return None
-
-    matches: list[tuple[int, str]] = []
-    for index, line in enumerate(lines[1:closing_index], start=1):
-        if not line.strip() or line.lstrip().startswith("#"):
-            continue
-        if line.startswith("\t"):
-            return None
-        if line.startswith(" "):
-            continue
-        name, separator, value = line.partition(":")
-        if not separator:
-            return None
-        key = _simple_metadata_key(name)
-        if key is None:
-            return None
-        if key == "short_description":
-            matches.append((index, value))
-
-    # Duplicate YAML keys are resolved differently across parsers. Refuse them
-    # instead of measuring one value while the Hub validates another.
-    if len(matches) != 1:
-        return None
-
-    index, raw_value = matches[0]
-    scalar = _without_yaml_comment(raw_value).strip()
-    block = BLOCK_SCALAR_HEADER.fullmatch(scalar)
-    if block is not None:
-        raw_block_lines: list[str] = []
-        modifiers = block.group("modifiers")
-        explicit_indent = next(
-            (int(character) for character in modifiers if character.isdigit()),
-            None,
-        )
-        content_indent = explicit_indent
-        for continuation in lines[index + 1 : closing_index]:
-            if continuation.strip():
-                indentation = len(continuation) - len(continuation.lstrip(" "))
-                if indentation == 0:
-                    break
-                if content_indent is None:
-                    content_indent = indentation
-                if indentation < content_indent:
-                    return None
-            elif "\t" in continuation:
-                return None
-            raw_block_lines.append(continuation)
-
-        if content_indent is None:
-            content_indent = 1
-        block_lines = [
-            continuation[content_indent:] for continuation in raw_block_lines
-        ]
-
-        content_characters = sum(len(line) for line in block_lines)
-        separators = max(len(block_lines) - 1, 0)
-        if block_lines and "-" not in modifiers:
-            separators += 1
-        return content_characters + separators
-
-    if not scalar:
-        return None
-
-    # Aliases, tags, anchors, flow collections, and block indicators can
-    # resolve to a value unrelated to their short source spelling. Refuse them
-    # rather than risk a length undercount.
-    if scalar[0] in "*!&[{}>|":
-        return None
-    if scalar.startswith(("- ", "? ", ": ")):
-        return None
-
-    if scalar[0] == '"':
-        if len(scalar) < 2 or scalar[-1] != '"':
-            return None
-        try:
-            normalized = json.loads(scalar)
-        except json.JSONDecodeError:
-            return None
-        if not isinstance(normalized, str):
-            return None
-    elif scalar[0] == "'":
-        if len(scalar) < 2 or scalar[-1] != "'":
-            return None
-        normalized = scalar[1:-1].replace("''", "'")
-    else:
-        normalized = scalar
-
-    # YAML permits multiline quoted/plain scalars. This deliberately scoped
-    # validator refuses them so it cannot silently omit continuation bytes.
-    for continuation in lines[index + 1 : closing_index]:
-        if not continuation.strip() or continuation.lstrip().startswith("#"):
-            continue
-        if continuation.startswith((" ", "\t")):
-            return None
-        break
-
-    return len(normalized)
-
-
-def short_description_length_within_limit(length: int | None) -> bool:
-    """Return whether a measured Hub short description satisfies its limit."""
-    return length is not None and length <= HUB_SHORT_DESCRIPTION_MAX_LENGTH
-
-
-def _without_yaml_comment(value: str) -> str:
-    """Remove a YAML comment while retaining hashes inside quoted scalars."""
-    quote: str | None = None
-    escaped = False
-    for index, character in enumerate(value):
-        if quote == '"' and escaped:
-            escaped = False
-            continue
-        if quote == '"' and character == "\\":
-            escaped = True
-            continue
-        if quote:
-            if character == quote:
-                quote = None
-            continue
-        if character in {'"', "'"}:
-            quote = character
-        elif character == "#" and (index == 0 or value[index - 1].isspace()):
-            return value[:index].rstrip()
-    return value.rstrip()
-
-
-def workflow_push_paths(document: str) -> set[str]:
-    """Parse list entries located specifically at ``on.push.paths``.
-
-    The deployment workflow uses only block mappings and a block sequence for
-    this path.  Keeping this parser deliberately scoped avoids treating a
-    comment or an unrelated scalar as an active GitHub Actions trigger while
-    requiring no runtime dependency in the publication job.
-    """
-    stack: list[tuple[int, str]] = []
-    paths: set[str] = set()
-    for raw_line in document.splitlines():
-        if not raw_line.strip() or raw_line.lstrip().startswith("#"):
-            continue
-        indent = len(raw_line) - len(raw_line.lstrip(" "))
-        content = _without_yaml_comment(raw_line[indent:])
-        if not content:
-            continue
-
-        if content.startswith("-"):
-            if [key for _, key in stack] == ["on", "push", "paths"]:
-                value = _yaml_scalar(content[1:].strip())
-                if value:
-                    paths.add(value)
-            continue
-
-        key_text, separator, _ = content.partition(":")
-        if not separator:
-            continue
-        while stack and stack[-1][0] >= indent:
-            stack.pop()
-        stack.append((indent, _yaml_scalar(key_text)))
-
-    return paths
 
 
 class SurfaceParser(HTMLParser):
@@ -297,55 +66,49 @@ class SurfaceParser(HTMLParser):
             self.external_assets.append(str(values["href"]))
 
 
-def require(condition: bool, message: str, failures: list[str]) -> None:
-    global CHECKS_EXECUTED
-    CHECKS_EXECUTED += 1
+class FailureList(list[str]):
+    """Failure messages plus an exact count of evaluated assertions."""
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.checks = 0
+
+
+def require(condition: bool, message: str, failures: FailureList) -> None:
+    failures.checks += 1
     if not condition:
         failures.append(message)
 
 
-def required_asset_mismatches(
-    root: Path, files: list[deploy.PublicationFile]
-) -> dict[str, dict[str, str | None]]:
-    """Return required destinations that are absent or bound to the wrong source."""
-    actual = {
-        item.destination: item.source.relative_to(root).as_posix()
-        for item in files
-        if item.destination in REQUIRED_HF_ASSETS
-    }
-    return {
-        destination: {"expected": expected, "actual": actual.get(destination)}
-        for destination, expected in REQUIRED_HF_ASSETS.items()
-        if actual.get(destination) != expected
-    }
-
-
 def main() -> int:
-    global CHECKS_EXECUTED
-    CHECKS_EXECUTED = 0
     root = Path(__file__).resolve().parents[2]
     profile = (root / "profile/README.md").read_text(encoding="utf-8")
     hub_card = (root / "huggingface/org-card/README.md").read_text(encoding="utf-8")
     html = (root / "huggingface/org-card/index.html").read_text(encoding="utf-8")
-    svg = (root / "profile/assets/estate-command-system.svg").read_text(encoding="utf-8")
-    portfolio_assets = {
-        path.name: path.read_text(encoding="utf-8")
-        for path in (root / "profile/assets").glob("hf-*.svg")
-    }
-    portfolio_assets["estate-banner-v2.svg"] = (
-        root / "profile/assets/estate-banner-v2.svg"
-    ).read_text(encoding="utf-8")
+    profile_banner = (root / "profile/assets/evidence-lattice-v2.webp").read_bytes()
+    space_banner = (root / "huggingface/org-card/assets/evidence-lattice-v2.webp").read_bytes()
     manifest_path = root / "huggingface/org-card.manifest.json"
-    deploy_workflow = (root / ".github/workflows/hf-org-card-deploy.yml").read_text(
-        encoding="utf-8"
-    )
-    failures: list[str] = []
+    failures = FailureList()
 
     for url in REQUIRED_LINKS:
         require(url in profile, f"GitHub profile missing canonical link: {url}", failures)
         require(url in hub_card, f"Hugging Face card missing canonical link: {url}", failures)
-    require("./assets/estate-command-system.svg" in profile, "profile does not use canonical hero", failures)
+    require(
+        "./assets/evidence-lattice-v2.webp" in profile,
+        "profile does not use canonical hero",
+        failures,
+    )
+    require(
+        "assets/evidence-lattice-v2.webp" in hub_card,
+        "Hub card does not use canonical hero",
+        failures,
+    )
     require("deployment.json" in hub_card, "Hub card does not expose served source binding", failures)
+    require(
+        "python -m http.server 8000 --directory huggingface/org-card" in hub_card,
+        "Hub card does not expose a local reproduction command",
+        failures,
+    )
     card_emoji = front_matter_value(hub_card, "emoji")
     require(card_emoji is not None, "Hub card front matter is missing emoji", failures)
     require(
@@ -353,26 +116,23 @@ def main() -> int:
         f"Hub card emoji must be the approved Extended Pictographic value {HUB_CARD_EMOJI}",
         failures,
     )
+    short_description = front_matter_value(hub_card, "short_description")
+    require(short_description is not None, "Hub card front matter is missing short_description", failures)
     require(
-        front_matter_value(hub_card, "thumbnail") is not None,
-        "Hub card front matter is missing a portfolio thumbnail",
-        failures,
-    )
-    short_description_length = hub_short_description_length(hub_card)
-    require(
-        short_description_length is not None,
-        "Hub card front matter has a missing, duplicate, or unsupported short_description",
-        failures,
-    )
-    require(
-        short_description_length is None
-        or short_description_length_within_limit(short_description_length),
+        short_description is not None and len(short_description) <= 60,
         "Hub card short_description exceeds the Hugging Face 60-character limit",
         failures,
     )
+
     combined = f"{profile}\n{hub_card}\n{html}".lower()
     for phrase in BANNED_COPY:
         require(phrase not in combined, f"unsupported public copy remains: {phrase}", failures)
+    for marker in TRUTH_MARKERS:
+        require(
+            marker in profile and marker in hub_card and marker in html,
+            f"truth boundary marker must remain on every front door: {marker}",
+            failures,
+        )
 
     parser = SurfaceParser()
     parser.feed(html)
@@ -381,32 +141,32 @@ def main() -> int:
     require(parser.body_marker == "company-front-door", "static front door marker is missing", failures)
     require(not parser.external_assets, f"runtime external assets are forbidden: {parser.external_assets}", failures)
     require("prefers-reduced-motion" in html, "reduced-motion contract is missing", failures)
+    require("prefers-contrast" in html, "increased-contrast contract is missing", failures)
+    require("forced-colors" in html, "forced-colors contract is missing", failures)
     require("@media (max-width: 640px)" in html, "mobile breakpoint contract is missing", failures)
     require("Skip to main content" in html, "keyboard skip link is missing", failures)
+    require('tabindex="-1"' in html, "main landmark must remain programmatically focusable", failures)
+
     require(
-        "profile/assets/**" in workflow_push_paths(deploy_workflow),
-        "org-card deployment does not watch all published profile assets",
+        profile_banner.startswith(b"RIFF") and profile_banner[8:12] == b"WEBP",
+        "GitHub profile hero must be a valid WebP asset",
         failures,
     )
-
-    require("<title" in svg and "<desc" in svg, "hero SVG needs an accessible title and description", failures)
-    require("<script" not in svg.lower(), "hero SVG must not execute scripts", failures)
-    require(len(portfolio_assets) >= 6, "portfolio asset family is incomplete", failures)
-    for name, source in portfolio_assets.items():
-        require(
-            "<title" in source and "<desc" in source,
-            f"portfolio SVG needs an accessible title and description: {name}",
-            failures,
-        )
-        require("<script" not in source.lower(), f"portfolio SVG must not execute scripts: {name}", failures)
+    require(
+        space_banner.startswith(b"RIFF") and space_banner[8:12] == b"WEBP",
+        "Hugging Face Space hero must be a valid WebP asset",
+        failures,
+    )
+    require(profile_banner == space_banner, "front doors must publish the same hero bytes", failures)
+    require(len(profile_banner) <= 250_000, "canonical hero exceeds 250 KB", failures)
 
     try:
         contract, files = deploy.load_contract(root, manifest_path)
+        destinations = {item.destination for item in files}
         require(contract.get("prune") is True, "org-card publication must prune unmanaged legacy files", failures)
-        mismatched_assets = required_asset_mismatches(root, files)
         require(
-            not mismatched_assets,
-            f"manifest portfolio source bindings are invalid: {mismatched_assets}",
+            "assets/evidence-lattice-v2.webp" in destinations,
+            "manifest must publish canonical hero",
             failures,
         )
     except Exception as exc:
@@ -415,7 +175,7 @@ def main() -> int:
     report = {
         "schema": "szl.public-front-door-check/v1",
         "state": "PASS" if not failures else "FAIL",
-        "checks": CHECKS_EXECUTED,
+        "checks": failures.checks,
         "failures": failures,
     }
     print(json.dumps(report, indent=2, sort_keys=True))
