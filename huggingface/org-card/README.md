@@ -7,13 +7,14 @@ sdk: static
 short_description: Models, evidence, and governed demonstrations with explicit boundaries
 pinned: true
 license: apache-2.0
+thumbnail: "https://huggingface.co/spaces/SZLHOLDINGS/README/resolve/main/assets/hf-portfolio-map.svg"
 ---
 
 <!-- markdownlint-disable MD013 MD033 MD041 -->
 
 <p align="center">
-  <img src="https://huggingface.co/spaces/SZLHOLDINGS/README/resolve/main/assets/estate-command-system.svg"
-       alt="SZL Holdings - autonomy, under authority"
+  <img src="https://huggingface.co/spaces/SZLHOLDINGS/README/resolve/main/assets/hf-portfolio-map.svg"
+       alt="SZL Holdings portfolio: command, intelligence, models and data, and evidence connected by one governed decision loop"
        width="100%" />
 </p>
 

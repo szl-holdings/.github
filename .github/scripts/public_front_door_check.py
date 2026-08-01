@@ -24,6 +24,16 @@ BANNED_COPY = {
     "all models operational",
 }
 HUB_CARD_EMOJI = "🛡️"
+REQUIRED_HF_ASSETS = {
+    "assets/estate-command-system.svg": "profile/assets/estate-command-system.svg",
+    "assets/estate-banner-v2.svg": "profile/assets/estate-banner-v2.svg",
+    "assets/hf-portfolio-map.svg": "profile/assets/hf-portfolio-map.svg",
+    "assets/hf-card-command.svg": "profile/assets/hf-card-command.svg",
+    "assets/hf-card-intelligence.svg": "profile/assets/hf-card-intelligence.svg",
+    "assets/hf-card-models.svg": "profile/assets/hf-card-models.svg",
+    "assets/hf-card-evidence.svg": "profile/assets/hf-card-evidence.svg",
+}
+CHECKS_EXECUTED = 0
 
 
 def front_matter_value(document: str, key: str) -> str | None:
@@ -38,6 +48,77 @@ def front_matter_value(document: str, key: str) -> str | None:
         if separator and name.strip() == key:
             return value.strip()
     return None
+
+
+def _yaml_scalar(value: str) -> str:
+    """Return a scalar used by the small workflow-path parser below."""
+    value = value.strip()
+    if len(value) >= 2 and value[0] == value[-1] == '"':
+        try:
+            parsed = json.loads(value)
+        except json.JSONDecodeError:
+            return value[1:-1]
+        return parsed if isinstance(parsed, str) else value
+    if len(value) >= 2 and value[0] == value[-1] == "'":
+        return value[1:-1].replace("''", "'")
+    return value
+
+
+def _without_yaml_comment(value: str) -> str:
+    """Remove a YAML comment while retaining hashes inside quoted scalars."""
+    quote: str | None = None
+    escaped = False
+    for index, character in enumerate(value):
+        if quote == '"' and escaped:
+            escaped = False
+            continue
+        if quote == '"' and character == "\\":
+            escaped = True
+            continue
+        if quote:
+            if character == quote:
+                quote = None
+            continue
+        if character in {'"', "'"}:
+            quote = character
+        elif character == "#" and (index == 0 or value[index - 1].isspace()):
+            return value[:index].rstrip()
+    return value.rstrip()
+
+
+def workflow_push_paths(document: str) -> set[str]:
+    """Parse list entries located specifically at ``on.push.paths``.
+
+    The deployment workflow uses only block mappings and a block sequence for
+    this path.  Keeping this parser deliberately scoped avoids treating a
+    comment or an unrelated scalar as an active GitHub Actions trigger while
+    requiring no runtime dependency in the publication job.
+    """
+    stack: list[tuple[int, str]] = []
+    paths: set[str] = set()
+    for raw_line in document.splitlines():
+        if not raw_line.strip() or raw_line.lstrip().startswith("#"):
+            continue
+        indent = len(raw_line) - len(raw_line.lstrip(" "))
+        content = _without_yaml_comment(raw_line[indent:])
+        if not content:
+            continue
+
+        if content.startswith("-"):
+            if [key for _, key in stack] == ["on", "push", "paths"]:
+                value = _yaml_scalar(content[1:].strip())
+                if value:
+                    paths.add(value)
+            continue
+
+        key_text, separator, _ = content.partition(":")
+        if not separator:
+            continue
+        while stack and stack[-1][0] >= indent:
+            stack.pop()
+        stack.append((indent, _yaml_scalar(key_text)))
+
+    return paths
 
 
 class SurfaceParser(HTMLParser):
@@ -66,17 +147,47 @@ class SurfaceParser(HTMLParser):
 
 
 def require(condition: bool, message: str, failures: list[str]) -> None:
+    global CHECKS_EXECUTED
+    CHECKS_EXECUTED += 1
     if not condition:
         failures.append(message)
 
 
+def required_asset_mismatches(
+    root: Path, files: list[deploy.PublicationFile]
+) -> dict[str, dict[str, str | None]]:
+    """Return required destinations that are absent or bound to the wrong source."""
+    actual = {
+        item.destination: item.source.relative_to(root).as_posix()
+        for item in files
+        if item.destination in REQUIRED_HF_ASSETS
+    }
+    return {
+        destination: {"expected": expected, "actual": actual.get(destination)}
+        for destination, expected in REQUIRED_HF_ASSETS.items()
+        if actual.get(destination) != expected
+    }
+
+
 def main() -> int:
+    global CHECKS_EXECUTED
+    CHECKS_EXECUTED = 0
     root = Path(__file__).resolve().parents[2]
     profile = (root / "profile/README.md").read_text(encoding="utf-8")
     hub_card = (root / "huggingface/org-card/README.md").read_text(encoding="utf-8")
     html = (root / "huggingface/org-card/index.html").read_text(encoding="utf-8")
     svg = (root / "profile/assets/estate-command-system.svg").read_text(encoding="utf-8")
+    portfolio_assets = {
+        path.name: path.read_text(encoding="utf-8")
+        for path in (root / "profile/assets").glob("hf-*.svg")
+    }
+    portfolio_assets["estate-banner-v2.svg"] = (
+        root / "profile/assets/estate-banner-v2.svg"
+    ).read_text(encoding="utf-8")
     manifest_path = root / "huggingface/org-card.manifest.json"
+    deploy_workflow = (root / ".github/workflows/hf-org-card-deploy.yml").read_text(
+        encoding="utf-8"
+    )
     failures: list[str] = []
 
     for url in REQUIRED_LINKS:
@@ -91,7 +202,11 @@ def main() -> int:
         f"Hub card emoji must be the approved Extended Pictographic value {HUB_CARD_EMOJI}",
         failures,
     )
-
+    require(
+        front_matter_value(hub_card, "thumbnail") is not None,
+        "Hub card front matter is missing a portfolio thumbnail",
+        failures,
+    )
     combined = f"{profile}\n{hub_card}\n{html}".lower()
     for phrase in BANNED_COPY:
         require(phrase not in combined, f"unsupported public copy remains: {phrase}", failures)
@@ -105,22 +220,39 @@ def main() -> int:
     require("prefers-reduced-motion" in html, "reduced-motion contract is missing", failures)
     require("@media (max-width: 640px)" in html, "mobile breakpoint contract is missing", failures)
     require("Skip to main content" in html, "keyboard skip link is missing", failures)
+    require(
+        "profile/assets/**" in workflow_push_paths(deploy_workflow),
+        "org-card deployment does not watch all published profile assets",
+        failures,
+    )
 
     require("<title" in svg and "<desc" in svg, "hero SVG needs an accessible title and description", failures)
     require("<script" not in svg.lower(), "hero SVG must not execute scripts", failures)
+    require(len(portfolio_assets) >= 6, "portfolio asset family is incomplete", failures)
+    for name, source in portfolio_assets.items():
+        require(
+            "<title" in source and "<desc" in source,
+            f"portfolio SVG needs an accessible title and description: {name}",
+            failures,
+        )
+        require("<script" not in source.lower(), f"portfolio SVG must not execute scripts: {name}", failures)
 
     try:
         contract, files = deploy.load_contract(root, manifest_path)
-        destinations = {item.destination for item in files}
         require(contract.get("prune") is True, "org-card publication must prune unmanaged legacy files", failures)
-        require("assets/estate-command-system.svg" in destinations, "manifest must publish canonical hero", failures)
+        mismatched_assets = required_asset_mismatches(root, files)
+        require(
+            not mismatched_assets,
+            f"manifest portfolio source bindings are invalid: {mismatched_assets}",
+            failures,
+        )
     except Exception as exc:
         failures.append(f"publication manifest invalid: {type(exc).__name__}: {exc}")
 
     report = {
         "schema": "szl.public-front-door-check/v1",
         "state": "PASS" if not failures else "FAIL",
-        "checks": 16 + len(REQUIRED_LINKS) * 2 + len(BANNED_COPY),
+        "checks": CHECKS_EXECUTED,
         "failures": failures,
     }
     print(json.dumps(report, indent=2, sort_keys=True))

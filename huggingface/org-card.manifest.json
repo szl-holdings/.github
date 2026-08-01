@@ -26,6 +26,30 @@
     {
       "source": "profile/assets/estate-command-system.svg",
       "destination": "assets/estate-command-system.svg"
+    },
+    {
+      "source": "profile/assets/estate-banner-v2.svg",
+      "destination": "assets/estate-banner-v2.svg"
+    },
+    {
+      "source": "profile/assets/hf-portfolio-map.svg",
+      "destination": "assets/hf-portfolio-map.svg"
+    },
+    {
+      "source": "profile/assets/hf-card-command.svg",
+      "destination": "assets/hf-card-command.svg"
+    },
+    {
+      "source": "profile/assets/hf-card-intelligence.svg",
+      "destination": "assets/hf-card-intelligence.svg"
+    },
+    {
+      "source": "profile/assets/hf-card-models.svg",
+      "destination": "assets/hf-card-models.svg"
+    },
+    {
+      "source": "profile/assets/hf-card-evidence.svg",
+      "destination": "assets/hf-card-evidence.svg"
     }
   ],
   "prune": true,

@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="300" viewBox="0 0 1280 300" role="img" aria-labelledby="title desc">
+  <title id="title">SZL Holdings — control before action, evidence after</title>
+  <desc id="desc">A compact dark portfolio banner with a governed-loop trace connecting control and evidence.</desc>
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#030F29"/><stop offset="1" stop-color="#10151C"/></linearGradient>
+    <linearGradient id="trace" x1="0" y1="0" x2="1" y2="0"><stop stop-color="#5CC4BF"/><stop offset=".55" stop-color="#E9EEF6"/><stop offset="1" stop-color="#DF735F"/></linearGradient>
+  </defs>
+  <rect width="1280" height="300" rx="24" fill="url(#bg)"/>
+  <rect x="1" y="1" width="1278" height="298" rx="23" fill="none" stroke="#5C6B86" stroke-opacity=".45"/>
+  <g font-family="system-ui,-apple-system,Segoe UI,Arial,sans-serif">
+    <g transform="translate(54 44)"><path d="M0 9h18M9 0v18" stroke="#DF735F" stroke-width="2"/><circle cx="9" cy="9" r="3.5" fill="#DF735F"/><text x="32" y="14" fill="#C9D2DF" font-size="13" font-weight="750" letter-spacing="3">SZL HOLDINGS</text></g>
+    <text x="54" y="145" fill="#F5F7FA" font-size="48" font-weight="760" letter-spacing="-1.8">Control before action.</text>
+    <text x="54" y="197" fill="#C9D2DF" font-size="34" font-weight="580" letter-spacing="-1">Evidence after.</text>
+    <text x="54" y="250" fill="#76859B" font-size="12" font-weight="700" letter-spacing="1.8">GOVERN · EXECUTE · PROVE</text>
+    <path d="M790 152h382" stroke="url(#trace)" stroke-width="3" stroke-linecap="round"/>
+    <g fill="#030F29" stroke-width="3"><circle cx="790" cy="152" r="11" stroke="#5CC4BF"/><circle cx="918" cy="152" r="11" stroke="#C9D2DF"/><circle cx="1045" cy="152" r="11" stroke="#E9EEF6"/><circle cx="1172" cy="152" r="11" stroke="#DF735F"/></g>
+    <g fill="#8C99AD" font-size="10" font-weight="750" letter-spacing="1.2" text-anchor="middle"><text x="790" y="187">SIGNAL</text><text x="918" y="187">POLICY</text><text x="1045" y="187">RECEIPT</text><text x="1172" y="187">VERIFY</text></g>
+  </g>
+</svg>
