@@ -58,7 +58,7 @@ Most AI systems stop at an answer. SZL adds a control and evidence layer:
 | --- | --- |
 | What can I see working? | [a11oy](https://a-11-oy.com) and the [killinchu demonstration](https://szlholdings-killinchu.hf.space/elite) |
 | How is the system assembled? | [Platform](https://github.com/szl-holdings/platform) and [a11oy architecture](https://github.com/szl-holdings/a11oy/blob/main/docs/architecture.md) |
-| What can be independently checked? | [Proof registry](https://a11oy.net), [receipt specification](https://github.com/szl-holdings/governed-receipt-spec), and [public trust portal](https://github.com/szl-holdings/szl-trust) |
+| What can be independently checked? | [Proof registry](https://a11oy.net), [receipt specification](https://github.com/szl-holdings/governed-receipt-spec), and [maintained trust documentation](https://github.com/szl-holdings/docs-site/tree/main/docs/trust) |
 | What is formally established? | [Lean sources](https://github.com/szl-holdings/lutar-lean) and the [formula ledger](https://github.com/szl-holdings/szl-formula-ledger) |
 | Where are the models and data? | [SZLHOLDINGS on Hugging Face](https://huggingface.co/SZLHOLDINGS) and the [receipt lake](https://huggingface.co/datasets/SZLHOLDINGS/szl-lake) |
 
@@ -98,7 +98,7 @@ The shared contract is documented in the
 | **Products** | [a11oy](https://github.com/szl-holdings/a11oy) · [killinchu](https://github.com/szl-holdings/killinchu) |
 | **Applications and demonstrations** | [SDA](https://github.com/szl-holdings/sda) · [David Leads](https://github.com/szl-holdings/david-leads) · [IMMUNE](https://github.com/szl-holdings/immune) |
 | **Runtime** | [platform](https://github.com/szl-holdings/platform) · [szl-substrate](https://github.com/szl-holdings/szl-substrate) · [Ouroboros](https://github.com/szl-holdings/ouroboros) · [router](https://github.com/szl-holdings/szl-router) |
-| **Evidence** | [receipt spec](https://github.com/szl-holdings/governed-receipt-spec) · [receipt library](https://github.com/szl-holdings/szl-receipt) · [trust portal](https://github.com/szl-holdings/szl-trust) · [evidence doctrine](https://github.com/szl-holdings/evidence-doctrine) |
+| **Evidence** | [receipt spec](https://github.com/szl-holdings/governed-receipt-spec) · [receipt library](https://github.com/szl-holdings/szl-receipt) · [trust documentation](https://github.com/szl-holdings/docs-site/tree/main/docs/trust) · [evidence doctrine](https://github.com/szl-holdings/evidence-doctrine) |
 | **Formal methods** | [lutar-lean](https://github.com/szl-holdings/lutar-lean) · [formula ledger](https://github.com/szl-holdings/szl-formula-ledger) · [Lambda gate](https://github.com/szl-holdings/szl-lambda-gate) |
 | **Models and compute** | [Forge](https://github.com/szl-holdings/szl-forge) · [kernels](https://github.com/szl-holdings/szl-kernels) · [energy attestation](https://github.com/szl-holdings/szl-energy-attest) |
 | **Research and examples** | [papers](https://github.com/szl-holdings/szl-papers) · [cookbook](https://github.com/szl-holdings/szl-cookbook) · [documentation source](https://github.com/szl-holdings/docs-site) |
