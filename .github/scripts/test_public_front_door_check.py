@@ -46,5 +46,19 @@ class RequiredAssetBindingTests(unittest.TestCase):
         self.assertEqual(next(iter(mismatches.values()))["actual"], "profile/assets/wrong.svg")
 
 
+class CheckCountingTests(unittest.TestCase):
+    def test_require_counts_passes_and_failures(self):
+        original = check.CHECKS_EXECUTED
+        try:
+            check.CHECKS_EXECUTED = 0
+            failures = []
+            check.require(True, "pass", failures)
+            check.require(False, "fail", failures)
+            self.assertEqual(check.CHECKS_EXECUTED, 2)
+            self.assertEqual(failures, ["fail"])
+        finally:
+            check.CHECKS_EXECUTED = original
+
+
 if __name__ == "__main__":
     unittest.main()

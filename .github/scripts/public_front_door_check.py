@@ -33,6 +33,7 @@ REQUIRED_HF_ASSETS = {
     "assets/hf-card-models.svg": "profile/assets/hf-card-models.svg",
     "assets/hf-card-evidence.svg": "profile/assets/hf-card-evidence.svg",
 }
+CHECKS_EXECUTED = 0
 
 
 def front_matter_value(document: str, key: str) -> str | None:
@@ -75,6 +76,8 @@ class SurfaceParser(HTMLParser):
 
 
 def require(condition: bool, message: str, failures: list[str]) -> None:
+    global CHECKS_EXECUTED
+    CHECKS_EXECUTED += 1
     if not condition:
         failures.append(message)
 
@@ -96,6 +99,8 @@ def required_asset_mismatches(
 
 
 def main() -> int:
+    global CHECKS_EXECUTED
+    CHECKS_EXECUTED = 0
     root = Path(__file__).resolve().parents[2]
     profile = (root / "profile/README.md").read_text(encoding="utf-8")
     hub_card = (root / "huggingface/org-card/README.md").read_text(encoding="utf-8")
@@ -109,6 +114,9 @@ def main() -> int:
         root / "profile/assets/estate-banner-v2.svg"
     ).read_text(encoding="utf-8")
     manifest_path = root / "huggingface/org-card.manifest.json"
+    deploy_workflow = (root / ".github/workflows/hf-org-card-deploy.yml").read_text(
+        encoding="utf-8"
+    )
     failures: list[str] = []
 
     for url in REQUIRED_LINKS:
@@ -158,6 +166,11 @@ def main() -> int:
     require("overflow-x: hidden" in html, "horizontal-overflow guard is missing", failures)
     require("overflow-wrap: anywhere" in html, "long-identifier reflow guard is missing", failures)
     require("Skip to main content" in html, "keyboard skip link is missing", failures)
+    require(
+        '"profile/assets/**"' in deploy_workflow,
+        "org-card deployment does not watch all published profile assets",
+        failures,
+    )
 
     require("<title" in svg and "<desc" in svg, "hero SVG needs an accessible title and description", failures)
     require("<script" not in svg.lower(), "hero SVG must not execute scripts", failures)
@@ -185,7 +198,7 @@ def main() -> int:
     report = {
         "schema": "szl.public-front-door-check/v1",
         "state": "PASS" if not failures else "FAIL",
-        "checks": 28 + len(REQUIRED_LINKS) * 2 + len(BANNED_COPY) + len(portfolio_assets) * 2,
+        "checks": CHECKS_EXECUTED,
         "failures": failures,
     }
     print(json.dumps(report, indent=2, sort_keys=True))
