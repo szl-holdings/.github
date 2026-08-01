@@ -6,7 +6,7 @@ on:
     paths:
       - "huggingface/org-card/**"
       - "huggingface/org-card.manifest.json"
-      - "profile/assets/estate-command-system.svg"
+      - "profile/assets/evidence-lattice-v2.webp"
       - ".github/scripts/hf_static_space_deploy.py"
       - ".github/workflows/hf-org-card-deploy.yml"
   workflow_dispatch:

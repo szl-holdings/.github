@@ -75,14 +75,24 @@ def main() -> int:
     profile = (root / "profile/README.md").read_text(encoding="utf-8")
     hub_card = (root / "huggingface/org-card/README.md").read_text(encoding="utf-8")
     html = (root / "huggingface/org-card/index.html").read_text(encoding="utf-8")
-    svg = (root / "profile/assets/estate-command-system.svg").read_text(encoding="utf-8")
+    profile_banner = (root / "profile/assets/evidence-lattice-v2.webp").read_bytes()
+    space_banner = (root / "huggingface/org-card/assets/evidence-lattice-v2.webp").read_bytes()
     manifest_path = root / "huggingface/org-card.manifest.json"
     failures: list[str] = []
 
     for url in REQUIRED_LINKS:
         require(url in profile, f"GitHub profile missing canonical link: {url}", failures)
         require(url in hub_card, f"Hugging Face card missing canonical link: {url}", failures)
-    require("./assets/estate-command-system.svg" in profile, "profile does not use canonical hero", failures)
+    require(
+        "profile/assets/evidence-lattice-v2.webp" in profile,
+        "profile does not use canonical hero",
+        failures,
+    )
+    require(
+        "assets/evidence-lattice-v2.webp" in hub_card,
+        "Hub card does not use canonical hero",
+        failures,
+    )
     require("deployment.json" in hub_card, "Hub card does not expose served source binding", failures)
     card_emoji = front_matter_value(hub_card, "emoji")
     require(card_emoji is not None, "Hub card front matter is missing emoji", failures)
@@ -106,14 +116,28 @@ def main() -> int:
     require("@media (max-width: 640px)" in html, "mobile breakpoint contract is missing", failures)
     require("Skip to main content" in html, "keyboard skip link is missing", failures)
 
-    require("<title" in svg and "<desc" in svg, "hero SVG needs an accessible title and description", failures)
-    require("<script" not in svg.lower(), "hero SVG must not execute scripts", failures)
+    require(
+        profile_banner.startswith(b"RIFF") and profile_banner[8:12] == b"WEBP",
+        "GitHub profile hero must be a valid WebP asset",
+        failures,
+    )
+    require(
+        space_banner.startswith(b"RIFF") and space_banner[8:12] == b"WEBP",
+        "Hugging Face Space hero must be a valid WebP asset",
+        failures,
+    )
+    require(profile_banner == space_banner, "front doors must publish the same hero bytes", failures)
+    require(len(profile_banner) <= 250_000, "canonical hero exceeds 250 KB", failures)
 
     try:
         contract, files = deploy.load_contract(root, manifest_path)
         destinations = {item.destination for item in files}
         require(contract.get("prune") is True, "org-card publication must prune unmanaged legacy files", failures)
-        require("assets/estate-command-system.svg" in destinations, "manifest must publish canonical hero", failures)
+        require(
+            "assets/evidence-lattice-v2.webp" in destinations,
+            "manifest must publish canonical hero",
+            failures,
+        )
     except Exception as exc:
         failures.append(f"publication manifest invalid: {type(exc).__name__}: {exc}")
 
