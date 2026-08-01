@@ -29,6 +29,7 @@ HUB_SHORT_DESCRIPTION_MAX_LENGTH = 60
 BLOCK_SCALAR_HEADER = re.compile(
     r"^(?P<style>[>|])(?P<modifiers>(?:[+-][1-9]?|[1-9][+-]?)?)$"
 )
+SIMPLE_METADATA_KEY = re.compile(r"^[A-Za-z_][A-Za-z0-9_-]*$")
 REQUIRED_HF_ASSETS = {
     "assets/estate-command-system.svg": "profile/assets/estate-command-system.svg",
     "assets/estate-banner-v2.svg": "profile/assets/estate-banner-v2.svg",
@@ -69,6 +70,25 @@ def _yaml_scalar(value: str) -> str:
     return value
 
 
+def _simple_metadata_key(value: str) -> str | None:
+    """Return a regular metadata key, rejecting YAML node properties."""
+    value = value.strip()
+    if SIMPLE_METADATA_KEY.fullmatch(value):
+        return value
+    if len(value) >= 2 and value[0] == value[-1] == '"':
+        try:
+            parsed = json.loads(value)
+        except json.JSONDecodeError:
+            return None
+        if isinstance(parsed, str) and SIMPLE_METADATA_KEY.fullmatch(parsed):
+            return parsed
+        return None
+    if len(value) >= 2 and value[0] == value[-1] == "'":
+        parsed = value[1:-1].replace("''", "'")
+        return parsed if SIMPLE_METADATA_KEY.fullmatch(parsed) else None
+    return None
+
+
 def hub_short_description_length(document: str) -> int | None:
     """Return a fail-closed upper bound for the Hub short-description length.
 
@@ -97,10 +117,17 @@ def hub_short_description_length(document: str) -> int | None:
     for index, line in enumerate(lines[1:closing_index], start=1):
         if not line.strip() or line.lstrip().startswith("#"):
             continue
-        if line.startswith((" ", "\t")):
+        if line.startswith("\t"):
+            return None
+        if line.startswith(" "):
             continue
         name, separator, value = line.partition(":")
-        if separator and _yaml_scalar(name.strip()) == "short_description":
+        if not separator:
+            return None
+        key = _simple_metadata_key(name)
+        if key is None:
+            return None
+        if key == "short_description":
             matches.append((index, value))
 
     # Duplicate YAML keys are resolved differently across parsers. Refuse them
@@ -112,7 +139,7 @@ def hub_short_description_length(document: str) -> int | None:
     scalar = _without_yaml_comment(raw_value).strip()
     block = BLOCK_SCALAR_HEADER.fullmatch(scalar)
     if block is not None:
-        block_lines: list[str] = []
+        raw_block_lines: list[str] = []
         modifiers = block.group("modifiers")
         explicit_indent = next(
             (int(character) for character in modifiers if character.isdigit()),
@@ -128,9 +155,15 @@ def hub_short_description_length(document: str) -> int | None:
                     content_indent = indentation
                 if indentation < content_indent:
                     return None
-                block_lines.append(continuation[content_indent:])
-            else:
-                block_lines.append("")
+            elif "\t" in continuation:
+                return None
+            raw_block_lines.append(continuation)
+
+        if content_indent is None:
+            content_indent = 1
+        block_lines = [
+            continuation[content_indent:] for continuation in raw_block_lines
+        ]
 
         content_characters = sum(len(line) for line in block_lines)
         separators = max(len(block_lines) - 1, 0)

@@ -56,9 +56,23 @@ class FrontMatterTests(unittest.TestCase):
         )
         self.assertIsNone(check.hub_short_description_length(document))
 
+    def test_rejects_tagged_duplicate_short_description_key(self):
+        document = (
+            "---\nshort_description: ok\n!!str short_description: "
+            + "x" * 61
+            + "\n---\n"
+        )
+        self.assertIsNone(check.hub_short_description_length(document))
+
     def test_rejects_alias_short_description(self):
         document = "---\nshort_description: *long_description\n---\n"
         self.assertIsNone(check.hub_short_description_length(document))
+
+    def test_counts_excess_spaces_on_whitespace_only_block_line(self):
+        document = "---\nshort_description: |-\n  " + "x" * 58 + "\n    \n---\n"
+        length = check.hub_short_description_length(document)
+        self.assertEqual(length, 61)
+        self.assertFalse(check.short_description_length_within_limit(length))
 
 
 class RequiredAssetBindingTests(unittest.TestCase):
