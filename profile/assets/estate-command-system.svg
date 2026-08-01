@@ -1,0 +1,97 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="520" viewBox="0 0 1280 520" role="img" aria-labelledby="title desc">
+  <title id="title">SZL Holdings governed decision infrastructure</title>
+  <desc id="desc">A dark command-system diagram showing signals passing through policy, bounded action, receipts, and independent verification.</desc>
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#070B12"/>
+      <stop offset="0.58" stop-color="#0B111B"/>
+      <stop offset="1" stop-color="#111724"/>
+    </linearGradient>
+    <radialGradient id="wash" cx="76%" cy="31%" r="56%">
+      <stop offset="0" stop-color="#173949" stop-opacity=".72"/>
+      <stop offset=".46" stop-color="#111A28" stop-opacity=".28"/>
+      <stop offset="1" stop-color="#070B12" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="gold" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#C99C43"/>
+      <stop offset=".55" stop-color="#E0C276"/>
+      <stop offset="1" stop-color="#B98A35"/>
+    </linearGradient>
+    <linearGradient id="trace" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#47D7C4" stop-opacity=".22"/>
+      <stop offset=".5" stop-color="#47D7C4"/>
+      <stop offset="1" stop-color="#E0C276"/>
+    </linearGradient>
+    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="6" result="blur"/>
+      <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <pattern id="grid" width="44" height="44" patternUnits="userSpaceOnUse">
+      <path d="M44 0H0V44" fill="none" stroke="#8290A5" stroke-opacity=".055"/>
+    </pattern>
+  </defs>
+  <rect width="1280" height="520" rx="28" fill="url(#bg)"/>
+  <rect width="1280" height="520" rx="28" fill="url(#wash)"/>
+  <rect x="1" y="1" width="1278" height="518" rx="27" fill="none" stroke="#8C99AC" stroke-opacity=".19"/>
+  <rect x="28" y="28" width="1224" height="464" rx="20" fill="url(#grid)"/>
+
+  <g font-family="Inter,Segoe UI,Arial,sans-serif">
+    <g transform="translate(64 58)">
+      <circle cx="7" cy="7" r="7" fill="#47D7C4" filter="url(#glow)"/>
+      <text x="28" y="12" fill="#AAB5C5" font-size="14" font-weight="650" letter-spacing="3.4">SZL HOLDINGS / CONTROL + EVIDENCE</text>
+    </g>
+
+    <text x="64" y="156" fill="#F3F5F8" font-size="58" font-weight="720" letter-spacing="-2.4">Autonomy, under authority.</text>
+    <text x="64" y="204" fill="#AAB5C5" font-size="20" font-weight="430">Governed decision infrastructure for systems that must explain,</text>
+    <text x="64" y="234" fill="#AAB5C5" font-size="20" font-weight="430">constrain, and verify action.</text>
+
+    <g transform="translate(64 276)" font-size="12" font-weight="700" letter-spacing="2.2">
+      <rect width="124" height="34" rx="17" fill="#47D7C4" fill-opacity=".08" stroke="#47D7C4" stroke-opacity=".45"/>
+      <text x="62" y="22" fill="#72E5D5" text-anchor="middle">GOVERN</text>
+      <rect x="136" width="124" height="34" rx="17" fill="#47D7C4" fill-opacity=".08" stroke="#47D7C4" stroke-opacity=".45"/>
+      <text x="198" y="22" fill="#72E5D5" text-anchor="middle">EXECUTE</text>
+      <rect x="272" width="124" height="34" rx="17" fill="#C99C43" fill-opacity=".10" stroke="#D9B75F" stroke-opacity=".56"/>
+      <text x="334" y="22" fill="#E0C276" text-anchor="middle">PROVE</text>
+    </g>
+
+    <g transform="translate(64 366)">
+      <path d="M56 34H748" stroke="url(#trace)" stroke-width="2"/>
+      <g font-size="11" font-weight="720" letter-spacing="1.6">
+        <g transform="translate(0)">
+          <circle cx="56" cy="34" r="8" fill="#47D7C4"/>
+          <text x="56" y="68" fill="#8F9CAF" text-anchor="middle">SIGNAL</text>
+        </g>
+        <g transform="translate(176)">
+          <circle cx="56" cy="34" r="8" fill="#47D7C4"/>
+          <text x="56" y="68" fill="#8F9CAF" text-anchor="middle">POLICY</text>
+        </g>
+        <g transform="translate(352)">
+          <circle cx="56" cy="34" r="8" fill="#47D7C4"/>
+          <text x="56" y="68" fill="#8F9CAF" text-anchor="middle">BOUNDED ACTION</text>
+        </g>
+        <g transform="translate(528)">
+          <circle cx="56" cy="34" r="8" fill="#D9B75F"/>
+          <text x="56" y="68" fill="#8F9CAF" text-anchor="middle">RECEIPT</text>
+        </g>
+        <g transform="translate(692)">
+          <circle cx="56" cy="34" r="8" fill="#D9B75F"/>
+          <text x="56" y="68" fill="#8F9CAF" text-anchor="middle">VERIFY</text>
+        </g>
+      </g>
+    </g>
+
+    <g transform="translate(918 102)">
+      <circle cx="136" cy="136" r="126" fill="#071017" fill-opacity=".62" stroke="#8E9BAD" stroke-opacity=".17"/>
+      <circle cx="136" cy="136" r="96" fill="none" stroke="#47D7C4" stroke-opacity=".13"/>
+      <path d="M38 136C38 77 86 77 136 136S234 195 234 136 186 77 136 136 38 195 38 136Z" fill="none" stroke="url(#gold)" stroke-width="4" stroke-linecap="round"/>
+      <path d="M48 136C48 86 88 86 136 136S224 186 224 136" fill="none" stroke="#47D7C4" stroke-width="2" stroke-linecap="round" stroke-dasharray="5 8"/>
+      <circle cx="38" cy="136" r="6" fill="#47D7C4" filter="url(#glow)"/>
+      <circle cx="234" cy="136" r="6" fill="#D9B75F" filter="url(#glow)"/>
+      <circle cx="136" cy="136" r="10" fill="#F3F5F8"/>
+      <text x="136" y="278" fill="#AAB5C5" font-size="12" font-weight="700" letter-spacing="2.3" text-anchor="middle">OUROBOROS GOVERNED LOOP</text>
+      <text x="136" y="300" fill="#657287" font-size="11" letter-spacing="1.1" text-anchor="middle">REASON ↔ REALITY / RECEIPT AT THE CROSSING</text>
+    </g>
+
+    <text x="64" y="478" fill="#596579" font-size="11" font-weight="650" letter-spacing="1.8">DECISION SYSTEMS · SOVEREIGN RUNTIME · PORTABLE EVIDENCE</text>
+  </g>
+</svg>
