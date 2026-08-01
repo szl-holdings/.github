@@ -25,13 +25,13 @@ BANNED_COPY = {
 }
 HUB_CARD_EMOJI = "🛡️"
 REQUIRED_HF_ASSETS = {
-    "assets/estate-command-system.svg",
-    "assets/estate-banner-v2.svg",
-    "assets/hf-portfolio-map.svg",
-    "assets/hf-card-command.svg",
-    "assets/hf-card-intelligence.svg",
-    "assets/hf-card-models.svg",
-    "assets/hf-card-evidence.svg",
+    "assets/estate-command-system.svg": "profile/assets/estate-command-system.svg",
+    "assets/estate-banner-v2.svg": "profile/assets/estate-banner-v2.svg",
+    "assets/hf-portfolio-map.svg": "profile/assets/hf-portfolio-map.svg",
+    "assets/hf-card-command.svg": "profile/assets/hf-card-command.svg",
+    "assets/hf-card-intelligence.svg": "profile/assets/hf-card-intelligence.svg",
+    "assets/hf-card-models.svg": "profile/assets/hf-card-models.svg",
+    "assets/hf-card-evidence.svg": "profile/assets/hf-card-evidence.svg",
 }
 
 
@@ -77,6 +77,22 @@ class SurfaceParser(HTMLParser):
 def require(condition: bool, message: str, failures: list[str]) -> None:
     if not condition:
         failures.append(message)
+
+
+def required_asset_mismatches(
+    root: Path, files: list[deploy.PublicationFile]
+) -> dict[str, dict[str, str | None]]:
+    """Return required destinations that are absent or bound to the wrong source."""
+    actual = {
+        item.destination: item.source.relative_to(root).as_posix()
+        for item in files
+        if item.destination in REQUIRED_HF_ASSETS
+    }
+    return {
+        destination: {"expected": expected, "actual": actual.get(destination)}
+        for destination, expected in REQUIRED_HF_ASSETS.items()
+        if actual.get(destination) != expected
+    }
 
 
 def main() -> int:
@@ -156,10 +172,13 @@ def main() -> int:
 
     try:
         contract, files = deploy.load_contract(root, manifest_path)
-        destinations = {item.destination for item in files}
         require(contract.get("prune") is True, "org-card publication must prune unmanaged legacy files", failures)
-        missing_assets = REQUIRED_HF_ASSETS - destinations
-        require(not missing_assets, f"manifest is missing portfolio assets: {sorted(missing_assets)}", failures)
+        mismatched_assets = required_asset_mismatches(root, files)
+        require(
+            not mismatched_assets,
+            f"manifest portfolio source bindings are invalid: {mismatched_assets}",
+            failures,
+        )
     except Exception as exc:
         failures.append(f"publication manifest invalid: {type(exc).__name__}: {exc}")
 
