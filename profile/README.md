@@ -101,7 +101,7 @@ The shared contract is documented in the
 | **Evidence** | [receipt spec](https://github.com/szl-holdings/governed-receipt-spec) · [receipt library](https://github.com/szl-holdings/szl-receipt) · [trust documentation](https://github.com/szl-holdings/docs-site/tree/main/docs/trust) · [evidence doctrine](https://github.com/szl-holdings/evidence-doctrine) |
 | **Formal methods** | [lutar-lean](https://github.com/szl-holdings/lutar-lean) · [formula ledger](https://github.com/szl-holdings/szl-formula-ledger) · [Lambda gate](https://github.com/szl-holdings/szl-lambda-gate) |
 | **Models and compute** | [Forge](https://github.com/szl-holdings/szl-forge) · [kernels](https://github.com/szl-holdings/szl-kernels) · [energy attestation](https://github.com/szl-holdings/szl-energy-attest) |
-| **Research and examples** | [papers](https://github.com/szl-holdings/szl-papers) · [cookbook](https://github.com/szl-holdings/szl-cookbook) · [documentation source](https://github.com/szl-holdings/docs-site) |
+| **Research and examples** | [papers](https://github.com/szl-holdings/szl-papers) · [maintained cookbook recipes](https://github.com/szl-holdings/docs-site/tree/main/docs/cookbook/recipes) · [documentation source](https://github.com/szl-holdings/docs-site) |
 
 Archived repositories are preserved as historical evidence. Their active
 successors and retention rationale are listed in the
