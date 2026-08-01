@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import ast
 import json
 import sys
 from html.parser import HTMLParser
@@ -28,16 +29,50 @@ TRUTH_MARKERS = {"Current state", "HISTORICAL", "SIMULATED"}
 
 
 def front_matter_value(document: str, key: str) -> str | None:
-    """Return an unquoted scalar from the leading YAML front matter only."""
+    """
+    Parse one-line front-matter scalars only, with strict rejection rules.
+
+    Rejects duplicated keys, aliases/anchors, continuation lines, and block
+    scalars so the contract cannot be bypassed by front-matter syntax games.
+    """
+
     lines = document.splitlines()
     if not lines or lines[0].strip() != "---":
         return None
+
+    values: dict[str, str] = {}
     for line in lines[1:]:
         if line.strip() == "---":
+            return values.get(key)
+        if not line or line.startswith(" ") or line.startswith("\t"):
             return None
-        name, separator, value = line.partition(":")
-        if separator and name.strip() == key:
-            return value.strip()
+        if line.strip().startswith("#"):
+            continue
+        if ":" not in line:
+            return None
+
+        name, _, raw_value = line.partition(":")
+        if not name or name.strip() != name or not name.strip():
+            return None
+        name = name.strip()
+        if name in values:
+            return None
+
+        value = raw_value.strip()
+        if not value:
+            return None
+        if value.startswith((">", "|")):
+            return None
+        if value.startswith(("&", "*")):
+            return None
+
+        if value[0] in "\"'" and value[-1] == value[0]:
+            try:
+                value = ast.literal_eval(value)
+            except Exception:
+                return None
+        values[name] = value
+
     return None
 
 
