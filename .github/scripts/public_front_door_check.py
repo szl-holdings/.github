@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import json
+import re
 import sys
 from html.parser import HTMLParser
 from pathlib import Path
@@ -24,7 +25,11 @@ BANNED_COPY = {
     "all models operational",
 }
 HUB_CARD_EMOJI = "🛡️"
-HUB_CARD_SHORT_DESCRIPTION_MAX_CHARS = 60
+HUB_SHORT_DESCRIPTION_MAX_LENGTH = 60
+BLOCK_SCALAR_HEADER = re.compile(
+    r"^(?P<style>[>|])(?P<modifiers>(?:[+-][1-9]?|[1-9][+-]?)?)$"
+)
+SIMPLE_METADATA_KEY = re.compile(r"^[A-Za-z_][A-Za-z0-9_-]*$")
 REQUIRED_HF_ASSETS = {
     "assets/estate-command-system.svg": "profile/assets/estate-command-system.svg",
     "assets/estate-banner-v2.svg": "profile/assets/estate-banner-v2.svg",
@@ -51,14 +56,6 @@ def front_matter_value(document: str, key: str) -> str | None:
     return None
 
 
-def front_matter_value_within_limit(
-    document: str, key: str, max_chars: int
-) -> bool:
-    """Return whether a leading front-matter scalar exists within a limit."""
-    value = front_matter_value(document, key)
-    return value is not None and len(value) <= max_chars
-
-
 def _yaml_scalar(value: str) -> str:
     """Return a scalar used by the small workflow-path parser below."""
     value = value.strip()
@@ -71,6 +68,151 @@ def _yaml_scalar(value: str) -> str:
     if len(value) >= 2 and value[0] == value[-1] == "'":
         return value[1:-1].replace("''", "'")
     return value
+
+
+def _simple_metadata_key(value: str) -> str | None:
+    """Return a regular metadata key, rejecting YAML node properties."""
+    value = value.strip()
+    if SIMPLE_METADATA_KEY.fullmatch(value):
+        return value
+    if len(value) >= 2 and value[0] == value[-1] == '"':
+        try:
+            parsed = json.loads(value)
+        except json.JSONDecodeError:
+            return None
+        if isinstance(parsed, str) and SIMPLE_METADATA_KEY.fullmatch(parsed):
+            return parsed
+        return None
+    if len(value) >= 2 and value[0] == value[-1] == "'":
+        parsed = value[1:-1].replace("''", "'")
+        return parsed if SIMPLE_METADATA_KEY.fullmatch(parsed) else None
+    return None
+
+
+def hub_short_description_length(document: str) -> int | None:
+    """Return a fail-closed upper bound for the Hub short-description length.
+
+    The Hub accepts YAML block scalars, whose folded/literal rendering can be
+    longer than the text on the declaration line.  The bound counts every
+    content character plus the maximum separator count the YAML block can
+    produce.  It may reject unusually padded but valid YAML, but it cannot
+    undercount a value that Hugging Face will measure.
+    """
+    lines = document.splitlines()
+    if not lines or lines[0] != "---":
+        return None
+
+    closing_index = next(
+        (
+            index
+            for index, line in enumerate(lines[1:], start=1)
+            if line.rstrip() == "---" and not line.startswith((" ", "\t"))
+        ),
+        None,
+    )
+    if closing_index is None:
+        return None
+
+    matches: list[tuple[int, str]] = []
+    for index, line in enumerate(lines[1:closing_index], start=1):
+        if not line.strip() or line.lstrip().startswith("#"):
+            continue
+        if line.startswith("\t"):
+            return None
+        if line.startswith(" "):
+            continue
+        name, separator, value = line.partition(":")
+        if not separator:
+            return None
+        key = _simple_metadata_key(name)
+        if key is None:
+            return None
+        if key == "short_description":
+            matches.append((index, value))
+
+    # Duplicate YAML keys are resolved differently across parsers. Refuse them
+    # instead of measuring one value while the Hub validates another.
+    if len(matches) != 1:
+        return None
+
+    index, raw_value = matches[0]
+    scalar = _without_yaml_comment(raw_value).strip()
+    block = BLOCK_SCALAR_HEADER.fullmatch(scalar)
+    if block is not None:
+        raw_block_lines: list[str] = []
+        modifiers = block.group("modifiers")
+        explicit_indent = next(
+            (int(character) for character in modifiers if character.isdigit()),
+            None,
+        )
+        content_indent = explicit_indent
+        for continuation in lines[index + 1 : closing_index]:
+            if continuation.strip():
+                indentation = len(continuation) - len(continuation.lstrip(" "))
+                if indentation == 0:
+                    break
+                if content_indent is None:
+                    content_indent = indentation
+                if indentation < content_indent:
+                    return None
+            elif "\t" in continuation:
+                return None
+            raw_block_lines.append(continuation)
+
+        if content_indent is None:
+            content_indent = 1
+        block_lines = [
+            continuation[content_indent:] for continuation in raw_block_lines
+        ]
+
+        content_characters = sum(len(line) for line in block_lines)
+        separators = max(len(block_lines) - 1, 0)
+        if block_lines and "-" not in modifiers:
+            separators += 1
+        return content_characters + separators
+
+    if not scalar:
+        return None
+
+    # Aliases, tags, anchors, flow collections, and block indicators can
+    # resolve to a value unrelated to their short source spelling. Refuse them
+    # rather than risk a length undercount.
+    if scalar[0] in "*!&[{}>|":
+        return None
+    if scalar.startswith(("- ", "? ", ": ")):
+        return None
+
+    if scalar[0] == '"':
+        if len(scalar) < 2 or scalar[-1] != '"':
+            return None
+        try:
+            normalized = json.loads(scalar)
+        except json.JSONDecodeError:
+            return None
+        if not isinstance(normalized, str):
+            return None
+    elif scalar[0] == "'":
+        if len(scalar) < 2 or scalar[-1] != "'":
+            return None
+        normalized = scalar[1:-1].replace("''", "'")
+    else:
+        normalized = scalar
+
+    # YAML permits multiline quoted/plain scalars. This deliberately scoped
+    # validator refuses them so it cannot silently omit continuation bytes.
+    for continuation in lines[index + 1 : closing_index]:
+        if not continuation.strip() or continuation.lstrip().startswith("#"):
+            continue
+        if continuation.startswith((" ", "\t")):
+            return None
+        break
+
+    return len(normalized)
+
+
+def short_description_length_within_limit(length: int | None) -> bool:
+    """Return whether a measured Hub short description satisfies its limit."""
+    return length is not None and length <= HUB_SHORT_DESCRIPTION_MAX_LENGTH
 
 
 def _without_yaml_comment(value: str) -> str:
@@ -204,20 +346,6 @@ def main() -> int:
         require(url in hub_card, f"Hugging Face card missing canonical link: {url}", failures)
     require("./assets/estate-command-system.svg" in profile, "profile does not use canonical hero", failures)
     require("deployment.json" in hub_card, "Hub card does not expose served source binding", failures)
-    card_short_description = front_matter_value(hub_card, "short_description")
-    require(
-        card_short_description is not None,
-        "Hub card front matter is missing short_description",
-        failures,
-    )
-    require(
-        front_matter_value_within_limit(
-            hub_card, "short_description", HUB_CARD_SHORT_DESCRIPTION_MAX_CHARS
-        ),
-        "Hub card short_description exceeds the Hugging Face 60-character limit"
-        f" (observed {len(card_short_description) if card_short_description is not None else 'missing'})",
-        failures,
-    )
     card_emoji = front_matter_value(hub_card, "emoji")
     require(card_emoji is not None, "Hub card front matter is missing emoji", failures)
     require(
@@ -228,6 +356,18 @@ def main() -> int:
     require(
         front_matter_value(hub_card, "thumbnail") is not None,
         "Hub card front matter is missing a portfolio thumbnail",
+        failures,
+    )
+    short_description_length = hub_short_description_length(hub_card)
+    require(
+        short_description_length is not None,
+        "Hub card front matter has a missing, duplicate, or unsupported short_description",
+        failures,
+    )
+    require(
+        short_description_length is None
+        or short_description_length_within_limit(short_description_length),
+        "Hub card short_description exceeds the Hugging Face 60-character limit",
         failures,
     )
     combined = f"{profile}\n{hub_card}\n{html}".lower()
