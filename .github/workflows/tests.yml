@@ -236,3 +236,9 @@ jobs:
       # navigation, accessibility, and honesty contract.
       - name: Public front-door contract
         run: python3 .github/scripts/public_front_door_check.py
+
+      - name: Public front-door parser self-test
+        run: >-
+          python3 -m unittest discover
+          -s .github/scripts
+          -p test_public_front_door_check.py

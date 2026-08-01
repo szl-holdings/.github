@@ -23,6 +23,21 @@ BANNED_COPY = {
     "trust ceiling 0.97",
     "all models operational",
 }
+HUB_CARD_EMOJI = "🛡️"
+
+
+def front_matter_value(document: str, key: str) -> str | None:
+    """Return an unquoted scalar from the leading YAML front matter only."""
+    lines = document.splitlines()
+    if not lines or lines[0].strip() != "---":
+        return None
+    for line in lines[1:]:
+        if line.strip() == "---":
+            return None
+        name, separator, value = line.partition(":")
+        if separator and name.strip() == key:
+            return value.strip()
+    return None
 
 
 class SurfaceParser(HTMLParser):
@@ -69,6 +84,13 @@ def main() -> int:
         require(url in hub_card, f"Hugging Face card missing canonical link: {url}", failures)
     require("./assets/estate-command-system.svg" in profile, "profile does not use canonical hero", failures)
     require("deployment.json" in hub_card, "Hub card does not expose served source binding", failures)
+    card_emoji = front_matter_value(hub_card, "emoji")
+    require(card_emoji is not None, "Hub card front matter is missing emoji", failures)
+    require(
+        card_emoji == HUB_CARD_EMOJI,
+        f"Hub card emoji must be the approved Extended Pictographic value {HUB_CARD_EMOJI}",
+        failures,
+    )
 
     combined = f"{profile}\n{hub_card}\n{html}".lower()
     for phrase in BANNED_COPY:
@@ -98,7 +120,7 @@ def main() -> int:
     report = {
         "schema": "szl.public-front-door-check/v1",
         "state": "PASS" if not failures else "FAIL",
-        "checks": 15 + len(REQUIRED_LINKS) * 2 + len(BANNED_COPY),
+        "checks": 16 + len(REQUIRED_LINKS) * 2 + len(BANNED_COPY),
         "failures": failures,
     }
     print(json.dumps(report, indent=2, sort_keys=True))
