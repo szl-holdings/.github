@@ -4,7 +4,7 @@ emoji: 🛡️
 colorFrom: gray
 colorTo: yellow
 sdk: static
-short_description: Models, evidence, and demonstrations with clear boundaries
+short_description: Control before action. Evidence after.
 pinned: true
 license: apache-2.0
 thumbnail: "https://huggingface.co/spaces/SZLHOLDINGS/README/resolve/main/assets/hf-portfolio-map.svg"
