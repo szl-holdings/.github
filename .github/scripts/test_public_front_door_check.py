@@ -32,6 +32,16 @@ class FrontMatterTests(unittest.TestCase):
         self.assertFalse(check.short_description_within_limit("x" * 61))
         self.assertFalse(check.short_description_within_limit(None))
 
+    def test_parses_complete_folded_block_short_description(self):
+        accepted = "---\nshort_description: >-\n  " + "x" * 29 + "\n  " + "y" * 30 + "\n---\n"
+        rejected = "---\nshort_description: >-\n  " + "x" * 30 + "\n  " + "y" * 30 + "\n---\n"
+        accepted_value = check.hub_short_description(accepted)
+        rejected_value = check.hub_short_description(rejected)
+        self.assertEqual(accepted_value, "x" * 29 + " " + "y" * 30)
+        self.assertEqual(rejected_value, "x" * 30 + " " + "y" * 30)
+        self.assertTrue(check.short_description_within_limit(accepted_value))
+        self.assertFalse(check.short_description_within_limit(rejected_value))
+
 
 class RequiredAssetBindingTests(unittest.TestCase):
     def test_accepts_exact_destination_source_bindings(self):

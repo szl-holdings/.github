@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import json
+import re
 import sys
 from html.parser import HTMLParser
 from pathlib import Path
@@ -25,6 +26,9 @@ BANNED_COPY = {
 }
 HUB_CARD_EMOJI = "🛡️"
 HUB_SHORT_DESCRIPTION_MAX_LENGTH = 60
+BLOCK_SCALAR_HEADER = re.compile(
+    r"^(?P<style>[>|])(?P<modifiers>(?:[+-][1-9]?|[1-9][+-]?)?)$"
+)
 REQUIRED_HF_ASSETS = {
     "assets/estate-command-system.svg": "profile/assets/estate-command-system.svg",
     "assets/estate-banner-v2.svg": "profile/assets/estate-banner-v2.svg",
@@ -66,9 +70,94 @@ def _yaml_scalar(value: str) -> str:
 
 
 def hub_short_description(document: str) -> str | None:
-    """Return the normalized Hub card short description, when present."""
-    value = front_matter_value(document, "short_description")
-    return None if value is None else _yaml_scalar(value)
+    """Return the complete normalized Hub card short description."""
+    lines = document.splitlines()
+    if not lines or lines[0].strip() != "---":
+        return None
+
+    for index, line in enumerate(lines[1:], start=1):
+        if line.strip() == "---":
+            return None
+        name, separator, value = line.partition(":")
+        if not separator or name.strip() != "short_description":
+            continue
+
+        scalar = value.strip()
+        block = BLOCK_SCALAR_HEADER.fullmatch(scalar)
+        if block is None:
+            if scalar.startswith(("'", '"')) and not (
+                len(scalar) >= 2 and scalar[0] == scalar[-1]
+            ):
+                return None
+            parent_indent = len(line) - len(line.lstrip(" "))
+            for continuation in lines[index + 1 :]:
+                if continuation.strip() == "---":
+                    break
+                if not continuation.strip() or continuation.lstrip().startswith("#"):
+                    continue
+                continuation_indent = len(continuation) - len(
+                    continuation.lstrip(" ")
+                )
+                if continuation_indent > parent_indent:
+                    return None
+                break
+            return _yaml_scalar(scalar)
+
+        parent_indent = len(line) - len(line.lstrip(" "))
+        modifiers = block.group("modifiers")
+        explicit_indent = next(
+            (int(character) for character in modifiers if character.isdigit()),
+            None,
+        )
+        content_indent = (
+            parent_indent + explicit_indent if explicit_indent is not None else None
+        )
+        block_lines: list[str] = []
+        for continuation in lines[index + 1 :]:
+            if continuation.strip() == "---" and not continuation.startswith(" "):
+                break
+            continuation_indent = len(continuation) - len(continuation.lstrip(" "))
+            if continuation.strip() and continuation_indent <= parent_indent:
+                break
+            if content_indent is None and continuation.strip():
+                content_indent = continuation_indent
+            block_lines.append(continuation)
+
+        if content_indent is None:
+            content_indent = parent_indent + 1
+        normalized: list[tuple[str, bool]] = []
+        for continuation in block_lines:
+            continuation_indent = len(continuation) - len(continuation.lstrip(" "))
+            if continuation.strip() and continuation_indent < content_indent:
+                return None
+            text = continuation[content_indent:] if continuation.strip() else ""
+            normalized.append((text, continuation_indent > content_indent))
+
+        if block.group("style") == "|":
+            parsed = "\n".join(text for text, _ in normalized)
+        else:
+            parts: list[str] = []
+            for line_index, (text, more_indented) in enumerate(normalized):
+                if line_index:
+                    previous_text, previous_more_indented = normalized[line_index - 1]
+                    if previous_more_indented or more_indented:
+                        parts.append("\n")
+                    elif previous_text and text:
+                        parts.append(" ")
+                    elif previous_text and not text:
+                        parts.append("\n")
+                    elif not previous_text and not text:
+                        parts.append("\n")
+                parts.append(text)
+            parsed = "".join(parts)
+
+        if "-" in modifiers:
+            return parsed.rstrip("\n")
+        if "+" in modifiers:
+            return parsed + "\n"
+        return parsed.rstrip("\n") + "\n"
+
+    return None
 
 
 def short_description_within_limit(value: str | None) -> bool:
