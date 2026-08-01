@@ -68,7 +68,7 @@ jobs:
           publish=false
           if [ "$GITHUB_EVENT_NAME" = "push" ] && [ "$GITHUB_REF" = "refs/heads/main" ]; then
             publish=true
-          elif [ "$GITHUB_EVENT_NAME" = "workflow_dispatch" ] && [ "${{ inputs.publish }}" = "true" ]; then
+          elif [ "$GITHUB_EVENT_NAME" = "workflow_dispatch" ] && [ "$GITHUB_REF" = "refs/heads/main" ] && [ "${{ inputs.publish }}" = "true" ]; then
             publish=true
           fi
           echo "publish=$publish" >> "$GITHUB_OUTPUT"

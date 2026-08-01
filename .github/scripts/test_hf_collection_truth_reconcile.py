@@ -116,6 +116,35 @@ class ReconcileTests(unittest.TestCase):
         self.assertNotIn("delete_collection(", source)
         self.assertNotIn("upload_file(", source)
 
+    def test_hub_token_selection_uses_approved_fallback_order(self) -> None:
+        self.assertEqual(
+            module._hub_token_from_environment(
+                {
+                    "HF_ORG_TOKEN": "org-primary",
+                    "HF_ORG_TOKEN1": "org-secondary",
+                    "HF_TOKEN": "generic",
+                }
+            ),
+            "org-primary",
+        )
+        self.assertEqual(
+            module._hub_token_from_environment(
+                {"HF_ORG_TOKEN1": "org-secondary", "HF_TOKEN": "generic"}
+            ),
+            "org-secondary",
+        )
+        self.assertEqual(
+            module._hub_token_from_environment({"HF_TOKEN": "generic"}),
+            "generic",
+        )
+        self.assertIsNone(module._hub_token_from_environment({}))
+
+    def test_manual_publish_is_pinned_to_main(self) -> None:
+        workflow = (
+            HERE.parent / "workflows" / "hf-collection-truth-reconcile.yml"
+        ).read_text(encoding="utf-8")
+        self.assertIn('[ "$GITHUB_REF" = "refs/heads/main" ]', workflow)
+
 
 if __name__ == "__main__":
     unittest.main()

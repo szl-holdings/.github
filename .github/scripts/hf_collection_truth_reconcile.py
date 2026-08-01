@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
 from pathlib import Path
@@ -37,6 +38,16 @@ REQUIRED_TRAINED_WEIGHTS = frozenset(
         "SZLHOLDINGS/SZL-Khipu-1.5B-GGUF",
     }
 )
+
+
+def _hub_token_from_environment(environ: Any) -> str | None:
+    """Select the approved Hub credential without relying on implicit aliases."""
+
+    return (
+        environ.get("HF_ORG_TOKEN")
+        or environ.get("HF_ORG_TOKEN1")
+        or environ.get("HF_TOKEN")
+    )
 
 
 class ReconcileError(RuntimeError):
@@ -190,7 +201,14 @@ def main() -> int:
     report_path = Path(args.report)
     report_path.parent.mkdir(parents=True, exist_ok=True)
     try:
-        report = CollectionTruthReconciler(HfApi(), publish=args.publish).run()
+        token = _hub_token_from_environment(os.environ)
+        if args.publish and not token:
+            raise ReconcileError(
+                "publish mode requires HF_ORG_TOKEN, HF_ORG_TOKEN1, or HF_TOKEN"
+            )
+        report = CollectionTruthReconciler(
+            HfApi(token=token), publish=args.publish
+        ).run()
         exit_code = 0
     except Exception as exc:
         report = {
