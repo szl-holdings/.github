@@ -1,47 +1,131 @@
-# {{REPO_DISPLAY_NAME}}
+<!-- markdownlint-disable MD013 -->
 
-  > {{TAGLINE}}
+# {{PROJECT_NAME}}
 
-  [![CI](https://github.com/szl-holdings/{{REPO}}/actions/workflows/ci.yml/badge.svg)](https://github.com/szl-holdings/{{REPO}}/actions/workflows/ci.yml)
-  [![License](https://img.shields.io/badge/license-Proprietary-red?style=flat-square)](./LICENSE)
+> {{ONE_SENTENCE_OUTCOME_FOR_THE_PRIMARY_USER}}
 
-  {{REPO_DISPLAY_NAME}} is part of the [SZL Holdings](https://github.com/szl-holdings) platform — governed AI decision infrastructure for regulated enterprises.
+[![Status](https://img.shields.io/badge/status-{{STATUS_LABEL}}-{{STATUS_COLOR}})]({{STATUS_EVIDENCE_URL}})
+[![CI]({{CI_BADGE_URL}})]({{CI_WORKFLOW_URL}})
+[![License](https://img.shields.io/badge/license-{{LICENSE_ID}}-5b8dee)](./LICENSE)
 
-  ## What it does
+{{PROJECT_NAME}} is {{WHAT_IT_IS}} for {{PRIMARY_AUDIENCE}}. It helps them
+{{USER_OUTCOME}} without {{IMPORTANT_BOUNDARY_OR_RISK}}.
 
-  {{ONE_PARAGRAPH_DESCRIPTION}}
+[**Try it**]({{DEMO_OR_QUICKSTART_URL}}) ·
+[**Read the docs**]({{DOCS_URL}}) ·
+[**Review evidence**]({{EVIDENCE_URL}})
 
-  ## Capabilities
+## Why it exists
 
-  - {{CAPABILITY_1}}
-  - {{CAPABILITY_2}}
-  - {{CAPABILITY_3}}
+{{PROBLEM_CONTEXT_IN_TWO_TO_FOUR_SENTENCES}}
 
-  ## Status
+## What it does
 
-  **{{STATUS}}** — This is a product module within the [SZL Holdings platform monorepo](https://github.com/szl-holdings/szl-holdings-platform).
+- **{{CAPABILITY_1}}:** {{CAPABILITY_1_OUTCOME}}
+- **{{CAPABILITY_2}}:** {{CAPABILITY_2_OUTCOME}}
+- **{{CAPABILITY_3}}:** {{CAPABILITY_3_OUTCOME}}
 
-  ## Tech stack
+## Maturity and evidence
 
-  TypeScript · React · Vite · Express · PostgreSQL · Drizzle ORM
+| Dimension | State | Evidence |
+| --- | --- | --- |
+| Product | {{PRODUCT_STATE}} | {{PRODUCT_EVIDENCE}} |
+| Runtime | {{RUNTIME_STATE}} | {{RUNTIME_EVIDENCE}} |
+| Security | {{SECURITY_STATE}} | {{SECURITY_EVIDENCE}} |
+| Evaluation | {{EVALUATION_STATE}} | {{EVALUATION_EVIDENCE}} |
 
-  ## Documentation
+Evidence class uses **PROVED**, **MEASURED**, **REPORTED**, **MODELED**,
+**CONJECTURE**, or **ROADMAP**. Operational status separately uses
+**OPERATIONAL**, **PARTIAL**, **DEGRADED**, **UNAVAILABLE**, or **HISTORICAL**.
+Evidence integrity does not independently establish model quality, safety, or
+compliance.
 
-  - [License](./LICENSE) — proprietary, source-available
-  - [Security policy](./SECURITY.md) — how to report vulnerabilities
-  - [Contributing](./CONTRIBUTING.md) — how to engage with this project
-  - [Code of Conduct](./CODE_OF_CONDUCT.md)
+## Quickstart
 
-  ## Related repositories
+### Prerequisites
 
-  - [`szl-holdings-platform`](https://github.com/szl-holdings/szl-holdings-platform) — TypeScript monorepo, all domain packs
-  - [`a11oy`](https://github.com/szl-holdings/a11oy) — governed agentic execution fabric
-  - [`ouroboros`](https://github.com/szl-holdings/ouroboros) — bounded-loop runtime (Lutar Invariant)
-  - [`ouroboros-thesis`](https://github.com/szl-holdings/ouroboros-thesis) — research papers with Zenodo DOIs
+- {{PREREQUISITE_1}}
+- {{PREREQUISITE_2}}
 
-  ---
+```{{SHELL_LANGUAGE}}
+{{INSTALL_COMMAND}}
+{{RUN_COMMAND}}
+```
 
-  **[SZL Holdings](https://szlholdings.com)** · [Platform Repository](https://github.com/szl-holdings/szl-holdings-platform) · [stephen@szlholdings.com](mailto:stephen@szlholdings.com)
+Expected result:
 
-  (c) 2024–2026 SZL Holdings, LLC. All rights reserved.
-  
+```text
+{{EXPECTED_OUTPUT}}
+```
+
+Next, follow {{FIRST_REAL_TASK_LINK}}. The quickstart must be executable from a
+clean environment and should take less than ten minutes.
+
+## Architecture
+
+```text
+{{INPUT}} -> {{GATE_OR_CORE}} -> {{OUTPUT}} -> {{EVIDENCE}}
+```
+
+| Boundary | Responsibility |
+| --- | --- |
+| `{{COMPONENT_1}}` | {{COMPONENT_1_RESPONSIBILITY}} |
+| `{{COMPONENT_2}}` | {{COMPONENT_2_RESPONSIBILITY}} |
+| `{{COMPONENT_3}}` | {{COMPONENT_3_RESPONSIBILITY}} |
+
+See {{ARCHITECTURE_LINK}} for trust boundaries, persistence, failure modes,
+and deployment topology.
+
+## Configuration
+
+| Setting | Required | Default | Description |
+| --- | ---: | --- | --- |
+| `{{SETTING_1}}` | {{YES_OR_NO}} | `{{DEFAULT_1}}` | {{SETTING_1_DESCRIPTION}} |
+| `{{SETTING_2}}` | {{YES_OR_NO}} | `{{DEFAULT_2}}` | {{SETTING_2_DESCRIPTION}} |
+
+Never place credentials in examples, issue bodies, logs, or committed files.
+
+## Verification
+
+```{{SHELL_LANGUAGE}}
+{{TEST_COMMAND}}
+{{LINT_COMMAND}}
+{{TYPECHECK_OR_BUILD_COMMAND}}
+```
+
+Document the expected checks, supported versions, and known environment
+constraints. Link release artifacts to their immutable source revision.
+
+## Limits and non-goals
+
+- {{LIMIT_1}}
+- {{LIMIT_2}}
+- {{EXPLICIT_NON_GOAL}}
+
+## Documentation
+
+- [Architecture]({{ARCHITECTURE_LINK}})
+- [API or CLI reference]({{REFERENCE_LINK}})
+- [Examples]({{EXAMPLES_LINK}})
+- [Changelog]({{CHANGELOG_LINK}})
+- [Security policy](https://github.com/szl-holdings/.github/security/policy)
+- [Contributing](https://github.com/szl-holdings/.github/blob/main/CONTRIBUTING.md)
+- [Support](https://github.com/szl-holdings/.github/blob/main/SUPPORT.md)
+
+## Related projects
+
+| Project | Relationship |
+| --- | --- |
+| [{{RELATED_PROJECT_1}}]({{RELATED_PROJECT_1_URL}}) | {{RELATIONSHIP_1}} |
+| [{{RELATED_PROJECT_2}}]({{RELATED_PROJECT_2_URL}}) | {{RELATIONSHIP_2}} |
+
+## License
+
+{{LICENSE_SENTENCE_MATCHING_THE_ACTUAL_LICENSE_FILE}}
+
+---
+
+[SZL Holdings](https://github.com/szl-holdings) ·
+[a11oy](https://a-11-oy.com) ·
+[Documentation](https://holdings.a-11-oy.com/docs-site/) ·
+[Hugging Face](https://huggingface.co/SZLHOLDINGS)
