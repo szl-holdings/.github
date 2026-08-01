@@ -117,7 +117,25 @@ class RedRun:
     url: str | None
 
 
-def classify(repository: str, workflow: str) -> tuple[str, str]:
+def classify(
+    repository: str,
+    workflow: str,
+    *,
+    event: str | None = None,
+    run_number: int | None = None,
+) -> tuple[str, str]:
+    if (
+        repository == "a11oy"
+        and workflow == "Nemo v3 isolated owner GPU dispatch"
+        and event == "repository_dispatch"
+        and run_number == 10
+    ):
+        return (
+            "INTENTIONAL",
+            "Run #10 is the immutable zero-effect Attempt 15 prefetch rejection. "
+            "Protected bridge evidence at 53b6e206 quarantines Attempts 15 and 16; "
+            "NEVER_RESEND and no future successor.",
+        )
     for repository_match, substring, verdict in POLICY:
         if (
             not repository_match or repository_match == repository
@@ -524,7 +542,12 @@ def build_body(
     total = 0
     for repository in sorted(reds):
         for red in reds[repository]:
-            disposition, note = classify(repository, red.workflow)
+            disposition, note = classify(
+                repository,
+                red.workflow,
+                event=red.event,
+                run_number=red.run_number,
+            )
             buckets[disposition].append((red, note))
             total += 1
 
