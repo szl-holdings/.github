@@ -245,5 +245,45 @@ class WorkflowProvenanceTests(unittest.TestCase):
         self.assertEqual(coverage["excluded_non_default_workflows"], 2)
 
 
+class ClassificationPolicyTests(unittest.TestCase):
+    def test_terminal_nemo_attempt_15_run_is_intentional(self):
+        self.assertEqual(
+            sweep.classify(
+                "a11oy",
+                "Nemo v3 isolated owner GPU dispatch",
+                event="repository_dispatch",
+                run_number=10,
+            ),
+            (
+                "INTENTIONAL",
+                "Run #10 is the immutable zero-effect Attempt 15 prefetch rejection. "
+                "Protected bridge evidence at 53b6e206 quarantines Attempts 15 and 16; "
+                "NEVER_RESEND and no future successor.",
+            ),
+        )
+
+    def test_future_nemo_owner_dispatch_failure_remains_actionable(self):
+        self.assertEqual(
+            sweep.classify(
+                "a11oy",
+                "Nemo v3 isolated owner GPU dispatch",
+                event="repository_dispatch",
+                run_number=11,
+            ),
+            ("ACTIONABLE", ""),
+        )
+
+    def test_non_dispatch_nemo_run_remains_actionable(self):
+        self.assertEqual(
+            sweep.classify(
+                "a11oy",
+                "Nemo v3 isolated owner GPU dispatch",
+                event="push",
+                run_number=10,
+            ),
+            ("ACTIONABLE", ""),
+        )
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)
