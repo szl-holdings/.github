@@ -245,5 +245,95 @@ class WorkflowProvenanceTests(unittest.TestCase):
         self.assertEqual(coverage["excluded_non_default_workflows"], 2)
 
 
+class ClassificationPolicyTests(unittest.TestCase):
+    def test_terminal_nemo_attempt_15_run_is_intentional(self):
+        self.assertEqual(
+            sweep.classify(
+                "a11oy",
+                "Nemo v3 isolated owner GPU dispatch",
+                event="repository_dispatch",
+                run_number=10,
+                run_id=30641766033,
+                run_attempt=1,
+            ),
+            (
+                "INTENTIONAL",
+                "Workflow run 30641766033 attempt 1 (run #10) is the immutable "
+                "zero-effect Attempt 15 prefetch rejection. "
+                "Protected bridge evidence at 53b6e206 quarantines Attempts 15 and 16; "
+                "NEVER_RESEND and no future successor.",
+            ),
+        )
+
+    def test_rerun_of_terminal_nemo_run_remains_actionable(self):
+        self.assertEqual(
+            sweep.classify(
+                "a11oy",
+                "Nemo v3 isolated owner GPU dispatch",
+                event="repository_dispatch",
+                run_number=10,
+                run_id=30641766033,
+                run_attempt=2,
+            ),
+            ("ACTIONABLE", ""),
+        )
+
+    def test_terminal_coordinates_with_wrong_run_id_remain_actionable(self):
+        self.assertEqual(
+            sweep.classify(
+                "a11oy",
+                "Nemo v3 isolated owner GPU dispatch",
+                event="repository_dispatch",
+                run_number=10,
+                run_id=30641766034,
+                run_attempt=1,
+            ),
+            ("ACTIONABLE", ""),
+        )
+
+    def test_red_run_captures_immutable_run_identity(self):
+        red = sweep._red_run(
+            repository="a11oy",
+            workflow={"id": 1, "name": "Nemo v3 isolated owner GPU dispatch"},
+            provenance="protected_default_branch",
+            run={
+                "conclusion": "failure",
+                "id": 30641766033,
+                "run_attempt": 1,
+                "run_number": 10,
+                "event": "repository_dispatch",
+            },
+        )
+        self.assertIsNotNone(red)
+        self.assertEqual(red.run_id, 30641766033)
+        self.assertEqual(red.run_attempt, 1)
+
+    def test_future_nemo_owner_dispatch_failure_remains_actionable(self):
+        self.assertEqual(
+            sweep.classify(
+                "a11oy",
+                "Nemo v3 isolated owner GPU dispatch",
+                event="repository_dispatch",
+                run_number=11,
+                run_id=30641766033,
+                run_attempt=1,
+            ),
+            ("ACTIONABLE", ""),
+        )
+
+    def test_non_dispatch_nemo_run_remains_actionable(self):
+        self.assertEqual(
+            sweep.classify(
+                "a11oy",
+                "Nemo v3 isolated owner GPU dispatch",
+                event="push",
+                run_number=10,
+                run_id=30641766033,
+                run_attempt=1,
+            ),
+            ("ACTIONABLE", ""),
+        )
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)
