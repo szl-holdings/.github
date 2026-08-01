@@ -25,6 +25,9 @@ UNSCOPED_SELECTOR_PATTERNS = (
         r"path|product|truth|label|status-list)\b"
     ),
 )
+CSS_CLASS_PATTERN = re.compile(
+    r"(?<![A-Za-z0-9_-])\.([A-Za-z_][A-Za-z0-9_-]*)"
+)
 
 REQUIRED_CSS_MARKERS = (
     "#szl-hf-org-card .szl-hf-button {",
@@ -191,6 +194,19 @@ def validate_document(document: str) -> list[str]:
             failures.append(
                 f"unscoped CSS selector is forbidden: {match.group(0).strip()}"
             )
+
+    bad_css_classes = sorted(
+        {
+            match.group(1)
+            for match in CSS_CLASS_PATTERN.finditer(css)
+            if not match.group(1).startswith(CLASS_PREFIX)
+        }
+    )
+    if bad_css_classes:
+        failures.append(
+            "unscoped CSS class selectors are forbidden, including unused rules: "
+            f"{bad_css_classes}"
+        )
 
     for marker in REQUIRED_CSS_MARKERS:
         if marker not in css:
