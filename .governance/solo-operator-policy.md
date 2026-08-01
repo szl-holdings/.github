@@ -16,8 +16,12 @@ therefore does not claim independent human review.
   requires it and pins it to App ID `4395545`; the default-branch queue records
   it as evidence. The App repeats gate verification, BAP signing, and status
   publication for the synthesized merge-group commit.
-- The ephemeral repository token requests the protected merge queue only after
-  the App attestation succeeds; it cannot approve or bypass the ruleset.
+- A trusted-default-branch `workflow_run` controller requests the protected
+  main queue only after exact gate-generation, body, base, App-status, and App-
+  review evidence matches. Its governed token is never exposed to PR code.
+- The ephemeral repository token requests only the non-queued `release/*`
+  auto-merge path after App attestation; it cannot approve or bypass the
+  ruleset.
 - The App has read-only Contents access and cannot alter repository code.
 - Ruleset bypass actors remain empty.
 
@@ -37,8 +41,8 @@ protected auto-merge path.
 
 ## Governance changes
 
-A pull request that edits the gate workflow, attestor workflow, or
-`.governance/` must include both:
+A pull request that edits the gate, attestor, merge-queue controller, staging
+workflow, or `.governance/` must include both:
 
 ```text
 Solo-Operator-Authorization: confirmed

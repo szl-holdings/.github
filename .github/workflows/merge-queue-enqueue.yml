@@ -1,43 +1,47 @@
 name: Protected Merge Queue Enqueue
 
+# workflow_run always loads this controller from the trusted default branch.
+# No pull-request-controlled file or command receives the write-capable token.
 on:
-  pull_request:
-    branches: [main]
-    types: [opened, reopened, synchronize, ready_for_review, edited]
+  workflow_run:
+    workflows:
+      - FORGE-9 gates
+    types:
+      - completed
 
 permissions:
+  actions: read
+  checks: read
   contents: read
   pull-requests: read
   statuses: read
-  checks: read
 
 concurrency:
-  group: merge-queue-enqueue-${{ github.event.pull_request.number }}-${{ github.event.pull_request.head.sha }}
+  group: merge-queue-enqueue-${{ github.event.workflow_run.head_sha }}
   cancel-in-progress: true
 
 jobs:
   enqueue:
     name: Enqueue exact attested head without direct merge
     if: >-
-      github.event.pull_request.head.repo.full_name == github.repository &&
-      github.event.pull_request.draft == false
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.event == 'pull_request'
     runs-on: ubuntu-latest
     timeout-minutes: 30
     env:
-      GH_TOKEN: ${{ secrets.SZL_GITHUB_TOKEN }}
       REPOSITORY: ${{ github.repository }}
-      PR: ${{ github.event.pull_request.number }}
-      EXPECTED_HEAD: ${{ github.event.pull_request.head.sha }}
+      EXPECTED_HEAD: ${{ github.event.workflow_run.head_sha }}
+      SOURCE_GATE_RUN_ID: ${{ github.event.workflow_run.id }}
     steps:
       - name: Harden runner
         uses: step-security/harden-runner@bf7454d06d71f1098171f2acdf0cd4708d7b5920 # v2.20.0
         with:
           egress-policy: audit
 
-      - name: Checkout the exact controller source
+      - name: Checkout trusted controller source
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: ${{ github.event.pull_request.head.sha }}
+          ref: ${{ github.event.repository.default_branch }}
           persist-credentials: false
           fetch-depth: 1
 
@@ -50,9 +54,11 @@ jobs:
           python .github/scripts/test_merge_queue_enqueue.py
           git diff --check
 
-      - name: Wait for exact-head App attestation and enqueue
+      - name: Wait for this gate generation's App attestation and enqueue
         id: enqueue
         shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.SZL_GITHUB_TOKEN }}
         run: |
           set -euo pipefail
           [ -n "${GH_TOKEN:-}" ] \
@@ -62,32 +68,75 @@ jobs:
           NAME="${REPOSITORY#*/}"
           mkdir -p reports/merge-queue-enqueue
 
+          gh api -H "Accept: application/vnd.github+json" \
+            "repos/$REPOSITORY/commits/$EXPECTED_HEAD/pulls?per_page=100" \
+            > reports/merge-queue-enqueue/candidate-pulls.json
+          mapfile -t PRS < <(
+            jq -r --arg sha "$EXPECTED_HEAD" --arg repository "$REPOSITORY" '.[] | select(
+              .state == "open"
+              and .head.sha == $sha
+              and .head.repo.full_name == $repository
+              and .base.ref == "main"
+            ) | .number' reports/merge-queue-enqueue/candidate-pulls.json
+          )
+          if [ "${#PRS[@]}" -eq 0 ]; then
+            echo "No open same-repository main PR matches gate run $SOURCE_GATE_RUN_ID; nothing to enqueue"
+            exit 0
+          fi
+          [ "${#PRS[@]}" -eq 1 ] \
+            || { echo "::error::expected one eligible PR for $EXPECTED_HEAD; found ${#PRS[@]}"; exit 1; }
+          PR="${PRS[0]}"
+
           attested=0
           for attempt in $(seq 1 120); do
             gh api "repos/$REPOSITORY/pulls/$PR" \
               > reports/merge-queue-enqueue/pull-request.json
             CURRENT_HEAD="$(jq -r .head.sha reports/merge-queue-enqueue/pull-request.json)"
+            CURRENT_BASE_REF="$(jq -r .base.ref reports/merge-queue-enqueue/pull-request.json)"
+            CURRENT_BASE_SHA="$(gh api "repos/$REPOSITORY/git/ref/heads/$CURRENT_BASE_REF" --jq .object.sha)"
             CURRENT_STATE="$(jq -r '.state | ascii_upcase' reports/merge-queue-enqueue/pull-request.json)"
             CURRENT_DRAFT="$(jq -r .draft reports/merge-queue-enqueue/pull-request.json)"
+            CURRENT_BODY_SHA256="$(jq -c '.body // ""' reports/merge-queue-enqueue/pull-request.json | sha256sum | cut -d' ' -f1)"
 
             [ "$CURRENT_HEAD" = "$EXPECTED_HEAD" ] \
               || { echo "::error::pull request head moved from $EXPECTED_HEAD to $CURRENT_HEAD"; exit 1; }
             [ "$CURRENT_STATE" = 'OPEN' ] \
               || { echo "::error::pull request state is $CURRENT_STATE, not OPEN"; exit 1; }
+            if [ "$CURRENT_DRAFT" = 'true' ]; then
+              echo "Gate run $SOURCE_GATE_RUN_ID is for draft PR $PR; queue request deferred"
+              exit 0
+            fi
             [ "$CURRENT_DRAFT" = 'false' ] \
-              || { echo "::error::pull request returned to draft"; exit 1; }
+              || { echo "::error::pull request draft state is invalid"; exit 1; }
 
-            gh api "repos/$REPOSITORY/commits/$EXPECTED_HEAD/status" \
-              > reports/merge-queue-enqueue/commit-status.json
-            STATUS_COUNT="$(jq '[.statuses[] | select(.context == "attestation/qillqaq" and .state == "success")] | length' reports/merge-queue-enqueue/commit-status.json)"
+            LATEST_GATE_RUN_ID="$(gh api "repos/$REPOSITORY/actions/workflows/gates.yml/runs?event=pull_request&per_page=100" \
+              --jq "[.workflow_runs[] | select(.head_sha == \"$EXPECTED_HEAD\")] | max_by(.id) | .id // 0")"
+            if [ "$LATEST_GATE_RUN_ID" != "$SOURCE_GATE_RUN_ID" ]; then
+              echo "Gate run $SOURCE_GATE_RUN_ID is stale; newer generation $LATEST_GATE_RUN_ID owns this head"
+              exit 0
+            fi
 
-            gh api "repos/$REPOSITORY/pulls/$PR/reviews?per_page=100" \
-              > reports/merge-queue-enqueue/reviews.json
-            APPROVAL_COUNT="$(jq --arg head "$EXPECTED_HEAD" '[.[] | select(
-              (.user.login == "qillqaq-attestor[bot]" or .user.login == "qillqaq-attestor")
+            gh api "repos/$REPOSITORY/commits/$EXPECTED_HEAD/statuses?per_page=100" --paginate --slurp \
+              > reports/merge-queue-enqueue/commit-status-pages.json
+            STATUS_COUNT="$(jq --arg description "Signed BAP and App review for gate run $SOURCE_GATE_RUN_ID" '[.[][] | select(
+              .context == "attestation/qillqaq"
+              and .state == "success"
+              and .description == $description
+              and (.creator.login == "qillqaq-attestor[bot]" or .creator.login == "qillqaq-attestor")
+              and .creator.type == "Bot"
+            )] | length' reports/merge-queue-enqueue/commit-status-pages.json)"
+
+            gh api "repos/$REPOSITORY/pulls/$PR/reviews?per_page=100" --paginate --slurp \
+              > reports/merge-queue-enqueue/review-pages.json
+            APPROVAL_COUNT="$(jq --arg head "$EXPECTED_HEAD" --arg body_digest "PR body sha256: $CURRENT_BODY_SHA256" --arg base "Base: $CURRENT_BASE_REF@$CURRENT_BASE_SHA" --arg gate_run "Gate run: $SOURCE_GATE_RUN_ID" '[.[][] | select(
+              .user.login == "qillqaq-attestor[bot]"
+              and .user.type == "Bot"
               and .state == "APPROVED"
               and .commit_id == $head
-            )] | length' reports/merge-queue-enqueue/reviews.json)"
+              and ((.body // "") | contains($body_digest))
+              and ((.body // "") | contains($base))
+              and ((.body // "") | contains($gate_run))
+            )] | length' reports/merge-queue-enqueue/review-pages.json)"
 
             if [ "$STATUS_COUNT" -ge 1 ] && [ "$APPROVAL_COUNT" -ge 1 ]; then
               attested=1
@@ -96,19 +145,46 @@ jobs:
             sleep 10
           done
           [ "$attested" -eq 1 ] \
-            || { echo "::error::exact-head qillqaq attestation did not arrive"; exit 1; }
+            || { echo "::error::current-generation qillqaq attestation did not arrive"; exit 1; }
+
+          gh api "repos/$REPOSITORY/pulls/$PR" \
+            > reports/merge-queue-enqueue/pull-request-before-enqueue.json
+          FINAL_HEAD="$(jq -r .head.sha reports/merge-queue-enqueue/pull-request-before-enqueue.json)"
+          FINAL_BASE_REF="$(jq -r .base.ref reports/merge-queue-enqueue/pull-request-before-enqueue.json)"
+          FINAL_BASE_SHA="$(gh api "repos/$REPOSITORY/git/ref/heads/$FINAL_BASE_REF" --jq .object.sha)"
+          FINAL_STATE="$(jq -r '.state | ascii_upcase' reports/merge-queue-enqueue/pull-request-before-enqueue.json)"
+          FINAL_DRAFT="$(jq -r .draft reports/merge-queue-enqueue/pull-request-before-enqueue.json)"
+          FINAL_BODY_SHA256="$(jq -c '.body // ""' reports/merge-queue-enqueue/pull-request-before-enqueue.json | sha256sum | cut -d' ' -f1)"
+          LATEST_GATE_RUN_ID="$(gh api "repos/$REPOSITORY/actions/workflows/gates.yml/runs?event=pull_request&per_page=100" \
+            --jq "[.workflow_runs[] | select(.head_sha == \"$EXPECTED_HEAD\")] | max_by(.id) | .id // 0")"
+          [ "$FINAL_HEAD" = "$EXPECTED_HEAD" ] \
+            || { echo "::error::pull request head moved before enqueue"; exit 1; }
+          [ "$FINAL_STATE" = 'OPEN' ] \
+            || { echo "::error::pull request state changed before enqueue"; exit 1; }
+          [ "$FINAL_DRAFT" = 'false' ] \
+            || { echo "::error::pull request returned to draft before enqueue"; exit 1; }
+          [ "$FINAL_BODY_SHA256" = "$CURRENT_BODY_SHA256" ] \
+            || { echo "::error::pull request body changed after attestation"; exit 1; }
+          [ "$FINAL_BASE_REF" = "$CURRENT_BASE_REF" ] && [ "$FINAL_BASE_SHA" = "$CURRENT_BASE_SHA" ] \
+            || { echo "::error::pull request base changed after attestation"; exit 1; }
+          [ "$LATEST_GATE_RUN_ID" = "$SOURCE_GATE_RUN_ID" ] \
+            || { echo "::error::a newer gate generation exists before enqueue"; exit 1; }
 
           gh api graphql \
-            -f query='query($owner:String!,$name:String!,$number:Int!){repository(owner:$owner,name:$name){pullRequest(number:$number){id headRefOid isDraft state mergeQueueEntry{id}}}}' \
+            -f query='query($owner:String!,$name:String!,$number:Int!,$base:String!){repository(owner:$owner,name:$name){ref(qualifiedName:$base){target{oid}} pullRequest(number:$number){id headRefOid baseRefName isDraft state body mergeQueueEntry{id}}}}' \
             -F owner="$OWNER" \
             -F name="$NAME" \
             -F number="$PR" \
+            -f base="refs/heads/$CURRENT_BASE_REF" \
             > reports/merge-queue-enqueue/queue-before.json
 
           PULL_REQUEST_ID="$(jq -r .data.repository.pullRequest.id reports/merge-queue-enqueue/queue-before.json)"
           GRAPH_HEAD="$(jq -r .data.repository.pullRequest.headRefOid reports/merge-queue-enqueue/queue-before.json)"
+          GRAPH_BASE_REF="$(jq -r .data.repository.pullRequest.baseRefName reports/merge-queue-enqueue/queue-before.json)"
+          GRAPH_BASE_SHA="$(jq -r .data.repository.ref.target.oid reports/merge-queue-enqueue/queue-before.json)"
           GRAPH_DRAFT="$(jq -r .data.repository.pullRequest.isDraft reports/merge-queue-enqueue/queue-before.json)"
           GRAPH_STATE="$(jq -r .data.repository.pullRequest.state reports/merge-queue-enqueue/queue-before.json)"
+          GRAPH_BODY_SHA256="$(jq -c '.data.repository.pullRequest.body // ""' reports/merge-queue-enqueue/queue-before.json | sha256sum | cut -d' ' -f1)"
           QUEUE_ENTRY="$(jq -r '.data.repository.pullRequest.mergeQueueEntry.id // empty' reports/merge-queue-enqueue/queue-before.json)"
 
           [ "$GRAPH_HEAD" = "$EXPECTED_HEAD" ] \
@@ -117,6 +193,10 @@ jobs:
             || { echo "::error::GraphQL reports draft state"; exit 1; }
           [ "$GRAPH_STATE" = 'OPEN' ] \
             || { echo "::error::GraphQL state is $GRAPH_STATE, not OPEN"; exit 1; }
+          [ "$GRAPH_BODY_SHA256" = "$CURRENT_BODY_SHA256" ] \
+            || { echo "::error::GraphQL body changed before enqueue"; exit 1; }
+          [ "$GRAPH_BASE_REF" = "$CURRENT_BASE_REF" ] && [ "$GRAPH_BASE_SHA" = "$CURRENT_BASE_SHA" ] \
+            || { echo "::error::GraphQL base changed before enqueue"; exit 1; }
 
           if [ -n "$QUEUE_ENTRY" ]; then
             RESULT='ALREADY_QUEUED'
@@ -147,11 +227,65 @@ jobs:
             RESULT='ENQUEUED'
           fi
 
+          gh api graphql \
+            -f query='query($owner:String!,$name:String!,$number:Int!,$base:String!){repository(owner:$owner,name:$name){ref(qualifiedName:$base){target{oid}} pullRequest(number:$number){headRefOid baseRefName isDraft state body mergeQueueEntry{id}}}}' \
+            -F owner="$OWNER" \
+            -F name="$NAME" \
+            -F number="$PR" \
+            -f base="refs/heads/$CURRENT_BASE_REF" \
+            > reports/merge-queue-enqueue/queue-postcheck.json
+          POST_HEAD="$(jq -r .data.repository.pullRequest.headRefOid reports/merge-queue-enqueue/queue-postcheck.json)"
+          POST_BASE_REF="$(jq -r .data.repository.pullRequest.baseRefName reports/merge-queue-enqueue/queue-postcheck.json)"
+          POST_BASE_SHA="$(jq -r .data.repository.ref.target.oid reports/merge-queue-enqueue/queue-postcheck.json)"
+          POST_DRAFT="$(jq -r .data.repository.pullRequest.isDraft reports/merge-queue-enqueue/queue-postcheck.json)"
+          POST_STATE="$(jq -r .data.repository.pullRequest.state reports/merge-queue-enqueue/queue-postcheck.json)"
+          POST_BODY_SHA256="$(jq -c '.data.repository.pullRequest.body // ""' reports/merge-queue-enqueue/queue-postcheck.json | sha256sum | cut -d' ' -f1)"
+          QUEUE_ENTRY="$(jq -r '.data.repository.pullRequest.mergeQueueEntry.id // empty' reports/merge-queue-enqueue/queue-postcheck.json)"
+          LATEST_GATE_RUN_ID="$(gh api "repos/$REPOSITORY/actions/workflows/gates.yml/runs?event=pull_request&per_page=100" \
+            --jq "[.workflow_runs[] | select(.head_sha == \"$EXPECTED_HEAD\")] | max_by(.id) | .id // 0")"
+          if [ "$POST_HEAD" != "$EXPECTED_HEAD" ] \
+              || [ "$POST_BASE_REF" != "$CURRENT_BASE_REF" ] \
+              || [ "$POST_BASE_SHA" != "$CURRENT_BASE_SHA" ] \
+              || [ "$POST_DRAFT" != 'false' ] \
+              || [ "$POST_STATE" != 'OPEN' ] \
+              || [ "$POST_BODY_SHA256" != "$CURRENT_BODY_SHA256" ] \
+              || [ "$LATEST_GATE_RUN_ID" != "$SOURCE_GATE_RUN_ID" ] \
+              || [ -z "$QUEUE_ENTRY" ]; then
+            if [ -n "$QUEUE_ENTRY" ]; then
+              set +e
+              gh api graphql \
+                -f query='mutation($id:ID!){dequeuePullRequest(input:{id:$id}){clientMutationId}}' \
+                -F id="$PULL_REQUEST_ID" \
+                > reports/merge-queue-enqueue/dequeue-result.json \
+                2> reports/merge-queue-enqueue/dequeue-error.txt
+              dequeue_code=$?
+              set -e
+              gh api graphql \
+                -f query='query($owner:String!,$name:String!,$number:Int!){repository(owner:$owner,name:$name){pullRequest(number:$number){mergeQueueEntry{id}}}}' \
+                -F owner="$OWNER" \
+                -F name="$NAME" \
+                -F number="$PR" \
+                > reports/merge-queue-enqueue/queue-after-dequeue.json
+              REMAINING_QUEUE_ENTRY="$(jq -r '.data.repository.pullRequest.mergeQueueEntry.id // empty' reports/merge-queue-enqueue/queue-after-dequeue.json)"
+              if [ -n "$REMAINING_QUEUE_ENTRY" ]; then
+                echo "::error::authority changed and queue-entry removal could not be verified (mutation exit $dequeue_code)"
+                cat reports/merge-queue-enqueue/dequeue-error.txt
+                exit 1
+              fi
+            fi
+            echo "::error::pull request authority changed during enqueue; queue absence verified"
+            exit 1
+          fi
+
           jq -n \
             --arg schema 'szl.merge-queue-enqueue/v1' \
             --arg repository "$REPOSITORY" \
             --argjson pull_request "$PR" \
             --arg head_sha "$EXPECTED_HEAD" \
+            --arg source_gate_run_id "$SOURCE_GATE_RUN_ID" \
+            --arg pull_request_base_ref "$CURRENT_BASE_REF" \
+            --arg pull_request_base_sha "$CURRENT_BASE_SHA" \
+            --arg pull_request_body_sha256 "$CURRENT_BODY_SHA256" \
             --arg result "$RESULT" \
             --arg queue_entry_id "$QUEUE_ENTRY" \
             '{
@@ -159,9 +293,16 @@ jobs:
               repository: $repository,
               pull_request: $pull_request,
               head_sha: $head_sha,
+              source_gate_run_id: ($source_gate_run_id | tonumber),
+              pull_request_base_ref: $pull_request_base_ref,
+              pull_request_base_sha: $pull_request_base_sha,
+              pull_request_body_sha256: $pull_request_body_sha256,
               result: $result,
               queue_entry_id: $queue_entry_id,
+              trusted_default_branch_controller: true,
               exact_head_attestation_verified: true,
+              exact_body_attestation_verified: true,
+              exact_gate_generation_verified: true,
               exact_head_app_approval_verified: true,
               direct_merge_attempted: false,
               bypass_used: false,

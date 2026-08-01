@@ -59,7 +59,7 @@ FORBIDDEN_EXECUTABLE_PATTERNS = {
 }
 
 ATTESTOR_SELF_EDIT_GUARD = (
-    r"^(\.github/workflows/(attest-and-approve|gates|forge9-staging)"
+    r"^(\.github/workflows/(attest-and-approve|gates|forge9-staging|merge-queue-enqueue)"
     r"\.ya?ml|\.governance/)"
 )
 GOVERNED_BASE_FILTER = (
@@ -206,6 +206,9 @@ def verify_gate_contract() -> None:
     gate_template = (ROOT / ".github/workflows/gates.yml").read_text(
         encoding="utf-8"
     )
+    ready_trigger = "types: [opened, synchronize, reopened, ready_for_review, edited]"
+    if ready_trigger not in gate_template:
+        fail("the gate workflow must rerun when a draft PR becomes ready or its body is edited")
     for gate in GATES:
         if gate not in gate_template:
             fail(f"gate template is missing {gate}")
@@ -217,7 +220,7 @@ def verify_gate_contract() -> None:
         ROOT / ".github/workflows/attest-and-approve.yml"
     ).read_text(encoding="utf-8")
     if ATTESTOR_SELF_EDIT_GUARD not in attestor_template:
-        fail("attestor must refuse edits to both gate and attestor workflows")
+        fail("attestor must refuse edits to every governance and queue controller")
     guard = re.compile(ATTESTOR_SELF_EDIT_GUARD)
     guarded_paths = (
         ".github/workflows/attest-and-approve.yml",
@@ -226,6 +229,8 @@ def verify_gate_contract() -> None:
         ".github/workflows/gates.yaml",
         ".github/workflows/forge9-staging.yml",
         ".github/workflows/forge9-staging.yaml",
+        ".github/workflows/merge-queue-enqueue.yml",
+        ".github/workflows/merge-queue-enqueue.yaml",
         ".governance/gates.json",
     )
     for path in guarded_paths:
@@ -254,21 +259,75 @@ def verify_gate_contract() -> None:
         "client-id: ${{ vars.QILLQAQ_CLIENT_ID }}",
         'SOURCE_EVENT: ${{ github.event.workflow_run.event }}',
         'if [ "$SOURCE_EVENT" = "merge_group" ]; then',
-        '[[ "$HEAD_BRANCH" == gh-readonly-queue/main/* ]]',
+        '[[ "$HEAD_BRANCH" =~ ^gh-readonly-queue/main/pr-',
+        '.head.repo.full_name == $repository',
         "subject_kind: $subject_kind",
     ):
         if marker not in attestor_template:
             fail(f"attestor status publication is missing {marker!r}")
     if "app-id:" in attestor_template:
         fail("the attestor must use the supported GitHub App client-id input")
-    if attestor_template.count(
-        "if: steps.subject.outputs.kind == 'pull_request'"
-    ) != 2:
-        fail("only PR-head attestations may approve or request a queue entry")
+    guarded_pr_condition = (
+        "if: steps.subject.outputs.kind == 'pull_request' && "
+        "steps.subject.outputs.draft == 'false'"
+    )
+    if attestor_template.count(guarded_pr_condition) != 3:
+        fail("PR revalidation, App approval, and queue request must all reject drafts")
     if 'gh pr merge "$PR" --repo "$REPOSITORY" --auto --squash' not in (
         attestor_template
     ):
         fail("the attestor must use GitHub's supported merge-queue CLI path")
+    for marker in (
+        'BODY_SHA256="$(jq -c \'.body // ""\'',
+        "pull_request_body_sha256",
+        "pull_request_base_ref",
+        "pull_request_base_sha",
+        "pull_request_head_sha",
+        "source_gate_run_id",
+        'LATEST_GATE_RUN_ID=',
+        '-f commit_id="$HEAD_SHA"',
+        "PR body sha256: $PR_BODY_SHA256",
+        "Base: $PR_BASE_REF@$PR_BASE_SHA",
+        "Gate run: $SOURCE_GATE_RUN_ID",
+        "--paginate --slurp",
+    ):
+        if marker not in attestor_template:
+            fail(f"the attestor freshness binding is missing {marker!r}")
+    draft_query = 'DRAFT=$(jq -r .draft "$RUNNER_TEMP/pr-before-queue.json")'
+    draft_guard = 'if [ "$DRAFT" = "true" ]; then'
+    draft_false_guard = '[ "$DRAFT" = "false" ]'
+    draft_deferral = (
+        "Attestation complete; protected merge request deferred while PR $PR is draft"
+    )
+    queue_request = 'gh pr merge "$PR" --repo "$REPOSITORY" --auto --squash'
+    for marker in (draft_query, draft_guard, draft_false_guard, draft_deferral):
+        if marker not in attestor_template:
+            fail(f"the attestor draft guard is missing {marker!r}")
+    draft_block = re.compile(
+        re.escape(draft_query)
+        + r"\s+"
+        + re.escape(draft_guard)
+        + r"\s+"
+        + re.escape(
+            'echo "Attestation complete; protected merge request deferred while PR $PR is draft"'
+        )
+        + r"\s+exit 0\s+fi\s+"
+        + re.escape(draft_false_guard),
+        re.MULTILINE,
+    )
+    if not draft_block.search(attestor_template):
+        fail("the attestor draft guard must terminate successfully before queueing")
+    if attestor_template.index(draft_guard) > attestor_template.index(queue_request):
+        fail("the attestor must reject draft queue requests before invoking gh pr merge")
+
+    limitations = (GOVERNANCE / "KNOWN_LIMITATIONS.md").read_text(encoding="utf-8")
+    for marker in (
+        "enqueuePullRequest",
+        "non-atomic read-to-mutation interval remains",
+        "immutable commit",
+    ):
+        if marker not in limitations:
+            fail(f"mutable PR authority limitation is missing {marker!r}")
 
     release = load_json(GOVERNANCE / "ruleset-release.json")
     if not isinstance(release, dict):
