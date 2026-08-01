@@ -22,6 +22,22 @@ class FrontMatterTests(unittest.TestCase):
         self.assertEqual(check.HUB_CARD_EMOJI, "🛡️")
         self.assertNotEqual(check.HUB_CARD_EMOJI, "𠀀")
 
+    def test_short_description_accepts_exact_hub_limit(self):
+        document = f"---\nshort_description: {'x' * 60}\n---\n# Card\n"
+        self.assertTrue(
+            check.front_matter_value_within_limit(
+                document, "short_description", check.HUB_CARD_SHORT_DESCRIPTION_MAX_CHARS
+            )
+        )
+
+    def test_short_description_rejects_over_hub_limit(self):
+        document = f"---\nshort_description: {'x' * 61}\n---\n# Card\n"
+        self.assertFalse(
+            check.front_matter_value_within_limit(
+                document, "short_description", check.HUB_CARD_SHORT_DESCRIPTION_MAX_CHARS
+            )
+        )
+
 
 class RequiredAssetBindingTests(unittest.TestCase):
     def test_accepts_exact_destination_source_bindings(self):
