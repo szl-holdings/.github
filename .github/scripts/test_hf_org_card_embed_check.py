@@ -70,6 +70,15 @@ class EmbedContractTests(unittest.TestCase):
             any("unscoped CSS selector" in item for item in failures)
         )
 
+    def test_rejects_unused_generic_css_class(self):
+        document = valid_document().replace(
+            "</style>", ".legacy-card { color: red; }\n</style>"
+        )
+        failures = check.validate_document(document)
+        self.assertTrue(
+            any("including unused rules" in item for item in failures)
+        )
+
     def test_rejects_relative_image_asset(self):
         document = valid_document().replace(
             '<div class="szl-hf-hero">',
