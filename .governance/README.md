@@ -63,10 +63,13 @@ The App needs `Administration: read` to inspect repository Actions policy and
 rulesets. It keeps `Contents: read` and does not receive merge or queue
 authority. GitHub rejected the GraphQL enqueue mutation for the installation
 token even with the merge-queue permission. After the App signs the BAP and
-records its approval, the repository-scoped ephemeral `GITHUB_TOKEN` uses
-GitHub's supported `gh pr merge` path to request the protected queue. That token
-cannot approve reviews and cannot bypass the ruleset. `id-token: write` is a
-workflow permission, not a GitHub App permission.
+records its approval, a `workflow_run` controller loaded only from the trusted
+default branch uses the governed `SZL_GITHUB_TOKEN` for the exact
+`enqueuePullRequest` mutation. Pull-request-controlled code never receives that
+token. The repository-scoped ephemeral `GITHUB_TOKEN` requests only the
+non-queued `release/*` auto-merge path; it cannot approve reviews or bypass the
+ruleset. `id-token: write` is a workflow permission, not a GitHub App
+permission.
 
 The attestor uses a repository Actions variable for the public App client ID
 and a repository Actions secret for the private key. It does not enter the

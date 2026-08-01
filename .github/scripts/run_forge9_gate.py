@@ -43,6 +43,16 @@ def run_verifier() -> None:
         fail("the complete governance invariant verifier failed")
 
 
+def run_queue_controller_contract() -> None:
+    completed = subprocess.run(
+        [sys.executable, ".github/scripts/test_merge_queue_enqueue.py"],
+        cwd=ROOT,
+        check=False,
+    )
+    if completed.returncode:
+        fail("the trusted merge-queue controller contract failed")
+
+
 def ground_truth() -> None:
     ruleset = load_json(".governance/ruleset-main.json")
     if ruleset.get("name") != "forge9-main":
@@ -150,8 +160,10 @@ def adversarial() -> None:
 
 def verify_all() -> None:
     run_verifier()
+    run_queue_controller_contract()
     for relative in (
         ".github/scripts/run_forge9_gate.py",
+        ".github/scripts/test_merge_queue_enqueue.py",
         ".github/scripts/verify_forge9_governance.py",
         ".governance/forge9_gate_runner.py",
     ):
@@ -179,11 +191,12 @@ def provenance() -> None:
         ".github/workflows/gates.yml",
         ".github/workflows/attest-and-approve.yml",
         ".github/workflows/forge9-staging.yml",
+        ".github/workflows/merge-queue-enqueue.yml",
     ):
         for number, line in enumerate(
             (ROOT / relative).read_text(encoding="utf-8").splitlines(), start=1
         ):
-            if "uses:" in line and not PINNED_ACTION.match(line):
+            if re.match(r"^\s*(?:-\s+)?uses:", line) and not PINNED_ACTION.match(line):
                 fail(f"{relative}:{number} contains an unpinned action")
 
 

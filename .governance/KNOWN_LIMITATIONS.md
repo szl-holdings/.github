@@ -31,7 +31,9 @@
   `pilots/2026-07-26-merge-group-delivery-blocker.md`.
 - GitHub rejected `enqueuePullRequest` for the App installation token despite
   its live merge-queue grant. The App retains attestation and approval duties;
-  the ephemeral repository token requests the protected queue after attestation.
+  the governed token requests the protected main queue only from a
+  trusted-default-branch `workflow_run` controller. The ephemeral repository
+  token remains limited to non-queued `release/*` auto-merge requests.
 - GitHub also rejected queue entry when `required_deployments` was active even
   with a successful exact-head `staging` deployment. Staging is therefore
   enforced by the `deploy/staging` required check pinned to GitHub Actions; the
@@ -39,6 +41,14 @@
 - Required statuses also apply to the synthesized merge-group commit. The
   attestor therefore signs and publishes a second BAP for that SHA; App review
   and the queue request remain PR-head-only operations.
+- GitHub's `enqueuePullRequest` mutation can atomically bind the expected head
+  SHA, but not the mutable PR body or base SHA. The controller binds the body
+  digest, base ref/SHA, and gate-run generation into the App evidence; checks
+  them immediately before and after enqueue; and dequeues a changed subject.
+  `ready_for_review` and `edited` also create fresh gate generations. A final
+  non-atomic read-to-mutation interval remains. Eliminating it requires moving
+  authorization into the immutable commit or a separately hosted App service
+  that can invalidate queue entries on every PR metadata event.
 - Commit metadata rules evaluate the full squash message, including the PR
   body. The rulesets enforce the conventional first line and allow the
   remaining body so GitHub's queue-generated commit can pass.
