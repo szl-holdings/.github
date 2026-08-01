@@ -62,10 +62,7 @@ ATTESTOR_SELF_EDIT_GUARD = (
     r"^(\.github/workflows/(attest-and-approve|gates|forge9-staging|merge-queue-enqueue)"
     r"\.ya?ml|\.governance/)"
 )
-GOVERNED_BASE_FILTER = (
-    '.base.ref == "main"\n'
-    '                  or (.base.ref | startswith("release/"))'
-)
+GOVERNED_BASE_FILTER = "--allowed-base-prefix release/"
 
 
 def fail(message: str) -> None:
@@ -260,13 +257,42 @@ def verify_gate_contract() -> None:
         'SOURCE_EVENT: ${{ github.event.workflow_run.event }}',
         'if [ "$SOURCE_EVENT" = "merge_group" ]; then',
         '[[ "$HEAD_BRANCH" =~ ^gh-readonly-queue/main/pr-',
-        '.head.repo.full_name == $repository',
+        "actions/runs/$SOURCE_GATE_RUN_ID",
+        "forge9_source_run.py bind",
+        "forge9_source_run.py verify-pr",
+        "forge9_source_run.py latest",
         "subject_kind: $subject_kind",
     ):
         if marker not in attestor_template:
             fail(f"attestor status publication is missing {marker!r}")
     if "app-id:" in attestor_template:
         fail("the attestor must use the supported GitHub App client-id input")
+    queue_template = (
+        ROOT / ".github/workflows/merge-queue-enqueue.yml"
+    ).read_text(encoding="utf-8")
+    for label, template in (
+        ("attestor", attestor_template),
+        ("queue controller", queue_template),
+    ):
+        for marker in (
+            "actions/runs/$SOURCE_GATE_RUN_ID",
+            "forge9_source_run.py bind",
+            "forge9_source_run.py verify-pr",
+            "forge9_source_run.py latest",
+            "source-run-binding.json",
+        ):
+            if marker not in template:
+                fail(f"{label} source-run identity binding is missing {marker!r}")
+        if re.search(r"commits/\$(?:HEAD_SHA|EXPECTED_HEAD)/pulls", template):
+            fail(f"{label} must not infer its privileged PR from a commit SHA")
+    if "--allowed-base-prefix release/" in queue_template:
+        fail("the main queue controller must not accept release/* associations")
+    for relative in (
+        ".github/scripts/forge9_source_run.py",
+        ".github/scripts/test_forge9_source_run.py",
+    ):
+        source = (ROOT / relative).read_text(encoding="utf-8")
+        compile(source, relative, "exec")
     guarded_pr_condition = (
         "if: steps.subject.outputs.kind == 'pull_request' && "
         "steps.subject.outputs.draft == 'false'"

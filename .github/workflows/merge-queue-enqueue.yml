@@ -51,6 +51,7 @@ jobs:
           mkdir -p reports/merge-queue-enqueue
           printf '%s\n' '{"schema":"szl.merge-queue-enqueue-contract/v1","stage":"source-contract","result":"STARTED"}' \
             > reports/merge-queue-enqueue/contract.json
+          python .github/scripts/test_forge9_source_run.py
           python .github/scripts/test_merge_queue_enqueue.py
           git diff --check
 
@@ -68,29 +69,24 @@ jobs:
           NAME="${REPOSITORY#*/}"
           mkdir -p reports/merge-queue-enqueue
 
-          gh api -H "Accept: application/vnd.github+json" \
-            "repos/$REPOSITORY/commits/$EXPECTED_HEAD/pulls?per_page=100" \
-            > reports/merge-queue-enqueue/candidate-pulls.json
-          mapfile -t PRS < <(
-            jq -r --arg sha "$EXPECTED_HEAD" --arg repository "$REPOSITORY" '.[] | select(
-              .state == "open"
-              and .head.sha == $sha
-              and .head.repo.full_name == $repository
-              and .base.ref == "main"
-            ) | .number' reports/merge-queue-enqueue/candidate-pulls.json
-          )
-          if [ "${#PRS[@]}" -eq 0 ]; then
-            echo "No open same-repository main PR matches gate run $SOURCE_GATE_RUN_ID; nothing to enqueue"
-            exit 0
-          fi
-          [ "${#PRS[@]}" -eq 1 ] \
-            || { echo "::error::expected one eligible PR for $EXPECTED_HEAD; found ${#PRS[@]}"; exit 1; }
-          PR="${PRS[0]}"
+          gh api "repos/$REPOSITORY/actions/runs/$SOURCE_GATE_RUN_ID" \
+            > reports/merge-queue-enqueue/source-gate-run.json
+          python .github/scripts/forge9_source_run.py bind \
+            --run-file reports/merge-queue-enqueue/source-gate-run.json \
+            --expected-run-id "$SOURCE_GATE_RUN_ID" \
+            --expected-repository "$REPOSITORY" \
+            --expected-head-sha "$EXPECTED_HEAD" \
+            --allowed-base main \
+            --output reports/merge-queue-enqueue/source-run-binding.json
+          PR="$(jq -r .pull_request_number reports/merge-queue-enqueue/source-run-binding.json)"
 
           attested=0
           for attempt in $(seq 1 120); do
             gh api "repos/$REPOSITORY/pulls/$PR" \
               > reports/merge-queue-enqueue/pull-request.json
+            python .github/scripts/forge9_source_run.py verify-pr \
+              --binding-file reports/merge-queue-enqueue/source-run-binding.json \
+              --pull-request-file reports/merge-queue-enqueue/pull-request.json
             CURRENT_HEAD="$(jq -r .head.sha reports/merge-queue-enqueue/pull-request.json)"
             CURRENT_BASE_REF="$(jq -r .base.ref reports/merge-queue-enqueue/pull-request.json)"
             CURRENT_BASE_SHA="$(gh api "repos/$REPOSITORY/git/ref/heads/$CURRENT_BASE_REF" --jq .object.sha)"
@@ -102,6 +98,8 @@ jobs:
               || { echo "::error::pull request head moved from $EXPECTED_HEAD to $CURRENT_HEAD"; exit 1; }
             [ "$CURRENT_STATE" = 'OPEN' ] \
               || { echo "::error::pull request state is $CURRENT_STATE, not OPEN"; exit 1; }
+            [ "$CURRENT_BASE_SHA" = "$(jq -r .base_sha reports/merge-queue-enqueue/source-run-binding.json)" ] \
+              || { echo "::error::source gate run base moved before attestation"; exit 1; }
             if [ "$CURRENT_DRAFT" = 'true' ]; then
               echo "Gate run $SOURCE_GATE_RUN_ID is for draft PR $PR; queue request deferred"
               exit 0
@@ -109,8 +107,11 @@ jobs:
             [ "$CURRENT_DRAFT" = 'false' ] \
               || { echo "::error::pull request draft state is invalid"; exit 1; }
 
-            LATEST_GATE_RUN_ID="$(gh api "repos/$REPOSITORY/actions/workflows/gates.yml/runs?event=pull_request&per_page=100" \
-              --jq "[.workflow_runs[] | select(.head_sha == \"$EXPECTED_HEAD\")] | max_by(.id) | .id // 0")"
+            gh api "repos/$REPOSITORY/actions/workflows/gates.yml/runs?event=pull_request&per_page=100" \
+              > reports/merge-queue-enqueue/gate-runs.json
+            LATEST_GATE_RUN_ID="$(python .github/scripts/forge9_source_run.py latest \
+              --runs-file reports/merge-queue-enqueue/gate-runs.json \
+              --binding-file reports/merge-queue-enqueue/source-run-binding.json)"
             if [ "$LATEST_GATE_RUN_ID" != "$SOURCE_GATE_RUN_ID" ]; then
               echo "Gate run $SOURCE_GATE_RUN_ID is stale; newer generation $LATEST_GATE_RUN_ID owns this head"
               exit 0
@@ -149,14 +150,20 @@ jobs:
 
           gh api "repos/$REPOSITORY/pulls/$PR" \
             > reports/merge-queue-enqueue/pull-request-before-enqueue.json
+          python .github/scripts/forge9_source_run.py verify-pr \
+            --binding-file reports/merge-queue-enqueue/source-run-binding.json \
+            --pull-request-file reports/merge-queue-enqueue/pull-request-before-enqueue.json
           FINAL_HEAD="$(jq -r .head.sha reports/merge-queue-enqueue/pull-request-before-enqueue.json)"
           FINAL_BASE_REF="$(jq -r .base.ref reports/merge-queue-enqueue/pull-request-before-enqueue.json)"
           FINAL_BASE_SHA="$(gh api "repos/$REPOSITORY/git/ref/heads/$FINAL_BASE_REF" --jq .object.sha)"
           FINAL_STATE="$(jq -r '.state | ascii_upcase' reports/merge-queue-enqueue/pull-request-before-enqueue.json)"
           FINAL_DRAFT="$(jq -r .draft reports/merge-queue-enqueue/pull-request-before-enqueue.json)"
           FINAL_BODY_SHA256="$(jq -c '.body // ""' reports/merge-queue-enqueue/pull-request-before-enqueue.json | sha256sum | cut -d' ' -f1)"
-          LATEST_GATE_RUN_ID="$(gh api "repos/$REPOSITORY/actions/workflows/gates.yml/runs?event=pull_request&per_page=100" \
-            --jq "[.workflow_runs[] | select(.head_sha == \"$EXPECTED_HEAD\")] | max_by(.id) | .id // 0")"
+          gh api "repos/$REPOSITORY/actions/workflows/gates.yml/runs?event=pull_request&per_page=100" \
+            > reports/merge-queue-enqueue/gate-runs-before-enqueue.json
+          LATEST_GATE_RUN_ID="$(python .github/scripts/forge9_source_run.py latest \
+            --runs-file reports/merge-queue-enqueue/gate-runs-before-enqueue.json \
+            --binding-file reports/merge-queue-enqueue/source-run-binding.json)"
           [ "$FINAL_HEAD" = "$EXPECTED_HEAD" ] \
             || { echo "::error::pull request head moved before enqueue"; exit 1; }
           [ "$FINAL_STATE" = 'OPEN' ] \
@@ -241,8 +248,11 @@ jobs:
           POST_STATE="$(jq -r .data.repository.pullRequest.state reports/merge-queue-enqueue/queue-postcheck.json)"
           POST_BODY_SHA256="$(jq -c '.data.repository.pullRequest.body // ""' reports/merge-queue-enqueue/queue-postcheck.json | sha256sum | cut -d' ' -f1)"
           QUEUE_ENTRY="$(jq -r '.data.repository.pullRequest.mergeQueueEntry.id // empty' reports/merge-queue-enqueue/queue-postcheck.json)"
-          LATEST_GATE_RUN_ID="$(gh api "repos/$REPOSITORY/actions/workflows/gates.yml/runs?event=pull_request&per_page=100" \
-            --jq "[.workflow_runs[] | select(.head_sha == \"$EXPECTED_HEAD\")] | max_by(.id) | .id // 0")"
+          gh api "repos/$REPOSITORY/actions/workflows/gates.yml/runs?event=pull_request&per_page=100" \
+            > reports/merge-queue-enqueue/gate-runs-postcheck.json
+          LATEST_GATE_RUN_ID="$(python .github/scripts/forge9_source_run.py latest \
+            --runs-file reports/merge-queue-enqueue/gate-runs-postcheck.json \
+            --binding-file reports/merge-queue-enqueue/source-run-binding.json)"
           if [ "$POST_HEAD" != "$EXPECTED_HEAD" ] \
               || [ "$POST_BASE_REF" != "$CURRENT_BASE_REF" ] \
               || [ "$POST_BASE_SHA" != "$CURRENT_BASE_SHA" ] \

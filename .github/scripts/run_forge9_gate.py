@@ -44,13 +44,17 @@ def run_verifier() -> None:
 
 
 def run_queue_controller_contract() -> None:
-    completed = subprocess.run(
-        [sys.executable, ".github/scripts/test_merge_queue_enqueue.py"],
-        cwd=ROOT,
-        check=False,
-    )
-    if completed.returncode:
-        fail("the trusted merge-queue controller contract failed")
+    for relative in (
+        ".github/scripts/test_forge9_source_run.py",
+        ".github/scripts/test_merge_queue_enqueue.py",
+    ):
+        completed = subprocess.run(
+            [sys.executable, relative],
+            cwd=ROOT,
+            check=False,
+        )
+        if completed.returncode:
+            fail(f"the trusted controller contract failed: {relative}")
 
 
 def ground_truth() -> None:
@@ -162,7 +166,9 @@ def verify_all() -> None:
     run_verifier()
     run_queue_controller_contract()
     for relative in (
+        ".github/scripts/forge9_source_run.py",
         ".github/scripts/run_forge9_gate.py",
+        ".github/scripts/test_forge9_source_run.py",
         ".github/scripts/test_merge_queue_enqueue.py",
         ".github/scripts/verify_forge9_governance.py",
         ".governance/forge9_gate_runner.py",

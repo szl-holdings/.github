@@ -33,6 +33,13 @@ jobs:
           owner: ${{ github.repository_owner }}
           repositories: ${{ github.event.repository.name }}
 
+      - name: Checkout trusted source-run resolver
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          persist-credentials: false
+          fetch-depth: 1
+
       - name: Resolve the attestation subject
         id: subject
         env:
@@ -40,6 +47,7 @@ jobs:
           HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
           HEAD_BRANCH: ${{ github.event.workflow_run.head_branch }}
           SOURCE_EVENT: ${{ github.event.workflow_run.event }}
+          SOURCE_GATE_RUN_ID: ${{ github.event.workflow_run.id }}
           REPOSITORY: ${{ github.repository }}
         run: |
           set -euo pipefail
@@ -72,35 +80,30 @@ jobs:
           [ "$SOURCE_EVENT" = "pull_request" ] \
             || { echo "::error::unsupported source event: $SOURCE_EVENT"; exit 1; }
 
-          gh api \
-            -H "Accept: application/vnd.github+json" \
-            "repos/$REPOSITORY/commits/$HEAD_SHA/pulls?per_page=100" \
-            > "$RUNNER_TEMP/pulls.json"
-          mapfile -t PRS < <(
-            jq -r --arg sha "$HEAD_SHA" --arg repository "$REPOSITORY" \
-              '.[] | select(
-                .state == "open"
-                and .head.sha == $sha
-                and .head.repo.full_name == $repository
-                and (
-                  .base.ref == "main"
-                  or (.base.ref | startswith("release/"))
-                )
-              ) | .number' \
-              "$RUNNER_TEMP/pulls.json"
-          )
-          if [ "${#PRS[@]}" -ne 1 ]; then
-            echo "::error::expected exactly one open main or release/* PR for $HEAD_SHA; found ${#PRS[@]}"
-            exit 1
-          fi
-          PR="${PRS[0]}"
+          gh api "repos/$REPOSITORY/actions/runs/$SOURCE_GATE_RUN_ID" \
+            > "$RUNNER_TEMP/source-gate-run.json"
+          python .github/scripts/forge9_source_run.py bind \
+            --run-file "$RUNNER_TEMP/source-gate-run.json" \
+            --expected-run-id "$SOURCE_GATE_RUN_ID" \
+            --expected-repository "$REPOSITORY" \
+            --expected-head-sha "$HEAD_SHA" \
+            --allowed-base main \
+            --allowed-base-prefix release/ \
+            --output "$RUNNER_TEMP/source-run-binding.json"
+          PR="$(jq -r .pull_request_number "$RUNNER_TEMP/source-run-binding.json")"
           gh api "repos/$REPOSITORY/pulls/$PR" > "$RUNNER_TEMP/pr.json"
+          python .github/scripts/forge9_source_run.py verify-pr \
+            --binding-file "$RUNNER_TEMP/source-run-binding.json" \
+            --pull-request-file "$RUNNER_TEMP/pr.json"
           PR_DRAFT="$(jq -r .draft "$RUNNER_TEMP/pr.json")"
           [[ "$PR_DRAFT" == "true" || "$PR_DRAFT" == "false" ]] \
             || { echo "::error::pull request draft state is invalid"; exit 1; }
           BODY_SHA256="$(jq -c '.body // ""' "$RUNNER_TEMP/pr.json" | sha256sum | cut -d' ' -f1)"
-          BASE_REF="$(jq -r .base.ref "$RUNNER_TEMP/pr.json")"
-          BASE_SHA="$(gh api "repos/$REPOSITORY/git/ref/heads/$BASE_REF" --jq .object.sha)"
+          BASE_REF="$(jq -r .base_ref "$RUNNER_TEMP/source-run-binding.json")"
+          BASE_SHA="$(jq -r .base_sha "$RUNNER_TEMP/source-run-binding.json")"
+          CURRENT_BASE_SHA="$(gh api "repos/$REPOSITORY/git/ref/heads/$BASE_REF" --jq .object.sha)"
+          [ "$CURRENT_BASE_SHA" = "$BASE_SHA" ] \
+            || { echo "::error::source gate run base moved from $BASE_SHA to $CURRENT_BASE_SHA"; exit 1; }
           echo "kind=pull_request" >> "$GITHUB_OUTPUT"
           echo "number=$PR" >> "$GITHUB_OUTPUT"
           echo "node_id=$(jq -r .node_id "$RUNNER_TEMP/pr.json")" >> "$GITHUB_OUTPUT"
@@ -108,7 +111,7 @@ jobs:
           echo "body_sha256=$BODY_SHA256" >> "$GITHUB_OUTPUT"
           echo "base_ref=$BASE_REF" >> "$GITHUB_OUTPUT"
           echo "base_sha=$BASE_SHA" >> "$GITHUB_OUTPUT"
-          echo "pr_head_sha=$(jq -r .head.sha "$RUNNER_TEMP/pr.json")" >> "$GITHUB_OUTPUT"
+          echo "pr_head_sha=$(jq -r .head_sha "$RUNNER_TEMP/source-run-binding.json")" >> "$GITHUB_OUTPUT"
 
       - name: Verify gates and preconditions P1-P7
         if: steps.subject.outputs.kind == 'merge_group' || steps.subject.outputs.draft == 'false'
@@ -294,13 +297,19 @@ jobs:
         run: |
           set -euo pipefail
           gh api "repos/$REPOSITORY/pulls/$PR" > "$RUNNER_TEMP/pr-before-app-mutation.json"
+          python .github/scripts/forge9_source_run.py verify-pr \
+            --binding-file "$RUNNER_TEMP/source-run-binding.json" \
+            --pull-request-file "$RUNNER_TEMP/pr-before-app-mutation.json"
           CURRENT_HEAD="$(jq -r .head.sha "$RUNNER_TEMP/pr-before-app-mutation.json")"
           CURRENT_BASE_REF="$(jq -r .base.ref "$RUNNER_TEMP/pr-before-app-mutation.json")"
           CURRENT_BASE_SHA="$(gh api "repos/$REPOSITORY/git/ref/heads/$CURRENT_BASE_REF" --jq .object.sha)"
           CURRENT_DRAFT="$(jq -r .draft "$RUNNER_TEMP/pr-before-app-mutation.json")"
           CURRENT_BODY_SHA256="$(jq -c '.body // ""' "$RUNNER_TEMP/pr-before-app-mutation.json" | sha256sum | cut -d' ' -f1)"
-          LATEST_GATE_RUN_ID="$(gh api "repos/$REPOSITORY/actions/workflows/gates.yml/runs?event=pull_request&per_page=100" \
-            --jq "[.workflow_runs[] | select(.head_sha == \"$HEAD_SHA\")] | max_by(.id) | .id // 0")"
+          gh api "repos/$REPOSITORY/actions/workflows/gates.yml/runs?event=pull_request&per_page=100" \
+            > "$RUNNER_TEMP/gate-runs-before-app.json"
+          LATEST_GATE_RUN_ID="$(python .github/scripts/forge9_source_run.py latest \
+            --runs-file "$RUNNER_TEMP/gate-runs-before-app.json" \
+            --binding-file "$RUNNER_TEMP/source-run-binding.json")"
           [ "$CURRENT_HEAD" = "$HEAD_SHA" ] \
             || { echo "::error::pull request head moved before App mutation"; exit 1; }
           [ "$CURRENT_DRAFT" = "false" ] \
@@ -381,6 +390,9 @@ jobs:
         run: |
           set -euo pipefail
           gh api "repos/$REPOSITORY/pulls/$PR" > "$RUNNER_TEMP/pr-before-queue.json"
+          python .github/scripts/forge9_source_run.py verify-pr \
+            --binding-file "$RUNNER_TEMP/source-run-binding.json" \
+            --pull-request-file "$RUNNER_TEMP/pr-before-queue.json"
           DRAFT=$(jq -r .draft "$RUNNER_TEMP/pr-before-queue.json")
           if [ "$DRAFT" = "true" ]; then
             echo "Attestation complete; protected merge request deferred while PR $PR is draft"
@@ -392,8 +404,11 @@ jobs:
           CURRENT_BASE_REF=$(jq -r .base.ref "$RUNNER_TEMP/pr-before-queue.json")
           CURRENT_BASE_SHA=$(gh api "repos/$REPOSITORY/git/ref/heads/$CURRENT_BASE_REF" --jq .object.sha)
           CURRENT_BODY_SHA256=$(jq -c '.body // ""' "$RUNNER_TEMP/pr-before-queue.json" | sha256sum | cut -d' ' -f1)
-          LATEST_GATE_RUN_ID="$(gh api "repos/$REPOSITORY/actions/workflows/gates.yml/runs?event=pull_request&per_page=100" \
-            --jq "[.workflow_runs[] | select(.head_sha == \"$HEAD_SHA\")] | max_by(.id) | .id // 0")"
+          gh api "repos/$REPOSITORY/actions/workflows/gates.yml/runs?event=pull_request&per_page=100" \
+            > "$RUNNER_TEMP/gate-runs-before-queue.json"
+          LATEST_GATE_RUN_ID="$(python .github/scripts/forge9_source_run.py latest \
+            --runs-file "$RUNNER_TEMP/gate-runs-before-queue.json" \
+            --binding-file "$RUNNER_TEMP/source-run-binding.json")"
           [ "$CURRENT_HEAD" = "$HEAD_SHA" ] \
             || { echo "::error::pull request head moved before queue request"; exit 1; }
           [ "$CURRENT_BODY_SHA256" = "$PR_BODY_SHA256" ] \

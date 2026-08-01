@@ -57,6 +57,11 @@ class MergeQueueEnqueueContractTests(unittest.TestCase):
         required = (
             "SOURCE_GATE_RUN_ID",
             "LATEST_GATE_RUN_ID",
+            "actions/runs/$SOURCE_GATE_RUN_ID",
+            "forge9_source_run.py bind",
+            "forge9_source_run.py verify-pr",
+            "forge9_source_run.py latest",
+            "source-run-binding.json",
             "PR body sha256:",
             "Gate run:",
             "CURRENT_BODY_SHA256",
@@ -86,6 +91,7 @@ class MergeQueueEnqueueContractTests(unittest.TestCase):
         )
         for marker in required:
             self.assertIn(marker, self.source, marker)
+        self.assertNotIn("commits/$EXPECTED_HEAD/pulls", self.source)
 
     def test_draft_deferral_is_complete_and_fail_closed(self) -> None:
         guard = re.compile(
@@ -99,7 +105,8 @@ class MergeQueueEnqueueContractTests(unittest.TestCase):
 
     def test_is_same_repository_only_and_does_not_expose_token(self) -> None:
         required = (
-            '.head.repo.full_name == $repository',
+            '--expected-repository "$REPOSITORY"',
+            "--allowed-base main",
             "trusted_default_branch_controller",
             "direct_merge_attempted",
             "bypass_used",
