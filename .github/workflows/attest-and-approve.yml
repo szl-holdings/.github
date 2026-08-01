@@ -8,10 +8,7 @@ on:
       - completed
 
 permissions:
-  actions: read
-  contents: write
-  id-token: write
-  pull-requests: write
+  contents: read
 
 concurrency:
   group: forge9-attest-${{ github.event.workflow_run.head_sha }}
@@ -20,6 +17,11 @@ concurrency:
 jobs:
   attest:
     if: github.event.workflow_run.conclusion == 'success'
+    permissions:
+      actions: read
+      contents: write
+      id-token: write
+      pull-requests: write
     runs-on: ubuntu-latest
     steps:
       - name: Mint the independent App token

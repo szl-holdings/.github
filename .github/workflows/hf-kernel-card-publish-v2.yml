@@ -16,8 +16,6 @@ on:
 
 permissions:
   contents: read
-  issues: write
-  actions: write
 
 concurrency:
   group: hf-kernel-card-publish-v2-${{ github.event_name }}-${{ github.ref }}
@@ -26,6 +24,10 @@ concurrency:
 jobs:
   publish:
     name: Publish, read back, and selfcheck exact kernel revisions
+    permissions:
+      actions: write
+      contents: read
+      issues: write
     runs-on: ubuntu-latest
     timeout-minutes: 60
     env:
