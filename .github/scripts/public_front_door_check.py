@@ -26,6 +26,8 @@ BANNED_COPY = {
 }
 HUB_CARD_EMOJI = "🛡️"
 TRUTH_MARKERS = {"Current state", "HISTORICAL", "SIMULATED"}
+HF_HERO_DESTINATION = "assets/evidence-lattice-v2.webp"
+HF_HERO_SOURCE = Path("huggingface/org-card/assets/evidence-lattice-v2.webp")
 
 
 def front_matter_value(document: str, key: str) -> str | None:
@@ -107,6 +109,15 @@ class FailureList(list[str]):
     def __init__(self) -> None:
         super().__init__()
         self.checks = 0
+
+
+def manifest_hero_source(files: list[deploy.PublicationFile], destination: str) -> Path | None:
+    """Return the exact source path for a manifest destination, if present."""
+
+    for file in files:
+        if file.destination == destination:
+            return file.source
+    return None
 
 
 def require(condition: bool, message: str, failures: FailureList) -> None:
@@ -200,8 +211,14 @@ def main() -> int:
         destinations = {item.destination for item in files}
         require(contract.get("prune") is True, "org-card publication must prune unmanaged legacy files", failures)
         require(
-            "assets/evidence-lattice-v2.webp" in destinations,
+            HF_HERO_DESTINATION in destinations,
             "manifest must publish canonical hero",
+            failures,
+        )
+        hero_source = manifest_hero_source(files, HF_HERO_DESTINATION)
+        require(
+            hero_source is not None and hero_source == (root / HF_HERO_SOURCE).resolve(),
+            f"manifest hero destination {HF_HERO_DESTINATION!r} must bind to {HF_HERO_SOURCE.as_posix()}",
             failures,
         )
     except Exception as exc:

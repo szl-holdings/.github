@@ -45,6 +45,38 @@ class FrontMatterTests(unittest.TestCase):
         self.assertLessEqual(len(description or ""), 60)
 
 
+class ManifestHeroBindingTests(unittest.TestCase):
+    def test_hero_binding_fails_when_misbound(self):
+        root = Path(__file__).resolve().parents[2]
+        files = [
+            check.deploy.PublicationFile(
+                (root / "profile/assets/evidence-lattice-v2.webp"),
+                check.HF_HERO_DESTINATION,
+                "abc",
+                42,
+            )
+        ]
+        actual = check.manifest_hero_source(files, check.HF_HERO_DESTINATION)
+        self.assertEqual(actual, (root / "profile/assets/evidence-lattice-v2.webp").resolve())
+        self.assertNotEqual(
+            actual,
+            (root / check.HF_HERO_SOURCE).resolve(),
+        )
+
+    def test_hero_binding_succeeds_when_exact(self):
+        root = Path(__file__).resolve().parents[2]
+        files = [
+            check.deploy.PublicationFile(
+                (root / check.HF_HERO_SOURCE),
+                check.HF_HERO_DESTINATION,
+                "abc",
+                42,
+            )
+        ]
+        actual = check.manifest_hero_source(files, check.HF_HERO_DESTINATION)
+        self.assertEqual(actual, (root / check.HF_HERO_SOURCE).resolve())
+
+
 if __name__ == "__main__":
     unittest.main()
 
