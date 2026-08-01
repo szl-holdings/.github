@@ -1,6 +1,6 @@
 ---
 title: SZL Holdings — Governed Decision Infrastructure
-emoji: ◈
+emoji: 🛡️
 colorFrom: gray
 colorTo: yellow
 sdk: static
