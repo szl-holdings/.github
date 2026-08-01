@@ -1,0 +1,84 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="720" viewBox="0 0 1280 720" role="img" aria-labelledby="title desc">
+  <title id="title">SZL Holdings portfolio map</title>
+  <desc id="desc">Four connected product lanes for command, intelligence, models and data, and evidence, centered on a governed decision loop.</desc>
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#030F29"/>
+      <stop offset=".55" stop-color="#07152F"/>
+      <stop offset="1" stop-color="#10151C"/>
+    </linearGradient>
+    <radialGradient id="wash" cx="50%" cy="43%" r="60%">
+      <stop offset="0" stop-color="#DF735F" stop-opacity=".17"/>
+      <stop offset=".55" stop-color="#0F726E" stop-opacity=".07"/>
+      <stop offset="1" stop-color="#030F29" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="signal" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#5CC4BF"/>
+      <stop offset=".5" stop-color="#E9EEF6"/>
+      <stop offset="1" stop-color="#DF735F"/>
+    </linearGradient>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="160%">
+      <feDropShadow dx="0" dy="18" stdDeviation="22" flood-color="#000814" flood-opacity=".44"/>
+    </filter>
+    <pattern id="grid" width="48" height="48" patternUnits="userSpaceOnUse">
+      <path d="M48 0H0V48" fill="none" stroke="#9AA7BD" stroke-opacity=".045"/>
+    </pattern>
+  </defs>
+  <rect width="1280" height="720" rx="32" fill="url(#bg)"/>
+  <rect width="1280" height="720" rx="32" fill="url(#wash)"/>
+  <rect x="1" y="1" width="1278" height="718" rx="31" fill="none" stroke="#5C6B86" stroke-opacity=".42"/>
+  <rect x="28" y="28" width="1224" height="664" rx="24" fill="url(#grid)"/>
+
+  <g font-family="system-ui,-apple-system,Segoe UI,Arial,sans-serif">
+    <g transform="translate(64 54)">
+      <path d="M0 10h18M9 1v18" stroke="#DF735F" stroke-width="2"/>
+      <circle cx="9" cy="10" r="3.5" fill="#DF735F"/>
+      <text x="34" y="15" fill="#C9D2DF" font-size="14" font-weight="700" letter-spacing="3.2">SZL HOLDINGS / PORTFOLIO SYSTEM</text>
+    </g>
+    <text x="64" y="142" fill="#F5F7FA" font-size="54" font-weight="760" letter-spacing="-2">One substrate. Four clear paths.</text>
+    <text x="64" y="180" fill="#A4B1C4" font-size="19">Choose the mission. Follow the evidence.</text>
+
+    <path d="M640 258V574M320 376H960" fill="none" stroke="#5C6B86" stroke-opacity=".5" stroke-width="1.5"/>
+    <path d="M411 376H869" fill="none" stroke="url(#signal)" stroke-width="3" stroke-linecap="round"/>
+    <circle cx="640" cy="376" r="70" fill="#07152F" stroke="#E9EEF6" stroke-opacity=".28"/>
+    <circle cx="640" cy="376" r="49" fill="none" stroke="#DF735F" stroke-width="2" stroke-dasharray="3 8"/>
+    <path d="M614 376c0-22 17-38 38-38 18 0 32 11 37 26M666 376c0 22-17 38-38 38-18 0-32-11-37-26" fill="none" stroke="url(#signal)" stroke-width="4" stroke-linecap="round"/>
+    <circle cx="640" cy="376" r="6" fill="#F5F7FA"/>
+    <text x="640" y="470" text-anchor="middle" fill="#C9D2DF" font-size="11" font-weight="700" letter-spacing="2.2">GOVERNED DECISION LOOP</text>
+
+    <g filter="url(#shadow)">
+      <g transform="translate(64 242)">
+        <rect width="347" height="156" rx="20" fill="#101925" stroke="#5C6B86" stroke-opacity=".58"/>
+        <rect width="5" height="156" rx="2.5" fill="#DF735F"/>
+        <text x="30" y="39" fill="#F0917E" font-size="11" font-weight="800" letter-spacing="2.2">COMMAND</text>
+        <text x="30" y="78" fill="#F5F7FA" font-size="27" font-weight="720">a11oy</text>
+        <text x="30" y="108" fill="#A4B1C4" font-size="15">Policy-bound action with receipts.</text>
+        <text x="30" y="135" fill="#76859B" font-size="11" font-weight="700" letter-spacing="1.2">PRODUCT + DEVELOPER ENTRY</text>
+      </g>
+      <g transform="translate(869 242)">
+        <rect width="347" height="156" rx="20" fill="#101925" stroke="#5C6B86" stroke-opacity=".58"/>
+        <rect x="342" width="5" height="156" rx="2.5" fill="#5CC4BF"/>
+        <text x="30" y="39" fill="#8FD9D5" font-size="11" font-weight="800" letter-spacing="2.2">INTELLIGENCE</text>
+        <text x="30" y="78" fill="#F5F7FA" font-size="27" font-weight="720">Killinchu</text>
+        <text x="30" y="108" fill="#A4B1C4" font-size="15">Operator-first mission awareness.</text>
+        <text x="30" y="135" fill="#76859B" font-size="11" font-weight="700" letter-spacing="1.2">DEMONSTRATION + CORPUS</text>
+      </g>
+      <g transform="translate(64 510)">
+        <rect width="347" height="146" rx="20" fill="#101925" stroke="#5C6B86" stroke-opacity=".58"/>
+        <rect width="5" height="146" rx="2.5" fill="#D7B96B"/>
+        <text x="30" y="38" fill="#E4CF99" font-size="11" font-weight="800" letter-spacing="2.2">MODELS + DATA</text>
+        <text x="30" y="76" fill="#F5F7FA" font-size="25" font-weight="720">Khipu / Forge</text>
+        <text x="30" y="106" fill="#A4B1C4" font-size="15">Weights, evaluations, and lineage.</text>
+        <text x="30" y="131" fill="#76859B" font-size="11" font-weight="700" letter-spacing="1.2">ARTIFACT FAMILIES</text>
+      </g>
+      <g transform="translate(869 510)">
+        <rect width="347" height="146" rx="20" fill="#101925" stroke="#5C6B86" stroke-opacity=".58"/>
+        <rect x="342" width="5" height="146" rx="2.5" fill="#E9EEF6"/>
+        <text x="30" y="38" fill="#C9D2DF" font-size="11" font-weight="800" letter-spacing="2.2">EVIDENCE</text>
+        <text x="30" y="76" fill="#F5F7FA" font-size="25" font-weight="720">Receipts / Lake</text>
+        <text x="30" y="106" fill="#A4B1C4" font-size="15">Portable records for independent review.</text>
+        <text x="30" y="131" fill="#76859B" font-size="11" font-weight="700" letter-spacing="1.2">VERIFY OUTSIDE THE UI</text>
+      </g>
+    </g>
+  </g>
+</svg>

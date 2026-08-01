@@ -24,6 +24,15 @@ BANNED_COPY = {
     "all models operational",
 }
 HUB_CARD_EMOJI = "🛡️"
+REQUIRED_HF_ASSETS = {
+    "assets/estate-command-system.svg",
+    "assets/estate-banner-v2.svg",
+    "assets/hf-portfolio-map.svg",
+    "assets/hf-card-command.svg",
+    "assets/hf-card-intelligence.svg",
+    "assets/hf-card-models.svg",
+    "assets/hf-card-evidence.svg",
+}
 
 
 def front_matter_value(document: str, key: str) -> str | None:
@@ -76,6 +85,13 @@ def main() -> int:
     hub_card = (root / "huggingface/org-card/README.md").read_text(encoding="utf-8")
     html = (root / "huggingface/org-card/index.html").read_text(encoding="utf-8")
     svg = (root / "profile/assets/estate-command-system.svg").read_text(encoding="utf-8")
+    portfolio_assets = {
+        path.name: path.read_text(encoding="utf-8")
+        for path in (root / "profile/assets").glob("hf-*.svg")
+    }
+    portfolio_assets["estate-banner-v2.svg"] = (
+        root / "profile/assets/estate-banner-v2.svg"
+    ).read_text(encoding="utf-8")
     manifest_path = root / "huggingface/org-card.manifest.json"
     failures: list[str] = []
 
@@ -91,6 +107,13 @@ def main() -> int:
         f"Hub card emoji must be the approved Extended Pictographic value {HUB_CARD_EMOJI}",
         failures,
     )
+    require(
+        front_matter_value(hub_card, "thumbnail") is not None,
+        "Hub card front matter is missing a portfolio thumbnail",
+        failures,
+    )
+    require("| --- |" not in hub_card, "Hub card uses a mobile-hostile Markdown table", failures)
+    require(len(hub_card.split()) <= 520, "Hub card exceeds the concise 520-word budget", failures)
 
     combined = f"{profile}\n{hub_card}\n{html}".lower()
     for phrase in BANNED_COPY:
@@ -104,23 +127,46 @@ def main() -> int:
     require(not parser.external_assets, f"runtime external assets are forbidden: {parser.external_assets}", failures)
     require("prefers-reduced-motion" in html, "reduced-motion contract is missing", failures)
     require("@media (max-width: 640px)" in html, "mobile breakpoint contract is missing", failures)
+    require("@media (max-width: 390px)" in html, "small-phone breakpoint contract is missing", failures)
+    require("min-height: 44px" in html, "touch-target contract is missing", failures)
+    require(
+        ".brand { display: inline-flex; min-height: 44px" in html,
+        "brand touch target must remain at least 44px",
+        failures,
+    )
+    require(
+        ".artifact { display: block;" in html,
+        "artifact links must expose their full card as the hit area",
+        failures,
+    )
+    require("overflow-x: hidden" in html, "horizontal-overflow guard is missing", failures)
+    require("overflow-wrap: anywhere" in html, "long-identifier reflow guard is missing", failures)
     require("Skip to main content" in html, "keyboard skip link is missing", failures)
 
     require("<title" in svg and "<desc" in svg, "hero SVG needs an accessible title and description", failures)
     require("<script" not in svg.lower(), "hero SVG must not execute scripts", failures)
+    require(len(portfolio_assets) >= 6, "portfolio asset family is incomplete", failures)
+    for name, source in portfolio_assets.items():
+        require(
+            "<title" in source and "<desc" in source,
+            f"portfolio SVG needs an accessible title and description: {name}",
+            failures,
+        )
+        require("<script" not in source.lower(), f"portfolio SVG must not execute scripts: {name}", failures)
 
     try:
         contract, files = deploy.load_contract(root, manifest_path)
         destinations = {item.destination for item in files}
         require(contract.get("prune") is True, "org-card publication must prune unmanaged legacy files", failures)
-        require("assets/estate-command-system.svg" in destinations, "manifest must publish canonical hero", failures)
+        missing_assets = REQUIRED_HF_ASSETS - destinations
+        require(not missing_assets, f"manifest is missing portfolio assets: {sorted(missing_assets)}", failures)
     except Exception as exc:
         failures.append(f"publication manifest invalid: {type(exc).__name__}: {exc}")
 
     report = {
         "schema": "szl.public-front-door-check/v1",
         "state": "PASS" if not failures else "FAIL",
-        "checks": 16 + len(REQUIRED_LINKS) * 2 + len(BANNED_COPY),
+        "checks": 28 + len(REQUIRED_LINKS) * 2 + len(BANNED_COPY) + len(portfolio_assets) * 2,
         "failures": failures,
     }
     print(json.dumps(report, indent=2, sort_keys=True))
