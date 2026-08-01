@@ -45,6 +45,12 @@ jobs:
           -s .github/scripts
           -p test_hf_static_space_deploy.py
 
+      - name: Test public front-door contract
+        run: >-
+          python -m unittest discover
+          -s .github/scripts
+          -p test_public_front_door_check.py
+
       - name: Verify public front-door contract
         run: python .github/scripts/public_front_door_check.py
 

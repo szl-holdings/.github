@@ -6,7 +6,14 @@
   <meta name="color-scheme" content="dark">
   <meta name="theme-color" content="#070b12">
   <meta name="description" content="SZL Holdings publishes governed AI models, evidence, software, and demonstrations with explicit operational boundaries.">
-  <title>SZL Holdings - Autonomy, under authority</title>
+  <title>SZL Holdings - Control before action. Evidence after.</title>
+  <meta property="og:title" content="SZL Holdings - Control before action. Evidence after.">
+  <meta property="og:description" content="Governed decision infrastructure for actions that must survive scrutiny.">
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://szlholdings-readme.static.hf.space/">
+  <meta property="og:image" content="https://szlholdings-readme.static.hf.space/assets/evidence-lattice-v2.webp">
+  <meta property="og:image:alt" content="A bounded signal path entering a holographic verification lattice">
+  <meta name="twitter:card" content="summary_large_image">
   <style>
     :root {
       --void: #070b12;
@@ -23,6 +30,7 @@
       --gold-hi: #ead08e;
       --amber: #e1a55f;
       --radius: 20px;
+      --tap: 44px;
       --mono: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
       --display: "Aptos Display", "Segoe UI Variable Display", "Trebuchet MS", sans-serif;
       --sans: "Aptos", "Segoe UI Variable Text", "Trebuchet MS", sans-serif;
@@ -30,8 +38,13 @@
 
     * { box-sizing: border-box; }
     html { scroll-behavior: smooth; }
+    img { display: block; max-width: 100%; }
     body {
       margin: 0;
+      padding-top: env(safe-area-inset-top);
+      padding-right: env(safe-area-inset-right);
+      padding-bottom: env(safe-area-inset-bottom);
+      padding-left: env(safe-area-inset-left);
       background:
         radial-gradient(900px 520px at 78% -8%, rgba(47, 127, 139, .24), transparent 68%),
         radial-gradient(760px 520px at 8% 18%, rgba(215, 181, 94, .08), transparent 72%),
@@ -43,52 +56,101 @@
     }
 
     a { color: inherit; }
+    h1, h2, h3, p, a, code { overflow-wrap: anywhere; }
     a:focus-visible { outline: 3px solid var(--teal); outline-offset: 4px; }
     .skip { position: absolute; left: -9999px; top: 0; }
-    .skip:focus { left: 16px; top: 16px; z-index: 30; background: var(--ink); color: var(--void); padding: 10px 14px; border-radius: 8px; }
+    .skip:focus { left: max(16px, env(safe-area-inset-left)); top: max(16px, env(safe-area-inset-top)); z-index: 30; background: var(--ink); color: var(--void); padding: 10px 14px; border-radius: 8px; }
     .shell { width: min(1180px, calc(100% - 40px)); margin: 0 auto; }
 
     header {
       position: sticky;
-      top: 0;
+      top: env(safe-area-inset-top);
       z-index: 10;
       border-bottom: 1px solid rgba(132, 149, 171, .2);
       background: rgba(7, 11, 18, .9);
       backdrop-filter: blur(18px);
     }
-    .nav { min-height: 72px; display: flex; align-items: center; justify-content: space-between; gap: 24px; }
-    .brand { display: inline-flex; flex: 0 0 auto; align-items: center; gap: 12px; min-height: 44px; text-decoration: none; font-weight: 760; letter-spacing: .08em; }
+    .nav { min-height: 72px; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px 24px; }
+    .brand { display: inline-flex; flex: 0 0 auto; align-items: center; gap: 12px; min-height: var(--tap); text-decoration: none; font-weight: 760; letter-spacing: .08em; }
     .brand-mark { width: 13px; height: 13px; border-radius: 50%; background: var(--teal); box-shadow: 0 0 22px rgba(71, 215, 196, .48); }
-    nav { display: flex; align-items: center; justify-content: flex-end; gap: 8px; }
-    nav a { display: inline-flex; min-height: 44px; align-items: center; border-radius: 999px; padding: 0 12px; color: var(--muted); text-decoration: none; font-size: 14px; white-space: nowrap; }
+    nav { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 8px; }
+    nav a { display: inline-flex; min-height: var(--tap); align-items: center; border-radius: 999px; padding: 0 12px; color: var(--muted); text-decoration: none; font-size: 14px; white-space: nowrap; }
     nav a:hover { background: rgba(71, 215, 196, .08); color: var(--ink); }
     nav a.primary-link { border: 1px solid rgba(215, 181, 94, .48); color: var(--gold-hi); }
 
-    main { overflow: hidden; }
-    .hero { padding: clamp(72px, 10vw, 132px) 0 84px; display: grid; grid-template-columns: 1.08fr .92fr; gap: 64px; align-items: center; }
+    main { min-width: 0; }
+    .hero {
+      position: relative;
+      isolation: isolate;
+      min-height: min(720px, calc(100vh - 104px));
+      margin: 48px auto 96px;
+      padding: clamp(64px, 8vw, 108px);
+      display: flex;
+      align-items: center;
+      overflow: hidden;
+      border: 1px solid rgba(124, 232, 218, .22);
+      border-radius: 32px;
+      background: #070b12;
+      box-shadow: 0 46px 120px rgba(0, 0, 0, .46), inset 0 1px rgba(255, 255, 255, .05);
+    }
+    .hero::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      z-index: 1;
+      background:
+        linear-gradient(90deg, rgba(5, 9, 16, .99) 0%, rgba(5, 9, 16, .94) 36%, rgba(5, 9, 16, .42) 66%, rgba(5, 9, 16, .10) 100%),
+        linear-gradient(0deg, rgba(5, 9, 16, .46), transparent 48%);
+    }
+    .hero::after {
+      content: "";
+      position: absolute;
+      inset: 14px;
+      z-index: 3;
+      pointer-events: none;
+      border: 1px solid rgba(169, 197, 255, .09);
+      border-radius: 22px;
+    }
+    .hero-copy { position: relative; z-index: 2; max-width: 690px; }
+    .hero-art {
+      position: absolute;
+      inset: 0;
+      z-index: 0;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      object-position: center;
+      opacity: .94;
+      filter: saturate(.88) contrast(1.08);
+    }
     .eyebrow { color: var(--teal); font-family: var(--mono); font-size: 12px; font-weight: 700; letter-spacing: .17em; text-transform: uppercase; }
+    .hero .eyebrow { display: inline-flex; align-items: center; gap: 10px; border: 1px solid rgba(71, 215, 196, .25); border-radius: 999px; padding: 8px 12px; background: rgba(7, 16, 23, .72); }
+    .hero .eyebrow::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: var(--teal); box-shadow: 0 0 18px rgba(71, 215, 196, .78); }
     h1, h2 { font-family: var(--display); }
-    h1 { margin: 20px 0; max-width: 780px; font-size: clamp(48px, 7vw, 88px); line-height: .98; letter-spacing: -.055em; text-wrap: balance; }
-    h1 span { color: var(--gold-hi); }
+    h1 { margin: 24px 0; max-width: 780px; font-size: clamp(54px, 7vw, 92px); line-height: .94; letter-spacing: -.062em; text-wrap: balance; }
+    h1 span { color: var(--gold-hi); text-shadow: 0 0 44px rgba(230, 202, 130, .16); }
     .lede { max-width: 650px; color: var(--muted); font-size: clamp(18px, 2.2vw, 23px); }
+    .hero .lede { color: #d0d7e0; text-wrap: pretty; }
     .microcopy { color: var(--quiet); font-family: var(--mono); font-size: 12px; }
     .actions { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 34px; }
-    .button { display: inline-flex; min-height: 48px; align-items: center; justify-content: center; border: 1px solid var(--line); border-radius: 999px; padding: 0 20px; text-decoration: none; font-size: 14px; font-weight: 720; }
-    .button.primary { background: var(--gold); border-color: var(--gold); color: #101216; }
-    .button.primary:hover { background: var(--gold-hi); }
+    .button { display: inline-flex; min-height: 48px; align-items: center; justify-content: center; border: 1px solid var(--line); border-radius: 999px; padding: 0 21px; text-decoration: none; font-size: 14px; font-weight: 760; transition: transform .2s ease, border-color .2s ease, background .2s ease; }
+    .button:hover { transform: translateY(-2px); }
+    .button.primary { background: linear-gradient(120deg, #7ce8da, #a9c5ff); border-color: #9ee2e4; color: #071019; box-shadow: 0 12px 38px rgba(71, 215, 196, .18); }
+    .button.primary:hover { background: linear-gradient(120deg, #a3f2e8, #c2d4ff); }
     .button.secondary:hover { border-color: var(--teal); color: var(--teal-hi); }
-    .hero-visual { width: 100%; filter: drop-shadow(0 28px 80px rgba(0, 0, 0, .34)); }
+    .hero .button.secondary { background: rgba(10, 17, 28, .76); border-color: rgba(169, 197, 255, .32); color: #dce6f4; backdrop-filter: blur(12px); }
 
     section { padding: 82px 0; border-top: 1px solid rgba(132, 149, 171, .15); scroll-margin-top: 84px; }
     .section-head { display: grid; grid-template-columns: .85fr 1.15fr; gap: 48px; align-items: start; margin-bottom: 36px; }
     h2 { margin: 10px 0 0; font-size: clamp(32px, 4vw, 52px); line-height: 1.08; letter-spacing: -.035em; text-wrap: balance; }
     .section-copy { color: var(--muted); font-size: 18px; max-width: 680px; margin: 6px 0 0; }
 
-    .paths { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
-    .path { border: 1px solid var(--line); border-radius: var(--radius); padding: 26px; background: linear-gradient(150deg, rgba(20, 30, 44, .92), rgba(12, 18, 28, .94)); }
+    .paths { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px; }
+    .path { display: flex; min-width: 0; min-height: 240px; flex-direction: column; border: 1px solid var(--line); border-radius: var(--radius); padding: 26px; background: linear-gradient(150deg, rgba(20, 30, 44, .92), rgba(12, 18, 28, .94)); text-decoration: none; transition: transform .2s ease, border-color .2s ease; }
+    .path:hover { transform: translateY(-3px); border-color: rgba(71, 215, 196, .52); }
     .path h3 { margin: 15px 0 10px; font-family: var(--display); font-size: 26px; }
     .path p { color: var(--muted); margin: 0 0 20px; }
-    .path a { color: var(--gold-hi); font-family: var(--mono); font-size: 13px; text-underline-offset: 4px; }
+    .path .go { display: inline-flex; min-height: var(--tap); align-items: flex-end; margin-top: auto; color: var(--gold-hi); font-family: var(--mono); font-size: 13px; }
 
     .loop { position: relative; overflow: hidden; border: 1px solid var(--line); border-radius: 24px; padding: clamp(26px, 5vw, 54px); background: #090f17; }
     .steps { position: relative; z-index: 1; display: grid; grid-template-columns: repeat(6, 1fr); gap: 12px; margin: 0; padding: 0; list-style: none; }
@@ -101,18 +163,12 @@
     .cards { display: grid; grid-template-columns: repeat(6, 1fr); gap: 16px; margin: 0; padding: 0; list-style: none; }
     .cards li { display: flex; grid-column: span 2; }
     .cards li:nth-child(4), .cards li:nth-child(5) { grid-column: span 3; }
-    .card { width: 100%; min-height: 282px; display: flex; flex-direction: column; border: 1px solid var(--line); border-radius: var(--radius); padding: 25px; background: linear-gradient(150deg, rgba(20, 30, 44, .9), rgba(12, 18, 28, .92)); text-decoration: none; }
+    .card { width: 100%; min-height: 282px; display: flex; flex-direction: column; border: 1px solid var(--line); border-radius: var(--radius); padding: 25px; background: linear-gradient(150deg, rgba(20, 30, 44, .9), rgba(12, 18, 28, .92)); text-decoration: none; transition: transform .2s ease, border-color .2s ease; }
     .card:hover { transform: translateY(-3px); border-color: rgba(71, 215, 196, .52); }
     .card .tag { color: var(--teal); font-family: var(--mono); font-size: 11px; font-weight: 700; letter-spacing: .15em; text-transform: uppercase; }
     .card h3 { margin: 18px 0 10px; font-family: var(--display); font-size: 24px; letter-spacing: -.025em; }
     .card p { color: var(--muted); margin: 0; }
     .card .arrow { margin-top: auto; padding-top: 30px; color: var(--gold-hi); font-family: var(--mono); font-size: 13px; }
-
-    .product-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
-    .product { border: 1px solid var(--line); border-radius: var(--radius); padding: 28px; background: var(--panel); }
-    .product h3 { margin: 8px 0 10px; font-family: var(--display); font-size: 28px; }
-    .product p { color: var(--muted); }
-    .boundary { border-left: 3px solid var(--amber); padding-left: 15px; color: var(--gold-hi); }
 
     .truth { display: grid; grid-template-columns: 1.05fr .95fr; gap: 24px; }
     .truth-panel { border: 1px solid var(--line); border-radius: var(--radius); padding: 28px; background: var(--panel); }
@@ -137,44 +193,64 @@
     footer { border-top: 1px solid rgba(132, 149, 171, .15); padding: 32px 0 46px; color: var(--quiet); font-size: 13px; }
     .footer-row { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 20px; }
     .footer-links { display: flex; flex-wrap: wrap; gap: 18px; }
-    .footer-links a { min-height: 44px; display: inline-flex; align-items: center; text-decoration: none; }
+    .footer-links a { min-height: var(--tap); display: inline-flex; align-items: center; text-decoration: none; }
     .footer-links a:hover { color: var(--ink); }
 
     @media (max-width: 900px) {
-      .hero, .section-head, .truth { grid-template-columns: 1fr; }
-      .hero { gap: 42px; }
-      .hero-visual { max-width: 640px; }
-      .paths { grid-template-columns: 1fr; }
+      .section-head, .truth { grid-template-columns: 1fr; }
+      .hero { min-height: min(680px, calc(100svh - 96px)); padding: clamp(42px, 8vw, 72px); }
+      .hero::before { background: linear-gradient(90deg, rgba(5, 9, 16, .98), rgba(5, 9, 16, .72) 72%, rgba(5, 9, 16, .34)); }
+      .hero-art { object-position: 62% center; }
+      .paths { grid-template-columns: 1fr 1fr; }
       .cards li, .cards li:nth-child(4), .cards li:nth-child(5) { grid-column: span 3; }
       .steps { grid-template-columns: repeat(3, 1fr); }
     }
+    @media (max-width: 760px) {
+      header { position: static; }
+      .nav { min-height: 0; padding: 10px 0; display: grid; grid-template-columns: 1fr; }
+      nav { width: 100%; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
+      nav a { justify-content: center; padding: 8px; text-align: center; white-space: normal; }
+    }
     @media (max-width: 640px) {
       .shell { width: min(100% - 28px, 1180px); }
-      header { position: static; }
-      .nav { min-height: 0; padding: 10px 0 8px; display: block; }
       .brand { margin-bottom: 4px; }
-      nav { width: 100%; justify-content: flex-start; gap: 4px; overflow-x: auto; padding: 2px 0 8px; scrollbar-width: thin; }
-      nav a { flex: 0 0 auto; }
-      .hero { padding-top: 52px; }
-      h1 { font-size: clamp(42px, 15vw, 68px); }
+      .hero { min-height: min(720px, calc(100svh - 88px)); margin: 24px auto 64px; padding: 52px 24px; border-radius: 24px; }
+      .hero::before { background: linear-gradient(0deg, rgba(5, 9, 16, .99), rgba(5, 9, 16, .78) 70%, rgba(5, 9, 16, .38)); }
+      .hero::after { inset: 9px; border-radius: 17px; }
+      .hero-art { object-position: 68% center; opacity: .72; }
+      h1 { font-size: clamp(48px, 14vw, 70px); }
       .actions .button { width: 100%; }
       .cards { grid-template-columns: 1fr; }
       .cards li, .cards li:nth-child(4), .cards li:nth-child(5) { grid-column: auto; }
-      .product-grid { grid-template-columns: 1fr; }
+      .paths { grid-template-columns: 1fr; }
       .steps { grid-template-columns: 1fr 1fr; }
       .status-list a { grid-template-columns: 1fr; gap: 2px; }
       section { padding: 64px 0; scroll-margin-top: 0; }
     }
+    @media (max-width: 390px) {
+      .shell { width: calc(100% - 20px); }
+      .hero { min-height: 0; margin-top: 10px; padding: 46px 20px; }
+      h1 { font-size: clamp(40px, 13vw, 52px); letter-spacing: -.045em; }
+      .path, .card, .truth-panel { padding: 20px; }
+      .steps { grid-template-columns: 1fr; }
+      .step { min-height: 0; padding-bottom: 12px; }
+      nav { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      nav a.primary-link { grid-column: 1 / -1; }
+    }
+    @media (max-height: 520px) and (orientation: landscape) {
+      .hero { min-height: 0; margin-block: 18px 48px; padding-block: 32px; }
+      h1 { font-size: clamp(42px, 8vw, 64px); }
+    }
     @media (prefers-reduced-motion: reduce) {
       html { scroll-behavior: auto; }
-      .card { transition: none; }
-      .card:hover { transform: none; }
+      .button, .card, .path { transition: none; }
+      .button:hover, .card:hover, .path:hover { transform: none; }
     }
     @media (prefers-contrast: more) {
       :root { --line: #718197; --muted: #d0d7e0; --quiet: #b5bfcc; }
     }
     @media (forced-colors: active) {
-      .brand-mark, .button, .card, .path, .product, .truth-panel, .status-list a { forced-color-adjust: auto; }
+      .brand-mark, .button, .card, .path, .truth-panel, .status-list a { forced-color-adjust: auto; }
     }
   </style>
 </head>
@@ -189,7 +265,6 @@
       <nav aria-label="Primary navigation">
         <a href="#paths">Start</a>
         <a href="#artifacts">Artifacts</a>
-        <a href="#products">Products</a>
         <a href="#status">Current state</a>
         <a class="primary-link" href="https://a-11-oy.com">Open a11oy</a>
       </nav>
@@ -198,10 +273,10 @@
 
   <main id="main" tabindex="-1">
     <div class="shell hero">
-      <div>
+      <div class="hero-copy">
         <div class="eyebrow">Governed decision infrastructure</div>
-        <h1>Autonomy,<br><span>under authority.</span></h1>
-        <p class="lede">Models, evidence, and public demonstrations for systems that must explain, constrain, and verify action.</p>
+        <h1>Control before action.<br><span>Evidence after.</span></h1>
+        <p class="lede">Governed models and systems for decisions that must survive scrutiny.</p>
         <p class="microcopy">Artifact type, evidence, and runtime state remain separate.</p>
         <div class="actions">
           <a class="button primary" href="#paths">Choose your path</a>
@@ -209,34 +284,41 @@
           <a class="button secondary" href="https://github.com/szl-holdings">View source</a>
         </div>
       </div>
-      <img class="hero-visual" src="assets/hf-portfolio-map.svg" alt="Four portfolio paths connected by one governed decision loop">
+      <img class="hero-art" src="assets/evidence-lattice-v2.webp"
+           alt="" width="1800" height="776" fetchpriority="high" decoding="async">
     </div>
 
     <section id="paths" aria-labelledby="paths-title">
       <div class="shell">
         <div class="section-head">
-          <div><div class="eyebrow">Start with intent</div><h2 id="paths-title">One front door. Three clear routes.</h2></div>
-          <p class="section-copy">Investors, developers, and technical evaluators need different depth. Each route ends at source and current evidence rather than a copied status claim.</p>
+          <div><div class="eyebrow">Choose a mission</div><h2 id="paths-title">One front door. Four focused paths.</h2></div>
+          <p class="section-copy">Move directly from the mission to its source, boundaries, and current evidence.</p>
         </div>
         <div class="paths">
-          <article class="path">
-            <div class="eyebrow">Investor</div>
-            <h3>Understand the company</h3>
-            <p>Follow the category, product boundaries, research lineage, trust posture, and live diligence links.</p>
-            <a href="https://github.com/szl-holdings#readme">Open company profile -></a>
-          </article>
-          <article class="path">
-            <div class="eyebrow">Developer</div>
-            <h3>Build from contracts</h3>
-            <p>Choose an artifact type, inspect the exact source and files, then reproduce the integration path.</p>
-            <a href="https://holdings.a-11-oy.com/docs-site/">Read documentation -></a>
-          </article>
-          <article class="path">
-            <div class="eyebrow">Evaluator</div>
-            <h3>Verify before inference</h3>
-            <p>Separate repository type, evidence class, runtime state, and authorization before drawing conclusions.</p>
-            <a href="#status">Open current sources -></a>
-          </article>
+          <a class="path" href="https://a-11-oy.com">
+            <div class="eyebrow">01 / Command</div>
+            <h3>Govern the action</h3>
+            <p>Bounded tools and receipts. Provider, signing, readiness, and authorization stay separate.</p>
+            <span class="go">Open a11oy -></span>
+          </a>
+          <a class="path" href="https://szlholdings-killinchu.hf.space/elite/cop">
+            <div class="eyebrow">02 / Intelligence</div>
+            <h3>See the mission</h3>
+            <p>Live-feed fusion when dependencies answer; samples stay labeled. Public actuation is SIMULATED—no live weapon command or production authorization.</p>
+            <span class="go">Open Killinchu -></span>
+          </a>
+          <a class="path" href="https://huggingface.co/SZLHOLDINGS">
+            <div class="eyebrow">03 / Models + data</div>
+            <h3>Inspect the artifact</h3>
+            <p>Weights, data, software, and recipes—with lineage and explicit limits.</p>
+            <span class="go">View portfolio -></span>
+          </a>
+          <a class="path" href="https://a11oy.net">
+            <div class="eyebrow">04 / Evidence</div>
+            <h3>Verify outside the UI</h3>
+            <p>Receipts, replay, proof sources, and current-state readback.</p>
+            <span class="go">Inspect evidence -></span>
+          </a>
         </div>
       </div>
     </section>
@@ -244,8 +326,8 @@
     <section id="system" aria-labelledby="system-title">
       <div class="shell">
         <div class="section-head">
-          <div><div class="eyebrow">One governed loop</div><h2 id="system-title">Control before action. Evidence after.</h2></div>
-          <p class="section-copy">The model proposes. A policy layer validates authority and evidence. The runtime executes only within a declared bound. A portable receipt records the decision path for independent review.</p>
+          <div><div class="eyebrow">One governed loop</div><h2 id="system-title">Six stages. One accountable path.</h2></div>
+          <p class="section-copy">Propose, validate authority, act within bounds, and emit a portable receipt.</p>
         </div>
         <div class="loop">
           <ol class="steps" aria-label="Governed loop stages">
@@ -291,36 +373,6 @@
       </div>
     </section>
 
-    <section id="products" aria-labelledby="products-title">
-      <div class="shell">
-        <div class="section-head">
-          <div><div class="eyebrow">Product surfaces</div><h2 id="products-title">Live links with visible limits.</h2></div>
-          <p class="section-copy">Product, source, runtime state, and evidence are linked separately so a reachable page cannot silently become a capability claim.</p>
-        </div>
-        <div class="product-grid">
-          <article class="product">
-            <div class="eyebrow">Governed command</div>
-            <h3>a11oy</h3>
-            <p>Governed inference and agentic execution. Provider availability, signing, readiness, and per-action authorization remain separate states.</p>
-            <div class="actions">
-              <a class="button primary" href="https://a-11-oy.com">Open product</a>
-              <a class="button secondary" href="https://a11oy.net">Inspect evidence</a>
-            </div>
-          </article>
-          <article class="product">
-            <div class="eyebrow">Observation and fusion</div>
-            <h3>Killinchu COP</h3>
-            <p>The public Common Operating Picture can exercise real-feed ingestion, fusion, provenance, and receipt paths when dependencies answer. Sample fallbacks remain labeled.</p>
-            <p class="boundary"><strong>Actuation boundary:</strong> effectors and public actuation are SIMULATED. This Space does not command a live weapon or establish production authorization.</p>
-            <div class="actions">
-              <a class="button primary" href="https://szlholdings-killinchu.hf.space/elite/cop">Open COP</a>
-              <a class="button secondary" href="https://github.com/szl-holdings/killinchu">View source</a>
-            </div>
-          </article>
-        </div>
-      </div>
-    </section>
-
     <section id="status" aria-labelledby="status-title">
       <div class="shell">
         <div class="section-head">
@@ -345,7 +397,7 @@
             <ul class="labels" aria-label="Evidence classes">
               <li class="label">PROVED</li><li class="label measured">MEASURED</li><li class="label">REPORTED</li><li class="label">MODELED</li><li class="label conjecture">CONJECTURE</li><li class="label">ROADMAP</li>
             </ul>
-            <p style="margin-top:20px">The dataset <a href="https://huggingface.co/datasets/SZLHOLDINGS/SZLHOLDINGS"><code>SZLHOLDINGS/SZLHOLDINGS</code></a> is a <strong>HISTORICAL profile mirror</strong>, not the current organization card or inventory.</p>
+            <p style="margin-top:20px">The dataset <a href="https://huggingface.co/datasets/SZLHOLDINGS/SZLHOLDINGS"><code>SZLHOLDINGS/SZLHOLDINGS</code></a> is a <strong>HISTORICAL profile mirror</strong>, not a current organization card, inventory, or runtime source.</p>
           </div>
         </div>
       </div>

@@ -2,161 +2,123 @@
 
 <div align="center">
 
-<img src="./assets/estate-command-system.svg"
-     alt="SZL Holdings - autonomy, under authority"
+<img src="./assets/evidence-lattice-v2.webp"
+     alt="A bounded signal path entering a holographic verification lattice"
      width="100%" />
 
 # Governed decision infrastructure
 
-SZL Holdings builds systems that can reason, act within authority, and return
-evidence that another party can verify.
+**Control before action. Evidence after.**
 
-[**Evaluate the company**](#investor-path) |
-[**Build with SZL**](#developer-path) |
-[**Inspect models and data**](https://huggingface.co/SZLHOLDINGS) |
+Systems that reason, act inside declared authority, and return evidence another
+party can verify.
+
+[**Evaluate SZL**](#investor-path) ·
+[**Build with SZL**](#builder-path) ·
+[**Inspect artifacts**](https://huggingface.co/SZLHOLDINGS) ·
 [**Check current state**](#current-state)
 
 </div>
 
 ---
 
-## Start with your question
+## One governed loop
 
-| You are here to... | Start here | Then verify |
-| --- | --- | --- |
-| Understand the company | [Category and product map](#the-company) | [Evidence registry](https://a11oy.net) |
-| Evaluate technical diligence | [Artifact map](#artifact-map) | [Current state](#current-state) |
-| Integrate the platform | [Developer path](#developer-path) | [Documentation](https://holdings.a-11-oy.com/docs-site/) |
-| Inspect public AI artifacts | [Hugging Face organization](https://huggingface.co/SZLHOLDINGS) | [Current Hugging Face front door](https://huggingface.co/spaces/SZLHOLDINGS/README) |
+**Signal** → **reason** → **policy** → **bounded action** → **receipt** →
+**independent verification**.
 
-## The company
+The model proposes. The controller validates authority and evidence. The
+runtime stays inside the bound. The receipt makes the result portable.
 
-AI capability is moving faster than institutional control. SZL focuses on the
-boundary between a model recommendation and an authorized action:
+## Four ways in
 
-```text
-signal -> reason -> policy -> bounded action -> receipt -> independent verification
-                    ^                                      |
-                    +------------ verified feedback -------+
-```
+<img src="./assets/hf-portfolio-map.svg"
+     alt="Four SZL paths: command, intelligence, models and data, and evidence"
+     width="100%" />
 
-The model proposes. A controller validates policy, authority, and evidence.
-The runtime acts only inside a declared bound. A portable receipt lets another
-party inspect what happened.
+### 01 / Command
 
-### Products
+[**a11oy**](https://a-11-oy.com) is governed inference and agentic execution
+for regulated workflows. [Open source](https://github.com/szl-holdings/a11oy)
+or [inspect evidence](https://a11oy.net).
 
-| Product | Public role | Reality boundary | Enter |
-| --- | --- | --- | --- |
-| **a11oy** | Governed inference and agentic execution for regulated workflows | Product reachability, provider availability, signing, and per-action readiness are separate states | [Product](https://a-11-oy.com) / [Source](https://github.com/szl-holdings/a11oy) |
-| **Killinchu** | Counter-UAS and maritime observation, fusion, and operator-decision demonstration | Public feeds may be live or unavailable; sample fallbacks are labeled; effectors and public actuation are **SIMULATED** | [Operator application](https://szlholdings-killinchu.hf.space/elite) / [Source](https://github.com/szl-holdings/killinchu) |
+### 02 / Intelligence
 
-The [Killinchu Common Operating Picture](https://szlholdings-killinchu.hf.space/elite/cop)
-is an observation and decision-support surface. It can exercise real public-feed
-ingestion, fusion, provenance, and receipt paths when their dependencies answer.
-It does not command a live weapon or represent production authorization.
+[**Killinchu**](https://szlholdings-killinchu.hf.space/elite) is a public
+observation, fusion, and operator-decision demonstration. Public feeds may be
+live or unavailable; sample fallbacks stay labeled. Effectors and public
+actuation are **SIMULATED**. It does not command a live weapon or establish
+production authorization. [Open source](https://github.com/szl-holdings/killinchu).
 
-## Artifact map
+### 03 / Models + data
 
-Hugging Face repository type does not establish artifact type. The portfolio
-uses these boundaries:
+Weights and adapters, software and substrate, surrogates and recipes, datasets
+and evidence, and Spaces and demonstrations are separate artifact classes.
+Repository type, downloads, and route reachability do not establish quality or
+readiness. [Inspect the portfolio](https://huggingface.co/SZLHOLDINGS).
 
-| Artifact class | What it is | Representative entry | What it is not |
-| --- | --- | --- | --- |
-| **Trained weights and adapters** | Neural weights, adapters, or quantized files with their own lineage and evaluation | [SZL-Khipu-1.5B](https://huggingface.co/SZLHOLDINGS/SZL-Khipu-1.5B) | Automatic proof of quality, safety, or production readiness |
-| **Software and substrate artifacts** | Source, manifests, kernels, meters, or governance packages published through a model-shaped repository | [a11oy-v19-substrate](https://huggingface.co/SZLHOLDINGS/a11oy-v19-substrate) | Trained model weights |
-| **Surrogates and recipes** | Small structural classifiers, compatibility artifacts, or model recipes | [szl-governed-norm](https://huggingface.co/SZLHOLDINGS/szl-governed-norm) | A substitute for the governed runtime or upstream foundation model |
-| **Datasets and evidence** | Corpora, receipts, evaluations, manifests, proofs, and historical snapshots | [szl-lake](https://huggingface.co/datasets/SZLHOLDINGS/szl-lake) | Automatic admission for training, deployment, or a performance claim |
-| **Spaces and demonstrations** | Public interfaces, verifiers, consoles, and status surfaces | [SZL Holdings README Space](https://huggingface.co/spaces/SZLHOLDINGS/README) | End-to-end operational proof merely because transport is reachable |
+### 04 / Evidence
 
-Each artifact owns its exact license, lineage, hashes, evaluation, runtime,
-privacy, and limitation evidence. Hub download events are not treated as unique
-users, customers, deployments, revenue, or model quality.
+Receipts, provenance, evaluation, and formal sources make claims inspectable.
+[Verify a receipt](https://a-11-oy.com/verify) or follow the
+[research lineage](https://github.com/szl-holdings/szl-papers).
 
 ## Investor path
 
-1. Read the [public company front door](https://huggingface.co/spaces/SZLHOLDINGS/README).
-2. Inspect the [product and evidence registry](https://a11oy.net).
-3. Follow the [research lineage](https://github.com/szl-holdings/szl-papers).
-4. Review [security](https://github.com/szl-holdings/.github/security/policy),
-   [trust](https://github.com/szl-holdings/.github/blob/main/TRUST.md), and
-   [support](https://github.com/szl-holdings/.github/blob/main/SUPPORT.md).
-5. Confirm current runtime state from the linked sources below rather than a
-   screenshot, badge, card, or cached count.
+[Company front door](https://huggingface.co/spaces/SZLHOLDINGS/README) ·
+[Evidence registry](https://a11oy.net) ·
+[Security](https://github.com/szl-holdings/.github/security/policy) ·
+[Trust](https://github.com/szl-holdings/.github/blob/main/TRUST.md) ·
+[Support](https://github.com/szl-holdings/.github/blob/main/SUPPORT.md)
 
-No production authorization, regulatory approval, universal safety guarantee,
-customer adoption, or investment outcome is claimed by this profile.
+This profile does not claim production authorization, regulatory approval,
+universal safety, customer adoption, or an investment outcome.
 
-## Developer path
+## Builder path
 
-1. Read the [documentation hub](https://holdings.a-11-oy.com/docs-site/).
-2. Start with the [a11oy source](https://github.com/szl-holdings/a11oy) and its
-   declared architecture and policy boundaries.
-3. Emit or verify a receipt with
-   [`szl-receipt`](https://github.com/szl-holdings/szl-receipt).
-4. Add governed tools through
-   [Hatun MCP](https://github.com/szl-holdings/hatun-mcp).
-5. Inspect shared runtime packages in
-   [`szl-substrate`](https://github.com/szl-holdings/szl-substrate).
-6. Select model, dataset, or Space artifacts from the
-   [Hugging Face organization](https://huggingface.co/SZLHOLDINGS) only after
-   reading the artifact-specific card and files.
+[Documentation](https://holdings.a-11-oy.com/docs-site/) ·
+[a11oy source](https://github.com/szl-holdings/a11oy) ·
+[Receipt tooling](https://github.com/szl-holdings/szl-receipt) ·
+[Hatun MCP](https://github.com/szl-holdings/hatun-mcp) ·
+[Runtime substrate](https://github.com/szl-holdings/szl-substrate)
 
-Organization-wide public conventions are defined in the
-[public experience standard](https://github.com/szl-holdings/.github/blob/main/docs/PUBLIC_EXPERIENCE_STANDARD.md).
-Repository lifecycle and canonical successors are recorded in the
-[estate lifecycle map](https://github.com/szl-holdings/.github/blob/main/docs/ESTATE_LIFECYCLE.md).
+Read each artifact's license, lineage, files, evaluation, and limits before use.
+The [public experience standard](https://github.com/szl-holdings/.github/blob/main/docs/PUBLIC_EXPERIENCE_STANDARD.md)
+and [estate lifecycle map](https://github.com/szl-holdings/.github/blob/main/docs/ESTATE_LIFECYCLE.md)
+define the shared contract.
 
 ## Current state
 
-Status is linked, not copied into this profile. These sources can change without
-a profile edit:
-
-| Question | Current source |
-| --- | --- |
-| Which Hugging Face front door is canonical? | [SZLHOLDINGS/README](https://huggingface.co/spaces/SZLHOLDINGS/README) |
-| Which source revision produced the served org card? | [Org-card deployment evidence](https://szlholdings-readme.static.hf.space/deployment.json) |
-| Is a11oy ready at this moment? | [a11oy readiness](https://a-11-oy.com/api/a11oy/v1/readiness) |
-| Which Killinchu revision is served? | [Killinchu build identity](https://szlholdings-killinchu.hf.space/api/build-info) |
-| Is the Killinchu public-risk gate available? | [Killinchu public-risk status](https://szlholdings-killinchu.hf.space/api/public-risk-status) |
-| Is the Killinchu service ready? | [Killinchu readiness](https://szlholdings-killinchu.hf.space/api/killinchu/readyz) |
+- [Served org-card source](https://szlholdings-readme.static.hf.space/deployment.json)
+- [a11oy readiness](https://a-11-oy.com/api/a11oy/v1/readiness)
+- [Killinchu build identity](https://szlholdings-killinchu.hf.space/api/build-info)
+- [Killinchu public-risk status](https://szlholdings-killinchu.hf.space/api/public-risk-status)
+- [Killinchu readiness](https://szlholdings-killinchu.hf.space/api/killinchu/readyz)
 
 The dataset [`SZLHOLDINGS/SZLHOLDINGS`](https://huggingface.co/datasets/SZLHOLDINGS/SZLHOLDINGS)
-is a **HISTORICAL profile mirror**. It is not the current organization card and
-must not be used to infer the present estate, inventory, or runtime state.
+is a **HISTORICAL profile mirror**, not a current organization card, inventory,
+or runtime source.
 
-## Evidence language
+## Truth language
 
-Public claims and operational state remain separate axes.
+Claims use **PROVED**, **MEASURED**, **REPORTED**, **MODELED**,
+**CONJECTURE**, or **ROADMAP**. Runtime state is separate:
+**OPERATIONAL**, **PARTIAL**, **DEGRADED**, **UNAVAILABLE**, or
+**HISTORICAL**. Lambda uniqueness remains **Conjecture 1**, not a theorem.
 
-| Evidence class | Meaning |
-| --- | --- |
-| **PROVED** | Machine-checked statement with exact theorem and artifact scope |
-| **MEASURED** | Direct observation with instrument, time, and context |
-| **REPORTED** | Identified upstream statement, not independently measured here |
-| **MODELED** | Simulation, projection, or analytical derivation |
-| **CONJECTURE** | Open hypothesis; never rendered as proved |
-| **ROADMAP** | Planned work with no operational claim |
-
-Operational states are **OPERATIONAL**, **PARTIAL**, **DEGRADED**,
-**UNAVAILABLE**, and **HISTORICAL**. Lambda uniqueness remains
-**Conjecture 1**, not a theorem; consult the canonical proof sources for current
-scope and revision.
-
-Reachability is not capability. A signed receipt proves integrity and origin
-within its stated scope; it does not automatically prove accuracy, safety,
-performance, compliance, or authorization to deploy.
+A signature establishes integrity and origin within scope—not accuracy,
+safety, performance, compliance, or authorization to deploy.
 
 ---
 
 <div align="center">
 
-**Govern | execute | prove**
+**Govern · execute · prove**
 
-[a-11-oy.com](https://a-11-oy.com) |
-[a11oy.net](https://a11oy.net) |
-[Documentation](https://holdings.a-11-oy.com/docs-site/) |
-[GitHub](https://github.com/szl-holdings) |
+[a-11-oy.com](https://a-11-oy.com) ·
+[a11oy.net](https://a11oy.net) ·
+[Documentation](https://holdings.a-11-oy.com/docs-site/) ·
+[GitHub](https://github.com/szl-holdings) ·
 [Hugging Face](https://huggingface.co/SZLHOLDINGS)
 
 </div>
