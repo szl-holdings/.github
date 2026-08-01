@@ -24,6 +24,7 @@ BANNED_COPY = {
     "all models operational",
 }
 HUB_CARD_EMOJI = "🛡️"
+HUB_CARD_SHORT_DESCRIPTION_MAX_CHARS = 60
 REQUIRED_HF_ASSETS = {
     "assets/estate-command-system.svg": "profile/assets/estate-command-system.svg",
     "assets/estate-banner-v2.svg": "profile/assets/estate-banner-v2.svg",
@@ -48,6 +49,14 @@ def front_matter_value(document: str, key: str) -> str | None:
         if separator and name.strip() == key:
             return value.strip()
     return None
+
+
+def front_matter_value_within_limit(
+    document: str, key: str, max_chars: int
+) -> bool:
+    """Return whether a leading front-matter scalar exists within a limit."""
+    value = front_matter_value(document, key)
+    return value is not None and len(value) <= max_chars
 
 
 def _yaml_scalar(value: str) -> str:
@@ -195,6 +204,20 @@ def main() -> int:
         require(url in hub_card, f"Hugging Face card missing canonical link: {url}", failures)
     require("./assets/estate-command-system.svg" in profile, "profile does not use canonical hero", failures)
     require("deployment.json" in hub_card, "Hub card does not expose served source binding", failures)
+    card_short_description = front_matter_value(hub_card, "short_description")
+    require(
+        card_short_description is not None,
+        "Hub card front matter is missing short_description",
+        failures,
+    )
+    require(
+        front_matter_value_within_limit(
+            hub_card, "short_description", HUB_CARD_SHORT_DESCRIPTION_MAX_CHARS
+        ),
+        "Hub card short_description exceeds the Hugging Face 60-character limit"
+        f" (observed {len(card_short_description) if card_short_description is not None else 'missing'})",
+        failures,
+    )
     card_emoji = front_matter_value(hub_card, "emoji")
     require(card_emoji is not None, "Hub card front matter is missing emoji", failures)
     require(
