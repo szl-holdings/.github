@@ -30,6 +30,9 @@ from ci_health_digest_http import (
 RED = {"failure", "startup_failure", "timed_out", "action_required"}
 SOURCE_WORKFLOW_PREFIX = ".github/workflows/"
 DYNAMIC_WORKFLOW_PREFIX = "dynamic/"
+TERMINAL_NEMO_RUN_ID = 30641766033
+TERMINAL_NEMO_RUN_NUMBER = 10
+TERMINAL_NEMO_RUN_ATTEMPT = 1
 POLICY = [
     (
         "lambda-bounty",
@@ -112,6 +115,8 @@ class RedRun:
     workflow: str
     provenance: str
     conclusion: str
+    run_id: int | None
+    run_attempt: int | None
     run_number: int | None
     event: str | None
     url: str | None
@@ -123,16 +128,21 @@ def classify(
     *,
     event: str | None = None,
     run_number: int | None = None,
+    run_id: int | None = None,
+    run_attempt: int | None = None,
 ) -> tuple[str, str]:
     if (
         repository == "a11oy"
         and workflow == "Nemo v3 isolated owner GPU dispatch"
         and event == "repository_dispatch"
-        and run_number == 10
+        and run_number == TERMINAL_NEMO_RUN_NUMBER
+        and run_id == TERMINAL_NEMO_RUN_ID
+        and run_attempt == TERMINAL_NEMO_RUN_ATTEMPT
     ):
         return (
             "INTENTIONAL",
-            "Run #10 is the immutable zero-effect Attempt 15 prefetch rejection. "
+            "Workflow run 30641766033 attempt 1 (run #10) is the immutable "
+            "zero-effect Attempt 15 prefetch rejection. "
             "Protected bridge evidence at 53b6e206 quarantines Attempts 15 and 16; "
             "NEVER_RESEND and no future successor.",
         )
@@ -397,6 +407,12 @@ def _red_run(
         ),
         provenance=provenance,
         conclusion=conclusion,
+        run_id=int(run["id"]) if run.get("id") is not None else None,
+        run_attempt=(
+            int(run["run_attempt"])
+            if run.get("run_attempt") is not None
+            else None
+        ),
         run_number=(
             int(run["run_number"])
             if run.get("run_number") is not None
@@ -547,6 +563,8 @@ def build_body(
                 red.workflow,
                 event=red.event,
                 run_number=red.run_number,
+                run_id=red.run_id,
+                run_attempt=red.run_attempt,
             )
             buckets[disposition].append((red, note))
             total += 1
