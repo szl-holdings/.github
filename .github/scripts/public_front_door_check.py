@@ -69,100 +69,117 @@ def _yaml_scalar(value: str) -> str:
     return value
 
 
-def hub_short_description(document: str) -> str | None:
-    """Return the complete normalized Hub card short description."""
+def hub_short_description_length(document: str) -> int | None:
+    """Return a fail-closed upper bound for the Hub short-description length.
+
+    The Hub accepts YAML block scalars, whose folded/literal rendering can be
+    longer than the text on the declaration line.  The bound counts every
+    content character plus the maximum separator count the YAML block can
+    produce.  It may reject unusually padded but valid YAML, but it cannot
+    undercount a value that Hugging Face will measure.
+    """
     lines = document.splitlines()
-    if not lines or lines[0].strip() != "---":
+    if not lines or lines[0] != "---":
         return None
 
-    for index, line in enumerate(lines[1:], start=1):
-        if line.strip() == "---":
-            return None
-        name, separator, value = line.partition(":")
-        if not separator or name.strip() != "short_description":
+    closing_index = next(
+        (
+            index
+            for index, line in enumerate(lines[1:], start=1)
+            if line.rstrip() == "---" and not line.startswith((" ", "\t"))
+        ),
+        None,
+    )
+    if closing_index is None:
+        return None
+
+    matches: list[tuple[int, str]] = []
+    for index, line in enumerate(lines[1:closing_index], start=1):
+        if not line.strip() or line.lstrip().startswith("#"):
             continue
+        if line.startswith((" ", "\t")):
+            continue
+        name, separator, value = line.partition(":")
+        if separator and _yaml_scalar(name.strip()) == "short_description":
+            matches.append((index, value))
 
-        scalar = value.strip()
-        block = BLOCK_SCALAR_HEADER.fullmatch(scalar)
-        if block is None:
-            if scalar.startswith(("'", '"')) and not (
-                len(scalar) >= 2 and scalar[0] == scalar[-1]
-            ):
-                return None
-            parent_indent = len(line) - len(line.lstrip(" "))
-            for continuation in lines[index + 1 :]:
-                if continuation.strip() == "---":
-                    break
-                if not continuation.strip() or continuation.lstrip().startswith("#"):
-                    continue
-                continuation_indent = len(continuation) - len(
-                    continuation.lstrip(" ")
-                )
-                if continuation_indent > parent_indent:
-                    return None
-                break
-            return _yaml_scalar(scalar)
+    # Duplicate YAML keys are resolved differently across parsers. Refuse them
+    # instead of measuring one value while the Hub validates another.
+    if len(matches) != 1:
+        return None
 
-        parent_indent = len(line) - len(line.lstrip(" "))
+    index, raw_value = matches[0]
+    scalar = _without_yaml_comment(raw_value).strip()
+    block = BLOCK_SCALAR_HEADER.fullmatch(scalar)
+    if block is not None:
+        block_lines: list[str] = []
         modifiers = block.group("modifiers")
         explicit_indent = next(
             (int(character) for character in modifiers if character.isdigit()),
             None,
         )
-        content_indent = (
-            parent_indent + explicit_indent if explicit_indent is not None else None
-        )
-        block_lines: list[str] = []
-        for continuation in lines[index + 1 :]:
-            if continuation.strip() == "---" and not continuation.startswith(" "):
-                break
-            continuation_indent = len(continuation) - len(continuation.lstrip(" "))
-            if continuation.strip() and continuation_indent <= parent_indent:
-                break
-            if content_indent is None and continuation.strip():
-                content_indent = continuation_indent
-            block_lines.append(continuation)
+        content_indent = explicit_indent
+        for continuation in lines[index + 1 : closing_index]:
+            if continuation.strip():
+                indentation = len(continuation) - len(continuation.lstrip(" "))
+                if indentation == 0:
+                    break
+                if content_indent is None:
+                    content_indent = indentation
+                if indentation < content_indent:
+                    return None
+                block_lines.append(continuation[content_indent:])
+            else:
+                block_lines.append("")
 
-        if content_indent is None:
-            content_indent = parent_indent + 1
-        normalized: list[tuple[str, bool]] = []
-        for continuation in block_lines:
-            continuation_indent = len(continuation) - len(continuation.lstrip(" "))
-            if continuation.strip() and continuation_indent < content_indent:
-                return None
-            text = continuation[content_indent:] if continuation.strip() else ""
-            normalized.append((text, continuation_indent > content_indent))
+        content_characters = sum(len(line) for line in block_lines)
+        separators = max(len(block_lines) - 1, 0)
+        if block_lines and "-" not in modifiers:
+            separators += 1
+        return content_characters + separators
 
-        if block.group("style") == "|":
-            parsed = "\n".join(text for text, _ in normalized)
-        else:
-            parts: list[str] = []
-            for line_index, (text, more_indented) in enumerate(normalized):
-                if line_index:
-                    previous_text, previous_more_indented = normalized[line_index - 1]
-                    if previous_more_indented or more_indented:
-                        parts.append("\n")
-                    elif previous_text and text:
-                        parts.append(" ")
-                    elif previous_text and not text:
-                        parts.append("\n")
-                    elif not previous_text and not text:
-                        parts.append("\n")
-                parts.append(text)
-            parsed = "".join(parts)
+    if not scalar:
+        return None
 
-        if "-" in modifiers:
-            return parsed.rstrip("\n")
-        if "+" in modifiers:
-            return parsed + "\n"
-        return parsed.rstrip("\n") + "\n"
+    # Aliases, tags, anchors, flow collections, and block indicators can
+    # resolve to a value unrelated to their short source spelling. Refuse them
+    # rather than risk a length undercount.
+    if scalar[0] in "*!&[{}>|":
+        return None
+    if scalar.startswith(("- ", "? ", ": ")):
+        return None
 
-    return None
+    if scalar[0] == '"':
+        if len(scalar) < 2 or scalar[-1] != '"':
+            return None
+        try:
+            normalized = json.loads(scalar)
+        except json.JSONDecodeError:
+            return None
+        if not isinstance(normalized, str):
+            return None
+    elif scalar[0] == "'":
+        if len(scalar) < 2 or scalar[-1] != "'":
+            return None
+        normalized = scalar[1:-1].replace("''", "'")
+    else:
+        normalized = scalar
+
+    # YAML permits multiline quoted/plain scalars. This deliberately scoped
+    # validator refuses them so it cannot silently omit continuation bytes.
+    for continuation in lines[index + 1 : closing_index]:
+        if not continuation.strip() or continuation.lstrip().startswith("#"):
+            continue
+        if continuation.startswith((" ", "\t")):
+            return None
+        break
+
+    return len(normalized)
 
 
-def short_description_within_limit(value: str | None) -> bool:
-    """Return whether a Hub short description satisfies its hard limit."""
-    return value is not None and len(value) <= HUB_SHORT_DESCRIPTION_MAX_LENGTH
+def short_description_length_within_limit(length: int | None) -> bool:
+    """Return whether a measured Hub short description satisfies its limit."""
+    return length is not None and length <= HUB_SHORT_DESCRIPTION_MAX_LENGTH
 
 
 def _without_yaml_comment(value: str) -> str:
@@ -308,15 +325,15 @@ def main() -> int:
         "Hub card front matter is missing a portfolio thumbnail",
         failures,
     )
-    short_description = hub_short_description(hub_card)
+    short_description_length = hub_short_description_length(hub_card)
     require(
-        short_description is not None,
-        "Hub card front matter is missing short_description",
+        short_description_length is not None,
+        "Hub card front matter has a missing, duplicate, or unsupported short_description",
         failures,
     )
     require(
-        short_description is None
-        or short_description_within_limit(short_description),
+        short_description_length is None
+        or short_description_length_within_limit(short_description_length),
         "Hub card short_description exceeds the Hugging Face 60-character limit",
         failures,
     )

@@ -22,25 +22,43 @@ class FrontMatterTests(unittest.TestCase):
         self.assertEqual(check.HUB_CARD_EMOJI, "🛡️")
         self.assertNotEqual(check.HUB_CARD_EMOJI, "𠀀")
 
-    def test_normalizes_quoted_short_description(self):
+    def test_measures_quoted_short_description(self):
         document = '---\nshort_description: "Clear boundaries"\n---\n# Card\n'
-        self.assertEqual(check.hub_short_description(document), "Clear boundaries")
+        self.assertEqual(check.hub_short_description_length(document), 16)
 
     def test_hub_short_description_limit_is_exact(self):
         self.assertEqual(check.HUB_SHORT_DESCRIPTION_MAX_LENGTH, 60)
-        self.assertTrue(check.short_description_within_limit("x" * 60))
-        self.assertFalse(check.short_description_within_limit("x" * 61))
-        self.assertFalse(check.short_description_within_limit(None))
+        self.assertTrue(check.short_description_length_within_limit(60))
+        self.assertFalse(check.short_description_length_within_limit(61))
+        self.assertFalse(check.short_description_length_within_limit(None))
 
-    def test_parses_complete_folded_block_short_description(self):
+    def test_measures_complete_folded_block_short_description(self):
         accepted = "---\nshort_description: >-\n  " + "x" * 29 + "\n  " + "y" * 30 + "\n---\n"
         rejected = "---\nshort_description: >-\n  " + "x" * 30 + "\n  " + "y" * 30 + "\n---\n"
-        accepted_value = check.hub_short_description(accepted)
-        rejected_value = check.hub_short_description(rejected)
-        self.assertEqual(accepted_value, "x" * 29 + " " + "y" * 30)
-        self.assertEqual(rejected_value, "x" * 30 + " " + "y" * 30)
-        self.assertTrue(check.short_description_within_limit(accepted_value))
-        self.assertFalse(check.short_description_within_limit(rejected_value))
+        accepted_length = check.hub_short_description_length(accepted)
+        rejected_length = check.hub_short_description_length(rejected)
+        self.assertEqual(accepted_length, 60)
+        self.assertEqual(rejected_length, 61)
+        self.assertTrue(check.short_description_length_within_limit(accepted_length))
+        self.assertFalse(check.short_description_length_within_limit(rejected_length))
+
+    def test_counts_leading_blank_line_in_folded_scalar(self):
+        document = "---\nshort_description: >-\n\n  " + "x" * 60 + "\n---\n"
+        length = check.hub_short_description_length(document)
+        self.assertEqual(length, 61)
+        self.assertFalse(check.short_description_length_within_limit(length))
+
+    def test_rejects_duplicate_short_description_keys(self):
+        document = (
+            "---\nshort_description: ok\nshort_description: "
+            + "x" * 61
+            + "\n---\n"
+        )
+        self.assertIsNone(check.hub_short_description_length(document))
+
+    def test_rejects_alias_short_description(self):
+        document = "---\nshort_description: *long_description\n---\n"
+        self.assertIsNone(check.hub_short_description_length(document))
 
 
 class RequiredAssetBindingTests(unittest.TestCase):
