@@ -269,6 +269,17 @@ def verify_gate_contract() -> None:
         attestor_template
     ):
         fail("the attestor must use GitHub's supported merge-queue CLI path")
+    draft_query = 'DRAFT=$(gh api "repos/$REPOSITORY/pulls/$PR" --jq .draft)'
+    draft_guard = 'if [ "$DRAFT" = "true" ]; then'
+    draft_deferral = (
+        "Attestation complete; protected merge request deferred while PR $PR is draft"
+    )
+    queue_request = 'gh pr merge "$PR" --repo "$REPOSITORY" --auto --squash'
+    for marker in (draft_query, draft_guard, draft_deferral):
+        if marker not in attestor_template:
+            fail(f"the attestor draft guard is missing {marker!r}")
+    if attestor_template.index(draft_guard) > attestor_template.index(queue_request):
+        fail("the attestor must reject draft queue requests before invoking gh pr merge")
 
     release = load_json(GOVERNANCE / "ruleset-release.json")
     if not isinstance(release, dict):

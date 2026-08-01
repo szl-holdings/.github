@@ -264,5 +264,10 @@ jobs:
           REPOSITORY: ${{ github.repository }}
         run: |
           set -euo pipefail
+          DRAFT=$(gh api "repos/$REPOSITORY/pulls/$PR" --jq .draft)
+          if [ "$DRAFT" = "true" ]; then
+            echo "Attestation complete; protected merge request deferred while PR $PR is draft"
+            exit 0
+          fi
           gh pr merge "$PR" --repo "$REPOSITORY" --auto --squash
           echo "Requested the protected merge path for PR $PR"
