@@ -1,9 +1,16 @@
 #!/usr/bin/env python3
-"""Clear the authenticated GitHub user's unread notification inbox.
+"""Move every authenticated GitHub notification inbox thread to Done.
 
 The script records counts only. It never logs notification subjects, repository
-names, URLs, or token material. Bulk clearing is followed by an exact unread
-inventory and an individual-thread fallback so the final count must be zero.
+names, URLs, thread identifiers, or token material. The GitHub notification API
+requires a classic personal access token with ``notifications`` or ``repo``
+scope; GitHub App and fine-grained tokens are intentionally unsupported by that
+API.
+
+Inbox clearance is stronger than marking notifications read: every thread still
+returned by ``GET /notifications?all=true`` is deleted through the documented
+"Mark a thread as done" endpoint. The final readback must show both zero inbox
+threads and zero unread threads.
 """
 from __future__ import annotations
 
@@ -20,9 +27,10 @@ from typing import Any
 
 API = "https://api.github.com"
 API_VERSION = "2022-11-28"
-PER_PAGE = 100
-MAX_PAGES = 100
-MAX_ATTEMPTS = 5
+PER_PAGE = 50
+MAX_PAGES = 200
+MAX_ROUNDS = 8
+SETTLE_SECONDS = 2
 
 
 class NotificationError(RuntimeError):
@@ -48,7 +56,7 @@ def request(
             "Accept": "application/vnd.github+json",
             "Authorization": f"Bearer {token}",
             "X-GitHub-Api-Version": API_VERSION,
-            "User-Agent": "szl-clear-personal-notifications/1.0",
+            "User-Agent": "szl-clear-personal-notifications/2.0",
             **({"Content-Type": "application/json"} if body is not None else {}),
         },
     )
@@ -76,12 +84,15 @@ def request(
         ) from exc
 
 
-def unread_thread_ids(token: str) -> list[str]:
+def notification_thread_ids(token: str, *, include_read: bool) -> list[str]:
+    """Return current inbox thread IDs without recording notification content."""
+
     ids: list[str] = []
+    seen: set[str] = set()
     for page in range(1, MAX_PAGES + 1):
         query = urllib.parse.urlencode(
             {
-                "all": "false",
+                "all": "true" if include_read else "false",
                 "participating": "false",
                 "per_page": PER_PAGE,
                 "page": page,
@@ -93,37 +104,26 @@ def unread_thread_ids(token: str) -> list[str]:
         for item in payload:
             thread_id = str((item or {}).get("id") or "")
             if not thread_id:
-                raise NotificationError("GitHub returned a notification without a thread id")
-            ids.append(thread_id)
+                raise NotificationError(
+                    "GitHub returned a notification without a thread id"
+                )
+            if thread_id not in seen:
+                seen.add(thread_id)
+                ids.append(thread_id)
         if len(payload) < PER_PAGE:
             return ids
     raise NotificationError(
-        f"Unread inventory exceeded the fail-closed limit of {MAX_PAGES * PER_PAGE}"
+        f"Inbox inventory exceeded the fail-closed limit of "
+        f"{MAX_PAGES * PER_PAGE} threads"
     )
 
 
-def mark_all_read(token: str) -> int:
-    status, _ = request(
-        token,
-        "PUT",
-        "/notifications",
-        {"last_read_at": utc_now()},
-    )
-    if status not in {202, 205}:
-        raise NotificationError(f"Unexpected bulk-clear response status: {status}")
-    return status
-
-
-def mark_thread_read(token: str, thread_id: str) -> None:
-    status, _ = request(
-        token,
-        "PATCH",
-        f"/notifications/threads/{urllib.parse.quote(thread_id, safe='')}",
-        {"read": True},
-    )
-    if status not in {200, 205}:
+def mark_thread_done(token: str, thread_id: str) -> None:
+    encoded = urllib.parse.quote(thread_id, safe="")
+    status, _ = request(token, "DELETE", f"/notifications/threads/{encoded}")
+    if status != 204:
         raise NotificationError(
-            f"Unexpected thread-clear response status for {thread_id}: {status}"
+            f"Unexpected mark-done response status for one thread: {status}"
         )
 
 
@@ -133,47 +133,51 @@ def clear_inbox(token: str) -> dict[str, Any]:
     if not identity:
         raise NotificationError("Authenticated GitHub identity did not expose a login")
 
-    before_ids = unread_thread_ids(token)
-    bulk_attempts = 0
-    fallback_threads = 0
-    remaining = before_ids
+    before_inbox = notification_thread_ids(token, include_read=True)
+    before_unread = notification_thread_ids(token, include_read=False)
 
-    for attempt in range(1, MAX_ATTEMPTS + 1):
-        bulk_attempts = attempt
-        mark_all_read(token)
-        time.sleep(2)
-        remaining = unread_thread_ids(token)
+    cleared_ids: set[str] = set()
+    delete_attempts = 0
+    rounds = 0
+    remaining = before_inbox
+
+    for round_number in range(1, MAX_ROUNDS + 1):
+        rounds = round_number
         if not remaining:
             break
-
         for thread_id in remaining:
-            mark_thread_read(token, thread_id)
-            fallback_threads += 1
-        time.sleep(2)
-        remaining = unread_thread_ids(token)
-        if not remaining:
-            break
-
-    if remaining:
-        mark_all_read(token)
-        time.sleep(3)
-        remaining = unread_thread_ids(token)
+            mark_thread_done(token, thread_id)
+            delete_attempts += 1
+            cleared_ids.add(thread_id)
+        time.sleep(SETTLE_SECONDS)
+        remaining = notification_thread_ids(token, include_read=True)
 
     if remaining:
         raise NotificationError(
-            f"Unread inbox did not converge to zero; remaining_count={len(remaining)}"
+            f"Notification inbox did not converge to zero; "
+            f"remaining_count={len(remaining)}"
+        )
+
+    final_unread = notification_thread_ids(token, include_read=False)
+    if final_unread:
+        raise NotificationError(
+            f"Unread notifications remained after inbox clearance; "
+            f"remaining_count={len(final_unread)}"
         )
 
     return {
-        "schema": "szl.github-notification-clearance/v1",
+        "schema": "szl.github-notification-clearance/v2",
         "generated_at": utc_now(),
         "identity": identity,
-        "before_unread_count": len(before_ids),
+        "before_inbox_count": len(before_inbox),
+        "before_unread_count": len(before_unread),
+        "after_inbox_count": 0,
         "after_unread_count": 0,
-        "cleared_count": len(before_ids),
-        "bulk_attempts": bulk_attempts,
-        "individual_thread_fallbacks": fallback_threads,
+        "cleared_count": len(cleared_ids),
+        "clearance_rounds": rounds,
+        "delete_attempts": delete_attempts,
         "notification_content_recorded": False,
+        "thread_ids_recorded": False,
         "status": "CLEARED",
     }
 
@@ -198,10 +202,12 @@ def main() -> int:
         code = 0
     except Exception as exc:  # noqa: BLE001
         report = {
-            "schema": "szl.github-notification-clearance/v1",
+            "schema": "szl.github-notification-clearance/v2",
             "generated_at": utc_now(),
+            "after_inbox_count": None,
             "after_unread_count": None,
             "notification_content_recorded": False,
+            "thread_ids_recorded": False,
             "status": "FAILED",
             "errors": [f"{type(exc).__name__}: {exc}"],
         }
