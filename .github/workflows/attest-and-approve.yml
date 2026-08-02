@@ -44,11 +44,29 @@ jobs:
         run: |
           set -euo pipefail
           if [ "$SOURCE_EVENT" = "merge_group" ]; then
-            [[ "$HEAD_BRANCH" == gh-readonly-queue/main/* ]] \
+            [[ "$HEAD_BRANCH" =~ ^gh-readonly-queue/main/pr-([0-9]+)-([0-9a-f]{40})$ ]] \
               || { echo "::error::unexpected merge-group branch: $HEAD_BRANCH"; exit 1; }
+            PR="${BASH_REMATCH[1]}"
+            QUEUED_BASE_SHA="${BASH_REMATCH[2]}"
+            gh api "repos/$REPOSITORY/pulls/$PR" > "$RUNNER_TEMP/pr.json"
+            [ "$(jq -r .head.repo.full_name "$RUNNER_TEMP/pr.json")" = "$REPOSITORY" ] \
+              || { echo "::error::merge-group PR is not from this repository"; exit 1; }
+            [ "$(jq -r .base.ref "$RUNNER_TEMP/pr.json")" = "main" ] \
+              || { echo "::error::merge-group PR does not target main"; exit 1; }
+            PR_DRAFT="$(jq -r .draft "$RUNNER_TEMP/pr.json")"
+            [[ "$PR_DRAFT" == "true" || "$PR_DRAFT" == "false" ]] \
+              || { echo "::error::merge-group PR draft state is invalid"; exit 1; }
+            [ "$PR_DRAFT" = "false" ] \
+              || { echo "::error::merge-group PR unexpectedly returned to draft"; exit 1; }
+            BODY_SHA256="$(jq -c '.body // ""' "$RUNNER_TEMP/pr.json" | sha256sum | cut -d' ' -f1)"
             echo "kind=merge_group" >> "$GITHUB_OUTPUT"
-            echo "number=" >> "$GITHUB_OUTPUT"
-            echo "node_id=" >> "$GITHUB_OUTPUT"
+            echo "number=$PR" >> "$GITHUB_OUTPUT"
+            echo "node_id=$(jq -r .node_id "$RUNNER_TEMP/pr.json")" >> "$GITHUB_OUTPUT"
+            echo "draft=$PR_DRAFT" >> "$GITHUB_OUTPUT"
+            echo "body_sha256=$BODY_SHA256" >> "$GITHUB_OUTPUT"
+            echo "base_ref=main" >> "$GITHUB_OUTPUT"
+            echo "base_sha=$QUEUED_BASE_SHA" >> "$GITHUB_OUTPUT"
+            echo "pr_head_sha=$(jq -r .head.sha "$RUNNER_TEMP/pr.json")" >> "$GITHUB_OUTPUT"
             exit 0
           fi
           [ "$SOURCE_EVENT" = "pull_request" ] \
@@ -59,10 +77,11 @@ jobs:
             "repos/$REPOSITORY/commits/$HEAD_SHA/pulls?per_page=100" \
             > "$RUNNER_TEMP/pulls.json"
           mapfile -t PRS < <(
-            jq -r --arg sha "$HEAD_SHA" \
+            jq -r --arg sha "$HEAD_SHA" --arg repository "$REPOSITORY" \
               '.[] | select(
                 .state == "open"
                 and .head.sha == $sha
+                and .head.repo.full_name == $repository
                 and (
                   .base.ref == "main"
                   or (.base.ref | startswith("release/"))
@@ -76,11 +95,23 @@ jobs:
           fi
           PR="${PRS[0]}"
           gh api "repos/$REPOSITORY/pulls/$PR" > "$RUNNER_TEMP/pr.json"
+          PR_DRAFT="$(jq -r .draft "$RUNNER_TEMP/pr.json")"
+          [[ "$PR_DRAFT" == "true" || "$PR_DRAFT" == "false" ]] \
+            || { echo "::error::pull request draft state is invalid"; exit 1; }
+          BODY_SHA256="$(jq -c '.body // ""' "$RUNNER_TEMP/pr.json" | sha256sum | cut -d' ' -f1)"
+          BASE_REF="$(jq -r .base.ref "$RUNNER_TEMP/pr.json")"
+          BASE_SHA="$(gh api "repos/$REPOSITORY/git/ref/heads/$BASE_REF" --jq .object.sha)"
           echo "kind=pull_request" >> "$GITHUB_OUTPUT"
           echo "number=$PR" >> "$GITHUB_OUTPUT"
           echo "node_id=$(jq -r .node_id "$RUNNER_TEMP/pr.json")" >> "$GITHUB_OUTPUT"
+          echo "draft=$PR_DRAFT" >> "$GITHUB_OUTPUT"
+          echo "body_sha256=$BODY_SHA256" >> "$GITHUB_OUTPUT"
+          echo "base_ref=$BASE_REF" >> "$GITHUB_OUTPUT"
+          echo "base_sha=$BASE_SHA" >> "$GITHUB_OUTPUT"
+          echo "pr_head_sha=$(jq -r .head.sha "$RUNNER_TEMP/pr.json")" >> "$GITHUB_OUTPUT"
 
       - name: Verify gates and preconditions P1-P7
+        if: steps.subject.outputs.kind == 'merge_group' || steps.subject.outputs.draft == 'false'
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
           HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
@@ -89,7 +120,7 @@ jobs:
           REPOSITORY: ${{ github.repository }}
         run: |
           set -euo pipefail
-          if [ "$SUBJECT_KIND" = "pull_request" ]; then
+          if [ -n "$PR" ]; then
           BODY=$(jq -r '.body // ""' "$RUNNER_TEMP/pr.json")
 
           grep -Eq 'Satisfies:[[:space:]]*(AT-[0-9]+|C-[0-9]+)' <<<"$BODY" \
@@ -103,7 +134,7 @@ jobs:
 
           gh api "repos/$REPOSITORY/pulls/$PR/files?per_page=100" --paginate \
             --jq '.[].filename' > "$RUNNER_TEMP/files.txt"
-          if grep -Eq '^(\.github/workflows/(attest-and-approve|gates|forge9-staging)\.ya?ml|\.governance/)' \
+          if grep -Eq '^(\.github/workflows/(attest-and-approve|gates|forge9-staging|merge-queue-enqueue)\.ya?ml|\.governance/)' \
               "$RUNNER_TEMP/files.txt"; then
             grep -Eq 'Solo-Operator-Authorization:[[:space:]]*confirmed' <<<"$BODY" \
               || { echo "::error::P5 governance change lacks solo-operator authorization"; exit 1; }
@@ -158,8 +189,15 @@ jobs:
             || { echo "::error::P7 default GITHUB_TOKEN can approve reviews"; exit 1; }
 
       - name: Build and sign the merge BAP
+        if: steps.subject.outputs.kind == 'merge_group' || steps.subject.outputs.draft == 'false'
         env:
           HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
+          PR_BODY_SHA256: ${{ steps.subject.outputs.body_sha256 }}
+          PR_BASE_REF: ${{ steps.subject.outputs.base_ref }}
+          PR_BASE_SHA: ${{ steps.subject.outputs.base_sha }}
+          PR_HEAD_SHA: ${{ steps.subject.outputs.pr_head_sha }}
+          SOURCE_GATE_EVENT: ${{ github.event.workflow_run.event }}
+          SOURCE_GATE_RUN_ID: ${{ github.event.workflow_run.id }}
           SUBJECT_KIND: ${{ steps.subject.outputs.kind }}
           PR: ${{ steps.subject.outputs.number }}
           REPOSITORY: ${{ github.repository }}
@@ -172,6 +210,12 @@ jobs:
             --arg subject_kind "$SUBJECT_KIND" \
             --arg pull_request "$PR" \
             --arg head_sha "$HEAD_SHA" \
+            --arg pull_request_body_sha256 "$PR_BODY_SHA256" \
+            --arg pull_request_base_ref "$PR_BASE_REF" \
+            --arg pull_request_base_sha "$PR_BASE_SHA" \
+            --arg pull_request_head_sha "$PR_HEAD_SHA" \
+            --arg source_gate_event "$SOURCE_GATE_EVENT" \
+            --arg source_gate_run_id "$SOURCE_GATE_RUN_ID" \
             --arg principal "spiffe://a11oy.net/ns/ci/sa/qillqaq-attestor" \
             --arg policy_id "merge-gate-v1" \
             --arg run_id "$RUN_ID" \
@@ -188,6 +232,23 @@ jobs:
                 end
               ),
               head_sha: $head_sha,
+              pull_request_body_sha256: (
+                if $pull_request != ""
+                then $pull_request_body_sha256
+                else null
+                end
+              ),
+              pull_request_base_ref: (
+                if $pull_request != "" then $pull_request_base_ref else null end
+              ),
+              pull_request_base_sha: (
+                if $pull_request != "" then $pull_request_base_sha else null end
+              ),
+              pull_request_head_sha: (
+                if $pull_request != "" then $pull_request_head_sha else null end
+              ),
+              source_gate_event: $source_gate_event,
+              source_gate_run_id: ($source_gate_run_id | tonumber),
               principal: $principal,
               policy_id: $policy_id,
               workflow_run_id: $run_id,
@@ -201,12 +262,15 @@ jobs:
             }' > merge-receipt.json
 
       - name: Install Cosign
+        if: steps.subject.outputs.kind == 'merge_group' || steps.subject.outputs.draft == 'false'
         uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2
 
       - name: Sign the merge BAP with Actions OIDC
+        if: steps.subject.outputs.kind == 'merge_group' || steps.subject.outputs.draft == 'false'
         run: cosign sign-blob --yes --bundle merge-receipt.bundle merge-receipt.json
 
       - name: Upload the signed merge BAP
+        if: steps.subject.outputs.kind == 'merge_group' || steps.subject.outputs.draft == 'false'
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: merge-receipt-${{ github.event.workflow_run.head_sha }}
@@ -216,36 +280,83 @@ jobs:
           if-no-files-found: error
           retention-days: 90
 
+      - name: Revalidate current PR generation before App mutations
+        if: steps.subject.outputs.kind == 'pull_request' && steps.subject.outputs.draft == 'false'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
+          PR: ${{ steps.subject.outputs.number }}
+          PR_BASE_REF: ${{ steps.subject.outputs.base_ref }}
+          PR_BASE_SHA: ${{ steps.subject.outputs.base_sha }}
+          PR_BODY_SHA256: ${{ steps.subject.outputs.body_sha256 }}
+          REPOSITORY: ${{ github.repository }}
+          SOURCE_GATE_RUN_ID: ${{ github.event.workflow_run.id }}
+        run: |
+          set -euo pipefail
+          gh api "repos/$REPOSITORY/pulls/$PR" > "$RUNNER_TEMP/pr-before-app-mutation.json"
+          CURRENT_HEAD="$(jq -r .head.sha "$RUNNER_TEMP/pr-before-app-mutation.json")"
+          CURRENT_BASE_REF="$(jq -r .base.ref "$RUNNER_TEMP/pr-before-app-mutation.json")"
+          CURRENT_BASE_SHA="$(gh api "repos/$REPOSITORY/git/ref/heads/$CURRENT_BASE_REF" --jq .object.sha)"
+          CURRENT_DRAFT="$(jq -r .draft "$RUNNER_TEMP/pr-before-app-mutation.json")"
+          CURRENT_BODY_SHA256="$(jq -c '.body // ""' "$RUNNER_TEMP/pr-before-app-mutation.json" | sha256sum | cut -d' ' -f1)"
+          LATEST_GATE_RUN_ID="$(gh api "repos/$REPOSITORY/actions/workflows/gates.yml/runs?event=pull_request&per_page=100" \
+            --jq "[.workflow_runs[] | select(.head_sha == \"$HEAD_SHA\")] | max_by(.id) | .id // 0")"
+          [ "$CURRENT_HEAD" = "$HEAD_SHA" ] \
+            || { echo "::error::pull request head moved before App mutation"; exit 1; }
+          [ "$CURRENT_DRAFT" = "false" ] \
+            || { echo "::error::pull request returned to draft before App mutation"; exit 1; }
+          [ "$CURRENT_BODY_SHA256" = "$PR_BODY_SHA256" ] \
+            || { echo "::error::pull request body changed before App mutation"; exit 1; }
+          [ "$CURRENT_BASE_REF" = "$PR_BASE_REF" ] && [ "$CURRENT_BASE_SHA" = "$PR_BASE_SHA" ] \
+            || { echo "::error::pull request base changed before App mutation"; exit 1; }
+          [ "$LATEST_GATE_RUN_ID" = "$SOURCE_GATE_RUN_ID" ] \
+            || { echo "::error::a newer gate generation exists for this head"; exit 1; }
+
       - name: Approve as the App and verify the review identity
-        if: steps.subject.outputs.kind == 'pull_request'
+        if: steps.subject.outputs.kind == 'pull_request' && steps.subject.outputs.draft == 'false'
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
           HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
           PR: ${{ steps.subject.outputs.number }}
           REPOSITORY: ${{ github.repository }}
+          PR_BASE_REF: ${{ steps.subject.outputs.base_ref }}
+          PR_BASE_SHA: ${{ steps.subject.outputs.base_sha }}
+          PR_BODY_SHA256: ${{ steps.subject.outputs.body_sha256 }}
+          SOURCE_GATE_RUN_ID: ${{ github.event.workflow_run.id }}
         run: |
           set -euo pipefail
           DIGEST=$(sha256sum merge-receipt.json | cut -d' ' -f1)
           gh api -X POST "repos/$REPOSITORY/pulls/$PR/reviews" \
             -f event=APPROVE \
-            -f body="ATTESTED. All Section 18 gates green. Merge BAP sha256: $DIGEST"
-          COUNT=$(gh api "repos/$REPOSITORY/pulls/$PR/reviews?per_page=100" --paginate \
-            --jq "[.[] | select(.user.login == \"qillqaq-attestor[bot]\" and .state == \"APPROVED\" and .commit_id == \"$HEAD_SHA\")] | length")
+            -f commit_id="$HEAD_SHA" \
+            -f body="ATTESTED. All Section 18 gates green. Merge BAP sha256: $DIGEST. PR body sha256: $PR_BODY_SHA256. Base: $PR_BASE_REF@$PR_BASE_SHA. Gate run: $SOURCE_GATE_RUN_ID"
+          gh api "repos/$REPOSITORY/pulls/$PR/reviews?per_page=100" --paginate --slurp \
+            > "$RUNNER_TEMP/review-pages.json"
+          COUNT=$(jq --arg head "$HEAD_SHA" --arg body_digest "PR body sha256: $PR_BODY_SHA256" --arg base "Base: $PR_BASE_REF@$PR_BASE_SHA" --arg gate_run "Gate run: $SOURCE_GATE_RUN_ID" '[.[][] | select(
+            .user.login == "qillqaq-attestor[bot]"
+            and .state == "APPROVED"
+            and .commit_id == $head
+            and ((.body // "") | contains($body_digest))
+            and ((.body // "") | contains($base))
+            and ((.body // "") | contains($gate_run))
+          )] | length' "$RUNNER_TEMP/review-pages.json")
           [ "$COUNT" -ge 1 ] \
             || { echo "::error::App approval was not recorded for the exact head SHA"; exit 1; }
 
       - name: Publish required App attestation status
+        if: steps.subject.outputs.kind == 'merge_group' || steps.subject.outputs.draft == 'false'
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
           HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
           SUBJECT_KIND: ${{ steps.subject.outputs.kind }}
+          SOURCE_GATE_RUN_ID: ${{ github.event.workflow_run.id }}
           REPOSITORY: ${{ github.repository }}
         run: |
           set -euo pipefail
           if [ "$SUBJECT_KIND" = "pull_request" ]; then
-            DESCRIPTION="Signed BAP and exact-head App review verified"
+            DESCRIPTION="Signed BAP and App review for gate run $SOURCE_GATE_RUN_ID"
           else
-            DESCRIPTION="Signed BAP verified for merge-group gates"
+            DESCRIPTION="Signed BAP for merge-group gate run $SOURCE_GATE_RUN_ID"
           fi
           gh api \
             --method POST \
@@ -257,12 +368,45 @@ jobs:
           echo "Published attestation/qillqaq for $HEAD_SHA"
 
       - name: Request protected merge after attestation
-        if: steps.subject.outputs.kind == 'pull_request'
+        if: steps.subject.outputs.kind == 'pull_request' && steps.subject.outputs.draft == 'false'
         env:
           GH_TOKEN: ${{ github.token }}
+          HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
           PR: ${{ steps.subject.outputs.number }}
+          PR_BASE_REF: ${{ steps.subject.outputs.base_ref }}
+          PR_BASE_SHA: ${{ steps.subject.outputs.base_sha }}
+          PR_BODY_SHA256: ${{ steps.subject.outputs.body_sha256 }}
           REPOSITORY: ${{ github.repository }}
+          SOURCE_GATE_RUN_ID: ${{ github.event.workflow_run.id }}
         run: |
           set -euo pipefail
+          gh api "repos/$REPOSITORY/pulls/$PR" > "$RUNNER_TEMP/pr-before-queue.json"
+          DRAFT=$(jq -r .draft "$RUNNER_TEMP/pr-before-queue.json")
+          if [ "$DRAFT" = "true" ]; then
+            echo "Attestation complete; protected merge request deferred while PR $PR is draft"
+            exit 0
+          fi
+          [ "$DRAFT" = "false" ] \
+            || { echo "::error::pull request draft state is invalid"; exit 1; }
+          CURRENT_HEAD=$(jq -r .head.sha "$RUNNER_TEMP/pr-before-queue.json")
+          CURRENT_BASE_REF=$(jq -r .base.ref "$RUNNER_TEMP/pr-before-queue.json")
+          CURRENT_BASE_SHA=$(gh api "repos/$REPOSITORY/git/ref/heads/$CURRENT_BASE_REF" --jq .object.sha)
+          CURRENT_BODY_SHA256=$(jq -c '.body // ""' "$RUNNER_TEMP/pr-before-queue.json" | sha256sum | cut -d' ' -f1)
+          LATEST_GATE_RUN_ID="$(gh api "repos/$REPOSITORY/actions/workflows/gates.yml/runs?event=pull_request&per_page=100" \
+            --jq "[.workflow_runs[] | select(.head_sha == \"$HEAD_SHA\")] | max_by(.id) | .id // 0")"
+          [ "$CURRENT_HEAD" = "$HEAD_SHA" ] \
+            || { echo "::error::pull request head moved before queue request"; exit 1; }
+          [ "$CURRENT_BODY_SHA256" = "$PR_BODY_SHA256" ] \
+            || { echo "::error::pull request body changed after attestation"; exit 1; }
+          [ "$CURRENT_BASE_REF" = "$PR_BASE_REF" ] && [ "$CURRENT_BASE_SHA" = "$PR_BASE_SHA" ] \
+            || { echo "::error::pull request base changed after attestation"; exit 1; }
+          [ "$LATEST_GATE_RUN_ID" = "$SOURCE_GATE_RUN_ID" ] \
+            || { echo "::error::a newer gate generation exists before queue request"; exit 1; }
+          if [ "$PR_BASE_REF" = "main" ]; then
+            echo "Attestation complete; trusted default-branch controller owns the main queue request"
+            exit 0
+          fi
+          [[ "$PR_BASE_REF" == release/* ]] \
+            || { echo "::error::unsupported protected base $PR_BASE_REF"; exit 1; }
           gh pr merge "$PR" --repo "$REPOSITORY" --auto --squash
           echo "Requested the protected merge path for PR $PR"
