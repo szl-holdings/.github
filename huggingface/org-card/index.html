@@ -1,29 +1,32 @@
 <!doctype html>
 <html lang="en">
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-  <meta name="color-scheme" content="dark">
-  <meta name="theme-color" content="#070b12">
-  <meta name="description" content="SZL Holdings builds governed decision infrastructure for systems that must explain, constrain, and verify action.">
-  <title>SZL Holdings — Autonomy, under authority</title>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="color-scheme" content="dark" />
+  <meta name="theme-color" content="#070b12" />
+  <meta
+    name="description"
+    content="SZL Holdings builds governed intelligence systems with evidence, policy controls, and auditable execution boundaries."
+  />
+  <title>SZL Holdings - Governed Decision Infrastructure</title>
   <style>
     :root {
       --void: #070b12;
-      --ground: #0b111b;
-      --panel: #101824;
-      --panel-2: #141e2c;
+      --panel: #0f1724;
+      --panel-2: #121d2b;
+      --panel-3: #0d141f;
       --line: #263344;
       --ink: #f3f5f8;
       --muted: #aab5c5;
       --quiet: #6f7d91;
-      --teal: #47d7c4;
-      --teal-hi: #7ce8da;
-      --gold: #d7b55e;
-      --gold-hi: #e6ca82;
-      --warning: #d79b5e;
+      --teal: #4de0cb;
+      --teal-hi: #88f3e3;
+      --gold: #ddbf71;
+      --gold-hi: #efdb9b;
+      --danger: #f0a86a;
       --radius: 18px;
-      --mono: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+      --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
       --sans: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
     }
 
@@ -32,7 +35,8 @@
     body {
       margin: 0;
       background:
-        radial-gradient(900px 520px at 78% -8%, rgba(47, 127, 139, .24), transparent 68%),
+        radial-gradient(900px 460px at 84% -6%, rgba(47, 127, 139, .22), transparent 62%),
+        radial-gradient(740px 360px at -10% 20%, rgba(215, 191, 96, .11), transparent 62%),
         var(--void);
       color: var(--ink);
       font-family: var(--sans);
@@ -41,10 +45,27 @@
     }
 
     a { color: inherit; }
-    a:focus-visible, button:focus-visible { outline: 3px solid var(--teal); outline-offset: 4px; }
-    .skip { position: absolute; left: -9999px; top: 0; }
-    .skip:focus { left: 16px; top: 16px; z-index: 20; background: var(--ink); color: var(--void); padding: 10px 14px; }
-    .shell { width: min(1180px, calc(100% - 40px)); margin: 0 auto; }
+    .skip {
+      position: absolute;
+      left: -9999px;
+      top: 0;
+    }
+    .skip:focus {
+      left: 16px;
+      top: 16px;
+      z-index: 20;
+      background: var(--ink);
+      color: var(--void);
+      border-radius: 12px;
+      padding: 10px 14px;
+      text-decoration: none;
+      font-weight: 650;
+    }
+
+    .shell {
+      width: min(1180px, calc(100% - 40px));
+      margin: 0 auto;
+    }
 
     header {
       position: sticky;
@@ -52,114 +73,370 @@
       z-index: 10;
       border-bottom: 1px solid rgba(132, 149, 171, .18);
       background: rgba(7, 11, 18, .88);
-      backdrop-filter: blur(18px);
+      backdrop-filter: blur(16px);
     }
-    .nav { min-height: 72px; display: flex; align-items: center; justify-content: space-between; gap: 24px; }
-    .brand { display: inline-flex; align-items: center; gap: 12px; text-decoration: none; font-weight: 760; letter-spacing: .08em; }
-    .brand-mark { width: 13px; height: 13px; border-radius: 50%; background: var(--teal); box-shadow: 0 0 22px rgba(71, 215, 196, .48); }
-    nav { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px 22px; }
-    nav a { color: var(--muted); text-decoration: none; font-size: 14px; }
-    nav a:hover { color: var(--ink); }
+    .topbar {
+      min-height: 72px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 20px;
+    }
+    .brand {
+      display: inline-flex;
+      align-items: center;
+      gap: 12px;
+      text-decoration: none;
+      font-weight: 760;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+      font-size: 14px;
+      color: var(--ink);
+    }
+    .brand-mark {
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      background: radial-gradient(circle at 30% 30%, var(--teal-hi), var(--teal));
+      box-shadow: 0 0 20px rgba(77, 224, 203, .55);
+    }
+    nav {
+      display: flex;
+      align-items: center;
+      gap: 14px 22px;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+    }
+    nav a {
+      color: var(--muted);
+      text-decoration: none;
+      font-size: 14px;
+      font-weight: 560;
+      padding: 4px 0;
+      border-bottom: 1px solid transparent;
+    }
+    nav a:hover { color: var(--ink); border-bottom-color: var(--teal); }
+    nav a.important { color: var(--teal-hi); border-bottom: 1px solid var(--teal); }
 
-    main { overflow: hidden; }
-    .hero { padding: clamp(72px, 10vw, 132px) 0 84px; display: grid; grid-template-columns: 1.1fr .9fr; gap: 64px; align-items: center; }
-    .eyebrow { color: var(--teal); font-family: var(--mono); font-size: 12px; font-weight: 700; letter-spacing: .17em; text-transform: uppercase; }
-    h1 { margin: 20px 0; max-width: 780px; font-size: clamp(48px, 7vw, 88px); line-height: .98; letter-spacing: -.055em; text-wrap: balance; }
+    section { padding: 78px 0; border-top: 1px solid rgba(132, 149, 171, .14); }
+    .hero {
+      padding-top: 88px;
+      padding-bottom: 92px;
+      display: grid;
+      grid-template-columns: 1.05fr .95fr;
+      gap: 48px;
+      align-items: center;
+    }
+
+    .eyebrow {
+      color: var(--teal);
+      font-family: var(--mono);
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: .17em;
+      text-transform: uppercase;
+    }
+    h1 {
+      margin: 14px 0 14px;
+      max-width: 760px;
+      font-size: clamp(46px, 7vw, 86px);
+      line-height: .98;
+      letter-spacing: -.06em;
+      text-wrap: balance;
+    }
     h1 span { color: var(--gold-hi); }
-    .lede { max-width: 650px; color: var(--muted); font-size: clamp(18px, 2.2vw, 23px); }
-    .actions { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 34px; }
-    .button { display: inline-flex; min-height: 46px; align-items: center; justify-content: center; border: 1px solid var(--line); border-radius: 999px; padding: 0 20px; text-decoration: none; font-size: 14px; font-weight: 720; }
-    .button.primary { background: var(--gold); border-color: var(--gold); color: #101216; }
-    .button.primary:hover { background: var(--gold-hi); }
-    .button.secondary:hover { border-color: var(--teal); color: var(--teal-hi); }
-    .hero-visual { width: 100%; filter: drop-shadow(0 28px 80px rgba(0, 0, 0, .34)); }
+    .lede {
+      max-width: 640px;
+      color: var(--muted);
+      font-size: clamp(18px, 2.2vw, 23px);
+      margin: 0 0 26px;
+    }
+    .actions { display: flex; flex-wrap: wrap; gap: 12px; }
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 45px;
+      border-radius: 999px;
+      text-decoration: none;
+      font-size: 14px;
+      font-weight: 720;
+      padding: 0 20px;
+      border: 1px solid transparent;
+    }
+    .btn.primary {
+      background: var(--gold);
+      color: #101216;
+      border-color: var(--gold);
+    }
+    .btn.primary:hover { background: var(--gold-hi); }
+    .btn.ghost {
+      color: var(--muted);
+      border-color: var(--line);
+    }
+    .btn.ghost:hover { color: var(--ink); border-color: var(--teal); }
 
-    section { padding: 82px 0; border-top: 1px solid rgba(132, 149, 171, .14); }
-    .section-head { display: grid; grid-template-columns: .85fr 1.15fr; gap: 48px; align-items: start; margin-bottom: 36px; }
-    h2 { margin: 10px 0 0; font-size: clamp(32px, 4vw, 52px); line-height: 1.08; letter-spacing: -.035em; text-wrap: balance; }
-    .section-copy { color: var(--muted); font-size: 18px; max-width: 680px; margin: 6px 0 0; }
+    .status {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 12px;
+      margin-top: 24px;
+    }
+    .pill {
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      padding: 9px 12px;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      color: var(--quiet);
+      font-size: 12px;
+      font-family: var(--mono);
+      background: rgba(8, 14, 20, .48);
+    }
+    .pill strong { color: var(--ink); font-weight: 690; }
+    .pill::before {
+      content: "";
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--teal);
+      box-shadow: 0 0 0 5px rgba(77, 224, 203, .15);
+    }
 
-    .cards { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
-    .card { min-height: 260px; display: flex; flex-direction: column; border: 1px solid var(--line); border-radius: var(--radius); padding: 25px; background: linear-gradient(150deg, rgba(20, 30, 44, .9), rgba(12, 18, 28, .92)); text-decoration: none; }
-    .card:hover { transform: translateY(-3px); border-color: rgba(71, 215, 196, .5); }
-    .card .tag { color: var(--teal); font-family: var(--mono); font-size: 11px; font-weight: 700; letter-spacing: .15em; text-transform: uppercase; }
-    .card h3 { margin: 18px 0 10px; font-size: 24px; letter-spacing: -.025em; }
+    .section-head {
+      display: grid;
+      grid-template-columns: .85fr 1.15fr;
+      gap: 30px 40px;
+      align-items: start;
+      margin-bottom: 36px;
+    }
+    h2 {
+      margin: 10px 0 0;
+      font-size: clamp(33px, 4vw, 52px);
+      line-height: 1.08;
+      letter-spacing: -.034em;
+      text-wrap: balance;
+    }
+    .section-copy {
+      color: var(--muted);
+      font-size: 18px;
+      max-width: 680px;
+    }
+    .hero-image {
+      width: min(100%, 620px);
+      justify-self: end;
+      border-radius: 24px;
+      border: 1px solid var(--line);
+      background: linear-gradient(150deg, rgba(15, 23, 36, .8), rgba(8, 12, 18, .94));
+      box-shadow: 0 28px 90px rgba(0, 0, 0, .34);
+      padding: 14px;
+      display: block;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 16px;
+    }
+    .card {
+      min-height: 256px;
+      display: flex;
+      flex-direction: column;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      padding: 24px;
+      background: linear-gradient(150deg, rgba(20, 30, 44, .96), rgba(12, 18, 28, .94));
+      text-decoration: none;
+      transition: border-color .2s ease, transform .2s ease;
+    }
+    .card:hover {
+      transform: translateY(-3px);
+      border-color: rgba(77, 224, 203, .5);
+    }
+    .tag {
+      display: inline-flex;
+      font-family: var(--mono);
+      text-transform: uppercase;
+      letter-spacing: .12em;
+      font-size: 11px;
+      font-weight: 760;
+      color: var(--teal-hi);
+      margin-bottom: 8px;
+    }
+    .card h3 {
+      margin: 8px 0 12px;
+      font-size: 25px;
+      letter-spacing: -.028em;
+    }
     .card p { color: var(--muted); margin: 0; }
-    .card .arrow { margin-top: auto; padding-top: 30px; color: var(--gold-hi); font-family: var(--mono); font-size: 13px; }
+    .link-arrow {
+      margin-top: auto;
+      padding-top: 24px;
+      color: var(--gold-hi);
+      font-family: var(--mono);
+      font-size: 13px;
+      letter-spacing: .02em;
+    }
 
-    .loop { position: relative; overflow: hidden; border: 1px solid var(--line); border-radius: 24px; padding: clamp(26px, 5vw, 54px); background: #090f17; }
-    .loop::after { content: ""; position: absolute; inset: 0; pointer-events: none; background: linear-gradient(90deg, transparent, rgba(71, 215, 196, .05), transparent); }
-    .steps { position: relative; z-index: 1; display: grid; grid-template-columns: repeat(6, 1fr); gap: 12px; }
-    .step { min-height: 122px; border-top: 2px solid var(--line); padding: 16px 8px 0 0; }
-    .step strong { display: block; color: var(--ink); font-family: var(--mono); font-size: 12px; letter-spacing: .08em; text-transform: uppercase; }
-    .step span { display: block; margin-top: 10px; color: var(--quiet); font-size: 13px; }
+    .loop {
+      border: 1px solid var(--line);
+      border-radius: 22px;
+      padding: 28px;
+      background: #0a111b;
+      position: relative;
+      overflow: hidden;
+    }
+    .loop::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      background: linear-gradient(90deg, transparent 20%, rgba(77, 224, 203, .04) 50%, transparent);
+    }
+    .steps {
+      position: relative;
+      z-index: 1;
+      display: grid;
+      grid-template-columns: repeat(6, minmax(0, 1fr));
+      gap: 12px;
+    }
+    .step {
+      border-top: 2px solid var(--line);
+      min-height: 118px;
+      padding: 12px 8px 0 0;
+    }
+    .step > strong {
+      display: block;
+      color: var(--ink);
+      font-family: var(--mono);
+      text-transform: uppercase;
+      letter-spacing: .09em;
+      font-size: 11px;
+      margin-bottom: 10px;
+    }
+    .step > span {
+      color: var(--quiet);
+      font-size: 13px;
+      display: block;
+    }
     .step.control { border-color: var(--teal); }
     .step.evidence { border-color: var(--gold); }
 
-    .contract { display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; }
-    .contract article { border-left: 2px solid var(--line); padding: 4px 22px 18px; }
-    .contract article:nth-child(1), .contract article:nth-child(2) { border-color: var(--teal); }
-    .contract article:nth-child(3), .contract article:nth-child(4) { border-color: var(--gold); }
-    .contract h3 { margin: 0 0 9px; font-size: 19px; }
+    .contract {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 16px;
+    }
+    .contract article {
+      border-left: 2px solid var(--line);
+      padding: 4px 22px 18px;
+    }
+    .contract h3 { margin: 0 0 10px; font-size: 19px; }
     .contract p { margin: 0; color: var(--muted); }
 
-    .truth { display: grid; grid-template-columns: 1.15fr .85fr; gap: 24px; }
-    .truth-panel { border: 1px solid var(--line); border-radius: var(--radius); padding: 28px; background: var(--panel); }
-    .truth-panel h3 { margin: 0 0 14px; }
-    .truth-panel p { color: var(--muted); margin: 0 0 18px; }
-    .labels { display: flex; flex-wrap: wrap; gap: 8px; }
-    .label { border: 1px solid var(--line); border-radius: 999px; padding: 7px 10px; color: var(--muted); font-family: var(--mono); font-size: 11px; }
-    .label.measured { border-color: rgba(71, 215, 196, .52); color: var(--teal-hi); }
-    .label.conjecture { border-color: rgba(170, 181, 197, .38); color: #c0c8d3; }
-    code { color: var(--gold-hi); font-family: var(--mono); }
+    .truth {
+      display: grid;
+      grid-template-columns: 1.15fr .85fr;
+      gap: 24px;
+    }
+    .panel {
+      border: 1px solid var(--line);
+      border-radius: 22px;
+      padding: 25px;
+      background: var(--panel-2);
+    }
+    .panel h3 { margin-top: 0; }
+    .panel p { color: var(--muted); }
+    .labels {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 16px;
+    }
+    .chip {
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      padding: 6px 10px;
+      color: var(--muted);
+      font-family: var(--mono);
+      font-size: 11px;
+    }
+    .chip.measured { color: var(--teal-hi); border-color: rgba(77, 224, 203, .5); }
 
-    .closing { padding-bottom: 112px; }
-    .closing-panel { border-radius: 24px; padding: clamp(34px, 7vw, 72px); background: linear-gradient(130deg, #132636, #111721 58%, #211c12); border: 1px solid rgba(215, 181, 94, .32); }
-    .closing-panel h2 { max-width: 760px; }
-    .closing-panel p { max-width: 680px; color: var(--muted); font-size: 18px; }
+    .closing {
+      margin-top: 18px;
+      padding: 24px;
+      border-radius: 24px;
+      border: 1px solid rgba(221, 191, 113, .36);
+      background: linear-gradient(130deg, #132636, #111723 58%, #211f16);
+    }
+    .closing h2 { margin-top: 0; }
+    .closing p { max-width: 690px; color: var(--muted); font-size: 18px; }
 
-    footer { border-top: 1px solid rgba(132, 149, 171, .14); padding: 32px 0 46px; color: var(--quiet); font-size: 13px; }
-    .footer-row { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 20px; }
+    footer {
+      border-top: 1px solid rgba(132, 149, 171, .14);
+      padding: 32px 0 44px;
+      color: var(--quiet);
+      font-size: 13px;
+    }
+    footer a:hover { color: var(--ink); }
+    .footer-row {
+      display: flex;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 18px;
+    }
     .footer-links { display: flex; flex-wrap: wrap; gap: 18px; }
-    .footer-links a { text-decoration: none; }
-    .footer-links a:hover { color: var(--ink); }
 
-    @media (max-width: 900px) {
-      .hero, .section-head, .truth { grid-template-columns: 1fr; }
-      .hero { gap: 42px; }
-      .hero-visual { max-width: 640px; }
-      .cards { grid-template-columns: 1fr 1fr; }
-      .steps { grid-template-columns: repeat(3, 1fr); }
+    @media (max-width: 1024px) {
+      .grid { grid-template-columns: 1fr 1fr; }
+      .steps { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    }
+    @media (max-width: 820px) {
+      .hero,
+      .section-head,
+      .truth { grid-template-columns: 1fr; }
+      .grid { grid-template-columns: 1fr; }
+      .contract { grid-template-columns: 1fr; }
+      .status { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .hero { gap: 40px; }
+      nav a:not(.essential) { display: none; }
     }
     @media (max-width: 640px) {
       .shell { width: min(100% - 28px, 1180px); }
-      .nav { min-height: 64px; }
-      nav a:not(.essential) { display: none; }
-      .hero { padding-top: 58px; }
+      .topbar { min-height: 64px; }
+      .hero { padding-top: 56px; padding-bottom: 68px; }
       h1 { font-size: clamp(42px, 15vw, 68px); }
-      .cards, .contract { grid-template-columns: 1fr; }
       .steps { grid-template-columns: 1fr 1fr; }
-      section { padding: 64px 0; }
     }
+
     @media (prefers-reduced-motion: reduce) {
-      html { scroll-behavior: auto; }
-      .card { transition: none; }
+      *,
+      *::before,
+      *::after { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; }
+      :root { scroll-behavior: auto; }
+      body { scroll-behavior: auto; }
+      .topbar { backdrop-filter: none; }
+      .card:hover,
+      .btn:hover { transform: none; }
     }
   </style>
 </head>
 <body data-szl-surface="company-front-door">
   <a class="skip" href="#main">Skip to main content</a>
   <header>
-    <div class="shell nav">
+    <div class="shell topbar">
       <a class="brand" href="https://huggingface.co/SZLHOLDINGS" aria-label="SZL Holdings on Hugging Face">
         <span class="brand-mark" aria-hidden="true"></span>
-        SZL HOLDINGS
+        SZL Holdings
       </a>
       <nav aria-label="Primary">
         <a href="#system">System</a>
         <a href="#artifacts">Artifacts</a>
         <a href="#evidence">Evidence</a>
-        <a class="essential" href="https://a-11-oy.com">Open a11oy ↗</a>
+        <a href="#proof">Proof</a>
+        <a class="important essential" href="https://a-11-oy.com">a11oy core</a>
       </nav>
     </div>
   </header>
@@ -168,31 +445,50 @@
     <div class="shell hero">
       <div>
         <div class="eyebrow">Governed decision infrastructure</div>
-        <h1>Autonomy,<br><span>under authority.</span></h1>
-        <p class="lede">Systems that can reason, act within a declared bound, and return evidence another party can verify.</p>
+        <h1>Autonomy<br /><span>under authority</span></h1>
+        <p class="lede">
+          We build systems that constrain model outputs with policy, provenance, and
+          auditable receipt checks before execution.
+        </p>
         <div class="actions">
-          <a class="button primary" href="https://a-11-oy.com">Open the command system</a>
-          <a class="button secondary" href="https://a11oy.net">Inspect the proof registry</a>
-          <a class="button secondary" href="https://github.com/szl-holdings">View source</a>
+          <a class="btn primary" href="https://a-11-oy.com">Open the command system</a>
+          <a class="btn ghost" href="https://a11oy.net">Review trust posture</a>
+          <a class="btn ghost" href="https://github.com/szl-holdings">Open source root</a>
+        </div>
+        <div class="status" aria-label="Operational status tokens">
+          <span class="pill"><strong>Status:</strong> front-door static</span>
+          <span class="pill"><strong>Scope:</strong> operational + non-operational boundaries</span>
+          <span class="pill"><strong>Integrity:</strong> source-bound front door</span>
+          <span class="pill"><strong>Evidence:</strong> artifact receipts and checks</span>
         </div>
       </div>
-      <img class="hero-visual" src="assets/estate-command-system.svg" alt="Signal to policy to bounded action to receipt to verification">
+      <img
+        class="hero-image"
+        src="assets/estate-command-system.svg"
+        alt="Governed decision loop: signal to policy to bounded action to receipt to verification"
+      />
     </div>
 
     <section id="system">
       <div class="shell">
         <div class="section-head">
-          <div><div class="eyebrow">One governed loop</div><h2>Control before action. Evidence after.</h2></div>
-          <p class="section-copy">The model proposes. A policy layer validates authority and evidence. The runtime executes only within a declared bound. A portable receipt records the decision path for independent review.</p>
+          <div>
+            <div class="eyebrow">The governed model-to-runtime loop</div>
+            <h2>Control before action. Evidence after.</h2>
+          </div>
+          <p class="section-copy">
+            Model proposals are admissible only when they pass policy and evidence checks.
+            Executed actions are bounded, receipt-bound, and independently verifiable.
+          </p>
         </div>
         <div class="loop" aria-label="Governed loop stages">
           <div class="steps">
-            <div class="step"><strong>Signal</strong><span>Observe and attribute the request.</span></div>
-            <div class="step"><strong>Reason</strong><span>Ground the proposal in disclosed context.</span></div>
-            <div class="step control"><strong>Policy</strong><span>Allow, require approval, or refuse.</span></div>
-            <div class="step control"><strong>Act</strong><span>Execute only inside the permitted bound.</span></div>
-            <div class="step evidence"><strong>Receipt</strong><span>Bind inputs, policy, action, and outcome.</span></div>
-            <div class="step evidence"><strong>Verify</strong><span>Replay evidence outside the product UI.</span></div>
+            <div class="step"><strong>Signal</strong><span>Capture and attribute request context.</span></div>
+            <div class="step"><strong>Reason</strong><span>Build proposals from admissible inputs.</span></div>
+            <div class="step control"><strong>Policy</strong><span>Route through allow, human, deny.</span></div>
+            <div class="step control"><strong>Action</strong><span>Execute only within configured bounds.</span></div>
+            <div class="step evidence"><strong>Receipt</strong><span>Bind proposal, approvals, and run inputs.</span></div>
+            <div class="step evidence"><strong>Verify</strong><span>Replay receipts from a verifier view.</span></div>
           </div>
         </div>
       </div>
@@ -201,33 +497,51 @@
     <section id="artifacts">
       <div class="shell">
         <div class="section-head">
-          <div><div class="eyebrow">Hugging Face portfolio</div><h2>Artifacts with explicit boundaries.</h2></div>
-          <p class="section-copy">Models, datasets, tools, and demonstrations are different product objects. Each owns its license, lineage, evaluation, runtime, and limitation evidence.</p>
+          <div>
+            <div class="eyebrow">Portfolio and object model</div>
+            <h2>Artifacts are explicit by type.</h2>
+          </div>
+          <p class="section-copy">
+            Models, datasets, kernels, and Spaces are separate artifact classes.
+            Each one has its own governance boundary and evidence contract.
+          </p>
         </div>
-        <div class="cards">
+        <div class="grid">
           <a class="card" href="https://huggingface.co/SZLHOLDINGS/SZL-Forge-1.5B-ReceiptAgent">
-            <span class="tag">Model family</span><h3>ReceiptAgent</h3>
-            <p>Compact receipt proposal artifact. Use with a validating controller; no autonomous or high-stakes boundary is implied.</p><span class="arrow">Inspect the card →</span>
+            <span class="tag">Model family</span>
+            <h3>ReceiptAgent</h3>
+            <p>Compact receipt proposal runtime. Operational use requires a validating controller.</p>
+            <span class="link-arrow">Inspect the card -></span>
           </a>
           <a class="card" href="https://huggingface.co/SZLHOLDINGS/SZL-Khipu-1.5B">
-            <span class="tag">Model family</span><h3>Khipu</h3>
-            <p>Grounded estate-navigation model family. Pair with cited retrieval and independently inspect the source evidence.</p><span class="arrow">Inspect the family →</span>
+            <span class="tag">Model family</span>
+            <h3>Khipu</h3>
+            <p>Estate-grounding navigation family. Use with independent source verification and policy limits.</p>
+            <span class="link-arrow">Inspect the card -></span>
           </a>
           <a class="card" href="https://huggingface.co/datasets/SZLHOLDINGS/szl-lake">
-            <span class="tag">Evidence dataset</span><h3>szl-lake</h3>
-            <p>Receipt and evidence records with explicit admission boundaries. A stored row is not automatically training-admitted.</p><span class="arrow">Inspect the lake →</span>
+            <span class="tag">Evidence dataset</span>
+            <h3>szl-lake</h3>
+            <p>Provenance row store for governed evidence records and admission state.</p>
+            <span class="link-arrow">Inspect provenance -></span>
           </a>
           <a class="card" href="https://huggingface.co/datasets/SZLHOLDINGS/killinchu-osint-corpus">
-            <span class="tag">Research dataset</span><h3>Killinchu corpus</h3>
-            <p>Public-source research corpus for the operator demonstration. It is not an operational intelligence feed.</p><span class="arrow">Inspect provenance →</span>
+            <span class="tag">Research dataset</span>
+            <h3>Killinchu corpus</h3>
+            <p>Public-source corpus for operator-oriented demos.</p>
+            <span class="link-arrow">Inspect the corpus -></span>
           </a>
           <a class="card" href="https://huggingface.co/SZLHOLDINGS/szl-kernels">
-            <span class="tag">Kernel registry</span><h3>SZL Kernels</h3>
-            <p>Runtime and computation artifacts. Kernel source and executable tests do not imply trained model weights.</p><span class="arrow">Inspect compatibility →</span>
+            <span class="tag">Kernel registry</span>
+            <h3>SZL Kernels</h3>
+            <p>Runtime artifacts and compute interfaces; kernels are not model capability claims.</p>
+            <span class="link-arrow">Inspect compatibility -></span>
           </a>
           <a class="card" href="https://huggingface.co/spaces/SZLHOLDINGS/a11oy">
-            <span class="tag">Demonstration</span><h3>a11oy</h3>
-            <p>A public command-system surface. Running transport and operational capability remain separately evidenced.</p><span class="arrow">Open the Space →</span>
+            <span class="tag">Demonstration</span>
+            <h3>a11oy space</h3>
+            <p>Public demo surface. Runtime and policy behavior remain independently validated.</p>
+            <span class="link-arrow">Open Space -></span>
           </a>
         </div>
       </div>
@@ -236,42 +550,73 @@
     <section id="evidence">
       <div class="shell">
         <div class="section-head">
-          <div><div class="eyebrow">Publication contract</div><h2>A card is not proof.</h2></div>
-          <p class="section-copy">Promotion requires exact lineage, hashes, load and inference evidence, evaluation, restart reproducibility, resource context, and an explicit autonomy boundary.</p>
+          <div>
+            <div class="eyebrow">Promotion contract</div>
+            <h2>A card is an index. Not a verdict.</h2>
+          </div>
+          <p class="section-copy">
+            Promotion requires exact lineage, clear boundaries, reproducible evaluation,
+            and explicit restart and throughput evidence.
+          </p>
         </div>
         <div class="contract">
-          <article><h3>Weights</h3><p>Base and license lineage, immutable hashes, clean load, held-out evaluation, restart evidence, resource envelope.</p></article>
-          <article><h3>Datasets</h3><p>Schema, splits, provenance, consent, PII posture, validation, quarantine, gaps, and update policy.</p></article>
-          <article><h3>Kernels</h3><p>Canonical source, supported hardware matrix, executable tests, benchmark protocol, and non-model classification.</p></article>
-          <article><h3>Spaces</h3><p>Source revision, dependency pins, served-revision binding, privacy behavior, limits, and a reproducible local path.</p></article>
-        </div>
-
-        <div class="truth" style="margin-top:48px">
-          <div class="truth-panel">
-            <h3>Evidence and runtime are separate axes.</h3>
-            <p>A signature establishes integrity and origin within scope. It does not automatically establish model quality, safety, regulatory compliance, profitability, or authorization to operate.</p>
-            <div class="labels">
-              <span class="label">PROVED</span><span class="label measured">MEASURED</span><span class="label">REPORTED</span><span class="label">MODELED</span><span class="label conjecture">CONJECTURE</span><span class="label">ROADMAP</span>
-            </div>
-          </div>
-          <div class="truth-panel">
-            <h3>Inspect the served source.</h3>
-            <p>This page is published from GitHub. The running Space exposes its source binding at <code>/deployment.json</code>.</p>
-            <a class="button secondary" href="deployment.json">Open deployment evidence</a>
-          </div>
+          <article><h3>Weights</h3><p>Base model and license lineage, weight/adapter hashes, clean load receipts, held-out and stress tests, restart and reproduction evidence, latency, memory, and energy context.</p></article>
+          <article><h3>Datasets</h3><p>Schema, lineage, privacy posture, consent assumptions, splits, validation status, and update policy.</p></article>
+          <article><h3>Kernels</h3><p>Canonical source, hardware matrix, executable tests, benchmark protocol, and non-model classification contract.</p></article>
+          <article><h3>Spaces</h3><p>Dependency pins, deployment revision, privacy behavior, and reproducible local path for exact served commit.</p></article>
         </div>
       </div>
     </section>
 
-    <section class="closing">
-      <div class="shell closing-panel">
-        <div class="eyebrow">Build, evaluate, verify</div>
-        <h2>Move from model output to accountable action.</h2>
-        <p>Start with the product, follow the evidence, then reproduce the exact path from source.</p>
-        <div class="actions">
-          <a class="button primary" href="https://a-11-oy.com">Enter a11oy</a>
-          <a class="button secondary" href="https://holdings.a-11-oy.com/docs-site/">Read the documentation</a>
-          <a class="button secondary" href="https://github.com/szl-holdings/.github/blob/main/huggingface/org-card/HONEST_DISCLOSURE.md">Review limitations</a>
+    <section id="proof">
+      <div class="shell">
+        <div class="section-head">
+          <div>
+            <div class="eyebrow">Language for claims</div>
+            <h2>Signal maturity by evidence, not marketing.</h2>
+          </div>
+          <p class="section-copy">
+            We use explicit classes and avoid mixing integrity checks with
+            model quality or commercial readiness.
+          </p>
+        </div>
+        <div class="truth">
+          <div class="panel">
+            <h3>Evidence classes</h3>
+            <p>
+              Classes used in the public portfolio include: PROVED, MEASURED,
+              MODELED, REPORTED, CONJECTURE, and ROADMAP.
+            </p>
+            <div class="labels">
+              <span class="chip measured">PROVED</span>
+              <span class="chip measured">MEASURED</span>
+              <span class="chip">MODELED</span>
+              <span class="chip">REPORTED</span>
+              <span class="chip">CONJECTURE</span>
+              <span class="chip">ROADMAP</span>
+            </div>
+          </div>
+          <div class="panel">
+            <h3>Operational honesty</h3>
+            <p>
+              A signature confirms source integrity and scope. It does not prove correctness,
+              safety, or permission to operate in all environments by itself.
+            </p>
+            <a class="btn ghost" href="HONEST_DISCLOSURE.md">Read the full honest disclosure</a>
+          </div>
+        </div>
+        <div class="closing">
+          <div class="eyebrow">Build, evaluate, verify</div>
+          <h2>From output to accountable action.</h2>
+          <p>
+            Start with the portfolio. Follow linked evidence contracts. Reproduce the exact
+            source-revision path before drawing conclusions about capability.
+          </p>
+          <div class="actions">
+            <a class="btn primary" href="https://a-11-oy.com">Enter command system</a>
+            <a class="btn ghost" href="https://holdings.a-11-oy.com/docs-site/">Read documentation</a>
+            <a class="btn ghost" href="https://github.com/szl-holdings/.github/blob/main/huggingface/org-card/HONEST_DISCLOSURE.md">Limitations</a>
+          </div>
         </div>
       </div>
     </section>
@@ -279,8 +624,12 @@
 
   <footer>
     <div class="shell footer-row">
-      <div>© 2026 SZL Holdings · Govern · execute · prove</div>
-      <div class="footer-links"><a href="https://a11oy.net">Evidence</a><a href="https://github.com/szl-holdings/.github/security/policy">Security</a><a href="https://github.com/szl-holdings/.github/blob/main/SUPPORT.md">Support</a></div>
+      <div>Copyright 2026 SZL Holdings. Govern. Execute. Prove.</div>
+      <div class="footer-links">
+        <a href="https://a11oy.net">Evidence</a>
+        <a href="https://github.com/szl-holdings/.github/security/policy">Security</a>
+        <a href="https://github.com/szl-holdings/.github/blob/main/SUPPORT.md">Support</a>
+      </div>
     </div>
   </footer>
 </body>

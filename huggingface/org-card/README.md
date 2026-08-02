@@ -22,7 +22,7 @@ license: apache-2.0
 # Governed models, data, and demonstrations
 
 SZL Holdings publishes the model and data layer for systems that must reason,
-act within authority, and return evidence another party can verify.
+act within authority, and return evidence that is independently auditable.
 
 [**Open a11oy**](https://a-11-oy.com) ·
 [**Inspect evidence**](https://a11oy.net) ·
@@ -87,27 +87,38 @@ transport availability only. A signed receipt establishes integrity and origin
 within its stated scope; it does not automatically establish correctness,
 safety, or authorization to operate.
 
+### Model status
+
+- **PROVED:** independently verified by a signed artifact in declared scope.
+- **MEASURED:** measured on a defined, reproducible dataset and test path.
+- **REPORTED:** reported by trusted telemetry or published evidence.
+- **MODELED:** mathematically/architecturally inferred and clearly bounded.
+- **CONJECTURE:** plausible but not yet externally measured.
+- **ROADMAP:** explicit next-step work plan.
+
+### Runtime status classes
+
+- **OPERATIONAL**
+- **PARTIAL**
+- **DEGRADED**
+- **UNAVAILABLE**
+- **HISTORICAL**
+
+Lambda uniqueness remains **Conjecture 1**, not a theorem. No artifact is
+promoted solely because it has a card, a counter, a live route, or a filename
+that sounds like a model.
+
 ## One governed loop
 
 ```text
 signal → reason → policy → bounded action → receipt → independent verification
                      ↑                                      │
-                     └──────────── verified feedback ───────┘
+                     └────────────── verified feedback ──────┘
 ```
 
 The model proposes. The controller validates authority and evidence. The
 runtime executes only within a declared bound. The receipt lets a separate
 party inspect what happened.
-
-## Evidence language
-
-Claims use **PROVED**, **MEASURED**, **REPORTED**, **MODELED**,
-**CONJECTURE**, or **ROADMAP**. Runtime status uses **OPERATIONAL**,
-**PARTIAL**, **DEGRADED**, **UNAVAILABLE**, or **HISTORICAL**.
-
-Lambda uniqueness remains **Conjecture 1**, not a theorem. No artifact is
-promoted solely because it has a card, a counter, a live route, or a filename
-that sounds like a model.
 
 ## Source and support
 
