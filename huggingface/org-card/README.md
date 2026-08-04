@@ -12,10 +12,30 @@ license: apache-2.0
 
 <!-- markdownlint-disable MD013 MD033 MD041 -->
 
+<!--
+  SZL ORG CARD - MOBILE CONTRACT v3
+  This file is the served Hugging Face organization card. It must render
+  without horizontal scroll from 320px upward.
+
+  RULES FOR FUTURE EDITS:
+  1. No Markdown tables with more than 2 columns. Markdown tables cannot wrap
+     below their content minimum and will force horizontal scroll on phones,
+     pushing boundary text off-screen.
+  2. For any 3+ column or long-prose content, use the grid pattern below:
+     display:grid with repeat(auto-fit, minmax(min(100%, 260px), 1fr)).
+     This is responsive WITHOUT media queries, which is required because the
+     Hub strips <style> blocks. Keep the grid declared inline on the container.
+  3. Images carry width="100%" and height="auto". Never a fixed pixel width.
+  4. No bare 40-char hashes or long unbroken tokens in body text; they do not
+     wrap and will widen the viewport.
+  5. Never soften or delete a boundary statement to save space. If space is
+     tight, cut decoration, not disclosure.
+-->
+
 <p align="center">
   <img src="https://huggingface.co/spaces/SZLHOLDINGS/README/resolve/main/assets/evidence-lattice-v2.webp"
        alt="A bounded signal path entering a holographic verification lattice"
-       width="100%" />
+       width="100%" height="auto" />
 </p>
 
 <div align="center">
@@ -36,25 +56,72 @@ inside declared authority, and return evidence another party can inspect.
 
 ## Choose a path
 
-| Goal | Start here | Boundary to retain |
-| --- | --- | --- |
-| Evaluate the company | [Company profile](https://github.com/szl-holdings#readme) and [evidence registry](https://a11oy.net) | Cards and counters are not operating or commercial proof |
-| Build an integration | [Documentation](https://holdings.a-11-oy.com/docs-site/) and [source organization](https://github.com/szl-holdings) | Read the exact artifact and runtime contract before use |
-| Inspect models and data | [SZLHOLDINGS portfolio](https://huggingface.co/SZLHOLDINGS) | Repository type, download events, and `RUNNING` state do not establish quality or readiness |
-| Check what is live now | [Current state](#current-state) | Use linked status and source-binding endpoints, not copied badges |
+<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,260px),1fr));gap:12px;margin:16px 0;">
+
+<div style="border:1px solid #30363d;border-radius:8px;padding:14px;">
+<strong>Evaluate the company</strong><br/>
+<a href="https://github.com/szl-holdings#readme">Company profile</a> and <a href="https://a11oy.net">evidence registry</a><br/>
+<em>Boundary to retain:</em> Cards and counters are not operating or commercial proof
+</div>
+
+<div style="border:1px solid #30363d;border-radius:8px;padding:14px;">
+<strong>Build an integration</strong><br/>
+<a href="https://holdings.a-11-oy.com/docs-site/">Documentation</a> and <a href="https://github.com/szl-holdings">source organization</a><br/>
+<em>Boundary to retain:</em> Read the exact artifact and runtime contract before use
+</div>
+
+<div style="border:1px solid #30363d;border-radius:8px;padding:14px;">
+<strong>Inspect models and data</strong><br/>
+<a href="https://huggingface.co/SZLHOLDINGS">SZLHOLDINGS portfolio</a><br/>
+<em>Boundary to retain:</em> Repository type, download events, and <code>RUNNING</code> state do not establish quality or readiness
+</div>
+
+<div style="border:1px solid #30363d;border-radius:8px;padding:14px;">
+<strong>Check what is live now</strong><br/>
+<a href="#current-state">Current state</a><br/>
+<em>Boundary to retain:</em> Use linked status and source-binding endpoints, not copied badges
+</div>
+
+</div>
 
 ## Artifact map
 
 Hugging Face repository type is a storage and discovery choice. It does not by
 itself identify the artifact inside.
 
-| Class | Representative artifact | Publication boundary |
-| --- | --- | --- |
-| **Trained weights and adapters** | [SZL-Khipu-1.5B](https://huggingface.co/SZLHOLDINGS/SZL-Khipu-1.5B), [ReceiptAgent](https://huggingface.co/SZLHOLDINGS/SZL-Forge-1.5B-ReceiptAgent), and [GGUF files](https://huggingface.co/SZLHOLDINGS/SZL-Khipu-1.5B-GGUF) | Exact file, base lineage, evaluation, and runtime matter; a validating controller is still required |
-| **Software and substrate artifacts** | [a11oy-v19-substrate](https://huggingface.co/SZLHOLDINGS/a11oy-v19-substrate) and [szl-kernels](https://huggingface.co/SZLHOLDINGS/szl-kernels) | Source, manifests, kernels, or tools; no trained weights are implied |
-| **Surrogates and recipes** | [szl-governed-norm](https://huggingface.co/SZLHOLDINGS/szl-governed-norm) and [szl-nemo](https://huggingface.co/SZLHOLDINGS/szl-nemo) | Compact structural classifier, compatibility artifact, or recipe; not a replacement for the governed runtime or upstream model |
-| **Datasets and evidence** | [szl-lake](https://huggingface.co/datasets/SZLHOLDINGS/szl-lake) and [receipt records](https://huggingface.co/datasets/SZLHOLDINGS/uds-governance-receipts) | A stored row or receipt is not automatically training-admitted, correct, or current |
-| **Spaces and demonstrations** | [a11oy](https://huggingface.co/spaces/SZLHOLDINGS/a11oy), [Killinchu](https://huggingface.co/spaces/SZLHOLDINGS/killinchu), and this [README Space](https://huggingface.co/spaces/SZLHOLDINGS/README) | A reachable route proves transport availability only; each capability owns separate evidence |
+<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,280px),1fr));gap:12px;margin:16px 0;">
+
+<div style="border:1px solid #30363d;border-radius:8px;padding:14px;">
+<strong>Trained weights and adapters</strong><br/>
+<a href="https://huggingface.co/SZLHOLDINGS/SZL-Khipu-1.5B">SZL-Khipu-1.5B</a>, <a href="https://huggingface.co/SZLHOLDINGS/SZL-Forge-1.5B-ReceiptAgent">ReceiptAgent</a>, and <a href="https://huggingface.co/SZLHOLDINGS/SZL-Khipu-1.5B-GGUF">GGUF files</a><br/><br/>
+<em>Publication boundary:</em> Exact file, base lineage, evaluation, and runtime matter; a validating controller is still required
+</div>
+
+<div style="border:1px solid #30363d;border-radius:8px;padding:14px;">
+<strong>Software and substrate artifacts</strong><br/>
+<a href="https://huggingface.co/SZLHOLDINGS/a11oy-v19-substrate">a11oy-v19-substrate</a> and <a href="https://huggingface.co/SZLHOLDINGS/szl-kernels">szl-kernels</a><br/><br/>
+<em>Publication boundary:</em> Source, manifests, kernels, or tools; no trained weights are implied
+</div>
+
+<div style="border:1px solid #30363d;border-radius:8px;padding:14px;">
+<strong>Surrogates and recipes</strong><br/>
+<a href="https://huggingface.co/SZLHOLDINGS/szl-governed-norm">szl-governed-norm</a> and <a href="https://huggingface.co/SZLHOLDINGS/szl-nemo">szl-nemo</a><br/><br/>
+<em>Publication boundary:</em> Compact structural classifier, compatibility artifact, or recipe; not a replacement for the governed runtime or upstream model
+</div>
+
+<div style="border:1px solid #30363d;border-radius:8px;padding:14px;">
+<strong>Datasets and evidence</strong><br/>
+<a href="https://huggingface.co/datasets/SZLHOLDINGS/szl-lake">szl-lake</a> and <a href="https://huggingface.co/datasets/SZLHOLDINGS/uds-governance-receipts">receipt records</a><br/><br/>
+<em>Publication boundary:</em> A stored row or receipt is not automatically training-admitted, correct, or current
+</div>
+
+<div style="border:1px solid #30363d;border-radius:8px;padding:14px;">
+<strong>Spaces and demonstrations</strong><br/>
+<a href="https://huggingface.co/spaces/SZLHOLDINGS/a11oy">a11oy</a>, <a href="https://huggingface.co/spaces/SZLHOLDINGS/killinchu">Killinchu</a>, and this <a href="https://huggingface.co/spaces/SZLHOLDINGS/README">README Space</a><br/><br/>
+<em>Publication boundary:</em> A reachable route proves transport availability only; each capability owns separate evidence
+</div>
+
+</div>
 
 Download counters are Hub-reported events, not unique users, deployments,
 customers, model quality, or revenue.
@@ -111,13 +178,34 @@ customer adoption, or investment outcome is claimed by this organization card.
 
 Every promoted artifact should identify what it is and what evidence exists.
 
-| Artifact | Minimum publication evidence |
-| --- | --- |
-| Weights and adapters | Base and license lineage, hashes, clean load, held-out and adversarial evaluation, restart evidence, resource envelope, autonomy boundary |
-| Software, kernels, and tools | Canonical source revision, supported environment, executable tests, benchmark protocol, and explicit non-model classification |
-| Surrogates and recipes | Upstream dependency, narrow intended use, input schema, validation limits, and a visible statement that the artifact is not the governed runtime |
-| Datasets and evidence | Source and license provenance, schema, splits or record shape, privacy and PII posture, validation, quarantine, omissions, and update policy |
-| Spaces | Source and deployment revision, dependencies, privacy and retention behavior, capability-level state, limitations, and reproducible local path |
+<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,280px),1fr));gap:12px;margin:16px 0;">
+
+<div style="border:1px solid #30363d;border-radius:8px;padding:14px;">
+<strong>Weights and adapters</strong><br/><br/>
+<em>Minimum publication evidence:</em> Base and license lineage, hashes, clean load, held-out and adversarial evaluation, restart evidence, resource envelope, autonomy boundary
+</div>
+
+<div style="border:1px solid #30363d;border-radius:8px;padding:14px;">
+<strong>Software, kernels, and tools</strong><br/><br/>
+<em>Minimum publication evidence:</em> Canonical source revision, supported environment, executable tests, benchmark protocol, and explicit non-model classification
+</div>
+
+<div style="border:1px solid #30363d;border-radius:8px;padding:14px;">
+<strong>Surrogates and recipes</strong><br/><br/>
+<em>Minimum publication evidence:</em> Upstream dependency, narrow intended use, input schema, validation limits, and a visible statement that the artifact is not the governed runtime
+</div>
+
+<div style="border:1px solid #30363d;border-radius:8px;padding:14px;">
+<strong>Datasets and evidence</strong><br/><br/>
+<em>Minimum publication evidence:</em> Source and license provenance, schema, splits or record shape, privacy and PII posture, validation, quarantine, omissions, and update policy
+</div>
+
+<div style="border:1px solid #30363d;border-radius:8px;padding:14px;">
+<strong>Spaces</strong><br/><br/>
+<em>Minimum publication evidence:</em> Source and deployment revision, dependencies, privacy and retention behavior, capability-level state, limitations, and reproducible local path
+</div>
+
+</div>
 
 A model card is not operational proof. A Space in `RUNNING` state proves
 transport availability only. A signed receipt establishes integrity and origin
@@ -129,14 +217,39 @@ safety, performance, compliance, or authorization to operate.
 This card deliberately links current state instead of hardcoding a green badge,
 resource count, served revision, or capability claim.
 
-| Question | Canonical source |
-| --- | --- |
-| What is the current Hugging Face front door? | [SZLHOLDINGS/README](https://huggingface.co/spaces/SZLHOLDINGS/README) |
-| Which GitHub revision produced the served card? | [deployment.json](https://szlholdings-readme.static.hf.space/deployment.json) |
-| Is a11oy ready now? | [a11oy readiness](https://a-11-oy.com/api/a11oy/v1/readiness) |
-| Which Killinchu revision is served? | [Killinchu build identity](https://szlholdings-killinchu.hf.space/api/build-info) |
-| Is Killinchu's public-risk gate available? | [Killinchu public-risk status](https://szlholdings-killinchu.hf.space/api/public-risk-status) |
-| Is the Killinchu service ready? | [Killinchu readiness](https://szlholdings-killinchu.hf.space/api/killinchu/readyz) |
+<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,260px),1fr));gap:12px;margin:16px 0;">
+
+<div style="border:1px solid #30363d;border-radius:8px;padding:14px;">
+<strong>What is the current Hugging Face front door?</strong><br/>
+<a href="https://huggingface.co/spaces/SZLHOLDINGS/README">SZLHOLDINGS/README</a>
+</div>
+
+<div style="border:1px solid #30363d;border-radius:8px;padding:14px;">
+<strong>Which GitHub revision produced the served card?</strong><br/>
+<a href="https://szlholdings-readme.static.hf.space/deployment.json">deployment.json</a>
+</div>
+
+<div style="border:1px solid #30363d;border-radius:8px;padding:14px;">
+<strong>Is a11oy ready now?</strong><br/>
+<a href="https://a-11-oy.com/api/a11oy/v1/readiness">a11oy readiness</a>
+</div>
+
+<div style="border:1px solid #30363d;border-radius:8px;padding:14px;">
+<strong>Which Killinchu revision is served?</strong><br/>
+<a href="https://szlholdings-killinchu.hf.space/api/build-info">Killinchu build identity</a>
+</div>
+
+<div style="border:1px solid #30363d;border-radius:8px;padding:14px;">
+<strong>Is Killinchu's public-risk gate available?</strong><br/>
+<a href="https://szlholdings-killinchu.hf.space/api/public-risk-status">Killinchu public-risk status</a>
+</div>
+
+<div style="border:1px solid #30363d;border-radius:8px;padding:14px;">
+<strong>Is the Killinchu service ready?</strong><br/>
+<a href="https://szlholdings-killinchu.hf.space/api/killinchu/readyz">Killinchu readiness</a>
+</div>
+
+</div>
 
 The dataset [`SZLHOLDINGS/SZLHOLDINGS`](https://huggingface.co/datasets/SZLHOLDINGS/SZLHOLDINGS)
 is a **HISTORICAL profile mirror**. It is not the current organization card and
@@ -183,4 +296,3 @@ Govern | execute | prove
 [Hugging Face](https://huggingface.co/SZLHOLDINGS)
 
 </div>
-
