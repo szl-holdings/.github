@@ -2,3 +2,4 @@
 *.html text eol=lf
 *.json text eol=lf
 *.md text eol=lf
+assets/evidence-lattice-v2.webp filter=lfs diff=lfs merge=lfs -text
