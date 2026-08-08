@@ -27,6 +27,12 @@ class DcoContractError(RuntimeError):
     """Raised when the API response cannot prove complete DCO coverage."""
 
 
+def _validate_sha(value: str, *, label: str) -> str:
+    if not SHA_PATTERN.fullmatch(value):
+        raise DcoContractError(f"{label} was not a full lowercase commit SHA")
+    return value
+
+
 def _request_json(
     url: str,
     token: str,
@@ -65,15 +71,20 @@ def _request_json(
         raise DcoContractError(f"{resource} response was not valid JSON") from exc
 
 
-def fetch_pr_commit_count(
+def fetch_pr_metadata(
     api_url: str,
     repository: str,
     pr_number: int,
     token: str,
+    expected_head_sha: str,
     *,
     opener: Any = None,
-) -> int:
-    """Retrieve the authoritative commit count from pull-request metadata."""
+) -> tuple[int, str]:
+    """Retrieve an authoritative commit count bound to the expected PR head."""
+    expected_head_sha = _validate_sha(
+        expected_head_sha,
+        label="expected pull-request head",
+    )
     url = f"{api_url.rstrip('/')}/repos/{repository}/pulls/{pr_number}"
     payload = _request_json(
         url,
@@ -94,6 +105,18 @@ def fetch_pr_commit_count(
         raise DcoContractError(
             "pull-request metadata did not declare a positive integer commit count"
         )
+
+    head = payload.get("head")
+    head_sha = head.get("sha") if isinstance(head, dict) else None
+    if not isinstance(head_sha, str) or not SHA_PATTERN.fullmatch(head_sha):
+        raise DcoContractError(
+            "pull-request metadata did not declare a valid head SHA"
+        )
+    if head_sha != expected_head_sha:
+        raise DcoContractError(
+            "pull-request head mismatch: "
+            f"metadata returned {head_sha}, expected {expected_head_sha}"
+        )
     if declared_count > MAX_PULL_REQUEST_COMMITS:
         raise DcoContractError(
             f"pull request declares {declared_count} commits; "
@@ -101,7 +124,7 @@ def fetch_pr_commit_count(
             f"{MAX_PULL_REQUEST_COMMITS}, so complete DCO coverage cannot be proven"
         )
 
-    return declared_count
+    return declared_count, head_sha
 
 
 def fetch_pr_commits(
@@ -123,6 +146,7 @@ def fetch_pr_commits(
         raise DcoContractError("declared commit count is outside the supported range")
 
     commits: list[dict[str, Any]] = []
+    seen_shas: set[str] = set()
     page_count = (declared_count + COMMITS_PER_PAGE - 1) // COMMITS_PER_PAGE
     endpoint = f"{api_url.rstrip('/')}/repos/{repository}/pulls/{pr_number}/commits"
 
@@ -148,7 +172,22 @@ def fetch_pr_commits(
                 f"page {page} returned {len(payload)} commits, "
                 f"expected {expected_page_size}"
             )
-        commits.extend(payload)
+        for index, item in enumerate(payload, start=1):
+            if not isinstance(item, dict):
+                raise DcoContractError(
+                    f"pull-request commits page {page} entry {index} was not an object"
+                )
+            sha = item.get("sha")
+            if not isinstance(sha, str) or not SHA_PATTERN.fullmatch(sha):
+                raise DcoContractError(
+                    f"pull-request commits page {page} entry {index} had an invalid SHA"
+                )
+            if sha in seen_shas:
+                raise DcoContractError(
+                    f"pull-request commits response contained duplicate SHA {sha}"
+                )
+            seen_shas.add(sha)
+            commits.append(item)
 
     boundary_page = page_count + 1
     boundary_payload = _request_json(
@@ -181,15 +220,21 @@ def fetch_authoritative_pr_commits(
     repository: str,
     pr_number: int,
     token: str,
+    expected_head_sha: str,
     *,
     opener: Any = None,
 ) -> tuple[int, list[dict[str, Any]]]:
-    """Bind complete paginated retrieval to the metadata-declared commit count."""
-    declared_count = fetch_pr_commit_count(
+    """Bind complete pagination to stable metadata and the exact event head."""
+    expected_head_sha = _validate_sha(
+        expected_head_sha,
+        label="expected pull-request head",
+    )
+    declared_count, initial_head_sha = fetch_pr_metadata(
         api_url,
         repository,
         pr_number,
         token,
+        expected_head_sha,
         opener=opener,
     )
     commits = fetch_pr_commits(
@@ -200,10 +245,30 @@ def fetch_authoritative_pr_commits(
         declared_count,
         opener=opener,
     )
+    final_count, final_head_sha = fetch_pr_metadata(
+        api_url,
+        repository,
+        pr_number,
+        token,
+        expected_head_sha,
+        opener=opener,
+    )
+    if final_count != declared_count or final_head_sha != initial_head_sha:
+        raise DcoContractError(
+            "pull-request metadata drifted during commit retrieval: "
+            f"initial head/count {initial_head_sha}/{declared_count}, "
+            f"final head/count {final_head_sha}/{final_count}"
+        )
     if len(commits) != declared_count:
         raise DcoContractError(
             "pull-request commit count mismatch after retrieval: "
             f"retrieved {len(commits)}, metadata declared {declared_count}"
+        )
+    retrieved_head_sha = commits[-1]["sha"]
+    if retrieved_head_sha != expected_head_sha:
+        raise DcoContractError(
+            "pull-request retrieved head mismatch: "
+            f"final commit was {retrieved_head_sha}, expected {expected_head_sha}"
         )
     return declared_count, commits
 
@@ -240,6 +305,7 @@ def main() -> int:
         repository = _required_environment("GITHUB_REPOSITORY")
         token = _required_environment("GITHUB_TOKEN")
         pr_number_text = _required_environment("PR_NUMBER")
+        expected_head_sha = _required_environment("EXPECTED_HEAD_SHA")
         try:
             pr_number = int(pr_number_text)
         except ValueError as exc:
@@ -252,6 +318,7 @@ def main() -> int:
             repository,
             pr_number,
             token,
+            expected_head_sha,
         )
         unsigned = unsigned_commit_shas(commits)
         if unsigned:
