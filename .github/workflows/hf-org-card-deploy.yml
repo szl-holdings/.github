@@ -11,6 +11,7 @@ on:
       - ".github/scripts/hf_static_space_deploy.py"
       - ".github/scripts/hf_org_card_embed_check.py"
       - ".github/scripts/public_front_door_check.py"
+      - ".github/scripts/test_hf_org_card_embed_check.py"
       - ".github/scripts/test_hf_static_space_deploy.py"
       - ".github/scripts/test_public_front_door_check.py"
       - ".github/workflows/hf-org-card-deploy.yml"
@@ -57,6 +58,12 @@ jobs:
           -s .github/scripts
           -p test_public_front_door_check.py
 
+      - name: Test org-card embed contract
+        run: >-
+          python -m unittest discover
+          -s .github/scripts
+          -p test_hf_org_card_embed_check.py
+
       - name: Run org-card embed hardening check
         run: python .github/scripts/hf_org_card_embed_check.py
 
@@ -69,6 +76,8 @@ jobs:
       - name: Publish and verify exact source
         env:
           HF_TOKEN: ${{ secrets.HF_TOKEN }}
+          GITHUB_TOKEN: ${{ github.token }}
+          SZL_PUBLICATION_ENVIRONMENT: production
         run: >-
           python .github/scripts/hf_static_space_deploy.py
           --repo-root .
