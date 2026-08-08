@@ -353,6 +353,7 @@ class TestSmokePathPolicy(unittest.TestCase):
 
 class TestRuntimeIdentity(unittest.TestCase):
     def test_restart_space_uses_explicit_governed_token(self):
+        oid = "a" * 40
         api = mock.Mock()
         api.restart_space.return_value = types.SimpleNamespace(stage="BUILDING")
         api_type = mock.Mock(return_value=api)
@@ -360,8 +361,11 @@ class TestRuntimeIdentity(unittest.TestCase):
         with (
             mock.patch.dict(os.environ, {"HF_TOKEN": "governed-token"}, clear=True),
             mock.patch.dict(sys.modules, {"huggingface_hub": module}),
+            mock.patch.object(dep, "hf_space_state", return_value=("PAUSED", oid)),
         ):
-            self.assertEqual(dep.restart_space("SZLHOLDINGS/a11oy"), "BUILDING")
+            self.assertEqual(
+                dep.restart_space("SZLHOLDINGS/a11oy", oid), "BUILDING"
+            )
 
         api_type.assert_called_once_with(token="governed-token")
         api.restart_space.assert_called_once_with(
@@ -371,7 +375,63 @@ class TestRuntimeIdentity(unittest.TestCase):
     def test_restart_space_requires_explicit_token(self):
         with mock.patch.dict(os.environ, {}, clear=True):
             with self.assertRaisesRegex(dep.DeployContractError, "HF_TOKEN"):
-                dep.restart_space("SZLHOLDINGS/a11oy")
+                dep.restart_space("SZLHOLDINGS/a11oy", "a" * 40)
+
+    def test_restart_space_rejects_commit_drift_before_mutation(self):
+        api_type = mock.Mock()
+        module = types.SimpleNamespace(HfApi=api_type)
+        with (
+            mock.patch.dict(os.environ, {"HF_TOKEN": "governed-token"}, clear=True),
+            mock.patch.dict(sys.modules, {"huggingface_hub": module}),
+            mock.patch.object(
+                dep, "hf_space_state", return_value=("PAUSED", "b" * 40)
+            ),
+        ):
+            with self.assertRaisesRegex(dep.DeployContractError, "advanced"):
+                dep.restart_space("SZLHOLDINGS/a11oy", "a" * 40)
+        api_type.assert_not_called()
+
+    def test_restart_cli_requires_manifest_and_rejects_dry_run(self):
+        with mock.patch.object(dep, "restart_from_manifest") as restart:
+            self.assertEqual(
+                dep.main(
+                    [
+                        "--restart-space",
+                        "--dry-run",
+                        "--manifest",
+                        "release.json",
+                        "--hf-repo",
+                        "SZLHOLDINGS/a11oy",
+                    ]
+                ),
+                2,
+            )
+        restart.assert_not_called()
+
+    def test_restart_cli_binds_manifest_to_exact_commit(self):
+        oid = "a" * 40
+        manifest = {
+            "hf_repo": "SZLHOLDINGS/a11oy",
+            "hf_commit_oid": oid,
+        }
+        with tempfile.NamedTemporaryFile("w", delete=False) as fh:
+            json.dump(manifest, fh)
+            path = fh.name
+        self.addCleanup(lambda: os.unlink(path))
+        with mock.patch.object(dep, "restart_space", return_value="BUILDING") as restart:
+            self.assertEqual(
+                dep.main(
+                    [
+                        "--restart-space",
+                        "--manifest",
+                        path,
+                        "--hf-repo",
+                        "SZLHOLDINGS/a11oy",
+                    ]
+                ),
+                0,
+            )
+        restart.assert_called_once_with("SZLHOLDINGS/a11oy", oid)
 
     def test_space_api_state_returns_stage_and_exact_sha(self):
         oid = "a" * 40
@@ -565,12 +625,19 @@ class TestReusableWorkflowContract(unittest.TestCase):
             "restart-space:",
             "if: inputs.restart-space == true",
             "--restart-space",
+            "--manifest hf-deploy-manifest.json",
         ):
             self.assertIn(contract, self.workflow)
-        self.assertLess(
-            self.workflow.index("Restart Space after governed publication"),
-            self.workflow.index("Attest exact running commit"),
+        ordered_steps = (
+            "Deploy Dockerfile-derived files to the Space",
+            "Bind exact source revision after publication",
+            "Restart Space after governed publication",
+            "Attest exact running commit",
+            "Verify running application source identity",
         )
+        offsets = [self.workflow.index(step) for step in ordered_steps]
+        self.assertEqual(offsets, sorted(offsets))
+        self.assertIn("group: hf-deploy-", self.workflow)
 
 
 class TestDefaultBranchTipGuard(unittest.TestCase):

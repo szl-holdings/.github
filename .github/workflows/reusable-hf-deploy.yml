@@ -76,6 +76,9 @@ jobs:
     name: Deploy derived COPY set, bind source, and attest live state
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    concurrency:
+      group: hf-deploy-${{ inputs.hf-repo || github.repository }}
+      cancel-in-progress: false
     steps:
       - name: Harden runner
         uses: step-security/harden-runner@bf7454d06d71f1098171f2acdf0cd4708d7b5920 # v2.20.0
@@ -210,6 +213,7 @@ jobs:
           set -euo pipefail
           python3 tools/.github/scripts/hf_deploy_from_dockerfile.py \
             --restart-space \
+            --manifest hf-deploy-manifest.json \
             --hf-repo "$HF_REPO"
 
       - name: Attest exact running commit, bytes, and smoke routes
