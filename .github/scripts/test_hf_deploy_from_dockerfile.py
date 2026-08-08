@@ -20,6 +20,7 @@ from __future__ import annotations
 import importlib.util
 import json
 import os
+import sys
 import tempfile
 import types
 import unittest
@@ -351,6 +352,27 @@ class TestSmokePathPolicy(unittest.TestCase):
 
 
 class TestRuntimeIdentity(unittest.TestCase):
+    def test_restart_space_uses_explicit_governed_token(self):
+        api = mock.Mock()
+        api.restart_space.return_value = types.SimpleNamespace(stage="BUILDING")
+        api_type = mock.Mock(return_value=api)
+        module = types.SimpleNamespace(HfApi=api_type)
+        with (
+            mock.patch.dict(os.environ, {"HF_TOKEN": "governed-token"}, clear=True),
+            mock.patch.dict(sys.modules, {"huggingface_hub": module}),
+        ):
+            self.assertEqual(dep.restart_space("SZLHOLDINGS/a11oy"), "BUILDING")
+
+        api_type.assert_called_once_with(token="governed-token")
+        api.restart_space.assert_called_once_with(
+            repo_id="SZLHOLDINGS/a11oy", token="governed-token"
+        )
+
+    def test_restart_space_requires_explicit_token(self):
+        with mock.patch.dict(os.environ, {}, clear=True):
+            with self.assertRaisesRegex(dep.DeployContractError, "HF_TOKEN"):
+                dep.restart_space("SZLHOLDINGS/a11oy")
+
     def test_space_api_state_returns_stage_and_exact_sha(self):
         oid = "a" * 40
         payload = json.dumps({"sha": oid, "runtime": {"stage": "RUNNING"}}).encode()
@@ -537,6 +559,18 @@ class TestReusableWorkflowContract(unittest.TestCase):
             '--source-sha "$SOURCE_SHA"',
         ):
             self.assertIn(contract, self.workflow)
+
+    def test_restart_is_opt_in_and_runs_before_attestation(self):
+        for contract in (
+            "restart-space:",
+            "if: inputs.restart-space == true",
+            "--restart-space",
+        ):
+            self.assertIn(contract, self.workflow)
+        self.assertLess(
+            self.workflow.index("Restart Space after governed publication"),
+            self.workflow.index("Attest exact running commit"),
+        )
 
 
 class TestDefaultBranchTipGuard(unittest.TestCase):

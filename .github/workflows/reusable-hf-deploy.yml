@@ -43,6 +43,11 @@ on:
         required: false
         type: number
         default: 600
+      restart-space:
+        description: "Restart the Space after exact publication and optional source binding. Required for PAUSED Docker Spaces."
+        required: false
+        type: boolean
+        default: false
       source-revision-variable:
         description: "Optional non-secret Space variable that receives the exact checked-out Git SHA."
         required: false
@@ -195,6 +200,17 @@ jobs:
             --revision "$SOURCE_SHA" \
             --probe-path "$SOURCE_REVISION_PROBE_PATH" \
             --output hf-source-binding-bind.json
+
+      - name: Restart Space after governed publication
+        if: inputs.restart-space == true
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+          HF_REPO: ${{ steps.hf.outputs.hf_repo }}
+        run: |
+          set -euo pipefail
+          python3 tools/.github/scripts/hf_deploy_from_dockerfile.py \
+            --restart-space \
+            --hf-repo "$HF_REPO"
 
       - name: Attest exact running commit, bytes, and smoke routes
         env:

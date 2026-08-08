@@ -336,6 +336,21 @@ def hf_space_state(hf_repo):
     return (payload.get("runtime") or {}).get("stage"), payload.get("sha")
 
 
+def restart_space(hf_repo):
+    """Restart one governed Space with the explicit workflow token."""
+    hf_live_origin(hf_repo)
+    token = os.environ.get("HF_TOKEN", "").rstrip("\r\n")
+    if not token:
+        raise DeployContractError("HF_TOKEN is required to restart a Space")
+
+    from huggingface_hub import HfApi  # lazy: only required for mutation
+
+    runtime = HfApi(token=token).restart_space(repo_id=hf_repo, token=token)
+    stage = getattr(runtime, "stage", None)
+    print(f"Restart requested for {hf_repo}; runtime stage={stage!r}")
+    return stage
+
+
 def normalize_smoke_paths(value=None):
     """Validate relative live-app paths; callers can never select another host."""
     if value is None or value == "":
@@ -808,6 +823,8 @@ def main():
     ap.add_argument("--attest", action="store_true",
                     help="verification mode: re-fetch manifest files from the live "
                          "Space and assert sha256 == pushed value")
+    ap.add_argument("--restart-space", action="store_true",
+                    help="restart one governed Space before runtime attestation")
     ap.add_argument("--manifest", default="", help="manifest path (attest mode)")
     ap.add_argument("--wait-running", type=int, default=0,
                     help="attest: seconds to require exact API sha + RUNNING stage")
@@ -824,6 +841,14 @@ def main():
         args.hf_repo = f"SZLHOLDINGS/{name}"
 
     try:
+        if args.restart_space:
+            if args.attest:
+                raise DeployContractError(
+                    "--restart-space and --attest are separate mutation and "
+                    "verification modes"
+                )
+            restart_space(args.hf_repo)
+            return 0
         if args.attest:
             if not args.manifest:
                 ap.error("--attest requires --manifest")
