@@ -137,6 +137,16 @@ class EmbedContractTests(unittest.TestCase):
         failures = check.validate_document(document)
         self.assertTrue(any("navigation targets" in item for item in failures))
 
+    def test_rejects_missing_aria_label_target(self):
+        document = valid_document().replace(
+            '<main id="szl-hf-main">',
+            '<main id="szl-hf-main" aria-labelledby="szl-hf-missing-title">',
+        )
+        failures = check.validate_document(document)
+        self.assertTrue(
+            any("aria-labelledby targets are missing" in item for item in failures)
+        )
+
     def test_rejects_missing_embed_marker(self):
         document = valid_document().replace(
             ' data-szl-embed-safe="true"', ""
