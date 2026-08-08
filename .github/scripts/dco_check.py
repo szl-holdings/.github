@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Fail-closed DCO validation for every commit returned by the PR API."""
+"""Fail-closed DCO validation for every commit in a pull request."""
 
 from __future__ import annotations
 
@@ -7,150 +7,268 @@ import json
 import os
 import re
 import sys
-import urllib.error
-import urllib.parse
-import urllib.request
+from typing import Any
+from urllib.error import URLError
+from urllib.request import Request, urlopen
 
 
-class DcoContractError(RuntimeError):
-    """The authoritative PR commit set could not be validated safely."""
-
-
-_REPOSITORY_RE = re.compile(r"^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$")
-_SHA_RE = re.compile(r"^[0-9a-f]{40}$")
-_SIGNOFF_RE = re.compile(
+API_VERSION = "2022-11-28"
+COMMITS_PER_PAGE = 100
+MAX_PULL_REQUEST_COMMITS = 250
+REQUEST_TIMEOUT_SECONDS = 30
+SHA_PATTERN = re.compile(r"^[0-9a-f]{40}$")
+SIGNED_OFF_BY_PATTERN = re.compile(
     r"^Signed-off-by:\s+.+\s+<[^<>\s]+@[^<>\s]+>\s*$",
-    re.MULTILINE,
+    re.IGNORECASE | re.MULTILINE,
 )
 
 
-def _required_environment(env):
-    api_url = str(env.get("GITHUB_API_URL") or "").rstrip("/")
-    repository = str(env.get("GITHUB_REPOSITORY") or "")
-    token = str(env.get("GITHUB_TOKEN") or "")
-    pr_number = str(env.get("PR_NUMBER") or "")
-
-    parsed = urllib.parse.urlsplit(api_url)
-    if parsed.scheme != "https" or not parsed.netloc or parsed.query or parsed.fragment:
-        raise DcoContractError("GITHUB_API_URL must be an absolute HTTPS origin")
-    if not _REPOSITORY_RE.fullmatch(repository):
-        raise DcoContractError("GITHUB_REPOSITORY must be exactly <owner>/<repo>")
-    if not token:
-        raise DcoContractError("GITHUB_TOKEN is required")
-    if not pr_number.isdigit() or int(pr_number) < 1:
-        raise DcoContractError("PR_NUMBER must be a positive integer")
-    return api_url, repository, int(pr_number), token
+class DcoContractError(RuntimeError):
+    """Raised when the API response cannot prove complete DCO coverage."""
 
 
-def fetch_pr_commits(api_url, repository, pr_number, token, *, opener=None):
-    """Return every authoritative PR commit or fail closed."""
-    if opener is None:
-        opener = urllib.request.urlopen
+def _request_json(
+    url: str,
+    token: str,
+    *,
+    resource: str,
+    opener: Any = None,
+) -> Any:
+    request = Request(
+        url,
+        headers={
+            "Accept": "application/vnd.github+json",
+            "Authorization": f"Bearer {token}",
+            "X-GitHub-Api-Version": API_VERSION,
+        },
+    )
+    open_request = opener or urlopen
 
-    encoded_repo = urllib.parse.quote(repository, safe="/")
-    commits = []
-    for page in range(1, 101):
-        url = (
-            f"{api_url}/repos/{encoded_repo}/pulls/{pr_number}/commits"
-            f"?per_page=100&page={page}"
+    try:
+        with open_request(request, timeout=REQUEST_TIMEOUT_SECONDS) as response:
+            status = getattr(response, "status", None)
+            if status is None and hasattr(response, "getcode"):
+                status = response.getcode()
+            if status != 200:
+                raise DcoContractError(
+                    f"{resource} retrieval failed with HTTP status {status}"
+                )
+            body = response.read()
+    except DcoContractError:
+        raise
+    except (OSError, TimeoutError, URLError) as exc:
+        raise DcoContractError(f"{resource} retrieval failed: {exc}") from exc
+
+    try:
+        return json.loads(body.decode("utf-8"))
+    except (AttributeError, UnicodeDecodeError, json.JSONDecodeError) as exc:
+        raise DcoContractError(f"{resource} response was not valid JSON") from exc
+
+
+def fetch_pr_commit_count(
+    api_url: str,
+    repository: str,
+    pr_number: int,
+    token: str,
+    *,
+    opener: Any = None,
+) -> int:
+    """Retrieve the authoritative commit count from pull-request metadata."""
+    url = f"{api_url.rstrip('/')}/repos/{repository}/pulls/{pr_number}"
+    payload = _request_json(
+        url,
+        token,
+        resource="pull-request metadata",
+        opener=opener,
+    )
+
+    if not isinstance(payload, dict):
+        raise DcoContractError("pull-request metadata response was not an object")
+
+    declared_count = payload.get("commits")
+    if (
+        isinstance(declared_count, bool)
+        or not isinstance(declared_count, int)
+        or declared_count <= 0
+    ):
+        raise DcoContractError(
+            "pull-request metadata did not declare a positive integer commit count"
         )
-        request = urllib.request.Request(
-            url,
-            headers={
-                "Accept": "application/vnd.github+json",
-                "Authorization": f"Bearer {token}",
-                "X-GitHub-Api-Version": "2022-11-28",
-                "User-Agent": "szl-dco-check/1.0",
-            },
+    if declared_count > MAX_PULL_REQUEST_COMMITS:
+        raise DcoContractError(
+            f"pull request declares {declared_count} commits; "
+            f"the pull-request commits endpoint is capped at "
+            f"{MAX_PULL_REQUEST_COMMITS}, so complete DCO coverage cannot be proven"
         )
-        try:
-            with opener(request, timeout=30) as response:
-                status = getattr(response, "status", 200)
-                raw = response.read()
-        except (OSError, TimeoutError, urllib.error.URLError) as exc:
-            raise DcoContractError(
-                f"PR commit API retrieval failed on page {page}: {type(exc).__name__}"
-            ) from exc
 
-        if status != 200:
-            raise DcoContractError(
-                f"PR commit API returned HTTP {status} on page {page}"
-            )
-        try:
-            payload = json.loads(raw)
-        except (UnicodeDecodeError, json.JSONDecodeError) as exc:
-            raise DcoContractError(
-                f"PR commit API returned invalid JSON on page {page}"
-            ) from exc
+    return declared_count
+
+
+def fetch_pr_commits(
+    api_url: str,
+    repository: str,
+    pr_number: int,
+    token: str,
+    declared_count: int,
+    *,
+    opener: Any = None,
+) -> list[dict[str, Any]]:
+    """Retrieve exactly the declared commits and prove the page boundary is empty."""
+    if (
+        isinstance(declared_count, bool)
+        or not isinstance(declared_count, int)
+        or declared_count <= 0
+        or declared_count > MAX_PULL_REQUEST_COMMITS
+    ):
+        raise DcoContractError("declared commit count is outside the supported range")
+
+    commits: list[dict[str, Any]] = []
+    page_count = (declared_count + COMMITS_PER_PAGE - 1) // COMMITS_PER_PAGE
+    endpoint = f"{api_url.rstrip('/')}/repos/{repository}/pulls/{pr_number}/commits"
+
+    for page in range(1, page_count + 1):
+        payload = _request_json(
+            f"{endpoint}?per_page={COMMITS_PER_PAGE}&page={page}",
+            token,
+            resource=f"pull-request commits page {page}",
+            opener=opener,
+        )
         if not isinstance(payload, list):
             raise DcoContractError(
-                f"PR commit API returned a non-list payload on page {page}"
+                f"pull-request commits page {page} response was not a list"
             )
-        if not payload:
-            if page == 1:
-                raise DcoContractError("PR commit API returned an empty commit list")
-            break
 
+        expected_page_size = min(
+            COMMITS_PER_PAGE,
+            declared_count - len(commits),
+        )
+        if len(payload) != expected_page_size:
+            raise DcoContractError(
+                "pull-request commit count mismatch: "
+                f"page {page} returned {len(payload)} commits, "
+                f"expected {expected_page_size}"
+            )
         commits.extend(payload)
-        if len(payload) < 100:
-            break
-    else:
-        raise DcoContractError("PR commit API exceeded the bounded pagination limit")
 
-    if not commits:
-        raise DcoContractError("PR commit API returned an empty commit list")
+    boundary_page = page_count + 1
+    boundary_payload = _request_json(
+        f"{endpoint}?per_page={COMMITS_PER_PAGE}&page={boundary_page}",
+        token,
+        resource=f"pull-request commits boundary page {boundary_page}",
+        opener=opener,
+    )
+    if not isinstance(boundary_payload, list):
+        raise DcoContractError(
+            f"pull-request commits boundary page {boundary_page} response was not a list"
+        )
+    if boundary_payload:
+        raise DcoContractError(
+            "pull-request commit count mismatch: "
+            f"boundary page {boundary_page} unexpectedly returned "
+            f"{len(boundary_payload)} commits"
+        )
+    if len(commits) != declared_count:
+        raise DcoContractError(
+            "pull-request commit count mismatch: "
+            f"retrieved {len(commits)}, metadata declared {declared_count}"
+        )
+
     return commits
 
 
-def commits_missing_signoff(commits):
-    """Return commit SHAs without a valid Signed-off-by trailer."""
-    if not isinstance(commits, list) or not commits:
-        raise DcoContractError("DCO validation requires a non-empty commit list")
+def fetch_authoritative_pr_commits(
+    api_url: str,
+    repository: str,
+    pr_number: int,
+    token: str,
+    *,
+    opener: Any = None,
+) -> tuple[int, list[dict[str, Any]]]:
+    """Bind complete paginated retrieval to the metadata-declared commit count."""
+    declared_count = fetch_pr_commit_count(
+        api_url,
+        repository,
+        pr_number,
+        token,
+        opener=opener,
+    )
+    commits = fetch_pr_commits(
+        api_url,
+        repository,
+        pr_number,
+        token,
+        declared_count,
+        opener=opener,
+    )
+    if len(commits) != declared_count:
+        raise DcoContractError(
+            "pull-request commit count mismatch after retrieval: "
+            f"retrieved {len(commits)}, metadata declared {declared_count}"
+        )
+    return declared_count, commits
 
-    missing = []
+
+def unsigned_commit_shas(commits: list[dict[str, Any]]) -> list[str]:
+    """Return every commit that lacks a syntactically valid DCO trailer."""
+    unsigned: list[str] = []
+
     for index, item in enumerate(commits, start=1):
         if not isinstance(item, dict):
-            raise DcoContractError(f"commit {index} is not an object")
-        sha = str(item.get("sha") or "").lower()
+            raise DcoContractError(f"commit entry {index} was not an object")
+        sha = item.get("sha")
         commit = item.get("commit")
-        message = commit.get("message") if isinstance(commit, dict) else None
-        if not _SHA_RE.fullmatch(sha):
-            raise DcoContractError(f"commit {index} has no exact SHA")
-        if not isinstance(message, str) or not message:
-            raise DcoContractError(f"commit {sha} has no commit message")
-        if not _SIGNOFF_RE.search(message):
-            missing.append(sha)
-    return missing
+        if not isinstance(sha, str) or not SHA_PATTERN.fullmatch(sha):
+            raise DcoContractError(f"commit entry {index} had an invalid SHA")
+        if not isinstance(commit, dict) or not isinstance(commit.get("message"), str):
+            raise DcoContractError(f"commit {sha} had no valid commit message")
+        if not SIGNED_OFF_BY_PATTERN.search(commit["message"]):
+            unsigned.append(sha)
+
+    return unsigned
 
 
-def main(env=None, *, opener=None):
-    env = os.environ if env is None else env
+def _required_environment(name: str) -> str:
+    value = os.environ.get(name, "").strip()
+    if not value:
+        raise DcoContractError(f"required environment variable {name} is empty")
+    return value
+
+
+def main() -> int:
     try:
-        api_url, repository, pr_number, token = _required_environment(env)
-        commits = fetch_pr_commits(
+        api_url = _required_environment("GITHUB_API_URL")
+        repository = _required_environment("GITHUB_REPOSITORY")
+        token = _required_environment("GITHUB_TOKEN")
+        pr_number_text = _required_environment("PR_NUMBER")
+        try:
+            pr_number = int(pr_number_text)
+        except ValueError as exc:
+            raise DcoContractError("PR_NUMBER must be an integer") from exc
+        if pr_number <= 0:
+            raise DcoContractError("PR_NUMBER must be positive")
+
+        declared_count, commits = fetch_authoritative_pr_commits(
             api_url,
             repository,
             pr_number,
             token,
-            opener=opener,
         )
-        missing = commits_missing_signoff(commits)
+        unsigned = unsigned_commit_shas(commits)
+        if unsigned:
+            print(
+                "DCO check failed: commits without a Signed-off-by trailer:",
+                file=sys.stderr,
+            )
+            for sha in unsigned:
+                print(f"  {sha}", file=sys.stderr)
+            return 1
+
+        print(f"DCO check passed for all {declared_count} pull-request commits")
+        return 0
     except DcoContractError as exc:
-        print(f"::error title=DCO contract::{exc}")
-        return 2
-
-    if missing:
-        for sha in missing:
-            print(f"::error title=DCO sign-off missing::{sha}")
-        print(
-            f"FAIL: {len(missing)} of {len(commits)} PR commits "
-            "lack a valid Signed-off-by trailer."
-        )
+        print(f"DCO check failed closed: {exc}", file=sys.stderr)
         return 1
-
-    print(f"OK: all {len(commits)} PR commits carry Signed-off-by trailers.")
-    return 0
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    raise SystemExit(main())

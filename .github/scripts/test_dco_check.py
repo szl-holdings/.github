@@ -1,119 +1,234 @@
 #!/usr/bin/env python3
-"""Network-free regression fixtures for the fail-closed DCO policy."""
+"""Focused regression tests for the fail-closed DCO checker."""
 
 from __future__ import annotations
 
-import importlib.util
 import json
-import os
-import urllib.error
 import unittest
+from pathlib import Path
+from urllib.error import URLError
+
+import dco_check
 
 
-_HERE = os.path.dirname(os.path.abspath(__file__))
-_MODULE_PATH = os.path.join(_HERE, "dco_check.py")
-_spec = importlib.util.spec_from_file_location("dco_check", _MODULE_PATH)
-assert _spec and _spec.loader
-dco = importlib.util.module_from_spec(_spec)
-_spec.loader.exec_module(dco)
+API_URL = "https://api.github.test"
+REPOSITORY = "szl-holdings/example"
+PR_NUMBER = 399
+TOKEN = "test-token"
 
 
-def _commit(char, message, *, files=None):
+def _commit(index: int, message: str) -> dict[str, object]:
     return {
-        "sha": char * 40,
+        "sha": f"{index:040x}",
         "commit": {"message": message},
-        "files": [] if files is None else files,
     }
 
 
-UNSIGNED_EMPTY_COMMIT = _commit("a", "chore(ci): retrigger checks", files=[])
+def _signed_commits(count: int, *, start: int = 1) -> list[dict[str, object]]:
+    return [
+        _commit(
+            index,
+            f"fix: commit {index}\n\nSigned-off-by: Test User <test@example.com>",
+        )
+        for index in range(start, start + count)
+    ]
+
+
+def _commit_pages(commits: list[dict[str, object]]) -> list[list[dict[str, object]]]:
+    return [
+        commits[index : index + dco_check.COMMITS_PER_PAGE]
+        for index in range(0, len(commits), dco_check.COMMITS_PER_PAGE)
+    ]
+
+
+UNSIGNED_EMPTY_COMMIT = _commit(1, "chore: intentionally empty commit")
 UNSIGNED_MERGE_COMMIT = _commit(
-    "b",
-    "Merge branch 'feature/dco-bypass'\n\nSubstantive unsigned merge.",
-    files=["governance/policy.yml"],
+    2,
+    "Merge substantive policy update\n\nThis commit changes governed behavior.",
 )
 SIGNED_MULTI_COMMIT_PR = [
-    _commit(
-        "c",
-        "fix(ci): fail closed\n\nSigned-off-by: Example One <one@example.com>",
-    ),
-    _commit(
-        "d",
-        "test(ci): add fixtures\n\nSigned-off-by: Example Two <two@example.com>",
-    ),
+    _commit(3, "feat: first\n\nSigned-off-by: Test User <test@example.com>"),
+    _commit(4, "fix: second\n\nSigned-off-by: Other User <other@example.com>"),
 ]
 
 
 class _Response:
-    status = 200
-
-    def __init__(self, payload):
+    def __init__(self, payload: object, status: int = 200) -> None:
+        self.status = status
         self._body = json.dumps(payload).encode("utf-8")
 
-    def __enter__(self):
+    def __enter__(self) -> "_Response":
         return self
 
-    def __exit__(self, exc_type, exc, traceback):
-        return False
+    def __exit__(self, *args: object) -> None:
+        return None
 
-    def read(self):
+    def read(self) -> bytes:
         return self._body
 
 
-class DcoPolicyTests(unittest.TestCase):
-    def test_api_retrieval_failure_fails_closed(self):
-        def unavailable(_request, timeout):
-            self.assertEqual(timeout, 30)
-            raise urllib.error.URLError("offline")
+class _SequenceOpener:
+    def __init__(self, *responses: object) -> None:
+        self._responses = list(responses)
+        self.urls: list[str] = []
 
-        with self.assertRaisesRegex(dco.DcoContractError, "retrieval failed"):
-            dco.fetch_pr_commits(
-                "https://api.github.com",
-                "szl-holdings/.github",
-                395,
-                "governed-token",
-                opener=unavailable,
+    def __call__(self, request: object, timeout: int) -> _Response:
+        del timeout
+        self.urls.append(request.full_url)  # type: ignore[attr-defined]
+        if not self._responses:
+            raise AssertionError("unexpected API request")
+        response = self._responses.pop(0)
+        if isinstance(response, BaseException):
+            raise response
+        if isinstance(response, _Response):
+            return response
+        return _Response(response)
+
+
+def _authoritative_responses(count: int) -> list[object]:
+    commits = _signed_commits(count)
+    return [{"commits": count}, *_commit_pages(commits), []]
+
+
+class DcoCheckTests(unittest.TestCase):
+    def test_metadata_api_retrieval_failure_fails_closed(self) -> None:
+        opener = _SequenceOpener(URLError("metadata unavailable"))
+
+        with self.assertRaisesRegex(dco_check.DcoContractError, "retrieval failed"):
+            dco_check.fetch_authoritative_pr_commits(
+                API_URL,
+                REPOSITORY,
+                PR_NUMBER,
+                TOKEN,
+                opener=opener,
             )
 
-    def test_unexpectedly_empty_api_list_fails_closed(self):
-        with self.assertRaisesRegex(dco.DcoContractError, "empty commit list"):
-            dco.fetch_pr_commits(
-                "https://api.github.com",
-                "szl-holdings/.github",
-                395,
-                "governed-token",
-                opener=lambda _request, timeout: _Response([]),
+    def test_commits_api_retrieval_failure_fails_closed(self) -> None:
+        opener = _SequenceOpener(
+            {"commits": 1},
+            URLError("commits unavailable"),
+        )
+
+        with self.assertRaisesRegex(dco_check.DcoContractError, "retrieval failed"):
+            dco_check.fetch_authoritative_pr_commits(
+                API_URL,
+                REPOSITORY,
+                PR_NUMBER,
+                TOKEN,
+                opener=opener,
             )
 
-    def test_unsigned_empty_commit_is_rejected(self):
+    def test_unexpectedly_empty_commit_list_fails_closed(self) -> None:
+        opener = _SequenceOpener({"commits": 1}, [])
+
+        with self.assertRaisesRegex(dco_check.DcoContractError, "count mismatch"):
+            dco_check.fetch_authoritative_pr_commits(
+                API_URL,
+                REPOSITORY,
+                PR_NUMBER,
+                TOKEN,
+                opener=opener,
+            )
+
+    def test_unsigned_empty_commit_is_rejected(self) -> None:
         self.assertEqual(
-            dco.commits_missing_signoff([UNSIGNED_EMPTY_COMMIT]),
-            ["a" * 40],
+            dco_check.unsigned_commit_shas([UNSIGNED_EMPTY_COMMIT]),
+            [UNSIGNED_EMPTY_COMMIT["sha"]],
         )
 
-    def test_unsigned_substantive_merge_prefixed_commit_is_rejected(self):
+    def test_unsigned_substantive_merge_prefixed_commit_is_rejected(self) -> None:
         self.assertEqual(
-            dco.commits_missing_signoff([UNSIGNED_MERGE_COMMIT]),
-            ["b" * 40],
+            dco_check.unsigned_commit_shas([UNSIGNED_MERGE_COMMIT]),
+            [UNSIGNED_MERGE_COMMIT["sha"]],
         )
 
-    def test_fully_signed_multi_commit_pr_passes(self):
-        self.assertEqual(dco.commits_missing_signoff(SIGNED_MULTI_COMMIT_PR), [])
+    def test_fully_signed_multi_commit_pr_passes(self) -> None:
+        self.assertEqual(dco_check.unsigned_commit_shas(SIGNED_MULTI_COMMIT_PR), [])
 
-    def test_workflow_has_no_message_or_zero_file_bypass(self):
-        workflow_path = os.path.join(_HERE, "..", "workflows", "dco.yml")
-        with open(workflow_path, encoding="utf-8") as handle:
-            workflow = handle.read()
+    def test_249_commits_are_retrieved_completely(self) -> None:
+        opener = _SequenceOpener(*_authoritative_responses(249))
 
-        self.assertIn("python3 .github/scripts/dco_check.py", workflow)
-        self.assertIn("python3 .github/scripts/test_dco_check.py", workflow)
-        for forbidden in (
-            'grep -q "^Merge "',
-            "file_count=",
-            "assuming OK",
-            "|| echo",
-        ):
-            self.assertNotIn(forbidden, workflow)
+        declared, commits = dco_check.fetch_authoritative_pr_commits(
+            API_URL,
+            REPOSITORY,
+            PR_NUMBER,
+            TOKEN,
+            opener=opener,
+        )
+
+        self.assertEqual(declared, 249)
+        self.assertEqual(len(commits), 249)
+        self.assertTrue(opener.urls[-1].endswith("per_page=100&page=4"))
+
+    def test_exactly_250_commits_are_retrieved_completely(self) -> None:
+        opener = _SequenceOpener(*_authoritative_responses(250))
+
+        declared, commits = dco_check.fetch_authoritative_pr_commits(
+            API_URL,
+            REPOSITORY,
+            PR_NUMBER,
+            TOKEN,
+            opener=opener,
+        )
+
+        self.assertEqual(declared, 250)
+        self.assertEqual(len(commits), 250)
+        self.assertTrue(opener.urls[-1].endswith("per_page=100&page=4"))
+
+    def test_251_commits_are_rejected_before_commit_pagination(self) -> None:
+        opener = _SequenceOpener({"commits": 251})
+
+        with self.assertRaisesRegex(dco_check.DcoContractError, "capped at 250"):
+            dco_check.fetch_authoritative_pr_commits(
+                API_URL,
+                REPOSITORY,
+                PR_NUMBER,
+                TOKEN,
+                opener=opener,
+            )
+
+        self.assertEqual(len(opener.urls), 1)
+
+    def test_declared_and_retrieved_short_count_mismatch_is_rejected(self) -> None:
+        commits = _signed_commits(248)
+        opener = _SequenceOpener(
+            {"commits": 249},
+            *_commit_pages(commits),
+        )
+
+        with self.assertRaisesRegex(dco_check.DcoContractError, "count mismatch"):
+            dco_check.fetch_authoritative_pr_commits(
+                API_URL,
+                REPOSITORY,
+                PR_NUMBER,
+                TOKEN,
+                opener=opener,
+            )
+
+    def test_nonempty_boundary_page_count_mismatch_is_rejected(self) -> None:
+        commits = _signed_commits(249)
+        opener = _SequenceOpener(
+            {"commits": 249},
+            *_commit_pages(commits),
+            [_signed_commits(1, start=250)[0]],
+        )
+
+        with self.assertRaisesRegex(dco_check.DcoContractError, "count mismatch"):
+            dco_check.fetch_authoritative_pr_commits(
+                API_URL,
+                REPOSITORY,
+                PR_NUMBER,
+                TOKEN,
+                opener=opener,
+            )
+
+    def test_workflow_contains_no_message_prefix_or_file_count_bypass(self) -> None:
+        workflow_path = Path(__file__).parents[1] / "workflows" / "dco.yml"
+        workflow = workflow_path.read_text(encoding="utf-8")
+
+        self.assertNotIn("head_commit.message", workflow)
+        self.assertNotIn("changed_files", workflow)
+        self.assertIn("dco_check.py", workflow)
 
 
 if __name__ == "__main__":
