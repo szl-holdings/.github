@@ -38,6 +38,13 @@ jobs:
           FAIL=0
           for sha in $COMMITS; do
             body=$(git log -1 --format="%B" "$sha" 2>/dev/null || echo "")
+            # Merge-queue / merge commit artifacts may be synthetic and message-only.
+            # They are evaluated for delivery order, not author provenance, and do not carry
+            # Signed-off-by trailers in GitHub's merge ref.
+            if echo "$body" | grep -q "^Merge "; then
+              echo "  SKIP: $sha — merge commit artifact"
+              continue
+            fi
             if echo "$body" | grep -q "^Signed-off-by:"; then
               echo "  OK: $sha"
             else
