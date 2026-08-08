@@ -32,12 +32,8 @@ RUNTIME_TRANSFORM_MODES = {
     "hf_bootstrap_injected",
     "rendered_markdown",
 }
-HF_BOOTSTRAP = re.compile(
-    rb'<script>window\.huggingface=\{variables:\{'
-    rb'(?:(?:"[A-Z][A-Z0-9_]*":"[A-Za-z0-9._:-]{1,256}")'
-    rb'(?:,(?:"[A-Z][A-Z0-9_]*":"[A-Za-z0-9._:-]{1,256}"))*)?'
-    rb'\}\};</script>'
-)
+HF_BOOTSTRAP_PREFIX = b"<script>window.huggingface="
+HF_BOOTSTRAP_SUFFIX = b"</script>"
 
 
 class ContractError(ValueError):
@@ -174,6 +170,15 @@ def load_contract(
             raise ContractError(
                 f"markers are not supported for transform: {destination!r}"
             )
+        if policy["mode"] == "hf_bootstrap_injected":
+            expected_bootstrap_sha256 = policy.get("expected_bootstrap_sha256")
+            if not isinstance(expected_bootstrap_sha256, str) or not re.fullmatch(
+                r"[0-9a-f]{64}", expected_bootstrap_sha256
+            ):
+                raise ContractError(
+                    "Hugging Face bootstrap transform requires an exact lowercase "
+                    f"expected_bootstrap_sha256: {destination!r}"
+                )
 
     required = {"README.md", "index.html", ".gitattributes"}
     missing = sorted(required - destinations)
@@ -404,18 +409,30 @@ def trusted_huggingface_url(url: str) -> bool:
     )
 
 
-def canonicalize_hf_bootstrap(data: bytes) -> bytes | None:
+def canonicalize_hf_bootstrap(
+    data: bytes, expected_bootstrap_sha256: str
+) -> bytes | None:
+    """Remove exactly one manifest-bound Hugging Face runtime bootstrap."""
+
+    if not re.fullmatch(r"[0-9a-f]{64}", expected_bootstrap_sha256):
+        return None
     marker = b"<head>"
     position = data.find(marker)
     if position < 0:
         return None
     start = position + len(marker)
-    match = HF_BOOTSTRAP.match(data, start)
-    if not match:
+    if not data.startswith(HF_BOOTSTRAP_PREFIX, start):
         return None
-    if HF_BOOTSTRAP.search(data, match.end()):
+    suffix_start = data.find(HF_BOOTSTRAP_SUFFIX, start + len(HF_BOOTSTRAP_PREFIX))
+    if suffix_start < 0:
         return None
-    return data[:start] + data[match.end() :]
+    end = suffix_start + len(HF_BOOTSTRAP_SUFFIX)
+    bootstrap = data[start:end]
+    if sha256_bytes(bootstrap) != expected_bootstrap_sha256:
+        return None
+    if HF_BOOTSTRAP_PREFIX in data[end:]:
+        return None
+    return data[:start] + data[end:]
 
 
 def _readback_result(
@@ -424,6 +441,7 @@ def _readback_result(
     mode: str,
     origin: str,
     markers: list[str] | None = None,
+    expected_bootstrap_sha256: str | None = None,
 ) -> dict[str, Any]:
     max_bytes = target.size + 1
     if mode == "hf_bootstrap_injected":
@@ -471,7 +489,9 @@ def _readback_result(
                 and len(data) == target.size
             )
         elif mode == "hf_bootstrap_injected":
-            canonical = canonicalize_hf_bootstrap(data)
+            canonical = canonicalize_hf_bootstrap(
+                data, expected_bootstrap_sha256 or ""
+            )
             if canonical is not None:
                 result["canonical_sha256"] = sha256_bytes(canonical)
                 result["canonical_size"] = len(canonical)
@@ -543,11 +563,19 @@ def verify_served_files(
         policy = policies.get(item.destination, {})
         mode = str(policy.get("mode", "runtime_exact"))
         markers = policy.get("required_markers", [])
+        expected_bootstrap_sha256 = policy.get("expected_bootstrap_sha256")
         target = ExpectedReadback(
             item.destination, item.sha256, item.size
         )
         url = f"{origin}/{quote(item.destination, safe='/')}"
-        return _readback_result(target, url, mode, origin, markers)
+        return _readback_result(
+            target,
+            url,
+            mode,
+            origin,
+            markers,
+            expected_bootstrap_sha256,
+        )
 
     with ThreadPoolExecutor(max_workers=min(8, max(1, len(files)))) as executor:
         rows = list(executor.map(inspect, files))

@@ -67,7 +67,8 @@
       ]
     },
     "index.html": {
-      "mode": "hf_bootstrap_injected"
+      "mode": "hf_bootstrap_injected",
+      "expected_bootstrap_sha256": "7792f93053b55830155c4f95b656b36323482e646e55aea2979d228c7f290c0c"
     }
   },
   "prune": true,

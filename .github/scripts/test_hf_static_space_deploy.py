@@ -215,19 +215,121 @@ class StaticSpaceDeployTests(unittest.TestCase):
         index_row = next(row for row in rows if row["path"] == "index.html")
         self.assertFalse(index_row["matches"])
 
-    def test_hf_bootstrap_canonicalization_preserves_source_head_newline(self):
-        source = (
-            b"<!doctype html>\n<html lang=\"en\">\n<head>\n"
-            b"  <meta charset=\"utf-8\">\n</head>\n</html>\n"
-        )
+    def test_hf_bootstrap_contract_requires_exact_hash(self):
+        contract = json.loads(self.manifest.read_text(encoding="utf-8"))
+        contract["runtime_transforms"] = {
+            "index.html": {"mode": "hf_bootstrap_injected"}
+        }
+        self.manifest.write_text(json.dumps(contract), encoding="utf-8")
+
+        with self.assertRaisesRegex(
+            deploy.ContractError, "expected_bootstrap_sha256"
+        ):
+            deploy.load_contract(self.root, self.manifest)
+
+    def test_hf_bootstrap_canonicalization_is_exact_and_preserves_source_bytes(self):
         bootstrap = (
             b'<script>window.huggingface={variables:{'
             b'"SPACE_CREATOR_USER_ID":"69ec7d565e5561c3b16baba8"'
             b'}};</script>'
         )
-        served = source.replace(b"<head>", b"<head>" + bootstrap, 1)
+        bootstrap_sha256 = deploy.sha256_bytes(bootstrap)
 
-        self.assertEqual(deploy.canonicalize_hf_bootstrap(served), source)
+        for separator in (b"\n", b"\r\n", b""):
+            with self.subTest(separator=separator):
+                source = b"<head>" + separator + b"<meta>"
+                served = source.replace(b"<head>", b"<head>" + bootstrap, 1)
+                self.assertEqual(
+                    deploy.canonicalize_hf_bootstrap(
+                        served, bootstrap_sha256
+                    ),
+                    source,
+                )
+
+        rejected = (
+            b'<script>window.huggingface={variables:{}};</script>',
+            b'<script>window.huggingface={variables:{"EVIL":"HOSTILE"}};</script>',
+            b'<script>window.huggingface={variables:{'
+            b'"SPACE_CREATOR_USER_ID":"wrong"}};</script>',
+            b'<script>window.huggingface={variables:{'
+            b'"SPACE_CREATOR_USER_ID":"69ec7d565e5561c3b16baba8",'
+            b'"SPACE_CREATOR_USER_ID":"69ec7d565e5561c3b16baba8"}};</script>',
+            b'<script> window.huggingface={variables:{'
+            b'"SPACE_CREATOR_USER_ID":"69ec7d565e5561c3b16baba8"}};</script>',
+        )
+        for hostile in rejected:
+            with self.subTest(hostile=hostile):
+                self.assertIsNone(
+                    deploy.canonicalize_hf_bootstrap(
+                        b"<head>" + hostile + b"\n<meta>",
+                        bootstrap_sha256,
+                    )
+                )
+
+        self.assertIsNone(
+            deploy.canonicalize_hf_bootstrap(
+                b"<head>" + bootstrap + bootstrap + b"\n<meta>",
+                bootstrap_sha256,
+            )
+        )
+
+    def test_hf_bootstrap_readback_requires_manifest_bound_bytes(self):
+        bootstrap = (
+            b'<script>window.huggingface={variables:{'
+            b'"SPACE_CREATOR_USER_ID":"69ec7d565e5561c3b16baba8"'
+            b'}};</script>'
+        )
+        bootstrap_sha256 = deploy.sha256_bytes(bootstrap)
+        index_path = self.root / "src" / "index.html"
+        index_path.write_bytes(b"<head>\n<meta>\n")
+        _, files = deploy.load_contract(self.root, self.manifest)
+        expected = {item.destination: item.source.read_bytes() for item in files}
+        transforms = {
+            "index.html": {
+                "mode": "hf_bootstrap_injected",
+                "expected_bootstrap_sha256": bootstrap_sha256,
+            }
+        }
+
+        def injected_fetch(url, max_bytes=0):
+            path = url.removeprefix("https://example.hf.space/")
+            data = expected[path]
+            if path == "index.html":
+                data = data.replace(b"<head>", b"<head>" + bootstrap, 1)
+            return 200, data, url
+
+        with mock.patch.object(deploy, "fetch", side_effect=injected_fetch):
+            matches, rows = deploy.verify_served_files(
+                "https://example.hf.space", files, transforms
+            )
+        self.assertTrue(matches)
+        index_row = next(row for row in rows if row["path"] == "index.html")
+        self.assertTrue(index_row["same_origin"])
+        self.assertEqual(
+            index_row["canonical_sha256"],
+            deploy.sha256_bytes(expected["index.html"]),
+        )
+        self.assertEqual(index_row["canonical_size"], len(expected["index.html"]))
+
+        hostile = (
+            b'<script>window.huggingface={variables:'
+            b'{"EVIL":"HOSTILE"}};</script>'
+        )
+        with mock.patch.object(
+            deploy,
+            "fetch",
+            side_effect=lambda url, max_bytes=0: (
+                200,
+                expected[url.removeprefix("https://example.hf.space/")].replace(
+                    b"<head>", b"<head>" + hostile, 1
+                ),
+                url,
+            ),
+        ):
+            matches, _ = deploy.verify_served_files(
+                "https://example.hf.space", files, transforms
+            )
+        self.assertFalse(matches)
 
     def test_served_file_redirect_or_fetch_error_fails_closed(self):
         _, files = deploy.load_contract(self.root, self.manifest)
