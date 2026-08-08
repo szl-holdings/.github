@@ -1,0 +1,49 @@
+name: Base-controlled DCO enforcement
+
+# This required gate runs only protected-base code. It never checks out or
+# executes the pull request branch, so a candidate cannot replace its checker
+# while retaining the same successful status context.
+on:
+  pull_request_target:
+    types: [opened, synchronize, reopened, ready_for_review]
+
+permissions:
+  contents: read
+  pull-requests: read
+
+concurrency:
+  group: dco-enforcement-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  enforce:
+    name: DCO enforcement
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Harden runner
+        uses: step-security/harden-runner@bf7454d06d71f1098171f2acdf0cd4708d7b5920 # v2.20.0
+        with:
+          egress-policy: audit
+
+      - name: Checkout exact protected workflow source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.workflow_sha }}
+          fetch-depth: 1
+          persist-credentials: false
+          sparse-checkout: .github/scripts/dco_check.py
+          sparse-checkout-cone-mode: false
+
+      - name: Validate every candidate commit using protected code
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          EXPECTED_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          WORKFLOW_SHA: ${{ github.workflow_sha }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$WORKFLOW_SHA"
+          python3 -m py_compile .github/scripts/dco_check.py
+          python3 .github/scripts/dco_check.py
