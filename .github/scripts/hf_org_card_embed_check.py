@@ -59,6 +59,7 @@ class OrgCardParser(HTMLParser):
         self.main_count = 0
         self.class_tokens: set[str] = set()
         self.ids: list[str] = []
+        self.aria_labelledby: list[str] = []
         self.hrefs: list[str] = []
         self.images: list[dict[str, str]] = []
         self.styles: list[str] = []
@@ -94,6 +95,8 @@ class OrgCardParser(HTMLParser):
         self.class_tokens.update(classes)
         if values.get("id"):
             self.ids.append(values["id"])
+        if "aria-labelledby" in values:
+            self.aria_labelledby.append(values["aria-labelledby"])
         if values.get("style"):
             self.inline_style_count += 1
 
@@ -322,6 +325,21 @@ def validate_document(document: str) -> list[str]:
         failures.append(f"duplicate DOM ids: {duplicate_ids}")
     if bad_ids:
         failures.append(f"unscoped DOM ids: {bad_ids}")
+
+    if any(not value.split() for value in parser.aria_labelledby):
+        failures.append("aria-labelledby must contain at least one DOM id")
+    missing_label_ids = sorted(
+        {
+            target
+            for value in parser.aria_labelledby
+            for target in value.split()
+            if target not in parser.ids
+        }
+    )
+    if missing_label_ids:
+        failures.append(
+            f"aria-labelledby targets are missing: {missing_label_ids}"
+        )
 
     bad_hrefs = sorted(value for value in parser.hrefs if not _safe_href(value))
     if bad_hrefs:
