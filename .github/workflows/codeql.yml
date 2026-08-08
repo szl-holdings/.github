@@ -19,24 +19,11 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - name: Check for analyzable code
-        id: check-code
-        run: |
-          # Check if there's any code to analyze
-          JS_FILES=$(find . -name "*.js" -o -name "*.ts" -o -name "*.jsx" -o -name "*.tsx" 2>/dev/null | grep -v node_modules | grep -v ".git" | wc -l)
-          echo "js_files=$JS_FILES" >> "$GITHUB_OUTPUT"
-          echo "Found $JS_FILES JS/TS files"
       - name: Initialize CodeQL
-        if: steps.check-code.outputs.js_files != '0'
         uses: github/codeql-action/init@f205ea1c3313d32999d8d6a48b4f6530d4437b38 # v4.37.4
         with:
           languages: javascript-typescript
       - name: Autobuild
-        if: steps.check-code.outputs.js_files != '0'
         uses: github/codeql-action/autobuild@f205ea1c3313d32999d8d6a48b4f6530d4437b38 # v4.37.4
       - name: Perform CodeQL Analysis
-        if: steps.check-code.outputs.js_files != '0'
         uses: github/codeql-action/analyze@f205ea1c3313d32999d8d6a48b4f6530d4437b38 # v4.37.4
-      - name: CodeQL skipped (no analyzable code)
-        if: steps.check-code.outputs.js_files == '0'
-        run: echo "No JavaScript/TypeScript files found — CodeQL analysis not applicable for this repo type."
