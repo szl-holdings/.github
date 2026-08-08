@@ -23,45 +23,23 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
+      - name: Self-test the fail-closed DCO policy
+        run: |
+          set -euo pipefail
+          python3 -m py_compile \
+            .github/scripts/dco_check.py \
+            .github/scripts/test_dco_check.py
+          python3 .github/scripts/test_dco_check.py
       - name: Check DCO on PR commits
         if: github.event_name == 'pull_request'
         env:
-          GH_TOKEN: ${{ github.token }}
+          GITHUB_API_URL: ${{ github.api_url }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          GITHUB_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
         run: |
-          echo "Checking Signed-off-by on PR commits..."
-          # Get commits in this PR
-          COMMITS=$(gh api "repos/${{ github.repository }}/pulls/${{ github.event.pull_request.number }}/commits" --jq '.[].sha' 2>/dev/null || echo "")
-          if [ -z "$COMMITS" ]; then
-            echo "No commits found — assuming OK"
-            exit 0
-          fi
-
-          FAIL=0
-          for sha in $COMMITS; do
-            body=$(git log -1 --format="%B" "$sha" 2>/dev/null || echo "")
-
-            # Merge-queue / merge commit artifacts may be synthetic and message-only.
-            if echo "$body" | grep -q "^Merge "; then
-              echo "  SKIP: $sha — merge commit artifact"
-              continue
-            fi
-
-            # Workflow maintenance/no-op commits do not carry signed intent and must
-            # not block policy gates.
-            file_count=$(git show --name-only --pretty=format: "$sha" | awk 'NF > 0' | wc -l | tr -d ' ')
-            if [ "$file_count" -eq 0 ]; then
-              echo "  SKIP: $sha — tooling/no-op commit artifact"
-              continue
-            fi
-
-            if echo "$body" | grep -q "^Signed-off-by:"; then
-              echo "  OK: $sha"
-            else
-              echo "  MISSING: $sha — no Signed-off-by"
-              FAIL=1
-            fi
-          done
-          exit $FAIL
+          set -euo pipefail
+          python3 .github/scripts/dco_check.py
       - name: DCO status (push/workflow_dispatch)
         if: github.event_name != 'pull_request'
         run: |
