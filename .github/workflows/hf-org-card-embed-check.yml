@@ -1,0 +1,51 @@
+name: Validate Hugging Face org card embed hardening
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "huggingface/org-card/**"
+      - "huggingface/org-card.manifest.json"
+      - "profile/assets/**"
+      - "profile/assets/evidence-lattice-v2.webp"
+      - ".github/scripts/hf_org_card_embed_check.py"
+      - ".github/scripts/public_front_door_check.py"
+      - ".github/scripts/test_public_front_door_check.py"
+      - ".github/scripts/hf-org-card-embed-check.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: hf-org-card-embed-main
+  cancel-in-progress: false
+
+jobs:
+  verify-embed-hardening:
+    name: Verify host-isolated embed contract
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Harden runner
+        uses: step-security/harden-runner@bf7454d06d71f1098171f2acdf0cd4708d7b5920 # v2.20.0
+        with:
+          egress-policy: audit
+
+      - name: Checkout source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12"
+
+      - name: Run public front-door contract tests
+        run: >-
+          python -m unittest discover
+          -s .github/scripts
+          -p test_public_front_door_check.py
+
+      - name: Verify org-card embed hardening
+        run: python .github/scripts/hf_org_card_embed_check.py
