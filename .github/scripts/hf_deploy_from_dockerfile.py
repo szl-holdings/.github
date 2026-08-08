@@ -14,7 +14,7 @@ Dockerfile's own `COPY` sources, the same derivation the org's drift-checker
 is the single source of truth for "what the Space is made of", so the deploy set
 can never silently drift from what the image actually builds.
 
-Two modes:
+Three modes:
   deploy  (default): parse Dockerfile COPY sources, expand to tracked files,
                      push them (+ the build Dockerfile at HF-root `Dockerfile`
                      and optional README) to the Space via huggingface_hub
@@ -22,6 +22,9 @@ Two modes:
   attest  (--attest): require the Space API to report the exact pushed HF commit
                       in RUNNING state, re-fetch every manifest path at that
                       immutable commit, and probe declared same-host live routes.
+  restart (--restart-space): require a deployment manifest, verify that the
+                      Space still points at its exact HF commit, then request a
+                      governed restart before the separate attest mode runs.
 
 Design notes:
   * EXCLUDES `COPY --from=<stage>` (build-stage artifacts, not repo files). A
@@ -334,6 +337,53 @@ def hf_space_state(hf_repo):
     except json.JSONDecodeError as exc:
         raise RuntimeError(f"Space API returned invalid JSON: {url}") from exc
     return (payload.get("runtime") or {}).get("stage"), payload.get("sha")
+
+
+def restart_space(hf_repo, expected_sha):
+    """Restart one governed Space only while its exact published SHA is current."""
+    hf_live_origin(hf_repo)
+    token = os.environ.get("HF_TOKEN", "").rstrip("\r\n")
+    if not token:
+        raise DeployContractError("HF_TOKEN is required to restart a Space")
+    if not re.fullmatch(r"[0-9a-f]{40}", str(expected_sha or "")):
+        raise DeployContractError(
+            "restart requires manifest.hf_commit_oid as an exact 40-character SHA"
+        )
+
+    current_stage, current_sha = hf_space_state(hf_repo)
+    if current_sha != expected_sha:
+        raise DeployContractError(
+            "refusing to restart a Space that advanced after publication: "
+            f"expected={expected_sha!r} current={current_sha!r}"
+        )
+
+    from huggingface_hub import HfApi  # lazy: only required for mutation
+
+    runtime = HfApi(token=token).restart_space(repo_id=hf_repo, token=token)
+    stage = getattr(runtime, "stage", None)
+    print(
+        f"Restart requested for {hf_repo}@{expected_sha}; "
+        f"runtime stage {current_stage!r} -> {stage!r}"
+    )
+    return stage
+
+
+def restart_from_manifest(manifest_path, requested_hf_repo=""):
+    """Bind a restart request to the exact immutable deployment manifest."""
+    try:
+        with open(manifest_path, encoding="utf-8") as fh:
+            manifest = json.load(fh)
+    except (OSError, json.JSONDecodeError) as exc:
+        raise DeployContractError(
+            f"restart manifest is unavailable or invalid: {manifest_path!r}"
+        ) from exc
+    manifest_repo = str(manifest.get("hf_repo") or "")
+    if requested_hf_repo and requested_hf_repo != manifest_repo:
+        raise DeployContractError(
+            "restart target differs from deployment manifest: "
+            f"requested={requested_hf_repo!r} manifest={manifest_repo!r}"
+        )
+    return restart_space(manifest_repo, manifest.get("hf_commit_oid"))
 
 
 def normalize_smoke_paths(value=None):
@@ -774,7 +824,8 @@ def attest(args):
     return 0
 
 
-def main():
+def main(argv=None):
+    cli_args = list(sys.argv[1:] if argv is None else argv)
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--repo-root", default=".")
     ap.add_argument("--github-repo", default=os.environ.get("GITHUB_REPOSITORY", ""))
@@ -808,22 +859,41 @@ def main():
     ap.add_argument("--attest", action="store_true",
                     help="verification mode: re-fetch manifest files from the live "
                          "Space and assert sha256 == pushed value")
+    ap.add_argument("--restart-space", action="store_true",
+                    help="restart one governed Space before runtime attestation")
     ap.add_argument("--manifest", default="", help="manifest path (attest mode)")
     ap.add_argument("--wait-running", type=int, default=0,
                     help="attest: seconds to require exact API sha + RUNNING stage")
     ap.add_argument("--smoke-retries", type=int, default=6,
                     help="attest: attempts per declared live route")
-    args = ap.parse_args()
+    args = ap.parse_args(cli_args)
 
     args.include_readme = str(args.include_readme).lower() not in ("false", "0", "no")
 
     # Derive HF repo by convention if not given: szl-holdings/<x> -> SZLHOLDINGS/<x>.
-    if not args.hf_repo:
+    if not args.hf_repo and not args.restart_space:
         name = (args.github_repo.split("/")[-1] if args.github_repo else
                 os.path.basename(os.path.abspath(args.repo_root)))
         args.hf_repo = f"SZLHOLDINGS/{name}"
 
     try:
+        if args.restart_space:
+            flag_names = {
+                item.split("=", 1)[0]
+                for item in cli_args
+                if item.startswith("--")
+            }
+            allowed = {"--restart-space", "--manifest", "--hf-repo"}
+            incompatible = sorted(flag_names - allowed)
+            if incompatible:
+                raise DeployContractError(
+                    "--restart-space accepts only --manifest and optional "
+                    f"--hf-repo; incompatible flags: {', '.join(incompatible)}"
+                )
+            if not args.manifest:
+                raise DeployContractError("--restart-space requires --manifest")
+            restart_from_manifest(args.manifest, args.hf_repo)
+            return 0
         if args.attest:
             if not args.manifest:
                 ap.error("--attest requires --manifest")
