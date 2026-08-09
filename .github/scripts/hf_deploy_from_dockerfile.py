@@ -95,6 +95,41 @@ def source_file(repo_root, source_path):
     return rel, full
 
 
+def materialize_source_revision_file(repo_root, requested_path, source_sha):
+    """Write an exact source SHA to a new, repository-contained payload file."""
+    if not requested_path:
+        return None
+    source_sha = str(source_sha or "")
+    if not re.fullmatch(r"[0-9a-f]{40}", source_sha):
+        raise DeployContractError(
+            "--source-revision-file requires --source-sha to be an exact "
+            "lowercase 40-character SHA"
+        )
+    rel = normalize_repo_path(requested_path, label="source revision file")
+    root = os.path.realpath(repo_root)
+    full = os.path.realpath(os.path.join(root, *rel.split("/")))
+    try:
+        contained = os.path.commonpath((root, full)) == root
+    except ValueError:
+        contained = False
+    if not contained:
+        raise DeployContractError(
+            f"source revision file escapes the repository root: {rel!r}"
+        )
+    if os.path.lexists(full):
+        raise DeployContractError(
+            f"source revision file must not already exist: {rel!r}"
+        )
+    parent = os.path.dirname(full)
+    if not os.path.isdir(parent):
+        raise DeployContractError(
+            f"source revision file parent is not a directory: {rel!r}"
+        )
+    with open(full, "x", encoding="ascii", newline="\n") as fh:
+        fh.write(source_sha + "\n")
+    return rel
+
+
 def read_source_bytes(repo_root, target_path, meta):
     """Read the GitHub source mapped to an HF target path."""
     source_path = meta.get("source_path") or target_path
@@ -501,6 +536,11 @@ def probe_smoke_routes(hf_repo, smoke_paths, retries=6, delay=5):
 # derive: Dockerfile -> deploy manifest (no network, no push)
 # --------------------------------------------------------------------------- #
 def derive(args):
+    revision_rel = materialize_source_revision_file(
+        args.repo_root,
+        getattr(args, "source_revision_file", ""),
+        getattr(args, "source_sha", ""),
+    )
     dockerfile_rel, df_path = source_file(args.repo_root, args.dockerfile_path)
     with open(df_path, "rb") as fh:
         dockerfile_text = fh.read().decode("utf-8", "replace")
@@ -522,6 +562,11 @@ def derive(args):
             "Dockerfile COPY/ADD sources were not found in the checkout: "
             + ", ".join(sorted(unresolved))
         )
+    if revision_rel and revision_rel not in targets:
+        raise DeployContractError(
+            "source revision file is not covered by a Dockerfile COPY/ADD "
+            f"source: {revision_rel!r}"
+        )
 
     files = {}
     for rel, src in sorted(targets.items()):
@@ -533,6 +578,8 @@ def derive(args):
             "copy_source": src,
             "source_path": rel,
         }
+        if rel == revision_rel:
+            files[rel]["generated_from_source_sha"] = True
 
     readme_rel = None
     if args.include_readme:
@@ -578,6 +625,7 @@ def derive(args):
         "unresolved_sources": unresolved,
         "readme": readme_rel,
         "smoke_paths": smoke_paths,
+        "source_revision_file": revision_rel,
         "files": files,
     }
     return manifest, files
@@ -837,6 +885,14 @@ def main(argv=None):
         help="exact checked-out source SHA used by mutation-boundary guards",
     )
     ap.add_argument("--dockerfile-path", default="Dockerfile")
+    ap.add_argument(
+        "--source-revision-file",
+        default="",
+        help=(
+            "write --source-sha to this new repository-contained path before "
+            "derivation; the Dockerfile must COPY the generated file"
+        ),
+    )
     ap.add_argument("--readme-path", default="README.md")
     ap.add_argument("--include-readme", default="true")
     ap.add_argument(

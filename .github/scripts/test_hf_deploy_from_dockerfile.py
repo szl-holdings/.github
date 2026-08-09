@@ -167,6 +167,7 @@ class TestDeriveReadmePolicy(unittest.TestCase):
     def _derive(
         self, dockerfile, files, *, include_readme, readme_path="README.md",
         dockerfile_path="Dockerfile", smoke_paths=None,
+        source_revision_file="", source_sha="",
     ):
         with tempfile.TemporaryDirectory() as repo_root:
             for rel, content in {dockerfile_path: dockerfile, **files}.items():
@@ -183,6 +184,8 @@ class TestDeriveReadmePolicy(unittest.TestCase):
                 hf_repo="SZLHOLDINGS/example",
                 ref="main",
                 smoke_paths=smoke_paths,
+                source_revision_file=source_revision_file,
+                source_sha=source_sha,
             )
             return dep.derive(args)
 
@@ -253,6 +256,43 @@ class TestDeriveReadmePolicy(unittest.TestCase):
                 "FROM scratch\nCOPY missing.py /app/missing.py\n",
                 {},
                 include_readme=False,
+            )
+
+    def test_generated_source_revision_is_copy_covered_and_manifest_bound(self):
+        revision = "a" * 40
+        manifest, files = self._derive(
+            "FROM scratch\nCOPY space /app/space\n",
+            {"space/app.py": "print('bound')\n"},
+            include_readme=False,
+            source_revision_file="space/SOURCE_REVISION",
+            source_sha=revision,
+        )
+
+        self.assertEqual(manifest["source_revision_file"], "space/SOURCE_REVISION")
+        self.assertTrue(
+            files["space/SOURCE_REVISION"]["generated_from_source_sha"]
+        )
+        self.assertEqual(
+            files["space/SOURCE_REVISION"]["sha256"],
+            dep.sha256((revision + "\n").encode("ascii")),
+        )
+
+    def test_generated_source_revision_must_be_new_and_copy_covered(self):
+        with self.assertRaisesRegex(dep.DeployContractError, "already exist"):
+            self._derive(
+                "FROM scratch\nCOPY space /app/space\n",
+                {"space/SOURCE_REVISION": "b" * 40 + "\n"},
+                include_readme=False,
+                source_revision_file="space/SOURCE_REVISION",
+                source_sha="a" * 40,
+            )
+        with self.assertRaisesRegex(dep.DeployContractError, "not covered"):
+            self._derive(
+                "FROM scratch\nCOPY app.py /app/app.py\n",
+                {"app.py": "pass\n", "space/keep": "tracked\n"},
+                include_readme=False,
+                source_revision_file="space/SOURCE_REVISION",
+                source_sha="a" * 40,
             )
 
     def test_manifest_smoke_paths_default_to_root(self):
@@ -617,6 +657,15 @@ class TestReusableWorkflowContract(unittest.TestCase):
             "GITHUB_TOKEN: ${{ github.token }}",
             "SOURCE_SHA: ${{ steps.hf.outputs.source_sha }}",
             '--source-sha "$SOURCE_SHA"',
+        ):
+            self.assertIn(contract, self.workflow)
+
+    def test_generated_source_revision_file_is_optional_and_forwarded(self):
+        for contract in (
+            "source-revision-file:",
+            "SOURCE_REVISION_FILE: ${{ inputs.source-revision-file }}",
+            'SOURCE_REVISION_ARGS+=(--source-revision-file "$SOURCE_REVISION_FILE")',
+            '"${SOURCE_REVISION_ARGS[@]}"',
         ):
             self.assertIn(contract, self.workflow)
 
