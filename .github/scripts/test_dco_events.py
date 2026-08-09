@@ -193,46 +193,46 @@ class DcoCheckTests(unittest.TestCase):
         self.assert_rejected("checks_requested", dco.merge_group_subject, wrong_action, head)
         self.assert_rejected("differs", dco.merge_group_subject, payload, "f" * 40)
 
-    def test_merge_group_validates_constituents_not_synthetic_head(self) -> None:
-        candidate = self.commit(
-            "fix: queued change\n\nSigned-off-by: Series A Builder <builder@example.com>"
+    def test_merge_group_validates_linear_squash_sequence(self) -> None:
+        first = self.commit(
+            "fix: first queued squash\n\nSigned-off-by: Series A Builder <builder@example.com>"
         )
-        tree = self.git("rev-parse", f"{candidate}^{{tree}}")
-        queue_head = self.git(
-            "commit-tree",
-            tree,
-            "-p",
-            self.base,
-            "-p",
-            candidate,
-            input_text="Merge queue candidate\n",
+        second = self.commit(
+            "fix: second queued squash\n\nSigned-off-by: Series A Builder <builder@example.com>"
         )
-        self.git("reset", "--hard", queue_head)
-
-        self.assertEqual(
-            dco.validate_merge_group(self.repo, self.base, queue_head),
-            1,
-        )
+        self.assertEqual(dco.validate_merge_group(self.repo, self.base, second), 2)
 
         self.git("reset", "--hard", self.base)
         unsigned = self.commit("fix: unsigned queued change")
-        tree = self.git("rev-parse", f"{unsigned}^{{tree}}")
-        unsigned_queue_head = self.git(
-            "commit-tree",
-            tree,
-            "-p",
-            self.base,
-            "-p",
-            unsigned,
-            input_text="Merge queue candidate\n",
-        )
-        self.git("reset", "--hard", unsigned_queue_head)
         self.assert_rejected(
             "no valid terminal",
             dco.validate_merge_group,
             self.repo,
             self.base,
-            unsigned_queue_head,
+            unsigned,
+        )
+
+        self.git("reset", "--hard", first)
+        tree = self.git("rev-parse", f"{first}^{{tree}}")
+        nonlinear_head = self.git(
+            "commit-tree",
+            tree,
+            "-p",
+            first,
+            "-p",
+            self.base,
+            input_text=(
+                "fix: nonlinear queue head\n\n"
+                "Signed-off-by: Series A Builder <builder@example.com>\n"
+            ),
+        )
+        self.git("reset", "--hard", nonlinear_head)
+        self.assert_rejected(
+            "linear single-parent",
+            dco.validate_merge_group,
+            self.repo,
+            self.base,
+            nonlinear_head,
         )
 
     def test_push_identity_contract(self) -> None:
