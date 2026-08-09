@@ -34,6 +34,26 @@ RUNTIME_TRANSFORM_MODES = {
 }
 HF_BOOTSTRAP_PREFIX = b"<script>window.huggingface="
 HF_BOOTSTRAP_SUFFIX = b"</script>"
+MANIFEST_KEYS = {
+    "schema",
+    "target",
+    "source_repository",
+    "files",
+    "runtime_transforms",
+    "prune",
+    "allowed_deletions",
+    "smoke",
+}
+TARGET_KEYS = {"repo_id", "repo_type", "live_base_url"}
+FILE_KEYS = {"source", "destination"}
+SMOKE_KEYS = {"path", "required_marker"}
+HF_BOOTSTRAP_POLICY_KEYS = {
+    "mode",
+    "variables",
+    "expected_bootstrap_sha256",
+}
+RENDERED_MARKDOWN_POLICY_KEYS = {"mode", "required_markers"}
+HF_BOOTSTRAP_VARIABLE_KEYS = {"SPACE_CREATOR_USER_ID"}
 
 
 class ContractError(ValueError):
@@ -64,11 +84,93 @@ class ExpectedReadback:
 
 
 def canonical_json(value: Any) -> bytes:
-    return (json.dumps(value, sort_keys=True, separators=(",", ":")) + "\n").encode()
+    return (
+        json.dumps(value, sort_keys=True, separators=(",", ":"), allow_nan=False) + "\n"
+    ).encode()
 
 
 def sha256_bytes(data: bytes) -> str:
     return hashlib.sha256(data).hexdigest()
+
+
+def _reject_nonfinite(value: str) -> None:
+    raise ContractError(f"non-finite JSON number is forbidden: {value}")
+
+
+def _reject_duplicate_keys(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
+    result: dict[str, Any] = {}
+    for key, value in pairs:
+        if key in result:
+            raise ContractError(f"duplicate JSON key: {key}")
+        result[key] = value
+    return result
+
+
+def load_json_contract(path: Path) -> dict[str, Any]:
+    try:
+        value = json.loads(
+            path.read_text(encoding="utf-8"),
+            object_pairs_hook=_reject_duplicate_keys,
+            parse_constant=_reject_nonfinite,
+        )
+    except json.JSONDecodeError as exc:
+        raise ContractError(f"manifest is not valid JSON: {exc}") from exc
+    if not isinstance(value, dict):
+        raise ContractError("manifest must contain an object")
+    return value
+
+
+def require_object_keys(
+    value: dict[str, Any],
+    allowed: set[str],
+    required: set[str],
+    label: str,
+) -> None:
+    unknown = sorted(set(value) - allowed)
+    missing = sorted(required - set(value))
+    if unknown:
+        raise ContractError(f"{label} contains unknown keys: {', '.join(unknown)}")
+    if missing:
+        raise ContractError(f"{label} is missing keys: {', '.join(missing)}")
+
+
+def hf_bootstrap_bytes(policy: dict[str, Any]) -> bytes:
+    require_object_keys(
+        policy,
+        HF_BOOTSTRAP_POLICY_KEYS,
+        HF_BOOTSTRAP_POLICY_KEYS,
+        "Hugging Face bootstrap policy",
+    )
+    variables = policy.get("variables")
+    if not isinstance(variables, dict):
+        raise ContractError("Hugging Face bootstrap variables must be an object")
+    require_object_keys(
+        variables,
+        HF_BOOTSTRAP_VARIABLE_KEYS,
+        HF_BOOTSTRAP_VARIABLE_KEYS,
+        "Hugging Face bootstrap variables",
+    )
+    creator = variables.get("SPACE_CREATOR_USER_ID")
+    if not isinstance(creator, str) or not re.fullmatch(r"[0-9a-f]{24}", creator):
+        raise ContractError(
+            "SPACE_CREATOR_USER_ID must be exactly 24 lowercase hexadecimal characters"
+        )
+    bootstrap = (
+        b'<script>window.huggingface={variables:{"SPACE_CREATOR_USER_ID":"'
+        + creator.encode("ascii")
+        + b'"}};</script>'
+    )
+    expected = policy.get("expected_bootstrap_sha256")
+    if not isinstance(expected, str) or not re.fullmatch(r"[0-9a-f]{64}", expected):
+        raise ContractError(
+            "Hugging Face bootstrap transform requires an exact lowercase "
+            "expected_bootstrap_sha256"
+        )
+    if sha256_bytes(bootstrap) != expected:
+        raise ContractError(
+            "Hugging Face bootstrap digest does not match the declarative variables"
+        )
+    return bootstrap
 
 
 def utc_now() -> str:
@@ -105,12 +207,19 @@ def resolve_source(repo_root: Path, value: str) -> Path:
 def load_contract(
     repo_root: Path, manifest_path: Path
 ) -> tuple[dict[str, Any], list[PublicationFile]]:
-    contract = json.loads(manifest_path.read_text(encoding="utf-8"))
+    contract = load_json_contract(manifest_path)
+    require_object_keys(
+        contract,
+        MANIFEST_KEYS,
+        {"schema", "target", "source_repository", "files", "smoke"},
+        "manifest",
+    )
     if contract.get("schema") != SCHEMA:
         raise ContractError(f"schema must be {SCHEMA}")
     target = contract.get("target")
     if not isinstance(target, dict):
         raise ContractError("target must be an object")
+    require_object_keys(target, TARGET_KEYS, TARGET_KEYS, "target")
     if target.get("repo_type") != "space":
         raise ContractError("only Hugging Face Spaces are supported")
     if not re.fullmatch(
@@ -132,6 +241,7 @@ def load_contract(
     for row in rows:
         if not isinstance(row, dict):
             raise ContractError("each file entry must be an object")
+        require_object_keys(row, FILE_KEYS, FILE_KEYS, "file entry")
         destination = safe_destination(str(row.get("destination", "")))
         if destination in destinations:
             raise ContractError(f"duplicate destination: {destination}")
@@ -156,8 +266,14 @@ def load_contract(
             raise ContractError(
                 f"unsupported runtime transform policy: {destination!r}"
             )
-        markers = policy.get("required_markers", [])
         if policy["mode"] == "rendered_markdown":
+            require_object_keys(
+                policy,
+                RENDERED_MARKDOWN_POLICY_KEYS,
+                RENDERED_MARKDOWN_POLICY_KEYS,
+                f"runtime transform {destination!r}",
+            )
+            markers = policy.get("required_markers")
             if (
                 not isinstance(markers, list)
                 or not markers
@@ -166,26 +282,18 @@ def load_contract(
                 raise ContractError(
                     f"rendered Markdown requires markers: {destination!r}"
                 )
-        elif markers:
-            raise ContractError(
-                f"markers are not supported for transform: {destination!r}"
-            )
-        if policy["mode"] == "hf_bootstrap_injected":
-            expected_bootstrap_sha256 = policy.get("expected_bootstrap_sha256")
-            if not isinstance(expected_bootstrap_sha256, str) or not re.fullmatch(
-                r"[0-9a-f]{64}", expected_bootstrap_sha256
-            ):
-                raise ContractError(
-                    "Hugging Face bootstrap transform requires an exact lowercase "
-                    f"expected_bootstrap_sha256: {destination!r}"
-                )
+        else:
+            hf_bootstrap_bytes(policy)
 
     required = {"README.md", "index.html", ".gitattributes"}
     missing = sorted(required - destinations)
     if missing:
         raise ContractError(f"missing required destinations: {', '.join(missing)}")
     smoke = contract.get("smoke")
-    if not isinstance(smoke, dict) or not str(smoke.get("path", "")).startswith("/"):
+    if not isinstance(smoke, dict):
+        raise ContractError("smoke must be an object")
+    require_object_keys(smoke, SMOKE_KEYS, SMOKE_KEYS, "smoke")
+    if not str(smoke.get("path", "")).startswith("/"):
         raise ContractError("smoke.path must be a same-host absolute path")
     if not str(smoke.get("required_marker", "")):
         raise ContractError("smoke.required_marker is required")
@@ -250,7 +358,12 @@ def materialize(
                 f"materialization destination escapes output root: {item.destination!r}"
             ) from exc
         destination.parent.mkdir(parents=True, exist_ok=True)
-        destination.write_bytes(item.source.read_bytes())
+        data = item.source.read_bytes()
+        if sha256_bytes(data) != item.sha256 or len(data) != item.size:
+            raise ContractError(
+                f"source changed after manifest validation: {item.destination}"
+            )
+        destination.write_bytes(data)
         output.append(destination)
     deployment_path = root / "deployment.json"
     deployment_path.write_bytes(canonical_json(deployment))
@@ -309,8 +422,49 @@ def same_origin(url: str, expected_base: str) -> bool:
     return expected is not None and origin(url) == expected
 
 
-def redact(message: str) -> str:
-    return TOKEN_RE.sub("[REDACTED]", message)
+TOKEN_RE = re.compile(
+    r"(?:hf_[A-Za-z0-9]{8,}|Bearer\s+[A-Za-z0-9._~-]+|"
+    r"gh[oprsu]_[A-Za-z0-9_]{8,}|github_pat_[A-Za-z0-9_]{8,})",
+    re.I,
+)
+
+
+def safe_text(value: Any) -> str:
+    try:
+        return str(value)
+    except BaseException:
+        try:
+            name = type(value).__name__
+        except BaseException:
+            name = "unknown"
+        return f"<unprintable {name}>"
+
+
+def redact(message: Any) -> str:
+    return TOKEN_RE.sub("[REDACTED]", safe_text(message))
+
+
+def describe_exception(exc: BaseException) -> str:
+    return f"{type(exc).__name__}: {redact(exc)}"
+
+
+def sanitize_report(value: Any, depth: int = 0) -> Any:
+    if depth > 20:
+        return "<maximum report depth exceeded>"
+    if value is None or isinstance(value, (bool, int)):
+        return value
+    if isinstance(value, float):
+        return value if value == value and abs(value) != float("inf") else "<non-finite>"
+    if isinstance(value, str):
+        return redact(value)
+    if isinstance(value, dict):
+        return {
+            redact(key): sanitize_report(item, depth + 1)
+            for key, item in value.items()
+        }
+    if isinstance(value, (list, tuple)):
+        return [sanitize_report(item, depth + 1) for item in value]
+    return redact(value)
 
 
 def assert_publish_authority(
@@ -409,12 +563,12 @@ def trusted_huggingface_url(url: str) -> bool:
     )
 
 
-def canonicalize_hf_bootstrap(
-    data: bytes, expected_bootstrap_sha256: str
-) -> bytes | None:
-    """Remove exactly one manifest-bound Hugging Face runtime bootstrap."""
+def canonicalize_hf_bootstrap(data: bytes, policy: dict[str, Any]) -> bytes | None:
+    """Remove exactly one bootstrap generated by the reviewed declarative policy."""
 
-    if not re.fullmatch(r"[0-9a-f]{64}", expected_bootstrap_sha256):
+    try:
+        expected_bootstrap = hf_bootstrap_bytes(policy)
+    except ContractError:
         return None
     marker = b"<head>"
     position = data.find(marker)
@@ -428,7 +582,7 @@ def canonicalize_hf_bootstrap(
         return None
     end = suffix_start + len(HF_BOOTSTRAP_SUFFIX)
     bootstrap = data[start:end]
-    if sha256_bytes(bootstrap) != expected_bootstrap_sha256:
+    if bootstrap != expected_bootstrap:
         return None
     if HF_BOOTSTRAP_PREFIX in data[end:]:
         return None
@@ -441,7 +595,7 @@ def _readback_result(
     mode: str,
     origin: str,
     markers: list[str] | None = None,
-    expected_bootstrap_sha256: str | None = None,
+    bootstrap_policy: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     max_bytes = target.size + 1
     if mode == "hf_bootstrap_injected":
@@ -489,9 +643,7 @@ def _readback_result(
                 and len(data) == target.size
             )
         elif mode == "hf_bootstrap_injected":
-            canonical = canonicalize_hf_bootstrap(
-                data, expected_bootstrap_sha256 or ""
-            )
+            canonical = canonicalize_hf_bootstrap(data, bootstrap_policy or {})
             if canonical is not None:
                 result["canonical_sha256"] = sha256_bytes(canonical)
                 result["canonical_size"] = len(canonical)
@@ -510,7 +662,7 @@ def _readback_result(
                 and all(marker in data for marker in encoded_markers)
             )
     except Exception as exc:
-        result["error"] = redact(f"{type(exc).__name__}: {exc}")
+        result["error"] = describe_exception(exc)
     return result
 
 
@@ -563,7 +715,6 @@ def verify_served_files(
         policy = policies.get(item.destination, {})
         mode = str(policy.get("mode", "runtime_exact"))
         markers = policy.get("required_markers", [])
-        expected_bootstrap_sha256 = policy.get("expected_bootstrap_sha256")
         target = ExpectedReadback(
             item.destination, item.sha256, item.size
         )
@@ -574,7 +725,7 @@ def verify_served_files(
             mode,
             origin,
             markers,
-            expected_bootstrap_sha256,
+            policy if mode == "hf_bootstrap_injected" else None,
         )
 
     with ThreadPoolExecutor(max_workers=min(8, max(1, len(files)))) as executor:
@@ -788,7 +939,7 @@ def publish(
                 f"manifest_bookend_match={manifest_bookend_match}"
             )
         except Exception as exc:
-            last_error = redact(str(exc))
+            last_error = describe_exception(exc)
         time.sleep(8)
     raise PublicationVerificationError(
         f"live verification did not converge: {last_error}",
@@ -816,7 +967,9 @@ def publish(
 
 
 def write_report(path: Path | None, report: dict[str, Any]) -> None:
-    payload = json.dumps(report, indent=2, sort_keys=True) + "\n"
+    payload = json.dumps(
+        sanitize_report(report), indent=2, sort_keys=True, allow_nan=False
+    ) + "\n"
     if path:
         path.write_text(payload, encoding="utf-8", newline="\n")
     print(payload, end="")
@@ -890,12 +1043,12 @@ def main() -> int:
         return 0
     except PublicationVerificationError as exc:
         report.update(exc.result)
-        report["error"] = redact(f"{type(exc).__name__}: {exc}")
+        report["error"] = describe_exception(exc)
         write_report(args.report, report)
         return 1
     except Exception as exc:  # fail closed and preserve a redacted report
         report["state"] = "FAILED"
-        report["error"] = redact(f"{type(exc).__name__}: {exc}")
+        report["error"] = describe_exception(exc)
         write_report(args.report, report)
         return 1
 
