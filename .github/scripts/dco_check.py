@@ -22,7 +22,7 @@ MAX_PULL_REQUEST_COMMITS = 250
 REQUEST_TIMEOUT_SECONDS = 30
 SHA_PATTERN = re.compile(r"^[0-9a-f]{40}$")
 QUEUE_REF_PREFIX = "refs/heads/gh-readonly-queue/main/"
-ALLOWED_PR_ACTIONS = {"opened", "synchronize", "reopened", "ready_for_review"}
+ALLOWED_PR_ACTIONS = {"opened", "synchronize", "reopened", "ready_for_review", "edited"}
 
 # Audited horizontal separators: TAB, SPACE, and every Unicode Zs code point.
 # Name and email tokens separately reject C0/C1 controls plus Unicode line and
@@ -733,8 +733,6 @@ def validate_merge_group(repo: Path, base_sha: str, head_sha: str) -> int:
     base_sha = require_sha(base_sha, "merge-group base SHA")
     head_sha = require_sha(head_sha, "merge-group head SHA")
     require(checked_out_head(repo) == head_sha, "checked-out HEAD does not match merge-group head")
-    parents, _, _, _ = commit_record(repo, head_sha)
-    require(len(parents) == 2, "merge-group head is not a two-parent synthetic merge")
     ancestor = subprocess.run(
         ["git", "merge-base", "--is-ancestor", base_sha, head_sha],
         cwd=repo,
@@ -749,13 +747,19 @@ def validate_merge_group(repo: Path, base_sha: str, head_sha: str) -> int:
         if line.strip()
     ]
     require(range_shas and range_shas[-1] == head_sha, "merge-group range does not end at head")
-    candidate_shas = range_shas[:-1]
-    require(candidate_shas, "merge-group contains no constituent commits")
+    previous_sha = base_sha
+    for sha in range_shas:
+        parents, _, _, _ = commit_record(repo, sha)
+        require(
+            parents == [previous_sha],
+            "merge-group range is not a linear single-parent squash sequence",
+        )
+        previous_sha = sha
     return validate_commits(
         repo,
-        candidate_shas,
-        candidate_shas[-1],
-        allow_merge_commits=True,
+        range_shas,
+        head_sha,
+        allow_merge_commits=False,
         checked_out_head_sha=head_sha,
     )
 
@@ -789,7 +793,17 @@ def validate_pull_request_target(
     base = pr.get("base")
     head = pr.get("head")
     require(isinstance(base, dict) and isinstance(head, dict), "pull-request refs are missing")
-    require(base.get("ref") == "main", "pull-request base ref is not main")
+    base_ref = base.get("ref")
+    require(
+        base_ref == "main"
+        or (
+            isinstance(base_ref, str)
+            and base_ref.startswith("release/")
+            and len(base_ref) > len("release/")
+            and "/" not in base_ref[len("release/") :]
+        ),
+        "pull-request base ref is not governed",
+    )
     base_sha = require_sha(base.get("sha"), "pull-request base SHA")
     head_sha = require_sha(head.get("sha"), "pull-request head SHA")
     if expected_base_sha is not None:
