@@ -1,429 +1,954 @@
 #!/usr/bin/env python3
-"""Executable adversarial contract for the trusted DCO checker."""
+"""Focused regression tests for the fail-closed DCO checker."""
 
 from __future__ import annotations
 
-import os
+import json
+import shutil
 import subprocess
-import tempfile
 import unittest
-from pathlib import Path
+from urllib.error import URLError
 
-import dco_check as dco
+import dco_check as dco_check
+
+
+API_URL = "https://api.github.test"
+REPOSITORY = "szl-holdings/example"
+PR_NUMBER = 399
+TOKEN = "test-token"
+BASE_SHA = "f" * 40
+
+
+def _commit(index: int, message: str | None = None) -> dict[str, object]:
+    if message is None:
+        message = f"fix: commit {index}\n\nSigned-off-by: Test User <test@example.com>"
+    return {"sha": f"{index:040x}", "commit": {"message": message}}
+
+
+def _signed_commits(count: int, *, start: int = 1) -> list[dict[str, object]]:
+    return [_commit(index) for index in range(start, start + count)]
+
+
+def _commit_pages(commits: list[dict[str, object]]) -> list[list[dict[str, object]]]:
+    return [
+        commits[index : index + dco_check.COMMITS_PER_PAGE]
+        for index in range(0, len(commits), dco_check.COMMITS_PER_PAGE)
+    ]
+
+
+def _head_sha(commits: list[dict[str, object]]) -> str:
+    sha = commits[-1]["sha"]
+    if not isinstance(sha, str):
+        raise AssertionError("fixture SHA was not a string")
+    return sha
+
+
+def _metadata(
+    count: int,
+    head_sha: str,
+    *,
+    base_sha: str = BASE_SHA,
+) -> dict[str, object]:
+    return {
+        "commits": count,
+        "head": {"sha": head_sha},
+        "base": {"sha": base_sha},
+    }
+
+
+def _density_message(
+    body_line_count: int,
+    signoff_line: str = "Signed-off-by: Test User <test@example.com>",
+) -> str:
+    body = "\n".join(
+        f"ordinary body line {index}" for index in range(1, body_line_count + 1)
+    )
+    return (
+        "fix: density boundary\n\n"
+        f"{body}\n"
+        f"{signoff_line}"
+    )
+
+
+def _two_trailer_density_message(
+    body_line_count: int,
+    *,
+    include_orphan: bool = False,
+) -> str:
+    body = "\n".join(
+        f"ordinary body line {index}" for index in range(1, body_line_count + 1)
+    )
+    orphan = "\n orphan continuation" if include_orphan else ""
+    return (
+        "fix: continuation density\n\n"
+        f"{body}{orphan}\n"
+        "Reviewed-by: Reviewer <reviewer@example.com>\n"
+        " folded one\n"
+        "\tfolded two\n"
+        " folded three\n"
+        "\tfolded four\n"
+        "Signed-off-by: Test User <test@example.com>"
+    )
+
+
+def _stable_responses(
+    commits: list[dict[str, object]],
+) -> tuple[str, list[object]]:
+    count = len(commits)
+    head_sha = _head_sha(commits)
+    metadata = _metadata(count, head_sha)
+    return head_sha, [metadata, *_commit_pages(commits), [], metadata]
+
+
+UNSIGNED_EMPTY_COMMIT = _commit(1, "chore: intentionally empty commit")
+UNSIGNED_MERGE_COMMIT = _commit(
+    2,
+    "Merge substantive policy update\n\nThis commit changes governed behavior.",
+)
+SIGNED_MULTI_COMMIT_PR = [_commit(3), _commit(4)]
+
+
+class _Response:
+    def __init__(self, payload: object, status: int = 200) -> None:
+        self.status = status
+        self._body = json.dumps(payload).encode("utf-8")
+
+    def __enter__(self) -> "_Response":
+        return self
+
+    def __exit__(self, *args: object) -> None:
+        return None
+
+    def read(self) -> bytes:
+        return self._body
+
+
+class _SequenceOpener:
+    def __init__(self, *responses: object) -> None:
+        self._responses = list(responses)
+        self.urls: list[str] = []
+
+    def __call__(self, request: object, timeout: int) -> _Response:
+        del timeout
+        self.urls.append(request.full_url)  # type: ignore[attr-defined]
+        if not self._responses:
+            raise AssertionError("unexpected API request")
+        response = self._responses.pop(0)
+        if isinstance(response, BaseException):
+            raise response
+        if isinstance(response, _Response):
+            return response
+        return _Response(response)
 
 
 class DcoCheckTests(unittest.TestCase):
-    def setUp(self) -> None:
-        self.temp = tempfile.TemporaryDirectory()
-        self.repo = Path(self.temp.name)
-        self.git("init", "-b", "main")
-        self.git("config", "user.name", "Series A Builder")
-        self.git("config", "user.email", "builder@example.com")
-        self.base = self.commit("chore: base\n\nSigned-off-by: Series A Builder <builder@example.com>")
+    def test_metadata_api_retrieval_failure_fails_closed(self) -> None:
+        expected_head = _head_sha(_signed_commits(1))
+        opener = _SequenceOpener(URLError("metadata unavailable"))
 
-    def tearDown(self) -> None:
-        self.temp.cleanup()
-
-    def git(self, *args: str, input_text: str | None = None) -> str:
-        completed = subprocess.run(
-            ["git", *args],
-            cwd=self.repo,
-            input=input_text,
-            text=True,
-            capture_output=True,
-            check=True,
-        )
-        return completed.stdout.strip()
-
-    def commit(
-        self,
-        message: str,
-        name: str = "Series A Builder",
-        email: str = "builder@example.com",
-    ) -> str:
-        env = {
-            **os.environ,
-            "GIT_AUTHOR_NAME": name,
-            "GIT_AUTHOR_EMAIL": email,
-            "GIT_COMMITTER_NAME": name,
-            "GIT_COMMITTER_EMAIL": email,
-        }
-        subprocess.run(
-            ["git", "commit", "--allow-empty", "-F", "-"],
-            cwd=self.repo,
-            input=message,
-            text=True,
-            capture_output=True,
-            check=True,
-            env=env,
-        )
-        return self.git("rev-parse", "HEAD")
-
-    def assert_rejected(self, pattern: str, function, *args, **kwargs) -> None:
-        with self.assertRaisesRegex(dco.DcoError, pattern):
-            function(*args, **kwargs)
-
-    def test_two_and_five_entry_signed_groups_pass(self) -> None:
-        second = self.commit("fix: one\n\nSigned-off-by: Series A Builder <builder@example.com>")
-        self.commit("fix: two\n\nSigned-off-by: Series A Builder <builder@example.com>")
-        self.assertEqual(dco.validate_range(self.repo, self.base, self.git("rev-parse", "HEAD")), 2)
-        for number in range(3):
-            self.commit(
-                f"fix: grouped {number}\n\nSigned-off-by: Series A Builder <builder@example.com>"
+        with self.assertRaisesRegex(dco_check.DcoContractError, "retrieval failed"):
+            dco_check.fetch_authoritative_pr_commits(
+                API_URL, REPOSITORY, PR_NUMBER, TOKEN, expected_head, opener=opener
             )
-        self.assertEqual(dco.validate_range(self.repo, self.base, self.git("rev-parse", "HEAD")), 5)
-        self.assertTrue(second)
 
-    def test_unsigned_middle_commit_fails(self) -> None:
-        self.commit("fix: signed\n\nSigned-off-by: Series A Builder <builder@example.com>")
-        self.commit("fix: unsigned")
-        self.commit("fix: signed again\n\nSigned-off-by: Series A Builder <builder@example.com>")
-        self.assert_rejected("no valid terminal", dco.validate_range, self.repo, self.base, self.git("rev-parse", "HEAD"))
-
-    def test_author_mismatch_fails(self) -> None:
-        head = self.commit(
-            "fix: mismatch\n\nSigned-off-by: Different Person <other@example.com>"
+    def test_commits_api_retrieval_failure_fails_closed(self) -> None:
+        expected_head = _head_sha(_signed_commits(1))
+        opener = _SequenceOpener(
+            _metadata(1, expected_head), URLError("commits unavailable")
         )
-        self.assert_rejected("does not match", dco.validate_range, self.repo, self.base, head)
 
-    def test_malformed_and_body_only_signoffs_fail(self) -> None:
-        malformed = self.commit("fix: malformed\n\nSigned-off-by: no-address")
-        self.assert_rejected("no valid terminal", dco.validate_range, self.repo, self.base, malformed)
-        self.git("reset", "--hard", self.base)
-        body_only = self.commit(
-            "fix: body only\n\nSigned-off-by: Series A Builder <builder@example.com>\n\nNot a trailer block."
-        )
-        self.assert_rejected("no valid terminal", dco.validate_range, self.repo, self.base, body_only)
+        with self.assertRaisesRegex(dco_check.DcoContractError, "retrieval failed"):
+            dco_check.fetch_authoritative_pr_commits(
+                API_URL, REPOSITORY, PR_NUMBER, TOKEN, expected_head, opener=opener
+            )
 
-    def test_unsigned_empty_and_merge_prefixed_commits_do_not_skip(self) -> None:
-        empty = self.commit("chore: empty")
-        self.assert_rejected("no valid terminal", dco.validate_range, self.repo, self.base, empty)
-        self.git("reset", "--hard", self.base)
-        merge_named = self.commit("Merge queue artifact")
-        self.assert_rejected("no valid terminal", dco.validate_range, self.repo, self.base, merge_named)
+    def test_unexpectedly_empty_commit_list_fails_closed(self) -> None:
+        expected_head = _head_sha(_signed_commits(1))
+        opener = _SequenceOpener(_metadata(1, expected_head), [])
 
-    def test_empty_range_and_non_ancestor_fail(self) -> None:
-        self.assert_rejected("empty", dco.validate_range, self.repo, self.base, self.base)
-        tree = self.git("rev-parse", f"{self.base}^{{tree}}")
-        unrelated = self.git("commit-tree", tree, input_text="chore: unrelated\n")
-        self.assert_rejected("not an ancestor", dco.validate_range, self.repo, unrelated, self.base)
+        with self.assertRaisesRegex(dco_check.DcoContractError, "count mismatch"):
+            dco_check.fetch_authoritative_pr_commits(
+                API_URL, REPOSITORY, PR_NUMBER, TOKEN, expected_head, opener=opener
+            )
 
-    def test_signed_two_parent_pr_merge_passes(self) -> None:
-        first = self.commit("fix: first\n\nSigned-off-by: Series A Builder <builder@example.com>")
-        tree = self.git("rev-parse", f"{first}^{{tree}}")
-        message = "fix: synthetic merge\n\nSigned-off-by: Series A Builder <builder@example.com>\n"
-        merged = self.git("commit-tree", tree, "-p", first, "-p", self.base, input_text=message)
-        self.git("reset", "--hard", merged)
-        shas = self.git("rev-list", "--reverse", f"{self.base}..{merged}").splitlines()
+    def test_unsigned_empty_commit_is_rejected(self) -> None:
         self.assertEqual(
-            dco.validate_commits(
-                self.repo,
-                shas,
-                merged,
-                allow_merge_commits=True,
+            dco_check.unsigned_commit_shas([UNSIGNED_EMPTY_COMMIT]),
+            [UNSIGNED_EMPTY_COMMIT["sha"]],
+        )
+
+    def test_unsigned_substantive_merge_prefixed_commit_is_rejected(self) -> None:
+        self.assertEqual(
+            dco_check.unsigned_commit_shas([UNSIGNED_MERGE_COMMIT]),
+            [UNSIGNED_MERGE_COMMIT["sha"]],
+        )
+
+    def test_fully_signed_multi_commit_pr_passes(self) -> None:
+        self.assertEqual(dco_check.unsigned_commit_shas(SIGNED_MULTI_COMMIT_PR), [])
+
+    def test_multiline_sign_off_values_are_rejected(self) -> None:
+        malformed = [
+            _commit(5, "fix: split name\n\nSigned-off-by: Test User\n<test@example.com>"),
+            _commit(6, "fix: split trailer\n\nSigned-off-by:\nTest User <test@example.com>"),
+        ]
+
+        self.assertEqual(
+            dco_check.unsigned_commit_shas(malformed),
+            [commit["sha"] for commit in malformed],
+        )
+
+    def test_whitespace_only_signer_names_are_rejected(self) -> None:
+        malformed = [
+            _commit(7, "fix: blank name\n\nSigned-off-by:   <test@example.com>"),
+            _commit(8, "fix: tab name\n\nSigned-off-by:\t\t<test@example.com>"),
+        ]
+
+        self.assertEqual(
+            dco_check.unsigned_commit_shas(malformed),
+            [commit["sha"] for commit in malformed],
+        )
+
+    def test_signer_emails_with_extra_at_signs_are_rejected(self) -> None:
+        malformed = [
+            _commit(801, "fix: extra at\n\nSigned-off-by: Test User <a@@b>"),
+            _commit(802, "fix: extra at\n\nSigned-off-by: Test User <a@b@c>"),
+            _commit(803, "fix: trailing at\n\nSigned-off-by: Test User <a@b@>"),
+        ]
+
+        self.assertEqual(
+            dco_check.unsigned_commit_shas(malformed),
+            [commit["sha"] for commit in malformed],
+        )
+
+    def test_vertical_whitespace_in_signer_names_is_rejected(self) -> None:
+        separators = ("\r", "\n", "\v", "\f", "\x85", "\u2028", "\u2029")
+        malformed = [
+            _commit(
+                index,
+                f"fix: vertical name\n\nSigned-off-by: A{separator}B <test@example.com>",
+            )
+            for index, separator in enumerate(separators, start=9)
+        ]
+
+        self.assertEqual(
+            dco_check.unsigned_commit_shas(malformed),
+            [commit["sha"] for commit in malformed],
+        )
+
+    def test_other_control_characters_in_signer_names_are_rejected(self) -> None:
+        controls = ("\x00", "\x01", "\x1c", "\x1f", "\x7f", "\x80", "\x9f")
+        malformed = [
+            _commit(
+                index,
+                f"fix: control name\n\nSigned-off-by: A{control}B <test@example.com>",
+            )
+            for index, control in enumerate(controls, start=20)
+        ]
+
+        self.assertEqual(
+            dco_check.unsigned_commit_shas(malformed),
+            [commit["sha"] for commit in malformed],
+        )
+
+    def test_one_character_signer_name_is_accepted(self) -> None:
+        commit = _commit(14, "fix: short signer\n\nSigned-off-by: X <x@example.com>")
+
+        self.assertEqual(dco_check.unsigned_commit_shas([commit]), [])
+
+    def test_audited_horizontal_separators_are_accepted(self) -> None:
+        separators = (
+            "\t",
+            "\x20",
+            "\u00a0",
+            "\u1680",
+            "\u2000",
+            "\u2001",
+            "\u2002",
+            "\u2003",
+            "\u2004",
+            "\u2005",
+            "\u2006",
+            "\u2007",
+            "\u2008",
+            "\u2009",
+            "\u200a",
+            "\u202f",
+            "\u205f",
+            "\u3000",
+        )
+        signed = [
+            _commit(
+                index,
+                "fix: horizontal signer\n\n"
+                f"Signed-off-by:{separator}A{separator}B{separator}"
+                f"<test@example.com>{separator}",
+            )
+            for index, separator in enumerate(separators, start=30)
+        ]
+
+        self.assertEqual(dco_check.unsigned_commit_shas(signed), [])
+
+    def test_preceding_folded_non_dco_trailers_are_accepted(self) -> None:
+        signed = [
+            _commit(
+                50,
+                "fix: reviewed change\n\n"
+                "Reviewed-by: Reviewer <reviewer@example.com>\n"
+                " review context\n"
+                "Signed-off-by: Test User <test@example.com>",
             ),
-            2,
-        )
-        self.assert_rejected("unsupported parent count", dco.validate_range, self.repo, self.base, merged)
+            _commit(
+                51,
+                "fix: co-authored change\n\n"
+                "Co-authored-by: Contributor <contributor@example.com>\n"
+                " first continuation\n"
+                "\tsecond continuation\n"
+                "Signed-off-by: Test User <test@example.com>",
+            ),
+        ]
 
-    def test_unsigned_second_parent_cannot_hide_behind_signed_pr_merge(self) -> None:
-        first = self.commit("fix: first\n\nSigned-off-by: Series A Builder <builder@example.com>")
-        self.git("switch", "-c", "unsigned-side", self.base)
-        unsigned = self.commit("fix: unsigned side")
-        self.git("switch", "main")
-        tree = self.git("rev-parse", f"{first}^{{tree}}")
-        message = "fix: synthetic merge\n\nSigned-off-by: Series A Builder <builder@example.com>\n"
-        merged = self.git("commit-tree", tree, "-p", first, "-p", unsigned, input_text=message)
-        self.git("reset", "--hard", merged)
-        shas = self.git("rev-list", "--reverse", f"{self.base}..{merged}").splitlines()
-        self.assert_rejected(
-            "no valid terminal",
-            dco.validate_commits,
-            self.repo,
-            shas,
-            merged,
-            allow_merge_commits=True,
-        )
+        self.assertEqual(dco_check.unsigned_commit_shas(signed), [])
 
-    def test_octopus_merge_fails_even_for_pr_history(self) -> None:
-        first = self.commit("fix: first\n\nSigned-off-by: Series A Builder <builder@example.com>")
-        self.git("switch", "-c", "side-one", self.base)
-        side_one = self.commit("fix: side one\n\nSigned-off-by: Series A Builder <builder@example.com>")
-        self.git("switch", "-c", "side-two", self.base)
-        side_two = self.commit("fix: side two\n\nSigned-off-by: Series A Builder <builder@example.com>")
-        self.git("switch", "main")
-        tree = self.git("rev-parse", f"{first}^{{tree}}")
-        message = "fix: synthetic merge\n\nSigned-off-by: Series A Builder <builder@example.com>\n"
-        merged = self.git(
-            "commit-tree",
-            tree,
-            "-p",
-            first,
-            "-p",
-            side_one,
-            "-p",
-            side_two,
-            input_text=message,
+    def test_body_signoff_outside_final_trailer_block_is_rejected(self) -> None:
+        malformed = _commit(
+            52,
+            "fix: body signoff\n\n"
+            "Signed-off-by: Test User <test@example.com>\n\n"
+            "A final body paragraph is not a trailer block.",
         )
-        self.git("reset", "--hard", merged)
-        self.assert_rejected(
-            "unsupported parent count",
-            dco.validate_commits,
-            self.repo,
-            [first, merged],
-            merged,
-            allow_merge_commits=True,
-        )
-
-    def test_merge_group_identity_and_hostile_ref_contract(self) -> None:
-        head = self.commit("fix: queue\n\nSigned-off-by: Series A Builder <builder@example.com>")
-        payload = {
-            "action": "checks_requested",
-            "merge_group": {
-                "base_ref": "refs/heads/main",
-                "head_ref": "refs/heads/gh-readonly-queue/main/pr-400-deadbeef",
-                "base_sha": self.base,
-                "head_sha": head,
-            },
-        }
-        self.assertEqual(dco.merge_group_subject(payload, head), (self.base, head))
-        hostile = {**payload, "merge_group": {**payload["merge_group"], "head_ref": "refs/heads/main"}}
-        self.assert_rejected("queue namespace", dco.merge_group_subject, hostile, head)
-        wrong_action = {**payload, "action": "destroy"}
-        self.assert_rejected("checks_requested", dco.merge_group_subject, wrong_action, head)
-        self.assert_rejected("differs", dco.merge_group_subject, payload, "f" * 40)
-
-    def test_merge_group_validates_constituents_not_synthetic_head(self) -> None:
-        candidate = self.commit(
-            "fix: queued change\n\nSigned-off-by: Series A Builder <builder@example.com>"
-        )
-        tree = self.git("rev-parse", f"{candidate}^{{tree}}")
-        queue_head = self.git(
-            "commit-tree",
-            tree,
-            "-p",
-            self.base,
-            "-p",
-            candidate,
-            input_text="Merge queue candidate\n",
-        )
-        self.git("reset", "--hard", queue_head)
 
         self.assertEqual(
-            dco.validate_merge_group(self.repo, self.base, queue_head),
-            1,
+            dco_check.unsigned_commit_shas([malformed]),
+            [malformed["sha"]],
         )
 
-        self.git("reset", "--hard", self.base)
-        unsigned = self.commit("fix: unsigned queued change")
-        tree = self.git("rev-parse", f"{unsigned}^{{tree}}")
-        unsigned_queue_head = self.git(
-            "commit-tree",
-            tree,
-            "-p",
-            self.base,
-            "-p",
-            unsigned,
-            input_text="Merge queue candidate\n",
-        )
-        self.git("reset", "--hard", unsigned_queue_head)
-        self.assert_rejected(
-            "no valid terminal",
-            dco.validate_merge_group,
-            self.repo,
-            self.base,
-            unsigned_queue_head,
-        )
-
-    def test_push_identity_contract(self) -> None:
-        head = self.commit("fix: push\n\nSigned-off-by: Series A Builder <builder@example.com>")
-        payload = {"ref": "refs/heads/main", "before": self.base, "after": head}
-        self.assertEqual(dco.push_subject(payload, head), (self.base, head))
-        self.assert_rejected("not main", dco.push_subject, {**payload, "ref": "refs/heads/dev"}, head)
-
-    def test_pr_pagination_boundaries_and_freshness(self) -> None:
-        for count in (249, 250, 251):
-            shas = [f"{number + 1:040x}" for number in range(count)]
-
-            def api_get(path: str, rows=shas):
-                if "/commits?" in path:
-                    page = int(path.rsplit("page=", 1)[1])
-                    start = (page - 1) * 100
-                    return [{"sha": sha} for sha in rows[start : start + 100]]
-                return {
-                    "base": {"sha": "a" * 40},
-                    "head": {"sha": rows[-1]},
-                    "commits": len(rows),
-                    "draft": False,
-                }
-
-            self.assertEqual(
-                dco.collect_pr_commits(
-                    "szl-holdings/.github", 400, "a" * 40, shas[-1], api_get
+    def test_signoff_after_patch_divider_is_rejected(self) -> None:
+        malformed = [
+            _commit(
+                index,
+                "fix: unsigned patch message\n\n"
+                "Body without a sign-off.\n"
+                f"---{suffix}\n"
+                "Signed-off-by: Test User <test@example.com>",
+            )
+            for index, suffix in enumerate(
+                (
+                    "",
+                    " ",
+                    "\t",
+                    " \t",
+                    " patch follows",
+                    "\tpatch follows",
+                    "\r",
                 ),
-                shas,
+                start=805,
+            )
+        ]
+
+        self.assertEqual(
+            dco_check.unsigned_commit_shas(malformed),
+            [commit["sha"] for commit in malformed],
+        )
+
+    def test_unterminated_patch_marker_does_not_truncate_message(self) -> None:
+        commit = _commit(
+            812,
+            "fix: unterminated patch marker\n\n"
+            "Signed-off-by: Test User <test@example.com>\n"
+            "postscript invalidates the trailer group\n\n"
+            "---",
+        )
+
+        self.assertEqual(
+            dco_check.unsigned_commit_shas([commit]),
+            [commit["sha"]],
+        )
+
+    def test_terminal_padded_patch_markers_truncate_message(self) -> None:
+        commits = [
+            _commit(
+                index,
+                "fix: terminal padded marker\n\n"
+                "Signed-off-by: Test User <test@example.com>\n"
+                f"---{suffix}",
+            )
+            for index, suffix in enumerate((" ", "\t", "\r"), start=813)
+        ]
+
+        self.assertEqual(dco_check.unsigned_commit_shas(commits), [])
+
+    def test_continuation_after_signed_off_by_is_rejected(self) -> None:
+        malformed = _commit(
+            53,
+            "fix: folded identity\n\n"
+            "Signed-off-by: Test User <test@example.com>\n"
+            " attacker-controlled identity extension",
+        )
+
+        self.assertEqual(
+            dco_check.unsigned_commit_shas([malformed]),
+            [malformed["sha"]],
+        )
+
+    def test_folded_signoff_name_or_email_is_rejected(self) -> None:
+        malformed = [
+            _commit(
+                54,
+                "fix: folded name\n\n"
+                "Signed-off-by: Test\n"
+                " User <test@example.com>",
+            ),
+            _commit(
+                55,
+                "fix: folded email\n\n"
+                "Signed-off-by: Test User <test@\n"
+                " example.com>",
+            ),
+        ]
+
+        self.assertEqual(
+            dco_check.unsigned_commit_shas(malformed),
+            [commit["sha"] for commit in malformed],
+        )
+
+    def test_orphan_continuation_in_trailer_region_is_rejected(self) -> None:
+        malformed = _commit(
+            56,
+            "fix: orphan continuation\n\n"
+            " continuation without a preceding trailer\n"
+            "Signed-off-by: Test User <test@example.com>",
+        )
+
+        self.assertEqual(
+            dco_check.unsigned_commit_shas([malformed]),
+            [malformed["sha"]],
+        )
+
+    def test_trailer_block_body_boundaries_match_git_semantics(self) -> None:
+        accepted = [
+            _commit(
+                57,
+                "fix: final trailer suffix\n\n"
+                "Body text may precede the final structured suffix.\n"
+                "Signed-off-by: Test User <test@example.com>",
+            ),
+            _commit(
+                59,
+                "fix: admitted body after trailer\n\n"
+                "Signed-off-by: Test User <test@example.com>\n"
+                "Git admits this complete group at fifty percent density.",
+            ),
+        ]
+        rejected = [
+            _commit(
+                58,
+                "fix: missing boundary\n"
+                "Signed-off-by: Test User <test@example.com>",
+            ),
+        ]
+
+        self.assertEqual(dco_check.unsigned_commit_shas(accepted), [])
+        self.assertEqual(
+            dco_check.unsigned_commit_shas(rejected),
+            [commit["sha"] for commit in rejected],
+        )
+
+    def test_git_density_admission_boundaries_are_deterministic(self) -> None:
+        density_20 = _commit(70, _density_message(4))
+        density_25 = _commit(71, _density_message(3))
+        density_50 = _commit(72, _density_message(1))
+
+        self.assertEqual(
+            dco_check.unsigned_commit_shas([density_20]),
+            [density_20["sha"]],
+        )
+        self.assertEqual(
+            dco_check.unsigned_commit_shas([density_25, density_50]),
+            [],
+        )
+
+    def test_git_density_admission_matches_interpret_trailers(self) -> None:
+        git = shutil.which("git")
+        if git is None:
+            self.skipTest("git is unavailable for differential fixtures")
+
+        fixtures = (
+            (4, False),
+            (3, True),
+            (1, True),
+        )
+        for body_line_count, expected in fixtures:
+            with self.subTest(body_line_count=body_line_count):
+                message = _density_message(body_line_count)
+                parsed = subprocess.run(
+                    [git, "interpret-trailers", "--parse"],
+                    input=message,
+                    text=True,
+                    capture_output=True,
+                    check=True,
+                    timeout=5,
+                ).stdout
+                git_accepts = any(
+                    line.lower().startswith("signed-off-by:")
+                    for line in parsed.splitlines()
+                )
+                policy_accepts = not dco_check.unsigned_commit_shas(
+                    [_commit(73, message)]
+                )
+
+                self.assertEqual(git_accepts, expected)
+                self.assertEqual(policy_accepts, git_accepts)
+
+    def test_mixed_group_recognition_requires_exact_git_prefix(self) -> None:
+        variants = {
+            "canonical": (
+                "Signed-off-by: Test User <test@example.com>",
+                (False, True, True),
+                (False, True, True),
+            ),
+            "tab": (
+                "Signed-off-by:\tTest User <test@example.com>",
+                (False, False, False),
+                (False, False, False),
+            ),
+            "nbsp": (
+                "Signed-off-by:\u00a0Test User <test@example.com>",
+                (False, False, False),
+                (False, False, False),
+            ),
+            "lowercase": (
+                "signed-off-by: Test User <test@example.com>",
+                (False, False, False),
+                (False, False, False),
+            ),
+            "uppercase": (
+                "SIGNED-OFF-BY: Test User <test@example.com>",
+                (False, False, False),
+                (False, False, False),
+            ),
+            "malformed": (
+                "Signed-off-by: malformed",
+                (False, True, True),
+                (False, False, False),
+            ),
+        }
+        body_counts = (4, 3, 1)
+
+        for name, (line, admission_results, policy_results) in variants.items():
+            for body_count, admitted, accepted in zip(
+                body_counts,
+                admission_results,
+                policy_results,
+                strict=True,
+            ):
+                with self.subTest(name=name, body_count=body_count):
+                    message = _density_message(body_count, line)
+                    self.assertEqual(
+                        dco_check._admitted_trailer_group(message) is not None,
+                        admitted,
+                    )
+                    policy_accepts = not dco_check.unsigned_commit_shas(
+                        [_commit(80, message)]
+                    )
+                    self.assertEqual(policy_accepts, accepted)
+
+    def test_mixed_group_prefix_admission_matches_interpret_trailers(self) -> None:
+        git = shutil.which("git")
+        if git is None:
+            self.skipTest("git is unavailable for differential fixtures")
+
+        variants = (
+            "Signed-off-by: Test User <test@example.com>",
+            "Signed-off-by:\tTest User <test@example.com>",
+            "Signed-off-by:\u00a0Test User <test@example.com>",
+            "signed-off-by: Test User <test@example.com>",
+            "SIGNED-OFF-BY: Test User <test@example.com>",
+            "Signed-off-by: malformed",
+        )
+        for line in variants:
+            for body_count in (4, 3, 1):
+                with self.subTest(line=line, body_count=body_count):
+                    message = _density_message(body_count, line)
+                    parsed = subprocess.run(
+                        [git, "interpret-trailers", "--parse"],
+                        input=message,
+                        text=True,
+                        capture_output=True,
+                        check=True,
+                        timeout=5,
+                    ).stdout
+                    git_admits = bool(parsed.strip())
+                    policy_admits = (
+                        dco_check._admitted_trailer_group(message) is not None
+                    )
+
+                    self.assertEqual(policy_admits, git_admits)
+
+    def test_project_signoff_variants_pass_in_all_trailer_groups(self) -> None:
+        signoff_lines = (
+            "Signed-off-by:\tTest User <test@example.com>",
+            "Signed-off-by:\u00a0Test User <test@example.com>",
+            "signed-off-by: Test User <test@example.com>",
+            "SIGNED-OFF-BY: Test User <test@example.com>",
+        )
+        signed = [
+            _commit(
+                index,
+                "fix: fully structured trailer group\n\n"
+                "Reviewed-by: Reviewer <reviewer@example.com>\n"
+                f"{line}",
+            )
+            for index, line in enumerate(signoff_lines, start=81)
+        ]
+
+        self.assertEqual(dco_check.unsigned_commit_shas(signed), [])
+
+    def test_density_counters_ignore_attached_continuations(self) -> None:
+        admitted_at_25 = _two_trailer_density_message(6)
+        rejected_below_25 = _two_trailer_density_message(7)
+        rejected_with_orphan = _two_trailer_density_message(
+            6,
+            include_orphan=True,
+        )
+
+        self.assertIsNotNone(
+            dco_check._admitted_trailer_group(admitted_at_25)
+        )
+        self.assertIsNone(
+            dco_check._admitted_trailer_group(rejected_below_25)
+        )
+        self.assertIsNone(
+            dco_check._admitted_trailer_group(rejected_with_orphan)
+        )
+        self.assertEqual(
+            dco_check.unsigned_commit_shas(
+                [
+                    _commit(90, admitted_at_25),
+                    _commit(91, rejected_below_25),
+                    _commit(92, rejected_with_orphan),
+                ]
+            ),
+            [f"{91:040x}", f"{92:040x}"],
+        )
+
+    def test_density_counters_match_interpret_trailers(self) -> None:
+        git = shutil.which("git")
+        if git is None:
+            self.skipTest("git is unavailable for differential fixtures")
+
+        fixtures = (
+            _two_trailer_density_message(6),
+            _two_trailer_density_message(7),
+            _two_trailer_density_message(6, include_orphan=True),
+        )
+        for message in fixtures:
+            with self.subTest(message=message):
+                parsed = subprocess.run(
+                    [git, "interpret-trailers", "--parse"],
+                    input=message,
+                    text=True,
+                    capture_output=True,
+                    check=True,
+                    timeout=5,
+                ).stdout
+                git_admits = bool(parsed.strip())
+                policy_admits = (
+                    dco_check._admitted_trailer_group(message) is not None
+                )
+
+                self.assertEqual(policy_admits, git_admits)
+
+    def test_complete_group_does_not_discard_malformed_material(self) -> None:
+        malformed = [
+            _commit(
+                74,
+                "fix: malformed generic trailer\n\n"
+                "Reviewed-by: Reviewer\x1cName <reviewer@example.com>\n"
+                "Signed-off-by: Test User <test@example.com>",
+            ),
+            _commit(
+                75,
+                "fix: malformed key spacing\n\n"
+                "Reviewed-by\x1c: Reviewer <reviewer@example.com>\n"
+                "Signed-off-by: Test User <test@example.com>",
+            ),
+        ]
+
+        self.assertEqual(
+            dco_check.unsigned_commit_shas(malformed),
+            [commit["sha"] for commit in malformed],
+        )
+
+    def test_generic_key_to_colon_spacing_and_folds_are_accepted(self) -> None:
+        signed = [
+            _commit(
+                76,
+                "fix: spaced trailer before DCO\n\n"
+                "Reviewed-by \t : Reviewer <reviewer@example.com>\n"
+                " first folded value\n"
+                "\tsecond folded value\n"
+                "Signed-off-by: Test User <test@example.com>",
+            ),
+            _commit(
+                77,
+                "fix: spaced trailer after DCO\n\n"
+                "Signed-off-by: Test User <test@example.com>\n"
+                "Reviewed-by\t: Reviewer <reviewer@example.com>\n"
+                " folded value belonging to Reviewed-by",
+            ),
+        ]
+
+        self.assertEqual(dco_check.unsigned_commit_shas(signed), [])
+
+    def test_leading_hyphen_generic_trailer_and_fold_are_accepted(self) -> None:
+        signed = _commit(
+            804,
+            "fix: leading hyphen trailer\n\n"
+            "-Reviewed-by: Reviewer <reviewer@example.com>\n"
+            " folded value\n"
+            "Signed-off-by: Test User <test@example.com>",
+        )
+
+        self.assertEqual(dco_check.unsigned_commit_shas([signed]), [])
+
+    def test_trailing_blank_line_variants_are_accepted(self) -> None:
+        endings = ("", "\n", "\n\n", "\n \t\n")
+        signed = [
+            _commit(
+                index,
+                "fix: trailing blanks\n\n"
+                "Signed-off-by: Test User <test@example.com>"
+                f"{ending}",
+            )
+            for index, ending in enumerate(endings, start=60)
+        ]
+
+        self.assertEqual(dco_check.unsigned_commit_shas(signed), [])
+
+    def test_valid_stable_pagination_passes(self) -> None:
+        commits = _signed_commits(3)
+        expected_head, responses = _stable_responses(commits)
+        opener = _SequenceOpener(*responses)
+
+        declared, retrieved = dco_check.fetch_authoritative_pr_commits(
+            API_URL, REPOSITORY, PR_NUMBER, TOKEN, expected_head, opener=opener
+        )
+
+        self.assertEqual(declared, 3)
+        self.assertEqual(retrieved, commits)
+        self.assertEqual(len(opener.urls), 4)
+
+    def test_249_commits_are_retrieved_completely(self) -> None:
+        commits = _signed_commits(249)
+        expected_head, responses = _stable_responses(commits)
+        opener = _SequenceOpener(*responses)
+
+        declared, retrieved = dco_check.fetch_authoritative_pr_commits(
+            API_URL, REPOSITORY, PR_NUMBER, TOKEN, expected_head, opener=opener
+        )
+
+        self.assertEqual(declared, 249)
+        self.assertEqual(len(retrieved), 249)
+        self.assertTrue(opener.urls[-2].endswith("per_page=100&page=4"))
+
+    def test_exactly_250_commits_are_retrieved_completely(self) -> None:
+        commits = _signed_commits(250)
+        expected_head, responses = _stable_responses(commits)
+        opener = _SequenceOpener(*responses)
+
+        declared, retrieved = dco_check.fetch_authoritative_pr_commits(
+            API_URL, REPOSITORY, PR_NUMBER, TOKEN, expected_head, opener=opener
+        )
+
+        self.assertEqual(declared, 250)
+        self.assertEqual(len(retrieved), 250)
+        self.assertTrue(opener.urls[-2].endswith("per_page=100&page=4"))
+
+    def test_251_commits_are_rejected_before_commit_pagination(self) -> None:
+        expected_head = _head_sha(_signed_commits(251))
+        opener = _SequenceOpener(_metadata(251, expected_head))
+
+        with self.assertRaisesRegex(dco_check.DcoContractError, "capped at 250"):
+            dco_check.fetch_authoritative_pr_commits(
+                API_URL, REPOSITORY, PR_NUMBER, TOKEN, expected_head, opener=opener
             )
 
-    def test_pr_duplicate_and_count_churn_fail(self) -> None:
-        head = "b" * 40
+        self.assertEqual(len(opener.urls), 1)
 
-        def duplicate(path: str):
-            if "/commits?" in path:
-                return [{"sha": head}, {"sha": head}]
-            return {"base": {"sha": "a" * 40}, "head": {"sha": head}, "commits": 2, "draft": False}
-
-        self.assert_rejected(
-            "duplicate",
-            dco.collect_pr_commits,
-            "szl-holdings/.github",
-            400,
-            "a" * 40,
-            head,
-            duplicate,
+    def test_declared_and_retrieved_short_count_mismatch_is_rejected(self) -> None:
+        commits = _signed_commits(248)
+        expected_head = _head_sha(_signed_commits(249))
+        opener = _SequenceOpener(
+            _metadata(249, expected_head), *_commit_pages(commits)
         )
 
-        def churn(path: str):
-            if "/commits?" in path:
-                return [{"sha": head}]
-            return {"base": {"sha": "a" * 40}, "head": {"sha": head}, "commits": 2, "draft": False}
+        with self.assertRaisesRegex(dco_check.DcoContractError, "count mismatch"):
+            dco_check.fetch_authoritative_pr_commits(
+                API_URL, REPOSITORY, PR_NUMBER, TOKEN, expected_head, opener=opener
+            )
 
-        self.assert_rejected(
-            "count changed",
-            dco.collect_pr_commits,
-            "szl-holdings/.github",
-            400,
-            "a" * 40,
-            head,
-            churn,
+    def test_nonempty_boundary_page_count_mismatch_is_rejected(self) -> None:
+        commits = _signed_commits(249)
+        expected_head = _head_sha(commits)
+        opener = _SequenceOpener(
+            _metadata(249, expected_head), *_commit_pages(commits), [_commit(250)]
         )
 
-    def test_pr_history_allows_signed_merge_and_requires_graph_parity(self) -> None:
-        first = self.commit("fix: first\n\nSigned-off-by: Series A Builder <builder@example.com>")
-        tree = self.git("rev-parse", f"{first}^{{tree}}")
-        message = "fix: reconcile main\n\nSigned-off-by: Series A Builder <builder@example.com>\n"
-        merged = self.git("commit-tree", tree, "-p", first, "-p", self.base, input_text=message)
-        self.git("reset", "--hard", merged)
-        shas = self.git("rev-list", "--reverse", f"{self.base}..{merged}").splitlines()
-        payload = {
-            "action": "synchronize",
-            "repository": {"full_name": "szl-holdings/.github"},
-            "pull_request": {
-                "number": 400,
-                "base": {"ref": "main", "sha": self.base},
-                "head": {"sha": merged},
-            },
-        }
+        with self.assertRaisesRegex(dco_check.DcoContractError, "count mismatch"):
+            dco_check.fetch_authoritative_pr_commits(
+                API_URL, REPOSITORY, PR_NUMBER, TOKEN, expected_head, opener=opener
+            )
 
-        def complete(path: str):
-            if "/commits?" in path:
-                return [{"sha": sha} for sha in shas]
-            return {
-                "base": {"sha": self.base},
-                "head": {"sha": merged},
-                "commits": len(shas),
-                "draft": False,
-            }
+    def test_duplicate_entries_within_page_are_rejected(self) -> None:
+        first = _commit(1)
+        expected_head = _head_sha(_signed_commits(2))
+        opener = _SequenceOpener(_metadata(2, expected_head), [first, first])
+
+        with self.assertRaisesRegex(dco_check.DcoContractError, "duplicate SHA"):
+            dco_check.fetch_authoritative_pr_commits(
+                API_URL, REPOSITORY, PR_NUMBER, TOKEN, expected_head, opener=opener
+            )
+
+    def test_duplicate_sha_across_pages_is_rejected(self) -> None:
+        first_page = _signed_commits(100)
+        expected_head = _head_sha(_signed_commits(101))
+        opener = _SequenceOpener(
+            _metadata(101, expected_head), first_page, [first_page[0]]
+        )
+
+        with self.assertRaisesRegex(dco_check.DcoContractError, "duplicate SHA"):
+            dco_check.fetch_authoritative_pr_commits(
+                API_URL, REPOSITORY, PR_NUMBER, TOKEN, expected_head, opener=opener
+            )
+
+    def test_initial_metadata_head_mismatch_is_rejected(self) -> None:
+        expected_head = _head_sha(_signed_commits(2))
+        replacement_head = _head_sha(_signed_commits(3))
+        opener = _SequenceOpener(_metadata(2, replacement_head))
+
+        with self.assertRaisesRegex(dco_check.DcoContractError, "head mismatch"):
+            dco_check.fetch_authoritative_pr_commits(
+                API_URL, REPOSITORY, PR_NUMBER, TOKEN, expected_head, opener=opener
+            )
+
+    def test_same_count_head_replacement_during_pagination_is_rejected(self) -> None:
+        commits = _signed_commits(2)
+        expected_head = _head_sha(commits)
+        replacement_head = _head_sha(_signed_commits(3))
+        opener = _SequenceOpener(
+            _metadata(2, expected_head),
+            commits,
+            [],
+            _metadata(2, replacement_head),
+        )
+
+        with self.assertRaisesRegex(dco_check.DcoContractError, "head mismatch"):
+            dco_check.fetch_authoritative_pr_commits(
+                API_URL, REPOSITORY, PR_NUMBER, TOKEN, expected_head, opener=opener
+            )
+
+    def test_metadata_count_drift_after_pagination_is_rejected(self) -> None:
+        commits = _signed_commits(2)
+        expected_head = _head_sha(commits)
+        opener = _SequenceOpener(
+            _metadata(2, expected_head), commits, [], _metadata(3, expected_head)
+        )
+
+        with self.assertRaisesRegex(dco_check.DcoContractError, "metadata drifted"):
+            dco_check.fetch_authoritative_pr_commits(
+                API_URL, REPOSITORY, PR_NUMBER, TOKEN, expected_head, opener=opener
+            )
+
+    def test_same_head_and_count_base_drift_is_rejected(self) -> None:
+        commits = _signed_commits(2)
+        expected_head = _head_sha(commits)
+        opener = _SequenceOpener(
+            _metadata(2, expected_head),
+            commits,
+            [],
+            _metadata(2, expected_head, base_sha="e" * 40),
+        )
+
+        with self.assertRaisesRegex(dco_check.DcoContractError, "metadata drifted"):
+            dco_check.fetch_authoritative_pr_commits(
+                API_URL, REPOSITORY, PR_NUMBER, TOKEN, expected_head, opener=opener
+            )
+
+    def test_event_base_mismatch_is_rejected_before_pagination(self) -> None:
+        expected_head = _head_sha(_signed_commits(2))
+        opener = _SequenceOpener(
+            _metadata(2, expected_head, base_sha="e" * 40)
+        )
+
+        with self.assertRaisesRegex(dco_check.DcoContractError, "base mismatch"):
+            dco_check.fetch_authoritative_pr_commits(
+                API_URL,
+                REPOSITORY,
+                PR_NUMBER,
+                TOKEN,
+                expected_head,
+                expected_base_sha=BASE_SHA,
+                opener=opener,
+            )
+
+    def test_final_retrieved_sha_must_equal_expected_head(self) -> None:
+        expected_head = _head_sha(_signed_commits(2))
+        replacement_commits = [_commit(1), _commit(3)]
+        stable_metadata = _metadata(2, expected_head)
+        opener = _SequenceOpener(
+            stable_metadata, replacement_commits, [], stable_metadata
+        )
+
+        with self.assertRaisesRegex(dco_check.DcoContractError, "retrieved head mismatch"):
+            dco_check.fetch_authoritative_pr_commits(
+                API_URL, REPOSITORY, PR_NUMBER, TOKEN, expected_head, opener=opener
+            )
+
+    def test_unicode_lookalike_header_is_rejected(self) -> None:
+        commit = _commit(
+            17,
+            "fix: lookalike\n\nSıgned-off-by: Test User <test@example.com>",
+        )
+
+        self.assertEqual(dco_check.unsigned_commit_shas([commit]), [commit["sha"]])
+
+
+    def test_target_body_signoff_outside_final_trailer_block_is_rejected(self) -> None:
+        commit = _commit(
+            18,
+            "fix: quoted signoff\n\nSigned-off-by: Test User <test@example.com>"
+            "\n\nOrdinary postscript text.",
+        )
+
+        self.assertEqual(dco_check.unsigned_commit_shas([commit]), [commit["sha"]])
+
+
+    def test_target_vertical_whitespace_in_signer_names_is_rejected(self) -> None:
+        separators = (
+            "\r",
+            "\n",
+            "\v",
+            "\f",
+            "\x1c",
+            "\x1d",
+            "\x1e",
+            "\x1f",
+            "\x85",
+            "\u2028",
+            "\u2029",
+        )
+        malformed = [
+            _commit(
+                index,
+                f"fix: vertical name\n\nSigned-off-by: A{separator}B <test@example.com>",
+            )
+            for index, separator in enumerate(separators, start=9)
+        ]
 
         self.assertEqual(
-            dco.validate_pull_request_target(
-                self.repo,
-                payload,
-                "szl-holdings/.github",
-                "token",
-                complete,
-            ),
-            2,
+            dco_check.unsigned_commit_shas(malformed),
+            [commit["sha"] for commit in malformed],
         )
-
-        def incomplete(path: str):
-            if "/commits?" in path:
-                return [{"sha": merged}]
-            return {
-                "base": {"sha": self.base},
-                "head": {"sha": merged},
-                "commits": 1,
-                "draft": False,
-            }
-
-        self.assert_rejected(
-            "differs from the checked-out history",
-            dco.validate_pull_request_target,
-            self.repo,
-            payload,
-            "szl-holdings/.github",
-            "token",
-            incomplete,
-        )
-
-    def test_pr_history_uses_actual_merge_base_when_main_advances(self) -> None:
-        head = self.commit(
-            "fix: branch work\n\nSigned-off-by: Series A Builder <builder@example.com>"
-        )
-        self.git("reset", "--hard", self.base)
-        current_base = self.commit(
-            "chore: advance main\n\nSigned-off-by: Series A Builder <builder@example.com>"
-        )
-        self.git("reset", "--hard", head)
-        payload = {
-            "action": "synchronize",
-            "repository": {"full_name": "szl-holdings/.github"},
-            "pull_request": {
-                "number": 400,
-                "base": {"ref": "main", "sha": current_base},
-                "head": {"sha": head},
-            },
-        }
-
-        def complete(path: str):
-            if "/commits?" in path:
-                return [{"sha": head}]
-            return {
-                "base": {"sha": current_base},
-                "head": {"sha": head},
-                "commits": 1,
-                "draft": False,
-            }
-
-        self.assertEqual(
-            dco.validate_pull_request_target(
-                self.repo,
-                payload,
-                "szl-holdings/.github",
-                "token",
-                complete,
-            ),
-            1,
-        )
-
-    def test_workflow_static_contract(self) -> None:
-        workflow = (Path(__file__).resolve().parents[1] / "workflows" / "dco.yml").read_text(
-            encoding="utf-8"
-        )
-        for marker in (
-            "pull_request_target:",
-            "merge_group:",
-            "types: [checks_requested]",
-            "persist-credentials: false",
-            "format('refs/pull/{0}/head', github.event.pull_request.number)",
-            "github.event.pull_request.base.sha",
-            "github.event.pull_request.head.sha",
-            "git -C \"$GITHUB_WORKSPACE/candidate\" fetch",
-            "trusted/.github/scripts/dco_check.py",
-        ):
-            self.assertIn(marker, workflow)
-        checker = (Path(__file__).resolve().parent / "dco_check.py").read_text(
-            encoding="utf-8"
-        )
-        for marker in (
-            'group.get("base_sha")',
-            'group.get("head_sha")',
-            '"merge-base", "--is-ancestor"',
-            '"interpret-trailers", "--parse"',
-        ):
-            self.assertIn(marker, checker)
-        self.assertNotIn("\n  pull_request:\n", workflow)
-        self.assertNotIn("workflow_dispatch:", workflow)
-        self.assertNotIn("github.event_name != 'pull_request'", workflow)
 
 
 if __name__ == "__main__":

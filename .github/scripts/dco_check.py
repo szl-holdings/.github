@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Fail-closed DCO validation for trusted PR, merge-group, and push events."""
+"""Fail-closed DCO validation for every commit in a pull request."""
 
 from __future__ import annotations
 
@@ -11,29 +11,514 @@ import subprocess
 import sys
 from pathlib import Path
 from typing import Any, Callable
+from urllib.error import URLError
 from urllib.parse import quote
 from urllib.request import Request, urlopen
 
 
-SHA_RE = re.compile(r"^[0-9a-f]{40}$")
-SIGNOFF_RE = re.compile(r"^\s*(.+?)\s*<([^<>\s]+@[^<>\s]+)>\s*$")
+API_VERSION = "2022-11-28"
+COMMITS_PER_PAGE = 100
+MAX_PULL_REQUEST_COMMITS = 250
+REQUEST_TIMEOUT_SECONDS = 30
+SHA_PATTERN = re.compile(r"^[0-9a-f]{40}$")
 QUEUE_REF_PREFIX = "refs/heads/gh-readonly-queue/main/"
 ALLOWED_PR_ACTIONS = {"opened", "synchronize", "reopened", "ready_for_review"}
-MAX_API_PAGES = 20
+
+# Audited horizontal separators: TAB, SPACE, and every Unicode Zs code point.
+# Name and email tokens separately reject C0/C1 controls plus Unicode line and
+# paragraph separators, so no broad whitespace class can admit a line break.
+HORIZONTAL_SEPARATOR_PATTERN = (
+    r"[\x09\x20\u00a0\u1680\u2000-\u200a\u202f\u205f\u3000]"
+)
+NAME_TOKEN_PATTERN = (
+    r"[^<>\x00-\x20\x7f-\x9f\u00a0\u1680\u2000-\u200a"
+    r"\u2028\u2029\u202f\u205f\u3000]+"
+)
+EMAIL_PART_PATTERN = (
+    r"[^<>@\x00-\x20\x7f-\x9f\u00a0\u1680\u2000-\u200a"
+    r"\u2028\u2029\u202f\u205f\u3000]+"
+)
+SIGNED_OFF_BY_PATTERN = re.compile(
+    rf"^Signed-off-by:{HORIZONTAL_SEPARATOR_PATTERN}+{NAME_TOKEN_PATTERN}"
+    rf"(?:{HORIZONTAL_SEPARATOR_PATTERN}+{NAME_TOKEN_PATTERN})*"
+    rf"{HORIZONTAL_SEPARATOR_PATTERN}+<{EMAIL_PART_PATTERN}@"
+    rf"{EMAIL_PART_PATTERN}>{HORIZONTAL_SEPARATOR_PATTERN}*$",
+    re.IGNORECASE,
+)
+SIGNED_OFF_BY_IDENTITY_PATTERN = re.compile(
+    rf"^Signed-off-by:{HORIZONTAL_SEPARATOR_PATTERN}+"
+    rf"(?P<name>{NAME_TOKEN_PATTERN}(?:{HORIZONTAL_SEPARATOR_PATTERN}+"
+    rf"{NAME_TOKEN_PATTERN})*){HORIZONTAL_SEPARATOR_PATTERN}+"
+    rf"<(?P<email>{EMAIL_PART_PATTERN}@{EMAIL_PART_PATTERN})>"
+    rf"{HORIZONTAL_SEPARATOR_PATTERN}*$",
+    re.IGNORECASE,
+)
+HORIZONTAL_ONLY_PATTERN = re.compile(
+    rf"^{HORIZONTAL_SEPARATOR_PATTERN}*$"
+)
+SAFE_TRAILER_TEXT_PATTERN = (
+    r"[^\x00-\x08\x0a-\x1f\x7f-\x9f\u2028\u2029]*"
+)
+TRAILER_LINE_PATTERN = re.compile(
+    rf"^(?P<token>[A-Za-z0-9-]+)[ \t]*:"
+    rf"(?P<value>{SAFE_TRAILER_TEXT_PATTERN})$"
+)
+CONTINUATION_LINE_PATTERN = re.compile(
+    rf"^{HORIZONTAL_SEPARATOR_PATTERN}+{SAFE_TRAILER_TEXT_PATTERN}$"
+)
+POTENTIAL_TRAILER_LINE_PATTERN = re.compile(
+    rf"^[A-Za-z0-9-]+(?:{HORIZONTAL_SEPARATOR_PATTERN}|"
+    r"[\x00-\x08\x0a-\x1f\x7f-\x9f\u2028\u2029])*:"
+)
+HORIZONTAL_PREFIX_PATTERN = re.compile(
+    rf"^{HORIZONTAL_SEPARATOR_PATTERN}"
+)
+
+# Git's mixed-group heuristic recognizes this exact generated prefix. Project
+# DCO matching is intentionally broader and is applied only after admission.
+GIT_RECOGNIZED_SIGNOFF_PREFIX = "Signed-off-by: "
 
 
-class DcoError(ValueError):
-    """Raised when event identity, history, or DCO evidence is invalid."""
+class DcoContractError(RuntimeError):
+    """Raised when the API response cannot prove complete DCO coverage."""
+
+
+DcoError = DcoContractError
 
 
 def require(condition: bool, message: str) -> None:
     if not condition:
-        raise DcoError(message)
+        raise DcoContractError(message)
 
 
 def require_sha(value: object, label: str) -> str:
-    require(isinstance(value, str) and bool(SHA_RE.fullmatch(value)), f"{label} is invalid")
+    require(
+        isinstance(value, str) and bool(SHA_PATTERN.fullmatch(value)),
+        f"{label} is invalid",
+    )
     return value
+
+
+def _validate_sha(value: str, *, label: str) -> str:
+    if not SHA_PATTERN.fullmatch(value):
+        raise DcoContractError(f"{label} was not a full lowercase commit SHA")
+    return value
+
+
+def _request_json(
+    url: str,
+    token: str,
+    *,
+    resource: str,
+    opener: Any = None,
+) -> Any:
+    request = Request(
+        url,
+        headers={
+            "Accept": "application/vnd.github+json",
+            "Authorization": f"Bearer {token}",
+            "X-GitHub-Api-Version": API_VERSION,
+        },
+    )
+    open_request = opener or urlopen
+
+    try:
+        with open_request(request, timeout=REQUEST_TIMEOUT_SECONDS) as response:
+            status = getattr(response, "status", None)
+            if status is None and hasattr(response, "getcode"):
+                status = response.getcode()
+            if status != 200:
+                raise DcoContractError(
+                    f"{resource} retrieval failed with HTTP status {status}"
+                )
+            body = response.read()
+    except DcoContractError:
+        raise
+    except (OSError, TimeoutError, URLError) as exc:
+        raise DcoContractError(f"{resource} retrieval failed: {exc}") from exc
+
+    try:
+        return json.loads(body.decode("utf-8"))
+    except (AttributeError, UnicodeDecodeError, json.JSONDecodeError) as exc:
+        raise DcoContractError(f"{resource} response was not valid JSON") from exc
+
+
+def fetch_pr_metadata(
+    api_url: str,
+    repository: str,
+    pr_number: int,
+    token: str,
+    expected_head_sha: str,
+    *,
+    expected_base_sha: str | None = None,
+    opener: Any = None,
+) -> tuple[int, str, str]:
+    """Retrieve an authoritative commit count bound to the expected PR tips."""
+    expected_head_sha = _validate_sha(
+        expected_head_sha,
+        label="expected pull-request head",
+    )
+    if expected_base_sha is not None:
+        expected_base_sha = _validate_sha(
+            expected_base_sha,
+            label="expected pull-request base",
+        )
+    url = f"{api_url.rstrip('/')}/repos/{repository}/pulls/{pr_number}"
+    payload = _request_json(
+        url,
+        token,
+        resource="pull-request metadata",
+        opener=opener,
+    )
+
+    if not isinstance(payload, dict):
+        raise DcoContractError("pull-request metadata response was not an object")
+
+    declared_count = payload.get("commits")
+    if (
+        isinstance(declared_count, bool)
+        or not isinstance(declared_count, int)
+        or declared_count <= 0
+    ):
+        raise DcoContractError(
+            "pull-request metadata did not declare a positive integer commit count"
+        )
+
+    head = payload.get("head")
+    head_sha = head.get("sha") if isinstance(head, dict) else None
+    if not isinstance(head_sha, str) or not SHA_PATTERN.fullmatch(head_sha):
+        raise DcoContractError(
+            "pull-request metadata did not declare a valid head SHA"
+        )
+    if head_sha != expected_head_sha:
+        raise DcoContractError(
+            "pull-request head mismatch: "
+            f"metadata returned {head_sha}, expected {expected_head_sha}"
+        )
+    base = payload.get("base")
+    base_sha = base.get("sha") if isinstance(base, dict) else None
+    if not isinstance(base_sha, str) or not SHA_PATTERN.fullmatch(base_sha):
+        raise DcoContractError(
+            "pull-request metadata did not declare a valid base SHA"
+        )
+    if expected_base_sha is not None and base_sha != expected_base_sha:
+        raise DcoContractError(
+            "pull-request base mismatch: "
+            f"metadata returned {base_sha}, expected {expected_base_sha}"
+        )
+    if declared_count > MAX_PULL_REQUEST_COMMITS:
+        raise DcoContractError(
+            f"pull request declares {declared_count} commits; "
+            f"the pull-request commits endpoint is capped at "
+            f"{MAX_PULL_REQUEST_COMMITS}, so complete DCO coverage cannot be proven"
+        )
+
+    return declared_count, head_sha, base_sha
+
+
+def fetch_pr_commits(
+    api_url: str,
+    repository: str,
+    pr_number: int,
+    token: str,
+    declared_count: int,
+    *,
+    opener: Any = None,
+) -> list[dict[str, Any]]:
+    """Retrieve exactly the declared commits and prove the page boundary is empty."""
+    if (
+        isinstance(declared_count, bool)
+        or not isinstance(declared_count, int)
+        or declared_count <= 0
+        or declared_count > MAX_PULL_REQUEST_COMMITS
+    ):
+        raise DcoContractError("declared commit count is outside the supported range")
+
+    commits: list[dict[str, Any]] = []
+    seen_shas: set[str] = set()
+    page_count = (declared_count + COMMITS_PER_PAGE - 1) // COMMITS_PER_PAGE
+    endpoint = f"{api_url.rstrip('/')}/repos/{repository}/pulls/{pr_number}/commits"
+
+    for page in range(1, page_count + 1):
+        payload = _request_json(
+            f"{endpoint}?per_page={COMMITS_PER_PAGE}&page={page}",
+            token,
+            resource=f"pull-request commits page {page}",
+            opener=opener,
+        )
+        if not isinstance(payload, list):
+            raise DcoContractError(
+                f"pull-request commits page {page} response was not a list"
+            )
+
+        expected_page_size = min(
+            COMMITS_PER_PAGE,
+            declared_count - len(commits),
+        )
+        if len(payload) != expected_page_size:
+            raise DcoContractError(
+                "pull-request commit count mismatch: "
+                f"page {page} returned {len(payload)} commits, "
+                f"expected {expected_page_size}"
+            )
+        for index, item in enumerate(payload, start=1):
+            if not isinstance(item, dict):
+                raise DcoContractError(
+                    f"pull-request commits page {page} entry {index} was not an object"
+                )
+            sha = item.get("sha")
+            if not isinstance(sha, str) or not SHA_PATTERN.fullmatch(sha):
+                raise DcoContractError(
+                    f"pull-request commits page {page} entry {index} had an invalid SHA"
+                )
+            if sha in seen_shas:
+                raise DcoContractError(
+                    f"pull-request commits response contained duplicate SHA {sha}"
+                )
+            seen_shas.add(sha)
+            commits.append(item)
+
+    boundary_page = page_count + 1
+    boundary_payload = _request_json(
+        f"{endpoint}?per_page={COMMITS_PER_PAGE}&page={boundary_page}",
+        token,
+        resource=f"pull-request commits boundary page {boundary_page}",
+        opener=opener,
+    )
+    if not isinstance(boundary_payload, list):
+        raise DcoContractError(
+            f"pull-request commits boundary page {boundary_page} response was not a list"
+        )
+    if boundary_payload:
+        raise DcoContractError(
+            "pull-request commit count mismatch: "
+            f"boundary page {boundary_page} unexpectedly returned "
+            f"{len(boundary_payload)} commits"
+        )
+    if len(commits) != declared_count:
+        raise DcoContractError(
+            "pull-request commit count mismatch: "
+            f"retrieved {len(commits)}, metadata declared {declared_count}"
+        )
+
+    return commits
+
+
+def fetch_authoritative_pr_commits(
+    api_url: str,
+    repository: str,
+    pr_number: int,
+    token: str,
+    expected_head_sha: str,
+    *,
+    expected_base_sha: str | None = None,
+    opener: Any = None,
+) -> tuple[int, list[dict[str, Any]]]:
+    """Bind complete pagination to stable metadata and exact event tips."""
+    expected_head_sha = _validate_sha(
+        expected_head_sha,
+        label="expected pull-request head",
+    )
+    if expected_base_sha is not None:
+        expected_base_sha = _validate_sha(
+            expected_base_sha,
+            label="expected pull-request base",
+        )
+    declared_count, initial_head_sha, initial_base_sha = fetch_pr_metadata(
+        api_url,
+        repository,
+        pr_number,
+        token,
+        expected_head_sha,
+        expected_base_sha=expected_base_sha,
+        opener=opener,
+    )
+    commits = fetch_pr_commits(
+        api_url,
+        repository,
+        pr_number,
+        token,
+        declared_count,
+        opener=opener,
+    )
+    final_count, final_head_sha, final_base_sha = fetch_pr_metadata(
+        api_url,
+        repository,
+        pr_number,
+        token,
+        expected_head_sha,
+        expected_base_sha=expected_base_sha,
+        opener=opener,
+    )
+    if (
+        final_count != declared_count
+        or final_head_sha != initial_head_sha
+        or final_base_sha != initial_base_sha
+    ):
+        raise DcoContractError(
+            "pull-request metadata drifted during commit retrieval: "
+            f"initial base/head/count "
+            f"{initial_base_sha}/{initial_head_sha}/{declared_count}, "
+            f"final base/head/count {final_base_sha}/{final_head_sha}/{final_count}"
+        )
+    if len(commits) != declared_count:
+        raise DcoContractError(
+            "pull-request commit count mismatch after retrieval: "
+            f"retrieved {len(commits)}, metadata declared {declared_count}"
+        )
+    retrieved_head_sha = commits[-1]["sha"]
+    if retrieved_head_sha != expected_head_sha:
+        raise DcoContractError(
+            "pull-request retrieved head mismatch: "
+            f"final commit was {retrieved_head_sha}, expected {expected_head_sha}"
+        )
+    return declared_count, commits
+
+
+def _is_horizontal_blank(line: str) -> bool:
+    """Return whether a physical line is blank under the audited grammar."""
+    return HORIZONTAL_ONLY_PATTERN.fullmatch(line) is not None
+
+
+def _final_nonblank_group(message: str) -> list[str]:
+    """Return the complete final nonblank group after a body boundary."""
+    lines = message.split("\n")
+    divider_index = next(
+        (
+            index
+            for index, line in enumerate(lines)
+            if (index < len(lines) - 1 or line != "---")
+            and re.match(r"^---(?:[ \t\r]|$)", line)
+        ),
+        None,
+    )
+    if divider_index is not None:
+        lines = lines[:divider_index]
+    while lines and _is_horizontal_blank(lines[-1]):
+        lines.pop()
+    if not lines:
+        return []
+
+    boundary_index = next(
+        (
+            index
+            for index in range(len(lines) - 1, -1, -1)
+            if _is_horizontal_blank(lines[index])
+        ),
+        None,
+    )
+    if boundary_index is None:
+        return []
+
+    final_paragraph = lines[boundary_index + 1 :]
+    if not final_paragraph:
+        return []
+    return final_paragraph
+
+
+def _admitted_trailer_group(
+    message: str,
+) -> list[tuple[str, str | None, str]] | None:
+    """Classify and admit the complete final group using Git's counters."""
+    final_group = _final_nonblank_group(message)
+    if not final_group:
+        return None
+
+    classified_lines: list[tuple[str, str | None, str]] = []
+    current_token: str | None = None
+    trailer_count = 0
+    non_trailer_count = 0
+    has_recognized_prefix = False
+
+    for line in final_group:
+        if CONTINUATION_LINE_PATTERN.fullmatch(line):
+            if current_token is None:
+                non_trailer_count += 1
+                classified_lines.append(("orphan-continuation", None, line))
+            else:
+                classified_lines.append(("continuation", current_token, line))
+            continue
+
+        trailer_match = TRAILER_LINE_PATTERN.fullmatch(line)
+        if trailer_match is not None:
+            current_token = trailer_match.group("token").lower()
+            trailer_count += 1
+            has_recognized_prefix = (
+                has_recognized_prefix
+                or line.startswith(GIT_RECOGNIZED_SIGNOFF_PREFIX)
+            )
+            classified_lines.append(("trailer", current_token, line))
+            continue
+
+        if (
+            POTENTIAL_TRAILER_LINE_PATTERN.match(line)
+            or HORIZONTAL_PREFIX_PATTERN.match(line)
+        ):
+            current_token = None
+            non_trailer_count += 1
+            classified_lines.append(("malformed", None, line))
+            continue
+
+        current_token = None
+        non_trailer_count += 1
+        classified_lines.append(("body", None, line))
+
+    if trailer_count == 0:
+        return None
+    if non_trailer_count and (
+        not has_recognized_prefix
+        or trailer_count * 4 < trailer_count + non_trailer_count
+    ):
+        return None
+
+    return classified_lines
+
+
+def has_valid_dco_trailer(message: str) -> bool:
+    """Admit Git-compatible trailers, then apply stricter project DCO rules."""
+    classified_lines = _admitted_trailer_group(message)
+    if classified_lines is None:
+        return False
+
+    found_signed_off_by = False
+    current_token = None
+    for line_kind, token, line in classified_lines:
+        if line_kind == "body":
+            current_token = None
+            continue
+        if line_kind in {"orphan-continuation", "malformed"}:
+            return False
+        if line_kind == "continuation":
+            if current_token is None or current_token == "signed-off-by":
+                return False
+            continue
+
+        current_token = token
+        if current_token == "signed-off-by":
+            if SIGNED_OFF_BY_PATTERN.fullmatch(line) is None:
+                return False
+            found_signed_off_by = True
+
+    return found_signed_off_by
+
+
+def unsigned_commit_shas(commits: list[dict[str, Any]]) -> list[str]:
+    """Return every commit that lacks a syntactically valid DCO trailer."""
+    unsigned: list[str] = []
+
+    for index, item in enumerate(commits, start=1):
+        if not isinstance(item, dict):
+            raise DcoContractError(f"commit entry {index} was not an object")
+        sha = item.get("sha")
+        commit = item.get("commit")
+        if not isinstance(sha, str) or not SHA_PATTERN.fullmatch(sha):
+            raise DcoContractError(f"commit entry {index} had an invalid SHA")
+        if not isinstance(commit, dict) or not isinstance(commit.get("message"), str):
+            raise DcoContractError(f"commit {sha} had no valid commit message")
+        if not has_valid_dco_trailer(commit["message"]):
+            unsigned.append(sha)
+
+    return unsigned
 
 
 def git(
@@ -53,7 +538,7 @@ def git(
     )
     if check and completed.returncode:
         detail = completed.stderr.strip() or completed.stdout.strip()
-        raise DcoError(f"git {' '.join(args)} failed: {detail}")
+        raise DcoContractError(f"git {' '.join(args)} failed: {detail}")
     return completed.stdout
 
 
@@ -74,16 +559,20 @@ def terminal_signoffs(repo: Path, message: str) -> list[tuple[str, str]]:
     parsed = git(repo, "interpret-trailers", "--parse", input_text=message)
     signoffs: list[tuple[str, str]] = []
     for line in parsed.splitlines():
-        key, separator, value = line.partition(":")
-        if not separator or key.strip().casefold() != "signed-off-by":
-            continue
-        match = SIGNOFF_RE.fullmatch(value)
-        if match:
-            signoffs.append(normalized_identity(match.group(1), match.group(2)))
+        match = SIGNED_OFF_BY_IDENTITY_PATTERN.fullmatch(line)
+        if match is not None:
+            signoffs.append(
+                normalized_identity(match.group("name"), match.group("email"))
+            )
     return signoffs
 
 
-def validate_commit(repo: Path, sha: str, *, allow_merge_commit: bool = False) -> None:
+def validate_commit(
+    repo: Path,
+    sha: str,
+    *,
+    allow_merge_commit: bool = False,
+) -> None:
     parents, author_name, author_email, message = commit_record(repo, sha)
     allowed_parent_counts = {1, 2} if allow_merge_commit else {1}
     require(
@@ -142,18 +631,19 @@ def validate_range(repo: Path, base_sha: str, head_sha: str) -> int:
 
 
 def github_get(path: str, token: str) -> Any:
+    api_url = os.environ.get("GITHUB_API_URL", "https://api.github.com").rstrip("/")
     request = Request(
-        "https://api.github.com" + path,
+        api_url + path,
         headers={
             "Accept": "application/vnd.github+json",
             "Authorization": f"Bearer {token}",
-            "User-Agent": "szl-dco-attestor/1",
-            "X-GitHub-Api-Version": "2022-11-28",
+            "User-Agent": "szl-dco-attestor/2",
+            "X-GitHub-Api-Version": API_VERSION,
         },
     )
     with urlopen(request, timeout=20) as response:
         require(response.status == 200, f"GitHub API returned HTTP {response.status}")
-        require(response.geturl().startswith("https://api.github.com/"), "GitHub API redirected")
+        require(response.geturl().startswith(api_url + "/"), "GitHub API redirected")
         data = response.read(2_000_001)
     require(len(data) <= 2_000_000, "GitHub API response is too large")
     return json.loads(data)
@@ -166,33 +656,57 @@ def collect_pr_commits(
     expected_head: str,
     api_get: Callable[[str], Any],
 ) -> list[str]:
+    expected_base = require_sha(expected_base, "pull-request base SHA")
+    expected_head = require_sha(expected_head, "pull-request head SHA")
     encoded_repo = quote(repository, safe="/")
-    rows: list[dict[str, Any]] = []
-    for page in range(1, MAX_API_PAGES + 1):
-        batch = api_get(
-            f"/repos/{encoded_repo}/pulls/{number}/commits?per_page=100&page={page}"
+    metadata_path = f"/repos/{encoded_repo}/pulls/{number}"
+
+    def stable_metadata() -> int:
+        current = api_get(metadata_path)
+        require(isinstance(current, dict), "pull-request metadata is not an object")
+        base = current.get("base")
+        head = current.get("head")
+        require(isinstance(base, dict) and isinstance(head, dict), "pull-request refs are missing")
+        require(base.get("sha") == expected_base, "pull-request base moved during validation")
+        require(head.get("sha") == expected_head, "pull-request head moved during validation")
+        declared = current.get("commits")
+        require(
+            isinstance(declared, int)
+            and not isinstance(declared, bool)
+            and 0 < declared <= MAX_PULL_REQUEST_COMMITS,
+            "pull-request commit count is outside the supported range",
         )
+        require(current.get("draft") is False, "draft pull requests cannot satisfy DCO")
+        return declared
+
+    declared_count = stable_metadata()
+    rows: list[dict[str, Any]] = []
+    page_count = (declared_count + COMMITS_PER_PAGE - 1) // COMMITS_PER_PAGE
+    endpoint = f"/repos/{encoded_repo}/pulls/{number}/commits"
+    for page in range(1, page_count + 1):
+        batch = api_get(f"{endpoint}?per_page={COMMITS_PER_PAGE}&page={page}")
         require(isinstance(batch, list), "pull-request commit page is not an array")
+        expected_size = min(COMMITS_PER_PAGE, declared_count - len(rows))
+        require(
+            len(batch) == expected_size,
+            "pull-request commit page differs from the declared count",
+        )
         require(all(isinstance(item, dict) for item in batch), "commit page row is invalid")
         rows.extend(batch)
-        if len(batch) < 100:
-            break
-    else:
-        raise DcoError("pull-request commit pagination exceeded the bounded limit")
-
+    boundary = api_get(
+        f"{endpoint}?per_page={COMMITS_PER_PAGE}&page={page_count + 1}"
+    )
+    require(
+        isinstance(boundary, list) and not boundary,
+        "pull-request commit boundary page was not empty",
+    )
+    require(
+        stable_metadata() == declared_count,
+        "pull-request commit count changed during validation",
+    )
     shas = [require_sha(item.get("sha"), "pull-request commit SHA") for item in rows]
-    require(shas and shas[-1] == expected_head, "retrieved commits do not end at expected head")
     require(len(shas) == len(set(shas)), "retrieved commits contain duplicate SHAs")
-
-    current = api_get(f"/repos/{encoded_repo}/pulls/{number}")
-    require(isinstance(current, dict), "pull-request metadata is not an object")
-    base = current.get("base")
-    head = current.get("head")
-    require(isinstance(base, dict) and isinstance(head, dict), "pull-request refs are missing")
-    require(base.get("sha") == expected_base, "pull-request base moved during validation")
-    require(head.get("sha") == expected_head, "pull-request head moved during validation")
-    require(current.get("commits") == len(shas), "pull-request commit count changed during validation")
-    require(current.get("draft") is False, "draft pull requests cannot satisfy DCO")
+    require(shas and shas[-1] == expected_head, "retrieved commits do not end at expected head")
     return shas
 
 
@@ -208,7 +722,10 @@ def merge_group_subject(payload: dict[str, Any], github_sha: str) -> tuple[str, 
     )
     base_sha = require_sha(group.get("base_sha"), "merge_group base SHA")
     head_sha = require_sha(group.get("head_sha"), "merge_group head SHA")
-    require(head_sha == require_sha(github_sha, "GITHUB_SHA"), "merge_group head differs from GITHUB_SHA")
+    require(
+        head_sha == require_sha(github_sha, "GITHUB_SHA"),
+        "merge_group head differs from GITHUB_SHA",
+    )
     return base_sha, head_sha
 
 
@@ -257,6 +774,9 @@ def validate_pull_request_target(
     repository: str,
     token: str,
     api_get: Callable[[str], Any] | None = None,
+    *,
+    expected_base_sha: str | None = None,
+    expected_head_sha: str | None = None,
 ) -> int:
     require(payload.get("action") in ALLOWED_PR_ACTIONS, "pull_request_target action is unsupported")
     require(
@@ -272,6 +792,16 @@ def validate_pull_request_target(
     require(base.get("ref") == "main", "pull-request base ref is not main")
     base_sha = require_sha(base.get("sha"), "pull-request base SHA")
     head_sha = require_sha(head.get("sha"), "pull-request head SHA")
+    if expected_base_sha is not None:
+        require(
+            base_sha == require_sha(expected_base_sha, "expected pull-request base SHA"),
+            "pull-request base differs from EXPECTED_BASE_SHA",
+        )
+    if expected_head_sha is not None:
+        require(
+            head_sha == require_sha(expected_head_sha, "expected pull-request head SHA"),
+            "pull-request head differs from EXPECTED_HEAD_SHA",
+        )
     number = pr.get("number") or payload.get("number")
     require(isinstance(number, int) and number > 0, "pull-request number is invalid")
     require(bool(token), "GITHUB_TOKEN is required for trusted PR validation")
@@ -288,7 +818,7 @@ def validate_pull_request_target(
         if line.strip()
     ]
     require(
-        len(local_shas) == len(shas) and set(local_shas) == set(shas),
+        local_shas == shas,
         "pull-request API commit set differs from the checked-out history",
     )
     return validate_commits(repo, shas, head_sha, allow_merge_commits=True)
@@ -301,38 +831,47 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
+def _required_environment(name: str) -> str:
+    value = os.environ.get(name, "").strip()
+    if not value:
+        raise DcoContractError(f"required environment variable {name} is empty")
+    return value
+
+
 def main() -> int:
-    args = parse_args()
-    payload = json.loads(args.event_path.read_text(encoding="utf-8"))
-    require(isinstance(payload, dict), "event payload must be an object")
-    event_name = os.environ.get("GITHUB_EVENT_NAME", "")
-    github_sha = os.environ.get("GITHUB_SHA", "")
-    repository = os.environ.get("GITHUB_REPOSITORY", "")
-    repo = args.repo_root.resolve()
+    try:
+        args = parse_args()
+        payload = json.loads(args.event_path.read_text(encoding="utf-8"))
+        require(isinstance(payload, dict), "event payload must be an object")
+        event_name = _required_environment("GITHUB_EVENT_NAME")
+        github_sha = _required_environment("GITHUB_SHA")
+        repository = _required_environment("GITHUB_REPOSITORY")
+        repo = args.repo_root.resolve()
 
-    if event_name == "pull_request_target":
-        count = validate_pull_request_target(
-            repo,
-            payload,
-            repository,
-            os.environ.get("GITHUB_TOKEN", ""),
-        )
-    elif event_name == "merge_group":
-        base_sha, head_sha = merge_group_subject(payload, github_sha)
-        count = validate_merge_group(repo, base_sha, head_sha)
-    elif event_name == "push":
-        base_sha, head_sha = push_subject(payload, github_sha)
-        count = validate_range(repo, base_sha, head_sha)
-    else:
-        raise DcoError(f"unsupported event: {event_name!r}")
+        if event_name == "pull_request_target":
+            count = validate_pull_request_target(
+                repo,
+                payload,
+                repository,
+                _required_environment("GITHUB_TOKEN"),
+                expected_base_sha=_required_environment("EXPECTED_BASE_SHA"),
+                expected_head_sha=_required_environment("EXPECTED_HEAD_SHA"),
+            )
+        elif event_name == "merge_group":
+            base_sha, head_sha = merge_group_subject(payload, github_sha)
+            count = validate_merge_group(repo, base_sha, head_sha)
+        elif event_name == "push":
+            base_sha, head_sha = push_subject(payload, github_sha)
+            count = validate_range(repo, base_sha, head_sha)
+        else:
+            raise DcoContractError(f"unsupported event: {event_name!r}")
 
-    print(f"DCO OK: validated {count} exact commit(s) for {event_name}")
-    return 0
+        print(f"DCO OK: validated {count} exact commit(s) for {event_name}")
+        return 0
+    except (DcoContractError, json.JSONDecodeError, OSError) as exc:
+        print(f"DCO FAILED: {type(exc).__name__}: {exc}", file=sys.stderr)
+        return 1
 
 
 if __name__ == "__main__":
-    try:
-        raise SystemExit(main())
-    except (DcoError, json.JSONDecodeError, OSError) as exc:
-        print(f"DCO FAILED: {type(exc).__name__}: {exc}", file=sys.stderr)
-        raise SystemExit(1)
+    raise SystemExit(main())

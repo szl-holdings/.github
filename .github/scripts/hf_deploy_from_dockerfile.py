@@ -95,8 +95,189 @@ def source_file(repo_root, source_path):
     return rel, full
 
 
+def materialize_source_revision_file(repo_root, requested_path, source_sha):
+    """Write an exact source SHA to a new, repository-contained payload file."""
+    if not requested_path:
+        return None
+    source_sha = str(source_sha or "")
+    if not re.fullmatch(r"[0-9a-f]{40}", source_sha):
+        raise DeployContractError(
+            "--source-revision-file requires --source-sha to be an exact "
+            "lowercase 40-character SHA"
+        )
+    rel = normalize_repo_path(requested_path, label="source revision file")
+    if rel.split("/", 1)[0].casefold() == ".git":
+        raise DeployContractError(
+            "source revision file must not be inside Git metadata"
+        )
+    if rel in {"Dockerfile", "Dockerfile.dockerignore"}:
+        raise DeployContractError(
+            "source revision file collides with reserved Hugging Face "
+            "Dockerfile target or its build-context policy"
+        )
+    root = os.path.realpath(repo_root)
+    requested_full = os.path.join(root, *rel.split("/"))
+    if os.path.lexists(requested_full):
+        raise DeployContractError(
+            f"source revision file must not already exist: {rel!r}"
+        )
+    unresolved_ancestor = root
+    for component in rel.split("/")[:-1]:
+        unresolved_ancestor = os.path.join(unresolved_ancestor, component)
+        if os.path.islink(unresolved_ancestor):
+            raise DeployContractError(
+                "source revision file ancestor must not be a symlink: "
+                f"{rel!r}"
+            )
+    full = os.path.realpath(requested_full)
+    try:
+        contained = os.path.commonpath((root, full)) == root
+    except ValueError:
+        contained = False
+    if not contained:
+        raise DeployContractError(
+            f"source revision file escapes the repository root: {rel!r}"
+        )
+    parent = os.path.dirname(full)
+    if not os.path.isdir(parent):
+        raise DeployContractError(
+            f"source revision file parent is not a directory: {rel!r}"
+        )
+    with open(full, "x", encoding="ascii", newline="\n") as fh:
+        fh.write(source_sha + "\n")
+    return rel
+
+
+def _dockerignore_pattern_regex(pattern):
+    """Compile Docker patternmatcher wildcards for slash-delimited repo paths."""
+    pieces = ["^(?:.*/)?" if "/" not in pattern else "^"]
+    index = 0
+    while index < len(pattern):
+        char = pattern[index]
+        if char == "*":
+            if index + 1 < len(pattern) and pattern[index + 1] == "*":
+                index += 2
+                if index < len(pattern) and pattern[index] == "/":
+                    index += 1
+                    pieces.append("(?:.*/)?")
+                else:
+                    pieces.append(".*")
+                continue
+            pieces.append("[^/]*")
+        elif char == "?":
+            pieces.append("[^/]")
+        elif char == "[":
+            end = index + 1
+            if end < len(pattern) and pattern[end] in ("!", "^"):
+                end += 1
+            if end < len(pattern) and pattern[end] == "]":
+                end += 1
+            while end < len(pattern) and pattern[end] != "]":
+                end += 1
+            if end >= len(pattern):
+                raise DeployContractError(
+                    f"invalid Docker ignore pattern: {pattern!r}"
+                )
+            content = pattern[index + 1 : end]
+            if "/" in content:
+                raise DeployContractError(
+                    f"invalid Docker ignore character class: {pattern!r}"
+                )
+            if content.startswith("!"):
+                content = "^" + content[1:]
+            elif content.startswith("^"):
+                content = "\\" + content
+            pieces.append("[" + content + "]")
+            index = end
+        elif char == "\\":
+            index += 1
+            if index >= len(pattern):
+                raise DeployContractError(
+                    f"invalid trailing escape in Docker ignore pattern: {pattern!r}"
+                )
+            pieces.append(re.escape(pattern[index]))
+        else:
+            pieces.append(re.escape(char))
+        index += 1
+    pieces.append("$")
+    try:
+        return re.compile("".join(pieces))
+    except re.error as exc:
+        raise DeployContractError(
+            f"invalid Docker ignore pattern: {pattern!r}"
+        ) from exc
+
+
+def _dockerignore_patterns(ignore_path):
+    """Load normalized patternmatcher rules from one effective ignore file."""
+    with open(ignore_path, "rb") as fh:
+        data = fh.read(262145)
+    if len(data) > 262144:
+        raise DeployContractError("Docker ignore file exceeds 256 KiB")
+    try:
+        text = data.decode("utf-8-sig")
+    except UnicodeDecodeError as exc:
+        raise DeployContractError("Docker ignore file is not valid UTF-8") from exc
+
+    patterns = []
+    for raw_line in text.splitlines():
+        if raw_line.startswith("#"):
+            continue
+        pattern = raw_line.strip()
+        if not pattern:
+            continue
+        negated = pattern.startswith("!")
+        if negated:
+            pattern = pattern[1:].strip()
+            if not pattern:
+                raise DeployContractError(
+                    "Docker ignore file contains an empty negation"
+                )
+        pattern = posixpath.normpath(pattern).strip("/")
+        if pattern in ("", "."):
+            continue
+        patterns.append((negated, _dockerignore_pattern_regex(pattern)))
+    return patterns
+
+
+def _effective_dockerignore(repo_root, dockerfile_rel):
+    """Resolve Dockerfile-specific precedence over the root ignore file."""
+    candidates = (dockerfile_rel + ".dockerignore", ".dockerignore")
+    root = os.path.realpath(repo_root)
+    for rel in candidates:
+        requested = os.path.join(root, *rel.split("/"))
+        if not os.path.lexists(requested):
+            continue
+        normalized, full = source_file(repo_root, rel)
+        return normalized, full
+    return None, None
+
+
+def source_revision_is_dockerignored(repo_root, dockerfile_rel, revision_rel):
+    """Return the effective ignore file when Docker removes the revision path."""
+    ignore_rel, ignore_path = _effective_dockerignore(repo_root, dockerfile_rel)
+    if ignore_path is None:
+        return None
+
+    path = normalize_repo_path(revision_rel, label="source revision file")
+    parents = path.split("/")[:-1]
+    parent_candidates = [
+        "/".join(parents[: index + 1])
+        for index in range(len(parents))
+    ]
+    candidates = [path] + parent_candidates
+    ignored = {candidate: False for candidate in candidates}
+    for negated, pattern in _dockerignore_patterns(ignore_path):
+        for candidate in candidates:
+            if pattern.fullmatch(candidate):
+                ignored[candidate] = not negated
+    return ignore_rel if any(ignored.values()) else None
+
+
 def read_source_bytes(repo_root, target_path, meta):
     """Read the GitHub source mapped to an HF target path."""
+    if "generated_content_utf8" in meta:
+        return str(meta["generated_content_utf8"]).encode("utf-8")
     source_path = meta.get("source_path") or target_path
     _, full = source_file(repo_root, source_path)
     with open(full, "rb") as fh:
@@ -120,11 +301,13 @@ def sha256(data: bytes) -> str:
 # --------------------------------------------------------------------------- #
 # Dockerfile COPY parsing (shared logic with hf_module_drift_check.py)
 # --------------------------------------------------------------------------- #
-def parse_copy_sources(dockerfile_text):
+def parse_copy_sources(dockerfile_text, *, eligible_sources=None):
     """Return COPY/ADD *source* tokens. Joins line-continuations, handles the
     JSON-array form, drops --flag options, and SKIPS `--from=` build-stage
     copies. A whole-context source is rejected because it cannot be represented
-    as a curated, independently attestable deploy set."""
+    as a curated, independently attestable deploy set. When requested,
+    eligible_sources receives only sources from instructions without
+    `--exclude`, which are safe to use as source-revision coverage."""
     logical = []
     buf = ""
     for raw in dockerfile_text.splitlines():
@@ -142,6 +325,7 @@ def parse_copy_sources(dockerfile_text):
         logical.append(buf)
 
     sources = []
+    revision_eligible = []
     for line in logical:
         m = re.match(r"^\s*(COPY|ADD)\s+(.*)$", line, re.IGNORECASE)
         if not m:
@@ -161,14 +345,18 @@ def parse_copy_sources(dockerfile_text):
                     f"invalid JSON-form Dockerfile instruction: {line.strip()}"
                 )
             sources.extend(arr[:-1])
+            revision_eligible.extend(arr[:-1])
             continue
         toks = rest.split()
         skip = False
+        has_exclude = False
         clean = []
         for t in toks:
             if t.startswith("--"):
                 if t.lower().startswith("--from"):
                     skip = True
+                if t.lower().startswith("--exclude"):
+                    has_exclude = True
                 continue
             clean.append(t)
         if skip:
@@ -189,22 +377,30 @@ def parse_copy_sources(dockerfile_text):
                     "the deployer requires an explicit curated source set"
                 )
         sources.extend(srcs)
+        if not has_exclude:
+            revision_eligible.extend(srcs)
 
-    out, seen = [], set()
-    for s in sources:
-        s = s.strip()
-        # Strip a literal leading "./" only -- NOT arbitrary leading "."/"/"
-        # chars, or a dotdir source like ".compliance/x" collapses to "compliance/x".
-        while s.startswith("./"):
-            s = s[2:]
-        if s in ("", "."):
-            raise DeployContractError(
-                "bare `COPY . <dest>` / `ADD . <dest>` is forbidden: "
-                "the deployer requires an explicit curated source set"
-            )
-        if s and s not in seen:
-            seen.add(s)
-            out.append(s)
+    def normalized_unique(raw_sources):
+        out, seen = [], set()
+        for source in raw_sources:
+            source = source.strip()
+            # Strip a literal leading "./" only -- NOT arbitrary leading "."/"/"
+            # chars, or a dotdir source like ".compliance/x" collapses.
+            while source.startswith("./"):
+                source = source[2:]
+            if source in ("", "."):
+                raise DeployContractError(
+                    "bare `COPY . <dest>` / `ADD . <dest>` is forbidden: "
+                    "the deployer requires an explicit curated source set"
+                )
+            if source and source not in seen:
+                seen.add(source)
+                out.append(source)
+        return out
+
+    out = normalized_unique(sources)
+    if eligible_sources is not None:
+        eligible_sources.extend(normalized_unique(revision_eligible))
     return out
 
 
@@ -501,20 +697,78 @@ def probe_smoke_routes(hf_repo, smoke_paths, retries=6, delay=5):
 # derive: Dockerfile -> deploy manifest (no network, no push)
 # --------------------------------------------------------------------------- #
 def derive(args):
+    readme_path = normalize_repo_path(
+        args.readme_path,
+        label="README source path",
+    )
+    requested_revision = getattr(args, "source_revision_file", "")
+    if requested_revision:
+        revision_candidate = normalize_repo_path(
+            requested_revision,
+            label="source revision file",
+        )
+        if (
+            args.include_readme
+            and revision_candidate.casefold() == readme_path.casefold()
+        ):
+            raise DeployContractError(
+                "source revision file collides with the included README target"
+            )
+        manifest_out = str(getattr(args, "manifest_out", "") or "")
+        if manifest_out:
+            root = os.path.realpath(args.repo_root)
+            revision_full = os.path.realpath(
+                os.path.join(root, *revision_candidate.split("/"))
+            )
+            manifest_full = os.path.realpath(os.path.abspath(manifest_out))
+            if os.path.normcase(revision_full) == os.path.normcase(manifest_full):
+                raise DeployContractError(
+                    "source revision file collides with the manifest output"
+                )
     dockerfile_rel, df_path = source_file(args.repo_root, args.dockerfile_path)
     with open(df_path, "rb") as fh:
         dockerfile_text = fh.read().decode("utf-8", "replace")
-    sources = parse_copy_sources(dockerfile_text)
+    eligible_sources = []
+    sources = parse_copy_sources(
+        dockerfile_text,
+        eligible_sources=eligible_sources,
+    )
+    smoke_paths = normalize_smoke_paths(getattr(args, "smoke_paths", None))
+
+    revision_rel = None
+    revision_content = None
+    if requested_revision:
+        source_sha = str(getattr(args, "source_sha", "") or "")
+        if not re.fullmatch(r"[0-9a-f]{40}", source_sha):
+            raise DeployContractError(
+                "--source-revision-file requires --source-sha to be an exact "
+                "lowercase 40-character SHA"
+            )
+        ignored_by = source_revision_is_dockerignored(
+            args.repo_root,
+            dockerfile_rel,
+            revision_candidate,
+        )
+        if ignored_by:
+            raise DeployContractError(
+                "source revision file is excluded from the Docker build "
+                f"context by {ignored_by!r}: {revision_candidate!r}"
+            )
+        revision_rel = revision_candidate
+        revision_content = source_sha + "\n"
+
     tree = local_tree(args.repo_root)
+    if revision_rel:
+        tree[revision_rel] = git_blob_sha1(revision_content.encode("ascii"))
     targets, unresolved = expand_sources(sources, tree)
+    eligible_targets, _ = expand_sources(eligible_sources, tree)
 
     # include-readme is authoritative. A README may already be in the derived
     # set because the Dockerfile explicitly COPYs it; remove that exact path
     # when the caller owns the Space card separately. Normalize the CLI path to
     # the forward-slash form used by local_tree/expand_sources, without filtering
     # unrelated nested README files.
-    readme_path = normalize_repo_path(args.readme_path, label="README source path")
-    if not args.include_readme:
+    if not args.include_readme and readme_path != revision_rel:
         targets.pop(readme_path, None)
 
     if unresolved:
@@ -522,10 +776,19 @@ def derive(args):
             "Dockerfile COPY/ADD sources were not found in the checkout: "
             + ", ".join(sorted(unresolved))
         )
+    if revision_rel and revision_rel not in eligible_targets:
+        raise DeployContractError(
+            "source revision file is not covered by a Dockerfile COPY/ADD "
+            "instruction without --exclude: "
+            f"source: {revision_rel!r}"
+        )
 
     files = {}
     for rel, src in sorted(targets.items()):
-        data = read_source_bytes(args.repo_root, rel, {"source_path": rel})
+        source_meta = {"source_path": rel}
+        if rel == revision_rel:
+            source_meta["generated_content_utf8"] = revision_content
+        data = read_source_bytes(args.repo_root, rel, source_meta)
         files[rel] = {
             "git_blob_sha1": git_blob_sha1(data),
             "sha256": sha256(data),
@@ -533,6 +796,9 @@ def derive(args):
             "copy_source": src,
             "source_path": rel,
         }
+        if rel == revision_rel:
+            files[rel]["generated_from_source_sha"] = True
+            files[rel]["generated_content_utf8"] = revision_content
 
     readme_rel = None
     if args.include_readme:
@@ -562,7 +828,44 @@ def derive(args):
         "source_path": dockerfile_rel,
     }
 
-    smoke_paths = normalize_smoke_paths(getattr(args, "smoke_paths", None))
+    if revision_rel:
+        ignore_rel, ignore_path = _effective_dockerignore(
+            args.repo_root,
+            dockerfile_rel,
+        )
+        if ignore_path is None:
+            ignore_source = "(generated-empty-dockerignore)"
+            ignore_meta = {
+                "source_path": ignore_source,
+                "generated_content_utf8": "",
+            }
+        else:
+            ignore_source = ignore_rel
+            ignore_meta = {"source_path": ignore_rel}
+        ignore_bytes = read_source_bytes(
+            args.repo_root,
+            "Dockerfile.dockerignore",
+            ignore_meta,
+        )
+        files["Dockerfile.dockerignore"] = {
+            "git_blob_sha1": git_blob_sha1(ignore_bytes),
+            "sha256": sha256(ignore_bytes),
+            "size": len(ignore_bytes),
+            "copy_source": "(dockerignore)",
+            "source_path": ignore_source,
+        }
+        if "generated_content_utf8" in ignore_meta:
+            files["Dockerfile.dockerignore"]["generated_content_utf8"] = ""
+
+        materialized_revision = materialize_source_revision_file(
+            args.repo_root,
+            revision_rel,
+            source_sha,
+        )
+        if materialized_revision != revision_rel:
+            raise DeployContractError(
+                "source revision materialization changed the validated target"
+            )
 
     manifest = {
         "schema": 2,
@@ -578,6 +881,7 @@ def derive(args):
         "unresolved_sources": unresolved,
         "readme": readme_rel,
         "smoke_paths": smoke_paths,
+        "source_revision_file": revision_rel,
         "files": files,
     }
     return manifest, files
@@ -837,6 +1141,14 @@ def main(argv=None):
         help="exact checked-out source SHA used by mutation-boundary guards",
     )
     ap.add_argument("--dockerfile-path", default="Dockerfile")
+    ap.add_argument(
+        "--source-revision-file",
+        default="",
+        help=(
+            "write --source-sha to this new repository-contained path before "
+            "derivation; the Dockerfile must COPY the generated file"
+        ),
+    )
     ap.add_argument("--readme-path", default="README.md")
     ap.add_argument("--include-readme", default="true")
     ap.add_argument(

@@ -206,6 +206,40 @@ class SourceBoundBaselineTests(unittest.TestCase):
         self.assertFalse(report["allowlist_used"])
         self.assertEqual(candidate["baseline_ref"], self.SOURCE)
 
+    def test_exact_deployed_candidate_is_a_valid_source_bound_baseline(self):
+        calls = self.install_clean()
+        baseline.source_probe_state = lambda _repo, _path: {
+            "observation_status": "stable",
+            "observation_count": 2,
+            "required_observation_count": 2,
+            "source_revision": self.HEAD,
+            "observations": [],
+        }
+        drift.github_ref_is_ancestor = lambda *_args: self.fail(
+            "exact candidate must not require ancestry against the PR base"
+        )
+        drift.candidate_managed_delta = (
+            lambda _repo, baseline_ref, candidate_ref, _dockerfile: {
+                "status": "no-changes",
+                "new_unresolved_sources": [],
+                "delta_count": 0,
+                "deltas": [],
+                "baseline_ref": baseline_ref,
+                "candidate_ref": candidate_ref,
+            }
+        )
+
+        report, errors, warns, candidate = baseline.source_bound_baseline_compare(
+            self.args()
+        )
+
+        self.assertEqual(errors, [])
+        self.assertEqual(warns, [])
+        self.assertEqual(calls["refs"], (self.HEAD, self.LIVE))
+        self.assertEqual(report["observed_source_ancestry_status"], "exact-candidate")
+        self.assertEqual(candidate["status"], "no-changes")
+        self.assertEqual(candidate["baseline_ref"], self.HEAD)
+
     def test_split_runtime_or_unstable_probe_fails_closed_without_compare(self):
         self.install_clean()
         drift.hf_space_state = lambda _repo: {
@@ -240,7 +274,7 @@ class SourceBoundBaselineTests(unittest.TestCase):
         self.install_clean()
         drift.github_ref_is_ancestor = lambda *_args: (False, "diverged")
         report, errors, _warns, _candidate = baseline.source_bound_baseline_compare(
-            self.args(candidate=False)
+            self.args()
         )
         self.assertEqual(report["status"], "drift")
         self.assertIn("observed-source-not-ancestor", {item["kind"] for item in errors})
