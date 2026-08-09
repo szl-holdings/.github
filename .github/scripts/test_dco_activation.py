@@ -14,6 +14,12 @@ class DcoActivationWorkflowTests(unittest.TestCase):
         self.native = (WORKFLOWS / "dco.yml").read_text(encoding="utf-8")
         self.reusable = (WORKFLOWS / "reusable-dco.yml").read_text(encoding="utf-8")
         self.checker = (SCRIPTS / "dco_check.py").read_text(encoding="utf-8")
+        self.forge_verifier = (SCRIPTS / "verify_forge9_governance.py").read_text(
+            encoding="utf-8"
+        )
+        self.forge_runner = (SCRIPTS / "run_forge9_gate.py").read_text(
+            encoding="utf-8"
+        )
 
     def test_native_workflow_preserves_all_governed_event_gates(self) -> None:
         for marker in (
@@ -95,6 +101,28 @@ class DcoActivationWorkflowTests(unittest.TestCase):
         self.assertNotIn(".governance/ruleset", production_sources)
         self.assertNotIn("ruleset-release.json", production_sources)
         self.assertNotIn("integration_id", production_sources)
+
+    def test_forge9_requires_strict_behavior_not_retired_implementation(self) -> None:
+        self.assertNotIn('"interpret-trailers", "--parse"', self.forge_verifier)
+        for marker in (
+            "PATCH_DIVIDER_PATTERN =",
+            "TRAILER_TOKEN_PATTERN =",
+            "def _is_patch_divider(",
+            "def valid_dco_identities(",
+            "Signed-off-by does not exactly match the commit author",
+            "class RealCommitPhysicalMessageTests",
+            "test_git_density_admission_matches_interpret_trailers",
+            "name: Reusable DCO validation",
+            "repository: ${{ job.workflow_repository }}",
+            "ref: ${{ job.workflow_sha }}",
+        ):
+            self.assertIn(marker, self.forge_verifier)
+        for suite in (
+            ".github/scripts/test_dco_check.py",
+            ".github/scripts/test_dco_events.py",
+            ".github/scripts/test_dco_activation.py",
+        ):
+            self.assertIn(suite, self.forge_runner)
 
 
 if __name__ == "__main__":
