@@ -576,14 +576,21 @@ class TestReusableWorkflowContract(unittest.TestCase):
 
     def test_shared_deployer_checkout_is_exact_reusable_revision(self):
         # The reusable workflow must checkout ITS OWN reviewed revision --
-        # github.job_workflow_sha is the documented context for that; the
-        # job.workflow_* forms do not exist and resolve empty.
-        self.assertIn("repository: szl-holdings/.github", self.workflow)
-        self.assertIn("ref: ${{ github.job_workflow_sha }}", self.workflow)
-        self.assertNotIn("${{ job.workflow_repository }}", self.workflow)
-        self.assertNotIn("${{ job.workflow_sha }}", self.workflow)
+        # the called-workflow identity is supplied by the documented job
+        # context and the checked-out commit must be asserted byte-for-byte.
+        self.assertNotIn("github.job_workflow_sha", self.workflow)
+        self.assertIn("repository: ${{ job.workflow_repository }}", self.workflow)
+        self.assertIn("ref: ${{ job.workflow_sha }}", self.workflow)
+        self.assertIn("EXPECTED_TOOLS_SHA: ${{ job.workflow_sha }}", self.workflow)
+        self.assertIn(
+            'ACTUAL_TOOLS_SHA="$(git -C tools rev-parse --verify HEAD)"',
+            self.workflow,
+        )
+        self.assertIn(
+            '[ "$ACTUAL_TOOLS_SHA" != "$EXPECTED_TOOLS_SHA" ]',
+            self.workflow,
+        )
         self.assertNotIn("ref: main", self.workflow)
-        self.assertNotIn("repository: szl-holdings/.github\n          ref: main", self.workflow)
 
     def test_shell_consumes_inputs_through_environment(self):
         for unsafe in (

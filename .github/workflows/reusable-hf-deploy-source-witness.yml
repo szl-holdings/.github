@@ -1,0 +1,18 @@
+name: Reusable publisher exact-source witness
+
+on:
+  push:
+
+permissions:
+  contents: read
+
+jobs:
+  reusable-publisher-exact-source-witness:
+    name: Reusable publisher exact-source witness
+    permissions:
+      contents: read
+    uses: ./.github/workflows/reusable-hf-deploy.yml
+    with:
+      contract-only: true
+    secrets:
+      HF_TOKEN: ${{ github.token }}
