@@ -12,6 +12,9 @@ class DcoActivationWorkflowTests(unittest.TestCase):
         ).read_text(encoding="utf-8")
         for marker in (
             "pull_request" + "_target:",
+            "- main",
+            "- 'release/**'",
+            "types: [opened, synchronize, reopened, ready_for_review, edited]",
             "merge_" + "group:",
             "types: [checks_requested]",
             "persist-credentials: false",
@@ -22,8 +25,11 @@ class DcoActivationWorkflowTests(unittest.TestCase):
             "EXPECTED_HEAD_SHA:",
             "statuses: write",
             "statuses/$EXPECTED_HEAD_SHA",
+            'state="pending"',
             'state="failure"',
             'exit "$dco_exit"',
+            "github.event.repository.default_branch",
+            "path: protected-base",
             "git -C \"$GITHUB_WORKSPACE/candidate\" fetch",
             "trusted/.github/scripts/dco_check.py",
         ):

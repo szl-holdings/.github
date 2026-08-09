@@ -4,7 +4,10 @@ on:
   push:
     branches: [main]
   pull_request_target:
-    types: [opened, synchronize, reopened, ready_for_review]
+    branches:
+      - main
+      - 'release/**'
+    types: [opened, synchronize, reopened, ready_for_review, edited]
   merge_group:
     types: [checks_requested]
 
@@ -19,6 +22,19 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
+      - name: Publish pending DCO status on exact pull-request head
+        if: github.event_name == 'pull_request_target'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EXPECTED_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          gh api --method POST \
+            "repos/$GITHUB_REPOSITORY/statuses/$EXPECTED_HEAD_SHA" \
+            -f state="pending" \
+            -f context="DCO sign-off check" \
+            -f description="DCO validation in progress" \
+            -f target_url="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+
       - name: Checkout exact candidate without credentials
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -27,10 +43,19 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
 
-      - name: Checkout exact trusted checker revision
+      - name: Checkout exact protected pull-request base
+        if: github.event_name == 'pull_request_target'
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: ${{ github.event_name == 'pull_request_target' && github.event.pull_request.base.sha || github.event_name == 'merge_group' && github.event.merge_group.base_sha || github.event.before }}
+          ref: ${{ github.event.pull_request.base.sha }}
+          path: protected-base
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Checkout protected default-branch checker revision
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event_name == 'pull_request_target' && github.event.repository.default_branch || github.event_name == 'merge_group' && github.event.merge_group.base_sha || github.event.before }}
           path: trusted
           fetch-depth: 1
           persist-credentials: false
@@ -42,12 +67,13 @@ jobs:
         run: |
           set -euo pipefail
           git -C "$GITHUB_WORKSPACE/candidate" fetch \
-            --no-tags "$GITHUB_WORKSPACE/trusted" "$BASE_SHA"
+            --no-tags "$GITHUB_WORKSPACE/protected-base" "$BASE_SHA"
           git -C "$GITHUB_WORKSPACE/candidate" cat-file -e "$BASE_SHA^{commit}"
 
       - name: Validate exact pull-request commits from trusted base
         if: github.event_name == 'pull_request_target'
         env:
+          GH_TOKEN: ${{ github.token }}
           GITHUB_TOKEN: ${{ github.token }}
           EXPECTED_BASE_SHA: ${{ github.event.pull_request.base.sha }}
           EXPECTED_HEAD_SHA: ${{ github.event.pull_request.head.sha }}

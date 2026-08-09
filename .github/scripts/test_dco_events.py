@@ -369,6 +369,19 @@ class DcoCheckTests(unittest.TestCase):
             2,
         )
 
+        payload["action"] = "edited"
+        self.assertEqual(
+            dco.validate_pull_request_target(
+                self.repo,
+                payload,
+                "szl-holdings/.github",
+                "token",
+                complete,
+            ),
+            2,
+        )
+        payload["action"] = "synchronize"
+
         payload["pull_request"]["base"]["ref"] = "release/2026.08"
         self.assertEqual(
             dco.validate_pull_request_target(

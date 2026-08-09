@@ -22,7 +22,7 @@ MAX_PULL_REQUEST_COMMITS = 250
 REQUEST_TIMEOUT_SECONDS = 30
 SHA_PATTERN = re.compile(r"^[0-9a-f]{40}$")
 QUEUE_REF_PREFIX = "refs/heads/gh-readonly-queue/main/"
-ALLOWED_PR_ACTIONS = {"opened", "synchronize", "reopened", "ready_for_review"}
+ALLOWED_PR_ACTIONS = {"opened", "synchronize", "reopened", "ready_for_review", "edited"}
 
 # Audited horizontal separators: TAB, SPACE, and every Unicode Zs code point.
 # Name and email tokens separately reject C0/C1 controls plus Unicode line and
