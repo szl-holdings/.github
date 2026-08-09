@@ -350,6 +350,20 @@ class DcoCheckTests(unittest.TestCase):
             [commit["sha"] for commit in malformed],
         )
 
+    def test_unterminated_patch_marker_does_not_truncate_message(self) -> None:
+        commit = _commit(
+            812,
+            "fix: unterminated patch marker\n\n"
+            "Signed-off-by: Test User <test@example.com>\n"
+            "postscript invalidates the trailer group\n\n"
+            "---",
+        )
+
+        self.assertEqual(
+            dco_check.unsigned_commit_shas([commit]),
+            [commit["sha"]],
+        )
+
     def test_continuation_after_signed_off_by_is_rejected(self) -> None:
         malformed = _commit(
             53,

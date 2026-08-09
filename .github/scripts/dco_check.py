@@ -357,7 +357,8 @@ def _final_nonblank_group(message: str) -> list[str]:
         (
             index
             for index, line in enumerate(lines)
-            if re.match(r"^---(?:[ \t\r]|$)", line)
+            if index < len(lines) - 1
+            and re.match(r"^---(?:[ \t\r]|$)", line)
         ),
         None,
     )
