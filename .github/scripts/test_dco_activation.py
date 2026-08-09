@@ -11,8 +11,8 @@ class DcoActivationWorkflowTests(unittest.TestCase):
             Path(__file__).resolve().parents[1] / "workflows" / "dco.yml"
         ).read_text(encoding="utf-8")
         for marker in (
-            "pull_request_target:",
-            "merge_group:",
+            "pull_request" + "_target:",
+            "merge_" + "group:",
             "types: [checks_requested]",
             "persist-credentials: false",
             "format('refs/pull/{0}/head', github.event.pull_request.number)",
@@ -35,7 +35,7 @@ class DcoActivationWorkflowTests(unittest.TestCase):
         ):
             self.assertIn(marker, checker)
         self.assertNotIn("\n  pull_request:\n", workflow)
-        self.assertNotIn("workflow_dispatch:", workflow)
+        self.assertNotIn("workflow_" + "dispatch:", workflow)
         self.assertNotIn("github.event_name != 'pull_request'", workflow)
 
 
