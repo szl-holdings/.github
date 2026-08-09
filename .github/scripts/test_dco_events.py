@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import os
+from pathlib import Path
 import subprocess
 import tempfile
 import unittest
@@ -241,7 +242,7 @@ class DcoCheckTests(unittest.TestCase):
         self.assert_rejected("not main", dco.push_subject, {**payload, "ref": "refs/heads/dev"}, head)
 
     def test_pr_pagination_boundaries_and_freshness(self) -> None:
-        for count in (249, 250, 251):
+        for count in (249, 250):
             shas = [f"{number + 1:040x}" for number in range(count)]
 
             def api_get(path: str, rows=shas):
@@ -263,12 +264,35 @@ class DcoCheckTests(unittest.TestCase):
                 shas,
             )
 
+        rejected = [f"{number + 1:040x}" for number in range(251)]
+
+        def over_limit(path: str):
+            if "/commits?" in path:
+                raise AssertionError("commit pages must not be fetched over the cap")
+            return {
+                "base": {"sha": "a" * 40},
+                "head": {"sha": rejected[-1]},
+                "commits": len(rejected),
+                "draft": False,
+            }
+
+        self.assert_rejected(
+            "supported range",
+            dco.collect_pr_commits,
+            "szl-holdings/.github",
+            400,
+            "a" * 40,
+            rejected[-1],
+            over_limit,
+        )
+
     def test_pr_duplicate_and_count_churn_fail(self) -> None:
         head = "b" * 40
 
         def duplicate(path: str):
             if "/commits?" in path:
-                return [{"sha": head}, {"sha": head}]
+                page = int(path.rsplit("page=", 1)[1])
+                return [{"sha": head}, {"sha": head}] if page == 1 else []
             return {"base": {"sha": "a" * 40}, "head": {"sha": head}, "commits": 2, "draft": False}
 
         self.assert_rejected(
@@ -281,10 +305,20 @@ class DcoCheckTests(unittest.TestCase):
             duplicate,
         )
 
+        metadata_calls = 0
+
         def churn(path: str):
+            nonlocal metadata_calls
             if "/commits?" in path:
-                return [{"sha": head}]
-            return {"base": {"sha": "a" * 40}, "head": {"sha": head}, "commits": 2, "draft": False}
+                page = int(path.rsplit("page=", 1)[1])
+                return [{"sha": head}] if page == 1 else []
+            metadata_calls += 1
+            return {
+                "base": {"sha": "a" * 40},
+                "head": {"sha": head},
+                "commits": 1 if metadata_calls == 1 else 2,
+                "draft": False,
+            }
 
         self.assert_rejected(
             "count changed",
@@ -315,7 +349,8 @@ class DcoCheckTests(unittest.TestCase):
 
         def complete(path: str):
             if "/commits?" in path:
-                return [{"sha": sha} for sha in shas]
+                page = int(path.rsplit("page=", 1)[1])
+                return [{"sha": sha} for sha in shas] if page == 1 else []
             return {
                 "base": {"sha": self.base},
                 "head": {"sha": merged},
@@ -336,7 +371,8 @@ class DcoCheckTests(unittest.TestCase):
 
         def incomplete(path: str):
             if "/commits?" in path:
-                return [{"sha": merged}]
+                page = int(path.rsplit("page=", 1)[1])
+                return [{"sha": merged}] if page == 1 else []
             return {
                 "base": {"sha": self.base},
                 "head": {"sha": merged},
@@ -375,7 +411,8 @@ class DcoCheckTests(unittest.TestCase):
 
         def complete(path: str):
             if "/commits?" in path:
-                return [{"sha": head}]
+                page = int(path.rsplit("page=", 1)[1])
+                return [{"sha": head}] if page == 1 else []
             return {
                 "base": {"sha": current_base},
                 "head": {"sha": head},
