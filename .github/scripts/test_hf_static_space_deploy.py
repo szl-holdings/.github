@@ -153,6 +153,19 @@ class StaticSpaceDeployTests(unittest.TestCase):
             contract, "a" * 40, self.authority_env()
         )
 
+    def test_publish_workflow_exports_exact_authority_environment(self):
+        repo_root = Path(__file__).resolve().parents[2]
+        workflow = (
+            repo_root / ".github" / "workflows" / "hf-org-card-deploy.yml"
+        ).read_text(encoding="utf-8")
+        for required in (
+            "environment: production",
+            "GITHUB_TOKEN: ${{ github.token }}",
+            "SZL_PUBLICATION_ENVIRONMENT: production",
+        ):
+            with self.subTest(required=required):
+                self.assertIn(required, workflow)
+
     def test_publish_authority_rejects_branch_dispatch_and_rerun(self):
         contract, _ = deploy.load_contract(self.root, self.manifest)
         for name, value in {
