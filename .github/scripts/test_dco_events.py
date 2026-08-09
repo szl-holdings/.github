@@ -403,6 +403,16 @@ class DcoCheckTests(unittest.TestCase):
             "token",
             complete,
         )
+        payload["pull_request"]["base"]["ref"] = "release/team/2026.08"
+        self.assert_rejected(
+            "not governed",
+            dco.validate_pull_request_target,
+            self.repo,
+            payload,
+            "szl-holdings/.github",
+            "token",
+            complete,
+        )
         payload["pull_request"]["base"]["ref"] = "feature/unprotected"
         self.assert_rejected(
             "not governed",

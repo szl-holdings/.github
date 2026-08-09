@@ -796,6 +796,7 @@ def validate_pull_request_target(
             isinstance(base_ref, str)
             and base_ref.startswith("release/")
             and len(base_ref) > len("release/")
+            and "/" not in base_ref[len("release/") :]
         ),
         "pull-request base ref is not governed",
     )

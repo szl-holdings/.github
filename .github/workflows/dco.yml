@@ -6,7 +6,7 @@ on:
   pull_request_target:
     branches:
       - main
-      - 'release/**'
+      - 'release/*'
     types: [opened, synchronize, reopened, ready_for_review, edited]
   merge_group:
     types: [checks_requested]
@@ -15,6 +15,10 @@ permissions:
   contents: read
   pull-requests: read
   statuses: write
+
+concurrency:
+  group: dco-${{ github.event_name == 'pull_request_target' && format('pr-{0}', github.event.pull_request.number) || github.ref }}
+  cancel-in-progress: true
 
 jobs:
   dco:
@@ -55,10 +59,17 @@ jobs:
       - name: Checkout protected default-branch checker revision
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: ${{ github.event_name == 'pull_request_target' && github.event.repository.default_branch || github.event_name == 'merge_group' && github.event.merge_group.base_sha || github.event.before }}
+          ref: ${{ github.event_name == 'pull_request_target' && github.workflow_sha || github.event_name == 'merge_group' && github.event.merge_group.base_sha || github.event.before }}
           path: trusted
           fetch-depth: 1
           persist-credentials: false
+
+      - name: Assert exact trusted checker revision
+        env:
+          EXPECTED_TRUSTED_SHA: ${{ github.event_name == 'pull_request_target' && github.workflow_sha || github.event_name == 'merge_group' && github.event.merge_group.base_sha || github.event.before }}
+        run: |
+          set -euo pipefail
+          test "$(git -C "$GITHUB_WORKSPACE/trusted" rev-parse HEAD)" = "$EXPECTED_TRUSTED_SHA"
 
       - name: Import current protected base into candidate graph
         if: github.event_name == 'pull_request_target'
@@ -75,6 +86,8 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           GITHUB_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          EXPECTED_BASE_REF: ${{ github.event.pull_request.base.ref }}
           EXPECTED_BASE_SHA: ${{ github.event.pull_request.base.sha }}
           EXPECTED_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
         run: |
@@ -85,9 +98,25 @@ jobs:
           dco_exit=$?
           set -e
 
+          current_pr="$(gh api "repos/$GITHUB_REPOSITORY/pulls/$PR_NUMBER")"
+          current_state="$(jq -r '.state' <<<"$current_pr")"
+          current_base_ref="$(jq -r '.base.ref' <<<"$current_pr")"
+          current_base_sha="$(jq -r '.base.sha' <<<"$current_pr")"
+          current_head_sha="$(jq -r '.head.sha' <<<"$current_pr")"
+          stale_event=false
+          if [[ "$current_state" != "open" \
+            || "$current_base_ref" != "$EXPECTED_BASE_REF" \
+            || "$current_base_sha" != "$EXPECTED_BASE_SHA" \
+            || "$current_head_sha" != "$EXPECTED_HEAD_SHA" ]]; then
+            stale_event=true
+            dco_exit=1
+          fi
+
           state="failure"
           description="DCO validation failed"
-          if [[ "$dco_exit" -eq 0 ]]; then
+          if [[ "$stale_event" == "true" ]]; then
+            description="DCO event is stale"
+          elif [[ "$dco_exit" -eq 0 ]]; then
             state="success"
             description="DCO validation passed"
           fi
