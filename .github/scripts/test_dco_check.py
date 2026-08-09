@@ -313,6 +313,46 @@ class DcoCheckTests(unittest.TestCase):
             incomplete,
         )
 
+    def test_pr_history_uses_actual_merge_base_when_main_advances(self) -> None:
+        head = self.commit(
+            "fix: branch work\n\nSigned-off-by: Series A Builder <builder@example.com>"
+        )
+        self.git("reset", "--hard", self.base)
+        current_base = self.commit(
+            "chore: advance main\n\nSigned-off-by: Series A Builder <builder@example.com>"
+        )
+        self.git("reset", "--hard", head)
+        payload = {
+            "action": "synchronize",
+            "repository": {"full_name": "szl-holdings/.github"},
+            "pull_request": {
+                "number": 400,
+                "base": {"ref": "main", "sha": current_base},
+                "head": {"sha": head},
+            },
+        }
+
+        def complete(path: str):
+            if "/commits?" in path:
+                return [{"sha": head}]
+            return {
+                "base": {"sha": current_base},
+                "head": {"sha": head},
+                "commits": 1,
+                "draft": False,
+            }
+
+        self.assertEqual(
+            dco.validate_pull_request_target(
+                self.repo,
+                payload,
+                "szl-holdings/.github",
+                "token",
+                complete,
+            ),
+            1,
+        )
+
     def test_workflow_static_contract(self) -> None:
         workflow = (Path(__file__).resolve().parents[1] / "workflows" / "dco.yml").read_text(
             encoding="utf-8"

@@ -242,17 +242,13 @@ def validate_pull_request_target(
     getter = api_get or (lambda path: github_get(path, token))
     shas = collect_pr_commits(repository, number, base_sha, head_sha, getter)
     require(checked_out_head(repo) == head_sha, "checked-out HEAD does not match event head")
-    ancestor = subprocess.run(
-        ["git", "merge-base", "--is-ancestor", base_sha, head_sha],
-        cwd=repo,
-        capture_output=True,
-        check=False,
-        timeout=30,
+    merge_base = require_sha(
+        git(repo, "merge-base", base_sha, head_sha).strip(),
+        "pull-request merge base",
     )
-    require(ancestor.returncode == 0, "pull-request base SHA is not an ancestor of head SHA")
     local_shas = [
         line.strip()
-        for line in git(repo, "rev-list", "--reverse", f"{base_sha}..{head_sha}").splitlines()
+        for line in git(repo, "rev-list", "--reverse", f"{merge_base}..{head_sha}").splitlines()
         if line.strip()
     ]
     require(
