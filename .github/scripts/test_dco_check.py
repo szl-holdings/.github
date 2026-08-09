@@ -323,17 +323,20 @@ class DcoCheckTests(unittest.TestCase):
         )
 
     def test_signoff_after_patch_divider_is_rejected(self) -> None:
-        malformed = _commit(
-            805,
-            "fix: unsigned patch message\n\n"
-            "Body without a sign-off.\n"
-            "---\n"
-            "Signed-off-by: Test User <test@example.com>",
-        )
+        malformed = [
+            _commit(
+                index,
+                "fix: unsigned patch message\n\n"
+                "Body without a sign-off.\n"
+                f"---{suffix}\n"
+                "Signed-off-by: Test User <test@example.com>",
+            )
+            for index, suffix in enumerate(("", " ", "\t", " \t"), start=805)
+        ]
 
         self.assertEqual(
-            dco_check.unsigned_commit_shas([malformed]),
-            [malformed["sha"]],
+            dco_check.unsigned_commit_shas(malformed),
+            [commit["sha"] for commit in malformed],
         )
 
     def test_continuation_after_signed_off_by_is_rejected(self) -> None:

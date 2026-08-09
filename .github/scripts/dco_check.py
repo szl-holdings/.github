@@ -353,10 +353,16 @@ def _is_horizontal_blank(line: str) -> bool:
 def _final_nonblank_group(message: str) -> list[str]:
     """Return the complete final nonblank group after a body boundary."""
     lines = message.split("\n")
-    try:
-        lines = lines[: lines.index("---")]
-    except ValueError:
-        pass
+    divider_index = next(
+        (
+            index
+            for index, line in enumerate(lines)
+            if line.rstrip(" \t") == "---"
+        ),
+        None,
+    )
+    if divider_index is not None:
+        lines = lines[:divider_index]
     while lines and _is_horizontal_blank(lines[-1]):
         lines.pop()
     if not lines:
