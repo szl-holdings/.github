@@ -17,13 +17,37 @@ COMMITS_PER_PAGE = 100
 MAX_PULL_REQUEST_COMMITS = 250
 REQUEST_TIMEOUT_SECONDS = 30
 SHA_PATTERN = re.compile(r"^[0-9a-f]{40}$")
-SIGNED_OFF_BY_PATTERN = re.compile(
-    r"^(?ai:Signed-off-by):[^\S\r\n\v\f\x1c-\x1f\x85\u2028\u2029]+"
-    r"[^<>\s]+(?:[^\S\r\n\v\f\x1c-\x1f\x85\u2028\u2029]+[^<>\s]+)*"
-    r"[^\S\r\n\v\f\x1c-\x1f\x85\u2028\u2029]+<[^<>\s]+@[^<>\s]+>"
-    r"[^\S\r\n\v\f\x1c-\x1f\x85\u2028\u2029]*$"
+
+# Audited horizontal separators: TAB, SPACE, and every Unicode Zs code point.
+# Name and email tokens separately reject C0/C1 controls plus Unicode line and
+# paragraph separators, so no broad whitespace class can admit a line break.
+HORIZONTAL_SEPARATOR_PATTERN = (
+    r"[\x09\x20\u00a0\u1680\u2000-\u200a\u202f\u205f\u3000]"
 )
-TRAILER_LINE_PATTERN = re.compile(r"^[A-Za-z0-9-]+:[ \t]+\S.*$")
+NAME_TOKEN_PATTERN = (
+    r"[^<>\x00-\x20\x7f-\x9f\u00a0\u1680\u2000-\u200a"
+    r"\u2028\u2029\u202f\u205f\u3000]+"
+)
+EMAIL_PART_PATTERN = (
+    r"[^<>\x00-\x20\x7f-\x9f\u00a0\u1680\u2000-\u200a"
+    r"\u2028\u2029\u202f\u205f\u3000]+"
+)
+TRAILER_VALUE_TOKEN_PATTERN = (
+    r"[^\x00-\x20\x7f-\x9f\u00a0\u1680\u2000-\u200a"
+    r"\u2028\u2029\u202f\u205f\u3000]+"
+)
+SIGNED_OFF_BY_PATTERN = re.compile(
+    rf"^(?ai:Signed-off-by):{HORIZONTAL_SEPARATOR_PATTERN}+{NAME_TOKEN_PATTERN}"
+    rf"(?:{HORIZONTAL_SEPARATOR_PATTERN}+{NAME_TOKEN_PATTERN})*"
+    rf"{HORIZONTAL_SEPARATOR_PATTERN}+<{EMAIL_PART_PATTERN}@"
+    rf"{EMAIL_PART_PATTERN}>{HORIZONTAL_SEPARATOR_PATTERN}*$"
+)
+TRAILER_LINE_PATTERN = re.compile(
+    rf"^[A-Za-z0-9-]+:{HORIZONTAL_SEPARATOR_PATTERN}+"
+    rf"{TRAILER_VALUE_TOKEN_PATTERN}"
+    rf"(?:{HORIZONTAL_SEPARATOR_PATTERN}+{TRAILER_VALUE_TOKEN_PATTERN})*"
+    rf"{HORIZONTAL_SEPARATOR_PATTERN}*$"
+)
 
 
 class DcoContractError(RuntimeError):
