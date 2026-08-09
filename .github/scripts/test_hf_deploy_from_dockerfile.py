@@ -322,6 +322,25 @@ class TestDeriveReadmePolicy(unittest.TestCase):
                 )
             self.assertFalse(os.path.exists(escaped))
 
+    def test_generated_source_revision_rejects_symlinked_ancestor(self):
+        with tempfile.TemporaryDirectory() as repo_root:
+            escaped_parent = os.path.join(repo_root, ".git", "refs", "heads")
+            os.makedirs(escaped_parent)
+            os.symlink(
+                os.path.join(".git", "refs", "heads"),
+                os.path.join(repo_root, "space"),
+                target_is_directory=True,
+            )
+            escaped = os.path.join(escaped_parent, "SOURCE_REVISION")
+
+            with self.assertRaisesRegex(
+                dep.DeployContractError, "ancestor must not be a symlink"
+            ):
+                dep.materialize_source_revision_file(
+                    repo_root, "space/SOURCE_REVISION", "a" * 40
+                )
+            self.assertFalse(os.path.exists(escaped))
+
     def test_manifest_smoke_paths_default_to_root(self):
         manifest, _ = self._derive(
             "FROM scratch\nCOPY app.py /app/app.py\n",

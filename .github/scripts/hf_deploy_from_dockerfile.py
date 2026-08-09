@@ -117,6 +117,14 @@ def materialize_source_revision_file(repo_root, requested_path, source_sha):
         raise DeployContractError(
             f"source revision file must not already exist: {rel!r}"
         )
+    unresolved_ancestor = root
+    for component in rel.split("/")[:-1]:
+        unresolved_ancestor = os.path.join(unresolved_ancestor, component)
+        if os.path.islink(unresolved_ancestor):
+            raise DeployContractError(
+                "source revision file ancestor must not be a symlink: "
+                f"{rel!r}"
+            )
     full = os.path.realpath(requested_full)
     try:
         contained = os.path.commonpath((root, full)) == root
