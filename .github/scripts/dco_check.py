@@ -3,12 +3,16 @@
 
 from __future__ import annotations
 
+import argparse
 import json
 import os
 import re
+import subprocess
 import sys
-from typing import Any
+from pathlib import Path
+from typing import Any, Callable
 from urllib.error import URLError
+from urllib.parse import quote
 from urllib.request import Request, urlopen
 
 
@@ -17,6 +21,8 @@ COMMITS_PER_PAGE = 100
 MAX_PULL_REQUEST_COMMITS = 250
 REQUEST_TIMEOUT_SECONDS = 30
 SHA_PATTERN = re.compile(r"^[0-9a-f]{40}$")
+QUEUE_REF_PREFIX = "refs/heads/gh-readonly-queue/main/"
+ALLOWED_PR_ACTIONS = {"opened", "synchronize", "reopened", "ready_for_review"}
 
 # Audited horizontal separators: TAB, SPACE, and every Unicode Zs code point.
 # Name and email tokens separately reject C0/C1 controls plus Unicode line and
@@ -37,6 +43,14 @@ SIGNED_OFF_BY_PATTERN = re.compile(
     rf"(?:{HORIZONTAL_SEPARATOR_PATTERN}+{NAME_TOKEN_PATTERN})*"
     rf"{HORIZONTAL_SEPARATOR_PATTERN}+<{EMAIL_PART_PATTERN}@"
     rf"{EMAIL_PART_PATTERN}>{HORIZONTAL_SEPARATOR_PATTERN}*$",
+    re.IGNORECASE,
+)
+SIGNED_OFF_BY_IDENTITY_PATTERN = re.compile(
+    rf"^Signed-off-by:{HORIZONTAL_SEPARATOR_PATTERN}+"
+    rf"(?P<name>{NAME_TOKEN_PATTERN}(?:{HORIZONTAL_SEPARATOR_PATTERN}+"
+    rf"{NAME_TOKEN_PATTERN})*){HORIZONTAL_SEPARATOR_PATTERN}+"
+    rf"<(?P<email>{EMAIL_PART_PATTERN}@{EMAIL_PART_PATTERN})>"
+    rf"{HORIZONTAL_SEPARATOR_PATTERN}*$",
     re.IGNORECASE,
 )
 HORIZONTAL_ONLY_PATTERN = re.compile(
@@ -67,6 +81,22 @@ GIT_RECOGNIZED_SIGNOFF_PREFIX = "Signed-off-by: "
 
 class DcoContractError(RuntimeError):
     """Raised when the API response cannot prove complete DCO coverage."""
+
+
+DcoError = DcoContractError
+
+
+def require(condition: bool, message: str) -> None:
+    if not condition:
+        raise DcoContractError(message)
+
+
+def require_sha(value: object, label: str) -> str:
+    require(
+        isinstance(value, str) and bool(SHA_PATTERN.fullmatch(value)),
+        f"{label} is invalid",
+    )
+    return value
 
 
 def _validate_sha(value: str, *, label: str) -> str:
@@ -491,6 +521,316 @@ def unsigned_commit_shas(commits: list[dict[str, Any]]) -> list[str]:
     return unsigned
 
 
+def git(
+    repo: Path,
+    *args: str,
+    input_text: str | None = None,
+    check: bool = True,
+) -> str:
+    completed = subprocess.run(
+        ["git", *args],
+        cwd=repo,
+        input=input_text,
+        text=True,
+        capture_output=True,
+        check=False,
+        timeout=30,
+    )
+    if check and completed.returncode:
+        detail = completed.stderr.strip() or completed.stdout.strip()
+        raise DcoContractError(f"git {' '.join(args)} failed: {detail}")
+    return completed.stdout
+
+
+def normalized_identity(name: str, email: str) -> tuple[str, str]:
+    return " ".join(name.split()).casefold(), email.strip().casefold()
+
+
+def commit_record(repo: Path, sha: str) -> tuple[list[str], str, str, str]:
+    require_sha(sha, "commit SHA")
+    raw = git(repo, "show", "-s", "--format=%P%x00%an%x00%ae%x00%B", sha)
+    fields = raw.split("\x00", 3)
+    require(len(fields) == 4, f"commit metadata is incomplete for {sha}")
+    parents = fields[0].strip().split()
+    return parents, fields[1], fields[2], fields[3]
+
+
+def terminal_signoffs(repo: Path, message: str) -> list[tuple[str, str]]:
+    parsed = git(repo, "interpret-trailers", "--parse", input_text=message)
+    signoffs: list[tuple[str, str]] = []
+    for line in parsed.splitlines():
+        match = SIGNED_OFF_BY_IDENTITY_PATTERN.fullmatch(line)
+        if match is not None:
+            signoffs.append(
+                normalized_identity(match.group("name"), match.group("email"))
+            )
+    return signoffs
+
+
+def validate_commit(
+    repo: Path,
+    sha: str,
+    *,
+    allow_merge_commit: bool = False,
+) -> None:
+    parents, author_name, author_email, message = commit_record(repo, sha)
+    allowed_parent_counts = {1, 2} if allow_merge_commit else {1}
+    require(
+        len(parents) in allowed_parent_counts,
+        f"{sha} has an unsupported parent count: {len(parents)}",
+    )
+    author = normalized_identity(author_name, author_email)
+    signoffs = terminal_signoffs(repo, message)
+    require(signoffs, f"{sha} has no valid terminal Signed-off-by trailer")
+    require(author in signoffs, f"{sha} Signed-off-by does not match the commit author")
+
+
+def checked_out_head(repo: Path) -> str:
+    return require_sha(git(repo, "rev-parse", "HEAD").strip(), "checked-out HEAD")
+
+
+def validate_commits(
+    repo: Path,
+    shas: list[str],
+    expected_head: str,
+    *,
+    allow_merge_commits: bool = False,
+    checked_out_head_sha: str | None = None,
+) -> int:
+    require(shas, "candidate commit set is empty")
+    require(len(shas) == len(set(shas)), "candidate commit set contains duplicate SHAs")
+    require(shas[-1] == expected_head, "last candidate commit does not match expected head")
+    expected_checkout = checked_out_head_sha or expected_head
+    require(
+        checked_out_head(repo) == expected_checkout,
+        "checked-out HEAD does not match expected head",
+    )
+    for sha in shas:
+        validate_commit(repo, sha, allow_merge_commit=allow_merge_commits)
+    return len(shas)
+
+
+def validate_range(repo: Path, base_sha: str, head_sha: str) -> int:
+    base_sha = require_sha(base_sha, "base SHA")
+    head_sha = require_sha(head_sha, "head SHA")
+    require(checked_out_head(repo) == head_sha, "checked-out HEAD does not match event head")
+    ancestor = subprocess.run(
+        ["git", "merge-base", "--is-ancestor", base_sha, head_sha],
+        cwd=repo,
+        capture_output=True,
+        check=False,
+        timeout=30,
+    )
+    require(ancestor.returncode == 0, "base SHA is not an ancestor of head SHA")
+    shas = [
+        line.strip()
+        for line in git(repo, "rev-list", "--reverse", f"{base_sha}..{head_sha}").splitlines()
+        if line.strip()
+    ]
+    return validate_commits(repo, shas, head_sha)
+
+
+def github_get(path: str, token: str) -> Any:
+    api_url = os.environ.get("GITHUB_API_URL", "https://api.github.com").rstrip("/")
+    request = Request(
+        api_url + path,
+        headers={
+            "Accept": "application/vnd.github+json",
+            "Authorization": f"Bearer {token}",
+            "User-Agent": "szl-dco-attestor/2",
+            "X-GitHub-Api-Version": API_VERSION,
+        },
+    )
+    with urlopen(request, timeout=20) as response:
+        require(response.status == 200, f"GitHub API returned HTTP {response.status}")
+        require(response.geturl().startswith(api_url + "/"), "GitHub API redirected")
+        data = response.read(2_000_001)
+    require(len(data) <= 2_000_000, "GitHub API response is too large")
+    return json.loads(data)
+
+
+def collect_pr_commits(
+    repository: str,
+    number: int,
+    expected_base: str,
+    expected_head: str,
+    api_get: Callable[[str], Any],
+) -> list[str]:
+    expected_base = require_sha(expected_base, "pull-request base SHA")
+    expected_head = require_sha(expected_head, "pull-request head SHA")
+    encoded_repo = quote(repository, safe="/")
+    metadata_path = f"/repos/{encoded_repo}/pulls/{number}"
+
+    def stable_metadata() -> int:
+        current = api_get(metadata_path)
+        require(isinstance(current, dict), "pull-request metadata is not an object")
+        base = current.get("base")
+        head = current.get("head")
+        require(isinstance(base, dict) and isinstance(head, dict), "pull-request refs are missing")
+        require(base.get("sha") == expected_base, "pull-request base moved during validation")
+        require(head.get("sha") == expected_head, "pull-request head moved during validation")
+        declared = current.get("commits")
+        require(
+            isinstance(declared, int)
+            and not isinstance(declared, bool)
+            and 0 < declared <= MAX_PULL_REQUEST_COMMITS,
+            "pull-request commit count is outside the supported range",
+        )
+        require(current.get("draft") is False, "draft pull requests cannot satisfy DCO")
+        return declared
+
+    declared_count = stable_metadata()
+    rows: list[dict[str, Any]] = []
+    page_count = (declared_count + COMMITS_PER_PAGE - 1) // COMMITS_PER_PAGE
+    endpoint = f"/repos/{encoded_repo}/pulls/{number}/commits"
+    for page in range(1, page_count + 1):
+        batch = api_get(f"{endpoint}?per_page={COMMITS_PER_PAGE}&page={page}")
+        require(isinstance(batch, list), "pull-request commit page is not an array")
+        expected_size = min(COMMITS_PER_PAGE, declared_count - len(rows))
+        require(
+            len(batch) == expected_size,
+            "pull-request commit page differs from the declared count",
+        )
+        require(all(isinstance(item, dict) for item in batch), "commit page row is invalid")
+        rows.extend(batch)
+    boundary = api_get(
+        f"{endpoint}?per_page={COMMITS_PER_PAGE}&page={page_count + 1}"
+    )
+    require(
+        isinstance(boundary, list) and not boundary,
+        "pull-request commit boundary page was not empty",
+    )
+    require(
+        stable_metadata() == declared_count,
+        "pull-request commit count changed during validation",
+    )
+    shas = [require_sha(item.get("sha"), "pull-request commit SHA") for item in rows]
+    require(len(shas) == len(set(shas)), "retrieved commits contain duplicate SHAs")
+    require(shas and shas[-1] == expected_head, "retrieved commits do not end at expected head")
+    return shas
+
+
+def merge_group_subject(payload: dict[str, Any], github_sha: str) -> tuple[str, str]:
+    require(payload.get("action") == "checks_requested", "merge_group action is not checks_requested")
+    group = payload.get("merge_group")
+    require(isinstance(group, dict), "merge_group payload is missing")
+    require(group.get("base_ref") == "refs/heads/main", "merge_group base_ref is not main")
+    head_ref = group.get("head_ref")
+    require(
+        isinstance(head_ref, str) and head_ref.startswith(QUEUE_REF_PREFIX),
+        "merge_group head_ref is outside the protected queue namespace",
+    )
+    base_sha = require_sha(group.get("base_sha"), "merge_group base SHA")
+    head_sha = require_sha(group.get("head_sha"), "merge_group head SHA")
+    require(
+        head_sha == require_sha(github_sha, "GITHUB_SHA"),
+        "merge_group head differs from GITHUB_SHA",
+    )
+    return base_sha, head_sha
+
+
+def validate_merge_group(repo: Path, base_sha: str, head_sha: str) -> int:
+    base_sha = require_sha(base_sha, "merge-group base SHA")
+    head_sha = require_sha(head_sha, "merge-group head SHA")
+    require(checked_out_head(repo) == head_sha, "checked-out HEAD does not match merge-group head")
+    parents, _, _, _ = commit_record(repo, head_sha)
+    require(len(parents) == 2, "merge-group head is not a two-parent synthetic merge")
+    ancestor = subprocess.run(
+        ["git", "merge-base", "--is-ancestor", base_sha, head_sha],
+        cwd=repo,
+        capture_output=True,
+        check=False,
+        timeout=30,
+    )
+    require(ancestor.returncode == 0, "merge-group base SHA is not an ancestor of head SHA")
+    range_shas = [
+        line.strip()
+        for line in git(repo, "rev-list", "--reverse", f"{base_sha}..{head_sha}").splitlines()
+        if line.strip()
+    ]
+    require(range_shas and range_shas[-1] == head_sha, "merge-group range does not end at head")
+    candidate_shas = range_shas[:-1]
+    require(candidate_shas, "merge-group contains no constituent commits")
+    return validate_commits(
+        repo,
+        candidate_shas,
+        candidate_shas[-1],
+        allow_merge_commits=True,
+        checked_out_head_sha=head_sha,
+    )
+
+
+def push_subject(payload: dict[str, Any], github_sha: str) -> tuple[str, str]:
+    require(payload.get("ref") == "refs/heads/main", "push ref is not main")
+    base_sha = require_sha(payload.get("before"), "push before SHA")
+    head_sha = require_sha(payload.get("after"), "push after SHA")
+    require(head_sha == require_sha(github_sha, "GITHUB_SHA"), "push head differs from GITHUB_SHA")
+    return base_sha, head_sha
+
+
+def validate_pull_request_target(
+    repo: Path,
+    payload: dict[str, Any],
+    repository: str,
+    token: str,
+    api_get: Callable[[str], Any] | None = None,
+    *,
+    expected_base_sha: str | None = None,
+    expected_head_sha: str | None = None,
+) -> int:
+    require(payload.get("action") in ALLOWED_PR_ACTIONS, "pull_request_target action is unsupported")
+    require(
+        isinstance(payload.get("repository"), dict)
+        and payload["repository"].get("full_name") == repository,
+        "event repository does not match GITHUB_REPOSITORY",
+    )
+    pr = payload.get("pull_request")
+    require(isinstance(pr, dict), "pull_request payload is missing")
+    base = pr.get("base")
+    head = pr.get("head")
+    require(isinstance(base, dict) and isinstance(head, dict), "pull-request refs are missing")
+    require(base.get("ref") == "main", "pull-request base ref is not main")
+    base_sha = require_sha(base.get("sha"), "pull-request base SHA")
+    head_sha = require_sha(head.get("sha"), "pull-request head SHA")
+    if expected_base_sha is not None:
+        require(
+            base_sha == require_sha(expected_base_sha, "expected pull-request base SHA"),
+            "pull-request base differs from EXPECTED_BASE_SHA",
+        )
+    if expected_head_sha is not None:
+        require(
+            head_sha == require_sha(expected_head_sha, "expected pull-request head SHA"),
+            "pull-request head differs from EXPECTED_HEAD_SHA",
+        )
+    number = pr.get("number") or payload.get("number")
+    require(isinstance(number, int) and number > 0, "pull-request number is invalid")
+    require(bool(token), "GITHUB_TOKEN is required for trusted PR validation")
+    getter = api_get or (lambda path: github_get(path, token))
+    shas = collect_pr_commits(repository, number, base_sha, head_sha, getter)
+    require(checked_out_head(repo) == head_sha, "checked-out HEAD does not match event head")
+    merge_base = require_sha(
+        git(repo, "merge-base", base_sha, head_sha).strip(),
+        "pull-request merge base",
+    )
+    local_shas = [
+        line.strip()
+        for line in git(repo, "rev-list", "--reverse", f"{merge_base}..{head_sha}").splitlines()
+        if line.strip()
+    ]
+    require(
+        local_shas == shas,
+        "pull-request API commit set differs from the checked-out history",
+    )
+    return validate_commits(repo, shas, head_sha, allow_merge_commits=True)
+
+
+def parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--repo-root", type=Path, required=True)
+    parser.add_argument("--event-path", type=Path, required=True)
+    return parser.parse_args()
+
+
 def _required_environment(name: str) -> str:
     value = os.environ.get(name, "").strip()
     if not value:
@@ -500,41 +840,36 @@ def _required_environment(name: str) -> str:
 
 def main() -> int:
     try:
-        api_url = _required_environment("GITHUB_API_URL")
+        args = parse_args()
+        payload = json.loads(args.event_path.read_text(encoding="utf-8"))
+        require(isinstance(payload, dict), "event payload must be an object")
+        event_name = _required_environment("GITHUB_EVENT_NAME")
+        github_sha = _required_environment("GITHUB_SHA")
         repository = _required_environment("GITHUB_REPOSITORY")
-        token = _required_environment("GITHUB_TOKEN")
-        pr_number_text = _required_environment("PR_NUMBER")
-        expected_head_sha = _required_environment("EXPECTED_HEAD_SHA")
-        expected_base_sha = _required_environment("EXPECTED_BASE_SHA")
-        try:
-            pr_number = int(pr_number_text)
-        except ValueError as exc:
-            raise DcoContractError("PR_NUMBER must be an integer") from exc
-        if pr_number <= 0:
-            raise DcoContractError("PR_NUMBER must be positive")
+        repo = args.repo_root.resolve()
 
-        declared_count, commits = fetch_authoritative_pr_commits(
-            api_url,
-            repository,
-            pr_number,
-            token,
-            expected_head_sha,
-            expected_base_sha=expected_base_sha,
-        )
-        unsigned = unsigned_commit_shas(commits)
-        if unsigned:
-            print(
-                "DCO check failed: commits without a Signed-off-by trailer:",
-                file=sys.stderr,
+        if event_name == "pull_request_target":
+            count = validate_pull_request_target(
+                repo,
+                payload,
+                repository,
+                _required_environment("GITHUB_TOKEN"),
+                expected_base_sha=_required_environment("EXPECTED_BASE_SHA"),
+                expected_head_sha=_required_environment("EXPECTED_HEAD_SHA"),
             )
-            for sha in unsigned:
-                print(f"  {sha}", file=sys.stderr)
-            return 1
+        elif event_name == "merge_group":
+            base_sha, head_sha = merge_group_subject(payload, github_sha)
+            count = validate_merge_group(repo, base_sha, head_sha)
+        elif event_name == "push":
+            base_sha, head_sha = push_subject(payload, github_sha)
+            count = validate_range(repo, base_sha, head_sha)
+        else:
+            raise DcoContractError(f"unsupported event: {event_name!r}")
 
-        print(f"DCO check passed for all {declared_count} pull-request commits")
+        print(f"DCO OK: validated {count} exact commit(s) for {event_name}")
         return 0
-    except DcoContractError as exc:
-        print(f"DCO check failed closed: {exc}", file=sys.stderr)
+    except (DcoContractError, json.JSONDecodeError, OSError) as exc:
+        print(f"DCO FAILED: {type(exc).__name__}: {exc}", file=sys.stderr)
         return 1
 
 
