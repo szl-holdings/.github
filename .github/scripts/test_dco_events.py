@@ -369,6 +369,39 @@ class DcoCheckTests(unittest.TestCase):
             2,
         )
 
+        payload["pull_request"]["base"]["ref"] = "release/2026.08"
+        self.assertEqual(
+            dco.validate_pull_request_target(
+                self.repo,
+                payload,
+                "szl-holdings/.github",
+                "token",
+                complete,
+            ),
+            2,
+        )
+        payload["pull_request"]["base"]["ref"] = "release/"
+        self.assert_rejected(
+            "not governed",
+            dco.validate_pull_request_target,
+            self.repo,
+            payload,
+            "szl-holdings/.github",
+            "token",
+            complete,
+        )
+        payload["pull_request"]["base"]["ref"] = "feature/unprotected"
+        self.assert_rejected(
+            "not governed",
+            dco.validate_pull_request_target,
+            self.repo,
+            payload,
+            "szl-holdings/.github",
+            "token",
+            complete,
+        )
+        payload["pull_request"]["base"]["ref"] = "main"
+
         def incomplete(path: str):
             if "/commits?" in path:
                 page = int(path.rsplit("page=", 1)[1])

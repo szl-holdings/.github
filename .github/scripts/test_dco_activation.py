@@ -20,6 +20,10 @@ class DcoActivationWorkflowTests(unittest.TestCase):
             "github.event.pull_request.head.sha",
             "EXPECTED_BASE_SHA:",
             "EXPECTED_HEAD_SHA:",
+            "statuses: write",
+            "statuses/$EXPECTED_HEAD_SHA",
+            'state="failure"',
+            'exit "$dco_exit"',
             "git -C \"$GITHUB_WORKSPACE/candidate\" fetch",
             "trusted/.github/scripts/dco_check.py",
         ):
@@ -37,6 +41,13 @@ class DcoActivationWorkflowTests(unittest.TestCase):
         self.assertNotIn("\n  pull_request:\n", workflow)
         self.assertNotIn("workflow_" + "dispatch:", workflow)
         self.assertNotIn("github.event_name != 'pull_request'", workflow)
+        release_ruleset = (
+            Path(__file__).resolve().parents[2]
+            / ".governance"
+            / "ruleset-release.json"
+        ).read_text(encoding="utf-8")
+        self.assertIn('"context": "DCO sign-off check"', release_ruleset)
+        self.assertIn('"integration_id": 15368', release_ruleset)
 
 
 if __name__ == "__main__":

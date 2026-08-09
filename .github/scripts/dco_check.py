@@ -789,7 +789,16 @@ def validate_pull_request_target(
     base = pr.get("base")
     head = pr.get("head")
     require(isinstance(base, dict) and isinstance(head, dict), "pull-request refs are missing")
-    require(base.get("ref") == "main", "pull-request base ref is not main")
+    base_ref = base.get("ref")
+    require(
+        base_ref == "main"
+        or (
+            isinstance(base_ref, str)
+            and base_ref.startswith("release/")
+            and len(base_ref) > len("release/")
+        ),
+        "pull-request base ref is not governed",
+    )
     base_sha = require_sha(base.get("sha"), "pull-request base SHA")
     head_sha = require_sha(head.get("sha"), "pull-request head SHA")
     if expected_base_sha is not None:
