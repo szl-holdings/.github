@@ -167,6 +167,7 @@ class TestDeriveReadmePolicy(unittest.TestCase):
     def _derive(
         self, dockerfile, files, *, include_readme, readme_path="README.md",
         dockerfile_path="Dockerfile", smoke_paths=None,
+        source_revision_file="", source_sha="", manifest_out_rel="",
     ):
         with tempfile.TemporaryDirectory() as repo_root:
             for rel, content in {dockerfile_path: dockerfile, **files}.items():
@@ -183,6 +184,13 @@ class TestDeriveReadmePolicy(unittest.TestCase):
                 hf_repo="SZLHOLDINGS/example",
                 ref="main",
                 smoke_paths=smoke_paths,
+                source_revision_file=source_revision_file,
+                source_sha=source_sha,
+                manifest_out=(
+                    os.path.join(repo_root, *manifest_out_rel.split("/"))
+                    if manifest_out_rel
+                    else ""
+                ),
             )
             return dep.derive(args)
 
@@ -254,6 +262,324 @@ class TestDeriveReadmePolicy(unittest.TestCase):
                 {},
                 include_readme=False,
             )
+
+    def test_generated_source_revision_is_copy_covered_and_manifest_bound(self):
+        revision = "a" * 40
+        manifest, files = self._derive(
+            "FROM scratch\nCOPY space /app/space\n",
+            {"space/app.py": "print('bound')\n"},
+            include_readme=False,
+            source_revision_file="space/SOURCE_REVISION",
+            source_sha=revision,
+        )
+
+        self.assertEqual(manifest["source_revision_file"], "space/SOURCE_REVISION")
+        self.assertTrue(
+            files["space/SOURCE_REVISION"]["generated_from_source_sha"]
+        )
+        self.assertEqual(
+            files["space/SOURCE_REVISION"]["sha256"],
+            dep.sha256((revision + "\n").encode("ascii")),
+        )
+        self.assertEqual(
+            files["Dockerfile.dockerignore"]["source_path"],
+            "(generated-empty-dockerignore)",
+        )
+        self.assertEqual(
+            files["Dockerfile.dockerignore"]["generated_content_utf8"],
+            "",
+        )
+
+    def test_generated_source_revision_must_be_new_and_copy_covered(self):
+        with self.assertRaisesRegex(dep.DeployContractError, "already exist"):
+            self._derive(
+                "FROM scratch\nCOPY space /app/space\n",
+                {"space/SOURCE_REVISION": "b" * 40 + "\n"},
+                include_readme=False,
+                source_revision_file="space/SOURCE_REVISION",
+                source_sha="a" * 40,
+            )
+        with self.assertRaisesRegex(dep.DeployContractError, "not covered"):
+            self._derive(
+                "FROM scratch\nCOPY app.py /app/app.py\n",
+                {"app.py": "pass\n", "space/keep": "tracked\n"},
+                include_readme=False,
+                source_revision_file="space/SOURCE_REVISION",
+                source_sha="a" * 40,
+            )
+
+    def test_copy_coverage_failure_does_not_materialize_revision(self):
+        with tempfile.TemporaryDirectory() as repo_root:
+            os.makedirs(os.path.join(repo_root, "space"))
+            with open(os.path.join(repo_root, "Dockerfile"), "w") as fh:
+                fh.write("FROM scratch\nCOPY app.py /app/app.py\n")
+            with open(os.path.join(repo_root, "app.py"), "w") as fh:
+                fh.write("pass\n")
+            revision = os.path.join(repo_root, "space", "SOURCE_REVISION")
+            args = types.SimpleNamespace(
+                repo_root=repo_root,
+                dockerfile_path="Dockerfile",
+                include_readme=False,
+                readme_path="README.md",
+                github_repo="szl-holdings/example",
+                hf_repo="SZLHOLDINGS/example",
+                ref="main",
+                smoke_paths=None,
+                source_revision_file="space/SOURCE_REVISION",
+                source_sha="a" * 40,
+                manifest_out="",
+            )
+
+            with self.assertRaisesRegex(dep.DeployContractError, "not covered"):
+                dep.derive(args)
+            self.assertFalse(os.path.lexists(revision))
+
+    def test_generated_source_revision_rejects_dockerfile_target_collision(self):
+        with self.assertRaisesRegex(
+            dep.DeployContractError, "reserved Hugging Face Dockerfile target"
+        ):
+            self._derive(
+                "FROM scratch\nCOPY Dockerfile /app/SOURCE_REVISION\n",
+                {"space/app.py": "pass\n"},
+                include_readme=False,
+                dockerfile_path="space/Dockerfile",
+                source_revision_file="Dockerfile",
+                source_sha="a" * 40,
+            )
+
+    def test_generated_source_revision_rejects_git_metadata_target(self):
+        with tempfile.TemporaryDirectory() as repo_root:
+            target = os.path.join(repo_root, ".git", "refs", "heads", "generated")
+            os.makedirs(os.path.dirname(target))
+
+            with self.assertRaisesRegex(dep.DeployContractError, "Git metadata"):
+                dep.materialize_source_revision_file(
+                    repo_root, ".git/refs/heads/generated", "a" * 40
+                )
+            self.assertFalse(os.path.exists(target))
+
+    def test_generated_source_revision_rejects_included_readme_collision(self):
+        with self.assertRaisesRegex(
+            dep.DeployContractError, "included README target"
+        ):
+            self._derive(
+                "FROM scratch\nCOPY space /app/space\n",
+                {"space/app.py": "pass\n"},
+                include_readme=True,
+                readme_path="space/SOURCE_REVISION",
+                source_revision_file="space/SOURCE_REVISION",
+                source_sha="a" * 40,
+            )
+
+    def test_generated_source_revision_rejects_excluded_copy_coverage(self):
+        with self.assertRaisesRegex(
+            dep.DeployContractError, "without --exclude"
+        ):
+            self._derive(
+                "FROM scratch\n"
+                "COPY --exclude=SOURCE_REVISION space /app/space\n",
+                {"space/app.py": "pass\n"},
+                include_readme=False,
+                source_revision_file="space/SOURCE_REVISION",
+                source_sha="a" * 40,
+            )
+
+    def test_generated_source_revision_rejects_manifest_output_collision(self):
+        with self.assertRaisesRegex(dep.DeployContractError, "manifest output"):
+            self._derive(
+                "FROM scratch\nCOPY manifest.json /app/manifest.json\n",
+                {},
+                include_readme=False,
+                source_revision_file="manifest.json",
+                source_sha="a" * 40,
+                manifest_out_rel="manifest.json",
+            )
+
+    def test_generated_source_revision_rejects_root_dockerignore_match(self):
+        with self.assertRaisesRegex(
+            dep.DeployContractError, "excluded from the Docker build context"
+        ):
+            self._derive(
+                "FROM scratch\nCOPY space /app/space\n",
+                {
+                    ".dockerignore": "space/SOURCE_REVISION\n",
+                    "space/app.py": "pass\n",
+                },
+                include_readme=False,
+                source_revision_file="space/SOURCE_REVISION",
+                source_sha="a" * 40,
+            )
+
+    def test_basename_dockerignore_rule_matches_nested_source_revision(self):
+        with self.assertRaisesRegex(
+            dep.DeployContractError, "excluded from the Docker build context"
+        ):
+            self._derive(
+                "FROM scratch\nCOPY space /app/space\n",
+                {
+                    ".dockerignore": "SOURCE_REVISION\n",
+                    "space/app.py": "pass\n",
+                },
+                include_readme=False,
+                source_revision_file="space/SOURCE_REVISION",
+                source_sha="a" * 40,
+            )
+
+    def test_smoke_path_failure_precedes_revision_materialization(self):
+        with mock.patch.object(
+            dep, "materialize_source_revision_file"
+        ) as materialize:
+            with self.assertRaises(dep.DeployContractError):
+                self._derive(
+                    "FROM scratch\nCOPY space /app/space\n",
+                    {"space/app.py": "pass\n"},
+                    include_readme=False,
+                    smoke_paths='["https://example.com/"]',
+                    source_revision_file="space/SOURCE_REVISION",
+                    source_sha="a" * 40,
+                )
+        materialize.assert_not_called()
+
+    def test_dockerfile_specific_ignore_takes_precedence_over_root(self):
+        manifest, files = self._derive(
+            "FROM scratch\nCOPY space /app/space\n",
+            {
+                ".dockerignore": "space/SOURCE_REVISION\n",
+                "Dockerfile.dockerignore": "# source revision remains included\n",
+                "space/app.py": "pass\n",
+            },
+            include_readme=False,
+            source_revision_file="space/SOURCE_REVISION",
+            source_sha="a" * 40,
+        )
+
+        self.assertEqual(
+            manifest["source_revision_file"],
+            "space/SOURCE_REVISION",
+        )
+        self.assertTrue(
+            files["space/SOURCE_REVISION"]["generated_from_source_sha"]
+        )
+        self.assertEqual(
+            files["Dockerfile.dockerignore"]["source_path"],
+            "Dockerfile.dockerignore",
+        )
+
+    def test_nested_dockerfile_ignore_is_published_at_hf_root(self):
+        manifest, files = self._derive(
+            "FROM scratch\nCOPY space /app/space\n",
+            {
+                ".dockerignore": "space/SOURCE_REVISION\n",
+                "space/Dockerfile.dockerignore": (
+                    "# source revision remains included\n"
+                ),
+                "space/app.py": "pass\n",
+            },
+            include_readme=False,
+            dockerfile_path="space/Dockerfile",
+            source_revision_file="space/SOURCE_REVISION",
+            source_sha="a" * 40,
+        )
+
+        self.assertEqual(
+            manifest["source_revision_file"],
+            "space/SOURCE_REVISION",
+        )
+        self.assertEqual(
+            files["Dockerfile.dockerignore"]["source_path"],
+            "space/Dockerfile.dockerignore",
+        )
+
+    def test_ignored_parent_cannot_reinclude_source_revision(self):
+        with self.assertRaisesRegex(
+            dep.DeployContractError, "excluded from the Docker build context"
+        ):
+            self._derive(
+                "FROM scratch\nCOPY space /app/space\n",
+                {
+                    ".dockerignore": "space\n!space/SOURCE_REVISION\n",
+                    "space/app.py": "pass\n",
+                },
+                include_readme=False,
+                source_revision_file="space/SOURCE_REVISION",
+                source_sha="a" * 40,
+            )
+
+    def test_later_rule_can_reinclude_ignored_parent(self):
+        manifest, files = self._derive(
+            "FROM scratch\nCOPY space /app/space\n",
+            {
+                ".dockerignore": "space\n!space\n",
+                "space/app.py": "pass\n",
+            },
+            include_readme=False,
+            source_revision_file="space/SOURCE_REVISION",
+            source_sha="a" * 40,
+        )
+
+        self.assertEqual(
+            manifest["source_revision_file"],
+            "space/SOURCE_REVISION",
+        )
+        self.assertTrue(
+            files["space/SOURCE_REVISION"]["generated_from_source_sha"]
+        )
+
+    def test_dockerignore_negation_reincludes_source_revision(self):
+        manifest, files = self._derive(
+            "FROM scratch\nCOPY space /app/space\n",
+            {
+                ".dockerignore": (
+                    "space/**\n"
+                    "!space/SOURCE_REVISION\n"
+                ),
+                "space/app.py": "pass\n",
+            },
+            include_readme=False,
+            source_revision_file="space/SOURCE_REVISION",
+            source_sha="a" * 40,
+        )
+
+        self.assertEqual(
+            manifest["source_revision_file"],
+            "space/SOURCE_REVISION",
+        )
+        self.assertTrue(
+            files["space/SOURCE_REVISION"]["generated_from_source_sha"]
+        )
+
+    def test_generated_source_revision_rejects_dangling_symlink(self):
+        with tempfile.TemporaryDirectory() as repo_root:
+            os.makedirs(os.path.join(repo_root, "space"))
+            os.makedirs(os.path.join(repo_root, ".git", "objects"))
+            requested = os.path.join(repo_root, "space", "SOURCE_REVISION")
+            escaped = os.path.join(repo_root, ".git", "objects", "revision")
+            os.symlink(os.path.join("..", ".git", "objects", "revision"), requested)
+
+            with self.assertRaisesRegex(dep.DeployContractError, "already exist"):
+                dep.materialize_source_revision_file(
+                    repo_root, "space/SOURCE_REVISION", "a" * 40
+                )
+            self.assertFalse(os.path.exists(escaped))
+
+    def test_generated_source_revision_rejects_symlinked_ancestor(self):
+        with tempfile.TemporaryDirectory() as repo_root:
+            escaped_parent = os.path.join(repo_root, ".git", "refs", "heads")
+            os.makedirs(escaped_parent)
+            os.symlink(
+                os.path.join(".git", "refs", "heads"),
+                os.path.join(repo_root, "space"),
+                target_is_directory=True,
+            )
+            escaped = os.path.join(escaped_parent, "SOURCE_REVISION")
+
+            with self.assertRaisesRegex(
+                dep.DeployContractError, "ancestor must not be a symlink"
+            ):
+                dep.materialize_source_revision_file(
+                    repo_root, "space/SOURCE_REVISION", "a" * 40
+                )
+            self.assertFalse(os.path.exists(escaped))
 
     def test_manifest_smoke_paths_default_to_root(self):
         manifest, _ = self._derive(
@@ -624,6 +950,15 @@ class TestReusableWorkflowContract(unittest.TestCase):
             "GITHUB_TOKEN: ${{ github.token }}",
             "SOURCE_SHA: ${{ steps.hf.outputs.source_sha }}",
             '--source-sha "$SOURCE_SHA"',
+        ):
+            self.assertIn(contract, self.workflow)
+
+    def test_generated_source_revision_file_is_optional_and_forwarded(self):
+        for contract in (
+            "source-revision-file:",
+            "SOURCE_REVISION_FILE: ${{ inputs.source-revision-file }}",
+            'SOURCE_REVISION_ARGS+=(--source-revision-file "$SOURCE_REVISION_FILE")',
+            '"${SOURCE_REVISION_ARGS[@]}"',
         ):
             self.assertIn(contract, self.workflow)
 

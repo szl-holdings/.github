@@ -23,6 +23,11 @@ on:
         required: false
         type: string
         default: "Dockerfile"
+      source-revision-file:
+        description: "Optional generated file, covered by Dockerfile COPY, that receives the exact checked-out Git SHA."
+        required: false
+        type: string
+        default: ""
       include-readme:
         description: "Mirror README.md so the Space card remains source-controlled."
         required: false
@@ -207,6 +212,7 @@ jobs:
           HF_REPO: ${{ steps.hf.outputs.hf_repo }}
           DEPLOY_REF: ${{ inputs.ref }}
           DOCKERFILE_PATH: ${{ inputs.dockerfile-path }}
+          SOURCE_REVISION_FILE: ${{ inputs.source-revision-file }}
           INCLUDE_README: ${{ inputs.include-readme }}
           PRUNE: ${{ inputs.prune }}
           REQUIRE_DEFAULT_BRANCH_TIP: ${{ inputs.require-default-branch-tip }}
@@ -220,6 +226,10 @@ jobs:
           if [ "$REQUIRE_DEFAULT_BRANCH_TIP" = "true" ]; then
             TIP_GUARD_ARGS+=(--require-default-branch-tip)
           fi
+          SOURCE_REVISION_ARGS=()
+          if [ -n "$SOURCE_REVISION_FILE" ]; then
+            SOURCE_REVISION_ARGS+=(--source-revision-file "$SOURCE_REVISION_FILE")
+          fi
           "$RUNNER_TEMP/hf-publisher-venv/bin/python" -I -P tools/.github/scripts/hf_deploy_from_dockerfile.py \
             --repo-root caller \
             --github-repo "$GH_REPO" \
@@ -227,6 +237,7 @@ jobs:
             --ref "$DEPLOY_REF" \
             --source-sha "$SOURCE_SHA" \
             --dockerfile-path "$DOCKERFILE_PATH" \
+            "${SOURCE_REVISION_ARGS[@]}" \
             --include-readme "$INCLUDE_README" \
             --smoke-paths "${SMOKE_PATHS}" \
             "${PRUNE_ARGS[@]}" \
