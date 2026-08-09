@@ -107,11 +107,28 @@ jobs:
         with:
           python-version: "3.12.10"
 
+      - name: Create fresh publisher virtual environment
+        shell: bash
+        run: |
+          set -euo pipefail
+          VENV="$RUNNER_TEMP/hf-publisher-venv"
+          if [ -e "$VENV" ]; then
+            echo '::error::Refusing preexisting publisher virtual environment.'
+            exit 2
+          fi
+          python3 -m venv "$VENV"
+          ACTUAL_VERSION="$("$VENV/bin/python" -I -P -c 'import platform; print(platform.python_version())')"
+          if [ "$ACTUAL_VERSION" != "3.12.10" ]; then
+            echo "::error::Expected publisher Python 3.12.10, found $ACTUAL_VERSION."
+            exit 2
+          fi
+
       - name: Install hash-locked deployment client closure
+        shell: bash
         run: >-
-          python -m pip install --disable-pip-version-check
-          --require-hashes --only-binary=:all:
-          -r tools/requirements/hf-publisher.lock
+          "$RUNNER_TEMP/hf-publisher-venv/bin/python" -I -P -m pip install
+          --disable-pip-version-check --require-hashes --only-binary=:all:
+          --ignore-installed -r tools/requirements/hf-publisher.lock
 
       - name: Resolve target and exact checked-out source
         id: hf
@@ -173,7 +190,7 @@ jobs:
           if [ "$REQUIRE_DEFAULT_BRANCH_TIP" = "true" ]; then
             TIP_GUARD_ARGS+=(--require-default-branch-tip)
           fi
-          python3 tools/.github/scripts/hf_deploy_from_dockerfile.py \
+          "$RUNNER_TEMP/hf-publisher-venv/bin/python" -I -P tools/.github/scripts/hf_deploy_from_dockerfile.py \
             --repo-root caller \
             --github-repo "$GH_REPO" \
             --hf-repo "$HF_REPO" \
@@ -196,7 +213,7 @@ jobs:
           SOURCE_REVISION_PROBE_PATH: ${{ inputs.source-revision-probe-path }}
         run: |
           set -euo pipefail
-          python3 tools/.github/scripts/hf_space_source_binding.py \
+          "$RUNNER_TEMP/hf-publisher-venv/bin/python" -I -P tools/.github/scripts/hf_space_source_binding.py \
             --mode bind \
             --repo-id "$HF_REPO" \
             --variable "$SOURCE_REVISION_VARIABLE" \
@@ -211,7 +228,7 @@ jobs:
           HF_REPO: ${{ steps.hf.outputs.hf_repo }}
         run: |
           set -euo pipefail
-          python3 tools/.github/scripts/hf_deploy_from_dockerfile.py \
+          "$RUNNER_TEMP/hf-publisher-venv/bin/python" -I -P tools/.github/scripts/hf_deploy_from_dockerfile.py \
             --restart-space \
             --manifest hf-deploy-manifest.json \
             --hf-repo "$HF_REPO"
@@ -223,7 +240,7 @@ jobs:
           WAIT_RUNNING: ${{ inputs.wait-running }}
         run: |
           set -euo pipefail
-          python3 tools/.github/scripts/hf_deploy_from_dockerfile.py \
+          "$RUNNER_TEMP/hf-publisher-venv/bin/python" -I -P tools/.github/scripts/hf_deploy_from_dockerfile.py \
             --attest \
             --manifest hf-deploy-manifest.json \
             --hf-repo "$HF_REPO" \
@@ -239,7 +256,7 @@ jobs:
           SOURCE_REVISION_PROBE_PATH: ${{ inputs.source-revision-probe-path }}
         run: |
           set -euo pipefail
-          python3 tools/.github/scripts/hf_space_source_binding.py \
+          "$RUNNER_TEMP/hf-publisher-venv/bin/python" -I -P tools/.github/scripts/hf_space_source_binding.py \
             --mode verify \
             --repo-id "$HF_REPO" \
             --variable "$SOURCE_REVISION_VARIABLE" \

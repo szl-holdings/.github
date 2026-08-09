@@ -20,7 +20,7 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
-          python-version: "3.12"
+          python-version: "3.12.10"
 
       # A full 40-character ref is not enough for a reusable workflow: the
       # target file can be absent at that exact commit (the a11oy/docs-site
@@ -225,11 +225,32 @@ jobs:
       - name: HF publisher immutable dependency closure self-test
         run: python3 .github/scripts/test_hf_publisher_lock.py
 
-      - name: HF publisher Linux wheel closure resolver proof
-        run: >-
-          python3 -m pip install --dry-run --disable-pip-version-check
-          --require-hashes --only-binary=:all:
-          -r requirements/hf-publisher.lock
+      - name: HF publisher clean Linux install and runtime proof
+        shell: bash
+        run: |
+          set -euo pipefail
+          VENV="$RUNNER_TEMP/hf-publisher-venv"
+          if [ -e "$VENV" ]; then
+            echo '::error::Refusing preexisting publisher virtual environment.'
+            exit 2
+          fi
+          python3 -m venv "$VENV"
+          ACTUAL_VERSION="$("$VENV/bin/python" -I -P -c 'import platform; print(platform.python_version())')"
+          if [ "$ACTUAL_VERSION" != "3.12.10" ]; then
+            echo "::error::Expected publisher Python 3.12.10, found $ACTUAL_VERSION."
+            exit 2
+          fi
+          "$VENV/bin/python" -I -P -m pip install \
+            --disable-pip-version-check --require-hashes --only-binary=:all: \
+            --ignore-installed -r requirements/hf-publisher.lock
+          "$VENV/bin/python" -I -P -c 'from importlib.metadata import version; import certifi, charset_normalizer, hf_xet, httpcore, httpx, huggingface_hub, requests, urllib3, yaml; assert version("huggingface-hub") == "1.19.0"; assert version("requests") == "2.32.5"'
+          "$VENV/bin/python" -I -P -m py_compile \
+            .github/scripts/hf_deploy_from_dockerfile.py \
+            .github/scripts/hf_space_source_binding.py
+          "$VENV/bin/python" -I -P .github/scripts/hf_deploy_from_dockerfile.py --help >/dev/null
+          "$VENV/bin/python" -I -P .github/scripts/hf_space_source_binding.py --help >/dev/null
+          "$VENV/bin/python" -I -P .github/scripts/test_hf_deploy_from_dockerfile.py
+          "$VENV/bin/python" -I -P .github/scripts/test_hf_space_source_binding.py
 
       # Pins the canonical static-Space publication path used by the Hugging
       # Face organization front door. The tests are network-free and lock safe

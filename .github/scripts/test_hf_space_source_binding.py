@@ -229,10 +229,20 @@ class ReusableWorkflowSourceBindingTests(unittest.TestCase):
         self.assertIn("requirements/hf-publisher.lock", self.workflow)
         self.assertIn("--require-hashes", self.workflow)
         self.assertIn("--only-binary=:all:", self.workflow)
+        self.assertIn("--ignore-installed", self.workflow)
         self.assertNotIn('"huggingface_hub==1.19.0"', self.workflow)
         self.assertNotIn('"requests==2.32.5"', self.workflow)
         self.assertIn("ref: ${{ github.job_workflow_sha }}", self.workflow)
         self.assertNotIn("repository: szl-holdings/.github\n          ref: main", self.workflow)
+        self.assertIn(
+            '"$RUNNER_TEMP/hf-publisher-venv/bin/python" -I -P '
+            "tools/.github/scripts/hf_space_source_binding.py",
+            self.workflow,
+        )
+        self.assertNotIn(
+            "python3 tools/.github/scripts/hf_space_source_binding.py",
+            self.workflow,
+        )
 
 
 if __name__ == "__main__":
