@@ -478,7 +478,11 @@ def verify_legacy_paths_removed() -> None:
             for label, pattern in FORBIDDEN_EXECUTABLE_PATTERNS.items():
                 if (
                     label == "privileged pull request trigger"
-                    and path == ROOT / ".github/workflows/dco.yml"
+                    and path
+                    in {
+                        ROOT / ".github/workflows/dco.yml",
+                        ROOT / ".github/scripts/test_dco_check.py",
+                    }
                 ):
                     continue
                 if pattern.search(text):
