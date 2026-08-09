@@ -26,6 +26,13 @@ def main() -> None:
         assert "--ignore-installed" in source
 
     assert "Create fresh publisher virtual environment" in workflow
+    assert "github.job_workflow_sha" not in workflow
+    assert "repository: ${{ job.workflow_repository }}" in workflow
+    assert "ref: ${{ job.workflow_sha }}" in workflow
+    assert "EXPECTED_TOOLS_SHA: ${{ job.workflow_sha }}" in workflow
+    assert 'ACTUAL_TOOLS_SHA="$(git -C tools rev-parse --verify HEAD)"' in workflow
+    assert '[[ ! "$EXPECTED_TOOLS_SHA" =~ ^[0-9a-f]{40}$ ]]' in workflow
+    assert '[ "$ACTUAL_TOOLS_SHA" != "$EXPECTED_TOOLS_SHA" ]' in workflow
     assert '"$RUNNER_TEMP/hf-publisher-venv/bin/python" -I -P -m pip install' in workflow
     assert "tools/requirements/hf-publisher.lock" in workflow
     assert '"huggingface_hub==1.19.0"' not in workflow
@@ -45,6 +52,12 @@ def main() -> None:
     install = workflow.index("Install hash-locked deployment client closure")
     secret = workflow.index("Require governed publisher")
     assert create < install < secret
+
+    assert "github.job_workflow_sha" not in tests_workflow
+    assert "name: Reusable publisher exact-source witness" in tests_workflow
+    assert "uses: ./.github/workflows/reusable-hf-deploy.yml" in tests_workflow
+    assert "contract-only: true" in tests_workflow
+    assert "HF_TOKEN: ${{ github.token }}" in tests_workflow
 
     assert "HF publisher clean Linux install and runtime proof" in tests_workflow
     assert "python3 -m pip install --dry-run" not in tests_workflow

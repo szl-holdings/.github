@@ -63,6 +63,11 @@ on:
         required: false
         type: boolean
         default: false
+      contract-only:
+        description: "Run only the non-secret exact-source workflow_call witness; never publish."
+        required: false
+        type: boolean
+        default: false
     secrets:
       HF_TOKEN:
         description: "HF write token with organization write access to the target Space."
@@ -74,6 +79,7 @@ permissions:
 jobs:
   hf-deploy:
     name: Deploy derived COPY set, bind source, and attest live state
+    if: ${{ inputs.contract-only == false }}
     runs-on: ubuntu-latest
     timeout-minutes: 30
     concurrency:
@@ -96,11 +102,35 @@ jobs:
       - name: Checkout exact reusable-workflow revision
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          repository: szl-holdings/.github
-          ref: ${{ github.job_workflow_sha }}
+          repository: ${{ job.workflow_repository }}
+          ref: ${{ job.workflow_sha }}
           path: tools
           persist-credentials: false
           fetch-depth: 1
+
+      - name: Assert exact reusable-workflow tools revision
+        shell: bash
+        env:
+          WORKFLOW_REPOSITORY: ${{ job.workflow_repository }}
+          EXPECTED_TOOLS_SHA: ${{ job.workflow_sha }}
+        run: |
+          set -euo pipefail
+          if [[ ! "$EXPECTED_TOOLS_SHA" =~ ^[0-9a-f]{40}$ ]]; then
+            echo "::error::job.workflow_sha is not an exact 40-character commit SHA: $EXPECTED_TOOLS_SHA"
+            exit 2
+          fi
+          ACTUAL_TOOLS_SHA="$(git -C tools rev-parse --verify HEAD)"
+          if [[ ! "$ACTUAL_TOOLS_SHA" =~ ^[0-9a-f]{40}$ ]]; then
+            echo "::error::Checked-out tools HEAD is not an exact 40-character commit SHA: $ACTUAL_TOOLS_SHA"
+            exit 2
+          fi
+          if [ "$ACTUAL_TOOLS_SHA" != "$EXPECTED_TOOLS_SHA" ]; then
+            echo "::error::Reusable-workflow tools mismatch: expected $EXPECTED_TOOLS_SHA, found $ACTUAL_TOOLS_SHA"
+            exit 2
+          fi
+          printf 'job.workflow_repository=%s\n' "$WORKFLOW_REPOSITORY"
+          printf 'job.workflow_sha=%s\n' "$EXPECTED_TOOLS_SHA"
+          printf 'checked_out_tools_head=%s\n' "$ACTUAL_TOOLS_SHA"
 
       - name: Set up Python
         uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
@@ -275,3 +305,55 @@ jobs:
             hf-source-binding-verify.json
           if-no-files-found: warn
           retention-days: 90
+
+  exact-source-contract:
+    name: Reusable publisher exact-source witness
+    if: ${{ inputs.contract-only == true }}
+    permissions:
+      contents: read
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout called reusable-workflow revision
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: ${{ job.workflow_repository }}
+          ref: ${{ job.workflow_sha }}
+          path: tools
+          persist-credentials: false
+          fetch-depth: 1
+
+      - name: Assert exact called-workflow source
+        shell: bash
+        env:
+          WORKFLOW_REPOSITORY: ${{ job.workflow_repository }}
+          EXPECTED_WORKFLOW_SHA: ${{ job.workflow_sha }}
+          EXPECTED_PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -euo pipefail
+          if [[ ! "$EXPECTED_WORKFLOW_SHA" =~ ^[0-9a-f]{40}$ ]]; then
+            echo "::error::job.workflow_sha is not an exact 40-character commit SHA: $EXPECTED_WORKFLOW_SHA"
+            exit 2
+          fi
+          ACTUAL_TOOLS_SHA="$(git -C tools rev-parse --verify HEAD)"
+          if [[ ! "$ACTUAL_TOOLS_SHA" =~ ^[0-9a-f]{40}$ ]]; then
+            echo "::error::Checked-out tools HEAD is not an exact 40-character commit SHA: $ACTUAL_TOOLS_SHA"
+            exit 2
+          fi
+          if [ "$ACTUAL_TOOLS_SHA" != "$EXPECTED_WORKFLOW_SHA" ]; then
+            echo "::error::Called-workflow source mismatch: expected $EXPECTED_WORKFLOW_SHA, found $ACTUAL_TOOLS_SHA"
+            exit 2
+          fi
+          if [ "$GITHUB_EVENT_NAME" = "pull_request" ]; then
+            if [[ ! "$EXPECTED_PR_HEAD_SHA" =~ ^[0-9a-f]{40}$ ]]; then
+              echo "::error::pull_request head is not an exact 40-character commit SHA: $EXPECTED_PR_HEAD_SHA"
+              exit 2
+            fi
+            if [ "$EXPECTED_WORKFLOW_SHA" != "$EXPECTED_PR_HEAD_SHA" ]; then
+              echo "::error::Called workflow is not the exact pull-request head: workflow $EXPECTED_WORKFLOW_SHA, PR $EXPECTED_PR_HEAD_SHA"
+              exit 2
+            fi
+          fi
+          printf 'job.workflow_repository=%s\n' "$WORKFLOW_REPOSITORY"
+          printf 'job.workflow_sha=%s\n' "$EXPECTED_WORKFLOW_SHA"
+          printf 'checked_out_tools_head=%s\n' "$ACTUAL_TOOLS_SHA"
