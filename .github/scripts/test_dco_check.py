@@ -332,7 +332,15 @@ class DcoCheckTests(unittest.TestCase):
                 "Signed-off-by: Test User <test@example.com>",
             )
             for index, suffix in enumerate(
-                ("", " ", "\t", " \t", " patch follows", "\tpatch follows"),
+                (
+                    "",
+                    " ",
+                    "\t",
+                    " \t",
+                    " patch follows",
+                    "\tpatch follows",
+                    "\r",
+                ),
                 start=805,
             )
         ]
