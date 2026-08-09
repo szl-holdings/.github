@@ -59,13 +59,24 @@ class FakeResponse:
 
 class FakeSession:
     def __init__(self, response):
-        self.response = response
+        self.responses = list(response) if isinstance(response, list) else [response]
         self.headers = {}
         self.calls = []
 
     def get(self, url, **kwargs):
         self.calls.append((url, kwargs))
-        return self.response
+        return self.responses.pop(0) if len(self.responses) > 1 else self.responses[0]
+
+
+class FakeClock:
+    def __init__(self):
+        self.now = 0.0
+
+    def monotonic(self):
+        return self.now
+
+    def sleep(self, seconds):
+        self.now += seconds
 
 
 class SourceBindingTests(unittest.TestCase):
@@ -114,27 +125,82 @@ class SourceBindingTests(unittest.TestCase):
         report = binding.verify_runtime_probe(self.normalized, session=session)
         self.assertTrue(report["matched"])
         self.assertEqual(
-            session.calls[0][0],
+            report["url"],
             "https://szlholdings-a11oy.hf.space/api/build-info",
         )
+        self.assertIn("__szl_source_revision=" + self.sha, session.calls[0][0])
         self.assertFalse(session.calls[0][1]["allow_redirects"])
 
         payload["build"]["revision"] = "b" * 40
-        with self.assertRaisesRegex(binding.SourceBindingError, "runtime source binding mismatch"):
+        with self.assertRaisesRegex(binding.SourceBindingError, "did not converge"):
             binding.verify_runtime_probe(
-                self.normalized, session=FakeSession(FakeResponse(payload))
+                self.normalized,
+                session=FakeSession(FakeResponse(payload)),
+                timeout_seconds=0,
             )
+
+    def test_runtime_probe_converges_from_stale_revision_and_records_every_attempt(self):
+        stale = {
+            "build": {"state": "OBSERVED", "revision": "b" * 40},
+            "receipt_minted": False,
+        }
+        current = {
+            "build": {"state": "OBSERVED", "revision": self.sha},
+            "receipt_minted": False,
+        }
+        clock = FakeClock()
+        session = FakeSession([FakeResponse(stale), FakeResponse(current)])
+        report = binding.verify_runtime_probe(
+            self.normalized,
+            session=session,
+            timeout_seconds=10,
+            interval_seconds=2,
+            monotonic=clock.monotonic,
+            sleep=clock.sleep,
+        )
+        self.assertTrue(report["matched"])
+        self.assertEqual(report["attempt_count"], 2)
+        self.assertEqual(len(report["observations"]), 2)
+        self.assertFalse(report["observations"][0]["matched"])
+        self.assertTrue(report["observations"][1]["matched"])
+        self.assertNotEqual(session.calls[0][0], session.calls[1][0])
+
+    def test_runtime_probe_exhaustion_is_bounded_and_retains_observations(self):
+        stale = {
+            "build": {"state": "OBSERVED", "revision": "b" * 40},
+            "receipt_minted": False,
+        }
+        clock = FakeClock()
+        with self.assertRaises(binding.SourceBindingError) as raised:
+            binding.verify_runtime_probe(
+                self.normalized,
+                session=FakeSession(FakeResponse(stale)),
+                timeout_seconds=4,
+                interval_seconds=2,
+                monotonic=clock.monotonic,
+                sleep=clock.sleep,
+            )
+        evidence = raised.exception.evidence
+        self.assertIsNotNone(evidence)
+        self.assertFalse(evidence["matched"])
+        self.assertEqual(evidence["attempt_count"], 3)
+        self.assertEqual(clock.now, 4)
 
     def test_runtime_probe_rejects_non_json_and_non_200(self):
         with self.assertRaises(binding.SourceBindingError):
             binding.verify_runtime_probe(
                 self.normalized,
                 session=FakeSession(FakeResponse({}, status=503)),
+                timeout_seconds=0,
             )
         response = FakeResponse({}, status=200, content_type="text/html")
         response.json = mock.Mock(side_effect=ValueError("not json"))
         with self.assertRaises(binding.SourceBindingError):
-            binding.verify_runtime_probe(self.normalized, session=FakeSession(response))
+            binding.verify_runtime_probe(
+                self.normalized,
+                session=FakeSession(response),
+                timeout_seconds=0,
+            )
 
     def test_source_contains_no_secret_or_hardware_mutation(self):
         with open(MODULE_PATH, encoding="utf-8") as fh:
@@ -167,6 +233,8 @@ class SourceBindingTests(unittest.TestCase):
                 "/api/build-info",
                 "--output",
                 output,
+                "--timeout-seconds",
+                "0",
             ]
             secret = "super-secret-token"
             with mock.patch.object(sys, "argv", argv), mock.patch.dict(
@@ -174,12 +242,15 @@ class SourceBindingTests(unittest.TestCase):
             ), mock.patch.object(
                 binding,
                 "run",
-                side_effect=binding.SourceBindingError("fail closed"),
+                side_effect=binding.SourceBindingError(
+                    "fail closed", evidence={"matched": False, "observations": []}
+                ),
             ):
                 self.assertEqual(binding.main(), 1)
             with open(output, encoding="utf-8") as fh:
                 report = json.load(fh)
         self.assertFalse(report["ok"])
+        self.assertFalse(report["runtime_probe"]["matched"])
         self.assertNotIn(secret, json.dumps(report, sort_keys=True))
 
 
@@ -222,6 +293,8 @@ class ReusableWorkflowSourceBindingTests(unittest.TestCase):
             "SOURCE_REVISION_PROBE_PATH: ${{ inputs.source-revision-probe-path }}",
             '--variable "$SOURCE_REVISION_VARIABLE"',
             '--probe-path "$SOURCE_REVISION_PROBE_PATH"',
+            "--timeout-seconds 180",
+            "--interval-seconds 5",
         ):
             self.assertIn(safe, self.workflow)
         for unsafe in (

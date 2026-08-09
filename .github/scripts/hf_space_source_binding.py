@@ -18,9 +18,10 @@ import argparse
 import json
 import os
 import re
+import time
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Mapping
+from typing import Any, Callable, Mapping
 from urllib.parse import urlsplit
 
 import requests
@@ -34,6 +35,10 @@ REPORT_SCHEMA = "szl.hf-space-source-binding/v1"
 
 class SourceBindingError(RuntimeError):
     """The source-binding contract cannot be established or verified."""
+
+    def __init__(self, message: str, *, evidence: Mapping[str, Any] | None = None) -> None:
+        super().__init__(message)
+        self.evidence = dict(evidence) if evidence is not None else None
 
 
 def normalize_binding(repo_id: str, variable: str, revision: str, probe_path: str) -> dict[str, str]:
@@ -111,9 +116,97 @@ def bind_variable(api: HfApi, binding: Mapping[str, str]) -> dict[str, Any]:
     return verify_variable(api, binding)
 
 
-def verify_runtime_probe(
-    binding: Mapping[str, str], *, session: requests.Session | None = None
+def _runtime_probe_observation(
+    binding: Mapping[str, str],
+    *,
+    session: requests.Session,
+    attempt: int,
+    request_timeout_seconds: float,
 ) -> dict[str, Any]:
+    canonical_url = live_origin(binding["repo_id"]) + binding["probe_path"]
+    separator = "&" if "?" in canonical_url else "?"
+    request_url = (
+        f"{canonical_url}{separator}__szl_source_revision={binding['revision']}"
+        f"&__szl_probe_attempt={attempt}"
+    )
+    observation: dict[str, Any] = {
+        "attempt": attempt,
+        "observed_at": datetime.now(timezone.utc).isoformat(),
+        "url": request_url,
+        "expected_revision": binding["revision"],
+        "matched": False,
+    }
+    try:
+        response = session.get(
+            request_url,
+            allow_redirects=False,
+            timeout=request_timeout_seconds,
+        )
+    except Exception as exc:  # noqa: BLE001 - preserve a bounded transport observation
+        observation.update(
+            {
+                "error_type": type(exc).__name__,
+                "error": "source revision probe transport failure",
+            }
+        )
+        return observation
+
+    observation.update(
+        {
+            "http_status": response.status_code,
+            "content_type": response.headers.get("content-type"),
+            "bytes": len(response.content),
+        }
+    )
+    if response.status_code != 200:
+        observation["error"] = "source revision probe did not return HTTP 200"
+        return observation
+    try:
+        payload = response.json()
+    except ValueError:
+        observation["error"] = "source revision probe did not return JSON"
+        return observation
+    if not isinstance(payload, Mapping):
+        observation["error"] = "source revision probe JSON is not an object"
+        return observation
+    build = payload.get("build")
+    if not isinstance(build, Mapping):
+        observation["error"] = "source revision probe lacks a build object"
+        return observation
+    observed = str(build.get("revision") or "").lower()
+    state = str(build.get("state") or "").upper()
+    receipt_minted = payload.get("receipt_minted")
+    matched = (
+        observed == binding["revision"]
+        and state == "OBSERVED"
+        and receipt_minted is False
+    )
+    observation.update(
+        {
+            "build_state": state,
+            "observed_revision": observed,
+            "receipt_minted": receipt_minted,
+            "matched": matched,
+        }
+    )
+    if not matched:
+        observation["error"] = "runtime source binding mismatch"
+    return observation
+
+
+def verify_runtime_probe(
+    binding: Mapping[str, str],
+    *,
+    session: requests.Session | None = None,
+    timeout_seconds: float = 180.0,
+    interval_seconds: float = 5.0,
+    monotonic: Callable[[], float] = time.monotonic,
+    sleep: Callable[[float], None] = time.sleep,
+) -> dict[str, Any]:
+    if not 0 <= timeout_seconds <= 900:
+        raise SourceBindingError("runtime probe timeout must be between 0 and 900 seconds")
+    if not 0 < interval_seconds <= 60:
+        raise SourceBindingError("runtime probe interval must be greater than 0 and at most 60 seconds")
     session = session or requests.Session()
     session.headers.update(
         {
@@ -123,41 +216,50 @@ def verify_runtime_probe(
             "User-Agent": "szl-hf-space-source-binding/1",
         }
     )
-    url = live_origin(binding["repo_id"]) + binding["probe_path"]
-    response = session.get(url, allow_redirects=False, timeout=60)
-    if response.status_code != 200:
-        raise SourceBindingError(
-            f"source revision probe returned HTTP {response.status_code}: {url}"
+    started = monotonic()
+    deadline = started + timeout_seconds
+    observations: list[dict[str, Any]] = []
+    while True:
+        now = monotonic()
+        remaining = max(0.0, deadline - now)
+        observation = _runtime_probe_observation(
+            binding,
+            session=session,
+            attempt=len(observations) + 1,
+            request_timeout_seconds=max(1.0, min(60.0, remaining or 1.0)),
         )
-    try:
-        payload = response.json()
-    except ValueError as exc:
-        raise SourceBindingError("source revision probe did not return JSON") from exc
-    if not isinstance(payload, Mapping):
-        raise SourceBindingError("source revision probe JSON is not an object")
-    build = payload.get("build")
-    if not isinstance(build, Mapping):
-        raise SourceBindingError("source revision probe lacks a build object")
-    observed = str(build.get("revision") or "").lower()
-    state = str(build.get("state") or "").upper()
-    receipt_minted = payload.get("receipt_minted")
-    if observed != binding["revision"] or state != "OBSERVED" or receipt_minted is not False:
-        raise SourceBindingError(
-            "runtime source binding mismatch: "
-            f"state={state!r}; expected={binding['revision']!r}; observed={observed!r}; "
-            f"receipt_minted={receipt_minted!r}"
-        )
-    return {
-        "url": url,
-        "http_status": response.status_code,
-        "content_type": response.headers.get("content-type"),
-        "bytes": len(response.content),
-        "build_state": state,
-        "expected_revision": binding["revision"],
-        "observed_revision": observed,
-        "receipt_minted": False,
-        "matched": True,
-    }
+        observations.append(observation)
+        elapsed = max(0.0, monotonic() - started)
+        if observation["matched"]:
+            return {
+                "url": live_origin(binding["repo_id"]) + binding["probe_path"],
+                "expected_revision": binding["revision"],
+                "attempt_count": len(observations),
+                "converged_after_seconds": round(elapsed, 3),
+                "observations": observations,
+                "matched": True,
+            }
+        remaining = deadline - monotonic()
+        if remaining <= 0:
+            evidence = {
+                "url": live_origin(binding["repo_id"]) + binding["probe_path"],
+                "expected_revision": binding["revision"],
+                "attempt_count": len(observations),
+                "elapsed_seconds": round(elapsed, 3),
+                "timeout_seconds": timeout_seconds,
+                "interval_seconds": interval_seconds,
+                "observations": observations,
+                "matched": False,
+            }
+            last = observations[-1]
+            raise SourceBindingError(
+                "runtime source binding did not converge before the bounded deadline: "
+                f"expected={binding['revision']!r}; "
+                f"observed={last.get('observed_revision')!r}; "
+                f"state={last.get('build_state')!r}; attempts={len(observations)}",
+                evidence=evidence,
+            )
+        sleep(min(interval_seconds, remaining))
 
 
 def write_report(path: str, report: Mapping[str, Any]) -> None:
@@ -173,7 +275,15 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
         raise SourceBindingError("HF_TOKEN is required for Space variable bind/readback")
     api = HfApi(token=token)
     variable = bind_variable(api, binding) if args.mode == "bind" else verify_variable(api, binding)
-    runtime = verify_runtime_probe(binding) if args.mode == "verify" else {"status": "NOT_RUN"}
+    runtime = (
+        verify_runtime_probe(
+            binding,
+            timeout_seconds=args.timeout_seconds,
+            interval_seconds=args.interval_seconds,
+        )
+        if args.mode == "verify"
+        else {"status": "NOT_RUN"}
+    )
     return {
         "schema": REPORT_SCHEMA,
         "generated_at": datetime.now(timezone.utc).isoformat(),
@@ -187,7 +297,7 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
         "ok": True,
         "boundaries": [
             "Only one non-secret Space variable may be added or updated.",
-            "Verification uses supported HfApi variable readback and one same-host GET.",
+            "Verification uses supported HfApi variable readback and bounded same-host GET convergence.",
             "No Space hardware, visibility, sleep policy, secret, model, dataset, or branch state is changed.",
         ],
     }
@@ -201,6 +311,8 @@ def main() -> int:
     parser.add_argument("--revision", required=True)
     parser.add_argument("--probe-path", required=True)
     parser.add_argument("--output", required=True)
+    parser.add_argument("--timeout-seconds", type=float, default=180.0)
+    parser.add_argument("--interval-seconds", type=float, default=5.0)
     args = parser.parse_args()
     try:
         report = run(args)
@@ -216,6 +328,8 @@ def main() -> int:
             "ok": False,
             "fatal": f"{type(exc).__name__}: {exc}",
         }
+        if isinstance(exc, SourceBindingError) and exc.evidence is not None:
+            report["runtime_probe"] = exc.evidence
         write_report(args.output, report)
         print(json.dumps(report, indent=2, sort_keys=True))
         return 1

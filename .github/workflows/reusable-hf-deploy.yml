@@ -303,6 +303,8 @@ jobs:
             --variable "$SOURCE_REVISION_VARIABLE" \
             --revision "$SOURCE_SHA" \
             --probe-path "$SOURCE_REVISION_PROBE_PATH" \
+            --timeout-seconds 180 \
+            --interval-seconds 5 \
             --output hf-source-binding-verify.json
 
       - name: Upload immutable deployment evidence
