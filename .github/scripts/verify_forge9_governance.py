@@ -451,10 +451,11 @@ def verify_gate_contract() -> None:
     if release_contexts != GATES + [
         STAGING_STATUS["context"],
         ATTESTATION_STATUS["context"],
+        DCO_STATUS["context"],
     ]:
-        fail("release checks must contain gates, staging, and attestation")
-    if release_required[-2:] != [STAGING_STATUS, ATTESTATION_STATUS]:
-        fail("release staging and attestation checks must be App-pinned")
+        fail("release checks must contain gates, staging, attestation, and DCO")
+    if release_required[-3:] != [STAGING_STATUS, ATTESTATION_STATUS, DCO_STATUS]:
+        fail("release staging, attestation, and DCO checks must be App-pinned")
     if any(
         item.get("type") == "required_deployments"
         for item in typed_release_rules
