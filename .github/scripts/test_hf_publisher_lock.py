@@ -7,12 +7,14 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[2]
 WORKFLOW = ROOT / ".github" / "workflows" / "reusable-hf-deploy.yml"
 TESTS_WORKFLOW = ROOT / ".github" / "workflows" / "tests.yml"
+WITNESS_WORKFLOW = ROOT / ".github" / "workflows" / "reusable-hf-deploy-source-witness.yml"
 LOCK = ROOT / "requirements" / "hf-publisher.lock"
 
 
 def main() -> None:
     workflow = WORKFLOW.read_text(encoding="utf-8")
     tests_workflow = TESTS_WORKFLOW.read_text(encoding="utf-8")
+    witness_workflow = WITNESS_WORKFLOW.read_text(encoding="utf-8")
     lock = LOCK.read_text(encoding="utf-8")
 
     for source in (workflow, tests_workflow):
@@ -53,11 +55,12 @@ def main() -> None:
     secret = workflow.index("Require governed publisher")
     assert create < install < secret
 
-    assert "github.job_workflow_sha" not in tests_workflow
-    assert "name: Reusable publisher exact-source witness" in tests_workflow
-    assert "uses: ./.github/workflows/reusable-hf-deploy.yml" in tests_workflow
-    assert "contract-only: true" in tests_workflow
-    assert "HF_TOKEN: ${{ github.token }}" in tests_workflow
+    assert "github.job_workflow_sha" not in witness_workflow
+    assert "name: Reusable publisher exact-source witness" in witness_workflow
+    assert "  push:" in witness_workflow
+    assert "uses: ./.github/workflows/reusable-hf-deploy.yml" in witness_workflow
+    assert "contract-only: true" in witness_workflow
+    assert "HF_TOKEN: ${{ github.token }}" in witness_workflow
 
     assert "HF publisher clean Linux install and runtime proof" in tests_workflow
     assert "python3 -m pip install --dry-run" not in tests_workflow

@@ -11,17 +11,6 @@ permissions:
   contents: read
 
 jobs:
-  reusable-publisher-exact-source-witness:
-    name: Reusable publisher exact-source witness
-    if: github.event_name == 'pull_request'
-    permissions:
-      contents: read
-    uses: ./.github/workflows/reusable-hf-deploy.yml
-    with:
-      contract-only: true
-    secrets:
-      HF_TOKEN: ${{ github.token }}
-
   test:
     name: Run tests
     runs-on: ubuntu-latest

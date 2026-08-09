@@ -328,7 +328,7 @@ jobs:
         env:
           WORKFLOW_REPOSITORY: ${{ job.workflow_repository }}
           EXPECTED_WORKFLOW_SHA: ${{ job.workflow_sha }}
-          EXPECTED_PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          EXPECTED_EVENT_SHA: ${{ github.sha }}
         run: |
           set -euo pipefail
           if [[ ! "$EXPECTED_WORKFLOW_SHA" =~ ^[0-9a-f]{40}$ ]]; then
@@ -344,16 +344,15 @@ jobs:
             echo "::error::Called-workflow source mismatch: expected $EXPECTED_WORKFLOW_SHA, found $ACTUAL_TOOLS_SHA"
             exit 2
           fi
-          if [ "$GITHUB_EVENT_NAME" = "pull_request" ]; then
-            if [[ ! "$EXPECTED_PR_HEAD_SHA" =~ ^[0-9a-f]{40}$ ]]; then
-              echo "::error::pull_request head is not an exact 40-character commit SHA: $EXPECTED_PR_HEAD_SHA"
-              exit 2
-            fi
-            if [ "$EXPECTED_WORKFLOW_SHA" != "$EXPECTED_PR_HEAD_SHA" ]; then
-              echo "::error::Called workflow is not the exact pull-request head: workflow $EXPECTED_WORKFLOW_SHA, PR $EXPECTED_PR_HEAD_SHA"
-              exit 2
-            fi
+          if [[ ! "$EXPECTED_EVENT_SHA" =~ ^[0-9a-f]{40}$ ]]; then
+            echo "::error::github.sha is not an exact 40-character commit SHA: $EXPECTED_EVENT_SHA"
+            exit 2
+          fi
+          if [ "$EXPECTED_WORKFLOW_SHA" != "$EXPECTED_EVENT_SHA" ]; then
+            echo "::error::Called workflow is not the exact event head: workflow $EXPECTED_WORKFLOW_SHA, event $EXPECTED_EVENT_SHA"
+            exit 2
           fi
           printf 'job.workflow_repository=%s\n' "$WORKFLOW_REPOSITORY"
           printf 'job.workflow_sha=%s\n' "$EXPECTED_WORKFLOW_SHA"
+          printf 'github.sha=%s\n' "$EXPECTED_EVENT_SHA"
           printf 'checked_out_tools_head=%s\n' "$ACTUAL_TOOLS_SHA"
