@@ -364,6 +364,19 @@ class DcoCheckTests(unittest.TestCase):
             [commit["sha"]],
         )
 
+    def test_terminal_padded_patch_markers_truncate_message(self) -> None:
+        commits = [
+            _commit(
+                index,
+                "fix: terminal padded marker\n\n"
+                "Signed-off-by: Test User <test@example.com>\n"
+                f"---{suffix}",
+            )
+            for index, suffix in enumerate((" ", "\t", "\r"), start=813)
+        ]
+
+        self.assertEqual(dco_check.unsigned_commit_shas(commits), [])
+
     def test_continuation_after_signed_off_by_is_rejected(self) -> None:
         malformed = _commit(
             53,
