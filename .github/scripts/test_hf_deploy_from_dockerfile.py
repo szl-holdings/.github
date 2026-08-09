@@ -410,6 +410,36 @@ class TestDeriveReadmePolicy(unittest.TestCase):
                 source_sha="a" * 40,
             )
 
+    def test_basename_dockerignore_rule_matches_nested_source_revision(self):
+        with self.assertRaisesRegex(
+            dep.DeployContractError, "excluded from the Docker build context"
+        ):
+            self._derive(
+                "FROM scratch\nCOPY space /app/space\n",
+                {
+                    ".dockerignore": "SOURCE_REVISION\n",
+                    "space/app.py": "pass\n",
+                },
+                include_readme=False,
+                source_revision_file="space/SOURCE_REVISION",
+                source_sha="a" * 40,
+            )
+
+    def test_smoke_path_failure_precedes_revision_materialization(self):
+        with mock.patch.object(
+            dep, "materialize_source_revision_file"
+        ) as materialize:
+            with self.assertRaises(dep.DeployContractError):
+                self._derive(
+                    "FROM scratch\nCOPY space /app/space\n",
+                    {"space/app.py": "pass\n"},
+                    include_readme=False,
+                    smoke_paths='["https://example.com/"]',
+                    source_revision_file="space/SOURCE_REVISION",
+                    source_sha="a" * 40,
+                )
+        materialize.assert_not_called()
+
     def test_dockerfile_specific_ignore_takes_precedence_over_root(self):
         manifest, files = self._derive(
             "FROM scratch\nCOPY space /app/space\n",

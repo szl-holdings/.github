@@ -150,7 +150,7 @@ def materialize_source_revision_file(repo_root, requested_path, source_sha):
 
 def _dockerignore_pattern_regex(pattern):
     """Compile Docker patternmatcher wildcards for slash-delimited repo paths."""
-    pieces = ["^"]
+    pieces = ["^(?:.*/)?" if "/" not in pattern else "^"]
     index = 0
     while index < len(pattern):
         char = pattern[index]
@@ -741,6 +741,7 @@ def derive(args):
         dockerfile_text,
         eligible_sources=eligible_sources,
     )
+    smoke_paths = normalize_smoke_paths(getattr(args, "smoke_paths", None))
 
     revision_rel = None
     revision_content = None
@@ -873,8 +874,6 @@ def derive(args):
             raise DeployContractError(
                 "source revision materialization changed the validated target"
             )
-
-    smoke_paths = normalize_smoke_paths(getattr(args, "smoke_paths", None))
 
     manifest = {
         "schema": 2,
