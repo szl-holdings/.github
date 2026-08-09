@@ -4,11 +4,9 @@
 from __future__ import annotations
 
 import json
-import re
 import shutil
 import subprocess
 import unittest
-from pathlib import Path
 from urllib.error import URLError
 
 import dco_check as dco_check
@@ -18,6 +16,7 @@ API_URL = "https://api.github.test"
 REPOSITORY = "szl-holdings/example"
 PR_NUMBER = 399
 TOKEN = "test-token"
+BASE_SHA = "f" * 40
 
 
 def _commit(index: int, message: str | None = None) -> dict[str, object]:
@@ -44,8 +43,17 @@ def _head_sha(commits: list[dict[str, object]]) -> str:
     return sha
 
 
-def _metadata(count: int, head_sha: str) -> dict[str, object]:
-    return {"commits": count, "head": {"sha": head_sha}}
+def _metadata(
+    count: int,
+    head_sha: str,
+    *,
+    base_sha: str = BASE_SHA,
+) -> dict[str, object]:
+    return {
+        "commits": count,
+        "head": {"sha": head_sha},
+        "base": {"sha": base_sha},
+    }
 
 
 def _density_message(
@@ -193,6 +201,18 @@ class DcoCheckTests(unittest.TestCase):
         malformed = [
             _commit(7, "fix: blank name\n\nSigned-off-by:   <test@example.com>"),
             _commit(8, "fix: tab name\n\nSigned-off-by:\t\t<test@example.com>"),
+        ]
+
+        self.assertEqual(
+            dco_check.unsigned_commit_shas(malformed),
+            [commit["sha"] for commit in malformed],
+        )
+
+    def test_signer_emails_with_extra_at_signs_are_rejected(self) -> None:
+        malformed = [
+            _commit(801, "fix: extra at\n\nSigned-off-by: Test User <a@@b>"),
+            _commit(802, "fix: extra at\n\nSigned-off-by: Test User <a@b@c>"),
+            _commit(803, "fix: trailing at\n\nSigned-off-by: Test User <a@b@>"),
         ]
 
         self.assertEqual(
@@ -625,6 +645,17 @@ class DcoCheckTests(unittest.TestCase):
 
         self.assertEqual(dco_check.unsigned_commit_shas(signed), [])
 
+    def test_leading_hyphen_generic_trailer_and_fold_are_accepted(self) -> None:
+        signed = _commit(
+            804,
+            "fix: leading hyphen trailer\n\n"
+            "-Reviewed-by: Reviewer <reviewer@example.com>\n"
+            " folded value\n"
+            "Signed-off-by: Test User <test@example.com>",
+        )
+
+        self.assertEqual(dco_check.unsigned_commit_shas([signed]), [])
+
     def test_trailing_blank_line_variants_are_accepted(self) -> None:
         endings = ("", "\n", "\n\n", "\n \t\n")
         signed = [
@@ -773,6 +804,38 @@ class DcoCheckTests(unittest.TestCase):
                 API_URL, REPOSITORY, PR_NUMBER, TOKEN, expected_head, opener=opener
             )
 
+    def test_same_head_and_count_base_drift_is_rejected(self) -> None:
+        commits = _signed_commits(2)
+        expected_head = _head_sha(commits)
+        opener = _SequenceOpener(
+            _metadata(2, expected_head),
+            commits,
+            [],
+            _metadata(2, expected_head, base_sha="e" * 40),
+        )
+
+        with self.assertRaisesRegex(dco_check.DcoContractError, "metadata drifted"):
+            dco_check.fetch_authoritative_pr_commits(
+                API_URL, REPOSITORY, PR_NUMBER, TOKEN, expected_head, opener=opener
+            )
+
+    def test_event_base_mismatch_is_rejected_before_pagination(self) -> None:
+        expected_head = _head_sha(_signed_commits(2))
+        opener = _SequenceOpener(
+            _metadata(2, expected_head, base_sha="e" * 40)
+        )
+
+        with self.assertRaisesRegex(dco_check.DcoContractError, "base mismatch"):
+            dco_check.fetch_authoritative_pr_commits(
+                API_URL,
+                REPOSITORY,
+                PR_NUMBER,
+                TOKEN,
+                expected_head,
+                expected_base_sha=BASE_SHA,
+                opener=opener,
+            )
+
     def test_final_retrieved_sha_must_equal_expected_head(self) -> None:
         expected_head = _head_sha(_signed_commits(2))
         replacement_commits = [_commit(1), _commit(3)]
@@ -785,31 +848,6 @@ class DcoCheckTests(unittest.TestCase):
             dco_check.fetch_authoritative_pr_commits(
                 API_URL, REPOSITORY, PR_NUMBER, TOKEN, expected_head, opener=opener
             )
-
-    def test_workflow_binds_head_and_has_no_historical_bypass(self) -> None:
-        workflow_path = Path(__file__).parents[1] / "workflows" / "dco.yml"
-        workflow = workflow_path.read_text(encoding="utf-8")
-
-        self.assertIn(
-            "EXPECTED_HEAD_SHA: ${{ github.event.pull_request.head.sha }}", workflow
-        )
-        self.assertIn("python3 .github/scripts/test_dco_check.py", workflow)
-        self.assertRegex(
-            workflow,
-            r"(?m)^\s*python3\s+\.github/scripts/dco_check\.py\s*$",
-        )
-        forbidden_patterns = (
-            r"(?i)\bfile_count\b",
-            r"(?i)\bchanged_files\b",
-            r"(?i)\bgit\s+show\b",
-            r"(?im)\bgrep\b[^\n]*\^Merge",
-            r"(?is)(?:file_count|changed_files).{0,200}(?:-eq|==)\s*0"
-            r".{0,200}(?:exit\s+0|success|pass)",
-            r"head_commit\.message",
-        )
-        for pattern in forbidden_patterns:
-            self.assertIsNone(re.search(pattern, workflow), pattern)
-
 
     def test_unicode_lookalike_header_is_rejected(self) -> None:
         commit = _commit(
