@@ -152,6 +152,17 @@ class DcoCheckTests(unittest.TestCase):
             [commit["sha"] for commit in malformed],
         )
 
+    def test_whitespace_only_signer_names_are_rejected(self) -> None:
+        malformed = [
+            _commit(7, "fix: blank name\n\nSigned-off-by:   <test@example.com>"),
+            _commit(8, "fix: tab name\n\nSigned-off-by:\t\t<test@example.com>"),
+        ]
+
+        self.assertEqual(
+            dco_check.unsigned_commit_shas(malformed),
+            [commit["sha"] for commit in malformed],
+        )
+
     def test_valid_stable_pagination_passes(self) -> None:
         commits = _signed_commits(3)
         expected_head, responses = _stable_responses(commits)
