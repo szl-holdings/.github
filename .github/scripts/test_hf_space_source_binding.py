@@ -225,9 +225,12 @@ class ReusableWorkflowSourceBindingTests(unittest.TestCase):
         ):
             self.assertNotIn(unsafe, self.workflow)
 
-    def test_workflow_uses_exact_supported_clients_and_immutable_tool_revision(self):
-        self.assertIn('"huggingface_hub==1.19.0"', self.workflow)
-        self.assertIn('"requests==2.32.5"', self.workflow)
+    def test_workflow_uses_hash_locked_clients_and_immutable_tool_revision(self):
+        self.assertIn("requirements/hf-publisher.lock", self.workflow)
+        self.assertIn("--require-hashes", self.workflow)
+        self.assertIn("--only-binary=:all:", self.workflow)
+        self.assertNotIn('"huggingface_hub==1.19.0"', self.workflow)
+        self.assertNotIn('"requests==2.32.5"', self.workflow)
         self.assertIn("ref: ${{ github.job_workflow_sha }}", self.workflow)
         self.assertNotIn("repository: szl-holdings/.github\n          ref: main", self.workflow)
 
