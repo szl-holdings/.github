@@ -6,6 +6,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import math
 import os
 import re
 import subprocess
@@ -432,10 +433,10 @@ TOKEN_RE = re.compile(
 def safe_text(value: Any) -> str:
     try:
         return str(value)
-    except BaseException:
+    except Exception:
         try:
             name = type(value).__name__
-        except BaseException:
+        except Exception:
             name = "unknown"
         return f"<unprintable {name}>"
 
@@ -454,7 +455,7 @@ def sanitize_report(value: Any, depth: int = 0) -> Any:
     if value is None or isinstance(value, (bool, int)):
         return value
     if isinstance(value, float):
-        return value if value == value and abs(value) != float("inf") else "<non-finite>"
+        return value if math.isfinite(value) else "<non-finite>"
     if isinstance(value, str):
         return redact(value)
     if isinstance(value, dict):

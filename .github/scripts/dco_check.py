@@ -83,9 +83,13 @@ def terminal_signoffs(repo: Path, message: str) -> list[tuple[str, str]]:
     return signoffs
 
 
-def validate_commit(repo: Path, sha: str) -> None:
+def validate_commit(repo: Path, sha: str, *, allow_merge_commit: bool = False) -> None:
     parents, author_name, author_email, message = commit_record(repo, sha)
-    require(len(parents) == 1, f"{sha} must have exactly one parent")
+    allowed_parent_counts = {1, 2} if allow_merge_commit else {1}
+    require(
+        len(parents) in allowed_parent_counts,
+        f"{sha} has an unsupported parent count: {len(parents)}",
+    )
     author = normalized_identity(author_name, author_email)
     signoffs = terminal_signoffs(repo, message)
     require(signoffs, f"{sha} has no valid terminal Signed-off-by trailer")
@@ -96,13 +100,19 @@ def checked_out_head(repo: Path) -> str:
     return require_sha(git(repo, "rev-parse", "HEAD").strip(), "checked-out HEAD")
 
 
-def validate_commits(repo: Path, shas: list[str], expected_head: str) -> int:
+def validate_commits(
+    repo: Path,
+    shas: list[str],
+    expected_head: str,
+    *,
+    allow_merge_commits: bool = False,
+) -> int:
     require(shas, "candidate commit set is empty")
     require(len(shas) == len(set(shas)), "candidate commit set contains duplicate SHAs")
     require(shas[-1] == expected_head, "last candidate commit does not match expected head")
     require(checked_out_head(repo) == expected_head, "checked-out HEAD does not match expected head")
     for sha in shas:
-        validate_commit(repo, sha)
+        validate_commit(repo, sha, allow_merge_commit=allow_merge_commits)
     return len(shas)
 
 
@@ -231,7 +241,25 @@ def validate_pull_request_target(
     require(bool(token), "GITHUB_TOKEN is required for trusted PR validation")
     getter = api_get or (lambda path: github_get(path, token))
     shas = collect_pr_commits(repository, number, base_sha, head_sha, getter)
-    return validate_commits(repo, shas, head_sha)
+    require(checked_out_head(repo) == head_sha, "checked-out HEAD does not match event head")
+    ancestor = subprocess.run(
+        ["git", "merge-base", "--is-ancestor", base_sha, head_sha],
+        cwd=repo,
+        capture_output=True,
+        check=False,
+        timeout=30,
+    )
+    require(ancestor.returncode == 0, "pull-request base SHA is not an ancestor of head SHA")
+    local_shas = [
+        line.strip()
+        for line in git(repo, "rev-list", "--reverse", f"{base_sha}..{head_sha}").splitlines()
+        if line.strip()
+    ]
+    require(
+        len(local_shas) == len(shas) and set(local_shas) == set(shas),
+        "pull-request API commit set differs from the checked-out history",
+    )
+    return validate_commits(repo, shas, head_sha, allow_merge_commits=True)
 
 
 def parse_args() -> argparse.Namespace:

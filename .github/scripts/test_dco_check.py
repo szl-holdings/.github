@@ -59,9 +59,9 @@ class DcoCheckTests(unittest.TestCase):
         )
         return self.git("rev-parse", "HEAD")
 
-    def assert_rejected(self, pattern: str, function, *args) -> None:
+    def assert_rejected(self, pattern: str, function, *args, **kwargs) -> None:
         with self.assertRaisesRegex(dco.DcoError, pattern):
-            function(*args)
+            function(*args, **kwargs)
 
     def test_two_and_five_entry_signed_groups_pass(self) -> None:
         second = self.commit("fix: one\n\nSigned-off-by: Series A Builder <builder@example.com>")
@@ -108,13 +108,72 @@ class DcoCheckTests(unittest.TestCase):
         unrelated = self.git("commit-tree", tree, input_text="chore: unrelated\n")
         self.assert_rejected("not an ancestor", dco.validate_range, self.repo, unrelated, self.base)
 
-    def test_multi_parent_commit_fails(self) -> None:
+    def test_signed_two_parent_pr_merge_passes(self) -> None:
         first = self.commit("fix: first\n\nSigned-off-by: Series A Builder <builder@example.com>")
         tree = self.git("rev-parse", f"{first}^{{tree}}")
         message = "fix: synthetic merge\n\nSigned-off-by: Series A Builder <builder@example.com>\n"
         merged = self.git("commit-tree", tree, "-p", first, "-p", self.base, input_text=message)
         self.git("reset", "--hard", merged)
-        self.assert_rejected("exactly one parent", dco.validate_range, self.repo, self.base, merged)
+        shas = self.git("rev-list", "--reverse", f"{self.base}..{merged}").splitlines()
+        self.assertEqual(
+            dco.validate_commits(
+                self.repo,
+                shas,
+                merged,
+                allow_merge_commits=True,
+            ),
+            2,
+        )
+        self.assert_rejected("unsupported parent count", dco.validate_range, self.repo, self.base, merged)
+
+    def test_unsigned_second_parent_cannot_hide_behind_signed_pr_merge(self) -> None:
+        first = self.commit("fix: first\n\nSigned-off-by: Series A Builder <builder@example.com>")
+        self.git("switch", "-c", "unsigned-side", self.base)
+        unsigned = self.commit("fix: unsigned side")
+        self.git("switch", "main")
+        tree = self.git("rev-parse", f"{first}^{{tree}}")
+        message = "fix: synthetic merge\n\nSigned-off-by: Series A Builder <builder@example.com>\n"
+        merged = self.git("commit-tree", tree, "-p", first, "-p", unsigned, input_text=message)
+        self.git("reset", "--hard", merged)
+        shas = self.git("rev-list", "--reverse", f"{self.base}..{merged}").splitlines()
+        self.assert_rejected(
+            "no valid terminal",
+            dco.validate_commits,
+            self.repo,
+            shas,
+            merged,
+            allow_merge_commits=True,
+        )
+
+    def test_octopus_merge_fails_even_for_pr_history(self) -> None:
+        first = self.commit("fix: first\n\nSigned-off-by: Series A Builder <builder@example.com>")
+        self.git("switch", "-c", "side-one", self.base)
+        side_one = self.commit("fix: side one\n\nSigned-off-by: Series A Builder <builder@example.com>")
+        self.git("switch", "-c", "side-two", self.base)
+        side_two = self.commit("fix: side two\n\nSigned-off-by: Series A Builder <builder@example.com>")
+        self.git("switch", "main")
+        tree = self.git("rev-parse", f"{first}^{{tree}}")
+        message = "fix: synthetic merge\n\nSigned-off-by: Series A Builder <builder@example.com>\n"
+        merged = self.git(
+            "commit-tree",
+            tree,
+            "-p",
+            first,
+            "-p",
+            side_one,
+            "-p",
+            side_two,
+            input_text=message,
+        )
+        self.git("reset", "--hard", merged)
+        self.assert_rejected(
+            "unsupported parent count",
+            dco.validate_commits,
+            self.repo,
+            [first, merged],
+            merged,
+            allow_merge_commits=True,
+        )
 
     def test_merge_group_identity_and_hostile_ref_contract(self) -> None:
         head = self.commit("fix: queue\n\nSigned-off-by: Series A Builder <builder@example.com>")
@@ -194,6 +253,64 @@ class DcoCheckTests(unittest.TestCase):
             "a" * 40,
             head,
             churn,
+        )
+
+    def test_pr_history_allows_signed_merge_and_requires_graph_parity(self) -> None:
+        first = self.commit("fix: first\n\nSigned-off-by: Series A Builder <builder@example.com>")
+        tree = self.git("rev-parse", f"{first}^{{tree}}")
+        message = "fix: reconcile main\n\nSigned-off-by: Series A Builder <builder@example.com>\n"
+        merged = self.git("commit-tree", tree, "-p", first, "-p", self.base, input_text=message)
+        self.git("reset", "--hard", merged)
+        shas = self.git("rev-list", "--reverse", f"{self.base}..{merged}").splitlines()
+        payload = {
+            "action": "synchronize",
+            "repository": {"full_name": "szl-holdings/.github"},
+            "pull_request": {
+                "number": 400,
+                "base": {"ref": "main", "sha": self.base},
+                "head": {"sha": merged},
+            },
+        }
+
+        def complete(path: str):
+            if "/commits?" in path:
+                return [{"sha": sha} for sha in shas]
+            return {
+                "base": {"sha": self.base},
+                "head": {"sha": merged},
+                "commits": len(shas),
+                "draft": False,
+            }
+
+        self.assertEqual(
+            dco.validate_pull_request_target(
+                self.repo,
+                payload,
+                "szl-holdings/.github",
+                "token",
+                complete,
+            ),
+            2,
+        )
+
+        def incomplete(path: str):
+            if "/commits?" in path:
+                return [{"sha": merged}]
+            return {
+                "base": {"sha": self.base},
+                "head": {"sha": merged},
+                "commits": 1,
+                "draft": False,
+            }
+
+        self.assert_rejected(
+            "differs from the checked-out history",
+            dco.validate_pull_request_target,
+            self.repo,
+            payload,
+            "szl-holdings/.github",
+            "token",
+            incomplete,
         )
 
     def test_workflow_static_contract(self) -> None:

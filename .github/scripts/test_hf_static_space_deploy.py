@@ -703,6 +703,14 @@ class StaticSpaceDeployTests(unittest.TestCase):
             self.assertNotIn(secret, payload)
         self.assertIn("<unprintable Unprintable>", payload)
 
+    def test_report_sanitizer_does_not_swallow_process_control(self):
+        class Interrupting:
+            def __str__(self):
+                raise KeyboardInterrupt()
+
+        with self.assertRaises(KeyboardInterrupt):
+            deploy.safe_text(Interrupting())
+
     def test_readback_preserves_error_when_exception_string_is_hostile(self):
         class HostileError(Exception):
             def __str__(self):
