@@ -691,7 +691,7 @@ class StaticSpaceDeployTests(unittest.TestCase):
         sanitized = deploy.sanitize_report(
             {
                 "one": "hf_abcdefghijklmnopqrstuvwxyz",
-                "two": ["Bearer abc.def", "ghs_abcdefghijklmnopqrstuvwxyz"],
+                "two": ["Bearer abc+/def==", "ghs_abcdefghijklmnopqrstuvwxyz"],
                 "three": {
                     "token": "github_pat_abcdefghijklmnopqrstuvwxyz",
                     "value": Unprintable(),
@@ -701,6 +701,7 @@ class StaticSpaceDeployTests(unittest.TestCase):
         payload = json.dumps(sanitized)
         for secret in ("hf_", "Bearer ", "ghs_", "github_pat_", "ghp_"):
             self.assertNotIn(secret, payload)
+        self.assertNotIn("abc+/def==", payload)
         self.assertIn("<unprintable Unprintable>", payload)
 
     def test_report_sanitizer_does_not_swallow_process_control(self):

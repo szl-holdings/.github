@@ -424,7 +424,7 @@ def same_origin(url: str, expected_base: str) -> bool:
 
 
 TOKEN_RE = re.compile(
-    r"(?:hf_[A-Za-z0-9]{8,}|Bearer\s+[A-Za-z0-9._~-]+|"
+    r"(?:hf_[A-Za-z0-9]{8,}|Bearer\s+[A-Za-z0-9._~+/-]+=*|"
     r"gh[oprsu]_[A-Za-z0-9_]{8,}|github_pat_[A-Za-z0-9_]{8,})",
     re.I,
 )
