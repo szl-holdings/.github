@@ -84,7 +84,19 @@ class DcoCheckTests(unittest.TestCase):
         head = self.commit(
             "fix: mismatch\n\nSigned-off-by: Different Person <other@example.com>"
         )
-        self.assert_rejected("does not match", dco.validate_range, self.repo, self.base, head)
+        self.assert_rejected(
+            "does not exactly match",
+            dco.validate_range,
+            self.repo,
+            self.base,
+            head,
+        )
+
+    def test_author_identity_comparison_is_exact(self) -> None:
+        head = self.commit(
+            "fix: exact identity\n\nSigned-off-by: series a builder <builder@example.com>"
+        )
+        self.assert_rejected("exactly match", dco.validate_range, self.repo, self.base, head)
 
     def test_malformed_and_body_only_signoffs_fail(self) -> None:
         malformed = self.commit("fix: malformed\n\nSigned-off-by: no-address")

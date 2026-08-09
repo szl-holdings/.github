@@ -21,6 +21,7 @@ COMMITS_PER_PAGE = 100
 MAX_PULL_REQUEST_COMMITS = 250
 REQUEST_TIMEOUT_SECONDS = 30
 SHA_PATTERN = re.compile(r"^[0-9a-f]{40}$")
+PATCH_DIVIDER_PATTERN = re.compile(r"^---(?:[ \t\r]|$)")
 QUEUE_REF_PREFIX = "refs/heads/gh-readonly-queue/main/"
 ALLOWED_PR_ACTIONS = {"opened", "synchronize", "reopened", "ready_for_review", "edited"}
 
@@ -39,13 +40,6 @@ EMAIL_PART_PATTERN = (
     r"\u2028\u2029\u202f\u205f\u3000]+"
 )
 SIGNED_OFF_BY_PATTERN = re.compile(
-    rf"^Signed-off-by:{HORIZONTAL_SEPARATOR_PATTERN}+{NAME_TOKEN_PATTERN}"
-    rf"(?:{HORIZONTAL_SEPARATOR_PATTERN}+{NAME_TOKEN_PATTERN})*"
-    rf"{HORIZONTAL_SEPARATOR_PATTERN}+<{EMAIL_PART_PATTERN}@"
-    rf"{EMAIL_PART_PATTERN}>{HORIZONTAL_SEPARATOR_PATTERN}*$",
-    re.IGNORECASE,
-)
-SIGNED_OFF_BY_IDENTITY_PATTERN = re.compile(
     rf"^Signed-off-by:{HORIZONTAL_SEPARATOR_PATTERN}+"
     rf"(?P<name>{NAME_TOKEN_PATTERN}(?:{HORIZONTAL_SEPARATOR_PATTERN}+"
     rf"{NAME_TOKEN_PATTERN})*){HORIZONTAL_SEPARATOR_PATTERN}+"
@@ -59,15 +53,17 @@ HORIZONTAL_ONLY_PATTERN = re.compile(
 SAFE_TRAILER_TEXT_PATTERN = (
     r"[^\x00-\x08\x0a-\x1f\x7f-\x9f\u2028\u2029]*"
 )
+TRAILER_TOKEN_PATTERN = r"-*[A-Za-z0-9][A-Za-z0-9-]*"
+TRAILER_TOKEN_FULL_PATTERN = re.compile(rf"^{TRAILER_TOKEN_PATTERN}$")
 TRAILER_LINE_PATTERN = re.compile(
-    rf"^(?P<token>[A-Za-z0-9-]+)[ \t]*:"
+    rf"^(?P<token>{TRAILER_TOKEN_PATTERN})[ \t]*:"
     rf"(?P<value>{SAFE_TRAILER_TEXT_PATTERN})$"
 )
 CONTINUATION_LINE_PATTERN = re.compile(
     rf"^{HORIZONTAL_SEPARATOR_PATTERN}+{SAFE_TRAILER_TEXT_PATTERN}$"
 )
 POTENTIAL_TRAILER_LINE_PATTERN = re.compile(
-    rf"^[A-Za-z0-9-]+(?:{HORIZONTAL_SEPARATOR_PATTERN}|"
+    rf"^{TRAILER_TOKEN_PATTERN}(?:{HORIZONTAL_SEPARATOR_PATTERN}|"
     r"[\x00-\x08\x0a-\x1f\x7f-\x9f\u2028\u2029])*:"
 )
 HORIZONTAL_PREFIX_PATTERN = re.compile(
@@ -380,6 +376,22 @@ def _is_horizontal_blank(line: str) -> bool:
     return HORIZONTAL_ONLY_PATTERN.fullmatch(line) is not None
 
 
+def _is_patch_divider(lines: list[str], index: int) -> bool:
+    """Apply the audited physical-line boundary for a Git patch divider."""
+    line = lines[index]
+    if PATCH_DIVIDER_PATTERN.match(line) is None:
+        return False
+    if line != "---":
+        return True
+
+    # split("\n") leaves one terminal empty element for a final line ending;
+    # that is not a physical line following the exact marker. Two line endings
+    # do create a following empty physical line. A terminal exact marker must
+    # remain message text so it cannot erase an invalid final postscript.
+    remaining = lines[index + 1 :]
+    return bool(remaining and remaining != [""])
+
+
 def _final_nonblank_group(message: str) -> list[str]:
     """Return the complete final nonblank group after a body boundary."""
     lines = message.split("\n")
@@ -387,12 +399,13 @@ def _final_nonblank_group(message: str) -> list[str]:
         (
             index
             for index, line in enumerate(lines)
-            if (index < len(lines) - 1 or line != "---")
-            and re.match(r"^---(?:[ \t\r]|$)", line)
+            if _is_patch_divider(lines, index)
         ),
         None,
     )
     if divider_index is not None:
+        # Git starts the patch area at the first column-zero `---` followed by
+        # space, tab, CR, or end-of-line; trailers there are not in the message.
         lines = lines[:divider_index]
     while lines and _is_horizontal_blank(lines[-1]):
         lines.pop()
@@ -474,32 +487,40 @@ def _admitted_trailer_group(
     return classified_lines
 
 
-def has_valid_dco_trailer(message: str) -> bool:
-    """Admit Git-compatible trailers, then apply stricter project DCO rules."""
+def valid_dco_identities(message: str) -> set[tuple[str, str]]:
+    """Return exact identities from a valid physical-line DCO trailer block."""
     classified_lines = _admitted_trailer_group(message)
     if classified_lines is None:
-        return False
+        return set()
 
-    found_signed_off_by = False
+    identities: set[tuple[str, str]] = set()
     current_token = None
     for line_kind, token, line in classified_lines:
         if line_kind == "body":
             current_token = None
             continue
         if line_kind in {"orphan-continuation", "malformed"}:
-            return False
+            return set()
         if line_kind == "continuation":
             if current_token is None or current_token == "signed-off-by":
-                return False
+                return set()
             continue
 
         current_token = token
         if current_token == "signed-off-by":
-            if SIGNED_OFF_BY_PATTERN.fullmatch(line) is None:
-                return False
-            found_signed_off_by = True
+            signoff_match = SIGNED_OFF_BY_PATTERN.fullmatch(line)
+            if signoff_match is None:
+                return set()
+            identities.add(
+                (signoff_match.group("name"), signoff_match.group("email"))
+            )
 
-    return found_signed_off_by
+    return identities
+
+
+def has_valid_dco_trailer(message: str) -> bool:
+    """Admit Git-compatible trailers, then apply stricter project DCO rules."""
+    return bool(valid_dco_identities(message))
 
 
 def unsigned_commit_shas(commits: list[dict[str, Any]]) -> list[str]:
@@ -515,7 +536,15 @@ def unsigned_commit_shas(commits: list[dict[str, Any]]) -> list[str]:
             raise DcoContractError(f"commit entry {index} had an invalid SHA")
         if not isinstance(commit, dict) or not isinstance(commit.get("message"), str):
             raise DcoContractError(f"commit {sha} had no valid commit message")
-        if not has_valid_dco_trailer(commit["message"]):
+        author = commit.get("author")
+        if not isinstance(author, dict):
+            raise DcoContractError(f"commit {sha} had no valid author identity")
+        author_name = author.get("name")
+        author_email = author.get("email")
+        if not isinstance(author_name, str) or not isinstance(author_email, str):
+            raise DcoContractError(f"commit {sha} had no valid author identity")
+        identities = valid_dco_identities(commit["message"])
+        if (author_name, author_email) not in identities:
             unsigned.append(sha)
 
     return unsigned
@@ -542,10 +571,6 @@ def git(
     return completed.stdout
 
 
-def normalized_identity(name: str, email: str) -> tuple[str, str]:
-    return " ".join(name.split()).casefold(), email.strip().casefold()
-
-
 def commit_record(repo: Path, sha: str) -> tuple[list[str], str, str, str]:
     require_sha(sha, "commit SHA")
     raw = git(repo, "show", "-s", "--format=%P%x00%an%x00%ae%x00%B", sha)
@@ -553,18 +578,6 @@ def commit_record(repo: Path, sha: str) -> tuple[list[str], str, str, str]:
     require(len(fields) == 4, f"commit metadata is incomplete for {sha}")
     parents = fields[0].strip().split()
     return parents, fields[1], fields[2], fields[3]
-
-
-def terminal_signoffs(repo: Path, message: str) -> list[tuple[str, str]]:
-    parsed = git(repo, "interpret-trailers", "--parse", input_text=message)
-    signoffs: list[tuple[str, str]] = []
-    for line in parsed.splitlines():
-        match = SIGNED_OFF_BY_IDENTITY_PATTERN.fullmatch(line)
-        if match is not None:
-            signoffs.append(
-                normalized_identity(match.group("name"), match.group("email"))
-            )
-    return signoffs
 
 
 def validate_commit(
@@ -579,10 +592,12 @@ def validate_commit(
         len(parents) in allowed_parent_counts,
         f"{sha} has an unsupported parent count: {len(parents)}",
     )
-    author = normalized_identity(author_name, author_email)
-    signoffs = terminal_signoffs(repo, message)
-    require(signoffs, f"{sha} has no valid terminal Signed-off-by trailer")
-    require(author in signoffs, f"{sha} Signed-off-by does not match the commit author")
+    identities = valid_dco_identities(message)
+    require(identities, f"{sha} has no valid terminal Signed-off-by trailer")
+    require(
+        (author_name, author_email) in identities,
+        f"{sha} Signed-off-by does not exactly match the commit author",
+    )
 
 
 def checked_out_head(repo: Path) -> str:
@@ -782,7 +797,7 @@ def validate_pull_request_target(
     expected_base_sha: str | None = None,
     expected_head_sha: str | None = None,
 ) -> int:
-    require(payload.get("action") in ALLOWED_PR_ACTIONS, "pull_request_target action is unsupported")
+    require(payload.get("action") in ALLOWED_PR_ACTIONS, "pull-request action is unsupported")
     require(
         isinstance(payload.get("repository"), dict)
         and payload["repository"].get("full_name") == repository,
@@ -862,7 +877,7 @@ def main() -> int:
         repository = _required_environment("GITHUB_REPOSITORY")
         repo = args.repo_root.resolve()
 
-        if event_name == "pull_request_target":
+        if event_name in {"pull_request_target", "pull_request"}:
             count = validate_pull_request_target(
                 repo,
                 payload,

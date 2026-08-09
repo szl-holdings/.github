@@ -1,4 +1,4 @@
-name: DCO
+name: Native DCO enforcement
 
 on:
   push:
@@ -18,7 +18,7 @@ permissions:
 
 jobs:
   dco:
-    name: DCO sign-off check
+    name: Native DCO enforcement
     if: github.event_name != 'pull_request_target' || github.event.action != 'closed'
     concurrency:
       group: dco-${{ github.event_name == 'pull_request_target' && format('head-{0}', github.event.pull_request.head.sha) || github.sha }}
@@ -70,6 +70,13 @@ jobs:
         run: |
           set -euo pipefail
           test "$(git -C "$GITHUB_WORKSPACE/trusted" rev-parse HEAD)" = "$EXPECTED_TRUSTED_SHA"
+
+      - name: Run strict real-commit DCO self-tests
+        run: |
+          set -euo pipefail
+          python "$GITHUB_WORKSPACE/trusted/.github/scripts/test_dco_check.py"
+          python "$GITHUB_WORKSPACE/trusted/.github/scripts/test_dco_events.py"
+          python "$GITHUB_WORKSPACE/trusted/.github/scripts/test_dco_activation.py"
 
       - name: Import current protected base into candidate graph
         if: github.event_name == 'pull_request_target'
