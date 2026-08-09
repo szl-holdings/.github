@@ -30,6 +30,10 @@ STAGING_STATUS = {
     "context": "deploy/staging",
     "integration_id": 15368,
 }
+DCO_STATUS = {
+    "context": "DCO sign-off check",
+    "integration_id": 15368,
+}
 COMMIT_MESSAGE_PATTERN = (
     r"^(feat|fix|docs|chore|refactor|test|perf|build|ci|revert)"
     r"(\([a-z0-9._/-]+\))?!?: [^\r\n]{1,100}(\r?\n(.|\r|\n)*)?$"
@@ -59,8 +63,9 @@ FORBIDDEN_EXECUTABLE_PATTERNS = {
 }
 
 ATTESTOR_SELF_EDIT_GUARD = (
-    r"^(\.github/workflows/(attest-and-approve|gates|forge9-staging|merge-queue-enqueue)"
-    r"\.ya?ml|\.governance/)"
+    r"^(\.github/workflows/(attest-and-approve|dco|gates|forge9-staging|"
+    r"merge-queue-enqueue)\.ya?ml|\.github/scripts/(dco_check|test_dco_check)\.py|"
+    r"\.governance/)"
 )
 GOVERNED_BASE_FILTER = (
     '.base.ref == "main"\n'
@@ -145,10 +150,10 @@ def verify_ruleset() -> None:
     contexts = [
         item.get("context") for item in required if isinstance(item, dict)
     ]
-    if contexts != GATES + [STAGING_STATUS["context"]]:
-        fail("main required checks must contain the gates and staging")
-    if required[-1:] != [STAGING_STATUS]:
-        fail("main staging check must be pinned to GitHub Actions")
+    if contexts != GATES + [STAGING_STATUS["context"], DCO_STATUS["context"]]:
+        fail("main required checks must contain the gates, staging, and DCO")
+    if required[-2:] != [STAGING_STATUS, DCO_STATUS]:
+        fail("main staging and DCO checks must be pinned to GitHub Actions")
     if ATTESTATION_STATUS in required:
         fail(
             "main must not require the workflow-run attestation status because "
@@ -216,6 +221,39 @@ def verify_gate_contract() -> None:
     if not (ROOT / ".github/workflows/forge9-staging.yml").is_file():
         fail("the staging deployment workflow is not active")
 
+    dco_template = (ROOT / ".github/workflows/dco.yml").read_text(encoding="utf-8")
+    for marker in (
+        "pull_request_target:",
+        "merge_group:",
+        "types: [checks_requested]",
+        "persist-credentials: false",
+        "github.event.pull_request.base.sha",
+        "github.event.pull_request.head.sha",
+        ".github/scripts/dco_check.py",
+    ):
+        if marker not in dco_template:
+            fail(f"trusted DCO workflow is missing {marker!r}")
+    if "\n  pull_request:\n" in dco_template:
+        fail("DCO must not execute PR-controlled code under pull_request")
+    if "workflow_dispatch:" in dco_template:
+        fail("DCO must not publish a manual false-green status")
+    if "github.event_name != 'pull_request'" in dco_template:
+        fail("DCO merge-group and push validation must not use a fallback pass")
+    dco_source = (ROOT / ".github/scripts/dco_check.py").read_text(encoding="utf-8")
+    for marker in (
+        'payload.get("action") == "checks_requested"',
+        'group.get("base_ref") == "refs/heads/main"',
+        'group.get("base_sha")',
+        'group.get("head_sha")',
+        "checked_out_head(repo) == head_sha",
+        '"merge-base", "--is-ancestor"',
+        '"interpret-trailers", "--parse"',
+        "Signed-off-by does not match the commit author",
+        "pull-request commit count changed during validation",
+    ):
+        if marker not in dco_source:
+            fail(f"trusted DCO checker is missing {marker!r}")
+
     attestor_template = (
         ROOT / ".github/workflows/attest-and-approve.yml"
     ).read_text(encoding="utf-8")
@@ -229,8 +267,12 @@ def verify_gate_contract() -> None:
         ".github/workflows/gates.yaml",
         ".github/workflows/forge9-staging.yml",
         ".github/workflows/forge9-staging.yaml",
+        ".github/workflows/dco.yml",
+        ".github/workflows/dco.yaml",
         ".github/workflows/merge-queue-enqueue.yml",
         ".github/workflows/merge-queue-enqueue.yaml",
+        ".github/scripts/dco_check.py",
+        ".github/scripts/test_dco_check.py",
         ".governance/gates.json",
     )
     for path in guarded_paths:
@@ -409,10 +451,11 @@ def verify_gate_contract() -> None:
     if release_contexts != GATES + [
         STAGING_STATUS["context"],
         ATTESTATION_STATUS["context"],
+        DCO_STATUS["context"],
     ]:
-        fail("release checks must contain gates, staging, and attestation")
-    if release_required[-2:] != [STAGING_STATUS, ATTESTATION_STATUS]:
-        fail("release staging and attestation checks must be App-pinned")
+        fail("release checks must contain gates, staging, attestation, and DCO")
+    if release_required[-3:] != [STAGING_STATUS, ATTESTATION_STATUS, DCO_STATUS]:
+        fail("release staging, attestation, and DCO checks must be App-pinned")
     if any(
         item.get("type") == "required_deployments"
         for item in typed_release_rules
@@ -434,6 +477,15 @@ def verify_legacy_paths_removed() -> None:
                 continue
             text = path.read_text(encoding="utf-8", errors="replace")
             for label, pattern in FORBIDDEN_EXECUTABLE_PATTERNS.items():
+                if (
+                    label == "privileged pull request trigger"
+                    and path
+                    in {
+                        ROOT / ".github/workflows/dco.yml",
+                        ROOT / ".github/scripts/test_dco_check.py",
+                    }
+                ):
+                    continue
                 if pattern.search(text):
                     fail(f"{path.relative_to(ROOT)} contains {label}")
 

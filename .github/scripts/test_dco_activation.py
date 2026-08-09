@@ -1,0 +1,90 @@
+#!/usr/bin/env python3
+"""Static contract for activating the trusted multi-event DCO workflow."""
+
+from pathlib import Path
+import unittest
+
+
+class DcoActivationWorkflowTests(unittest.TestCase):
+    def test_workflow_static_contract(self) -> None:
+        workflow = (
+            Path(__file__).resolve().parents[1] / "workflows" / "dco.yml"
+        ).read_text(encoding="utf-8")
+        for marker in (
+            "pull_request" + "_target:",
+            "- main",
+            "- 'release/*'",
+            "types: [opened, synchronize, reopened, ready_for_review, edited, closed]",
+            "concurrency:",
+            "github.event.pull_request.head.sha",
+            "cancel-in-progress: true",
+            "Reconcile surviving DCO status",
+            "github.event.before",
+            "AFFECTED_HEAD_SHA:",
+            "reconcile-candidate",
+            "reconcile-base",
+            "reconcile-trusted",
+            "dco-reconcile-event.json",
+            "DCO reconciliation in progress",
+            "Finalize pull-request DCO failure",
+            "steps.validate_pr.outputs.published",
+            "DCO workflow setup failed",
+            "Finalize reconciliation failure",
+            "steps.validate_reconciliation.outputs.published",
+            "DCO reconciliation setup failed",
+            "always()",
+            "merge_" + "group:",
+            "types: [checks_requested]",
+            "persist-credentials: false",
+            "format('refs/pull/{0}/head', github.event.pull_request.number)",
+            "github.event.pull_request.base.sha",
+            "github.event.pull_request.head.sha",
+            "EXPECTED_BASE_SHA:",
+            "EXPECTED_HEAD_SHA:",
+            "statuses: write",
+            "statuses/$EXPECTED_HEAD_SHA",
+            'state="pending"',
+            'state="failure"',
+            'exit "$dco_exit"',
+            "github.workflow_sha",
+            "EXPECTED_TRUSTED_SHA:",
+            "rev-parse HEAD",
+            "path: protected-base",
+            "EXPECTED_BASE_REF:",
+            'current_pr="$(gh api',
+            "--paginate --slurp",
+            'governed_pr_numbers="$(',
+            'shared_head=false',
+            'revalidation_error=false',
+            'current_tuple="$(',
+            'description="DCO live revalidation failed"',
+            'description="DCO head is shared by governed PRs"',
+            'description="DCO event is stale"',
+            "git -C \"$GITHUB_WORKSPACE/candidate\" fetch",
+            "trusted/.github/scripts/dco_check.py",
+        ):
+            self.assertIn(marker, workflow)
+        checker = (Path(__file__).resolve().parent / "dco_check.py").read_text(
+            encoding="utf-8"
+        )
+        for marker in (
+            'group.get("base_sha")',
+            'group.get("head_sha")',
+            '"merge-base", "--is-ancestor"',
+            '"interpret-trailers", "--parse"',
+        ):
+            self.assertIn(marker, checker)
+        self.assertNotIn("\n  pull_request:\n", workflow)
+        self.assertNotIn("workflow_" + "dispatch:", workflow)
+        self.assertNotIn("github.event_name != 'pull_request'", workflow)
+        release_ruleset = (
+            Path(__file__).resolve().parents[2]
+            / ".governance"
+            / "ruleset-release.json"
+        ).read_text(encoding="utf-8")
+        self.assertIn('"context": "DCO sign-off check"', release_ruleset)
+        self.assertIn('"integration_id": 15368', release_ruleset)
+
+
+if __name__ == "__main__":
+    unittest.main()

@@ -215,6 +215,132 @@ class StaticSpaceDeployTests(unittest.TestCase):
         index_row = next(row for row in rows if row["path"] == "index.html")
         self.assertFalse(index_row["matches"])
 
+    def test_hf_bootstrap_contract_requires_exact_hash(self):
+        contract = json.loads(self.manifest.read_text(encoding="utf-8"))
+        contract["runtime_transforms"] = {
+            "index.html": {"mode": "hf_bootstrap_injected"}
+        }
+        self.manifest.write_text(json.dumps(contract), encoding="utf-8")
+
+        with self.assertRaisesRegex(
+            deploy.ContractError, "expected_bootstrap_sha256"
+        ):
+            deploy.load_contract(self.root, self.manifest)
+
+    def test_hf_bootstrap_canonicalization_is_exact_and_preserves_source_bytes(self):
+        bootstrap = (
+            b'<script>window.huggingface={variables:{'
+            b'"SPACE_CREATOR_USER_ID":"69ec7d565e5561c3b16baba8"'
+            b'}};</script>'
+        )
+        bootstrap_sha256 = deploy.sha256_bytes(bootstrap)
+        policy = {
+            "mode": "hf_bootstrap_injected",
+            "variables": {
+                "SPACE_CREATOR_USER_ID": "69ec7d565e5561c3b16baba8"
+            },
+            "expected_bootstrap_sha256": bootstrap_sha256,
+        }
+
+        for separator in (b"\n", b"\r\n", b""):
+            with self.subTest(separator=separator):
+                source = b"<head>" + separator + b"<meta>"
+                served = source.replace(b"<head>", b"<head>" + bootstrap, 1)
+                self.assertEqual(
+                    deploy.canonicalize_hf_bootstrap(
+                        served, policy
+                    ),
+                    source,
+                )
+
+        rejected = (
+            b'<script>window.huggingface={variables:{}};</script>',
+            b'<script>window.huggingface={variables:{"EVIL":"HOSTILE"}};</script>',
+            b'<script>window.huggingface={variables:{'
+            b'"SPACE_CREATOR_USER_ID":"wrong"}};</script>',
+            b'<script>window.huggingface={variables:{'
+            b'"SPACE_CREATOR_USER_ID":"69ec7d565e5561c3b16baba8",'
+            b'"SPACE_CREATOR_USER_ID":"69ec7d565e5561c3b16baba8"}};</script>',
+            b'<script> window.huggingface={variables:{'
+            b'"SPACE_CREATOR_USER_ID":"69ec7d565e5561c3b16baba8"}};</script>',
+        )
+        for hostile in rejected:
+            with self.subTest(hostile=hostile):
+                self.assertIsNone(
+                    deploy.canonicalize_hf_bootstrap(
+                        b"<head>" + hostile + b"\n<meta>",
+                        policy,
+                    )
+                )
+
+        self.assertIsNone(
+            deploy.canonicalize_hf_bootstrap(
+                b"<head>" + bootstrap + bootstrap + b"\n<meta>",
+                policy,
+            )
+        )
+
+    def test_hf_bootstrap_readback_requires_manifest_bound_bytes(self):
+        bootstrap = (
+            b'<script>window.huggingface={variables:{'
+            b'"SPACE_CREATOR_USER_ID":"69ec7d565e5561c3b16baba8"'
+            b'}};</script>'
+        )
+        bootstrap_sha256 = deploy.sha256_bytes(bootstrap)
+        index_path = self.root / "src" / "index.html"
+        index_path.write_bytes(b"<head>\n<meta>\n")
+        _, files = deploy.load_contract(self.root, self.manifest)
+        expected = {item.destination: item.source.read_bytes() for item in files}
+        transforms = {
+            "index.html": {
+                "mode": "hf_bootstrap_injected",
+                "variables": {
+                    "SPACE_CREATOR_USER_ID": "69ec7d565e5561c3b16baba8"
+                },
+                "expected_bootstrap_sha256": bootstrap_sha256,
+            }
+        }
+
+        def injected_fetch(url, max_bytes=0):
+            path = url.removeprefix("https://example.hf.space/")
+            data = expected[path]
+            if path == "index.html":
+                data = data.replace(b"<head>", b"<head>" + bootstrap, 1)
+            return 200, data, url
+
+        with mock.patch.object(deploy, "fetch", side_effect=injected_fetch):
+            matches, rows = deploy.verify_served_files(
+                "https://example.hf.space", files, transforms
+            )
+        self.assertTrue(matches)
+        index_row = next(row for row in rows if row["path"] == "index.html")
+        self.assertTrue(index_row["same_origin"])
+        self.assertEqual(
+            index_row["canonical_sha256"],
+            deploy.sha256_bytes(expected["index.html"]),
+        )
+        self.assertEqual(index_row["canonical_size"], len(expected["index.html"]))
+
+        hostile = (
+            b'<script>window.huggingface={variables:'
+            b'{"EVIL":"HOSTILE"}};</script>'
+        )
+        with mock.patch.object(
+            deploy,
+            "fetch",
+            side_effect=lambda url, max_bytes=0: (
+                200,
+                expected[url.removeprefix("https://example.hf.space/")].replace(
+                    b"<head>", b"<head>" + hostile, 1
+                ),
+                url,
+            ),
+        ):
+            matches, _ = deploy.verify_served_files(
+                "https://example.hf.space", files, transforms
+            )
+        self.assertFalse(matches)
+
     def test_served_file_redirect_or_fetch_error_fails_closed(self):
         _, files = deploy.load_contract(self.root, self.manifest)
 
@@ -303,6 +429,15 @@ class StaticSpaceDeployTests(unittest.TestCase):
         )
         with self.assertRaisesRegex(deploy.ContractError, "escapes output root"):
             deploy.materialize(self.root / "contained-preview", [unsafe], {})
+
+    def test_materialize_refuses_source_changed_after_contract_load(self):
+        contract, files = deploy.load_contract(self.root, self.manifest)
+        deployment = deploy.build_deployment(
+            contract, files, "a" * 40, "2026-08-01T00:00:00Z"
+        )
+        (self.root / "src" / "README.md").write_text("changed\n", encoding="utf-8")
+        with self.assertRaisesRegex(deploy.ContractError, "changed after"):
+            deploy.materialize(self.root / "changed-preview", files, deployment)
 
     def test_post_commit_timeout_preserves_remote_mutation_evidence(self):
         contract, files = deploy.load_contract(self.root, self.manifest)
@@ -521,6 +656,97 @@ class StaticSpaceDeployTests(unittest.TestCase):
         result = json.loads(report.read_text(encoding="utf-8"))
         self.assertEqual(result["state"], "FAILED")
         self.assertIn("HF_TOKEN is required", result["error"])
+
+    def test_manifest_rejects_duplicate_unknown_and_nonfinite_json(self):
+        original = self.manifest.read_text(encoding="utf-8")
+        self.manifest.write_text(
+            original.replace('"schema":', '"schema":"duplicate","schema":', 1),
+            encoding="utf-8",
+        )
+        with self.assertRaisesRegex(deploy.ContractError, "duplicate JSON key"):
+            deploy.load_contract(self.root, self.manifest)
+
+        self.write_manifest()
+        contract = json.loads(self.manifest.read_text(encoding="utf-8"))
+        contract["unknown"] = True
+        self.manifest.write_text(json.dumps(contract), encoding="utf-8")
+        with self.assertRaisesRegex(deploy.ContractError, "unknown keys"):
+            deploy.load_contract(self.root, self.manifest)
+
+        self.write_manifest()
+        self.manifest.write_text(
+            self.manifest.read_text(encoding="utf-8").replace(
+                '"prune": true', '"prune": NaN'
+            ),
+            encoding="utf-8",
+        )
+        with self.assertRaisesRegex(deploy.ContractError, "non-finite"):
+            deploy.load_contract(self.root, self.manifest)
+
+    def test_report_sanitizes_nested_github_and_huggingface_credentials(self):
+        class Unprintable:
+            def __str__(self):
+                raise RuntimeError("ghp_should_never_escape")
+
+        sanitized = deploy.sanitize_report(
+            {
+                "one": "hf_abcdefghijklmnopqrstuvwxyz",
+                "two": ["Bearer abc+/def==", "ghs_abcdefghijklmnopqrstuvwxyz"],
+                "three": {
+                    "token": "github_pat_abcdefghijklmnopqrstuvwxyz",
+                    "value": Unprintable(),
+                },
+            }
+        )
+        payload = json.dumps(sanitized)
+        for secret in ("hf_", "Bearer ", "ghs_", "github_pat_", "ghp_"):
+            self.assertNotIn(secret, payload)
+        self.assertNotIn("abc+/def==", payload)
+        self.assertIn("<unprintable Unprintable>", payload)
+
+    def test_report_sanitizer_does_not_swallow_process_control(self):
+        class Interrupting:
+            def __str__(self):
+                raise KeyboardInterrupt()
+
+        with self.assertRaises(KeyboardInterrupt):
+            deploy.safe_text(Interrupting())
+
+    def test_readback_preserves_error_when_exception_string_is_hostile(self):
+        class HostileError(Exception):
+            def __str__(self):
+                raise RuntimeError("ghp_should_never_escape")
+
+        target = deploy.ExpectedReadback("index.html", "0" * 64, 1)
+        with mock.patch.object(deploy, "fetch", side_effect=HostileError()):
+            result = deploy._readback_result(
+                target,
+                "https://example.hf.space/index.html",
+                "runtime_exact",
+                "https://example.hf.space",
+            )
+        self.assertIn("<unprintable HostileError>", result["error"])
+
+    def test_production_manifest_binds_exact_reviewed_bootstrap(self):
+        repo_root = Path(__file__).resolve().parents[2]
+        contract, _ = deploy.load_contract(
+            repo_root, repo_root / "huggingface" / "org-card.manifest.json"
+        )
+        policy = contract["runtime_transforms"]["index.html"]
+        bootstrap = deploy.hf_bootstrap_bytes(policy)
+        self.assertEqual(
+            bootstrap,
+            (
+                b'<script>window.huggingface={variables:{'
+                b'"SPACE_CREATOR_USER_ID":"69ec7d565e5561c3b16baba8"'
+                b'}};</script>'
+            ),
+        )
+        self.assertEqual(len(bootstrap), 101)
+        self.assertEqual(
+            deploy.sha256_bytes(bootstrap),
+            "7792f93053b55830155c4f95b656b36323482e646e55aea2979d228c7f290c0c",
+        )
 
 
 if __name__ == "__main__":

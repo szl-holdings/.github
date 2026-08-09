@@ -53,6 +53,16 @@ def run_queue_controller_contract() -> None:
         fail("the trusted merge-queue controller contract failed")
 
 
+def run_dco_contract() -> None:
+    completed = subprocess.run(
+        [sys.executable, ".github/scripts/test_dco_check.py"],
+        cwd=ROOT,
+        check=False,
+    )
+    if completed.returncode:
+        fail("the trusted DCO event and history contract failed")
+
+
 def ground_truth() -> None:
     ruleset = load_json(".governance/ruleset-main.json")
     if ruleset.get("name") != "forge9-main":
@@ -156,13 +166,17 @@ def schema() -> None:
 
 def adversarial() -> None:
     run_verifier()
+    run_dco_contract()
 
 
 def verify_all() -> None:
     run_verifier()
     run_queue_controller_contract()
+    run_dco_contract()
     for relative in (
+        ".github/scripts/dco_check.py",
         ".github/scripts/run_forge9_gate.py",
+        ".github/scripts/test_dco_check.py",
         ".github/scripts/test_merge_queue_enqueue.py",
         ".github/scripts/verify_forge9_governance.py",
         ".governance/forge9_gate_runner.py",
