@@ -106,8 +106,18 @@ def materialize_source_revision_file(repo_root, requested_path, source_sha):
             "lowercase 40-character SHA"
         )
     rel = normalize_repo_path(requested_path, label="source revision file")
+    if rel == "Dockerfile":
+        raise DeployContractError(
+            "source revision file collides with reserved Hugging Face "
+            "Dockerfile target"
+        )
     root = os.path.realpath(repo_root)
-    full = os.path.realpath(os.path.join(root, *rel.split("/")))
+    requested_full = os.path.join(root, *rel.split("/"))
+    if os.path.lexists(requested_full):
+        raise DeployContractError(
+            f"source revision file must not already exist: {rel!r}"
+        )
+    full = os.path.realpath(requested_full)
     try:
         contained = os.path.commonpath((root, full)) == root
     except ValueError:
@@ -115,10 +125,6 @@ def materialize_source_revision_file(repo_root, requested_path, source_sha):
     if not contained:
         raise DeployContractError(
             f"source revision file escapes the repository root: {rel!r}"
-        )
-    if os.path.lexists(full):
-        raise DeployContractError(
-            f"source revision file must not already exist: {rel!r}"
         )
     parent = os.path.dirname(full)
     if not os.path.isdir(parent):

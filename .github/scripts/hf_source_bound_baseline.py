@@ -10,9 +10,10 @@ identity planes:
 * Dockerfile-managed bytes can be compared at those two immutable revisions.
 
 This verifier observes both live planes more than once with cache bypass, requires
-stable exact values, proves the observed Git source is an ancestor of the pull
-request base, compares the exact deployed pair without an allowlist, and reports
-the candidate's managed-file delta without deploying it. It performs no mutation.
+stable exact values, proves the observed Git source is either an ancestor of the
+pull request base or the exact pull request candidate after controlled deployment,
+compares the exact deployed pair without an allowlist, and reports the candidate's
+managed-file delta without deploying it. It performs no mutation.
 """
 from __future__ import annotations
 
@@ -305,10 +306,16 @@ def source_bound_baseline_compare(args: argparse.Namespace):
         )
     ancestry_status = None
     if drift.FULL_SHA_RE.fullmatch(source_sha) is not None:
-        is_ancestor, ancestry_status = drift.github_ref_is_ancestor(
-            args.github_repo, source_sha, trusted_base_ref
+        source_matches_candidate = bool(
+            candidate_ref and source_sha == candidate_ref
         )
-        if not is_ancestor:
+        if source_matches_candidate:
+            ancestry_status = "exact-candidate"
+        else:
+            is_ancestor, ancestry_status = drift.github_ref_is_ancestor(
+                args.github_repo, source_sha, trusted_base_ref
+            )
+        if not source_matches_candidate and not is_ancestor:
             contract_errors.append(
                 {
                     "path": "(source-probe)",
@@ -316,9 +323,10 @@ def source_bound_baseline_compare(args: argparse.Namespace):
                     "severity": "error",
                     "observed_source_sha": source_sha,
                     "trusted_base_ref": trusted_base_ref,
+                    "candidate_ref": candidate_ref or None,
                     "detail": (
-                        "live build-info source is not an ancestor of the exact pull "
-                        "request base"
+                        "live build-info source is neither an ancestor of the exact "
+                        "pull request base nor the exact pull request candidate"
                     ),
                 }
             )

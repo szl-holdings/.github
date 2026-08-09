@@ -68,6 +68,11 @@ on:
         required: false
         type: boolean
         default: false
+      contract-only:
+        description: "Run only the non-secret exact-source workflow_call witness; never publish."
+        required: false
+        type: boolean
+        default: false
     secrets:
       HF_TOKEN:
         description: "HF write token with organization write access to the target Space."
@@ -79,6 +84,7 @@ permissions:
 jobs:
   hf-deploy:
     name: Deploy derived COPY set, bind source, and attest live state
+    if: ${{ inputs.contract-only == false }}
     runs-on: ubuntu-latest
     timeout-minutes: 30
     concurrency:
@@ -101,22 +107,63 @@ jobs:
       - name: Checkout exact reusable-workflow revision
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          repository: szl-holdings/.github
-          ref: ${{ github.job_workflow_sha }}
+          repository: ${{ job.workflow_repository }}
+          ref: ${{ job.workflow_sha }}
           path: tools
           persist-credentials: false
           fetch-depth: 1
 
+      - name: Assert exact reusable-workflow tools revision
+        shell: bash
+        env:
+          WORKFLOW_REPOSITORY: ${{ job.workflow_repository }}
+          EXPECTED_TOOLS_SHA: ${{ job.workflow_sha }}
+        run: |
+          set -euo pipefail
+          if [[ ! "$EXPECTED_TOOLS_SHA" =~ ^[0-9a-f]{40}$ ]]; then
+            echo "::error::job.workflow_sha is not an exact 40-character commit SHA: $EXPECTED_TOOLS_SHA"
+            exit 2
+          fi
+          ACTUAL_TOOLS_SHA="$(git -C tools rev-parse --verify HEAD)"
+          if [[ ! "$ACTUAL_TOOLS_SHA" =~ ^[0-9a-f]{40}$ ]]; then
+            echo "::error::Checked-out tools HEAD is not an exact 40-character commit SHA: $ACTUAL_TOOLS_SHA"
+            exit 2
+          fi
+          if [ "$ACTUAL_TOOLS_SHA" != "$EXPECTED_TOOLS_SHA" ]; then
+            echo "::error::Reusable-workflow tools mismatch: expected $EXPECTED_TOOLS_SHA, found $ACTUAL_TOOLS_SHA"
+            exit 2
+          fi
+          printf 'job.workflow_repository=%s\n' "$WORKFLOW_REPOSITORY"
+          printf 'job.workflow_sha=%s\n' "$EXPECTED_TOOLS_SHA"
+          printf 'checked_out_tools_head=%s\n' "$ACTUAL_TOOLS_SHA"
+
       - name: Set up Python
         uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
-          python-version: "3.12"
+          python-version: "3.12.10"
 
-      - name: Install exact supported deployment clients
+      - name: Create fresh publisher virtual environment
+        shell: bash
+        run: |
+          set -euo pipefail
+          VENV="$RUNNER_TEMP/hf-publisher-venv"
+          if [ -e "$VENV" ]; then
+            echo '::error::Refusing preexisting publisher virtual environment.'
+            exit 2
+          fi
+          python3 -m venv "$VENV"
+          ACTUAL_VERSION="$("$VENV/bin/python" -I -P -c 'import platform; print(platform.python_version())')"
+          if [ "$ACTUAL_VERSION" != "3.12.10" ]; then
+            echo "::error::Expected publisher Python 3.12.10, found $ACTUAL_VERSION."
+            exit 2
+          fi
+
+      - name: Install hash-locked deployment client closure
+        shell: bash
         run: >-
-          python -m pip install --disable-pip-version-check
-          "huggingface_hub==1.19.0"
-          "requests==2.32.5"
+          "$RUNNER_TEMP/hf-publisher-venv/bin/python" -I -P -m pip install
+          --disable-pip-version-check --require-hashes --only-binary=:all:
+          --ignore-installed -r tools/requirements/hf-publisher.lock
 
       - name: Resolve target and exact checked-out source
         id: hf
@@ -183,7 +230,7 @@ jobs:
           if [ -n "$SOURCE_REVISION_FILE" ]; then
             SOURCE_REVISION_ARGS+=(--source-revision-file "$SOURCE_REVISION_FILE")
           fi
-          python3 tools/.github/scripts/hf_deploy_from_dockerfile.py \
+          "$RUNNER_TEMP/hf-publisher-venv/bin/python" -I -P tools/.github/scripts/hf_deploy_from_dockerfile.py \
             --repo-root caller \
             --github-repo "$GH_REPO" \
             --hf-repo "$HF_REPO" \
@@ -207,7 +254,7 @@ jobs:
           SOURCE_REVISION_PROBE_PATH: ${{ inputs.source-revision-probe-path }}
         run: |
           set -euo pipefail
-          python3 tools/.github/scripts/hf_space_source_binding.py \
+          "$RUNNER_TEMP/hf-publisher-venv/bin/python" -I -P tools/.github/scripts/hf_space_source_binding.py \
             --mode bind \
             --repo-id "$HF_REPO" \
             --variable "$SOURCE_REVISION_VARIABLE" \
@@ -222,7 +269,7 @@ jobs:
           HF_REPO: ${{ steps.hf.outputs.hf_repo }}
         run: |
           set -euo pipefail
-          python3 tools/.github/scripts/hf_deploy_from_dockerfile.py \
+          "$RUNNER_TEMP/hf-publisher-venv/bin/python" -I -P tools/.github/scripts/hf_deploy_from_dockerfile.py \
             --restart-space \
             --manifest hf-deploy-manifest.json \
             --hf-repo "$HF_REPO"
@@ -234,7 +281,7 @@ jobs:
           WAIT_RUNNING: ${{ inputs.wait-running }}
         run: |
           set -euo pipefail
-          python3 tools/.github/scripts/hf_deploy_from_dockerfile.py \
+          "$RUNNER_TEMP/hf-publisher-venv/bin/python" -I -P tools/.github/scripts/hf_deploy_from_dockerfile.py \
             --attest \
             --manifest hf-deploy-manifest.json \
             --hf-repo "$HF_REPO" \
@@ -250,7 +297,7 @@ jobs:
           SOURCE_REVISION_PROBE_PATH: ${{ inputs.source-revision-probe-path }}
         run: |
           set -euo pipefail
-          python3 tools/.github/scripts/hf_space_source_binding.py \
+          "$RUNNER_TEMP/hf-publisher-venv/bin/python" -I -P tools/.github/scripts/hf_space_source_binding.py \
             --mode verify \
             --repo-id "$HF_REPO" \
             --variable "$SOURCE_REVISION_VARIABLE" \
@@ -269,3 +316,54 @@ jobs:
             hf-source-binding-verify.json
           if-no-files-found: warn
           retention-days: 90
+
+  exact-source-contract:
+    name: Reusable publisher exact-source witness
+    if: ${{ inputs.contract-only == true }}
+    permissions:
+      contents: read
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout called reusable-workflow revision
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: ${{ job.workflow_repository }}
+          ref: ${{ job.workflow_sha }}
+          path: tools
+          persist-credentials: false
+          fetch-depth: 1
+
+      - name: Assert exact called-workflow source
+        shell: bash
+        env:
+          WORKFLOW_REPOSITORY: ${{ job.workflow_repository }}
+          EXPECTED_WORKFLOW_SHA: ${{ job.workflow_sha }}
+          EXPECTED_EVENT_SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          if [[ ! "$EXPECTED_WORKFLOW_SHA" =~ ^[0-9a-f]{40}$ ]]; then
+            echo "::error::job.workflow_sha is not an exact 40-character commit SHA: $EXPECTED_WORKFLOW_SHA"
+            exit 2
+          fi
+          ACTUAL_TOOLS_SHA="$(git -C tools rev-parse --verify HEAD)"
+          if [[ ! "$ACTUAL_TOOLS_SHA" =~ ^[0-9a-f]{40}$ ]]; then
+            echo "::error::Checked-out tools HEAD is not an exact 40-character commit SHA: $ACTUAL_TOOLS_SHA"
+            exit 2
+          fi
+          if [ "$ACTUAL_TOOLS_SHA" != "$EXPECTED_WORKFLOW_SHA" ]; then
+            echo "::error::Called-workflow source mismatch: expected $EXPECTED_WORKFLOW_SHA, found $ACTUAL_TOOLS_SHA"
+            exit 2
+          fi
+          if [[ ! "$EXPECTED_EVENT_SHA" =~ ^[0-9a-f]{40}$ ]]; then
+            echo "::error::github.sha is not an exact 40-character commit SHA: $EXPECTED_EVENT_SHA"
+            exit 2
+          fi
+          if [ "$EXPECTED_WORKFLOW_SHA" != "$EXPECTED_EVENT_SHA" ]; then
+            echo "::error::Called workflow is not the exact event head: workflow $EXPECTED_WORKFLOW_SHA, event $EXPECTED_EVENT_SHA"
+            exit 2
+          fi
+          printf 'job.workflow_repository=%s\n' "$WORKFLOW_REPOSITORY"
+          printf 'job.workflow_sha=%s\n' "$EXPECTED_WORKFLOW_SHA"
+          printf 'github.sha=%s\n' "$EXPECTED_EVENT_SHA"
+          printf 'checked_out_tools_head=%s\n' "$ACTUAL_TOOLS_SHA"

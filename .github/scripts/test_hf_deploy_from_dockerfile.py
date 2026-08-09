@@ -295,6 +295,33 @@ class TestDeriveReadmePolicy(unittest.TestCase):
                 source_sha="a" * 40,
             )
 
+    def test_generated_source_revision_rejects_dockerfile_target_collision(self):
+        with self.assertRaisesRegex(
+            dep.DeployContractError, "reserved Hugging Face Dockerfile target"
+        ):
+            self._derive(
+                "FROM scratch\nCOPY Dockerfile /app/SOURCE_REVISION\n",
+                {"space/app.py": "pass\n"},
+                include_readme=False,
+                dockerfile_path="space/Dockerfile",
+                source_revision_file="Dockerfile",
+                source_sha="a" * 40,
+            )
+
+    def test_generated_source_revision_rejects_dangling_symlink(self):
+        with tempfile.TemporaryDirectory() as repo_root:
+            os.makedirs(os.path.join(repo_root, "space"))
+            os.makedirs(os.path.join(repo_root, ".git", "objects"))
+            requested = os.path.join(repo_root, "space", "SOURCE_REVISION")
+            escaped = os.path.join(repo_root, ".git", "objects", "revision")
+            os.symlink(os.path.join("..", ".git", "objects", "revision"), requested)
+
+            with self.assertRaisesRegex(dep.DeployContractError, "already exist"):
+                dep.materialize_source_revision_file(
+                    repo_root, "space/SOURCE_REVISION", "a" * 40
+                )
+            self.assertFalse(os.path.exists(escaped))
+
     def test_manifest_smoke_paths_default_to_root(self):
         manifest, _ = self._derive(
             "FROM scratch\nCOPY app.py /app/app.py\n",
@@ -616,14 +643,21 @@ class TestReusableWorkflowContract(unittest.TestCase):
 
     def test_shared_deployer_checkout_is_exact_reusable_revision(self):
         # The reusable workflow must checkout ITS OWN reviewed revision --
-        # github.job_workflow_sha is the documented context for that; the
-        # job.workflow_* forms do not exist and resolve empty.
-        self.assertIn("repository: szl-holdings/.github", self.workflow)
-        self.assertIn("ref: ${{ github.job_workflow_sha }}", self.workflow)
-        self.assertNotIn("${{ job.workflow_repository }}", self.workflow)
-        self.assertNotIn("${{ job.workflow_sha }}", self.workflow)
+        # the called-workflow identity is supplied by the documented job
+        # context and the checked-out commit must be asserted byte-for-byte.
+        self.assertNotIn("github.job_workflow_sha", self.workflow)
+        self.assertIn("repository: ${{ job.workflow_repository }}", self.workflow)
+        self.assertIn("ref: ${{ job.workflow_sha }}", self.workflow)
+        self.assertIn("EXPECTED_TOOLS_SHA: ${{ job.workflow_sha }}", self.workflow)
+        self.assertIn(
+            'ACTUAL_TOOLS_SHA="$(git -C tools rev-parse --verify HEAD)"',
+            self.workflow,
+        )
+        self.assertIn(
+            '[ "$ACTUAL_TOOLS_SHA" != "$EXPECTED_TOOLS_SHA" ]',
+            self.workflow,
+        )
         self.assertNotIn("ref: main", self.workflow)
-        self.assertNotIn("repository: szl-holdings/.github\n          ref: main", self.workflow)
 
     def test_shell_consumes_inputs_through_environment(self):
         for unsafe in (

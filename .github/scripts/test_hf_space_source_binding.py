@@ -189,6 +189,11 @@ class ReusableWorkflowSourceBindingTests(unittest.TestCase):
         path = os.path.join(HERE, "..", "workflows", "reusable-hf-deploy.yml")
         with open(path, encoding="utf-8") as fh:
             cls.workflow = fh.read()
+        witness_path = os.path.join(
+            HERE, "..", "workflows", "reusable-hf-deploy-source-witness.yml"
+        )
+        with open(witness_path, encoding="utf-8") as fh:
+            cls.witness_workflow = fh.read()
 
     def test_source_binding_inputs_are_optional_but_paired(self):
         self.assertIn("source-revision-variable:", self.workflow)
@@ -225,11 +230,80 @@ class ReusableWorkflowSourceBindingTests(unittest.TestCase):
         ):
             self.assertNotIn(unsafe, self.workflow)
 
-    def test_workflow_uses_exact_supported_clients_and_immutable_tool_revision(self):
-        self.assertIn('"huggingface_hub==1.19.0"', self.workflow)
-        self.assertIn('"requests==2.32.5"', self.workflow)
-        self.assertIn("ref: ${{ github.job_workflow_sha }}", self.workflow)
-        self.assertNotIn("repository: szl-holdings/.github\n          ref: main", self.workflow)
+    def test_workflow_uses_hash_locked_clients_and_immutable_tool_revision(self):
+        self.assertIn("requirements/hf-publisher.lock", self.workflow)
+        self.assertIn("--require-hashes", self.workflow)
+        self.assertIn("--only-binary=:all:", self.workflow)
+        self.assertIn("--ignore-installed", self.workflow)
+        self.assertNotIn('"huggingface_hub==1.19.0"', self.workflow)
+        self.assertNotIn('"requests==2.32.5"', self.workflow)
+        self.assertNotIn("github.job_workflow_sha", self.workflow)
+        self.assertIn("repository: ${{ job.workflow_repository }}", self.workflow)
+        self.assertIn("ref: ${{ job.workflow_sha }}", self.workflow)
+        self.assertIn("EXPECTED_TOOLS_SHA: ${{ job.workflow_sha }}", self.workflow)
+        self.assertIn(
+            'ACTUAL_TOOLS_SHA="$(git -C tools rev-parse --verify HEAD)"',
+            self.workflow,
+        )
+        self.assertIn(
+            '[[ ! "$EXPECTED_TOOLS_SHA" =~ ^[0-9a-f]{40}$ ]]',
+            self.workflow,
+        )
+        self.assertIn(
+            '[ "$ACTUAL_TOOLS_SHA" != "$EXPECTED_TOOLS_SHA" ]',
+            self.workflow,
+        )
+        self.assertIn(
+            '"$RUNNER_TEMP/hf-publisher-venv/bin/python" -I -P '
+            "tools/.github/scripts/hf_space_source_binding.py",
+            self.workflow,
+        )
+        self.assertNotIn(
+            "python3 tools/.github/scripts/hf_space_source_binding.py",
+            self.workflow,
+        )
+
+    def test_contract_only_witness_is_exact_read_only_and_non_secret(self):
+        deploy_start = self.workflow.index("  hf-deploy:")
+        contract_start = self.workflow.index("  exact-source-contract:")
+        deploy = self.workflow[deploy_start:contract_start]
+        contract = self.workflow[contract_start:]
+
+        self.assertIn("if: ${{ inputs.contract-only == false }}", deploy)
+        self.assertIn("if: ${{ inputs.contract-only == true }}", contract)
+        self.assertIn("permissions:\n      contents: read", contract)
+        self.assertEqual(contract.count("uses:"), 1)
+        self.assertIn("repository: ${{ job.workflow_repository }}", contract)
+        self.assertIn("ref: ${{ job.workflow_sha }}", contract)
+        self.assertIn("EXPECTED_EVENT_SHA: ${{ github.sha }}", contract)
+        self.assertIn(
+            '[ "$EXPECTED_WORKFLOW_SHA" != "$EXPECTED_EVENT_SHA" ]',
+            contract,
+        )
+        for forbidden in (
+            "HF_TOKEN",
+            "pip install",
+            "hf_deploy_from_dockerfile.py",
+            "hf_space_source_binding.py",
+            "curl ",
+            "gh api",
+        ):
+            self.assertNotIn(forbidden, contract)
+
+    def test_tests_workflow_calls_actual_reusable_contract(self):
+        self.assertNotIn("github.job_workflow_sha", self.witness_workflow)
+        self.assertIn(
+            "name: Reusable publisher exact-source witness",
+            self.witness_workflow,
+        )
+        self.assertIn("  push:", self.witness_workflow)
+        self.assertIn(
+            "uses: ./.github/workflows/reusable-hf-deploy.yml",
+            self.witness_workflow,
+        )
+        self.assertIn("contract-only: true", self.witness_workflow)
+        self.assertIn("HF_TOKEN: ${{ github.token }}", self.witness_workflow)
+        self.assertIn("permissions:\n  contents: read", self.witness_workflow)
 
 
 if __name__ == "__main__":
