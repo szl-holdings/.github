@@ -183,6 +183,18 @@ class DcoCheckTests(unittest.TestCase):
 
         self.assertEqual(dco_check.unsigned_commit_shas([commit]), [])
 
+    def test_horizontal_unicode_spaces_in_signer_names_are_accepted(self) -> None:
+        separators = ("\u00a0", "\u2003")
+        commits = [
+            _commit(
+                index,
+                f"fix: unicode name\n\nSigned-off-by: A{separator}B <test@example.com>",
+            )
+            for index, separator in enumerate(separators, start=15)
+        ]
+
+        self.assertEqual(dco_check.unsigned_commit_shas(commits), [])
+
     def test_valid_stable_pagination_passes(self) -> None:
         commits = _signed_commits(3)
         expected_head, responses = _stable_responses(commits)
