@@ -281,6 +281,14 @@ class TestDeriveReadmePolicy(unittest.TestCase):
             files["space/SOURCE_REVISION"]["sha256"],
             dep.sha256((revision + "\n").encode("ascii")),
         )
+        self.assertEqual(
+            files["Dockerfile.dockerignore"]["source_path"],
+            "(generated-empty-dockerignore)",
+        )
+        self.assertEqual(
+            files["Dockerfile.dockerignore"]["generated_content_utf8"],
+            "",
+        )
 
     def test_generated_source_revision_must_be_new_and_copy_covered(self):
         with self.assertRaisesRegex(dep.DeployContractError, "already exist"):
@@ -299,6 +307,32 @@ class TestDeriveReadmePolicy(unittest.TestCase):
                 source_revision_file="space/SOURCE_REVISION",
                 source_sha="a" * 40,
             )
+
+    def test_copy_coverage_failure_does_not_materialize_revision(self):
+        with tempfile.TemporaryDirectory() as repo_root:
+            os.makedirs(os.path.join(repo_root, "space"))
+            with open(os.path.join(repo_root, "Dockerfile"), "w") as fh:
+                fh.write("FROM scratch\nCOPY app.py /app/app.py\n")
+            with open(os.path.join(repo_root, "app.py"), "w") as fh:
+                fh.write("pass\n")
+            revision = os.path.join(repo_root, "space", "SOURCE_REVISION")
+            args = types.SimpleNamespace(
+                repo_root=repo_root,
+                dockerfile_path="Dockerfile",
+                include_readme=False,
+                readme_path="README.md",
+                github_repo="szl-holdings/example",
+                hf_repo="SZLHOLDINGS/example",
+                ref="main",
+                smoke_paths=None,
+                source_revision_file="space/SOURCE_REVISION",
+                source_sha="a" * 40,
+                manifest_out="",
+            )
+
+            with self.assertRaisesRegex(dep.DeployContractError, "not covered"):
+                dep.derive(args)
+            self.assertFalse(os.path.lexists(revision))
 
     def test_generated_source_revision_rejects_dockerfile_target_collision(self):
         with self.assertRaisesRegex(
@@ -396,6 +430,50 @@ class TestDeriveReadmePolicy(unittest.TestCase):
         self.assertTrue(
             files["space/SOURCE_REVISION"]["generated_from_source_sha"]
         )
+        self.assertEqual(
+            files["Dockerfile.dockerignore"]["source_path"],
+            "Dockerfile.dockerignore",
+        )
+
+    def test_nested_dockerfile_ignore_is_published_at_hf_root(self):
+        manifest, files = self._derive(
+            "FROM scratch\nCOPY space /app/space\n",
+            {
+                ".dockerignore": "space/SOURCE_REVISION\n",
+                "space/Dockerfile.dockerignore": (
+                    "# source revision remains included\n"
+                ),
+                "space/app.py": "pass\n",
+            },
+            include_readme=False,
+            dockerfile_path="space/Dockerfile",
+            source_revision_file="space/SOURCE_REVISION",
+            source_sha="a" * 40,
+        )
+
+        self.assertEqual(
+            manifest["source_revision_file"],
+            "space/SOURCE_REVISION",
+        )
+        self.assertEqual(
+            files["Dockerfile.dockerignore"]["source_path"],
+            "space/Dockerfile.dockerignore",
+        )
+
+    def test_ignored_parent_cannot_reinclude_source_revision(self):
+        with self.assertRaisesRegex(
+            dep.DeployContractError, "excluded from the Docker build context"
+        ):
+            self._derive(
+                "FROM scratch\nCOPY space /app/space\n",
+                {
+                    ".dockerignore": "space\n!space/SOURCE_REVISION\n",
+                    "space/app.py": "pass\n",
+                },
+                include_readme=False,
+                source_revision_file="space/SOURCE_REVISION",
+                source_sha="a" * 40,
+            )
 
     def test_dockerignore_negation_reincludes_source_revision(self):
         manifest, files = self._derive(

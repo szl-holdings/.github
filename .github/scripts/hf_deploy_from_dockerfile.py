@@ -110,10 +110,10 @@ def materialize_source_revision_file(repo_root, requested_path, source_sha):
         raise DeployContractError(
             "source revision file must not be inside Git metadata"
         )
-    if rel == "Dockerfile":
+    if rel in {"Dockerfile", "Dockerfile.dockerignore"}:
         raise DeployContractError(
             "source revision file collides with reserved Hugging Face "
-            "Dockerfile target"
+            "Dockerfile target or its build-context policy"
         )
     root = os.path.realpath(repo_root)
     requested_full = os.path.join(root, *rel.split("/"))
@@ -261,6 +261,10 @@ def source_revision_is_dockerignored(repo_root, dockerfile_rel, revision_rel):
 
     path = normalize_repo_path(revision_rel, label="source revision file")
     parents = path.split("/")[:-1]
+    parent_candidates = [
+        "/".join(parents[: index + 1])
+        for index in range(len(parents))
+    ]
     candidates = [path] + [
         "/".join(parents[: index + 1])
         for index in range(len(parents))
@@ -269,6 +273,10 @@ def source_revision_is_dockerignored(repo_root, dockerfile_rel, revision_rel):
     for negated, pattern in _dockerignore_patterns(ignore_path):
         if negated != matched:
             continue
+        if not negated and any(
+            pattern.fullmatch(parent) for parent in parent_candidates
+        ):
+            return ignore_rel
         if any(pattern.fullmatch(candidate) for candidate in candidates):
             matched = not negated
     return ignore_rel if matched else None
@@ -276,6 +284,8 @@ def source_revision_is_dockerignored(repo_root, dockerfile_rel, revision_rel):
 
 def read_source_bytes(repo_root, target_path, meta):
     """Read the GitHub source mapped to an HF target path."""
+    if "generated_content_utf8" in meta:
+        return str(meta["generated_content_utf8"]).encode("utf-8")
     source_path = meta.get("source_path") or target_path
     _, full = source_file(repo_root, source_path)
     with open(full, "rb") as fh:
@@ -724,7 +734,23 @@ def derive(args):
                     "source revision file collides with the manifest output"
                 )
     dockerfile_rel, df_path = source_file(args.repo_root, args.dockerfile_path)
+    with open(df_path, "rb") as fh:
+        dockerfile_text = fh.read().decode("utf-8", "replace")
+    eligible_sources = []
+    sources = parse_copy_sources(
+        dockerfile_text,
+        eligible_sources=eligible_sources,
+    )
+
+    revision_rel = None
+    revision_content = None
     if requested_revision:
+        source_sha = str(getattr(args, "source_sha", "") or "")
+        if not re.fullmatch(r"[0-9a-f]{40}", source_sha):
+            raise DeployContractError(
+                "--source-revision-file requires --source-sha to be an exact "
+                "lowercase 40-character SHA"
+            )
         ignored_by = source_revision_is_dockerignored(
             args.repo_root,
             dockerfile_rel,
@@ -735,19 +761,12 @@ def derive(args):
                 "source revision file is excluded from the Docker build "
                 f"context by {ignored_by!r}: {revision_candidate!r}"
             )
-    revision_rel = materialize_source_revision_file(
-        args.repo_root,
-        requested_revision,
-        getattr(args, "source_sha", ""),
-    )
-    with open(df_path, "rb") as fh:
-        dockerfile_text = fh.read().decode("utf-8", "replace")
-    eligible_sources = []
-    sources = parse_copy_sources(
-        dockerfile_text,
-        eligible_sources=eligible_sources,
-    )
+        revision_rel = revision_candidate
+        revision_content = source_sha + "\n"
+
     tree = local_tree(args.repo_root)
+    if revision_rel:
+        tree[revision_rel] = git_blob_sha1(revision_content.encode("ascii"))
     targets, unresolved = expand_sources(sources, tree)
     eligible_targets, _ = expand_sources(eligible_sources, tree)
 
@@ -756,7 +775,7 @@ def derive(args):
     # when the caller owns the Space card separately. Normalize the CLI path to
     # the forward-slash form used by local_tree/expand_sources, without filtering
     # unrelated nested README files.
-    if not args.include_readme:
+    if not args.include_readme and readme_path != revision_rel:
         targets.pop(readme_path, None)
 
     if unresolved:
@@ -773,7 +792,10 @@ def derive(args):
 
     files = {}
     for rel, src in sorted(targets.items()):
-        data = read_source_bytes(args.repo_root, rel, {"source_path": rel})
+        source_meta = {"source_path": rel}
+        if rel == revision_rel:
+            source_meta["generated_content_utf8"] = revision_content
+        data = read_source_bytes(args.repo_root, rel, source_meta)
         files[rel] = {
             "git_blob_sha1": git_blob_sha1(data),
             "sha256": sha256(data),
@@ -783,6 +805,7 @@ def derive(args):
         }
         if rel == revision_rel:
             files[rel]["generated_from_source_sha"] = True
+            files[rel]["generated_content_utf8"] = revision_content
 
     readme_rel = None
     if args.include_readme:
@@ -811,6 +834,45 @@ def derive(args):
         "copy_source": "(dockerfile)",
         "source_path": dockerfile_rel,
     }
+
+    if revision_rel:
+        ignore_rel, ignore_path = _effective_dockerignore(
+            args.repo_root,
+            dockerfile_rel,
+        )
+        if ignore_path is None:
+            ignore_source = "(generated-empty-dockerignore)"
+            ignore_meta = {
+                "source_path": ignore_source,
+                "generated_content_utf8": "",
+            }
+        else:
+            ignore_source = ignore_rel
+            ignore_meta = {"source_path": ignore_rel}
+        ignore_bytes = read_source_bytes(
+            args.repo_root,
+            "Dockerfile.dockerignore",
+            ignore_meta,
+        )
+        files["Dockerfile.dockerignore"] = {
+            "git_blob_sha1": git_blob_sha1(ignore_bytes),
+            "sha256": sha256(ignore_bytes),
+            "size": len(ignore_bytes),
+            "copy_source": "(dockerignore)",
+            "source_path": ignore_source,
+        }
+        if "generated_content_utf8" in ignore_meta:
+            files["Dockerfile.dockerignore"]["generated_content_utf8"] = ""
+
+        materialized_revision = materialize_source_revision_file(
+            args.repo_root,
+            revision_rel,
+            source_sha,
+        )
+        if materialized_revision != revision_rel:
+            raise DeployContractError(
+                "source revision materialization changed the validated target"
+            )
 
     smoke_paths = normalize_smoke_paths(getattr(args, "smoke_paths", None))
 
