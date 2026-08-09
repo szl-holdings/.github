@@ -225,6 +225,12 @@ jobs:
       - name: HF publisher immutable dependency closure self-test
         run: python3 .github/scripts/test_hf_publisher_lock.py
 
+      - name: HF publisher Linux wheel closure resolver proof
+        run: >-
+          python3 -m pip install --dry-run --disable-pip-version-check
+          --require-hashes --only-binary=:all:
+          -r requirements/hf-publisher.lock
+
       # Pins the canonical static-Space publication path used by the Hugging
       # Face organization front door. The tests are network-free and lock safe
       # path handling, immutable source identity, and generated deployment
