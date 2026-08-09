@@ -105,13 +105,13 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
-          python-version: "3.12"
+          python-version: "3.12.10"
 
-      - name: Install exact supported deployment clients
+      - name: Install hash-locked deployment client closure
         run: >-
           python -m pip install --disable-pip-version-check
-          "huggingface_hub==1.19.0"
-          "requests==2.32.5"
+          --require-hashes --only-binary=:all:
+          -r tools/requirements/hf-publisher.lock
 
       - name: Resolve target and exact checked-out source
         id: hf

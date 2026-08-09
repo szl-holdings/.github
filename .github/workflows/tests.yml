@@ -222,6 +222,9 @@ jobs:
       - name: HF deploy-from-Dockerfile derivation self-test
         run: python3 .github/scripts/test_hf_deploy_from_dockerfile.py
 
+      - name: HF publisher immutable dependency closure self-test
+        run: python3 .github/scripts/test_hf_publisher_lock.py
+
       # Pins the canonical static-Space publication path used by the Hugging
       # Face organization front door. The tests are network-free and lock safe
       # path handling, immutable source identity, and generated deployment
