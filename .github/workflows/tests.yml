@@ -22,6 +22,11 @@ jobs:
         with:
           python-version: "3.12.10"
 
+      - name: DCO bootstrap and event contract self-tests
+        run: |
+          python3 .github/scripts/test_dco_check.py
+          python3 .github/scripts/test_dco_events.py
+
       # A full 40-character ref is not enough for a reusable workflow: the
       # target file can be absent at that exact commit (the a11oy/docs-site
       # pre-merge-pin startup_failure). This network-free test locks three
