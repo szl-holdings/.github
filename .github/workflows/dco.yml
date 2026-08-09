@@ -17,7 +17,7 @@ permissions:
   statuses: write
 
 concurrency:
-  group: dco-${{ github.event_name == 'pull_request_target' && format('pr-{0}', github.event.pull_request.number) || github.ref }}
+  group: dco-${{ github.event_name == 'pull_request_target' && format('head-{0}', github.event.pull_request.head.sha) || github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -98,13 +98,57 @@ jobs:
           dco_exit=$?
           set -e
 
+          set +e
           current_pr="$(gh api "repos/$GITHUB_REPOSITORY/pulls/$PR_NUMBER")"
-          current_state="$(jq -r '.state' <<<"$current_pr")"
-          current_base_ref="$(jq -r '.base.ref' <<<"$current_pr")"
-          current_base_sha="$(jq -r '.base.sha' <<<"$current_pr")"
-          current_head_sha="$(jq -r '.head.sha' <<<"$current_pr")"
+          current_lookup_exit=$?
+          current_tuple="$(
+            jq -er '[.state, .base.ref, .base.sha, .head.sha] | @tsv' \
+              <<<"$current_pr"
+          )"
+          current_tuple_exit=$?
+          governed_pr_numbers="$(
+            gh api --paginate --slurp \
+              "repos/$GITHUB_REPOSITORY/pulls?state=open&per_page=100" \
+              | jq -er --arg head "$EXPECTED_HEAD_SHA" '
+                  [
+                    .[][]
+                    | select(.head.sha == $head)
+                    | select(
+                        .base.ref == "main"
+                        or (.base.ref | test("^release/[^/]+$"))
+                      )
+                    | .number
+                  ]
+                  | sort
+                  | map(tostring)
+                  | join(",")
+                '
+          )"
+          shared_lookup_exit=$?
+          set -e
+
+          current_state=""
+          current_base_ref=""
+          current_base_sha=""
+          current_head_sha=""
+          if [[ "$current_tuple_exit" -eq 0 ]]; then
+            IFS=$'\t' read -r \
+              current_state current_base_ref current_base_sha current_head_sha \
+              <<<"$current_tuple"
+          fi
+
+          revalidation_error=false
           stale_event=false
-          if [[ "$current_state" != "open" \
+          shared_head=false
+          if [[ "$current_lookup_exit" -ne 0 \
+            || "$current_tuple_exit" -ne 0 \
+            || "$shared_lookup_exit" -ne 0 ]]; then
+            revalidation_error=true
+            dco_exit=1
+          elif [[ "$governed_pr_numbers" != "$PR_NUMBER" ]]; then
+            shared_head=true
+            dco_exit=1
+          elif [[ "$current_state" != "open" \
             || "$current_base_ref" != "$EXPECTED_BASE_REF" \
             || "$current_base_sha" != "$EXPECTED_BASE_SHA" \
             || "$current_head_sha" != "$EXPECTED_HEAD_SHA" ]]; then
@@ -114,7 +158,11 @@ jobs:
 
           state="failure"
           description="DCO validation failed"
-          if [[ "$stale_event" == "true" ]]; then
+          if [[ "$revalidation_error" == "true" ]]; then
+            description="DCO live revalidation failed"
+          elif [[ "$shared_head" == "true" ]]; then
+            description="DCO head is shared by governed PRs"
+          elif [[ "$stale_event" == "true" ]]; then
             description="DCO event is stale"
           elif [[ "$dco_exit" -eq 0 ]]; then
             state="success"
