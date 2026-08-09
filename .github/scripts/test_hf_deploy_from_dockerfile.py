@@ -361,6 +361,65 @@ class TestDeriveReadmePolicy(unittest.TestCase):
                 manifest_out_rel="manifest.json",
             )
 
+    def test_generated_source_revision_rejects_root_dockerignore_match(self):
+        with self.assertRaisesRegex(
+            dep.DeployContractError, "excluded from the Docker build context"
+        ):
+            self._derive(
+                "FROM scratch\nCOPY space /app/space\n",
+                {
+                    ".dockerignore": "space/SOURCE_REVISION\n",
+                    "space/app.py": "pass\n",
+                },
+                include_readme=False,
+                source_revision_file="space/SOURCE_REVISION",
+                source_sha="a" * 40,
+            )
+
+    def test_dockerfile_specific_ignore_takes_precedence_over_root(self):
+        manifest, files = self._derive(
+            "FROM scratch\nCOPY space /app/space\n",
+            {
+                ".dockerignore": "space/SOURCE_REVISION\n",
+                "Dockerfile.dockerignore": "# source revision remains included\n",
+                "space/app.py": "pass\n",
+            },
+            include_readme=False,
+            source_revision_file="space/SOURCE_REVISION",
+            source_sha="a" * 40,
+        )
+
+        self.assertEqual(
+            manifest["source_revision_file"],
+            "space/SOURCE_REVISION",
+        )
+        self.assertTrue(
+            files["space/SOURCE_REVISION"]["generated_from_source_sha"]
+        )
+
+    def test_dockerignore_negation_reincludes_source_revision(self):
+        manifest, files = self._derive(
+            "FROM scratch\nCOPY space /app/space\n",
+            {
+                ".dockerignore": (
+                    "space/**\n"
+                    "!space/SOURCE_REVISION\n"
+                ),
+                "space/app.py": "pass\n",
+            },
+            include_readme=False,
+            source_revision_file="space/SOURCE_REVISION",
+            source_sha="a" * 40,
+        )
+
+        self.assertEqual(
+            manifest["source_revision_file"],
+            "space/SOURCE_REVISION",
+        )
+        self.assertTrue(
+            files["space/SOURCE_REVISION"]["generated_from_source_sha"]
+        )
+
     def test_generated_source_revision_rejects_dangling_symlink(self):
         with tempfile.TemporaryDirectory() as repo_root:
             os.makedirs(os.path.join(repo_root, "space"))

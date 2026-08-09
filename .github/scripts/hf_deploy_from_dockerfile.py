@@ -148,6 +148,132 @@ def materialize_source_revision_file(repo_root, requested_path, source_sha):
     return rel
 
 
+def _dockerignore_pattern_regex(pattern):
+    """Compile Docker patternmatcher wildcards for slash-delimited repo paths."""
+    pieces = ["^"]
+    index = 0
+    while index < len(pattern):
+        char = pattern[index]
+        if char == "*":
+            if index + 1 < len(pattern) and pattern[index + 1] == "*":
+                index += 2
+                if index < len(pattern) and pattern[index] == "/":
+                    index += 1
+                    pieces.append("(?:.*/)?")
+                else:
+                    pieces.append(".*")
+                continue
+            pieces.append("[^/]*")
+        elif char == "?":
+            pieces.append("[^/]")
+        elif char == "[":
+            end = index + 1
+            if end < len(pattern) and pattern[end] in ("!", "^"):
+                end += 1
+            if end < len(pattern) and pattern[end] == "]":
+                end += 1
+            while end < len(pattern) and pattern[end] != "]":
+                end += 1
+            if end >= len(pattern):
+                raise DeployContractError(
+                    f"invalid Docker ignore pattern: {pattern!r}"
+                )
+            content = pattern[index + 1 : end]
+            if "/" in content:
+                raise DeployContractError(
+                    f"invalid Docker ignore character class: {pattern!r}"
+                )
+            if content.startswith("!"):
+                content = "^" + content[1:]
+            elif content.startswith("^"):
+                content = "\\" + content
+            pieces.append("[" + content + "]")
+            index = end
+        elif char == "\\":
+            index += 1
+            if index >= len(pattern):
+                raise DeployContractError(
+                    f"invalid trailing escape in Docker ignore pattern: {pattern!r}"
+                )
+            pieces.append(re.escape(pattern[index]))
+        else:
+            pieces.append(re.escape(char))
+        index += 1
+    pieces.append("$")
+    try:
+        return re.compile("".join(pieces))
+    except re.error as exc:
+        raise DeployContractError(
+            f"invalid Docker ignore pattern: {pattern!r}"
+        ) from exc
+
+
+def _dockerignore_patterns(ignore_path):
+    """Load normalized patternmatcher rules from one effective ignore file."""
+    with open(ignore_path, "rb") as fh:
+        data = fh.read(262145)
+    if len(data) > 262144:
+        raise DeployContractError("Docker ignore file exceeds 256 KiB")
+    try:
+        text = data.decode("utf-8-sig")
+    except UnicodeDecodeError as exc:
+        raise DeployContractError("Docker ignore file is not valid UTF-8") from exc
+
+    patterns = []
+    for raw_line in text.splitlines():
+        if raw_line.startswith("#"):
+            continue
+        pattern = raw_line.strip()
+        if not pattern:
+            continue
+        negated = pattern.startswith("!")
+        if negated:
+            pattern = pattern[1:].strip()
+            if not pattern:
+                raise DeployContractError(
+                    "Docker ignore file contains an empty negation"
+                )
+        pattern = posixpath.normpath(pattern).strip("/")
+        if pattern in ("", "."):
+            continue
+        patterns.append((negated, _dockerignore_pattern_regex(pattern)))
+    return patterns
+
+
+def _effective_dockerignore(repo_root, dockerfile_rel):
+    """Resolve Dockerfile-specific precedence over the root ignore file."""
+    candidates = (dockerfile_rel + ".dockerignore", ".dockerignore")
+    root = os.path.realpath(repo_root)
+    for rel in candidates:
+        requested = os.path.join(root, *rel.split("/"))
+        if not os.path.lexists(requested):
+            continue
+        normalized, full = source_file(repo_root, rel)
+        return normalized, full
+    return None, None
+
+
+def source_revision_is_dockerignored(repo_root, dockerfile_rel, revision_rel):
+    """Return the effective ignore file when Docker removes the revision path."""
+    ignore_rel, ignore_path = _effective_dockerignore(repo_root, dockerfile_rel)
+    if ignore_path is None:
+        return None
+
+    path = normalize_repo_path(revision_rel, label="source revision file")
+    parents = path.split("/")[:-1]
+    candidates = [path] + [
+        "/".join(parents[: index + 1])
+        for index in range(len(parents))
+    ]
+    matched = False
+    for negated, pattern in _dockerignore_patterns(ignore_path):
+        if negated != matched:
+            continue
+        if any(pattern.fullmatch(candidate) for candidate in candidates):
+            matched = not negated
+    return ignore_rel if matched else None
+
+
 def read_source_bytes(repo_root, target_path, meta):
     """Read the GitHub source mapped to an HF target path."""
     source_path = meta.get("source_path") or target_path
@@ -597,12 +723,23 @@ def derive(args):
                 raise DeployContractError(
                     "source revision file collides with the manifest output"
                 )
+    dockerfile_rel, df_path = source_file(args.repo_root, args.dockerfile_path)
+    if requested_revision:
+        ignored_by = source_revision_is_dockerignored(
+            args.repo_root,
+            dockerfile_rel,
+            revision_candidate,
+        )
+        if ignored_by:
+            raise DeployContractError(
+                "source revision file is excluded from the Docker build "
+                f"context by {ignored_by!r}: {revision_candidate!r}"
+            )
     revision_rel = materialize_source_revision_file(
         args.repo_root,
         requested_revision,
         getattr(args, "source_sha", ""),
     )
-    dockerfile_rel, df_path = source_file(args.repo_root, args.dockerfile_path)
     with open(df_path, "rb") as fh:
         dockerfile_text = fh.read().decode("utf-8", "replace")
     eligible_sources = []
