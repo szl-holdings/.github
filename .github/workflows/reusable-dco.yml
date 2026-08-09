@@ -95,3 +95,18 @@ jobs:
           python "$GITHUB_WORKSPACE/trusted-dco/.github/scripts/dco_check.py"
           --repo-root "$GITHUB_WORKSPACE/candidate"
           --event-path "$GITHUB_EVENT_PATH"
+
+  reusable-dco-compatibility:
+    name: DCO sign-off
+    needs: reusable-dco
+    if: always()
+    permissions: {}
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - name: Propagate terminal reusable DCO result
+        env:
+          REUSABLE_DCO_RESULT: ${{ needs.reusable-dco.result }}
+        run: |
+          set -euo pipefail
+          test "$REUSABLE_DCO_RESULT" = "success"

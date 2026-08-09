@@ -205,6 +205,33 @@ class DcoCheckTests(unittest.TestCase):
         self.assert_rejected("checks_requested", dco.merge_group_subject, wrong_action, head)
         self.assert_rejected("differs", dco.merge_group_subject, payload, "f" * 40)
 
+    def test_merge_group_legacy_context_has_one_terminal_producer(self) -> None:
+        workflow = (
+            Path(__file__).resolve().parents[1] / "workflows" / "dco.yml"
+        ).read_text(encoding="utf-8")
+        self.assertEqual(workflow.count("name: DCO sign-off check\n"), 1)
+        self.assertIn("needs: dco", workflow)
+        self.assertIn(
+            "if: always() && github.event_name != 'pull_request_target'",
+            workflow,
+        )
+        self.assertIn("NATIVE_DCO_RESULT: ${{ needs.dco.result }}", workflow)
+        self.assertIn('test "$NATIVE_DCO_RESULT" = "success"', workflow)
+        self.assertNotIn("continue-on-error", workflow)
+
+    def test_reusable_legacy_context_faithfully_propagates_validation(self) -> None:
+        workflow = (
+            Path(__file__).resolve().parents[1]
+            / "workflows"
+            / "reusable-dco.yml"
+        ).read_text(encoding="utf-8")
+        self.assertEqual(workflow.count("name: DCO sign-off\n"), 1)
+        self.assertIn("needs: reusable-dco", workflow)
+        self.assertIn("if: always()", workflow)
+        self.assertIn("REUSABLE_DCO_RESULT: ${{ needs.reusable-dco.result }}", workflow)
+        self.assertIn('test "$REUSABLE_DCO_RESULT" = "success"', workflow)
+        self.assertNotIn("continue-on-error", workflow)
+
     def test_merge_group_validates_linear_squash_sequence(self) -> None:
         first = self.commit(
             "fix: first queued squash\n\nSigned-off-by: Series A Builder <builder@example.com>"

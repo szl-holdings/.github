@@ -51,6 +51,12 @@ class DcoActivationWorkflowTests(unittest.TestCase):
             "--paginate --slurp",
             "trusted/.github/scripts/dco_check.py",
             "Run strict real-commit DCO self-tests",
+            "native-dco-compatibility:",
+            "name: DCO sign-off check",
+            "needs: dco",
+            "if: always() && github.event_name != 'pull_request_target'",
+            "NATIVE_DCO_RESULT: ${{ needs.dco.result }}",
+            'test "$NATIVE_DCO_RESULT" = "success"',
         ):
             self.assertIn(marker, self.native)
         self.assertNotIn("\n  pull_request:\n", self.native)
@@ -69,11 +75,18 @@ class DcoActivationWorkflowTests(unittest.TestCase):
             "persist-credentials: false",
             "trusted-dco/.github/scripts/dco_check.py",
             "Run strict real-commit DCO self-tests",
+            "reusable-dco-compatibility:",
+            "name: DCO sign-off",
+            "needs: reusable-dco",
+            "REUSABLE_DCO_RESULT: ${{ needs.reusable-dco.result }}",
+            'test "$REUSABLE_DCO_RESULT" = "success"',
         ):
             self.assertIn(marker, self.reusable)
         self.assertNotIn("secrets.", self.reusable)
         self.assertNotIn("secrets: inherit", self.reusable)
         self.assertNotIn("grep ", self.reusable)
+        self.assertEqual(self.reusable.count("name: DCO sign-off\n"), 1)
+        self.assertNotIn("continue-on-error", self.reusable)
 
     def test_source_namespaces_are_distinct_and_legacy_status_survives(self) -> None:
         self.assertNotEqual("Native DCO enforcement", "Reusable DCO validation")
@@ -82,6 +95,8 @@ class DcoActivationWorkflowTests(unittest.TestCase):
         self.assertIn("name: Reusable DCO validation", self.reusable)
         self.assertNotIn("name: Native DCO enforcement", self.reusable)
         self.assertIn('context="DCO sign-off check"', self.native)
+        self.assertEqual(self.native.count("name: DCO sign-off check\n"), 1)
+        self.assertNotIn("continue-on-error", self.native)
 
     def test_physical_parser_and_bounded_event_contract_are_consumed(self) -> None:
         for marker in (

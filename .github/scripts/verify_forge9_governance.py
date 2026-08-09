@@ -230,6 +230,12 @@ def verify_gate_contract() -> None:
         "github.event.pull_request.base.sha",
         "github.event.pull_request.head.sha",
         ".github/scripts/dco_check.py",
+        "native-dco-compatibility:",
+        "name: DCO sign-off check",
+        "needs: dco",
+        "if: always() && github.event_name != 'pull_request_target'",
+        "NATIVE_DCO_RESULT: ${{ needs.dco.result }}",
+        'test "$NATIVE_DCO_RESULT" = "success"',
     ):
         if marker not in dco_template:
             fail(f"trusted DCO workflow is missing {marker!r}")
@@ -239,6 +245,10 @@ def verify_gate_contract() -> None:
         fail("DCO must not publish a manual false-green status")
     if "github.event_name != 'pull_request'" in dco_template:
         fail("DCO merge-group and push validation must not use a fallback pass")
+    if dco_template.count("name: DCO sign-off check\n") != 1:
+        fail("native DCO must expose exactly one legacy compatibility job")
+    if "continue-on-error" in dco_template:
+        fail("native DCO compatibility must not suppress a failed gate")
 
     reusable_dco_template = (
         ROOT / ".github/workflows/reusable-dco.yml"
@@ -250,11 +260,21 @@ def verify_gate_contract() -> None:
         "GITHUB_TOKEN: ${{ github.token }}",
         "persist-credentials: false",
         "trusted-dco/.github/scripts/dco_check.py",
+        "reusable-dco-compatibility:",
+        "name: DCO sign-off",
+        "needs: reusable-dco",
+        "if: always()",
+        "REUSABLE_DCO_RESULT: ${{ needs.reusable-dco.result }}",
+        'test "$REUSABLE_DCO_RESULT" = "success"',
     ):
         if marker not in reusable_dco_template:
             fail(f"reusable DCO workflow is missing {marker!r}")
     if "secrets." in reusable_dco_template or "secrets: inherit" in reusable_dco_template:
         fail("reusable DCO workflow must not consume inherited secrets")
+    if reusable_dco_template.count("name: DCO sign-off\n") != 1:
+        fail("reusable DCO must expose exactly one legacy compatibility job")
+    if "continue-on-error" in reusable_dco_template:
+        fail("reusable DCO compatibility must not suppress a failed gate")
 
     dco_source = (ROOT / ".github/scripts/dco_check.py").read_text(encoding="utf-8")
     for marker in (

@@ -217,6 +217,21 @@ jobs:
           --repo-root "$GITHUB_WORKSPACE/candidate"
           --event-path "$GITHUB_EVENT_PATH"
 
+  native-dco-compatibility:
+    name: DCO sign-off check
+    needs: dco
+    if: always() && github.event_name != 'pull_request_target'
+    permissions: {}
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - name: Propagate terminal native DCO result
+        env:
+          NATIVE_DCO_RESULT: ${{ needs.dco.result }}
+        run: |
+          set -euo pipefail
+          test "$NATIVE_DCO_RESULT" = "success"
+
   reconcile-old-head:
     name: Reconcile surviving DCO status
     if: >-
