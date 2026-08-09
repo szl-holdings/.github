@@ -7,7 +7,7 @@ on:
     branches:
       - main
       - 'release/*'
-    types: [opened, synchronize, reopened, ready_for_review, edited]
+    types: [opened, synchronize, reopened, ready_for_review, edited, closed]
   merge_group:
     types: [checks_requested]
 
@@ -16,13 +16,13 @@ permissions:
   pull-requests: read
   statuses: write
 
-concurrency:
-  group: dco-${{ github.event_name == 'pull_request_target' && format('head-{0}', github.event.pull_request.head.sha) || github.ref }}
-  cancel-in-progress: true
-
 jobs:
   dco:
     name: DCO sign-off check
+    if: github.event_name != 'pull_request_target' || github.event.action != 'closed'
+    concurrency:
+      group: dco-${{ github.event_name == 'pull_request_target' && format('head-{0}', github.event.pull_request.head.sha) || github.sha }}
+      cancel-in-progress: true
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
@@ -191,3 +191,216 @@ jobs:
           python "$GITHUB_WORKSPACE/trusted/.github/scripts/dco_check.py"
           --repo-root "$GITHUB_WORKSPACE/candidate"
           --event-path "$GITHUB_EVENT_PATH"
+
+  reconcile-old-head:
+    name: Reconcile surviving DCO status
+    if: >-
+      github.event_name == 'pull_request_target'
+      && (github.event.action == 'closed' || github.event.action == 'synchronize')
+    concurrency:
+      group: dco-${{ format('head-{0}', github.event.action == 'synchronize' && github.event.before || github.event.pull_request.head.sha) }}
+      cancel-in-progress: true
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Resolve the surviving governed PR for the old head
+        id: subject
+        env:
+          GH_TOKEN: ${{ github.token }}
+          AFFECTED_HEAD_SHA: ${{ github.event.action == 'synchronize' && github.event.before || github.event.pull_request.head.sha }}
+        run: |
+          set -euo pipefail
+          governed_prs="$(
+            gh api --paginate --slurp \
+              "repos/$GITHUB_REPOSITORY/pulls?state=open&per_page=100" \
+              | jq -ce --arg head "$AFFECTED_HEAD_SHA" '
+                  [
+                    .[][]
+                    | select(.head.sha == $head)
+                    | select(
+                        .base.ref == "main"
+                        or (.base.ref | test("^release/[^/]+$"))
+                      )
+                  ]
+                '
+          )"
+          count="$(jq -r 'length' <<<"$governed_prs")"
+          echo "reconcile=false" >>"$GITHUB_OUTPUT"
+
+          if [[ "$count" -eq 0 ]]; then
+            exit 0
+          fi
+          if [[ "$count" -ne 1 ]]; then
+            gh api --method POST \
+              "repos/$GITHUB_REPOSITORY/statuses/$AFFECTED_HEAD_SHA" \
+              -f state="failure" \
+              -f context="DCO sign-off check" \
+              -f description="DCO head is shared by governed PRs" \
+              -f target_url="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+            exit 0
+          fi
+
+          pr_number="$(jq -r '.[0].number' <<<"$governed_prs")"
+          base_ref="$(jq -r '.[0].base.ref' <<<"$governed_prs")"
+          base_sha="$(jq -r '.[0].base.sha' <<<"$governed_prs")"
+          head_sha="$(jq -r '.[0].head.sha' <<<"$governed_prs")"
+          test "$head_sha" = "$AFFECTED_HEAD_SHA"
+
+          gh api --method POST \
+            "repos/$GITHUB_REPOSITORY/statuses/$head_sha" \
+            -f state="pending" \
+            -f context="DCO sign-off check" \
+            -f description="DCO reconciliation in progress" \
+            -f target_url="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+
+          {
+            echo "reconcile=true"
+            echo "pr_number=$pr_number"
+            echo "base_ref=$base_ref"
+            echo "base_sha=$base_sha"
+            echo "head_sha=$head_sha"
+          } >>"$GITHUB_OUTPUT"
+
+      - name: Checkout surviving exact candidate without credentials
+        if: steps.subject.outputs.reconcile == 'true'
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: refs/pull/${{ steps.subject.outputs.pr_number }}/head
+          path: reconcile-candidate
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Checkout surviving exact protected base
+        if: steps.subject.outputs.reconcile == 'true'
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ steps.subject.outputs.base_sha }}
+          path: reconcile-base
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Checkout immutable reconciliation checker
+        if: steps.subject.outputs.reconcile == 'true'
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.workflow_sha }}
+          path: reconcile-trusted
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Validate and republish surviving DCO evidence
+        if: steps.subject.outputs.reconcile == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GITHUB_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ steps.subject.outputs.pr_number }}
+          EXPECTED_BASE_REF: ${{ steps.subject.outputs.base_ref }}
+          EXPECTED_BASE_SHA: ${{ steps.subject.outputs.base_sha }}
+          EXPECTED_HEAD_SHA: ${{ steps.subject.outputs.head_sha }}
+          EXPECTED_TRUSTED_SHA: ${{ github.workflow_sha }}
+        run: |
+          set -euo pipefail
+          test "$(git -C "$GITHUB_WORKSPACE/reconcile-trusted" rev-parse HEAD)" = "$EXPECTED_TRUSTED_SHA"
+          git -C "$GITHUB_WORKSPACE/reconcile-candidate" fetch \
+            --no-tags "$GITHUB_WORKSPACE/reconcile-base" "$EXPECTED_BASE_SHA"
+          git -C "$GITHUB_WORKSPACE/reconcile-candidate" cat-file -e "$EXPECTED_BASE_SHA^{commit}"
+          jq -n \
+            --arg repository "$GITHUB_REPOSITORY" \
+            --arg base_ref "$EXPECTED_BASE_REF" \
+            --arg base_sha "$EXPECTED_BASE_SHA" \
+            --arg head_sha "$EXPECTED_HEAD_SHA" \
+            --argjson number "$PR_NUMBER" \
+            '{
+              action: "synchronize",
+              repository: {full_name: $repository},
+              number: $number,
+              pull_request: {
+                number: $number,
+                base: {ref: $base_ref, sha: $base_sha},
+                head: {sha: $head_sha}
+              }
+            }' >"$RUNNER_TEMP/dco-reconcile-event.json"
+
+          set +e
+          python "$GITHUB_WORKSPACE/reconcile-trusted/.github/scripts/dco_check.py" \
+            --repo-root "$GITHUB_WORKSPACE/reconcile-candidate" \
+            --event-path "$RUNNER_TEMP/dco-reconcile-event.json"
+          dco_exit=$?
+          current_pr="$(gh api "repos/$GITHUB_REPOSITORY/pulls/$PR_NUMBER")"
+          current_lookup_exit=$?
+          current_tuple="$(
+            jq -er '[.state, .base.ref, .base.sha, .head.sha] | @tsv' \
+              <<<"$current_pr"
+          )"
+          current_tuple_exit=$?
+          governed_pr_numbers="$(
+            gh api --paginate --slurp \
+              "repos/$GITHUB_REPOSITORY/pulls?state=open&per_page=100" \
+              | jq -er --arg head "$EXPECTED_HEAD_SHA" '
+                  [
+                    .[][]
+                    | select(.head.sha == $head)
+                    | select(
+                        .base.ref == "main"
+                        or (.base.ref | test("^release/[^/]+$"))
+                      )
+                    | .number
+                  ]
+                  | sort
+                  | map(tostring)
+                  | join(",")
+                '
+          )"
+          shared_lookup_exit=$?
+          set -e
+
+          current_state=""
+          current_base_ref=""
+          current_base_sha=""
+          current_head_sha=""
+          if [[ "$current_tuple_exit" -eq 0 ]]; then
+            IFS=$'\t' read -r \
+              current_state current_base_ref current_base_sha current_head_sha \
+              <<<"$current_tuple"
+          fi
+
+          revalidation_error=false
+          stale_event=false
+          shared_head=false
+          if [[ "$current_lookup_exit" -ne 0 \
+            || "$current_tuple_exit" -ne 0 \
+            || "$shared_lookup_exit" -ne 0 ]]; then
+            revalidation_error=true
+            dco_exit=1
+          elif [[ "$governed_pr_numbers" != "$PR_NUMBER" ]]; then
+            shared_head=true
+            dco_exit=1
+          elif [[ "$current_state" != "open" \
+            || "$current_base_ref" != "$EXPECTED_BASE_REF" \
+            || "$current_base_sha" != "$EXPECTED_BASE_SHA" \
+            || "$current_head_sha" != "$EXPECTED_HEAD_SHA" ]]; then
+            stale_event=true
+            dco_exit=1
+          fi
+
+          state="failure"
+          description="DCO reconciliation failed"
+          if [[ "$revalidation_error" == "true" ]]; then
+            description="DCO live revalidation failed"
+          elif [[ "$shared_head" == "true" ]]; then
+            description="DCO head is shared by governed PRs"
+          elif [[ "$stale_event" == "true" ]]; then
+            description="DCO reconciliation is stale"
+          elif [[ "$dco_exit" -eq 0 ]]; then
+            state="success"
+            description="DCO validation passed"
+          fi
+
+          gh api --method POST \
+            "repos/$GITHUB_REPOSITORY/statuses/$EXPECTED_HEAD_SHA" \
+            -f state="$state" \
+            -f context="DCO sign-off check" \
+            -f description="$description" \
+            -f target_url="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+
+          exit "$dco_exit"
