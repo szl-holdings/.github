@@ -331,7 +331,10 @@ class DcoCheckTests(unittest.TestCase):
                 f"---{suffix}\n"
                 "Signed-off-by: Test User <test@example.com>",
             )
-            for index, suffix in enumerate(("", " ", "\t", " \t"), start=805)
+            for index, suffix in enumerate(
+                ("", " ", "\t", " \t", " patch follows", "\tpatch follows"),
+                start=805,
+            )
         ]
 
         self.assertEqual(

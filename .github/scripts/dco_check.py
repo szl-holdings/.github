@@ -357,7 +357,7 @@ def _final_nonblank_group(message: str) -> list[str]:
         (
             index
             for index, line in enumerate(lines)
-            if line.rstrip(" \t") == "---"
+            if re.match(r"^---(?:[ \t]|$)", line)
         ),
         None,
     )
