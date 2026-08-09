@@ -18,12 +18,12 @@ MAX_PULL_REQUEST_COMMITS = 250
 REQUEST_TIMEOUT_SECONDS = 30
 SHA_PATTERN = re.compile(r"^[0-9a-f]{40}$")
 SIGNED_OFF_BY_PATTERN = re.compile(
-    r"^Signed-off-by:[^\S\r\n\v\f\x85\u2028\u2029]+"
-    r"[^<>\s]+(?:[^\S\r\n\v\f\x85\u2028\u2029]+[^<>\s]+)*"
-    r"[^\S\r\n\v\f\x85\u2028\u2029]+<[^<>\s]+@[^<>\s]+>"
-    r"[^\S\r\n\v\f\x85\u2028\u2029]*$",
-    re.IGNORECASE | re.MULTILINE,
+    r"^(?ai:Signed-off-by):[^\S\r\n\v\f\x1c-\x1f\x85\u2028\u2029]+"
+    r"[^<>\s]+(?:[^\S\r\n\v\f\x1c-\x1f\x85\u2028\u2029]+[^<>\s]+)*"
+    r"[^\S\r\n\v\f\x1c-\x1f\x85\u2028\u2029]+<[^<>\s]+@[^<>\s]+>"
+    r"[^\S\r\n\v\f\x1c-\x1f\x85\u2028\u2029]*$"
 )
+TRAILER_LINE_PATTERN = re.compile(r"^[A-Za-z0-9-]+:[ \t]+\S.*$")
 
 
 class DcoContractError(RuntimeError):
@@ -289,7 +289,19 @@ def unsigned_commit_shas(commits: list[dict[str, Any]]) -> list[str]:
             raise DcoContractError(f"commit entry {index} had an invalid SHA")
         if not isinstance(commit, dict) or not isinstance(commit.get("message"), str):
             raise DcoContractError(f"commit {sha} had no valid commit message")
-        if not SIGNED_OFF_BY_PATTERN.search(commit["message"]):
+        lines = commit["message"].splitlines()
+        while lines and not lines[-1].strip():
+            lines.pop()
+        paragraph_start = len(lines)
+        while paragraph_start > 0 and lines[paragraph_start - 1].strip():
+            paragraph_start -= 1
+        trailer_lines = lines[paragraph_start:]
+        is_trailer_block = bool(trailer_lines) and all(
+            TRAILER_LINE_PATTERN.fullmatch(line) for line in trailer_lines
+        )
+        if not is_trailer_block or not any(
+            SIGNED_OFF_BY_PATTERN.fullmatch(line) for line in trailer_lines
+        ):
             unsigned.append(sha)
 
     return unsigned

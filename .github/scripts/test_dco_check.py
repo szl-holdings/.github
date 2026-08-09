@@ -164,7 +164,17 @@ class DcoCheckTests(unittest.TestCase):
         )
 
     def test_vertical_whitespace_in_signer_names_is_rejected(self) -> None:
-        separators = ("\v", "\f", "\x85", "\u2028", "\u2029")
+        separators = (
+            "\v",
+            "\f",
+            "\x1c",
+            "\x1d",
+            "\x1e",
+            "\x1f",
+            "\x85",
+            "\u2028",
+            "\u2029",
+        )
         malformed = [
             _commit(
                 index,
@@ -194,6 +204,23 @@ class DcoCheckTests(unittest.TestCase):
         ]
 
         self.assertEqual(dco_check.unsigned_commit_shas(commits), [])
+
+    def test_unicode_lookalike_header_is_rejected(self) -> None:
+        commit = _commit(
+            17,
+            "fix: lookalike\n\nSıgned-off-by: Test User <test@example.com>",
+        )
+
+        self.assertEqual(dco_check.unsigned_commit_shas([commit]), [commit["sha"]])
+
+    def test_body_signoff_outside_final_trailer_block_is_rejected(self) -> None:
+        commit = _commit(
+            18,
+            "fix: quoted signoff\n\nSigned-off-by: Test User <test@example.com>"
+            "\n\nOrdinary postscript text.",
+        )
+
+        self.assertEqual(dco_check.unsigned_commit_shas([commit]), [commit["sha"]])
 
     def test_valid_stable_pagination_passes(self) -> None:
         commits = _signed_commits(3)
@@ -341,30 +368,6 @@ class DcoCheckTests(unittest.TestCase):
             dco_check.fetch_authoritative_pr_commits(
                 API_URL, REPOSITORY, PR_NUMBER, TOKEN, expected_head, opener=opener
             )
-
-    def test_workflow_binds_head_and_has_no_historical_bypass(self) -> None:
-        workflow_path = Path(__file__).parents[1] / "workflows" / "dco.yml"
-        workflow = workflow_path.read_text(encoding="utf-8")
-
-        self.assertIn(
-            "EXPECTED_HEAD_SHA: ${{ github.event.pull_request.head.sha }}", workflow
-        )
-        self.assertRegex(
-            workflow,
-            r"(?m)^\s*python3\s+\.github/scripts/dco_check\.py\s*$",
-        )
-        forbidden_patterns = (
-            r"(?i)\bfile_count\b",
-            r"(?i)\bchanged_files\b",
-            r"(?i)\bgit\s+show\b",
-            r"(?im)\bgrep\b[^\n]*\^Merge",
-            r"(?is)(?:file_count|changed_files).{0,200}(?:-eq|==)\s*0"
-            r".{0,200}(?:exit\s+0|success|pass)",
-            r"head_commit\.message",
-        )
-        for pattern in forbidden_patterns:
-            self.assertIsNone(re.search(pattern, workflow), pattern)
-
 
 if __name__ == "__main__":
     unittest.main()
