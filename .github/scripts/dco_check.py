@@ -18,7 +18,8 @@ MAX_PULL_REQUEST_COMMITS = 250
 REQUEST_TIMEOUT_SECONDS = 30
 SHA_PATTERN = re.compile(r"^[0-9a-f]{40}$")
 SIGNED_OFF_BY_PATTERN = re.compile(
-    r"^Signed-off-by:[ \t]+[^<>\r\n]+[ \t]+<[^<>\s]+@[^<>\s]+>[ \t]*$",
+    r"^Signed-off-by:[ \t]+[^\s<>\r\n](?:[^<>\r\n]*[^\s<>\r\n])?"
+    r"[ \t]+<[^<>\s]+@[^<>\s]+>[ \t]*$",
     re.IGNORECASE | re.MULTILINE,
 )
 
