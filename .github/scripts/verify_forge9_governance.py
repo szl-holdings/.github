@@ -227,8 +227,6 @@ def verify_gate_contract() -> None:
         "merge_group:",
         "types: [checks_requested]",
         "persist-credentials: false",
-        "github.event.merge_group.base_sha",
-        "github.event.merge_group.head_sha",
         "github.event.pull_request.base.sha",
         "github.event.pull_request.head.sha",
         ".github/scripts/dco_check.py",
@@ -241,6 +239,20 @@ def verify_gate_contract() -> None:
         fail("DCO must not publish a manual false-green status")
     if "github.event_name != 'pull_request'" in dco_template:
         fail("DCO merge-group and push validation must not use a fallback pass")
+    dco_source = (ROOT / ".github/scripts/dco_check.py").read_text(encoding="utf-8")
+    for marker in (
+        'payload.get("action") == "checks_requested"',
+        'group.get("base_ref") == "refs/heads/main"',
+        'group.get("base_sha")',
+        'group.get("head_sha")',
+        "checked_out_head(repo) == head_sha",
+        '"merge-base", "--is-ancestor"',
+        '"interpret-trailers", "--parse"',
+        "Signed-off-by does not match the commit author",
+        "pull-request commit count changed during validation",
+    ):
+        if marker not in dco_source:
+            fail(f"trusted DCO checker is missing {marker!r}")
 
     attestor_template = (
         ROOT / ".github/workflows/attest-and-approve.yml"

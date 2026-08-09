@@ -205,12 +205,20 @@ class DcoCheckTests(unittest.TestCase):
             "merge_group:",
             "types: [checks_requested]",
             "persist-credentials: false",
-            "github.event.merge_group.base_sha",
-            "github.event.merge_group.head_sha",
             "github.event.pull_request.base.sha",
             "github.event.pull_request.head.sha",
         ):
             self.assertIn(marker, workflow)
+        checker = (Path(__file__).resolve().parent / "dco_check.py").read_text(
+            encoding="utf-8"
+        )
+        for marker in (
+            'group.get("base_sha")',
+            'group.get("head_sha")',
+            '"merge-base", "--is-ancestor"',
+            '"interpret-trailers", "--parse"',
+        ):
+            self.assertIn(marker, checker)
         self.assertNotIn("\n  pull_request:\n", workflow)
         self.assertNotIn("workflow_dispatch:", workflow)
         self.assertNotIn("github.event_name != 'pull_request'", workflow)
