@@ -265,21 +265,13 @@ def source_revision_is_dockerignored(repo_root, dockerfile_rel, revision_rel):
         "/".join(parents[: index + 1])
         for index in range(len(parents))
     ]
-    candidates = [path] + [
-        "/".join(parents[: index + 1])
-        for index in range(len(parents))
-    ]
-    matched = False
+    candidates = [path] + parent_candidates
+    ignored = {candidate: False for candidate in candidates}
     for negated, pattern in _dockerignore_patterns(ignore_path):
-        if negated != matched:
-            continue
-        if not negated and any(
-            pattern.fullmatch(parent) for parent in parent_candidates
-        ):
-            return ignore_rel
-        if any(pattern.fullmatch(candidate) for candidate in candidates):
-            matched = not negated
-    return ignore_rel if matched else None
+        for candidate in candidates:
+            if pattern.fullmatch(candidate):
+                ignored[candidate] = not negated
+    return ignore_rel if any(ignored.values()) else None
 
 
 def read_source_bytes(repo_root, target_path, meta):

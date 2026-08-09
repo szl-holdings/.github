@@ -505,6 +505,26 @@ class TestDeriveReadmePolicy(unittest.TestCase):
                 source_sha="a" * 40,
             )
 
+    def test_later_rule_can_reinclude_ignored_parent(self):
+        manifest, files = self._derive(
+            "FROM scratch\nCOPY space /app/space\n",
+            {
+                ".dockerignore": "space\n!space\n",
+                "space/app.py": "pass\n",
+            },
+            include_readme=False,
+            source_revision_file="space/SOURCE_REVISION",
+            source_sha="a" * 40,
+        )
+
+        self.assertEqual(
+            manifest["source_revision_file"],
+            "space/SOURCE_REVISION",
+        )
+        self.assertTrue(
+            files["space/SOURCE_REVISION"]["generated_from_source_sha"]
+        )
+
     def test_dockerignore_negation_reincludes_source_revision(self):
         manifest, files = self._derive(
             "FROM scratch\nCOPY space /app/space\n",
