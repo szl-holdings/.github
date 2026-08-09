@@ -21,21 +21,28 @@ jobs:
       - name: Checkout exact candidate without credentials
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          repository: ${{ github.event_name == 'pull_request_target' && github.event.pull_request.head.repo.full_name || github.repository }}
-          ref: ${{ github.event_name == 'pull_request_target' && github.event.pull_request.head.sha || github.event_name == 'merge_group' && github.event.merge_group.head_sha || github.sha }}
+          ref: ${{ github.event_name == 'pull_request_target' && format('refs/pull/{0}/head', github.event.pull_request.number) || github.event_name == 'merge_group' && github.event.merge_group.head_sha || github.sha }}
           path: candidate
           fetch-depth: 0
           persist-credentials: false
 
-      - name: Checkout trusted base checker for pull requests
-        if: github.event_name == 'pull_request_target'
+      - name: Checkout exact trusted checker revision
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          repository: ${{ github.repository }}
-          ref: ${{ github.event.pull_request.base.sha }}
+          ref: ${{ github.event_name == 'pull_request_target' && github.event.pull_request.base.sha || github.event_name == 'merge_group' && github.event.merge_group.base_sha || github.event.before }}
           path: trusted
           fetch-depth: 1
           persist-credentials: false
+
+      - name: Import current protected base into candidate graph
+        if: github.event_name == 'pull_request_target'
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          set -euo pipefail
+          git -C "$GITHUB_WORKSPACE/candidate" fetch \
+            --no-tags "$GITHUB_WORKSPACE/trusted" "$BASE_SHA"
+          git -C "$GITHUB_WORKSPACE/candidate" cat-file -e "$BASE_SHA^{commit}"
 
       - name: Validate exact pull-request commits from trusted base
         if: github.event_name == 'pull_request_target'
@@ -49,13 +56,13 @@ jobs:
       - name: Validate exact merge-group range
         if: github.event_name == 'merge_group'
         run: >-
-          python "$GITHUB_WORKSPACE/candidate/.github/scripts/dco_check.py"
+          python "$GITHUB_WORKSPACE/trusted/.github/scripts/dco_check.py"
           --repo-root "$GITHUB_WORKSPACE/candidate"
           --event-path "$GITHUB_EVENT_PATH"
 
       - name: Validate exact protected push range
         if: github.event_name == 'push'
         run: >-
-          python "$GITHUB_WORKSPACE/candidate/.github/scripts/dco_check.py"
+          python "$GITHUB_WORKSPACE/trusted/.github/scripts/dco_check.py"
           --repo-root "$GITHUB_WORKSPACE/candidate"
           --event-path "$GITHUB_EVENT_PATH"

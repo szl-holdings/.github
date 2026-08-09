@@ -106,11 +106,16 @@ def validate_commits(
     expected_head: str,
     *,
     allow_merge_commits: bool = False,
+    checked_out_head_sha: str | None = None,
 ) -> int:
     require(shas, "candidate commit set is empty")
     require(len(shas) == len(set(shas)), "candidate commit set contains duplicate SHAs")
     require(shas[-1] == expected_head, "last candidate commit does not match expected head")
-    require(checked_out_head(repo) == expected_head, "checked-out HEAD does not match expected head")
+    expected_checkout = checked_out_head_sha or expected_head
+    require(
+        checked_out_head(repo) == expected_checkout,
+        "checked-out HEAD does not match expected head",
+    )
     for sha in shas:
         validate_commit(repo, sha, allow_merge_commit=allow_merge_commits)
     return len(shas)
@@ -207,6 +212,37 @@ def merge_group_subject(payload: dict[str, Any], github_sha: str) -> tuple[str, 
     return base_sha, head_sha
 
 
+def validate_merge_group(repo: Path, base_sha: str, head_sha: str) -> int:
+    base_sha = require_sha(base_sha, "merge-group base SHA")
+    head_sha = require_sha(head_sha, "merge-group head SHA")
+    require(checked_out_head(repo) == head_sha, "checked-out HEAD does not match merge-group head")
+    parents, _, _, _ = commit_record(repo, head_sha)
+    require(len(parents) == 2, "merge-group head is not a two-parent synthetic merge")
+    ancestor = subprocess.run(
+        ["git", "merge-base", "--is-ancestor", base_sha, head_sha],
+        cwd=repo,
+        capture_output=True,
+        check=False,
+        timeout=30,
+    )
+    require(ancestor.returncode == 0, "merge-group base SHA is not an ancestor of head SHA")
+    range_shas = [
+        line.strip()
+        for line in git(repo, "rev-list", "--reverse", f"{base_sha}..{head_sha}").splitlines()
+        if line.strip()
+    ]
+    require(range_shas and range_shas[-1] == head_sha, "merge-group range does not end at head")
+    candidate_shas = range_shas[:-1]
+    require(candidate_shas, "merge-group contains no constituent commits")
+    return validate_commits(
+        repo,
+        candidate_shas,
+        candidate_shas[-1],
+        allow_merge_commits=True,
+        checked_out_head_sha=head_sha,
+    )
+
+
 def push_subject(payload: dict[str, Any], github_sha: str) -> tuple[str, str]:
     require(payload.get("ref") == "refs/heads/main", "push ref is not main")
     base_sha = require_sha(payload.get("before"), "push before SHA")
@@ -283,7 +319,7 @@ def main() -> int:
         )
     elif event_name == "merge_group":
         base_sha, head_sha = merge_group_subject(payload, github_sha)
-        count = validate_range(repo, base_sha, head_sha)
+        count = validate_merge_group(repo, base_sha, head_sha)
     elif event_name == "push":
         base_sha, head_sha = push_subject(payload, github_sha)
         count = validate_range(repo, base_sha, head_sha)

@@ -193,6 +193,48 @@ class DcoCheckTests(unittest.TestCase):
         self.assert_rejected("checks_requested", dco.merge_group_subject, wrong_action, head)
         self.assert_rejected("differs", dco.merge_group_subject, payload, "f" * 40)
 
+    def test_merge_group_validates_constituents_not_synthetic_head(self) -> None:
+        candidate = self.commit(
+            "fix: queued change\n\nSigned-off-by: Series A Builder <builder@example.com>"
+        )
+        tree = self.git("rev-parse", f"{candidate}^{{tree}}")
+        queue_head = self.git(
+            "commit-tree",
+            tree,
+            "-p",
+            self.base,
+            "-p",
+            candidate,
+            input_text="Merge queue candidate\n",
+        )
+        self.git("reset", "--hard", queue_head)
+
+        self.assertEqual(
+            dco.validate_merge_group(self.repo, self.base, queue_head),
+            1,
+        )
+
+        self.git("reset", "--hard", self.base)
+        unsigned = self.commit("fix: unsigned queued change")
+        tree = self.git("rev-parse", f"{unsigned}^{{tree}}")
+        unsigned_queue_head = self.git(
+            "commit-tree",
+            tree,
+            "-p",
+            self.base,
+            "-p",
+            unsigned,
+            input_text="Merge queue candidate\n",
+        )
+        self.git("reset", "--hard", unsigned_queue_head)
+        self.assert_rejected(
+            "no valid terminal",
+            dco.validate_merge_group,
+            self.repo,
+            self.base,
+            unsigned_queue_head,
+        )
+
     def test_push_identity_contract(self) -> None:
         head = self.commit("fix: push\n\nSigned-off-by: Series A Builder <builder@example.com>")
         payload = {"ref": "refs/heads/main", "before": self.base, "after": head}
@@ -362,8 +404,11 @@ class DcoCheckTests(unittest.TestCase):
             "merge_group:",
             "types: [checks_requested]",
             "persist-credentials: false",
+            "format('refs/pull/{0}/head', github.event.pull_request.number)",
             "github.event.pull_request.base.sha",
             "github.event.pull_request.head.sha",
+            "git -C \"$GITHUB_WORKSPACE/candidate\" fetch",
+            "trusted/.github/scripts/dco_check.py",
         ):
             self.assertIn(marker, workflow)
         checker = (Path(__file__).resolve().parent / "dco_check.py").read_text(
