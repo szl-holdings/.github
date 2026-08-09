@@ -167,7 +167,7 @@ class TestDeriveReadmePolicy(unittest.TestCase):
     def _derive(
         self, dockerfile, files, *, include_readme, readme_path="README.md",
         dockerfile_path="Dockerfile", smoke_paths=None,
-        source_revision_file="", source_sha="",
+        source_revision_file="", source_sha="", manifest_out_rel="",
     ):
         with tempfile.TemporaryDirectory() as repo_root:
             for rel, content in {dockerfile_path: dockerfile, **files}.items():
@@ -186,6 +186,11 @@ class TestDeriveReadmePolicy(unittest.TestCase):
                 smoke_paths=smoke_paths,
                 source_revision_file=source_revision_file,
                 source_sha=source_sha,
+                manifest_out=(
+                    os.path.join(repo_root, *manifest_out_rel.split("/"))
+                    if manifest_out_rel
+                    else ""
+                ),
             )
             return dep.derive(args)
 
@@ -306,6 +311,54 @@ class TestDeriveReadmePolicy(unittest.TestCase):
                 dockerfile_path="space/Dockerfile",
                 source_revision_file="Dockerfile",
                 source_sha="a" * 40,
+            )
+
+    def test_generated_source_revision_rejects_git_metadata_target(self):
+        with tempfile.TemporaryDirectory() as repo_root:
+            target = os.path.join(repo_root, ".git", "refs", "heads", "generated")
+            os.makedirs(os.path.dirname(target))
+
+            with self.assertRaisesRegex(dep.DeployContractError, "Git metadata"):
+                dep.materialize_source_revision_file(
+                    repo_root, ".git/refs/heads/generated", "a" * 40
+                )
+            self.assertFalse(os.path.exists(target))
+
+    def test_generated_source_revision_rejects_included_readme_collision(self):
+        with self.assertRaisesRegex(
+            dep.DeployContractError, "included README target"
+        ):
+            self._derive(
+                "FROM scratch\nCOPY space /app/space\n",
+                {"space/app.py": "pass\n"},
+                include_readme=True,
+                readme_path="space/SOURCE_REVISION",
+                source_revision_file="space/SOURCE_REVISION",
+                source_sha="a" * 40,
+            )
+
+    def test_generated_source_revision_rejects_excluded_copy_coverage(self):
+        with self.assertRaisesRegex(
+            dep.DeployContractError, "without --exclude"
+        ):
+            self._derive(
+                "FROM scratch\n"
+                "COPY --exclude=SOURCE_REVISION space /app/space\n",
+                {"space/app.py": "pass\n"},
+                include_readme=False,
+                source_revision_file="space/SOURCE_REVISION",
+                source_sha="a" * 40,
+            )
+
+    def test_generated_source_revision_rejects_manifest_output_collision(self):
+        with self.assertRaisesRegex(dep.DeployContractError, "manifest output"):
+            self._derive(
+                "FROM scratch\nCOPY manifest.json /app/manifest.json\n",
+                {},
+                include_readme=False,
+                source_revision_file="manifest.json",
+                source_sha="a" * 40,
+                manifest_out_rel="manifest.json",
             )
 
     def test_generated_source_revision_rejects_dangling_symlink(self):

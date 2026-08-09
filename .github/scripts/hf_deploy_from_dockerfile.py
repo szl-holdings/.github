@@ -106,6 +106,10 @@ def materialize_source_revision_file(repo_root, requested_path, source_sha):
             "lowercase 40-character SHA"
         )
     rel = normalize_repo_path(requested_path, label="source revision file")
+    if rel.split("/", 1)[0].casefold() == ".git":
+        raise DeployContractError(
+            "source revision file must not be inside Git metadata"
+        )
     if rel == "Dockerfile":
         raise DeployContractError(
             "source revision file collides with reserved Hugging Face "
@@ -169,11 +173,13 @@ def sha256(data: bytes) -> str:
 # --------------------------------------------------------------------------- #
 # Dockerfile COPY parsing (shared logic with hf_module_drift_check.py)
 # --------------------------------------------------------------------------- #
-def parse_copy_sources(dockerfile_text):
+def parse_copy_sources(dockerfile_text, *, eligible_sources=None):
     """Return COPY/ADD *source* tokens. Joins line-continuations, handles the
     JSON-array form, drops --flag options, and SKIPS `--from=` build-stage
     copies. A whole-context source is rejected because it cannot be represented
-    as a curated, independently attestable deploy set."""
+    as a curated, independently attestable deploy set. When requested,
+    eligible_sources receives only sources from instructions without
+    `--exclude`, which are safe to use as source-revision coverage."""
     logical = []
     buf = ""
     for raw in dockerfile_text.splitlines():
@@ -191,6 +197,7 @@ def parse_copy_sources(dockerfile_text):
         logical.append(buf)
 
     sources = []
+    revision_eligible = []
     for line in logical:
         m = re.match(r"^\s*(COPY|ADD)\s+(.*)$", line, re.IGNORECASE)
         if not m:
@@ -210,14 +217,18 @@ def parse_copy_sources(dockerfile_text):
                     f"invalid JSON-form Dockerfile instruction: {line.strip()}"
                 )
             sources.extend(arr[:-1])
+            revision_eligible.extend(arr[:-1])
             continue
         toks = rest.split()
         skip = False
+        has_exclude = False
         clean = []
         for t in toks:
             if t.startswith("--"):
                 if t.lower().startswith("--from"):
                     skip = True
+                if t.lower().startswith("--exclude"):
+                    has_exclude = True
                 continue
             clean.append(t)
         if skip:
@@ -238,22 +249,30 @@ def parse_copy_sources(dockerfile_text):
                     "the deployer requires an explicit curated source set"
                 )
         sources.extend(srcs)
+        if not has_exclude:
+            revision_eligible.extend(srcs)
 
-    out, seen = [], set()
-    for s in sources:
-        s = s.strip()
-        # Strip a literal leading "./" only -- NOT arbitrary leading "."/"/"
-        # chars, or a dotdir source like ".compliance/x" collapses to "compliance/x".
-        while s.startswith("./"):
-            s = s[2:]
-        if s in ("", "."):
-            raise DeployContractError(
-                "bare `COPY . <dest>` / `ADD . <dest>` is forbidden: "
-                "the deployer requires an explicit curated source set"
-            )
-        if s and s not in seen:
-            seen.add(s)
-            out.append(s)
+    def normalized_unique(raw_sources):
+        out, seen = [], set()
+        for source in raw_sources:
+            source = source.strip()
+            # Strip a literal leading "./" only -- NOT arbitrary leading "."/"/"
+            # chars, or a dotdir source like ".compliance/x" collapses.
+            while source.startswith("./"):
+                source = source[2:]
+            if source in ("", "."):
+                raise DeployContractError(
+                    "bare `COPY . <dest>` / `ADD . <dest>` is forbidden: "
+                    "the deployer requires an explicit curated source set"
+                )
+            if source and source not in seen:
+                seen.add(source)
+                out.append(source)
+        return out
+
+    out = normalized_unique(sources)
+    if eligible_sources is not None:
+        eligible_sources.extend(normalized_unique(revision_eligible))
     return out
 
 
@@ -550,24 +569,56 @@ def probe_smoke_routes(hf_repo, smoke_paths, retries=6, delay=5):
 # derive: Dockerfile -> deploy manifest (no network, no push)
 # --------------------------------------------------------------------------- #
 def derive(args):
+    readme_path = normalize_repo_path(
+        args.readme_path,
+        label="README source path",
+    )
+    requested_revision = getattr(args, "source_revision_file", "")
+    if requested_revision:
+        revision_candidate = normalize_repo_path(
+            requested_revision,
+            label="source revision file",
+        )
+        if (
+            args.include_readme
+            and revision_candidate.casefold() == readme_path.casefold()
+        ):
+            raise DeployContractError(
+                "source revision file collides with the included README target"
+            )
+        manifest_out = str(getattr(args, "manifest_out", "") or "")
+        if manifest_out:
+            root = os.path.realpath(args.repo_root)
+            revision_full = os.path.realpath(
+                os.path.join(root, *revision_candidate.split("/"))
+            )
+            manifest_full = os.path.realpath(os.path.abspath(manifest_out))
+            if os.path.normcase(revision_full) == os.path.normcase(manifest_full):
+                raise DeployContractError(
+                    "source revision file collides with the manifest output"
+                )
     revision_rel = materialize_source_revision_file(
         args.repo_root,
-        getattr(args, "source_revision_file", ""),
+        requested_revision,
         getattr(args, "source_sha", ""),
     )
     dockerfile_rel, df_path = source_file(args.repo_root, args.dockerfile_path)
     with open(df_path, "rb") as fh:
         dockerfile_text = fh.read().decode("utf-8", "replace")
-    sources = parse_copy_sources(dockerfile_text)
+    eligible_sources = []
+    sources = parse_copy_sources(
+        dockerfile_text,
+        eligible_sources=eligible_sources,
+    )
     tree = local_tree(args.repo_root)
     targets, unresolved = expand_sources(sources, tree)
+    eligible_targets, _ = expand_sources(eligible_sources, tree)
 
     # include-readme is authoritative. A README may already be in the derived
     # set because the Dockerfile explicitly COPYs it; remove that exact path
     # when the caller owns the Space card separately. Normalize the CLI path to
     # the forward-slash form used by local_tree/expand_sources, without filtering
     # unrelated nested README files.
-    readme_path = normalize_repo_path(args.readme_path, label="README source path")
     if not args.include_readme:
         targets.pop(readme_path, None)
 
@@ -576,9 +627,10 @@ def derive(args):
             "Dockerfile COPY/ADD sources were not found in the checkout: "
             + ", ".join(sorted(unresolved))
         )
-    if revision_rel and revision_rel not in targets:
+    if revision_rel and revision_rel not in eligible_targets:
         raise DeployContractError(
             "source revision file is not covered by a Dockerfile COPY/ADD "
+            "instruction without --exclude: "
             f"source: {revision_rel!r}"
         )
 
