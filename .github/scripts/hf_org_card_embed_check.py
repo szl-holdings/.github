@@ -393,8 +393,44 @@ def validate_document(document: str) -> list[str]:
             rf"@media\s*\(\s*max-width\s*:\s*{max_width}px\s*\)\s*\{{",
             re.IGNORECASE,
         )
+        searchable = list(css)
+        index = 0
+        quote = ""
+        in_comment = False
+        while index < len(css):
+            if in_comment:
+                searchable[index] = " "
+                if css.startswith("*/", index):
+                    searchable[index + 1] = " "
+                    in_comment = False
+                    index += 2
+                    continue
+                index += 1
+                continue
+            if quote:
+                searchable[index] = " "
+                if css[index] == "\\":
+                    if index + 1 < len(css):
+                        searchable[index + 1] = " "
+                    index += 2
+                    continue
+                if css[index] == quote:
+                    quote = ""
+                index += 1
+                continue
+            if css.startswith("/*", index):
+                searchable[index] = searchable[index + 1] = " "
+                in_comment = True
+                index += 2
+                continue
+            if css[index] in {'"', "'"}:
+                quote = css[index]
+                searchable[index] = " "
+            index += 1
+        searchable_css = "".join(searchable)
+
         bodies: list[str] = []
-        for match in marker.finditer(css):
+        for match in marker.finditer(searchable_css):
             depth = 1
             index = match.end()
             body_start = index
