@@ -424,54 +424,79 @@ def validate_document(document: str) -> list[str]:
         return "".join(searchable)
 
     searchable_css = mask_css_non_code(css)
-    normalized = re.sub(r"\s+", " ", searchable_css)
 
-    def media_bodies(max_width: int) -> list[str]:
-        marker = re.compile(
-            rf"@media\s*\(\s*max-width\s*:\s*{max_width}px\s*\)\s*\{{",
-            re.IGNORECASE,
-        )
-
-        bodies: list[str] = []
-        for match in marker.finditer(searchable_css):
+    def direct_blocks(source: str) -> list[tuple[str, str]]:
+        blocks: list[tuple[str, str]] = []
+        cursor = 0
+        while cursor < len(source):
+            open_brace = source.find("{", cursor)
+            if open_brace < 0:
+                break
+            prelude = source[cursor:open_brace]
+            if ";" in prelude:
+                prelude = prelude.rsplit(";", 1)[-1]
+            prelude = re.sub(r"\s+", " ", prelude.strip())
             depth = 1
-            index = match.end()
-            body_start = index
-            quote = ""
-            in_comment = False
-            while index < len(css):
-                if in_comment:
-                    if css.startswith("*/", index):
-                        in_comment = False
-                        index += 2
-                        continue
-                    index += 1
-                    continue
-                if quote:
-                    if css[index] == "\\":
-                        index += 2
-                        continue
-                    if css[index] == quote:
-                        quote = ""
-                    index += 1
-                    continue
-                if css.startswith("/*", index):
-                    in_comment = True
-                    index += 2
-                    continue
-                if css[index] in {'"', "'"}:
-                    quote = css[index]
-                elif css[index] == "{":
+            index = open_brace + 1
+            while index < len(source):
+                if source[index] == "{":
                     depth += 1
-                elif css[index] == "}":
+                elif source[index] == "}":
                     depth -= 1
                     if depth == 0:
-                        bodies.append(
-                            re.sub(r"\s+", " ", searchable_css[body_start:index])
-                        )
                         break
                 index += 1
-        return bodies
+            if depth:
+                break
+            if prelude:
+                blocks.append((prelude, source[open_brace + 1 : index]))
+            cursor = index + 1
+        return blocks
+
+    top_level_blocks = direct_blocks(searchable_css)
+
+    def direct_declarations(body: str) -> str:
+        declarations = list(body)
+        depth = 0
+        for index, character in enumerate(body):
+            if character == "{":
+                depth += 1
+                declarations[index] = " "
+            elif character == "}":
+                declarations[index] = " "
+                depth = max(0, depth - 1)
+            elif depth:
+                declarations[index] = " "
+        return "".join(declarations)
+
+    def direct_rule(prelude: str, body: str) -> str:
+        return f"{prelude} {{{direct_declarations(body)}}}"
+
+    unconditional_css = re.sub(
+        r"\s+",
+        " ",
+        " ".join(
+            direct_rule(prelude, body)
+            for prelude, body in top_level_blocks
+            if not prelude.startswith("@")
+        ),
+    )
+
+    def media_direct_rules(max_width: int) -> str:
+        media_prelude = re.compile(
+            rf"@media\s*\(\s*max-width\s*:\s*{max_width}px\s*\)",
+            re.IGNORECASE,
+        )
+        rules = []
+        for prelude, body in top_level_blocks:
+            if not media_prelude.fullmatch(prelude):
+                continue
+            rules.extend(
+                direct_rule(child_prelude, child_body)
+                for child_prelude, child_body in direct_blocks(body)
+                if not child_prelude.startswith("@")
+            )
+        return re.sub(r"\s+", " ", " ".join(rules))
 
     required_patterns = {
         "44px touch token": r"--tap:\s*44px",
@@ -480,7 +505,7 @@ def validate_document(document: str) -> list[str]:
         "bounded embedded shell": rf"{re.escape(ROOT_SELECTOR)} \.szl-hf-shell \{{[^}}]*width:\s*min\(1180px,\s*calc\(100%\s*-\s*40px\)\);[^}}]*max-width:\s*100%",
     }
     for label, pattern in required_patterns.items():
-        if not re.search(pattern, normalized):
+        if not re.search(pattern, unconditional_css):
             failures.append(f"missing {label} contract")
     responsive_patterns = {
         "one-column mobile CTA": (
@@ -501,23 +526,47 @@ def validate_document(document: str) -> list[str]:
         ),
     }
     for label, (max_width, pattern) in responsive_patterns.items():
-        if not any(
-            re.search(pattern, body) for body in media_bodies(max_width)
-        ):
+        if not re.search(pattern, media_direct_rules(max_width)):
             failures.append(f"missing {label} contract")
+    conditional_markers = {
+        "prefers-reduced-motion": re.compile(
+            r"@media\s*\(\s*prefers-reduced-motion\s*:\s*reduce\s*\)",
+            re.IGNORECASE,
+        ),
+        "prefers-contrast": re.compile(
+            r"@media\s*\(\s*prefers-contrast\s*:\s*more\s*\)",
+            re.IGNORECASE,
+        ),
+        "forced-colors": re.compile(
+            r"@media\s*\(\s*forced-colors\s*:\s*active\s*\)",
+            re.IGNORECASE,
+        ),
+    }
+    top_level_preludes = [prelude for prelude, _ in top_level_blocks]
+    for marker, pattern in conditional_markers.items():
+        if not any(pattern.fullmatch(prelude) for prelude in top_level_preludes):
+            failures.append(f"missing CSS marker: {marker}")
+    unconditional_declarations = re.sub(
+        r"\s+",
+        " ",
+        " ".join(
+            direct_declarations(body)
+            for prelude, body in top_level_blocks
+            if not prelude.startswith("@")
+        ),
+    )
     for marker in (
-        "prefers-reduced-motion",
-        "prefers-contrast",
-        "forced-colors",
         "safe-area-inset-top",
         "safe-area-inset-right",
         "safe-area-inset-bottom",
         "safe-area-inset-left",
         "overflow-wrap: anywhere",
     ):
-        if marker not in searchable_css:
+        if marker not in unconditional_declarations:
             failures.append(f"missing CSS marker: {marker}")
-    if re.search(r"(?i)overflow-x\s*:\s*(?:hidden|auto|clip)", css):
+    if re.search(
+        r"(?i)overflow-x\s*:\s*(?:hidden|auto|clip)", searchable_css
+    ):
         failures.append("horizontal overflow must remain observable")
 
     if 'href="#szl-hf-main"' not in document:

@@ -212,6 +212,30 @@ class EmbedContractTests(unittest.TestCase):
                 failures = check.validate_document(commented_in_place)
                 self.assertTrue(any(label in item for item in failures))
 
+                contradictory = valid_document().replace(rule, "", 1)
+                contradictory = contradictory.replace(
+                    f"@media (max-width: {max_width}px) {{",
+                    f"@media (max-width: {max_width}px) {{\n"
+                    f"  @media (min-width: {max_width + 1}px) {{\n"
+                    f"{rule}\n"
+                    "  }",
+                    1,
+                )
+                failures = check.validate_document(contradictory)
+                self.assertTrue(any(label in item for item in failures))
+
+                nested_under_selector = valid_document().replace(rule, "", 1)
+                nested_under_selector = nested_under_selector.replace(
+                    f"@media (max-width: {max_width}px) {{",
+                    f"@media (max-width: {max_width}px) {{\n"
+                    "  #szl-hf-org-card .szl-hf-never-match {\n"
+                    f"{rule}\n"
+                    "  }",
+                    1,
+                )
+                failures = check.validate_document(nested_under_selector)
+                self.assertTrue(any(label in item for item in failures))
+
     def test_rejects_commented_bounded_shell(self):
         shell_rule = (
             "#szl-hf-org-card .szl-hf-shell {\n"
@@ -224,6 +248,48 @@ class EmbedContractTests(unittest.TestCase):
         failures = check.validate_document(
             document.replace(shell_rule, f"/* {shell_rule} */", 1)
         )
+        self.assertTrue(
+            any("bounded embedded shell" in item for item in failures)
+        )
+
+    def test_rejects_conditionally_bounded_shell(self):
+        shell_rule = (
+            "#szl-hf-org-card .szl-hf-shell {\n"
+            "  width: min(1180px, calc(100% - 40px));\n"
+            "  max-width: 100%;\n"
+            "}"
+        )
+        document = valid_document()
+        self.assertIn(shell_rule, document)
+        document = document.replace(shell_rule, "", 1)
+        document = document.replace(
+            "</style>",
+            f"@media (min-width: 9999px) {{\n{shell_rule}\n}}\n</style>",
+            1,
+        )
+        failures = check.validate_document(document)
+        self.assertTrue(
+            any("bounded embedded shell" in item for item in failures)
+        )
+
+    def test_rejects_nested_bounded_shell(self):
+        shell_rule = (
+            "#szl-hf-org-card .szl-hf-shell {\n"
+            "  width: min(1180px, calc(100% - 40px));\n"
+            "  max-width: 100%;\n"
+            "}"
+        )
+        document = valid_document()
+        self.assertIn(shell_rule, document)
+        document = document.replace(shell_rule, "", 1)
+        document = document.replace(
+            "</style>",
+            "#szl-hf-org-card .szl-hf-never-match {\n"
+            f"{shell_rule}\n"
+            "}\n</style>",
+            1,
+        )
+        failures = check.validate_document(document)
         self.assertTrue(
             any("bounded embedded shell" in item for item in failures)
         )
