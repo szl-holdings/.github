@@ -13,7 +13,8 @@ tags:
   - governed-ai
 ---
 
-<!-- markdownlint-disable MD013 MD060 -->
+<!-- markdownlint-disable MD013 -->
+<!-- szl-responsive-card:v1 -->
 
 # {{DATASET_NAME}}
 
@@ -22,18 +23,16 @@ tags:
 **Release:** `{{IMMUTABLE_REVISION}}` · **Status:** {{STATUS_LABEL}} ·
 **License:** {{LICENSE_NAME}}
 
-## Dataset summary
+## At a glance
 
 {{WHAT_THE_DATASET_CONTAINS_WHO_CREATED_IT_AND_WHAT_IT_SUPPORTS}}
 
-| Property | Value |
-| --- | --- |
-| Rows or artifacts | {{COUNT}} |
-| Splits | {{SPLITS}} |
-| Formats | {{FORMATS}} |
-| Languages | {{LANGUAGES}} |
-| Source revision | `{{SOURCE_REVISION}}` |
-| Manifest digest | `{{MANIFEST_DIGEST}}` |
+- **Rows or artifacts:** {{COUNT}}
+- **Splits:** {{SPLITS}}
+- **Formats:** {{FORMATS}}
+- **Languages:** {{LANGUAGES}}
+- **Source revision:** `{{SOURCE_REVISION}}`
+- **Manifest digest:** `{{MANIFEST_DIGEST}}`
 
 ## Supported and excluded uses
 
@@ -59,26 +58,21 @@ Pin the exact dataset revision in reproducible work.
 
 ### Splits
 
-| Split | Records | Purpose |
-|---|---:|---|
-| `{{SPLIT_NAME}}` | {{RECORD_COUNT}} | {{SPLIT_PURPOSE}} |
+- **`{{SPLIT_NAME}}`:** {{RECORD_COUNT}} records. {{SPLIT_PURPOSE}}
 
 ### Fields
 
-| Field | Type | Nullable | Description |
-|---|---|---:|---|
-| `{{FIELD_NAME}}` | `{{FIELD_TYPE}}` | {{YES_OR_NO}} | {{FIELD_DESCRIPTION}} |
+- **`{{FIELD_NAME}}`** (`{{FIELD_TYPE}}`, nullable: {{YES_OR_NO}}):
+  {{FIELD_DESCRIPTION}}
 
 ## Provenance and governance
 
 Document collection sources, dates, licenses, consent, attribution,
 preprocessing, filtering, deduplication, synthetic generation, and derivation.
 
-| Stage | Source | Revision or digest |
-| --- | --- | --- |
-| Raw input | {{RAW_SOURCE_LINK}} | `{{RAW_SOURCE_DIGEST}}` |
-| Transformation | {{PIPELINE_LINK}} | `{{PIPELINE_REVISION}}` |
-| Validation | {{VALIDATION_LINK}} | `{{VALIDATION_RECEIPT}}` |
+- **Raw input:** {{RAW_SOURCE_LINK}} at `{{RAW_SOURCE_DIGEST}}`
+- **Transformation:** {{PIPELINE_LINK}} at `{{PIPELINE_REVISION}}`
+- **Validation:** {{VALIDATION_LINK}} with receipt `{{VALIDATION_RECEIPT}}`
 
 ### Privacy and PII
 
@@ -86,11 +80,9 @@ preprocessing, filtering, deduplication, synthetic generation, and derivation.
 
 ## Validation
 
-| Check | Result | Evidence |
-| --- | --- | --- |
-| Schema | {{RESULT}} | {{EVIDENCE_LINK}} |
-| Integrity | {{RESULT}} | {{EVIDENCE_LINK}} |
-| Contamination or leakage | {{RESULT}} | {{EVIDENCE_LINK}} |
+- **Schema:** {{RESULT}}. Evidence: {{EVIDENCE_LINK}}
+- **Integrity:** {{RESULT}}. Evidence: {{EVIDENCE_LINK}}
+- **Contamination or leakage:** {{RESULT}}. Evidence: {{EVIDENCE_LINK}}
 
 ## Known gaps and bias
 

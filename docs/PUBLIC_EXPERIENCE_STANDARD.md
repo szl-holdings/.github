@@ -207,6 +207,31 @@ running route returns that revision and the primary smoke marker. A Hub commit,
 Use the templates in [`templates/`](../templates/README.md) as the adoption
 baseline.
 
+### Responsive artifact contract
+
+Hugging Face owns the organization shell and the Model, Dataset, App, Files,
+and Community tab chrome. SZL owns the content embedded inside those surfaces.
+Do not claim that a repository README or Space application can restyle the
+host chrome.
+
+Every owned Hugging Face surface must pass these representative widths:
+
+- 320 to 390 CSS pixels for phones, including safe-area insets;
+- 768 CSS pixels for portrait tablets;
+- 1366 CSS pixels for laptops; and
+- 1728 CSS pixels for wide desktops.
+
+At each width, owned content must have no horizontal page scroll, clipped
+navigation, hidden evidence stages, or fixed-width reading columns. The first
+useful action must not depend on a decorative image finishing download. Touch
+targets are at least 44 CSS pixels, calls to action reflow to one column on
+phones, and long identifiers may wrap without changing their bytes.
+
+Model, dataset, and Space cards use short at-a-glance lists instead of wide
+summary tables. Use tables only when the comparison itself is the user task;
+provide an equivalent stacked reading order for mobile. Space applications
+must test their own iframe content separately from the Hugging Face tabs.
+
 ## Accessibility and performance gate
 
 Critical user flows target WCAG 2.2 AA. Verification includes keyboard-only

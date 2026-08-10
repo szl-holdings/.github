@@ -392,6 +392,10 @@ def validate_document(document: str) -> list[str]:
         "48px CTA": rf"{re.escape(ROOT_SELECTOR)} \.szl-hf-button \{{[^}}]*display:\s*inline-flex\s*!important;[^}}]*min-height:\s*48px",
         "44px navigation": rf"{re.escape(ROOT_SELECTOR)} nav a \{{[^}}]*min-height:\s*var\(--tap\)",
         "one-column mobile CTA": rf"@media \(max-width:\s*640px\).*?{re.escape(ROOT_SELECTOR)} \.szl-hf-actions \.szl-hf-button \{{[^}}]*width:\s*100%\s*!important",
+        "bounded embedded shell": rf"{re.escape(ROOT_SELECTOR)} \.szl-hf-shell \{{[^}}]*width:\s*min\(1180px,\s*calc\(100%\s*-\s*40px\)\);[^}}]*max-width:\s*100%",
+        "mobile navigation reflow": rf"@media \(max-width:\s*760px\).*?{re.escape(ROOT_SELECTOR)} nav \{{[^}}]*grid-template-columns:\s*repeat\(2,\s*minmax\(0,\s*1fr\)\)",
+        "compact mobile hero": rf"@media \(max-width:\s*640px\).*?{re.escape(ROOT_SELECTOR)} \.szl-hf-hero \{{[^}}]*min-height:\s*0",
+        "single-column mobile evidence loop": rf"@media \(max-width:\s*640px\).*?{re.escape(ROOT_SELECTOR)} \.szl-hf-steps \{{[^}}]*grid-template-columns:\s*1fr",
     }
     for label, pattern in required_patterns.items():
         if not re.search(pattern, normalized):

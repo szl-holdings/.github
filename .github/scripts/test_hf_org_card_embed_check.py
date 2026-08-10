@@ -12,6 +12,10 @@ def valid_document() -> str:
 #szl-hf-org-card {
   --tap: 44px;
 }
+#szl-hf-org-card .szl-hf-shell {
+  width: min(1180px, calc(100% - 40px));
+  max-width: 100%;
+}
 #szl-hf-org-card .szl-hf-button {
   display: inline-flex !important;
   min-height: 48px;
@@ -35,6 +39,18 @@ def valid_document() -> str:
   }
   #szl-hf-org-card .szl-hf-actions .szl-hf-button {
     width: 100% !important;
+  }
+  #szl-hf-org-card .szl-hf-hero {
+    min-height: 0;
+  }
+  #szl-hf-org-card .szl-hf-steps {
+    grid-template-columns: 1fr;
+  }
+}
+@media (max-width: 760px) {
+  #szl-hf-org-card nav {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 @media (prefers-reduced-motion: reduce) {
@@ -72,6 +88,7 @@ def valid_document() -> str:
       </div>
     </div>
   </main>
+  <ol class="szl-hf-steps"><li class="szl-hf-step">Verify</li></ol>
   <!-- canonical deployment source: https://szlholdings-readme.static.hf.space/deployment.json -->
 </div>
 </body>
@@ -129,6 +146,23 @@ class EmbedContractTests(unittest.TestCase):
         )
         failures = check.validate_document(document)
         self.assertTrue(any("mobile CTA contract" in item for item in failures))
+
+    def test_rejects_missing_mobile_evidence_reflow(self):
+        document = valid_document().replace(
+            "#szl-hf-org-card .szl-hf-steps {\n    grid-template-columns: 1fr;",
+            "#szl-hf-org-card .szl-hf-steps {\n    grid-template-columns: repeat(6, 1fr);",
+        )
+        failures = check.validate_document(document)
+        self.assertTrue(
+            any("single-column mobile evidence loop" in item for item in failures)
+        )
+
+    def test_rejects_unbounded_embedded_shell(self):
+        document = valid_document().replace(
+            "max-width: 100%;", "max-width: 1180px;", 1
+        )
+        failures = check.validate_document(document)
+        self.assertTrue(any("bounded embedded shell" in item for item in failures))
 
     def test_rejects_relative_navigation(self):
         document = valid_document().replace(

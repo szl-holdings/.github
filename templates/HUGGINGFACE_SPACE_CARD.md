@@ -22,6 +22,7 @@ tags:
 ---
 
 <!-- markdownlint-disable MD025 -->
+<!-- szl-responsive-card:v1 -->
 
 # {{SPACE_TITLE}}
 
@@ -51,11 +52,13 @@ Expected result: {{EXPECTED_RESULT_AND_EVIDENCE}}
 
 ## Immutable dependencies
 
-| Dependency | Repository | Revision |
-| --- | --- | --- |
-| Model | {{MODEL_ID_OR_NONE}} | `{{MODEL_REVISION_OR_NONE}}` |
-| Dataset | {{DATASET_ID_OR_NONE}} | `{{DATASET_REVISION_OR_NONE}}` |
-| Application | {{SOURCE_REPOSITORY}} | `{{SOURCE_REVISION}}` |
+- **Model:** {{MODEL_ID_OR_NONE}} at `{{MODEL_REVISION_OR_NONE}}`
+- **Dataset:** {{DATASET_ID_OR_NONE}} at `{{DATASET_REVISION_OR_NONE}}`
+- **Application:** {{SOURCE_REPOSITORY}} at `{{SOURCE_REVISION}}`
+
+The Hugging Face **App**, **Files**, and **Community** tabs are host chrome.
+The application inside the App tab must independently reflow without horizontal
+scroll at phone, tablet, laptop, and desktop widths.
 
 ## Runtime and evidence behavior
 
