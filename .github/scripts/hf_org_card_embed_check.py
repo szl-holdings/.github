@@ -621,20 +621,65 @@ def validate_document(document: str) -> list[str]:
         return discovered
 
     support_paths = discover_support_paths(top_level_blocks)
-    if len(support_paths) > 8:
-        failures.append("too many @supports branches for exhaustive cascade validation")
-    support_scenarios = [
+    protected_property = re.compile(
+        r"(?i)(?:^|[;{])\s*(?:--tap|display|min-height|width|max-width|"
+        r"grid-template-columns|grid-template|grid|all)\s*:"
+    )
+
+    def media_has_unmodeled_state(prelude: str) -> bool:
+        feature_names = re.findall(
+            r"\(\s*([A-Za-z-]+)\s*:", prelude, re.IGNORECASE
+        )
+        if any(
+            feature.casefold() not in {"min-width", "max-width"}
+            for feature in feature_names
+        ):
+            return True
+        residual = re.sub(r"\([^()]*\)", " ", prelude[len("@media") :])
+        media_tokens = re.findall(r"[A-Za-z-]+", residual.casefold())
+        return any(
+            token not in {"and", "or", "not", "only", "screen", "all"}
+            for token in media_tokens
+        )
+
+    def discover_conditional_media_paths(
+        blocks: list[tuple[str, str]], path: tuple[int, ...] = ()
+    ) -> list[tuple[int, ...]]:
+        discovered: list[tuple[int, ...]] = []
+        for block_index, (prelude, body) in enumerate(blocks):
+            lowered = prelude.lower()
+            block_path = path + (block_index,)
+            if lowered.startswith("@media"):
+                if media_has_unmodeled_state(prelude) and protected_property.search(body):
+                    discovered.append(block_path)
+                discovered.extend(
+                    discover_conditional_media_paths(direct_blocks(body), block_path)
+                )
+            elif lowered.startswith("@supports") or lowered.startswith("@layer"):
+                discovered.extend(
+                    discover_conditional_media_paths(direct_blocks(body), block_path)
+                )
+        return discovered
+
+    conditional_media_paths = discover_conditional_media_paths(top_level_blocks)
+    conditional_paths = [
+        *(("supports", path) for path in support_paths),
+        *(("media", path) for path in conditional_media_paths),
+    ]
+    if len(conditional_paths) > 8:
+        failures.append("too many conditional branches for exhaustive cascade validation")
+    conditional_scenarios = [
         frozenset(
-            support_path
-            for bit, support_path in enumerate(support_paths)
+            conditional_path
+            for bit, conditional_path in enumerate(conditional_paths)
             if mask & (1 << bit)
         )
-        for mask in range(1 << min(len(support_paths), 8))
+        for mask in range(1 << min(len(conditional_paths), 8))
     ]
 
     def cascade_rules_at_width(
         width: int,
-        enabled_supports: frozenset[tuple[int, ...]],
+        enabled_conditions: frozenset[tuple[str, tuple[int, ...]]],
     ) -> list[tuple[str, str, int | None]]:
         anonymous_layer_cursor = [0]
 
@@ -657,12 +702,18 @@ def validate_document(document: str) -> list[str]:
                         )
                     )
                 elif lowered.startswith("@media"):
+                    conditional_media_enabled = (
+                        block_path not in conditional_media_paths
+                        or ("media", block_path) in enabled_conditions
+                    )
                     collected.extend(
                         collect(
                             direct_blocks(body),
                             current_layer,
                             block_path,
-                            active and media_may_apply_at_width(prelude, width),
+                            active
+                            and conditional_media_enabled
+                            and media_may_apply_at_width(prelude, width),
                         )
                     )
                 elif lowered.startswith("@supports"):
@@ -671,7 +722,7 @@ def validate_document(document: str) -> list[str]:
                             direct_blocks(body),
                             current_layer,
                             block_path,
-                            active and block_path in enabled_supports,
+                            active and ("supports", block_path) in enabled_conditions,
                         )
                     )
                 elif lowered.startswith("@layer"):
@@ -779,10 +830,6 @@ def validate_document(document: str) -> list[str]:
         flush()
         return [item for item in compounds if item], combinators
 
-    def selector_compounds(selector: str) -> tuple[list[str], bool]:
-        compounds, combinators = selector_structure(selector)
-        return compounds, any(item in {"+", "~"} for item in combinators)
-
     def functional_pseudo_classes(compound: str) -> list[tuple[str, str]]:
         functions: list[tuple[str, str]] = []
         position = 0
@@ -848,6 +895,55 @@ def validate_document(document: str) -> list[str]:
                 )
             position = cursor
         return functions
+
+    def simple_pseudo_classes(compound: str) -> list[str]:
+        simple: list[str] = []
+        position = 0
+        brackets = 0
+        quote = ""
+        while position < len(compound):
+            character = compound[position]
+            if quote:
+                if character == "\\":
+                    position += 2
+                    continue
+                if character == quote:
+                    quote = ""
+                position += 1
+                continue
+            if character in {'"', "'"}:
+                quote = character
+                position += 1
+                continue
+            if character == "[":
+                brackets += 1
+                position += 1
+                continue
+            if character == "]":
+                brackets = max(0, brackets - 1)
+                position += 1
+                continue
+            if character != ":" or brackets or compound[position : position + 2] == "::":
+                position += 1
+                continue
+            name_start = position + 1
+            name_end = name_start
+            while name_end < len(compound) and re.match(r"[\w-]", compound[name_end]):
+                name_end += 1
+            if name_end >= len(compound) or compound[name_end] != "(":
+                if name_end > name_start:
+                    simple.append(compound[name_start:name_end].casefold())
+                position = name_end
+                continue
+            depth = 1
+            position = name_end + 1
+            while position < len(compound) and depth:
+                if compound[position] == "(":
+                    depth += 1
+                elif compound[position] == ")":
+                    depth -= 1
+                position += 1
+        return simple
 
     def without_pseudo_classes(compound: str) -> str:
         result: list[str] = []
@@ -931,6 +1027,30 @@ def validate_document(document: str) -> list[str]:
             if name in {"is", "where"} and not any(argument_matches):
                 return False
         tag, attributes, _ = element
+        form_controls = {
+            "button",
+            "fieldset",
+            "input",
+            "optgroup",
+            "option",
+            "select",
+            "textarea",
+        }
+        for name in simple_pseudo_classes(compound):
+            if name == "disabled" and not (
+                tag in form_controls and "disabled" in attributes
+            ):
+                return False
+            if name == "enabled" and not (
+                tag in form_controls and "disabled" not in attributes
+            ):
+                return False
+            if name in {"link", "any-link"} and not (
+                tag in {"a", "area"} and bool(attributes.get("href"))
+            ):
+                return False
+            if name == "root":
+                return False
         base = without_pseudo_classes(compound)
         without_attributes = re.sub(r"\[[^]]*\]", "", base)
         required_ids = CSS_ID.findall(without_attributes)
@@ -1286,7 +1406,7 @@ def validate_document(document: str) -> list[str]:
                 property_name,
             )
             for width in global_sample_widths
-            for support_scenario in support_scenarios
+            for support_scenario in conditional_scenarios
         ]
         if (
             not winner_matches(unconditional_winner, value_pattern, important)
@@ -1343,7 +1463,7 @@ def validate_document(document: str) -> list[str]:
                 property_name,
             )
             for width in responsive_sample_widths(max_width)
-            for support_scenario in support_scenarios
+            for support_scenario in conditional_scenarios
         ]
         if not winner_matches(
             exact_winner, value_pattern, important
