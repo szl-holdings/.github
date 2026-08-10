@@ -369,6 +369,46 @@ class EmbedContractTests(unittest.TestCase):
         failures = check.validate_document(document)
         self.assertTrue(any("mobile CTA contract" in item for item in failures))
 
+    def test_rejects_layered_important_mobile_cta_override(self):
+        document = valid_document().replace(
+            "</style>",
+            "@layer overrides {\n"
+            "  @media (max-width: 640px) {\n"
+            "    #szl-hf-org-card .szl-hf-actions .szl-hf-button {\n"
+            "      width: auto !important;\n"
+            "    }\n"
+            "  }\n"
+            "}\n</style>",
+            1,
+        )
+        failures = check.validate_document(document)
+        self.assertTrue(any("mobile CTA contract" in item for item in failures))
+
+    def test_ignores_layered_normal_override_of_unlayered_rule(self):
+        document = valid_document().replace(
+            "</style>",
+            "@layer overrides {\n"
+            "  @media (max-width: 640px) {\n"
+            "    #szl-hf-org-card .szl-hf-hero { min-height: 500px; }\n"
+            "  }\n"
+            "}\n</style>",
+            1,
+        )
+        self.assertEqual(check.validate_document(document), [])
+
+    def test_rejects_comma_separated_mobile_media_override(self):
+        document = valid_document().replace(
+            "</style>",
+            "@media (min-width: 1000px), (max-width: 640px) {\n"
+            "  #szl-hf-org-card .szl-hf-actions .szl-hf-button {\n"
+            "    width: auto !important;\n"
+            "  }\n"
+            "}\n</style>",
+            1,
+        )
+        failures = check.validate_document(document)
+        self.assertTrue(any("mobile CTA contract" in item for item in failures))
+
     def test_rejects_navigation_grid_shorthand_override(self):
         document = valid_document().replace(
             "</style>",

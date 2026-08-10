@@ -483,12 +483,14 @@ def validate_document(document: str) -> list[str]:
         return "".join(declarations)
 
     unconditional_rules = [
-        (prelude, body)
+        (prelude, body, None)
         for prelude, body in top_level_blocks
         if not prelude.startswith("@")
     ]
 
-    def exact_media_rules(max_width: int) -> list[tuple[str, str]]:
+    def exact_media_rules(
+        max_width: int,
+    ) -> list[tuple[str, str, int | None]]:
         media_prelude = re.compile(
             rf"@media\s*\(\s*max-width\s*:\s*{max_width}px\s*\)",
             re.IGNORECASE,
@@ -498,7 +500,7 @@ def validate_document(document: str) -> list[str]:
             if not media_prelude.fullmatch(prelude):
                 continue
             rules.extend(
-                (child_prelude, child_body)
+                (child_prelude, child_body, None)
                 for child_prelude, child_body in direct_blocks(body)
                 if not child_prelude.startswith("@")
             )
@@ -507,36 +509,96 @@ def validate_document(document: str) -> list[str]:
     def media_may_apply_at_width(prelude: str, width: int) -> bool:
         if not prelude.lower().startswith("@media"):
             return False
-        constraints = re.findall(
-            r"\(\s*(min|max)-width\s*:\s*(\d+)px\s*\)",
-            prelude,
-            re.IGNORECASE,
-        )
-        for bound, value in constraints:
-            limit = int(value)
-            if bound.lower() == "min" and width < limit:
-                return False
-            if bound.lower() == "max" and width > limit:
-                return False
-        return True
+        query_list = prelude[len("@media") :].strip()
+        for query in split_selector_members(query_list):
+            constraints = re.findall(
+                r"\(\s*(min|max)-width\s*:\s*(\d+)px\s*\)",
+                query,
+                re.IGNORECASE,
+            )
+            applies = True
+            for bound, value in constraints:
+                limit = int(value)
+                if bound.lower() == "min" and width < limit:
+                    applies = False
+                if bound.lower() == "max" and width > limit:
+                    applies = False
+            if applies:
+                return True
+        return False
 
-    def cascade_rules_at_width(width: int) -> list[tuple[str, str]]:
+    layer_orders: dict[str, int] = {}
+    for layer_match in re.finditer(
+        r"(?i)@layer(?:\s+([^;{]+))?\s*(?=[;{])", searchable_css
+    ):
+        names = split_selector_members((layer_match.group(1) or "").strip())
+        for name in names:
+            if name and name not in layer_orders:
+                layer_orders[name] = len(layer_orders)
+
+    def layer_order_for(name: str) -> int:
+        if name not in layer_orders:
+            layer_orders[name] = len(layer_orders)
+        return layer_orders[name]
+
+    def cascade_rules_at_width(
+        width: int,
+    ) -> list[tuple[str, str, int | None]]:
         def collect(
             blocks: list[tuple[str, str]],
-        ) -> list[tuple[str, str]]:
-            collected: list[tuple[str, str]] = []
-            for prelude, body in blocks:
+            current_layer: tuple[str, int] | None = None,
+            path: tuple[int, ...] = (),
+        ) -> list[tuple[str, str, int | None]]:
+            collected: list[tuple[str, str, int | None]] = []
+            for block_index, (prelude, body) in enumerate(blocks):
                 lowered = prelude.lower()
                 if not prelude.startswith("@"):
-                    collected.append((prelude, body))
+                    collected.append(
+                        (
+                            prelude,
+                            body,
+                            None if current_layer is None else current_layer[1],
+                        )
+                    )
                 elif lowered.startswith("@media"):
                     if media_may_apply_at_width(prelude, width):
-                        collected.extend(collect(direct_blocks(body)))
+                        collected.extend(
+                            collect(
+                                direct_blocks(body),
+                                current_layer,
+                                path + (block_index,),
+                            )
+                        )
                 elif lowered.startswith("@supports"):
                     # A supported feature query can participate in the browser
                     # cascade. Treat every branch as potentially applicable so
                     # the responsive contract remains fail-closed.
-                    collected.extend(collect(direct_blocks(body)))
+                    collected.extend(
+                        collect(
+                            direct_blocks(body),
+                            current_layer,
+                            path + (block_index,),
+                        )
+                    )
+                elif lowered.startswith("@layer"):
+                    local_name = prelude[len("@layer") :].strip()
+                    if local_name:
+                        layer_name = (
+                            local_name
+                            if current_layer is None
+                            else f"{current_layer[0]}.{local_name}"
+                        )
+                    else:
+                        layer_name = "__anonymous_layer_" + "_".join(
+                            str(item) for item in path + (block_index,)
+                        )
+                    collected.extend(
+                        collect(
+                            direct_blocks(body),
+                            (layer_name, layer_order_for(layer_name)),
+                            path + (block_index,),
+                        )
+                    )
             return collected
 
         return collect(top_level_blocks)
@@ -763,7 +825,9 @@ def validate_document(document: str) -> list[str]:
         return True
 
     def winning_declaration(
-        rules: list[tuple[str, str]], selector: str, property_name: str
+        rules: list[tuple[str, str, int | None]],
+        selector: str,
+        property_name: str,
     ) -> list[tuple[str, bool] | None]:
         expected_selector = re.sub(r"\s+", " ", selector.strip())
         target_indices = selector_targets(expected_selector)
@@ -787,10 +851,12 @@ def validate_document(document: str) -> list[str]:
         if not property_name.startswith("--"):
             resetters.setdefault(property_name, set()).add("all")
 
-        winners: dict[int, tuple[str, bool, tuple[int, int, int]] | None] = {
+        winners: dict[
+            int, tuple[str, bool, tuple[int, int, int], int | None] | None
+        ] = {
             target_index: None for target_index in target_indices
         }
-        for prelude, body in rules:
+        for prelude, body, layer_order in rules:
             matching_specificities: dict[int, tuple[int, int, int]] = {}
             for item in split_selector_members(prelude):
                 candidate = re.sub(r"\s+", " ", item.strip())
@@ -812,18 +878,48 @@ def validate_document(document: str) -> list[str]:
                     continue
                 for target_index, candidate_specificity in matching_specificities.items():
                     winner = winners[target_index]
-                    if winner is not None and winner[1] and not important:
-                        continue
-                    if (
-                        winner is not None
-                        and winner[1] == important
-                        and winner[2] > candidate_specificity
-                    ):
-                        continue
+                    if important:
+                        layer_priority = (
+                            1,
+                            -layer_order if layer_order is not None else 0,
+                        ) if layer_order is not None else (0, 0)
+                    else:
+                        layer_priority = (
+                            (0, layer_order)
+                            if layer_order is not None
+                            else (1, 0)
+                        )
+                    candidate_priority = (
+                        int(important),
+                        *layer_priority,
+                        *candidate_specificity,
+                    )
+                    if winner is not None:
+                        winner_layer = winner[3]
+                        if winner[1]:
+                            winner_layer_priority = (
+                                (1, -winner_layer)
+                                if winner_layer is not None
+                                else (0, 0)
+                            )
+                        else:
+                            winner_layer_priority = (
+                                (0, winner_layer)
+                                if winner_layer is not None
+                                else (1, 0)
+                            )
+                        winner_priority = (
+                            int(winner[1]),
+                            *winner_layer_priority,
+                            *winner[2],
+                        )
+                        if winner_priority > candidate_priority:
+                            continue
                     winners[target_index] = (
                         candidate_value,
                         important,
                         candidate_specificity,
+                        layer_order,
                     )
         return [
             None if winners[target_index] is None else winners[target_index][:2]
@@ -854,6 +950,8 @@ def validate_document(document: str) -> list[str]:
                             samples.add(adjacent)
                     collect_boundaries(direct_blocks(body))
                 elif lowered.startswith("@supports"):
+                    collect_boundaries(direct_blocks(body))
+                elif lowered.startswith("@layer"):
                     collect_boundaries(direct_blocks(body))
 
         collect_boundaries(top_level_blocks)
