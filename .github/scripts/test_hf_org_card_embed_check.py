@@ -79,7 +79,7 @@ def valid_document() -> str:
     fetchpriority="high"
     decoding="async"
   >
-  <main id="szl-hf-main">
+  <main id="szl-hf-main" class="szl-hf-shell">
     <h1 class="szl-hf-title">Autonomy under authority</h1>
   <nav><a class="szl-hf-nav-item" href="https://example.com">Navigate</a></nav>
     <div class="szl-hf-hero">
@@ -343,6 +343,32 @@ class EmbedContractTests(unittest.TestCase):
         failures = check.validate_document(document)
         self.assertTrue(any("mobile CTA contract" in item for item in failures))
 
+    def test_rejects_alternate_selector_mobile_cta_override(self):
+        document = valid_document().replace(
+            "</style>",
+            "@media (max-width: 640px) {\n"
+            "  #szl-hf-org-card .szl-hf-button.szl-hf-primary {\n"
+            "    width: auto !important;\n"
+            "  }\n"
+            "}\n</style>",
+            1,
+        )
+        failures = check.validate_document(document)
+        self.assertTrue(any("mobile CTA contract" in item for item in failures))
+
+    def test_rejects_supported_mobile_cta_override(self):
+        document = valid_document().replace(
+            "</style>",
+            "@supports (display: grid) {\n"
+            "  #szl-hf-org-card .szl-hf-actions .szl-hf-button {\n"
+            "    width: auto !important;\n"
+            "  }\n"
+            "}\n</style>",
+            1,
+        )
+        failures = check.validate_document(document)
+        self.assertTrue(any("mobile CTA contract" in item for item in failures))
+
     def test_rejects_navigation_grid_shorthand_override(self):
         document = valid_document().replace(
             "</style>",
@@ -385,8 +411,9 @@ class EmbedContractTests(unittest.TestCase):
 
     def test_rejects_missing_aria_label_target(self):
         document = valid_document().replace(
-            '<main id="szl-hf-main">',
-            '<main id="szl-hf-main" aria-labelledby="szl-hf-missing-title">',
+            '<main id="szl-hf-main" class="szl-hf-shell">',
+            '<main id="szl-hf-main" class="szl-hf-shell" '
+            'aria-labelledby="szl-hf-missing-title">',
         )
         failures = check.validate_document(document)
         self.assertTrue(

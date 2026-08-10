@@ -68,7 +68,8 @@ class OrgCardParser(HTMLParser):
         self.outside_root: list[str] = []
         self._in_body = False
         self._root_depth = 0
-        self._stack: list[tuple[str, bool]] = []
+        self.elements: list[tuple[str, dict[str, str], int | None]] = []
+        self._stack: list[tuple[str, bool, int | None]] = []
         self._in_style = False
         self._style_parts: list[str] = []
 
@@ -78,6 +79,18 @@ class OrgCardParser(HTMLParser):
         values = {key: str(value or "") for key, value in attrs}
         is_root = values.get("id") == ROOT_ID
         inside_root = self._root_depth > 0 or is_root
+        element_index: int | None = None
+        if inside_root:
+            parent_index = next(
+                (
+                    opened_index
+                    for _, _, opened_index in reversed(self._stack)
+                    if opened_index is not None
+                ),
+                None,
+            )
+            element_index = len(self.elements)
+            self.elements.append((tag, values, parent_index))
 
         if tag == "body":
             self._in_body = True
@@ -115,7 +128,7 @@ class OrgCardParser(HTMLParser):
             self._style_parts = []
 
         if tag not in VOID_ELEMENTS:
-            self._stack.append((tag, inside_root))
+            self._stack.append((tag, inside_root, element_index))
             if inside_root:
                 self._root_depth += 1
 
@@ -127,7 +140,7 @@ class OrgCardParser(HTMLParser):
         if tag == "body":
             self._in_body = False
         if self._stack:
-            opened_tag, inside_root = self._stack.pop()
+            opened_tag, inside_root, _ = self._stack.pop()
             if opened_tag != tag:
                 self.outside_root.append(f"mismatched:{opened_tag}/{tag}")
             if inside_root:
@@ -508,17 +521,25 @@ def validate_document(document: str) -> list[str]:
         return True
 
     def cascade_rules_at_width(width: int) -> list[tuple[str, str]]:
-        rules: list[tuple[str, str]] = []
-        for prelude, body in top_level_blocks:
-            if not prelude.startswith("@"):
-                rules.append((prelude, body))
-            elif media_may_apply_at_width(prelude, width):
-                rules.extend(
-                    (child_prelude, child_body)
-                    for child_prelude, child_body in direct_blocks(body)
-                    if not child_prelude.startswith("@")
-                )
-        return rules
+        def collect(
+            blocks: list[tuple[str, str]],
+        ) -> list[tuple[str, str]]:
+            collected: list[tuple[str, str]] = []
+            for prelude, body in blocks:
+                lowered = prelude.lower()
+                if not prelude.startswith("@"):
+                    collected.append((prelude, body))
+                elif lowered.startswith("@media"):
+                    if media_may_apply_at_width(prelude, width):
+                        collected.extend(collect(direct_blocks(body)))
+                elif lowered.startswith("@supports"):
+                    # A supported feature query can participate in the browser
+                    # cascade. Treat every branch as potentially applicable so
+                    # the responsive contract remains fail-closed.
+                    collected.extend(collect(direct_blocks(body)))
+            return collected
+
+        return collect(top_level_blocks)
 
     def direct_declaration_entries(body: str) -> list[tuple[str, str, bool]]:
         entries: list[tuple[str, str, bool]] = []
@@ -535,23 +556,217 @@ def validate_document(document: str) -> list[str]:
                 entries.append((property_name, value.strip(), important))
         return entries
 
+    def selector_compounds(selector: str) -> tuple[list[str], bool]:
+        compounds: list[str] = []
+        current: list[str] = []
+        parentheses = 0
+        brackets = 0
+        quote = ""
+        sibling_combinator = False
+        position = 0
+        while position < len(selector):
+            character = selector[position]
+            if quote:
+                current.append(character)
+                if character == "\\" and position + 1 < len(selector):
+                    position += 1
+                    current.append(selector[position])
+                elif character == quote:
+                    quote = ""
+            elif character in {'"', "'"}:
+                quote = character
+                current.append(character)
+            elif character == "[":
+                brackets += 1
+                current.append(character)
+            elif character == "]":
+                brackets = max(0, brackets - 1)
+                current.append(character)
+            elif character == "(":
+                parentheses += 1
+                current.append(character)
+            elif character == ")":
+                parentheses = max(0, parentheses - 1)
+                current.append(character)
+            elif not parentheses and not brackets and (
+                character.isspace() or character in ">+~"
+            ):
+                if current:
+                    compounds.append("".join(current).strip())
+                    current = []
+                if character in "+~":
+                    sibling_combinator = True
+            else:
+                current.append(character)
+            position += 1
+        if current:
+            compounds.append("".join(current).strip())
+        return [item for item in compounds if item], sibling_combinator
+
+    def without_pseudo_classes(compound: str) -> str:
+        result: list[str] = []
+        position = 0
+        brackets = 0
+        quote = ""
+        while position < len(compound):
+            character = compound[position]
+            if quote:
+                result.append(character)
+                if character == "\\" and position + 1 < len(compound):
+                    position += 1
+                    result.append(compound[position])
+                elif character == quote:
+                    quote = ""
+                position += 1
+                continue
+            if character in {'"', "'"}:
+                quote = character
+                result.append(character)
+                position += 1
+                continue
+            if character == "[":
+                brackets += 1
+                result.append(character)
+                position += 1
+                continue
+            if character == "]":
+                brackets = max(0, brackets - 1)
+                result.append(character)
+                position += 1
+                continue
+            if character != ":" or brackets:
+                result.append(character)
+                position += 1
+                continue
+
+            position += 1
+            while position < len(compound) and re.match(r"[\w-]", compound[position]):
+                position += 1
+            if position < len(compound) and compound[position] == "(":
+                depth = 1
+                position += 1
+                nested_quote = ""
+                while position < len(compound) and depth:
+                    nested = compound[position]
+                    if nested_quote:
+                        if nested == "\\":
+                            position += 2
+                            continue
+                        if nested == nested_quote:
+                            nested_quote = ""
+                    elif nested in {'"', "'"}:
+                        nested_quote = nested
+                    elif nested == "(":
+                        depth += 1
+                    elif nested == ")":
+                        depth -= 1
+                    position += 1
+        return "".join(result)
+
+    def compound_may_match(
+        compound: str, element: tuple[str, dict[str, str], int | None]
+    ) -> bool:
+        if re.search(r"::[A-Za-z_-]", compound):
+            return False
+        tag, attributes, _ = element
+        base = without_pseudo_classes(compound)
+        without_attributes = re.sub(r"\[[^]]*\]", "", base)
+        required_ids = CSS_ID.findall(without_attributes)
+        if required_ids and any(value != attributes.get("id", "") for value in required_ids):
+            return False
+        classes = set(attributes.get("class", "").split())
+        if any(value not in classes for value in CSS_CLASS.findall(without_attributes)):
+            return False
+
+        simple = CSS_ID.sub("", CSS_CLASS.sub("", without_attributes))
+        simple = simple.replace("*", "").strip()
+        tag_match = re.match(r"^[A-Za-z][A-Za-z0-9_-]*", simple)
+        if tag_match and tag_match.group(0).lower() != tag.lower():
+            return False
+
+        attribute_pattern = re.compile(
+            r"^\s*([A-Za-z_:][\w:.-]*)"
+            r"(?:\s*([~|^$*]?=)\s*"
+            r"(?:\"([^\"]*)\"|'([^']*)'|([^\]\s]+))"
+            r"\s*([isIS])?)?\s*$"
+        )
+        for raw_attribute in re.findall(r"\[([^]]*)\]", base):
+            parsed = attribute_pattern.fullmatch(raw_attribute)
+            if parsed is None:
+                continue
+            name, operator, double, single, bare, flag = parsed.groups()
+            actual = attributes.get(name.lower())
+            if actual is None:
+                return False
+            if operator is None:
+                continue
+            expected = next(
+                value for value in (double, single, bare) if value is not None
+            )
+            if flag and flag.lower() == "i":
+                actual = actual.casefold()
+                expected = expected.casefold()
+            if operator == "=" and actual != expected:
+                return False
+            if operator == "~=" and expected not in actual.split():
+                return False
+            if operator == "|=" and actual != expected and not actual.startswith(expected + "-"):
+                return False
+            if operator == "^=" and not actual.startswith(expected):
+                return False
+            if operator == "$=" and not actual.endswith(expected):
+                return False
+            if operator == "*=" and expected not in actual:
+                return False
+        return True
+
+    def selector_targets(selector: str) -> list[int]:
+        compounds, sibling_combinator = selector_compounds(selector)
+        if not compounds or sibling_combinator:
+            return []
+        targets: list[int] = []
+        for element_index, element in enumerate(parser.elements):
+            if not compound_may_match(compounds[-1], element):
+                continue
+            ancestor_index = element[2]
+            matched = True
+            for compound in reversed(compounds[:-1]):
+                while ancestor_index is not None and not compound_may_match(
+                    compound, parser.elements[ancestor_index]
+                ):
+                    ancestor_index = parser.elements[ancestor_index][2]
+                if ancestor_index is None:
+                    matched = False
+                    break
+                ancestor_index = parser.elements[ancestor_index][2]
+            if matched:
+                targets.append(element_index)
+        return targets
+
+    def selector_may_match_target(candidate: str, target_index: int) -> bool:
+        compounds, sibling_combinator = selector_compounds(candidate)
+        if not compounds or not compound_may_match(
+            compounds[-1], parser.elements[target_index]
+        ):
+            return False
+        if sibling_combinator:
+            return True
+        ancestor_index = parser.elements[target_index][2]
+        for compound in reversed(compounds[:-1]):
+            while ancestor_index is not None and not compound_may_match(
+                compound, parser.elements[ancestor_index]
+            ):
+                ancestor_index = parser.elements[ancestor_index][2]
+            if ancestor_index is None:
+                return False
+            ancestor_index = parser.elements[ancestor_index][2]
+        return True
+
     def winning_declaration(
         rules: list[tuple[str, str]], selector: str, property_name: str
-    ) -> tuple[str, bool] | None:
+    ) -> list[tuple[str, bool] | None]:
         expected_selector = re.sub(r"\s+", " ", selector.strip())
-        expected_tokens = re.findall(
-            r"#[\w-]+|\.[\w-]+|[a-zA-Z][\w-]*", expected_selector
-        )
-
-        def may_match(candidate: str) -> bool:
-            candidate_tokens = re.findall(
-                r"#[\w-]+|\.[\w-]+|[a-zA-Z][\w-]*", candidate
-            )
-            cursor = 0
-            for token in candidate_tokens:
-                if cursor < len(expected_tokens) and token == expected_tokens[cursor]:
-                    cursor += 1
-            return cursor == len(expected_tokens)
+        target_indices = selector_targets(expected_selector)
 
         def specificity(candidate: str) -> tuple[int, int, int]:
             ids = len(re.findall(r"#[\w-]+", candidate))
@@ -572,16 +787,22 @@ def validate_document(document: str) -> list[str]:
         if not property_name.startswith("--"):
             resetters.setdefault(property_name, set()).add("all")
 
-        winner: tuple[str, bool, tuple[int, int, int]] | None = None
+        winners: dict[int, tuple[str, bool, tuple[int, int, int]] | None] = {
+            target_index: None for target_index in target_indices
+        }
         for prelude, body in rules:
-            matching_selectors = [
-                re.sub(r"\s+", " ", item.strip())
-                for item in prelude.split(",")
-                if may_match(re.sub(r"\s+", " ", item.strip()))
-            ]
-            if not matching_selectors:
+            matching_specificities: dict[int, tuple[int, int, int]] = {}
+            for item in split_selector_members(prelude):
+                candidate = re.sub(r"\s+", " ", item.strip())
+                candidate_specificity = specificity(candidate)
+                for target_index in target_indices:
+                    if not selector_may_match_target(candidate, target_index):
+                        continue
+                    previous = matching_specificities.get(target_index)
+                    if previous is None or candidate_specificity > previous:
+                        matching_specificities[target_index] = candidate_specificity
+            if not matching_specificities:
                 continue
-            candidate_specificity = max(specificity(item) for item in matching_selectors)
             for candidate_property, value, important in direct_declaration_entries(body):
                 if candidate_property == property_name:
                     candidate_value = value
@@ -589,45 +810,66 @@ def validate_document(document: str) -> list[str]:
                     candidate_value = f"__reset_by_{candidate_property}__"
                 else:
                     continue
-                if winner is not None and winner[1] and not important:
-                    continue
-                if (
-                    winner is not None
-                    and winner[1] == important
-                    and winner[2] > candidate_specificity
-                ):
-                    continue
-                winner = (candidate_value, important, candidate_specificity)
-        return None if winner is None else (winner[0], winner[1])
+                for target_index, candidate_specificity in matching_specificities.items():
+                    winner = winners[target_index]
+                    if winner is not None and winner[1] and not important:
+                        continue
+                    if (
+                        winner is not None
+                        and winner[1] == important
+                        and winner[2] > candidate_specificity
+                    ):
+                        continue
+                    winners[target_index] = (
+                        candidate_value,
+                        important,
+                        candidate_specificity,
+                    )
+        return [
+            None if winners[target_index] is None else winners[target_index][:2]
+            for target_index in target_indices
+        ]
 
     def responsive_sample_widths(max_width: int) -> list[int]:
         minimum_width = 320
         samples = {minimum_width, max_width}
-        for prelude, _ in top_level_blocks:
-            if not prelude.lower().startswith("@media"):
-                continue
-            for bound, value in re.findall(
-                r"\(\s*(min|max)-width\s*:\s*(\d+)px\s*\)",
-                prelude,
-                re.IGNORECASE,
-            ):
-                boundary = int(value)
-                if not minimum_width <= boundary <= max_width:
-                    continue
-                samples.add(boundary)
-                adjacent = boundary - 1 if bound.lower() == "min" else boundary + 1
-                if minimum_width <= adjacent <= max_width:
-                    samples.add(adjacent)
+
+        def collect_boundaries(blocks: list[tuple[str, str]]) -> None:
+            for prelude, body in blocks:
+                lowered = prelude.lower()
+                if lowered.startswith("@media"):
+                    for bound, value in re.findall(
+                        r"\(\s*(min|max)-width\s*:\s*(\d+)px\s*\)",
+                        prelude,
+                        re.IGNORECASE,
+                    ):
+                        boundary = int(value)
+                        if not minimum_width <= boundary <= max_width:
+                            continue
+                        samples.add(boundary)
+                        adjacent = (
+                            boundary - 1 if bound.lower() == "min" else boundary + 1
+                        )
+                        if minimum_width <= adjacent <= max_width:
+                            samples.add(adjacent)
+                    collect_boundaries(direct_blocks(body))
+                elif lowered.startswith("@supports"):
+                    collect_boundaries(direct_blocks(body))
+
+        collect_boundaries(top_level_blocks)
         return sorted(samples)
 
     def winner_matches(
-        winner: tuple[str, bool] | None,
+        winners: list[tuple[str, bool] | None],
         value_pattern: str,
         required_important: bool | None = None,
     ) -> bool:
-        if winner is None or not re.fullmatch(value_pattern, winner[0], re.I):
-            return False
-        return required_important is None or winner[1] is required_important
+        return bool(winners) and all(
+            winner is not None
+            and re.fullmatch(value_pattern, winner[0], re.I)
+            and (required_important is None or winner[1] is required_important)
+            for winner in winners
+        )
 
     global_requirements = (
         ("44px touch token", ROOT_SELECTOR, "--tap", r"44px", None),
