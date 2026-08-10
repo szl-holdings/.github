@@ -404,6 +404,35 @@ class EmbedContractTests(unittest.TestCase):
         failures = check.validate_document(document)
         self.assertTrue(any("mobile CTA contract" in item for item in failures))
 
+    def test_evaluates_complete_selector_in_functional_pseudo_class(self):
+        document = valid_document().replace(
+            "</style>",
+            "@media (max-width: 640px) {\n"
+            "  #szl-hf-org-card .szl-hf-button:not("
+            ".szl-hf-definitely-missing .szl-hf-button) {\n"
+            "    width: auto !important;\n"
+            "  }\n"
+            "}\n</style>",
+            1,
+        )
+        failures = check.validate_document(document)
+        self.assertTrue(any("mobile CTA contract" in item for item in failures))
+
+    def test_rejects_native_nested_css_rules(self):
+        document = valid_document().replace(
+            "</style>",
+            "#szl-hf-org-card {\n"
+            "  @media (max-width: 640px) {\n"
+            "    & .szl-hf-actions .szl-hf-button {\n"
+            "      width: auto !important;\n"
+            "    }\n"
+            "  }\n"
+            "}\n</style>",
+            1,
+        )
+        failures = check.validate_document(document)
+        self.assertTrue(any("native CSS nesting is unsupported" in item for item in failures))
+
     def test_rejects_layered_important_mobile_cta_override(self):
         document = valid_document().replace(
             "</style>",

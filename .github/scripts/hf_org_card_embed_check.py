@@ -270,6 +270,13 @@ def selector_failures(source: str) -> list[str]:
                     failures.append(f"unrooted CSS selector: {selector}")
                 if ":root" in selector or re.search(r"(?<![-\w])(html|body)(?![-\w])", selector):
                     failures.append(f"host-level CSS selector: {selector}")
+            try:
+                nested_blocks = css_blocks(body)
+            except ValueError as exc:
+                failures.append(f"nested CSS parse failed: {exc}")
+                nested_blocks = []
+            if any(nested_body for _, nested_body in nested_blocks):
+                failures.append(f"native CSS nesting is unsupported: {prelude}")
             if ROOT_OVERFLOW_MASK.fullmatch(prelude) and re.search(
                 r"(?i)\boverflow(?:-[xy])?\s*:\s*(?:hidden|clip)\b", body
             ):
@@ -714,13 +721,25 @@ def validate_document(document: str) -> list[str]:
                 entries.append((property_name, value.strip(), important))
         return entries
 
-    def selector_compounds(selector: str) -> tuple[list[str], bool]:
+    def selector_structure(selector: str) -> tuple[list[str], list[str]]:
         compounds: list[str] = []
+        combinators: list[str] = []
         current: list[str] = []
+        pending_combinator = ""
         parentheses = 0
         brackets = 0
         quote = ""
-        sibling_combinator = False
+
+        def flush() -> None:
+            nonlocal current, pending_combinator
+            if not current:
+                return
+            if compounds:
+                combinators.append(pending_combinator or " ")
+            compounds.append("".join(current).strip())
+            current = []
+            pending_combinator = ""
+
         position = 0
         while position < len(selector):
             character = selector[position]
@@ -749,17 +768,20 @@ def validate_document(document: str) -> list[str]:
             elif not parentheses and not brackets and (
                 character.isspace() or character in ">+~"
             ):
-                if current:
-                    compounds.append("".join(current).strip())
-                    current = []
-                if character in "+~":
-                    sibling_combinator = True
+                flush()
+                if character in ">+~":
+                    pending_combinator = character
+                elif compounds and not pending_combinator:
+                    pending_combinator = " "
             else:
                 current.append(character)
             position += 1
-        if current:
-            compounds.append("".join(current).strip())
-        return [item for item in compounds if item], sibling_combinator
+        flush()
+        return [item for item in compounds if item], combinators
+
+    def selector_compounds(selector: str) -> tuple[list[str], bool]:
+        compounds, combinators = selector_structure(selector)
+        return compounds, any(item in {"+", "~"} for item in combinators)
 
     def functional_pseudo_classes(compound: str) -> list[tuple[str, str]]:
         functions: list[tuple[str, str]] = []
@@ -888,7 +910,9 @@ def validate_document(document: str) -> list[str]:
         return "".join(result)
 
     def compound_may_match(
-        compound: str, element: tuple[str, dict[str, str], int | None]
+        compound: str,
+        element: tuple[str, dict[str, str], int | None],
+        element_index: int | None = None,
     ) -> bool:
         if re.search(r"::[A-Za-z_-]", compound):
             return False
@@ -897,10 +921,10 @@ def validate_document(document: str) -> list[str]:
                 continue
             argument_matches = []
             for member in split_selector_members(arguments):
-                argument_compounds, _ = selector_compounds(member)
                 argument_matches.append(
-                    bool(argument_compounds)
-                    and compound_may_match(argument_compounds[-1], element)
+                    selector_may_match_target(member, element_index)
+                    if element_index is not None
+                    else False
                 )
             if name == "not" and any(argument_matches):
                 return False
@@ -959,46 +983,60 @@ def validate_document(document: str) -> list[str]:
         return True
 
     def selector_targets(selector: str) -> list[int]:
-        compounds, sibling_combinator = selector_compounds(selector)
-        if not compounds or sibling_combinator:
-            return []
-        targets: list[int] = []
-        for element_index, element in enumerate(parser.elements):
-            if not compound_may_match(compounds[-1], element):
-                continue
-            ancestor_index = element[2]
-            matched = True
-            for compound in reversed(compounds[:-1]):
-                while ancestor_index is not None and not compound_may_match(
-                    compound, parser.elements[ancestor_index]
-                ):
-                    ancestor_index = parser.elements[ancestor_index][2]
-                if ancestor_index is None:
-                    matched = False
-                    break
-                ancestor_index = parser.elements[ancestor_index][2]
-            if matched:
-                targets.append(element_index)
-        return targets
+        return [
+            element_index
+            for element_index in range(len(parser.elements))
+            if selector_may_match_target(selector, element_index)
+        ]
 
-    def selector_may_match_target(candidate: str, target_index: int) -> bool:
-        compounds, sibling_combinator = selector_compounds(candidate)
-        if not compounds or not compound_may_match(
-            compounds[-1], parser.elements[target_index]
-        ):
+    def selector_may_match_target(
+        candidate: str, target_index: int | None
+    ) -> bool:
+        if target_index is None:
             return False
-        if sibling_combinator:
-            return True
-        ancestor_index = parser.elements[target_index][2]
-        for compound in reversed(compounds[:-1]):
-            while ancestor_index is not None and not compound_may_match(
-                compound, parser.elements[ancestor_index]
+        compounds, combinators = selector_structure(candidate)
+        if not compounds or len(combinators) != len(compounds) - 1:
+            return False
+
+        def previous_siblings(element_index: int) -> list[int]:
+            parent_index = parser.elements[element_index][2]
+            return [
+                sibling_index
+                for sibling_index, sibling in enumerate(parser.elements[:element_index])
+                if sibling[2] == parent_index
+            ]
+
+        def matches(compound_index: int, element_index: int) -> bool:
+            if not compound_may_match(
+                compounds[compound_index],
+                parser.elements[element_index],
+                element_index,
             ):
-                ancestor_index = parser.elements[ancestor_index][2]
-            if ancestor_index is None:
                 return False
-            ancestor_index = parser.elements[ancestor_index][2]
-        return True
+            if compound_index == 0:
+                return True
+            combinator = combinators[compound_index - 1]
+            if combinator == ">":
+                parent_index = parser.elements[element_index][2]
+                return parent_index is not None and matches(
+                    compound_index - 1, parent_index
+                )
+            if combinator == "+":
+                siblings = previous_siblings(element_index)
+                return bool(siblings) and matches(compound_index - 1, siblings[-1])
+            if combinator == "~":
+                return any(
+                    matches(compound_index - 1, sibling_index)
+                    for sibling_index in reversed(previous_siblings(element_index))
+                )
+            ancestor_index = parser.elements[element_index][2]
+            while ancestor_index is not None:
+                if matches(compound_index - 1, ancestor_index):
+                    return True
+                ancestor_index = parser.elements[ancestor_index][2]
+            return False
+
+        return matches(len(compounds) - 1, target_index)
 
     def winning_declaration(
         rules: list[tuple[str, str, int | None]],
