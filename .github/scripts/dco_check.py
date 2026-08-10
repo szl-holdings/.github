@@ -26,18 +26,21 @@ QUEUE_REF_PREFIX = "refs/heads/gh-readonly-queue/main/"
 ALLOWED_PR_ACTIONS = {"opened", "synchronize", "reopened", "ready_for_review", "edited"}
 
 # Audited horizontal separators: TAB, SPACE, and every Unicode Zs code point.
-# Name and email tokens separately reject C0/C1 controls plus Unicode line and
-# paragraph separators, so no broad whitespace class can admit a line break.
+# Name, email, and trailer text separately reject C0/C1 controls, Unicode line
+# and paragraph separators, and every Bidi_Control code point. Ordinary RTL
+# letters remain valid, but invisible direction overrides cannot alter review.
 HORIZONTAL_SEPARATOR_PATTERN = (
     r"[\x09\x20\u00a0\u1680\u2000-\u200a\u202f\u205f\u3000]"
 )
 NAME_TOKEN_PATTERN = (
     r"[^<>\x00-\x20\x7f-\x9f\u00a0\u1680\u2000-\u200a"
-    r"\u2028\u2029\u202f\u205f\u3000]+"
+    r"\u061c\u200e\u200f\u2028\u2029\u202a-\u202e\u202f"
+    r"\u205f\u2066-\u2069\u3000]+"
 )
 EMAIL_PART_PATTERN = (
     r"[^<>@\x00-\x20\x7f-\x9f\u00a0\u1680\u2000-\u200a"
-    r"\u2028\u2029\u202f\u205f\u3000]+"
+    r"\u061c\u200e\u200f\u2028\u2029\u202a-\u202e\u202f"
+    r"\u205f\u2066-\u2069\u3000]+"
 )
 SIGNED_OFF_BY_PATTERN = re.compile(
     rf"^Signed-off-by:{HORIZONTAL_SEPARATOR_PATTERN}+"
@@ -51,7 +54,8 @@ HORIZONTAL_ONLY_PATTERN = re.compile(
     rf"^{HORIZONTAL_SEPARATOR_PATTERN}*$"
 )
 SAFE_TRAILER_TEXT_PATTERN = (
-    r"[^\x00-\x08\x0a-\x1f\x7f-\x9f\u2028\u2029]*"
+    r"[^\x00-\x08\x0a-\x1f\x7f-\x9f\u061c\u200e\u200f"
+    r"\u2028\u2029\u202a-\u202e\u2066-\u2069]*"
 )
 TRAILER_TOKEN_PATTERN = r"-*[A-Za-z0-9][A-Za-z0-9-]*"
 TRAILER_TOKEN_FULL_PATTERN = re.compile(rf"^{TRAILER_TOKEN_PATTERN}$")
@@ -556,15 +560,20 @@ def git(
     input_text: str | None = None,
     check: bool = True,
 ) -> str:
-    completed = subprocess.run(
-        ["git", *args],
-        cwd=repo,
-        input=input_text,
-        text=True,
-        capture_output=True,
-        check=False,
-        timeout=30,
-    )
+    try:
+        completed = subprocess.run(
+            ["git", *args],
+            cwd=repo,
+            input=input_text,
+            text=True,
+            encoding="utf-8",
+            errors="strict",
+            capture_output=True,
+            check=False,
+            timeout=30,
+        )
+    except UnicodeError as exc:
+        raise DcoContractError("git output was not valid UTF-8") from exc
     if check and completed.returncode:
         detail = completed.stderr.strip() or completed.stdout.strip()
         raise DcoContractError(f"git {' '.join(args)} failed: {detail}")

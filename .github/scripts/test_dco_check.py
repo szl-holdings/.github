@@ -5,10 +5,12 @@ from __future__ import annotations
 
 import json
 import os
+from pathlib import Path
 import shutil
 import subprocess
 import tempfile
 import unittest
+from unittest.mock import patch
 from urllib.error import URLError
 
 import dco_check as dco_check
@@ -19,6 +21,20 @@ REPOSITORY = "szl-holdings/example"
 PR_NUMBER = 399
 TOKEN = "test-token"
 BASE_SHA = "f" * 40
+BIDI_CONTROLS = (
+    "\u061c",
+    "\u200e",
+    "\u200f",
+    "\u202a",
+    "\u202b",
+    "\u202c",
+    "\u202d",
+    "\u202e",
+    "\u2066",
+    "\u2067",
+    "\u2068",
+    "\u2069",
+)
 
 
 def _commit(
@@ -163,6 +179,191 @@ class RealCommitPhysicalMessageTests(unittest.TestCase):
             "non-trailer postscript\n\n---"
         )
         self.assertEqual(dco_check.unsigned_commit_shas([commit]), [commit["sha"]])
+
+    def test_real_commit_bidi_controls_in_signer_names_are_rejected(self) -> None:
+        for control in BIDI_CONTROLS:
+            with self.subTest(code_point=f"U+{ord(control):04X}"):
+                name = f"Alice{control}Builder"
+                commit = _real_commit(
+                    "fix: reject directional signer name\n\n"
+                    f"Signed-off-by: {name} <test@example.com>",
+                    author_name=name,
+                )
+                self.assertEqual(
+                    dco_check.unsigned_commit_shas([commit]),
+                    [commit["sha"]],
+                )
+
+    def test_real_commit_bidi_controls_in_signer_emails_are_rejected(self) -> None:
+        for control in BIDI_CONTROLS:
+            with self.subTest(code_point=f"U+{ord(control):04X}"):
+                email = f"alice{control}@example.com"
+                commit = _real_commit(
+                    "fix: reject directional signer email\n\n"
+                    f"Signed-off-by: Test User <{email}>",
+                    author_email=email,
+                )
+                self.assertEqual(
+                    dco_check.unsigned_commit_shas([commit]),
+                    [commit["sha"]],
+                )
+
+    def test_real_commit_bidi_controls_in_trailer_text_are_rejected(self) -> None:
+        for control in BIDI_CONTROLS:
+            with self.subTest(code_point=f"U+{ord(control):04X}"):
+                commit = _real_commit(
+                    "fix: reject directional trailer text\n\n"
+                    f"Reviewed-by: Alice{control}Builder <reviewer@example.com>\n"
+                    "Signed-off-by: Test User <test@example.com>"
+                )
+                self.assertEqual(
+                    dco_check.unsigned_commit_shas([commit]),
+                    [commit["sha"]],
+                )
+
+    def test_real_commit_ordinary_arabic_and_hebrew_letters_are_accepted(self) -> None:
+        name = "مستخدم עברי"
+        email = "משתמש@مثال.test"
+        commit = _real_commit(
+            "fix: preserve ordinary right-to-left identity\n\n"
+            "Reviewed-by: مراجع עברי <reviewer@example.com>\n"
+            f"Signed-off-by: {name} <{email}>",
+            author_name=name,
+            author_email=email,
+        )
+        self.assertEqual(dco_check.unsigned_commit_shas([commit]), [])
+
+
+class LocalGitProductionPathTests(unittest.TestCase):
+    def setUp(self) -> None:
+        git = shutil.which("git")
+        if git is None:
+            self.skipTest("git is required for production-path DCO tests")
+        self.git_executable = git
+        self.temp = tempfile.TemporaryDirectory(prefix="dco-production-path-")
+        self.repo = Path(self.temp.name)
+        self.git("init", "-b", "main")
+        self.tree = self.git("write-tree")
+        self.base = self.commit(
+            "chore: base\n\nSigned-off-by: Base Builder <base@example.com>",
+            author_name="Base Builder",
+            author_email="base@example.com",
+            parent=None,
+        )
+        self.git("reset", "--hard", self.base)
+
+    def tearDown(self) -> None:
+        if hasattr(self, "temp"):
+            self.temp.cleanup()
+
+    def git(
+        self,
+        *args: str,
+        input_bytes: bytes | None = None,
+        env: dict[str, str] | None = None,
+    ) -> str:
+        completed = subprocess.run(
+            [self.git_executable, *args],
+            cwd=self.repo,
+            input=input_bytes,
+            env=env,
+            check=True,
+            capture_output=True,
+            timeout=10,
+        )
+        return completed.stdout.decode("ascii").strip()
+
+    def commit(
+        self,
+        message: str,
+        *,
+        author_name: str,
+        author_email: str,
+        parent: str | None = "base",
+    ) -> str:
+        commit_env = os.environ.copy()
+        commit_env.update(
+            {
+                "GIT_AUTHOR_NAME": author_name,
+                "GIT_AUTHOR_EMAIL": author_email,
+                "GIT_AUTHOR_DATE": "2000-01-01T00:00:00+00:00",
+                "GIT_COMMITTER_NAME": "DCO Production Test",
+                "GIT_COMMITTER_EMAIL": "committer@example.com",
+                "GIT_COMMITTER_DATE": "2000-01-01T00:00:00+00:00",
+            }
+        )
+        arguments = ["commit-tree", self.tree]
+        if parent is not None:
+            arguments.extend(["-p", self.base if parent == "base" else parent])
+        return self.git(*arguments, input_bytes=message.encode("utf-8"), env=commit_env)
+
+    def assert_rejected_by_commit_and_range(self, sha: str) -> None:
+        self.git("reset", "--hard", sha)
+        with self.assertRaises(dco_check.DcoContractError):
+            dco_check.validate_commit(self.repo, sha)
+        with self.assertRaises(dco_check.DcoContractError):
+            dco_check.validate_range(self.repo, self.base, sha)
+
+    def test_bidi_controls_in_author_and_signoff_fail_production_path(self) -> None:
+        for control in BIDI_CONTROLS:
+            with self.subTest(code_point=f"U+{ord(control):04X}"):
+                name = f"Alice{control}Builder"
+                sha = self.commit(
+                    "fix: reject directional author\n\n"
+                    f"Signed-off-by: {name} <test@example.com>",
+                    author_name=name,
+                    author_email="test@example.com",
+                )
+                self.assert_rejected_by_commit_and_range(sha)
+
+    def test_bidi_controls_in_email_and_signoff_fail_production_path(self) -> None:
+        for control in BIDI_CONTROLS:
+            with self.subTest(code_point=f"U+{ord(control):04X}"):
+                email = f"alice{control}@example.com"
+                sha = self.commit(
+                    "fix: reject directional email\n\n"
+                    f"Signed-off-by: Test User <{email}>",
+                    author_name="Test User",
+                    author_email=email,
+                )
+                self.assert_rejected_by_commit_and_range(sha)
+
+    def test_bidi_controls_in_trailer_text_fail_production_path(self) -> None:
+        for control in BIDI_CONTROLS:
+            with self.subTest(code_point=f"U+{ord(control):04X}"):
+                sha = self.commit(
+                    "fix: reject directional trailer\n\n"
+                    f"Reviewed-by: Alice{control}Builder <reviewer@example.com>\n"
+                    "Signed-off-by: Test User <test@example.com>",
+                    author_name="Test User",
+                    author_email="test@example.com",
+                )
+                self.assert_rejected_by_commit_and_range(sha)
+
+    def test_ordinary_rtl_identity_and_trailer_pass_production_path(self) -> None:
+        name = "مستخدم עברי"
+        email = "משתמש@مثال.test"
+        sha = self.commit(
+            "fix: preserve ordinary right-to-left identity\n\n"
+            "Reviewed-by: مراجع עברי <reviewer@example.com>\n"
+            f"Signed-off-by: {name} <{email}>",
+            author_name=name,
+            author_email=email,
+        )
+        self.git("reset", "--hard", sha)
+        dco_check.validate_commit(self.repo, sha)
+        self.assertEqual(dco_check.validate_range(self.repo, self.base, sha), 1)
+
+    def test_invalid_utf8_from_git_fails_closed_with_bounded_error(self) -> None:
+        invalid = UnicodeDecodeError("utf-8", b"\xff", 0, 1, "invalid start byte")
+        with patch.object(dco_check.subprocess, "run", side_effect=invalid):
+            with self.assertRaisesRegex(
+                dco_check.DcoContractError,
+                "git output was not valid UTF-8",
+            ) as raised:
+                dco_check.git(self.repo, "show", "--format=%B", self.base)
+        self.assertNotIn("show", str(raised.exception))
+        self.assertNotIn(self.base, str(raised.exception))
 
 
 UNSIGNED_EMPTY_COMMIT = _commit(1, "chore: intentionally empty commit")
