@@ -157,6 +157,41 @@ class EmbedContractTests(unittest.TestCase):
             any("single-column mobile evidence loop" in item for item in failures)
         )
 
+    def test_rejects_responsive_rules_outside_intended_media_block(self):
+        cases = (
+            (
+                "  #szl-hf-org-card .szl-hf-actions .szl-hf-button {\n"
+                "    width: 100% !important;\n"
+                "  }",
+                "one-column mobile CTA",
+            ),
+            (
+                "  #szl-hf-org-card nav {\n"
+                "    display: grid;\n"
+                "    grid-template-columns: repeat(2, minmax(0, 1fr));\n"
+                "  }",
+                "mobile navigation reflow",
+            ),
+            (
+                "  #szl-hf-org-card .szl-hf-hero {\n"
+                "    min-height: 0;\n"
+                "  }",
+                "compact mobile hero",
+            ),
+            (
+                "  #szl-hf-org-card .szl-hf-steps {\n"
+                "    grid-template-columns: 1fr;\n"
+                "  }",
+                "single-column mobile evidence loop",
+            ),
+        )
+        for rule, label in cases:
+            with self.subTest(label=label):
+                document = valid_document().replace(rule, "", 1)
+                document = document.replace("</style>", f"{rule}\n</style>", 1)
+                failures = check.validate_document(document)
+                self.assertTrue(any(label in item for item in failures))
+
     def test_rejects_unbounded_embedded_shell(self):
         document = valid_document().replace(
             "max-width: 100%;", "max-width: 1180px;", 1
