@@ -562,6 +562,7 @@ def validate_document(document: str) -> list[str]:
         query_list = prelude[len("@media") :].strip()
         for member in split_selector_members(query_list):
             for query in split_top_level_or(member):
+                negated = bool(re.match(r"^\s*not\b", query, re.IGNORECASE))
                 constraints = re.findall(
                     r"\(\s*(min|max)-width\s*:\s*(\d+)px\s*\)",
                     query,
@@ -574,6 +575,8 @@ def validate_document(document: str) -> list[str]:
                         applies = False
                     if bound.lower() == "max" and width > limit:
                         applies = False
+                if negated:
+                    applies = not applies
                 if applies:
                     return True
         return False
@@ -899,7 +902,9 @@ def validate_document(document: str) -> list[str]:
             position = cursor
         return functions
 
-    def simple_pseudo_classes(compound: str) -> list[str]:
+    def simple_pseudo_classes(
+        compound: str, include_function_arguments: bool = False
+    ) -> list[str]:
         simple: list[str] = []
         position = 0
         brackets = 0
@@ -947,9 +952,12 @@ def validate_document(document: str) -> list[str]:
                 elif compound[position] == ")":
                     depth -= 1
                 position += 1
-            if depth == 0:
+            if depth == 0 and include_function_arguments:
                 simple.extend(
-                    simple_pseudo_classes(compound[argument_start : position - 1])
+                    simple_pseudo_classes(
+                        compound[argument_start : position - 1],
+                        include_function_arguments=True,
+                    )
                 )
         return simple
 
@@ -1239,7 +1247,6 @@ def validate_document(document: str) -> list[str]:
             "any-link",
             "disabled",
             "enabled",
-            "link",
             "root",
         }
         for prelude, body, layer_order in rules:
@@ -1249,9 +1256,11 @@ def validate_document(document: str) -> list[str]:
             for item in split_selector_members(prelude):
                 candidate = re.sub(r"\s+", " ", item.strip())
                 candidate_specificity = specificity(candidate)
-                unsupported_pseudos = set(simple_pseudo_classes(candidate)) - (
-                    deterministic_simple_pseudos
-                )
+                unsupported_pseudos = set(
+                    simple_pseudo_classes(
+                        candidate, include_function_arguments=True
+                    )
+                ) - deterministic_simple_pseudos
                 unsupported_pseudos.update(
                     name
                     for name, _ in functional_pseudo_classes(candidate)
