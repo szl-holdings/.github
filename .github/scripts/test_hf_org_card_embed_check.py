@@ -212,6 +212,22 @@ class EmbedContractTests(unittest.TestCase):
                 failures = check.validate_document(commented_in_place)
                 self.assertTrue(any(label in item for item in failures))
 
+    def test_rejects_commented_bounded_shell(self):
+        shell_rule = (
+            "#szl-hf-org-card .szl-hf-shell {\n"
+            "  width: min(1180px, calc(100% - 40px));\n"
+            "  max-width: 100%;\n"
+            "}"
+        )
+        document = valid_document()
+        self.assertIn(shell_rule, document)
+        failures = check.validate_document(
+            document.replace(shell_rule, f"/* {shell_rule} */", 1)
+        )
+        self.assertTrue(
+            any("bounded embedded shell" in item for item in failures)
+        )
+
     def test_rejects_unbounded_embedded_shell(self):
         document = valid_document().replace(
             "max-width: 100%;", "max-width: 1180px;", 1

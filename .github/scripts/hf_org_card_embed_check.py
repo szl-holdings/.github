@@ -386,21 +386,15 @@ def validate_document(document: str) -> list[str]:
     if bad_css_ids:
         failures.append(f"unscoped CSS ids: {bad_css_ids}")
 
-    normalized = re.sub(r"\s+", " ", css)
-
-    def media_bodies(max_width: int) -> list[str]:
-        marker = re.compile(
-            rf"@media\s*\(\s*max-width\s*:\s*{max_width}px\s*\)\s*\{{",
-            re.IGNORECASE,
-        )
-        searchable = list(css)
+    def mask_css_non_code(source: str) -> str:
+        searchable = list(source)
         index = 0
         quote = ""
         in_comment = False
-        while index < len(css):
+        while index < len(source):
             if in_comment:
                 searchable[index] = " "
-                if css.startswith("*/", index):
+                if source.startswith("*/", index):
                     searchable[index + 1] = " "
                     in_comment = False
                     index += 2
@@ -409,25 +403,34 @@ def validate_document(document: str) -> list[str]:
                 continue
             if quote:
                 searchable[index] = " "
-                if css[index] == "\\":
-                    if index + 1 < len(css):
+                if source[index] == "\\":
+                    if index + 1 < len(source):
                         searchable[index + 1] = " "
                     index += 2
                     continue
-                if css[index] == quote:
+                if source[index] == quote:
                     quote = ""
                 index += 1
                 continue
-            if css.startswith("/*", index):
+            if source.startswith("/*", index):
                 searchable[index] = searchable[index + 1] = " "
                 in_comment = True
                 index += 2
                 continue
-            if css[index] in {'"', "'"}:
-                quote = css[index]
+            if source[index] in {'"', "'"}:
+                quote = source[index]
                 searchable[index] = " "
             index += 1
-        searchable_css = "".join(searchable)
+        return "".join(searchable)
+
+    searchable_css = mask_css_non_code(css)
+    normalized = re.sub(r"\s+", " ", searchable_css)
+
+    def media_bodies(max_width: int) -> list[str]:
+        marker = re.compile(
+            rf"@media\s*\(\s*max-width\s*:\s*{max_width}px\s*\)\s*\{{",
+            re.IGNORECASE,
+        )
 
         bodies: list[str] = []
         for match in marker.finditer(searchable_css):
@@ -512,7 +515,7 @@ def validate_document(document: str) -> list[str]:
         "safe-area-inset-left",
         "overflow-wrap: anywhere",
     ):
-        if marker not in css:
+        if marker not in searchable_css:
             failures.append(f"missing CSS marker: {marker}")
     if re.search(r"(?i)overflow-x\s*:\s*(?:hidden|auto|clip)", css):
         failures.append("horizontal overflow must remain observable")
