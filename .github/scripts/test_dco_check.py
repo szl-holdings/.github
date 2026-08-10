@@ -221,6 +221,19 @@ class RealCommitPhysicalMessageTests(unittest.TestCase):
                     [commit["sha"]],
                 )
 
+    def test_real_commit_bidi_controls_in_trailer_tokens_are_rejected(self) -> None:
+        for control in BIDI_CONTROLS:
+            with self.subTest(code_point=f"U+{ord(control):04X}"):
+                commit = _real_commit(
+                    "fix: reject directional trailer token\n\n"
+                    f"Reviewed-by{control}: Alice <reviewer@example.com>\n"
+                    "Signed-off-by: Test User <test@example.com>"
+                )
+                self.assertEqual(
+                    dco_check.unsigned_commit_shas([commit]),
+                    [commit["sha"]],
+                )
+
     def test_real_commit_ordinary_arabic_and_hebrew_letters_are_accepted(self) -> None:
         name = "مستخدم עברי"
         email = "משתמש@مثال.test"
@@ -334,6 +347,18 @@ class LocalGitProductionPathTests(unittest.TestCase):
                 sha = self.commit(
                     "fix: reject directional trailer\n\n"
                     f"Reviewed-by: Alice{control}Builder <reviewer@example.com>\n"
+                    "Signed-off-by: Test User <test@example.com>",
+                    author_name="Test User",
+                    author_email="test@example.com",
+                )
+                self.assert_rejected_by_commit_and_range(sha)
+
+    def test_bidi_controls_in_trailer_tokens_fail_production_path(self) -> None:
+        for control in BIDI_CONTROLS:
+            with self.subTest(code_point=f"U+{ord(control):04X}"):
+                sha = self.commit(
+                    "fix: reject directional trailer token\n\n"
+                    f"Reviewed-by{control}: Alice <reviewer@example.com>\n"
                     "Signed-off-by: Test User <test@example.com>",
                     author_name="Test User",
                     author_email="test@example.com",

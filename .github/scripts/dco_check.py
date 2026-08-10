@@ -57,6 +57,9 @@ SAFE_TRAILER_TEXT_PATTERN = (
     r"[^\x00-\x08\x0a-\x1f\x7f-\x9f\u061c\u200e\u200f"
     r"\u2028\u2029\u202a-\u202e\u2066-\u2069]*"
 )
+BIDI_CONTROL_PATTERN = re.compile(
+    r"[\u061c\u200e\u200f\u202a-\u202e\u2066-\u2069]"
+)
 TRAILER_TOKEN_PATTERN = r"-*[A-Za-z0-9][A-Za-z0-9-]*"
 TRAILER_TOKEN_FULL_PATTERN = re.compile(rf"^{TRAILER_TOKEN_PATTERN}$")
 TRAILER_LINE_PATTERN = re.compile(
@@ -448,6 +451,12 @@ def _admitted_trailer_group(
     has_recognized_prefix = False
 
     for line in final_group:
+        if BIDI_CONTROL_PATTERN.search(line):
+            current_token = None
+            non_trailer_count += 1
+            classified_lines.append(("malformed", None, line))
+            continue
+
         if CONTINUATION_LINE_PATTERN.fullmatch(line):
             if current_token is None:
                 non_trailer_count += 1
