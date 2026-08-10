@@ -438,6 +438,40 @@ class EmbedContractTests(unittest.TestCase):
         failures = check.validate_document(document)
         self.assertTrue(any("mobile CTA contract" in item for item in failures))
 
+    def test_rejects_boolean_media_state_recovery(self):
+        document = valid_document().replace(
+            "</style>",
+            "@media (hover) and (max-width: 640px) {\n"
+            "  #szl-hf-org-card .szl-hf-actions .szl-hf-button {\n"
+            "    width: auto !important;\n"
+            "  }\n"
+            "}\n"
+            "@media (not (hover)) and (max-width: 640px) {\n"
+            "  #szl-hf-org-card .szl-hf-actions .szl-hf-button {\n"
+            "    width: 100% !important;\n"
+            "  }\n"
+            "}\n</style>",
+            1,
+        )
+        failures = check.validate_document(document)
+        self.assertTrue(any("mobile CTA contract" in item for item in failures))
+
+    def test_fails_closed_on_unmodeled_pseudo_state(self):
+        document = valid_document().replace(
+            "</style>",
+            "@media (max-width: 640px) {\n"
+            "  #szl-hf-org-card .szl-hf-actions .szl-hf-button {\n"
+            "    width: auto !important;\n"
+            "  }\n"
+            "  #szl-hf-org-card .szl-hf-actions .szl-hf-button:hover {\n"
+            "    width: 100% !important;\n"
+            "  }\n"
+            "}\n</style>",
+            1,
+        )
+        failures = check.validate_document(document)
+        self.assertTrue(any("mobile CTA contract" in item for item in failures))
+
     def test_evaluates_complete_selector_in_functional_pseudo_class(self):
         document = valid_document().replace(
             "</style>",

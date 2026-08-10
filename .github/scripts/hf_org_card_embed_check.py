@@ -627,12 +627,15 @@ def validate_document(document: str) -> list[str]:
     )
 
     def media_has_unmodeled_state(prelude: str) -> bool:
-        feature_names = re.findall(
-            r"\(\s*([A-Za-z-]+)\s*:", prelude, re.IGNORECASE
-        )
+        conditions = re.findall(r"\(([^()]*)\)", prelude)
         if any(
-            feature.casefold() not in {"min-width", "max-width"}
-            for feature in feature_names
+            re.fullmatch(
+                r"\s*(?:min|max)-width\s*:\s*\d+px\s*",
+                condition,
+                re.IGNORECASE,
+            )
+            is None
+            for condition in conditions
         ):
             return True
         residual = re.sub(r"\([^()]*\)", " ", prelude[len("@media") :])
@@ -936,13 +939,18 @@ def validate_document(document: str) -> list[str]:
                 position = name_end
                 continue
             depth = 1
-            position = name_end + 1
+            argument_start = name_end + 1
+            position = argument_start
             while position < len(compound) and depth:
                 if compound[position] == "(":
                     depth += 1
                 elif compound[position] == ")":
                     depth -= 1
                 position += 1
+            if depth == 0:
+                simple.extend(
+                    simple_pseudo_classes(compound[argument_start : position - 1])
+                )
         return simple
 
     def without_pseudo_classes(compound: str) -> str:
@@ -1226,19 +1234,54 @@ def validate_document(document: str) -> list[str]:
         ] = {
             target_index: None for target_index in target_indices
         }
+        uncertain_pseudo_targets: set[int] = set()
+        deterministic_simple_pseudos = {
+            "any-link",
+            "disabled",
+            "enabled",
+            "link",
+            "root",
+        }
         for prelude, body, layer_order in rules:
             matching_specificities: dict[int, tuple[int, int, int]] = {}
+            unsupported_targets: set[int] = set()
+            unconditional_targets: set[int] = set()
             for item in split_selector_members(prelude):
                 candidate = re.sub(r"\s+", " ", item.strip())
                 candidate_specificity = specificity(candidate)
+                unsupported_pseudos = set(simple_pseudo_classes(candidate)) - (
+                    deterministic_simple_pseudos
+                )
+                unsupported_pseudos.update(
+                    name
+                    for name, _ in functional_pseudo_classes(candidate)
+                    if name not in {"is", "not", "where"}
+                )
+                compounds, combinators = selector_structure(candidate)
+                stripped_compounds = [
+                    without_pseudo_classes(compound).strip() or "*"
+                    for compound in compounds
+                ]
+                stripped_candidate = stripped_compounds[0] if stripped_compounds else ""
+                for combinator, compound in zip(
+                    combinators, stripped_compounds[1:], strict=True
+                ):
+                    stripped_candidate += f" {combinator} {compound}"
                 for target_index in target_indices:
                     if not selector_may_match_target(candidate, target_index):
+                        if unsupported_pseudos and selector_may_match_target(
+                            stripped_candidate, target_index
+                        ):
+                            unsupported_targets.add(target_index)
                         continue
+                    if unsupported_pseudos:
+                        unsupported_targets.add(target_index)
+                    else:
+                        unconditional_targets.add(target_index)
                     previous = matching_specificities.get(target_index)
                     if previous is None or candidate_specificity > previous:
                         matching_specificities[target_index] = candidate_specificity
-            if not matching_specificities:
-                continue
+            relevant_targets = unsupported_targets - unconditional_targets
             for candidate_property, value, important in direct_declaration_entries(body):
                 if candidate_property == property_name:
                     candidate_value = value
@@ -1246,6 +1289,7 @@ def validate_document(document: str) -> list[str]:
                     candidate_value = f"__reset_by_{candidate_property}__"
                 else:
                     continue
+                uncertain_pseudo_targets.update(relevant_targets)
                 for target_index, candidate_specificity in matching_specificities.items():
                     winner = winners[target_index]
                     if important:
@@ -1291,10 +1335,15 @@ def validate_document(document: str) -> list[str]:
                         candidate_specificity,
                         layer_order,
                     )
-        return [
+        results = [
             None if winners[target_index] is None else winners[target_index][:2]
             for target_index in target_indices
         ]
+        results.extend(
+            ("__unmodeled_pseudo_state__", True)
+            for _ in sorted(uncertain_pseudo_targets)
+        )
+        return results
 
     def responsive_sample_widths(max_width: int) -> list[int]:
         minimum_width = 320
