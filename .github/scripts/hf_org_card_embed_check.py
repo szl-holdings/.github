@@ -506,44 +506,100 @@ def validate_document(document: str) -> list[str]:
             )
         return rules
 
+    def split_top_level_or(value: str) -> list[str]:
+        alternatives: list[str] = []
+        start = 0
+        parentheses = 0
+        brackets = 0
+        quote = ""
+        position = 0
+        while position < len(value):
+            character = value[position]
+            if quote:
+                if character == "\\":
+                    position += 2
+                    continue
+                if character == quote:
+                    quote = ""
+            elif character in {'"', "'"}:
+                quote = character
+            elif character == "(":
+                parentheses += 1
+            elif character == ")":
+                parentheses = max(0, parentheses - 1)
+            elif character == "[":
+                brackets += 1
+            elif character == "]":
+                brackets = max(0, brackets - 1)
+            elif (
+                not parentheses
+                and not brackets
+                and value[position : position + 2].casefold() == "or"
+                and (position == 0 or not re.match(r"[\w-]", value[position - 1]))
+                and (
+                    position + 2 == len(value)
+                    or not re.match(r"[\w-]", value[position + 2])
+                )
+            ):
+                alternatives.append(value[start:position].strip())
+                position += 2
+                start = position
+                continue
+            position += 1
+        alternatives.append(value[start:].strip())
+        return [item for item in alternatives if item]
+
     def media_may_apply_at_width(prelude: str, width: int) -> bool:
         if not prelude.lower().startswith("@media"):
             return False
         query_list = prelude[len("@media") :].strip()
-        for query in split_selector_members(query_list):
-            constraints = re.findall(
-                r"\(\s*(min|max)-width\s*:\s*(\d+)px\s*\)",
-                query,
-                re.IGNORECASE,
-            )
-            applies = True
-            for bound, value in constraints:
-                limit = int(value)
-                if bound.lower() == "min" and width < limit:
-                    applies = False
-                if bound.lower() == "max" and width > limit:
-                    applies = False
-            if applies:
-                return True
+        for member in split_selector_members(query_list):
+            for query in split_top_level_or(member):
+                constraints = re.findall(
+                    r"\(\s*(min|max)-width\s*:\s*(\d+)px\s*\)",
+                    query,
+                    re.IGNORECASE,
+                )
+                applies = True
+                for bound, value in constraints:
+                    limit = int(value)
+                    if bound.lower() == "min" and width < limit:
+                        applies = False
+                    if bound.lower() == "max" and width > limit:
+                        applies = False
+                if applies:
+                    return True
         return False
 
     layer_orders: dict[str, int] = {}
+    anonymous_layer_orders: list[int] = []
+    next_layer_order = 0
     for layer_match in re.finditer(
         r"(?i)@layer(?:\s+([^;{]+))?\s*(?=[;{])", searchable_css
     ):
         names = split_selector_members((layer_match.group(1) or "").strip())
-        for name in names:
-            if name and name not in layer_orders:
-                layer_orders[name] = len(layer_orders)
+        if any(names):
+            for name in names:
+                if name and name not in layer_orders:
+                    layer_orders[name] = next_layer_order
+                    next_layer_order += 1
+        else:
+            anonymous_layer_orders.append(next_layer_order)
+            next_layer_order += 1
+
+    next_dynamic_layer_order = [next_layer_order]
 
     def layer_order_for(name: str) -> int:
         if name not in layer_orders:
-            layer_orders[name] = len(layer_orders)
+            layer_orders[name] = next_dynamic_layer_order[0]
+            next_dynamic_layer_order[0] += 1
         return layer_orders[name]
 
     def cascade_rules_at_width(
         width: int,
     ) -> list[tuple[str, str, int | None]]:
+        anonymous_layer_cursor = [0]
+
         def collect(
             blocks: list[tuple[str, str]],
             current_layer: tuple[str, int] | None = None,
@@ -588,14 +644,22 @@ def validate_document(document: str) -> list[str]:
                             if current_layer is None
                             else f"{current_layer[0]}.{local_name}"
                         )
+                        layer_order = layer_order_for(layer_name)
                     else:
                         layer_name = "__anonymous_layer_" + "_".join(
                             str(item) for item in path + (block_index,)
                         )
+                        if anonymous_layer_cursor[0] < len(anonymous_layer_orders):
+                            layer_order = anonymous_layer_orders[
+                                anonymous_layer_cursor[0]
+                            ]
+                        else:
+                            layer_order = layer_order_for(layer_name)
+                        anonymous_layer_cursor[0] += 1
                     collected.extend(
                         collect(
                             direct_blocks(body),
-                            (layer_name, layer_order_for(layer_name)),
+                            (layer_name, layer_order),
                             path + (block_index,),
                         )
                     )
@@ -1007,10 +1071,41 @@ def validate_document(document: str) -> list[str]:
             None,
         ),
     )
+    media_boundaries = [
+        int(value)
+        for _, value in re.findall(
+            r"\(\s*(min|max)-width\s*:\s*(\d+)px\s*\)",
+            searchable_css,
+            re.IGNORECASE,
+        )
+    ]
+    global_sample_widths = responsive_sample_widths(
+        max([4096, *media_boundaries])
+    )
     failed_global_contracts: list[str] = []
     for label, selector, property_name, value_pattern, important in global_requirements:
-        winner = winning_declaration(unconditional_rules, selector, property_name)
-        if not winner_matches(winner, value_pattern, important) and label not in failed_global_contracts:
+        cascade_value_pattern = value_pattern
+        if label == "bounded embedded shell" and property_name == "width":
+            cascade_value_pattern = (
+                rf"(?:{value_pattern}|"
+                r"calc\(\s*100%\s*-\s*(?:18|24)px\s*\))"
+            )
+        unconditional_winner = winning_declaration(
+            unconditional_rules, selector, property_name
+        )
+        cascade_winners = [
+            winning_declaration(
+                cascade_rules_at_width(width), selector, property_name
+            )
+            for width in global_sample_widths
+        ]
+        if (
+            not winner_matches(unconditional_winner, value_pattern, important)
+            or not all(
+                winner_matches(winner, cascade_value_pattern, important)
+                for winner in cascade_winners
+            )
+        ) and label not in failed_global_contracts:
             failed_global_contracts.append(label)
     for label in failed_global_contracts:
             failures.append(f"missing {label} contract")

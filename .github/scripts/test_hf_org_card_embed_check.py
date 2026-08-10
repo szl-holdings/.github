@@ -396,6 +396,28 @@ class EmbedContractTests(unittest.TestCase):
         )
         self.assertEqual(check.validate_document(document), [])
 
+    def test_preserves_anonymous_layer_source_order_for_important_rules(self):
+        document = valid_document().replace(
+            "</style>",
+            "@layer {\n"
+            "  @media (max-width: 640px) {\n"
+            "    #szl-hf-org-card .szl-hf-actions .szl-hf-button {\n"
+            "      width: auto !important;\n"
+            "    }\n"
+            "  }\n"
+            "}\n"
+            "@layer recovery {\n"
+            "  @media (max-width: 640px) {\n"
+            "    #szl-hf-org-card .szl-hf-actions .szl-hf-button {\n"
+            "      width: 100% !important;\n"
+            "    }\n"
+            "  }\n"
+            "}\n</style>",
+            1,
+        )
+        failures = check.validate_document(document)
+        self.assertTrue(any("mobile CTA contract" in item for item in failures))
+
     def test_rejects_comma_separated_mobile_media_override(self):
         document = valid_document().replace(
             "</style>",
@@ -408,6 +430,33 @@ class EmbedContractTests(unittest.TestCase):
         )
         failures = check.validate_document(document)
         self.assertTrue(any("mobile CTA contract" in item for item in failures))
+
+    def test_rejects_or_separated_mobile_media_override(self):
+        document = valid_document().replace(
+            "</style>",
+            "@media (min-width: 1000px) or (max-width: 640px) {\n"
+            "  #szl-hf-org-card .szl-hf-actions .szl-hf-button {\n"
+            "    width: auto !important;\n"
+            "  }\n"
+            "}\n</style>",
+            1,
+        )
+        failures = check.validate_document(document)
+        self.assertTrue(any("mobile CTA contract" in item for item in failures))
+
+    def test_rejects_responsive_global_shell_override(self):
+        document = valid_document().replace(
+            "</style>",
+            "@media (max-width: 640px) {\n"
+            "  #szl-hf-org-card .szl-hf-shell {\n"
+            "    width: 2000px;\n"
+            "    max-width: none;\n"
+            "  }\n"
+            "}\n</style>",
+            1,
+        )
+        failures = check.validate_document(document)
+        self.assertTrue(any("bounded embedded shell" in item for item in failures))
 
     def test_rejects_navigation_grid_shorthand_override(self):
         document = valid_document().replace(
