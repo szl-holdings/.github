@@ -1,23 +1,35 @@
 #!/usr/bin/env python3
-"""Static contract for activating the trusted multi-event DCO workflow."""
+"""Static contract for the native and reusable trusted DCO producers."""
 
 from pathlib import Path
 import unittest
 
 
+SCRIPTS = Path(__file__).resolve().parent
+WORKFLOWS = SCRIPTS.parent / "workflows"
+
+
 class DcoActivationWorkflowTests(unittest.TestCase):
-    def test_workflow_static_contract(self) -> None:
-        workflow = (
-            Path(__file__).resolve().parents[1] / "workflows" / "dco.yml"
-        ).read_text(encoding="utf-8")
+    def setUp(self) -> None:
+        self.native = (WORKFLOWS / "dco.yml").read_text(encoding="utf-8")
+        self.reusable = (WORKFLOWS / "reusable-dco.yml").read_text(encoding="utf-8")
+        self.checker = (SCRIPTS / "dco_check.py").read_text(encoding="utf-8")
+        self.forge_verifier = (SCRIPTS / "verify_forge9_governance.py").read_text(
+            encoding="utf-8"
+        )
+        self.forge_runner = (SCRIPTS / "run_forge9_gate.py").read_text(
+            encoding="utf-8"
+        )
+
+    def test_native_workflow_preserves_all_governed_event_gates(self) -> None:
         for marker in (
+            "name: Native DCO enforcement",
             "pull_request" + "_target:",
             "- main",
             "- 'release/*'",
             "types: [opened, synchronize, reopened, ready_for_review, edited, closed]",
-            "concurrency:",
-            "github.event.pull_request.head.sha",
-            "cancel-in-progress: true",
+            "merge_" + "group:",
+            "types: [checks_requested]",
             "Reconcile surviving DCO status",
             "github.event.before",
             "AFFECTED_HEAD_SHA:",
@@ -25,65 +37,107 @@ class DcoActivationWorkflowTests(unittest.TestCase):
             "reconcile-base",
             "reconcile-trusted",
             "dco-reconcile-event.json",
-            "DCO reconciliation in progress",
             "Finalize pull-request DCO failure",
-            "steps.validate_pr.outputs.published",
-            "DCO workflow setup failed",
             "Finalize reconciliation failure",
-            "steps.validate_reconciliation.outputs.published",
-            "DCO reconciliation setup failed",
-            "always()",
-            "merge_" + "group:",
-            "types: [checks_requested]",
             "persist-credentials: false",
-            "format('refs/pull/{0}/head', github.event.pull_request.number)",
             "github.event.pull_request.base.sha",
             "github.event.pull_request.head.sha",
             "EXPECTED_BASE_SHA:",
             "EXPECTED_HEAD_SHA:",
             "statuses: write",
             "statuses/$EXPECTED_HEAD_SHA",
-            'state="pending"',
-            'state="failure"',
-            'exit "$dco_exit"',
+            '-f context="DCO sign-off check"',
             "github.workflow_sha",
-            "EXPECTED_TRUSTED_SHA:",
-            "rev-parse HEAD",
-            "path: protected-base",
-            "EXPECTED_BASE_REF:",
-            'current_pr="$(gh api',
             "--paginate --slurp",
-            'governed_pr_numbers="$(',
-            'shared_head=false',
-            'revalidation_error=false',
-            'current_tuple="$(',
-            'description="DCO live revalidation failed"',
-            'description="DCO head is shared by governed PRs"',
-            'description="DCO event is stale"',
-            "git -C \"$GITHUB_WORKSPACE/candidate\" fetch",
             "trusted/.github/scripts/dco_check.py",
+            "Run strict real-commit DCO self-tests",
+            "native-dco-compatibility:",
+            "name: DCO sign-off check",
+            "needs: dco",
+            "if: always() && github.event_name != 'pull_request_target'",
+            "NATIVE_DCO_RESULT: ${{ needs.dco.result }}",
+            'test "$NATIVE_DCO_RESULT" = "success"',
         ):
-            self.assertIn(marker, workflow)
-        checker = (Path(__file__).resolve().parent / "dco_check.py").read_text(
-            encoding="utf-8"
-        )
+            self.assertIn(marker, self.native)
+        self.assertNotIn("\n  pull_request:\n", self.native)
+        self.assertNotIn("workflow_" + "dispatch:", self.native)
+
+    def test_reusable_workflow_is_exact_and_secretless(self) -> None:
         for marker in (
+            "name: Reusable DCO validation",
+            "repository: ${{ job.workflow_repository }}",
+            "ref: ${{ job.workflow_sha }}",
+            "GH_TOKEN: ${{ github.token }}",
+            "GITHUB_TOKEN: ${{ github.token }}",
+            "github.event.pull_request.base.sha",
+            "github.event.pull_request.head.sha",
+            "refs/pull/${{ github.event.pull_request.number }}/head",
+            "persist-credentials: false",
+            "trusted-dco/.github/scripts/dco_check.py",
+            "Run strict real-commit DCO self-tests",
+            "reusable-dco-compatibility:",
+            "name: DCO sign-off",
+            "needs: reusable-dco",
+            "REUSABLE_DCO_RESULT: ${{ needs.reusable-dco.result }}",
+            'test "$REUSABLE_DCO_RESULT" = "success"',
+        ):
+            self.assertIn(marker, self.reusable)
+        self.assertNotIn("secrets.", self.reusable)
+        self.assertNotIn("secrets: inherit", self.reusable)
+        self.assertNotIn("grep ", self.reusable)
+        self.assertEqual(self.reusable.count("name: DCO sign-off\n"), 1)
+        self.assertNotIn("continue-on-error", self.reusable)
+
+    def test_source_namespaces_are_distinct_and_legacy_status_survives(self) -> None:
+        self.assertNotEqual("Native DCO enforcement", "Reusable DCO validation")
+        self.assertIn("name: Native DCO enforcement", self.native)
+        self.assertNotIn("name: Reusable DCO validation", self.native)
+        self.assertIn("name: Reusable DCO validation", self.reusable)
+        self.assertNotIn("name: Native DCO enforcement", self.reusable)
+        self.assertIn('context="DCO sign-off check"', self.native)
+        self.assertEqual(self.native.count("name: DCO sign-off check\n"), 1)
+        self.assertNotIn("continue-on-error", self.native)
+
+    def test_physical_parser_and_bounded_event_contract_are_consumed(self) -> None:
+        for marker in (
+            "PATCH_DIVIDER_PATTERN",
+            "TRAILER_TOKEN_PATTERN",
+            "valid_dco_identities",
+            "MAX_PULL_REQUEST_COMMITS = 250",
+            'event_name in {"pull_request_target", "pull_request"}',
             'group.get("base_sha")',
             'group.get("head_sha")',
             '"merge-base", "--is-ancestor"',
-            '"interpret-trailers", "--parse"',
         ):
-            self.assertIn(marker, checker)
-        self.assertNotIn("\n  pull_request:\n", workflow)
-        self.assertNotIn("workflow_" + "dispatch:", workflow)
-        self.assertNotIn("github.event_name != 'pull_request'", workflow)
-        release_ruleset = (
-            Path(__file__).resolve().parents[2]
-            / ".governance"
-            / "ruleset-release.json"
-        ).read_text(encoding="utf-8")
-        self.assertIn('"context": "DCO sign-off check"', release_ruleset)
-        self.assertIn('"integration_id": 15368', release_ruleset)
+            self.assertIn(marker, self.checker)
+
+    def test_committed_ruleset_fixtures_are_not_live_activation_evidence(self) -> None:
+        production_sources = self.native + self.reusable + self.checker
+        self.assertNotIn(".governance/ruleset", production_sources)
+        self.assertNotIn("ruleset-release.json", production_sources)
+        self.assertNotIn("integration_id", production_sources)
+
+    def test_forge9_requires_strict_behavior_not_retired_implementation(self) -> None:
+        self.assertNotIn('"interpret-trailers", "--parse"', self.forge_verifier)
+        for marker in (
+            "PATCH_DIVIDER_PATTERN =",
+            "TRAILER_TOKEN_PATTERN =",
+            "def _is_patch_divider(",
+            "def valid_dco_identities(",
+            "Signed-off-by does not exactly match the commit author",
+            "class RealCommitPhysicalMessageTests",
+            "test_git_density_admission_matches_interpret_trailers",
+            "name: Reusable DCO validation",
+            "repository: ${{ job.workflow_repository }}",
+            "ref: ${{ job.workflow_sha }}",
+        ):
+            self.assertIn(marker, self.forge_verifier)
+        for suite in (
+            ".github/scripts/test_dco_check.py",
+            ".github/scripts/test_dco_events.py",
+            ".github/scripts/test_dco_activation.py",
+        ):
+            self.assertIn(suite, self.forge_runner)
 
 
 if __name__ == "__main__":

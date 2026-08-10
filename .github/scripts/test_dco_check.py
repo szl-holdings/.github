@@ -4,8 +4,10 @@
 from __future__ import annotations
 
 import json
+import os
 import shutil
 import subprocess
+import tempfile
 import unittest
 from urllib.error import URLError
 
@@ -19,10 +21,22 @@ TOKEN = "test-token"
 BASE_SHA = "f" * 40
 
 
-def _commit(index: int, message: str | None = None) -> dict[str, object]:
+def _commit(
+    index: int,
+    message: str | None = None,
+    *,
+    author_name: str = "Test User",
+    author_email: str = "test@example.com",
+) -> dict[str, object]:
     if message is None:
         message = f"fix: commit {index}\n\nSigned-off-by: Test User <test@example.com>"
-    return {"sha": f"{index:040x}", "commit": {"message": message}}
+    return {
+        "sha": f"{index:040x}",
+        "commit": {
+            "message": message,
+            "author": {"name": author_name, "email": author_email},
+        },
+    }
 
 
 def _signed_commits(count: int, *, start: int = 1) -> list[dict[str, object]]:
@@ -98,6 +112,57 @@ def _stable_responses(
     head_sha = _head_sha(commits)
     metadata = _metadata(count, head_sha)
     return head_sha, [metadata, *_commit_pages(commits), [], metadata]
+
+
+def _real_commit(
+    message: str,
+    *,
+    author_name: str = "Test User",
+    author_email: str = "test@example.com",
+) -> dict[str, object]:
+    """Create a real Git commit and return its physical API-shaped identity."""
+    git = shutil.which("git")
+    if git is None:
+        raise unittest.SkipTest("git is unavailable for real-commit fixtures")
+    with tempfile.TemporaryDirectory(prefix="dco-real-commit-") as root:
+        subprocess.run([git, "-C", root, "init", "--quiet"], check=True, capture_output=True, timeout=5)
+        tree = subprocess.run([git, "-C", root, "mktree"], input=b"", check=True, capture_output=True, timeout=5).stdout.strip().decode("ascii")
+        commit_env = os.environ.copy()
+        commit_env.update({
+            "GIT_AUTHOR_NAME": author_name,
+            "GIT_AUTHOR_EMAIL": author_email,
+            "GIT_AUTHOR_DATE": "2000-01-01T00:00:00+00:00",
+            "GIT_COMMITTER_NAME": "DCO Test Committer",
+            "GIT_COMMITTER_EMAIL": "committer@example.com",
+            "GIT_COMMITTER_DATE": "2000-01-01T00:00:00+00:00",
+        })
+        sha = subprocess.run([git, "-C", root, "commit-tree", tree], input=message.encode("utf-8"), env=commit_env, check=True, capture_output=True, timeout=5).stdout.strip().decode("ascii")
+        raw = subprocess.run([git, "-C", root, "cat-file", "commit", sha], check=True, capture_output=True, timeout=5).stdout
+        physical_message = raw.split(b"\n\n", 1)[1].decode("utf-8").rstrip("\n")
+        identity = subprocess.run([git, "-C", root, "show", "-s", "--format=%an%x00%ae", sha], check=True, capture_output=True, timeout=5).stdout.decode("utf-8").rstrip("\n").split("\x00", 1)
+    return {
+        "sha": sha,
+        "commit": {
+            "message": physical_message,
+            "author": {"name": identity[0], "email": identity[1]},
+        },
+    }
+
+
+class RealCommitPhysicalMessageTests(unittest.TestCase):
+    def test_real_commit_exact_author_identity_is_enforced(self) -> None:
+        message = "fix: physical message\n\nSigned-off-by: Test User <test@example.com>"
+        self.assertEqual(dco_check.unsigned_commit_shas([_real_commit(message)]), [])
+        mismatched = _real_commit(message, author_name="Different User")
+        self.assertEqual(dco_check.unsigned_commit_shas([mismatched]), [mismatched["sha"]])
+
+    def test_real_commit_terminal_patch_marker_cannot_hide_postscript(self) -> None:
+        commit = _real_commit(
+            "fix: terminal marker\n\n"
+            "Signed-off-by: Test User <test@example.com>\n"
+            "non-trailer postscript\n\n---"
+        )
+        self.assertEqual(dco_check.unsigned_commit_shas([commit]), [commit["sha"]])
 
 
 UNSIGNED_EMPTY_COMMIT = _commit(1, "chore: intentionally empty commit")
@@ -251,7 +316,12 @@ class DcoCheckTests(unittest.TestCase):
         )
 
     def test_one_character_signer_name_is_accepted(self) -> None:
-        commit = _commit(14, "fix: short signer\n\nSigned-off-by: X <x@example.com>")
+        commit = _commit(
+            14,
+            "fix: short signer\n\nSigned-off-by: X <x@example.com>",
+            author_name="X",
+            author_email="x@example.com",
+        )
 
         self.assertEqual(dco_check.unsigned_commit_shas([commit]), [])
 
@@ -282,6 +352,7 @@ class DcoCheckTests(unittest.TestCase):
                 "fix: horizontal signer\n\n"
                 f"Signed-off-by:{separator}A{separator}B{separator}"
                 f"<test@example.com>{separator}",
+                author_name=f"A{separator}B",
             )
             for index, separator in enumerate(separators, start=30)
         ]

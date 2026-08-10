@@ -230,6 +230,12 @@ def verify_gate_contract() -> None:
         "github.event.pull_request.base.sha",
         "github.event.pull_request.head.sha",
         ".github/scripts/dco_check.py",
+        "native-dco-compatibility:",
+        "name: DCO sign-off check",
+        "needs: dco",
+        "if: always() && github.event_name != 'pull_request_target'",
+        "NATIVE_DCO_RESULT: ${{ needs.dco.result }}",
+        'test "$NATIVE_DCO_RESULT" = "success"',
     ):
         if marker not in dco_template:
             fail(f"trusted DCO workflow is missing {marker!r}")
@@ -239,6 +245,37 @@ def verify_gate_contract() -> None:
         fail("DCO must not publish a manual false-green status")
     if "github.event_name != 'pull_request'" in dco_template:
         fail("DCO merge-group and push validation must not use a fallback pass")
+    if dco_template.count("name: DCO sign-off check\n") != 1:
+        fail("native DCO must expose exactly one legacy compatibility job")
+    if "continue-on-error" in dco_template:
+        fail("native DCO compatibility must not suppress a failed gate")
+
+    reusable_dco_template = (
+        ROOT / ".github/workflows/reusable-dco.yml"
+    ).read_text(encoding="utf-8")
+    for marker in (
+        "name: Reusable DCO validation",
+        "repository: ${{ job.workflow_repository }}",
+        "ref: ${{ job.workflow_sha }}",
+        "GITHUB_TOKEN: ${{ github.token }}",
+        "persist-credentials: false",
+        "trusted-dco/.github/scripts/dco_check.py",
+        "reusable-dco-compatibility:",
+        "name: DCO sign-off",
+        "needs: reusable-dco",
+        "if: always()",
+        "REUSABLE_DCO_RESULT: ${{ needs.reusable-dco.result }}",
+        'test "$REUSABLE_DCO_RESULT" = "success"',
+    ):
+        if marker not in reusable_dco_template:
+            fail(f"reusable DCO workflow is missing {marker!r}")
+    if "secrets." in reusable_dco_template or "secrets: inherit" in reusable_dco_template:
+        fail("reusable DCO workflow must not consume inherited secrets")
+    if reusable_dco_template.count("name: DCO sign-off\n") != 1:
+        fail("reusable DCO must expose exactly one legacy compatibility job")
+    if "continue-on-error" in reusable_dco_template:
+        fail("reusable DCO compatibility must not suppress a failed gate")
+
     dco_source = (ROOT / ".github/scripts/dco_check.py").read_text(encoding="utf-8")
     for marker in (
         'payload.get("action") == "checks_requested"',
@@ -247,12 +284,43 @@ def verify_gate_contract() -> None:
         'group.get("head_sha")',
         "checked_out_head(repo) == head_sha",
         '"merge-base", "--is-ancestor"',
-        '"interpret-trailers", "--parse"',
-        "Signed-off-by does not match the commit author",
+        "PATCH_DIVIDER_PATTERN =",
+        "TRAILER_TOKEN_PATTERN =",
+        "def _is_patch_divider(",
+        "def valid_dco_identities(",
+        "Signed-off-by does not exactly match the commit author",
+        "draft pull requests cannot satisfy DCO",
+        "MAX_PULL_REQUEST_COMMITS = 250",
         "pull-request commit count changed during validation",
     ):
         if marker not in dco_source:
             fail(f"trusted DCO checker is missing {marker!r}")
+
+    dco_parser_tests = (
+        ROOT / ".github/scripts/test_dco_check.py"
+    ).read_text(encoding="utf-8")
+    for marker in (
+        "class RealCommitPhysicalMessageTests",
+        "test_real_commit_exact_author_identity_is_enforced",
+        "test_real_commit_terminal_patch_marker_cannot_hide_postscript",
+        "test_git_density_admission_matches_interpret_trailers",
+        "test_mixed_group_prefix_admission_matches_interpret_trailers",
+        "test_generic_key_to_colon_spacing_and_folds_are_accepted",
+        "test_unterminated_patch_marker_does_not_truncate_message",
+    ):
+        if marker not in dco_parser_tests:
+            fail(f"strict physical DCO parser tests are missing {marker!r}")
+
+    dco_event_tests = (
+        ROOT / ".github/scripts/test_dco_events.py"
+    ).read_text(encoding="utf-8")
+    for marker in (
+        "test_author_identity_comparison_is_exact",
+        "test_pr_pagination_boundaries_and_freshness",
+        "test_merge_group_identity_and_hostile_ref_contract",
+    ):
+        if marker not in dco_event_tests:
+            fail(f"trusted DCO event tests are missing {marker!r}")
 
     attestor_template = (
         ROOT / ".github/workflows/attest-and-approve.yml"
