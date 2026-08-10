@@ -595,8 +595,39 @@ def validate_document(document: str) -> list[str]:
             next_dynamic_layer_order[0] += 1
         return layer_orders[name]
 
+    def discover_support_paths(
+        blocks: list[tuple[str, str]], path: tuple[int, ...] = ()
+    ) -> list[tuple[int, ...]]:
+        discovered: list[tuple[int, ...]] = []
+        for block_index, (prelude, body) in enumerate(blocks):
+            lowered = prelude.lower()
+            block_path = path + (block_index,)
+            if lowered.startswith("@supports"):
+                discovered.append(block_path)
+                discovered.extend(
+                    discover_support_paths(direct_blocks(body), block_path)
+                )
+            elif lowered.startswith("@media") or lowered.startswith("@layer"):
+                discovered.extend(
+                    discover_support_paths(direct_blocks(body), block_path)
+                )
+        return discovered
+
+    support_paths = discover_support_paths(top_level_blocks)
+    if len(support_paths) > 8:
+        failures.append("too many @supports branches for exhaustive cascade validation")
+    support_scenarios = [
+        frozenset(
+            support_path
+            for bit, support_path in enumerate(support_paths)
+            if mask & (1 << bit)
+        )
+        for mask in range(1 << min(len(support_paths), 8))
+    ]
+
     def cascade_rules_at_width(
         width: int,
+        enabled_supports: frozenset[tuple[int, ...]],
     ) -> list[tuple[str, str, int | None]]:
         anonymous_layer_cursor = [0]
 
@@ -604,11 +635,13 @@ def validate_document(document: str) -> list[str]:
             blocks: list[tuple[str, str]],
             current_layer: tuple[str, int] | None = None,
             path: tuple[int, ...] = (),
+            active: bool = True,
         ) -> list[tuple[str, str, int | None]]:
             collected: list[tuple[str, str, int | None]] = []
             for block_index, (prelude, body) in enumerate(blocks):
                 lowered = prelude.lower()
-                if not prelude.startswith("@"):
+                block_path = path + (block_index,)
+                if not prelude.startswith("@") and active:
                     collected.append(
                         (
                             prelude,
@@ -617,23 +650,21 @@ def validate_document(document: str) -> list[str]:
                         )
                     )
                 elif lowered.startswith("@media"):
-                    if media_may_apply_at_width(prelude, width):
-                        collected.extend(
-                            collect(
-                                direct_blocks(body),
-                                current_layer,
-                                path + (block_index,),
-                            )
-                        )
-                elif lowered.startswith("@supports"):
-                    # A supported feature query can participate in the browser
-                    # cascade. Treat every branch as potentially applicable so
-                    # the responsive contract remains fail-closed.
                     collected.extend(
                         collect(
                             direct_blocks(body),
                             current_layer,
-                            path + (block_index,),
+                            block_path,
+                            active and media_may_apply_at_width(prelude, width),
+                        )
+                    )
+                elif lowered.startswith("@supports"):
+                    collected.extend(
+                        collect(
+                            direct_blocks(body),
+                            current_layer,
+                            block_path,
+                            active and block_path in enabled_supports,
                         )
                     )
                 elif lowered.startswith("@layer"):
@@ -660,7 +691,8 @@ def validate_document(document: str) -> list[str]:
                         collect(
                             direct_blocks(body),
                             (layer_name, layer_order),
-                            path + (block_index,),
+                            block_path,
+                            active,
                         )
                     )
             return collected
@@ -729,6 +761,72 @@ def validate_document(document: str) -> list[str]:
             compounds.append("".join(current).strip())
         return [item for item in compounds if item], sibling_combinator
 
+    def functional_pseudo_classes(compound: str) -> list[tuple[str, str]]:
+        functions: list[tuple[str, str]] = []
+        position = 0
+        brackets = 0
+        quote = ""
+        while position < len(compound):
+            character = compound[position]
+            if quote:
+                if character == "\\":
+                    position += 2
+                    continue
+                if character == quote:
+                    quote = ""
+                position += 1
+                continue
+            if character in {'"', "'"}:
+                quote = character
+                position += 1
+                continue
+            if character == "[":
+                brackets += 1
+                position += 1
+                continue
+            if character == "]":
+                brackets = max(0, brackets - 1)
+                position += 1
+                continue
+            if character != ":" or brackets or compound[position : position + 2] == "::":
+                position += 1
+                continue
+            name_start = position + 1
+            name_end = name_start
+            while name_end < len(compound) and re.match(r"[\w-]", compound[name_end]):
+                name_end += 1
+            if name_end >= len(compound) or compound[name_end] != "(":
+                position = name_end
+                continue
+            depth = 1
+            argument_start = name_end + 1
+            cursor = argument_start
+            nested_quote = ""
+            while cursor < len(compound) and depth:
+                nested = compound[cursor]
+                if nested_quote:
+                    if nested == "\\":
+                        cursor += 2
+                        continue
+                    if nested == nested_quote:
+                        nested_quote = ""
+                elif nested in {'"', "'"}:
+                    nested_quote = nested
+                elif nested == "(":
+                    depth += 1
+                elif nested == ")":
+                    depth -= 1
+                cursor += 1
+            if depth == 0:
+                functions.append(
+                    (
+                        compound[name_start:name_end].casefold(),
+                        compound[argument_start : cursor - 1],
+                    )
+                )
+            position = cursor
+        return functions
+
     def without_pseudo_classes(compound: str) -> str:
         result: list[str] = []
         position = 0
@@ -794,6 +892,20 @@ def validate_document(document: str) -> list[str]:
     ) -> bool:
         if re.search(r"::[A-Za-z_-]", compound):
             return False
+        for name, arguments in functional_pseudo_classes(compound):
+            if name not in {"not", "is", "where"}:
+                continue
+            argument_matches = []
+            for member in split_selector_members(arguments):
+                argument_compounds, _ = selector_compounds(member)
+                argument_matches.append(
+                    bool(argument_compounds)
+                    and compound_may_match(argument_compounds[-1], element)
+                )
+            if name == "not" and any(argument_matches):
+                return False
+            if name in {"is", "where"} and not any(argument_matches):
+                return False
         tag, attributes, _ = element
         base = without_pseudo_classes(compound)
         without_attributes = re.sub(r"\[[^]]*\]", "", base)
@@ -897,17 +1009,53 @@ def validate_document(document: str) -> list[str]:
         target_indices = selector_targets(expected_selector)
 
         def specificity(candidate: str) -> tuple[int, int, int]:
-            ids = len(re.findall(r"#[\w-]+", candidate))
+            without_functions = candidate
+            functional_specificity = (0, 0, 0)
+            for name, arguments in functional_pseudo_classes(candidate):
+                marker = re.compile(
+                    rf":{re.escape(name)}\s*\({re.escape(arguments)}\)",
+                    re.IGNORECASE,
+                )
+                without_functions = marker.sub("", without_functions, count=1)
+                if name == "where":
+                    continue
+                if name in {"is", "not", "has"}:
+                    argument_specificities = [
+                        specificity(member)
+                        for member in split_selector_members(arguments)
+                    ]
+                    if argument_specificities:
+                        selected = max(argument_specificities)
+                        functional_specificity = tuple(
+                            left + right
+                            for left, right in zip(
+                                functional_specificity, selected, strict=True
+                            )
+                        )
+                else:
+                    functional_specificity = (
+                        functional_specificity[0],
+                        functional_specificity[1] + 1,
+                        functional_specificity[2],
+                    )
+            ids = len(re.findall(r"#[\w-]+", without_functions))
             classes = len(
-                re.findall(r"\.[\w-]+|\[[^\]]+\]|:(?!:)[\w-]+", candidate)
+                re.findall(
+                    r"\.[\w-]+|\[[^\]]+\]|:(?!:)[\w-]+", without_functions
+                )
             )
             without_simple = re.sub(
                 r"#[\w-]+|\.[\w-]+|\[[^\]]+\]|::?[\w-]+(?:\([^)]*\))?",
                 " ",
-                candidate,
+                without_functions,
             )
             elements = len(re.findall(r"\b[a-zA-Z][\w-]*\b", without_simple))
-            return ids, classes, elements
+            return tuple(
+                left + right
+                for left, right in zip(
+                    (ids, classes, elements), functional_specificity, strict=True
+                )
+            )
 
         resetters = {
             "grid-template-columns": {"grid", "grid-template", "all"},
@@ -1095,9 +1243,12 @@ def validate_document(document: str) -> list[str]:
         )
         cascade_winners = [
             winning_declaration(
-                cascade_rules_at_width(width), selector, property_name
+                cascade_rules_at_width(width, support_scenario),
+                selector,
+                property_name,
             )
             for width in global_sample_widths
+            for support_scenario in support_scenarios
         ]
         if (
             not winner_matches(unconditional_winner, value_pattern, important)
@@ -1149,9 +1300,12 @@ def validate_document(document: str) -> list[str]:
         )
         cascade_winners = [
             winning_declaration(
-                cascade_rules_at_width(width), selector, property_name
+                cascade_rules_at_width(width, support_scenario),
+                selector,
+                property_name,
             )
             for width in responsive_sample_widths(max_width)
+            for support_scenario in support_scenarios
         ]
         if not winner_matches(
             exact_winner, value_pattern, important
