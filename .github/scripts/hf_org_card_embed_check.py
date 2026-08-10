@@ -562,21 +562,21 @@ def validate_document(document: str) -> list[str]:
         query_list = prelude[len("@media") :].strip()
         for member in split_selector_members(query_list):
             for query in split_top_level_or(member):
-                negated = bool(re.match(r"^\s*not\b", query, re.IGNORECASE))
                 constraints = re.findall(
+                    r"(?:(not)\s+)?"
                     r"\(\s*(min|max)-width\s*:\s*(\d+)px\s*\)",
                     query,
                     re.IGNORECASE,
                 )
                 applies = True
-                for bound, value in constraints:
+                for negated, bound, value in constraints:
                     limit = int(value)
-                    if bound.lower() == "min" and width < limit:
-                        applies = False
-                    if bound.lower() == "max" and width > limit:
-                        applies = False
-                if negated:
-                    applies = not applies
+                    condition = (
+                        width >= limit if bound.lower() == "min" else width <= limit
+                    )
+                    if negated:
+                        condition = not condition
+                    applies = applies and condition
                 if applies:
                     return True
         return False
