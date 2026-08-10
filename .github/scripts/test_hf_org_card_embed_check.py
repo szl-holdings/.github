@@ -165,6 +165,8 @@ class EmbedContractTests(unittest.TestCase):
                 "  }",
                 "one-column mobile CTA",
                 640,
+                "    width: 100% !important;",
+                "    width: auto !important;",
             ),
             (
                 "  #szl-hf-org-card nav {\n"
@@ -173,6 +175,8 @@ class EmbedContractTests(unittest.TestCase):
                 "  }",
                 "mobile navigation reflow",
                 760,
+                "    grid-template-columns: repeat(2, minmax(0, 1fr));",
+                "    grid-template-columns: none;",
             ),
             (
                 "  #szl-hf-org-card .szl-hf-hero {\n"
@@ -180,6 +184,8 @@ class EmbedContractTests(unittest.TestCase):
                 "  }",
                 "compact mobile hero",
                 640,
+                "    min-height: 0;",
+                "    min-height: 500px;",
             ),
             (
                 "  #szl-hf-org-card .szl-hf-steps {\n"
@@ -187,9 +193,11 @@ class EmbedContractTests(unittest.TestCase):
                 "  }",
                 "single-column mobile evidence loop",
                 640,
+                "    grid-template-columns: 1fr;",
+                "    grid-template-columns: repeat(6, 1fr);",
             ),
         )
-        for rule, label, max_width in cases:
+        for rule, label, max_width, required, override in cases:
             with self.subTest(label=label):
                 document = valid_document().replace(rule, "", 1)
                 document = document.replace("</style>", f"{rule}\n</style>", 1)
@@ -234,6 +242,22 @@ class EmbedContractTests(unittest.TestCase):
                     1,
                 )
                 failures = check.validate_document(nested_under_selector)
+                self.assertTrue(any(label in item for item in failures))
+
+                overridden_in_rule = valid_document().replace(
+                    required, f"{required}\n{override}", 1
+                )
+                failures = check.validate_document(overridden_in_rule)
+                self.assertTrue(any(label in item for item in failures))
+
+                later_override = valid_document().replace(
+                    "</style>",
+                    f"@media (max-width: {max_width}px) {{\n"
+                    f"{rule.replace(required, override)}\n"
+                    "}\n</style>",
+                    1,
+                )
+                failures = check.validate_document(later_override)
                 self.assertTrue(any(label in item for item in failures))
 
     def test_rejects_commented_bounded_shell(self):
@@ -287,6 +311,18 @@ class EmbedContractTests(unittest.TestCase):
             "#szl-hf-org-card .szl-hf-never-match {\n"
             f"{shell_rule}\n"
             "}\n</style>",
+            1,
+        )
+        failures = check.validate_document(document)
+        self.assertTrue(
+            any("bounded embedded shell" in item for item in failures)
+        )
+
+    def test_rejects_later_bounded_shell_override(self):
+        document = valid_document().replace(
+            "</style>",
+            "#szl-hf-org-card .szl-hf-shell { max-width: 1180px; }\n"
+            "</style>",
             1,
         )
         failures = check.validate_document(document)

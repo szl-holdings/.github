@@ -472,61 +472,198 @@ def validate_document(document: str) -> list[str]:
     def direct_rule(prelude: str, body: str) -> str:
         return f"{prelude} {{{direct_declarations(body)}}}"
 
+    unconditional_rules = [
+        (prelude, body)
+        for prelude, body in top_level_blocks
+        if not prelude.startswith("@")
+    ]
     unconditional_css = re.sub(
         r"\s+",
         " ",
         " ".join(
             direct_rule(prelude, body)
-            for prelude, body in top_level_blocks
-            if not prelude.startswith("@")
+            for prelude, body in unconditional_rules
         ),
     )
 
-    def media_direct_rules(max_width: int) -> str:
+    def exact_media_rules(max_width: int) -> list[tuple[str, str]]:
         media_prelude = re.compile(
             rf"@media\s*\(\s*max-width\s*:\s*{max_width}px\s*\)",
             re.IGNORECASE,
         )
-        rules = []
+        rules: list[tuple[str, str]] = []
         for prelude, body in top_level_blocks:
             if not media_prelude.fullmatch(prelude):
                 continue
             rules.extend(
-                direct_rule(child_prelude, child_body)
+                (child_prelude, child_body)
                 for child_prelude, child_body in direct_blocks(body)
                 if not child_prelude.startswith("@")
             )
-        return re.sub(r"\s+", " ", " ".join(rules))
+        return rules
 
-    required_patterns = {
-        "44px touch token": r"--tap:\s*44px",
-        "48px CTA": rf"{re.escape(ROOT_SELECTOR)} \.szl-hf-button \{{[^}}]*display:\s*inline-flex\s*!important;[^}}]*min-height:\s*48px",
-        "44px navigation": rf"{re.escape(ROOT_SELECTOR)} nav a \{{[^}}]*min-height:\s*var\(--tap\)",
-        "bounded embedded shell": rf"{re.escape(ROOT_SELECTOR)} \.szl-hf-shell \{{[^}}]*width:\s*min\(1180px,\s*calc\(100%\s*-\s*40px\)\);[^}}]*max-width:\s*100%",
-    }
-    for label, pattern in required_patterns.items():
-        if not re.search(pattern, unconditional_css):
+    def media_may_apply_at_width(prelude: str, width: int) -> bool:
+        if not prelude.lower().startswith("@media"):
+            return False
+        constraints = re.findall(
+            r"\(\s*(min|max)-width\s*:\s*(\d+)px\s*\)",
+            prelude,
+            re.IGNORECASE,
+        )
+        for bound, value in constraints:
+            limit = int(value)
+            if bound.lower() == "min" and width < limit:
+                return False
+            if bound.lower() == "max" and width > limit:
+                return False
+        return True
+
+    def cascade_rules_at_width(width: int) -> list[tuple[str, str]]:
+        rules: list[tuple[str, str]] = []
+        for prelude, body in top_level_blocks:
+            if not prelude.startswith("@"):
+                rules.append((prelude, body))
+            elif media_may_apply_at_width(prelude, width):
+                rules.extend(
+                    (child_prelude, child_body)
+                    for child_prelude, child_body in direct_blocks(body)
+                    if not child_prelude.startswith("@")
+                )
+        return rules
+
+    def direct_declaration_entries(body: str) -> list[tuple[str, str, bool]]:
+        entries: list[tuple[str, str, bool]] = []
+        for declaration in direct_declarations(body).split(";"):
+            if ":" not in declaration:
+                continue
+            property_name, value = declaration.split(":", 1)
+            property_name = property_name.strip().lower()
+            value = re.sub(r"\s+", " ", value.strip())
+            important = bool(re.search(r"\s*!important\s*$", value, re.I))
+            if important:
+                value = re.sub(r"\s*!important\s*$", "", value, flags=re.I)
+            if property_name:
+                entries.append((property_name, value.strip(), important))
+        return entries
+
+    def winning_declaration(
+        rules: list[tuple[str, str]], selector: str, property_name: str
+    ) -> tuple[str, bool] | None:
+        expected_selector = re.sub(r"\s+", " ", selector.strip())
+        winner: tuple[str, bool] | None = None
+        for prelude, body in rules:
+            selectors = {
+                re.sub(r"\s+", " ", item.strip())
+                for item in prelude.split(",")
+            }
+            if expected_selector not in selectors:
+                continue
+            for candidate_property, value, important in direct_declaration_entries(body):
+                if candidate_property != property_name:
+                    continue
+                if winner is not None and winner[1] and not important:
+                    continue
+                winner = (value, important)
+        return winner
+
+    def winner_matches(
+        winner: tuple[str, bool] | None,
+        value_pattern: str,
+        required_important: bool | None = None,
+    ) -> bool:
+        if winner is None or not re.fullmatch(value_pattern, winner[0], re.I):
+            return False
+        return required_important is None or winner[1] is required_important
+
+    global_requirements = (
+        ("44px touch token", ROOT_SELECTOR, "--tap", r"44px", None),
+        (
+            "48px CTA",
+            f"{ROOT_SELECTOR} .szl-hf-button",
+            "display",
+            r"inline-flex",
+            True,
+        ),
+        (
+            "48px CTA",
+            f"{ROOT_SELECTOR} .szl-hf-button",
+            "min-height",
+            r"48px",
+            None,
+        ),
+        (
+            "44px navigation",
+            f"{ROOT_SELECTOR} nav a",
+            "min-height",
+            r"var\(\s*--tap\s*\)",
+            None,
+        ),
+        (
+            "bounded embedded shell",
+            f"{ROOT_SELECTOR} .szl-hf-shell",
+            "width",
+            r"min\(\s*1180px\s*,\s*calc\(\s*100%\s*-\s*40px\s*\)\s*\)",
+            None,
+        ),
+        (
+            "bounded embedded shell",
+            f"{ROOT_SELECTOR} .szl-hf-shell",
+            "max-width",
+            r"100%",
+            None,
+        ),
+    )
+    failed_global_contracts: list[str] = []
+    for label, selector, property_name, value_pattern, important in global_requirements:
+        winner = winning_declaration(unconditional_rules, selector, property_name)
+        if not winner_matches(winner, value_pattern, important) and label not in failed_global_contracts:
+            failed_global_contracts.append(label)
+    for label in failed_global_contracts:
             failures.append(f"missing {label} contract")
-    responsive_patterns = {
-        "one-column mobile CTA": (
+    responsive_requirements = (
+        (
+            "one-column mobile CTA",
             640,
-            rf"{re.escape(ROOT_SELECTOR)} \.szl-hf-actions \.szl-hf-button \{{[^}}]*width:\s*100%\s*!important",
+            f"{ROOT_SELECTOR} .szl-hf-actions .szl-hf-button",
+            "width",
+            r"100%",
+            True,
         ),
-        "mobile navigation reflow": (
+        (
+            "mobile navigation reflow",
             760,
-            rf"{re.escape(ROOT_SELECTOR)} nav \{{[^}}]*grid-template-columns:\s*repeat\(2,\s*minmax\(0,\s*1fr\)\)",
+            f"{ROOT_SELECTOR} nav",
+            "grid-template-columns",
+            r"repeat\(\s*2\s*,\s*minmax\(\s*0\s*,\s*1fr\s*\)\s*\)",
+            None,
         ),
-        "compact mobile hero": (
+        (
+            "compact mobile hero",
             640,
-            rf"{re.escape(ROOT_SELECTOR)} \.szl-hf-hero \{{[^}}]*min-height:\s*0",
+            f"{ROOT_SELECTOR} .szl-hf-hero",
+            "min-height",
+            r"0",
+            None,
         ),
-        "single-column mobile evidence loop": (
+        (
+            "single-column mobile evidence loop",
             640,
-            rf"{re.escape(ROOT_SELECTOR)} \.szl-hf-steps \{{[^}}]*grid-template-columns:\s*1fr",
+            f"{ROOT_SELECTOR} .szl-hf-steps",
+            "grid-template-columns",
+            r"1fr",
+            None,
         ),
-    }
-    for label, (max_width, pattern) in responsive_patterns.items():
-        if not re.search(pattern, media_direct_rules(max_width)):
+    )
+    for label, max_width, selector, property_name, value_pattern, important in responsive_requirements:
+        exact_winner = winning_declaration(
+            exact_media_rules(max_width), selector, property_name
+        )
+        cascade_winner = winning_declaration(
+            cascade_rules_at_width(max_width), selector, property_name
+        )
+        if not winner_matches(
+            exact_winner, value_pattern, important
+        ) or not winner_matches(cascade_winner, value_pattern, important):
             failures.append(f"missing {label} contract")
     conditional_markers = {
         "prefers-reduced-motion": re.compile(
