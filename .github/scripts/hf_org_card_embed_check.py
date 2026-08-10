@@ -463,7 +463,9 @@ def validate_document(document: str) -> list[str]:
                 elif css[index] == "}":
                     depth -= 1
                     if depth == 0:
-                        bodies.append(re.sub(r"\s+", " ", css[body_start:index]))
+                        bodies.append(
+                            re.sub(r"\s+", " ", searchable_css[body_start:index])
+                        )
                         break
                 index += 1
         return bodies

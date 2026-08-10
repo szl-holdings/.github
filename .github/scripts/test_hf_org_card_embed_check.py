@@ -206,6 +206,12 @@ class EmbedContractTests(unittest.TestCase):
                 failures = check.validate_document(commented)
                 self.assertTrue(any(label in item for item in failures))
 
+                commented_in_place = valid_document().replace(
+                    rule, f"/* {rule} */", 1
+                )
+                failures = check.validate_document(commented_in_place)
+                self.assertTrue(any(label in item for item in failures))
+
     def test_rejects_unbounded_embedded_shell(self):
         document = valid_document().replace(
             "max-width: 100%;", "max-width: 1180px;", 1
