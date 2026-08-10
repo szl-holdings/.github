@@ -562,13 +562,33 @@ def validate_document(document: str) -> list[str]:
         query_list = prelude[len("@media") :].strip()
         for member in split_selector_members(query_list):
             for query in split_top_level_or(member):
+                media_type_match = re.match(
+                    r"^\s*(?:(not|only)\s+)?([A-Za-z-]+)\b",
+                    query,
+                    re.IGNORECASE,
+                )
+                query_wide_negated = False
+                media_type_applies = True
+                if media_type_match:
+                    modifier, media_type = media_type_match.groups()
+                    media_type = media_type.casefold()
+                    if media_type in {"all", "screen"}:
+                        media_type_applies = True
+                        query_wide_negated = bool(
+                            modifier and modifier.casefold() == "not"
+                        )
+                    elif media_type in {"print", "speech"}:
+                        media_type_applies = False
+                        query_wide_negated = bool(
+                            modifier and modifier.casefold() == "not"
+                        )
                 constraints = re.findall(
                     r"(?:(not)\s+)?"
                     r"\(\s*(min|max)-width\s*:\s*(\d+)px\s*\)",
                     query,
                     re.IGNORECASE,
                 )
-                applies = True
+                applies = media_type_applies
                 for negated, bound, value in constraints:
                     limit = int(value)
                     condition = (
@@ -577,6 +597,8 @@ def validate_document(document: str) -> list[str]:
                     if negated:
                         condition = not condition
                     applies = applies and condition
+                if query_wide_negated:
+                    applies = not applies
                 if applies:
                     return True
         return False
