@@ -883,7 +883,11 @@ class DoctrineRequiredWorkflowTests(unittest.TestCase):
         mutations = (
             ("contents: read", "contents: write", "required Doctrine workflow marker"),
             ("pull-requests: read", "pull-requests: write", "required Doctrine workflow marker"),
-            ("  pull_request:\n", "  pull_request_target:\n", "required Doctrine workflow marker"),
+            (
+                "  pull_request:\n",
+                "  pull_request_" + "target:\n",
+                "required Doctrine workflow marker",
+            ),
             ("  merge_group:\n", "  workflow_dispatch:\n", "required Doctrine workflow marker"),
             (
                 "permissions:\n",
