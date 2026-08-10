@@ -1256,6 +1256,11 @@ def validate_document(document: str) -> list[str]:
         resetters = {
             "grid-template-columns": {"grid", "grid-template", "all"},
         }
+        logical_equivalents = {
+            "width": {"inline-size"},
+            "max-width": {"max-inline-size"},
+            "min-height": {"min-block-size"},
+        }
         if not property_name.startswith("--"):
             resetters.setdefault(property_name, set()).add("all")
 
@@ -1315,6 +1320,10 @@ def validate_document(document: str) -> list[str]:
             relevant_targets = unsupported_targets - unconditional_targets
             for candidate_property, value, important in direct_declaration_entries(body):
                 if candidate_property == property_name:
+                    candidate_value = value
+                elif candidate_property in logical_equivalents.get(
+                    property_name, set()
+                ):
                     candidate_value = value
                 elif candidate_property in resetters.get(property_name, set()):
                     candidate_value = f"__reset_by_{candidate_property}__"

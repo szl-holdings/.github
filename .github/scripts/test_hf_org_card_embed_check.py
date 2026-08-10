@@ -672,6 +672,39 @@ class EmbedContractTests(unittest.TestCase):
             any("mobile navigation reflow" in item for item in failures)
         )
 
+    def test_rejects_logical_inline_size_mobile_cta_override(self):
+        document = valid_document().replace(
+            "</style>",
+            "@media (max-width: 640px) {\n"
+            "  #szl-hf-org-card .szl-hf-actions .szl-hf-button {\n"
+            "    inline-size: auto !important;\n"
+            "  }\n"
+            "}\n</style>",
+            1,
+        )
+        failures = check.validate_document(document)
+        self.assertTrue(any("mobile CTA contract" in item for item in failures))
+
+    def test_rejects_logical_max_inline_size_shell_override(self):
+        document = valid_document().replace(
+            "</style>",
+            "#szl-hf-org-card .szl-hf-shell { max-inline-size: none; }\n"
+            "</style>",
+            1,
+        )
+        failures = check.validate_document(document)
+        self.assertTrue(any("bounded embedded shell" in item for item in failures))
+
+    def test_rejects_logical_min_block_size_cta_override(self):
+        document = valid_document().replace(
+            "</style>",
+            "#szl-hf-org-card .szl-hf-button { min-block-size: 12px; }\n"
+            "</style>",
+            1,
+        )
+        failures = check.validate_document(document)
+        self.assertTrue(any("48px CTA" in item for item in failures))
+
     def test_rejects_narrower_mobile_cta_override(self):
         document = valid_document().replace(
             "</style>",
