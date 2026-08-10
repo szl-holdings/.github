@@ -469,22 +469,11 @@ def validate_document(document: str) -> list[str]:
                 declarations[index] = " "
         return "".join(declarations)
 
-    def direct_rule(prelude: str, body: str) -> str:
-        return f"{prelude} {{{direct_declarations(body)}}}"
-
     unconditional_rules = [
         (prelude, body)
         for prelude, body in top_level_blocks
         if not prelude.startswith("@")
     ]
-    unconditional_css = re.sub(
-        r"\s+",
-        " ",
-        " ".join(
-            direct_rule(prelude, body)
-            for prelude, body in unconditional_rules
-        ),
-    )
 
     def exact_media_rules(max_width: int) -> list[tuple[str, str]]:
         media_prelude = re.compile(
@@ -550,21 +539,86 @@ def validate_document(document: str) -> list[str]:
         rules: list[tuple[str, str]], selector: str, property_name: str
     ) -> tuple[str, bool] | None:
         expected_selector = re.sub(r"\s+", " ", selector.strip())
-        winner: tuple[str, bool] | None = None
+        expected_tokens = re.findall(
+            r"#[\w-]+|\.[\w-]+|[a-zA-Z][\w-]*", expected_selector
+        )
+
+        def may_match(candidate: str) -> bool:
+            candidate_tokens = re.findall(
+                r"#[\w-]+|\.[\w-]+|[a-zA-Z][\w-]*", candidate
+            )
+            cursor = 0
+            for token in candidate_tokens:
+                if cursor < len(expected_tokens) and token == expected_tokens[cursor]:
+                    cursor += 1
+            return cursor == len(expected_tokens)
+
+        def specificity(candidate: str) -> tuple[int, int, int]:
+            ids = len(re.findall(r"#[\w-]+", candidate))
+            classes = len(
+                re.findall(r"\.[\w-]+|\[[^\]]+\]|:(?!:)[\w-]+", candidate)
+            )
+            without_simple = re.sub(
+                r"#[\w-]+|\.[\w-]+|\[[^\]]+\]|::?[\w-]+(?:\([^)]*\))?",
+                " ",
+                candidate,
+            )
+            elements = len(re.findall(r"\b[a-zA-Z][\w-]*\b", without_simple))
+            return ids, classes, elements
+
+        resetters = {
+            "grid-template-columns": {"grid", "grid-template", "all"},
+        }
+        if not property_name.startswith("--"):
+            resetters.setdefault(property_name, set()).add("all")
+
+        winner: tuple[str, bool, tuple[int, int, int]] | None = None
         for prelude, body in rules:
-            selectors = {
+            matching_selectors = [
                 re.sub(r"\s+", " ", item.strip())
                 for item in prelude.split(",")
-            }
-            if expected_selector not in selectors:
+                if may_match(re.sub(r"\s+", " ", item.strip()))
+            ]
+            if not matching_selectors:
                 continue
+            candidate_specificity = max(specificity(item) for item in matching_selectors)
             for candidate_property, value, important in direct_declaration_entries(body):
-                if candidate_property != property_name:
+                if candidate_property == property_name:
+                    candidate_value = value
+                elif candidate_property in resetters.get(property_name, set()):
+                    candidate_value = f"__reset_by_{candidate_property}__"
+                else:
                     continue
                 if winner is not None and winner[1] and not important:
                     continue
-                winner = (value, important)
-        return winner
+                if (
+                    winner is not None
+                    and winner[1] == important
+                    and winner[2] > candidate_specificity
+                ):
+                    continue
+                winner = (candidate_value, important, candidate_specificity)
+        return None if winner is None else (winner[0], winner[1])
+
+    def responsive_sample_widths(max_width: int) -> list[int]:
+        minimum_width = 320
+        samples = {minimum_width, max_width}
+        for prelude, _ in top_level_blocks:
+            if not prelude.lower().startswith("@media"):
+                continue
+            for bound, value in re.findall(
+                r"\(\s*(min|max)-width\s*:\s*(\d+)px\s*\)",
+                prelude,
+                re.IGNORECASE,
+            ):
+                boundary = int(value)
+                if not minimum_width <= boundary <= max_width:
+                    continue
+                samples.add(boundary)
+                adjacent = boundary - 1 if bound.lower() == "min" else boundary + 1
+                if minimum_width <= adjacent <= max_width:
+                    samples.add(adjacent)
+        return sorted(samples)
 
     def winner_matches(
         winner: tuple[str, bool] | None,
@@ -658,12 +712,18 @@ def validate_document(document: str) -> list[str]:
         exact_winner = winning_declaration(
             exact_media_rules(max_width), selector, property_name
         )
-        cascade_winner = winning_declaration(
-            cascade_rules_at_width(max_width), selector, property_name
-        )
+        cascade_winners = [
+            winning_declaration(
+                cascade_rules_at_width(width), selector, property_name
+            )
+            for width in responsive_sample_widths(max_width)
+        ]
         if not winner_matches(
             exact_winner, value_pattern, important
-        ) or not winner_matches(cascade_winner, value_pattern, important):
+        ) or not all(
+            winner_matches(winner, value_pattern, important)
+            for winner in cascade_winners
+        ):
             failures.append(f"missing {label} contract")
     conditional_markers = {
         "prefers-reduced-motion": re.compile(

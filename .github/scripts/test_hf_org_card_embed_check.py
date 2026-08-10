@@ -330,6 +330,45 @@ class EmbedContractTests(unittest.TestCase):
             any("bounded embedded shell" in item for item in failures)
         )
 
+    def test_rejects_more_specific_mobile_cta_override(self):
+        document = valid_document().replace(
+            "</style>",
+            "@media (max-width: 640px) {\n"
+            "  #szl-hf-org-card main .szl-hf-actions .szl-hf-button {\n"
+            "    width: auto !important;\n"
+            "  }\n"
+            "}\n</style>",
+            1,
+        )
+        failures = check.validate_document(document)
+        self.assertTrue(any("mobile CTA contract" in item for item in failures))
+
+    def test_rejects_navigation_grid_shorthand_override(self):
+        document = valid_document().replace(
+            "</style>",
+            "@media (max-width: 760px) {\n"
+            "  #szl-hf-org-card nav { grid: none; }\n"
+            "}\n</style>",
+            1,
+        )
+        failures = check.validate_document(document)
+        self.assertTrue(
+            any("mobile navigation reflow" in item for item in failures)
+        )
+
+    def test_rejects_narrower_mobile_cta_override(self):
+        document = valid_document().replace(
+            "</style>",
+            "@media (max-width: 390px) {\n"
+            "  #szl-hf-org-card .szl-hf-actions .szl-hf-button {\n"
+            "    width: auto !important;\n"
+            "  }\n"
+            "}\n</style>",
+            1,
+        )
+        failures = check.validate_document(document)
+        self.assertTrue(any("mobile CTA contract" in item for item in failures))
+
     def test_rejects_unbounded_embedded_shell(self):
         document = valid_document().replace(
             "max-width: 100%;", "max-width: 1180px;", 1
