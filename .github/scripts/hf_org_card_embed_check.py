@@ -648,7 +648,8 @@ def validate_document(document: str) -> list[str]:
     support_paths = discover_support_paths(top_level_blocks)
     protected_property = re.compile(
         r"(?i)(?:^|[;{])\s*(?:--tap|display|min-height|width|max-width|"
-        r"grid-template-columns|grid-template|grid|all)\s*:"
+        r"inline-size|max-inline-size|min-block-size|grid-template-columns|"
+        r"grid-template|grid|all)\s*:"
     )
 
     def media_has_unmodeled_state(prelude: str) -> bool:
