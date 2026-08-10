@@ -211,13 +211,15 @@ class DcoCheckTests(unittest.TestCase):
         ).read_text(encoding="utf-8")
         self.assertEqual(workflow.count("name: DCO sign-off check\n"), 1)
         self.assertIn("needs: dco", workflow)
-        self.assertIn(
-            "if: always() && github.event_name != 'pull_request_target'",
-            workflow,
-        )
+        self.assertIn("github.event.action != 'closed'", workflow)
         self.assertIn("NATIVE_DCO_RESULT: ${{ needs.dco.result }}", workflow)
         self.assertIn('test "$NATIVE_DCO_RESULT" = "success"', workflow)
         self.assertNotIn("continue-on-error", workflow)
+        self.assertIn("  pull_request:\n", workflow)
+        self.assertNotIn("pull_request" + "_target:", workflow)
+        self.assertNotIn("statuses: write", workflow)
+        self.assertNotIn("/statuses/", workflow)
+        self.assertNotIn("reconcile-old-head:", workflow)
 
     def test_reusable_legacy_context_faithfully_propagates_validation(self) -> None:
         workflow = (

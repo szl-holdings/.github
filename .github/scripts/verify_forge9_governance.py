@@ -223,7 +223,7 @@ def verify_gate_contract() -> None:
 
     dco_template = (ROOT / ".github/workflows/dco.yml").read_text(encoding="utf-8")
     for marker in (
-        "pull_request_target:",
+        "pull_request:",
         "merge_group:",
         "types: [checks_requested]",
         "persist-credentials: false",
@@ -233,18 +233,25 @@ def verify_gate_contract() -> None:
         "native-dco-compatibility:",
         "name: DCO sign-off check",
         "needs: dco",
-        "if: always() && github.event_name != 'pull_request_target'",
+        "github.event.action != 'closed'",
         "NATIVE_DCO_RESULT: ${{ needs.dco.result }}",
         'test "$NATIVE_DCO_RESULT" = "success"',
     ):
         if marker not in dco_template:
             fail(f"trusted DCO workflow is missing {marker!r}")
-    if "\n  pull_request:\n" in dco_template:
-        fail("DCO must not execute PR-controlled code under pull_request")
+    if "pull_request" + "_target:" in dco_template:
+        fail("native DCO must not execute candidate code under a privileged trigger")
+    if "statuses: write" in dco_template or "/statuses/" in dco_template:
+        fail("native DCO must rely on check runs instead of writable commit statuses")
+    if "reconcile-old-head:" in dco_template:
+        fail("native DCO must not retain obsolete manual status reconciliation")
     if "workflow_dispatch:" in dco_template:
         fail("DCO must not publish a manual false-green status")
-    if "github.event_name != 'pull_request'" in dco_template:
-        fail("DCO merge-group and push validation must not use a fallback pass")
+    if (
+        "if: github.event_name != 'pull_request' "
+        "|| github.event.action != 'closed'"
+    ) not in dco_template:
+        fail("native DCO must skip only a closed pull-request event")
     if dco_template.count("name: DCO sign-off check\n") != 1:
         fail("native DCO must expose exactly one legacy compatibility job")
     if "continue-on-error" in dco_template:

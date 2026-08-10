@@ -24,29 +24,18 @@ class DcoActivationWorkflowTests(unittest.TestCase):
     def test_native_workflow_preserves_all_governed_event_gates(self) -> None:
         for marker in (
             "name: Native DCO enforcement",
-            "pull_request" + "_target:",
+            "pull_request:",
             "- main",
             "- 'release/*'",
             "types: [opened, synchronize, reopened, ready_for_review, edited, closed]",
             "merge_" + "group:",
             "types: [checks_requested]",
-            "Reconcile surviving DCO status",
             "github.event.before",
-            "AFFECTED_HEAD_SHA:",
-            "reconcile-candidate",
-            "reconcile-base",
-            "reconcile-trusted",
-            "dco-reconcile-event.json",
-            "Finalize pull-request DCO failure",
-            "Finalize reconciliation failure",
             "persist-credentials: false",
             "github.event.pull_request.base.sha",
             "github.event.pull_request.head.sha",
             "EXPECTED_BASE_SHA:",
             "EXPECTED_HEAD_SHA:",
-            "statuses: write",
-            "statuses/$EXPECTED_HEAD_SHA",
-            '-f context="DCO sign-off check"',
             "github.workflow_sha",
             "--paginate --slurp",
             "trusted/.github/scripts/dco_check.py",
@@ -54,12 +43,15 @@ class DcoActivationWorkflowTests(unittest.TestCase):
             "native-dco-compatibility:",
             "name: DCO sign-off check",
             "needs: dco",
-            "if: always() && github.event_name != 'pull_request_target'",
+            "github.event.action != 'closed'",
             "NATIVE_DCO_RESULT: ${{ needs.dco.result }}",
             'test "$NATIVE_DCO_RESULT" = "success"',
         ):
             self.assertIn(marker, self.native)
-        self.assertNotIn("\n  pull_request:\n", self.native)
+        self.assertNotIn("pull_request" + "_target:", self.native)
+        self.assertNotIn("statuses: write", self.native)
+        self.assertNotIn("/statuses/", self.native)
+        self.assertNotIn("reconcile-old-head:", self.native)
         self.assertNotIn("workflow_" + "dispatch:", self.native)
 
     def test_reusable_workflow_is_exact_and_secretless(self) -> None:
@@ -94,7 +86,8 @@ class DcoActivationWorkflowTests(unittest.TestCase):
         self.assertNotIn("name: Reusable DCO validation", self.native)
         self.assertIn("name: Reusable DCO validation", self.reusable)
         self.assertNotIn("name: Native DCO enforcement", self.reusable)
-        self.assertIn('context="DCO sign-off check"', self.native)
+        self.assertIn("name: DCO sign-off check", self.native)
+        self.assertNotIn('context="DCO sign-off check"', self.native)
         self.assertEqual(self.native.count("name: DCO sign-off check\n"), 1)
         self.assertNotIn("continue-on-error", self.native)
 
@@ -140,5 +133,21 @@ class DcoActivationWorkflowTests(unittest.TestCase):
             self.assertIn(suite, self.forge_runner)
 
 
+
+class NativeDCOUnprivilegedTriggerTests(unittest.TestCase):
+    def test_native_workflow_has_no_privileged_candidate_checkout(self) -> None:
+        from pathlib import Path
+
+        workflow = (
+            Path(__file__).resolve().parents[1] / "workflows" / "dco.yml"
+        ).read_text(encoding="utf-8")
+
+        self.assertIn("  pull_request:\n", workflow)
+        self.assertNotIn("pull_request" + "_target:", workflow)
+        self.assertNotIn("statuses: write", workflow)
+        self.assertNotIn("/statuses/", workflow)
+        self.assertNotIn("reconcile-old-head:", workflow)
+        self.assertIn("persist-credentials: false", workflow)
+        self.assertIn("name: DCO sign-off check", workflow)
 if __name__ == "__main__":
     unittest.main()
