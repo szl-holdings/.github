@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import base64
 import json
 import os
 import re
@@ -12,7 +13,7 @@ import sys
 from pathlib import Path
 from typing import Any, Callable
 from urllib.error import URLError
-from urllib.parse import quote
+from urllib.parse import quote, urlsplit
 from urllib.request import Request, urlopen
 
 
@@ -24,6 +25,7 @@ SHA_PATTERN = re.compile(r"^[0-9a-f]{40}$")
 PATCH_DIVIDER_PATTERN = re.compile(r"^---(?:[ \t\r]|$)")
 QUEUE_REF_PREFIX = "refs/heads/gh-readonly-queue/main/"
 ALLOWED_PR_ACTIONS = {"opened", "synchronize", "reopened", "ready_for_review", "edited"}
+GITHUB_WEB_FLOW_COMMITTER = ("GitHub", "noreply@github.com")
 
 # Audited horizontal separators: TAB, SPACE, and every Unicode Zs code point.
 # Name, email, and trailer text separately reject C0/C1 controls, Unicode line
@@ -603,7 +605,10 @@ def git_bytes(repo: Path, *args: str) -> bytes:
     return completed.stdout
 
 
-def commit_record(repo: Path, sha: str) -> tuple[list[str], str, str, str]:
+def commit_record(
+    repo: Path,
+    sha: str,
+) -> tuple[list[str], str, str, str, str, str]:
     require_sha(sha, "commit SHA")
     raw_bytes = git_bytes(repo, "cat-file", "commit", sha)
     try:
@@ -618,8 +623,8 @@ def commit_record(repo: Path, sha: str) -> tuple[list[str], str, str, str]:
 
     parents: list[str] = []
     author: tuple[str, str] | None = None
+    committer: tuple[str, str] | None = None
     tree_seen = False
-    committer_seen = False
     encoding_seen = False
     current_header: str | None = None
     for line in headers.split("\n"):
@@ -645,8 +650,16 @@ def commit_record(repo: Path, sha: str) -> tuple[list[str], str, str, str]:
             require(match is not None, f"commit author header is malformed for {sha}")
             author = (match.group("name"), match.group("email"))
         elif key == "committer":
-            require(not committer_seen, f"commit has duplicate committer headers for {sha}")
-            committer_seen = True
+            require(
+                committer is None,
+                f"commit has duplicate committer headers for {sha}",
+            )
+            match = re.fullmatch(
+                r"(?P<name>.+) <(?P<email>[^<>]+)> -?[0-9]+ [+-][0-9]{4}",
+                value,
+            )
+            require(match is not None, f"commit committer header is malformed for {sha}")
+            committer = (match.group("name"), match.group("email"))
         elif key == "encoding":
             require(not encoding_seen, f"commit has duplicate encoding headers for {sha}")
             require(value.casefold() == "utf-8", "commit encoding must be UTF-8")
@@ -654,8 +667,8 @@ def commit_record(repo: Path, sha: str) -> tuple[list[str], str, str, str]:
 
     require(tree_seen, f"commit has no tree header for {sha}")
     require(author is not None, f"commit has no author header for {sha}")
-    require(committer_seen, f"commit has no committer header for {sha}")
-    return parents, author[0], author[1], message
+    require(committer is not None, f"commit has no committer header for {sha}")
+    return parents, author[0], author[1], committer[0], committer[1], message
 
 
 def validate_commit(
@@ -664,7 +677,7 @@ def validate_commit(
     *,
     allow_merge_commit: bool = False,
 ) -> None:
-    parents, author_name, author_email, message = commit_record(repo, sha)
+    parents, author_name, author_email, _, _, message = commit_record(repo, sha)
     allowed_parent_counts = {1, 2} if allow_merge_commit else {1}
     require(
         len(parents) in allowed_parent_counts,
@@ -742,16 +755,121 @@ def github_get(path: str, token: str) -> Any:
     return json.loads(data)
 
 
+def fetch_pull_head(
+    repo: Path,
+    repository: str,
+    number: int,
+    expected_head: str,
+    token: str,
+) -> None:
+    """Fetch an exact GitHub pull ref as inert raw-object validation data."""
+    require(
+        isinstance(repository, str)
+        and repository.count("/") == 1
+        and all(repository.split("/")),
+        "GitHub repository slug is invalid",
+    )
+    require(
+        isinstance(number, int) and not isinstance(number, bool) and number > 0,
+        "pull-request number is invalid",
+    )
+    expected_head = require_sha(expected_head, "pull-request source head SHA")
+    require(bool(token), "GITHUB_TOKEN is required to fetch pull-request source history")
+
+    server_url = os.environ.get("GITHUB_SERVER_URL", "https://github.com").rstrip("/")
+    parsed_server = urlsplit(server_url)
+    require(
+        parsed_server.scheme == "https"
+        and bool(parsed_server.netloc)
+        and parsed_server.username is None
+        and parsed_server.password is None
+        and parsed_server.path in {"", "/"}
+        and not parsed_server.query
+        and not parsed_server.fragment,
+        "GITHUB_SERVER_URL is not a canonical HTTPS origin",
+    )
+    canonical_server = f"https://{parsed_server.netloc}"
+    repository_url = f"{canonical_server}/{quote(repository, safe='/')}.git"
+    authorization = base64.b64encode(
+        f"x-access-token:{token}".encode("utf-8")
+    ).decode("ascii")
+    fetch_environment = os.environ.copy()
+    trace_environment = {
+        "GIT_CURL_VERBOSE",
+        "GIT_TRACE",
+        "GIT_TRACE_CURL",
+        "GIT_TRACE_CURL_NO_DATA",
+        "GIT_TRACE_PACKET",
+    }
+    for key in list(fetch_environment):
+        if (
+            key == "GIT_CONFIG_COUNT"
+            or key in trace_environment
+            or re.fullmatch(r"GIT_CONFIG_(?:KEY|VALUE)_[0-9]+", key)
+        ):
+            del fetch_environment[key]
+    fetch_environment.update(
+        {
+            "GIT_TERMINAL_PROMPT": "0",
+            "GIT_TRACE_REDACT": "1",
+            "GIT_CONFIG_COUNT": "2",
+            "GIT_CONFIG_KEY_0": f"http.{repository_url}.extraheader",
+            "GIT_CONFIG_VALUE_0": f"AUTHORIZATION: basic {authorization}",
+            "GIT_CONFIG_KEY_1": "credential.helper",
+            "GIT_CONFIG_VALUE_1": "",
+        }
+    )
+    try:
+        completed = subprocess.run(
+            [
+                "git",
+                "fetch",
+                "--no-tags",
+                repository_url,
+                f"refs/pull/{number}/head",
+            ],
+            cwd=repo,
+            env=fetch_environment,
+            text=False,
+            capture_output=True,
+            check=False,
+            timeout=30,
+        )
+    except (OSError, subprocess.TimeoutExpired) as exc:
+        raise DcoContractError("exact pull-request source fetch failed") from exc
+    require(
+        completed.returncode == 0,
+        "exact pull-request source fetch failed",
+    )
+    require(
+        require_sha(
+            git(repo, "rev-parse", "FETCH_HEAD").strip(),
+            "fetched pull-request source head SHA",
+        )
+        == expected_head,
+        "fetched pull-request source head differs from the associated pull request",
+    )
+    require(
+        git(repo, "cat-file", "-t", expected_head).strip() == "commit",
+        "fetched pull-request source head is not a commit",
+    )
+
+
 def validate_github_squash_attestation(
+    repo: Path,
     repository: str,
     sha: str,
     parents: list[str],
     author_name: str,
     author_email: str,
     message: str,
+    push_head_sha: str,
+    token: str,
     api_get: Callable[[str], Any],
+    *,
+    source_fetch: Callable[[int, str], None] | None = None,
 ) -> None:
-    """Prove a name-canonicalized push commit is a GitHub squash merge."""
+    """Prove a GitHub squash and strictly validate its exact source history."""
     require(
         isinstance(repository, str)
         and repository.count("/") == 1
@@ -808,6 +926,7 @@ def validate_github_squash_attestation(
         for parent in api_parents
     ]
     require(parent_shas == parents, "provider commit parents differ from the raw commit")
+    require(len(parents) == 1, "provider squash commit is not single-parent")
 
     pulls_path = f"/repos/{encoded_repo}/commits/{sha}/pulls"
     pulls = api_get(f"{pulls_path}?per_page=100&page=1")
@@ -848,16 +967,83 @@ def validate_github_squash_attestation(
         and base["repo"].get("full_name") == repository,
         "provider squash pull request does not target this repository main",
     )
-    require(
-        isinstance(head, dict)
-        and isinstance(head.get("sha"), str)
-        and SHA_PATTERN.fullmatch(head["sha"]) is not None,
-        "provider squash pull-request head SHA is invalid",
+    base_sha = require_sha(base.get("sha"), "provider squash pull-request base SHA")
+    require(isinstance(head, dict), "provider squash pull-request head is missing")
+    source_head = require_sha(
+        head.get("sha"),
+        "provider squash pull-request head SHA",
     )
     subject = message.partition("\n")[0]
     require(
         subject.endswith(f"(#{number})"),
         "provider squash subject does not bind the merged pull-request number",
+    )
+
+    if source_fetch is None:
+        fetch_pull_head(repo, repository, number, source_head, token)
+    else:
+        source_fetch(number, source_head)
+    source_shas = collect_pr_commits(
+        repository,
+        number,
+        base_sha,
+        source_head,
+        api_get,
+    )
+    # A queued PR's recorded base can legitimately predate the squash's
+    # direct parent after main advances. Stable API equality plus ancestry is
+    # the exact binding; direct equality would reject valid protected queues.
+    base_ancestor = subprocess.run(
+        ["git", "merge-base", "--is-ancestor", base_sha, parents[0]],
+        cwd=repo,
+        capture_output=True,
+        check=False,
+        timeout=30,
+    )
+    require(
+        base_ancestor.returncode == 0,
+        "provider squash pull-request base is not an ancestor of the squash parent",
+    )
+    merge_base = require_sha(
+        git(repo, "merge-base", base_sha, source_head).strip(),
+        "provider squash pull-request merge base",
+    )
+    local_source_shas = [
+        line.strip()
+        for line in git(
+            repo,
+            "rev-list",
+            "--reverse",
+            f"{merge_base}..{source_head}",
+        ).splitlines()
+        if line.strip()
+    ]
+    require(
+        local_source_shas == source_shas,
+        "provider squash API commit set differs from the fetched source history",
+    )
+    validate_commits(
+        repo,
+        source_shas,
+        source_head,
+        allow_merge_commits=True,
+        checked_out_head_sha=push_head_sha,
+    )
+    source_author_identities: set[tuple[str, str]] = set()
+    for source_sha in source_shas:
+        _, source_author_name, source_author_email, _, _, _ = commit_record(
+            repo,
+            source_sha,
+        )
+        source_author_identities.add((source_author_name, source_author_email))
+    squash_identities = valid_dco_identities(message)
+    require(
+        any(
+            identity[1] == author_email and identity in source_author_identities
+            for identity in squash_identities
+        ),
+        "provider squash Signed-off-by identity is not an exact validated "
+        "source-commit author identity",
     )
 
 
@@ -869,6 +1055,7 @@ def validate_push_range(
     token: str,
     *,
     api_get: Callable[[str], Any] | None = None,
+    source_fetch: Callable[[int, str], None] | None = None,
 ) -> int:
     """Validate main pushes, admitting only proven GitHub name canonicalization."""
     base_sha = require_sha(base_sha, "push base SHA")
@@ -893,14 +1080,25 @@ def validate_push_range(
     provider_get = api_get
     previous_sha = base_sha
     for sha in shas:
-        parents, author_name, author_email, message = commit_record(repo, sha)
+        (
+            parents,
+            author_name,
+            author_email,
+            committer_name,
+            committer_email,
+            message,
+        ) = commit_record(repo, sha)
         require(
             parents == [previous_sha],
             "push range is not a linear single-parent sequence",
         )
         identities = valid_dco_identities(message)
         require(identities, f"{sha} has no valid terminal Signed-off-by trailer")
-        if (author_name, author_email) not in identities:
+        provider_candidate = (
+            committer_name,
+            committer_email,
+        ) == GITHUB_WEB_FLOW_COMMITTER
+        if provider_candidate:
             require(
                 any(identity_email == author_email for _, identity_email in identities),
                 f"{sha} Signed-off-by email does not exactly match the push commit author email",
@@ -909,13 +1107,22 @@ def validate_push_range(
                 require(bool(token), "GITHUB_TOKEN is required for provider squash attestation")
                 provider_get = lambda path: github_get(path, token)
             validate_github_squash_attestation(
+                repo,
                 repository,
                 sha,
                 parents,
                 author_name,
                 author_email,
                 message,
+                head_sha,
+                token,
                 provider_get,
+                source_fetch=source_fetch,
+            )
+        else:
+            require(
+                (author_name, author_email) in identities,
+                f"{sha} Signed-off-by does not exactly match the push commit author",
             )
         previous_sha = sha
     return len(shas)
@@ -1029,7 +1236,7 @@ def validate_merge_group(repo: Path, base_sha: str, head_sha: str) -> int:
     )
     previous_sha = base_sha
     for sha in range_shas:
-        parents, _, author_email, message = commit_record(repo, sha)
+        parents, _, author_email, _, _, message = commit_record(repo, sha)
         require(
             parents == [previous_sha],
             "merge-group range is not a linear single-parent squash sequence",
