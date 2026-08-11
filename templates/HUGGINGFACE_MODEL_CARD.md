@@ -27,7 +27,8 @@ model-index:
             name: {{METRIC_DISPLAY_NAME}}
 ---
 
-<!-- markdownlint-disable MD013 MD060 -->
+<!-- markdownlint-disable MD013 -->
+<!-- szl-responsive-card:v1 -->
 
 # {{MODEL_NAME}}
 
@@ -36,19 +37,17 @@ model-index:
 **Release:** `{{IMMUTABLE_REVISION}}` · **Status:** {{STATUS_LABEL}} ·
 **License:** {{LICENSE_NAME}}
 
-## Model summary
+## At a glance
 
 {{WHAT_THE_MODEL_IS_AND_WHERE_IT_FITS_IN_THE_SZL_ESTATE}}
 
-| Property | Value |
-| --- | --- |
-| Architecture | {{ARCHITECTURE}} |
-| Parameters | {{PARAMETER_COUNT}} |
-| Context length | {{CONTEXT_LENGTH}} |
-| Precision | {{PRECISION}} |
-| Languages | {{LANGUAGES}} |
-| Source revision | `{{SOURCE_REVISION}}` |
-| Artifact digest | `{{ARTIFACT_DIGEST}}` |
+- **Architecture:** {{ARCHITECTURE}}
+- **Parameters:** {{PARAMETER_COUNT}}
+- **Context length:** {{CONTEXT_LENGTH}}
+- **Precision:** {{PRECISION}}
+- **Languages:** {{LANGUAGES}}
+- **Source revision:** `{{SOURCE_REVISION}}`
+- **Artifact digest:** `{{ARTIFACT_DIGEST}}`
 
 ## Intended use
 
@@ -83,12 +82,10 @@ Pin `revision="{{IMMUTABLE_REVISION}}"` in production or evaluation code.
 
 ## Training and lineage
 
-| Stage | Source | Revision or digest |
-| --- | --- | --- |
-| Base model | {{BASE_MODEL_LINK}} | `{{BASE_MODEL_REVISION}}` |
-| Dataset | {{DATASET_LINK}} | `{{DATASET_REVISION}}` |
-| Training code | {{TRAINING_CODE_LINK}} | `{{TRAINING_CODE_REVISION}}` |
-| Receipt | {{TRAINING_RECEIPT_LINK}} | `{{RECEIPT_DIGEST}}` |
+- **Base model:** {{BASE_MODEL_LINK}} at `{{BASE_MODEL_REVISION}}`
+- **Dataset:** {{DATASET_LINK}} at `{{DATASET_REVISION}}`
+- **Training code:** {{TRAINING_CODE_LINK}} at `{{TRAINING_CODE_REVISION}}`
+- **Receipt:** {{TRAINING_RECEIPT_LINK}} with digest `{{RECEIPT_DIGEST}}`
 
 Describe preprocessing, filtering, deduplication, sampling, prompt format,
 hyperparameters, random seeds, hardware, training duration, and known gaps.
@@ -96,9 +93,10 @@ Mark unavailable lineage explicitly; do not infer it.
 
 ## Evaluation
 
-| Evaluation | Result | Scope | Reproduce |
-|---|---:|---|---|
-| {{EVALUATION_NAME}} | {{RESULT_WITH_UNIT}} | {{DATASET_SPLIT_AND_LIMITS}} | {{EVALUATION_COMMAND_OR_LINK}} |
+- **Evaluation:** {{EVALUATION_NAME}}
+- **Result:** {{RESULT_WITH_UNIT}}
+- **Scope:** {{DATASET_SPLIT_AND_LIMITS}}
+- **Reproduce:** {{EVALUATION_COMMAND_OR_LINK}}
 
 State when and where each result was measured. Separate upstream-reported
 benchmarks from SZL measurements and from modeled results.
@@ -112,9 +110,9 @@ benchmarks from SZL measurements and from modeled results.
 
 ## Hardware and deployment
 
-| Mode | Minimum tested hardware | Notes |
-|---|---|---|
-| {{MODE_1}} | {{HARDWARE_1}} | {{NOTES_1}} |
+- **Mode:** {{MODE_1}}
+- **Minimum tested hardware:** {{HARDWARE_1}}
+- **Notes:** {{NOTES_1}}
 
 ## Citation
 

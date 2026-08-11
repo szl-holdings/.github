@@ -12,6 +12,10 @@ def valid_document() -> str:
 #szl-hf-org-card {
   --tap: 44px;
 }
+#szl-hf-org-card .szl-hf-shell {
+  width: min(1180px, calc(100% - 40px));
+  max-width: 100%;
+}
 #szl-hf-org-card .szl-hf-button {
   display: inline-flex !important;
   min-height: 48px;
@@ -35,6 +39,18 @@ def valid_document() -> str:
   }
   #szl-hf-org-card .szl-hf-actions .szl-hf-button {
     width: 100% !important;
+  }
+  #szl-hf-org-card .szl-hf-hero {
+    min-height: 0;
+  }
+  #szl-hf-org-card .szl-hf-steps {
+    grid-template-columns: 1fr;
+  }
+}
+@media (max-width: 760px) {
+  #szl-hf-org-card nav {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 @media (prefers-reduced-motion: reduce) {
@@ -63,7 +79,7 @@ def valid_document() -> str:
     fetchpriority="high"
     decoding="async"
   >
-  <main id="szl-hf-main">
+  <main id="szl-hf-main" class="szl-hf-shell">
     <h1 class="szl-hf-title">Autonomy under authority</h1>
   <nav><a class="szl-hf-nav-item" href="https://example.com">Navigate</a></nav>
     <div class="szl-hf-hero">
@@ -72,6 +88,7 @@ def valid_document() -> str:
       </div>
     </div>
   </main>
+  <ol class="szl-hf-steps"><li class="szl-hf-step">Verify</li></ol>
   <!-- canonical deployment source: https://szlholdings-readme.static.hf.space/deployment.json -->
 </div>
 </body>
@@ -130,6 +147,602 @@ class EmbedContractTests(unittest.TestCase):
         failures = check.validate_document(document)
         self.assertTrue(any("mobile CTA contract" in item for item in failures))
 
+    def test_rejects_missing_mobile_evidence_reflow(self):
+        document = valid_document().replace(
+            "#szl-hf-org-card .szl-hf-steps {\n    grid-template-columns: 1fr;",
+            "#szl-hf-org-card .szl-hf-steps {\n    grid-template-columns: repeat(6, 1fr);",
+        )
+        failures = check.validate_document(document)
+        self.assertTrue(
+            any("single-column mobile evidence loop" in item for item in failures)
+        )
+
+    def test_rejects_responsive_rules_outside_intended_media_block(self):
+        cases = (
+            (
+                "  #szl-hf-org-card .szl-hf-actions .szl-hf-button {\n"
+                "    width: 100% !important;\n"
+                "  }",
+                "one-column mobile CTA",
+                640,
+                "    width: 100% !important;",
+                "    width: auto !important;",
+            ),
+            (
+                "  #szl-hf-org-card nav {\n"
+                "    display: grid;\n"
+                "    grid-template-columns: repeat(2, minmax(0, 1fr));\n"
+                "  }",
+                "mobile navigation reflow",
+                760,
+                "    grid-template-columns: repeat(2, minmax(0, 1fr));",
+                "    grid-template-columns: none;",
+            ),
+            (
+                "  #szl-hf-org-card .szl-hf-hero {\n"
+                "    min-height: 0;\n"
+                "  }",
+                "compact mobile hero",
+                640,
+                "    min-height: 0;",
+                "    min-height: 500px;",
+            ),
+            (
+                "  #szl-hf-org-card .szl-hf-steps {\n"
+                "    grid-template-columns: 1fr;\n"
+                "  }",
+                "single-column mobile evidence loop",
+                640,
+                "    grid-template-columns: 1fr;",
+                "    grid-template-columns: repeat(6, 1fr);",
+            ),
+        )
+        for rule, label, max_width, required, override in cases:
+            with self.subTest(label=label):
+                document = valid_document().replace(rule, "", 1)
+                document = document.replace("</style>", f"{rule}\n</style>", 1)
+                failures = check.validate_document(document)
+                self.assertTrue(any(label in item for item in failures))
+
+                commented = valid_document().replace(rule, "", 1)
+                commented = commented.replace(
+                    "</style>",
+                    f"/* @media (max-width: {max_width}px) {{\n{rule}\n}} */\n"
+                    "</style>",
+                    1,
+                )
+                failures = check.validate_document(commented)
+                self.assertTrue(any(label in item for item in failures))
+
+                commented_in_place = valid_document().replace(
+                    rule, f"/* {rule} */", 1
+                )
+                failures = check.validate_document(commented_in_place)
+                self.assertTrue(any(label in item for item in failures))
+
+                contradictory = valid_document().replace(rule, "", 1)
+                contradictory = contradictory.replace(
+                    f"@media (max-width: {max_width}px) {{",
+                    f"@media (max-width: {max_width}px) {{\n"
+                    f"  @media (min-width: {max_width + 1}px) {{\n"
+                    f"{rule}\n"
+                    "  }",
+                    1,
+                )
+                failures = check.validate_document(contradictory)
+                self.assertTrue(any(label in item for item in failures))
+
+                nested_under_selector = valid_document().replace(rule, "", 1)
+                nested_under_selector = nested_under_selector.replace(
+                    f"@media (max-width: {max_width}px) {{",
+                    f"@media (max-width: {max_width}px) {{\n"
+                    "  #szl-hf-org-card .szl-hf-never-match {\n"
+                    f"{rule}\n"
+                    "  }",
+                    1,
+                )
+                failures = check.validate_document(nested_under_selector)
+                self.assertTrue(any(label in item for item in failures))
+
+                overridden_in_rule = valid_document().replace(
+                    required, f"{required}\n{override}", 1
+                )
+                failures = check.validate_document(overridden_in_rule)
+                self.assertTrue(any(label in item for item in failures))
+
+                later_override = valid_document().replace(
+                    "</style>",
+                    f"@media (max-width: {max_width}px) {{\n"
+                    f"{rule.replace(required, override)}\n"
+                    "}\n</style>",
+                    1,
+                )
+                failures = check.validate_document(later_override)
+                self.assertTrue(any(label in item for item in failures))
+
+    def test_rejects_commented_bounded_shell(self):
+        shell_rule = (
+            "#szl-hf-org-card .szl-hf-shell {\n"
+            "  width: min(1180px, calc(100% - 40px));\n"
+            "  max-width: 100%;\n"
+            "}"
+        )
+        document = valid_document()
+        self.assertIn(shell_rule, document)
+        failures = check.validate_document(
+            document.replace(shell_rule, f"/* {shell_rule} */", 1)
+        )
+        self.assertTrue(
+            any("bounded embedded shell" in item for item in failures)
+        )
+
+    def test_rejects_conditionally_bounded_shell(self):
+        shell_rule = (
+            "#szl-hf-org-card .szl-hf-shell {\n"
+            "  width: min(1180px, calc(100% - 40px));\n"
+            "  max-width: 100%;\n"
+            "}"
+        )
+        document = valid_document()
+        self.assertIn(shell_rule, document)
+        document = document.replace(shell_rule, "", 1)
+        document = document.replace(
+            "</style>",
+            f"@media (min-width: 9999px) {{\n{shell_rule}\n}}\n</style>",
+            1,
+        )
+        failures = check.validate_document(document)
+        self.assertTrue(
+            any("bounded embedded shell" in item for item in failures)
+        )
+
+    def test_rejects_nested_bounded_shell(self):
+        shell_rule = (
+            "#szl-hf-org-card .szl-hf-shell {\n"
+            "  width: min(1180px, calc(100% - 40px));\n"
+            "  max-width: 100%;\n"
+            "}"
+        )
+        document = valid_document()
+        self.assertIn(shell_rule, document)
+        document = document.replace(shell_rule, "", 1)
+        document = document.replace(
+            "</style>",
+            "#szl-hf-org-card .szl-hf-never-match {\n"
+            f"{shell_rule}\n"
+            "}\n</style>",
+            1,
+        )
+        failures = check.validate_document(document)
+        self.assertTrue(
+            any("bounded embedded shell" in item for item in failures)
+        )
+
+    def test_rejects_later_bounded_shell_override(self):
+        document = valid_document().replace(
+            "</style>",
+            "#szl-hf-org-card .szl-hf-shell { max-width: 1180px; }\n"
+            "</style>",
+            1,
+        )
+        failures = check.validate_document(document)
+        self.assertTrue(
+            any("bounded embedded shell" in item for item in failures)
+        )
+
+    def test_rejects_more_specific_mobile_cta_override(self):
+        document = valid_document().replace(
+            "</style>",
+            "@media (max-width: 640px) {\n"
+            "  #szl-hf-org-card main .szl-hf-actions .szl-hf-button {\n"
+            "    width: auto !important;\n"
+            "  }\n"
+            "}\n</style>",
+            1,
+        )
+        failures = check.validate_document(document)
+        self.assertTrue(any("mobile CTA contract" in item for item in failures))
+
+    def test_rejects_alternate_selector_mobile_cta_override(self):
+        document = valid_document().replace(
+            "</style>",
+            "@media (max-width: 640px) {\n"
+            "  #szl-hf-org-card .szl-hf-button.szl-hf-primary {\n"
+            "    width: auto !important;\n"
+            "  }\n"
+            "}\n</style>",
+            1,
+        )
+        failures = check.validate_document(document)
+        self.assertTrue(any("mobile CTA contract" in item for item in failures))
+
+    def test_rejects_supported_mobile_cta_override(self):
+        document = valid_document().replace(
+            "</style>",
+            "@supports (display: grid) {\n"
+            "  #szl-hf-org-card .szl-hf-actions .szl-hf-button {\n"
+            "    width: auto !important;\n"
+            "  }\n"
+            "}\n</style>",
+            1,
+        )
+        failures = check.validate_document(document)
+        self.assertTrue(any("mobile CTA contract" in item for item in failures))
+
+    def test_rejects_mutually_exclusive_supports_recovery(self):
+        document = valid_document().replace(
+            "</style>",
+            "@supports (display: grid) {\n"
+            "  #szl-hf-org-card .szl-hf-actions .szl-hf-button {\n"
+            "    width: auto !important;\n"
+            "  }\n"
+            "}\n"
+            "@supports not (display: grid) {\n"
+            "  #szl-hf-org-card .szl-hf-actions .szl-hf-button {\n"
+            "    width: 100% !important;\n"
+            "  }\n"
+            "}\n</style>",
+            1,
+        )
+        failures = check.validate_document(document)
+        self.assertTrue(any("mobile CTA contract" in item for item in failures))
+
+    def test_rejects_impossible_pseudo_class_recovery(self):
+        document = valid_document().replace(
+            "</style>",
+            "@media (max-width: 640px) {\n"
+            "  #szl-hf-org-card .szl-hf-actions .szl-hf-button {\n"
+            "    width: auto !important;\n"
+            "  }\n"
+            "  #szl-hf-org-card .szl-hf-actions "
+            ".szl-hf-button:not(.szl-hf-button) {\n"
+            "    width: 100% !important;\n"
+            "  }\n"
+            "}\n</style>",
+            1,
+        )
+        failures = check.validate_document(document)
+        self.assertTrue(any("mobile CTA contract" in item for item in failures))
+
+    def test_rejects_impossible_disabled_recovery(self):
+        document = valid_document().replace(
+            "</style>",
+            "@media (max-width: 640px) {\n"
+            "  #szl-hf-org-card .szl-hf-actions .szl-hf-button {\n"
+            "    width: auto !important;\n"
+            "  }\n"
+            "  #szl-hf-org-card .szl-hf-actions .szl-hf-button:disabled {\n"
+            "    width: 100% !important;\n"
+            "  }\n"
+            "}\n</style>",
+            1,
+        )
+        failures = check.validate_document(document)
+        self.assertTrue(any("mobile CTA contract" in item for item in failures))
+
+    def test_rejects_mutually_exclusive_media_state_recovery(self):
+        document = valid_document().replace(
+            "</style>",
+            "@media (hover: none) and (max-width: 640px) {\n"
+            "  #szl-hf-org-card .szl-hf-actions .szl-hf-button {\n"
+            "    width: auto !important;\n"
+            "  }\n"
+            "}\n"
+            "@media (hover: hover) and (max-width: 640px) {\n"
+            "  #szl-hf-org-card .szl-hf-actions .szl-hf-button {\n"
+            "    width: 100% !important;\n"
+            "  }\n"
+            "}\n</style>",
+            1,
+        )
+        failures = check.validate_document(document)
+        self.assertTrue(any("mobile CTA contract" in item for item in failures))
+
+    def test_rejects_logical_recovery_in_exclusive_media_state(self):
+        document = valid_document().replace(
+            "</style>",
+            "@media (hover: none) and (max-width: 640px) {\n"
+            "  #szl-hf-org-card .szl-hf-actions .szl-hf-button {\n"
+            "    width: auto !important;\n"
+            "  }\n"
+            "}\n"
+            "@media (hover: hover) and (max-width: 640px) {\n"
+            "  #szl-hf-org-card .szl-hf-actions .szl-hf-button {\n"
+            "    inline-size: 100% !important;\n"
+            "  }\n"
+            "}\n</style>",
+            1,
+        )
+        failures = check.validate_document(document)
+        self.assertTrue(any("mobile CTA contract" in item for item in failures))
+
+    def test_rejects_boolean_media_state_recovery(self):
+        document = valid_document().replace(
+            "</style>",
+            "@media (hover) and (max-width: 640px) {\n"
+            "  #szl-hf-org-card .szl-hf-actions .szl-hf-button {\n"
+            "    width: auto !important;\n"
+            "  }\n"
+            "}\n"
+            "@media (not (hover)) and (max-width: 640px) {\n"
+            "  #szl-hf-org-card .szl-hf-actions .szl-hf-button {\n"
+            "    width: 100% !important;\n"
+            "  }\n"
+            "}\n</style>",
+            1,
+        )
+        failures = check.validate_document(document)
+        self.assertTrue(any("mobile CTA contract" in item for item in failures))
+
+    def test_rejects_negated_width_media_override(self):
+        document = valid_document().replace(
+            "</style>",
+            "@media not (min-width: 641px) {\n"
+            "  #szl-hf-org-card .szl-hf-actions .szl-hf-button {\n"
+            "    width: auto !important;\n"
+            "  }\n"
+            "}\n</style>",
+            1,
+        )
+        failures = check.validate_document(document)
+        self.assertTrue(any("mobile CTA contract" in item for item in failures))
+
+    def test_rejects_feature_level_negated_width_media_override(self):
+        document = valid_document().replace(
+            "</style>",
+            "@media screen and not (min-width: 641px) {\n"
+            "  #szl-hf-org-card .szl-hf-actions .szl-hf-button {\n"
+            "    width: auto !important;\n"
+            "  }\n"
+            "}\n</style>",
+            1,
+        )
+        failures = check.validate_document(document)
+        self.assertTrue(any("mobile CTA contract" in item for item in failures))
+
+    def test_rejects_query_wide_media_type_negation_override(self):
+        document = valid_document().replace(
+            "</style>",
+            "@media not screen and (min-width: 641px) {\n"
+            "  #szl-hf-org-card .szl-hf-actions .szl-hf-button {\n"
+            "    width: auto !important;\n"
+            "  }\n"
+            "}\n</style>",
+            1,
+        )
+        failures = check.validate_document(document)
+        self.assertTrue(any("mobile CTA contract" in item for item in failures))
+
+    def test_rejects_not_disabled_override_on_anchor(self):
+        document = valid_document().replace(
+            "</style>",
+            "@media (max-width: 640px) {\n"
+            "  #szl-hf-org-card .szl-hf-actions "
+            ".szl-hf-button:not(:disabled) {\n"
+            "    width: auto !important;\n"
+            "  }\n"
+            "}\n</style>",
+            1,
+        )
+        failures = check.validate_document(document)
+        self.assertTrue(any("mobile CTA contract" in item for item in failures))
+
+    def test_fails_closed_on_link_state_recovery(self):
+        document = valid_document().replace(
+            "</style>",
+            "@media (max-width: 640px) {\n"
+            "  #szl-hf-org-card .szl-hf-actions .szl-hf-button {\n"
+            "    width: auto !important;\n"
+            "  }\n"
+            "  #szl-hf-org-card .szl-hf-actions .szl-hf-button:link {\n"
+            "    width: 100% !important;\n"
+            "  }\n"
+            "}\n</style>",
+            1,
+        )
+        failures = check.validate_document(document)
+        self.assertTrue(any("mobile CTA contract" in item for item in failures))
+
+    def test_fails_closed_on_unmodeled_pseudo_state(self):
+        document = valid_document().replace(
+            "</style>",
+            "@media (max-width: 640px) {\n"
+            "  #szl-hf-org-card .szl-hf-actions .szl-hf-button {\n"
+            "    width: auto !important;\n"
+            "  }\n"
+            "  #szl-hf-org-card .szl-hf-actions .szl-hf-button:hover {\n"
+            "    width: 100% !important;\n"
+            "  }\n"
+            "}\n</style>",
+            1,
+        )
+        failures = check.validate_document(document)
+        self.assertTrue(any("mobile CTA contract" in item for item in failures))
+
+    def test_evaluates_complete_selector_in_functional_pseudo_class(self):
+        document = valid_document().replace(
+            "</style>",
+            "@media (max-width: 640px) {\n"
+            "  #szl-hf-org-card .szl-hf-button:not("
+            ".szl-hf-definitely-missing .szl-hf-button) {\n"
+            "    width: auto !important;\n"
+            "  }\n"
+            "}\n</style>",
+            1,
+        )
+        failures = check.validate_document(document)
+        self.assertTrue(any("mobile CTA contract" in item for item in failures))
+
+    def test_rejects_native_nested_css_rules(self):
+        document = valid_document().replace(
+            "</style>",
+            "#szl-hf-org-card {\n"
+            "  @media (max-width: 640px) {\n"
+            "    & .szl-hf-actions .szl-hf-button {\n"
+            "      width: auto !important;\n"
+            "    }\n"
+            "  }\n"
+            "}\n</style>",
+            1,
+        )
+        failures = check.validate_document(document)
+        self.assertTrue(any("native CSS nesting is unsupported" in item for item in failures))
+
+    def test_rejects_layered_important_mobile_cta_override(self):
+        document = valid_document().replace(
+            "</style>",
+            "@layer overrides {\n"
+            "  @media (max-width: 640px) {\n"
+            "    #szl-hf-org-card .szl-hf-actions .szl-hf-button {\n"
+            "      width: auto !important;\n"
+            "    }\n"
+            "  }\n"
+            "}\n</style>",
+            1,
+        )
+        failures = check.validate_document(document)
+        self.assertTrue(any("mobile CTA contract" in item for item in failures))
+
+    def test_ignores_layered_normal_override_of_unlayered_rule(self):
+        document = valid_document().replace(
+            "</style>",
+            "@layer overrides {\n"
+            "  @media (max-width: 640px) {\n"
+            "    #szl-hf-org-card .szl-hf-hero { min-height: 500px; }\n"
+            "  }\n"
+            "}\n</style>",
+            1,
+        )
+        self.assertEqual(check.validate_document(document), [])
+
+    def test_preserves_anonymous_layer_source_order_for_important_rules(self):
+        document = valid_document().replace(
+            "</style>",
+            "@layer {\n"
+            "  @media (max-width: 640px) {\n"
+            "    #szl-hf-org-card .szl-hf-actions .szl-hf-button {\n"
+            "      width: auto !important;\n"
+            "    }\n"
+            "  }\n"
+            "}\n"
+            "@layer recovery {\n"
+            "  @media (max-width: 640px) {\n"
+            "    #szl-hf-org-card .szl-hf-actions .szl-hf-button {\n"
+            "      width: 100% !important;\n"
+            "    }\n"
+            "  }\n"
+            "}\n</style>",
+            1,
+        )
+        failures = check.validate_document(document)
+        self.assertTrue(any("mobile CTA contract" in item for item in failures))
+
+    def test_rejects_comma_separated_mobile_media_override(self):
+        document = valid_document().replace(
+            "</style>",
+            "@media (min-width: 1000px), (max-width: 640px) {\n"
+            "  #szl-hf-org-card .szl-hf-actions .szl-hf-button {\n"
+            "    width: auto !important;\n"
+            "  }\n"
+            "}\n</style>",
+            1,
+        )
+        failures = check.validate_document(document)
+        self.assertTrue(any("mobile CTA contract" in item for item in failures))
+
+    def test_rejects_or_separated_mobile_media_override(self):
+        document = valid_document().replace(
+            "</style>",
+            "@media (min-width: 1000px) or (max-width: 640px) {\n"
+            "  #szl-hf-org-card .szl-hf-actions .szl-hf-button {\n"
+            "    width: auto !important;\n"
+            "  }\n"
+            "}\n</style>",
+            1,
+        )
+        failures = check.validate_document(document)
+        self.assertTrue(any("mobile CTA contract" in item for item in failures))
+
+    def test_rejects_responsive_global_shell_override(self):
+        document = valid_document().replace(
+            "</style>",
+            "@media (max-width: 640px) {\n"
+            "  #szl-hf-org-card .szl-hf-shell {\n"
+            "    width: 2000px;\n"
+            "    max-width: none;\n"
+            "  }\n"
+            "}\n</style>",
+            1,
+        )
+        failures = check.validate_document(document)
+        self.assertTrue(any("bounded embedded shell" in item for item in failures))
+
+    def test_rejects_navigation_grid_shorthand_override(self):
+        document = valid_document().replace(
+            "</style>",
+            "@media (max-width: 760px) {\n"
+            "  #szl-hf-org-card nav { grid: none; }\n"
+            "}\n</style>",
+            1,
+        )
+        failures = check.validate_document(document)
+        self.assertTrue(
+            any("mobile navigation reflow" in item for item in failures)
+        )
+
+    def test_rejects_logical_inline_size_mobile_cta_override(self):
+        document = valid_document().replace(
+            "</style>",
+            "@media (max-width: 640px) {\n"
+            "  #szl-hf-org-card .szl-hf-actions .szl-hf-button {\n"
+            "    inline-size: auto !important;\n"
+            "  }\n"
+            "}\n</style>",
+            1,
+        )
+        failures = check.validate_document(document)
+        self.assertTrue(any("mobile CTA contract" in item for item in failures))
+
+    def test_rejects_logical_max_inline_size_shell_override(self):
+        document = valid_document().replace(
+            "</style>",
+            "#szl-hf-org-card .szl-hf-shell { max-inline-size: none; }\n"
+            "</style>",
+            1,
+        )
+        failures = check.validate_document(document)
+        self.assertTrue(any("bounded embedded shell" in item for item in failures))
+
+    def test_rejects_logical_min_block_size_cta_override(self):
+        document = valid_document().replace(
+            "</style>",
+            "#szl-hf-org-card .szl-hf-button { min-block-size: 12px; }\n"
+            "</style>",
+            1,
+        )
+        failures = check.validate_document(document)
+        self.assertTrue(any("48px CTA" in item for item in failures))
+
+    def test_rejects_narrower_mobile_cta_override(self):
+        document = valid_document().replace(
+            "</style>",
+            "@media (max-width: 390px) {\n"
+            "  #szl-hf-org-card .szl-hf-actions .szl-hf-button {\n"
+            "    width: auto !important;\n"
+            "  }\n"
+            "}\n</style>",
+            1,
+        )
+        failures = check.validate_document(document)
+        self.assertTrue(any("mobile CTA contract" in item for item in failures))
+
+    def test_rejects_unbounded_embedded_shell(self):
+        document = valid_document().replace(
+            "max-width: 100%;", "max-width: 1180px;", 1
+        )
+        failures = check.validate_document(document)
+        self.assertTrue(any("bounded embedded shell" in item for item in failures))
+
     def test_rejects_relative_navigation(self):
         document = valid_document().replace(
             'href="https://example.com"', 'href="/docs"'
@@ -139,8 +752,9 @@ class EmbedContractTests(unittest.TestCase):
 
     def test_rejects_missing_aria_label_target(self):
         document = valid_document().replace(
-            '<main id="szl-hf-main">',
-            '<main id="szl-hf-main" aria-labelledby="szl-hf-missing-title">',
+            '<main id="szl-hf-main" class="szl-hf-shell">',
+            '<main id="szl-hf-main" class="szl-hf-shell" '
+            'aria-labelledby="szl-hf-missing-title">',
         )
         failures = check.validate_document(document)
         self.assertTrue(
