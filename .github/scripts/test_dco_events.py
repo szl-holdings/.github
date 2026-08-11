@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import base64
 import hashlib
 import os
 from pathlib import Path
@@ -10,6 +11,7 @@ import re
 import subprocess
 import tempfile
 import unittest
+from unittest import mock
 
 import dco_check as dco
 
@@ -305,13 +307,15 @@ class DcoCheckTests(unittest.TestCase):
         message: str,
         name: str = "Series A Builder",
         email: str = "builder@example.com",
+        committer_name: str | None = None,
+        committer_email: str | None = None,
     ) -> str:
         env = {
             **os.environ,
             "GIT_AUTHOR_NAME": name,
             "GIT_AUTHOR_EMAIL": email,
-            "GIT_COMMITTER_NAME": name,
-            "GIT_COMMITTER_EMAIL": email,
+            "GIT_COMMITTER_NAME": committer_name or name,
+            "GIT_COMMITTER_EMAIL": committer_email or email,
         }
         subprocess.run(
             ["git", "commit", "--allow-empty", "-F", "-"],
@@ -327,6 +331,108 @@ class DcoCheckTests(unittest.TestCase):
     def assert_rejected(self, pattern: str, function, *args, **kwargs) -> None:
         with self.assertRaisesRegex(dco.DcoError, pattern):
             function(*args, **kwargs)
+
+    def provider_api(
+        self,
+        squash_sha: str,
+        source_shas: list[str],
+        source_head: str,
+        *,
+        number: int = 411,
+        pr_base_sha: str | None = None,
+    ):
+        (
+            parents,
+            author_name,
+            author_email,
+            committer_name,
+            committer_email,
+            _,
+        ) = dco.commit_record(
+            self.repo,
+            squash_sha,
+        )
+        if (
+            committer_name,
+            committer_email,
+        ) != dco.GITHUB_WEB_FLOW_COMMITTER:
+            raise AssertionError("provider fixture is not a raw GitHub/web-flow commit")
+        commit_path = f"/repos/szl-holdings/.github/commits/{squash_sha}"
+        pulls_path = f"{commit_path}/pulls"
+        metadata_path = f"/repos/szl-holdings/.github/pulls/{number}"
+        commits_path = f"{metadata_path}/commits"
+        provider_base = parents[0] if pr_base_sha is None else pr_base_sha
+        responses: dict[str, object] = {
+            commit_path: {
+                "sha": squash_sha,
+                "commit": {
+                    "author": {"name": author_name, "email": author_email},
+                    "committer": {
+                        "name": committer_name,
+                        "email": committer_email,
+                    },
+                    "verification": {
+                        "verified": True,
+                        "reason": "valid",
+                        "signature": "signed",
+                        "payload": "bound payload",
+                    },
+                },
+                "committer": {"login": "web-flow", "type": "User"},
+                "parents": [{"sha": parent} for parent in parents],
+            },
+            f"{pulls_path}?per_page=100&page=1": [
+                {
+                    "number": number,
+                    "state": "closed",
+                    "draft": False,
+                    "merged_at": "2026-08-11T05:49:54Z",
+                    "merge_commit_sha": squash_sha,
+                    "base": {
+                        "ref": "main",
+                        "sha": provider_base,
+                        "repo": {"full_name": "szl-holdings/.github"},
+                    },
+                    "head": {"sha": source_head},
+                }
+            ],
+            f"{pulls_path}?per_page=100&page=2": [],
+            metadata_path: {
+                "base": {"sha": provider_base},
+                "head": {"sha": source_head},
+                "commits": len(source_shas),
+                "draft": False,
+            },
+        }
+        page_count = (
+            len(source_shas) + dco.COMMITS_PER_PAGE - 1
+        ) // dco.COMMITS_PER_PAGE
+        for page in range(1, page_count + 1):
+            start = (page - 1) * dco.COMMITS_PER_PAGE
+            responses[f"{commits_path}?per_page=100&page={page}"] = [
+                {"sha": sha}
+                for sha in source_shas[start : start + dco.COMMITS_PER_PAGE]
+            ]
+        responses[f"{commits_path}?per_page=100&page={page_count + 1}"] = []
+        calls: list[str] = []
+
+        def api_get(path: str):
+            calls.append(path)
+            if path not in responses:
+                raise AssertionError(f"unexpected provider lookup: {path}")
+            return responses[path]
+
+        paths = {
+            "commit": commit_path,
+            "pulls_page": f"{pulls_path}?per_page=100&page=1",
+            "pulls_boundary": f"{pulls_path}?per_page=100&page=2",
+            "metadata": metadata_path,
+            "commits_page": f"{commits_path}?per_page=100&page=1",
+            "commits_boundary": (
+                f"{commits_path}?per_page=100&page={page_count + 1}"
+            ),
+        }
+        return api_get, responses, calls, paths
 
     def test_two_and_five_entry_signed_groups_pass(self) -> None:
         second = self.commit("fix: one\n\nSigned-off-by: Series A Builder <builder@example.com>")
@@ -587,70 +693,155 @@ class DcoCheckTests(unittest.TestCase):
         self.assertEqual(dco.push_subject(payload, head), (self.base, head))
         self.assert_rejected("not main", dco.push_subject, {**payload, "ref": "refs/heads/dev"}, head)
 
-    def test_push_provider_name_canonicalization_requires_verified_merged_pr(self) -> None:
+    def test_fetch_pull_head_uses_exact_ref_without_persisting_credentials(self) -> None:
+        expected_head = "d" * 40
+        token = "fake-read-token"
+        completed = subprocess.CompletedProcess([], 0, b"", b"")
+        inherited_config = {
+            "GITHUB_SERVER_URL": "https://github.example",
+            "GIT_CONFIG_COUNT": "10",
+            "GIT_CONFIG_KEY_9": "malicious.inherited",
+            "GIT_CONFIG_VALUE_9": "ignored",
+            "GIT_TRACE_CURL": "1",
+            "GIT_CURL_VERBOSE": "1",
+        }
+        with (
+            mock.patch.dict(dco.os.environ, inherited_config, clear=False),
+            mock.patch.object(
+                dco.subprocess,
+                "run",
+                return_value=completed,
+            ) as fetch_run,
+            mock.patch.object(
+                dco,
+                "git",
+                side_effect=[expected_head + "\n", "commit\n"],
+            ) as git_call,
+        ):
+            dco.fetch_pull_head(
+                self.repo,
+                "szl-holdings/.github",
+                411,
+                expected_head,
+                token,
+            )
+
+        command = fetch_run.call_args.args[0]
+        environment = fetch_run.call_args.kwargs["env"]
+        self.assertEqual(
+            command,
+            [
+                "git",
+                "fetch",
+                "--no-tags",
+                "https://github.example/szl-holdings/.github.git",
+                "refs/pull/411/head",
+            ],
+        )
+        self.assertNotIn(token, repr(command))
+        self.assertEqual(environment["GIT_TERMINAL_PROMPT"], "0")
+        self.assertEqual(environment["GIT_TRACE_REDACT"], "1")
+        self.assertEqual(environment["GIT_CONFIG_COUNT"], "2")
+        self.assertEqual(
+            environment["GIT_CONFIG_KEY_0"],
+            "http.https://github.example/szl-holdings/.github.git.extraheader",
+        )
+        self.assertEqual(
+            environment["GIT_CONFIG_VALUE_0"],
+            "AUTHORIZATION: basic "
+            + base64.b64encode(f"x-access-token:{token}".encode()).decode(),
+        )
+        self.assertEqual(environment["GIT_CONFIG_KEY_1"], "credential.helper")
+        self.assertEqual(environment["GIT_CONFIG_VALUE_1"], "")
+        self.assertNotIn("GIT_CONFIG_KEY_9", environment)
+        self.assertNotIn("GIT_CONFIG_VALUE_9", environment)
+        self.assertNotIn("GIT_TRACE_CURL", environment)
+        self.assertNotIn("GIT_CURL_VERBOSE", environment)
+        self.assertEqual(
+            git_call.call_args_list,
+            [
+                mock.call(self.repo, "rev-parse", "FETCH_HEAD"),
+                mock.call(self.repo, "cat-file", "-t", expected_head),
+            ],
+        )
+
+        with (
+            mock.patch.dict(dco.os.environ, inherited_config, clear=False),
+            mock.patch.object(
+                dco.subprocess,
+                "run",
+                return_value=completed,
+            ),
+            mock.patch.object(dco, "git", return_value="e" * 40 + "\n"),
+        ):
+            self.assert_rejected(
+                "differs from the associated pull request",
+                dco.fetch_pull_head,
+                self.repo,
+                "szl-holdings/.github",
+                411,
+                expected_head,
+                token,
+            )
+
+    def test_push_provider_name_canonicalization_requires_exact_source_dco(self) -> None:
+        source_first = self.commit(
+            "fix: source one\n\n"
+            "Signed-off-by: Stephen P. Lutar Jr. <builder@example.com>",
+            name="Stephen P. Lutar Jr.",
+        )
+        source_head = self.commit(
+            "fix: source two\n\n"
+            "Signed-off-by: Stephen P. Lutar Jr. <builder@example.com>",
+            name="Stephen P. Lutar Jr.",
+        )
+        source_shas = [source_first, source_head]
+        self.git("reset", "--hard", self.base)
+        protected_parent = self.commit(
+            "fix: intervening protected main change\n\n"
+            "Signed-off-by: Series A Builder <builder@example.com>"
+        )
         head = self.commit(
             "fix: provider squash (#411)\n\n"
             "Signed-off-by: Stephen P. Lutar Jr. <builder@example.com>",
             name="Lutar, Stephen P.",
             email="builder@example.com",
+            committer_name="GitHub",
+            committer_email="noreply@github.com",
         )
-        commit_path = f"/repos/szl-holdings/.github/commits/{head}"
-        pulls_path = f"{commit_path}/pulls"
-        responses = {
-            commit_path: {
-                "sha": head,
-                "commit": {
-                    "author": {"name": "Lutar, Stephen P.", "email": "builder@example.com"},
-                    "committer": {"name": "GitHub", "email": "noreply@github.com"},
-                    "verification": {
-                        "verified": True,
-                        "reason": "valid",
-                        "signature": "signed",
-                        "payload": "bound payload",
-                    },
-                },
-                "committer": {"login": "web-flow", "type": "User"},
-                "parents": [{"sha": self.base}],
-            },
-            f"{pulls_path}?per_page=100&page=1": [
-                {
-                    "number": 411,
-                    "state": "closed",
-                    "draft": False,
-                    "merged_at": "2026-08-11T05:49:54Z",
-                    "merge_commit_sha": head,
-                    "base": {
-                        "ref": "main",
-                        "repo": {"full_name": "szl-holdings/.github"},
-                    },
-                    "head": {"sha": "d" * 40},
-                }
-            ],
-            f"{pulls_path}?per_page=100&page=2": [],
-        }
-        calls: list[str] = []
-
-        def api_get(path: str):
-            calls.append(path)
-            return responses[path]
+        api_get, _, calls, paths = self.provider_api(
+            head,
+            source_shas,
+            source_head,
+            pr_base_sha=self.base,
+        )
+        source_fetches: list[tuple[int, str]] = []
 
         self.assertEqual(
             dco.validate_push_range(
                 self.repo,
-                self.base,
+                protected_parent,
                 head,
                 "szl-holdings/.github",
                 "",
                 api_get=api_get,
+                source_fetch=lambda number, sha: source_fetches.append(
+                    (number, sha)
+                ),
             ),
             1,
         )
+        self.assertEqual(source_fetches, [(411, source_head)])
         self.assertEqual(
             calls,
             [
-                commit_path,
-                f"{pulls_path}?per_page=100&page=1",
-                f"{pulls_path}?per_page=100&page=2",
+                paths["commit"],
+                paths["pulls_page"],
+                paths["pulls_boundary"],
+                paths["metadata"],
+                paths["commits_page"],
+                paths["commits_boundary"],
+                paths["metadata"],
             ],
         )
 
@@ -670,85 +861,134 @@ class DcoCheckTests(unittest.TestCase):
             1,
         )
 
+    def test_push_exact_identity_provider_squash_rejects_unsigned_source(self) -> None:
+        unsigned_source = self.commit(
+            "fix: unsigned provider source",
+            name="Lutar, Stephen P.",
+            email="builder@example.com",
+        )
+        self.git("reset", "--hard", self.base)
+        head = self.commit(
+            "fix: exact-identity provider squash (#411)\n\n"
+            "Signed-off-by: Lutar, Stephen P. <builder@example.com>",
+            name="Lutar, Stephen P.",
+            email="builder@example.com",
+            committer_name="GitHub",
+            committer_email="noreply@github.com",
+        )
+        api_get, _, calls, paths = self.provider_api(
+            head,
+            [unsigned_source],
+            unsigned_source,
+        )
+        source_fetches: list[tuple[int, str]] = []
+
+        self.assert_rejected(
+            "no valid terminal",
+            dco.validate_push_range,
+            self.repo,
+            self.base,
+            head,
+            "szl-holdings/.github",
+            "",
+            api_get=api_get,
+            source_fetch=lambda number, sha: source_fetches.append((number, sha)),
+        )
+        self.assertIn(paths["commit"], calls)
+        self.assertIn(paths["commits_page"], calls)
+        self.assertEqual(source_fetches, [(411, unsigned_source)])
+
+    def test_push_exact_identity_provider_squash_validates_all_sources(self) -> None:
+        source_first = self.commit(
+            "fix: first exact-identity source\n\n"
+            "Signed-off-by: Lutar, Stephen P. <builder@example.com>",
+            name="Lutar, Stephen P.",
+            email="builder@example.com",
+        )
+        source_head = self.commit(
+            "fix: second exact-identity source\n\n"
+            "Signed-off-by: Lutar, Stephen P. <builder@example.com>",
+            name="Lutar, Stephen P.",
+            email="builder@example.com",
+        )
+        self.git("reset", "--hard", self.base)
+        head = self.commit(
+            "fix: exact-identity provider squash (#411)\n\n"
+            "Signed-off-by: Lutar, Stephen P. <builder@example.com>",
+            name="Lutar, Stephen P.",
+            email="builder@example.com",
+            committer_name="GitHub",
+            committer_email="noreply@github.com",
+        )
+        api_get, _, calls, paths = self.provider_api(
+            head,
+            [source_first, source_head],
+            source_head,
+        )
+        source_fetches: list[tuple[int, str]] = []
+
+        self.assertEqual(
+            dco.validate_push_range(
+                self.repo,
+                self.base,
+                head,
+                "szl-holdings/.github",
+                "",
+                api_get=api_get,
+                source_fetch=lambda number, sha: source_fetches.append((number, sha)),
+            ),
+            1,
+        )
+        self.assertIn(paths["commit"], calls)
+        self.assertIn(paths["commits_page"], calls)
+        self.assertEqual(source_fetches, [(411, source_head)])
+
     def test_push_provider_canonicalization_fails_closed(self) -> None:
+        source_head = self.commit(
+            "fix: governed source\n\n"
+            "Signed-off-by: Stephen P. Lutar Jr. <builder@example.com>",
+            name="Stephen P. Lutar Jr.",
+        )
+        self.git("reset", "--hard", self.base)
         head = self.commit(
             "fix: provider squash (#411)\n\n"
             "Signed-off-by: Stephen P. Lutar Jr. <builder@example.com>",
             name="Lutar, Stephen P.",
             email="builder@example.com",
+            committer_name="GitHub",
+            committer_email="noreply@github.com",
         )
-        commit_path = f"/repos/szl-holdings/.github/commits/{head}"
-        pulls_path = f"{commit_path}/pulls"
-
-        def api_get(
-            path: str,
-            *,
-            verified: bool = True,
-            login: str = "web-flow",
-            merge_sha: str | None = None,
-            base_ref: str = "main",
+        for case, error in (
+            ("verification", "not validly signed"),
+            ("account", "web-flow"),
+            ("merge", "unique exact merged"),
+            ("base_ref", "does not target"),
         ):
-            if path == commit_path:
-                return {
-                    "sha": head,
-                    "commit": {
-                        "author": {
-                            "name": "Lutar, Stephen P.",
-                            "email": "builder@example.com",
-                        },
-                        "committer": {
-                            "name": "GitHub",
-                            "email": "noreply@github.com",
-                        },
-                        "verification": {
-                            "verified": verified,
-                            "reason": "valid" if verified else "unsigned",
-                            "signature": "signed" if verified else None,
-                            "payload": "bound payload" if verified else None,
-                        },
-                    },
-                    "committer": {"login": login, "type": "User"},
-                    "parents": [{"sha": self.base}],
-                }
-            if path == f"{pulls_path}?per_page=100&page=1":
-                return [
-                    {
-                        "number": 411,
-                        "state": "closed",
-                        "draft": False,
-                        "merged_at": "2026-08-11T05:49:54Z",
-                        "merge_commit_sha": merge_sha or head,
-                        "base": {
-                            "ref": base_ref,
-                            "repo": {"full_name": "szl-holdings/.github"},
-                        },
-                        "head": {"sha": "d" * 40},
-                    }
-                ]
-            if path == f"{pulls_path}?per_page=100&page=2":
-                return []
-            raise AssertionError(f"unexpected provider lookup: {path}")
+            with self.subTest(case=case):
+                api_get, responses, _, paths = self.provider_api(
+                    head,
+                    [source_head],
+                    source_head,
+                )
+                commit_response = responses[paths["commit"]]
+                associated_pull = responses[paths["pulls_page"]][0]
+                if case == "verification":
+                    verification = commit_response["commit"]["verification"]
+                    verification.update(
+                        {
+                            "verified": False,
+                            "reason": "unsigned",
+                            "signature": None,
+                            "payload": None,
+                        }
+                    )
+                elif case == "account":
+                    commit_response["committer"]["login"] = "attacker"
+                elif case == "merge":
+                    associated_pull["merge_commit_sha"] = "f" * 40
+                else:
+                    associated_pull["base"]["ref"] = "release/unsafe"
 
-        cases = (
-            (
-                "not validly signed",
-                lambda path: api_get(path, verified=False),
-            ),
-            (
-                "web-flow",
-                lambda path: api_get(path, login="attacker"),
-            ),
-            (
-                "unique exact merged",
-                lambda path: api_get(path, merge_sha="f" * 40),
-            ),
-            (
-                "does not target",
-                lambda path: api_get(path, base_ref="release/unsafe"),
-            ),
-        )
-        for error, provider in cases:
-            with self.subTest(error=error):
                 with self.assertRaisesRegex(dco.DcoContractError, error):
                     dco.validate_push_range(
                         self.repo,
@@ -756,7 +996,8 @@ class DcoCheckTests(unittest.TestCase):
                         head,
                         "szl-holdings/.github",
                         "",
-                        api_get=provider,
+                        api_get=api_get,
+                        source_fetch=lambda number, sha: None,
                     )
 
         self.git("reset", "--hard", self.base)
@@ -765,6 +1006,8 @@ class DcoCheckTests(unittest.TestCase):
             "Signed-off-by: Stephen P. Lutar Jr. <other@example.com>",
             name="Lutar, Stephen P.",
             email="builder@example.com",
+            committer_name="GitHub",
+            committer_email="noreply@github.com",
         )
         with self.assertRaisesRegex(dco.DcoContractError, "email does not exactly match"):
             dco.validate_push_range(
@@ -775,6 +1018,288 @@ class DcoCheckTests(unittest.TestCase):
                 "",
                 api_get=lambda path: self.fail(f"unexpected provider lookup: {path}"),
             )
+
+    def test_push_provider_source_validation_uses_overall_push_head(self) -> None:
+        source_head = self.commit(
+            "fix: source before a batched push\n\n"
+            "Signed-off-by: Stephen P. Lutar Jr. <builder@example.com>",
+            name="Stephen P. Lutar Jr.",
+        )
+        self.git("reset", "--hard", self.base)
+        provider_squash = self.commit(
+            "fix: provider squash (#411)\n\n"
+            "Signed-off-by: Stephen P. Lutar Jr. <builder@example.com>",
+            name="Lutar, Stephen P.",
+            committer_name="GitHub",
+            committer_email="noreply@github.com",
+        )
+        push_head = self.commit(
+            "fix: later strict push commit\n\n"
+            "Signed-off-by: Series A Builder <builder@example.com>"
+        )
+        api_get, _, _, _ = self.provider_api(
+            provider_squash,
+            [source_head],
+            source_head,
+        )
+
+        self.assertEqual(
+            dco.validate_push_range(
+                self.repo,
+                self.base,
+                push_head,
+                "szl-holdings/.github",
+                "",
+                api_get=api_get,
+                source_fetch=lambda number, sha: None,
+            ),
+            2,
+        )
+
+    def test_push_provider_validates_two_source_bound_squashes(self) -> None:
+        source_one = self.commit(
+            "fix: first queued source\n\n"
+            "Signed-off-by: Source One <one@example.com>",
+            name="Source One",
+            email="one@example.com",
+        )
+        self.git("reset", "--hard", self.base)
+        source_two = self.commit(
+            "fix: second queued source\n\n"
+            "Signed-off-by: Source Two <two@example.com>",
+            name="Source Two",
+            email="two@example.com",
+        )
+        self.git("reset", "--hard", self.base)
+        squash_one = self.commit(
+            "fix: first provider squash (#411)\n\n"
+            "Signed-off-by: Source One <one@example.com>",
+            name="Canonical One",
+            email="one@example.com",
+            committer_name="GitHub",
+            committer_email="noreply@github.com",
+        )
+        squash_two = self.commit(
+            "fix: second provider squash (#412)\n\n"
+            "Signed-off-by: Source Two <two@example.com>",
+            name="Canonical Two",
+            email="two@example.com",
+            committer_name="GitHub",
+            committer_email="noreply@github.com",
+        )
+        _, responses_one, _, _ = self.provider_api(
+            squash_one,
+            [source_one],
+            source_one,
+            number=411,
+        )
+        _, responses_two, _, _ = self.provider_api(
+            squash_two,
+            [source_two],
+            source_two,
+            number=412,
+            pr_base_sha=self.base,
+        )
+        responses = {**responses_one, **responses_two}
+
+        def api_get(path: str):
+            if path not in responses:
+                raise AssertionError(f"unexpected provider lookup: {path}")
+            return responses[path]
+
+        self.assertEqual(
+            dco.validate_push_range(
+                self.repo,
+                self.base,
+                squash_two,
+                "szl-holdings/.github",
+                "",
+                api_get=api_get,
+                source_fetch=lambda number, sha: None,
+            ),
+            2,
+        )
+
+    def test_push_provider_squash_binds_exact_pr_base_and_head(self) -> None:
+        source_head = self.commit(
+            "fix: exact source refs\n\n"
+            "Signed-off-by: Stephen P. Lutar Jr. <builder@example.com>",
+            name="Stephen P. Lutar Jr.",
+        )
+        self.git("reset", "--hard", self.base)
+        head = self.commit(
+            "fix: provider squash (#411)\n\n"
+            "Signed-off-by: Stephen P. Lutar Jr. <builder@example.com>",
+            name="Lutar, Stephen P.",
+            committer_name="GitHub",
+            committer_email="noreply@github.com",
+        )
+
+        api_get, responses, _, paths = self.provider_api(
+            head,
+            [source_head],
+            source_head,
+        )
+        responses[paths["pulls_page"]][0]["base"]["sha"] = "e" * 40
+        self.assert_rejected(
+            "pull-request base moved during validation",
+            dco.validate_push_range,
+            self.repo,
+            self.base,
+            head,
+            "szl-holdings/.github",
+            "",
+            api_get=api_get,
+            source_fetch=lambda number, sha: None,
+        )
+
+        api_get, responses, _, paths = self.provider_api(
+            head,
+            [source_head],
+            source_head,
+        )
+        responses[paths["pulls_page"]][0]["head"]["sha"] = "d" * 40
+        self.assert_rejected(
+            "pull-request head moved during validation",
+            dco.validate_push_range,
+            self.repo,
+            self.base,
+            head,
+            "szl-holdings/.github",
+            "",
+            api_get=api_get,
+            source_fetch=lambda number, sha: None,
+        )
+
+        tree = self.git("rev-parse", f"{self.base}^{{tree}}")
+        unrelated_base = self.git(
+            "commit-tree",
+            tree,
+            input_text=(
+                "chore: unrelated base\n\n"
+                "Signed-off-by: Series A Builder <builder@example.com>\n"
+            ),
+        )
+        api_get, _, _, _ = self.provider_api(
+            head,
+            [source_head],
+            source_head,
+            pr_base_sha=unrelated_base,
+        )
+        self.assert_rejected(
+            "base is not an ancestor of the squash parent",
+            dco.validate_push_range,
+            self.repo,
+            self.base,
+            head,
+            "szl-holdings/.github",
+            "",
+            api_get=api_get,
+            source_fetch=lambda number, sha: None,
+        )
+
+    def test_push_provider_squash_rejects_invalid_raw_source_history(self) -> None:
+        source_first = self.commit(
+            "fix: signed source one\n\n"
+            "Signed-off-by: Stephen P. Lutar Jr. <builder@example.com>",
+            name="Stephen P. Lutar Jr.",
+        )
+        unsigned_middle = self.commit(
+            "fix: unsigned source middle",
+            name="Stephen P. Lutar Jr.",
+        )
+        source_head = self.commit(
+            "fix: signed source head\n\n"
+            "Signed-off-by: Stephen P. Lutar Jr. <builder@example.com>",
+            name="Stephen P. Lutar Jr.",
+        )
+        source_shas = [source_first, unsigned_middle, source_head]
+        self.git("reset", "--hard", self.base)
+        head = self.commit(
+            "fix: provider squash (#411)\n\n"
+            "Signed-off-by: Stephen P. Lutar Jr. <builder@example.com>",
+            name="Lutar, Stephen P.",
+            committer_name="GitHub",
+            committer_email="noreply@github.com",
+        )
+        api_get, _, _, _ = self.provider_api(
+            head,
+            source_shas,
+            source_head,
+        )
+        self.assert_rejected(
+            "no valid terminal",
+            dco.validate_push_range,
+            self.repo,
+            self.base,
+            head,
+            "szl-holdings/.github",
+            "",
+            api_get=api_get,
+            source_fetch=lambda number, sha: None,
+        )
+
+        self.git("reset", "--hard", self.base)
+        mismatched_source = self.commit(
+            "fix: mismatched source\n\n"
+            "Signed-off-by: Any Name <builder@example.com>",
+            name="Stephen P. Lutar Jr.",
+        )
+        self.git("reset", "--hard", self.base)
+        head = self.commit(
+            "fix: provider squash (#411)\n\n"
+            "Signed-off-by: Stephen P. Lutar Jr. <builder@example.com>",
+            name="Lutar, Stephen P.",
+            committer_name="GitHub",
+            committer_email="noreply@github.com",
+        )
+        api_get, _, _, _ = self.provider_api(
+            head,
+            [mismatched_source],
+            mismatched_source,
+        )
+        self.assert_rejected(
+            "does not exactly match",
+            dco.validate_push_range,
+            self.repo,
+            self.base,
+            head,
+            "szl-holdings/.github",
+            "",
+            api_get=api_get,
+            source_fetch=lambda number, sha: None,
+        )
+
+    def test_push_provider_squash_rejects_arbitrary_same_email_name(self) -> None:
+        source_head = self.commit(
+            "fix: valid source identity\n\n"
+            "Signed-off-by: Stephen P. Lutar Jr. <builder@example.com>",
+            name="Stephen P. Lutar Jr.",
+        )
+        self.git("reset", "--hard", self.base)
+        head = self.commit(
+            "fix: provider squash (#411)\n\n"
+            "Signed-off-by: Any Name <builder@example.com>",
+            name="Lutar, Stephen P.",
+            committer_name="GitHub",
+            committer_email="noreply@github.com",
+        )
+        api_get, _, _, _ = self.provider_api(
+            head,
+            [source_head],
+            source_head,
+        )
+        self.assert_rejected(
+            "not an exact validated source-commit author identity",
+            dco.validate_push_range,
+            self.repo,
+            self.base,
+            head,
+            "szl-holdings/.github",
+            "",
+            api_get=api_get,
+            source_fetch=lambda number, sha: None,
+        )
 
     def test_pr_pagination_boundaries_and_freshness(self) -> None:
         for count in (249, 250):
