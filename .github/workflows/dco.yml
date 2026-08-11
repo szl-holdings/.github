@@ -212,6 +212,8 @@ jobs:
 
       - name: Validate exact protected push range
         if: github.event_name == 'push'
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
         run: >-
           python "$GITHUB_WORKSPACE/trusted/.github/scripts/dco_check.py"
           --repo-root "$GITHUB_WORKSPACE/candidate"
