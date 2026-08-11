@@ -536,6 +536,48 @@ class DcoCheckTests(unittest.TestCase):
             nonlinear_head,
         )
 
+    def test_merge_group_provider_name_canonicalization_is_email_bound(self) -> None:
+        provider_head = self.commit(
+            "fix: provider-generated squash\n\n"
+            "Signed-off-by: Stephen P. Lutar Jr. <builder@example.com>",
+            name="Lutar, Stephen P.",
+            email="builder@example.com",
+        )
+        self.assertEqual(
+            dco.validate_merge_group(self.repo, self.base, provider_head),
+            1,
+        )
+
+        self.git("reset", "--hard", self.base)
+        wrong_email = self.commit(
+            "fix: provider-generated mismatch\n\n"
+            "Signed-off-by: Stephen P. Lutar Jr. <other@example.com>",
+            name="Lutar, Stephen P.",
+            email="builder@example.com",
+        )
+        self.assert_rejected(
+            "email does not exactly match",
+            dco.validate_merge_group,
+            self.repo,
+            self.base,
+            wrong_email,
+        )
+
+        self.git("reset", "--hard", self.base)
+        wrong_case = self.commit(
+            "fix: provider-generated case mismatch\n\n"
+            "Signed-off-by: Stephen P. Lutar Jr. <Builder@example.com>",
+            name="Lutar, Stephen P.",
+            email="builder@example.com",
+        )
+        self.assert_rejected(
+            "email does not exactly match",
+            dco.validate_merge_group,
+            self.repo,
+            self.base,
+            wrong_case,
+        )
+
     def test_push_identity_contract(self) -> None:
         head = self.commit("fix: push\n\nSigned-off-by: Series A Builder <builder@example.com>")
         payload = {"ref": "refs/heads/main", "before": self.base, "after": head}
