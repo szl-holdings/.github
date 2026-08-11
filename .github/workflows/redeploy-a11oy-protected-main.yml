@@ -28,7 +28,7 @@ jobs:
       SZL_GITHUB_TOKEN: ${{ secrets.SZL_GITHUB_TOKEN }}
       HF_ORG_TOKEN: ${{ secrets.HF_ORG_TOKEN || secrets.HF_ORG_TOKEN1 }}
       HF_TOKEN: ${{ secrets.HF_TOKEN }}
-      EXPECTED_A11OY_MAIN: 389c26224437b5e38da44396e1c8bae5ee061557
+      EXPECTED_A11OY_MAIN: 90ed8c7289efbda085d82f0dc60cf821b22f5caf
       REPORT_ISSUE_TITLE: '[a11oy-canonical-redeploy] protected-main restoration'
     steps:
       - name: Checkout organization control plane
