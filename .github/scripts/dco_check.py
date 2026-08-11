@@ -26,18 +26,21 @@ QUEUE_REF_PREFIX = "refs/heads/gh-readonly-queue/main/"
 ALLOWED_PR_ACTIONS = {"opened", "synchronize", "reopened", "ready_for_review", "edited"}
 
 # Audited horizontal separators: TAB, SPACE, and every Unicode Zs code point.
-# Name and email tokens separately reject C0/C1 controls plus Unicode line and
-# paragraph separators, so no broad whitespace class can admit a line break.
+# Name, email, and trailer text separately reject C0/C1 controls, Unicode line
+# and paragraph separators, and every Bidi_Control code point. Ordinary RTL
+# letters remain valid, but invisible direction overrides cannot alter review.
 HORIZONTAL_SEPARATOR_PATTERN = (
     r"[\x09\x20\u00a0\u1680\u2000-\u200a\u202f\u205f\u3000]"
 )
 NAME_TOKEN_PATTERN = (
     r"[^<>\x00-\x20\x7f-\x9f\u00a0\u1680\u2000-\u200a"
-    r"\u2028\u2029\u202f\u205f\u3000]+"
+    r"\u061c\u200e\u200f\u2028\u2029\u202a-\u202e\u202f"
+    r"\u205f\u2066-\u2069\u3000]+"
 )
 EMAIL_PART_PATTERN = (
     r"[^<>@\x00-\x20\x7f-\x9f\u00a0\u1680\u2000-\u200a"
-    r"\u2028\u2029\u202f\u205f\u3000]+"
+    r"\u061c\u200e\u200f\u2028\u2029\u202a-\u202e\u202f"
+    r"\u205f\u2066-\u2069\u3000]+"
 )
 SIGNED_OFF_BY_PATTERN = re.compile(
     rf"^Signed-off-by:{HORIZONTAL_SEPARATOR_PATTERN}+"
@@ -51,7 +54,11 @@ HORIZONTAL_ONLY_PATTERN = re.compile(
     rf"^{HORIZONTAL_SEPARATOR_PATTERN}*$"
 )
 SAFE_TRAILER_TEXT_PATTERN = (
-    r"[^\x00-\x08\x0a-\x1f\x7f-\x9f\u2028\u2029]*"
+    r"[^\x00-\x08\x0a-\x1f\x7f-\x9f\u061c\u200e\u200f"
+    r"\u2028\u2029\u202a-\u202e\u2066-\u2069]*"
+)
+BIDI_CONTROL_PATTERN = re.compile(
+    r"[\u061c\u200e\u200f\u202a-\u202e\u2066-\u2069]"
 )
 TRAILER_TOKEN_PATTERN = r"-*[A-Za-z0-9][A-Za-z0-9-]*"
 TRAILER_TOKEN_FULL_PATTERN = re.compile(rf"^{TRAILER_TOKEN_PATTERN}$")
@@ -444,6 +451,12 @@ def _admitted_trailer_group(
     has_recognized_prefix = False
 
     for line in final_group:
+        if BIDI_CONTROL_PATTERN.search(line):
+            current_token = None
+            non_trailer_count += 1
+            classified_lines.append(("malformed", None, line))
+            continue
+
         if CONTINUATION_LINE_PATTERN.fullmatch(line):
             if current_token is None:
                 non_trailer_count += 1
@@ -556,28 +569,93 @@ def git(
     input_text: str | None = None,
     check: bool = True,
 ) -> str:
-    completed = subprocess.run(
-        ["git", *args],
-        cwd=repo,
-        input=input_text,
-        text=True,
-        capture_output=True,
-        check=False,
-        timeout=30,
-    )
+    try:
+        completed = subprocess.run(
+            ["git", *args],
+            cwd=repo,
+            input=input_text,
+            text=True,
+            encoding="utf-8",
+            errors="strict",
+            capture_output=True,
+            check=False,
+            timeout=30,
+        )
+    except UnicodeError as exc:
+        raise DcoContractError("git output was not valid UTF-8") from exc
     if check and completed.returncode:
         detail = completed.stderr.strip() or completed.stdout.strip()
         raise DcoContractError(f"git {' '.join(args)} failed: {detail}")
     return completed.stdout
 
 
+def git_bytes(repo: Path, *args: str) -> bytes:
+    completed = subprocess.run(
+        ["git", *args],
+        cwd=repo,
+        text=False,
+        capture_output=True,
+        check=False,
+        timeout=30,
+    )
+    if completed.returncode:
+        raise DcoContractError(f"git {args[0]} failed")
+    return completed.stdout
+
+
 def commit_record(repo: Path, sha: str) -> tuple[list[str], str, str, str]:
     require_sha(sha, "commit SHA")
-    raw = git(repo, "show", "-s", "--format=%P%x00%an%x00%ae%x00%B", sha)
-    fields = raw.split("\x00", 3)
-    require(len(fields) == 4, f"commit metadata is incomplete for {sha}")
-    parents = fields[0].strip().split()
-    return parents, fields[1], fields[2], fields[3]
+    raw_bytes = git_bytes(repo, "cat-file", "commit", sha)
+    try:
+        raw = raw_bytes.decode("utf-8", errors="strict")
+    except UnicodeError as exc:
+        raise DcoContractError("commit object was not valid UTF-8") from exc
+
+    headers, separator, message = raw.partition("\n\n")
+    require(bool(separator), f"commit object is incomplete for {sha}")
+    message = message.replace("\r\n", "\n")
+    require("\r" not in message, f"commit message has unsupported line endings for {sha}")
+
+    parents: list[str] = []
+    author: tuple[str, str] | None = None
+    tree_seen = False
+    committer_seen = False
+    encoding_seen = False
+    current_header: str | None = None
+    for line in headers.split("\n"):
+        if line.startswith(" "):
+            require(current_header is not None, f"commit headers are malformed for {sha}")
+            continue
+
+        key, delimiter, value = line.partition(" ")
+        require(bool(delimiter and key and value), f"commit headers are malformed for {sha}")
+        current_header = key
+        if key == "tree":
+            require(not tree_seen, f"commit has duplicate tree headers for {sha}")
+            require_sha(value, "commit tree SHA")
+            tree_seen = True
+        elif key == "parent":
+            parents.append(require_sha(value, "commit parent SHA"))
+        elif key == "author":
+            require(author is None, f"commit has duplicate author headers for {sha}")
+            match = re.fullmatch(
+                r"(?P<name>.+) <(?P<email>[^<>]+)> -?[0-9]+ [+-][0-9]{4}",
+                value,
+            )
+            require(match is not None, f"commit author header is malformed for {sha}")
+            author = (match.group("name"), match.group("email"))
+        elif key == "committer":
+            require(not committer_seen, f"commit has duplicate committer headers for {sha}")
+            committer_seen = True
+        elif key == "encoding":
+            require(not encoding_seen, f"commit has duplicate encoding headers for {sha}")
+            require(value.casefold() == "utf-8", "commit encoding must be UTF-8")
+            encoding_seen = True
+
+    require(tree_seen, f"commit has no tree header for {sha}")
+    require(author is not None, f"commit has no author header for {sha}")
+    require(committer_seen, f"commit has no committer header for {sha}")
+    return parents, author[0], author[1], message
 
 
 def validate_commit(
