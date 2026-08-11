@@ -1,0 +1,120 @@
+{
+  "schema": "szl.codex.whole-thread-workgraph/v1",
+  "generated_at": "2026-08-11T00:00:00Z",
+  "marker": "SZL-CODEX-WHOLE-THREAD-FINISH-V1",
+  "owner_authorization": "PRESENT",
+  "coordination_repository": "szl-holdings/.github",
+  "source_contract": "coordination/codex/whole-thread-finish-2026-08-11/CODEX_WORKCELL.md",
+  "initial_status": "PENDING_CURRENT_STATE_RECAPTURE",
+  "allowed_terminal_statuses": [
+    "VERIFIED_CURRENT",
+    "TERMINAL_FAILURE",
+    "BLOCKED_MANAGED_PREREQUISITE"
+  ],
+  "global_gates": {
+    "direct_main_push": "FORBIDDEN",
+    "force_push": "FORBIDDEN",
+    "history_rewrite": "FORBIDDEN",
+    "managed_secrets_only": true,
+    "dco_required": true,
+    "repository_signing_policy_required": true,
+    "exact_head_revalidation_required": true,
+    "required_checks_terminal": true,
+    "live_readback_required_for_deployment_claims": true,
+    "current_evidence_overrides_historical_counts": true
+  },
+  "tasks": [
+    {
+      "id": "W0",
+      "name": "Immutable estate recapture",
+      "scope": ["github", "huggingface", "domains", "database", "deployments"],
+      "depends_on": [],
+      "mutates": false,
+      "outputs": ["current-state.json", "workgraph.json", "decision-log.md", "risk-register.md"]
+    },
+    {
+      "id": "W1",
+      "name": "GitHub organization convergence",
+      "scope": ["szl-holdings/.github", "all active repositories"],
+      "depends_on": ["W0"],
+      "mutates": true,
+      "acceptance": ["current inventory generated", "actionable CI repaired", "stale claims removed", "protected delivery preserved"]
+    },
+    {
+      "id": "W2",
+      "name": "A11oy public truth and terminal health",
+      "scope": ["szl-holdings/a11oy", "szl-holdings/a11oy-net", "szl-holdings/killinchu"],
+      "depends_on": ["W0"],
+      "mutates": true,
+      "acceptance": ["no indefinite transient states", "Killinchu capability axes accurate", "exact deployed revisions verified"]
+    },
+    {
+      "id": "W3",
+      "name": "Hugging Face estate convergence",
+      "scope": ["SZLHOLDINGS models", "kernels", "datasets", "spaces", "collections", "buckets"],
+      "depends_on": ["W0", "W1"],
+      "mutates": true,
+      "acceptance": ["fully paginated manifests", "immutable source bindings", "responsive cards", "no stale retired references"]
+    },
+    {
+      "id": "W4",
+      "name": "Governed model frontier",
+      "scope": ["szl-holdings/a11oy", "szl-holdings/szl-forge", "SZLHOLDINGS"],
+      "depends_on": ["W0"],
+      "mutates": true,
+      "acceptance": ["deny-by-default admission passports", "clean-room behavior profiles", "Pareto evaluations", "receipt-backed promotion"]
+    },
+    {
+      "id": "W5",
+      "name": "SZL Forge productionization",
+      "scope": ["szl-holdings/szl-forge"],
+      "depends_on": ["W0", "W4"],
+      "mutates": true,
+      "acceptance": ["rerun-safe pipeline", "content-addressed receipts", "hardware profiles", "A11oy registry integration"]
+    },
+    {
+      "id": "W6",
+      "name": "Series A database upgrade",
+      "scope": ["szl-holdings/platform", "managed production database"],
+      "depends_on": ["W0"],
+      "mutates": true,
+      "external_prerequisites": ["managed DATABASE_URL", "encrypted backup target", "change approval", "signing identity"],
+      "acceptance": ["journal-based migration", "backup restore proof", "tracker and schema equivalence", "application readback", "signed cutover receipt"]
+    },
+    {
+      "id": "W7",
+      "name": "MCP authority unification",
+      "scope": ["szl-holdings/hatun-mcp", "szl-holdings/platform", "szl-holdings/a11oy"],
+      "depends_on": ["W0"],
+      "mutates": true,
+      "acceptance": ["one canonical source contract", "generated compatibility layers", "cross-repository drift tests", "no third registry"]
+    },
+    {
+      "id": "W8",
+      "name": "Frontend, mobile, investor and developer polish",
+      "scope": ["GitHub", "Hugging Face", "a-11-oy.com", "a11oy.net", "deployable applications"],
+      "depends_on": ["W1", "W2", "W3"],
+      "mutates": true,
+      "acceptance": ["responsive viewports", "accessibility gates", "live screenshots", "clear product hierarchy", "evidence-safe narrative"]
+    },
+    {
+      "id": "W9",
+      "name": "Protected deployments and final proof",
+      "scope": ["all shipping surfaces"],
+      "depends_on": ["W2", "W3", "W5", "W6", "W7", "W8"],
+      "mutates": true,
+      "acceptance": ["source artifact deployment equivalence", "independent live readback", "offline-verifiable final receipt", "explicit residual risks"]
+    }
+  ],
+  "final_outputs": [
+    "final-state.json",
+    "claim-drift-report.md",
+    "github-estate-manifest.json",
+    "hf-estate-manifest.json",
+    "model-admission-report.json",
+    "database-cutover-receipt.json",
+    "deployment-reconciliation.json",
+    "FINAL_SERIES_A_REPORT.md",
+    "receipts/"
+  ]
+}
