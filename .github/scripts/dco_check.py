@@ -840,21 +840,34 @@ def validate_merge_group(repo: Path, base_sha: str, head_sha: str) -> int:
         if line.strip()
     ]
     require(range_shas and range_shas[-1] == head_sha, "merge-group range does not end at head")
+    require(
+        len(range_shas) == len(set(range_shas)),
+        "merge-group range contains duplicate SHAs",
+    )
     previous_sha = base_sha
     for sha in range_shas:
-        parents, _, _, _ = commit_record(repo, sha)
+        parents, _, author_email, message = commit_record(repo, sha)
         require(
             parents == [previous_sha],
             "merge-group range is not a linear single-parent squash sequence",
         )
+        identities = valid_dco_identities(message)
+        require(
+            identities,
+            f"{sha} has no valid terminal Signed-off-by trailer",
+        )
+        # GitHub creates merge-queue squash commits on a protected temporary
+        # ref and can canonicalize the account display name independently of
+        # the exact source-commit author name. The source commits retain the
+        # stricter name-and-email check above; only this provider-generated
+        # merge_group path accepts an exact, case-sensitive author-email match.
+        require(
+            any(identity_email == author_email for _, identity_email in identities),
+            f"{sha} Signed-off-by email does not exactly match "
+            "the merge-group commit author email",
+        )
         previous_sha = sha
-    return validate_commits(
-        repo,
-        range_shas,
-        head_sha,
-        allow_merge_commits=False,
-        checked_out_head_sha=head_sha,
-    )
+    return len(range_shas)
 
 
 def push_subject(payload: dict[str, Any], github_sha: str) -> tuple[str, str]:
