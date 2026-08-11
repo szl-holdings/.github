@@ -129,21 +129,38 @@ class DcoActivationWorkflowTests(unittest.TestCase):
             "^Solo-Operator-Authorization:[[:space:]]*"
             "(confirmed|CONFIRMED)[[:space:]]*$"
         )
-        self.assertIn(f"grep -Eq '{marker}'", self.attestor)
+        self.assertIn(f"awk '/{marker}/", self.attestor)
         self.assertIn(f'"{marker}"', self.forge_verifier)
+        self.assertIn('AUTHORIZATION_COUNT="$(', self.attestor)
+        self.assertIn("{ count += 1 } END { print count + 0 }", self.attestor)
+        self.assertIn('[ "$AUTHORIZATION_COUNT" -eq 1 ]', self.attestor)
+        self.assertIn(
+            "P5 governance change requires exactly one canonical "
+            "solo-operator authorization",
+            self.attestor,
+        )
         self.assertNotIn(
             "Solo-Operator-Authorization:[[:space:]]*confirmed'",
             self.attestor,
         )
 
     def test_solo_operator_policy_documents_both_canonical_confirmations(self) -> None:
-        for marker in (
+        expected_markers = {
             "Solo-Operator-Authorization: confirmed",
             "Solo-Operator-Authorization: CONFIRMED",
-            "The authorization value is case-sensitive.",
-            "Mixed-case values, prefixes,",
-        ):
-            self.assertIn(marker, self.solo_policy)
+        }
+        actual_markers = {
+            line.strip()
+            for line in self.solo_policy.splitlines()
+            if line.startswith("Solo-Operator-Authorization:")
+        }
+        self.assertEqual(actual_markers, expected_markers)
+        self.assertIn("must include exactly one", self.solo_policy)
+        self.assertIn(
+            "The authorization value is case-sensitive. Mixed-case values, "
+            "prefixes,\nsuffixes, and additional text are invalid.",
+            self.solo_policy,
+        )
 
     def test_forge9_requires_strict_behavior_not_retired_implementation(self) -> None:
         self.assertNotIn('"interpret-trailers", "--parse"', self.forge_verifier)
