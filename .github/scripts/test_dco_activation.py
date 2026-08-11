@@ -7,6 +7,7 @@ import unittest
 
 SCRIPTS = Path(__file__).resolve().parent
 WORKFLOWS = SCRIPTS.parent / "workflows"
+GOVERNANCE = SCRIPTS.parents[1] / ".governance"
 
 
 class DcoActivationWorkflowTests(unittest.TestCase):
@@ -14,6 +15,9 @@ class DcoActivationWorkflowTests(unittest.TestCase):
         self.native = (WORKFLOWS / "dco.yml").read_text(encoding="utf-8")
         self.reusable = (WORKFLOWS / "reusable-dco.yml").read_text(encoding="utf-8")
         self.attestor = (WORKFLOWS / "attest-and-approve.yml").read_text(
+            encoding="utf-8"
+        )
+        self.solo_policy = (GOVERNANCE / "solo-operator-policy.md").read_text(
             encoding="utf-8"
         )
         self.checker = (SCRIPTS / "dco_check.py").read_text(encoding="utf-8")
@@ -125,11 +129,37 @@ class DcoActivationWorkflowTests(unittest.TestCase):
             "^Solo-Operator-Authorization:[[:space:]]*"
             "(confirmed|CONFIRMED)[[:space:]]*$"
         )
-        self.assertIn(f"grep -Eq '{marker}'", self.attestor)
+        self.assertIn(f"awk '/{marker}/", self.attestor)
         self.assertIn(f'"{marker}"', self.forge_verifier)
+        self.assertIn('AUTHORIZATION_COUNT="$(', self.attestor)
+        self.assertIn("{ count += 1 } END { print count + 0 }", self.attestor)
+        self.assertIn('[ "$AUTHORIZATION_COUNT" -eq 1 ]', self.attestor)
+        self.assertIn(
+            "P5 governance change requires exactly one canonical "
+            "solo-operator authorization",
+            self.attestor,
+        )
         self.assertNotIn(
             "Solo-Operator-Authorization:[[:space:]]*confirmed'",
             self.attestor,
+        )
+
+    def test_solo_operator_policy_documents_both_canonical_confirmations(self) -> None:
+        expected_markers = {
+            "Solo-Operator-Authorization: confirmed",
+            "Solo-Operator-Authorization: CONFIRMED",
+        }
+        actual_markers = {
+            line.strip()
+            for line in self.solo_policy.splitlines()
+            if line.startswith("Solo-Operator-Authorization:")
+        }
+        self.assertEqual(actual_markers, expected_markers)
+        self.assertIn("must include exactly one", self.solo_policy)
+        self.assertIn(
+            "The authorization value is case-sensitive. Mixed-case values, "
+            "prefixes,\nsuffixes, and additional text are invalid.",
+            self.solo_policy,
         )
 
     def test_forge9_requires_strict_behavior_not_retired_implementation(self) -> None:

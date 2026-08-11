@@ -136,8 +136,11 @@ jobs:
             --jq '.[].filename' > "$RUNNER_TEMP/files.txt"
           if grep -Eq '^(\.github/workflows/(attest-and-approve|dco|gates|forge9-staging|merge-queue-enqueue)\.ya?ml|\.github/scripts/(dco_check|test_dco_check)\.py|\.governance/)' \
               "$RUNNER_TEMP/files.txt"; then
-            grep -Eq '^Solo-Operator-Authorization:[[:space:]]*(confirmed|CONFIRMED)[[:space:]]*$' <<<"$BODY" \
-              || { echo "::error::P5 governance change lacks solo-operator authorization"; exit 1; }
+            AUTHORIZATION_COUNT="$(
+              awk '/^Solo-Operator-Authorization:[[:space:]]*(confirmed|CONFIRMED)[[:space:]]*$/ { count += 1 } END { print count + 0 }' <<<"$BODY"
+            )"
+            [ "$AUTHORIZATION_COUNT" -eq 1 ] \
+              || { echo "::error::P5 governance change requires exactly one canonical solo-operator authorization"; exit 1; }
             grep -Eq 'Risk:[[:space:]]*D[[:space:]]*[-â€”]' <<<"$BODY" \
               || { echo "::error::P5 governance change must be classified Risk D"; exit 1; }
           fi

@@ -351,6 +351,10 @@ def verify_gate_contract() -> None:
 
     for marker in (
         "^Solo-Operator-Authorization:[[:space:]]*(confirmed|CONFIRMED)[[:space:]]*$",
+        'AUTHORIZATION_COUNT="$(',
+        "{ count += 1 } END { print count + 0 }",
+        '[ "$AUTHORIZATION_COUNT" -eq 1 ]',
+        "P5 governance change requires exactly one canonical solo-operator authorization",
         "Risk:[[:space:]]*D[[:space:]]*[-â€”]",
     ):
         if marker not in attestor_template:
