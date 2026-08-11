@@ -1,0 +1,178 @@
+{
+  "schema": "szl.codex.whole-thread-workgraph/v2",
+  "generated_at": "2026-08-11T00:00:00Z",
+  "marker": "SZL-CODEX-WHOLE-THREAD-FINISH-V1",
+  "authority": "This file is the canonical machine-readable graph. The compact JSON block in WORKCELL.md is a human-readable summary only.",
+  "owner_authorization": "PRESENT",
+  "coordination_repository": "szl-holdings/.github",
+  "source_contract": "coordination/codex/whole-thread-finish-2026-08-11/WORKCELL.md",
+  "initial_status": "PENDING_CURRENT_STATE_RECAPTURE",
+  "allowed_terminal_statuses": [
+    "VERIFIED_CURRENT",
+    "TERMINAL_FAILURE",
+    "BLOCKED_MANAGED_PREREQUISITE"
+  ],
+  "global_gates": {
+    "direct_main_push": "FORBIDDEN",
+    "force_push": "FORBIDDEN",
+    "history_rewrite": "FORBIDDEN",
+    "mutation_protocol_required_for_all_mutations": true,
+    "managed_secrets_only": true,
+    "dco_required": true,
+    "repository_signing_policy_required": true,
+    "exact_head_revalidation_required": true,
+    "required_checks_terminal": true,
+    "live_readback_required_for_deployment_claims": true,
+    "current_evidence_overrides_historical_counts": true
+  },
+  "tasks": [
+    {
+      "id": "W0R",
+      "name": "Immutable estate reconnaissance",
+      "depends_on": [],
+      "mutates": false,
+      "scope": ["github", "huggingface", "domains", "database", "deployments"],
+      "acceptance": [
+        "full source OIDs captured",
+        "rulesets and checks captured",
+        "current Hub inventory captured with pagination",
+        "deployment revisions captured",
+        "database identity captured without secret disclosure"
+      ]
+    },
+    {
+      "id": "W0A",
+      "name": "Publish Phase 0 evidence artifacts",
+      "depends_on": ["W0R"],
+      "mutates": true,
+      "scope": ["szl-holdings/.github"],
+      "mutation_protocol_required": true,
+      "outputs": [
+        "current-state.json",
+        "WORKGRAPH.json",
+        "decision-log.md",
+        "risk-register.md"
+      ],
+      "acceptance": [
+        "artifacts written on a non-protected branch",
+        "repository-native checks pass",
+        "protected PR opened",
+        "exact evidence sources recorded"
+      ]
+    },
+    {
+      "id": "W1",
+      "name": "GitHub organization convergence",
+      "depends_on": ["W0A"],
+      "mutates": true,
+      "mutation_protocol_required": true
+    },
+    {
+      "id": "W2",
+      "name": "A11oy public truth and terminal health",
+      "depends_on": ["W0A"],
+      "mutates": true,
+      "mutation_protocol_required": true
+    },
+    {
+      "id": "W3",
+      "name": "Hugging Face estate convergence",
+      "depends_on": ["W0A", "W1"],
+      "mutates": true,
+      "mutation_protocol_required": true
+    },
+    {
+      "id": "W4",
+      "name": "Governed model frontier",
+      "depends_on": ["W0A"],
+      "mutates": true,
+      "mutation_protocol_required": true
+    },
+    {
+      "id": "W5",
+      "name": "SZL Forge productionization",
+      "depends_on": ["W0A", "W4"],
+      "mutates": true,
+      "mutation_protocol_required": true
+    },
+    {
+      "id": "W6",
+      "name": "Series A database upgrade",
+      "depends_on": ["W0A"],
+      "mutates": true,
+      "mutation_protocol_required": true,
+      "managed_prerequisites": [
+        "DATABASE_URL",
+        "encrypted backup target",
+        "change approval",
+        "signing identity"
+      ]
+    },
+    {
+      "id": "W7",
+      "name": "MCP authority unification",
+      "depends_on": ["W0A"],
+      "mutates": true,
+      "mutation_protocol_required": true
+    },
+    {
+      "id": "W8",
+      "name": "Responsive investor/developer presentation",
+      "depends_on": ["W1", "W2", "W3"],
+      "mutates": true,
+      "mutation_protocol_required": true
+    },
+    {
+      "id": "W9",
+      "name": "Protected deployments and final proof",
+      "depends_on": ["W2", "W3", "W5", "W6", "W7", "W8"],
+      "mutates": true,
+      "mutation_protocol_required": true,
+      "dependency_status_policy": {
+        "start_requires": "ALL_DEPENDENCIES_VERIFIED_CURRENT",
+        "terminal_failure_propagates": "TERMINAL_FAILURE",
+        "managed_prerequisite_block_propagates": "BLOCKED_MANAGED_PREREQUISITE",
+        "terminal_but_nonverified_does_not_unlock": true
+      },
+      "acceptance": [
+        "every in-scope source merge is bound to an exact protected-main OID",
+        "every shipping artifact is bound to an immutable digest",
+        "every deployment is bound to the merged source OID and artifact digest",
+        "independent live readback matches the expected deployment identity",
+        "required signed receipts verify offline",
+        "public claims match current machine-readable evidence",
+        "all required final outputs and status-dependent outputs exist and validate"
+      ],
+      "required_outputs": [
+        "deployment-reconciliation.json",
+        "final-state.json",
+        "FINAL_SERIES_A_REPORT.md",
+        "receipts/"
+      ]
+    }
+  ],
+  "final_outputs": [
+    "final-state.json",
+    "claim-drift-report.md",
+    "github-estate-manifest.json",
+    "hf-estate-manifest.json",
+    "model-admission-report.json",
+    "deployment-reconciliation.json",
+    "FINAL_SERIES_A_REPORT.md",
+    "receipts/"
+  ],
+  "conditional_final_outputs": [
+    {
+      "when": "W6=VERIFIED_CURRENT",
+      "required": "database-cutover-receipt.json"
+    },
+    {
+      "when": "W6=BLOCKED_MANAGED_PREREQUISITE",
+      "required": "database-managed-prerequisite-block-receipt.json"
+    },
+    {
+      "when": "W6=TERMINAL_FAILURE",
+      "required": "database-terminal-failure-receipt.json"
+    }
+  ]
+}
