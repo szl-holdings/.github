@@ -42,10 +42,18 @@ protected auto-merge path.
 ## Governance changes
 
 A pull request that edits the gate, attestor, merge-queue controller, staging
-workflow, or `.governance/` must include both:
+workflow, or `.governance/` must include exactly one of these authorization
+markers:
 
 ```text
 Solo-Operator-Authorization: confirmed
+Solo-Operator-Authorization: CONFIRMED
+```
+
+The authorization value is case-sensitive. Mixed-case values, prefixes,
+suffixes, and additional text are invalid. The pull request must also include:
+
+```text
 Risk: D - <reason>
 ```
 

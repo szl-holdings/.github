@@ -7,6 +7,7 @@ import unittest
 
 SCRIPTS = Path(__file__).resolve().parent
 WORKFLOWS = SCRIPTS.parent / "workflows"
+GOVERNANCE = SCRIPTS.parents[1] / ".governance"
 
 
 class DcoActivationWorkflowTests(unittest.TestCase):
@@ -14,6 +15,9 @@ class DcoActivationWorkflowTests(unittest.TestCase):
         self.native = (WORKFLOWS / "dco.yml").read_text(encoding="utf-8")
         self.reusable = (WORKFLOWS / "reusable-dco.yml").read_text(encoding="utf-8")
         self.attestor = (WORKFLOWS / "attest-and-approve.yml").read_text(
+            encoding="utf-8"
+        )
+        self.solo_policy = (GOVERNANCE / "solo-operator-policy.md").read_text(
             encoding="utf-8"
         )
         self.checker = (SCRIPTS / "dco_check.py").read_text(encoding="utf-8")
@@ -131,6 +135,15 @@ class DcoActivationWorkflowTests(unittest.TestCase):
             "Solo-Operator-Authorization:[[:space:]]*confirmed'",
             self.attestor,
         )
+
+    def test_solo_operator_policy_documents_both_canonical_confirmations(self) -> None:
+        for marker in (
+            "Solo-Operator-Authorization: confirmed",
+            "Solo-Operator-Authorization: CONFIRMED",
+            "The authorization value is case-sensitive.",
+            "Mixed-case values, prefixes,",
+        ):
+            self.assertIn(marker, self.solo_policy)
 
     def test_forge9_requires_strict_behavior_not_retired_implementation(self) -> None:
         self.assertNotIn('"interpret-trailers", "--parse"', self.forge_verifier)
