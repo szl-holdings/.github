@@ -135,3 +135,4 @@ jobs:
           python -B "$GITHUB_WORKSPACE/trusted-dco/.github/scripts/dco_check.py"
           --repo-root "$GITHUB_WORKSPACE/candidate"
           --event-path "$GITHUB_EVENT_PATH"
+          --allow-draft

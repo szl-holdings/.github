@@ -748,6 +748,8 @@ def collect_pr_commits(
     expected_base: str,
     expected_head: str,
     api_get: Callable[[str], Any],
+    *,
+    allow_draft: bool = False,
 ) -> list[str]:
     expected_base = require_sha(expected_base, "pull-request base SHA")
     expected_head = require_sha(expected_head, "pull-request head SHA")
@@ -769,7 +771,9 @@ def collect_pr_commits(
             and 0 < declared <= MAX_PULL_REQUEST_COMMITS,
             "pull-request commit count is outside the supported range",
         )
-        require(current.get("draft") is False, "draft pull requests cannot satisfy DCO")
+        draft = current.get("draft")
+        require(isinstance(draft, bool), "pull-request draft state is not boolean")
+        require(allow_draft or not draft, "draft pull requests cannot satisfy DCO")
         return declared
 
     declared_count = stable_metadata()
@@ -887,6 +891,7 @@ def validate_pull_request_target(
     *,
     expected_base_sha: str | None = None,
     expected_head_sha: str | None = None,
+    allow_draft: bool = False,
 ) -> int:
     require(payload.get("action") in ALLOWED_PR_ACTIONS, "pull-request action is unsupported")
     require(
@@ -926,7 +931,14 @@ def validate_pull_request_target(
     require(isinstance(number, int) and number > 0, "pull-request number is invalid")
     require(bool(token), "GITHUB_TOKEN is required for trusted PR validation")
     getter = api_get or (lambda path: github_get(path, token))
-    shas = collect_pr_commits(repository, number, base_sha, head_sha, getter)
+    shas = collect_pr_commits(
+        repository,
+        number,
+        base_sha,
+        head_sha,
+        getter,
+        allow_draft=allow_draft,
+    )
     require(checked_out_head(repo) == head_sha, "checked-out HEAD does not match event head")
     merge_base = require_sha(
         git(repo, "merge-base", base_sha, head_sha).strip(),
@@ -948,6 +960,11 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser()
     parser.add_argument("--repo-root", type=Path, required=True)
     parser.add_argument("--event-path", type=Path, required=True)
+    parser.add_argument(
+        "--allow-draft",
+        action="store_true",
+        help="validate DCO on draft PRs when GitHub cannot dispatch ready_for_review",
+    )
     return parser.parse_args()
 
 
@@ -976,6 +993,7 @@ def main() -> int:
                 _required_environment("GITHUB_TOKEN"),
                 expected_base_sha=_required_environment("EXPECTED_BASE_SHA"),
                 expected_head_sha=_required_environment("EXPECTED_HEAD_SHA"),
+                allow_draft=args.allow_draft,
             )
         elif event_name == "merge_group":
             base_sha, head_sha = merge_group_subject(payload, github_sha)

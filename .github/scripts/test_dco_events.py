@@ -18,7 +18,7 @@ DOCTRINE_REQUIRED_WORKFLOW = (
     Path(__file__).resolve().parents[1] / "workflows" / "doctrine-required-dco.yml"
 )
 DOCTRINE_REQUIRED_WORKFLOW_SHA256 = (
-    "b1d3c05f6572637b3116893047e6ce7d33840bdb050adf36c36824a72beeac3f"
+    "43b210ab34819bd617b0892b3fa60a9c910d63fca2ca59fc93874b27ab22d51a"
 )
 
 
@@ -78,6 +78,7 @@ def validate_doctrine_required_workflow(workflow: str) -> None:
         "status --porcelain=v1 --untracked-files=all",
         '--repo-root "$GITHUB_WORKSPACE/candidate"',
         '--event-path "$GITHUB_EVENT_PATH"',
+        "--allow-draft",
     )
     for marker in required_markers:
         if marker not in workflow:
@@ -91,6 +92,8 @@ def validate_doctrine_required_workflow(workflow: str) -> None:
         raise ValueError("every Doctrine workflow checkout must discard credentials")
     if workflow.count("GITHUB_TOKEN: ${{ github.token }}") != 1:
         raise ValueError("Doctrine validation must have one read-only API token binding")
+    if workflow.count("--allow-draft") != 1:
+        raise ValueError("Doctrine required workflow must explicitly validate draft PR commits")
     if workflow.count("name: Required DCO enforcement\n") != 1:
         raise ValueError("Doctrine required context must have one producer")
     if workflow.count("branches: [__doctrine-ruleset-only__]") != 2:
@@ -169,8 +172,8 @@ def validate_doctrine_required_workflow(workflow: str) -> None:
         (
             "Validate exact target commits with protected DCO code",
             ("env", "run"),
-            "05b556ae578705413e6180e4ab764dabc230db463cf0ab6b1299714a952cfe60",
-            "9e85bf2913790c46cfc9db72378ebfba6a87ce78547eada2bc7d607054c16b05",
+            "925c200c57a237dfd8c21ec158b14018fed30a984c4d29deb677308cb484bbbf",
+            "8b357ad998cea49994f3a9e44525d3ec5ded8618462d6263e2ff9a2d963e7866",
         ),
     )
     workflow_lines = workflow.splitlines()
@@ -627,6 +630,41 @@ class DcoCheckTests(unittest.TestCase):
             "a" * 40,
             rejected[-1],
             over_limit,
+        )
+
+    def test_draft_pr_requires_explicit_protected_controller_opt_in(self) -> None:
+        head = "b" * 40
+
+        def draft_pr(path: str):
+            if "/commits?" in path:
+                page = int(path.rsplit("page=", 1)[1])
+                return [{"sha": head}] if page == 1 else []
+            return {
+                "base": {"sha": "a" * 40},
+                "head": {"sha": head},
+                "commits": 1,
+                "draft": True,
+            }
+
+        self.assert_rejected(
+            "draft pull requests cannot satisfy DCO",
+            dco.collect_pr_commits,
+            "szl-holdings/.github",
+            400,
+            "a" * 40,
+            head,
+            draft_pr,
+        )
+        self.assertEqual(
+            dco.collect_pr_commits(
+                "szl-holdings/.github",
+                400,
+                "a" * 40,
+                head,
+                draft_pr,
+                allow_draft=True,
+            ),
+            [head],
         )
 
     def test_pr_duplicate_and_count_churn_fail(self) -> None:
