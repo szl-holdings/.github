@@ -310,6 +310,33 @@ class LocalGitProductionPathTests(unittest.TestCase):
             arguments.extend(["-p", self.base if parent == "base" else parent])
         return self.git(*arguments, input_bytes=message.encode("utf-8"), env=commit_env)
 
+    def raw_commit(
+        self,
+        identity: bytes,
+        message: bytes,
+        encoding: bytes,
+    ) -> str:
+        raw = (
+            f"tree {self.tree}\nparent {self.base}\n".encode("ascii")
+            + b"author "
+            + identity
+            + b" 946684800 +0000\n"
+            + b"committer DCO Production Test <committer@example.com> "
+            + b"946684800 +0000\nencoding "
+            + encoding
+            + b"\n\n"
+            + message
+            + b"\n"
+        )
+        return self.git(
+            "hash-object",
+            "-t",
+            "commit",
+            "-w",
+            "--stdin",
+            input_bytes=raw,
+        )
+
     def assert_rejected_by_commit_and_range(self, sha: str) -> None:
         self.git("reset", "--hard", sha)
         with self.assertRaises(dco_check.DcoContractError):
@@ -374,6 +401,26 @@ class LocalGitProductionPathTests(unittest.TestCase):
             f"Signed-off-by: {name} <{email}>",
             author_name=name,
             author_email=email,
+        )
+        self.git("reset", "--hard", sha)
+        dco_check.validate_commit(self.repo, sha)
+        self.assertEqual(dco_check.validate_range(self.repo, self.base, sha), 1)
+
+    def test_legacy_encoded_commit_object_fails_closed(self) -> None:
+        identity = b"Jos\xe9 <jose@example.com>"
+        sha = self.raw_commit(
+            identity,
+            b"fix: legacy bytes\n\nSigned-off-by: " + identity,
+            b"ISO-8859-1",
+        )
+        self.assert_rejected_by_commit_and_range(sha)
+
+    def test_explicit_utf8_commit_object_passes(self) -> None:
+        identity = "Jos\u00e9 <jose@example.com>".encode("utf-8")
+        sha = self.raw_commit(
+            identity,
+            b"fix: utf8 bytes\n\nSigned-off-by: " + identity,
+            b"UTF-8",
         )
         self.git("reset", "--hard", sha)
         dco_check.validate_commit(self.repo, sha)

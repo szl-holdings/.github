@@ -589,13 +589,73 @@ def git(
     return completed.stdout
 
 
+def git_bytes(repo: Path, *args: str) -> bytes:
+    completed = subprocess.run(
+        ["git", *args],
+        cwd=repo,
+        text=False,
+        capture_output=True,
+        check=False,
+        timeout=30,
+    )
+    if completed.returncode:
+        raise DcoContractError(f"git {args[0]} failed")
+    return completed.stdout
+
+
 def commit_record(repo: Path, sha: str) -> tuple[list[str], str, str, str]:
     require_sha(sha, "commit SHA")
-    raw = git(repo, "show", "-s", "--format=%P%x00%an%x00%ae%x00%B", sha)
-    fields = raw.split("\x00", 3)
-    require(len(fields) == 4, f"commit metadata is incomplete for {sha}")
-    parents = fields[0].strip().split()
-    return parents, fields[1], fields[2], fields[3]
+    raw_bytes = git_bytes(repo, "cat-file", "commit", sha)
+    try:
+        raw = raw_bytes.decode("utf-8", errors="strict")
+    except UnicodeError as exc:
+        raise DcoContractError("commit object was not valid UTF-8") from exc
+
+    headers, separator, message = raw.partition("\n\n")
+    require(bool(separator), f"commit object is incomplete for {sha}")
+    message = message.replace("\r\n", "\n")
+    require("\r" not in message, f"commit message has unsupported line endings for {sha}")
+
+    parents: list[str] = []
+    author: tuple[str, str] | None = None
+    tree_seen = False
+    committer_seen = False
+    encoding_seen = False
+    current_header: str | None = None
+    for line in headers.split("\n"):
+        if line.startswith(" "):
+            require(current_header is not None, f"commit headers are malformed for {sha}")
+            continue
+
+        key, delimiter, value = line.partition(" ")
+        require(bool(delimiter and key and value), f"commit headers are malformed for {sha}")
+        current_header = key
+        if key == "tree":
+            require(not tree_seen, f"commit has duplicate tree headers for {sha}")
+            require_sha(value, "commit tree SHA")
+            tree_seen = True
+        elif key == "parent":
+            parents.append(require_sha(value, "commit parent SHA"))
+        elif key == "author":
+            require(author is None, f"commit has duplicate author headers for {sha}")
+            match = re.fullmatch(
+                r"(?P<name>.+) <(?P<email>[^<>]+)> -?[0-9]+ [+-][0-9]{4}",
+                value,
+            )
+            require(match is not None, f"commit author header is malformed for {sha}")
+            author = (match.group("name"), match.group("email"))
+        elif key == "committer":
+            require(not committer_seen, f"commit has duplicate committer headers for {sha}")
+            committer_seen = True
+        elif key == "encoding":
+            require(not encoding_seen, f"commit has duplicate encoding headers for {sha}")
+            require(value.casefold() == "utf-8", "commit encoding must be UTF-8")
+            encoding_seen = True
+
+    require(tree_seen, f"commit has no tree header for {sha}")
+    require(author is not None, f"commit has no author header for {sha}")
+    require(committer_seen, f"commit has no committer header for {sha}")
+    return parents, author[0], author[1], message
 
 
 def validate_commit(
