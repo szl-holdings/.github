@@ -350,7 +350,7 @@ def verify_gate_contract() -> None:
         fail("attestor self-edit guard overmatches unrelated workflows")
 
     for marker in (
-        "Solo-Operator-Authorization:[[:space:]]*confirmed",
+        "^Solo-Operator-Authorization:[[:space:]]*(confirmed|CONFIRMED)[[:space:]]*$",
         "Risk:[[:space:]]*D[[:space:]]*[-â€”]",
     ):
         if marker not in attestor_template:

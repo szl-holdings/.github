@@ -13,6 +13,9 @@ class DcoActivationWorkflowTests(unittest.TestCase):
     def setUp(self) -> None:
         self.native = (WORKFLOWS / "dco.yml").read_text(encoding="utf-8")
         self.reusable = (WORKFLOWS / "reusable-dco.yml").read_text(encoding="utf-8")
+        self.attestor = (WORKFLOWS / "attest-and-approve.yml").read_text(
+            encoding="utf-8"
+        )
         self.checker = (SCRIPTS / "dco_check.py").read_text(encoding="utf-8")
         self.forge_verifier = (SCRIPTS / "verify_forge9_governance.py").read_text(
             encoding="utf-8"
@@ -116,6 +119,18 @@ class DcoActivationWorkflowTests(unittest.TestCase):
         self.assertNotIn(".governance/ruleset", production_sources)
         self.assertNotIn("ruleset-release.json", production_sources)
         self.assertNotIn("integration_id", production_sources)
+
+    def test_attestor_accepts_only_canonical_solo_operator_confirmations(self) -> None:
+        marker = (
+            "^Solo-Operator-Authorization:[[:space:]]*"
+            "(confirmed|CONFIRMED)[[:space:]]*$"
+        )
+        self.assertIn(f"grep -Eq '{marker}'", self.attestor)
+        self.assertIn(f'"{marker}"', self.forge_verifier)
+        self.assertNotIn(
+            "Solo-Operator-Authorization:[[:space:]]*confirmed'",
+            self.attestor,
+        )
 
     def test_forge9_requires_strict_behavior_not_retired_implementation(self) -> None:
         self.assertNotIn('"interpret-trailers", "--parse"', self.forge_verifier)
