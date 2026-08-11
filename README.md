@@ -107,7 +107,7 @@ All Actions are SHA-pinned and wrapped with [`step-security/harden-runner`](http
 - Email: `security@szlholdings.com`
 - Canonical RFC 9116 record: [`security.txt`](./security.txt)
 - Org-wide: branch protection rulesets, signed-commit enforcement, CODEOWNERS, OpenSSF Scorecard
-- Live security status is authoritative only in GitHub's [Dependabot](https://github.com/szl-holdings/.github/security/dependabot), [secret-scanning](https://github.com/szl-holdings/.github/security/secret-scanning), and [CodeQL](https://github.com/szl-holdings/.github/security/code-scanning) dashboards; this README does not freeze alert counts.
+- This repository's live security status is authoritative only in GitHub's [Dependabot](https://github.com/szl-holdings/.github/security/dependabot), [secret-scanning](https://github.com/szl-holdings/.github/security/secret-scanning), and [CodeQL](https://github.com/szl-holdings/.github/security/code-scanning) dashboards; organization-wide alert state is not asserted here, and this README does not freeze alert counts.
 
 ## Tooling for contributors
 
