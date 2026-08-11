@@ -41,7 +41,7 @@ Before editing any repository:
 4. Capture database provider/version, target identity, schema fingerprint, migration trackers, and application source without logging connection material.
 5. Create under this directory:
    - `current-state.json`
-   - `workgraph.json`
+   - `WORKGRAPH.json`
    - `decision-log.md`
    - `risk-register.md`
 6. Diff current evidence against historical claims. Current evidence wins.
@@ -218,14 +218,16 @@ For every mutation:
 Maintain under this coordination directory:
 
 - `current-state.json`
-- `workgraph.json`
+- `WORKGRAPH.json`
 - `decision-log.md`
 - `risk-register.md`
 - `claim-drift-report.md`
 - `github-estate-manifest.json`
 - `hf-estate-manifest.json`
 - `model-admission-report.json`
-- `database-cutover-receipt.json` or a managed-prerequisite block receipt
+- `database-cutover-receipt.json` when W6 is `VERIFIED_CURRENT`, or
+  `database-managed-prerequisite-block-receipt.json` when W6 is
+  `BLOCKED_MANAGED_PREREQUISITE`
 - `deployment-reconciliation.json`
 - `final-state.json`
 - `FINAL_SERIES_A_REPORT.md`
@@ -251,22 +253,7 @@ Do not end with a plan. End with the evidence-backed execution matrix.
 
 ## Machine-readable workgraph
 
-```json
-{
-  "schema": "szl.codex.whole-thread-workgraph/v1",
-  "generated_at": "2026-08-11T00:00:00Z",
-  "tasks": [
-    {"id":"W0","name":"Immutable estate recapture","depends_on":[],"mutates":false},
-    {"id":"W1","name":"GitHub organization convergence","depends_on":["W0"],"mutates":true},
-    {"id":"W2","name":"A11oy public truth and terminal health","depends_on":["W0"],"mutates":true},
-    {"id":"W3","name":"Hugging Face estate convergence","depends_on":["W0","W1"],"mutates":true},
-    {"id":"W4","name":"Governed model frontier","depends_on":["W0"],"mutates":true},
-    {"id":"W5","name":"SZL Forge productionization","depends_on":["W0","W4"],"mutates":true},
-    {"id":"W6","name":"Series A database upgrade","depends_on":["W0"],"mutates":true,"managed_prerequisites":["DATABASE_URL","backup target","change approval","signing identity"]},
-    {"id":"W7","name":"MCP authority unification","depends_on":["W0"],"mutates":true},
-    {"id":"W8","name":"Responsive investor/developer presentation","depends_on":["W1","W2","W3"],"mutates":true},
-    {"id":"W9","name":"Protected deployments and final proof","depends_on":["W2","W3","W5","W6","W7","W8"],"mutates":true}
-  ],
-  "allowed_terminal_statuses":["VERIFIED_CURRENT","TERMINAL_FAILURE","BLOCKED_MANAGED_PREREQUISITE"]
-}
-```
+[`WORKGRAPH.json`](./WORKGRAPH.json) is the sole canonical machine-readable
+graph. This source contract intentionally does not embed a second graph or
+schema snapshot; executors must bind the canonical file's digest before
+scheduling or promoting any task.

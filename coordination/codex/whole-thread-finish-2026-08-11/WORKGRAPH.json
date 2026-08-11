@@ -16,6 +16,7 @@
     "direct_main_push": "FORBIDDEN",
     "force_push": "FORBIDDEN",
     "history_rewrite": "FORBIDDEN",
+    "mutation_protocol_required_for_all_mutations": true,
     "managed_secrets_only": true,
     "dco_required": true,
     "repository_signing_policy_required": true,
@@ -48,7 +49,7 @@
       "mutation_protocol_required": true,
       "outputs": [
         "current-state.json",
-        "workgraph.json",
+        "WORKGRAPH.json",
         "decision-log.md",
         "risk-register.md"
       ],
@@ -63,37 +64,43 @@
       "id": "W1",
       "name": "GitHub organization convergence",
       "depends_on": ["W0A"],
-      "mutates": true
+      "mutates": true,
+      "mutation_protocol_required": true
     },
     {
       "id": "W2",
       "name": "A11oy public truth and terminal health",
       "depends_on": ["W0A"],
-      "mutates": true
+      "mutates": true,
+      "mutation_protocol_required": true
     },
     {
       "id": "W3",
       "name": "Hugging Face estate convergence",
       "depends_on": ["W0A", "W1"],
-      "mutates": true
+      "mutates": true,
+      "mutation_protocol_required": true
     },
     {
       "id": "W4",
       "name": "Governed model frontier",
       "depends_on": ["W0A"],
-      "mutates": true
+      "mutates": true,
+      "mutation_protocol_required": true
     },
     {
       "id": "W5",
       "name": "SZL Forge productionization",
       "depends_on": ["W0A", "W4"],
-      "mutates": true
+      "mutates": true,
+      "mutation_protocol_required": true
     },
     {
       "id": "W6",
       "name": "Series A database upgrade",
       "depends_on": ["W0A"],
       "mutates": true,
+      "mutation_protocol_required": true,
       "managed_prerequisites": [
         "DATABASE_URL",
         "encrypted backup target",
@@ -105,19 +112,43 @@
       "id": "W7",
       "name": "MCP authority unification",
       "depends_on": ["W0A"],
-      "mutates": true
+      "mutates": true,
+      "mutation_protocol_required": true
     },
     {
       "id": "W8",
       "name": "Responsive investor/developer presentation",
       "depends_on": ["W1", "W2", "W3"],
-      "mutates": true
+      "mutates": true,
+      "mutation_protocol_required": true
     },
     {
       "id": "W9",
       "name": "Protected deployments and final proof",
       "depends_on": ["W2", "W3", "W5", "W6", "W7", "W8"],
-      "mutates": true
+      "mutates": true,
+      "mutation_protocol_required": true,
+      "dependency_status_policy": {
+        "start_requires": "ALL_DEPENDENCIES_VERIFIED_CURRENT",
+        "terminal_failure_propagates": "TERMINAL_FAILURE",
+        "managed_prerequisite_block_propagates": "BLOCKED_MANAGED_PREREQUISITE",
+        "terminal_but_nonverified_does_not_unlock": true
+      },
+      "acceptance": [
+        "every in-scope source merge is bound to an exact protected-main OID",
+        "every shipping artifact is bound to an immutable digest",
+        "every deployment is bound to the merged source OID and artifact digest",
+        "independent live readback matches the expected deployment identity",
+        "required signed receipts verify offline",
+        "public claims match current machine-readable evidence",
+        "all required final outputs and status-dependent outputs exist and validate"
+      ],
+      "required_outputs": [
+        "deployment-reconciliation.json",
+        "final-state.json",
+        "FINAL_SERIES_A_REPORT.md",
+        "receipts/"
+      ]
     }
   ],
   "final_outputs": [
@@ -126,9 +157,22 @@
     "github-estate-manifest.json",
     "hf-estate-manifest.json",
     "model-admission-report.json",
-    "database-cutover-receipt.json",
     "deployment-reconciliation.json",
     "FINAL_SERIES_A_REPORT.md",
     "receipts/"
+  ],
+  "conditional_final_outputs": [
+    {
+      "when": "W6=VERIFIED_CURRENT",
+      "required": "database-cutover-receipt.json"
+    },
+    {
+      "when": "W6=BLOCKED_MANAGED_PREREQUISITE",
+      "required": "database-managed-prerequisite-block-receipt.json"
+    },
+    {
+      "when": "W6=TERMINAL_FAILURE",
+      "required": "database-terminal-failure-receipt.json"
+    }
   ]
 }
