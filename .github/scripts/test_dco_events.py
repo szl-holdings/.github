@@ -682,7 +682,7 @@ class DcoCheckTests(unittest.TestCase):
                 ]
             if path == f"{pulls_path}?per_page=100&page=2":
                 return []
-            self.fail(f"unexpected provider lookup: {path}")
+            raise AssertionError(f"unexpected provider lookup: {path}")
 
         cases = (
             (
