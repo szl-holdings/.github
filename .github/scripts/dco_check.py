@@ -742,6 +742,185 @@ def github_get(path: str, token: str) -> Any:
     return json.loads(data)
 
 
+def validate_github_squash_attestation(
+    repository: str,
+    sha: str,
+    parents: list[str],
+    author_name: str,
+    author_email: str,
+    message: str,
+    api_get: Callable[[str], Any],
+) -> None:
+    """Prove a name-canonicalized push commit is a GitHub squash merge."""
+    require(
+        isinstance(repository, str)
+        and repository.count("/") == 1
+        and all(repository.split("/")),
+        "GitHub repository slug is invalid",
+    )
+    sha = require_sha(sha, "provider squash SHA")
+    encoded_repo = quote(repository, safe="/")
+    payload = api_get(f"/repos/{encoded_repo}/commits/{sha}")
+    require(isinstance(payload, dict), "provider commit response is not an object")
+    require(payload.get("sha") == sha, "provider commit response SHA differs")
+
+    commit = payload.get("commit")
+    require(isinstance(commit, dict), "provider commit metadata is missing")
+    api_author = commit.get("author")
+    api_committer = commit.get("committer")
+    require(
+        isinstance(api_author, dict)
+        and (api_author.get("name"), api_author.get("email"))
+        == (author_name, author_email),
+        "provider commit author differs from the raw commit",
+    )
+    require(
+        isinstance(api_committer, dict)
+        and (api_committer.get("name"), api_committer.get("email"))
+        == ("GitHub", "noreply@github.com"),
+        "provider commit does not have the GitHub committer identity",
+    )
+    provider_account = payload.get("committer")
+    require(
+        isinstance(provider_account, dict)
+        and provider_account.get("login") == "web-flow"
+        and provider_account.get("type") == "User",
+        "provider commit is not attributed to the web-flow account",
+    )
+    verification = commit.get("verification")
+    require(
+        isinstance(verification, dict)
+        and verification.get("verified") is True
+        and verification.get("reason") == "valid"
+        and isinstance(verification.get("signature"), str)
+        and bool(verification["signature"])
+        and isinstance(verification.get("payload"), str)
+        and bool(verification["payload"]),
+        "provider commit is not validly signed by GitHub",
+    )
+
+    api_parents = payload.get("parents")
+    require(isinstance(api_parents, list), "provider commit parents are missing")
+    parent_shas = [
+        require_sha(parent.get("sha"), "provider commit parent SHA")
+        if isinstance(parent, dict)
+        else require(False, "provider commit parent is invalid")
+        for parent in api_parents
+    ]
+    require(parent_shas == parents, "provider commit parents differ from the raw commit")
+
+    pulls_path = f"/repos/{encoded_repo}/commits/{sha}/pulls"
+    pulls = api_get(f"{pulls_path}?per_page=100&page=1")
+    boundary = api_get(f"{pulls_path}?per_page=100&page=2")
+    require(isinstance(pulls, list), "associated pull requests are not an array")
+    require(
+        isinstance(boundary, list) and not boundary,
+        "associated pull-request boundary page was not empty",
+    )
+    matches = [
+        pull
+        for pull in pulls
+        if isinstance(pull, dict) and pull.get("merge_commit_sha") == sha
+    ]
+    require(
+        len(matches) == 1,
+        "provider commit is not the unique exact merged pull-request commit",
+    )
+    pull = matches[0]
+    number = pull.get("number")
+    require(
+        isinstance(number, int) and not isinstance(number, bool) and number > 0,
+        "associated pull-request number is invalid",
+    )
+    require(
+        pull.get("state") == "closed"
+        and pull.get("draft") is False
+        and isinstance(pull.get("merged_at"), str)
+        and bool(pull["merged_at"]),
+        "provider commit is not bound to a closed non-draft merged pull request",
+    )
+    base = pull.get("base")
+    head = pull.get("head")
+    require(
+        isinstance(base, dict)
+        and base.get("ref") == "main"
+        and isinstance(base.get("repo"), dict)
+        and base["repo"].get("full_name") == repository,
+        "provider squash pull request does not target this repository main",
+    )
+    require(
+        isinstance(head, dict)
+        and isinstance(head.get("sha"), str)
+        and SHA_PATTERN.fullmatch(head["sha"]) is not None,
+        "provider squash pull-request head SHA is invalid",
+    )
+    subject = message.partition("\n")[0]
+    require(
+        subject.endswith(f"(#{number})"),
+        "provider squash subject does not bind the merged pull-request number",
+    )
+
+
+def validate_push_range(
+    repo: Path,
+    base_sha: str,
+    head_sha: str,
+    repository: str,
+    token: str,
+    *,
+    api_get: Callable[[str], Any] | None = None,
+) -> int:
+    """Validate main pushes, admitting only proven GitHub name canonicalization."""
+    base_sha = require_sha(base_sha, "push base SHA")
+    head_sha = require_sha(head_sha, "push head SHA")
+    require(checked_out_head(repo) == head_sha, "checked-out HEAD does not match push head")
+    ancestor = subprocess.run(
+        ["git", "merge-base", "--is-ancestor", base_sha, head_sha],
+        cwd=repo,
+        capture_output=True,
+        check=False,
+        timeout=30,
+    )
+    require(ancestor.returncode == 0, "push base SHA is not an ancestor of head SHA")
+    shas = [
+        line.strip()
+        for line in git(repo, "rev-list", "--reverse", f"{base_sha}..{head_sha}").splitlines()
+        if line.strip()
+    ]
+    require(shas and shas[-1] == head_sha, "push range does not end at head")
+    require(len(shas) == len(set(shas)), "push range contains duplicate SHAs")
+
+    provider_get = api_get
+    previous_sha = base_sha
+    for sha in shas:
+        parents, author_name, author_email, message = commit_record(repo, sha)
+        require(
+            parents == [previous_sha],
+            "push range is not a linear single-parent sequence",
+        )
+        identities = valid_dco_identities(message)
+        require(identities, f"{sha} has no valid terminal Signed-off-by trailer")
+        if (author_name, author_email) not in identities:
+            require(
+                any(identity_email == author_email for _, identity_email in identities),
+                f"{sha} Signed-off-by email does not exactly match the push commit author email",
+            )
+            if provider_get is None:
+                require(bool(token), "GITHUB_TOKEN is required for provider squash attestation")
+                provider_get = lambda path: github_get(path, token)
+            validate_github_squash_attestation(
+                repository,
+                sha,
+                parents,
+                author_name,
+                author_email,
+                message,
+                provider_get,
+            )
+        previous_sha = sha
+    return len(shas)
+
+
 def collect_pr_commits(
     repository: str,
     number: int,
@@ -1000,7 +1179,13 @@ def main() -> int:
             count = validate_merge_group(repo, base_sha, head_sha)
         elif event_name == "push":
             base_sha, head_sha = push_subject(payload, github_sha)
-            count = validate_range(repo, base_sha, head_sha)
+            count = validate_push_range(
+                repo,
+                base_sha,
+                head_sha,
+                repository,
+                _required_environment("GITHUB_TOKEN"),
+            )
         else:
             raise DcoContractError(f"unsupported event: {event_name!r}")
 
