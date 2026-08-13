@@ -20,7 +20,7 @@ of redefining the same logic locally.
 | `reusable-secret-scan.yml` | TruffleHog committed-secret detection | `push`, `pull_request`, weekly cron |
 | `reusable-scorecard.yml` | OpenSSF Scorecard supply-chain hygiene | weekly cron, `branch_protection_rule` |
 | `reusable-trivy.yml` | Trivy filesystem vulnerability scan | `push`, weekly cron |
-| `reusable-hf-candidate-plan.yml` | Build a network-free exact base-to-head Dockerfile payload plan using protected verifier code | base-controlled `pull_request_target` |
+| `reusable-hf-candidate-plan.yml` | Revalidate a live PR and build an exact base-to-head Dockerfile payload plan from publisher-materialized bytes using protected verifier code | base-controlled `pull_request_target` with `contents: read` and `pull-requests: read` |
 | `reusable-hf-module-drift-check.yml` | Detect drift between a repo's source-of-truth and its live Hugging Face Space | caller-chosen |
 
 ## Calling a reusable workflow

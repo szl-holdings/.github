@@ -12,9 +12,8 @@ import shutil
 import subprocess
 import sys
 import tempfile
-import unittest
 from pathlib import Path
-from unittest import mock
+from unittest import TestCase, main, mock
 
 
 HERE = Path(__file__).resolve().parent
@@ -136,8 +135,48 @@ class GitPlanFixture:
             candidate,
         )
 
+    def materialized_plan(
+        self,
+        candidate: str,
+        *,
+        baseline: str | None = None,
+        dockerfile_path: str = "Dockerfile",
+        include_readme: bool = True,
+        readme_path: str = "README.md",
+    ) -> dict:
+        baseline_ref = baseline or self.base
+        baseline_checkout = self.root.parent / f"{self.root.name}-baseline"
+        candidate_checkout = self.root.parent / f"{self.root.name}-candidate"
+        _git(
+            self.root,
+            "worktree",
+            "add",
+            "--detach",
+            str(baseline_checkout),
+            baseline_ref,
+        )
+        _git(
+            self.root,
+            "worktree",
+            "add",
+            "--detach",
+            str(candidate_checkout),
+            candidate,
+        )
+        return candidate_plan.build_plan(
+            self.root,
+            "szl-holdings/fixture",
+            baseline_ref,
+            candidate,
+            baseline_checkout_root=baseline_checkout,
+            candidate_checkout_root=candidate_checkout,
+            dockerfile_path=dockerfile_path,
+            include_readme=include_readme,
+            readme_path=readme_path,
+        )
 
-class CandidatePlanTestCase(unittest.TestCase):
+
+class CandidatePlanTestCase(TestCase):
     def setUp(self) -> None:
         self._temporary_directory = tempfile.TemporaryDirectory(
             prefix="szl-hf-candidate-plan-test-"
@@ -148,7 +187,9 @@ class CandidatePlanTestCase(unittest.TestCase):
         self._temporary_directory.cleanup()
 
     def fixture(self, **kwargs) -> GitPlanFixture:
-        return GitPlanFixture(self.root, **kwargs)
+        repo = self.root / "repo"
+        repo.mkdir()
+        return GitPlanFixture(repo, **kwargs)
 
 
 class TestExactCandidatePlan(CandidatePlanTestCase):
@@ -164,6 +205,7 @@ class TestExactCandidatePlan(CandidatePlanTestCase):
 
         self.assertEqual(first, second)
         self.assertEqual(first["status"], "changes")
+        self.assertEqual(first["schema"], 2)
         self.assertEqual(first["baseline_ref"], fixture.base)
         self.assertEqual(first["candidate_ref"], candidate)
         self.assertEqual(first["network_requests"], 0)
@@ -182,6 +224,29 @@ class TestExactCandidatePlan(CandidatePlanTestCase):
             separators=(",", ":"),
         ).encode()
         self.assertEqual(digest, hashlib.sha256(canonical_bytes).hexdigest())
+
+    def test_checkout_attributes_change_publisher_bytes_even_with_same_source_oid(
+        self,
+    ) -> None:
+        fixture = self.fixture()
+        candidate = fixture.commit(
+            "materialize managed file as CRLF",
+            {".gitattributes": "app/mod.py text eol=crlf\n"},
+        )
+
+        report = fixture.materialized_plan(candidate)
+        delta = next(item for item in report["deltas"] if item["path"] == "app/mod.py")
+
+        self.assertEqual(report["baseline"]["byte_representation"], "publisher-worktree")
+        self.assertEqual(report["candidate"]["byte_representation"], "publisher-worktree")
+        self.assertEqual(
+            delta["baseline_source_blob_sha"],
+            delta["candidate_source_blob_sha"],
+        )
+        self.assertNotEqual(
+            delta["baseline_blob_sha"],
+            delta["candidate_blob_sha"],
+        )
 
     def test_directory_copy_recurses_through_git_tree(self) -> None:
         fixture = self.fixture(
@@ -454,6 +519,30 @@ class TestEffectiveDockerignore(CandidatePlanTestCase):
             "space/Dockerfile",
         )
 
+    def test_dockerfile_overlay_wins_readme_target_collision_like_publisher(self) -> None:
+        fixture = self.fixture(
+            extra_files={
+                "space/Dockerfile": "FROM scratch\nCOPY app/ /app/\n"
+            }
+        )
+        candidate = fixture.commit(
+            "nested dockerfile collision",
+            {"app/mod.py": "VALUE = 'nested-collision'\n"},
+        )
+
+        report = candidate_plan.build_plan(
+            fixture.root,
+            "szl-holdings/fixture",
+            fixture.base,
+            candidate,
+            dockerfile_path="space/Dockerfile",
+            readme_path="Dockerfile",
+        )
+
+        control = report["candidate"]["files"]["Dockerfile"]
+        self.assertEqual(control["source_path"], "space/Dockerfile")
+        self.assertEqual(control["copy_source"], "(dockerfile)")
+
 
 class TestObjectAndNetworkBoundaries(CandidatePlanTestCase):
     def test_managed_symlink_is_rejected_from_exact_git_tree(self) -> None:
@@ -509,7 +598,7 @@ class TestObjectAndNetworkBoundaries(CandidatePlanTestCase):
             sentinel.assert_not_called()
 
 
-class TestReusableWorkflowContract(unittest.TestCase):
+class TestReusableWorkflowContract(TestCase):
     @classmethod
     def setUpClass(cls) -> None:
         cls.workflow_path = HERE.parent / "workflows" / "reusable-hf-candidate-plan.yml"
@@ -550,6 +639,34 @@ class TestReusableWorkflowContract(unittest.TestCase):
             '[ "${TRUSTED_BASE_REF}" = "${EVENT_BASE_SHA}" ]',
             '[ "${CANDIDATE_REF}" = "${EVENT_HEAD_SHA}" ]',
             '[ -z "${SOURCE_REVISION_FILE}" ]',
+            "pull-requests: read",
+            "PR_NUMBER: ${{ github.event.pull_request.number }}",
+            'gh api --method GET',
+            '"repos/${GH_REPO}/pulls/${PR_NUMBER}"',
+            '.state == "open"',
+            '.base.sha == $base',
+            '.head.sha == $head',
+            "validate_live_pr",
+        ):
+            self.assertIn(required, self.workflow)
+        self.assertGreaterEqual(self.workflow.count("gh api --method GET"), 2)
+        self.assertIn(
+            "validate_live_pr || {\n"
+            "            rm -f hf-managed-candidate-plan.out.json",
+            self.workflow,
+        )
+
+    def test_workflow_materializes_exact_base_and_candidate_publisher_bytes(self) -> None:
+        for required in (
+            "Checkout exact protected baseline bytes as data",
+            "ref: ${{ inputs.trusted-base-ref }}",
+            "path: baseline",
+            "ref: ${{ inputs.candidate-ref }}",
+            "path: caller",
+            '--baseline-checkout-root baseline',
+            '--candidate-checkout-root caller',
+            'observed_base="$(git -C baseline rev-parse HEAD)"',
+            'observed_head="$(git -C caller rev-parse HEAD)"',
         ):
             self.assertIn(required, self.workflow)
 
@@ -589,4 +706,4 @@ class TestReusableWorkflowContract(unittest.TestCase):
 
 
 if __name__ == "__main__":
-    unittest.main(verbosity=2)
+    main(verbosity=2)
