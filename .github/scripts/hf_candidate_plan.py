@@ -14,6 +14,7 @@ import hashlib
 import json
 import os
 import re
+import stat
 import subprocess
 import sys
 import tempfile
@@ -34,7 +35,12 @@ class CandidatePlanError(RuntimeError):
     """The candidate cannot produce one complete, immutable payload plan."""
 
 
-def _git(repo_root: Path, *args: str, allow_nonzero: bool = False) -> subprocess.CompletedProcess[bytes]:
+def _git(
+    repo_root: Path,
+    *args: str,
+    allow_nonzero: bool = False,
+    input_bytes: bytes | None = None,
+) -> subprocess.CompletedProcess[bytes]:
     env = os.environ.copy()
     env.update(
         {
@@ -50,6 +56,7 @@ def _git(repo_root: Path, *args: str, allow_nonzero: bool = False) -> subprocess
             env.pop(variable, None)
     completed = subprocess.run(
         ["git", "-C", str(repo_root), *args],
+        input=input_bytes,
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
         check=False,
@@ -83,9 +90,7 @@ def _safe_repo_path(value: str, label: str) -> str:
         raise CandidatePlanError(f"{label} contains a control character: {raw!r}")
     components = raw.split("/")
     if any(
-        not component
-        or component in {".", ".."}
-        or component.endswith((".", " "))
+        not component or component in {".", ".."} or component.endswith((".", " "))
         for component in components
     ):
         raise CandidatePlanError(f"{label} is not canonical: {raw!r}")
@@ -180,60 +185,119 @@ def _blob(repo_root: Path, entry: dict[str, str], path: str) -> bytes:
     return data
 
 
-def _materialized_blob(
-    checkout_root: Path,
-    entry: dict[str, str],
-    path: str,
-) -> bytes:
-    """Read the exact checkout bytes consumed by the production publisher."""
-    _require_regular_blob(entry, path)
+def _worktree_head(repo_root: Path) -> str:
+    completed = _git(repo_root, "rev-parse", "--verify", "HEAD^{commit}")
     try:
-        _normalized, full = publisher.source_file(checkout_root, path)
-    except publisher.DeployContractError as exc:
-        raise CandidatePlanError(
-            f"materialized publisher source is unavailable: {path!r}: {exc}"
-        ) from exc
-    with open(full, "rb") as handle:
-        data = handle.read(MAX_GIT_OUTPUT + 1)
-    if len(data) > MAX_GIT_OUTPUT:
-        raise CandidatePlanError(
-            f"materialized publisher source exceeds the 512 MiB bound: {path!r}"
-        )
-    return data
-
-
-def _source_bytes(
-    repo_root: Path,
-    checkout_root: Path | None,
-    entry: dict[str, str],
-    path: str,
-) -> bytes:
-    if checkout_root is None:
-        return _blob(repo_root, entry, path)
-    return _materialized_blob(checkout_root, entry, path)
-
-
-def _materialized_checkout(
-    value: Path | None,
-    expected_revision: str,
-    label: str,
-) -> Path | None:
-    if value is None:
-        return None
-    root = Path(value).resolve()
-    if not (root / ".git").exists():
-        raise CandidatePlanError(f"{label} is not a Git worktree: {root}")
-    observed = _git(root, "rev-parse", "--verify", "HEAD^{commit}")
-    try:
-        observed_revision = observed.stdout.decode("ascii").strip()
+        return completed.stdout.decode("ascii").strip()
     except UnicodeDecodeError as exc:
-        raise CandidatePlanError(f"{label} HEAD did not resolve to ASCII") from exc
-    if observed_revision != expected_revision:
-        raise CandidatePlanError(
-            f"{label} is not the exact requested revision: "
-            f"expected={expected_revision} observed={observed_revision!r}"
+        raise CandidatePlanError("candidate worktree HEAD is not ASCII") from exc
+
+
+def _require_worktree_blob(
+    repo_root: Path,
+    source_path: str,
+    expected_oid: str,
+) -> None:
+    rel = _safe_repo_path(source_path, "publisher source path")
+    root = repo_root.resolve(strict=True)
+    current = root
+    for component in rel.split("/"):
+        current = current / component
+        try:
+            metadata = current.lstat()
+        except OSError as exc:
+            raise CandidatePlanError(
+                f"publisher source is absent from the candidate checkout: {rel!r}"
+            ) from exc
+        reparse = bool(
+            getattr(metadata, "st_file_attributes", 0)
+            & getattr(stat, "FILE_ATTRIBUTE_REPARSE_POINT", 0)
         )
-    return root
+        if stat.S_ISLNK(metadata.st_mode) or reparse:
+            raise CandidatePlanError(
+                f"publisher source traverses a link or reparse point: {rel!r}"
+            )
+    if not stat.S_ISREG(metadata.st_mode):
+        raise CandidatePlanError(
+            f"publisher source is not a regular checkout file: {rel!r}"
+        )
+    try:
+        contained = os.path.commonpath(
+            (str(root), str(current.resolve(strict=True)))
+        ) == str(root)
+    except (OSError, ValueError) as exc:
+        raise CandidatePlanError(
+            f"publisher source cannot be resolved safely: {rel!r}"
+        ) from exc
+    if not contained:
+        raise CandidatePlanError(f"publisher source escapes the checkout: {rel!r}")
+    try:
+        raw = current.read_bytes()
+    except OSError as exc:
+        raise CandidatePlanError(
+            f"publisher source cannot be read from the checkout: {rel!r}"
+        ) from exc
+    actual_oid = publisher.git_blob_sha1(raw)
+    if actual_oid != expected_oid:
+        raise CandidatePlanError(
+            "candidate checkout bytes differ from the exact Git object that the "
+            f"plan binds: {rel!r} expected={expected_oid} actual={actual_oid}"
+        )
+
+
+TRANSFORM_ATTRIBUTES = (
+    "text",
+    "eol",
+    "crlf",
+    "ident",
+    "filter",
+    "working-tree-encoding",
+)
+
+
+def _transform_attributes(
+    repo_root: Path,
+    revision: str,
+    paths: set[str],
+) -> dict[str, tuple[tuple[str, str], ...]]:
+    if not paths:
+        return {}
+    ordered_paths = sorted(paths)
+    encoded_paths = b"".join(path.encode("utf-8") + b"\0" for path in ordered_paths)
+    raw = _git(
+        repo_root,
+        "check-attr",
+        f"--source={revision}",
+        "-z",
+        "--stdin",
+        *TRANSFORM_ATTRIBUTES,
+        input_bytes=encoded_paths,
+    ).stdout
+    fields = raw.split(b"\0")
+    if not fields or fields[-1] != b"":
+        raise CandidatePlanError("git check-attr output is not NUL terminated")
+    fields = fields[:-1]
+    if len(fields) % 3:
+        raise CandidatePlanError("git check-attr returned a malformed record set")
+    observed: dict[str, list[tuple[str, str]]] = {path: [] for path in ordered_paths}
+    for index in range(0, len(fields), 3):
+        try:
+            path = fields[index].decode("utf-8")
+            attribute = fields[index + 1].decode("ascii")
+            value = fields[index + 2].decode("utf-8")
+        except UnicodeDecodeError as exc:
+            raise CandidatePlanError(
+                "git check-attr returned non-canonical text"
+            ) from exc
+        if path not in observed or attribute not in TRANSFORM_ATTRIBUTES:
+            raise CandidatePlanError(
+                "git check-attr returned an unexpected path or attribute"
+            )
+        observed[path].append((attribute, value))
+    expected_count = len(TRANSFORM_ATTRIBUTES)
+    if any(len(values) != expected_count for values in observed.values()):
+        raise CandidatePlanError("git check-attr returned an incomplete attribute set")
+    return {path: tuple(values) for path, values in observed.items()}
 
 
 def _strict_copy_sources(dockerfile: str) -> list[str]:
@@ -295,7 +359,9 @@ def _strict_copy_sources(dockerfile: str) -> list[str]:
     try:
         publisher_sources = publisher.parse_copy_sources(dockerfile)
     except (publisher.DeployContractError, ValueError, json.JSONDecodeError) as exc:
-        raise CandidatePlanError(f"production publisher rejected Dockerfile: {exc}") from exc
+        raise CandidatePlanError(
+            f"production publisher rejected Dockerfile: {exc}"
+        ) from exc
     if publisher_sources != list(dict.fromkeys(canonical_sources)):
         raise CandidatePlanError(
             "candidate planner and production publisher derived different COPY sources"
@@ -332,23 +398,19 @@ def _snapshot(
     repo_root: Path,
     revision: str,
     *,
-    materialized_root: Path | None,
     dockerfile_path: str,
     include_readme: bool,
     readme_path: str,
 ) -> dict[str, Any]:
     entries = _tree(repo_root, revision)
     dockerfile_path = _safe_repo_path(dockerfile_path, "Dockerfile path")
-    readme_path = _safe_repo_path(readme_path, "README path")
+    readme_path = publisher.validate_readme_target(readme_path, include_readme)
     dockerfile_entry = entries.get(dockerfile_path)
     if dockerfile_entry is None:
-        raise CandidatePlanError(f"Dockerfile is absent at {revision}: {dockerfile_path}")
-    dockerfile_bytes = _source_bytes(
-        repo_root,
-        materialized_root,
-        dockerfile_entry,
-        dockerfile_path,
-    )
+        raise CandidatePlanError(
+            f"Dockerfile is absent at {revision}: {dockerfile_path}"
+        )
+    dockerfile_bytes = _blob(repo_root, dockerfile_entry, dockerfile_path)
     try:
         dockerfile = dockerfile_bytes.decode("utf-8")
     except UnicodeDecodeError as exc:
@@ -373,15 +435,11 @@ def _snapshot(
     patterns: list[tuple[bool, re.Pattern[str]]] = []
     ignore_bytes = b""
     if ignore_path:
-        ignore_bytes = _source_bytes(
-            repo_root,
-            materialized_root,
-            entries[ignore_path],
-            ignore_path,
-        )
+        ignore_bytes = _blob(repo_root, entries[ignore_path], ignore_path)
         patterns = _ignore_patterns(ignore_bytes)
 
     files: dict[str, dict[str, Any]] = {}
+    source_files: dict[str, str] = {}
     ignored_paths: list[str] = []
     for path, copy_source in sorted(targets.items()):
         _safe_repo_path(path, "managed COPY path")
@@ -389,13 +447,12 @@ def _snapshot(
         if ignored:
             ignored_paths.append(path)
         entry = entries[path]
-        data = _source_bytes(repo_root, materialized_root, entry, path)
+        _require_regular_blob(entry, path)
+        source_files[path] = entry["oid"]
         files[path] = {
             "mode": entry["mode"],
-            "oid": publisher.git_blob_sha1(data),
-            "source_oid": entry["oid"],
+            "oid": entry["oid"],
             "copy_source": copy_source,
-            "source_path": path,
             "docker_context_included": not ignored,
         }
 
@@ -403,59 +460,49 @@ def _snapshot(
     # any same-path Dockerfile-derived entry with the Space-card mapping.
     if not include_readme:
         files.pop(readme_path, None)
+        source_files.pop(readme_path, None)
 
-    if include_readme:
-        readme_entry = entries.get(readme_path)
-        if readme_entry is None:
-            raise CandidatePlanError(f"included README is absent: {readme_path!r}")
-        readme_bytes = _source_bytes(
-            repo_root,
-            materialized_root,
-            readme_entry,
-            readme_path,
-        )
-        files[readme_path] = {
-            "mode": readme_entry["mode"],
-            "oid": publisher.git_blob_sha1(readme_bytes),
-            "source_oid": readme_entry["oid"],
-            "copy_source": "(readme)",
-            "source_path": readme_path,
-            "docker_context_included": None,
-        }
-
-    # Preserve the production publisher's overlay order: the configured
-    # Dockerfile always owns the HF-root Dockerfile target, even when a caller
-    # selects a colliding README source path.
     files["Dockerfile"] = {
         "mode": dockerfile_entry["mode"],
-        "oid": publisher.git_blob_sha1(dockerfile_bytes),
-        "source_oid": dockerfile_entry["oid"],
+        "oid": dockerfile_entry["oid"],
         "copy_source": "(dockerfile)",
         "source_path": dockerfile_path,
         "docker_context_included": None,
     }
+    source_files[dockerfile_path] = dockerfile_entry["oid"]
+    if include_readme:
+        readme_entry = entries.get(readme_path)
+        if readme_entry is None:
+            raise CandidatePlanError(f"included README is absent: {readme_path!r}")
+        _blob(repo_root, readme_entry, readme_path)
+        source_files[readme_path] = readme_entry["oid"]
+        files[readme_path] = {
+            "mode": readme_entry["mode"],
+            "oid": readme_entry["oid"],
+            "copy_source": "(readme)",
+            "docker_context_included": None,
+        }
     deployed_ignore_oid = publisher.git_blob_sha1(ignore_bytes)
     files["Dockerfile.dockerignore"] = {
         "mode": entries[ignore_path]["mode"] if ignore_path else "100644",
         "oid": deployed_ignore_oid,
-        "source_oid": entries[ignore_path]["oid"] if ignore_path else None,
         "copy_source": "(dockerignore-control)",
         "source_path": ignore_path or "(generated-empty-dockerignore)",
         "docker_context_included": None,
     }
+    if ignore_path:
+        source_files[ignore_path] = entries[ignore_path]["oid"]
     if not files:
         raise CandidatePlanError("candidate payload set is empty")
     return {
         "revision": revision,
-        "byte_representation": (
-            "publisher-worktree" if materialized_root is not None else "git-object"
-        ),
         "dockerfile_path": dockerfile_path,
         "effective_dockerignore": ignore_path,
         "copy_sources": sorted(sources),
         "unresolved_sources": [],
         "docker_context_ignored_paths": ignored_paths,
         "managed_count": len(files),
+        "source_files": dict(sorted(source_files.items())),
         "files": files,
     }
 
@@ -466,8 +513,6 @@ def build_plan(
     baseline_ref: str,
     candidate_ref: str,
     *,
-    baseline_checkout_root: Path | None = None,
-    candidate_checkout_root: Path | None = None,
     dockerfile_path: str = "Dockerfile",
     include_readme: bool = True,
     readme_path: str = "README.md",
@@ -482,24 +527,15 @@ def build_plan(
     baseline = _resolve_commit(root, baseline_ref, "candidate baseline")
     candidate = _resolve_commit(root, candidate_ref, "candidate head")
     _require_ancestry(root, baseline, candidate)
-    if (baseline_checkout_root is None) != (candidate_checkout_root is None):
+    observed_head = _worktree_head(root)
+    if observed_head != candidate:
         raise CandidatePlanError(
-            "baseline and candidate materialized checkouts must be supplied together"
+            "candidate checkout HEAD is not the exact requested candidate: "
+            f"expected={candidate} actual={observed_head}"
         )
-    baseline_materialized = _materialized_checkout(
-        baseline_checkout_root,
-        baseline,
-        "baseline checkout",
-    )
-    candidate_materialized = _materialized_checkout(
-        candidate_checkout_root,
-        candidate,
-        "candidate checkout",
-    )
     before = _snapshot(
         root,
         baseline,
-        materialized_root=baseline_materialized,
         dockerfile_path=dockerfile_path,
         include_readme=include_readme,
         readme_path=readme_path,
@@ -507,11 +543,27 @@ def build_plan(
     after = _snapshot(
         root,
         candidate,
-        materialized_root=candidate_materialized,
         dockerfile_path=dockerfile_path,
         include_readme=include_readme,
         readme_path=readme_path,
     )
+
+    for source_path, expected_oid in after["source_files"].items():
+        _require_worktree_blob(root, source_path, expected_oid)
+
+    common_sources = set(before["source_files"]) & set(after["source_files"])
+    baseline_attributes = _transform_attributes(root, baseline, common_sources)
+    candidate_attributes = _transform_attributes(root, candidate, common_sources)
+    changed_attributes = sorted(
+        path
+        for path in common_sources
+        if baseline_attributes[path] != candidate_attributes[path]
+    )
+    if changed_attributes:
+        raise CandidatePlanError(
+            "candidate changes checkout-transform attributes for publisher source "
+            "paths: " + ", ".join(changed_attributes)
+        )
 
     baseline_files = before["files"]
     candidate_files = after["files"]
@@ -551,8 +603,6 @@ def build_plan(
                 "kind": kind,
                 "baseline_blob_sha": old["oid"] if old else None,
                 "candidate_blob_sha": new["oid"] if new else None,
-                "baseline_source_blob_sha": old["source_oid"] if old else None,
-                "candidate_source_blob_sha": new["source_oid"] if new else None,
                 "baseline_mode": old["mode"] if old else None,
                 "candidate_mode": new["mode"] if new else None,
                 "baseline_copy_source": old["copy_source"] if old else None,
@@ -569,7 +619,7 @@ def build_plan(
         )
 
     plan: dict[str, Any] = {
-        "schema": 2,
+        "schema": 1,
         "mode": "candidate-managed-plan",
         "status": "changes" if deltas else "no-changes",
         "github_repo": github_repo,
@@ -593,7 +643,7 @@ def build_plan(
 
 def _invalid_report(args: argparse.Namespace, detail: str) -> dict[str, Any]:
     report: dict[str, Any] = {
-        "schema": 2,
+        "schema": 1,
         "mode": "candidate-managed-plan",
         "status": "invalid",
         "github_repo": args.github_repo,
@@ -622,8 +672,6 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--github-repo", required=True)
     parser.add_argument("--trusted-base-ref", required=True)
     parser.add_argument("--candidate-ref", required=True)
-    parser.add_argument("--baseline-checkout-root", type=Path, required=True)
-    parser.add_argument("--candidate-checkout-root", type=Path, required=True)
     parser.add_argument("--dockerfile-path", default="Dockerfile")
     parser.add_argument("--include-readme", choices=("true", "false"), default="true")
     parser.add_argument("--readme-path", default="README.md")
@@ -635,8 +683,6 @@ def main(argv: list[str] | None = None) -> int:
             args.github_repo,
             args.trusted_base_ref,
             args.candidate_ref,
-            baseline_checkout_root=args.baseline_checkout_root,
-            candidate_checkout_root=args.candidate_checkout_root,
             dockerfile_path=args.dockerfile_path,
             include_readme=args.include_readme == "true",
             readme_path=args.readme_path,

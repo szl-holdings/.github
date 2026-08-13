@@ -212,6 +212,30 @@ class TestDeriveReadmePolicy(unittest.TestCase):
         self.assertIsNone(manifest["readme"])
         self.assertEqual(files["Dockerfile"]["source_path"], "Dockerfile")
 
+    def test_include_readme_rejects_reserved_hf_root_targets(self):
+        for readme_path in ("Dockerfile", "./Dockerfile", "Dockerfile.dockerignore"):
+            with self.subTest(readme_path=readme_path), self.assertRaisesRegex(
+                dep.DeployContractError,
+                "reserved Hugging Face root target",
+            ):
+                self._derive(
+                    "FROM scratch\nCOPY serve.py /app/serve.py\n",
+                    {"README.md": "# Card\n", "serve.py": "pass\n"},
+                    include_readme=True,
+                    readme_path=readme_path,
+                )
+
+    def test_include_readme_false_allows_reserved_path_without_publishing_it(self):
+        manifest, files = self._derive(
+            "FROM scratch\nCOPY serve.py /app/serve.py\n",
+            {"serve.py": "pass\n"},
+            include_readme=False,
+            readme_path="Dockerfile",
+        )
+
+        self.assertIsNone(manifest["readme"])
+        self.assertEqual(files["Dockerfile"]["copy_source"], "(dockerfile)")
+
     def test_include_readme_false_keeps_unrelated_nested_readme(self):
         manifest, files = self._derive(
             "FROM scratch\n"

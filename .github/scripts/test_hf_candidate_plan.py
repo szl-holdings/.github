@@ -95,6 +95,10 @@ class GitPlanFixture:
         else:
             destination.unlink()
 
+    def restore_from_head(self, path: str) -> None:
+        self.remove(path)
+        _git(self.root, "checkout", "HEAD", "--", path)
+
     def commit(
         self,
         message: str,
@@ -135,46 +139,6 @@ class GitPlanFixture:
             candidate,
         )
 
-    def materialized_plan(
-        self,
-        candidate: str,
-        *,
-        baseline: str | None = None,
-        dockerfile_path: str = "Dockerfile",
-        include_readme: bool = True,
-        readme_path: str = "README.md",
-    ) -> dict:
-        baseline_ref = baseline or self.base
-        baseline_checkout = self.root.parent / f"{self.root.name}-baseline"
-        candidate_checkout = self.root.parent / f"{self.root.name}-candidate"
-        _git(
-            self.root,
-            "worktree",
-            "add",
-            "--detach",
-            str(baseline_checkout),
-            baseline_ref,
-        )
-        _git(
-            self.root,
-            "worktree",
-            "add",
-            "--detach",
-            str(candidate_checkout),
-            candidate,
-        )
-        return candidate_plan.build_plan(
-            self.root,
-            "szl-holdings/fixture",
-            baseline_ref,
-            candidate,
-            baseline_checkout_root=baseline_checkout,
-            candidate_checkout_root=candidate_checkout,
-            dockerfile_path=dockerfile_path,
-            include_readme=include_readme,
-            readme_path=readme_path,
-        )
-
 
 class CandidatePlanTestCase(TestCase):
     def setUp(self) -> None:
@@ -187,9 +151,7 @@ class CandidatePlanTestCase(TestCase):
         self._temporary_directory.cleanup()
 
     def fixture(self, **kwargs) -> GitPlanFixture:
-        repo = self.root / "repo"
-        repo.mkdir()
-        return GitPlanFixture(repo, **kwargs)
+        return GitPlanFixture(self.root, **kwargs)
 
 
 class TestExactCandidatePlan(CandidatePlanTestCase):
@@ -205,9 +167,12 @@ class TestExactCandidatePlan(CandidatePlanTestCase):
 
         self.assertEqual(first, second)
         self.assertEqual(first["status"], "changes")
-        self.assertEqual(first["schema"], 2)
         self.assertEqual(first["baseline_ref"], fixture.base)
         self.assertEqual(first["candidate_ref"], candidate)
+        self.assertEqual(
+            first["candidate"]["source_files"]["app/mod.py"],
+            first["candidate"]["files"]["app/mod.py"]["oid"],
+        )
         self.assertEqual(first["network_requests"], 0)
         self.assertFalse(first["allowlist_used"])
         self.assertEqual(first["delta_count"], 1)
@@ -224,29 +189,6 @@ class TestExactCandidatePlan(CandidatePlanTestCase):
             separators=(",", ":"),
         ).encode()
         self.assertEqual(digest, hashlib.sha256(canonical_bytes).hexdigest())
-
-    def test_checkout_attributes_change_publisher_bytes_even_with_same_source_oid(
-        self,
-    ) -> None:
-        fixture = self.fixture()
-        candidate = fixture.commit(
-            "materialize managed file as CRLF",
-            {".gitattributes": "app/mod.py text eol=crlf\n"},
-        )
-
-        report = fixture.materialized_plan(candidate)
-        delta = next(item for item in report["deltas"] if item["path"] == "app/mod.py")
-
-        self.assertEqual(report["baseline"]["byte_representation"], "publisher-worktree")
-        self.assertEqual(report["candidate"]["byte_representation"], "publisher-worktree")
-        self.assertEqual(
-            delta["baseline_source_blob_sha"],
-            delta["candidate_source_blob_sha"],
-        )
-        self.assertNotEqual(
-            delta["baseline_blob_sha"],
-            delta["candidate_blob_sha"],
-        )
 
     def test_directory_copy_recurses_through_git_tree(self) -> None:
         fixture = self.fixture(
@@ -289,9 +231,7 @@ class TestExactCandidatePlan(CandidatePlanTestCase):
             "unresolved source",
             {
                 "Dockerfile": (
-                    "FROM python:3.12-slim\n"
-                    "COPY app/ /app/\n"
-                    "COPY missing.py /app/\n"
+                    "FROM python:3.12-slim\nCOPY app/ /app/\nCOPY missing.py /app/\n"
                 )
             },
         )
@@ -303,9 +243,7 @@ class TestExactCandidatePlan(CandidatePlanTestCase):
             fixture.plan(candidate)
 
     def test_managed_payload_removal_fails_without_prune_proof(self) -> None:
-        fixture = self.fixture(
-            extra_files={"app/retired.py": "RETIRED = True\n"}
-        )
+        fixture = self.fixture(extra_files={"app/retired.py": "RETIRED = True\n"})
         candidate = fixture.commit(
             "remove managed payload",
             {"app/retired.py": None},
@@ -339,8 +277,9 @@ class TestExactCandidatePlan(CandidatePlanTestCase):
         )
 
         for invalid in invalid_refs:
-            with self.subTest(ref=invalid), self.assertRaises(
-                candidate_plan.CandidatePlanError
+            with (
+                self.subTest(ref=invalid),
+                self.assertRaises(candidate_plan.CandidatePlanError),
             ):
                 candidate_plan.build_plan(
                     fixture.root,
@@ -425,9 +364,7 @@ class TestEffectiveDockerignore(CandidatePlanTestCase):
             "copy a preignored path",
             {
                 "Dockerfile": (
-                    "FROM python:3.12-slim\n"
-                    "COPY app/ /app/\n"
-                    "COPY secret.py /app/\n"
+                    "FROM python:3.12-slim\nCOPY app/ /app/\nCOPY secret.py /app/\n"
                 ),
                 "secret.py": "SECRET = False\n",
             },
@@ -450,9 +387,7 @@ class TestEffectiveDockerignore(CandidatePlanTestCase):
 
         self.assertEqual(report["candidate"]["docker_context_ignored_paths"], [])
         self.assertTrue(
-            report["candidate"]["files"]["app/mod.py"][
-                "docker_context_included"
-            ]
+            report["candidate"]["files"]["app/mod.py"]["docker_context_included"]
         )
 
     def test_dockerfile_specific_ignore_takes_precedence_over_root(self) -> None:
@@ -469,9 +404,7 @@ class TestEffectiveDockerignore(CandidatePlanTestCase):
             "Dockerfile.dockerignore",
         )
         self.assertTrue(
-            report["candidate"]["files"]["app/mod.py"][
-                "docker_context_included"
-            ]
+            report["candidate"]["files"]["app/mod.py"]["docker_context_included"]
         )
 
     def test_newly_ignored_explicit_readme_copy_fails_before_overlay(self) -> None:
@@ -496,7 +429,8 @@ class TestEffectiveDockerignore(CandidatePlanTestCase):
     def test_nested_dockerfile_is_mapped_to_hf_root_target(self) -> None:
         fixture = self.fixture(
             extra_files={
-                "space/Dockerfile": "FROM scratch\nCOPY app/ /app/\n"
+                "space/Dockerfile": "FROM scratch\nCOPY app/ /app/\n",
+                "space/Dockerfile.dockerignore": "*.tmp\n",
             }
         )
         candidate = fixture.commit(
@@ -518,30 +452,127 @@ class TestEffectiveDockerignore(CandidatePlanTestCase):
             report["candidate"]["files"]["Dockerfile"]["source_path"],
             "space/Dockerfile",
         )
+        self.assertIn("space/Dockerfile", report["candidate"]["source_files"])
+        self.assertIn(
+            "space/Dockerfile.dockerignore", report["candidate"]["source_files"]
+        )
+        self.assertIn("README.md", report["candidate"]["source_files"])
 
-    def test_dockerfile_overlay_wins_readme_target_collision_like_publisher(self) -> None:
-        fixture = self.fixture(
-            extra_files={
-                "space/Dockerfile": "FROM scratch\nCOPY app/ /app/\n"
-            }
-        )
+    def test_normalized_lf_checkout_attributes_preserve_exact_blob_parity(self) -> None:
+        fixture = self.fixture(extra_files={".gitattributes": "* text=auto eol=lf\n"})
         candidate = fixture.commit(
-            "nested dockerfile collision",
-            {"app/mod.py": "VALUE = 'nested-collision'\n"},
+            "normalized LF candidate",
+            {"app/mod.py": "VALUE = 'normalized'\n"},
         )
+        fixture.restore_from_head("app/mod.py")
+
+        report = fixture.plan(candidate)
+
+        self.assertEqual(report["delta_count"], 1)
+
+    def test_checkout_transformed_candidate_bytes_fail_exact_blob_parity(self) -> None:
+        fixture = self.fixture()
+        candidate = fixture.commit(
+            "force CRLF checkout",
+            {
+                ".gitattributes": "*.py text eol=crlf\n",
+                "app/mod.py": "VALUE = 'candidate'\n",
+            },
+        )
+        fixture.restore_from_head("app/mod.py")
+
+        with self.assertRaisesRegex(
+            candidate_plan.CandidatePlanError,
+            "checkout bytes differ from the exact Git object.*app/mod.py",
+        ):
+            fixture.plan(candidate)
+
+    def test_changed_checkout_transform_attributes_fail_for_unchanged_blob(
+        self,
+    ) -> None:
+        fixture = self.fixture(extra_files={".gitattributes": "*.py text eol=crlf\n"})
+        candidate = fixture.commit(
+            "change checkout transform",
+            {".gitattributes": "*.py text eol=lf\n"},
+        )
+        fixture.restore_from_head("app/mod.py")
+
+        with self.assertRaisesRegex(
+            candidate_plan.CandidatePlanError,
+            "changes checkout-transform attributes.*app/mod.py",
+        ):
+            fixture.plan(candidate)
+
+    def test_generated_empty_ignore_has_no_checkout_source(self) -> None:
+        fixture = self.fixture()
+        candidate = fixture.commit(
+            "ordinary candidate", {"app/mod.py": "NEXT = True\n"}
+        )
+
+        report = fixture.plan(candidate)
+
+        self.assertNotIn(
+            "(generated-empty-dockerignore)", report["candidate"]["source_files"]
+        )
+        self.assertNotIn("Dockerfile.dockerignore", report["candidate"]["source_files"])
+
+    def test_reserved_readme_targets_fail_closed(self) -> None:
+        fixture = self.fixture()
+        candidate = fixture.commit(
+            "ordinary candidate", {"app/mod.py": "NEXT = True\n"}
+        )
+
+        for readme_path in ("Dockerfile", "Dockerfile.dockerignore"):
+            with (
+                self.subTest(readme_path=readme_path),
+                self.assertRaisesRegex(
+                    candidate_plan.publisher.DeployContractError,
+                    "reserved Hugging Face root target",
+                ),
+            ):
+                candidate_plan.build_plan(
+                    fixture.root,
+                    "szl-holdings/fixture",
+                    fixture.base,
+                    candidate,
+                    readme_path=readme_path,
+                )
 
         report = candidate_plan.build_plan(
             fixture.root,
             "szl-holdings/fixture",
             fixture.base,
             candidate,
-            dockerfile_path="space/Dockerfile",
+            include_readme=False,
             readme_path="Dockerfile",
         )
+        self.assertFalse(report["include_readme"])
 
-        control = report["candidate"]["files"]["Dockerfile"]
-        self.assertEqual(control["source_path"], "space/Dockerfile")
-        self.assertEqual(control["copy_source"], "(dockerfile)")
+    def test_excluded_explicit_readme_is_not_a_publisher_source(self) -> None:
+        fixture = self.fixture(
+            dockerfile=(
+                "FROM python:3.12-slim\n"
+                "COPY app/ /app/\n"
+                "COPY README.md /app/README.md\n"
+            ),
+            extra_files={".gitattributes": "README.md text eol=crlf\n"},
+        )
+        candidate = fixture.commit(
+            "exclude transformed readme",
+            {".gitattributes": "README.md text eol=lf\n"},
+        )
+        fixture.restore_from_head("README.md")
+
+        report = candidate_plan.build_plan(
+            fixture.root,
+            "szl-holdings/fixture",
+            fixture.base,
+            candidate,
+            include_readme=False,
+        )
+
+        self.assertNotIn("README.md", report["candidate"]["files"])
+        self.assertNotIn("README.md", report["candidate"]["source_files"])
 
 
 class TestObjectAndNetworkBoundaries(CandidatePlanTestCase):
@@ -555,7 +586,9 @@ class TestObjectAndNetworkBoundaries(CandidatePlanTestCase):
         ):
             fixture.plan(candidate)
 
-    def test_successful_plan_never_calls_publisher_network_or_runtime_helpers(self) -> None:
+    def test_successful_plan_never_calls_publisher_network_or_runtime_helpers(
+        self,
+    ) -> None:
         fixture = self.fixture()
         candidate = fixture.commit(
             "offline candidate",
@@ -608,7 +641,9 @@ class TestReusableWorkflowContract(TestCase):
         marker = f"      {name}:\n"
         self.assertIn(marker, self.workflow)
         start = self.workflow.index(marker) + len(marker)
-        next_input = re.search(r"(?m)^      [a-z][a-z0-9-]*:\s*$", self.workflow[start:])
+        next_input = re.search(
+            r"(?m)^      [a-z][a-z0-9-]*:\s*$", self.workflow[start:]
+        )
         end = start + next_input.start() if next_input else len(self.workflow)
         return self.workflow[start:end]
 
@@ -639,36 +674,36 @@ class TestReusableWorkflowContract(TestCase):
             '[ "${TRUSTED_BASE_REF}" = "${EVENT_BASE_SHA}" ]',
             '[ "${CANDIDATE_REF}" = "${EVENT_HEAD_SHA}" ]',
             '[ -z "${SOURCE_REVISION_FILE}" ]',
-            "pull-requests: read",
-            "PR_NUMBER: ${{ github.event.pull_request.number }}",
-            'gh api --method GET',
-            '"repos/${GH_REPO}/pulls/${PR_NUMBER}"',
-            '.state == "open"',
-            '.base.sha == $base',
-            '.head.sha == $head',
-            "validate_live_pr",
         ):
             self.assertIn(required, self.workflow)
-        self.assertGreaterEqual(self.workflow.count("gh api --method GET"), 2)
-        self.assertIn(
-            "validate_live_pr || {\n"
-            "            rm -f hf-managed-candidate-plan.out.json",
-            self.workflow,
-        )
 
-    def test_workflow_materializes_exact_base_and_candidate_publisher_bytes(self) -> None:
+    def test_workflow_revalidates_live_pair_before_plan_and_after_artifact(
+        self,
+    ) -> None:
+        helper = "python3 tools/.github/scripts/hf_live_pr_pair.py"
+        self.assertEqual(self.workflow.count(helper), 2)
+        first_live = self.workflow.index(helper)
+        planner = self.workflow.index(
+            "python3 tools/.github/scripts/hf_candidate_plan.py"
+        )
+        upload = self.workflow.index("actions/upload-artifact@")
+        final_live = self.workflow.rindex(helper)
+        self.assertLess(first_live, planner)
+        self.assertLess(planner, upload)
+        self.assertLess(upload, final_live)
+        self.assertEqual(
+            self.workflow.rstrip().splitlines()[-1].strip(), f"run: {helper}"
+        )
         for required in (
-            "Checkout exact protected baseline bytes as data",
-            "ref: ${{ inputs.trusted-base-ref }}",
-            "path: baseline",
-            "ref: ${{ inputs.candidate-ref }}",
-            "path: caller",
-            '--baseline-checkout-root baseline',
-            '--candidate-checkout-root caller',
-            'observed_base="$(git -C baseline rev-parse HEAD)"',
-            'observed_head="$(git -C caller rev-parse HEAD)"',
+            "pull-requests: read",
+            "GITHUB_API_URL: ${{ github.api_url }}",
+            "GITHUB_TOKEN: ${{ github.token }}",
+            "PR_NUMBER: ${{ github.event.pull_request.number }}",
+            "EXPECTED_BASE_SHA: ${{ inputs.trusted-base-ref }}",
+            "EXPECTED_HEAD_SHA: ${{ inputs.candidate-ref }}",
         ):
             self.assertIn(required, self.workflow)
+        self.assertNotIn("--token", self.workflow.lower())
 
     def test_protected_authority_checkout_is_source_and_revision_bound(self) -> None:
         self.assertIn("repository: ${{ job.workflow_repository }}", self.workflow)
@@ -678,7 +713,9 @@ class TestReusableWorkflowContract(TestCase):
         self.assertIn('--trusted-base-ref "${TRUSTED_BASE_REF}"', self.workflow)
         self.assertIn('--candidate-ref "${CANDIDATE_REF}"', self.workflow)
 
-    def test_workflow_has_no_provider_token_runtime_probe_or_candidate_execution(self) -> None:
+    def test_workflow_has_no_provider_token_runtime_probe_or_candidate_execution(
+        self,
+    ) -> None:
         lowered = self.workflow.lower()
         for forbidden in (
             "secrets.",
@@ -695,7 +732,9 @@ class TestReusableWorkflowContract(TestCase):
         self.assertNotIn("working-directory: caller", lowered)
         self.assertIn("tools/.github/scripts/hf_candidate_plan.py", self.workflow)
 
-    def test_all_actions_are_immutable_and_missing_report_fails_artifact_step(self) -> None:
+    def test_all_actions_are_immutable_and_missing_report_fails_artifact_step(
+        self,
+    ) -> None:
         action_refs = re.findall(r"(?m)^\s*-?\s*uses:\s*([^\s#]+)", self.workflow)
         self.assertGreaterEqual(len(action_refs), 3)
         for action_ref in action_refs:

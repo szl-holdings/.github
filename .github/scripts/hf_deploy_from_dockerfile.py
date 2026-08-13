@@ -59,6 +59,7 @@ import urllib.request
 HF_HOST = "https://huggingface.co"
 UA = {"User-Agent": "hf-deploy-from-dockerfile/1.0"}
 TERMINAL_RUNTIME_STAGES = {"BUILD_ERROR", "CONFIG_ERROR", "RUNTIME_ERROR"}
+RESERVED_HF_ROOT_TARGETS = {"dockerfile", "dockerfile.dockerignore"}
 
 
 class DeployContractError(ValueError):
@@ -77,6 +78,17 @@ def normalize_repo_path(path, *, label="repository path"):
     if value == ".." or value.startswith("../"):
         raise DeployContractError(f"{label} escapes the repository root: {path!r}")
     return value
+
+
+def validate_readme_target(readme_path, include_readme):
+    """Normalize the Space card path and reject reserved HF-root targets."""
+    rel = normalize_repo_path(readme_path, label="README source path")
+    if include_readme and rel.casefold() in RESERVED_HF_ROOT_TARGETS:
+        raise DeployContractError(
+            "included README collides with a reserved Hugging Face root target: "
+            f"{rel!r}"
+        )
+    return rel
 
 
 def source_file(repo_root, source_path):
@@ -697,10 +709,7 @@ def probe_smoke_routes(hf_repo, smoke_paths, retries=6, delay=5):
 # derive: Dockerfile -> deploy manifest (no network, no push)
 # --------------------------------------------------------------------------- #
 def derive(args):
-    readme_path = normalize_repo_path(
-        args.readme_path,
-        label="README source path",
-    )
+    readme_path = validate_readme_target(args.readme_path, args.include_readme)
     requested_revision = getattr(args, "source_revision_file", "")
     if requested_revision:
         revision_candidate = normalize_repo_path(

@@ -181,6 +181,9 @@ jobs:
       - name: HF candidate deployment-plan self-test
         run: python3 .github/scripts/test_hf_candidate_plan.py
 
+      - name: HF candidate live PR-pair self-test
+        run: python3 .github/scripts/test_hf_live_pr_pair.py
+
       # Pins optional exact-source equality for scheduled/manual/post-deploy
       # verification while retaining legacy ancestor diagnostics for callers
       # that intentionally omit the exact-source input.

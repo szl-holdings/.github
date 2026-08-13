@@ -86,7 +86,7 @@ jobs:
 | Workflow | What it does |
 |---|---|
 | `reusable-hf-deploy.yml` | GitHub → Hugging Face Space deployer (Dockerfile-derived file set) |
-| `reusable-hf-candidate-plan.yml` | Build an exact, network-free base-to-head HF deployment plan from protected verifier code |
+| `reusable-hf-candidate-plan.yml` | Build an exact, provider-free base-to-head HF deployment plan and revalidate the live PR pair |
 | `reusable-hf-module-drift-check.yml` | Detect drift between a repo's source and its live HF Space |
 | `reusable-anatomy-map-drift.yml` | Guard the shared SZL Anatomy map across its surfaces |
 | `reusable-bundle-ref-check.yml` | Verify UDS bundle `repository`/`ref` point at published GHCR tags |
