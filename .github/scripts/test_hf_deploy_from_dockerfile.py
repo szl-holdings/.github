@@ -204,10 +204,37 @@ class TestDeriveReadmePolicy(unittest.TestCase):
             readme_path="./README.md",
         )
 
-        self.assertEqual(set(files), {"Dockerfile", "serve.py"})
+        self.assertEqual(
+            set(files),
+            {"Dockerfile", "Dockerfile.dockerignore", "serve.py"},
+        )
         self.assertEqual(manifest["files_resolved"], 1)
         self.assertIsNone(manifest["readme"])
         self.assertEqual(files["Dockerfile"]["source_path"], "Dockerfile")
+
+    def test_include_readme_rejects_reserved_hf_root_targets(self):
+        for readme_path in ("Dockerfile", "./Dockerfile", "Dockerfile.dockerignore"):
+            with self.subTest(readme_path=readme_path), self.assertRaisesRegex(
+                dep.DeployContractError,
+                "reserved Hugging Face root target",
+            ):
+                self._derive(
+                    "FROM scratch\nCOPY serve.py /app/serve.py\n",
+                    {"README.md": "# Card\n", "serve.py": "pass\n"},
+                    include_readme=True,
+                    readme_path=readme_path,
+                )
+
+    def test_include_readme_false_allows_reserved_path_without_publishing_it(self):
+        manifest, files = self._derive(
+            "FROM scratch\nCOPY serve.py /app/serve.py\n",
+            {"serve.py": "pass\n"},
+            include_readme=False,
+            readme_path="Dockerfile",
+        )
+
+        self.assertIsNone(manifest["readme"])
+        self.assertEqual(files["Dockerfile"]["copy_source"], "(dockerfile)")
 
     def test_include_readme_false_keeps_unrelated_nested_readme(self):
         manifest, files = self._derive(
@@ -221,7 +248,10 @@ class TestDeriveReadmePolicy(unittest.TestCase):
             include_readme=False,
         )
 
-        self.assertEqual(set(files), {"Dockerfile", "docs/README.md"})
+        self.assertEqual(
+            set(files),
+            {"Dockerfile", "Dockerfile.dockerignore", "docs/README.md"},
+        )
         self.assertEqual(manifest["files_resolved"], 1)
 
     def test_include_readme_true_merges_derived_entry_as_readme(self):
@@ -232,7 +262,10 @@ class TestDeriveReadmePolicy(unittest.TestCase):
             include_readme=True,
         )
 
-        self.assertEqual(set(files), {"Dockerfile", "README.md"})
+        self.assertEqual(
+            set(files),
+            {"Dockerfile", "Dockerfile.dockerignore", "README.md"},
+        )
         self.assertEqual(files["README.md"]["copy_source"], "(readme)")
         self.assertEqual(files["README.md"]["sha256"], dep.sha256(readme.encode()))
         self.assertEqual(manifest["readme"], "README.md")
@@ -254,6 +287,52 @@ class TestDeriveReadmePolicy(unittest.TestCase):
         self.assertEqual(
             files["Dockerfile"]["sha256"], dep.sha256(dockerfile.encode())
         )
+
+    def test_effective_dockerignore_is_always_published_with_dockerfile(self):
+        manifest, files = self._derive(
+            "FROM scratch\nCOPY serve.py /app/serve.py\n",
+            {"serve.py": "pass\n", ".dockerignore": "*.log\n"},
+            include_readme=False,
+        )
+
+        self.assertEqual(
+            files["Dockerfile.dockerignore"]["source_path"], ".dockerignore"
+        )
+        self.assertEqual(
+            files["Dockerfile.dockerignore"]["sha256"],
+            dep.sha256(b"*.log\n"),
+        )
+        self.assertEqual(
+            manifest["files_deployed"], manifest["files_resolved"] + 2
+        )
+
+    def test_dockerfile_specific_ignore_is_always_published_at_hf_root(self):
+        dockerfile = "FROM scratch\nCOPY space/app.py /app/app.py\n"
+        _manifest, files = self._derive(
+            dockerfile,
+            {
+                "space/app.py": "pass\n",
+                "space/Dockerfile.dockerignore": "*.tmp\n",
+            },
+            include_readme=False,
+            dockerfile_path="space/Dockerfile",
+        )
+
+        control = files["Dockerfile.dockerignore"]
+        self.assertEqual(control["source_path"], "space/Dockerfile.dockerignore")
+        self.assertEqual(control["sha256"], dep.sha256(b"*.tmp\n"))
+
+    def test_missing_dockerignore_publishes_deterministic_empty_control(self):
+        _manifest, files = self._derive(
+            "FROM scratch\nCOPY serve.py /app/serve.py\n",
+            {"serve.py": "pass\n"},
+            include_readme=False,
+        )
+
+        control = files["Dockerfile.dockerignore"]
+        self.assertEqual(control["source_path"], "(generated-empty-dockerignore)")
+        self.assertEqual(control["generated_content_utf8"], "")
+        self.assertEqual(control["size"], 0)
 
     def test_unresolved_copy_source_fails_closed(self):
         with self.assertRaisesRegex(dep.DeployContractError, "not found"):
@@ -554,7 +633,12 @@ class TestDeriveReadmePolicy(unittest.TestCase):
             os.makedirs(os.path.join(repo_root, ".git", "objects"))
             requested = os.path.join(repo_root, "space", "SOURCE_REVISION")
             escaped = os.path.join(repo_root, ".git", "objects", "revision")
-            os.symlink(os.path.join("..", ".git", "objects", "revision"), requested)
+            try:
+                os.symlink(
+                    os.path.join("..", ".git", "objects", "revision"), requested
+                )
+            except OSError as exc:
+                self.skipTest(f"symlink creation unavailable: {exc}")
 
             with self.assertRaisesRegex(dep.DeployContractError, "already exist"):
                 dep.materialize_source_revision_file(
@@ -566,11 +650,14 @@ class TestDeriveReadmePolicy(unittest.TestCase):
         with tempfile.TemporaryDirectory() as repo_root:
             escaped_parent = os.path.join(repo_root, ".git", "refs", "heads")
             os.makedirs(escaped_parent)
-            os.symlink(
-                os.path.join(".git", "refs", "heads"),
-                os.path.join(repo_root, "space"),
-                target_is_directory=True,
-            )
+            try:
+                os.symlink(
+                    os.path.join(".git", "refs", "heads"),
+                    os.path.join(repo_root, "space"),
+                    target_is_directory=True,
+                )
+            except OSError as exc:
+                self.skipTest(f"symlink creation unavailable: {exc}")
             escaped = os.path.join(escaped_parent, "SOURCE_REVISION")
 
             with self.assertRaisesRegex(

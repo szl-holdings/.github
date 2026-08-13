@@ -20,6 +20,7 @@ of redefining the same logic locally.
 | `reusable-secret-scan.yml` | TruffleHog committed-secret detection | `push`, `pull_request`, weekly cron |
 | `reusable-scorecard.yml` | OpenSSF Scorecard supply-chain hygiene | weekly cron, `branch_protection_rule` |
 | `reusable-trivy.yml` | Trivy filesystem vulnerability scan | `push`, weekly cron |
+| `reusable-hf-candidate-plan.yml` | Build a provider-free exact base-to-head Dockerfile payload plan and revalidate the live PR pair | base-controlled `pull_request_target` |
 | `reusable-hf-module-drift-check.yml` | Detect drift between a repo's source-of-truth and its live Hugging Face Space | caller-chosen |
 
 ## Calling a reusable workflow
@@ -64,6 +65,15 @@ layers guard this:
 
 Both honor `.github/hf-module-drift-allow.json`. They never overwrite either
 side automatically because drift can originate in GitHub or Hugging Face.
+
+Candidate admission is deliberately separate from live drift. A protected
+base-controlled workflow may call `reusable-hf-candidate-plan.yml` with the
+exact pull-request base and head SHAs. The reusable workflow executes only this
+repository's protected verifier revision, treats candidate Git objects as
+data, revalidates the live GitHub PR tuple immediately before planning and after
+artifact upload, makes no Hugging Face or runtime request, and emits a
+deterministic Dockerfile-managed payload plan. Live source, deployment, and
+runtime identity remain distinct post-merge gates.
 
 ## Org code-security config drift (`code-security-drift.yml`)
 

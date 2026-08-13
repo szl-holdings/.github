@@ -1,0 +1,185 @@
+name: Reusable - HF Candidate Deployment Plan
+
+# Base-controlled, provider-free admission for a Dockerfile-backed Hugging Face
+# payload. The caller supplies exact base/head Git objects. Only the protected
+# reusable-workflow revision is executed; candidate repository code is data.
+
+on:
+  workflow_call:
+    inputs:
+      trusted-base-ref:
+        description: "Exact lowercase 40-character protected PR base SHA."
+        required: true
+        type: string
+      candidate-ref:
+        description: "Exact lowercase 40-character candidate head SHA."
+        required: true
+        type: string
+      dockerfile-path:
+        description: "Canonical repository-relative Dockerfile path."
+        required: false
+        type: string
+        default: "Dockerfile"
+      include-readme:
+        description: "Include the Space README as a first-class payload control."
+        required: false
+        type: boolean
+        default: true
+      readme-path:
+        description: "Canonical repository-relative Space README path."
+        required: false
+        type: string
+        default: "README.md"
+      source-revision-file:
+        description: "Generated source-revision files are not yet supported by offline admission."
+        required: false
+        type: string
+        default: ""
+
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  hf-candidate-plan:
+    name: Immutable HF candidate deployment plan
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Harden runner
+        uses: step-security/harden-runner@b09bb98e06d4d774595224525879c09bc6e98c40 # v2.20.1
+        with:
+          egress-policy: audit
+
+      - name: Validate immutable candidate inputs
+        env:
+          TRUSTED_BASE_REF: ${{ inputs.trusted-base-ref }}
+          CANDIDATE_REF: ${{ inputs.candidate-ref }}
+          DOCKERFILE_PATH: ${{ inputs.dockerfile-path }}
+          README_PATH: ${{ inputs.readme-path }}
+          SOURCE_REVISION_FILE: ${{ inputs.source-revision-file }}
+          EVENT_NAME: ${{ github.event_name }}
+          EVENT_BASE_REPO: ${{ github.event.pull_request.base.repo.full_name }}
+          EVENT_HEAD_REPO: ${{ github.event.pull_request.head.repo.full_name }}
+          EVENT_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          EVENT_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          sha_re='^[0-9a-f]{40}$'
+          [[ "${TRUSTED_BASE_REF}" =~ ${sha_re} ]] || {
+            echo "::error::trusted-base-ref must be an exact lowercase 40-character SHA"
+            exit 1
+          }
+          [[ "${CANDIDATE_REF}" =~ ${sha_re} ]] || {
+            echo "::error::candidate-ref must be an exact lowercase 40-character SHA"
+            exit 1
+          }
+          [ "${EVENT_NAME}" = "pull_request_target" ] || {
+            echo "::error::candidate admission requires a base-controlled pull_request_target caller"
+            exit 1
+          }
+          [ "${EVENT_BASE_REPO}" = "${GH_REPO}" ] && \
+            [ "${EVENT_HEAD_REPO}" = "${GH_REPO}" ] || {
+              echo "::error::candidate admission currently requires a same-repository pull request"
+              exit 1
+            }
+          [ "${TRUSTED_BASE_REF}" = "${EVENT_BASE_SHA}" ] && \
+            [ "${CANDIDATE_REF}" = "${EVENT_HEAD_SHA}" ] || {
+              echo "::error::candidate admission inputs do not equal the current pull-request base/head"
+              exit 1
+            }
+          [ -z "${SOURCE_REVISION_FILE}" ] || {
+            echo "::error::offline candidate admission does not yet model generated source-revision files"
+            exit 1
+          }
+          for candidate_path in "${DOCKERFILE_PATH}" "${README_PATH}"; do
+            case "${candidate_path}" in
+              ""|/*|*\\*|*:*|*..*|*//*|./*|*/./*)
+                echo "::error::payload control paths must be canonical repository-relative paths"
+                exit 1
+                ;;
+            esac
+          done
+
+      - name: Checkout exact candidate Git objects as data
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: ${{ github.repository }}
+          ref: ${{ inputs.candidate-ref }}
+          fetch-depth: 0
+          path: caller
+          persist-credentials: false
+
+      - name: Checkout exact protected verifier authority
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: ${{ job.workflow_repository }}
+          ref: ${{ job.workflow_sha }}
+          path: tools
+          persist-credentials: false
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12"
+
+      - name: Revalidate live pull-request pair before planning
+        env:
+          GITHUB_API_URL: ${{ github.api_url }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          GITHUB_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          EXPECTED_BASE_REPO: ${{ github.event.pull_request.base.repo.full_name }}
+          EXPECTED_HEAD_REPO: ${{ github.event.pull_request.head.repo.full_name }}
+          EXPECTED_BASE_REF: ${{ github.event.pull_request.base.ref }}
+          EXPECTED_BASE_SHA: ${{ inputs.trusted-base-ref }}
+          EXPECTED_HEAD_SHA: ${{ inputs.candidate-ref }}
+        run: python3 tools/.github/scripts/hf_live_pr_pair.py
+
+      - name: Verify exact offline candidate deployment plan
+        env:
+          GH_REPO: ${{ github.repository }}
+          TRUSTED_BASE_REF: ${{ inputs.trusted-base-ref }}
+          CANDIDATE_REF: ${{ inputs.candidate-ref }}
+          DOCKERFILE_PATH: ${{ inputs.dockerfile-path }}
+          INCLUDE_README: ${{ inputs.include-readme }}
+          README_PATH: ${{ inputs.readme-path }}
+        run: |
+          set -euo pipefail
+          observed_head="$(git -C caller rev-parse HEAD)"
+          if [ "${observed_head}" != "${CANDIDATE_REF}" ]; then
+            echo "::error::candidate checkout did not resolve to the exact requested head"
+            exit 1
+          fi
+          python3 tools/.github/scripts/hf_candidate_plan.py \
+            --repo-root caller \
+            --github-repo "${GH_REPO}" \
+            --trusted-base-ref "${TRUSTED_BASE_REF}" \
+            --candidate-ref "${CANDIDATE_REF}" \
+            --dockerfile-path "${DOCKERFILE_PATH}" \
+            --include-readme "${INCLUDE_README}" \
+            --readme-path "${README_PATH}" \
+            --report-out hf-managed-candidate-plan.out.json
+
+      - name: Upload immutable candidate plan
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: hf-managed-candidate-plan
+          path: hf-managed-candidate-plan.out.json
+          if-no-files-found: error
+          retention-days: 90
+
+      - name: Revalidate live pull-request pair after artifact upload
+        env:
+          GITHUB_API_URL: ${{ github.api_url }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          GITHUB_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          EXPECTED_BASE_REPO: ${{ github.event.pull_request.base.repo.full_name }}
+          EXPECTED_HEAD_REPO: ${{ github.event.pull_request.head.repo.full_name }}
+          EXPECTED_BASE_REF: ${{ github.event.pull_request.base.ref }}
+          EXPECTED_BASE_SHA: ${{ inputs.trusted-base-ref }}
+          EXPECTED_HEAD_SHA: ${{ inputs.candidate-ref }}
+        run: python3 tools/.github/scripts/hf_live_pr_pair.py

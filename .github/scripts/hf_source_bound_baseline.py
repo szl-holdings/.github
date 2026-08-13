@@ -10,10 +10,12 @@ identity planes:
 * Dockerfile-managed bytes can be compared at those two immutable revisions.
 
 This verifier observes both live planes more than once with cache bypass, requires
-stable exact values, proves the observed Git source is either an ancestor of the
-pull request base or the exact pull request candidate after controlled deployment,
-compares the exact deployed pair without an allowlist, and reports the candidate's
-managed-file delta without deploying it. It performs no mutation.
+stable exact values, and compares the exact deployed pair without an allowlist.
+Callers may require the observed Git source to equal one explicit protected source
+revision. When that input is omitted, the legacy pull-request policy proves that
+the source is either an ancestor of the pull request base or the exact pull request
+candidate after controlled deployment. Candidate managed-file deltas are reported
+only after the selected source-binding policy succeeds. It performs no mutation.
 """
 from __future__ import annotations
 
@@ -227,6 +229,16 @@ def source_bound_baseline_compare(args: argparse.Namespace):
         if args.candidate_ref
         else ""
     )
+    expected_source_ref_raw = str(
+        getattr(args, "expected_source_ref", "") or ""
+    ).strip()
+    expected_source_ref = (
+        drift.require_full_sha(
+            expected_source_ref_raw, "expected protected source GitHub SHA"
+        )
+        if expected_source_ref_raw
+        else ""
+    )
     probe_path = require_probe_path(args.source_probe_path)
     live_state = drift.hf_space_state(args.hf_repo)
     probe_state = source_probe_state(args.hf_repo, probe_path)
@@ -305,31 +317,55 @@ def source_bound_baseline_compare(args: argparse.Namespace):
             }
         )
     ancestry_status = None
+    source_binding_valid = False
     if drift.FULL_SHA_RE.fullmatch(source_sha) is not None:
-        source_matches_candidate = bool(
-            candidate_ref and source_sha == candidate_ref
-        )
-        if source_matches_candidate:
-            ancestry_status = "exact-candidate"
+        if expected_source_ref:
+            if source_sha == expected_source_ref:
+                ancestry_status = "exact-expected-source"
+                source_binding_valid = True
+            else:
+                ancestry_status = "expected-source-mismatch"
+                contract_errors.append(
+                    {
+                        "path": "(source-probe)",
+                        "kind": "observed-source-not-exact",
+                        "severity": "error",
+                        "observed_source_sha": source_sha,
+                        "expected_source_ref": expected_source_ref,
+                        "detail": (
+                            "live build-info source does not equal the exact "
+                            "protected source revision required by this run"
+                        ),
+                    }
+                )
         else:
-            is_ancestor, ancestry_status = drift.github_ref_is_ancestor(
-                args.github_repo, source_sha, trusted_base_ref
+            source_matches_candidate = bool(
+                candidate_ref and source_sha == candidate_ref
             )
-        if not source_matches_candidate and not is_ancestor:
-            contract_errors.append(
-                {
-                    "path": "(source-probe)",
-                    "kind": "observed-source-not-ancestor",
-                    "severity": "error",
-                    "observed_source_sha": source_sha,
-                    "trusted_base_ref": trusted_base_ref,
-                    "candidate_ref": candidate_ref or None,
-                    "detail": (
-                        "live build-info source is neither an ancestor of the exact "
-                        "pull request base nor the exact pull request candidate"
-                    ),
-                }
-            )
+            if source_matches_candidate:
+                ancestry_status = "exact-candidate"
+                source_binding_valid = True
+            else:
+                is_ancestor, ancestry_status = drift.github_ref_is_ancestor(
+                    args.github_repo, source_sha, trusted_base_ref
+                )
+                source_binding_valid = is_ancestor
+                if not is_ancestor:
+                    contract_errors.append(
+                        {
+                            "path": "(source-probe)",
+                            "kind": "observed-source-not-ancestor",
+                            "severity": "error",
+                            "observed_source_sha": source_sha,
+                            "trusted_base_ref": trusted_base_ref,
+                            "candidate_ref": candidate_ref or None,
+                            "detail": (
+                                "live build-info source is neither an ancestor of "
+                                "the exact pull request base nor the exact pull "
+                                "request candidate"
+                            ),
+                        }
+                    )
     else:
         contract_errors.append(
             {
@@ -351,7 +387,7 @@ def source_bound_baseline_compare(args: argparse.Namespace):
         and live_stage == "RUNNING"
         and probe_state.get("observation_status") == "stable"
         and drift.FULL_SHA_RE.fullmatch(source_sha) is not None
-        and not any(error["kind"] == "observed-source-not-ancestor" for error in contract_errors)
+        and source_binding_valid
     )
     if can_compare:
         baseline_args = argparse.Namespace(**vars(args))
@@ -366,7 +402,11 @@ def source_bound_baseline_compare(args: argparse.Namespace):
         )
 
     candidate_report = None
-    if candidate_ref and drift.FULL_SHA_RE.fullmatch(source_sha) is not None:
+    if (
+        candidate_ref
+        and drift.FULL_SHA_RE.fullmatch(source_sha) is not None
+        and source_binding_valid
+    ):
         candidate_report = drift.candidate_managed_delta(
             args.github_repo,
             source_sha,
@@ -400,6 +440,13 @@ def source_bound_baseline_compare(args: argparse.Namespace):
             "status": "drift" if errors else "ok",
             "trusted_base_ref": trusted_base_ref,
             "candidate_ref": candidate_ref or None,
+            "expected_source_ref": expected_source_ref or None,
+            "source_binding_policy": (
+                "exact-expected-source"
+                if expected_source_ref
+                else "ancestor-or-exact-candidate"
+            ),
+            "source_binding_valid": source_binding_valid,
             "source_probe": probe_state,
             "observed_source_sha": source_sha or None,
             "observed_source_ancestry_status": ancestry_status,
@@ -430,6 +477,7 @@ def main() -> int:
     parser.add_argument("--hf-repo", required=True)
     parser.add_argument("--trusted-base-ref", required=True)
     parser.add_argument("--candidate-ref", default="")
+    parser.add_argument("--expected-source-ref", default="")
     parser.add_argument("--dockerfile-path", default="Dockerfile")
     parser.add_argument("--source-probe-path", default="/api/build-info")
     parser.add_argument("--report-out", default="")
@@ -460,6 +508,13 @@ def main() -> int:
             "hf_repo": args.hf_repo,
             "trusted_base_ref": args.trusted_base_ref,
             "candidate_ref": args.candidate_ref or None,
+            "expected_source_ref": args.expected_source_ref or None,
+            "source_binding_policy": (
+                "exact-expected-source"
+                if args.expected_source_ref
+                else "ancestor-or-exact-candidate"
+            ),
+            "source_binding_valid": False,
             "allowlist_used": False,
             "error_count": 1,
             "warn_count": 0,

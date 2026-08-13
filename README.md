@@ -39,7 +39,7 @@
 | [`profile/README.md`](./profile/README.md) | Org profile shown at <https://github.com/szl-holdings> |
 | [`.github/ISSUE_TEMPLATE/`](./.github/ISSUE_TEMPLATE/) | Default issue templates cascaded to every repo without its own |
 | [`.github/PULL_REQUEST_TEMPLATE.md`](./.github/PULL_REQUEST_TEMPLATE.md) | Default PR template |
-| [`.github/workflows/`](./.github/workflows/) | **21 reusable workflows** — see [`WORKFLOWS.md`](./WORKFLOWS.md) |
+| [`.github/workflows/`](./.github/workflows/) | **22 reusable workflows** — see [`WORKFLOWS.md`](./WORKFLOWS.md) |
 | [`.github/dependabot.yml`](./.github/dependabot.yml) | Weekly dependency updates for this repo |
 | [`.github/CODEOWNERS`](./.github/CODEOWNERS) | Org-default ownership |
 | [`templates/`](./templates/) | Copy-paste templates for product repos (`README`, `CONTRIBUTING`, `CODE_OF_CONDUCT`, `SECURITY`) |
@@ -50,7 +50,7 @@
 
 ## Reusable workflows
 
-Twenty-one SHA-pinned, harden-runner-protected workflows that every product repo can call:
+Twenty-two SHA-pinned, harden-runner-protected workflows that every product repo can call:
 
 ```yaml
 jobs:
@@ -86,6 +86,7 @@ jobs:
 | Workflow | What it does |
 |---|---|
 | `reusable-hf-deploy.yml` | GitHub → Hugging Face Space deployer (Dockerfile-derived file set) |
+| `reusable-hf-candidate-plan.yml` | Build an exact, provider-free base-to-head HF deployment plan and revalidate the live PR pair |
 | `reusable-hf-module-drift-check.yml` | Detect drift between a repo's source and its live HF Space |
 | `reusable-anatomy-map-drift.yml` | Guard the shared SZL Anatomy map across its surfaces |
 | `reusable-bundle-ref-check.yml` | Verify UDS bundle `repository`/`ref` point at published GHCR tags |

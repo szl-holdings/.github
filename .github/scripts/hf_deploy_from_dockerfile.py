@@ -59,6 +59,7 @@ import urllib.request
 HF_HOST = "https://huggingface.co"
 UA = {"User-Agent": "hf-deploy-from-dockerfile/1.0"}
 TERMINAL_RUNTIME_STAGES = {"BUILD_ERROR", "CONFIG_ERROR", "RUNTIME_ERROR"}
+RESERVED_HF_ROOT_TARGETS = {"dockerfile", "dockerfile.dockerignore"}
 
 
 class DeployContractError(ValueError):
@@ -77,6 +78,17 @@ def normalize_repo_path(path, *, label="repository path"):
     if value == ".." or value.startswith("../"):
         raise DeployContractError(f"{label} escapes the repository root: {path!r}")
     return value
+
+
+def validate_readme_target(readme_path, include_readme):
+    """Normalize the Space card path and reject reserved HF-root targets."""
+    rel = normalize_repo_path(readme_path, label="README source path")
+    if include_readme and rel.casefold() in RESERVED_HF_ROOT_TARGETS:
+        raise DeployContractError(
+            "included README collides with a reserved Hugging Face root target: "
+            f"{rel!r}"
+        )
+    return rel
 
 
 def source_file(repo_root, source_path):
@@ -697,10 +709,7 @@ def probe_smoke_routes(hf_repo, smoke_paths, retries=6, delay=5):
 # derive: Dockerfile -> deploy manifest (no network, no push)
 # --------------------------------------------------------------------------- #
 def derive(args):
-    readme_path = normalize_repo_path(
-        args.readme_path,
-        label="README source path",
-    )
+    readme_path = validate_readme_target(args.readme_path, args.include_readme)
     requested_revision = getattr(args, "source_revision_file", "")
     if requested_revision:
         revision_candidate = normalize_repo_path(
@@ -828,35 +837,40 @@ def derive(args):
         "source_path": dockerfile_rel,
     }
 
-    if revision_rel:
-        ignore_rel, ignore_path = _effective_dockerignore(
-            args.repo_root,
-            dockerfile_rel,
-        )
-        if ignore_path is None:
-            ignore_source = "(generated-empty-dockerignore)"
-            ignore_meta = {
-                "source_path": ignore_source,
-                "generated_content_utf8": "",
-            }
-        else:
-            ignore_source = ignore_rel
-            ignore_meta = {"source_path": ignore_rel}
-        ignore_bytes = read_source_bytes(
-            args.repo_root,
-            "Dockerfile.dockerignore",
-            ignore_meta,
-        )
-        files["Dockerfile.dockerignore"] = {
-            "git_blob_sha1": git_blob_sha1(ignore_bytes),
-            "sha256": sha256(ignore_bytes),
-            "size": len(ignore_bytes),
-            "copy_source": "(dockerignore)",
+    # The remote HF build always consumes an HF-root Dockerfile. Bind the exact
+    # effective local build-context ignore contract beside it on every publish,
+    # even when no generated source-revision file is requested. Otherwise a
+    # stale remote Dockerfile.dockerignore can silently produce different build
+    # bytes from the exact source tree the manifest reports.
+    ignore_rel, ignore_path = _effective_dockerignore(
+        args.repo_root,
+        dockerfile_rel,
+    )
+    if ignore_path is None:
+        ignore_source = "(generated-empty-dockerignore)"
+        ignore_meta = {
             "source_path": ignore_source,
+            "generated_content_utf8": "",
         }
-        if "generated_content_utf8" in ignore_meta:
-            files["Dockerfile.dockerignore"]["generated_content_utf8"] = ""
+    else:
+        ignore_source = ignore_rel
+        ignore_meta = {"source_path": ignore_rel}
+    ignore_bytes = read_source_bytes(
+        args.repo_root,
+        "Dockerfile.dockerignore",
+        ignore_meta,
+    )
+    files["Dockerfile.dockerignore"] = {
+        "git_blob_sha1": git_blob_sha1(ignore_bytes),
+        "sha256": sha256(ignore_bytes),
+        "size": len(ignore_bytes),
+        "copy_source": "(dockerignore)",
+        "source_path": ignore_source,
+    }
+    if "generated_content_utf8" in ignore_meta:
+        files["Dockerfile.dockerignore"]["generated_content_utf8"] = ""
 
+    if revision_rel:
         materialized_revision = materialize_source_revision_file(
             args.repo_root,
             revision_rel,
