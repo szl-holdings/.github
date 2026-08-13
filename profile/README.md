@@ -65,6 +65,10 @@ Receipts, provenance, evaluation, and formal sources make claims inspectable.
 
 ## Investor path
 
+[Technical diligence](https://a11oy.net/diligence/) ·
+[architecture source](https://github.com/szl-holdings/platform) ·
+[evidence registry](https://a11oy.net/)
+
 [Company front door](https://huggingface.co/spaces/SZLHOLDINGS/README) ·
 [Evidence registry](https://a11oy.net) ·
 [Security](https://github.com/szl-holdings/.github/security/policy) ·

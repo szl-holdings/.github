@@ -4,7 +4,7 @@
 
   ## Contribution model
 
-  .github is **source-available, proprietary software**. The codebase is published for evaluation, audit, and reference. We do not accept unsolicited pull requests at this time. See the repository [`LICENSE`](./LICENSE) for the full grant.
+  This repository is licensed under **Apache-2.0** and maintained as SZL Holdings' controlled community-health source. We do not accept unsolicited pull requests at this time. See the repository [`LICENSE`](./LICENSE) for the full grant.
 
   If you are a partner, customer, or collaborator with a written agreement, your contribution path is coordinated with your account contact. Reach us at [partners@szlholdings.com](mailto:partners@szlholdings.com).
 
