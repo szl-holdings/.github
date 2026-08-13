@@ -59,6 +59,11 @@ on:
         required: false
         type: string
         default: "/api/build-info"
+      expected-source-ref:
+        description: "Source-bound mode: optional exact protected source SHA that build-info must equal."
+        required: false
+        type: string
+        default: ""
 
 permissions:
   contents: read
@@ -98,6 +103,7 @@ jobs:
           MODE: ${{ inputs.mode }}
           TRUSTED_BASE_REF: ${{ inputs.trusted-base-ref }}
           CANDIDATE_REF: ${{ inputs.candidate-ref }}
+          EXPECTED_SOURCE_REF: ${{ inputs.expected-source-ref }}
           LOCK_PATH: ${{ inputs.deployment-lock-path }}
           SOURCE_PROBE_PATH: ${{ inputs.source-probe-path }}
         run: |
@@ -110,6 +116,12 @@ jobs:
           if [ -n "${CANDIDATE_REF}" ]; then
             [[ "${CANDIDATE_REF}" =~ ${sha_re} ]] || {
               echo "::error::candidate-ref must be an exact lowercase 40-character SHA"
+              exit 1
+            }
+          fi
+          if [ -n "${EXPECTED_SOURCE_REF}" ]; then
+            [[ "${EXPECTED_SOURCE_REF}" =~ ${sha_re} ]] || {
+              echo "::error::expected-source-ref must be an exact lowercase 40-character SHA"
               exit 1
             }
           fi
@@ -212,6 +224,7 @@ jobs:
           HF_REPO_IN: ${{ inputs.hf-repo }}
           TRUSTED_BASE_REF: ${{ inputs.trusted-base-ref }}
           CANDIDATE_REF: ${{ inputs.candidate-ref }}
+          EXPECTED_SOURCE_REF: ${{ inputs.expected-source-ref }}
           DOCKERFILE_PATH: ${{ inputs.dockerfile-path }}
           SOURCE_PROBE_PATH: ${{ inputs.source-probe-path }}
         run: |
@@ -226,6 +239,7 @@ jobs:
             --hf-repo "${HF_REPO}" \
             --trusted-base-ref "${TRUSTED_BASE_REF}" \
             --candidate-ref "${CANDIDATE_REF}" \
+            --expected-source-ref "${EXPECTED_SOURCE_REF}" \
             --dockerfile-path "${DOCKERFILE_PATH}" \
             --source-probe-path "${SOURCE_PROBE_PATH}" \
             --report-out hf-module-drift-report.out.json \

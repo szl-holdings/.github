@@ -121,12 +121,13 @@ class SourceBoundBaselineTests(unittest.TestCase):
             else:
                 setattr(drift, key, value)
 
-    def args(self, candidate=True):
+    def args(self, candidate=True, expected_source_ref=""):
         return argparse.Namespace(
             github_repo="szl-holdings/a11oy",
             hf_repo="SZLHOLDINGS/a11oy",
             trusted_base_ref=self.BASE,
             candidate_ref=self.HEAD if candidate else "",
+            expected_source_ref=expected_source_ref,
             dockerfile_path="Dockerfile",
             source_probe_path="/api/build-info",
             ref="main",
@@ -203,8 +204,77 @@ class SourceBoundBaselineTests(unittest.TestCase):
         self.assertTrue(calls["include_dockerfile"])
         self.assertEqual(report["mode"], "source-bound-live-baseline")
         self.assertEqual(report["observed_source_sha"], self.SOURCE)
+        self.assertIsNone(report["expected_source_ref"])
+        self.assertEqual(
+            report["source_binding_policy"], "ancestor-or-exact-candidate"
+        )
+        self.assertTrue(report["source_binding_valid"])
         self.assertFalse(report["allowlist_used"])
         self.assertEqual(candidate["baseline_ref"], self.SOURCE)
+
+    def test_exact_expected_source_succeeds_without_ancestry_fallback(self):
+        calls = self.install_clean()
+        drift.github_ref_is_ancestor = lambda *_args: self.fail(
+            "exact expected-source mode must not use ancestry"
+        )
+
+        report, errors, warns, candidate = baseline.source_bound_baseline_compare(
+            self.args(expected_source_ref=self.SOURCE)
+        )
+
+        self.assertEqual(errors, [])
+        self.assertEqual(warns, [])
+        self.assertEqual(calls["refs"], (self.SOURCE, self.LIVE))
+        self.assertEqual(report["expected_source_ref"], self.SOURCE)
+        self.assertEqual(report["source_binding_policy"], "exact-expected-source")
+        self.assertTrue(report["source_binding_valid"])
+        self.assertEqual(
+            report["observed_source_ancestry_status"], "exact-expected-source"
+        )
+        self.assertEqual(candidate["baseline_ref"], self.SOURCE)
+
+    def test_stale_ancestor_fails_exact_mode_without_compare_or_candidate_delta(self):
+        self.install_clean()
+        drift.github_ref_is_ancestor = lambda *_args: self.fail(
+            "exact expected-source mode must not fall back to ancestry"
+        )
+        drift.compare = lambda *_args, **_kwargs: self.fail("compare must not run")
+        drift.candidate_managed_delta = lambda *_args: self.fail(
+            "candidate delta must not run for an invalid source binding"
+        )
+
+        report, errors, warns, candidate = baseline.source_bound_baseline_compare(
+            self.args(expected_source_ref=self.BASE)
+        )
+
+        self.assertEqual(warns, [])
+        self.assertIsNone(candidate)
+        self.assertEqual(report["status"], "drift")
+        self.assertEqual(report["expected_source_ref"], self.BASE)
+        self.assertFalse(report["source_binding_valid"])
+        self.assertEqual(
+            report["observed_source_ancestry_status"], "expected-source-mismatch"
+        )
+        exact_errors = [
+            item for item in errors if item["kind"] == "observed-source-not-exact"
+        ]
+        self.assertEqual(len(exact_errors), 1)
+        self.assertEqual(exact_errors[0]["observed_source_sha"], self.SOURCE)
+        self.assertEqual(exact_errors[0]["expected_source_ref"], self.BASE)
+
+    def test_malformed_expected_source_fails_before_any_network_observation(self):
+        drift.hf_space_state = lambda *_args: self.fail("HF must not be queried")
+        baseline.source_probe_state = lambda *_args: self.fail(
+            "source probe must not be queried"
+        )
+        drift.github_ref_is_ancestor = lambda *_args: self.fail(
+            "GitHub ancestry must not be queried"
+        )
+
+        with self.assertRaisesRegex(ValueError, "expected protected source GitHub SHA"):
+            baseline.source_bound_baseline_compare(
+                self.args(expected_source_ref="main")
+            )
 
     def test_exact_deployed_candidate_is_a_valid_source_bound_baseline(self):
         calls = self.install_clean()
@@ -333,10 +403,21 @@ class ReusableWorkflowTests(unittest.TestCase):
             '--source-probe-path "${SOURCE_PROBE_PATH}"',
             "TRUSTED_BASE_REF: ${{ inputs.trusted-base-ref }}",
             "CANDIDATE_REF: ${{ inputs.candidate-ref }}",
+            "EXPECTED_SOURCE_REF: ${{ inputs.expected-source-ref }}",
+            '--expected-source-ref "${EXPECTED_SOURCE_REF}"',
         ):
             self.assertIn(safe, self.workflow)
         self.assertNotIn(
             '--source-probe-path "${{ inputs.source-probe-path }}"', self.workflow
+        )
+        self.assertNotIn(
+            '--expected-source-ref "${{ inputs.expected-source-ref }}"',
+            self.workflow,
+        )
+        self.assertIn("expected-source-ref:", self.workflow)
+        self.assertIn(
+            "expected-source-ref must be an exact lowercase 40-character SHA",
+            self.workflow,
         )
 
     def test_exact_reusable_revision_tools_and_reports_are_preserved(self):

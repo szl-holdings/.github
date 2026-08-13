@@ -828,35 +828,40 @@ def derive(args):
         "source_path": dockerfile_rel,
     }
 
-    if revision_rel:
-        ignore_rel, ignore_path = _effective_dockerignore(
-            args.repo_root,
-            dockerfile_rel,
-        )
-        if ignore_path is None:
-            ignore_source = "(generated-empty-dockerignore)"
-            ignore_meta = {
-                "source_path": ignore_source,
-                "generated_content_utf8": "",
-            }
-        else:
-            ignore_source = ignore_rel
-            ignore_meta = {"source_path": ignore_rel}
-        ignore_bytes = read_source_bytes(
-            args.repo_root,
-            "Dockerfile.dockerignore",
-            ignore_meta,
-        )
-        files["Dockerfile.dockerignore"] = {
-            "git_blob_sha1": git_blob_sha1(ignore_bytes),
-            "sha256": sha256(ignore_bytes),
-            "size": len(ignore_bytes),
-            "copy_source": "(dockerignore)",
+    # The remote HF build always consumes an HF-root Dockerfile. Bind the exact
+    # effective local build-context ignore contract beside it on every publish,
+    # even when no generated source-revision file is requested. Otherwise a
+    # stale remote Dockerfile.dockerignore can silently produce different build
+    # bytes from the exact source tree the manifest reports.
+    ignore_rel, ignore_path = _effective_dockerignore(
+        args.repo_root,
+        dockerfile_rel,
+    )
+    if ignore_path is None:
+        ignore_source = "(generated-empty-dockerignore)"
+        ignore_meta = {
             "source_path": ignore_source,
+            "generated_content_utf8": "",
         }
-        if "generated_content_utf8" in ignore_meta:
-            files["Dockerfile.dockerignore"]["generated_content_utf8"] = ""
+    else:
+        ignore_source = ignore_rel
+        ignore_meta = {"source_path": ignore_rel}
+    ignore_bytes = read_source_bytes(
+        args.repo_root,
+        "Dockerfile.dockerignore",
+        ignore_meta,
+    )
+    files["Dockerfile.dockerignore"] = {
+        "git_blob_sha1": git_blob_sha1(ignore_bytes),
+        "sha256": sha256(ignore_bytes),
+        "size": len(ignore_bytes),
+        "copy_source": "(dockerignore)",
+        "source_path": ignore_source,
+    }
+    if "generated_content_utf8" in ignore_meta:
+        files["Dockerfile.dockerignore"]["generated_content_utf8"] = ""
 
+    if revision_rel:
         materialized_revision = materialize_source_revision_file(
             args.repo_root,
             revision_rel,
