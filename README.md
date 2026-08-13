@@ -50,7 +50,7 @@
 
 ## Reusable workflows
 
-Twenty-one SHA-pinned, harden-runner-protected workflows that every product repo can call:
+Twenty-two SHA-pinned, harden-runner-protected workflows that every product repo can call:
 
 ```yaml
 jobs:
