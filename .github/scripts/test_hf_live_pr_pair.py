@@ -9,9 +9,9 @@ import io
 import json
 import sys
 import unittest
+import unittest.mock
 import urllib.error
 from pathlib import Path
-from unittest import mock
 
 
 HERE = Path(__file__).resolve().parent
@@ -242,12 +242,12 @@ class TestLivePRPair(unittest.TestCase):
 
         stderr = io.StringIO()
         with (
-            mock.patch.object(
+            unittest.mock.patch.object(
                 live_pair,
                 "validate_live_pr_pair",
                 side_effect=live_pair.LivePRPairError(token),
             ),
-            mock.patch.dict(live_pair.os.environ, environment, clear=True),
+            unittest.mock.patch.dict(live_pair.os.environ, environment, clear=True),
             contextlib.redirect_stderr(stderr),
         ):
             self.assertEqual(live_pair.main(), 1)
