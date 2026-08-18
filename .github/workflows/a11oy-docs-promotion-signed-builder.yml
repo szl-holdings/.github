@@ -71,9 +71,9 @@ jobs:
           if 'EXPECTED_BASE_SHA: 7788830c8db3d2611f5df296a5103e2a6ed74dc5' not in text:
               raise SystemExit('exact protected base is not bound')
           for line in text.splitlines():
-              if line.strip().startswith('uses:') and not re.search(r'@[0-9a-f]{40}(?:\\s|$)', line):
+              if line.strip().startswith('uses:') and not re.search(r'@[0-9a-f]{40}(?:\s|$)', line):
                   raise SystemExit(f'unpinned action: {line.strip()}')
-          if '${{ secrets.QILLQAQ_PRIVATE_KEY }}' not in text:
+          if 'private-key:' not in text or 'secrets.QILLQAQ_PRIVATE_KEY' not in text:
               raise SystemExit('independent App signer binding is missing')
           if 'echo $GH_TOKEN' in text or 'printenv' in text:
               raise SystemExit('secret-output construct detected')
