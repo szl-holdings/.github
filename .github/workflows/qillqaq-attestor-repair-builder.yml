@@ -1,0 +1,296 @@
+name: Qillqaq attestor exact successor builder
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - '.github/workflows/qillqaq-attestor-repair-builder.yml'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: qillqaq-attestor-successor-${{ github.event.pull_request.number }}
+  cancel-in-progress: false
+
+jobs:
+  build-successor:
+    name: build signed qillqaq successor
+    if: >-
+      github.event.pull_request.user.login == 'stephenlutar2-hash' &&
+      github.event.pull_request.head.ref == 'chore/qillqaq-attestor-repair-builder-20260818'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      GH_TOKEN: ${{ github.token }}
+      REPOSITORY: ${{ github.repository }}
+      TARGET_BRANCH: fix/qillqaq-secret-read-attestor-successor-20260818
+    steps:
+      - name: Verify exact protected-base context
+        id: context
+        shell: bash
+        run: |
+          set -euo pipefail
+          base_sha='${{ github.event.pull_request.base.sha }}'
+          current_main="$(gh api "repos/${REPOSITORY}/git/ref/heads/main" --jq '.object.sha')"
+          test "$current_main" = "$base_sha"
+          target_head="$(gh api "repos/${REPOSITORY}/git/ref/heads/${TARGET_BRANCH}" --jq '.object.sha')"
+          test "$target_head" = "$base_sha"
+          echo "base_sha=$base_sha" >> "$GITHUB_OUTPUT"
+
+      - name: Checkout exact protected base
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ steps.context.outputs.base_sha }}
+          path: source
+          persist-credentials: false
+
+      - name: Apply exact permission and attestor repairs
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+
+          root = Path('source')
+
+          def replace_once(relative: str, old: str, new: str) -> None:
+              path = root / relative
+              text = path.read_text(encoding='utf-8')
+              if text.count(old) != 1:
+                  raise SystemExit(f'{relative}: expected exactly one replacement anchor')
+              path.write_text(text.replace(old, new, 1), encoding='utf-8')
+
+          replace_once(
+              '.governance/github-app-manifest.json',
+              '    "organization_administration": "read",\n'
+              '    "pull_requests": "write"\n',
+              '    "organization_administration": "read",\n'
+              '    "organization_secrets": "read",\n'
+              '    "pull_requests": "write",\n'
+              '    "secrets": "read"\n',
+          )
+          replace_once(
+              '.github/scripts/verify_forge9_governance.py',
+              '        "organization_administration": "read",\n'
+              '        "pull_requests": "write",\n',
+              '        "organization_administration": "read",\n'
+              '        "organization_secrets": "read",\n'
+              '        "pull_requests": "write",\n'
+              '        "secrets": "read",\n',
+          )
+          replace_once(
+              '.github/scripts/test_code_security_drift.py',
+              '        self.assertEqual(permissions["organization_administration"], "read")\n'
+              '        self.assertEqual(permissions["administration"], "read")\n',
+              '        self.assertEqual(permissions["organization_administration"], "read")\n'
+              '        self.assertEqual(permissions["organization_secrets"], "read")\n'
+              '        self.assertEqual(permissions["administration"], "read")\n'
+              '        self.assertEqual(permissions["secrets"], "read")\n',
+          )
+          replace_once(
+              '.github/workflows/attest-and-approve.yml',
+              "grep -Eq 'Risk:[[:space:]]*D[[:space:]]*[-â€”]'",
+              "grep -Eq 'Risk:[[:space:]]*D[[:space:]]*[-—]'",
+          )
+          replace_once(
+              '.github/scripts/test_dco_activation.py',
+              '        self.assertNotIn(\n'
+              '            "Solo-Operator-Authorization:[[:space:]]*confirmed\'",\n'
+              '            self.attestor,\n'
+              '        )\n',
+              '        self.assertNotIn(\n'
+              '            "Solo-Operator-Authorization:[[:space:]]*confirmed\'",\n'
+              '            self.attestor,\n'
+              '        )\n'
+              '        risk_marker = "Risk:[[:space:]]*D[[:space:]]*[-—]"\n'
+              '        self.assertIn(f"grep -Eq \'{risk_marker}\'", self.attestor)\n'
+              '        self.assertNotIn("[-â€”]", self.attestor)\n',
+          )
+          PY
+
+      - name: Enforce exact five-file scope and regressions
+        working-directory: source
+        shell: bash
+        run: |
+          set -euo pipefail
+          mapfile -t changed < <(git diff --name-only | sort)
+          expected=(
+            .github/scripts/test_code_security_drift.py
+            .github/scripts/test_dco_activation.py
+            .github/scripts/verify_forge9_governance.py
+            .github/workflows/attest-and-approve.yml
+            .governance/github-app-manifest.json
+          )
+          test "${changed[*]}" = "${expected[*]}"
+          git diff --check
+          python .github/scripts/test_dco_activation.py
+          python .github/scripts/verify_forge9_governance.py
+          python .github/scripts/test_code_security_drift.py
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          manifest = json.loads(
+              Path('.governance/github-app-manifest.json').read_text(encoding='utf-8')
+          )
+          permissions = manifest['default_permissions']
+          assert permissions['organization_secrets'] == 'read'
+          assert permissions['secrets'] == 'read'
+          assert all(value != 'write' for key, value in permissions.items() if 'secret' in key)
+          attestor = Path('.github/workflows/attest-and-approve.yml').read_text(
+              encoding='utf-8'
+          )
+          assert "Risk:[[:space:]]*D[[:space:]]*[-—]" in attestor
+          assert 'â€”' not in attestor
+          PY
+          printf '%s\n' 'Risk: D - narrow change' | \
+            grep -Eq 'Risk:[[:space:]]*D[[:space:]]*[-—]'
+          printf '%s\n' 'Risk: D — narrow change' | \
+            grep -Eq 'Risk:[[:space:]]*D[[:space:]]*[-—]'
+          if printf '%s\n' 'Risk: D / invalid' | \
+            grep -Eq 'Risk:[[:space:]]*D[[:space:]]*[-—]'; then
+            exit 1
+          fi
+
+      - name: Create exact GitHub-signed successor commit
+        id: publish
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          export REPAIR_ROOT="$GITHUB_WORKSPACE/source"
+          export REPAIR_BASE_SHA='${{ steps.context.outputs.base_sha }}'
+          result="$RUNNER_TEMP/qillqaq-attestor-successor.json"
+          python - "$result" <<'PY'
+          import base64
+          import json
+          import os
+          import pathlib
+          import sys
+          import urllib.request
+
+          output = pathlib.Path(sys.argv[1])
+          root = pathlib.Path(os.environ['REPAIR_ROOT'])
+          paths = [
+              '.github/scripts/test_code_security_drift.py',
+              '.github/scripts/test_dco_activation.py',
+              '.github/scripts/verify_forge9_governance.py',
+              '.github/workflows/attest-and-approve.yml',
+              '.governance/github-app-manifest.json',
+          ]
+          additions = [
+              {
+                  'path': rel,
+                  'contents': base64.b64encode((root / rel).read_bytes()).decode('ascii'),
+              }
+              for rel in paths
+          ]
+          query = '''
+          mutation BuildQillqaqSuccessor($input: CreateCommitOnBranchInput!) {
+            createCommitOnBranch(input: $input) {
+              commit { oid url }
+            }
+          }
+          '''
+          variables = {
+              'input': {
+                  'branch': {
+                      'repositoryNameWithOwner': os.environ['REPOSITORY'],
+                      'branchName': os.environ['TARGET_BRANCH'],
+                  },
+                  'expectedHeadOid': os.environ['REPAIR_BASE_SHA'],
+                  'message': {
+                      'headline': 'fix(governance): repair qillqaq attestor admission',
+                      'body': (
+                          'Add read-only secret-name scopes to the reviewed App manifest.\n'
+                          'Repair the P5 Risk-D separator matcher and bind its regression.\n\n'
+                          'Signed-off-by: github-actions[bot] '
+                          '<41898282+github-actions[bot]@users.noreply.github.com>'
+                      ),
+                  },
+                  'fileChanges': {'additions': additions},
+              }
+          }
+          request = urllib.request.Request(
+              'https://api.github.com/graphql',
+              data=json.dumps({'query': query, 'variables': variables}).encode('utf-8'),
+              method='POST',
+              headers={
+                  'Authorization': f"Bearer {os.environ['GH_TOKEN']}",
+                  'Accept': 'application/vnd.github+json',
+                  'Content-Type': 'application/json',
+                  'User-Agent': 'szl-qillqaq-attestor-repair-builder',
+                  'X-GitHub-Api-Version': '2022-11-28',
+              },
+          )
+          with urllib.request.urlopen(request, timeout=90) as response:
+              payload = json.load(response)
+          if payload.get('errors'):
+              raise SystemExit('; '.join(str(row.get('message')) for row in payload['errors']))
+          commit = payload['data']['createCommitOnBranch']['commit']
+          output.write_text(json.dumps(commit) + '\n', encoding='utf-8')
+          PY
+
+          commit_sha="$(jq -er '.oid' "$result")"
+          commit_json="$(gh api "repos/${REPOSITORY}/commits/${commit_sha}")"
+          jq -e '.commit.verification.verified == true' <<<"$commit_json" >/dev/null
+          test "$(jq -er '.parents | length' <<<"$commit_json")" = '1'
+          test "$(jq -er '.parents[0].sha' <<<"$commit_json")" = \
+            '${{ steps.context.outputs.base_sha }}'
+          grep -Fq \
+            'Signed-off-by: github-actions[bot] <41898282+github-actions[bot]@users.noreply.github.com>' \
+            <<<"$(jq -r '.commit.message' <<<"$commit_json")"
+          mapfile -t changed < <(jq -r '.files[].filename' <<<"$commit_json" | sort)
+          expected=(
+            .github/scripts/test_code_security_drift.py
+            .github/scripts/test_dco_activation.py
+            .github/scripts/verify_forge9_governance.py
+            .github/workflows/attest-and-approve.yml
+            .governance/github-app-manifest.json
+          )
+          test "${changed[*]}" = "${expected[*]}"
+          echo "commit_sha=$commit_sha" >> "$GITHUB_OUTPUT"
+          echo "branch=$TARGET_BRANCH" >> "$GITHUB_OUTPUT"
+
+      - name: Upload immutable successor identity
+        shell: bash
+        run: |
+          set -euo pipefail
+          evidence="$RUNNER_TEMP/qillqaq-attestor-successor-evidence"
+          mkdir -p "$evidence"
+          jq -n \
+            --arg schema 'szl.qillqaq-attestor-successor.v1' \
+            --arg base '${{ steps.context.outputs.base_sha }}' \
+            --arg head '${{ steps.publish.outputs.commit_sha }}' \
+            --arg branch '${{ steps.publish.outputs.branch }}' \
+            '{schema:$schema,base_sha:$base,head_sha:$head,branch:$branch}' \
+            > "$evidence/identity.json"
+          cd source
+          sha256sum \
+            .github/scripts/test_code_security_drift.py \
+            .github/scripts/test_dco_activation.py \
+            .github/scripts/verify_forge9_governance.py \
+            .github/workflows/attest-and-approve.yml \
+            .governance/github-app-manifest.json \
+            > "$evidence/files.sha256"
+
+      - name: Upload successor evidence
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: qillqaq-attestor-successor-evidence
+          path: ${{ runner.temp }}/qillqaq-attestor-successor-evidence
+          if-no-files-found: error
+          retention-days: 90
+
+      - name: Report successor
+        shell: bash
+        run: |
+          {
+            echo '### Qillqaq attestor signed successor'
+            echo "- branch: \`${{ steps.publish.outputs.branch }}\`"
+            echo "- base: \`${{ steps.context.outputs.base_sha }}\`"
+            echo "- head: \`${{ steps.publish.outputs.commit_sha }}\`"
+            echo '- signature: GitHub verified'
+            echo '- DCO: exact github-actions bot identity'
+            echo '- scope: five permanent files only'
+          } >> "$GITHUB_STEP_SUMMARY"
