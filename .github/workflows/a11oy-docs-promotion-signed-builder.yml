@@ -27,7 +27,7 @@ jobs:
     env:
       GH_TOKEN: ${{ github.token }}
       REPOSITORY: ${{ github.repository }}
-      TARGET_BRANCH: feat/a11oy-docs-security-promotion-20260818
+      TARGET_BRANCH: feat/a11oy-docs-security-promotion-20260818-v2
       TARGET_PATH: .github/workflows/a11oy-docs-security-promotion.yml
     steps:
       - name: Harden runner
@@ -158,6 +158,7 @@ jobs:
                               'reviews exact A11oy PR 1313, revalidates its signed head, DCO, paths, '
                               'hosted workflow matrix, body digest, and protected base, then '
                               'promotes only that immutable head through the Qillqaq GitHub App.\n\n'
+                              'Signed-off-by: github-actions[bot] <41898282+github-actions[bot]@users.noreply.github.com>\n'
                               'Signed-off-by: Lutar, Stephen P. <stephenlutar2@gmail.com>'
                           ),
                       },
@@ -189,8 +190,10 @@ jobs:
           if [row.get('filename') for row in files] != [target_path]:
               raise SystemExit('target commit changed-path mismatch')
           message = str((commit.get('commit') or {}).get('message') or '')
+          if 'Signed-off-by: github-actions[bot] <41898282+github-actions[bot]@users.noreply.github.com>' not in message:
+              raise SystemExit('target commit author DCO sign-off is missing')
           if 'Signed-off-by: Lutar, Stephen P. <stephenlutar2@gmail.com>' not in message:
-              raise SystemExit('target commit DCO sign-off is missing')
+              raise SystemExit('target commit owner sign-off is missing')
           ref = api('GET', ref_url)
           if ((ref.get('object') or {}).get('sha')) != head:
               raise SystemExit('target branch readback mismatch')
