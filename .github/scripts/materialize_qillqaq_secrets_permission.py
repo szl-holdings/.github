@@ -57,6 +57,10 @@ NEW_TEST = '''        self.assertEqual(permissions["organization_administration"
         self.assertEqual(permissions["administration"], "read")
         self.assertEqual(permissions["secrets"], "read")
 '''
+BOT_SIGNOFF = (
+    "Signed-off-by: github-actions[bot] "
+    "<41898282+github-actions[bot]@users.noreply.github.com>"
+)
 
 
 def run(*args: str) -> None:
@@ -73,7 +77,7 @@ def request(url: str, *, data: dict[str, Any] | None = None) -> Any:
             "Accept": "application/vnd.github+json",
             "Content-Type": "application/json",
             "X-GitHub-Api-Version": "2022-11-28",
-            "User-Agent": "szl-qillqaq-secrets-permission-materializer/1",
+            "User-Agent": "szl-qillqaq-secrets-permission-materializer/2",
         },
     )
     try:
@@ -149,7 +153,7 @@ def main() -> int:
             },
             "message": {
                 "headline": "fix(app): grant qillqaq secret-name read",
-                "body": "Signed-off-by: Stephen Lutar <stephenlutar2@gmail.com>",
+                "body": BOT_SIGNOFF,
             },
             "expectedHeadOid": EXPECTED_PARENT,
             "fileChanges": {
@@ -173,14 +177,22 @@ def main() -> int:
         raise SystemExit(json.dumps(payload["errors"], indent=2))
     commit = payload["data"]["createCommitOnBranch"]["commit"]
     sha = commit["oid"]
-    verification = request(
-        f"https://api.github.com/repos/{REPOSITORY}/commits/{sha}"
-    )["commit"]["verification"]
+    commit_payload = request(f"https://api.github.com/repos/{REPOSITORY}/commits/{sha}")
+    verification = commit_payload["commit"]["verification"]
+    author = commit_payload["commit"]["author"]
     if verification.get("verified") is not True or verification.get("reason") != "valid":
         raise SystemExit(f"target commit is not GitHub-verified: {verification}")
+    if author != {
+        "name": "github-actions[bot]",
+        "email": "41898282+github-actions[bot]@users.noreply.github.com",
+        "date": author.get("date"),
+    }:
+        raise SystemExit(f"unexpected signed commit author: {author}")
+    if BOT_SIGNOFF not in commit_payload["commit"]["message"]:
+        raise SystemExit("signed commit does not carry its exact author DCO identity")
 
     receipt = {
-        "schema": "szl.qillqaq-secrets-permission-materialization/v1",
+        "schema": "szl.qillqaq-secrets-permission-materialization/v2",
         "expected_parent": EXPECTED_PARENT,
         "target_branch": TARGET_BRANCH,
         "commit": commit,
@@ -188,6 +200,7 @@ def main() -> int:
             "verified": verification.get("verified"),
             "reason": verification.get("reason"),
         },
+        "dco_identity": BOT_SIGNOFF,
         "permissions_added": {
             "repository.secrets": "read",
             "organization.organization_secrets": "read",
