@@ -304,7 +304,9 @@ class TestProductionWorkflowAuthContract(unittest.TestCase):
         )
         permissions = manifest["default_permissions"]
         self.assertEqual(permissions["organization_administration"], "read")
+        self.assertEqual(permissions["organization_secrets"], "read")
         self.assertEqual(permissions["administration"], "read")
+        self.assertEqual(permissions["secrets"], "read")
 
 
 if __name__ == "__main__":

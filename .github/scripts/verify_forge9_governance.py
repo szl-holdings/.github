@@ -178,7 +178,9 @@ def verify_manifest() -> None:
         "contents": "read",
         "metadata": "read",
         "organization_administration": "read",
+        "organization_secrets": "read",
         "pull_requests": "write",
+        "secrets": "read",
     }
     if permissions != expected:
         fail("GitHub App permissions differ from the reviewed minimum")
