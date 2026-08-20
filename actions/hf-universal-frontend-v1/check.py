@@ -404,13 +404,32 @@ def _has_reduced_motion_control(declarations: list[tuple[str, str]]) -> bool:
     return any(declaration in accepted for declaration in declarations)
 
 
+def _selector_is_guaranteed_active(prelude: str) -> bool:
+    """Accept only selectors guaranteed to match the served document.
+
+    The contract cannot inspect runtime component markup, so class, attribute,
+    state, and negation selectors are not evidence that a declaration applies.
+    A selector list is usable when it includes the document root/body or the
+    universal selector directly.
+    """
+    guaranteed = {":root", "html", "body", "*"}
+    audited = guaranteed | {"*::before", "*::after"}
+    selectors = {
+        re.sub(r"\s+", "", selector).casefold()
+        for selector in prelude.split(",")
+        if selector.strip()
+    }
+    return bool(selectors & guaranteed) and selectors <= audited
+
+
 def validate_css(css_text: str) -> None:
     active_css = _strip_css_inert_text(css_text)
     active_declarations: set[tuple[str, str]] = set()
     observed_media: set[str] = set()
     for prelude, body in _css_rule_blocks(active_css):
         if not prelude.lstrip().startswith("@"):
-            active_declarations.update(_css_declarations(body))
+            if _selector_is_guaranteed_active(prelude):
+                active_declarations.update(_css_declarations(body))
             continue
         query = _media_query(prelude)
         if query not in REQUIRED_MEDIA_QUERIES:
@@ -418,6 +437,8 @@ def validate_css(css_text: str) -> None:
         nested_declarations: list[tuple[str, str]] = []
         for nested_prelude, nested_body in _css_rule_blocks(body):
             if nested_prelude.lstrip().startswith("@"):
+                continue
+            if not _selector_is_guaranteed_active(nested_prelude):
                 continue
             nested_declarations.extend(_css_declarations(nested_body))
         if not nested_declarations:
@@ -542,11 +563,45 @@ def _module_aliases(tree: ast.Module, module: str) -> set[str]:
     return aliases - shadowed
 
 
+def _direct_top_level_calls(tree: ast.Module) -> list[ast.Call]:
+    """Return calls in the narrow module statements guaranteed to execute.
+
+    Calls under functions, classes, conditionals, loops, exception handlers,
+    and comprehensions are intentionally excluded because static inspection
+    cannot prove that those paths run. Top-level ``with`` bodies are accepted;
+    entering the context and executing its body are unconditional module work.
+    """
+    calls: list[ast.Call] = []
+
+    def collect(statements: list[ast.stmt]) -> None:
+        for statement in statements:
+            expression: ast.AST | None = None
+            if isinstance(statement, ast.Expr):
+                expression = statement.value
+            elif isinstance(statement, ast.Assign):
+                expression = statement.value
+            elif isinstance(statement, ast.AnnAssign):
+                expression = statement.value
+            if isinstance(expression, ast.Call):
+                calls.append(expression)
+                continue
+            if isinstance(statement, (ast.With, ast.AsyncWith)):
+                calls.extend(
+                    item.context_expr
+                    for item in statement.items
+                    if isinstance(item.context_expr, ast.Call)
+                )
+                collect(statement.body)
+
+    collect(tree.body)
+    return calls
+
+
 def _gradio_applies_css(tree: ast.Module, css_variables: set[str]) -> bool:
     aliases = _module_aliases(tree, "gradio")
     constructors = {"Blocks", "ChatInterface", "Interface", "TabbedInterface"}
-    for node in ast.walk(tree):
-        if not isinstance(node, ast.Call) or not isinstance(node.func, ast.Attribute):
+    for node in _direct_top_level_calls(tree):
+        if not isinstance(node.func, ast.Attribute):
             continue
         if (
             not isinstance(node.func.value, ast.Name)
@@ -601,8 +656,8 @@ def _style_expression_uses_css(expression: ast.AST, css_variables: set[str]) -> 
 
 def _streamlit_applies_css(tree: ast.Module, css_variables: set[str]) -> bool:
     aliases = _module_aliases(tree, "streamlit")
-    for node in ast.walk(tree):
-        if not isinstance(node, ast.Call) or not isinstance(node.func, ast.Attribute):
+    for node in _direct_top_level_calls(tree):
+        if not isinstance(node.func, ast.Attribute):
             continue
         if (
             not isinstance(node.func.value, ast.Name)
@@ -622,6 +677,136 @@ def _streamlit_applies_css(tree: ast.Module, css_variables: set[str]) -> bool:
         ):
             return True
     return False
+
+
+def _consume_javascript_string(
+    source: str,
+    start: int,
+    *,
+    reject_escapes: bool = False,
+) -> tuple[str, int] | None:
+    quote = source[start]
+    cursor = start + 1
+    value: list[str] = []
+    while cursor < len(source):
+        character = source[cursor]
+        if character == "\\":
+            if reject_escapes:
+                # Escaped module specifiers are not an exact, auditable path form.
+                return None
+            if cursor + 1 >= len(source):
+                return None
+            value.extend((character, source[cursor + 1]))
+            cursor += 2
+            continue
+        if character == quote:
+            return "".join(value), cursor + 1
+        if quote != "`" and character in {"\r", "\n"}:
+            return None
+        value.append(character)
+        cursor += 1
+    return None
+
+
+def _react_marker_and_imports(app_text: str) -> tuple[bool, list[str]]:
+    """Extract exact top-level side-effect imports from JavaScript source."""
+    marker = False
+    imports: list[str] = []
+    cursor = 0
+    brace_depth = 0
+    while cursor < len(app_text):
+        if app_text.startswith("//", cursor):
+            end = len(app_text)
+            for separator in ("\r", "\n"):
+                candidate = app_text.find(separator, cursor + 2)
+                if candidate >= 0:
+                    end = min(end, candidate)
+            if brace_depth == 0 and app_text[cursor:end].strip() == REACT_MARKER:
+                marker = True
+            cursor = end
+            continue
+        if app_text.startswith("/*", cursor):
+            end = app_text.find("*/", cursor + 2)
+            if end < 0:
+                raise ContractError("React frontend binding contains an unclosed comment")
+            cursor = end + 2
+            continue
+
+        character = app_text[cursor]
+        if character in {"'", '"', "`"}:
+            consumed = _consume_javascript_string(app_text, cursor)
+            if consumed is None:
+                raise ContractError("React frontend binding contains an unsupported string literal")
+            _, cursor = consumed
+            continue
+        if character == "{":
+            brace_depth += 1
+            cursor += 1
+            continue
+        if character == "}":
+            brace_depth = max(0, brace_depth - 1)
+            cursor += 1
+            continue
+
+        if (
+            brace_depth == 0
+            and app_text.startswith("import", cursor)
+            and not app_text[
+                max(app_text.rfind("\n", 0, cursor), app_text.rfind("\r", 0, cursor)) + 1 : cursor
+            ].strip()
+            and (cursor == 0 or not (app_text[cursor - 1].isalnum() or app_text[cursor - 1] in {"_", "$"}))
+            and (
+                cursor + 6 == len(app_text)
+                or not (app_text[cursor + 6].isalnum() or app_text[cursor + 6] in {"_", "$"})
+            )
+        ):
+            path_start = cursor + 6
+            while path_start < len(app_text) and app_text[path_start] in {" ", "\t"}:
+                path_start += 1
+            if path_start < len(app_text) and app_text[path_start] in {"'", '"'}:
+                consumed = _consume_javascript_string(
+                    app_text,
+                    path_start,
+                    reject_escapes=True,
+                )
+                if consumed is not None:
+                    specifier, end = consumed
+                    terminator = re.match(
+                        r"[ \t]*;?[ \t]*(?://[^\r\n]*)?(?:\r?\n|$)",
+                        app_text[end:],
+                    )
+                    if terminator:
+                        imports.append(specifier)
+                        cursor = end + terminator.end()
+                        continue
+        cursor += 1
+    return marker, imports
+
+
+def _resolved_react_import(app_file: str, specifier: str) -> str:
+    _reject_line_breaks(specifier, "React stylesheet import")
+    parsed = urlsplit(specifier)
+    if parsed.scheme or parsed.netloc or parsed.query or parsed.fragment:
+        raise ContractError("React universal stylesheet import must be repository-local")
+    if not parsed.path or parsed.path.startswith("/") or "\\" in parsed.path:
+        raise ContractError("React universal stylesheet import must be a relative POSIX path")
+    resolved = posixpath.normpath(
+        posixpath.join(posixpath.dirname(app_file), parsed.path)
+    )
+    if resolved == ".." or resolved.startswith("../"):
+        raise ContractError("React universal stylesheet import escapes the repository")
+    return resolved
+
+
+def _react_applies_css(app_text: str, app_file: str, css_file: str) -> bool:
+    marker, imports = _react_marker_and_imports(app_text)
+    if not marker:
+        raise ContractError("React universal CSS import marker is absent")
+    expected = posixpath.normpath(css_file)
+    return any(
+        _resolved_react_import(app_file, specifier) == expected
+        for specifier in imports
+    )
 
 
 def _resolved_static_href(app_file: str, href: str) -> str:
@@ -687,8 +872,14 @@ def validate_framework_binding(
             raise ContractError(
                 "Static universal CSS requires a stylesheet <link> whose marker and href bind the declared css_file"
             )
-    if framework == "react" and REACT_MARKER not in app_text:
-        raise ContractError("React universal CSS import marker is absent")
+    if framework == "react" and not _react_applies_css(
+        app_text,
+        app_file,
+        css_file,
+    ):
+        raise ContractError(
+            "React universal CSS requires a top-level side-effect import of the declared css_file"
+        )
 
 
 def validate_hashes(

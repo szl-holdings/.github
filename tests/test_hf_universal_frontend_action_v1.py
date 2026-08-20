@@ -71,6 +71,16 @@ def _fixture(root: Path, framework: str = "static") -> None:
         )
         app_file = "app.py"
         sdk = "streamlit"
+    elif framework == "react":
+        app = root / "main.tsx"
+        app.write_text(
+            "// SZL_HF_UNIVERSAL_FRONTEND_V1\n"
+            'import "./szl-universal-frontend.css";\n'
+            "export const App = () => <main>ok</main>;\n",
+            encoding="utf-8",
+        )
+        app_file = "main.tsx"
+        sdk = "static"
     else:
         raise AssertionError(framework)
     css = root / "szl-universal-frontend.css"
@@ -140,6 +150,13 @@ def test_streamlit_contract_passes(tmp_path: Path) -> None:
     result = MODULE.validate(tmp_path, Path("docs/hf-universal-frontend-v1.json"))
     assert result["framework"] == "streamlit"
     assert result["sdk"] == "streamlit"
+
+
+def test_react_contract_passes_with_live_stylesheet_import(tmp_path: Path) -> None:
+    _fixture(tmp_path, "react")
+    result = MODULE.validate(tmp_path, Path("docs/hf-universal-frontend-v1.json"))
+    assert result["framework"] == "react"
+    assert result["sdk"] == "static"
 
 
 def test_hash_drift_fails_closed(tmp_path: Path) -> None:
@@ -236,6 +253,34 @@ def test_non_applying_css_rules_are_rejected(tmp_path: Path, wrapper: str) -> No
     _fixture(tmp_path)
     css = tmp_path / "szl-universal-frontend.css"
     css.write_text(wrapper, encoding="utf-8")
+    manifest_path, payload = _manifest(tmp_path)
+    payload["file_sha256"]["szl-universal-frontend.css"] = _sha(css)
+    manifest_path.write_text(json.dumps(payload), encoding="utf-8")
+    with pytest.raises(MODULE.ContractError, match="missing required active tokens"):
+        MODULE.validate(tmp_path, Path("docs/hf-universal-frontend-v1.json"))
+
+
+@pytest.mark.parametrize("selector", [":not(*)", "*, :not("])
+def test_impossible_css_selectors_cannot_satisfy_controls(
+    tmp_path: Path,
+    selector: str,
+) -> None:
+    _fixture(tmp_path)
+    css = tmp_path / "szl-universal-frontend.css"
+    css.write_text(
+        f"{selector} {{\n"
+        "  --szl-touch-target: 44px;\n"
+        "  overflow-wrap: anywhere;\n"
+        "  overflow-x: clip;\n"
+        "}\n"
+        "@media (max-width: 560px) {\n"
+        f"  {selector} {{ padding-inline: 0.5rem; }}\n"
+        "}\n"
+        "@media (prefers-reduced-motion: reduce) {\n"
+        f"  {selector} {{ animation-duration: 0.01ms !important; }}\n"
+        "}\n",
+        encoding="utf-8",
+    )
     manifest_path, payload = _manifest(tmp_path)
     payload["file_sha256"]["szl-universal-frontend.css"] = _sha(css)
     manifest_path.write_text(json.dumps(payload), encoding="utf-8")
@@ -387,6 +432,100 @@ def test_python_framework_must_apply_declared_css(
     app.write_text(app_text, encoding="utf-8")
     manifest_path, payload = _manifest(tmp_path)
     payload["file_sha256"]["app.py"] = _sha(app)
+    manifest_path.write_text(json.dumps(payload), encoding="utf-8")
+    with pytest.raises(MODULE.ContractError, match=message):
+        MODULE.validate(tmp_path, Path("docs/hf-universal-frontend-v1.json"))
+
+
+@pytest.mark.parametrize(
+    ("framework", "dead_binding", "message"),
+    [
+        (
+            "gradio",
+            "if False:\n    demo = gr.Blocks(css=_SZL_UNIVERSAL_CSS)\n",
+            "Gradio universal CSS binding is absent",
+        ),
+        (
+            "gradio",
+            "def build():\n    return gr.Blocks(css=_SZL_UNIVERSAL_CSS)\n",
+            "Gradio universal CSS binding is absent",
+        ),
+        (
+            "streamlit",
+            "if False:\n"
+            + "    st.markdown(f'<style>{_SZL_UNIVERSAL_CSS}</style>', unsafe_allow_html=True)\n",
+            "Streamlit universal CSS binding is absent",
+        ),
+        (
+            "streamlit",
+            "def render():\n"
+            + "    st.markdown(f'<style>{_SZL_UNIVERSAL_CSS}</style>', unsafe_allow_html=True)\n",
+            "Streamlit universal CSS binding is absent",
+        ),
+    ],
+)
+def test_python_framework_binding_in_dead_code_is_rejected(
+    tmp_path: Path,
+    framework: str,
+    dead_binding: str,
+    message: str,
+) -> None:
+    _fixture(tmp_path, framework)
+    module_name = "gradio as gr" if framework == "gradio" else "streamlit as st"
+    app = tmp_path / "app.py"
+    app.write_text(
+        "from pathlib import Path\n"
+        + f"import {module_name}\n"
+        + "# SZL_HF_UNIVERSAL_FRONTEND_V1\n"
+        + "_SZL_UNIVERSAL_CSS = Path('szl-universal-frontend.css').read_text()\n"
+        + dead_binding,
+        encoding="utf-8",
+    )
+    manifest_path, payload = _manifest(tmp_path)
+    payload["file_sha256"]["app.py"] = _sha(app)
+    manifest_path.write_text(json.dumps(payload), encoding="utf-8")
+    with pytest.raises(MODULE.ContractError, match=message):
+        MODULE.validate(tmp_path, Path("docs/hf-universal-frontend-v1.json"))
+
+
+@pytest.mark.parametrize(
+    ("app_text", "message"),
+    [
+        (
+            "// SZL_HF_UNIVERSAL_FRONTEND_V1\nexport const App = () => null;\n",
+            "top-level side-effect import",
+        ),
+        (
+            'const marker = "// SZL_HF_UNIVERSAL_FRONTEND_V1";\n'
+            + 'import "./szl-universal-frontend.css";\n',
+            "import marker is absent",
+        ),
+        (
+            "// SZL_HF_UNIVERSAL_FRONTEND_V1\n"
+            + 'const decoy = "import \\\"./szl-universal-frontend.css\\\";";\n',
+            "top-level side-effect import",
+        ),
+        (
+            "// SZL_HF_UNIVERSAL_FRONTEND_V1\n"
+            + 'if (false) { void import("./szl-universal-frontend.css"); }\n',
+            "top-level side-effect import",
+        ),
+        (
+            "// SZL_HF_UNIVERSAL_FRONTEND_V1\nimport './other.css';\n",
+            "top-level side-effect import",
+        ),
+    ],
+)
+def test_react_marker_must_have_live_declared_stylesheet_import(
+    tmp_path: Path,
+    app_text: str,
+    message: str,
+) -> None:
+    _fixture(tmp_path, "react")
+    app = tmp_path / "main.tsx"
+    app.write_text(app_text, encoding="utf-8")
+    manifest_path, payload = _manifest(tmp_path)
+    payload["file_sha256"]["main.tsx"] = _sha(app)
     manifest_path.write_text(json.dumps(payload), encoding="utf-8")
     with pytest.raises(MODULE.ContractError, match=message):
         MODULE.validate(tmp_path, Path("docs/hf-universal-frontend-v1.json"))

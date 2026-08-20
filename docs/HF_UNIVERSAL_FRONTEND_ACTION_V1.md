@@ -35,6 +35,16 @@ It validates:
 - reduced-motion and technical-identifier wrapping controls
 - exact managed-file SHA-256 digests
 
+Framework binding evidence is deliberately narrow. Gradio and Streamlit must
+read the declared CSS into an unshadowed top-level variable and consume it in
+an executable top-level framework call; bindings in dead or conditional code
+do not count. React must pair its exact top-level marker comment with a
+top-level side-effect import that resolves to the declared CSS file. CSS
+controls count only in rules made from the audited `:root`, `html`, `body`,
+`*`, `*::before`, and `*::after` selectors, with at least one selector that
+matches a document element, so inert or invalid selector lists cannot satisfy
+the contract.
+
 It does not prove live runtime readiness. Live readiness remains the responsibility of the estate-wide browser census and source/runtime revision readback.
 
 ## Pinning policy
