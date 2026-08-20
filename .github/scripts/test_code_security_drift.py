@@ -11,9 +11,10 @@ import importlib.util
 import io
 import json
 import os
-from pathlib import Path
 import sys
+import tempfile
 import unittest
+from pathlib import Path
 
 _HERE = os.path.dirname(os.path.abspath(__file__))
 _MODULE_PATH = os.path.join(_HERE, "code_security_drift.py")
@@ -359,6 +360,74 @@ class TestProductionWorkflowAuthContract(unittest.TestCase):
             },
         )
         forge9.verify_app_token_permissions()
+
+    def app_token_blocks_for(self, workflow: str) -> list[dict[str, str]]:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            relative = ".github/workflows/adversarial.yml"
+            path = root / relative
+            path.parent.mkdir(parents=True)
+            path.write_text(workflow, encoding="utf-8")
+            saved_root = forge9.ROOT
+            forge9.ROOT = root
+            try:
+                return forge9.app_token_permission_blocks(relative)
+            finally:
+                forge9.ROOT = saved_root
+
+    def assert_app_token_alias_rejected(self, workflow: str) -> None:
+        with (
+            contextlib.redirect_stderr(io.StringIO()) as stderr,
+            self.assertRaises(SystemExit) as raised,
+        ):
+            self.app_token_blocks_for(workflow)
+        self.assertEqual(raised.exception.code, 1)
+        self.assertIn("uses a YAML alias", stderr.getvalue())
+
+    def test_scalar_alias_cannot_hide_app_token_mint(self):
+        self.assert_app_token_alias_rejected(
+            "name: &mint "
+            + forge9.APP_TOKEN_ACTION
+            + "\njobs:\n  verify:\n    steps:\n      - uses: *mint\n"
+        )
+
+    def test_mapping_and_flow_aliases_cannot_duplicate_token_mints(self):
+        cases = (
+            (
+                "template: &mint\n"
+                f"  uses: {forge9.APP_TOKEN_ACTION}\n"
+                "jobs:\n  verify:\n    steps:\n      - *mint\n"
+            ),
+            (
+                "name: &mint reviewed\n"
+                "jobs:\n  verify:\n    steps: [*mint]\n"
+            ),
+            (
+                "name: &mínt reviewed\n"
+                "jobs:\n  verify:\n    steps:\n      - uses: *mínt\n"
+            ),
+        )
+        for workflow in cases:
+            with self.subTest(workflow=workflow):
+                self.assert_app_token_alias_rejected(workflow)
+
+    def test_quoted_alias_text_and_shell_globs_are_not_yaml_aliases(self):
+        workflow = (
+            'name: "*mint" # *comment_only\n'
+            "jobs:\n  verify:\n    steps:\n"
+            "      - run: echo *mint\n"
+            "      - run: |\n"
+            "          uses: *script_text_only\n"
+            "          case value in\n"
+            "            *) exit 0 ;;\n"
+            "          esac\n"
+            f"      - uses: {forge9.APP_TOKEN_ACTION}\n"
+            "        with:\n          permission-actions: read\n"
+        )
+        self.assertEqual(
+            self.app_token_blocks_for(workflow),
+            [{"permission-actions": "read"}],
+        )
 
     def test_secret_permissions_are_isolated_to_secret_health(self):
         secret_workflow = ".github/workflows/secret-health.yml"

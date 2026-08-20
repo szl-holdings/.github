@@ -18,6 +18,13 @@ APP_TOKEN_ACTION = (
 APP_TOKEN_USES_LINE = re.compile(
     r"^(?P<dash>-\s+)?uses\s*:\s*(?P<value>.*)$"
 )
+YAML_ALIAS_NODE = re.compile(
+    r"(?:^\s*(?:-\s+)?|:\s+|[\[\{,]\s*)"
+    r"\*[^\s\[\]\{\},]+(?=\s*(?:$|[,\]\}]))"
+)
+YAML_BLOCK_SCALAR_LINE = re.compile(
+    r"^(?:-\s+)?[^:#]+:\s*[>|][0-9+-]*\s*$"
+)
 APP_TOKEN_PERMISSION_CONTRACTS = {
     ".github/workflows/attest-and-approve.yml": (
         {
@@ -129,12 +136,80 @@ def load_json(path: Path) -> object:
         fail(f"{path.relative_to(ROOT)} is not valid JSON: {exc}")
 
 
+def yaml_unquoted_syntax(line: str) -> str:
+    """Return YAML syntax outside quoted scalars and comments.
+
+    The App-token inventory is intentionally dependency-free, so it cannot
+    rely on a YAML loader to expand aliases.  Preserving only unquoted syntax
+    lets the inventory reject structural alias nodes without mistaking quoted
+    documentation, comments, or ordinary shell globs for YAML aliases.
+    """
+
+    syntax: list[str] = []
+    quote: str | None = None
+    index = 0
+    while index < len(line):
+        char = line[index]
+        if quote == "'":
+            if char == "'":
+                if index + 1 < len(line) and line[index + 1] == "'":
+                    syntax.extend((" ", " "))
+                    index += 2
+                    continue
+                quote = None
+            syntax.append(" ")
+        elif quote == '"':
+            if char == "\\" and index + 1 < len(line):
+                syntax.extend((" ", " "))
+                index += 2
+                continue
+            if char == '"':
+                quote = None
+            syntax.append(" ")
+        elif char in {"'", '"'}:
+            quote = char
+            syntax.append(" ")
+        elif char == "#" and (index == 0 or line[index - 1].isspace()):
+            break
+        else:
+            syntax.append(char)
+        index += 1
+    return "".join(syntax)
+
+
+def yaml_alias_line(lines: list[str]) -> int | None:
+    """Return the first structural alias line, excluding block-scalar text."""
+
+    block_scalar_indent: int | None = None
+    for line_number, line in enumerate(lines, start=1):
+        syntax = yaml_unquoted_syntax(line)
+        stripped = syntax.strip()
+        indent = len(syntax) - len(syntax.lstrip())
+        if block_scalar_indent is not None:
+            if not stripped or indent > block_scalar_indent:
+                continue
+            block_scalar_indent = None
+        if YAML_BLOCK_SCALAR_LINE.fullmatch(stripped):
+            block_scalar_indent = indent
+            continue
+        if YAML_ALIAS_NODE.search(syntax):
+            return line_number
+    return None
+
+
 def app_token_permission_blocks(relative: str) -> list[dict[str, str]]:
     path = ROOT / relative
     try:
         lines = path.read_text(encoding="utf-8").splitlines()
     except OSError as exc:
         fail(f"cannot read App-token workflow {relative}: {exc}")
+
+    alias_line = yaml_alias_line(lines)
+    if alias_line is not None:
+        fail(
+            f"{relative}:{alias_line} uses a YAML alias; App-token "
+            "workflow inventory requires literal nodes"
+        )
 
     blocks: list[dict[str, str]] = []
     permission_line = re.compile(r"^(permission-[a-z0-9-]+):\s*(.*)$")
