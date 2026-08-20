@@ -1037,13 +1037,15 @@ def validate_github_squash_attestation(
         )
         source_author_identities.add((source_author_name, source_author_email))
     squash_identities = valid_dco_identities(message)
+    exact_squash_author = (author_name, author_email) in squash_identities
+    validated_source_author_fallback = any(
+        identity[1] == author_email and identity in source_author_identities
+        for identity in squash_identities
+    )
     require(
-        any(
-            identity[1] == author_email and identity in source_author_identities
-            for identity in squash_identities
-        ),
-        "provider squash Signed-off-by identity is not an exact validated "
-        "source-commit author identity",
+        exact_squash_author or validated_source_author_fallback,
+        "provider squash Signed-off-by identity does not exactly match the "
+        "squash author or a validated source-commit author",
     )
 
 

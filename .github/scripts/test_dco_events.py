@@ -864,15 +864,15 @@ class DcoCheckTests(unittest.TestCase):
     def test_push_exact_identity_provider_squash_rejects_unsigned_source(self) -> None:
         unsigned_source = self.commit(
             "fix: unsigned provider source",
-            name="Lutar, Stephen P.",
-            email="builder@example.com",
+            name="Source Contributor",
+            email="contributor@example.com",
         )
         self.git("reset", "--hard", self.base)
         head = self.commit(
             "fix: exact-identity provider squash (#411)\n\n"
-            "Signed-off-by: Lutar, Stephen P. <builder@example.com>",
-            name="Lutar, Stephen P.",
-            email="builder@example.com",
+            "Signed-off-by: PR Creator <creator@example.com>",
+            name="PR Creator",
+            email="creator@example.com",
             committer_name="GitHub",
             committer_email="noreply@github.com",
         )
@@ -897,6 +897,55 @@ class DcoCheckTests(unittest.TestCase):
         self.assertIn(paths["commit"], calls)
         self.assertIn(paths["commits_page"], calls)
         self.assertEqual(source_fetches, [(411, unsigned_source)])
+
+    def test_push_exact_squash_author_can_differ_from_source_author(self) -> None:
+        source_head = self.commit(
+            "fix: source contribution\n\n"
+            "Signed-off-by: Source Contributor <contributor@example.com>",
+            name="Source Contributor",
+            email="contributor@example.com",
+        )
+        self.git("reset", "--hard", self.base)
+        head = self.commit(
+            "fix: exact squash author (#411)\n\n"
+            "Signed-off-by: PR Creator <creator@example.com>",
+            name="PR Creator",
+            email="creator@example.com",
+            committer_name="GitHub",
+            committer_email="noreply@github.com",
+        )
+        api_get, _, calls, paths = self.provider_api(
+            head,
+            [source_head],
+            source_head,
+        )
+        source_fetches: list[tuple[int, str]] = []
+
+        self.assertEqual(
+            dco.validate_push_range(
+                self.repo,
+                self.base,
+                head,
+                "szl-holdings/.github",
+                "",
+                api_get=api_get,
+                source_fetch=lambda number, sha: source_fetches.append((number, sha)),
+            ),
+            1,
+        )
+        self.assertEqual(source_fetches, [(411, source_head)])
+        self.assertEqual(
+            calls,
+            [
+                paths["commit"],
+                paths["pulls_page"],
+                paths["pulls_boundary"],
+                paths["metadata"],
+                paths["commits_page"],
+                paths["commits_boundary"],
+                paths["metadata"],
+            ],
+        )
 
     def test_push_exact_identity_provider_squash_validates_all_sources(self) -> None:
         source_first = self.commit(
@@ -1290,7 +1339,7 @@ class DcoCheckTests(unittest.TestCase):
             source_head,
         )
         self.assert_rejected(
-            "not an exact validated source-commit author identity",
+            "does not exactly match the squash author or a validated source-commit author",
             dco.validate_push_range,
             self.repo,
             self.base,
