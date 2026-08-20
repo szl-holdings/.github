@@ -168,7 +168,10 @@ class _StaticDocumentParser(HTMLParser):
             return
         if "disabled" in values:
             return
-        media = values.get("media", "").strip().casefold()
+        # CSS media queries recognize only CSS whitespace. Unicode whitespace
+        # such as NBSP remains part of the query and must not be erased into an
+        # apparently empty or ``all`` query.
+        media = values.get("media", "").strip(CSS_WHITESPACE).casefold()
         if media not in {"", "all"}:
             return
         content_type = values.get("type", "").strip().casefold()
@@ -354,7 +357,7 @@ def _css_rule_blocks(css_text: str) -> list[tuple[str, str]]:
     return blocks
 
 
-def _css_declarations(rule_body: str) -> list[tuple[str, str]]:
+def _css_declarations(rule_body: str) -> list[tuple[str, str, bool]]:
     """Parse declarations at the current rule level, ignoring nested rules."""
     flattened: list[str] = []
     brace_depth = 0
@@ -374,7 +377,7 @@ def _css_declarations(rule_body: str) -> list[tuple[str, str]]:
     if brace_depth:
         raise ContractError("universal CSS contains an unclosed nested rule")
 
-    declarations: list[tuple[str, str]] = []
+    declarations: list[tuple[str, str, bool]] = []
     for declaration in "".join(flattened).split(";"):
         if ":" not in declaration:
             continue
@@ -394,18 +397,22 @@ def _css_declarations(rule_body: str) -> list[tuple[str, str]]:
             " ",
             value.strip(CSS_WHITESPACE),
         ).casefold()
-        normalized_value = re.sub(
+        important_pattern = (
             CSS_WHITESPACE_PATTERN
             + "*!"
             + CSS_WHITESPACE_PATTERN
             + "*important"
             + CSS_WHITESPACE_PATTERN
-            + "*$",
+            + "*$"
+        )
+        important = re.search(important_pattern, normalized_value) is not None
+        normalized_value = re.sub(
+            important_pattern,
             "",
             normalized_value,
         ).rstrip(CSS_WHITESPACE)
         if normalized_property and normalized_value:
-            declarations.append((normalized_property, normalized_value))
+            declarations.append((normalized_property, normalized_value, important))
     return declarations
 
 
@@ -428,7 +435,9 @@ def _media_query(prelude: str) -> str | None:
     return None
 
 
-def _has_reduced_motion_control(declarations: list[tuple[str, str]]) -> bool:
+def _has_reduced_motion_control(
+    declarations: dict[tuple[str, str], tuple[str, bool]],
+) -> bool:
     accepted = {
         ("animation", "none"),
         ("animation-duration", "0s"),
@@ -440,10 +449,13 @@ def _has_reduced_motion_control(declarations: list[tuple[str, str]]) -> bool:
         ("transition-duration", "0.01ms"),
         ("scroll-behavior", "auto"),
     }
-    return any(declaration in accepted for declaration in declarations)
+    return any(
+        (property_name, value) in accepted
+        for (_, property_name), (value, _) in declarations.items()
+    )
 
 
-def _selector_is_guaranteed_active(prelude: str) -> bool:
+def _guaranteed_active_selectors(prelude: str) -> set[str]:
     """Accept only selectors guaranteed to match the served document.
 
     The contract cannot inspect runtime component markup, so class, attribute,
@@ -458,44 +470,82 @@ def _selector_is_guaranteed_active(prelude: str) -> bool:
     # ``h t m l`` into the guaranteed document selector ``html``.
     selector_items = prelude.split(",")
     if any(not selector.strip(CSS_WHITESPACE) for selector in selector_items):
-        return False
+        return set()
     selectors = {
         selector.strip(CSS_WHITESPACE).casefold() for selector in selector_items
     }
-    return bool(selectors & guaranteed) and selectors <= audited
+    if not selectors & guaranteed or not selectors <= audited:
+        return set()
+    return selectors
+
+
+def _update_cascade(
+    cascade: dict[tuple[str, str], tuple[str, bool]],
+    selectors: set[str],
+    declarations: list[tuple[str, str, bool]],
+) -> None:
+    """Record final same-selector declarations, honoring ``!important``."""
+    for property_name, value, important in declarations:
+        for selector in selectors:
+            key = (selector, property_name)
+            previous = cascade.get(key)
+            if previous is not None and previous[1] and not important:
+                continue
+            cascade[key] = (value, important)
 
 
 def validate_css(css_text: str) -> None:
     active_css = _strip_css_inert_text(css_text)
-    active_declarations: set[tuple[str, str]] = set()
-    observed_media: set[str] = set()
+    active_declarations: dict[tuple[str, str], tuple[str, bool]] = {}
+    media_declarations: dict[
+        str,
+        dict[tuple[str, str], tuple[str, bool]],
+    ] = {query: {} for query in REQUIRED_MEDIA_QUERIES}
     for prelude, body in _css_rule_blocks(active_css):
         if not prelude.lstrip(CSS_WHITESPACE).startswith("@"):
-            if _selector_is_guaranteed_active(prelude):
-                active_declarations.update(_css_declarations(body))
+            selectors = _guaranteed_active_selectors(prelude)
+            if selectors:
+                _update_cascade(
+                    active_declarations,
+                    selectors,
+                    _css_declarations(body),
+                )
             continue
         query = _media_query(prelude)
         if query not in REQUIRED_MEDIA_QUERIES:
             continue
-        nested_declarations: list[tuple[str, str]] = []
         for nested_prelude, nested_body in _css_rule_blocks(body):
             if nested_prelude.lstrip(CSS_WHITESPACE).startswith("@"):
                 continue
-            if not _selector_is_guaranteed_active(nested_prelude):
+            selectors = _guaranteed_active_selectors(nested_prelude)
+            if not selectors:
                 continue
-            nested_declarations.extend(_css_declarations(nested_body))
-        if not nested_declarations:
-            continue
-        if query == "(prefers-reduced-motion:reduce)" and not _has_reduced_motion_control(
-            nested_declarations
-        ):
-            continue
-        observed_media.add(query)
+            _update_cascade(
+                media_declarations[query],
+                selectors,
+                _css_declarations(nested_body),
+            )
+
+    observed_media = {
+        query
+        for query, declarations in media_declarations.items()
+        if declarations
+        and (
+            query != "(prefers-reduced-motion:reduce)"
+            or _has_reduced_motion_control(declarations)
+        )
+    }
 
     missing = [
         f"{name}: {value}"
         for name, value in REQUIRED_CSS_DECLARATIONS.items()
-        if (name, value) not in active_declarations
+        if not any(
+            property_name == name and declaration_value == value
+            for (_, property_name), (
+                declaration_value,
+                _,
+            ) in active_declarations.items()
+        )
     ]
     missing.extend(
         f"@media {query}"
@@ -647,7 +697,11 @@ def _loads_declared_css(
         except LookupError:
             return False
     path_call = expression.func.value
-    if not isinstance(path_call, ast.Call) or len(path_call.args) != 1:
+    if (
+        not isinstance(path_call, ast.Call)
+        or len(path_call.args) != 1
+        or path_call.keywords
+    ):
         return False
     if not isinstance(path_call.func, ast.Name):
         return False
@@ -729,6 +783,11 @@ def _statements_fall_through(statements: list[ast.stmt]) -> bool:
     for statement in statements:
         if isinstance(statement, (ast.Raise, ast.Return, ast.Break, ast.Continue)):
             return False
+        if (
+            isinstance(statement, ast.Assert)
+            and _literal_truth_value(statement.test) is False
+        ):
+            return False
         if not isinstance(statement, ast.If):
             continue
         truth_value = _literal_truth_value(statement.test)
@@ -767,6 +826,11 @@ def _direct_top_level_calls(tree: ast.Module) -> list[ast.Call]:
         """Collect calls until control can no longer reach the next statement."""
         for statement in statements:
             if isinstance(statement, (ast.Raise, ast.Return, ast.Break, ast.Continue)):
+                return False
+            if (
+                isinstance(statement, ast.Assert)
+                and _literal_truth_value(statement.test) is False
+            ):
                 return False
             expression: ast.AST | None = None
             if isinstance(statement, ast.Expr):

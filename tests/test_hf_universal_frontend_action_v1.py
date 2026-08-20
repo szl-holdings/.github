@@ -278,6 +278,69 @@ def test_standard_css_property_name_case_remains_insensitive(tmp_path: Path) -> 
 
 
 @pytest.mark.parametrize(
+    ("selector", "property_name", "overriding_value"),
+    [
+        (":root", "--szl-touch-target", "1px"),
+        ("*", "overflow-wrap", "normal"),
+        ("*", "overflow-x", "auto"),
+    ],
+)
+def test_later_same_selector_declaration_overrides_required_css_control(
+    tmp_path: Path,
+    selector: str,
+    property_name: str,
+    overriding_value: str,
+) -> None:
+    _fixture(tmp_path)
+    css = tmp_path / "szl-universal-frontend.css"
+    css.write_text(
+        CSS + f"\n{selector} {{ {property_name}: {overriding_value}; }}\n",
+        encoding="utf-8",
+    )
+    manifest_path, payload = _manifest(tmp_path)
+    payload["file_sha256"]["szl-universal-frontend.css"] = _sha(css)
+    manifest_path.write_text(json.dumps(payload), encoding="utf-8")
+    with pytest.raises(MODULE.ContractError, match=property_name):
+        MODULE.validate(tmp_path, Path("docs/hf-universal-frontend-v1.json"))
+
+
+def test_important_required_css_control_survives_later_normal_override(
+    tmp_path: Path,
+) -> None:
+    _fixture(tmp_path)
+    css = tmp_path / "szl-universal-frontend.css"
+    css.write_text(
+        CSS.replace("overflow-x: clip", "overflow-x: clip !important")
+        + "\n* { overflow-x: auto; }\n",
+        encoding="utf-8",
+    )
+    manifest_path, payload = _manifest(tmp_path)
+    payload["file_sha256"]["szl-universal-frontend.css"] = _sha(css)
+    manifest_path.write_text(json.dumps(payload), encoding="utf-8")
+    assert MODULE.validate(
+        tmp_path,
+        Path("docs/hf-universal-frontend-v1.json"),
+    )["status"] == "PASS"
+
+
+def test_later_reduced_motion_override_is_rejected(tmp_path: Path) -> None:
+    _fixture(tmp_path)
+    css = tmp_path / "szl-universal-frontend.css"
+    css.write_text(
+        CSS
+        + "\n@media (prefers-reduced-motion: reduce) {\n"
+        + "  *, *::before, *::after { animation-duration: 1s !important; }\n"
+        + "}\n",
+        encoding="utf-8",
+    )
+    manifest_path, payload = _manifest(tmp_path)
+    payload["file_sha256"]["szl-universal-frontend.css"] = _sha(css)
+    manifest_path.write_text(json.dumps(payload), encoding="utf-8")
+    with pytest.raises(MODULE.ContractError, match="prefers-reduced-motion"):
+        MODULE.validate(tmp_path, Path("docs/hf-universal-frontend-v1.json"))
+
+
+@pytest.mark.parametrize(
     ("original", "spaced"),
     [
         ("44px", "44 px"),
@@ -504,6 +567,53 @@ def test_static_rel_tokens_split_on_each_html_ascii_whitespace(
         app.read_text(encoding="utf-8").replace(
             'rel="stylesheet"',
             f'rel="decoy{separator}stylesheet"',
+        ),
+        encoding="utf-8",
+    )
+    manifest_path, payload = _manifest(tmp_path)
+    payload["file_sha256"]["index.html"] = _sha(app)
+    manifest_path.write_text(json.dumps(payload), encoding="utf-8")
+    assert MODULE.validate(
+        tmp_path,
+        Path("docs/hf-universal-frontend-v1.json"),
+    )["status"] == "PASS"
+
+
+@pytest.mark.parametrize(
+    "media_value",
+    [
+        "\N{NO-BREAK SPACE}",
+        "\N{NO-BREAK SPACE}all",
+        "all\N{NO-BREAK SPACE}",
+    ],
+)
+def test_static_media_does_not_strip_non_css_whitespace(
+    tmp_path: Path,
+    media_value: str,
+) -> None:
+    _fixture(tmp_path)
+    app = tmp_path / "index.html"
+    app.write_text(
+        app.read_text(encoding="utf-8").replace(
+            'rel="stylesheet"',
+            f'rel="stylesheet" media="{media_value}"',
+        ),
+        encoding="utf-8",
+    )
+    manifest_path, payload = _manifest(tmp_path)
+    payload["file_sha256"]["index.html"] = _sha(app)
+    manifest_path.write_text(json.dumps(payload), encoding="utf-8")
+    with pytest.raises(MODULE.ContractError, match="stylesheet <link>"):
+        MODULE.validate(tmp_path, Path("docs/hf-universal-frontend-v1.json"))
+
+
+def test_static_media_strips_css_whitespace(tmp_path: Path) -> None:
+    _fixture(tmp_path)
+    app = tmp_path / "index.html"
+    app.write_text(
+        app.read_text(encoding="utf-8").replace(
+            'rel="stylesheet"',
+            'rel="stylesheet" media="\t all \n"',
         ),
         encoding="utf-8",
     )
@@ -831,6 +941,35 @@ def test_python_css_read_rejects_unsupported_keywords_and_codecs(
         MODULE.validate(tmp_path, Path("docs/hf-universal-frontend-v1.json"))
 
 
+@pytest.mark.parametrize("framework", ["gradio", "streamlit"])
+@pytest.mark.parametrize(
+    "path_arguments",
+    [
+        "'szl-universal-frontend.css', bogus=True",
+        "'szl-universal-frontend.css', **{}",
+    ],
+)
+def test_python_css_read_rejects_path_constructor_keywords(
+    tmp_path: Path,
+    framework: str,
+    path_arguments: str,
+) -> None:
+    _fixture(tmp_path, framework)
+    app = tmp_path / "app.py"
+    app.write_text(
+        app.read_text(encoding="utf-8").replace(
+            "Path('szl-universal-frontend.css')",
+            f"Path({path_arguments})",
+        ),
+        encoding="utf-8",
+    )
+    manifest_path, payload = _manifest(tmp_path)
+    payload["file_sha256"]["app.py"] = _sha(app)
+    manifest_path.write_text(json.dumps(payload), encoding="utf-8")
+    with pytest.raises(MODULE.ContractError, match="does not read the declared CSS"):
+        MODULE.validate(tmp_path, Path("docs/hf-universal-frontend-v1.json"))
+
+
 @pytest.mark.parametrize(
     "read_text_arguments",
     [
@@ -946,6 +1085,42 @@ def test_python_framework_binding_in_dead_code_is_rejected(
     payload["file_sha256"]["app.py"] = _sha(app)
     manifest_path.write_text(json.dumps(payload), encoding="utf-8")
     with pytest.raises(MODULE.ContractError, match=message):
+        MODULE.validate(tmp_path, Path("docs/hf-universal-frontend-v1.json"))
+
+
+@pytest.mark.parametrize("framework", ["gradio", "streamlit"])
+@pytest.mark.parametrize(
+    "terminating_assertion",
+    [
+        "assert False\n",
+        "assert 0, 'stop'\n",
+        "assert not True\n",
+        "if True:\n    assert False\n",
+    ],
+)
+def test_python_framework_call_after_statically_failing_assertion_is_rejected(
+    tmp_path: Path,
+    framework: str,
+    terminating_assertion: str,
+) -> None:
+    _fixture(tmp_path, framework)
+    app = tmp_path / "app.py"
+    call = (
+        "demo = gr.Blocks(css=_SZL_UNIVERSAL_CSS)\n"
+        if framework == "gradio"
+        else "st.markdown(f'<style>{_SZL_UNIVERSAL_CSS}</style>', unsafe_allow_html=True)\n"
+    )
+    app.write_text(
+        app.read_text(encoding="utf-8").replace(
+            call,
+            terminating_assertion + call,
+        ),
+        encoding="utf-8",
+    )
+    manifest_path, payload = _manifest(tmp_path)
+    payload["file_sha256"]["app.py"] = _sha(app)
+    manifest_path.write_text(json.dumps(payload), encoding="utf-8")
+    with pytest.raises(MODULE.ContractError, match="CSS binding is absent"):
         MODULE.validate(tmp_path, Path("docs/hf-universal-frontend-v1.json"))
 
 
