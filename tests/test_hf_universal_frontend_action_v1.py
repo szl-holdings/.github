@@ -38,6 +38,7 @@ def _fixture(root: Path, framework: str = "static") -> None:
             encoding="utf-8",
         )
         app_file = "index.html"
+        sdk = "static"
     elif framework == "gradio":
         app = root / "app.py"
         app.write_text(
@@ -45,6 +46,7 @@ def _fixture(root: Path, framework: str = "static") -> None:
             encoding="utf-8",
         )
         app_file = "app.py"
+        sdk = "gradio"
     else:
         raise AssertionError(framework)
     css = root / "szl-universal-frontend.css"
@@ -52,7 +54,7 @@ def _fixture(root: Path, framework: str = "static") -> None:
     (root / "README.md").write_text(
         "---\n"
         "title: Example\n"
-        "sdk: static\n"
+        f"sdk: {sdk}\n"
         f"app_file: {app_file}\n"
         "short_description: Governed example\n"
         "fullWidth: true\n"
@@ -64,7 +66,7 @@ def _fixture(root: Path, framework: str = "static") -> None:
     manifest = {
         "schema": "szl.hf-universal-frontend/v1",
         "remote_mutation": False,
-        "sdk": "static",
+        "sdk": sdk,
         "framework": framework,
         "app_file": app_file,
         "css_file": "szl-universal-frontend.css",
@@ -88,11 +90,17 @@ def _fixture(root: Path, framework: str = "static") -> None:
     )
 
 
+def _manifest(root: Path) -> tuple[Path, dict[str, object]]:
+    path = root / "docs" / "hf-universal-frontend-v1.json"
+    return path, json.loads(path.read_text(encoding="utf-8"))
+
+
 def test_static_contract_passes(tmp_path: Path) -> None:
     _fixture(tmp_path)
     result = MODULE.validate(tmp_path, Path("docs/hf-universal-frontend-v1.json"))
     assert result["status"] == "PASS"
     assert result["framework"] == "static"
+    assert result["sdk"] == "static"
     assert result["remote_mutation"] is False
 
 
@@ -100,6 +108,7 @@ def test_gradio_contract_passes(tmp_path: Path) -> None:
     _fixture(tmp_path, "gradio")
     result = MODULE.validate(tmp_path, Path("docs/hf-universal-frontend-v1.json"))
     assert result["framework"] == "gradio"
+    assert result["sdk"] == "gradio"
 
 
 def test_hash_drift_fails_closed(tmp_path: Path) -> None:
@@ -111,8 +120,7 @@ def test_hash_drift_fails_closed(tmp_path: Path) -> None:
 
 def test_partial_hash_manifest_is_rejected(tmp_path: Path) -> None:
     _fixture(tmp_path)
-    manifest_path = tmp_path / "docs" / "hf-universal-frontend-v1.json"
-    payload = json.loads(manifest_path.read_text(encoding="utf-8"))
+    manifest_path, payload = _manifest(tmp_path)
     del payload["file_sha256"]["index.html"]
     manifest_path.write_text(json.dumps(payload), encoding="utf-8")
     with pytest.raises(MODULE.ContractError, match="missing managed paths: index.html"):
@@ -121,8 +129,7 @@ def test_partial_hash_manifest_is_rejected(tmp_path: Path) -> None:
 
 def test_path_traversal_is_rejected(tmp_path: Path) -> None:
     _fixture(tmp_path)
-    manifest_path = tmp_path / "docs" / "hf-universal-frontend-v1.json"
-    payload = json.loads(manifest_path.read_text(encoding="utf-8"))
+    manifest_path, payload = _manifest(tmp_path)
     payload["app_file"] = "../outside.py"
     manifest_path.write_text(json.dumps(payload), encoding="utf-8")
     with pytest.raises(MODULE.ContractError, match="safe repository-relative path"):
@@ -143,18 +150,80 @@ def test_missing_css_control_is_rejected(tmp_path: Path) -> None:
     _fixture(tmp_path)
     css = tmp_path / "szl-universal-frontend.css"
     css.write_text(CSS.replace("overflow-x: clip;", ""), encoding="utf-8")
-    manifest_path = tmp_path / "docs" / "hf-universal-frontend-v1.json"
-    payload = json.loads(manifest_path.read_text(encoding="utf-8"))
+    manifest_path, payload = _manifest(tmp_path)
     payload["file_sha256"]["szl-universal-frontend.css"] = _sha(css)
     manifest_path.write_text(json.dumps(payload), encoding="utf-8")
-    with pytest.raises(MODULE.ContractError, match="missing required tokens"):
+    with pytest.raises(MODULE.ContractError, match="missing required active tokens"):
+        MODULE.validate(tmp_path, Path("docs/hf-universal-frontend-v1.json"))
+
+
+def test_css_comments_cannot_satisfy_controls(tmp_path: Path) -> None:
+    _fixture(tmp_path)
+    css = tmp_path / "szl-universal-frontend.css"
+    css.write_text(f"/*\n{CSS}\n*/\nbody {{ color: black; }}\n", encoding="utf-8")
+    manifest_path, payload = _manifest(tmp_path)
+    payload["file_sha256"]["szl-universal-frontend.css"] = _sha(css)
+    manifest_path.write_text(json.dumps(payload), encoding="utf-8")
+    with pytest.raises(MODULE.ContractError, match="missing required active tokens"):
+        MODULE.validate(tmp_path, Path("docs/hf-universal-frontend-v1.json"))
+
+
+def test_sdk_framework_mismatch_is_rejected(tmp_path: Path) -> None:
+    _fixture(tmp_path)
+    manifest_path, payload = _manifest(tmp_path)
+    payload["framework"] = "gradio"
+    manifest_path.write_text(json.dumps(payload), encoding="utf-8")
+    with pytest.raises(MODULE.ContractError, match="not compatible with framework"):
+        MODULE.validate(tmp_path, Path("docs/hf-universal-frontend-v1.json"))
+
+
+def test_card_and_manifest_sdk_must_match(tmp_path: Path) -> None:
+    _fixture(tmp_path)
+    manifest_path, payload = _manifest(tmp_path)
+    payload["sdk"] = "docker"
+    manifest_path.write_text(json.dumps(payload), encoding="utf-8")
+    with pytest.raises(MODULE.ContractError, match="diverges from manifest sdk"):
+        MODULE.validate(tmp_path, Path("docs/hf-universal-frontend-v1.json"))
+
+
+def test_static_marker_requires_declared_stylesheet_link(tmp_path: Path) -> None:
+    _fixture(tmp_path)
+    app = tmp_path / "index.html"
+    app.write_text(
+        '<html><head><meta name="viewport" content="width=device-width, initial-scale=1">'
+        '</head><body><div data-szl-universal-frontend="v1"></div>'
+        '<!-- <link rel="stylesheet" href="./szl-universal-frontend.css" '
+        'data-szl-universal-frontend="v1"> --></body></html>',
+        encoding="utf-8",
+    )
+    manifest_path, payload = _manifest(tmp_path)
+    payload["file_sha256"]["index.html"] = _sha(app)
+    manifest_path.write_text(json.dumps(payload), encoding="utf-8")
+    with pytest.raises(MODULE.ContractError, match="stylesheet <link>"):
+        MODULE.validate(tmp_path, Path("docs/hf-universal-frontend-v1.json"))
+
+
+def test_static_stylesheet_href_must_bind_declared_css(tmp_path: Path) -> None:
+    _fixture(tmp_path)
+    app = tmp_path / "index.html"
+    other_css = tmp_path / "other.css"
+    other_css.write_text(CSS, encoding="utf-8")
+    app.write_text(
+        '<html><head><meta name="viewport" content="width=device-width, initial-scale=1">'
+        '<link rel="stylesheet" href="./other.css" data-szl-universal-frontend="v1">'
+        "</head><body></body></html>",
+        encoding="utf-8",
+    )
+    manifest_path, payload = _manifest(tmp_path)
+    payload["file_sha256"]["index.html"] = _sha(app)
+    manifest_path.write_text(json.dumps(payload), encoding="utf-8")
+    with pytest.raises(MODULE.ContractError, match="declared css_file"):
         MODULE.validate(tmp_path, Path("docs/hf-universal-frontend-v1.json"))
 
 
 def test_identifier_wrapping_contract_is_required(tmp_path: Path) -> None:
     _fixture(tmp_path)
-    manifest_path = tmp_path / "docs" / "hf-universal-frontend-v1.json"
-    payload = json.loads(manifest_path.read_text(encoding="utf-8"))
+    manifest_path, payload = _manifest(tmp_path)
     payload["contract"]["technical_identifier_wrapping_required"] = False
     manifest_path.write_text(json.dumps(payload), encoding="utf-8")
     with pytest.raises(
@@ -167,12 +236,23 @@ def test_identifier_wrapping_contract_is_required(tmp_path: Path) -> None:
 def test_overlong_short_description_is_rejected(tmp_path: Path) -> None:
     _fixture(tmp_path)
     readme = tmp_path / "README.md"
-    readme.write_text(readme.read_text(encoding="utf-8").replace("Governed example", "x" * 61), encoding="utf-8")
-    manifest_path = tmp_path / "docs" / "hf-universal-frontend-v1.json"
-    payload = json.loads(manifest_path.read_text(encoding="utf-8"))
+    readme.write_text(
+        readme.read_text(encoding="utf-8").replace("Governed example", "x" * 61),
+        encoding="utf-8",
+    )
+    manifest_path, payload = _manifest(tmp_path)
     payload["file_sha256"]["README.md"] = _sha(readme)
     manifest_path.write_text(json.dumps(payload), encoding="utf-8")
     with pytest.raises(MODULE.ContractError, match="exceeds 60"):
+        MODULE.validate(tmp_path, Path("docs/hf-universal-frontend-v1.json"))
+
+
+def test_manifest_path_with_line_break_is_rejected(tmp_path: Path) -> None:
+    _fixture(tmp_path)
+    manifest_path, payload = _manifest(tmp_path)
+    payload["css_file"] = "szl-universal-frontend.css\napp_file=unverified.py"
+    manifest_path.write_text(json.dumps(payload), encoding="utf-8")
+    with pytest.raises(MODULE.ContractError, match="CR or LF"):
         MODULE.validate(tmp_path, Path("docs/hf-universal-frontend-v1.json"))
 
 
@@ -185,3 +265,11 @@ def test_github_output_is_bounded(tmp_path: Path) -> None:
     assert lines["status"] == "PASS"
     assert lines["framework"] == "static"
     assert len(lines["manifest_sha256"]) == 64
+
+
+def test_github_output_rejects_line_break_injection(tmp_path: Path) -> None:
+    _fixture(tmp_path)
+    result = MODULE.validate(tmp_path, Path("docs/hf-universal-frontend-v1.json"))
+    result["css_file"] = "safe.css\napp_file=unverified.py"
+    with pytest.raises(MODULE.ContractError, match="CR or LF"):
+        MODULE.write_github_output(tmp_path / "github-output", result)
