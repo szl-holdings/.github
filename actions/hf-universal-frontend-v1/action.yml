@@ -1,0 +1,49 @@
+name: SZL Hugging Face universal frontend contract v1
+description: Verify source-native Hugging Face card, responsive CSS, framework binding, and managed-file digests.
+author: SZL Holdings
+
+inputs:
+  root:
+    description: Repository root containing README.md and the frontend manifest.
+    required: false
+    default: .
+  manifest:
+    description: Repository-relative frontend manifest path.
+    required: false
+    default: docs/hf-universal-frontend-v1.json
+
+outputs:
+  status:
+    description: PASS when every contract gate succeeds.
+    value: ${{ steps.verify.outputs.status }}
+  framework:
+    description: Detected framework recorded in the manifest.
+    value: ${{ steps.verify.outputs.framework }}
+  app_file:
+    description: Canonical application entry point.
+    value: ${{ steps.verify.outputs.app_file }}
+  css_file:
+    description: Universal frontend CSS path.
+    value: ${{ steps.verify.outputs.css_file }}
+  manifest_sha256:
+    description: SHA-256 digest of the verified manifest.
+    value: ${{ steps.verify.outputs.manifest_sha256 }}
+
+runs:
+  using: composite
+  steps:
+    - id: verify
+      name: Verify universal frontend contract
+      shell: bash
+      env:
+        INPUT_ROOT: ${{ inputs.root }}
+        INPUT_MANIFEST: ${{ inputs.manifest }}
+      run: >-
+        python3 "$GITHUB_ACTION_PATH/check.py"
+        --root "$INPUT_ROOT"
+        --manifest "$INPUT_MANIFEST"
+        --github-output "$GITHUB_OUTPUT"
+
+branding:
+  icon: monitor
+  color: blue
