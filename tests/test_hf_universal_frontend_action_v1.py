@@ -15,11 +15,19 @@ MODULE = importlib.util.module_from_spec(SPEC)
 sys.modules[SPEC.name] = MODULE
 SPEC.loader.exec_module(MODULE)
 
-CSS = """--szl-touch-target: 44px;
-overflow-wrap: anywhere;
-overflow-x: clip;
-@media (max-width: 560px) {}
-@media (prefers-reduced-motion: reduce) {}
+CSS = """:root {
+  --szl-touch-target: 44px;
+}
+* {
+  overflow-wrap: anywhere;
+  overflow-x: clip;
+}
+@media (max-width: 560px) {
+  body { padding-inline: 0.5rem; }
+}
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: 0.01ms !important; }
+}
 """
 
 
@@ -42,11 +50,27 @@ def _fixture(root: Path, framework: str = "static") -> None:
     elif framework == "gradio":
         app = root / "app.py"
         app.write_text(
-            "# SZL_HF_UNIVERSAL_FRONTEND_V1\n_SZL_UNIVERSAL_CSS = 'x'\n",
+            "from pathlib import Path\n"
+            "import gradio as gr\n\n"
+            "# SZL_HF_UNIVERSAL_FRONTEND_V1\n"
+            "_SZL_UNIVERSAL_CSS = Path('szl-universal-frontend.css').read_text(encoding='utf-8')\n"
+            "demo = gr.Blocks(css=_SZL_UNIVERSAL_CSS)\n",
             encoding="utf-8",
         )
         app_file = "app.py"
         sdk = "gradio"
+    elif framework == "streamlit":
+        app = root / "app.py"
+        app.write_text(
+            "from pathlib import Path\n"
+            "import streamlit as st\n\n"
+            "# SZL_HF_UNIVERSAL_FRONTEND_V1\n"
+            "_SZL_UNIVERSAL_CSS = Path('szl-universal-frontend.css').read_text(encoding='utf-8')\n"
+            "st.markdown(f'<style>{_SZL_UNIVERSAL_CSS}</style>', unsafe_allow_html=True)\n",
+            encoding="utf-8",
+        )
+        app_file = "app.py"
+        sdk = "streamlit"
     else:
         raise AssertionError(framework)
     css = root / "szl-universal-frontend.css"
@@ -109,6 +133,13 @@ def test_gradio_contract_passes(tmp_path: Path) -> None:
     result = MODULE.validate(tmp_path, Path("docs/hf-universal-frontend-v1.json"))
     assert result["framework"] == "gradio"
     assert result["sdk"] == "gradio"
+
+
+def test_streamlit_contract_passes(tmp_path: Path) -> None:
+    _fixture(tmp_path, "streamlit")
+    result = MODULE.validate(tmp_path, Path("docs/hf-universal-frontend-v1.json"))
+    assert result["framework"] == "streamlit"
+    assert result["sdk"] == "streamlit"
 
 
 def test_hash_drift_fails_closed(tmp_path: Path) -> None:
@@ -194,6 +225,38 @@ def test_inert_css_controls_are_rejected(
         MODULE.validate(tmp_path, Path("docs/hf-universal-frontend-v1.json"))
 
 
+@pytest.mark.parametrize(
+    "wrapper",
+    [
+        "@media not all {" + CSS + "}",
+        "@unknown inert {" + CSS + "}",
+    ],
+)
+def test_non_applying_css_rules_are_rejected(tmp_path: Path, wrapper: str) -> None:
+    _fixture(tmp_path)
+    css = tmp_path / "szl-universal-frontend.css"
+    css.write_text(wrapper, encoding="utf-8")
+    manifest_path, payload = _manifest(tmp_path)
+    payload["file_sha256"]["szl-universal-frontend.css"] = _sha(css)
+    manifest_path.write_text(json.dumps(payload), encoding="utf-8")
+    with pytest.raises(MODULE.ContractError, match="missing required active tokens"):
+        MODULE.validate(tmp_path, Path("docs/hf-universal-frontend-v1.json"))
+
+
+def test_reduced_motion_media_requires_an_active_control(tmp_path: Path) -> None:
+    _fixture(tmp_path)
+    css = tmp_path / "szl-universal-frontend.css"
+    css.write_text(
+        CSS.replace("animation-duration: 0.01ms !important", "color: red"),
+        encoding="utf-8",
+    )
+    manifest_path, payload = _manifest(tmp_path)
+    payload["file_sha256"]["szl-universal-frontend.css"] = _sha(css)
+    manifest_path.write_text(json.dumps(payload), encoding="utf-8")
+    with pytest.raises(MODULE.ContractError, match="prefers-reduced-motion"):
+        MODULE.validate(tmp_path, Path("docs/hf-universal-frontend-v1.json"))
+
+
 def test_sdk_framework_mismatch_is_rejected(tmp_path: Path) -> None:
     _fixture(tmp_path)
     manifest_path, payload = _manifest(tmp_path)
@@ -242,6 +305,90 @@ def test_static_marker_must_bind_the_declared_stylesheet(
     payload["file_sha256"]["index.html"] = _sha(app)
     manifest_path.write_text(json.dumps(payload), encoding="utf-8")
     with pytest.raises(MODULE.ContractError, match="stylesheet <link>"):
+        MODULE.validate(tmp_path, Path("docs/hf-universal-frontend-v1.json"))
+
+
+@pytest.mark.parametrize("container", ["svg", "math"])
+def test_static_stylesheet_link_must_be_in_html_namespace(
+    tmp_path: Path,
+    container: str,
+) -> None:
+    _fixture(tmp_path)
+    app = tmp_path / "index.html"
+    app.write_text(
+        '<html><head><meta name="viewport" content="width=device-width">'
+        f'<{container}><link rel="stylesheet" href="./szl-universal-frontend.css" '
+        f'data-szl-universal-frontend="v1"></link></{container}>'
+        "</head><body></body></html>",
+        encoding="utf-8",
+    )
+    manifest_path, payload = _manifest(tmp_path)
+    payload["file_sha256"]["index.html"] = _sha(app)
+    manifest_path.write_text(json.dumps(payload), encoding="utf-8")
+    with pytest.raises(MODULE.ContractError, match="stylesheet <link>"):
+        MODULE.validate(tmp_path, Path("docs/hf-universal-frontend-v1.json"))
+
+
+@pytest.mark.parametrize(
+    ("framework", "app_text", "message"),
+    [
+        (
+            "gradio",
+            "# SZL_HF_UNIVERSAL_FRONTEND_V1\n# _SZL_UNIVERSAL_CSS\n",
+            "does not read the declared CSS",
+        ),
+        (
+            "gradio",
+            "from pathlib import Path\n"
+            "import gradio as gr\n"
+            "# SZL_HF_UNIVERSAL_FRONTEND_V1\n"
+            "_SZL_UNIVERSAL_CSS = Path('szl-universal-frontend.css').read_text()\n",
+            "Gradio universal CSS binding is absent",
+        ),
+        (
+            "gradio",
+            "from pathlib import Path\n"
+            "import gradio as gr\n"
+            "# SZL_HF_UNIVERSAL_FRONTEND_V1\n"
+            "_SZL_UNIVERSAL_CSS = Path('szl-universal-frontend.css').read_text()\n"
+            "_SZL_UNIVERSAL_CSS = ''\n"
+            "demo = gr.Blocks(css=_SZL_UNIVERSAL_CSS)\n",
+            "does not read the declared CSS",
+        ),
+        (
+            "streamlit",
+            "from pathlib import Path\n"
+            "import streamlit as st\n"
+            "# SZL_HF_UNIVERSAL_FRONTEND_V1\n"
+            "_SZL_UNIVERSAL_CSS = Path('szl-universal-frontend.css').read_text()\n"
+            "# st.markdown(f'<style>{_SZL_UNIVERSAL_CSS}</style>', unsafe_allow_html=True)\n",
+            "Streamlit universal CSS binding is absent",
+        ),
+        (
+            "streamlit",
+            "from pathlib import Path\n"
+            "import streamlit as st\n"
+            "# SZL_HF_UNIVERSAL_FRONTEND_V1\n"
+            "_SZL_UNIVERSAL_CSS = Path('szl-universal-frontend.css').read_text()\n"
+            "st.markdown(f'<style>{_SZL_UNIVERSAL_CSS}</style>' if False else '', "
+            "unsafe_allow_html=True)\n",
+            "Streamlit universal CSS binding is absent",
+        ),
+    ],
+)
+def test_python_framework_must_apply_declared_css(
+    tmp_path: Path,
+    framework: str,
+    app_text: str,
+    message: str,
+) -> None:
+    _fixture(tmp_path, framework)
+    app = tmp_path / "app.py"
+    app.write_text(app_text, encoding="utf-8")
+    manifest_path, payload = _manifest(tmp_path)
+    payload["file_sha256"]["app.py"] = _sha(app)
+    manifest_path.write_text(json.dumps(payload), encoding="utf-8")
+    with pytest.raises(MODULE.ContractError, match=message):
         MODULE.validate(tmp_path, Path("docs/hf-universal-frontend-v1.json"))
 
 

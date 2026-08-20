@@ -78,11 +78,12 @@ jobs:
               encoding='utf-8',
           )
           (root / 'szl-universal-frontend.css').write_text(
-              '--szl-touch-target: 44px;\n'
-              'overflow-wrap: anywhere;\n'
-              'overflow-x: clip;\n'
-              '@media (max-width: 560px) {}\n'
-              '@media (prefers-reduced-motion: reduce) {}\n',
+              ':root { --szl-touch-target: 44px; }\n'
+              '* { overflow-wrap: anywhere; overflow-x: clip; }\n'
+              '@media (max-width: 560px) { body { padding-inline: 0.5rem; } }\n'
+              '@media (prefers-reduced-motion: reduce) {\n'
+              '  *, *::before, *::after { animation-duration: 0.01ms !important; }\n'
+              '}\n',
               encoding='utf-8',
           )
           def digest(path):

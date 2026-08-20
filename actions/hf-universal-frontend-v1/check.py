@@ -2,11 +2,14 @@
 from __future__ import annotations
 
 import argparse
+import ast
 import hashlib
 from html.parser import HTMLParser
+import io
 import json
 import posixpath
 import re
+import tokenize
 from pathlib import Path
 from typing import Any
 from urllib.parse import unquote, urlsplit
@@ -21,13 +24,15 @@ FRAMEWORK_SDKS = {
 }
 PYTHON_MARKER = "# SZL_HF_UNIVERSAL_FRONTEND_V1"
 REACT_MARKER = "// SZL_HF_UNIVERSAL_FRONTEND_V1"
-REQUIRED_CSS_TOKENS = (
-    "--szl-touch-target: 44px",
-    "overflow-wrap: anywhere",
-    "overflow-x: clip",
-    "@media (max-width: 560px)",
-    "@media (prefers-reduced-motion: reduce)",
-)
+REQUIRED_CSS_DECLARATIONS = {
+    "--szl-touch-target": "44px",
+    "overflow-wrap": "anywhere",
+    "overflow-x": "clip",
+}
+REQUIRED_MEDIA_QUERIES = {
+    "(max-width:560px)",
+    "(prefers-reduced-motion:reduce)",
+}
 SHA256 = re.compile(r"^[0-9a-f]{64}$")
 MAX_OUTPUT_VALUE_BYTES = 4096
 
@@ -38,6 +43,7 @@ class ContractError(RuntimeError):
 
 class _StaticDocumentParser(HTMLParser):
     _INERT_CONTAINERS = frozenset({"noscript", "template"})
+    _FOREIGN_CONTAINERS = frozenset({"math", "svg"})
 
     def __init__(self) -> None:
         super().__init__(convert_charrefs=True)
@@ -45,10 +51,15 @@ class _StaticDocumentParser(HTMLParser):
         self.has_base = False
         self.stylesheet_links: list[dict[str, str]] = []
         self._inert_stack: list[str] = []
+        self._foreign_stack: list[str] = []
 
     @property
     def has_unclosed_inert_container(self) -> bool:
         return bool(self._inert_stack)
+
+    @property
+    def has_unclosed_foreign_container(self) -> bool:
+        return bool(self._foreign_stack)
 
     def handle_starttag(
         self,
@@ -56,10 +67,17 @@ class _StaticDocumentParser(HTMLParser):
         attrs: list[tuple[str, str | None]],
     ) -> None:
         normalized_tag = tag.casefold()
+        if self._foreign_stack:
+            if normalized_tag in self._FOREIGN_CONTAINERS:
+                self._foreign_stack.append(normalized_tag)
+            return
         if normalized_tag in self._INERT_CONTAINERS:
             self._inert_stack.append(normalized_tag)
             return
         if self._inert_stack:
+            return
+        if normalized_tag in self._FOREIGN_CONTAINERS:
+            self._foreign_stack.append(normalized_tag)
             return
         self._record(tag, attrs)
 
@@ -69,6 +87,8 @@ class _StaticDocumentParser(HTMLParser):
         attrs: list[tuple[str, str | None]],
     ) -> None:
         normalized_tag = tag.casefold()
+        if self._foreign_stack:
+            return
         if normalized_tag in self._INERT_CONTAINERS:
             raise ContractError(
                 f"Static application contains self-closing <{normalized_tag}>"
@@ -79,6 +99,16 @@ class _StaticDocumentParser(HTMLParser):
 
     def handle_endtag(self, tag: str) -> None:
         normalized_tag = tag.casefold()
+        if self._foreign_stack:
+            if normalized_tag in self._FOREIGN_CONTAINERS:
+                expected = self._foreign_stack[-1]
+                if normalized_tag != expected:
+                    raise ContractError(
+                        "Static application contains mismatched foreign containers: "
+                        f"expected </{expected}>, received </{normalized_tag}>"
+                    )
+                self._foreign_stack.pop()
+            return
         if not self._inert_stack or normalized_tag not in self._INERT_CONTAINERS:
             return
         expected = self._inert_stack[-1]
@@ -284,11 +314,314 @@ def _strip_css_inert_text(css_text: str) -> str:
     return "".join(output)
 
 
+def _css_rule_blocks(css_text: str) -> list[tuple[str, str]]:
+    """Return top-level CSS rule preludes and bodies, failing on bad braces."""
+    blocks: list[tuple[str, str]] = []
+    start = 0
+    cursor = 0
+    while cursor < len(css_text):
+        character = css_text[cursor]
+        if character == "}":
+            raise ContractError("universal CSS contains an unmatched closing brace")
+        if character == ";":
+            start = cursor + 1
+            cursor += 1
+            continue
+        if character != "{":
+            cursor += 1
+            continue
+
+        prelude = css_text[start:cursor].strip()
+        depth = 1
+        body_start = cursor + 1
+        cursor += 1
+        while cursor < len(css_text) and depth:
+            if css_text[cursor] == "{":
+                depth += 1
+            elif css_text[cursor] == "}":
+                depth -= 1
+            cursor += 1
+        if depth:
+            raise ContractError("universal CSS contains an unclosed rule block")
+        if prelude:
+            blocks.append((prelude, css_text[body_start : cursor - 1]))
+        start = cursor
+    return blocks
+
+
+def _css_declarations(rule_body: str) -> list[tuple[str, str]]:
+    """Parse declarations at the current rule level, ignoring nested rules."""
+    flattened: list[str] = []
+    brace_depth = 0
+    for character in rule_body:
+        if character == "{":
+            brace_depth += 1
+            flattened.append(" ")
+        elif character == "}":
+            if brace_depth == 0:
+                raise ContractError("universal CSS contains an unmatched closing brace")
+            brace_depth -= 1
+            flattened.append(" ")
+        elif brace_depth:
+            flattened.append("\n" if character == "\n" else " ")
+        else:
+            flattened.append(character)
+    if brace_depth:
+        raise ContractError("universal CSS contains an unclosed nested rule")
+
+    declarations: list[tuple[str, str]] = []
+    for declaration in "".join(flattened).split(";"):
+        if ":" not in declaration:
+            continue
+        property_name, value = declaration.split(":", 1)
+        normalized_property = property_name.strip().casefold()
+        normalized_value = re.sub(r"\s+", "", value).casefold()
+        normalized_value = re.sub(r"!important$", "", normalized_value)
+        if normalized_property and normalized_value:
+            declarations.append((normalized_property, normalized_value))
+    return declarations
+
+
+def _media_query(prelude: str) -> str | None:
+    match = re.fullmatch(r"@media\s+(.+)", prelude.strip(), flags=re.IGNORECASE)
+    if not match:
+        return None
+    return re.sub(r"\s+", "", match.group(1)).casefold()
+
+
+def _has_reduced_motion_control(declarations: list[tuple[str, str]]) -> bool:
+    accepted = {
+        ("animation", "none"),
+        ("animation-duration", "0s"),
+        ("animation-duration", "0ms"),
+        ("animation-duration", "0.01ms"),
+        ("transition", "none"),
+        ("transition-duration", "0s"),
+        ("transition-duration", "0ms"),
+        ("transition-duration", "0.01ms"),
+        ("scroll-behavior", "auto"),
+    }
+    return any(declaration in accepted for declaration in declarations)
+
+
 def validate_css(css_text: str) -> None:
     active_css = _strip_css_inert_text(css_text)
-    missing = [token for token in REQUIRED_CSS_TOKENS if token not in active_css]
+    active_declarations: set[tuple[str, str]] = set()
+    observed_media: set[str] = set()
+    for prelude, body in _css_rule_blocks(active_css):
+        if not prelude.lstrip().startswith("@"):
+            active_declarations.update(_css_declarations(body))
+            continue
+        query = _media_query(prelude)
+        if query not in REQUIRED_MEDIA_QUERIES:
+            continue
+        nested_declarations: list[tuple[str, str]] = []
+        for nested_prelude, nested_body in _css_rule_blocks(body):
+            if nested_prelude.lstrip().startswith("@"):
+                continue
+            nested_declarations.extend(_css_declarations(nested_body))
+        if not nested_declarations:
+            continue
+        if query == "(prefers-reduced-motion:reduce)" and not _has_reduced_motion_control(
+            nested_declarations
+        ):
+            continue
+        observed_media.add(query)
+
+    missing = [
+        f"{name}: {value}"
+        for name, value in REQUIRED_CSS_DECLARATIONS.items()
+        if (name, value) not in active_declarations
+    ]
+    missing.extend(
+        f"@media {query}"
+        for query in sorted(REQUIRED_MEDIA_QUERIES - observed_media)
+    )
     if missing:
         raise ContractError("universal CSS is missing required active tokens: " + ", ".join(missing))
+
+
+def _parse_python(app_text: str) -> ast.Module:
+    try:
+        return ast.parse(app_text)
+    except SyntaxError as error:
+        raise ContractError(f"Python frontend binding is not valid syntax: {error}") from error
+
+
+def _has_python_marker(app_text: str) -> bool:
+    try:
+        tokens = tokenize.generate_tokens(io.StringIO(app_text).readline)
+        return any(
+            token.type == tokenize.COMMENT and token.string.strip() == PYTHON_MARKER
+            for token in tokens
+        )
+    except tokenize.TokenError as error:
+        raise ContractError(f"Python frontend binding cannot be tokenized: {error}") from error
+
+
+def _path_aliases(tree: ast.Module) -> set[str]:
+    aliases: set[str] = set()
+    for node in tree.body:
+        if not isinstance(node, ast.ImportFrom) or node.module != "pathlib":
+            continue
+        for imported in node.names:
+            if imported.name == "Path":
+                aliases.add(imported.asname or imported.name)
+    shadowed = {
+        node.id
+        for node in ast.walk(tree)
+        if isinstance(node, ast.Name) and isinstance(node.ctx, ast.Store)
+    }
+    shadowed.update(
+        node.arg for node in ast.walk(tree) if isinstance(node, ast.arg)
+    )
+    return aliases - shadowed
+
+
+def _loads_declared_css(expression: ast.AST, css_file: str, path_aliases: set[str]) -> bool:
+    if not isinstance(expression, ast.Call) or not isinstance(expression.func, ast.Attribute):
+        return False
+    if expression.func.attr != "read_text" or expression.args:
+        return False
+    path_call = expression.func.value
+    if not isinstance(path_call, ast.Call) or len(path_call.args) != 1:
+        return False
+    if not isinstance(path_call.func, ast.Name) or path_call.func.id not in path_aliases:
+        return False
+    literal = path_call.args[0]
+    return isinstance(literal, ast.Constant) and literal.value == css_file
+
+
+def _css_binding_variables(
+    tree: ast.Module,
+    css_file: str,
+    path_aliases: set[str],
+) -> set[str]:
+    variables: set[str] = set()
+    for node in tree.body:
+        targets: list[ast.expr] = []
+        value: ast.AST | None = None
+        if isinstance(node, ast.Assign):
+            targets = node.targets
+            value = node.value
+        elif isinstance(node, ast.AnnAssign):
+            targets = [node.target]
+            value = node.value
+        if value is None or not _loads_declared_css(value, css_file, path_aliases):
+            continue
+        variables.update(target.id for target in targets if isinstance(target, ast.Name))
+    store_counts = {
+        variable: sum(
+            1
+            for node in ast.walk(tree)
+            if isinstance(node, ast.Name)
+            and isinstance(node.ctx, ast.Store)
+            and node.id == variable
+        )
+        for variable in variables
+    }
+    return {variable for variable in variables if store_counts[variable] == 1}
+
+
+def _module_aliases(tree: ast.Module, module: str) -> set[str]:
+    aliases: set[str] = set()
+    for node in tree.body:
+        if not isinstance(node, ast.Import):
+            continue
+        for imported in node.names:
+            if imported.name == module:
+                aliases.add(imported.asname or imported.name)
+    shadowed = {
+        node.id
+        for node in ast.walk(tree)
+        if isinstance(node, ast.Name) and isinstance(node.ctx, ast.Store)
+    }
+    shadowed.update(
+        node.arg for node in ast.walk(tree) if isinstance(node, ast.arg)
+    )
+    return aliases - shadowed
+
+
+def _gradio_applies_css(tree: ast.Module, css_variables: set[str]) -> bool:
+    aliases = _module_aliases(tree, "gradio")
+    constructors = {"Blocks", "ChatInterface", "Interface", "TabbedInterface"}
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.Call) or not isinstance(node.func, ast.Attribute):
+            continue
+        if (
+            not isinstance(node.func.value, ast.Name)
+            or node.func.value.id not in aliases
+            or node.func.attr not in constructors
+        ):
+            continue
+        for keyword in node.keywords:
+            if (
+                keyword.arg == "css"
+                and isinstance(keyword.value, ast.Name)
+                and keyword.value.id in css_variables
+            ):
+                return True
+    return False
+
+
+def _style_expression_parts(
+    expression: ast.AST,
+    css_variables: set[str],
+) -> list[str] | None:
+    if isinstance(expression, ast.Constant) and isinstance(expression.value, str):
+        return [expression.value]
+    if isinstance(expression, ast.Name) and expression.id in css_variables:
+        return ["<DECLARED_CSS>"]
+    if isinstance(expression, ast.FormattedValue):
+        return _style_expression_parts(expression.value, css_variables)
+    if isinstance(expression, ast.JoinedStr):
+        parts: list[str] = []
+        for value in expression.values:
+            nested = _style_expression_parts(value, css_variables)
+            if nested is None:
+                return None
+            parts.extend(nested)
+        return parts
+    if isinstance(expression, ast.BinOp) and isinstance(expression.op, ast.Add):
+        left = _style_expression_parts(expression.left, css_variables)
+        right = _style_expression_parts(expression.right, css_variables)
+        if left is None or right is None:
+            return None
+        return left + right
+    return None
+
+
+def _style_expression_uses_css(expression: ast.AST, css_variables: set[str]) -> bool:
+    parts = _style_expression_parts(expression, css_variables)
+    if parts is None or "<DECLARED_CSS>" not in parts:
+        return False
+    rendered = "".join(parts).casefold()
+    return "<style" in rendered and "</style>" in rendered
+
+
+def _streamlit_applies_css(tree: ast.Module, css_variables: set[str]) -> bool:
+    aliases = _module_aliases(tree, "streamlit")
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.Call) or not isinstance(node.func, ast.Attribute):
+            continue
+        if (
+            not isinstance(node.func.value, ast.Name)
+            or node.func.value.id not in aliases
+            or node.func.attr != "markdown"
+            or not node.args
+        ):
+            continue
+        unsafe = next(
+            (keyword.value for keyword in node.keywords if keyword.arg == "unsafe_allow_html"),
+            None,
+        )
+        if (
+            isinstance(unsafe, ast.Constant)
+            and unsafe.value is True
+            and _style_expression_uses_css(node.args[0], css_variables)
+        ):
+            return True
+    return False
 
 
 def _resolved_static_href(app_file: str, href: str) -> str:
@@ -313,18 +646,30 @@ def validate_framework_binding(
     app_file: str,
     css_file: str,
 ) -> None:
-    if framework in {"gradio", "streamlit"} and PYTHON_MARKER not in app_text:
-        raise ContractError("Python frontend binding marker is absent")
-    if framework == "gradio" and "_SZL_UNIVERSAL_CSS" not in app_text:
-        raise ContractError("Gradio universal CSS binding is absent")
-    if framework == "streamlit" and "unsafe_allow_html=True" not in app_text:
-        raise ContractError("Streamlit universal CSS binding is absent")
+    if framework in {"gradio", "streamlit"}:
+        if not _has_python_marker(app_text):
+            raise ContractError("Python frontend binding marker is absent")
+        tree = _parse_python(app_text)
+        path_aliases = _path_aliases(tree)
+        css_variables = _css_binding_variables(tree, css_file, path_aliases)
+        if not css_variables:
+            raise ContractError(
+                "Python frontend binding does not read the declared CSS file"
+            )
+        if framework == "gradio" and not _gradio_applies_css(tree, css_variables):
+            raise ContractError("Gradio universal CSS binding is absent")
+        if framework == "streamlit" and not _streamlit_applies_css(
+            tree, css_variables
+        ):
+            raise ContractError("Streamlit universal CSS binding is absent")
     if framework == "static":
         parser = _StaticDocumentParser()
         parser.feed(app_text)
         parser.close()
         if parser.has_unclosed_inert_container:
             raise ContractError("Static application contains an unclosed inert container")
+        if parser.has_unclosed_foreign_container:
+            raise ContractError("Static application contains an unclosed foreign container")
         if not parser.has_viewport:
             raise ContractError("Static viewport metadata is absent")
         if parser.has_base:
