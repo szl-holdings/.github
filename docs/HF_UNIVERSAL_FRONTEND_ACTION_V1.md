@@ -1,0 +1,61 @@
+# Organization-wide Hugging Face Universal Frontend Action v1
+
+## Architecture
+
+Each Space repository owns its framework-native adapter, application source, card metadata, and canonical deployment workflow. The organization repository owns one reusable, read-only verifier:
+
+```text
+source-native adapter
++ repository manifest
++ pinned organization verifier
++ protected merge
++ existing Space writer
++ estate-wide live census
+```
+
+This prevents two failure modes:
+
+1. copying one application shell across unrelated Static, Gradio, Streamlit, React, and Docker architectures;
+2. allowing local verifier forks to drift until identical claims have different meanings.
+
+## Trust boundary
+
+The shared action verifies only committed repository state. It has no network dependency and requires no token, secret, Hub credential, or write permission.
+
+It validates:
+
+- safe repository-relative managed paths
+- exact evidence schema
+- explicit non-mutation boundary
+- framework-native CSS binding
+- Hugging Face card metadata boundaries
+- five canonical viewport classes
+- 44-pixel touch targets
+- horizontal-overflow prohibition
+- reduced-motion and technical-identifier wrapping controls
+- exact managed-file SHA-256 digests
+
+Framework binding evidence is deliberately narrow. Gradio and Streamlit must
+read the declared CSS into an unshadowed top-level variable and consume it in
+an executable top-level framework call. The `Path` and framework imports and
+the CSS assignment must precede the call; bindings in dead or conditional code
+do not count. Streamlit must interpolate the CSS as the sole non-whitespace
+content of a complete, active HTML `<style>` element, not beside one, into its
+attributes, or inside an inert container. React must pair its exact
+marker comment with a side-effect import that resolves to the declared CSS
+file; both must occur in the leading comment/import module prologue, where JSX
+text cannot imitate them. CSS controls count only in rules made from the
+audited `:root`, `html`, `body`, `*`, `*::before`, and `*::after` selectors,
+with at least one selector that matches a document element. Empty selector-list
+entries and whitespace that changes selector, declaration-value, or media-query
+tokens remain semantic and cannot be normalized into evidence.
+
+It does not prove live runtime readiness. Live readiness remains the responsibility of the estate-wide browser census and source/runtime revision readback.
+
+## Pinning policy
+
+Callers must pin the action to a full immutable commit SHA. Floating references such as `main`, tags without immutable policy, or version branches are not admissible in protected CI.
+
+## Promotion policy
+
+The action is read-only. It may not create branches, commits, pull requests, releases, deployments, Hub revisions, model updates, dataset updates, collection changes, secrets, signer keys, storage mounts, visibility changes, or hardware allocations.
