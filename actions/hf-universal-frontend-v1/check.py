@@ -414,8 +414,11 @@ def _selector_is_guaranteed_active(prelude: str) -> bool:
     """
     guaranteed = {":root", "html", "body", "*"}
     audited = guaranteed | {"*::before", "*::after"}
+    # Whitespace inside a selector is semantic: it is the descendant
+    # combinator.  Removing it would turn an unrelated selector such as
+    # ``h t m l`` into the guaranteed document selector ``html``.
     selectors = {
-        re.sub(r"\s+", "", selector).casefold()
+        selector.strip().casefold()
         for selector in prelude.split(",")
         if selector.strip()
     }
@@ -573,8 +576,11 @@ def _direct_top_level_calls(tree: ast.Module) -> list[ast.Call]:
     """
     calls: list[ast.Call] = []
 
-    def collect(statements: list[ast.stmt]) -> None:
+    def collect(statements: list[ast.stmt]) -> bool:
+        """Collect calls until control can no longer reach the next statement."""
         for statement in statements:
+            if isinstance(statement, (ast.Raise, ast.Return, ast.Break, ast.Continue)):
+                return False
             expression: ast.AST | None = None
             if isinstance(statement, ast.Expr):
                 expression = statement.value
@@ -591,7 +597,9 @@ def _direct_top_level_calls(tree: ast.Module) -> list[ast.Call]:
                     for item in statement.items
                     if isinstance(item.context_expr, ast.Call)
                 )
-                collect(statement.body)
+                if not collect(statement.body):
+                    return False
+        return True
 
     collect(tree.body)
     return calls
@@ -709,19 +717,28 @@ def _consume_javascript_string(
 
 
 def _react_marker_and_imports(app_text: str) -> tuple[bool, list[str]]:
-    """Extract exact top-level side-effect imports from JavaScript source."""
+    """Extract exact side-effect imports from the JavaScript module prologue.
+
+    Import-looking JSX text is not JavaScript code, but recognizing all of JSX
+    without a JavaScript parser is unsafe.  Static imports and the audit marker
+    therefore count only in the leading comment/import prologue, before the
+    first executable module token.  This is a deliberately narrow subset of
+    valid JavaScript and cannot be reached from JSX text.
+    """
     marker = False
     imports: list[str] = []
     cursor = 0
-    brace_depth = 0
     while cursor < len(app_text):
+        if app_text[cursor].isspace():
+            cursor += 1
+            continue
         if app_text.startswith("//", cursor):
             end = len(app_text)
             for separator in ("\r", "\n"):
                 candidate = app_text.find(separator, cursor + 2)
                 if candidate >= 0:
                     end = min(end, candidate)
-            if brace_depth == 0 and app_text[cursor:end].strip() == REACT_MARKER:
+            if app_text[cursor:end].strip() == REACT_MARKER:
                 marker = True
             cursor = end
             continue
@@ -732,28 +749,8 @@ def _react_marker_and_imports(app_text: str) -> tuple[bool, list[str]]:
             cursor = end + 2
             continue
 
-        character = app_text[cursor]
-        if character in {"'", '"', "`"}:
-            consumed = _consume_javascript_string(app_text, cursor)
-            if consumed is None:
-                raise ContractError("React frontend binding contains an unsupported string literal")
-            _, cursor = consumed
-            continue
-        if character == "{":
-            brace_depth += 1
-            cursor += 1
-            continue
-        if character == "}":
-            brace_depth = max(0, brace_depth - 1)
-            cursor += 1
-            continue
-
         if (
-            brace_depth == 0
-            and app_text.startswith("import", cursor)
-            and not app_text[
-                max(app_text.rfind("\n", 0, cursor), app_text.rfind("\r", 0, cursor)) + 1 : cursor
-            ].strip()
+            app_text.startswith("import", cursor)
             and (cursor == 0 or not (app_text[cursor - 1].isalnum() or app_text[cursor - 1] in {"_", "$"}))
             and (
                 cursor + 6 == len(app_text)
@@ -779,7 +776,61 @@ def _react_marker_and_imports(app_text: str) -> tuple[bool, list[str]]:
                         imports.append(specifier)
                         cursor = end + terminator.end()
                         continue
-        cursor += 1
+            # Other static imports may precede the governed side-effect import.
+            # Consume their statement without interpreting their bindings.
+            nesting: list[str] = []
+            scan = path_start
+            pairs = {"(": ")", "[": "]", "{": "}"}
+            while scan < len(app_text):
+                if app_text.startswith("//", scan):
+                    line_end = min(
+                        (
+                            position
+                            for position in (
+                                app_text.find("\r", scan + 2),
+                                app_text.find("\n", scan + 2),
+                            )
+                            if position >= 0
+                        ),
+                        default=len(app_text),
+                    )
+                    scan = line_end
+                    if not nesting:
+                        break
+                    continue
+                if app_text.startswith("/*", scan):
+                    comment_end = app_text.find("*/", scan + 2)
+                    if comment_end < 0:
+                        raise ContractError(
+                            "React frontend binding contains an unclosed comment"
+                        )
+                    scan = comment_end + 2
+                    continue
+                character = app_text[scan]
+                if character in {"'", '"', "`"}:
+                    consumed = _consume_javascript_string(app_text, scan)
+                    if consumed is None:
+                        raise ContractError(
+                            "React frontend binding contains an unsupported string literal"
+                        )
+                    _, scan = consumed
+                    continue
+                if character in pairs:
+                    nesting.append(pairs[character])
+                elif nesting and character == nesting[-1]:
+                    nesting.pop()
+                elif not nesting and character == ";":
+                    scan += 1
+                    break
+                elif not nesting and character in {"\r", "\n"}:
+                    scan += 1
+                    break
+                scan += 1
+            cursor = scan
+            continue
+        # No comment or import declaration can begin here.  Closing the
+        # prologue prevents JSX text later in the module from becoming proof.
+        break
     return marker, imports
 
 

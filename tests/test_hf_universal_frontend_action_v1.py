@@ -159,6 +159,25 @@ def test_react_contract_passes_with_live_stylesheet_import(tmp_path: Path) -> No
     assert result["sdk"] == "static"
 
 
+def test_react_contract_allows_static_imports_before_marker(tmp_path: Path) -> None:
+    _fixture(tmp_path, "react")
+    app = tmp_path / "main.tsx"
+    app.write_text(
+        "import {\n"
+        "  StrictMode,\n"
+        '} from "react";\n'
+        "// SZL_HF_UNIVERSAL_FRONTEND_V1\n"
+        'import "./szl-universal-frontend.css";\n'
+        "export const App = () => <StrictMode>ok</StrictMode>;\n",
+        encoding="utf-8",
+    )
+    manifest_path, payload = _manifest(tmp_path)
+    payload["file_sha256"]["main.tsx"] = _sha(app)
+    manifest_path.write_text(json.dumps(payload), encoding="utf-8")
+    result = MODULE.validate(tmp_path, Path("docs/hf-universal-frontend-v1.json"))
+    assert result["framework"] == "react"
+
+
 def test_hash_drift_fails_closed(tmp_path: Path) -> None:
     _fixture(tmp_path)
     (tmp_path / "index.html").write_text("drift", encoding="utf-8")
@@ -260,7 +279,7 @@ def test_non_applying_css_rules_are_rejected(tmp_path: Path, wrapper: str) -> No
         MODULE.validate(tmp_path, Path("docs/hf-universal-frontend-v1.json"))
 
 
-@pytest.mark.parametrize("selector", [":not(*)", "*, :not("])
+@pytest.mark.parametrize("selector", [":not(*)", "*, :not(", "h t m l"])
 def test_impossible_css_selectors_cannot_satisfy_controls(
     tmp_path: Path,
     selector: str,
@@ -462,6 +481,18 @@ def test_python_framework_must_apply_declared_css(
             + "    st.markdown(f'<style>{_SZL_UNIVERSAL_CSS}</style>', unsafe_allow_html=True)\n",
             "Streamlit universal CSS binding is absent",
         ),
+        (
+            "gradio",
+            "raise SystemExit\n"
+            + "demo = gr.Blocks(css=_SZL_UNIVERSAL_CSS)\n",
+            "Gradio universal CSS binding is absent",
+        ),
+        (
+            "streamlit",
+            "raise SystemExit\n"
+            + "st.markdown(f'<style>{_SZL_UNIVERSAL_CSS}</style>', unsafe_allow_html=True)\n",
+            "Streamlit universal CSS binding is absent",
+        ),
     ],
 )
 def test_python_framework_binding_in_dead_code_is_rejected(
@@ -512,6 +543,15 @@ def test_python_framework_binding_in_dead_code_is_rejected(
         ),
         (
             "// SZL_HF_UNIVERSAL_FRONTEND_V1\nimport './other.css';\n",
+            "top-level side-effect import",
+        ),
+        (
+            "// SZL_HF_UNIVERSAL_FRONTEND_V1\n"
+            + "export const App = () => (\n"
+            + "  <main>\n"
+            + '    import "./szl-universal-frontend.css";\n'
+            + "  </main>\n"
+            + ");\n",
             "top-level side-effect import",
         ),
     ],
