@@ -3,15 +3,23 @@ from __future__ import annotations
 
 import argparse
 import hashlib
+from html.parser import HTMLParser
 import json
+import posixpath
 import re
 from pathlib import Path
 from typing import Any
+from urllib.parse import unquote, urlsplit
 
 SCHEMA = "szl.hf-universal-frontend/v1"
 ALLOWED_FRAMEWORKS = {"static", "gradio", "streamlit", "react"}
+FRAMEWORK_SDKS = {
+    "static": frozenset({"static"}),
+    "gradio": frozenset({"gradio"}),
+    "streamlit": frozenset({"streamlit", "docker"}),
+    "react": frozenset({"static", "docker"}),
+}
 PYTHON_MARKER = "# SZL_HF_UNIVERSAL_FRONTEND_V1"
-HTML_MARKER = 'data-szl-universal-frontend="v1"'
 REACT_MARKER = "// SZL_HF_UNIVERSAL_FRONTEND_V1"
 REQUIRED_CSS_TOKENS = (
     "--szl-touch-target: 44px",
@@ -21,14 +29,64 @@ REQUIRED_CSS_TOKENS = (
     "@media (prefers-reduced-motion: reduce)",
 )
 SHA256 = re.compile(r"^[0-9a-f]{64}$")
+CSS_COMMENT = re.compile(r"/\*.*?\*/", re.DOTALL)
+MAX_OUTPUT_VALUE_BYTES = 4096
 
 
 class ContractError(RuntimeError):
     pass
 
 
+class _StaticDocumentParser(HTMLParser):
+    def __init__(self) -> None:
+        super().__init__(convert_charrefs=True)
+        self.has_viewport = False
+        self.stylesheet_links: list[dict[str, str]] = []
+
+    def handle_starttag(
+        self,
+        tag: str,
+        attrs: list[tuple[str, str | None]],
+    ) -> None:
+        self._record(tag, attrs)
+
+    def handle_startendtag(
+        self,
+        tag: str,
+        attrs: list[tuple[str, str | None]],
+    ) -> None:
+        self._record(tag, attrs)
+
+    def _record(
+        self,
+        tag: str,
+        attrs: list[tuple[str, str | None]],
+    ) -> None:
+        values = {
+            str(name).casefold(): "" if value is None else str(value)
+            for name, value in attrs
+        }
+        normalized_tag = tag.casefold()
+        if normalized_tag == "meta" and values.get("name", "").casefold() == "viewport":
+            self.has_viewport = True
+        if normalized_tag != "link":
+            return
+        rel_tokens = {
+            token.casefold()
+            for token in values.get("rel", "").split()
+            if token.strip()
+        }
+        if "stylesheet" in rel_tokens:
+            self.stylesheet_links.append(values)
+
+
 def sha256(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+def _reject_line_breaks(value: str, label: str) -> None:
+    if "\r" in value or "\n" in value:
+        raise ContractError(f"{label} may not contain CR or LF characters")
 
 
 def safe_path(root: Path, value: Any, label: str) -> Path:
@@ -36,6 +94,7 @@ def safe_path(root: Path, value: Any, label: str) -> Path:
         value = str(value)
     if not isinstance(value, str) or not value.strip():
         raise ContractError(f"{label} is absent or not a string")
+    _reject_line_breaks(value, label)
     relative = Path(value)
     if relative.is_absolute() or ".." in relative.parts:
         raise ContractError(f"{label} must be a safe repository-relative path: {value!r}")
@@ -80,7 +139,7 @@ def parse_front_matter(text: str) -> dict[str, str]:
     return values
 
 
-def validate_front_matter(values: dict[str, str], manifest: dict[str, Any]) -> None:
+def validate_front_matter(values: dict[str, str], manifest: dict[str, Any]) -> str:
     short = values.get("short_description") or values.get("shortDescription")
     if not short:
         raise ContractError("short_description is absent")
@@ -98,15 +157,55 @@ def validate_front_matter(values: dict[str, str], manifest: dict[str, Any]) -> N
         raise ContractError(
             f"README app_file {app_file!r} diverges from manifest app_file {manifest.get('app_file')!r}"
         )
+    return sdk.strip().casefold()
+
+
+def validate_sdk_binding(card_sdk: str, manifest: dict[str, Any], framework: str) -> str:
+    manifest_sdk = manifest.get("sdk")
+    if not isinstance(manifest_sdk, str) or not manifest_sdk.strip():
+        raise ContractError("manifest sdk is absent or not a string")
+    normalized = manifest_sdk.strip().casefold()
+    if card_sdk != normalized:
+        raise ContractError(
+            f"README sdk {card_sdk!r} diverges from manifest sdk {normalized!r}"
+        )
+    compatible = FRAMEWORK_SDKS[framework]
+    if normalized not in compatible:
+        allowed = ", ".join(sorted(compatible))
+        raise ContractError(
+            f"sdk {normalized!r} is not compatible with framework {framework!r}; expected one of: {allowed}"
+        )
+    return normalized
 
 
 def validate_css(css_text: str) -> None:
-    missing = [token for token in REQUIRED_CSS_TOKENS if token not in css_text]
+    active_css = CSS_COMMENT.sub("", css_text)
+    missing = [token for token in REQUIRED_CSS_TOKENS if token not in active_css]
     if missing:
-        raise ContractError("universal CSS is missing required tokens: " + ", ".join(missing))
+        raise ContractError("universal CSS is missing required active tokens: " + ", ".join(missing))
 
 
-def validate_framework_binding(framework: str, app_text: str) -> None:
+def _resolved_static_href(app_file: str, href: str) -> str:
+    _reject_line_breaks(href, "static stylesheet href")
+    parsed = urlsplit(href)
+    if parsed.scheme or parsed.netloc:
+        raise ContractError("static universal stylesheet href must be repository-local")
+    decoded = unquote(parsed.path)
+    if not decoded or decoded.startswith("/") or "\\" in decoded:
+        raise ContractError("static universal stylesheet href must be a relative POSIX path")
+    resolved = posixpath.normpath(posixpath.join(posixpath.dirname(app_file), decoded))
+    if resolved == ".." or resolved.startswith("../"):
+        raise ContractError("static universal stylesheet href escapes the application directory")
+    return resolved
+
+
+def validate_framework_binding(
+    framework: str,
+    app_text: str,
+    *,
+    app_file: str,
+    css_file: str,
+) -> None:
     if framework in {"gradio", "streamlit"} and PYTHON_MARKER not in app_text:
         raise ContractError("Python frontend binding marker is absent")
     if framework == "gradio" and "_SZL_UNIVERSAL_CSS" not in app_text:
@@ -114,10 +213,22 @@ def validate_framework_binding(framework: str, app_text: str) -> None:
     if framework == "streamlit" and "unsafe_allow_html=True" not in app_text:
         raise ContractError("Streamlit universal CSS binding is absent")
     if framework == "static":
-        if HTML_MARKER not in app_text:
-            raise ContractError("Static universal CSS link marker is absent")
-        if not re.search(r"<meta\s+[^>]*name=[\"']viewport[\"']", app_text, re.IGNORECASE):
+        parser = _StaticDocumentParser()
+        parser.feed(app_text)
+        parser.close()
+        if not parser.has_viewport:
             raise ContractError("Static viewport metadata is absent")
+        expected_css = posixpath.normpath(css_file)
+        for link in parser.stylesheet_links:
+            if link.get("data-szl-universal-frontend") != "v1":
+                continue
+            href = link.get("href", "")
+            if _resolved_static_href(app_file, href) == expected_css:
+                break
+        else:
+            raise ContractError(
+                "Static universal CSS requires a stylesheet <link> whose marker and href bind the declared css_file"
+            )
     if framework == "react" and REACT_MARKER not in app_text:
         raise ContractError("React universal CSS import marker is absent")
 
@@ -189,10 +300,16 @@ def validate(root: Path, manifest_path: Path) -> dict[str, Any]:
     )
 
     front = parse_front_matter(readme.read_text(encoding="utf-8"))
-    validate_front_matter(front, manifest)
+    card_sdk = validate_front_matter(front, manifest)
+    sdk = validate_sdk_binding(card_sdk, manifest, framework)
     validate_css(css.read_text(encoding="utf-8"))
     binding_path = entry or app
-    validate_framework_binding(framework, binding_path.read_text(encoding="utf-8"))
+    validate_framework_binding(
+        framework,
+        binding_path.read_text(encoding="utf-8"),
+        app_file=str(manifest.get("entry_file") or manifest["app_file"]),
+        css_file=str(manifest["css_file"]),
+    )
 
     contract = manifest.get("contract")
     if not isinstance(contract, dict):
@@ -213,7 +330,7 @@ def validate(root: Path, manifest_path: Path) -> dict[str, Any]:
         "schema": "szl.hf-universal-frontend-contract-result/v1",
         "status": "PASS",
         "framework": framework,
-        "sdk": manifest.get("sdk"),
+        "sdk": sdk,
         "app_file": manifest.get("app_file"),
         "css_file": manifest.get("css_file"),
         "entry_file": manifest.get("entry_file"),
@@ -222,6 +339,16 @@ def validate(root: Path, manifest_path: Path) -> dict[str, Any]:
         "verified_files": hashes,
         "remote_mutation": False,
     }
+
+
+def _github_output_value(name: str, value: Any) -> str:
+    text = "" if value is None else str(value)
+    _reject_line_breaks(text, f"GitHub output {name}")
+    if len(text.encode("utf-8")) > MAX_OUTPUT_VALUE_BYTES:
+        raise ContractError(
+            f"GitHub output {name} exceeds {MAX_OUTPUT_VALUE_BYTES} bytes"
+        )
+    return text
 
 
 def write_github_output(path: Path, result: dict[str, Any]) -> None:
@@ -234,7 +361,7 @@ def write_github_output(path: Path, result: dict[str, Any]) -> None:
     }
     with path.open("a", encoding="utf-8") as handle:
         for key, value in lines.items():
-            handle.write(f"{key}={value}\n")
+            handle.write(f"{key}={_github_output_value(key, value)}\n")
 
 
 def main() -> int:
@@ -249,11 +376,11 @@ def main() -> int:
     args = parser.parse_args()
     try:
         result = validate(args.root, args.manifest)
+        if args.github_output:
+            write_github_output(args.github_output, result)
     except (ContractError, OSError, ValueError) as error:
         print(json.dumps({"status": "FAIL", "error": str(error)}, indent=2, sort_keys=True))
         return 1
-    if args.github_output:
-        write_github_output(args.github_output, result)
     print(json.dumps(result, indent=2, sort_keys=True))
     return 0
 
