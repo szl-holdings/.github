@@ -323,7 +323,6 @@ class TestProductionWorkflowAuthContract(unittest.TestCase):
             {
                 ".github/workflows/attest-and-approve.yml": (
                     {
-                        "permission-actions": "read",
                         "permission-administration": "read",
                         "permission-checks": "read",
                         "permission-contents": "read",

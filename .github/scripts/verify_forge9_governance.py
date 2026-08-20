@@ -21,7 +21,6 @@ APP_TOKEN_USES_LINE = re.compile(
 APP_TOKEN_PERMISSION_CONTRACTS = {
     ".github/workflows/attest-and-approve.yml": (
         {
-            "permission-actions": "read",
             "permission-administration": "read",
             "permission-checks": "read",
             "permission-contents": "read",
