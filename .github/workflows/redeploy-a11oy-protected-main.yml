@@ -46,7 +46,7 @@ jobs:
             const fs = require('fs');
             const path = require('path');
             const report = {
-              schema: 'szl.a11oy-recovery-authority/v2',
+              schema: 'szl.a11oy-recovery-authority/v3',
               generated_at: new Date().toISOString(),
               canonical_deployment_workflow: 'szl-holdings/a11oy/.github/workflows/hf-sync.yml',
               github_repository: process.env.A11OY_REPOSITORY,
@@ -68,7 +68,7 @@ jobs:
               const response = await fetch(url, {
                 headers: {
                   accept: 'application/json',
-                  'user-agent': 'szl-a11oy-recovery-authority/2.0',
+                  'user-agent': 'szl-a11oy-recovery-authority/3.0',
                 },
                 signal: AbortSignal.timeout(30000),
               });
@@ -78,11 +78,24 @@ jobs:
               return response.json();
             }
 
+            function immutableSha(value) {
+              const text = String(value || '').toLowerCase();
+              return /^[0-9a-f]{40}$/.test(text) ? text : '';
+            }
+
+            function runtimeRevision(runtime) {
+              const candidate = runtime.sha ?? runtime.revision ?? '';
+              if (candidate && typeof candidate === 'object') {
+                return immutableSha(candidate.sha ?? candidate.value ?? candidate.revision ?? '');
+              }
+              return immutableSha(candidate);
+            }
+
             try {
               const [owner, repo] = process.env.A11OY_REPOSITORY.split('/');
               const commit = await github.rest.repos.getCommit({owner, repo, ref: 'main'});
-              const mainSha = String(commit.data.sha || '');
-              if (!/^[0-9a-f]{40}$/.test(mainSha)) {
+              const mainSha = immutableSha(commit.data.sha);
+              if (!mainSha) {
                 throw new Error('Protected main did not return a full immutable SHA.');
               }
               report.source = {branch: 'main', sha: mainSha};
@@ -94,46 +107,46 @@ jobs:
               ]);
 
               const build = buildInfo && typeof buildInfo.build === 'object' ? buildInfo.build : {};
-              const deployed = String(
-                build.revision ||
-                build.deployed_git_sha ||
-                build.git_sha ||
-                buildInfo.revision ||
-                ''
-              );
-              const revisionSource = String(build.revision_source || buildInfo.revision_source || 'UNKNOWN');
-              const buildStatus = String(buildInfo.status || build.state || 'UNKNOWN').toUpperCase();
+              const deployed = immutableSha(build.revision);
+              const buildState = String(build.state || 'UNKNOWN').toUpperCase();
+              const receiptMinted = buildInfo?.receipt_minted;
               const liveStatus = String(livez.status || 'UNKNOWN').toUpperCase();
               const runtime = space && typeof space.runtime === 'object' ? space.runtime : {};
               const stageRaw = runtime.stage && typeof runtime.stage === 'object'
                 ? runtime.stage.value
                 : runtime.stage;
               const stage = String(stageRaw || 'UNKNOWN').split('.').pop().toUpperCase();
-              const hfSha = String(space.sha || runtime.sha || '');
+              const repositorySha = immutableSha(space.sha);
+              const servedRuntimeSha = runtimeRevision(runtime);
 
               report.runtime = {
                 deployed_git_sha: deployed || null,
-                revision_source: revisionSource,
-                build_status: buildStatus,
+                build_state: buildState,
+                receipt_minted: receiptMinted,
                 livez_status: liveStatus,
                 source_matches_main: deployed === mainSha,
               };
               report.huggingface = {
                 repo_id: 'SZLHOLDINGS/a11oy',
-                repository_sha: hfSha || null,
+                repository_sha: repositorySha || null,
+                runtime_sha: servedRuntimeSha || null,
                 stage,
                 public: space.private !== true,
-                immutable_sha_observed: /^[0-9a-f]{40}$/.test(hfSha),
+                repository_sha_immutable: Boolean(repositorySha),
+                runtime_sha_immutable: Boolean(servedRuntimeSha),
+                runtime_matches_repository: Boolean(
+                  repositorySha && servedRuntimeSha && servedRuntimeSha === repositorySha
+                ),
               };
 
               if (deployed !== mainSha) {
                 report.errors.push(`Runtime revision ${deployed || 'UNKNOWN'} does not match protected main ${mainSha}.`);
               }
-              if (revisionSource !== 'env:SZL_GIT_SHA') {
-                report.errors.push(`Runtime source binding is ${revisionSource}, not env:SZL_GIT_SHA.`);
+              if (buildState !== 'OBSERVED') {
+                report.errors.push(`Build identity state is ${buildState}, not OBSERVED.`);
               }
-              if (!['OBSERVED', 'OK'].includes(buildStatus)) {
-                report.errors.push(`Build identity status is ${buildStatus}.`);
+              if (receiptMinted !== false) {
+                report.errors.push(`Build identity receipt_minted is ${String(receiptMinted)}, not false.`);
               }
               if (liveStatus !== 'LIVE') {
                 report.errors.push(`Liveness status is ${liveStatus}.`);
@@ -141,8 +154,16 @@ jobs:
               if (stage !== 'RUNNING') {
                 report.errors.push(`Hugging Face runtime stage is ${stage}.`);
               }
-              if (!/^[0-9a-f]{40}$/.test(hfSha)) {
-                report.errors.push('Hugging Face immutable repository/runtime SHA was not observed.');
+              if (!repositorySha) {
+                report.errors.push('Hugging Face immutable repository head SHA was not observed.');
+              }
+              if (!servedRuntimeSha) {
+                report.errors.push('Hugging Face immutable served runtime SHA was not observed.');
+              }
+              if (repositorySha && servedRuntimeSha && servedRuntimeSha !== repositorySha) {
+                report.errors.push(
+                  `Hugging Face served runtime ${servedRuntimeSha} does not match repository head ${repositorySha}.`
+                );
               }
               if (space.private === true) {
                 report.errors.push('Canonical A11oy Space is private.');
