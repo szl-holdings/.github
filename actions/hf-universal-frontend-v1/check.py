@@ -32,6 +32,8 @@ def sha256(path: Path) -> str:
 
 
 def safe_path(root: Path, value: Any, label: str) -> Path:
+    if isinstance(value, Path):
+        value = str(value)
     if not isinstance(value, str) or not value.strip():
         raise ContractError(f"{label} is absent or not a string")
     relative = Path(value)
