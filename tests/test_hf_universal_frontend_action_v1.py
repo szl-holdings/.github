@@ -216,15 +216,15 @@ def test_card_and_manifest_sdk_must_match(tmp_path: Path) -> None:
     "stylesheet_markup",
     [
         '<link rel="stylesheet" href="./szl-universal-frontend.css">'
-        '<div data-szl-universal-frontend="v1"></div>',
+        + '<div data-szl-universal-frontend="v1"></div>',
         '<!-- <link rel="stylesheet" href="./szl-universal-frontend.css" '
-        'data-szl-universal-frontend="v1"> -->',
+        + 'data-szl-universal-frontend="v1"> -->',
         '<link rel="stylesheet" href="./other.css" '
-        'data-szl-universal-frontend="v1">',
+        + 'data-szl-universal-frontend="v1">',
         '<template><link rel="stylesheet" href="./szl-universal-frontend.css" '
-        'data-szl-universal-frontend="v1"></template>',
+        + 'data-szl-universal-frontend="v1"></template>',
         '<link rel="stylesheet" href="./szl-universal-frontend.css" '
-        'data-szl-universal-frontend="v1" disabled>',
+        + 'data-szl-universal-frontend="v1" disabled>',
     ],
 )
 def test_static_marker_must_bind_the_declared_stylesheet(
@@ -268,14 +268,14 @@ def test_static_duplicate_controlled_attributes_are_rejected(tmp_path: Path) -> 
     [
         (
             '<template/><link rel="stylesheet" '
-            'href="./szl-universal-frontend.css" '
-            'data-szl-universal-frontend="v1">',
+            + 'href="./szl-universal-frontend.css" '
+            + 'data-szl-universal-frontend="v1">',
             "self-closing <template>",
         ),
         (
             '<template></noscript><link rel="stylesheet" '
-            'href="./szl-universal-frontend.css" '
-            'data-szl-universal-frontend="v1"></template>',
+            + 'href="./szl-universal-frontend.css" '
+            + 'data-szl-universal-frontend="v1"></template>',
             "mismatched inert containers",
         ),
         ("<template>", "unclosed inert container"),
