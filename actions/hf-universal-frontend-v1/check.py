@@ -39,16 +39,20 @@ def safe_path(root: Path, value: Any, label: str) -> Path:
     relative = Path(value)
     if relative.is_absolute() or ".." in relative.parts:
         raise ContractError(f"{label} must be a safe repository-relative path: {value!r}")
-    path = (root / relative).resolve()
     resolved_root = root.resolve()
+    unresolved = resolved_root / relative
+    cursor = resolved_root
+    for part in relative.parts:
+        cursor /= part
+        if cursor.is_symlink():
+            raise ContractError(f"{label} may not contain a symlink: {value!r}")
+    path = unresolved.resolve()
     try:
         path.relative_to(resolved_root)
     except ValueError as error:
         raise ContractError(f"{label} escapes the repository root: {value!r}") from error
     if not path.is_file():
         raise ContractError(f"{label} does not exist: {value!r}")
-    if path.is_symlink():
-        raise ContractError(f"{label} may not be a symlink: {value!r}")
     return path
 
 
@@ -118,9 +122,16 @@ def validate_framework_binding(framework: str, app_text: str) -> None:
         raise ContractError("React universal CSS import marker is absent")
 
 
-def validate_hashes(root: Path, hashes: Any) -> dict[str, str]:
+def validate_hashes(
+    root: Path, hashes: Any, required_paths: set[str]
+) -> dict[str, str]:
     if not isinstance(hashes, dict) or not hashes:
         raise ContractError("file_sha256 is absent or empty")
+    missing = sorted(required_paths - set(hashes))
+    if missing:
+        raise ContractError(
+            "file_sha256 is missing managed paths: " + ", ".join(missing)
+        )
     verified: dict[str, str] = {}
     for relative, expected in sorted(hashes.items()):
         if not isinstance(expected, str) or not SHA256.fullmatch(expected):
@@ -166,7 +177,16 @@ def validate(root: Path, manifest_path: Path) -> dict[str, Any]:
     # Authenticate managed bytes before interpreting their contents. A changed
     # file must report hash drift rather than an incidental downstream parse or
     # framework-binding error.
-    hashes = validate_hashes(root, manifest.get("file_sha256"))
+    required_hashes = {
+        "README.md",
+        str(manifest["app_file"]),
+        str(manifest["css_file"]),
+    }
+    if manifest.get("entry_file"):
+        required_hashes.add(str(manifest["entry_file"]))
+    hashes = validate_hashes(
+        root, manifest.get("file_sha256"), required_hashes
+    )
 
     front = parse_front_matter(readme.read_text(encoding="utf-8"))
     validate_front_matter(front, manifest)
@@ -183,6 +203,8 @@ def validate(root: Path, manifest_path: Path) -> dict[str, Any]:
         raise ContractError("horizontal_overflow_allowed must be false")
     if contract.get("reduced_motion_required") is not True:
         raise ContractError("reduced_motion_required must be true")
+    if contract.get("technical_identifier_wrapping_required") is not True:
+        raise ContractError("technical_identifier_wrapping_required must be true")
     viewports = contract.get("viewport_classes")
     if viewports != [360, 390, 768, 1024, 1440]:
         raise ContractError(f"unexpected viewport_classes: {viewports!r}")

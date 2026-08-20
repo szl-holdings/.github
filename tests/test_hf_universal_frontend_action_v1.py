@@ -109,6 +109,16 @@ def test_hash_drift_fails_closed(tmp_path: Path) -> None:
         MODULE.validate(tmp_path, Path("docs/hf-universal-frontend-v1.json"))
 
 
+def test_partial_hash_manifest_is_rejected(tmp_path: Path) -> None:
+    _fixture(tmp_path)
+    manifest_path = tmp_path / "docs" / "hf-universal-frontend-v1.json"
+    payload = json.loads(manifest_path.read_text(encoding="utf-8"))
+    del payload["file_sha256"]["index.html"]
+    manifest_path.write_text(json.dumps(payload), encoding="utf-8")
+    with pytest.raises(MODULE.ContractError, match="missing managed paths: index.html"):
+        MODULE.validate(tmp_path, Path("docs/hf-universal-frontend-v1.json"))
+
+
 def test_path_traversal_is_rejected(tmp_path: Path) -> None:
     _fixture(tmp_path)
     manifest_path = tmp_path / "docs" / "hf-universal-frontend-v1.json"
@@ -116,6 +126,16 @@ def test_path_traversal_is_rejected(tmp_path: Path) -> None:
     payload["app_file"] = "../outside.py"
     manifest_path.write_text(json.dumps(payload), encoding="utf-8")
     with pytest.raises(MODULE.ContractError, match="safe repository-relative path"):
+        MODULE.validate(tmp_path, Path("docs/hf-universal-frontend-v1.json"))
+
+
+def test_managed_file_symlink_is_rejected(tmp_path: Path) -> None:
+    _fixture(tmp_path)
+    app = tmp_path / "index.html"
+    target = tmp_path / "index-target.html"
+    app.rename(target)
+    app.symlink_to(target.name)
+    with pytest.raises(MODULE.ContractError, match="may not contain a symlink"):
         MODULE.validate(tmp_path, Path("docs/hf-universal-frontend-v1.json"))
 
 
@@ -128,6 +148,19 @@ def test_missing_css_control_is_rejected(tmp_path: Path) -> None:
     payload["file_sha256"]["szl-universal-frontend.css"] = _sha(css)
     manifest_path.write_text(json.dumps(payload), encoding="utf-8")
     with pytest.raises(MODULE.ContractError, match="missing required tokens"):
+        MODULE.validate(tmp_path, Path("docs/hf-universal-frontend-v1.json"))
+
+
+def test_identifier_wrapping_contract_is_required(tmp_path: Path) -> None:
+    _fixture(tmp_path)
+    manifest_path = tmp_path / "docs" / "hf-universal-frontend-v1.json"
+    payload = json.loads(manifest_path.read_text(encoding="utf-8"))
+    payload["contract"]["technical_identifier_wrapping_required"] = False
+    manifest_path.write_text(json.dumps(payload), encoding="utf-8")
+    with pytest.raises(
+        MODULE.ContractError,
+        match="technical_identifier_wrapping_required must be true",
+    ):
         MODULE.validate(tmp_path, Path("docs/hf-universal-frontend-v1.json"))
 
 
