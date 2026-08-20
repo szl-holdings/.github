@@ -239,6 +239,53 @@ def test_missing_css_control_is_rejected(tmp_path: Path) -> None:
 
 
 @pytest.mark.parametrize(
+    ("original", "spaced"),
+    [
+        ("44px", "44 px"),
+        ("anywhere", "any where"),
+        ("clip", "c l i p"),
+        ("0.01ms", "0.01 ms"),
+    ],
+)
+def test_css_declaration_value_whitespace_is_semantic(
+    tmp_path: Path,
+    original: str,
+    spaced: str,
+) -> None:
+    _fixture(tmp_path)
+    css = tmp_path / "szl-universal-frontend.css"
+    css.write_text(CSS.replace(original, spaced), encoding="utf-8")
+    manifest_path, payload = _manifest(tmp_path)
+    payload["file_sha256"]["szl-universal-frontend.css"] = _sha(css)
+    manifest_path.write_text(json.dumps(payload), encoding="utf-8")
+    with pytest.raises(MODULE.ContractError, match="missing required active tokens"):
+        MODULE.validate(tmp_path, Path("docs/hf-universal-frontend-v1.json"))
+
+
+@pytest.mark.parametrize(
+    ("original", "spaced"),
+    [
+        ("max-width: 560px", "max-width: 5 60px"),
+        ("max-width: 560px", "max-width:\N{NO-BREAK SPACE}560px"),
+        ("prefers-reduced-motion: reduce", "prefers-reduced-motion: r e d u c e"),
+    ],
+)
+def test_media_query_token_whitespace_is_semantic(
+    tmp_path: Path,
+    original: str,
+    spaced: str,
+) -> None:
+    _fixture(tmp_path)
+    css = tmp_path / "szl-universal-frontend.css"
+    css.write_text(CSS.replace(original, spaced), encoding="utf-8")
+    manifest_path, payload = _manifest(tmp_path)
+    payload["file_sha256"]["szl-universal-frontend.css"] = _sha(css)
+    manifest_path.write_text(json.dumps(payload), encoding="utf-8")
+    with pytest.raises(MODULE.ContractError, match="missing required active tokens"):
+        MODULE.validate(tmp_path, Path("docs/hf-universal-frontend-v1.json"))
+
+
+@pytest.mark.parametrize(
     "css_text",
     [
         f"/* {CSS} */",
@@ -279,7 +326,18 @@ def test_non_applying_css_rules_are_rejected(tmp_path: Path, wrapper: str) -> No
         MODULE.validate(tmp_path, Path("docs/hf-universal-frontend-v1.json"))
 
 
-@pytest.mark.parametrize("selector", [":not(*)", "*, :not(", "h t m l"])
+@pytest.mark.parametrize(
+    "selector",
+    [
+        ":not(*)",
+        "*, :not(",
+        "h t m l",
+        "html,",
+        ", body",
+        "html,,body",
+        "\N{NO-BREAK SPACE}html",
+    ],
+)
 def test_impossible_css_selectors_cannot_satisfy_controls(
     tmp_path: Path,
     selector: str,
@@ -434,8 +492,179 @@ def test_static_stylesheet_link_must_be_in_html_namespace(
             "import streamlit as st\n"
             "# SZL_HF_UNIVERSAL_FRONTEND_V1\n"
             "_SZL_UNIVERSAL_CSS = Path('szl-universal-frontend.css').read_text()\n"
+            "st.markdown(f'<style>/*{_SZL_UNIVERSAL_CSS}*/</style>', "
+            "unsafe_allow_html=True)\n",
+            "Streamlit universal CSS binding is absent",
+        ),
+        (
+            "streamlit",
+            "from pathlib import Path\n"
+            "import streamlit as st\n"
+            "# SZL_HF_UNIVERSAL_FRONTEND_V1\n"
+            "_SZL_UNIVERSAL_CSS = Path('szl-universal-frontend.css').read_text()\n"
+            "st.markdown(f'<style>{_SZL_UNIVERSAL_CSS!r}</style>', "
+            "unsafe_allow_html=True)\n",
+            "Streamlit universal CSS binding is absent",
+        ),
+        (
+            "gradio",
+            "from pathlib import Path\n"
+            "import gradio as gr\n"
+            "# SZL_HF_UNIVERSAL_FRONTEND_V1\n"
+            "_SZL_UNIVERSAL_CSS = Path('szl-universal-frontend.css').read_text()\n"
+            "del gr\n"
+            "demo = gr.Blocks(css=_SZL_UNIVERSAL_CSS)\n",
+            "Gradio universal CSS binding is absent",
+        ),
+        (
+            "streamlit",
+            "from pathlib import Path\n"
+            "import streamlit as st\n"
+            "import gradio as st\n"
+            "# SZL_HF_UNIVERSAL_FRONTEND_V1\n"
+            "_SZL_UNIVERSAL_CSS = Path('szl-universal-frontend.css').read_text()\n"
+            "st.markdown(f'<style>{_SZL_UNIVERSAL_CSS}</style>', unsafe_allow_html=True)\n",
+            "Streamlit universal CSS binding is absent",
+        ),
+        (
+            "gradio",
+            "from pathlib import Path\n"
+            "import gradio as gr\n"
+            "# SZL_HF_UNIVERSAL_FRONTEND_V1\n"
+            "_SZL_UNIVERSAL_CSS = Path('szl-universal-frontend.css').read_text()\n"
+            "demo = gr.Blocks(css=_SZL_UNIVERSAL_CSS, css='')\n",
+            "not valid syntax",
+        ),
+        (
+            "streamlit",
+            "from pathlib import Path\n"
+            "import streamlit as st\n"
+            "# SZL_HF_UNIVERSAL_FRONTEND_V1\n"
+            "_SZL_UNIVERSAL_CSS = Path('szl-universal-frontend.css').read_text()\n"
+            "del _SZL_UNIVERSAL_CSS\n"
+            "st.markdown(f'<style>{_SZL_UNIVERSAL_CSS}</style>', unsafe_allow_html=True)\n",
+            "does not read the declared CSS",
+        ),
+        (
+            "streamlit",
+            "from pathlib import Path\n"
+            "import streamlit as st\n"
+            "# SZL_HF_UNIVERSAL_FRONTEND_V1\n"
+            "_SZL_UNIVERSAL_CSS = Path('szl-universal-frontend.css').read_text()\n"
             "st.markdown(f'<style>{_SZL_UNIVERSAL_CSS}</style>' if False else '', "
             "unsafe_allow_html=True)\n",
+            "Streamlit universal CSS binding is absent",
+        ),
+        (
+            "streamlit",
+            "from pathlib import Path\n"
+            "import streamlit as st\n"
+            "# SZL_HF_UNIVERSAL_FRONTEND_V1\n"
+            "_SZL_UNIVERSAL_CSS = Path('szl-universal-frontend.css').read_text()\n"
+            "st.markdown(f'<style>SZL_DECLARED_CSS_PLACEHOLDER</style>'\n"
+            "            f'{_SZL_UNIVERSAL_CSS}', unsafe_allow_html=True)\n",
+            "Streamlit universal CSS binding is absent",
+        ),
+        (
+            "streamlit",
+            "from pathlib import Path\n"
+            "import streamlit as st\n"
+            "# SZL_HF_UNIVERSAL_FRONTEND_V1\n"
+            "_SZL_UNIVERSAL_CSS = Path('szl-universal-frontend.css').read_text()\n"
+            "st.markdown(f'<template><style>{_SZL_UNIVERSAL_CSS}</style></template>', "
+            "unsafe_allow_html=True)\n",
+            "Streamlit universal CSS binding is absent",
+        ),
+        (
+            "streamlit",
+            "from pathlib import Path\n"
+            "import streamlit as st\n"
+            "# SZL_HF_UNIVERSAL_FRONTEND_V1\n"
+            "_SZL_UNIVERSAL_CSS = Path('szl-universal-frontend.css').read_text()\n"
+            "st.markdown(f'<svg><style>{_SZL_UNIVERSAL_CSS}</style></svg>', "
+            "unsafe_allow_html=True)\n",
+            "Streamlit universal CSS binding is absent",
+        ),
+        (
+            "streamlit",
+            "from pathlib import Path\n"
+            "import streamlit as st\n"
+            "# SZL_HF_UNIVERSAL_FRONTEND_V1\n"
+            "_SZL_UNIVERSAL_CSS = Path('szl-universal-frontend.css').read_text()\n"
+            "st.markdown(f'<style media=\"not all\">{_SZL_UNIVERSAL_CSS}</style>', "
+            "unsafe_allow_html=True)\n",
+            "Streamlit universal CSS binding is absent",
+        ),
+        (
+            "gradio",
+            "from pathlib import Path\n"
+            "# SZL_HF_UNIVERSAL_FRONTEND_V1\n"
+            "_SZL_UNIVERSAL_CSS = Path('szl-universal-frontend.css').read_text()\n"
+            "demo = gr.Blocks(css=_SZL_UNIVERSAL_CSS)\n"
+            "import gradio as gr\n",
+            "Gradio universal CSS binding is absent",
+        ),
+        (
+            "streamlit",
+            "from pathlib import Path\n"
+            "# SZL_HF_UNIVERSAL_FRONTEND_V1\n"
+            "_SZL_UNIVERSAL_CSS = Path('szl-universal-frontend.css').read_text()\n"
+            "st.markdown(f'<style>{_SZL_UNIVERSAL_CSS}</style>', unsafe_allow_html=True)\n"
+            "import streamlit as st\n",
+            "Streamlit universal CSS binding is absent",
+        ),
+        (
+            "gradio",
+            "import gradio as gr\n"
+            "# SZL_HF_UNIVERSAL_FRONTEND_V1\n"
+            "_SZL_UNIVERSAL_CSS = Path('szl-universal-frontend.css').read_text()\n"
+            "from pathlib import Path\n"
+            "demo = gr.Blocks(css=_SZL_UNIVERSAL_CSS)\n",
+            "does not read the declared CSS",
+        ),
+        (
+            "gradio",
+            "from pathlib import Path\n"
+            "import gradio as gr\n"
+            "# SZL_HF_UNIVERSAL_FRONTEND_V1\n"
+            "demo = gr.Blocks(css=_SZL_UNIVERSAL_CSS)\n"
+            "_SZL_UNIVERSAL_CSS = Path('szl-universal-frontend.css').read_text()\n",
+            "Gradio universal CSS binding is absent",
+        ),
+        (
+            "streamlit",
+            "from pathlib import Path\n"
+            "import streamlit as st\n"
+            "# SZL_HF_UNIVERSAL_FRONTEND_V1\n"
+            "_SZL_UNIVERSAL_CSS = Path('szl-universal-frontend.css').read_text()\n"
+            "st.markdown(f'<style></style>{_SZL_UNIVERSAL_CSS}', unsafe_allow_html=True)\n",
+            "Streamlit universal CSS binding is absent",
+        ),
+        (
+            "streamlit",
+            "from pathlib import Path\n"
+            "import streamlit as st\n"
+            "# SZL_HF_UNIVERSAL_FRONTEND_V1\n"
+            "_SZL_UNIVERSAL_CSS = Path('szl-universal-frontend.css').read_text()\n"
+            "st.markdown(f'{_SZL_UNIVERSAL_CSS}<style></style>', unsafe_allow_html=True)\n",
+            "Streamlit universal CSS binding is absent",
+        ),
+        (
+            "streamlit",
+            "from pathlib import Path\n"
+            "import streamlit as st\n"
+            "# SZL_HF_UNIVERSAL_FRONTEND_V1\n"
+            "_SZL_UNIVERSAL_CSS = Path('szl-universal-frontend.css').read_text()\n"
+            "st.markdown(f'<style data-css={_SZL_UNIVERSAL_CSS}></style>', unsafe_allow_html=True)\n",
+            "Streamlit universal CSS binding is absent",
+        ),
+        (
+            "streamlit",
+            "from pathlib import Path\n"
+            "import streamlit as st\n"
+            "# SZL_HF_UNIVERSAL_FRONTEND_V1\n"
+            "_SZL_UNIVERSAL_CSS = Path('szl-universal-frontend.css').read_text()\n"
+            "st.markdown(f'<style>{_SZL_UNIVERSAL_CSS}', unsafe_allow_html=True)\n",
             "Streamlit universal CSS binding is absent",
         ),
     ],
@@ -454,6 +683,32 @@ def test_python_framework_must_apply_declared_css(
     manifest_path.write_text(json.dumps(payload), encoding="utf-8")
     with pytest.raises(MODULE.ContractError, match=message):
         MODULE.validate(tmp_path, Path("docs/hf-universal-frontend-v1.json"))
+
+
+def test_streamlit_binding_allows_style_attributes_and_concatenation(
+    tmp_path: Path,
+) -> None:
+    _fixture(tmp_path, "streamlit")
+    app = tmp_path / "app.py"
+    app.write_text(
+        "from pathlib import Path\n"
+        "import streamlit as st\n"
+        "# SZL_HF_UNIVERSAL_FRONTEND_V1\n"
+        "_SZL_UNIVERSAL_CSS = Path('szl-universal-frontend.css').read_text()\n"
+        "st.markdown('<style data-szl=\"v1\">' + _SZL_UNIVERSAL_CSS + '</style>', "
+        "unsafe_allow_html=True)\n",
+        encoding="utf-8",
+    )
+    manifest_path, payload = _manifest(tmp_path)
+    payload["file_sha256"]["app.py"] = _sha(app)
+    manifest_path.write_text(json.dumps(payload), encoding="utf-8")
+    assert (
+        MODULE.validate(
+            tmp_path,
+            Path("docs/hf-universal-frontend-v1.json"),
+        )["status"]
+        == "PASS"
+    )
 
 
 @pytest.mark.parametrize(

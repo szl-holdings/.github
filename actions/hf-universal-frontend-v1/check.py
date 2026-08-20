@@ -35,6 +35,8 @@ REQUIRED_MEDIA_QUERIES = {
 }
 SHA256 = re.compile(r"^[0-9a-f]{64}$")
 MAX_OUTPUT_VALUE_BYTES = 4096
+CSS_WHITESPACE = " \t\r\n\f"
+CSS_WHITESPACE_PATTERN = r"[ \t\r\n\f]"
 
 
 class ContractError(RuntimeError):
@@ -331,7 +333,7 @@ def _css_rule_blocks(css_text: str) -> list[tuple[str, str]]:
             cursor += 1
             continue
 
-        prelude = css_text[start:cursor].strip()
+        prelude = css_text[start:cursor].strip(CSS_WHITESPACE)
         depth = 1
         body_start = cursor + 1
         cursor += 1
@@ -374,19 +376,48 @@ def _css_declarations(rule_body: str) -> list[tuple[str, str]]:
         if ":" not in declaration:
             continue
         property_name, value = declaration.split(":", 1)
-        normalized_property = property_name.strip().casefold()
-        normalized_value = re.sub(r"\s+", "", value).casefold()
-        normalized_value = re.sub(r"!important$", "", normalized_value)
+        normalized_property = property_name.strip(CSS_WHITESPACE).casefold()
+        # Whitespace separates CSS tokens. Removing it would turn invalid or
+        # different values such as ``44 px`` and ``any where`` into the
+        # required ``44px`` and ``anywhere`` controls. Collapse runs instead,
+        # then remove only the syntactically separate !important annotation.
+        normalized_value = re.sub(
+            CSS_WHITESPACE_PATTERN + "+",
+            " ",
+            value.strip(CSS_WHITESPACE),
+        ).casefold()
+        normalized_value = re.sub(
+            CSS_WHITESPACE_PATTERN
+            + "*!"
+            + CSS_WHITESPACE_PATTERN
+            + "*important"
+            + CSS_WHITESPACE_PATTERN
+            + "*$",
+            "",
+            normalized_value,
+        ).rstrip(CSS_WHITESPACE)
         if normalized_property and normalized_value:
             declarations.append((normalized_property, normalized_value))
     return declarations
 
 
 def _media_query(prelude: str) -> str | None:
-    match = re.fullmatch(r"@media\s+(.+)", prelude.strip(), flags=re.IGNORECASE)
+    match = re.fullmatch(
+        r"@media[ \t\r\n\f]+(.+)",
+        prelude.strip(CSS_WHITESPACE),
+        flags=re.IGNORECASE,
+    )
     if not match:
         return None
-    return re.sub(r"\s+", "", match.group(1)).casefold()
+    query = match.group(1)
+    recognized = {
+        r"\([ \t\r\n\f]*max-width[ \t\r\n\f]*:[ \t\r\n\f]*560px[ \t\r\n\f]*\)": "(max-width:560px)",
+        r"\([ \t\r\n\f]*prefers-reduced-motion[ \t\r\n\f]*:[ \t\r\n\f]*reduce[ \t\r\n\f]*\)": "(prefers-reduced-motion:reduce)",
+    }
+    for pattern, normalized in recognized.items():
+        if re.fullmatch(pattern, query, flags=re.IGNORECASE):
+            return normalized
+    return None
 
 
 def _has_reduced_motion_control(declarations: list[tuple[str, str]]) -> bool:
@@ -417,10 +448,11 @@ def _selector_is_guaranteed_active(prelude: str) -> bool:
     # Whitespace inside a selector is semantic: it is the descendant
     # combinator.  Removing it would turn an unrelated selector such as
     # ``h t m l`` into the guaranteed document selector ``html``.
+    selector_items = prelude.split(",")
+    if any(not selector.strip(CSS_WHITESPACE) for selector in selector_items):
+        return False
     selectors = {
-        selector.strip().casefold()
-        for selector in prelude.split(",")
-        if selector.strip()
+        selector.strip(CSS_WHITESPACE).casefold() for selector in selector_items
     }
     return bool(selectors & guaranteed) and selectors <= audited
 
@@ -430,7 +462,7 @@ def validate_css(css_text: str) -> None:
     active_declarations: set[tuple[str, str]] = set()
     observed_media: set[str] = set()
     for prelude, body in _css_rule_blocks(active_css):
-        if not prelude.lstrip().startswith("@"):
+        if not prelude.lstrip(CSS_WHITESPACE).startswith("@"):
             if _selector_is_guaranteed_active(prelude):
                 active_declarations.update(_css_declarations(body))
             continue
@@ -439,7 +471,7 @@ def validate_css(css_text: str) -> None:
             continue
         nested_declarations: list[tuple[str, str]] = []
         for nested_prelude, nested_body in _css_rule_blocks(body):
-            if nested_prelude.lstrip().startswith("@"):
+            if nested_prelude.lstrip(CSS_WHITESPACE).startswith("@"):
                 continue
             if not _selector_is_guaranteed_active(nested_prelude):
                 continue
@@ -467,6 +499,10 @@ def validate_css(css_text: str) -> None:
 
 def _parse_python(app_text: str) -> ast.Module:
     try:
+        # ast.parse alone can construct trees for forms the bytecode compiler
+        # rejects, including repeated keyword arguments. Such a module cannot
+        # execute the claimed framework binding.
+        compile(app_text, "<hf-universal-frontend>", "exec")
         return ast.parse(app_text)
     except SyntaxError as error:
         raise ContractError(f"Python frontend binding is not valid syntax: {error}") from error
@@ -483,34 +519,106 @@ def _has_python_marker(app_text: str) -> bool:
         raise ContractError(f"Python frontend binding cannot be tokenized: {error}") from error
 
 
-def _path_aliases(tree: ast.Module) -> set[str]:
-    aliases: set[str] = set()
+SourcePosition = tuple[int, int]
+
+
+def _source_position(node: ast.AST) -> SourcePosition:
+    return (getattr(node, "lineno", 0), getattr(node, "col_offset", 0))
+
+
+def _store_bound_names(tree: ast.Module) -> set[str]:
+    return {
+        node.id
+        for node in ast.walk(tree)
+        if isinstance(node, ast.Name) and isinstance(node.ctx, ast.Store)
+    }
+
+
+def _non_store_bound_names(tree: ast.Module) -> set[str]:
+    names = {
+        node.id
+        for node in ast.walk(tree)
+        if isinstance(node, ast.Name) and isinstance(node.ctx, ast.Del)
+    }
+    names.update(node.arg for node in ast.walk(tree) if isinstance(node, ast.arg))
+    names.update(
+        node.name
+        for node in ast.walk(tree)
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef))
+    )
+    names.update(
+        node.name
+        for node in ast.walk(tree)
+        if isinstance(node, ast.ExceptHandler) and node.name is not None
+    )
+    names.update(
+        node.name
+        for node in ast.walk(tree)
+        if isinstance(node, (ast.MatchAs, ast.MatchStar)) and node.name is not None
+    )
+    names.update(
+        node.rest
+        for node in ast.walk(tree)
+        if isinstance(node, ast.MatchMapping) and node.rest is not None
+    )
+    return names
+
+
+def _import_binding_counts(tree: ast.Module) -> dict[str, int]:
+    counts: dict[str, int] = {}
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Import):
+            bindings = [
+                imported.asname or imported.name.split(".", 1)[0]
+                for imported in node.names
+            ]
+        elif isinstance(node, ast.ImportFrom):
+            bindings = [imported.asname or imported.name for imported in node.names]
+        else:
+            continue
+        for name in bindings:
+            counts[name] = counts.get(name, 0) + 1
+    return counts
+
+
+def _path_aliases(tree: ast.Module) -> dict[str, SourcePosition]:
+    aliases: dict[str, SourcePosition] = {}
     for node in tree.body:
         if not isinstance(node, ast.ImportFrom) or node.module != "pathlib":
             continue
         for imported in node.names:
             if imported.name == "Path":
-                aliases.add(imported.asname or imported.name)
-    shadowed = {
-        node.id
-        for node in ast.walk(tree)
-        if isinstance(node, ast.Name) and isinstance(node.ctx, ast.Store)
+                name = imported.asname or imported.name
+                position = _source_position(node)
+                if name not in aliases or position < aliases[name]:
+                    aliases[name] = position
+    shadowed = _store_bound_names(tree) | _non_store_bound_names(tree)
+    import_counts = _import_binding_counts(tree)
+    return {
+        name: position
+        for name, position in aliases.items()
+        if name not in shadowed and import_counts.get(name) == 1
     }
-    shadowed.update(
-        node.arg for node in ast.walk(tree) if isinstance(node, ast.arg)
-    )
-    return aliases - shadowed
 
 
-def _loads_declared_css(expression: ast.AST, css_file: str, path_aliases: set[str]) -> bool:
-    if not isinstance(expression, ast.Call) or not isinstance(expression.func, ast.Attribute):
+def _loads_declared_css(
+    expression: ast.AST,
+    css_file: str,
+    path_aliases: dict[str, SourcePosition],
+) -> bool:
+    if not isinstance(expression, ast.Call) or not isinstance(
+        expression.func, ast.Attribute
+    ):
         return False
     if expression.func.attr != "read_text" or expression.args:
         return False
     path_call = expression.func.value
     if not isinstance(path_call, ast.Call) or len(path_call.args) != 1:
         return False
-    if not isinstance(path_call.func, ast.Name) or path_call.func.id not in path_aliases:
+    if not isinstance(path_call.func, ast.Name):
+        return False
+    import_position = path_aliases.get(path_call.func.id)
+    if import_position is None or import_position >= _source_position(path_call):
         return False
     literal = path_call.args[0]
     return isinstance(literal, ast.Constant) and literal.value == css_file
@@ -519,9 +627,9 @@ def _loads_declared_css(expression: ast.AST, css_file: str, path_aliases: set[st
 def _css_binding_variables(
     tree: ast.Module,
     css_file: str,
-    path_aliases: set[str],
-) -> set[str]:
-    variables: set[str] = set()
+    path_aliases: dict[str, SourcePosition],
+) -> dict[str, SourcePosition]:
+    variables: dict[str, SourcePosition] = {}
     for node in tree.body:
         targets: list[ast.expr] = []
         value: ast.AST | None = None
@@ -533,7 +641,9 @@ def _css_binding_variables(
             value = node.value
         if value is None or not _loads_declared_css(value, css_file, path_aliases):
             continue
-        variables.update(target.id for target in targets if isinstance(target, ast.Name))
+        for target in targets:
+            if isinstance(target, ast.Name):
+                variables[target.id] = _source_position(node)
     store_counts = {
         variable: sum(
             1
@@ -544,26 +654,32 @@ def _css_binding_variables(
         )
         for variable in variables
     }
-    return {variable for variable in variables if store_counts[variable] == 1}
+    invalidated = _non_store_bound_names(tree) | set(_import_binding_counts(tree))
+    return {
+        variable: position
+        for variable, position in variables.items()
+        if store_counts[variable] == 1 and variable not in invalidated
+    }
 
 
-def _module_aliases(tree: ast.Module, module: str) -> set[str]:
-    aliases: set[str] = set()
+def _module_aliases(tree: ast.Module, module: str) -> dict[str, SourcePosition]:
+    aliases: dict[str, SourcePosition] = {}
     for node in tree.body:
         if not isinstance(node, ast.Import):
             continue
         for imported in node.names:
             if imported.name == module:
-                aliases.add(imported.asname or imported.name)
-    shadowed = {
-        node.id
-        for node in ast.walk(tree)
-        if isinstance(node, ast.Name) and isinstance(node.ctx, ast.Store)
+                name = imported.asname or imported.name
+                position = _source_position(node)
+                if name not in aliases or position < aliases[name]:
+                    aliases[name] = position
+    shadowed = _store_bound_names(tree) | _non_store_bound_names(tree)
+    import_counts = _import_binding_counts(tree)
+    return {
+        name: position
+        for name, position in aliases.items()
+        if name not in shadowed and import_counts.get(name) == 1
     }
-    shadowed.update(
-        node.arg for node in ast.walk(tree) if isinstance(node, ast.arg)
-    )
-    return aliases - shadowed
 
 
 def _direct_top_level_calls(tree: ast.Module) -> list[ast.Call]:
@@ -605,15 +721,22 @@ def _direct_top_level_calls(tree: ast.Module) -> list[ast.Call]:
     return calls
 
 
-def _gradio_applies_css(tree: ast.Module, css_variables: set[str]) -> bool:
+def _gradio_applies_css(
+    tree: ast.Module,
+    css_variables: dict[str, SourcePosition],
+) -> bool:
     aliases = _module_aliases(tree, "gradio")
     constructors = {"Blocks", "ChatInterface", "Interface", "TabbedInterface"}
     for node in _direct_top_level_calls(tree):
         if not isinstance(node.func, ast.Attribute):
             continue
+        if not isinstance(node.func.value, ast.Name):
+            continue
+        import_position = aliases.get(node.func.value.id)
+        call_position = _source_position(node)
         if (
-            not isinstance(node.func.value, ast.Name)
-            or node.func.value.id not in aliases
+            import_position is None
+            or import_position >= call_position
             or node.func.attr not in constructors
         ):
             continue
@@ -622,6 +745,7 @@ def _gradio_applies_css(tree: ast.Module, css_variables: set[str]) -> bool:
                 keyword.arg == "css"
                 and isinstance(keyword.value, ast.Name)
                 and keyword.value.id in css_variables
+                and css_variables[keyword.value.id] < call_position
             ):
                 return True
     return False
@@ -629,47 +753,228 @@ def _gradio_applies_css(tree: ast.Module, css_variables: set[str]) -> bool:
 
 def _style_expression_parts(
     expression: ast.AST,
-    css_variables: set[str],
-) -> list[str] | None:
+    css_variables: dict[str, SourcePosition],
+    call_position: SourcePosition,
+) -> list[str | None] | None:
     if isinstance(expression, ast.Constant) and isinstance(expression.value, str):
         return [expression.value]
-    if isinstance(expression, ast.Name) and expression.id in css_variables:
-        return ["<DECLARED_CSS>"]
+    if (
+        isinstance(expression, ast.Name)
+        and expression.id in css_variables
+        and css_variables[expression.id] < call_position
+    ):
+        return [None]
     if isinstance(expression, ast.FormattedValue):
-        return _style_expression_parts(expression.value, css_variables)
+        if expression.conversion != -1 or expression.format_spec is not None:
+            return None
+        return _style_expression_parts(expression.value, css_variables, call_position)
     if isinstance(expression, ast.JoinedStr):
-        parts: list[str] = []
+        parts: list[str | None] = []
         for value in expression.values:
-            nested = _style_expression_parts(value, css_variables)
+            nested = _style_expression_parts(value, css_variables, call_position)
             if nested is None:
                 return None
             parts.extend(nested)
         return parts
     if isinstance(expression, ast.BinOp) and isinstance(expression.op, ast.Add):
-        left = _style_expression_parts(expression.left, css_variables)
-        right = _style_expression_parts(expression.right, css_variables)
+        left = _style_expression_parts(expression.left, css_variables, call_position)
+        right = _style_expression_parts(expression.right, css_variables, call_position)
         if left is None or right is None:
             return None
         return left + right
     return None
 
 
-def _style_expression_uses_css(expression: ast.AST, css_variables: set[str]) -> bool:
-    parts = _style_expression_parts(expression, css_variables)
-    if parts is None or "<DECLARED_CSS>" not in parts:
+class _StylePlaceholderParser(HTMLParser):
+    _INERT_CONTAINERS = frozenset(
+        {
+            "iframe",
+            "noembed",
+            "noframes",
+            "noscript",
+            "object",
+            "plaintext",
+            "script",
+            "template",
+            "textarea",
+            "title",
+            "xmp",
+        }
+    )
+    _FOREIGN_CONTAINERS = frozenset({"math", "svg"})
+
+    def __init__(self, placeholder: str) -> None:
+        super().__init__(convert_charrefs=False)
+        self._placeholder = placeholder
+        self._inert_stack: list[str] = []
+        self._foreign_stack: list[str] = []
+        self._style_frames: list[list[str]] = []
+        self.has_enclosed_placeholder = False
+        self.is_malformed = False
+
+    def handle_starttag(
+        self,
+        tag: str,
+        attrs: list[tuple[str, str | None]],
+    ) -> None:
+        normalized_tag = tag.casefold()
+        if self._style_frames and normalized_tag != "style":
+            self.is_malformed = True
+            return
+        if self._foreign_stack:
+            if normalized_tag in self._FOREIGN_CONTAINERS:
+                self._foreign_stack.append(normalized_tag)
+            return
+        if normalized_tag in self._INERT_CONTAINERS:
+            self._inert_stack.append(normalized_tag)
+            return
+        if self._inert_stack:
+            return
+        if normalized_tag in self._FOREIGN_CONTAINERS:
+            self._foreign_stack.append(normalized_tag)
+            return
+        if normalized_tag != "style":
+            return
+        if self._style_frames:
+            self.is_malformed = True
+        values: dict[str, str] = {}
+        duplicates: set[str] = set()
+        for name, value in attrs:
+            key = str(name).casefold()
+            if key in values:
+                duplicates.add(key)
+                continue
+            values[key] = "" if value is None else str(value)
+        if duplicates & {"disabled", "media", "type"}:
+            self.is_malformed = True
+        media = values.get("media", "").strip(CSS_WHITESPACE).casefold()
+        content_type = values.get("type", "").strip(CSS_WHITESPACE).casefold()
+        if "disabled" in values or media not in {"", "all"}:
+            self.is_malformed = True
+        if content_type not in {"", "text/css"}:
+            self.is_malformed = True
+        self._style_frames.append([])
+
+    def handle_startendtag(
+        self,
+        tag: str,
+        attrs: list[tuple[str, str | None]],
+    ) -> None:
+        del attrs
+        normalized_tag = tag.casefold()
+        if self._style_frames:
+            self.is_malformed = True
+            return
+        if (
+            normalized_tag in self._INERT_CONTAINERS
+            or normalized_tag in self._FOREIGN_CONTAINERS
+            or normalized_tag == "style"
+        ):
+            self.is_malformed = True
+
+    def handle_endtag(self, tag: str) -> None:
+        normalized_tag = tag.casefold()
+        if self._style_frames and normalized_tag != "style":
+            self.is_malformed = True
+            return
+        if self._foreign_stack:
+            if normalized_tag in self._FOREIGN_CONTAINERS:
+                expected = self._foreign_stack[-1]
+                if normalized_tag != expected:
+                    self.is_malformed = True
+                    return
+                self._foreign_stack.pop()
+            return
+        if self._inert_stack:
+            if normalized_tag in self._INERT_CONTAINERS:
+                expected = self._inert_stack[-1]
+                if normalized_tag != expected:
+                    self.is_malformed = True
+                    return
+                self._inert_stack.pop()
+            return
+        if normalized_tag != "style":
+            return
+        if not self._style_frames:
+            self.is_malformed = True
+            return
+        content = "".join(self._style_frames.pop()).strip(CSS_WHITESPACE)
+        if content == self._placeholder:
+            self.has_enclosed_placeholder = True
+
+    def handle_data(self, data: str) -> None:
+        if not self._style_frames:
+            return
+        self._style_frames[-1].append(data)
+
+    def handle_comment(self, data: str) -> None:
+        del data
+        if self._style_frames:
+            self.is_malformed = True
+
+    def handle_entityref(self, name: str) -> None:
+        del name
+        if self._style_frames:
+            self.is_malformed = True
+
+    def handle_charref(self, name: str) -> None:
+        del name
+        if self._style_frames:
+            self.is_malformed = True
+
+    def handle_decl(self, decl: str) -> None:
+        del decl
+        if self._style_frames:
+            self.is_malformed = True
+
+    def handle_pi(self, data: str) -> None:
+        del data
+        if self._style_frames:
+            self.is_malformed = True
+
+    @property
+    def has_unclosed_style(self) -> bool:
+        return bool(self._style_frames or self._inert_stack or self._foreign_stack)
+
+
+def _style_expression_uses_css(
+    expression: ast.AST,
+    css_variables: dict[str, SourcePosition],
+    call_position: SourcePosition,
+) -> bool:
+    parts = _style_expression_parts(expression, css_variables, call_position)
+    if parts is None or not any(part is None for part in parts):
         return False
-    rendered = "".join(parts).casefold()
-    return "<style" in rendered and "</style>" in rendered
+    literal_text = "".join(part for part in parts if part is not None)
+    placeholder = "SZL_DECLARED_CSS_PLACEHOLDER"
+    while placeholder in literal_text:
+        placeholder += "_UNIQUE"
+    rendered = "".join(placeholder if part is None else part for part in parts)
+    parser = _StylePlaceholderParser(placeholder)
+    parser.feed(rendered)
+    parser.close()
+    return (
+        parser.has_enclosed_placeholder
+        and not parser.has_unclosed_style
+        and not parser.is_malformed
+    )
 
 
-def _streamlit_applies_css(tree: ast.Module, css_variables: set[str]) -> bool:
+def _streamlit_applies_css(
+    tree: ast.Module,
+    css_variables: dict[str, SourcePosition],
+) -> bool:
     aliases = _module_aliases(tree, "streamlit")
     for node in _direct_top_level_calls(tree):
         if not isinstance(node.func, ast.Attribute):
             continue
+        if not isinstance(node.func.value, ast.Name):
+            continue
+        import_position = aliases.get(node.func.value.id)
+        call_position = _source_position(node)
         if (
-            not isinstance(node.func.value, ast.Name)
-            or node.func.value.id not in aliases
+            import_position is None
+            or import_position >= call_position
             or node.func.attr != "markdown"
             or not node.args
         ):
@@ -681,7 +986,11 @@ def _streamlit_applies_css(tree: ast.Module, css_variables: set[str]) -> bool:
         if (
             isinstance(unsafe, ast.Constant)
             and unsafe.value is True
-            and _style_expression_uses_css(node.args[0], css_variables)
+            and _style_expression_uses_css(
+                node.args[0],
+                css_variables,
+                call_position,
+            )
         ):
             return True
     return False

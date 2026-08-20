@@ -37,14 +37,18 @@ It validates:
 
 Framework binding evidence is deliberately narrow. Gradio and Streamlit must
 read the declared CSS into an unshadowed top-level variable and consume it in
-an executable top-level framework call; bindings in dead or conditional code
-do not count. React must pair its exact marker comment with a side-effect
-import that resolves to the declared CSS file; both must occur in the leading
-comment/import module prologue, where JSX text cannot imitate them. CSS
-controls count only in rules made from the audited `:root`, `html`, `body`,
-`*`, `*::before`, and `*::after` selectors, with at least one selector that
-matches a document element, so inert or invalid selector lists cannot satisfy
-the contract.
+an executable top-level framework call. The `Path` and framework imports and
+the CSS assignment must precede the call; bindings in dead or conditional code
+do not count. Streamlit must interpolate the CSS as the sole non-whitespace
+content of a complete, active HTML `<style>` element, not beside one, into its
+attributes, or inside an inert container. React must pair its exact
+marker comment with a side-effect import that resolves to the declared CSS
+file; both must occur in the leading comment/import module prologue, where JSX
+text cannot imitate them. CSS controls count only in rules made from the
+audited `:root`, `html`, `body`, `*`, `*::before`, and `*::after` selectors,
+with at least one selector that matches a document element. Empty selector-list
+entries and whitespace that changes selector, declaration-value, or media-query
+tokens remain semantic and cannot be normalized into evidence.
 
 It does not prove live runtime readiness. Live readiness remains the responsibility of the estate-wide browser census and source/runtime revision readback.
 
