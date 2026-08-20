@@ -154,20 +154,25 @@ def validate(root: Path, manifest_path: Path) -> dict[str, Any]:
     if framework not in ALLOWED_FRAMEWORKS:
         raise ContractError(f"unsupported framework: {framework!r}")
 
+    # Resolve every manifest-controlled path before comparing descriptive
+    # metadata. This keeps traversal and containment failures authoritative.
     readme = safe_path(root, "README.md", "README.md")
-    front = parse_front_matter(readme.read_text(encoding="utf-8"))
-    validate_front_matter(front, manifest)
-
     app = safe_path(root, manifest.get("app_file"), "app_file")
     css = safe_path(root, manifest.get("css_file"), "css_file")
     entry = None
     if manifest.get("entry_file"):
         entry = safe_path(root, manifest.get("entry_file"), "entry_file")
 
+    # Authenticate managed bytes before interpreting their contents. A changed
+    # file must report hash drift rather than an incidental downstream parse or
+    # framework-binding error.
+    hashes = validate_hashes(root, manifest.get("file_sha256"))
+
+    front = parse_front_matter(readme.read_text(encoding="utf-8"))
+    validate_front_matter(front, manifest)
     validate_css(css.read_text(encoding="utf-8"))
     binding_path = entry or app
     validate_framework_binding(framework, binding_path.read_text(encoding="utf-8"))
-    hashes = validate_hashes(root, manifest.get("file_sha256"))
 
     contract = manifest.get("contract")
     if not isinstance(contract, dict):
