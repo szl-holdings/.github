@@ -3,13 +3,14 @@ from __future__ import annotations
 
 import argparse
 import ast
+import codecs
 import hashlib
-from html.parser import HTMLParser
 import io
 import json
 import posixpath
 import re
 import tokenize
+from html.parser import HTMLParser
 from pathlib import Path
 from typing import Any
 from urllib.parse import unquote, urlsplit
@@ -35,6 +36,7 @@ REQUIRED_MEDIA_QUERIES = {
 }
 SHA256 = re.compile(r"^[0-9a-f]{64}$")
 MAX_OUTPUT_VALUE_BYTES = 4096
+HTML_ASCII_WHITESPACE = " \t\n\f\r"
 CSS_WHITESPACE = " \t\r\n\f"
 CSS_WHITESPACE_PATTERN = r"[ \t\r\n\f]"
 
@@ -156,10 +158,11 @@ class _StaticDocumentParser(HTMLParser):
                 "Static stylesheet link contains duplicate controlled attributes: "
                 + ", ".join(ambiguous)
             )
+        rel_value = values.get("rel", "").strip(HTML_ASCII_WHITESPACE)
         rel_tokens = {
             token.casefold()
-            for token in values.get("rel", "").split()
-            if token.strip()
+            for token in re.split(r"[ \t\n\f\r]+", rel_value)
+            if token
         }
         if "stylesheet" not in rel_tokens or "alternate" in rel_tokens:
             return
@@ -376,7 +379,12 @@ def _css_declarations(rule_body: str) -> list[tuple[str, str]]:
         if ":" not in declaration:
             continue
         property_name, value = declaration.split(":", 1)
-        normalized_property = property_name.strip(CSS_WHITESPACE).casefold()
+        normalized_property = property_name.strip(CSS_WHITESPACE)
+        # Standard CSS property names are ASCII case-insensitive, but custom
+        # properties are case-sensitive. ``--SZL-TOUCH-TARGET`` therefore
+        # defines a different variable from the contract's lowercase name.
+        if not normalized_property.startswith("--"):
+            normalized_property = normalized_property.casefold()
         # Whitespace separates CSS tokens. Removing it would turn invalid or
         # different values such as ``44 px`` and ``any where`` into the
         # required ``44px`` and ``anywhere`` controls. Collapse runs instead,
@@ -612,6 +620,32 @@ def _loads_declared_css(
         return False
     if expression.func.attr != "read_text" or expression.args:
         return False
+    read_options: dict[str, str | None] = {}
+    for keyword in expression.keywords:
+        if keyword.arg not in {"encoding", "errors"} or keyword.arg in read_options:
+            return False
+        if not isinstance(keyword.value, ast.Constant) or not (
+            keyword.value.value is None or isinstance(keyword.value.value, str)
+        ):
+            return False
+        read_options[keyword.arg] = keyword.value.value
+    encoding = read_options.get("encoding")
+    if encoding is not None:
+        try:
+            codec_name = codecs.lookup(encoding).name
+        except LookupError:
+            return False
+        # The verifier authenticates and parses the managed stylesheet as
+        # UTF-8. Certifying a different decoder would not bind the adapter to
+        # the same text the contract inspected.
+        if codec_name != "utf-8":
+            return False
+    errors = read_options.get("errors")
+    if errors is not None:
+        try:
+            codecs.lookup_error(errors)
+        except LookupError:
+            return False
     path_call = expression.func.value
     if not isinstance(path_call, ast.Call) or len(path_call.args) != 1:
         return False
@@ -682,6 +716,43 @@ def _module_aliases(tree: ast.Module, module: str) -> dict[str, SourcePosition]:
     }
 
 
+def _literal_truth_value(expression: ast.AST) -> bool | None:
+    if isinstance(expression, ast.Constant):
+        return bool(expression.value)
+    if isinstance(expression, ast.UnaryOp) and isinstance(expression.op, ast.Not):
+        nested = _literal_truth_value(expression.operand)
+        return None if nested is None else not nested
+    return None
+
+
+def _statements_fall_through(statements: list[ast.stmt]) -> bool:
+    for statement in statements:
+        if isinstance(statement, (ast.Raise, ast.Return, ast.Break, ast.Continue)):
+            return False
+        if not isinstance(statement, ast.If):
+            continue
+        truth_value = _literal_truth_value(statement.test)
+        if truth_value is True:
+            branch_falls_through = _statements_fall_through(statement.body)
+        elif truth_value is False:
+            branch_falls_through = (
+                _statements_fall_through(statement.orelse)
+                if statement.orelse
+                else True
+            )
+        else:
+            body_falls_through = _statements_fall_through(statement.body)
+            else_falls_through = (
+                _statements_fall_through(statement.orelse)
+                if statement.orelse
+                else True
+            )
+            branch_falls_through = body_falls_through or else_falls_through
+        if not branch_falls_through:
+            return False
+    return True
+
+
 def _direct_top_level_calls(tree: ast.Module) -> list[ast.Call]:
     """Return calls in the narrow module statements guaranteed to execute.
 
@@ -715,6 +786,11 @@ def _direct_top_level_calls(tree: ast.Module) -> list[ast.Call]:
                 )
                 if not collect(statement.body):
                     return False
+                continue
+            if isinstance(statement, ast.If) and not _statements_fall_through(
+                [statement]
+            ):
+                return False
         return True
 
     collect(tree.body)

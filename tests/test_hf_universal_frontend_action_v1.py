@@ -239,6 +239,45 @@ def test_missing_css_control_is_rejected(tmp_path: Path) -> None:
 
 
 @pytest.mark.parametrize(
+    "custom_property",
+    ["--SZL-TOUCH-TARGET", "--Szl-Touch-Target"],
+)
+def test_css_custom_property_name_case_is_semantic(
+    tmp_path: Path,
+    custom_property: str,
+) -> None:
+    _fixture(tmp_path)
+    css = tmp_path / "szl-universal-frontend.css"
+    css.write_text(
+        CSS.replace("--szl-touch-target", custom_property),
+        encoding="utf-8",
+    )
+    manifest_path, payload = _manifest(tmp_path)
+    payload["file_sha256"]["szl-universal-frontend.css"] = _sha(css)
+    manifest_path.write_text(json.dumps(payload), encoding="utf-8")
+    with pytest.raises(MODULE.ContractError, match="--szl-touch-target: 44px"):
+        MODULE.validate(tmp_path, Path("docs/hf-universal-frontend-v1.json"))
+
+
+def test_standard_css_property_name_case_remains_insensitive(tmp_path: Path) -> None:
+    _fixture(tmp_path)
+    css = tmp_path / "szl-universal-frontend.css"
+    css.write_text(
+        CSS.replace("overflow-wrap", "OvErFlOw-WrAp")
+        .replace("overflow-x", "OVERFLOW-X")
+        .replace("animation-duration", "Animation-Duration"),
+        encoding="utf-8",
+    )
+    manifest_path, payload = _manifest(tmp_path)
+    payload["file_sha256"]["szl-universal-frontend.css"] = _sha(css)
+    manifest_path.write_text(json.dumps(payload), encoding="utf-8")
+    assert MODULE.validate(
+        tmp_path,
+        Path("docs/hf-universal-frontend-v1.json"),
+    )["status"] == "PASS"
+
+
+@pytest.mark.parametrize(
     ("original", "spaced"),
     [
         ("44px", "44 px"),
@@ -428,6 +467,53 @@ def test_static_marker_must_bind_the_declared_stylesheet(
     manifest_path.write_text(json.dumps(payload), encoding="utf-8")
     with pytest.raises(MODULE.ContractError, match="stylesheet <link>"):
         MODULE.validate(tmp_path, Path("docs/hf-universal-frontend-v1.json"))
+
+
+@pytest.mark.parametrize(
+    "separator",
+    ["\N{NO-BREAK SPACE}", "\N{EM SPACE}", "\v"],
+)
+def test_static_rel_tokens_do_not_split_on_non_html_whitespace(
+    tmp_path: Path,
+    separator: str,
+) -> None:
+    _fixture(tmp_path)
+    app = tmp_path / "index.html"
+    app.write_text(
+        app.read_text(encoding="utf-8").replace(
+            'rel="stylesheet"',
+            f'rel="decoy{separator}stylesheet"',
+        ),
+        encoding="utf-8",
+    )
+    manifest_path, payload = _manifest(tmp_path)
+    payload["file_sha256"]["index.html"] = _sha(app)
+    manifest_path.write_text(json.dumps(payload), encoding="utf-8")
+    with pytest.raises(MODULE.ContractError, match="stylesheet <link>"):
+        MODULE.validate(tmp_path, Path("docs/hf-universal-frontend-v1.json"))
+
+
+@pytest.mark.parametrize("separator", [" ", "\t", "\n", "\r", "\f"])
+def test_static_rel_tokens_split_on_each_html_ascii_whitespace(
+    tmp_path: Path,
+    separator: str,
+) -> None:
+    _fixture(tmp_path)
+    app = tmp_path / "index.html"
+    app.write_text(
+        app.read_text(encoding="utf-8").replace(
+            'rel="stylesheet"',
+            f'rel="decoy{separator}stylesheet"',
+        ),
+        encoding="utf-8",
+    )
+    manifest_path, payload = _manifest(tmp_path)
+    payload["file_sha256"]["index.html"] = _sha(app)
+    manifest_path.write_text(json.dumps(payload), encoding="utf-8")
+    assert MODULE.validate(
+        tmp_path,
+        Path("docs/hf-universal-frontend-v1.json"),
+    )["status"] == "PASS"
 
 
 @pytest.mark.parametrize("container", ["svg", "math"])
@@ -712,6 +798,72 @@ def test_streamlit_binding_allows_style_attributes_and_concatenation(
 
 
 @pytest.mark.parametrize(
+    "read_text_arguments",
+    [
+        "bogus=True",
+        "newline=None",
+        "encoding='definitely-not-a-codec'",
+        "encoding='latin-1'",
+        "encoding='utf-8-sig'",
+        "encoding=codec_name",
+        "errors='definitely-not-an-error-handler'",
+        "errors=error_mode",
+        "**{'encoding': 'utf-8'}",
+    ],
+)
+def test_python_css_read_rejects_unsupported_keywords_and_codecs(
+    tmp_path: Path,
+    read_text_arguments: str,
+) -> None:
+    _fixture(tmp_path, "gradio")
+    app = tmp_path / "app.py"
+    app.write_text(
+        app.read_text(encoding="utf-8").replace(
+            "read_text(encoding='utf-8')",
+            f"read_text({read_text_arguments})",
+        ),
+        encoding="utf-8",
+    )
+    manifest_path, payload = _manifest(tmp_path)
+    payload["file_sha256"]["app.py"] = _sha(app)
+    manifest_path.write_text(json.dumps(payload), encoding="utf-8")
+    with pytest.raises(MODULE.ContractError, match="does not read the declared CSS"):
+        MODULE.validate(tmp_path, Path("docs/hf-universal-frontend-v1.json"))
+
+
+@pytest.mark.parametrize(
+    "read_text_arguments",
+    [
+        "",
+        "encoding='UTF8'",
+        "encoding='utf-8', errors='strict'",
+        "encoding=None, errors=None",
+        "errors='strict'",
+    ],
+)
+def test_python_css_read_accepts_supported_literal_signature(
+    tmp_path: Path,
+    read_text_arguments: str,
+) -> None:
+    _fixture(tmp_path, "gradio")
+    app = tmp_path / "app.py"
+    app.write_text(
+        app.read_text(encoding="utf-8").replace(
+            "read_text(encoding='utf-8')",
+            f"read_text({read_text_arguments})",
+        ),
+        encoding="utf-8",
+    )
+    manifest_path, payload = _manifest(tmp_path)
+    payload["file_sha256"]["app.py"] = _sha(app)
+    manifest_path.write_text(json.dumps(payload), encoding="utf-8")
+    assert MODULE.validate(
+        tmp_path,
+        Path("docs/hf-universal-frontend-v1.json"),
+    )["status"] == "PASS"
+
+
+@pytest.mark.parametrize(
     ("framework", "dead_binding", "message"),
     [
         (
@@ -748,6 +900,29 @@ def test_streamlit_binding_allows_style_attributes_and_concatenation(
             + "st.markdown(f'<style>{_SZL_UNIVERSAL_CSS}</style>', unsafe_allow_html=True)\n",
             "Streamlit universal CSS binding is absent",
         ),
+        (
+            "gradio",
+            "if True:\n"
+            + "    raise SystemExit\n"
+            + "demo = gr.Blocks(css=_SZL_UNIVERSAL_CSS)\n",
+            "Gradio universal CSS binding is absent",
+        ),
+        (
+            "streamlit",
+            "if True:\n"
+            + "    raise SystemExit\n"
+            + "st.markdown(f'<style>{_SZL_UNIVERSAL_CSS}</style>', unsafe_allow_html=True)\n",
+            "Streamlit universal CSS binding is absent",
+        ),
+        (
+            "gradio",
+            "if runtime_condition:\n"
+            + "    raise SystemExit\n"
+            + "else:\n"
+            + "    raise RuntimeError\n"
+            + "demo = gr.Blocks(css=_SZL_UNIVERSAL_CSS)\n",
+            "Gradio universal CSS binding is absent",
+        ),
     ],
 )
 def test_python_framework_binding_in_dead_code_is_rejected(
@@ -772,6 +947,34 @@ def test_python_framework_binding_in_dead_code_is_rejected(
     manifest_path.write_text(json.dumps(payload), encoding="utf-8")
     with pytest.raises(MODULE.ContractError, match=message):
         MODULE.validate(tmp_path, Path("docs/hf-universal-frontend-v1.json"))
+
+
+@pytest.mark.parametrize("framework", ["gradio", "streamlit"])
+def test_python_framework_call_after_nonterminating_compound_still_counts(
+    tmp_path: Path,
+    framework: str,
+) -> None:
+    _fixture(tmp_path, framework)
+    app = tmp_path / "app.py"
+    call = (
+        "demo = gr.Blocks(css=_SZL_UNIVERSAL_CSS)\n"
+        if framework == "gradio"
+        else "st.markdown(f'<style>{_SZL_UNIVERSAL_CSS}</style>', unsafe_allow_html=True)\n"
+    )
+    app.write_text(
+        app.read_text(encoding="utf-8").replace(
+            call,
+            "if False:\n    raise SystemExit\n" + call,
+        ),
+        encoding="utf-8",
+    )
+    manifest_path, payload = _manifest(tmp_path)
+    payload["file_sha256"]["app.py"] = _sha(app)
+    manifest_path.write_text(json.dumps(payload), encoding="utf-8")
+    assert MODULE.validate(
+        tmp_path,
+        Path("docs/hf-universal-frontend-v1.json"),
+    )["status"] == "PASS"
 
 
 @pytest.mark.parametrize(
