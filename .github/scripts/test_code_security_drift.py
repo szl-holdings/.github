@@ -24,6 +24,15 @@ assert _spec and _spec.loader
 csd = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(csd)
 
+_FORGE9_PATH = os.path.join(_HERE, "verify_forge9_governance.py")
+_forge9_spec = importlib.util.spec_from_file_location(
+    "verify_forge9_governance",
+    _FORGE9_PATH,
+)
+assert _forge9_spec and _forge9_spec.loader
+forge9 = importlib.util.module_from_spec(_forge9_spec)
+_forge9_spec.loader.exec_module(forge9)
+
 ORG = "szl-holdings"
 CFG = csd.CANONICAL_CONFIG_ID
 
@@ -304,9 +313,69 @@ class TestProductionWorkflowAuthContract(unittest.TestCase):
         )
         permissions = manifest["default_permissions"]
         self.assertEqual(permissions["organization_administration"], "read")
-        self.assertEqual(permissions["organization_secrets"], "read")
         self.assertEqual(permissions["administration"], "read")
         self.assertEqual(permissions["secrets"], "read")
+        self.assertNotIn("organization_secrets", permissions)
+
+    def test_every_app_token_mint_has_exact_permission_contract(self):
+        self.assertEqual(
+            forge9.APP_TOKEN_PERMISSION_CONTRACTS,
+            {
+                ".github/workflows/attest-and-approve.yml": (
+                    {
+                        "permission-actions": "read",
+                        "permission-administration": "read",
+                        "permission-checks": "read",
+                        "permission-contents": "read",
+                        "permission-metadata": "read",
+                        "permission-pull-requests": "write",
+                        "permission-statuses": "write",
+                    },
+                ),
+                ".github/workflows/ci-health-digest.yml": (
+                    {
+                        "permission-actions": "read",
+                        "permission-contents": "read",
+                        "permission-organization-administration": "read",
+                    },
+                ),
+                ".github/workflows/code-security-drift.yml": (
+                    {
+                        "permission-organization-administration": "read",
+                    },
+                ),
+                ".github/workflows/organization-control-sweep.yml": (
+                    {
+                        "permission-actions": "read",
+                        "permission-contents": "read",
+                        "permission-organization-administration": "read",
+                    },
+                ),
+                ".github/workflows/secret-health.yml": (
+                    {
+                        "permission-metadata": "read",
+                        "permission-secrets": "read",
+                    },
+                ),
+            },
+        )
+        forge9.verify_app_token_permissions()
+
+    def test_secret_permissions_are_isolated_to_secret_health(self):
+        secret_workflow = ".github/workflows/secret-health.yml"
+        for relative, blocks in forge9.APP_TOKEN_PERMISSION_CONTRACTS.items():
+            for permissions in blocks:
+                self.assertNotIn("permission-organization-secrets", permissions)
+                if relative == secret_workflow:
+                    self.assertEqual(
+                        permissions,
+                        {
+                            "permission-metadata": "read",
+                            "permission-secrets": "read",
+                        },
+                    )
+                else:
+                    self.assertNotIn("permission-secrets", permissions)
 
 
 if __name__ == "__main__":

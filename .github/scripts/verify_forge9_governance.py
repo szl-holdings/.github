@@ -11,6 +11,51 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 GOVERNANCE = ROOT / ".governance"
+APP_TOKEN_ACTION_PREFIX = "actions/create-github-app-token@"
+APP_TOKEN_ACTION = (
+    APP_TOKEN_ACTION_PREFIX + "bcd2ba49218906704ab6c1aa796996da409d3eb1"
+)
+APP_TOKEN_USES_LINE = re.compile(
+    r"^(?P<dash>-\s+)?uses\s*:\s*(?P<value>.*)$"
+)
+APP_TOKEN_PERMISSION_CONTRACTS = {
+    ".github/workflows/attest-and-approve.yml": (
+        {
+            "permission-actions": "read",
+            "permission-administration": "read",
+            "permission-checks": "read",
+            "permission-contents": "read",
+            "permission-metadata": "read",
+            "permission-pull-requests": "write",
+            "permission-statuses": "write",
+        },
+    ),
+    ".github/workflows/ci-health-digest.yml": (
+        {
+            "permission-actions": "read",
+            "permission-contents": "read",
+            "permission-organization-administration": "read",
+        },
+    ),
+    ".github/workflows/code-security-drift.yml": (
+        {
+            "permission-organization-administration": "read",
+        },
+    ),
+    ".github/workflows/organization-control-sweep.yml": (
+        {
+            "permission-actions": "read",
+            "permission-contents": "read",
+            "permission-organization-administration": "read",
+        },
+    ),
+    ".github/workflows/secret-health.yml": (
+        {
+            "permission-metadata": "read",
+            "permission-secrets": "read",
+        },
+    ),
+}
 
 GATES = [
     "gate/ground-truth",
@@ -83,6 +128,98 @@ def load_json(path: Path) -> object:
         return json.loads(path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError) as exc:
         fail(f"{path.relative_to(ROOT)} is not valid JSON: {exc}")
+
+
+def app_token_permission_blocks(relative: str) -> list[dict[str, str]]:
+    path = ROOT / relative
+    try:
+        lines = path.read_text(encoding="utf-8").splitlines()
+    except OSError as exc:
+        fail(f"cannot read App-token workflow {relative}: {exc}")
+
+    blocks: list[dict[str, str]] = []
+    permission_line = re.compile(r"^(permission-[a-z0-9-]+):\s*(.*)$")
+    for action_index, line in enumerate(lines):
+        action_match = APP_TOKEN_USES_LINE.fullmatch(line.lstrip())
+        if (
+            action_match is None
+            or APP_TOKEN_ACTION_PREFIX not in action_match.group("value")
+        ):
+            continue
+        action_value = action_match.group("value").split(" #", 1)[0].rstrip()
+        if (
+            len(action_value) >= 2
+            and action_value[0] == action_value[-1]
+            and action_value[0] in {"'", '"'}
+        ):
+            action_value = action_value[1:-1]
+        if action_value != APP_TOKEN_ACTION:
+            fail(
+                f"{relative} App-token action is not pinned to the reviewed source"
+            )
+        action_indent = len(line) - len(line.lstrip()) + len(
+            action_match.group("dash") or ""
+        )
+        with_index = None
+        for index in range(action_index + 1, len(lines)):
+            candidate = lines[index]
+            stripped = candidate.strip()
+            indent = len(candidate) - len(candidate.lstrip())
+            if stripped == "with:" and indent == action_indent:
+                with_index = index
+                break
+            if stripped and indent < action_indent:
+                break
+        if with_index is None:
+            fail(f"{relative} App-token step has no literal with block")
+
+        with_indent = len(lines[with_index]) - len(lines[with_index].lstrip())
+        permissions: dict[str, str] = {}
+        for candidate in lines[with_index + 1 :]:
+            stripped = candidate.strip()
+            indent = len(candidate) - len(candidate.lstrip())
+            if stripped and indent <= with_indent:
+                break
+            match = permission_line.fullmatch(stripped)
+            if not match:
+                if "permission-" in stripped and not stripped.startswith("#"):
+                    fail(
+                        f"{relative} App-token permission input must be a literal key/value"
+                    )
+                continue
+            key, value = match.groups()
+            value = value.split(" #", 1)[0].rstrip()
+            if key in permissions:
+                fail(f"{relative} App-token step repeats {key}")
+            permissions[key] = value
+        blocks.append(permissions)
+    return blocks
+
+
+def verify_app_token_permissions() -> None:
+    workflow_root = ROOT / ".github" / "workflows"
+    discovered: dict[str, list[dict[str, str]]] = {}
+    for path in workflow_root.iterdir():
+        if not path.is_file() or path.suffix.lower() not in {".yml", ".yaml"}:
+            continue
+        relative = str(path.relative_to(ROOT))
+        blocks = app_token_permission_blocks(relative)
+        if blocks:
+            discovered[relative] = blocks
+    expected_paths = set(APP_TOKEN_PERMISSION_CONTRACTS)
+    if set(discovered) != expected_paths:
+        fail(
+            "App-token workflow inventory drifted: expected "
+            f"{sorted(expected_paths)!r}, observed {sorted(discovered)!r}"
+        )
+
+    for relative, expected_blocks in APP_TOKEN_PERMISSION_CONTRACTS.items():
+        observed = discovered[relative]
+        if observed != list(expected_blocks):
+            fail(
+                f"{relative} App-token permissions differ from the exact minimum: "
+                f"expected {list(expected_blocks)!r}, observed {observed!r}"
+            )
 
 
 def rule(rules: list[dict[str, object]], kind: str) -> dict[str, object]:
@@ -178,7 +315,6 @@ def verify_manifest() -> None:
         "contents": "read",
         "metadata": "read",
         "organization_administration": "read",
-        "organization_secrets": "read",
         "pull_requests": "write",
         "secrets": "read",
     }
@@ -567,6 +703,7 @@ def verify_legacy_paths_removed() -> None:
 def main() -> int:
     verify_ruleset()
     verify_manifest()
+    verify_app_token_permissions()
     verify_gate_contract()
     verify_legacy_paths_removed()
     print("FORGE-9 bootstrap invariants verified")
