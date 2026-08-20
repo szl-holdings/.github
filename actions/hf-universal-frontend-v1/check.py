@@ -29,7 +29,6 @@ REQUIRED_CSS_TOKENS = (
     "@media (prefers-reduced-motion: reduce)",
 )
 SHA256 = re.compile(r"^[0-9a-f]{64}$")
-CSS_COMMENT = re.compile(r"/\*.*?\*/", re.DOTALL)
 MAX_OUTPUT_VALUE_BYTES = 4096
 
 
@@ -38,16 +37,30 @@ class ContractError(RuntimeError):
 
 
 class _StaticDocumentParser(HTMLParser):
+    _INERT_CONTAINERS = frozenset({"noscript", "template"})
+
     def __init__(self) -> None:
         super().__init__(convert_charrefs=True)
         self.has_viewport = False
+        self.has_base = False
         self.stylesheet_links: list[dict[str, str]] = []
+        self._inert_stack: list[str] = []
+
+    @property
+    def has_unclosed_inert_container(self) -> bool:
+        return bool(self._inert_stack)
 
     def handle_starttag(
         self,
         tag: str,
         attrs: list[tuple[str, str | None]],
     ) -> None:
+        normalized_tag = tag.casefold()
+        if normalized_tag in self._INERT_CONTAINERS:
+            self._inert_stack.append(normalized_tag)
+            return
+        if self._inert_stack:
+            return
         self._record(tag, attrs)
 
     def handle_startendtag(
@@ -55,29 +68,78 @@ class _StaticDocumentParser(HTMLParser):
         tag: str,
         attrs: list[tuple[str, str | None]],
     ) -> None:
+        normalized_tag = tag.casefold()
+        if normalized_tag in self._INERT_CONTAINERS:
+            raise ContractError(
+                f"Static application contains self-closing <{normalized_tag}>"
+            )
+        if self._inert_stack:
+            return
         self._record(tag, attrs)
+
+    def handle_endtag(self, tag: str) -> None:
+        normalized_tag = tag.casefold()
+        if not self._inert_stack or normalized_tag not in self._INERT_CONTAINERS:
+            return
+        expected = self._inert_stack[-1]
+        if normalized_tag != expected:
+            raise ContractError(
+                "Static application contains mismatched inert containers: "
+                f"expected </{expected}>, received </{normalized_tag}>"
+            )
+        self._inert_stack.pop()
 
     def _record(
         self,
         tag: str,
         attrs: list[tuple[str, str | None]],
     ) -> None:
-        values = {
-            str(name).casefold(): "" if value is None else str(value)
-            for name, value in attrs
-        }
+        values: dict[str, str] = {}
+        duplicates: set[str] = set()
+        for name, value in attrs:
+            key = str(name).casefold()
+            if key in values:
+                duplicates.add(key)
+                continue
+            values[key] = "" if value is None else str(value)
         normalized_tag = tag.casefold()
+        if normalized_tag == "base":
+            self.has_base = True
+            return
         if normalized_tag == "meta" and values.get("name", "").casefold() == "viewport":
             self.has_viewport = True
         if normalized_tag != "link":
             return
+        security_attributes = {
+            "rel",
+            "href",
+            "data-szl-universal-frontend",
+            "disabled",
+            "media",
+            "type",
+        }
+        ambiguous = sorted(duplicates & security_attributes)
+        if ambiguous:
+            raise ContractError(
+                "Static stylesheet link contains duplicate controlled attributes: "
+                + ", ".join(ambiguous)
+            )
         rel_tokens = {
             token.casefold()
             for token in values.get("rel", "").split()
             if token.strip()
         }
-        if "stylesheet" in rel_tokens:
-            self.stylesheet_links.append(values)
+        if "stylesheet" not in rel_tokens or "alternate" in rel_tokens:
+            return
+        if "disabled" in values:
+            return
+        media = values.get("media", "").strip().casefold()
+        if media not in {"", "all"}:
+            return
+        content_type = values.get("type", "").strip().casefold()
+        if content_type not in {"", "text/css"}:
+            return
+        self.stylesheet_links.append(values)
 
 
 def sha256(path: Path) -> str:
@@ -178,8 +240,52 @@ def validate_sdk_binding(card_sdk: str, manifest: dict[str, Any], framework: str
     return normalized
 
 
+def _strip_css_inert_text(css_text: str) -> str:
+    """Blank comments and strings without joining tokens across them."""
+    output: list[str] = []
+    index = 0
+
+    def blank(character: str) -> str:
+        return character if character in {"\r", "\n"} else " "
+
+    while index < len(css_text):
+        if css_text.startswith("/*", index):
+            output.extend((" ", " "))
+            index += 2
+            while index < len(css_text):
+                if css_text.startswith("*/", index):
+                    output.extend((" ", " "))
+                    index += 2
+                    break
+                output.append(blank(css_text[index]))
+                index += 1
+            continue
+
+        character = css_text[index]
+        if character not in {"'", '"'}:
+            output.append(character)
+            index += 1
+            continue
+
+        quote = character
+        output.append(" ")
+        index += 1
+        while index < len(css_text):
+            character = css_text[index]
+            output.append(blank(character))
+            index += 1
+            if character == "\\" and index < len(css_text):
+                output.append(blank(css_text[index]))
+                index += 1
+                continue
+            if character == quote:
+                break
+
+    return "".join(output)
+
+
 def validate_css(css_text: str) -> None:
-    active_css = CSS_COMMENT.sub("", css_text)
+    active_css = _strip_css_inert_text(css_text)
     missing = [token for token in REQUIRED_CSS_TOKENS if token not in active_css]
     if missing:
         raise ContractError("universal CSS is missing required active tokens: " + ", ".join(missing))
@@ -191,6 +297,7 @@ def _resolved_static_href(app_file: str, href: str) -> str:
     if parsed.scheme or parsed.netloc:
         raise ContractError("static universal stylesheet href must be repository-local")
     decoded = unquote(parsed.path)
+    _reject_line_breaks(decoded, "decoded static stylesheet href")
     if not decoded or decoded.startswith("/") or "\\" in decoded:
         raise ContractError("static universal stylesheet href must be a relative POSIX path")
     resolved = posixpath.normpath(posixpath.join(posixpath.dirname(app_file), decoded))
@@ -216,8 +323,14 @@ def validate_framework_binding(
         parser = _StaticDocumentParser()
         parser.feed(app_text)
         parser.close()
+        if parser.has_unclosed_inert_container:
+            raise ContractError("Static application contains an unclosed inert container")
         if not parser.has_viewport:
             raise ContractError("Static viewport metadata is absent")
+        if parser.has_base:
+            raise ContractError(
+                "Static application may not override repository-local URL resolution with <base>"
+            )
         expected_css = posixpath.normpath(css_file)
         for link in parser.stylesheet_links:
             if link.get("data-szl-universal-frontend") != "v1":
@@ -303,11 +416,19 @@ def validate(root: Path, manifest_path: Path) -> dict[str, Any]:
     card_sdk = validate_front_matter(front, manifest)
     sdk = validate_sdk_binding(card_sdk, manifest, framework)
     validate_css(css.read_text(encoding="utf-8"))
-    binding_path = entry or app
+    # A static Space serves app_file directly. entry_file is relevant to
+    # source-based adapters, but it must not redirect validation to a decoy
+    # document while the served HTML omits the declared stylesheet.
+    binding_path = app if framework == "static" else (entry or app)
+    binding_relative = (
+        str(manifest["app_file"])
+        if framework == "static"
+        else str(manifest.get("entry_file") or manifest["app_file"])
+    )
     validate_framework_binding(
         framework,
         binding_path.read_text(encoding="utf-8"),
-        app_file=str(manifest.get("entry_file") or manifest["app_file"]),
+        app_file=binding_relative,
         css_file=str(manifest["css_file"]),
     )
 
@@ -359,9 +480,14 @@ def write_github_output(path: Path, result: dict[str, Any]) -> None:
         "css_file": result["css_file"],
         "manifest_sha256": result["manifest_sha256"],
     }
+    # Authenticate every value before opening the environment file. A rejected
+    # value must not leave a partial set of outputs behind.
+    records = [
+        f"{key}={_github_output_value(key, value)}\n"
+        for key, value in lines.items()
+    ]
     with path.open("a", encoding="utf-8") as handle:
-        for key, value in lines.items():
-            handle.write(f"{key}={_github_output_value(key, value)}\n")
+        handle.writelines(records)
 
 
 def main() -> int:

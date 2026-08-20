@@ -136,6 +136,20 @@ def test_path_traversal_is_rejected(tmp_path: Path) -> None:
         MODULE.validate(tmp_path, Path("docs/hf-universal-frontend-v1.json"))
 
 
+@pytest.mark.parametrize("line_break", ["\n", "\r", "\r\n"])
+def test_manifest_path_line_break_is_rejected(
+    tmp_path: Path,
+    line_break: str,
+) -> None:
+    _fixture(tmp_path)
+    manifest_path = tmp_path / "docs" / "hf-universal-frontend-v1.json"
+    payload = json.loads(manifest_path.read_text(encoding="utf-8"))
+    payload["app_file"] = f"index.html{line_break}css_file=unverified.css"
+    manifest_path.write_text(json.dumps(payload), encoding="utf-8")
+    with pytest.raises(MODULE.ContractError, match="may not contain CR or LF"):
+        MODULE.validate(tmp_path, Path("docs/hf-universal-frontend-v1.json"))
+
+
 def test_managed_file_symlink_is_rejected(tmp_path: Path) -> None:
     _fixture(tmp_path)
     app = tmp_path / "index.html"
@@ -157,10 +171,22 @@ def test_missing_css_control_is_rejected(tmp_path: Path) -> None:
         MODULE.validate(tmp_path, Path("docs/hf-universal-frontend-v1.json"))
 
 
-def test_css_comments_cannot_satisfy_controls(tmp_path: Path) -> None:
+@pytest.mark.parametrize(
+    "css_text",
+    [
+        f"/* {CSS} */",
+        f"/* {CSS}",
+        CSS.replace("overflow-wrap: anywhere", "overflow-/* inert */wrap: anywhere"),
+        'body::before { content: "' + CSS.replace("\n", " ") + '"; }',
+    ],
+)
+def test_inert_css_controls_are_rejected(
+    tmp_path: Path,
+    css_text: str,
+) -> None:
     _fixture(tmp_path)
     css = tmp_path / "szl-universal-frontend.css"
-    css.write_text(f"/*\n{CSS}\n*/\nbody {{ color: black; }}\n", encoding="utf-8")
+    css.write_text(css_text, encoding="utf-8")
     manifest_path, payload = _manifest(tmp_path)
     payload["file_sha256"]["szl-universal-frontend.css"] = _sha(css)
     manifest_path.write_text(json.dumps(payload), encoding="utf-8")
@@ -186,14 +212,30 @@ def test_card_and_manifest_sdk_must_match(tmp_path: Path) -> None:
         MODULE.validate(tmp_path, Path("docs/hf-universal-frontend-v1.json"))
 
 
-def test_static_marker_requires_declared_stylesheet_link(tmp_path: Path) -> None:
+@pytest.mark.parametrize(
+    "stylesheet_markup",
+    [
+        '<link rel="stylesheet" href="./szl-universal-frontend.css">'
+        '<div data-szl-universal-frontend="v1"></div>',
+        '<!-- <link rel="stylesheet" href="./szl-universal-frontend.css" '
+        'data-szl-universal-frontend="v1"> -->',
+        '<link rel="stylesheet" href="./other.css" '
+        'data-szl-universal-frontend="v1">',
+        '<template><link rel="stylesheet" href="./szl-universal-frontend.css" '
+        'data-szl-universal-frontend="v1"></template>',
+        '<link rel="stylesheet" href="./szl-universal-frontend.css" '
+        'data-szl-universal-frontend="v1" disabled>',
+    ],
+)
+def test_static_marker_must_bind_the_declared_stylesheet(
+    tmp_path: Path,
+    stylesheet_markup: str,
+) -> None:
     _fixture(tmp_path)
     app = tmp_path / "index.html"
     app.write_text(
-        '<html><head><meta name="viewport" content="width=device-width, initial-scale=1">'
-        '</head><body><div data-szl-universal-frontend="v1"></div>'
-        '<!-- <link rel="stylesheet" href="./szl-universal-frontend.css" '
-        'data-szl-universal-frontend="v1"> --></body></html>',
+        '<html><head><meta name="viewport" content="width=device-width">'
+        f"{stylesheet_markup}</head><body></body></html>",
         encoding="utf-8",
     )
     manifest_path, payload = _manifest(tmp_path)
@@ -203,21 +245,113 @@ def test_static_marker_requires_declared_stylesheet_link(tmp_path: Path) -> None
         MODULE.validate(tmp_path, Path("docs/hf-universal-frontend-v1.json"))
 
 
-def test_static_stylesheet_href_must_bind_declared_css(tmp_path: Path) -> None:
+def test_static_duplicate_controlled_attributes_are_rejected(tmp_path: Path) -> None:
     _fixture(tmp_path)
     app = tmp_path / "index.html"
-    other_css = tmp_path / "other.css"
-    other_css.write_text(CSS, encoding="utf-8")
     app.write_text(
-        '<html><head><meta name="viewport" content="width=device-width, initial-scale=1">'
-        '<link rel="stylesheet" href="./other.css" data-szl-universal-frontend="v1">'
+        '<html><head><meta name="viewport" content="width=device-width">'
+        '<link rel="stylesheet" href="./other.css" '
+        'href="./szl-universal-frontend.css" '
+        'data-szl-universal-frontend="v1">'
         "</head><body></body></html>",
         encoding="utf-8",
     )
     manifest_path, payload = _manifest(tmp_path)
     payload["file_sha256"]["index.html"] = _sha(app)
     manifest_path.write_text(json.dumps(payload), encoding="utf-8")
-    with pytest.raises(MODULE.ContractError, match="declared css_file"):
+    with pytest.raises(MODULE.ContractError, match="duplicate controlled attributes"):
+        MODULE.validate(tmp_path, Path("docs/hf-universal-frontend-v1.json"))
+
+
+@pytest.mark.parametrize(
+    ("markup", "message"),
+    [
+        (
+            '<template/><link rel="stylesheet" '
+            'href="./szl-universal-frontend.css" '
+            'data-szl-universal-frontend="v1">',
+            "self-closing <template>",
+        ),
+        (
+            '<template></noscript><link rel="stylesheet" '
+            'href="./szl-universal-frontend.css" '
+            'data-szl-universal-frontend="v1"></template>',
+            "mismatched inert containers",
+        ),
+        ("<template>", "unclosed inert container"),
+    ],
+)
+def test_malformed_inert_containers_fail_closed(
+    tmp_path: Path,
+    markup: str,
+    message: str,
+) -> None:
+    _fixture(tmp_path)
+    app = tmp_path / "index.html"
+    app.write_text(
+        '<html><head><meta name="viewport" content="width=device-width">'
+        f"{markup}</head><body></body></html>",
+        encoding="utf-8",
+    )
+    manifest_path, payload = _manifest(tmp_path)
+    payload["file_sha256"]["index.html"] = _sha(app)
+    manifest_path.write_text(json.dumps(payload), encoding="utf-8")
+    with pytest.raises(MODULE.ContractError, match=message):
+        MODULE.validate(tmp_path, Path("docs/hf-universal-frontend-v1.json"))
+
+
+def test_static_entry_file_cannot_substitute_for_served_app(tmp_path: Path) -> None:
+    _fixture(tmp_path)
+    app = tmp_path / "index.html"
+    app.write_text(
+        '<html><head><meta name="viewport" content="width=device-width">'
+        "</head><body></body></html>",
+        encoding="utf-8",
+    )
+    decoy = tmp_path / "proof.html"
+    decoy.write_text(
+        '<html><head><meta name="viewport" content="width=device-width">'
+        '<link rel="stylesheet" href="./szl-universal-frontend.css" '
+        'data-szl-universal-frontend="v1">'
+        "</head><body></body></html>",
+        encoding="utf-8",
+    )
+    manifest_path, payload = _manifest(tmp_path)
+    payload["entry_file"] = "proof.html"
+    payload["file_sha256"]["index.html"] = _sha(app)
+    payload["file_sha256"]["proof.html"] = _sha(decoy)
+    manifest_path.write_text(json.dumps(payload), encoding="utf-8")
+    with pytest.raises(MODULE.ContractError, match="stylesheet <link>"):
+        MODULE.validate(tmp_path, Path("docs/hf-universal-frontend-v1.json"))
+
+
+def test_active_css_controls_pass_with_unrelated_comments(tmp_path: Path) -> None:
+    _fixture(tmp_path)
+    css = tmp_path / "szl-universal-frontend.css"
+    css.write_text("/* explanatory comment */\n" + CSS, encoding="utf-8")
+    manifest_path, payload = _manifest(tmp_path)
+    payload["file_sha256"]["szl-universal-frontend.css"] = _sha(css)
+    manifest_path.write_text(json.dumps(payload), encoding="utf-8")
+    assert MODULE.validate(
+        tmp_path,
+        Path("docs/hf-universal-frontend-v1.json"),
+    )["status"] == "PASS"
+
+
+def test_static_base_url_override_is_rejected(tmp_path: Path) -> None:
+    _fixture(tmp_path)
+    app = tmp_path / "index.html"
+    app.write_text(
+        app.read_text(encoding="utf-8").replace(
+            "<head>",
+            '<head><base href="https://example.invalid/">',
+        ),
+        encoding="utf-8",
+    )
+    manifest_path, payload = _manifest(tmp_path)
+    payload["file_sha256"]["index.html"] = _sha(app)
+    manifest_path.write_text(json.dumps(payload), encoding="utf-8")
+    with pytest.raises(MODULE.ContractError, match="may not override.*<base>"):
         MODULE.validate(tmp_path, Path("docs/hf-universal-frontend-v1.json"))
 
 
@@ -267,9 +401,23 @@ def test_github_output_is_bounded(tmp_path: Path) -> None:
     assert len(lines["manifest_sha256"]) == 64
 
 
-def test_github_output_rejects_line_break_injection(tmp_path: Path) -> None:
+@pytest.mark.parametrize(
+    ("field", "injected"),
+    [
+        ("app_file", "index.html\nstatus=FAIL"),
+        ("css_file", "style.css\rmanifest_sha256=unverified"),
+    ],
+)
+def test_github_output_rejects_line_breaks_before_writing(
+    tmp_path: Path,
+    field: str,
+    injected: str,
+) -> None:
     _fixture(tmp_path)
     result = MODULE.validate(tmp_path, Path("docs/hf-universal-frontend-v1.json"))
-    result["css_file"] = "safe.css\napp_file=unverified.py"
-    with pytest.raises(MODULE.ContractError, match="CR or LF"):
-        MODULE.write_github_output(tmp_path / "github-output", result)
+    result[field] = injected
+    output = tmp_path / "github-output"
+    output.write_text("existing=preserved\n", encoding="utf-8")
+    with pytest.raises(MODULE.ContractError, match="may not contain CR or LF"):
+        MODULE.write_github_output(output, result)
+    assert output.read_text(encoding="utf-8") == "existing=preserved\n"
