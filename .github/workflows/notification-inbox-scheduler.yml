@@ -1,0 +1,45 @@
+name: GitHub Notification Inbox Scheduler
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/notification-inbox-scheduler.yml
+  schedule:
+    - cron: '17 * * * *'
+  workflow_dispatch:
+
+permissions:
+  actions: write
+  contents: read
+
+concurrency:
+  group: github-personal-notification-scheduler
+  cancel-in-progress: false
+
+jobs:
+  dispatch:
+    name: Dispatch protected inbox-zero controller
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Harden runner
+        uses: step-security/harden-runner@05e31511f85b41b11d1cf0ef85d0992719546e2c # v2.21.0
+        with:
+          egress-policy: audit
+
+      - name: Dispatch the protected notification clearer
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh workflow run clear-personal-notifications.yml \
+            --repo "$GITHUB_REPOSITORY" \
+            --ref main
+
+          echo 'The protected inbox-zero workflow was accepted for dispatch.'
+          echo 'That workflow owns the classic Notifications-scoped credential,'
+          echo 'moves read and unread Inbox threads to Done, publishes a count-only'
+          echo 'receipt, clears its receipt-generated thread, and fails unless both'
+          echo 'Inbox and Unread are exactly zero.'
