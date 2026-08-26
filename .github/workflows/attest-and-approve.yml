@@ -32,6 +32,12 @@ jobs:
           private-key: ${{ secrets.QILLQAQ_PRIVATE_KEY }}
           owner: ${{ github.repository_owner }}
           repositories: ${{ github.event.repository.name }}
+          permission-administration: read
+          permission-checks: read
+          permission-contents: read
+          permission-metadata: read
+          permission-pull-requests: write
+          permission-statuses: write
 
       - name: Resolve the attestation subject
         id: subject

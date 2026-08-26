@@ -14,7 +14,8 @@
     "contents": "read",
     "metadata": "read",
     "organization_administration": "read",
-    "pull_requests": "write"
+    "pull_requests": "write",
+    "secrets": "read"
   },
   "default_events": []
 }
