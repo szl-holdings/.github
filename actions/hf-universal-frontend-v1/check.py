@@ -75,6 +75,56 @@ class _StaticDocumentParser(HTMLParser):
             "wbr",
         }
     )
+    _FOREIGN_BREAKOUT_START_TAGS = frozenset(
+        {
+            "b",
+            "big",
+            "blockquote",
+            "body",
+            "br",
+            "center",
+            "code",
+            "dd",
+            "div",
+            "dl",
+            "dt",
+            "em",
+            "embed",
+            "h1",
+            "h2",
+            "h3",
+            "h4",
+            "h5",
+            "h6",
+            "head",
+            "hr",
+            "i",
+            "img",
+            "li",
+            "listing",
+            "menu",
+            "meta",
+            "nobr",
+            "ol",
+            "p",
+            "pre",
+            "ruby",
+            "s",
+            "small",
+            "span",
+            "strong",
+            "strike",
+            "sub",
+            "sup",
+            "table",
+            "tt",
+            "u",
+            "ul",
+            "var",
+        }
+    )
+    _FOREIGN_BREAKOUT_END_TAGS = frozenset({"br", "p"})
+    _FOREIGN_BREAKOUT_FONT_ATTRIBUTES = frozenset({"color", "face", "size"})
     _SVG_HTML_INTEGRATION_POINTS = frozenset({"desc", "foreignobject", "title"})
     _MATHML_TEXT_INTEGRATION_POINTS = frozenset(
         {"mi", "mn", "mo", "ms", "mtext"}
@@ -113,6 +163,28 @@ class _StaticDocumentParser(HTMLParser):
         )
 
     @classmethod
+    def _is_foreign_breakout_start_tag(
+        cls,
+        tag: str,
+        attrs: list[tuple[str, str | None]],
+    ) -> bool:
+        if tag in cls._FOREIGN_BREAKOUT_START_TAGS:
+            return True
+        if tag != "font":
+            return False
+        return any(
+            str(name).casefold() in cls._FOREIGN_BREAKOUT_FONT_ATTRIBUTES
+            for name, _ in attrs
+        )
+
+    def _pop_to_html_processing_boundary(self) -> None:
+        while self._foreign_tree_stack:
+            _, namespace, integration_kind = self._foreign_tree_stack[-1]
+            if namespace == "html" or integration_kind is not None:
+                return
+            self._foreign_tree_stack.pop()
+
+    @classmethod
     def _integration_kind(
         cls,
         namespace: str,
@@ -141,12 +213,20 @@ class _StaticDocumentParser(HTMLParser):
             return "html"
         return None
 
-    def _namespace_for_start_tag(self, tag: str) -> str:
+    def _namespace_for_start_tag(
+        self,
+        tag: str,
+        attrs: list[tuple[str, str | None]],
+    ) -> str:
         if not self._foreign_tree_stack:
             if tag in self._FOREIGN_CONTAINERS:
                 return tag
             return "html"
-        _, current_namespace, integration_kind = self._foreign_tree_stack[-1]
+        (
+            current_tag,
+            current_namespace,
+            integration_kind,
+        ) = self._foreign_tree_stack[-1]
         process_as_html = (
             current_namespace == "html"
             or integration_kind == "html"
@@ -154,11 +234,19 @@ class _StaticDocumentParser(HTMLParser):
                 integration_kind == "math-text"
                 and tag not in self._MATHML_FOREIGN_EXCEPTIONS
             )
+            or (
+                current_namespace == "math"
+                and current_tag == "annotation-xml"
+                and tag == "svg"
+            )
         )
         if process_as_html:
             if tag in self._FOREIGN_CONTAINERS:
                 return tag
             return "html"
+        if self._is_foreign_breakout_start_tag(tag, attrs):
+            self._pop_to_html_processing_boundary()
+            return self._namespace_for_start_tag(tag, attrs)
         return current_namespace
 
     def handle_starttag(
@@ -172,7 +260,7 @@ class _StaticDocumentParser(HTMLParser):
                 self._inert_stack.append(normalized_tag)
             return
 
-        namespace = self._namespace_for_start_tag(normalized_tag)
+        namespace = self._namespace_for_start_tag(normalized_tag, attrs)
         if (
             namespace == "html"
             and normalized_tag in self._INERT_CONTAINERS
@@ -209,7 +297,7 @@ class _StaticDocumentParser(HTMLParser):
         if self._inert_stack:
             return
 
-        namespace = self._namespace_for_start_tag(normalized_tag)
+        namespace = self._namespace_for_start_tag(normalized_tag, attrs)
         if (
             namespace == "html"
             and normalized_tag in self._INERT_CONTAINERS
@@ -237,6 +325,12 @@ class _StaticDocumentParser(HTMLParser):
             return
 
         if not self._foreign_tree_stack:
+            return
+        if (
+            self._foreign_tree_stack[-1][1] != "html"
+            and normalized_tag in self._FOREIGN_BREAKOUT_END_TAGS
+        ):
+            self._pop_to_html_processing_boundary()
             return
         expected = self._foreign_tree_stack[-1][0]
         if normalized_tag != expected:

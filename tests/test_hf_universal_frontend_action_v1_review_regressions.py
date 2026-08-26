@@ -88,6 +88,24 @@ def _static_document(
             "</template></mtext></math></svg>",
             "",
         ),
+        (
+            "<math><annotation-xml><svg><mtext><template>"
+            '<svg style="width:200vw"></svg>'
+            "</template></mtext></svg></annotation-xml></math>",
+            "",
+        ),
+        (
+            "<math><div><svg><mtext><template>"
+            '<svg style="width:200vw"></svg>'
+            "</template></mtext></svg></div></math>",
+            "",
+        ),
+        (
+            '<svg><font color="red"><svg><mtext><template>'
+            '<svg style="width:200vw"></svg>'
+            "</template></mtext></svg></font></svg>",
+            "",
+        ),
     ],
     ids=[
         "style-element",
@@ -100,6 +118,9 @@ def _static_document(
         "padded-annotation-encoding",
         "mathml-glyph-exception",
         "svg-nested-math-tag",
+        "annotation-xml-svg-transition",
+        "foreign-div-breakout",
+        "foreign-font-breakout",
     ],
 )
 def test_static_rejects_unaudited_author_styles(
