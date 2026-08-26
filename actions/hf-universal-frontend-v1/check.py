@@ -435,9 +435,80 @@ def _media_query(prelude: str) -> str | None:
     return None
 
 
-def _has_reduced_motion_control(
-    declarations: dict[tuple[str, str], tuple[str, bool]],
+CSSCascadeEntry = tuple[str, str, str, bool, int]
+CSSCascadeWinner = tuple[str, bool, tuple[int, int, int], int]
+
+AUDITED_SELECTOR_TARGETS = {
+    ":root": frozenset({"root"}),
+    "html": frozenset({"root"}),
+    "body": frozenset({"body"}),
+    "*": frozenset({"root", "body", "element"}),
+    "*::before": frozenset({"before"}),
+    "*::after": frozenset({"after"}),
+}
+AUDITED_SELECTOR_SPECIFICITY = {
+    ":root": (0, 1, 0),
+    "html": (0, 0, 1),
+    "body": (0, 0, 1),
+    "*": (0, 0, 0),
+    "*::before": (0, 0, 1),
+    "*::after": (0, 0, 1),
+}
+
+
+def _cascade_winners(
+    declarations: list[CSSCascadeEntry],
+) -> dict[tuple[str, str], CSSCascadeWinner]:
+    """Resolve audited author declarations by importance, specificity, and order."""
+    winners: dict[tuple[str, str], CSSCascadeWinner] = {}
+    for selector, property_name, value, important, source_order in declarations:
+        specificity = AUDITED_SELECTOR_SPECIFICITY[selector]
+        priority = (1 if important else 0, specificity, source_order)
+        for target in AUDITED_SELECTOR_TARGETS[selector]:
+            key = (target, property_name)
+            previous = winners.get(key)
+            if previous is None:
+                winners[key] = (value, important, specificity, source_order)
+                continue
+            previous_priority = (
+                1 if previous[1] else 0,
+                previous[2],
+                previous[3],
+            )
+            if priority >= previous_priority:
+                winners[key] = (value, important, specificity, source_order)
+    return winners
+
+
+def _effective_inherited_value(
+    winners: dict[tuple[str, str], CSSCascadeWinner],
+    property_name: str,
+) -> str | None:
+    """Resolve the audited generic-element value through root/body inheritance."""
+    for target in ("element", "body", "root"):
+        winner = winners.get((target, property_name))
+        if winner is not None:
+            return winner[0]
+    return None
+
+
+def _has_required_css_control(
+    winners: dict[tuple[str, str], CSSCascadeWinner],
+    property_name: str,
+    value: str,
 ) -> bool:
+    if property_name in {"--szl-touch-target", "overflow-wrap"}:
+        return _effective_inherited_value(winners, property_name) == value
+    if property_name == "overflow-x":
+        return all(
+            (winner := winners.get((target, property_name))) is not None
+            and winner[0] == value
+            for target in ("root", "body")
+        )
+    return False
+
+
+def _has_reduced_motion_control(declarations: list[CSSCascadeEntry]) -> bool:
     accepted = {
         ("animation", "none"),
         ("animation-duration", "0s"),
@@ -449,9 +520,14 @@ def _has_reduced_motion_control(
         ("transition-duration", "0.01ms"),
         ("scroll-behavior", "auto"),
     }
-    return any(
-        (property_name, value) in accepted
-        for (_, property_name), (value, _) in declarations.items()
+    winners = _cascade_winners(declarations)
+    required_targets = {"root", "body", "element", "before", "after"}
+    return all(
+        any(
+            candidate_target == target and (property_name, winner[0]) in accepted
+            for (candidate_target, property_name), winner in winners.items()
+        )
+        for target in required_targets
     )
 
 
@@ -479,33 +555,32 @@ def _guaranteed_active_selectors(prelude: str) -> set[str]:
     return selectors
 
 
-def _update_cascade(
-    cascade: dict[tuple[str, str], tuple[str, bool]],
-    selectors: set[str],
-    declarations: list[tuple[str, str, bool]],
-) -> None:
-    """Record final same-selector declarations, honoring ``!important``."""
-    for property_name, value, important in declarations:
-        for selector in selectors:
-            key = (selector, property_name)
-            previous = cascade.get(key)
-            if previous is not None and previous[1] and not important:
-                continue
-            cascade[key] = (value, important)
-
-
 def validate_css(css_text: str) -> None:
     active_css = _strip_css_inert_text(css_text)
-    active_declarations: dict[tuple[str, str], tuple[str, bool]] = {}
-    media_declarations: dict[
-        str,
-        dict[tuple[str, str], tuple[str, bool]],
-    ] = {query: {} for query in REQUIRED_MEDIA_QUERIES}
+    active_declarations: list[CSSCascadeEntry] = []
+    media_declarations: dict[str, list[CSSCascadeEntry]] = {
+        query: [] for query in REQUIRED_MEDIA_QUERIES
+    }
+    source_order = 0
+
+    def append_declarations(
+        cascade: list[CSSCascadeEntry],
+        selectors: set[str],
+        declarations: list[tuple[str, str, bool]],
+    ) -> None:
+        nonlocal source_order
+        for property_name, value, important in declarations:
+            for selector in selectors:
+                cascade.append(
+                    (selector, property_name, value, important, source_order)
+                )
+            source_order += 1
+
     for prelude, body in _css_rule_blocks(active_css):
         if not prelude.lstrip(CSS_WHITESPACE).startswith("@"):
             selectors = _guaranteed_active_selectors(prelude)
             if selectors:
-                _update_cascade(
+                append_declarations(
                     active_declarations,
                     selectors,
                     _css_declarations(body),
@@ -520,32 +595,27 @@ def validate_css(css_text: str) -> None:
             selectors = _guaranteed_active_selectors(nested_prelude)
             if not selectors:
                 continue
-            _update_cascade(
+            append_declarations(
                 media_declarations[query],
                 selectors,
                 _css_declarations(nested_body),
             )
 
+    active_winners = _cascade_winners(active_declarations)
     observed_media = {
         query
         for query, declarations in media_declarations.items()
         if declarations
         and (
             query != "(prefers-reduced-motion:reduce)"
-            or _has_reduced_motion_control(declarations)
+            or _has_reduced_motion_control(active_declarations + declarations)
         )
     }
 
     missing = [
         f"{name}: {value}"
         for name, value in REQUIRED_CSS_DECLARATIONS.items()
-        if not any(
-            property_name == name and declaration_value == value
-            for (_, property_name), (
-                declaration_value,
-                _,
-            ) in active_declarations.items()
-        )
+        if not _has_required_css_control(active_winners, name, value)
     ]
     missing.extend(
         f"@media {query}"
@@ -880,6 +950,8 @@ def _gradio_applies_css(
             or node.func.attr not in constructors
         ):
             continue
+        if any(keyword.arg is None for keyword in node.keywords):
+            continue
         for keyword in node.keywords:
             if (
                 keyword.arg == "css"
@@ -1118,6 +1190,8 @@ def _streamlit_applies_css(
             or node.func.attr != "markdown"
             or not node.args
         ):
+            continue
+        if any(keyword.arg is None for keyword in node.keywords):
             continue
         unsafe = next(
             (keyword.value for keyword in node.keywords if keyword.arg == "unsafe_allow_html"),

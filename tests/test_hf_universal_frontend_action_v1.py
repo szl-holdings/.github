@@ -323,6 +323,22 @@ def test_important_required_css_control_survives_later_normal_override(
     )["status"] == "PASS"
 
 
+def test_stronger_matching_selector_overrides_required_css_control(
+    tmp_path: Path,
+) -> None:
+    _fixture(tmp_path)
+    css = tmp_path / "szl-universal-frontend.css"
+    css.write_text(
+        CSS + "\nhtml { overflow-x: auto !important; }\n",
+        encoding="utf-8",
+    )
+    manifest_path, payload = _manifest(tmp_path)
+    payload["file_sha256"]["szl-universal-frontend.css"] = _sha(css)
+    manifest_path.write_text(json.dumps(payload), encoding="utf-8")
+    with pytest.raises(MODULE.ContractError, match="overflow-x"):
+        MODULE.validate(tmp_path, Path("docs/hf-universal-frontend-v1.json"))
+
+
 def test_later_reduced_motion_override_is_rejected(tmp_path: Path) -> None:
     _fixture(tmp_path)
     css = tmp_path / "szl-universal-frontend.css"
@@ -331,6 +347,20 @@ def test_later_reduced_motion_override_is_rejected(tmp_path: Path) -> None:
         + "\n@media (prefers-reduced-motion: reduce) {\n"
         + "  *, *::before, *::after { animation-duration: 1s !important; }\n"
         + "}\n",
+        encoding="utf-8",
+    )
+    manifest_path, payload = _manifest(tmp_path)
+    payload["file_sha256"]["szl-universal-frontend.css"] = _sha(css)
+    manifest_path.write_text(json.dumps(payload), encoding="utf-8")
+    with pytest.raises(MODULE.ContractError, match="prefers-reduced-motion"):
+        MODULE.validate(tmp_path, Path("docs/hf-universal-frontend-v1.json"))
+
+
+def test_later_global_rule_overrides_reduced_motion_control(tmp_path: Path) -> None:
+    _fixture(tmp_path)
+    css = tmp_path / "szl-universal-frontend.css"
+    css.write_text(
+        CSS + "\n* { animation-duration: 10s !important; }\n",
         encoding="utf-8",
     )
     manifest_path, payload = _manifest(tmp_path)
@@ -878,6 +908,36 @@ def test_python_framework_must_apply_declared_css(
     payload["file_sha256"]["app.py"] = _sha(app)
     manifest_path.write_text(json.dumps(payload), encoding="utf-8")
     with pytest.raises(MODULE.ContractError, match=message):
+        MODULE.validate(tmp_path, Path("docs/hf-universal-frontend-v1.json"))
+
+
+@pytest.mark.parametrize("framework", ["gradio", "streamlit"])
+def test_python_framework_binding_rejects_keyword_expansion_collision(
+    tmp_path: Path,
+    framework: str,
+) -> None:
+    _fixture(tmp_path, framework)
+    app = tmp_path / "app.py"
+    if framework == "gradio":
+        app.write_text(
+            app.read_text(encoding="utf-8").replace(
+                "gr.Blocks(css=_SZL_UNIVERSAL_CSS)",
+                "gr.Blocks(css=_SZL_UNIVERSAL_CSS, **{'css': ''})",
+            ),
+            encoding="utf-8",
+        )
+    else:
+        app.write_text(
+            app.read_text(encoding="utf-8").replace(
+                "unsafe_allow_html=True)",
+                "unsafe_allow_html=True, **{'unsafe_allow_html': False})",
+            ),
+            encoding="utf-8",
+        )
+    manifest_path, payload = _manifest(tmp_path)
+    payload["file_sha256"]["app.py"] = _sha(app)
+    manifest_path.write_text(json.dumps(payload), encoding="utf-8")
+    with pytest.raises(MODULE.ContractError, match="CSS binding is absent"):
         MODULE.validate(tmp_path, Path("docs/hf-universal-frontend-v1.json"))
 
 
