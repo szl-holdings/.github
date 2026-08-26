@@ -57,6 +57,13 @@ class ContractError(RuntimeError):
 class _StaticDocumentParser(HTMLParser):
     _INERT_CONTAINERS = frozenset({"noscript", "template"})
     _FOREIGN_CONTAINERS = frozenset({"math", "svg"})
+    _SVG_HTML_INTEGRATION_POINTS = frozenset({"desc", "foreignobject", "title"})
+    _MATHML_TEXT_INTEGRATION_POINTS = frozenset(
+        {"mi", "mn", "mo", "ms", "mtext"}
+    )
+    _MATHML_HTML_ENCODINGS = frozenset(
+        {"application/xhtml+xml", "text/html"}
+    )
 
     def __init__(self) -> None:
         super().__init__(convert_charrefs=True)
@@ -68,6 +75,8 @@ class _StaticDocumentParser(HTMLParser):
         self.stylesheet_links: list[dict[str, str]] = []
         self._inert_stack: list[str] = []
         self._foreign_stack: list[str] = []
+        self._foreign_html_integration_stack: list[tuple[str, int]] = []
+        self._foreign_html_integration_shadow_depths: list[int] = []
 
     @property
     def has_unclosed_inert_container(self) -> bool:
@@ -76,6 +85,44 @@ class _StaticDocumentParser(HTMLParser):
     @property
     def has_unclosed_foreign_container(self) -> bool:
         return bool(self._foreign_stack)
+
+    @property
+    def has_unclosed_foreign_integration_point(self) -> bool:
+        return bool(self._foreign_html_integration_stack)
+
+    @property
+    def _in_foreign_html_integration_point(self) -> bool:
+        return bool(self._foreign_html_integration_stack) and len(
+            self._foreign_stack
+        ) == self._foreign_html_integration_stack[-1][1]
+
+    @classmethod
+    def _starts_foreign_html_integration_point(
+        cls,
+        namespace: str,
+        tag: str,
+        attrs: list[tuple[str, str | None]],
+    ) -> bool:
+        if namespace == "svg":
+            return tag in cls._SVG_HTML_INTEGRATION_POINTS
+        if namespace != "math":
+            return False
+        if tag in cls._MATHML_TEXT_INTEGRATION_POINTS:
+            return True
+        if tag != "annotation-xml":
+            return False
+        encodings = [
+            "" if value is None else str(value)
+            for name, value in attrs
+            if str(name).casefold() == "encoding"
+        ]
+        return (
+            len(encodings) == 1
+            and encodings[0]
+            .strip(HTML_ASCII_WHITESPACE)
+            .casefold()
+            in cls._MATHML_HTML_ENCODINGS
+        )
 
     def handle_starttag(
         self,
@@ -86,16 +133,42 @@ class _StaticDocumentParser(HTMLParser):
         has_author_style = normalized_tag == "style" or any(
             str(name).casefold() == "style" for name, _ in attrs
         )
+        if self._inert_stack:
+            if normalized_tag in self._INERT_CONTAINERS:
+                self._inert_stack.append(normalized_tag)
+            return
+        if self._in_foreign_html_integration_point:
+            integration_tag = self._foreign_html_integration_stack[-1][0]
+            if normalized_tag in self._INERT_CONTAINERS:
+                self._inert_stack.append(normalized_tag)
+                return
+            if has_author_style:
+                self.has_author_style = True
+            if normalized_tag in self._FOREIGN_CONTAINERS:
+                self._foreign_stack.append(normalized_tag)
+                return
+            if normalized_tag == integration_tag:
+                self._foreign_html_integration_shadow_depths[-1] += 1
+            self._record(tag, attrs)
+            return
         if self._foreign_stack:
             if has_author_style:
                 self.has_author_style = True
+            if self._starts_foreign_html_integration_point(
+                self._foreign_stack[-1],
+                normalized_tag,
+                attrs,
+            ):
+                self._foreign_html_integration_stack.append(
+                    (normalized_tag, len(self._foreign_stack))
+                )
+                self._foreign_html_integration_shadow_depths.append(0)
+                return
             if normalized_tag in self._FOREIGN_CONTAINERS:
                 self._foreign_stack.append(normalized_tag)
             return
         if normalized_tag in self._INERT_CONTAINERS:
             self._inert_stack.append(normalized_tag)
-            return
-        if self._inert_stack:
             return
         if has_author_style:
             self.has_author_style = True
@@ -113,6 +186,17 @@ class _StaticDocumentParser(HTMLParser):
         has_author_style = normalized_tag == "style" or any(
             str(name).casefold() == "style" for name, _ in attrs
         )
+        if self._inert_stack:
+            return
+        if self._in_foreign_html_integration_point:
+            if normalized_tag in self._INERT_CONTAINERS:
+                raise ContractError(
+                    f"Static application contains self-closing <{normalized_tag}>"
+                )
+            if has_author_style:
+                self.has_author_style = True
+            self._record(tag, attrs)
+            return
         if self._foreign_stack:
             if has_author_style:
                 self.has_author_style = True
@@ -121,14 +205,32 @@ class _StaticDocumentParser(HTMLParser):
             raise ContractError(
                 f"Static application contains self-closing <{normalized_tag}>"
             )
-        if self._inert_stack:
-            return
         if has_author_style:
             self.has_author_style = True
         self._record(tag, attrs)
 
     def handle_endtag(self, tag: str) -> None:
         normalized_tag = tag.casefold()
+        if self._inert_stack:
+            if normalized_tag not in self._INERT_CONTAINERS:
+                return
+            expected = self._inert_stack[-1]
+            if normalized_tag != expected:
+                raise ContractError(
+                    "Static application contains mismatched inert containers: "
+                    f"expected </{expected}>, received </{normalized_tag}>"
+                )
+            self._inert_stack.pop()
+            return
+        if self._in_foreign_html_integration_point:
+            integration_tag = self._foreign_html_integration_stack[-1][0]
+            if normalized_tag == integration_tag:
+                if self._foreign_html_integration_shadow_depths[-1]:
+                    self._foreign_html_integration_shadow_depths[-1] -= 1
+                else:
+                    self._foreign_html_integration_stack.pop()
+                    self._foreign_html_integration_shadow_depths.pop()
+            return
         if self._foreign_stack:
             if normalized_tag in self._FOREIGN_CONTAINERS:
                 expected = self._foreign_stack[-1]
@@ -139,15 +241,6 @@ class _StaticDocumentParser(HTMLParser):
                     )
                 self._foreign_stack.pop()
             return
-        if not self._inert_stack or normalized_tag not in self._INERT_CONTAINERS:
-            return
-        expected = self._inert_stack[-1]
-        if normalized_tag != expected:
-            raise ContractError(
-                "Static application contains mismatched inert containers: "
-                f"expected </{expected}>, received </{normalized_tag}>"
-            )
-        self._inert_stack.pop()
 
     def _record(
         self,
@@ -1764,6 +1857,10 @@ def validate_framework_binding(
             raise ContractError("Static application contains an unclosed inert container")
         if parser.has_unclosed_foreign_container:
             raise ContractError("Static application contains an unclosed foreign container")
+        if parser.has_unclosed_foreign_integration_point:
+            raise ContractError(
+                "Static application contains an unclosed foreign HTML integration point"
+            )
         if not parser.viewport_contents:
             raise ContractError("Static viewport metadata is absent")
         if len(parser.viewport_contents) != 1:

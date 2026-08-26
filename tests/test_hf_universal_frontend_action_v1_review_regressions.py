@@ -65,6 +65,11 @@ def _static_document(
             '<math><mrow style="width:200vw"></mrow></math>',
             "",
         ),
+        (
+            "<svg><foreignObject><div "
+            'style="width:200vw"></div></foreignObject></svg>',
+            "",
+        ),
     ],
     ids=[
         "style-element",
@@ -73,6 +78,7 @@ def _static_document(
         "svg-style-attribute",
         "svg-style-element",
         "mathml-style-attribute",
+        "foreign-object-style-attribute",
     ],
 )
 def test_static_rejects_unaudited_author_styles(
@@ -130,3 +136,61 @@ if runtime_condition:
     )
 
     assert not CHECKER._statements_fall_through(tree.body)
+
+
+@pytest.mark.parametrize(
+    "foreign_markup",
+    [
+        (
+            "<svg><foreignObject><template><style>"
+            "html { width: 200vw; }"
+            "</style></template></foreignObject></svg>"
+        ),
+        (
+            "<svg><desc><template><style>"
+            "html { width: 200vw; }"
+            "</style></template></desc></svg>"
+        ),
+        (
+            "<math><mtext><template><style>"
+            "html { width: 200vw; }"
+            "</style></template></mtext></math>"
+        ),
+        (
+            '<math><annotation-xml encoding="text/html"><template><style>'
+            "html { width: 200vw; }"
+            "</style></template></annotation-xml></math>"
+        ),
+    ],
+    ids=[
+        "svg-foreign-object",
+        "svg-description",
+        "mathml-text",
+        "mathml-annotation",
+    ],
+)
+def test_static_ignores_inert_templates_at_foreign_html_integration_points(
+    foreign_markup: str,
+) -> None:
+    CHECKER.validate_framework_binding(
+        "static",
+        _static_document(extra_head=foreign_markup),
+        app_file="index.html",
+        css_file="assets/universal.css",
+    )
+
+
+def test_static_does_not_treat_raw_svg_template_as_html_inert() -> None:
+    with pytest.raises(CHECKER.ContractError, match="author styles"):
+        CHECKER.validate_framework_binding(
+            "static",
+            _static_document(
+                extra_head=(
+                    "<svg><template><style>"
+                    "html { width: 200vw; }"
+                    "</style></template></svg>"
+                )
+            ),
+            app_file="index.html",
+            css_file="assets/universal.css",
+        )
