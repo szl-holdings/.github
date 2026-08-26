@@ -126,6 +126,40 @@ class _StaticDocumentParser(HTMLParser):
     )
     _FOREIGN_BREAKOUT_END_TAGS = frozenset({"br", "p"})
     _FOREIGN_BREAKOUT_FONT_ATTRIBUTES = frozenset({"color", "face", "size"})
+    _VALID_BUILTIN_SHADOW_HOST_NAMES = frozenset(
+        {
+            "article",
+            "aside",
+            "blockquote",
+            "body",
+            "div",
+            "footer",
+            "h1",
+            "h2",
+            "h3",
+            "h4",
+            "h5",
+            "h6",
+            "header",
+            "main",
+            "nav",
+            "p",
+            "section",
+            "span",
+        }
+    )
+    _RESERVED_CUSTOM_ELEMENT_NAMES = frozenset(
+        {
+            "annotation-xml",
+            "color-profile",
+            "font-face",
+            "font-face-format",
+            "font-face-name",
+            "font-face-src",
+            "font-face-uri",
+            "missing-glyph",
+        }
+    )
     _SVG_HTML_INTEGRATION_POINTS = frozenset({"desc", "foreignobject", "title"})
     _MATHML_TEXT_INTEGRATION_POINTS = frozenset(
         {"mi", "mn", "mo", "ms", "mtext"}
@@ -144,6 +178,7 @@ class _StaticDocumentParser(HTMLParser):
         self.author_stylesheet_links: list[dict[str, str]] = []
         self.stylesheet_links: list[dict[str, str]] = []
         self._inert_stack: list[str] = []
+        self._html_element_stack: list[str] = []
         self._foreign_tree_stack: list[tuple[str, str, str | None]] = []
 
     @property
@@ -162,6 +197,67 @@ class _StaticDocumentParser(HTMLParser):
         return tag == "style" or any(
             str(name).casefold() == "style" for name, _ in attrs
         )
+
+    @classmethod
+    def _is_valid_custom_element_name(cls, name: str) -> bool:
+        if (
+            not name
+            or not ("a" <= name[0] <= "z")
+            or "-" not in name
+            or name in cls._RESERVED_CUSTOM_ELEMENT_NAMES
+        ):
+            return False
+        for character in name[1:]:
+            codepoint = ord(character)
+            if (
+                character in {"-", ".", "_"}
+                or "0" <= character <= "9"
+                or "a" <= character <= "z"
+                or codepoint == 0x00B7
+                or 0x00C0 <= codepoint <= 0x00D6
+                or 0x00D8 <= codepoint <= 0x00F6
+                or 0x00F8 <= codepoint <= 0x037D
+                or 0x037F <= codepoint <= 0x1FFF
+                or 0x200C <= codepoint <= 0x200D
+                or 0x203F <= codepoint <= 0x2040
+                or 0x2070 <= codepoint <= 0x218F
+                or 0x2C00 <= codepoint <= 0x2FEF
+                or 0x3001 <= codepoint <= 0xD7FF
+                or 0xF900 <= codepoint <= 0xFDCF
+                or 0xFDF0 <= codepoint <= 0xFFFD
+                or 0x10000 <= codepoint <= 0xEFFFF
+            ):
+                continue
+            return False
+        return True
+
+    @classmethod
+    def _is_valid_shadow_host_name(cls, name: str | None) -> bool:
+        return name is not None and (
+            name in cls._VALID_BUILTIN_SHADOW_HOST_NAMES
+            or cls._is_valid_custom_element_name(name)
+        )
+
+    @staticmethod
+    def _shadowroot_mode(
+        attrs: list[tuple[str, str | None]],
+    ) -> str | None:
+        for name, value in attrs:
+            if str(name).casefold() != "shadowrootmode":
+                continue
+            mode = "" if value is None else str(value).casefold()
+            if mode in {"closed", "open"}:
+                return mode
+            return None
+        return None
+
+    def _current_html_parent_name(self) -> str | None:
+        if self._foreign_tree_stack:
+            tag, namespace, _ = self._foreign_tree_stack[-1]
+            return tag if namespace == "html" else None
+        if self._html_element_stack:
+            return self._html_element_stack[-1]
+        return None
 
     @classmethod
     def _is_foreign_breakout_start_tag(
@@ -263,9 +359,12 @@ class _StaticDocumentParser(HTMLParser):
             namespace == "html"
             and normalized_tag in self._INERT_CONTAINERS
         ):
-            if normalized_tag == "template" and any(
-                str(name).casefold() == "shadowrootmode"
-                for name, _ in attrs
+            if (
+                normalized_tag == "template"
+                and self._shadowroot_mode(attrs) is not None
+                and self._is_valid_shadow_host_name(
+                    self._current_html_parent_name()
+                )
             ):
                 raise ContractError(
                     "Static application may not use a declarative shadow root template"
@@ -279,6 +378,8 @@ class _StaticDocumentParser(HTMLParser):
             self._record(tag, attrs)
 
         if not self._foreign_tree_stack and namespace == "html":
+            if normalized_tag not in self._HTML_VOID_ELEMENTS:
+                self._html_element_stack.append(normalized_tag)
             return
         if (
             namespace == "html"
@@ -314,6 +415,21 @@ class _StaticDocumentParser(HTMLParser):
             self.has_author_style = True
         if namespace == "html":
             self._record(tag, attrs)
+            if normalized_tag not in self._HTML_VOID_ELEMENTS:
+                if self._foreign_tree_stack:
+                    self._foreign_tree_stack.append(
+                        (
+                            normalized_tag,
+                            namespace,
+                            self._integration_kind(
+                                namespace,
+                                normalized_tag,
+                                attrs,
+                            ),
+                        )
+                    )
+                else:
+                    self._html_element_stack.append(normalized_tag)
 
     def handle_endtag(self, tag: str) -> None:
         normalized_tag = tag.casefold()
@@ -330,6 +446,10 @@ class _StaticDocumentParser(HTMLParser):
             return
 
         if not self._foreign_tree_stack:
+            for index in range(len(self._html_element_stack) - 1, -1, -1):
+                if self._html_element_stack[index] == normalized_tag:
+                    del self._html_element_stack[index:]
+                    break
             return
         if (
             self._foreign_tree_stack[-1][1] != "html"

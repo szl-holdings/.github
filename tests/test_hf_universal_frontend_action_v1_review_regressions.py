@@ -336,3 +336,52 @@ def test_static_audits_author_styles_inside_noscript(
             app_file="index.html",
             css_file="assets/universal.css",
         )
+
+
+def test_static_leaves_direct_noscript_shadow_template_inert() -> None:
+    CHECKER.validate_framework_binding(
+        "static",
+        _static_document(
+            body_contents=(
+                "<noscript><template shadowrootmode=\"open\">"
+                "<style>:host { overflow-x: auto !important; }</style>"
+                "</template></noscript>"
+            )
+        ),
+        app_file="index.html",
+        css_file="assets/universal.css",
+    )
+
+
+def test_static_leaves_invalid_mode_shadow_template_inert() -> None:
+    CHECKER.validate_framework_binding(
+        "static",
+        _static_document(
+            body_contents=(
+                "<div><template shadowrootmode=\"invalid\">"
+                "<style>:host { overflow-x: auto !important; }</style>"
+                "</template></div>"
+            )
+        ),
+        app_file="index.html",
+        css_file="assets/universal.css",
+    )
+
+
+def test_static_rejects_custom_element_declarative_shadow_root() -> None:
+    with pytest.raises(
+        CHECKER.ContractError,
+        match="declarative shadow root template",
+    ):
+        CHECKER.validate_framework_binding(
+            "static",
+            _static_document(
+                body_contents=(
+                    "<szl-host><template shadowrootmode=\"open\">"
+                    "<style>:host { overflow-x: auto !important; }</style>"
+                    "</template></szl-host>"
+                )
+            ),
+            app_file="index.html",
+            css_file="assets/universal.css",
+        )
