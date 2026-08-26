@@ -295,3 +295,44 @@ def test_static_rejects_declarative_shadow_root_templates(mode: str) -> None:
             app_file="index.html",
             css_file="assets/universal.css",
         )
+
+
+def test_static_audits_declarative_shadow_roots_inside_noscript() -> None:
+    with pytest.raises(
+        CHECKER.ContractError,
+        match="declarative shadow root template",
+    ):
+        CHECKER.validate_framework_binding(
+            "static",
+            _static_document(
+                body_contents=(
+                    "<noscript><div><template shadowrootmode=\"open\">"
+                    "<style>:host { overflow-x: auto !important; }</style>"
+                    "</template></div></noscript>"
+                )
+            ),
+            app_file="index.html",
+            css_file="assets/universal.css",
+        )
+
+
+@pytest.mark.parametrize(
+    "noscript_contents",
+    [
+        "<style>html { overflow-x: auto !important; }</style>",
+        '<link rel="stylesheet" href="./override.css">',
+    ],
+    ids=["style-element", "stylesheet-link"],
+)
+def test_static_audits_author_styles_inside_noscript(
+    noscript_contents: str,
+) -> None:
+    with pytest.raises(CHECKER.ContractError, match="author styles"):
+        CHECKER.validate_framework_binding(
+            "static",
+            _static_document(
+                body_contents=f"<noscript>{noscript_contents}</noscript>"
+            ),
+            app_file="index.html",
+            css_file="assets/universal.css",
+        )

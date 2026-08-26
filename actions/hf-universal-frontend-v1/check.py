@@ -55,7 +55,8 @@ class ContractError(RuntimeError):
 
 
 class _StaticDocumentParser(HTMLParser):
-    _INERT_CONTAINERS = frozenset({"noscript", "template"})
+    _INERT_CONTAINERS = frozenset({"template"})
+    _INERT_NESTING_CONTAINERS = frozenset({"noscript", "template"})
     _FOREIGN_CONTAINERS = frozenset({"math", "svg"})
     _HTML_VOID_ELEMENTS = frozenset(
         {
@@ -253,7 +254,7 @@ class _StaticDocumentParser(HTMLParser):
     ) -> None:
         normalized_tag = tag.casefold()
         if self._inert_stack:
-            if normalized_tag in self._INERT_CONTAINERS:
+            if normalized_tag in self._INERT_NESTING_CONTAINERS:
                 self._inert_stack.append(normalized_tag)
             return
 
@@ -317,7 +318,7 @@ class _StaticDocumentParser(HTMLParser):
     def handle_endtag(self, tag: str) -> None:
         normalized_tag = tag.casefold()
         if self._inert_stack:
-            if normalized_tag not in self._INERT_CONTAINERS:
+            if normalized_tag not in self._INERT_NESTING_CONTAINERS:
                 return
             expected = self._inert_stack[-1]
             if normalized_tag != expected:
