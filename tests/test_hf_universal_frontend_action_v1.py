@@ -497,6 +497,57 @@ def test_impossible_css_selectors_cannot_satisfy_controls(
         MODULE.validate(tmp_path, Path("docs/hf-universal-frontend-v1.json"))
 
 
+@pytest.mark.parametrize(
+    "reset_rule",
+    [
+        "* { overflow: auto !important; }",
+        "* { all: initial !important; }",
+        "* { animation: spin 1s linear infinite !important; }",
+    ],
+)
+def test_controlled_css_shorthand_reset_is_rejected(
+    tmp_path: Path,
+    reset_rule: str,
+) -> None:
+    _fixture(tmp_path)
+    css = tmp_path / "szl-universal-frontend.css"
+    css.write_text(CSS + "\n" + reset_rule + "\n", encoding="utf-8")
+    manifest_path, payload = _manifest(tmp_path)
+    payload["file_sha256"]["szl-universal-frontend.css"] = _sha(css)
+    manifest_path.write_text(json.dumps(payload), encoding="utf-8")
+    with pytest.raises(MODULE.ContractError, match="missing required active tokens"):
+        MODULE.validate(tmp_path, Path("docs/hf-universal-frontend-v1.json"))
+
+
+def test_safe_overflow_shorthand_preserves_control(tmp_path: Path) -> None:
+    _fixture(tmp_path)
+    css = tmp_path / "szl-universal-frontend.css"
+    css.write_text(CSS + "\n* { overflow: clip; }\n", encoding="utf-8")
+    manifest_path, payload = _manifest(tmp_path)
+    payload["file_sha256"]["szl-universal-frontend.css"] = _sha(css)
+    manifest_path.write_text(json.dumps(payload), encoding="utf-8")
+    assert MODULE.validate(
+        tmp_path,
+        Path("docs/hf-universal-frontend-v1.json"),
+    )["status"] == "PASS"
+
+
+def test_unclosed_css_component_value_cannot_supply_controls(
+    tmp_path: Path,
+) -> None:
+    _fixture(tmp_path)
+    css = tmp_path / "szl-universal-frontend.css"
+    css.write_text(
+        CSS.replace("* {\n", "* {\n  bogus: func(;\n", 1),
+        encoding="utf-8",
+    )
+    manifest_path, payload = _manifest(tmp_path)
+    payload["file_sha256"]["szl-universal-frontend.css"] = _sha(css)
+    manifest_path.write_text(json.dumps(payload), encoding="utf-8")
+    with pytest.raises(MODULE.ContractError, match="unclosed component value"):
+        MODULE.validate(tmp_path, Path("docs/hf-universal-frontend-v1.json"))
+
+
 def test_reduced_motion_media_requires_an_active_control(tmp_path: Path) -> None:
     _fixture(tmp_path)
     css = tmp_path / "szl-universal-frontend.css"
@@ -908,6 +959,33 @@ def test_python_framework_must_apply_declared_css(
     payload["file_sha256"]["app.py"] = _sha(app)
     manifest_path.write_text(json.dumps(payload), encoding="utf-8")
     with pytest.raises(MODULE.ContractError, match=message):
+        MODULE.validate(tmp_path, Path("docs/hf-universal-frontend-v1.json"))
+
+
+@pytest.mark.parametrize("framework", ["gradio", "streamlit"])
+def test_python_binding_after_top_level_loop_is_rejected(
+    tmp_path: Path,
+    framework: str,
+) -> None:
+    _fixture(tmp_path, framework)
+    app = tmp_path / "app.py"
+    binding = (
+        "demo = gr.Blocks(css=_SZL_UNIVERSAL_CSS)"
+        if framework == "gradio"
+        else "st.markdown("
+    )
+    app.write_text(
+        app.read_text(encoding="utf-8").replace(
+            binding,
+            "while True:\n    pass\n" + binding,
+            1,
+        ),
+        encoding="utf-8",
+    )
+    manifest_path, payload = _manifest(tmp_path)
+    payload["file_sha256"]["app.py"] = _sha(app)
+    manifest_path.write_text(json.dumps(payload), encoding="utf-8")
+    with pytest.raises(MODULE.ContractError, match="CSS binding is absent"):
         MODULE.validate(tmp_path, Path("docs/hf-universal-frontend-v1.json"))
 
 

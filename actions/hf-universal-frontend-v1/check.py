@@ -454,6 +454,53 @@ def _decode_css_identifier(identifier: str) -> str:
     return "".join(decoded)
 
 
+def _split_css_component_level(
+    text: str,
+    delimiter: str,
+    *,
+    maxsplit: int | None = None,
+) -> list[str]:
+    if len(delimiter) != 1:
+        raise ValueError("CSS component delimiter must be one character")
+    pairs = {"(": ")", "[": "]"}
+    closers = set(pairs.values())
+    stack: list[str] = []
+    parts: list[str] = []
+    start = 0
+    cursor = 0
+    splits = 0
+    while cursor < len(text):
+        character = text[cursor]
+        if character == "\\":
+            if cursor + 1 >= len(text):
+                raise ContractError(
+                    "universal CSS contains an invalid component-value escape"
+                )
+            cursor += 2
+            continue
+        if character in pairs:
+            stack.append(pairs[character])
+        elif character in closers:
+            if not stack or character != stack[-1]:
+                raise ContractError(
+                    "universal CSS contains mismatched component-value nesting"
+                )
+            stack.pop()
+        elif (
+            character == delimiter
+            and not stack
+            and (maxsplit is None or splits < maxsplit)
+        ):
+            parts.append(text[start:cursor])
+            start = cursor + 1
+            splits += 1
+        cursor += 1
+    if stack:
+        raise ContractError("universal CSS contains an unclosed component value")
+    parts.append(text[start:])
+    return parts
+
+
 def _css_declarations(rule_body: str) -> list[tuple[str, str, bool]]:
     """Parse declarations at the current rule level, ignoring nested rules."""
     flattened: list[str] = []
@@ -475,10 +522,11 @@ def _css_declarations(rule_body: str) -> list[tuple[str, str, bool]]:
         raise ContractError("universal CSS contains an unclosed nested rule")
 
     declarations: list[tuple[str, str, bool]] = []
-    for declaration in "".join(flattened).split(";"):
-        if ":" not in declaration:
+    for declaration in _split_css_component_level("".join(flattened), ";"):
+        components = _split_css_component_level(declaration, ":", maxsplit=1)
+        if len(components) != 2:
             continue
-        property_name, value = declaration.split(":", 1)
+        property_name, value = components
         normalized_property = _decode_css_identifier(
             property_name.strip(CSS_WHITESPACE)
         )
@@ -510,8 +558,34 @@ def _css_declarations(rule_body: str) -> list[tuple[str, str, bool]]:
             "",
             normalized_value,
         ).rstrip(CSS_WHITESPACE)
-        if normalized_property and normalized_value:
-            declarations.append((normalized_property, normalized_value, important))
+        if not normalized_property or not normalized_value:
+            continue
+        declarations.append((normalized_property, normalized_value, important))
+        if normalized_property == "overflow":
+            overflow_x = normalized_value.split(" ", 1)[0]
+            declarations.append(("overflow-x", overflow_x, important))
+        elif normalized_property == "all":
+            reset_value = f"__all_reset__:{normalized_value}"
+            for controlled_property in (
+                "animation",
+                "animation-duration",
+                "overflow-wrap",
+                "overflow-x",
+                "scroll-behavior",
+                "transition",
+                "transition-duration",
+            ):
+                declarations.append(
+                    (controlled_property, reset_value, important)
+                )
+        elif normalized_property in {"animation", "transition"}:
+            duration_property = f"{normalized_property}-duration"
+            duration_value = (
+                "0s"
+                if normalized_value == "none"
+                else f"__{normalized_property}_reset__:{normalized_value}"
+            )
+            declarations.append((duration_property, duration_value, important))
     return declarations
 
 
@@ -990,9 +1064,17 @@ def _literal_truth_value(expression: ast.AST) -> bool | None:
     return None
 
 
+def _loop_is_fallthrough_barrier(statement: ast.stmt) -> bool:
+    if isinstance(statement, ast.While):
+        return _literal_truth_value(statement.test) is not False
+    return isinstance(statement, (ast.For, ast.AsyncFor))
+
+
 def _statements_fall_through(statements: list[ast.stmt]) -> bool:
     for statement in statements:
         if isinstance(statement, (ast.Raise, ast.Return, ast.Break, ast.Continue)):
+            return False
+        if _loop_is_fallthrough_barrier(statement):
             return False
         if (
             isinstance(statement, ast.Assert)
@@ -1037,6 +1119,8 @@ def _direct_top_level_calls(tree: ast.Module) -> list[ast.Call]:
         """Collect calls until control can no longer reach the next statement."""
         for statement in statements:
             if isinstance(statement, (ast.Raise, ast.Return, ast.Break, ast.Continue)):
+                return False
+            if _loop_is_fallthrough_barrier(statement):
                 return False
             if (
                 isinstance(statement, ast.Assert)
