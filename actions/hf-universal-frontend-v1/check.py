@@ -61,7 +61,10 @@ class _StaticDocumentParser(HTMLParser):
     def __init__(self) -> None:
         super().__init__(convert_charrefs=True)
         self.has_viewport = False
+        self.viewport_contents: list[str] = []
         self.has_base = False
+        self.has_author_style = False
+        self.author_stylesheet_links: list[dict[str, str]] = []
         self.stylesheet_links: list[dict[str, str]] = []
         self._inert_stack: list[str] = []
         self._foreign_stack: list[str] = []
@@ -146,16 +149,32 @@ class _StaticDocumentParser(HTMLParser):
                 continue
             values[key] = "" if value is None else str(value)
         normalized_tag = tag.casefold()
+        if "style" in values or normalized_tag == "style":
+            self.has_author_style = True
         if normalized_tag == "base":
             self.has_base = True
             return
-        if normalized_tag == "meta" and values.get("name", "").casefold() == "viewport":
+        if (
+            normalized_tag == "meta"
+            and values.get("name", "")
+            .strip(HTML_ASCII_WHITESPACE)
+            .casefold()
+            == "viewport"
+        ):
+            ambiguous_viewport = sorted(duplicates & {"name", "content"})
+            if ambiguous_viewport:
+                raise ContractError(
+                    "Static viewport metadata contains duplicate controlled attributes: "
+                    + ", ".join(ambiguous_viewport)
+                )
             self.has_viewport = True
+            self.viewport_contents.append(values.get("content", ""))
         if normalized_tag != "link":
             return
         security_attributes = {
             "rel",
             "href",
+            "integrity",
             "data-szl-universal-frontend",
             "disabled",
             "media",
@@ -173,7 +192,10 @@ class _StaticDocumentParser(HTMLParser):
             for token in re.split(r"[ \t\n\f\r]+", rel_value)
             if token
         }
-        if "stylesheet" not in rel_tokens or "alternate" in rel_tokens:
+        if "stylesheet" not in rel_tokens:
+            return
+        self.author_stylesheet_links.append(values)
+        if "alternate" in rel_tokens:
             return
         if "disabled" in values:
             return
@@ -187,6 +209,23 @@ class _StaticDocumentParser(HTMLParser):
         if content_type not in {"", "text/css"}:
             return
         self.stylesheet_links.append(values)
+
+
+def _valid_static_viewport_content(content: str) -> bool:
+    directives: dict[str, str] = {}
+    for raw_directive in content.split(","):
+        directive = raw_directive.strip(HTML_ASCII_WHITESPACE)
+        match = re.fullmatch(
+            r"([A-Za-z][A-Za-z0-9-]*)[ \t\n\f\r]*=[ \t\n\f\r]*([^ \t\n\f\r,]+)",
+            directive,
+        )
+        if match is None:
+            return False
+        name = match.group(1).casefold()
+        if name in directives:
+            return False
+        directives[name] = match.group(2).casefold()
+    return directives.get("width") == "device-width"
 
 
 def sha256(path: Path) -> str:
@@ -1151,7 +1190,7 @@ def _statements_fall_through(statements: list[ast.stmt]) -> bool:
                 if statement.orelse
                 else True
             )
-            branch_falls_through = body_falls_through or else_falls_through
+            branch_falls_through = body_falls_through and else_falls_through
         if not branch_falls_through:
             return False
     return True
@@ -1711,14 +1750,34 @@ def validate_framework_binding(
             raise ContractError("Static application contains an unclosed inert container")
         if parser.has_unclosed_foreign_container:
             raise ContractError("Static application contains an unclosed foreign container")
-        if not parser.has_viewport:
+        if not parser.viewport_contents:
             raise ContractError("Static viewport metadata is absent")
+        if len(parser.viewport_contents) != 1:
+            raise ContractError(
+                "Static application must contain exactly one viewport meta element"
+            )
+        if not _valid_static_viewport_content(parser.viewport_contents[0]):
+            raise ContractError(
+                "Static viewport metadata must contain one supported width=device-width directive"
+            )
         if parser.has_base:
             raise ContractError(
                 "Static application may not override repository-local URL resolution with <base>"
             )
+        if parser.has_author_style:
+            raise ContractError(
+                "Static application contains unaudited author styles; use only the universal stylesheet link"
+            )
+        if len(parser.author_stylesheet_links) != 1:
+            raise ContractError(
+                "Static universal CSS requires exactly one stylesheet <link>; additional author styles are not allowed"
+            )
         expected_css = posixpath.normpath(css_file)
         for link in parser.stylesheet_links:
+            if "integrity" in link:
+                raise ContractError(
+                    "Static universal stylesheet link may not use integrity metadata"
+                )
             if link.get("data-szl-universal-frontend") != "v1":
                 continue
             href = link.get("href", "")
