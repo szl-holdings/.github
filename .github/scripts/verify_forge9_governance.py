@@ -211,6 +211,13 @@ def app_token_permission_blocks(relative: str) -> list[dict[str, str]]:
             "workflow inventory requires literal nodes"
         )
 
+    # Count every structural action reference before parsing block-style steps.
+    # Unsupported flow mappings and folded scalars must fail closed instead of
+    # silently disappearing from the exact permission inventory.
+    structural_action_mentions = sum(
+        APP_TOKEN_ACTION_PREFIX in yaml_unquoted_syntax(line) for line in lines
+    )
+
     blocks: list[dict[str, str]] = []
     permission_line = re.compile(r"^(permission-[a-z0-9-]+):\s*(.*)$")
     for action_index, line in enumerate(lines):
@@ -267,6 +274,12 @@ def app_token_permission_blocks(relative: str) -> list[dict[str, str]]:
                 fail(f"{relative} App-token step repeats {key}")
             permissions[key] = value
         blocks.append(permissions)
+
+    if len(blocks) != structural_action_mentions:
+        fail(
+            f"{relative} contains an App-token action in an unsupported YAML "
+            "representation; use one literal block-style step"
+        )
     return blocks
 
 
