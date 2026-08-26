@@ -83,7 +83,12 @@ class _StaticDocumentParser(HTMLParser):
         attrs: list[tuple[str, str | None]],
     ) -> None:
         normalized_tag = tag.casefold()
+        has_author_style = normalized_tag == "style" or any(
+            str(name).casefold() == "style" for name, _ in attrs
+        )
         if self._foreign_stack:
+            if has_author_style:
+                self.has_author_style = True
             if normalized_tag in self._FOREIGN_CONTAINERS:
                 self._foreign_stack.append(normalized_tag)
             return
@@ -92,6 +97,8 @@ class _StaticDocumentParser(HTMLParser):
             return
         if self._inert_stack:
             return
+        if has_author_style:
+            self.has_author_style = True
         if normalized_tag in self._FOREIGN_CONTAINERS:
             self._foreign_stack.append(normalized_tag)
             return
@@ -103,7 +110,12 @@ class _StaticDocumentParser(HTMLParser):
         attrs: list[tuple[str, str | None]],
     ) -> None:
         normalized_tag = tag.casefold()
+        has_author_style = normalized_tag == "style" or any(
+            str(name).casefold() == "style" for name, _ in attrs
+        )
         if self._foreign_stack:
+            if has_author_style:
+                self.has_author_style = True
             return
         if normalized_tag in self._INERT_CONTAINERS:
             raise ContractError(
@@ -111,6 +123,8 @@ class _StaticDocumentParser(HTMLParser):
             )
         if self._inert_stack:
             return
+        if has_author_style:
+            self.has_author_style = True
         self._record(tag, attrs)
 
     def handle_endtag(self, tag: str) -> None:

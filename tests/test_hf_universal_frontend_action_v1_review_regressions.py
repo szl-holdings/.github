@@ -53,8 +53,27 @@ def _static_document(
         ),
         ('<link rel="stylesheet" href="./override.css">', ""),
         ("", ' style="overflow-x: auto !important"'),
+        (
+            '<svg style="overflow-x:auto!important;width:200vw"></svg>',
+            "",
+        ),
+        (
+            "<svg><style>svg { width: 200vw !important; }</style></svg>",
+            "",
+        ),
+        (
+            '<math><mrow style="width:200vw"></mrow></math>',
+            "",
+        ),
     ],
-    ids=["style-element", "second-stylesheet", "style-attribute"],
+    ids=[
+        "style-element",
+        "second-stylesheet",
+        "style-attribute",
+        "svg-style-attribute",
+        "svg-style-element",
+        "mathml-style-attribute",
+    ],
 )
 def test_static_rejects_unaudited_author_styles(
     extra_head: str,
