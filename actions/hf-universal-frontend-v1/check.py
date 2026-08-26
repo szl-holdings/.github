@@ -262,6 +262,13 @@ class _StaticDocumentParser(HTMLParser):
             namespace == "html"
             and normalized_tag in self._INERT_CONTAINERS
         ):
+            if normalized_tag == "template" and any(
+                str(name).casefold() == "shadowrootmode"
+                for name, _ in attrs
+            ):
+                raise ContractError(
+                    "Static application may not use a declarative shadow root template"
+                )
             self._inert_stack.append(normalized_tag)
             return
 

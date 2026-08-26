@@ -25,6 +25,7 @@ def _static_document(
     viewport: str = "width=device-width, initial-scale=1",
     extra_head: str = "",
     body_attributes: str = "",
+    body_contents: str = "",
     integrity: str = "",
 ) -> str:
     integrity_attribute = f' integrity="{integrity}"' if integrity else ""
@@ -39,7 +40,7 @@ def _static_document(
   >
   {extra_head}
 </head>
-<body{body_attributes}></body>
+<body{body_attributes}>{body_contents}</body>
 </html>
 """
 
@@ -270,6 +271,27 @@ def test_static_rejects_foreign_content_breakout_parse_errors(
         CHECKER.validate_framework_binding(
             "static",
             _static_document(extra_head=foreign_markup),
+            app_file="index.html",
+            css_file="assets/universal.css",
+        )
+
+
+@pytest.mark.parametrize("mode", ["open", "closed"])
+def test_static_rejects_declarative_shadow_root_templates(mode: str) -> None:
+    with pytest.raises(
+        CHECKER.ContractError,
+        match="declarative shadow root template",
+    ):
+        CHECKER.validate_framework_binding(
+            "static",
+            _static_document(
+                body_contents=(
+                    "<div><template "
+                    f'shadowrootmode="{mode}">'
+                    "<style>:host { overflow-x: auto !important; }</style>"
+                    "</template></div>"
+                )
+            ),
             app_file="index.html",
             css_file="assets/universal.css",
         )
