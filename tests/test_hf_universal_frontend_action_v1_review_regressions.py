@@ -385,3 +385,178 @@ def test_static_rejects_custom_element_declarative_shadow_root() -> None:
             app_file="index.html",
             css_file="assets/universal.css",
         )
+
+@pytest.mark.parametrize(
+    "override_rule",
+    [
+        "* { overflow-inline: auto !important; }",
+        "* { writing-mode: vertical-rl; overflow-block: auto !important; }",
+        r"* { overflow\2d inline: auto !important; }",
+    ],
+    ids=[
+        "inline-default-writing-mode",
+        "block-vertical-writing-mode",
+        "escaped-inline-property",
+    ],
+)
+def test_logical_overflow_cannot_override_physical_control(
+    override_rule: str,
+) -> None:
+    css = """
+:root { --szl-touch-target: 44px; }
+* { overflow-wrap: anywhere; overflow-x: clip; }
+@media (max-width: 560px) {
+  body { padding-inline: 0.5rem; }
+}
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: 0.01ms !important; }
+}
+"""
+    with pytest.raises(
+        CHECKER.ContractError,
+        match="logical overflow properties",
+    ):
+        CHECKER.validate_css(css + "\n" + override_rule + "\n")
+
+
+@pytest.mark.parametrize(
+    "app_text",
+    [
+        """<!doctype html>
+<html>
+<head>
+  <meta name="viewport" content="width=device-width">
+  <noscript>
+    <link
+      rel="stylesheet"
+      href="./assets/universal.css"
+      data-szl-universal-frontend="v1"
+    >
+  </noscript>
+</head>
+<body></body>
+</html>
+""",
+        """<!doctype html>
+<html>
+<head>
+  <meta name="viewport" content="width=device-width">
+</head>
+<body>
+  <noscript>
+    <link
+      rel="stylesheet"
+      href="./assets/universal.css"
+      data-szl-universal-frontend="v1"
+    >
+  </noscript>
+</body>
+</html>
+""",
+    ],
+    ids=["head-noscript", "body-noscript"],
+)
+def test_static_does_not_bind_managed_stylesheet_inside_noscript(
+    app_text: str,
+) -> None:
+    with pytest.raises(
+        CHECKER.ContractError,
+        match="stylesheet <link>",
+    ):
+        CHECKER.validate_framework_binding(
+            "static",
+            app_text,
+            app_file="index.html",
+            css_file="assets/universal.css",
+        )
+
+
+@pytest.mark.parametrize(
+    ("framework", "framework_import", "binding", "expected_error"),
+    [
+        (
+            "streamlit",
+            "import streamlit as ui",
+            'ui.markdown(f"<style>{css}</style>", unsafe_allow_html=True)',
+            "Streamlit universal CSS binding is absent",
+        ),
+        (
+            "gradio",
+            "import gradio as ui",
+            "demo = ui.Blocks(css=css)",
+            "Gradio universal CSS binding is absent",
+        ),
+    ],
+)
+def test_local_function_call_before_binding_fails_closed(
+    framework: str,
+    framework_import: str,
+    binding: str,
+    expected_error: str,
+) -> None:
+    app_text = f"""\
+# SZL_HF_UNIVERSAL_FRONTEND_V1
+from pathlib import Path
+{framework_import}
+
+css = Path("assets/universal.css").read_text(encoding="utf-8")
+
+def stop():
+    raise RuntimeError("stop")
+
+stop()
+{binding}
+"""
+
+    with pytest.raises(CHECKER.ContractError, match=expected_error):
+        CHECKER.validate_framework_binding(
+            framework,
+            app_text,
+            app_file="app.py",
+            css_file="assets/universal.css",
+        )
+
+
+def test_uncalled_local_function_does_not_block_streamlit_binding() -> None:
+    app_text = """\
+# SZL_HF_UNIVERSAL_FRONTEND_V1
+from pathlib import Path
+import streamlit as st
+
+css = Path("assets/universal.css").read_text(encoding="utf-8")
+
+def stop():
+    raise RuntimeError("stop")
+
+st.markdown(f"<style>{css}</style>", unsafe_allow_html=True)
+"""
+
+    CHECKER.validate_framework_binding(
+        "streamlit",
+        app_text,
+        app_file="app.py",
+        css_file="assets/universal.css",
+    )
+
+
+def test_local_function_call_after_streamlit_binding_preserves_binding() -> None:
+    app_text = """\
+# SZL_HF_UNIVERSAL_FRONTEND_V1
+from pathlib import Path
+import streamlit as st
+
+css = Path("assets/universal.css").read_text(encoding="utf-8")
+
+def stop():
+    raise RuntimeError("stop")
+
+st.markdown(f"<style>{css}</style>", unsafe_allow_html=True)
+stop()
+"""
+
+    CHECKER.validate_framework_binding(
+        "streamlit",
+        app_text,
+        app_file="app.py",
+        css_file="assets/universal.css",
+    )

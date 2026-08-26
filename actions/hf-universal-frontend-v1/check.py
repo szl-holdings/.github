@@ -39,6 +39,12 @@ CONTROLLED_CSS_PROPERTIES = frozenset(REQUIRED_CSS_DECLARATIONS) | frozenset(
         "transition-duration",
     }
 )
+UNSUPPORTED_LOGICAL_OVERFLOW_PROPERTIES = frozenset(
+    {
+        "overflow-block",
+        "overflow-inline",
+    }
+)
 REQUIRED_MEDIA_QUERIES = {
     "(max-width:560px)",
     "(prefers-reduced-motion:reduce)",
@@ -258,6 +264,14 @@ class _StaticDocumentParser(HTMLParser):
         if self._html_element_stack:
             return self._html_element_stack[-1]
         return None
+
+    def _has_html_noscript_ancestor(self) -> bool:
+        if "noscript" in self._html_element_stack:
+            return True
+        return any(
+            tag == "noscript" and namespace == "html"
+            for tag, namespace, _ in self._foreign_tree_stack
+        )
 
     @classmethod
     def _is_foreign_breakout_start_tag(
@@ -539,6 +553,8 @@ class _StaticDocumentParser(HTMLParser):
             return
         content_type = values.get("type", "").strip().casefold()
         if content_type not in {"", "text/css"}:
+            return
+        if self._has_html_noscript_ancestor():
             return
         self.stylesheet_links.append(values)
 
@@ -967,6 +983,11 @@ def _css_declarations(rule_body: str) -> list[tuple[str, str, bool]]:
         )
         if not normalized_property or not normalized_value:
             continue
+        if normalized_property in UNSUPPORTED_LOGICAL_OVERFLOW_PROPERTIES:
+            raise ContractError(
+                "universal CSS may not declare logical overflow properties: "
+                f"{normalized_property}"
+            )
         declarations.append((normalized_property, normalized_value, important))
         if normalized_property == "overflow":
             overflow_x = _overflow_x_from_shorthand(normalized_value)
@@ -1537,10 +1558,14 @@ def _direct_top_level_calls(tree: ast.Module) -> list[ast.Call]:
     entering the context and executing its body are unconditional module work.
     """
     calls: list[ast.Call] = []
+    local_function_names: set[str] = set()
 
     def collect(statements: list[ast.stmt]) -> bool:
         """Collect calls until control can no longer reach the next statement."""
         for statement in statements:
+            if isinstance(statement, ast.FunctionDef):
+                local_function_names.add(statement.name)
+                continue
             if isinstance(statement, (ast.Raise, ast.Return, ast.Break, ast.Continue)):
                 return False
             if _loop_is_fallthrough_barrier(statement):
@@ -1558,6 +1583,11 @@ def _direct_top_level_calls(tree: ast.Module) -> list[ast.Call]:
             elif isinstance(statement, ast.AnnAssign):
                 expression = statement.value
             if isinstance(expression, ast.Call):
+                if (
+                    isinstance(expression.func, ast.Name)
+                    and expression.func.id in local_function_names
+                ):
+                    return False
                 calls.append(expression)
                 continue
             if isinstance(statement, (ast.With, ast.AsyncWith)):
