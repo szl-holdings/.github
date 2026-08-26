@@ -3,7 +3,6 @@ from __future__ import annotations
 
 import argparse
 import ast
-import builtins
 import codecs
 import hashlib
 import io
@@ -1110,76 +1109,12 @@ def _loop_is_fallthrough_barrier(statement: ast.stmt) -> bool:
 TRY_STATEMENT_TYPES = (ast.Try, getattr(ast, "TryStar", ast.Try))
 
 
-def _named_builtin_exception(
-    expression: ast.expr,
-) -> type[BaseException] | None:
-    if not isinstance(expression, ast.Name):
-        return None
-    candidate = getattr(builtins, expression.id, None)
-    if (
-        isinstance(candidate, type)
-        and issubclass(candidate, BaseException)
-    ):
-        return candidate
-    return None
-
-
-def _first_statement_builtin_raise(
-    statements: list[ast.stmt],
-) -> type[BaseException] | None:
-    if not statements or not isinstance(statements[0], ast.Raise):
-        return None
-    expression = statements[0].exc
-    if isinstance(expression, ast.Call):
-        expression = expression.func
-    if expression is None:
-        return None
-    return _named_builtin_exception(expression)
-
-
-def _handler_catches_builtin_exception(
-    expression: ast.expr | None,
-    raised: type[BaseException],
-) -> bool | None:
-    if expression is None:
-        return True
-    candidates = expression.elts if isinstance(expression, ast.Tuple) else [expression]
-    exception_types: list[type[BaseException]] = []
-    for candidate_expression in candidates:
-        candidate = _named_builtin_exception(candidate_expression)
-        if candidate is None:
-            return None
-        exception_types.append(candidate)
-    return any(issubclass(raised, candidate) for candidate in exception_types)
-
-
 def _try_statement_falls_through(statement: ast.Try) -> bool:
-    """Return whether a proven try path can reach its next statement."""
-    if not _statements_fall_through(statement.finalbody):
-        return False
-
-    normal_path = _statements_fall_through(statement.body)
-    if normal_path and statement.orelse:
-        normal_path = _statements_fall_through(statement.orelse)
-    if normal_path:
-        return True
-
-    # except-star matching wraps and splits exception groups. Keep that richer
-    # behavior fail-closed instead of applying regular except assumptions.
-    if type(statement) is not ast.Try:
-        return False
-
-    raised = _first_statement_builtin_raise(statement.body)
-    if raised is None:
-        return False
-    for handler in statement.handlers:
-        catches = _handler_catches_builtin_exception(handler.type, raised)
-        if catches is None:
-            return False
-        if catches:
-            # Python selects the first compatible handler; a later compatible
-            # clause cannot restore fall-through when this handler terminates.
-            return _statements_fall_through(handler.body)
+    """Fail closed on a top-level try before a claimed framework binding."""
+    # Reachability depends on runtime name resolution plus evaluation of the
+    # try body, exception constructor, cause, handler types, and finally body.
+    # A partial evaluator can turn an actually unreachable binding green, so
+    # this contract requires the binding to precede any top-level try.
     return False
 
 

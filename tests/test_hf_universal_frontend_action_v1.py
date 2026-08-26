@@ -1806,7 +1806,7 @@ def test_python_binding_after_uncaught_known_raise_is_rejected(
     "handler",
     ["RuntimeError", "Exception", "(ValueError, RuntimeError)"],
 )
-def test_python_binding_after_compatible_known_raise_handler_is_accepted(
+def test_python_binding_after_known_raise_handler_fails_closed(
     tmp_path: Path,
     framework: str,
     handler: str,
@@ -1833,10 +1833,8 @@ def test_python_binding_after_compatible_known_raise_handler_is_accepted(
     manifest_path, payload = _manifest(tmp_path)
     payload["file_sha256"]["app.py"] = _sha(app)
     manifest_path.write_text(json.dumps(payload), encoding="utf-8")
-    assert MODULE.validate(
-        tmp_path,
-        Path("docs/hf-universal-frontend-v1.json"),
-    )["status"] == "PASS"
+    with pytest.raises(MODULE.ContractError, match="CSS binding is absent"):
+        MODULE.validate(tmp_path, Path("docs/hf-universal-frontend-v1.json"))
 
 
 @pytest.mark.parametrize("framework", ["gradio", "streamlit"])
@@ -1860,6 +1858,84 @@ def test_python_binding_after_shadowed_handler_is_rejected(
             "    raise\n"
             "except RuntimeError:\n"
             "    pass\n"
+            + binding,
+            1,
+        ),
+        encoding="utf-8",
+    )
+    manifest_path, payload = _manifest(tmp_path)
+    payload["file_sha256"]["app.py"] = _sha(app)
+    manifest_path.write_text(json.dumps(payload), encoding="utf-8")
+    with pytest.raises(MODULE.ContractError, match="CSS binding is absent"):
+        MODULE.validate(tmp_path, Path("docs/hf-universal-frontend-v1.json"))
+
+@pytest.mark.parametrize("framework", ["gradio", "streamlit"])
+@pytest.mark.parametrize(
+    "raise_statement",
+    [
+        "raise RuntimeError(1 / 0)",
+        "raise RuntimeError from (1 / 0)",
+    ],
+)
+def test_python_binding_after_raise_evaluation_failure_is_rejected(
+    tmp_path: Path,
+    framework: str,
+    raise_statement: str,
+) -> None:
+    _fixture(tmp_path, framework)
+    app = tmp_path / "app.py"
+    binding = (
+        "demo = gr.Blocks(css=_SZL_UNIVERSAL_CSS)"
+        if framework == "gradio"
+        else "st.markdown("
+    )
+    app.write_text(
+        app.read_text(encoding="utf-8").replace(
+            binding,
+            "try:\n"
+            f"    {raise_statement}\n"
+            "except RuntimeError:\n"
+            "    pass\n"
+            + binding,
+            1,
+        ),
+        encoding="utf-8",
+    )
+    manifest_path, payload = _manifest(tmp_path)
+    payload["file_sha256"]["app.py"] = _sha(app)
+    manifest_path.write_text(json.dumps(payload), encoding="utf-8")
+    with pytest.raises(MODULE.ContractError, match="CSS binding is absent"):
+        MODULE.validate(tmp_path, Path("docs/hf-universal-frontend-v1.json"))
+
+
+@pytest.mark.parametrize("framework", ["gradio", "streamlit"])
+@pytest.mark.parametrize(
+    "shadowing",
+    [
+        "RuntimeError = BaseException",
+        "Exception = ValueError",
+    ],
+)
+def test_python_binding_after_shadowed_exception_name_is_rejected(
+    tmp_path: Path,
+    framework: str,
+    shadowing: str,
+) -> None:
+    _fixture(tmp_path, framework)
+    app = tmp_path / "app.py"
+    binding = (
+        "demo = gr.Blocks(css=_SZL_UNIVERSAL_CSS)"
+        if framework == "gradio"
+        else "st.markdown("
+    )
+    app.write_text(
+        app.read_text(encoding="utf-8").replace(
+            binding,
+            shadowing
+            + "\ntry:\n"
+            + "    raise RuntimeError\n"
+            + "except Exception:\n"
+            + "    pass\n"
             + binding,
             1,
         ),
