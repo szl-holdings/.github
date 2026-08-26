@@ -1671,3 +1671,101 @@ def test_github_output_rejects_line_breaks_before_writing(
     with pytest.raises(MODULE.ContractError, match="may not contain CR or LF"):
         MODULE.write_github_output(output, result)
     assert output.read_text(encoding="utf-8") == "existing=preserved\n"
+
+@pytest.mark.parametrize(
+    ("overflow_value", "message"),
+    [
+        ("clip garbage", "overflow shorthand"),
+        ("clip auto", "missing required active tokens"),
+    ],
+)
+def test_overflow_shorthand_cannot_mask_unsafe_longhand(
+    tmp_path: Path,
+    overflow_value: str,
+    message: str,
+) -> None:
+    _fixture(tmp_path)
+    css = tmp_path / "szl-universal-frontend.css"
+    css.write_text(
+        CSS
+        + "\n* { overflow-x: auto !important; overflow: "
+        + overflow_value
+        + " !important; }\n",
+        encoding="utf-8",
+    )
+    manifest_path, payload = _manifest(tmp_path)
+    payload["file_sha256"]["szl-universal-frontend.css"] = _sha(css)
+    manifest_path.write_text(json.dumps(payload), encoding="utf-8")
+    with pytest.raises(MODULE.ContractError, match=message):
+        MODULE.validate(tmp_path, Path("docs/hf-universal-frontend-v1.json"))
+
+
+def test_safe_two_value_overflow_shorthand_preserves_control(
+    tmp_path: Path,
+) -> None:
+    _fixture(tmp_path)
+    css = tmp_path / "szl-universal-frontend.css"
+    css.write_text(CSS + "\n* { overflow: clip visible; }\n", encoding="utf-8")
+    manifest_path, payload = _manifest(tmp_path)
+    payload["file_sha256"]["szl-universal-frontend.css"] = _sha(css)
+    manifest_path.write_text(json.dumps(payload), encoding="utf-8")
+    assert MODULE.validate(
+        tmp_path,
+        Path("docs/hf-universal-frontend-v1.json"),
+    )["status"] == "PASS"
+
+
+def test_escaped_important_annotation_controls_cascade(tmp_path: Path) -> None:
+    _fixture(tmp_path)
+    css = tmp_path / "szl-universal-frontend.css"
+    css.write_text(
+        CSS.replace("overflow-x: clip;", "overflow-x: clip !important;")
+        + "\n* { overflow-x: auto !\\69mportant; }\n",
+        encoding="utf-8",
+    )
+    manifest_path, payload = _manifest(tmp_path)
+    payload["file_sha256"]["szl-universal-frontend.css"] = _sha(css)
+    manifest_path.write_text(json.dumps(payload), encoding="utf-8")
+    with pytest.raises(MODULE.ContractError, match="missing required active tokens"):
+        MODULE.validate(tmp_path, Path("docs/hf-universal-frontend-v1.json"))
+
+
+def test_nested_css_rule_is_rejected(tmp_path: Path) -> None:
+    _fixture(tmp_path)
+    css = tmp_path / "szl-universal-frontend.css"
+    css.write_text(
+        CSS + "\n* { & { overflow-x: auto !important; } }\n",
+        encoding="utf-8",
+    )
+    manifest_path, payload = _manifest(tmp_path)
+    payload["file_sha256"]["szl-universal-frontend.css"] = _sha(css)
+    manifest_path.write_text(json.dumps(payload), encoding="utf-8")
+    with pytest.raises(MODULE.ContractError, match="unsupported nested rule"):
+        MODULE.validate(tmp_path, Path("docs/hf-universal-frontend-v1.json"))
+
+
+@pytest.mark.parametrize("framework", ["gradio", "streamlit"])
+def test_python_binding_after_non_fallthrough_try_is_rejected(
+    tmp_path: Path,
+    framework: str,
+) -> None:
+    _fixture(tmp_path, framework)
+    app = tmp_path / "app.py"
+    binding = (
+        "demo = gr.Blocks(css=_SZL_UNIVERSAL_CSS)"
+        if framework == "gradio"
+        else "st.markdown("
+    )
+    app.write_text(
+        app.read_text(encoding="utf-8").replace(
+            binding,
+            "try:\n    raise RuntimeError\nfinally:\n    pass\n" + binding,
+            1,
+        ),
+        encoding="utf-8",
+    )
+    manifest_path, payload = _manifest(tmp_path)
+    payload["file_sha256"]["app.py"] = _sha(app)
+    manifest_path.write_text(json.dumps(payload), encoding="utf-8")
+    with pytest.raises(MODULE.ContractError, match="CSS binding is absent"):
+        MODULE.validate(tmp_path, Path("docs/hf-universal-frontend-v1.json"))

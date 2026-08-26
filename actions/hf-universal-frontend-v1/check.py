@@ -501,12 +501,57 @@ def _split_css_component_level(
     return parts
 
 
+def _split_css_important_annotation(value: str) -> tuple[str, bool]:
+    """Return a declaration value and whether its final annotation is important."""
+    normalized = value.rstrip(CSS_WHITESPACE)
+    bang_index = normalized.rfind("!")
+    if bang_index == -1:
+        return normalized, False
+    annotation = normalized[bang_index + 1 :].strip(CSS_WHITESPACE)
+    if not annotation:
+        return normalized, False
+    if _decode_css_identifier(annotation).casefold() != "important":
+        return normalized, False
+    return normalized[:bang_index].rstrip(CSS_WHITESPACE), True
+
+
+OVERFLOW_AXIS_VALUES = frozenset({"visible", "hidden", "clip", "scroll", "auto"})
+CSS_WIDE_VALUES = frozenset(
+    {"inherit", "initial", "revert", "revert-layer", "unset"}
+)
+
+
+def _overflow_x_from_shorthand(value: str) -> str:
+    """Validate overflow shorthand syntax and return its computed x-axis value."""
+    components = value.split(" ")
+    if len(components) == 1:
+        component = components[0]
+        if component in OVERFLOW_AXIS_VALUES or component in CSS_WIDE_VALUES:
+            return component
+    elif len(components) == 2 and all(
+        component in OVERFLOW_AXIS_VALUES for component in components
+    ):
+        overflow_x, overflow_y = components
+        if overflow_y not in {"visible", "clip"}:
+            if overflow_x == "visible":
+                return "auto"
+            if overflow_x == "clip":
+                return "hidden"
+        return overflow_x
+    raise ContractError(
+        "universal CSS contains an unsupported or invalid overflow shorthand: "
+        f"{value}"
+    )
+
+
 def _css_declarations(rule_body: str) -> list[tuple[str, str, bool]]:
-    """Parse declarations at the current rule level, ignoring nested rules."""
+    """Parse declarations at the current rule level, rejecting nested rules."""
     flattened: list[str] = []
     brace_depth = 0
+    saw_nested_rule = False
     for character in rule_body:
         if character == "{":
+            saw_nested_rule = True
             brace_depth += 1
             flattened.append(" ")
         elif character == "}":
@@ -520,6 +565,8 @@ def _css_declarations(rule_body: str) -> list[tuple[str, str, bool]]:
             flattened.append(character)
     if brace_depth:
         raise ContractError("universal CSS contains an unclosed nested rule")
+    if saw_nested_rule:
+        raise ContractError("universal CSS contains an unsupported nested rule")
 
     declarations: list[tuple[str, str, bool]] = []
     for declaration in _split_css_component_level("".join(flattened), ";"):
@@ -544,25 +591,14 @@ def _css_declarations(rule_body: str) -> list[tuple[str, str, bool]]:
             " ",
             value.strip(CSS_WHITESPACE),
         ).casefold()
-        important_pattern = (
-            CSS_WHITESPACE_PATTERN
-            + "*!"
-            + CSS_WHITESPACE_PATTERN
-            + "*important"
-            + CSS_WHITESPACE_PATTERN
-            + "*$"
+        normalized_value, important = _split_css_important_annotation(
+            normalized_value
         )
-        important = re.search(important_pattern, normalized_value) is not None
-        normalized_value = re.sub(
-            important_pattern,
-            "",
-            normalized_value,
-        ).rstrip(CSS_WHITESPACE)
         if not normalized_property or not normalized_value:
             continue
         declarations.append((normalized_property, normalized_value, important))
         if normalized_property == "overflow":
-            overflow_x = normalized_value.split(" ", 1)[0]
+            overflow_x = _overflow_x_from_shorthand(normalized_value)
             declarations.append(("overflow-x", overflow_x, important))
         elif normalized_property == "all":
             reset_value = f"__all_reset__:{normalized_value}"
@@ -1070,6 +1106,24 @@ def _loop_is_fallthrough_barrier(statement: ast.stmt) -> bool:
     return isinstance(statement, (ast.For, ast.AsyncFor))
 
 
+TRY_STATEMENT_TYPES = (ast.Try, getattr(ast, "TryStar", ast.Try))
+
+
+def _try_statement_falls_through(statement: ast.Try) -> bool:
+    """Return whether any modeled try path can reach its next statement."""
+    if not _statements_fall_through(statement.finalbody):
+        return False
+
+    normal_path = _statements_fall_through(statement.body)
+    if normal_path and statement.orelse:
+        normal_path = _statements_fall_through(statement.orelse)
+
+    handled_path = any(
+        _statements_fall_through(handler.body) for handler in statement.handlers
+    )
+    return normal_path or handled_path
+
+
 def _statements_fall_through(statements: list[ast.stmt]) -> bool:
     for statement in statements:
         if isinstance(statement, (ast.Raise, ast.Return, ast.Break, ast.Continue)):
@@ -1081,6 +1135,10 @@ def _statements_fall_through(statements: list[ast.stmt]) -> bool:
             and _literal_truth_value(statement.test) is False
         ):
             return False
+        if isinstance(statement, TRY_STATEMENT_TYPES):
+            if not _try_statement_falls_through(statement):
+                return False
+            continue
         if not isinstance(statement, ast.If):
             continue
         truth_value = _literal_truth_value(statement.test)
@@ -1146,9 +1204,10 @@ def _direct_top_level_calls(tree: ast.Module) -> list[ast.Call]:
                 if not collect(statement.body):
                     return False
                 continue
-            if isinstance(statement, ast.If) and not _statements_fall_through(
-                [statement]
-            ):
+            if isinstance(
+                statement,
+                (ast.If,) + TRY_STATEMENT_TYPES,
+            ) and not _statements_fall_through([statement]):
                 return False
         return True
 
