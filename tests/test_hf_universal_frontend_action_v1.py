@@ -1441,6 +1441,75 @@ def test_streamlit_binding_rejects_positional_keyword_collision(
         MODULE.validate(tmp_path, Path("docs/hf-universal-frontend-v1.json"))
 
 
+def test_stylesheet_import_is_rejected(tmp_path: Path) -> None:
+    _fixture(tmp_path)
+    css = tmp_path / "szl-universal-frontend.css"
+    css.write_text('@import "./override.css";\n' + CSS, encoding="utf-8")
+    manifest_path, payload = _manifest(tmp_path)
+    payload["file_sha256"]["szl-universal-frontend.css"] = _sha(css)
+    manifest_path.write_text(json.dumps(payload), encoding="utf-8")
+    with pytest.raises(
+        MODULE.ContractError,
+        match="top-level semicolon statements",
+    ):
+        MODULE.validate(tmp_path, Path("docs/hf-universal-frontend-v1.json"))
+
+
+def test_unaudited_complex_selector_control_override_is_rejected(
+    tmp_path: Path,
+) -> None:
+    _fixture(tmp_path)
+    app = tmp_path / "index.html"
+    app.write_text(
+        app.read_text(encoding="utf-8")
+        .replace("<html>", '<html class="bad">')
+        .replace("<body>", '<body class="bad">'),
+        encoding="utf-8",
+    )
+    css = tmp_path / "szl-universal-frontend.css"
+    css.write_text(
+        CSS + "\nhtml.bad, body.bad { overflow-x: auto !important; }\n",
+        encoding="utf-8",
+    )
+    manifest_path, payload = _manifest(tmp_path)
+    payload["file_sha256"]["index.html"] = _sha(app)
+    payload["file_sha256"]["szl-universal-frontend.css"] = _sha(css)
+    manifest_path.write_text(json.dumps(payload), encoding="utf-8")
+    with pytest.raises(
+        MODULE.ContractError,
+        match="controlled declarations on an unaudited selector",
+    ):
+        MODULE.validate(tmp_path, Path("docs/hf-universal-frontend-v1.json"))
+
+
+@pytest.mark.parametrize("encoded_separator", ["%2f", "%2F", "%5c", "%5C"])
+def test_static_href_rejects_encoded_path_separators(
+    tmp_path: Path,
+    encoded_separator: str,
+) -> None:
+    _fixture(tmp_path)
+    app = tmp_path / "index.html"
+    encoded_href = (
+        f"./x{encoded_separator}..{encoded_separator}"
+        "szl-universal-frontend.css"
+    )
+    app.write_text(
+        app.read_text(encoding="utf-8").replace(
+            "./szl-universal-frontend.css",
+            encoded_href,
+        ),
+        encoding="utf-8",
+    )
+    manifest_path, payload = _manifest(tmp_path)
+    payload["file_sha256"]["index.html"] = _sha(app)
+    manifest_path.write_text(json.dumps(payload), encoding="utf-8")
+    with pytest.raises(
+        MODULE.ContractError,
+        match="encoded path separators",
+    ):
+        MODULE.validate(tmp_path, Path("docs/hf-universal-frontend-v1.json"))
+
+
 def test_static_base_url_override_is_rejected(tmp_path: Path) -> None:
     _fixture(tmp_path)
     app = tmp_path / "index.html"

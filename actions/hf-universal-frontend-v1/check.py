@@ -30,6 +30,15 @@ REQUIRED_CSS_DECLARATIONS = {
     "overflow-wrap": "anywhere",
     "overflow-x": "clip",
 }
+CONTROLLED_CSS_PROPERTIES = frozenset(REQUIRED_CSS_DECLARATIONS) | frozenset(
+    {
+        "animation",
+        "animation-duration",
+        "scroll-behavior",
+        "transition",
+        "transition-duration",
+    }
+)
 REQUIRED_MEDIA_QUERIES = {
     "(max-width:560px)",
     "(prefers-reduced-motion:reduce)",
@@ -360,6 +369,12 @@ def _css_rule_blocks(css_text: str) -> list[tuple[str, str]]:
         if character == "}":
             raise ContractError("universal CSS contains an unmatched closing brace")
         if character == ";":
+            statement = css_text[start:cursor].strip(CSS_WHITESPACE)
+            if statement:
+                raise ContractError(
+                    "universal CSS may not contain top-level semicolon statements "
+                    "such as @import"
+                )
             start = cursor + 1
             cursor += 1
             continue
@@ -657,6 +672,23 @@ def _guaranteed_active_selectors(prelude: str) -> set[str]:
     return selectors
 
 
+def _reject_unaudited_controlled_declarations(
+    declarations: list[tuple[str, str, bool]],
+) -> None:
+    controlled = sorted(
+        {
+            property_name
+            for property_name, _, _ in declarations
+            if property_name in CONTROLLED_CSS_PROPERTIES
+        }
+    )
+    if controlled:
+        raise ContractError(
+            "universal CSS is missing required active tokens; contains controlled declarations on an unaudited "
+            f"selector: {', '.join(controlled)}"
+        )
+
+
 def validate_css(css_text: str) -> None:
     active_css = _strip_css_inert_text(css_text)
     active_declarations: list[CSSCascadeEntry] = []
@@ -680,13 +712,16 @@ def validate_css(css_text: str) -> None:
 
     for prelude, body in _css_rule_blocks(active_css):
         if not prelude.lstrip(CSS_WHITESPACE).startswith("@"):
+            declarations = _css_declarations(body)
             selectors = _guaranteed_active_selectors(prelude)
-            if selectors:
-                append_declarations(
-                    active_declarations,
-                    selectors,
-                    _css_declarations(body),
-                )
+            if not selectors:
+                _reject_unaudited_controlled_declarations(declarations)
+                continue
+            append_declarations(
+                active_declarations,
+                selectors,
+                declarations,
+            )
             continue
         query = _media_query(prelude)
         if query not in REQUIRED_MEDIA_QUERIES:
@@ -696,13 +731,15 @@ def validate_css(css_text: str) -> None:
             if nested_prelude.lstrip(CSS_WHITESPACE).startswith("@"):
                 _require_non_cascade_at_rule(nested_prelude)
                 continue
+            declarations = _css_declarations(nested_body)
             selectors = _guaranteed_active_selectors(nested_prelude)
             if not selectors:
+                _reject_unaudited_controlled_declarations(declarations)
                 continue
             append_declarations(
                 media_declarations[query],
                 selectors,
-                _css_declarations(nested_body),
+                declarations,
             )
 
     active_winners = _cascade_winners(active_declarations)
@@ -1492,6 +1529,10 @@ def _resolved_static_href(app_file: str, href: str) -> str:
     parsed = urlsplit(href)
     if parsed.scheme or parsed.netloc:
         raise ContractError("static universal stylesheet href must be repository-local")
+    if re.search(r"%(?:2f|5c)", parsed.path, flags=re.IGNORECASE):
+        raise ContractError(
+            "static universal stylesheet href may not contain encoded path separators"
+        )
     decoded = unquote(parsed.path)
     _reject_line_breaks(decoded, "decoded static stylesheet href")
     if not decoded or decoded.startswith("/") or "\\" in decoded:
