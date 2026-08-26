@@ -1769,3 +1769,104 @@ def test_python_binding_after_non_fallthrough_try_is_rejected(
     manifest_path.write_text(json.dumps(payload), encoding="utf-8")
     with pytest.raises(MODULE.ContractError, match="CSS binding is absent"):
         MODULE.validate(tmp_path, Path("docs/hf-universal-frontend-v1.json"))
+
+@pytest.mark.parametrize("framework", ["gradio", "streamlit"])
+def test_python_binding_after_uncaught_known_raise_is_rejected(
+    tmp_path: Path,
+    framework: str,
+) -> None:
+    _fixture(tmp_path, framework)
+    app = tmp_path / "app.py"
+    binding = (
+        "demo = gr.Blocks(css=_SZL_UNIVERSAL_CSS)"
+        if framework == "gradio"
+        else "st.markdown("
+    )
+    app.write_text(
+        app.read_text(encoding="utf-8").replace(
+            binding,
+            "try:\n"
+            "    raise RuntimeError('boom')\n"
+            "except ValueError:\n"
+            "    pass\n"
+            + binding,
+            1,
+        ),
+        encoding="utf-8",
+    )
+    manifest_path, payload = _manifest(tmp_path)
+    payload["file_sha256"]["app.py"] = _sha(app)
+    manifest_path.write_text(json.dumps(payload), encoding="utf-8")
+    with pytest.raises(MODULE.ContractError, match="CSS binding is absent"):
+        MODULE.validate(tmp_path, Path("docs/hf-universal-frontend-v1.json"))
+
+
+@pytest.mark.parametrize("framework", ["gradio", "streamlit"])
+@pytest.mark.parametrize(
+    "handler",
+    ["RuntimeError", "Exception", "(ValueError, RuntimeError)"],
+)
+def test_python_binding_after_compatible_known_raise_handler_is_accepted(
+    tmp_path: Path,
+    framework: str,
+    handler: str,
+) -> None:
+    _fixture(tmp_path, framework)
+    app = tmp_path / "app.py"
+    binding = (
+        "demo = gr.Blocks(css=_SZL_UNIVERSAL_CSS)"
+        if framework == "gradio"
+        else "st.markdown("
+    )
+    app.write_text(
+        app.read_text(encoding="utf-8").replace(
+            binding,
+            "try:\n"
+            "    raise RuntimeError\n"
+            f"except {handler}:\n"
+            "    pass\n"
+            + binding,
+            1,
+        ),
+        encoding="utf-8",
+    )
+    manifest_path, payload = _manifest(tmp_path)
+    payload["file_sha256"]["app.py"] = _sha(app)
+    manifest_path.write_text(json.dumps(payload), encoding="utf-8")
+    assert MODULE.validate(
+        tmp_path,
+        Path("docs/hf-universal-frontend-v1.json"),
+    )["status"] == "PASS"
+
+
+@pytest.mark.parametrize("framework", ["gradio", "streamlit"])
+def test_python_binding_after_shadowed_handler_is_rejected(
+    tmp_path: Path,
+    framework: str,
+) -> None:
+    _fixture(tmp_path, framework)
+    app = tmp_path / "app.py"
+    binding = (
+        "demo = gr.Blocks(css=_SZL_UNIVERSAL_CSS)"
+        if framework == "gradio"
+        else "st.markdown("
+    )
+    app.write_text(
+        app.read_text(encoding="utf-8").replace(
+            binding,
+            "try:\n"
+            "    raise RuntimeError\n"
+            "except Exception:\n"
+            "    raise\n"
+            "except RuntimeError:\n"
+            "    pass\n"
+            + binding,
+            1,
+        ),
+        encoding="utf-8",
+    )
+    manifest_path, payload = _manifest(tmp_path)
+    payload["file_sha256"]["app.py"] = _sha(app)
+    manifest_path.write_text(json.dumps(payload), encoding="utf-8")
+    with pytest.raises(MODULE.ContractError, match="CSS binding is absent"):
+        MODULE.validate(tmp_path, Path("docs/hf-universal-frontend-v1.json"))
