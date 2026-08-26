@@ -177,12 +177,7 @@ class _StaticDocumentParser(HTMLParser):
             for name, _ in attrs
         )
 
-    def _pop_to_html_processing_boundary(self) -> None:
-        while self._foreign_tree_stack:
-            _, namespace, integration_kind = self._foreign_tree_stack[-1]
-            if namespace == "html" or integration_kind is not None:
-                return
-            self._foreign_tree_stack.pop()
+
 
     @classmethod
     def _integration_kind(
@@ -245,8 +240,10 @@ class _StaticDocumentParser(HTMLParser):
                 return tag
             return "html"
         if self._is_foreign_breakout_start_tag(tag, attrs):
-            self._pop_to_html_processing_boundary()
-            return self._namespace_for_start_tag(tag, attrs)
+            raise ContractError(
+                "Static application contains a foreign-content breakout parse error "
+                "that can expose unaudited author styles"
+            )
         return current_namespace
 
     def handle_starttag(
@@ -330,8 +327,10 @@ class _StaticDocumentParser(HTMLParser):
             self._foreign_tree_stack[-1][1] != "html"
             and normalized_tag in self._FOREIGN_BREAKOUT_END_TAGS
         ):
-            self._pop_to_html_processing_boundary()
-            return
+            raise ContractError(
+                "Static application contains a foreign-content breakout parse error "
+                "that can expose unaudited author styles"
+            )
         expected = self._foreign_tree_stack[-1][0]
         if normalized_tag != expected:
             raise ContractError(

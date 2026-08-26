@@ -242,3 +242,34 @@ def test_static_does_not_treat_raw_svg_template_as_html_inert() -> None:
             app_file="index.html",
             css_file="assets/universal.css",
         )
+
+
+@pytest.mark.parametrize(
+    "foreign_markup",
+    [
+        (
+            "<math><mtext><p><math><div></div><mglyph><template>"
+            '<mrow style="width:200vw"></mrow>'
+            "</template></mglyph></p></mtext></math>"
+        ),
+        (
+            "<math><mtext><p><math></p><mglyph><template>"
+            '<mrow style="width:200vw"></mrow>'
+            "</template></mglyph></p></mtext></math>"
+        ),
+    ],
+    ids=["breakout-start-reprocessing", "breakout-end-reprocessing"],
+)
+def test_static_rejects_foreign_content_breakout_parse_errors(
+    foreign_markup: str,
+) -> None:
+    with pytest.raises(
+        CHECKER.ContractError,
+        match="foreign-content breakout parse error",
+    ):
+        CHECKER.validate_framework_binding(
+            "static",
+            _static_document(extra_head=foreign_markup),
+            app_file="index.html",
+            css_file="assets/universal.css",
+        )
