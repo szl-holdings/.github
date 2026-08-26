@@ -70,6 +70,24 @@ def _static_document(
             'style="width:200vw"></div></foreignObject></svg>',
             "",
         ),
+        (
+            '<math><annotation-xml encoding=" text/html "><template>'
+            '<mrow style="width:200vw"></mrow>'
+            "</template></annotation-xml></math>",
+            "",
+        ),
+        (
+            "<math><mtext><mglyph><template>"
+            '<mrow style="width:200vw"></mrow>'
+            "</template></mglyph></mtext></math>",
+            "",
+        ),
+        (
+            "<svg><math><mtext><template>"
+            '<g style="width:200vw"></g>'
+            "</template></mtext></math></svg>",
+            "",
+        ),
     ],
     ids=[
         "style-element",
@@ -79,6 +97,9 @@ def _static_document(
         "svg-style-element",
         "mathml-style-attribute",
         "foreign-object-style-attribute",
+        "padded-annotation-encoding",
+        "mathml-glyph-exception",
+        "svg-nested-math-tag",
     ],
 )
 def test_static_rejects_unaudited_author_styles(
@@ -147,6 +168,11 @@ if runtime_condition:
             "</style></template></foreignObject></svg>"
         ),
         (
+            "<svg><foreignObject><div><template><style>"
+            "html { width: 200vw; }"
+            "</style></template></div></foreignObject></svg>"
+        ),
+        (
             "<svg><desc><template><style>"
             "html { width: 200vw; }"
             "</style></template></desc></svg>"
@@ -164,6 +190,7 @@ if runtime_condition:
     ],
     ids=[
         "svg-foreign-object",
+        "svg-foreign-object-html-descendant",
         "svg-description",
         "mathml-text",
         "mathml-annotation",
