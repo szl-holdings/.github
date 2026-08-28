@@ -22,12 +22,12 @@ license: apache-2.0
 
 # Control before action. Evidence after.
 
-Models, data, and demonstrations that act within authority and leave
+Models, kernels, and demonstrations that act within authority and leave
 inspectable evidence.
 
 [**Open a11oy**](https://a-11-oy.com) ·
 [**Verify evidence**](https://a11oy.net) ·
-[**Build with SZL**](https://holdings.a-11-oy.com/docs-site/) ·
+[**Killinchu**](https://huggingface.co/spaces/SZLHOLDINGS/killinchu) ·
 [**View source**](https://github.com/szl-holdings)
 
 </div>
@@ -47,12 +47,22 @@ or unavailable; samples remain labeled. Effectors and public actuation are
 **SIMULATED**. This Space does not command a live weapon or establish
 production authorization.
 
-### 03 / Models + data
+### 03 / Models + kernels
 
-[**Khipu**](https://huggingface.co/SZLHOLDINGS/SZL-Khipu-1.5B),
-[**ReceiptAgent**](https://huggingface.co/SZLHOLDINGS/SZL-Forge-1.5B-ReceiptAgent),
-and [**szl-lake**](https://huggingface.co/datasets/SZLHOLDINGS/szl-lake)
-publish weights, receipt proposals, and admitted evidence as distinct artifacts.
+Ready-to-wear (proposal-only weights):
+[**Khipu 1.5B**](https://huggingface.co/SZLHOLDINGS/SZL-Khipu-1.5B),
+[**Forge ReceiptAgent**](https://huggingface.co/SZLHOLDINGS/SZL-Forge-1.5B-ReceiptAgent),
+[**ReceiptAgent 0.8B**](https://huggingface.co/SZLHOLDINGS/szl-receiptagent-qwen35-0.8b-v2).
+
+**CUTTING** (no weights):
+[**KHIPU-R2**](https://huggingface.co/SZLHOLDINGS/KHIPU-R2),
+[**WILLAY**](https://huggingface.co/SZLHOLDINGS/WILLAY),
+[**KILLINCHU-EYE**](https://huggingface.co/SZLHOLDINGS/KILLINCHU-EYE),
+[**YARQA-ATTN**](https://huggingface.co/SZLHOLDINGS/YARQA-ATTN),
+[**A11OY-MINI**](https://huggingface.co/SZLHOLDINGS/A11OY-MINI).
+
+[**szl-lake**](https://huggingface.co/datasets/SZLHOLDINGS/szl-lake).
+Gucci rule: SZL cut, no relabeled weights.
 
 ### 04 / Evidence
 
