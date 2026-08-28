@@ -7,9 +7,10 @@ name: Reusable — Lockfile Registry Check
 # with EAI_AGAIN and any workflow depending on the install step goes red.
 #
 # A repo wires this into its own CI so a poisoned lockfile fails the PR/push that
-# introduces it — before it ever lands on main. It checks out the CALLER repo and
-# greps its committed lockfiles; no token and no network are required. (The org's
-# scheduled scanner, lockfile-registry-check.yml, is the catch-all safety net.)
+# introduces it — before it ever lands on main. It sparsely checks out the CALLER
+# repo and reads every lockfile blob from the exact committed Git tree without
+# executing caller content. (The org's scheduled scanner,
+# lockfile-registry-check.yml, is the catch-all safety net.)
 #
 # Wire it up from a consuming repo, e.g.:
 #   jobs:
@@ -35,7 +36,7 @@ jobs:
   scan:
     name: No lockfile references a Replit-internal registry host
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 15
     steps:
       - name: Harden runner
         uses: step-security/harden-runner@b09bb98e06d4d774595224525879c09bc6e98c40 # v2.20.1
@@ -44,21 +45,36 @@ jobs:
 
       - name: Checkout caller
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 1
+          persist-credentials: false
+          sparse-checkout: .github/workflows
 
       - name: Grep committed lockfiles for *.replit.local hosts
         shell: bash
         run: |
           set -euo pipefail
-          # Collect lockfiles (skip node_modules and .git).
-          mapfile -t files < <(find . \
-            -path ./node_modules -prune -o \
-            -path ./.git -prune -o \
-            -type f \( \
-              -name package-lock.json -o \
-              -name npm-shrinkwrap.json -o \
-              -name pnpm-lock.yaml -o \
-              -name yarn.lock \
-            \) -print | sed 's#^\./##' | sort)
+          lockfile_manifest="$(mktemp)"
+          lockfile_blob="$(mktemp)"
+          trap 'rm -f "$lockfile_manifest" "$lockfile_blob"' EXIT
+
+          # Enumerate the exact committed tree instead of trusting the sparse
+          # worktree. This preserves whole-repository coverage while avoiding a
+          # multi-minute checkout of unrelated caller files.
+          git rev-parse --verify 'HEAD^{commit}' >/dev/null
+          git ls-tree -r -z --name-only HEAD |
+            while IFS= read -r -d '' file; do
+              case "$file" in
+                package-lock.json|*/package-lock.json|\
+                npm-shrinkwrap.json|*/npm-shrinkwrap.json|\
+                pnpm-lock.yaml|*/pnpm-lock.yaml|\
+                yarn.lock|*/yarn.lock)
+                  printf '%s\0' "$file"
+                  ;;
+              esac
+            done |
+            LC_ALL=C sort -z > "$lockfile_manifest"
+          mapfile -d '' -t files < "$lockfile_manifest"
 
           if [ "${#files[@]}" -eq 0 ]; then
             echo "✓ No lockfiles found to scan."
@@ -72,9 +88,23 @@ jobs:
           pattern='[A-Za-z0-9_.-]+\.replit\.local'
           found=0
           for f in "${files[@]}"; do
-            if hits="$(grep -Eo "$pattern" "$f" | sort -u)"; [ -n "$hits" ]; then
+            # cat-file reads the committed blob even though it is intentionally
+            # absent from the sparse worktree. A missing/unreadable object is a
+            # hard failure under `set -e` rather than a false clean result.
+            git cat-file blob "HEAD:$f" > "$lockfile_blob"
+            if hits="$(grep -aEo "$pattern" "$lockfile_blob" | LC_ALL=C sort -u)"; then
+              :
+            else
+              grep_status=$?
+              if [ "$grep_status" -ne 1 ]; then
+                echo "::error file=${f}::Lockfile scan failed with grep status ${grep_status}."
+                exit "$grep_status"
+              fi
+              hits=""
+            fi
+            if [ -n "$hits" ]; then
               found=1
-              joined="$(echo "$hits" | paste -sd', ' -)"
+              joined="${hits//$'\n'/, }"
               echo "::error file=${f}::References Replit-internal registry host(s): ${joined}. These do not resolve on GitHub runners and break npm/pnpm install. Rewrite to https://registry.npmjs.org/ (integrity sha unchanged)."
             fi
           done
