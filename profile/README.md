@@ -63,6 +63,20 @@ Receipts, provenance, evaluation, and formal sources make claims inspectable.
 [Verify a receipt](https://a-11-oy.com/verify) or follow the
 [research lineage](https://github.com/szl-holdings/szl-papers).
 
+## Five verticals
+
+One governed core, applied to five markets. Stage is a **REPORTED** product
+state, never adoption, authorization, or revenue. The vertical map lives at
+[a11oy.net](https://a11oy.net).
+
+| Vertical | Surface | Stage (REPORTED) |
+| --- | --- | --- |
+| Governed inference | [a11oy](https://github.com/szl-holdings/a11oy) | Live console and receipt ledger |
+| Defense — counter-UAS + SDA | [killinchu](https://github.com/szl-holdings/killinchu) · [khipu-sda-core](https://github.com/szl-holdings/khipu-sda-core) | Live demonstration; effectors **SIMULATED** |
+| Insurance | [David Leads](https://github.com/szl-holdings/david-leads) | Live public-readonly workspace |
+| Finance | [szl-quant](https://github.com/szl-holdings/szl-quant) · [Space](https://huggingface.co/spaces/SZLHOLDINGS/szl-quant-live) | Paper-only research; not financial advice |
+| Real estate | governed workflows | **ROADMAP** — no surface exists yet |
+
 ## Investor path
 
 [Company front door](https://huggingface.co/spaces/SZLHOLDINGS/README) ·
