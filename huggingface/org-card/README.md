@@ -22,12 +22,12 @@ license: apache-2.0
 
 # Control before action. Evidence after.
 
-Models, data, and demonstrations that act within authority and leave
-inspectable evidence.
+Models, kernels, and demonstrations that act within authority and leave
+inspectable evidence. Cut like a house, not a dump.
 
 [**Open a11oy**](https://a-11-oy.com) ·
 [**Verify evidence**](https://a11oy.net) ·
-[**Build with SZL**](https://holdings.a-11-oy.com/docs-site/) ·
+[**Killinchu**](https://huggingface.co/spaces/SZLHOLDINGS/killinchu) ·
 [**View source**](https://github.com/szl-holdings)
 
 </div>
@@ -47,12 +47,24 @@ or unavailable; samples remain labeled. Effectors and public actuation are
 **SIMULATED**. This Space does not command a live weapon or establish
 production authorization.
 
-### 03 / Models + data
+### 03 / Models + kernels
 
-[**Khipu**](https://huggingface.co/SZLHOLDINGS/SZL-Khipu-1.5B),
-[**ReceiptAgent**](https://huggingface.co/SZLHOLDINGS/SZL-Forge-1.5B-ReceiptAgent),
-and [**szl-lake**](https://huggingface.co/datasets/SZLHOLDINGS/szl-lake)
-publish weights, receipt proposals, and admitted evidence as distinct artifacts.
+Ready-to-wear (weights exist, proposal-only):
+[**Khipu 1.5B**](https://huggingface.co/SZLHOLDINGS/SZL-Khipu-1.5B),
+[**Forge ReceiptAgent**](https://huggingface.co/SZLHOLDINGS/SZL-Forge-1.5B-ReceiptAgent),
+[**ReceiptAgent 0.8B**](https://huggingface.co/SZLHOLDINGS/szl-receiptagent-qwen35-0.8b-v2),
+[**szl-kernels**](https://huggingface.co/SZLHOLDINGS/szl-kernels).
+
+Fall 2026 collection (**CUTTING** — cards only, no weights yet):
+[**KHIPU-R2**](https://huggingface.co/SZLHOLDINGS/KHIPU-R2),
+[**WILLAY**](https://huggingface.co/SZLHOLDINGS/WILLAY),
+[**KILLINCHU-EYE**](https://huggingface.co/SZLHOLDINGS/KILLINCHU-EYE),
+[**YARQA-ATTN**](https://huggingface.co/SZLHOLDINGS/YARQA-ATTN),
+[**A11OY-MINI**](https://huggingface.co/SZLHOLDINGS/A11OY-MINI).
+
+Admitted evidence lives in [**szl-lake**](https://huggingface.co/datasets/SZLHOLDINGS/szl-lake).
+Gucci rule: silhouette from the runway, original SZL cut. We do not relabel
+someone else's weights.
 
 ### 04 / Evidence
 
