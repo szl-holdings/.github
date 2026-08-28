@@ -52,9 +52,8 @@ production authorization. [Open source](https://github.com/szl-holdings/killinch
 
 ### 03 / Models + data
 
-Weights and adapters, software and substrate, surrogates and recipes, datasets
-and evidence, and Spaces and demonstrations are separate artifact classes.
-Repository type, downloads, and route reachability do not establish quality or
+Weights, software, surrogates, datasets, and Spaces are separate artifact
+classes. Type, downloads, and reachability do not establish quality or
 readiness. [Inspect the portfolio](https://huggingface.co/SZLHOLDINGS).
 
 ### 04 / Evidence
@@ -62,6 +61,16 @@ readiness. [Inspect the portfolio](https://huggingface.co/SZLHOLDINGS).
 Receipts, provenance, evaluation, and formal sources make claims inspectable.
 [Verify a receipt](https://a-11-oy.com/verify) or follow the
 [research lineage](https://github.com/szl-holdings/szl-papers).
+
+## Five verticals
+
+**REPORTED**; never adoption or revenue. [a11oy.net](https://a11oy.net).
+
+- Inference: [a11oy](https://github.com/szl-holdings/a11oy)
+- Defense: [killinchu](https://github.com/szl-holdings/killinchu); effectors **SIMULATED**
+- Insurance: [David Leads](https://github.com/szl-holdings/david-leads)
+- Finance: [szl-quant](https://github.com/szl-holdings/szl-quant); paper-only, not financial advice
+- Real estate: **ROADMAP**; no surface yet
 
 ## Investor path
 
@@ -82,7 +91,7 @@ universal safety, customer adoption, or an investment outcome.
 [Hatun MCP](https://github.com/szl-holdings/hatun-mcp) ·
 [Runtime substrate](https://github.com/szl-holdings/szl-substrate)
 
-Read each artifact's license, lineage, files, evaluation, and limits before use.
+Read each artifact's license and limits before use.
 The [public experience standard](https://github.com/szl-holdings/.github/blob/main/docs/PUBLIC_EXPERIENCE_STANDARD.md)
 and [estate lifecycle map](https://github.com/szl-holdings/.github/blob/main/docs/ESTATE_LIFECYCLE.md)
 define the shared contract.
@@ -96,8 +105,7 @@ define the shared contract.
 - [Killinchu readiness](https://szlholdings-killinchu.hf.space/api/killinchu/readyz)
 
 The dataset [`SZLHOLDINGS/SZLHOLDINGS`](https://huggingface.co/datasets/SZLHOLDINGS/SZLHOLDINGS)
-is a **HISTORICAL profile mirror**, not a current organization card, inventory,
-or runtime source.
+is a **HISTORICAL** mirror, not a current card or runtime source.
 
 ## Truth language
 
