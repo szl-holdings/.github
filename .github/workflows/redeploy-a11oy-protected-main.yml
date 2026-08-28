@@ -84,11 +84,22 @@ jobs:
             }
 
             function runtimeRevision(runtime) {
-              const candidate = runtime.sha ?? runtime.revision ?? '';
-              if (candidate && typeof candidate === 'object') {
-                return immutableSha(candidate.sha ?? candidate.value ?? candidate.revision ?? '');
+              for (const candidate of [runtime.sha, runtime.revision]) {
+                if (candidate && typeof candidate === 'object') {
+                  for (const nested of [candidate.sha, candidate.value, candidate.revision]) {
+                    const normalized = immutableSha(nested);
+                    if (normalized) {
+                      return normalized;
+                    }
+                  }
+                  continue;
+                }
+                const normalized = immutableSha(candidate);
+                if (normalized) {
+                  return normalized;
+                }
               }
-              return immutableSha(candidate);
+              return '';
             }
 
             try {
