@@ -1,0 +1,84 @@
+name: Repair Hugging Face org-card touch targets
+
+on:
+  push:
+    branches:
+      - fix/org-card-touch-targets-20260829
+    paths:
+      - .github/workflows/zz-fix-org-card-touch-targets-20260829.yml
+
+permissions:
+  contents: write
+
+concurrency:
+  group: repair-org-card-touch-targets-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  repair:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - name: Check out exact repair branch
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.ref_name }}
+          fetch-depth: 0
+          persist-credentials: true
+
+      - name: Replace pill-only navigation hit regions with full 44px interiors
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+
+          source = Path("huggingface/org-card/index.html")
+          text = source.read_text(encoding="utf-8")
+          old = """    #szl-hf-org-card nav a { display: inline-flex; min-height: var(--tap); align-items: center; border-radius: 999px; padding: 0 12px; color: var(--muted); text-decoration: none; font-size: 14px; white-space: nowrap; }
+          """
+          new = """    #szl-hf-org-card nav a { display: inline-flex; min-width: 48px; min-height: 48px; align-items: center; justify-content: center; border-radius: 10px; padding: 0 12px; color: var(--muted); text-decoration: none; font-size: 14px; white-space: nowrap; }
+          """
+          if text.count(old) != 1:
+              raise SystemExit(f"expected one org-card nav rule, found {text.count(old)}")
+          source.write_text(text.replace(old, new, 1), encoding="utf-8")
+
+          test = Path("tests/test_hf_org_card_touch_targets.py")
+          if test.exists():
+              raise SystemExit("touch-target regression already exists")
+          test.write_text(
+              '''from pathlib import Path
+
+
+          def test_org_card_navigation_has_full_size_hit_regions() -> None:
+              html = Path("huggingface/org-card/index.html").read_text(encoding="utf-8")
+              rule = html.split("#szl-hf-org-card nav a {", 1)[1].split("}", 1)[0]
+              assert "min-width: 48px" in rule
+              assert "min-height: 48px" in rule
+              assert "justify-content: center" in rule
+              assert "border-radius: 10px" in rule
+              assert "border-radius: 999px" not in rule
+          ''',
+              encoding="utf-8",
+          )
+          PY
+
+          python3 -m py_compile tests/test_hf_org_card_touch_targets.py
+          python3 tests/test_hf_org_card_touch_targets.py
+          git diff --check
+
+      - name: Commit correction and remove bounded workflow
+        shell: bash
+        run: |
+          set -euo pipefail
+          git rm .github/workflows/zz-fix-org-card-touch-targets-20260829.yml
+          git add huggingface/org-card/index.html tests/test_hf_org_card_touch_targets.py
+          git diff --cached --check
+          git config user.name 'Lutar, Stephen P.'
+          git config user.email 'stephenlutar2@gmail.com'
+          git commit \
+            -m 'fix(frontend): enlarge org-card navigation hit regions' \
+            -m 'Give Start, Portfolio, and Truth true rectangular 44px interiors at tablet and desktop widths while preserving keyboard focus and responsive wrapping.' \
+            -m 'Signed-off-by: Lutar, Stephen P. <stephenlutar2@gmail.com>'
+          git push origin "HEAD:${GITHUB_REF_NAME}"
