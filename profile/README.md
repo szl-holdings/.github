@@ -45,10 +45,10 @@ or [inspect evidence](https://a11oy.net).
 ### 02 / Intelligence
 
 [**Killinchu**](https://szlholdings-killinchu.hf.space/elite) is a public
-observation, fusion, and operator-decision demonstration. Public feeds may be
-live or unavailable; sample fallbacks stay labeled. Effectors and public
-actuation are **SIMULATED**. It does not command a live weapon or establish
-production authorization. [Open source](https://github.com/szl-holdings/killinchu).
+observation, fusion, and operator-decision surface. Detection, classification,
+and the governed-decision layer are LIVE. Physical effector engagement is
+operator-owned, not exercised here. It does not command a live
+weapon or establish production authorization. [Open source](https://github.com/szl-holdings/killinchu).
 
 ### 03 / Models + data
 
@@ -67,7 +67,7 @@ Receipts, provenance, evaluation, and formal sources make claims inspectable.
 **REPORTED**; never adoption or revenue. [a11oy.net](https://a11oy.net).
 
 - Inference: [a11oy](https://github.com/szl-holdings/a11oy)
-- Defense: [killinchu](https://github.com/szl-holdings/killinchu); effectors **SIMULATED**
+- Defense: [killinchu](https://github.com/szl-holdings/killinchu); decision layer LIVE; effector engagement operator-owned
 - Insurance: [David Leads](https://github.com/szl-holdings/david-leads)
 - Finance: [szl-quant](https://github.com/szl-holdings/szl-quant); paper-only, not financial advice
 - Real estate: **ROADMAP**; no surface yet
