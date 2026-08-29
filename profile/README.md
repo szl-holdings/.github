@@ -33,18 +33,23 @@ The controller validates authority and evidence. The runtime stays inside the bo
 - **Product** · [a-11-oy.com](https://a-11-oy.com) — Command Center, console, interactive verify
 - **Proof** · [a11oy.net](https://a11oy.net) — RECORD, diligence, atlas. Not a product host.
 - **Source** · [github.com/szl-holdings/a11oy](https://github.com/szl-holdings/a11oy)
-- **Artifacts** · [huggingface.co/SZLHOLDINGS](https://huggingface.co/SZLHOLDINGS) — pin a11oy, killinchu, immune, atelier, holographic
+- **Artifacts** · [huggingface.co/SZLHOLDINGS](https://huggingface.co/SZLHOLDINGS) — pin five Spaces only: [a11oy](https://huggingface.co/spaces/SZLHOLDINGS/a11oy), [szl-khipu](https://huggingface.co/spaces/SZLHOLDINGS/szl-khipu), [szl-atelier](https://huggingface.co/spaces/SZLHOLDINGS/szl-atelier), [killinchu](https://huggingface.co/spaces/SZLHOLDINGS/killinchu), [immune](https://huggingface.co/spaces/SZLHOLDINGS/immune)
 
 Factory ([a11oy-factory](https://github.com/szl-holdings/a11oy-factory)) is a **bind**, not a second flagship. Killinchu is a **public synthetic reference** — no public effector. Formulas never grant authority.
+
+The sixth Space, [governed-receipt-verifier](https://huggingface.co/spaces/SZLHOLDINGS/governed-receipt-verifier), folds into [a11oy.net](https://a11oy.net) and a-11-oy.com verify. Do not pin it. Do not delete it.
 
 ## Index (kept, not on the first fold)
 
 - Intelligence: [killinchu](https://github.com/szl-holdings/killinchu) — decisions LIVE, public actuation SIMULATED
 - Defense: [immune](https://github.com/szl-holdings/immune)
-- Insurance: [David Leads](https://github.com/szl-holdings/david-leads)
+- Insurance: ROADMAP (david-leads is an archived hologram)
 - Finance: [szl-quant](https://github.com/szl-holdings/szl-quant) — paper-only, not financial advice
-- Real estate: ROADMAP
-- Labs: command-lab, khipu-lab, cosmos, ayllu, atelier, experiments — holograms, not origins
+- Real estate: [szl-real-estate](https://github.com/szl-holdings/szl-real-estate) — occupancy UNAVAILABLE
+- Labs and binds: factory, lyte-lattice, nexus, ayllu, evidence-studio — holograms or packages, not origins
+- Company landing: [holdings.a-11-oy.com](https://holdings.a-11-oy.com) — not the product, not the proof origin
+
+Full map: [Public surface atlas](https://github.com/szl-holdings/.github/blob/main/docs/PUBLIC-SURFACE-ATLAS.md). Thirty-four GitHub holograms are already archived. Five remaining live holograms plus deprecated `szl-governed-norm` are marked fold. Unique work is named on every row. Nothing is deleted.
 
 ## Investor path
 
@@ -62,7 +67,7 @@ This profile does not claim production authorization, regulatory approval, unive
 
 - [a11oy honest](https://a-11-oy.com/api/a11oy/v1/honest) — locked-8, Λ = Conjecture 1, kernel `c7c0ba17`
 - [a11oy.net health.json](https://a11oy.net/health.json) — static document, signer unavailable, not DSSE-LIVE
-- Hub: pin five, unpin cosmos, do not pin factory, do not mint Warhacker
+- Hub: pin five Spaces. Unpin holograms. Do not pin factory. Do not mint Warhacker. Verifier Space is a pointer, not a flagship.
 
 The dataset [`SZLHOLDINGS/SZLHOLDINGS`](https://huggingface.co/datasets/SZLHOLDINGS/SZLHOLDINGS) is a **HISTORICAL** mirror.
 
