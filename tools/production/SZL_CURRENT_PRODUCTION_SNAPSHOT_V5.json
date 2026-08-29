@@ -39,53 +39,12 @@
     },
     "open_prs": [
       {
-        "number": 70,
-        "production_disposition": "HOLD_BEHIND_EVAL_AND_RELEASE_GATE",
-        "reason": "Train loss is not evaluation; publication remains false. Admit only after frozen evaluation, passport, and exact Hub lineage.",
-        "repository": "szl-holdings/szl-forge",
-        "title": "feat(chaski_r2): Unsloth bf16 LoRA; QLoRA not recommended on Qwen3.5"
-      },
-      {
-        "number": 1412,
-        "production_disposition": "REDESIGN_FOR_ISOLATION_THEN_QUALIFY",
-        "reason": "Require per-kernel timeouts, isolation, caching, circuit breaking, provenance, and resource budgets before runtime activation.",
-        "repository": "szl-holdings/a11oy",
-        "title": "feat(kernels): register kernel estate organ that import+calls SZL kernels"
-      },
-      {
-        "number": 1333,
-        "production_disposition": "REBASE_REVIEW_AND_KEEP_STANDALONE",
-        "reason": "Keep standalone; current-base review and a separate canonical deployment successor remain required.",
-        "repository": "szl-holdings/a11oy",
-        "title": "feat(oro): add standalone obligation-ranked orbit control plane"
-      },
-      {
-        "number": 1405,
-        "production_disposition": "HOLD_FIRST_FOLD_SIMPLIFICATION",
-        "reason": "Estate cards belong behind /estate and must not increase first-fold cognitive load or imply quality from reachability.",
-        "repository": "szl-holdings/a11oy",
-        "title": "feat(ui): bind Series A models and kernels as holographic estate cards"
-      },
-      {
-        "number": 8,
-        "production_disposition": "QUALIFY_OR_SUPERSEDE_IN_EVIDENCE_STUDIO",
-        "reason": "Complete exact-head proof if canonical; otherwise preserve evidence and migrate into Evidence Studio.",
-        "repository": "szl-holdings/governed-norm-holo",
-        "title": "fix(release): rebind redacted merge revision publicly"
-      },
-      {
-        "number": 676,
-        "production_disposition": "QUALIFY_FIRST_THEN_VENDOR_SYNC",
-        "reason": "Small truth/brand correction; land before corresponding a11oy cleanup with generated vendor-sync proof.",
-        "repository": "szl-holdings/platform",
-        "title": "fix(ui): replace LUMINA/PARAGON in vendored a11oy brand data"
-      },
-      {
-        "number": 465,
-        "production_disposition": "EXTERNAL_PERMISSION_BLOCKED",
-        "reason": "Requires live GitHub App permission and exact-head secret-health proof without secret-value disclosure.",
+        "number": 490,
+        "production_disposition": "SUPERSEDED_UNSIGNED_HISTORY",
+        "reason": "Packet-5 recapture. Branch recapture/packet5-open-prs-20260829 carries unsigned commit 945751eb so DCO cannot pass on that history. Successor is recapture/packet5-open-prs-20260829b: one signed commit from main. Squash the successor only if required checks are terminal green.",
         "repository": "szl-holdings/.github",
-        "title": "fix(app): grant qillqaq secret-name read"
+        "title": "chore(production): recapture packet-5 open PRs at 2026-08-29T04:15Z",
+        "html_url": "https://github.com/szl-holdings/.github/pull/490"
       }
     ],
     "private": 5,
@@ -113,6 +72,52 @@
         "severity": "P0",
         "target": "szl-holdings organization"
       }
+    ],
+    "merged_since_packet": [
+      {
+        "number": 1421,
+        "repository": "szl-holdings/a11oy",
+        "merged_at": "2026-08-29T04:06:33Z",
+        "merged_sha": "1e1c30e64212091ef9ff2704cdbfadb1afbc080a",
+        "production_disposition": "MERGED_TOUCH_TARGETS_HF_MANIFEST_POST_DEPLOY_RESIDUAL",
+        "title": "fix(frontend): restore live touch targets and Hub manifest"
+      },
+      {
+        "number": 1423,
+        "repository": "szl-holdings/a11oy",
+        "merged_at": "2026-08-29T03:50:32Z",
+        "merged_sha": "83dbdbb2269145c476d56d7d4dc6a54a60a77314",
+        "production_disposition": "MERGED_ORGAN_KERNEL_ISOLATION_RESIDUAL",
+        "title": "feat: wire five-organ fail-closed kernel onto a-11-oy.com"
+      },
+      {
+        "number": 489,
+        "repository": "szl-holdings/.github",
+        "merged_at": "2026-08-29T03:32:53Z",
+        "production_disposition": "MERGED_ORG_CARD_TOUCH_TARGETS",
+        "title": "fix(frontend): enlarge org-card navigation hit regions"
+      },
+      {
+        "number": 1418,
+        "repository": "szl-holdings/a11oy",
+        "merged_at": "2026-08-29T03:22:58Z",
+        "production_disposition": "MERGED_STALE_NAME_STRIP",
+        "title": "fix(ui): strip remaining KORA/LUMINA/PARAGON from web/src"
+      },
+      {
+        "number": 1420,
+        "repository": "szl-holdings/a11oy",
+        "merged_at": "2026-08-29T03:21:35Z",
+        "production_disposition": "MERGED_KILLINCHU_SHARED_BYTES",
+        "title": "fix(vendor): restore killinchu-shared bytes after pin bump"
+      },
+      {
+        "number": 1416,
+        "repository": "szl-holdings/a11oy",
+        "merged_at": "2026-08-29T03:15:31Z",
+        "production_disposition": "MERGED_VENDOR_PIN",
+        "title": "fix(vendor): pin platform@de08cf8e after LUMINA/PARAGON strip"
+      }
     ]
   },
   "schema": "szl.current-production-snapshot/v5",
@@ -136,5 +141,8 @@
       "surface": "https://huggingface.co/SZLHOLDINGS"
     }
   ],
-  "truth_boundary": "No merge, deployment, Hub mutation, ruleset edit or production certification was performed."
+  "truth_boundary": "A document or workflow file is not proof of live enforcement. Missing evidence is UNKNOWN or FAIL, never PASS. This recapture performs no Hub mutation, ruleset edit, or production certification. Green-light does not override a red required check.",
+  "recaptured_at": "2026-08-29T04:15:00Z",
+  "overall_status": "PARTIALLY_VERIFIED_WITH_EXACT_BLOCKERS",
+  "certified_production_ready": false
 }
