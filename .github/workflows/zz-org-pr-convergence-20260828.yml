@@ -1,0 +1,415 @@
+name: Bounded organization PR convergence
+
+on:
+  push:
+    branches:
+      - ops/org-pr-convergence-20260828
+
+permissions:
+  contents: write
+
+concurrency:
+  group: bounded-org-pr-convergence-20260828
+  cancel-in-progress: false
+
+jobs:
+  converge:
+    if: github.repository == 'szl-holdings/.github' && github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      ORG: szl-holdings
+      CONTROLLER_BRANCH: ops/org-pr-convergence-20260828
+      APP_ID: ${{ secrets.QILLQAQ_APP_ID || secrets.SZL_QILLQAQ_APP_ID || secrets.GH_APP_ID }}
+      APP_PRIVATE_KEY: ${{ secrets.QILLQAQ_PRIVATE_KEY || secrets.QILLQAQ_APP_PRIVATE_KEY || secrets.SZL_QILLQAQ_PRIVATE_KEY || secrets.GH_APP_PRIVATE_KEY }}
+    steps:
+      - name: Check out exact controller branch
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: ops/org-pr-convergence-20260828
+          fetch-depth: 0
+          persist-credentials: true
+
+      - name: Mint minimum-lived organization installation token
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "${APP_ID:-}" || { echo 'GitHub App ID unavailable' >&2; exit 1; }
+          test -n "${APP_PRIVATE_KEY:-}" || { echo 'GitHub App private key unavailable' >&2; exit 1; }
+          key_file="$RUNNER_TEMP/org-app-key.pem"
+          token_file="$RUNNER_TEMP/org-app-token"
+          printf '%s' "$APP_PRIVATE_KEY" > "$key_file"
+          chmod 600 "$key_file"
+          b64url() { openssl base64 -A | tr '+/' '-_' | tr -d '='; }
+          now="$(date +%s)"
+          iat="$((now - 60))"
+          exp="$((now + 540))"
+          header="$(printf '%s' '{"alg":"RS256","typ":"JWT"}' | b64url)"
+          payload="$(printf '{"iat":%s,"exp":%s,"iss":"%s"}' "$iat" "$exp" "$APP_ID" | b64url)"
+          unsigned="$header.$payload"
+          signature="$(printf '%s' "$unsigned" | openssl dgst -sha256 -sign "$key_file" | b64url)"
+          jwt="$unsigned.$signature"
+          installations="$RUNNER_TEMP/installations.json"
+          curl --fail --silent --show-error \
+            -H 'Accept: application/vnd.github+json' \
+            -H "Authorization: Bearer $jwt" \
+            -H 'X-GitHub-Api-Version: 2022-11-28' \
+            'https://api.github.com/app/installations?per_page=100' > "$installations"
+          installation_id="$(python3 - "$installations" "$ORG" <<'PY'
+          import json, sys
+          path, organization = sys.argv[1:]
+          rows = json.load(open(path, encoding='utf-8'))
+          exact = [row for row in rows if isinstance(row, dict) and isinstance(row.get('account'), dict) and row['account'].get('login') == organization]
+          if len(exact) != 1 or type(exact[0].get('id')) is not int:
+              raise SystemExit('exact organization installation unavailable or ambiguous')
+          print(exact[0]['id'])
+          PY
+          )"
+          token_json="$RUNNER_TEMP/installation-token.json"
+          curl --fail --silent --show-error \
+            -X POST \
+            -H 'Accept: application/vnd.github+json' \
+            -H "Authorization: Bearer $jwt" \
+            -H 'X-GitHub-Api-Version: 2022-11-28' \
+            "https://api.github.com/app/installations/$installation_id/access_tokens" > "$token_json"
+          python3 - "$token_json" "$token_file" <<'PY'
+          import json, os, sys
+          source, destination = sys.argv[1:]
+          value = json.load(open(source, encoding='utf-8'))
+          token = value.get('token') if isinstance(value, dict) else None
+          if not isinstance(token, str) or len(token) < 20:
+              raise SystemExit('installation token unavailable')
+          with open(destination, 'w', encoding='utf-8') as handle:
+              handle.write(token)
+          os.chmod(destination, 0o600)
+          PY
+          rm -f "$key_file" "$installations" "$token_json"
+          printf 'ORG_APP_TOKEN_FILE=%s\n' "$token_file" >> "$GITHUB_ENV"
+
+      - name: Update only admissible heads and enable protected auto-merge
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from __future__ import annotations
+
+          import json
+          import os
+          from pathlib import Path
+          import re
+          import urllib.error
+          import urllib.parse
+          import urllib.request
+
+          API = "https://api.github.com"
+          GRAPHQL = "https://api.github.com/graphql"
+          ORG = os.environ["ORG"]
+          CONTROLLER_BRANCH = os.environ["CONTROLLER_BRANCH"]
+          TOKEN_FILE = Path(os.environ["ORG_APP_TOKEN_FILE"])
+          TOKEN = TOKEN_FILE.read_text(encoding="utf-8").strip()
+          RECEIPT = Path("audit/ORG_PR_CONVERGENCE_20260828.json")
+          WORKFLOW = Path(".github/workflows/zz-org-pr-convergence-20260828.yml")
+          ALLOWED_CONCLUSIONS = {"success", "neutral", "skipped"}
+          HOLD_PATTERNS = (
+              r"\bdraft\s*/\s*hold\b",
+              r"\bkeep this pr draft\b",
+              r"\bdo not merge\b",
+              r"\bno merge .* authorized\b",
+              r"\bpending an independent review\b",
+              r"\bindependent exact-head review:\s*pending\b",
+              r"\bstack\s*/\s*landing order\b",
+              r"\bmust integrate current protected main\b",
+              r"\brebuild this tree on the new signed main\b",
+              r"\bcurrent unresolved p[01]\b",
+              r"\bmerge remains blocked\b",
+          )
+
+          def request_json(method: str, url: str, payload: object | None = None) -> object:
+              body = None
+              headers = {
+                  "Accept": "application/vnd.github+json",
+                  "Authorization": f"Bearer {TOKEN}",
+                  "User-Agent": "szl-bounded-org-pr-convergence/1",
+                  "X-GitHub-Api-Version": "2022-11-28",
+              }
+              if payload is not None:
+                  body = json.dumps(payload, separators=(",", ":")).encode("utf-8")
+                  headers["Content-Type"] = "application/json"
+              request = urllib.request.Request(url, data=body, headers=headers, method=method)
+              try:
+                  with urllib.request.urlopen(request, timeout=30) as response:
+                      return {} if response.status == 204 else json.load(response)
+              except urllib.error.HTTPError as error:
+                  detail = error.read(4096).decode("utf-8", "replace")
+                  raise RuntimeError(f"{method} {url} failed {error.code}: {detail}") from error
+
+          def get(path: str) -> object:
+              return request_json("GET", API + path)
+
+          def paginate(path: str, key: str | None = None, max_pages: int = 100) -> list[dict]:
+              rows: list[dict] = []
+              for page in range(1, max_pages + 1):
+                  separator = "&" if "?" in path else "?"
+                  response = get(f"{path}{separator}per_page=100&page={page}")
+                  if key is None:
+                      if not isinstance(response, list):
+                          raise RuntimeError(f"list inventory malformed for {path}")
+                      batch = response
+                  else:
+                      if not isinstance(response, dict) or not isinstance(response.get(key), list):
+                          raise RuntimeError(f"object inventory malformed for {path}")
+                      batch = response[key]
+                  if any(not isinstance(row, dict) for row in batch):
+                      raise RuntimeError(f"inventory row malformed for {path}")
+                  rows.extend(batch)
+                  if len(batch) < 100:
+                      return rows
+              raise RuntimeError(f"pagination bound exceeded for {path}")
+
+          def graphql(query: str, variables: dict) -> dict:
+              response = request_json("POST", GRAPHQL, {"query": query, "variables": variables})
+              if not isinstance(response, dict):
+                  raise RuntimeError("GraphQL response is not an object")
+              if response.get("errors"):
+                  raise RuntimeError(f"GraphQL failed: {json.dumps(response['errors'])[:3000]}")
+              data = response.get("data")
+              if not isinstance(data, dict):
+                  raise RuntimeError("GraphQL data unavailable")
+              return data
+
+          def main_sha(repository: str) -> str:
+              response = get(f"/repos/{repository}/branches/main")
+              commit = response.get("commit") if isinstance(response, dict) else None
+              sha = commit.get("sha") if isinstance(commit, dict) else None
+              if not isinstance(sha, str) or re.fullmatch(r"[0-9a-f]{40}", sha) is None:
+                  raise RuntimeError(f"protected main identity unavailable for {repository}")
+              return sha
+
+          def review_state(owner: str, name: str, number: int) -> tuple[str | None, list[dict], str]:
+              query = """
+              query($owner:String!,$name:String!,$number:Int!,$cursor:String) {
+                repository(owner:$owner,name:$name) {
+                  pullRequest(number:$number) {
+                    id
+                    reviewDecision
+                    reviewThreads(first:100,after:$cursor) {
+                      nodes { id isResolved isOutdated }
+                      pageInfo { hasNextPage endCursor }
+                    }
+                  }
+                }
+              }
+              """
+              cursor = None
+              decision = None
+              node_id = None
+              threads: list[dict] = []
+              while True:
+                  data = graphql(query, {"owner": owner, "name": name, "number": number, "cursor": cursor})
+                  repository = data.get("repository")
+                  pull = repository.get("pullRequest") if isinstance(repository, dict) else None
+                  if not isinstance(pull, dict):
+                      raise RuntimeError(f"{owner}/{name}#{number} vanished")
+                  node_id = pull.get("id")
+                  decision = pull.get("reviewDecision")
+                  inventory = pull.get("reviewThreads")
+                  if not isinstance(inventory, dict):
+                      raise RuntimeError("review thread inventory unavailable")
+                  nodes = inventory.get("nodes")
+                  page = inventory.get("pageInfo")
+                  if not isinstance(nodes, list) or not isinstance(page, dict):
+                      raise RuntimeError("review thread inventory malformed")
+                  threads.extend(row for row in nodes if isinstance(row, dict))
+                  if not page.get("hasNextPage"):
+                      break
+                  cursor = page.get("endCursor")
+                  if not isinstance(cursor, str) or not cursor:
+                      raise RuntimeError("review thread pagination malformed")
+              if not isinstance(node_id, str) or not node_id:
+                  raise RuntimeError("pull request node ID unavailable")
+              unresolved = [row for row in threads if row.get("isResolved") is False and row.get("isOutdated") is False]
+              return decision if isinstance(decision, str) else None, unresolved, node_id
+
+          repositories = paginate(f"/orgs/{ORG}/repos?type=all&sort=full_name&direction=asc")
+          repo_state: dict[str, dict] = {}
+          for row in repositories:
+              full_name = row.get("full_name")
+              if not isinstance(full_name, str) or not full_name.startswith(ORG + "/"):
+                  raise RuntimeError("organization repository inventory malformed")
+              repo_state[full_name] = {
+                  "archived": row.get("archived") is True,
+                  "disabled": row.get("disabled") is True,
+                  "default_branch": row.get("default_branch"),
+              }
+
+          pulls = paginate(
+              "/search/issues?q="
+              + urllib.parse.quote(f"org:{ORG} is:pr is:open")
+              + "&sort=updated&order=asc",
+              key="items",
+              max_pages=20,
+          )
+          baseline_main: dict[str, str] = {}
+          actions: list[dict] = []
+
+          for item in pulls:
+              repository_url = item.get("repository_url")
+              number = item.get("number")
+              if not isinstance(repository_url, str) or type(number) is not int or number <= 0:
+                  raise RuntimeError("open PR search inventory malformed")
+              repository = repository_url.rsplit("/repos/", 1)[-1]
+              record = {
+                  "repository": repository,
+                  "number": number,
+                  "title": item.get("title"),
+                  "decision": "SKIP",
+                  "reason": "UNCLASSIFIED",
+              }
+              actions.append(record)
+              state = repo_state.get(repository)
+              if not isinstance(state, dict) or state["archived"] or state["disabled"] or state["default_branch"] != "main":
+                  record["reason"] = "REPOSITORY_NOT_ADMISSIBLE"
+                  continue
+              try:
+                  pr = get(f"/repos/{repository}/pulls/{number}")
+                  if not isinstance(pr, dict) or pr.get("state") != "open":
+                      record["reason"] = "NO_LONGER_OPEN"
+                      continue
+                  head = pr.get("head") if isinstance(pr.get("head"), dict) else {}
+                  base = pr.get("base") if isinstance(pr.get("base"), dict) else {}
+                  head_repo = head.get("repo") if isinstance(head.get("repo"), dict) else {}
+                  record["head_ref"] = head.get("ref")
+                  record["head_sha"] = head.get("sha")
+                  record["draft"] = pr.get("draft")
+                  if repository == f"{ORG}/.github" and head.get("ref") == CONTROLLER_BRANCH:
+                      record["reason"] = "CONTROLLER_BRANCH"
+                      continue
+                  if pr.get("draft") is True:
+                      record["reason"] = "DRAFT"
+                      continue
+                  if base.get("ref") != "main" or head_repo.get("full_name") != repository:
+                      record["reason"] = "CROSS_REPOSITORY_OR_NON_MAIN"
+                      continue
+                  body = str(pr.get("body") or "").casefold()
+                  if any(re.search(pattern, body) for pattern in HOLD_PATTERNS):
+                      record["reason"] = "EXPLICIT_HOLD_CONTRACT"
+                      continue
+                  head_sha = head.get("sha")
+                  if not isinstance(head_sha, str) or re.fullmatch(r"[0-9a-f]{40}", head_sha) is None:
+                      record["reason"] = "MALFORMED_HEAD"
+                      continue
+
+                  checks = paginate(f"/repos/{repository}/commits/{head_sha}/check-runs", key="check_runs", max_pages=10)
+                  if not checks:
+                      record["reason"] = "NO_CHECK_EVIDENCE"
+                      continue
+                  pending = [row for row in checks if row.get("status") != "completed"]
+                  failed = [row for row in checks if row.get("status") == "completed" and row.get("conclusion") not in ALLOWED_CONCLUSIONS]
+                  if pending:
+                      record["reason"] = "CHECKS_NONTERMINAL"
+                      record["checks_nonterminal"] = [row.get("name") for row in pending]
+                      continue
+                  if failed:
+                      record["reason"] = "CHECKS_FAILED"
+                      record["checks_failed"] = [{"name": row.get("name"), "conclusion": row.get("conclusion")} for row in failed]
+                      continue
+                  status = get(f"/repos/{repository}/commits/{head_sha}/status")
+                  if isinstance(status, dict) and status.get("total_count", 0) and status.get("state") != "success":
+                      record["reason"] = "COMBINED_STATUS_NOT_SUCCESS"
+                      record["combined_status"] = status.get("state")
+                      continue
+
+                  owner, name = repository.split("/", 1)
+                  review_decision, unresolved, node_id = review_state(owner, name, number)
+                  record["review_decision"] = review_decision
+                  record["unresolved_current_threads"] = len(unresolved)
+                  if review_decision == "CHANGES_REQUESTED":
+                      record["reason"] = "CHANGES_REQUESTED"
+                      continue
+                  if unresolved:
+                      record["reason"] = "UNRESOLVED_CURRENT_THREADS"
+                      continue
+
+                  if repository not in baseline_main:
+                      baseline_main[repository] = main_sha(repository)
+                  if main_sha(repository) != baseline_main[repository]:
+                      record["reason"] = "MAIN_CHANGED_DURING_CONTROLLER"
+                      continue
+
+                  mergeable = pr.get("mergeable")
+                  mergeable_state = pr.get("mergeable_state")
+                  record["mergeable"] = mergeable
+                  record["mergeable_state"] = mergeable_state
+                  if mergeable_state == "behind":
+                      update = request_json(
+                          "PUT",
+                          API + f"/repos/{repository}/pulls/{number}/update-branch",
+                          {"expected_head_sha": head_sha},
+                      )
+                      record["decision"] = "UPDATE_BRANCH"
+                      record["reason"] = "BEHIND_CURRENT_MAIN"
+                      record["api_result"] = update
+                      continue
+                  if mergeable is not True or mergeable_state != "clean":
+                      record["reason"] = f"NOT_CLEAN:{mergeable_state}"
+                      continue
+                  if pr.get("auto_merge") is not None:
+                      record["decision"] = "ALREADY_AUTO_MERGE"
+                      record["reason"] = "ADMISSIBLE"
+                      continue
+
+                  mutation = """
+                  mutation($pullRequestId:ID!) {
+                    enablePullRequestAutoMerge(input:{pullRequestId:$pullRequestId,mergeMethod:SQUASH}) {
+                      pullRequest { number autoMergeRequest { enabledAt mergeMethod } }
+                    }
+                  }
+                  """
+                  result = graphql(mutation, {"pullRequestId": node_id})
+                  record["decision"] = "ENABLE_AUTO_MERGE"
+                  record["reason"] = "ADMISSIBLE"
+                  record["api_result"] = result
+              except Exception as error:
+                  record["reason"] = "CONTROLLER_ERROR"
+                  record["error"] = f"{type(error).__name__}: {error}"
+
+          final_main = {}
+          for repository, expected in baseline_main.items():
+              try:
+                  final_main[repository] = main_sha(repository)
+              except Exception as error:
+                  final_main[repository] = f"ERROR:{type(error).__name__}:{error}"
+
+          receipt = {
+              "schema": "szl.org-pr-convergence/v1",
+              "organization": ORG,
+              "baseline_main": baseline_main,
+              "final_main": final_main,
+              "actions": actions,
+              "summary": {
+                  "open_prs_seen": len(actions),
+                  "branches_updated": sum(row.get("decision") == "UPDATE_BRANCH" for row in actions),
+                  "auto_merge_enabled": sum(row.get("decision") == "ENABLE_AUTO_MERGE" for row in actions),
+                  "already_auto_merge": sum(row.get("decision") == "ALREADY_AUTO_MERGE" for row in actions),
+                  "skipped": sum(row.get("decision") == "SKIP" for row in actions),
+                  "controller_errors": sum(row.get("reason") == "CONTROLLER_ERROR" for row in actions),
+              },
+          }
+          RECEIPT.parent.mkdir(parents=True, exist_ok=True)
+          RECEIPT.write_text(json.dumps(receipt, ensure_ascii=False, sort_keys=True, indent=2) + "\n", encoding="utf-8")
+          TOKEN_FILE.unlink(missing_ok=True)
+          if not WORKFLOW.is_file():
+              raise RuntimeError("self-deleting organization controller is missing")
+          WORKFLOW.unlink()
+          PY
+
+          git config user.name "Lutar, Stephen P."
+          git config user.email "stephenlutar2@gmail.com"
+          git add audit/ORG_PR_CONVERGENCE_20260828.json \
+            .github/workflows/zz-org-pr-convergence-20260828.yml
+          git diff --cached --check
+          git commit \
+            -m "ops(pr): record organization convergence decisions" \
+            -m "Update only behind same-repository heads and enable protected squash auto-merge only for terminal-green, review-clean, non-held pull requests across SZL Holdings. Remove the one-shot controller." \
+            -m "Signed-off-by: Lutar, Stephen P. <stephenlutar2@gmail.com>"
+          git push origin HEAD:ops/org-pr-convergence-20260828
