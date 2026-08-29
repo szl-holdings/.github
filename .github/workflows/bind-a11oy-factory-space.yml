@@ -8,8 +8,9 @@ jobs:
     name: Create private Docker Space SZLHOLDINGS/a11oy-factory
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    environment: production
     env:
-      HF_TOKEN: ${{ secrets.HF_ORG_TOKEN || secrets.HF_ORG_TOKEN1 || secrets.HF_TOKEN }}
+      HF_TOKEN: ${{ secrets.HF_ORG_TOKEN || secrets.HF_ORG_TOKEN1 || secrets.HF_TOKEN || secrets.HF_WRITE_TOKEN }}
       HF_HUB_DISABLE_PROGRESS_BARS: "1"
     steps:
       - name: Checkout factory source
