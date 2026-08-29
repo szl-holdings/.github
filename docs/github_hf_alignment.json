@@ -1,0 +1,36 @@
+{
+  "schema": "szl.github-hf-alignment/v1",
+  "status": "SOURCE_MIRROR_REGISTRY_PUBLISHED",
+  "capturedAt": "2026-08-29T00:31:00-04:00",
+  "evidenceClass": "REPORTED",
+  "runtimeState": "DEMO",
+  "rule": "GitHub is protected source. Hugging Face is the artifact mirror, not customer production.",
+  "github": {
+    "org": "szl-holdings",
+    "searchTotal": 82,
+    "orgPageShown": 69,
+    "privateObserved": 5,
+    "archivedObserved": 7,
+    "remainingOpenPr": "szl-holdings/.github#465"
+  },
+  "huggingface": {
+    "org": "SZLHOLDINGS",
+    "models": 40,
+    "datasets": 28,
+    "spacesApi": 31,
+    "spacesOrgCard": 30,
+    "collections": 13,
+    "kernelTaggedModels": 15
+  },
+  "packet": {
+    "githubAuthenticated": 76,
+    "hfModelsDedicated": 17,
+    "hfSpaces": 27
+  },
+  "denies": [
+    "No new public GitHub repository",
+    "No new Hugging Face Space or model-brand",
+    "No ATO, paid pilot, ROI, or live BFT",
+    "No 9000-node second-brain invention"
+  ]
+}

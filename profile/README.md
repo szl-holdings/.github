@@ -91,10 +91,8 @@ universal safety, customer adoption, or an investment outcome.
 [Hatun MCP](https://github.com/szl-holdings/hatun-mcp) ·
 [Runtime substrate](https://github.com/szl-holdings/szl-substrate)
 
-Read each artifact's license and limits before use.
-The [public experience standard](https://github.com/szl-holdings/.github/blob/main/docs/PUBLIC_EXPERIENCE_STANDARD.md)
-and [estate lifecycle map](https://github.com/szl-holdings/.github/blob/main/docs/ESTATE_LIFECYCLE.md)
-define the shared contract.
+[Public experience](https://github.com/szl-holdings/.github/blob/main/docs/PUBLIC_EXPERIENCE_STANDARD.md)
+and [lifecycle](https://github.com/szl-holdings/.github/blob/main/docs/ESTATE_LIFECYCLE.md).
 
 ## Current state
 
@@ -106,6 +104,12 @@ define the shared contract.
 
 The dataset [`SZLHOLDINGS/SZLHOLDINGS`](https://huggingface.co/datasets/SZLHOLDINGS/SZLHOLDINGS)
 is a **HISTORICAL** mirror, not a current card or runtime source.
+
+
+## GitHub ↔ Hugging Face
+
+GitHub is protected source. Hugging Face is the artifact mirror.
+[Alignment registry](https://github.com/szl-holdings/.github/blob/main/docs/GITHUB_HF_ALIGNMENT.md).
 
 ## Truth language
 
