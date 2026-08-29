@@ -1,0 +1,37 @@
+{
+  "schema": "szl.green-light/v1",
+  "terminal": "GREEN_LIGHT",
+  "action": "AUTHORIZE_WAVE_1",
+  "actor": "founder@szl-holdings",
+  "capturedAt": "2026-08-29T09:05:00-04:00",
+  "signedAt": "2026-08-29T06:47:00-04:00",
+  "kind": {
+    "estate.sign": "ALLOW",
+    "estate.admit": "DENY",
+    "wave.unlock": "DENY"
+  },
+  "productionCertified": false,
+  "github": {
+    "searchTotal": 85,
+    "orgPageShown": 80,
+    "privateObserved": 5,
+    "archivedObserved": 7,
+    "openPrs": ["szl-holdings/immune#56"]
+  },
+  "huggingface": {
+    "org": "SZLHOLDINGS",
+    "models": 40,
+    "datasets": 28,
+    "spaces": 35
+  },
+  "holds": [
+    "immune#56 QUALIFY_PUBLICATION — Hub-write mirror, checks unstable, not merged",
+    "a11oy trusted-contract job 99096216389 FAILED — green light does not override"
+  ],
+  "denies": [
+    "No new public GitHub repository",
+    "No new Hugging Face Space or model-brand",
+    "No production ATO",
+    "Waves 2-4 locked"
+  ]
+}
