@@ -1,0 +1,15 @@
+{
+  "capturedAt": "2026-08-29T09:35:00-04:00",
+  "actor": "founder@szl-holdings",
+  "terminal": "GREEN_LIGHT",
+  "surface": "/brain",
+  "liveClass": "DERIVED_HANDLES",
+  "claimed9000": "UNAVAILABLE",
+  "private9464": "UNPUBLISHED",
+  "newHubSpace": false,
+  "productionCertified": false,
+  "dco": "GitHub-signed commits with Signed-off-by. Required checks not overridden.",
+  "githubSearch": 88,
+  "hub": { "models": 40, "datasets": 28, "spaces": 35 },
+  "heldPrs": [".github#496", "a11oy-factory#1", "a11oy-net#41"]
+}
