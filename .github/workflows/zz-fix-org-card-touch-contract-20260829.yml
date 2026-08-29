@@ -1,0 +1,80 @@
+name: Reconcile org-card touch geometry and embed contract
+
+on:
+  push:
+    branches:
+      - fix/org-card-touch-targets-20260829
+    paths:
+      - .github/workflows/zz-fix-org-card-touch-contract-20260829.yml
+
+permissions:
+  contents: write
+
+concurrency:
+  group: reconcile-org-card-touch-contract-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  repair:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - name: Check out exact repair branch
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.ref_name }}
+          fetch-depth: 0
+          persist-credentials: true
+
+      - name: Preserve the shared 44px token and enforce a 48px rendered box
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+
+          source = Path('huggingface/org-card/index.html')
+          html = source.read_text(encoding='utf-8')
+          old = '#szl-hf-org-card nav a { display: inline-flex; min-width: 48px; min-height: 48px; align-items: center; justify-content: center; border-radius: 10px;'
+          new = '#szl-hf-org-card nav a { display: inline-flex; min-width: 48px; height: 48px; min-height: var(--tap); align-items: center; justify-content: center; border-radius: 10px;'
+          if html.count(old) != 1:
+              raise SystemExit(f'expected one navigation geometry rule, found {html.count(old)}')
+          source.write_text(html.replace(old, new, 1), encoding='utf-8')
+
+          test = Path('tests/test_hf_org_card_touch_targets.py')
+          text = test.read_text(encoding='utf-8')
+          old_test = '''    assert "min-width: 48px" in rule
+              assert "min-height: 48px" in rule
+              assert "justify-content: center" in rule
+          '''
+          new_test = '''    assert "min-width: 48px" in rule
+              assert "height: 48px" in rule
+              assert "min-height: var(--tap)" in rule
+              assert "justify-content: center" in rule
+          '''
+          if text.count(old_test) != 1:
+              raise SystemExit(f'expected one regression assertion block, found {text.count(old_test)}')
+          test.write_text(text.replace(old_test, new_test, 1), encoding='utf-8')
+          PY
+
+          python3 -m py_compile tests/test_hf_org_card_touch_targets.py .github/scripts/hf_org_card_embed_check.py
+          python3 tests/test_hf_org_card_touch_targets.py
+          python3 -m unittest discover -s .github/scripts -p test_hf_org_card_embed_check.py
+          python3 .github/scripts/hf_org_card_embed_check.py
+          git diff --check
+
+      - name: Commit exact reconciliation and remove bounded workflow
+        shell: bash
+        run: |
+          set -euo pipefail
+          git rm .github/workflows/zz-fix-org-card-touch-contract-20260829.yml
+          git add huggingface/org-card/index.html tests/test_hf_org_card_touch_targets.py
+          git diff --cached --check
+          git config user.name 'Lutar, Stephen P.'
+          git config user.email 'stephenlutar2@gmail.com'
+          git commit \
+            -m 'fix(frontend): preserve org-card touch token contract' \
+            -m 'Keep min-height bound to the shared 44px token required by the isolated embed contract while rendering every navigation control at a full 48px height with rectangular hit geometry.' \
+            -m 'Signed-off-by: Lutar, Stephen P. <stephenlutar2@gmail.com>'
+          git push origin "HEAD:${GITHUB_REF_NAME}"
