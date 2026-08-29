@@ -1,0 +1,58 @@
+{
+  "schema": "szl.intended-rulesets/v5",
+  "truth_boundary": "Intended policy is not live enforcement. Promote only through a protected PR and prove with API readback.",
+  "solo_operator_exception": {
+    "id": "SOLO_OPERATOR_EXCEPTION",
+    "status": "ACTIVE_EXPIRING",
+    "reason": "Independent non-author reviewer is not currently available.",
+    "requires": [
+      "exact-head automated review",
+      "signed commits",
+      "strict status checks",
+      "squash-only"
+    ],
+    "expires_at": "2026-09-11T23:59:59-04:00",
+    "independent_human_approval": "UNAVAILABLE"
+  },
+  "tiers": {
+    "T0": {
+      "approvals": 1,
+      "allow_solo_operator_exception": true,
+      "require_code_owner_review": false,
+      "require_last_push_approval": false,
+      "require_conversation_resolution": true,
+      "require_signatures": true,
+      "strict_status_checks": true,
+      "allowed_merge_methods": ["squash"],
+      "bypass_actors": [],
+      "required_check_substrings": [
+        "gitleaks",
+        "lockfile",
+        "ci",
+        "e2e",
+        "security",
+        "codeql",
+        "dependency",
+        "readiness"
+      ]
+    },
+    "T1": {
+      "approvals": 1,
+      "allow_solo_operator_exception": true,
+      "require_conversation_resolution": true,
+      "require_signatures": true,
+      "strict_status_checks": true,
+      "allowed_merge_methods": ["squash"],
+      "bypass_actors": [],
+      "required_check_substrings": ["gitleaks", "security", "dependency"]
+    },
+    "T2": {
+      "approvals": 0,
+      "require_conversation_resolution": true,
+      "require_signatures": false,
+      "strict_status_checks": false,
+      "allowed_merge_methods": ["squash"],
+      "required_check_substrings": []
+    }
+  }
+}

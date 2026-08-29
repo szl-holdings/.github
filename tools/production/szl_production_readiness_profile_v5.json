@@ -1,0 +1,1820 @@
+{
+  "captured_at": "2026-08-28T23:58:00-04:00",
+  "current_findings": [
+    {
+      "finding": "Captured active repository ruleset: zero approvals, no code-owner review, no last-push approval, squash and rebase allowed, strict/up-to-date disabled, and only one lockfile status check required.",
+      "id": "CTRL-001",
+      "required_action": "Make live enforcement match policy: strict aggregate gates, squash-only, signatures, no bypass, conversation resolution, and honest solo-operator/independent-review modes.",
+      "severity": "P0",
+      "target": "szl-holdings/platform"
+    },
+    {
+      "finding": "Captured active series-a ruleset: signatures and strict status checks exist, but zero approvals and only Gitleaks plus a lockfile check are required; a separate workflow protects frontier source pins.",
+      "id": "CTRL-002",
+      "required_action": "Add actual aggregate CI, backend, E2E, accessibility/performance, dependency, CodeQL, readiness, release-contract, and Hub-parity contexts after discovering exact names.",
+      "severity": "P0",
+      "target": "szl-holdings/a11oy"
+    },
+    {
+      "finding": "Captured organization default ruleset requires PRs and thread resolution but zero approvals, no code-owner/last-push approval, and no required status checks.",
+      "id": "CTRL-003",
+      "required_action": "Create tiered intended rulesets and a policy-as-code test against effective API readback for every repository.",
+      "severity": "P0",
+      "target": "szl-holdings organization"
+    }
+  ],
+  "gates": [
+    {
+      "block_release": true,
+      "controls": [
+        "API-read every applicable ruleset and required workflow.",
+        "Strict up-to-date checks for T0/T1; no bypass or direct-main writes.",
+        "Squash-only promotion; signed commits/tags; thread resolution.",
+        "Independent non-author approval when available; expiring SOLO_OPERATOR_EXCEPTION otherwise.",
+        "Policy-as-code test fails when intended and effective rulesets diverge."
+      ],
+      "domain": "governance",
+      "evidence": [
+        "effective_rulesets.json",
+        "required_checks.json",
+        "ruleset_diff.json",
+        "control-plane receipt"
+      ],
+      "id": "G00",
+      "name": "Governance and effective control plane",
+      "objective": "Governance and effective control plane",
+      "priority": "P0"
+    },
+    {
+      "block_release": true,
+      "controls": [
+        "One package manager/lockfile per workspace.",
+        "Clean-clone install/build/test with deterministic generated files.",
+        "No unmanaged large binaries or build output in Git.",
+        "Actions and container bases are immutable pinned.",
+        "Build manifest binds source, toolchain, locks, and artifact digest."
+      ],
+      "domain": "build",
+      "evidence": [
+        "clean_clone.json",
+        "build_manifest.json",
+        "artifact_digest.json",
+        "reproducibility_diff.json"
+      ],
+      "id": "G01",
+      "name": "Clean clone, deterministic build, and repository hygiene",
+      "objective": "Clean clone, deterministic build, and repository hygiene",
+      "priority": "P0"
+    },
+    {
+      "block_release": true,
+      "controls": [
+        "Format, lint, typecheck, dependency boundaries, dead code, generated-code drift.",
+        "No T0/T1 circular dependencies.",
+        "Risk-critical authorization, tenancy, receipt, approval, rollback paths have direct tests.",
+        "Flaky tests have owner/expiry; retries collect evidence but never turn nondeterminism green.",
+        "One production:verify command emits a machine aggregate."
+      ],
+      "domain": "code_quality",
+      "evidence": [
+        "quality_results.json",
+        "test_aggregate.json",
+        "dependency_graph.json",
+        "flaky_test_register.json"
+      ],
+      "id": "G02",
+      "name": "Static quality, typing, architecture, and maintainability",
+      "objective": "Static quality, typing, architecture, and maintainability",
+      "priority": "P0"
+    },
+    {
+      "block_release": true,
+      "controls": [
+        "Playwright on Chromium, Firefox, WebKit.",
+        "Desktop/tablet and 390/375/320px viewports.",
+        "No uncaught errors, console errors, critical request failures, mixed content, broken links, or unexpected redirects.",
+        "Visual regression masks only declared dynamic regions.",
+        "Failed CI retains trace, screenshots, video, DOM, network, and exact revision."
+      ],
+      "domain": "frontend",
+      "evidence": [
+        "playwright-report",
+        "browser-matrix.json",
+        "visual-diff.json",
+        "trace-bundles"
+      ],
+      "id": "G03",
+      "name": "Frontend functional and journey verification",
+      "objective": "Frontend functional and journey verification",
+      "priority": "P0"
+    },
+    {
+      "block_release": true,
+      "controls": [
+        "Zero critical/serious axe violations and blocking Lighthouse accessibility.",
+        "Manual keyboard, focus, escape, screen-reader, zoom/reflow, reduced-motion and contrast review.",
+        "Accessible names, skip links, target sizes, labels, live regions.",
+        "Maps/3D have equivalent table/list summaries.",
+        "Current audit records route, browser and assistive-technology scope."
+      ],
+      "domain": "frontend",
+      "evidence": [
+        "axe-results.json",
+        "wcag22-checklist.json",
+        "manual-a11y-witness.md",
+        "lighthouse-results.json"
+      ],
+      "id": "G04",
+      "name": "Accessibility WCAG 2.2 AA",
+      "objective": "Accessibility WCAG 2.2 AA",
+      "priority": "P0"
+    },
+    {
+      "block_release": true,
+      "controls": [
+        "Field p75: LCP <=2.5s, INP <=200ms, CLS <=0.1 by device class.",
+        "Production-build Lighthouse with at least three diagnostic runs.",
+        "No synchronous 3D/map/model inventory in the first fold.",
+        "Route JS/CSS/image/font budgets and regression limits.",
+        "Performance, best practices and SEO become blocking after baseline remediation."
+      ],
+      "domain": "frontend",
+      "evidence": [
+        "rum-vitals.json",
+        "lighthouse-production.json",
+        "bundle-analysis.json",
+        "performance-budget.json"
+      ],
+      "id": "G05",
+      "name": "Frontend performance and user experience",
+      "objective": "Frontend performance and user experience",
+      "priority": "P0"
+    },
+    {
+      "block_release": true,
+      "controls": [
+        "Product first fold states buyer, problem, Lyte outcome, proof and CTA.",
+        "Console, investor, estate, verifier, trust and research routes are separate.",
+        "a11oy.net is proof-first; Hugging Face is artifact-first.",
+        "No stale counts/status/product names or unsupported parity claims.",
+        "Changing claims are generated with source and freshness."
+      ],
+      "domain": "frontend",
+      "evidence": [
+        "content-contract.json",
+        "claims-diff.json",
+        "route-role-map.json",
+        "freshness-report.json"
+      ],
+      "id": "G06",
+      "name": "Content design, information architecture, and truth",
+      "objective": "Content design, information architecture, and truth",
+      "priority": "P0"
+    },
+    {
+      "block_release": true,
+      "controls": [
+        "Canonical OpenAPI/JSON Schema and breaking-change diff.",
+        "Strict request/response validation, bounded bodies and pagination.",
+        "Stable error code plus request/trace/error IDs and source revision.",
+        "Idempotency for mutations; safe timeout/cancel/retry/backoff/circuit breaker/bulkhead.",
+        "Identity/tenant/operation-aware rate limits and tested deprecation windows."
+      ],
+      "domain": "backend",
+      "evidence": [
+        "openapi.json",
+        "api-breakage-report.json",
+        "contract-tests.xml",
+        "fault-injection.json"
+      ],
+      "id": "G07",
+      "name": "API contracts, validation, and compatibility",
+      "objective": "API contracts, validation, and compatibility",
+      "priority": "P0"
+    },
+    {
+      "block_release": true,
+      "controls": [
+        "Verify explicitly, least privilege, short-lived credentials, deny by default.",
+        "Tenant identity propagates through data, retrieval, cache, model/tool, receipt and telemetry.",
+        "Model output never grants authority.",
+        "Admin/destructive paths have step-up controls and audit.",
+        "Secrets/PII never appear in logs, traces, screenshots, errors or receipts.",
+        "ASVS L2 baseline and targeted L3 verification."
+      ],
+      "domain": "backend_security",
+      "evidence": [
+        "authorization-matrix.json",
+        "tenant-isolation-tests.json",
+        "asvs-verification.json",
+        "redaction-tests.json"
+      ],
+      "id": "G08",
+      "name": "Identity, tenancy, authorization, and data protection",
+      "objective": "Identity, tenancy, authorization, and data protection",
+      "priority": "P0"
+    },
+    {
+      "block_release": true,
+      "controls": [
+        "Durable governed storage is mandatory for production readiness.",
+        "Forward, rollback/roll-forward, compatibility and dirty-upgrade tests.",
+        "Backup/restore exercise with measured RPO/RTO draft.",
+        "Transactions, constraints, idempotency and concurrent writers tested.",
+        "Serving identity cannot edit/delete append-only evidence."
+      ],
+      "domain": "backend",
+      "evidence": [
+        "migration-test.json",
+        "restore-exercise.json",
+        "concurrency-tests.json",
+        "negative-mutation-test.json"
+      ],
+      "id": "G09",
+      "name": "Persistence, migrations, backup, and recovery",
+      "objective": "Persistence, migrations, backup, and recovery",
+      "priority": "P0"
+    },
+    {
+      "block_release": true,
+      "controls": [
+        "Distinct startup/liveness/readiness.",
+        "Graceful shutdown/restart with no corrupt or duplicate operation.",
+        "Forecast and 2x load, burst, stress and soak tests.",
+        "Dependency outage, timeout, malformed/slow response, quota, disk-full and clock-skew tests.",
+        "Declared degraded modes and loop/cost/capacity guardrails."
+      ],
+      "domain": "reliability",
+      "evidence": [
+        "probe-contract.json",
+        "load-test.json",
+        "soak-test.json",
+        "chaos-results.json",
+        "capacity-plan.json"
+      ],
+      "id": "G10",
+      "name": "Reliability, capacity, degradation, and failure testing",
+      "objective": "Reliability, capacity, degradation, and failure testing",
+      "priority": "P0"
+    },
+    {
+      "block_release": true,
+      "controls": [
+        "OTel traces, metrics and logs with semantic conventions.",
+        "Trace browser -> API -> policy -> model -> tool -> approval -> receipt -> outcome.",
+        "SLOs approved only after baseline; no invented uptime.",
+        "Error-budget policy freezes nonessential change when exhausted.",
+        "Every alert ends in page, ticket or logging and has an owner."
+      ],
+      "domain": "operations",
+      "evidence": [
+        "otel-conformance.json",
+        "slo.yaml",
+        "error-budget.json",
+        "alert-routing.json",
+        "trace-witness.json"
+      ],
+      "id": "G11",
+      "name": "Observability, SLOs, error budgets, and alerting",
+      "objective": "Observability, SLOs, error budgets, and alerting",
+      "priority": "P0"
+    },
+    {
+      "block_release": true,
+      "controls": [
+        "Uniform debug bundle with IDs, exact revisions, sanitized logs, browser trace and replay fixture.",
+        "Contain/rollback before speculative repair.",
+        "Failing reproduction/regression test precedes fix where feasible.",
+        "Bisect/dependency-diff evidence.",
+        "Blameless postmortem and permanent control improvement."
+      ],
+      "domain": "operations",
+      "evidence": [
+        "debug-bundle.json",
+        "incident-timeline.json",
+        "regression-test.json",
+        "postmortem.md",
+        "corrective-actions.json"
+      ],
+      "id": "G12",
+      "name": "Debugging, incident response, and learning",
+      "objective": "Debugging, incident response, and learning",
+      "priority": "P0"
+    },
+    {
+      "block_release": true,
+      "controls": [
+        "NIST SSDF outcome map and T0 threat model.",
+        "Secret scan/push protection, CodeQL/SAST, dependency review, vuln/license policy.",
+        "Pinned actions/bases and least-privilege workflow permissions.",
+        "SBOM and ML-BOM where applicable.",
+        "Generate and verify artifact attestation; immutable release and offline bundle."
+      ],
+      "domain": "security",
+      "evidence": [
+        "ssdf-map.json",
+        "threat-model.md",
+        "security-results.sarif",
+        "sbom.json",
+        "attestation-verification.json"
+      ],
+      "id": "G13",
+      "name": "Secure software and supply chain",
+      "objective": "Secure software and supply chain",
+      "priority": "P0"
+    },
+    {
+      "block_release": true,
+      "controls": [
+        "Build once and promote exact artifact.",
+        "CI -> preview -> staging -> canary -> production.",
+        "Merge does not automatically mean global release.",
+        "Canary success/abort thresholds and automatic rollback/traffic removal.",
+        "Runtime readback binds artifact, policy, model/data and receipt."
+      ],
+      "domain": "release",
+      "evidence": [
+        "release-candidate.json",
+        "ring-results.json",
+        "canary-analysis.json",
+        "rollback-test.json",
+        "runtime-readback.json"
+      ],
+      "id": "G14",
+      "name": "Release rings, canary, rollback, and post-deploy verification",
+      "objective": "Release rings, canary, rollback, and post-deploy verification",
+      "priority": "P0"
+    },
+    {
+      "block_release": true,
+      "controls": [
+        "No public pickle/joblib; no mutable trust_remote_code.",
+        "Weights/adapters/quantizations/kernels/recipes/aliases/roadmaps/history visibly distinct.",
+        "Cards include source, rights/license, intended use, limits, training/eval revisions and N.",
+        "Spaces bind exact source/deployment/runtime/readiness/accessibility/security.",
+        "One writer, exact-parent Hub PRs, immutable readback, red-team and drift gates."
+      ],
+      "domain": "ai_hub",
+      "evidence": [
+        "hf-inventory.json",
+        "artifact-passports",
+        "unsafe-serialization.json",
+        "eval-scorecards",
+        "space-readback.json"
+      ],
+      "id": "G15",
+      "name": "Hugging Face model, data, kernel, and Space controls",
+      "objective": "Hugging Face model, data, kernel, and Space controls",
+      "priority": "P0"
+    },
+    {
+      "block_release": true,
+      "controls": [
+        "One product hierarchy and primary vertical.",
+        "Three deterministic positive/negative demonstrations.",
+        "Architecture, data flow, threat model, SLO draft, release, incident, support and compatibility.",
+        "Current risk/claim/gap/dependency/license/data-rights registers.",
+        "Clean-machine governed decision and offline verification."
+      ],
+      "domain": "investor",
+      "evidence": [
+        "diligence-index.json",
+        "investor-demo-receipts",
+        "clean-machine-proof.json",
+        "risk-register.json",
+        "claims-register.json"
+      ],
+      "id": "G16",
+      "name": "Investor, customer, and contributor diligence",
+      "objective": "Investor, customer, and contributor diligence",
+      "priority": "P0"
+    }
+  ],
+  "leader_processes": [
+    {
+      "pattern": "Risk-scaled PRR covering architecture, traffic, capacity, dependencies, failover, operations, ownership.",
+      "source": "Google SRE launch planning",
+      "source_url": "https://sre.google/resources/practices-and-processes/production-launch-planning/",
+      "szl_translation": "Risk-tiered Production Readiness Review for every T0/T1 repo and public runtime."
+    },
+    {
+      "pattern": "SLO/error budget determines whether to ship or freeze nonessential changes.",
+      "source": "Google SRE error budgets",
+      "source_url": "https://sre.google/sre-book/service-best-practices/",
+      "szl_translation": "Measured SLOs and an automatic reliability mode when budget is exhausted."
+    },
+    {
+      "pattern": "Independent verification and gradual release through rings.",
+      "source": "Microsoft SDL / safe deployment",
+      "source_url": "https://learn.microsoft.com/en-us/compliance/assurance/assurance-microsoft-security-development-lifecycle",
+      "szl_translation": "Exact-head review plus build-once preview, staging, canary, and production promotion."
+    },
+    {
+      "pattern": "Consistent operational excellence, security, reliability, performance, cost, sustainability review.",
+      "source": "AWS Well-Architected",
+      "source_url": "https://docs.aws.amazon.com/wellarchitected/latest/userguide/waf.html",
+      "szl_translation": "One evidence-linked architecture and operations scorecard."
+    },
+    {
+      "pattern": "Prepare, protect, produce well-secured software, and respond to vulnerabilities.",
+      "source": "NIST SSDF",
+      "source_url": "https://csrc.nist.gov/projects/ssdf",
+      "szl_translation": "SSDF mapping for T0 and AI-specific model/data practices."
+    },
+    {
+      "pattern": "Standardized verification of web application security controls.",
+      "source": "OWASP ASVS 5",
+      "source_url": "https://owasp.org/www-project-application-security-verification-standard/",
+      "szl_translation": "ASVS L2 baseline; targeted L3 for identity, approval, receipt, and admin paths."
+    },
+    {
+      "pattern": "Dependency review, immutable releases, SBOM, attestations, and verification.",
+      "source": "GitHub supply chain",
+      "source_url": "https://docs.github.com/en/code-security/concepts/supply-chain-security/supply-chain-security",
+      "szl_translation": "Build once, SPDX/CycloneDX, attest and verify before deploy, offline verification bundle."
+    },
+    {
+      "pattern": "Current testable accessibility standard.",
+      "source": "W3C WCAG 2.2",
+      "source_url": "https://www.w3.org/TR/WCAG22/",
+      "szl_translation": "WCAG 2.2 AA automated and manual evidence for current routes."
+    },
+    {
+      "pattern": "Field measurement of loading, responsiveness, and stability.",
+      "source": "Google Core Web Vitals",
+      "source_url": "https://web.dev/articles/vitals",
+      "szl_translation": "RUM p75 LCP/INP/CLS plus production-build diagnostics and budgets."
+    },
+    {
+      "pattern": "Cross-browser journeys and CI trace-based debugging.",
+      "source": "Playwright",
+      "source_url": "https://playwright.dev/docs/trace-viewer-intro",
+      "szl_translation": "Chromium/Firefox/WebKit with traces, video, screenshots, console/network evidence."
+    },
+    {
+      "pattern": "Vendor-neutral traces, metrics, logs, and semantic conventions.",
+      "source": "OpenTelemetry",
+      "source_url": "https://opentelemetry.io/docs/",
+      "szl_translation": "One context from browser through API, policy, model, tool, approval, receipt, outcome."
+    },
+    {
+      "pattern": "Separate startup, liveness, and readiness.",
+      "source": "Kubernetes probes",
+      "source_url": "https://kubernetes.io/docs/concepts/workloads/pods/probes/",
+      "szl_translation": "Distinct dependency-aware probes on every runtime."
+    },
+    {
+      "pattern": "Safe formats, signed revisions, scanning, intended-use/limitations/evaluation metadata.",
+      "source": "Hugging Face security/cards",
+      "source_url": "https://huggingface.co/docs/hub/security",
+      "szl_translation": "No public joblib/pickle, immutable remote code, generated passports and eval-bound cards."
+    }
+  ],
+  "mission": "Unify existing frontend, backend, security, truth, AI, debugging and release controls into one fail-closed PRR.",
+  "name": "SZL Production Readiness System",
+  "primary_vertical": "Build and sell Lyte Services now.",
+  "product_hierarchy": {
+    "adjacent_vertical": {
+      "commercial_name": "Aegis Assurance \u2014 MSP Security and Compliance Decision Governance",
+      "name": "Aegis Assurance",
+      "role": "Second vertical after primary traction"
+    },
+    "category": "Governed Decision Infrastructure",
+    "company": "SZL Holdings",
+    "core_product": {
+      "name": "A11oy",
+      "one_sentence": "A11oy connects operational context to policy-checked, approval-gated action and returns evidence that can be independently verified.",
+      "role": "The governed decision control plane"
+    },
+    "internal_engine": {
+      "name": "Alloy Runtime",
+      "role": "Internal execution engine and package family",
+      "rule": "Do not market Alloy as a second flagship product or a separate company-facing platform."
+    },
+    "partner_gated_vertical": {
+      "name": "Vessels Assurance",
+      "role": "Specialty vertical only with licensed data and maritime design partner"
+    },
+    "primary_vertical": {
+      "commercial_name": "Lyte Services \u2014 Professional Services Margin Assurance",
+      "name": "Lyte Services",
+      "role": "First paid vertical application"
+    },
+    "public_reference": {
+      "name": "Killinchu",
+      "role": "High-stakes governed-decision proof surface; no public effector or production authorization claim"
+    },
+    "retired_or_incubated": [
+      "Terra",
+      "Counsel",
+      "Carlota Jo",
+      "generic cross-domain command products",
+      "unfunded standalone model brands"
+    ]
+  },
+  "release_rings": [
+    {
+      "entry": "clean-clone build and required gates",
+      "exit": "exact candidate artifact and machine results",
+      "name": "CI ephemeral",
+      "ring": 0
+    },
+    {
+      "entry": "attested candidate",
+      "exit": "browser/API/a11y/performance/security/manual product review",
+      "name": "Preview",
+      "ring": 1
+    },
+    {
+      "entry": "same candidate artifact",
+      "exit": "migration/integration/replay/load/failure/rollback evidence",
+      "name": "Staging",
+      "ring": 2
+    },
+    {
+      "entry": "approved candidate and rollback",
+      "exit": "SLO, safety and business thresholds within budget",
+      "name": "Canary",
+      "ring": 3
+    },
+    {
+      "entry": "same artifact promoted from canary",
+      "exit": "runtime readback and ongoing SLO/error-budget monitoring",
+      "name": "Production",
+      "ring": 4
+    }
+  ],
+  "repo_commands": {
+    "szl-holdings/a11oy": [
+      [
+        "python",
+        "-m",
+        "compileall",
+        "-q",
+        "."
+      ],
+      [
+        "python",
+        "-m",
+        "pytest",
+        "-q"
+      ]
+    ],
+    "szl-holdings/docs-site": [
+      [
+        "pnpm",
+        "install",
+        "--frozen-lockfile"
+      ],
+      [
+        "pnpm",
+        "test"
+      ]
+    ],
+    "szl-holdings/killinchu": [
+      [
+        "python",
+        "-m",
+        "compileall",
+        "-q",
+        "."
+      ],
+      [
+        "python",
+        "-m",
+        "pytest",
+        "-q"
+      ]
+    ],
+    "szl-holdings/platform": [
+      [
+        "pnpm",
+        "install",
+        "--frozen-lockfile"
+      ],
+      [
+        "pnpm",
+        "lint:ci"
+      ],
+      [
+        "pnpm",
+        "typecheck"
+      ],
+      [
+        "pnpm",
+        "test"
+      ],
+      [
+        "pnpm",
+        "test:integration"
+      ],
+      [
+        "pnpm",
+        "test:e2e"
+      ],
+      [
+        "pnpm",
+        "security:audit"
+      ],
+      [
+        "pnpm",
+        "truth:check"
+      ],
+      [
+        "pnpm",
+        "audit:all"
+      ],
+      [
+        "pnpm",
+        "readiness:gate"
+      ]
+    ],
+    "szl-holdings/szl-forge": [
+      [
+        "python",
+        "-m",
+        "compileall",
+        "-q",
+        "."
+      ],
+      [
+        "python",
+        "-m",
+        "unittest",
+        "discover",
+        "-v"
+      ]
+    ]
+  },
+  "repositories": [
+    {
+      "action": "KEEP_AND_HARDEN",
+      "archived": "False",
+      "current_portfolio": "platform runtime",
+      "priority": "P0",
+      "production_policy": "full blocking production gate",
+      "production_tier": "T0",
+      "repository": "szl-holdings/platform",
+      "size_kb": "694880",
+      "source_url": "https://github.com/szl-holdings/platform",
+      "target": "Commercial applications monorepo; slim and remove incubator products from default build/navigation",
+      "target_class": "PUBLIC_FRONT_DOOR",
+      "visibility": "public"
+    },
+    {
+      "action": "KEEP_AND_HARDEN",
+      "archived": "False",
+      "current_portfolio": "governance control plane",
+      "priority": "P0",
+      "production_policy": "full blocking production gate",
+      "production_tier": "T0",
+      "repository": "szl-holdings/.github",
+      "size_kb": "11341",
+      "source_url": "https://github.com/szl-holdings/.github",
+      "target": "Organization profile, governance, reusable policy and workflow authority",
+      "target_class": "PUBLIC_FRONT_DOOR",
+      "visibility": "public"
+    },
+    {
+      "action": "KEEP_AND_HARDEN",
+      "archived": "False",
+      "current_portfolio": "flagship product",
+      "priority": "P0",
+      "production_policy": "full blocking production gate",
+      "production_tier": "T0",
+      "repository": "szl-holdings/a11oy",
+      "size_kb": "45799",
+      "source_url": "https://github.com/szl-holdings/a11oy",
+      "target": "Core product, control plane, open verifier/runtime surface",
+      "target_class": "PUBLIC_FRONT_DOOR",
+      "visibility": "public"
+    },
+    {
+      "action": "MIGRATE_MIRROR_ARCHIVE",
+      "archived": "False",
+      "current_portfolio": "research / component",
+      "priority": "P2",
+      "production_policy": "classification, security, integrity, migration/archive, and source-binding gate",
+      "production_tier": "T2",
+      "repository": "szl-holdings/ouroboros",
+      "size_kb": "1286",
+      "source_url": "https://github.com/szl-holdings/ouroboros",
+      "target": "one normative doctrine source plus papers/formal research",
+      "target_class": "CONSOLIDATION_SOURCE",
+      "visibility": "public"
+    },
+    {
+      "action": "KEEP_NOT_PINNED",
+      "archived": "False",
+      "current_portfolio": "examples and quickstarts",
+      "priority": "P1",
+      "production_policy": "blocking build, contract, security, provenance, and release gate",
+      "production_tier": "T1",
+      "repository": "szl-holdings/szl-cookbook",
+      "size_kb": "8520",
+      "source_url": "https://github.com/szl-holdings/szl-cookbook",
+      "target": "Clean-machine examples and repeatable investor/contributor demonstrations",
+      "target_class": "MAINTAINED_TECHNICAL",
+      "visibility": "public"
+    },
+    {
+      "action": "MIGRATE_MIRROR_ARCHIVE",
+      "archived": "False",
+      "current_portfolio": "doctrine and trust docs",
+      "priority": "P1",
+      "production_policy": "classification, security, integrity, migration/archive, and source-binding gate",
+      "production_tier": "T2",
+      "repository": "szl-holdings/szl-trust",
+      "size_kb": "191",
+      "source_url": "https://github.com/szl-holdings/szl-trust",
+      "target": "one normative doctrine source plus papers/formal research",
+      "target_class": "CONSOLIDATION_SOURCE",
+      "visibility": "public"
+    },
+    {
+      "action": "KEEP_COMPONENT_AND_SLIM",
+      "archived": "False",
+      "current_portfolio": "brand system",
+      "priority": "P2",
+      "production_policy": "classification, security, integrity, migration/archive, and source-binding gate",
+      "production_tier": "T2",
+      "repository": "szl-holdings/szl-brand",
+      "size_kb": "13919",
+      "source_url": "https://github.com/szl-holdings/szl-brand",
+      "target": "shared brand package/assets",
+      "target_class": "REVIEW",
+      "visibility": "public"
+    },
+    {
+      "action": "KEEP_NOT_PINNED",
+      "archived": "False",
+      "current_portfolio": "formal methods research",
+      "priority": "P1",
+      "production_policy": "blocking build, contract, security, provenance, and release gate",
+      "production_tier": "T1",
+      "repository": "szl-holdings/lutar-lean",
+      "size_kb": "3927",
+      "source_url": "https://github.com/szl-holdings/lutar-lean",
+      "target": "Formal methods research with exact proof boundaries",
+      "target_class": "MAINTAINED_TECHNICAL",
+      "visibility": "public"
+    },
+    {
+      "action": "MIGRATE_MIRROR_ARCHIVE",
+      "archived": "False",
+      "current_portfolio": "platform runtime",
+      "priority": "P1",
+      "production_policy": "classification, security, integrity, migration/archive, and source-binding gate",
+      "production_tier": "T2",
+      "repository": "szl-holdings/vsp-otel",
+      "size_kb": "475",
+      "source_url": "https://github.com/szl-holdings/vsp-otel",
+      "target": "a11oy/infra or platform/infra",
+      "target_class": "CONSOLIDATION_SOURCE",
+      "visibility": "public"
+    },
+    {
+      "action": "KEEP_ARCHIVED",
+      "archived": "True",
+      "current_portfolio": "archive",
+      "priority": "P2",
+      "production_policy": "classification, security, integrity, migration/archive, and source-binding gate",
+      "production_tier": "T2",
+      "repository": "szl-holdings/szl-otel-mesh",
+      "size_kb": "441",
+      "source_url": "https://github.com/szl-holdings/szl-otel-mesh",
+      "target": "Immutable archive with successor/tombstone",
+      "target_class": "ARCHIVE",
+      "visibility": "public"
+    },
+    {
+      "action": "KEEP_ARCHIVED",
+      "archived": "True",
+      "current_portfolio": "archive",
+      "priority": "P2",
+      "production_policy": "classification, security, integrity, migration/archive, and source-binding gate",
+      "production_tier": "T2",
+      "repository": "szl-holdings/szl-uds-deployment",
+      "size_kb": "4484",
+      "source_url": "https://github.com/szl-holdings/szl-uds-deployment",
+      "target": "Immutable archive with successor/tombstone",
+      "target_class": "ARCHIVE",
+      "visibility": "public"
+    },
+    {
+      "action": "KEEP_AND_HARDEN",
+      "archived": "False",
+      "current_portfolio": "vertical reference product",
+      "priority": "P0",
+      "production_policy": "full blocking production gate",
+      "production_tier": "T0",
+      "repository": "szl-holdings/killinchu",
+      "size_kb": "15196",
+      "source_url": "https://github.com/szl-holdings/killinchu",
+      "target": "Bounded high-stakes reference implementation",
+      "target_class": "PUBLIC_FRONT_DOOR",
+      "visibility": "public"
+    },
+    {
+      "action": "KEEP_AND_HARDEN",
+      "archived": "False",
+      "current_portfolio": "public surface",
+      "priority": "P0",
+      "production_policy": "full blocking production gate",
+      "production_tier": "T0",
+      "repository": "szl-holdings/docs-site",
+      "size_kb": "6078",
+      "source_url": "https://github.com/szl-holdings/docs-site",
+      "target": "Canonical product, developer, security, support, and diligence documentation",
+      "target_class": "PUBLIC_FRONT_DOOR",
+      "visibility": "public"
+    },
+    {
+      "action": "KEEP_NOT_PINNED",
+      "archived": "False",
+      "current_portfolio": "integration gateway",
+      "priority": "P1",
+      "production_policy": "blocking build, contract, security, provenance, and release gate",
+      "production_tier": "T1",
+      "repository": "szl-holdings/hatun-mcp",
+      "size_kb": "394",
+      "source_url": "https://github.com/szl-holdings/hatun-mcp",
+      "target": "Capability-scoped MCP/A2A integration gateway",
+      "target_class": "MAINTAINED_TECHNICAL",
+      "visibility": "public"
+    },
+    {
+      "action": "KEEP_ARCHIVED",
+      "archived": "True",
+      "current_portfolio": "archive",
+      "priority": "P2",
+      "production_policy": "classification, security, integrity, migration/archive, and source-binding gate",
+      "production_tier": "T2",
+      "repository": "szl-holdings/uds-bundles",
+      "size_kb": "789",
+      "source_url": "https://github.com/szl-holdings/uds-bundles",
+      "target": "Immutable archive with successor/tombstone",
+      "target_class": "ARCHIVE",
+      "visibility": "public"
+    },
+    {
+      "action": "MIGRATE_MIRROR_ARCHIVE",
+      "archived": "False",
+      "current_portfolio": "kernel family",
+      "priority": "P1",
+      "production_policy": "classification, security, integrity, migration/archive, and source-binding gate",
+      "production_tier": "T2",
+      "repository": "szl-holdings/lean-kernel",
+      "size_kb": "160",
+      "source_url": "https://github.com/szl-holdings/lean-kernel",
+      "target": "szl-kernels",
+      "target_class": "CONSOLIDATION_SOURCE",
+      "visibility": "public"
+    },
+    {
+      "action": "KEEP_ARCHIVED",
+      "archived": "True",
+      "current_portfolio": "archive",
+      "priority": "P2",
+      "production_policy": "classification, security, integrity, migration/archive, and source-binding gate",
+      "production_tier": "T2",
+      "repository": "szl-holdings/developers",
+      "size_kb": "141",
+      "source_url": "https://github.com/szl-holdings/developers",
+      "target": "Immutable archive with successor/tombstone",
+      "target_class": "ARCHIVE",
+      "visibility": "public"
+    },
+    {
+      "action": "KEEP_PRIVATE_AND_CLASSIFY",
+      "archived": "False",
+      "current_portfolio": "internal control / diligence",
+      "priority": "P0",
+      "production_policy": "classification, security, integrity, migration/archive, and source-binding gate",
+      "production_tier": "T2",
+      "repository": "szl-holdings/pitch-collateral",
+      "size_kb": "103",
+      "source_url": "https://github.com/szl-holdings/pitch-collateral",
+      "target": "Private operations, diligence, defensive, or incubator plane",
+      "target_class": "PRIVATE_INTERNAL",
+      "visibility": "private"
+    },
+    {
+      "action": "MIGRATE_MIRROR_ARCHIVE",
+      "archived": "False",
+      "current_portfolio": "model factory",
+      "priority": "P1",
+      "production_policy": "classification, security, integrity, migration/archive, and source-binding gate",
+      "production_tier": "T2",
+      "repository": "szl-holdings/khipu-consensus",
+      "size_kb": "153",
+      "source_url": "https://github.com/szl-holdings/khipu-consensus",
+      "target": "szl-forge models/evals/quantization packages",
+      "target_class": "CONSOLIDATION_SOURCE",
+      "visibility": "public"
+    },
+    {
+      "action": "KEEP_ARCHIVED",
+      "archived": "True",
+      "current_portfolio": "archive",
+      "priority": "P2",
+      "production_policy": "classification, security, integrity, migration/archive, and source-binding gate",
+      "production_tier": "T2",
+      "repository": "szl-holdings/warhacker-demo",
+      "size_kb": "84",
+      "source_url": "https://github.com/szl-holdings/warhacker-demo",
+      "target": "Immutable archive with successor/tombstone",
+      "target_class": "ARCHIVE",
+      "visibility": "public"
+    },
+    {
+      "action": "KEEP_NOT_PINNED",
+      "archived": "False",
+      "current_portfolio": "governed data/evidence lake",
+      "priority": "P0",
+      "production_policy": "blocking build, contract, security, provenance, and release gate",
+      "production_tier": "T1",
+      "repository": "szl-holdings/szl-lake",
+      "size_kb": "2279",
+      "source_url": "https://github.com/szl-holdings/szl-lake",
+      "target": "Governed data, evidence, lineage, rights, and freshness authority",
+      "target_class": "MAINTAINED_TECHNICAL",
+      "visibility": "public"
+    },
+    {
+      "action": "MIGRATE_MIRROR_ARCHIVE",
+      "archived": "False",
+      "current_portfolio": "platform runtime",
+      "priority": "P1",
+      "production_policy": "classification, security, integrity, migration/archive, and source-binding gate",
+      "production_tier": "T2",
+      "repository": "szl-holdings/szl-mesh",
+      "size_kb": "228",
+      "source_url": "https://github.com/szl-holdings/szl-mesh",
+      "target": "a11oy repository packages/services",
+      "target_class": "CONSOLIDATION_SOURCE",
+      "visibility": "public"
+    },
+    {
+      "action": "MIGRATE_MIRROR_ARCHIVE",
+      "archived": "False",
+      "current_portfolio": "platform runtime",
+      "priority": "P1",
+      "production_policy": "classification, security, integrity, migration/archive, and source-binding gate",
+      "production_tier": "T2",
+      "repository": "szl-holdings/szl-fleet-overlay",
+      "size_kb": "214",
+      "source_url": "https://github.com/szl-holdings/szl-fleet-overlay",
+      "target": "platform apps/modules plus private incubator",
+      "target_class": "CONSOLIDATION_SOURCE",
+      "visibility": "public"
+    },
+    {
+      "action": "MIGRATE_MIRROR_ARCHIVE",
+      "archived": "False",
+      "current_portfolio": "research / component",
+      "priority": "P2",
+      "production_policy": "classification, security, integrity, migration/archive, and source-binding gate",
+      "production_tier": "T2",
+      "repository": "szl-holdings/szl-papers",
+      "size_kb": "2853",
+      "source_url": "https://github.com/szl-holdings/szl-papers",
+      "target": "one normative doctrine source plus papers/formal research",
+      "target_class": "CONSOLIDATION_SOURCE",
+      "visibility": "public"
+    },
+    {
+      "action": "MIGRATE_MIRROR_ARCHIVE",
+      "archived": "False",
+      "current_portfolio": "platform runtime",
+      "priority": "P1",
+      "production_policy": "classification, security, integrity, migration/archive, and source-binding gate",
+      "production_tier": "T2",
+      "repository": "szl-holdings/szl-build-env",
+      "size_kb": "171",
+      "source_url": "https://github.com/szl-holdings/szl-build-env",
+      "target": "a11oy/infra or platform/infra",
+      "target_class": "CONSOLIDATION_SOURCE",
+      "visibility": "public"
+    },
+    {
+      "action": "MIGRATE_MIRROR_ARCHIVE",
+      "archived": "False",
+      "current_portfolio": "doctrine and trust docs",
+      "priority": "P1",
+      "production_policy": "classification, security, integrity, migration/archive, and source-binding gate",
+      "production_tier": "T2",
+      "repository": "szl-holdings/szl-doctrine",
+      "size_kb": "436",
+      "source_url": "https://github.com/szl-holdings/szl-doctrine",
+      "target": "one normative doctrine source plus papers/formal research",
+      "target_class": "CONSOLIDATION_SOURCE",
+      "visibility": "public"
+    },
+    {
+      "action": "MIGRATE_MIRROR_ARCHIVE",
+      "archived": "False",
+      "current_portfolio": "showcase",
+      "priority": "P1",
+      "production_policy": "classification, security, integrity, migration/archive, and source-binding gate",
+      "production_tier": "T2",
+      "repository": "szl-holdings/anatomy",
+      "size_kb": "589",
+      "source_url": "https://github.com/szl-holdings/anatomy",
+      "target": "one modular Evidence Studio",
+      "target_class": "CONSOLIDATION_SOURCE",
+      "visibility": "public"
+    },
+    {
+      "action": "MIGRATE_MIRROR_ARCHIVE",
+      "archived": "False",
+      "current_portfolio": "SDA / YARQA research",
+      "priority": "P1",
+      "production_policy": "classification, security, integrity, migration/archive, and source-binding gate",
+      "production_tier": "T2",
+      "repository": "szl-holdings/yarqa",
+      "size_kb": "628",
+      "source_url": "https://github.com/szl-holdings/yarqa",
+      "target": "one research package and one bounded demo",
+      "target_class": "CONSOLIDATION_SOURCE",
+      "visibility": "public"
+    },
+    {
+      "action": "MIGRATE_MIRROR_ARCHIVE",
+      "archived": "False",
+      "current_portfolio": "research / component",
+      "priority": "P2",
+      "production_policy": "classification, security, integrity, migration/archive, and source-binding gate",
+      "production_tier": "T2",
+      "repository": "szl-holdings/szl-router",
+      "size_kb": "255",
+      "source_url": "https://github.com/szl-holdings/szl-router",
+      "target": "a11oy repository packages/services",
+      "target_class": "CONSOLIDATION_SOURCE",
+      "visibility": "public"
+    },
+    {
+      "action": "MIGRATE_MIRROR_ARCHIVE",
+      "archived": "False",
+      "current_portfolio": "SDA / YARQA research",
+      "priority": "P1",
+      "production_policy": "classification, security, integrity, migration/archive, and source-binding gate",
+      "production_tier": "T2",
+      "repository": "szl-holdings/khipu-sda-core",
+      "size_kb": "120",
+      "source_url": "https://github.com/szl-holdings/khipu-sda-core",
+      "target": "one research package and one bounded demo",
+      "target_class": "CONSOLIDATION_SOURCE",
+      "visibility": "public"
+    },
+    {
+      "action": "MIGRATE_MIRROR_ARCHIVE",
+      "archived": "False",
+      "current_portfolio": "trust and evidence",
+      "priority": "P1",
+      "production_policy": "classification, security, integrity, migration/archive, and source-binding gate",
+      "production_tier": "T2",
+      "repository": "szl-holdings/szl-governed-norm",
+      "size_kb": "104",
+      "source_url": "https://github.com/szl-holdings/szl-governed-norm",
+      "target": "a11oy/packages/evidence plus szl-kernels where computational",
+      "target_class": "CONSOLIDATION_SOURCE",
+      "visibility": "public"
+    },
+    {
+      "action": "MIGRATE_MIRROR_ARCHIVE",
+      "archived": "False",
+      "current_portfolio": "trust and evidence",
+      "priority": "P1",
+      "production_policy": "classification, security, integrity, migration/archive, and source-binding gate",
+      "production_tier": "T2",
+      "repository": "szl-holdings/szl-lambda-gate",
+      "size_kb": "109",
+      "source_url": "https://github.com/szl-holdings/szl-lambda-gate",
+      "target": "a11oy/packages/evidence plus szl-kernels where computational",
+      "target_class": "CONSOLIDATION_SOURCE",
+      "visibility": "public"
+    },
+    {
+      "action": "MIGRATE_MIRROR_ARCHIVE",
+      "archived": "False",
+      "current_portfolio": "trust and evidence",
+      "priority": "P1",
+      "production_policy": "classification, security, integrity, migration/archive, and source-binding gate",
+      "production_tier": "T2",
+      "repository": "szl-holdings/szl-energy-attest",
+      "size_kb": "175",
+      "source_url": "https://github.com/szl-holdings/szl-energy-attest",
+      "target": "a11oy/packages/evidence plus szl-kernels where computational",
+      "target_class": "CONSOLIDATION_SOURCE",
+      "visibility": "public"
+    },
+    {
+      "action": "MIGRATE_MIRROR_ARCHIVE",
+      "archived": "False",
+      "current_portfolio": "trust and evidence",
+      "priority": "P1",
+      "production_policy": "classification, security, integrity, migration/archive, and source-binding gate",
+      "production_tier": "T2",
+      "repository": "szl-holdings/governed-inference-meter",
+      "size_kb": "148",
+      "source_url": "https://github.com/szl-holdings/governed-inference-meter",
+      "target": "a11oy/packages/evidence plus szl-kernels where computational",
+      "target_class": "CONSOLIDATION_SOURCE",
+      "visibility": "public"
+    },
+    {
+      "action": "MOVE_PRIVATE_OR_ARCHIVE",
+      "archived": "False",
+      "current_portfolio": "incubator",
+      "priority": "P1",
+      "production_policy": "classification, security, integrity, migration/archive, and source-binding gate",
+      "production_tier": "T2",
+      "repository": "szl-holdings/david-leads",
+      "size_kb": "3562",
+      "source_url": "https://github.com/szl-holdings/david-leads",
+      "target": "Private incubator or archive",
+      "target_class": "PRIVATE_INCUBATOR",
+      "visibility": "public"
+    },
+    {
+      "action": "MIGRATE_MIRROR_ARCHIVE",
+      "archived": "False",
+      "current_portfolio": "trust and evidence",
+      "priority": "P1",
+      "production_policy": "classification, security, integrity, migration/archive, and source-binding gate",
+      "production_tier": "T2",
+      "repository": "szl-holdings/szl-receipt",
+      "size_kb": "99",
+      "source_url": "https://github.com/szl-holdings/szl-receipt",
+      "target": "a11oy/packages/evidence plus szl-kernels where computational",
+      "target_class": "CONSOLIDATION_SOURCE",
+      "visibility": "public"
+    },
+    {
+      "action": "REVIEW_SCOPE",
+      "archived": "False",
+      "current_portfolio": "research / component",
+      "priority": "P2",
+      "production_policy": "classification, security, integrity, migration/archive, and source-binding gate",
+      "production_tier": "T2",
+      "repository": "szl-holdings/immune",
+      "size_kb": "628",
+      "source_url": "https://github.com/szl-holdings/immune",
+      "target": "package/module, research archive, or private incubator",
+      "target_class": "REVIEW",
+      "visibility": "public"
+    },
+    {
+      "action": "MIGRATE_MIRROR_ARCHIVE",
+      "archived": "False",
+      "current_portfolio": "platform runtime",
+      "priority": "P1",
+      "production_policy": "classification, security, integrity, migration/archive, and source-binding gate",
+      "production_tier": "T2",
+      "repository": "szl-holdings/szl-substrate",
+      "size_kb": "2377",
+      "source_url": "https://github.com/szl-holdings/szl-substrate",
+      "target": "a11oy repository packages/services",
+      "target_class": "CONSOLIDATION_SOURCE",
+      "visibility": "public"
+    },
+    {
+      "action": "KEEP_ENTRY",
+      "archived": "False",
+      "current_portfolio": "public surface",
+      "priority": "P0",
+      "production_policy": "full blocking production gate",
+      "production_tier": "T0",
+      "repository": "szl-holdings/szl-holdings.github.io",
+      "size_kb": "1047",
+      "source_url": "https://github.com/szl-holdings/szl-holdings.github.io",
+      "target": "single corporate marketing site",
+      "target_class": "REVIEW",
+      "visibility": "public"
+    },
+    {
+      "action": "KEEP_PRIVATE_AND_CLASSIFY",
+      "archived": "False",
+      "current_portfolio": "internal control / diligence",
+      "priority": "P0",
+      "production_policy": "classification, security, integrity, migration/archive, and source-binding gate",
+      "production_tier": "T2",
+      "repository": "szl-holdings/szl-org-health",
+      "size_kb": "295",
+      "source_url": "https://github.com/szl-holdings/szl-org-health",
+      "target": "Private operations, diligence, defensive, or incubator plane",
+      "target_class": "PRIVATE_INTERNAL",
+      "visibility": "private"
+    },
+    {
+      "action": "KEEP_NOT_PINNED",
+      "archived": "False",
+      "current_portfolio": "open receipt standard",
+      "priority": "P0",
+      "production_policy": "blocking build, contract, security, provenance, and release gate",
+      "production_tier": "T1",
+      "repository": "szl-holdings/governed-receipt-spec",
+      "size_kb": "54",
+      "source_url": "https://github.com/szl-holdings/governed-receipt-spec",
+      "target": "Independent open receipt standard and offline verifier",
+      "target_class": "MAINTAINED_TECHNICAL",
+      "visibility": "public"
+    },
+    {
+      "action": "MIGRATE_MIRROR_ARCHIVE",
+      "archived": "False",
+      "current_portfolio": "trust and evidence",
+      "priority": "P1",
+      "production_policy": "classification, security, integrity, migration/archive, and source-binding gate",
+      "production_tier": "T2",
+      "repository": "szl-holdings/szl-guardrail-receipt",
+      "size_kb": "37",
+      "source_url": "https://github.com/szl-holdings/szl-guardrail-receipt",
+      "target": "a11oy/packages/evidence plus szl-kernels where computational",
+      "target_class": "CONSOLIDATION_SOURCE",
+      "visibility": "public"
+    },
+    {
+      "action": "MIGRATE_MIRROR_ARCHIVE",
+      "archived": "False",
+      "current_portfolio": "trust and evidence",
+      "priority": "P1",
+      "production_policy": "classification, security, integrity, migration/archive, and source-binding gate",
+      "production_tier": "T2",
+      "repository": "szl-holdings/szl-formula-ledger",
+      "size_kb": "34",
+      "source_url": "https://github.com/szl-holdings/szl-formula-ledger",
+      "target": "a11oy/packages/evidence plus szl-kernels where computational",
+      "target_class": "CONSOLIDATION_SOURCE",
+      "visibility": "public"
+    },
+    {
+      "action": "KEEP_NOT_PINNED",
+      "archived": "False",
+      "current_portfolio": "model factory",
+      "priority": "P0",
+      "production_policy": "blocking build, contract, security, provenance, and release gate",
+      "production_tier": "T1",
+      "repository": "szl-holdings/szl-forge",
+      "size_kb": "977",
+      "source_url": "https://github.com/szl-holdings/szl-forge",
+      "target": "One model lifecycle, training, evaluation, quantization, and Hub lineage authority",
+      "target_class": "MAINTAINED_TECHNICAL",
+      "visibility": "public"
+    },
+    {
+      "action": "MIGRATE_MIRROR_ARCHIVE",
+      "archived": "False",
+      "current_portfolio": "showcase",
+      "priority": "P1",
+      "production_policy": "classification, security, integrity, migration/archive, and source-binding gate",
+      "production_tier": "T2",
+      "repository": "szl-holdings/energy-attest-holo",
+      "size_kb": "281",
+      "source_url": "https://github.com/szl-holdings/energy-attest-holo",
+      "target": "one modular Evidence Studio",
+      "target_class": "CONSOLIDATION_SOURCE",
+      "visibility": "public"
+    },
+    {
+      "action": "MIGRATE_MIRROR_ARCHIVE",
+      "archived": "False",
+      "current_portfolio": "showcase",
+      "priority": "P1",
+      "production_policy": "classification, security, integrity, migration/archive, and source-binding gate",
+      "production_tier": "T2",
+      "repository": "szl-holdings/governed-norm-holo",
+      "size_kb": "271",
+      "source_url": "https://github.com/szl-holdings/governed-norm-holo",
+      "target": "one modular Evidence Studio",
+      "target_class": "CONSOLIDATION_SOURCE",
+      "visibility": "public"
+    },
+    {
+      "action": "MIGRATE_MIRROR_ARCHIVE",
+      "archived": "False",
+      "current_portfolio": "showcase",
+      "priority": "P1",
+      "production_policy": "classification, security, integrity, migration/archive, and source-binding gate",
+      "production_tier": "T2",
+      "repository": "szl-holdings/lambda-gate-holo",
+      "size_kb": "311",
+      "source_url": "https://github.com/szl-holdings/lambda-gate-holo",
+      "target": "one modular Evidence Studio",
+      "target_class": "CONSOLIDATION_SOURCE",
+      "visibility": "public"
+    },
+    {
+      "action": "MIGRATE_MIRROR_ARCHIVE",
+      "archived": "False",
+      "current_portfolio": "showcase",
+      "priority": "P1",
+      "production_policy": "classification, security, integrity, migration/archive, and source-binding gate",
+      "production_tier": "T2",
+      "repository": "szl-holdings/receipt-chain-live",
+      "size_kb": "251",
+      "source_url": "https://github.com/szl-holdings/receipt-chain-live",
+      "target": "one modular Evidence Studio",
+      "target_class": "CONSOLIDATION_SOURCE",
+      "visibility": "public"
+    },
+    {
+      "action": "MIGRATE_MIRROR_ARCHIVE",
+      "archived": "False",
+      "current_portfolio": "showcase",
+      "priority": "P1",
+      "production_policy": "classification, security, integrity, migration/archive, and source-binding gate",
+      "production_tier": "T2",
+      "repository": "szl-holdings/szl-provctl-live",
+      "size_kb": "228",
+      "source_url": "https://github.com/szl-holdings/szl-provctl-live",
+      "target": "one modular Evidence Studio",
+      "target_class": "CONSOLIDATION_SOURCE",
+      "visibility": "public"
+    },
+    {
+      "action": "MIGRATE_MIRROR_ARCHIVE",
+      "archived": "False",
+      "current_portfolio": "showcase",
+      "priority": "P1",
+      "production_policy": "classification, security, integrity, migration/archive, and source-binding gate",
+      "production_tier": "T2",
+      "repository": "szl-holdings/szl-kernels-live",
+      "size_kb": "474",
+      "source_url": "https://github.com/szl-holdings/szl-kernels-live",
+      "target": "one modular Evidence Studio",
+      "target_class": "CONSOLIDATION_SOURCE",
+      "visibility": "public"
+    },
+    {
+      "action": "KEEP_ARCHIVED",
+      "archived": "True",
+      "current_portfolio": "archive",
+      "priority": "P2",
+      "production_policy": "classification, security, integrity, migration/archive, and source-binding gate",
+      "production_tier": "T2",
+      "repository": "szl-holdings/evidence-typed-formula-governance",
+      "size_kb": "6",
+      "source_url": "https://github.com/szl-holdings/evidence-typed-formula-governance",
+      "target": "Immutable archive with successor/tombstone",
+      "target_class": "ARCHIVE",
+      "visibility": "public"
+    },
+    {
+      "action": "KEEP_ARCHIVED",
+      "archived": "True",
+      "current_portfolio": "archive",
+      "priority": "P2",
+      "production_policy": "classification, security, integrity, migration/archive, and source-binding gate",
+      "production_tier": "T2",
+      "repository": "szl-holdings/fail-closed-governed-ai-services",
+      "size_kb": "3",
+      "source_url": "https://github.com/szl-holdings/fail-closed-governed-ai-services",
+      "target": "Immutable archive with successor/tombstone",
+      "target_class": "ARCHIVE",
+      "visibility": "public"
+    },
+    {
+      "action": "MIGRATE_MIRROR_ARCHIVE",
+      "archived": "False",
+      "current_portfolio": "model factory",
+      "priority": "P1",
+      "production_policy": "classification, security, integrity, migration/archive, and source-binding gate",
+      "production_tier": "T2",
+      "repository": "szl-holdings/szl-quant",
+      "size_kb": "6073",
+      "source_url": "https://github.com/szl-holdings/szl-quant",
+      "target": "szl-forge models/evals/quantization packages",
+      "target_class": "CONSOLIDATION_SOURCE",
+      "visibility": "public"
+    },
+    {
+      "action": "MIGRATE_MIRROR_ARCHIVE",
+      "archived": "False",
+      "current_portfolio": "platform runtime",
+      "priority": "P1",
+      "production_policy": "classification, security, integrity, migration/archive, and source-binding gate",
+      "production_tier": "T2",
+      "repository": "szl-holdings/szl-telemetry",
+      "size_kb": "109",
+      "source_url": "https://github.com/szl-holdings/szl-telemetry",
+      "target": "a11oy/infra or platform/infra",
+      "target_class": "CONSOLIDATION_SOURCE",
+      "visibility": "public"
+    },
+    {
+      "action": "MIGRATE_MIRROR_ARCHIVE",
+      "archived": "False",
+      "current_portfolio": "model factory",
+      "priority": "P1",
+      "production_policy": "classification, security, integrity, migration/archive, and source-binding gate",
+      "production_tier": "T2",
+      "repository": "szl-holdings/szl-quant-witness",
+      "size_kb": "662",
+      "source_url": "https://github.com/szl-holdings/szl-quant-witness",
+      "target": "szl-forge models/evals/quantization packages",
+      "target_class": "CONSOLIDATION_SOURCE",
+      "visibility": "public"
+    },
+    {
+      "action": "KEEP_AND_HARDEN",
+      "archived": "False",
+      "current_portfolio": "public surface",
+      "priority": "P0",
+      "production_policy": "full blocking production gate",
+      "production_tier": "T0",
+      "repository": "szl-holdings/a11oy-net",
+      "size_kb": "1286",
+      "source_url": "https://github.com/szl-holdings/a11oy-net",
+      "target": "Independent proof and transparency registry",
+      "target_class": "PUBLIC_FRONT_DOOR",
+      "visibility": "public"
+    },
+    {
+      "action": "MIGRATE_MIRROR_ARCHIVE",
+      "archived": "False",
+      "current_portfolio": "platform runtime",
+      "priority": "P1",
+      "production_policy": "classification, security, integrity, migration/archive, and source-binding gate",
+      "production_tier": "T2",
+      "repository": "szl-holdings/szl-gpu-bridge",
+      "size_kb": "959",
+      "source_url": "https://github.com/szl-holdings/szl-gpu-bridge",
+      "target": "a11oy/infra or platform/infra",
+      "target_class": "CONSOLIDATION_SOURCE",
+      "visibility": "public"
+    },
+    {
+      "action": "MIGRATE_MIRROR_ARCHIVE",
+      "archived": "False",
+      "current_portfolio": "doctrine and trust docs",
+      "priority": "P1",
+      "production_policy": "classification, security, integrity, migration/archive, and source-binding gate",
+      "production_tier": "T2",
+      "repository": "szl-holdings/evidence-doctrine",
+      "size_kb": "23",
+      "source_url": "https://github.com/szl-holdings/evidence-doctrine",
+      "target": "one normative doctrine source plus papers/formal research",
+      "target_class": "CONSOLIDATION_SOURCE",
+      "visibility": "public"
+    },
+    {
+      "action": "KEEP_PRIVATE_AND_CLASSIFY",
+      "archived": "False",
+      "current_portfolio": "internal control / diligence",
+      "priority": "P1",
+      "production_policy": "classification, security, integrity, migration/archive, and source-binding gate",
+      "production_tier": "T2",
+      "repository": "szl-holdings/gdw-frontier",
+      "size_kb": "407",
+      "source_url": "https://github.com/szl-holdings/gdw-frontier",
+      "target": "Private operations, diligence, defensive, or incubator plane",
+      "target_class": "PRIVATE_INTERNAL",
+      "visibility": "private"
+    },
+    {
+      "action": "KEEP_PRIVATE_AND_CLASSIFY",
+      "archived": "False",
+      "current_portfolio": "internal control / diligence",
+      "priority": "P0",
+      "production_policy": "classification, security, integrity, migration/archive, and source-binding gate",
+      "production_tier": "T2",
+      "repository": "szl-holdings/szl-estate-os",
+      "size_kb": "387",
+      "source_url": "https://github.com/szl-holdings/szl-estate-os",
+      "target": "Private operations, diligence, defensive, or incubator plane",
+      "target_class": "PRIVATE_INTERNAL",
+      "visibility": "private"
+    },
+    {
+      "action": "MIGRATE_MIRROR_ARCHIVE",
+      "archived": "False",
+      "current_portfolio": "SDA / YARQA research",
+      "priority": "P1",
+      "production_policy": "classification, security, integrity, migration/archive, and source-binding gate",
+      "production_tier": "T2",
+      "repository": "szl-holdings/sda",
+      "size_kb": "280",
+      "source_url": "https://github.com/szl-holdings/sda",
+      "target": "one research package and one bounded demo",
+      "target_class": "CONSOLIDATION_SOURCE",
+      "visibility": "public"
+    },
+    {
+      "action": "KEEP_NOT_PINNED",
+      "archived": "False",
+      "current_portfolio": "kernel family",
+      "priority": "P0",
+      "production_policy": "blocking build, contract, security, provenance, and release gate",
+      "production_tier": "T1",
+      "repository": "szl-holdings/szl-kernels",
+      "size_kb": "645",
+      "source_url": "https://github.com/szl-holdings/szl-kernels",
+      "target": "One kernel family, correctness, benchmark, energy, and release authority",
+      "target_class": "MAINTAINED_TECHNICAL",
+      "visibility": "public"
+    },
+    {
+      "action": "KEEP_PRIVATE_AND_CLASSIFY",
+      "archived": "False",
+      "current_portfolio": "internal control / diligence",
+      "priority": "P1",
+      "production_policy": "classification, security, integrity, migration/archive, and source-binding gate",
+      "production_tier": "T2",
+      "repository": "szl-holdings/szl-defensive-control-plane",
+      "size_kb": "80",
+      "source_url": "https://github.com/szl-holdings/szl-defensive-control-plane",
+      "target": "Private operations, diligence, defensive, or incubator plane",
+      "target_class": "PRIVATE_INTERNAL",
+      "visibility": "private"
+    },
+    {
+      "action": "MIGRATE_MIRROR_ARCHIVE",
+      "archived": "False",
+      "current_portfolio": "kernel family",
+      "priority": "P1",
+      "production_policy": "classification, security, integrity, migration/archive, and source-binding gate",
+      "production_tier": "T2",
+      "repository": "szl-holdings/szl-receipt-attn",
+      "size_kb": "45",
+      "source_url": "https://github.com/szl-holdings/szl-receipt-attn",
+      "target": "szl-kernels",
+      "target_class": "CONSOLIDATION_SOURCE",
+      "visibility": "public"
+    },
+    {
+      "action": "MIGRATE_MIRROR_ARCHIVE",
+      "archived": "False",
+      "current_portfolio": "kernel family",
+      "priority": "P1",
+      "production_policy": "classification, security, integrity, migration/archive, and source-binding gate",
+      "production_tier": "T2",
+      "repository": "szl-holdings/szl-maskmod",
+      "size_kb": "15",
+      "source_url": "https://github.com/szl-holdings/szl-maskmod",
+      "target": "szl-kernels",
+      "target_class": "CONSOLIDATION_SOURCE",
+      "visibility": "public"
+    },
+    {
+      "action": "MIGRATE_MIRROR_ARCHIVE",
+      "archived": "False",
+      "current_portfolio": "kernel family",
+      "priority": "P1",
+      "production_policy": "classification, security, integrity, migration/archive, and source-binding gate",
+      "production_tier": "T2",
+      "repository": "szl-holdings/szl-block-kv",
+      "size_kb": "16",
+      "source_url": "https://github.com/szl-holdings/szl-block-kv",
+      "target": "szl-kernels",
+      "target_class": "CONSOLIDATION_SOURCE",
+      "visibility": "public"
+    },
+    {
+      "action": "REVIEW_SCOPE",
+      "archived": "False",
+      "current_portfolio": "research / component",
+      "priority": "P2",
+      "production_policy": "classification, security, integrity, migration/archive, and source-binding gate",
+      "production_tier": "T2",
+      "repository": "szl-holdings/szl-serve",
+      "size_kb": "45",
+      "source_url": "https://github.com/szl-holdings/szl-serve",
+      "target": "package/module, research archive, or private incubator",
+      "target_class": "REVIEW",
+      "visibility": "public"
+    },
+    {
+      "action": "MIGRATE_MIRROR_ARCHIVE",
+      "archived": "False",
+      "current_portfolio": "trust and evidence",
+      "priority": "P1",
+      "production_policy": "classification, security, integrity, migration/archive, and source-binding gate",
+      "production_tier": "T2",
+      "repository": "szl-holdings/szl-govsign",
+      "size_kb": "34",
+      "source_url": "https://github.com/szl-holdings/szl-govsign",
+      "target": "a11oy/packages/evidence plus szl-kernels where computational",
+      "target_class": "CONSOLIDATION_SOURCE",
+      "visibility": "public"
+    },
+    {
+      "action": "MIGRATE_MIRROR_ARCHIVE",
+      "archived": "False",
+      "current_portfolio": "trust and evidence",
+      "priority": "P1",
+      "production_policy": "classification, security, integrity, migration/archive, and source-binding gate",
+      "production_tier": "T2",
+      "repository": "szl-holdings/szl-blocked",
+      "size_kb": "65",
+      "source_url": "https://github.com/szl-holdings/szl-blocked",
+      "target": "a11oy/packages/evidence plus szl-kernels where computational",
+      "target_class": "CONSOLIDATION_SOURCE",
+      "visibility": "public"
+    },
+    {
+      "action": "MIGRATE_MIRROR_ARCHIVE",
+      "archived": "False",
+      "current_portfolio": "trust and evidence",
+      "priority": "P1",
+      "production_policy": "classification, security, integrity, migration/archive, and source-binding gate",
+      "production_tier": "T2",
+      "repository": "szl-holdings/szl-provctl",
+      "size_kb": "43",
+      "source_url": "https://github.com/szl-holdings/szl-provctl",
+      "target": "a11oy/packages/evidence plus szl-kernels where computational",
+      "target_class": "CONSOLIDATION_SOURCE",
+      "visibility": "public"
+    },
+    {
+      "action": "MIGRATE_MIRROR_ARCHIVE",
+      "archived": "False",
+      "current_portfolio": "trust and evidence",
+      "priority": "P1",
+      "production_policy": "classification, security, integrity, migration/archive, and source-binding gate",
+      "production_tier": "T2",
+      "repository": "szl-holdings/szl-invariants",
+      "size_kb": "49",
+      "source_url": "https://github.com/szl-holdings/szl-invariants",
+      "target": "a11oy/packages/evidence plus szl-kernels where computational",
+      "target_class": "CONSOLIDATION_SOURCE",
+      "visibility": "public"
+    },
+    {
+      "action": "MIGRATE_MIRROR_ARCHIVE",
+      "archived": "False",
+      "current_portfolio": "kernel family",
+      "priority": "P1",
+      "production_policy": "classification, security, integrity, migration/archive, and source-binding gate",
+      "production_tier": "T2",
+      "repository": "szl-holdings/szl-ouroboros",
+      "size_kb": "33",
+      "source_url": "https://github.com/szl-holdings/szl-ouroboros",
+      "target": "szl-kernels",
+      "target_class": "CONSOLIDATION_SOURCE",
+      "visibility": "public"
+    },
+    {
+      "action": "MIGRATE_MIRROR_ARCHIVE",
+      "archived": "False",
+      "current_portfolio": "trust and evidence",
+      "priority": "P1",
+      "production_policy": "classification, security, integrity, migration/archive, and source-binding gate",
+      "production_tier": "T2",
+      "repository": "szl-holdings/szl-formulas",
+      "size_kb": "47",
+      "source_url": "https://github.com/szl-holdings/szl-formulas",
+      "target": "a11oy/packages/evidence plus szl-kernels where computational",
+      "target_class": "CONSOLIDATION_SOURCE",
+      "visibility": "public"
+    },
+    {
+      "action": "MIGRATE_MIRROR_ARCHIVE",
+      "archived": "False",
+      "current_portfolio": "kernel family",
+      "priority": "P2",
+      "production_policy": "classification, security, integrity, migration/archive, and source-binding gate",
+      "production_tier": "T2",
+      "repository": "szl-holdings/YARQA-ATTN",
+      "size_kb": "26",
+      "source_url": "https://github.com/szl-holdings/YARQA-ATTN",
+      "target": "one research package and one bounded demo",
+      "target_class": "CONSOLIDATION_SOURCE",
+      "visibility": "public"
+    },
+    {
+      "action": "MIGRATE_MIRROR_ARCHIVE",
+      "archived": "False",
+      "current_portfolio": "model research placeholder",
+      "priority": "P0",
+      "production_policy": "classification, security, integrity, migration/archive, and source-binding gate",
+      "production_tier": "T2",
+      "repository": "szl-holdings/szl-nemo",
+      "size_kb": "0",
+      "source_url": "https://github.com/szl-holdings/szl-nemo",
+      "target": "szl-forge models/evals/quantization packages",
+      "target_class": "CONSOLIDATION_SOURCE",
+      "visibility": "public"
+    },
+    {
+      "action": "MIGRATE_MIRROR_ARCHIVE",
+      "archived": "False",
+      "current_portfolio": "model research placeholder",
+      "priority": "P0",
+      "production_policy": "classification, security, integrity, migration/archive, and source-binding gate",
+      "production_tier": "T2",
+      "repository": "szl-holdings/szl-khipu",
+      "size_kb": "0",
+      "source_url": "https://github.com/szl-holdings/szl-khipu",
+      "target": "szl-forge models/evals/quantization packages",
+      "target_class": "CONSOLIDATION_SOURCE",
+      "visibility": "public"
+    }
+  ],
+  "schema": "szl.production-readiness-profile/v5",
+  "supersedes": "Payload 4 only for production hardening/debugging; Payload 4 remains product/vertical strategy.",
+  "thresholds": {
+    "core_web_vitals_field_p75": {
+      "CLS_max": 0.1,
+      "INP_ms_max": 200,
+      "LCP_seconds_max": 2.5,
+      "scope": "mobile and desktop separately"
+    },
+    "frontend_lab": {
+      "accessibility_score_min": 0.95,
+      "axe_critical_max": 0,
+      "axe_serious_max": 0,
+      "lighthouse_runs_min": 3,
+      "uncaught_console_errors_max": 0
+    },
+    "load": {
+      "forecast_multiplier_min": 2,
+      "soak_hours_min": 4,
+      "zero_cross_tenant_results": true,
+      "zero_duplicate_side_effects": true
+    },
+    "reliability_drafts_requiring_baseline": {
+      "pilot_api_availability": "99.5%/30d",
+      "public_static_availability": "99.9%/30d",
+      "restore_RPO": "<=15m where supported",
+      "restore_RTO": "<=60m"
+    },
+    "truth_boundary": "Proposed thresholds, not current measurements or availability claims."
+  },
+  "truth_boundary": [
+    "A document or workflow file is not proof of live enforcement.",
+    "Missing evidence is UNKNOWN or FAIL, never PASS.",
+    "The companion auditor is externally read-only."
+  ],
+  "web_targets": [
+    {
+      "base_url": "https://a-11-oy.com",
+      "forbidden_phrases": [
+        "One governed core. Five places it earns its keep."
+      ],
+      "id": "a11oy-product",
+      "json_endpoints": [
+        {
+          "path": "/api/a11oy/v1/honest",
+          "required_fields": [
+            "locked_formula_count"
+          ]
+        }
+      ],
+      "required_paths": [
+        "/",
+        "/console",
+        "/verify",
+        "/healthz",
+        "/readyz",
+        "/api/a11oy/v1/honest"
+      ],
+      "required_security_headers": [
+        "strict-transport-security",
+        "content-security-policy",
+        "x-content-type-options",
+        "referrer-policy"
+      ],
+      "role": "product"
+    },
+    {
+      "base_url": "https://a11oy.net",
+      "forbidden_phrases": [],
+      "id": "a11oy-proof",
+      "json_endpoints": [
+        {
+          "path": "/health.json",
+          "required_fields": [
+            "sha",
+            "signer"
+          ]
+        }
+      ],
+      "required_paths": [
+        "/",
+        "/record/",
+        "/record.json",
+        "/health.json",
+        "/diligence/"
+      ],
+      "required_security_headers": [
+        "strict-transport-security",
+        "x-content-type-options",
+        "referrer-policy"
+      ],
+      "role": "proof_registry"
+    },
+    {
+      "base_url": "https://huggingface.co/SZLHOLDINGS",
+      "forbidden_phrases": [],
+      "id": "hf-organization",
+      "json_endpoints": [],
+      "required_paths": [
+        "/SZLHOLDINGS"
+      ],
+      "required_security_headers": [],
+      "role": "artifact_registry"
+    }
+  ]
+}

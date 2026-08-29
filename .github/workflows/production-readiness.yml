@@ -1,0 +1,17 @@
+name: production-readiness
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+    paths:
+      - "tools/production/**"
+      - ".github/workflows/production-readiness.yml"
+      - ".github/workflows/reusable-production-readiness.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    uses: ./.github/workflows/reusable-production-readiness.yml

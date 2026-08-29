@@ -1,0 +1,140 @@
+{
+  "captured_at": "2026-08-28T23:58:00-04:00",
+  "existing_strengths": [
+    "Platform already has extensive lint/typecheck/test/E2E/route/link/truth/security/SBOM/stress/readiness commands.",
+    "A11oy already has a readiness harness, Hub frontend audit/canary, backend-hardening tests and observability code.",
+    "Platform already has Lighthouse CI, accessibility audits, screenshot proof tooling and a known-gaps register.",
+    "The missing layer is one required machine-readable effective gate and post-deployment evidence."
+  ],
+  "github": {
+    "archived": 7,
+    "captured_ruleset_evidence": {
+      "a11oy": {
+        "captured_approvals": 0,
+        "captured_frontier_workflow": ".github/workflows/frontier-source-pin-authority-v2.yml",
+        "captured_required_checks": [
+          "Gitleaks secret scan",
+          "lockfiles / No lockfile references a Replit-internal registry host"
+        ],
+        "captured_required_signatures": true,
+        "captured_strict": true,
+        "frontier_required_workflow_ruleset_id": 21598815,
+        "organization_default_ruleset_id": 17630223,
+        "repository_ruleset_id": 16195484
+      },
+      "platform": {
+        "captured_allowed_merge_methods": [
+          "squash",
+          "rebase"
+        ],
+        "captured_approvals": 0,
+        "captured_required_checks": [
+          "lockfiles / No lockfile references a Replit-internal registry host"
+        ],
+        "captured_strict": false,
+        "organization_default_ruleset_id": 17630223,
+        "repository_ruleset_id": 16195495,
+        "repository_ruleset_name": "series-a-default-branch"
+      }
+    },
+    "open_prs": [
+      {
+        "number": 70,
+        "production_disposition": "HOLD_BEHIND_EVAL_AND_RELEASE_GATE",
+        "reason": "Train loss is not evaluation; publication remains false. Admit only after frozen evaluation, passport, and exact Hub lineage.",
+        "repository": "szl-holdings/szl-forge",
+        "title": "feat(chaski_r2): Unsloth bf16 LoRA; QLoRA not recommended on Qwen3.5"
+      },
+      {
+        "number": 1412,
+        "production_disposition": "REDESIGN_FOR_ISOLATION_THEN_QUALIFY",
+        "reason": "Require per-kernel timeouts, isolation, caching, circuit breaking, provenance, and resource budgets before runtime activation.",
+        "repository": "szl-holdings/a11oy",
+        "title": "feat(kernels): register kernel estate organ that import+calls SZL kernels"
+      },
+      {
+        "number": 1333,
+        "production_disposition": "REBASE_REVIEW_AND_KEEP_STANDALONE",
+        "reason": "Keep standalone; current-base review and a separate canonical deployment successor remain required.",
+        "repository": "szl-holdings/a11oy",
+        "title": "feat(oro): add standalone obligation-ranked orbit control plane"
+      },
+      {
+        "number": 1405,
+        "production_disposition": "HOLD_FIRST_FOLD_SIMPLIFICATION",
+        "reason": "Estate cards belong behind /estate and must not increase first-fold cognitive load or imply quality from reachability.",
+        "repository": "szl-holdings/a11oy",
+        "title": "feat(ui): bind Series A models and kernels as holographic estate cards"
+      },
+      {
+        "number": 8,
+        "production_disposition": "QUALIFY_OR_SUPERSEDE_IN_EVIDENCE_STUDIO",
+        "reason": "Complete exact-head proof if canonical; otherwise preserve evidence and migrate into Evidence Studio.",
+        "repository": "szl-holdings/governed-norm-holo",
+        "title": "fix(release): rebind redacted merge revision publicly"
+      },
+      {
+        "number": 676,
+        "production_disposition": "QUALIFY_FIRST_THEN_VENDOR_SYNC",
+        "reason": "Small truth/brand correction; land before corresponding a11oy cleanup with generated vendor-sync proof.",
+        "repository": "szl-holdings/platform",
+        "title": "fix(ui): replace LUMINA/PARAGON in vendored a11oy brand data"
+      },
+      {
+        "number": 465,
+        "production_disposition": "EXTERNAL_PERMISSION_BLOCKED",
+        "reason": "Requires live GitHub App permission and exact-head secret-health proof without secret-value disclosure.",
+        "repository": "szl-holdings/.github",
+        "title": "fix(app): grant qillqaq secret-name read"
+      }
+    ],
+    "private": 5,
+    "public": 71,
+    "repositories": 76,
+    "ruleset_findings": [
+      {
+        "finding": "Captured active repository ruleset: zero approvals, no code-owner review, no last-push approval, squash and rebase allowed, strict/up-to-date disabled, and only one lockfile status check required.",
+        "id": "CTRL-001",
+        "required_action": "Make live enforcement match policy: strict aggregate gates, squash-only, signatures, no bypass, conversation resolution, and honest solo-operator/independent-review modes.",
+        "severity": "P0",
+        "target": "szl-holdings/platform"
+      },
+      {
+        "finding": "Captured active series-a ruleset: signatures and strict status checks exist, but zero approvals and only Gitleaks plus a lockfile check are required; a separate workflow protects frontier source pins.",
+        "id": "CTRL-002",
+        "required_action": "Add actual aggregate CI, backend, E2E, accessibility/performance, dependency, CodeQL, readiness, release-contract, and Hub-parity contexts after discovering exact names.",
+        "severity": "P0",
+        "target": "szl-holdings/a11oy"
+      },
+      {
+        "finding": "Captured organization default ruleset requires PRs and thread resolution but zero approvals, no code-owner/last-push approval, and no required status checks.",
+        "id": "CTRL-003",
+        "required_action": "Create tiered intended rulesets and a policy-as-code test against effective API readback for every repository.",
+        "severity": "P0",
+        "target": "szl-holdings organization"
+      }
+    ]
+  },
+  "schema": "szl.current-production-snapshot/v5",
+  "surfaces": [
+    {
+      "action": "Split marketing, console, investor, estate, verifier, trust, and research. First fold: buyer, problem, Lyte Services outcome, one proof, one CTA.",
+      "captured": "Strong honesty thesis, but one public journey combines dense navigation, five verticals, a 3D living body, estate inventory, proof concepts, and operator surfaces.",
+      "role": "product",
+      "surface": "https://a-11-oy.com"
+    },
+    {
+      "action": "Lead with current releases, receipt inclusion/consistency, freshness, incidents, revocations, runtime bindings, and offline verification.",
+      "captured": "Product/evidence separation is explicit, but the first page also includes ROADMAP cuts and a static 2026-08-28 Hub inventory snapshot.",
+      "role": "proof registry",
+      "surface": "https://a11oy.net"
+    },
+    {
+      "action": "Generate cards from passports and separate weights, adapters, quantizations, software, recipes, aliases, roadmaps, failures, and historical records.",
+      "captured": "The organization card has a clear control-before-action narrative, but the Models journey still groups weights, adapters, recipes, surrogates, and software kernels.",
+      "role": "artifact registry",
+      "surface": "https://huggingface.co/SZLHOLDINGS"
+    }
+  ],
+  "truth_boundary": "No merge, deployment, Hub mutation, ruleset edit or production certification was performed."
+}
