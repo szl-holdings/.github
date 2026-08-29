@@ -1,0 +1,42 @@
+{
+  "schema": "szl.wave0-signed/v1",
+  "status": "WAVE0_SIGNED",
+  "signedAt": "2026-08-29T06:47:00-04:00",
+  "actor": "founder@szl-holdings",
+  "evidenceClass": "REPORTED",
+  "runtimeState": "DEMO",
+  "productionCertified": false,
+  "currentWave": 1,
+  "action": "AUTHORIZE_WAVE_1",
+  "github": {
+    "org": "szl-holdings",
+    "searchTotal": 85,
+    "orgPageShown": 80,
+    "privateObserved": 5,
+    "archivedObserved": 7,
+    "openPrsNow": 0
+  },
+  "huggingface": {
+    "org": "SZLHOLDINGS",
+    "models": 40,
+    "datasets": 28,
+    "spacesApi": 35
+  },
+  "packet": {
+    "githubAuthenticated": 76,
+    "hfModelsDedicated": 17,
+    "hfSpaces": 27
+  },
+  "allows": [
+    "Sign the current estate snapshot on existing surfaces",
+    "Authorize Wave 1 on existing repositories",
+    "Keep classifying Hub sprawl against GitHub authorities"
+  ],
+  "denies": [
+    "No new public GitHub repository",
+    "No new Hugging Face Space or model-brand",
+    "No production ATO",
+    "No paid pilot, ROI, or live BFT",
+    "Waves 2-4 stay locked until Wave 1 exits"
+  ]
+}
