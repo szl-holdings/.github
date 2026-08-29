@@ -16,7 +16,7 @@ jobs:
   check:
     name: All actions SHA-pinned
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 15
     steps:
       - name: Harden runner
         uses: step-security/harden-runner@b09bb98e06d4d774595224525879c09bc6e98c40 # v2.20.1
@@ -26,14 +26,21 @@ jobs:
       - name: Checkout caller
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          fetch-depth: 1
           path: caller
+          persist-credentials: false
+          sparse-checkout: .github/workflows
 
       - name: Checkout exact reusable-workflow revision (shared validator)
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          fetch-depth: 1
+          persist-credentials: false
           repository: ${{ job.workflow_repository }}
           ref: ${{ job.workflow_sha }}
           path: tools
+          sparse-checkout: .github/scripts/reusable_workflow_target_check.py
+          sparse-checkout-cone-mode: false
 
       - name: Verify SHA-pins
         shell: bash

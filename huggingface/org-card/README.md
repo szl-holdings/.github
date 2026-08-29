@@ -22,13 +22,13 @@ license: apache-2.0
 
 # Control before action. Evidence after.
 
-Models, data, and demonstrations that act within authority and leave
-inspectable evidence.
+Models, kernels, data, and demonstrations that operate within authority and
+leave inspectable evidence.
 
 [**Open a11oy**](https://a-11-oy.com) ·
 [**Verify evidence**](https://a11oy.net) ·
-[**Build with SZL**](https://holdings.a-11-oy.com/docs-site/) ·
-[**View source**](https://github.com/szl-holdings)
+[**Killinchu**](https://huggingface.co/spaces/SZLHOLDINGS/killinchu) ·
+[**Source**](https://github.com/szl-holdings)
 
 </div>
 
@@ -36,49 +36,52 @@ inspectable evidence.
 
 ### 01 / Command
 
-[**a11oy**](https://huggingface.co/spaces/SZLHOLDINGS/a11oy) — governed
-inference and bounded action with portable receipts.
+[**a11oy**](https://huggingface.co/spaces/SZLHOLDINGS/a11oy) provides governed
+inference, bounded action, and portable receipts.
 
 ### 02 / Intelligence
 
-[**Killinchu**](https://huggingface.co/spaces/SZLHOLDINGS/killinchu) — public
-observation, fusion, and operator-decision workflows. Public feeds may be live
-or unavailable; samples remain labeled. Effectors and public actuation are
-**SIMULATED**. This Space does not command a live weapon or establish
-production authorization.
+[**Killinchu**](https://huggingface.co/spaces/SZLHOLDINGS/killinchu) supports
+public observation, fusion, and operator decisions. Feeds may be live or
+unavailable; samples remain labeled. Effectors and public actuation are
+**SIMULATED**. The Space does not command a live weapon or establish production
+authorization.
 
-### 03 / Models + data
+### 03 / Models + kernels
 
-[**Khipu**](https://huggingface.co/SZLHOLDINGS/SZL-Khipu-1.5B),
-[**ReceiptAgent**](https://huggingface.co/SZLHOLDINGS/SZL-Forge-1.5B-ReceiptAgent),
-and [**szl-lake**](https://huggingface.co/datasets/SZLHOLDINGS/szl-lake)
-publish weights, receipt proposals, and admitted evidence as distinct artifacts.
+Ready-to-wear—weights exist, proposal-only:
+[**Khipu 1.5B**](https://huggingface.co/SZLHOLDINGS/SZL-Khipu-1.5B),
+[**Forge ReceiptAgent**](https://huggingface.co/SZLHOLDINGS/SZL-Forge-1.5B-ReceiptAgent),
+[**ReceiptAgent 0.8B**](https://huggingface.co/SZLHOLDINGS/szl-receiptagent-qwen35-0.8b-v2),
+and [**szl-kernels**](https://huggingface.co/SZLHOLDINGS/szl-kernels).
+
+Fall 2026—**CUTTING**, cards only, no weights:
+[**KHIPU-R2**](https://huggingface.co/SZLHOLDINGS/KHIPU-R2),
+[**WILLAY**](https://huggingface.co/SZLHOLDINGS/WILLAY),
+[**KILLINCHU-EYE**](https://huggingface.co/SZLHOLDINGS/KILLINCHU-EYE),
+[**YARQA-ATTN**](https://huggingface.co/SZLHOLDINGS/YARQA-ATTN), and
+[**A11OY-MINI**](https://huggingface.co/SZLHOLDINGS/A11OY-MINI).
+
+Admitted evidence lives in
+[**szl-lake**](https://huggingface.co/datasets/SZLHOLDINGS/szl-lake).
+We use public research as inspiration while preserving original SZL
+implementations and lineage; third-party weights are never relabeled.
 
 ### 04 / Evidence
 
 [**Receipt verifier**](https://huggingface.co/spaces/SZLHOLDINGS/governed-receipt-verifier)
-supports replay. [**SZL Kernels**](https://huggingface.co/SZLHOLDINGS/szl-kernels)
-publishes source-bound runtime artifacts.
-
-> A running Space proves reachability, not capability. A signature establishes
-> integrity and origin within scope—not accuracy, safety, or authorization.
+supports replay. A running Space proves reachability, not capability; a
+signature establishes scoped integrity and origin, not accuracy, safety, or
+authorization.
 
 <details>
 <summary><strong>Artifact and truth contract</strong></summary>
 
-- **Weights and adapters** require lineage, hashes, evaluation, and an autonomy
-  boundary.
-- **Software and substrate**, **surrogates and recipes**, **datasets and
-  evidence**, and **Spaces and demonstrations** remain explicitly classified;
-  repository type does not redefine them.
-- Claims use **PROVED**, **MEASURED**, **REPORTED**, **MODELED**,
-  **CONJECTURE**, or **ROADMAP**. Runtime state is separate:
-  **OPERATIONAL**, **PARTIAL**, **DEGRADED**, **UNAVAILABLE**, or
-  **HISTORICAL**.
-- Lambda uniqueness remains **Conjecture 1**, not a theorem.
+- Weights require lineage, hashes, evaluation, and an autonomy boundary.
+- Claims use PROVED, MEASURED, REPORTED, MODELED, CONJECTURE, or ROADMAP.
+- Lambda uniqueness remains Conjecture 1, not a theorem.
 - [`SZLHOLDINGS/SZLHOLDINGS`](https://huggingface.co/datasets/SZLHOLDINGS/SZLHOLDINGS)
-  is a **HISTORICAL profile mirror**, not a current organization card,
-  inventory, or runtime source.
+  is a **HISTORICAL** mirror, not the current card, inventory, or runtime source.
 
 </details>
 
@@ -86,17 +89,16 @@ publishes source-bound runtime artifacts.
 
 [Served source](https://szlholdings-readme.static.hf.space/deployment.json) ·
 [a11oy readiness](https://a-11-oy.com/api/a11oy/v1/readiness) ·
-[Killinchu build](https://szlholdings-killinchu.hf.space/api/build-info) ·
-[Public-risk status](https://szlholdings-killinchu.hf.space/api/public-risk-status) ·
-[Killinchu readiness](https://szlholdings-killinchu.hf.space/api/killinchu/readyz)
+[Killinchu build](https://szlholdings-killinchu.hf.space/api/build-info)
 
 Links change. No authorization, approval, adoption, or investment outcome is
 claimed.
 
 ## Reproduce and verify
 
-Source: [`szl-holdings/.github`](https://github.com/szl-holdings/.github/tree/main/huggingface/org-card).
-The Space exposes its exact GitHub revision at
+Source:
+[`szl-holdings/.github`](https://github.com/szl-holdings/.github/tree/main/huggingface/org-card).
+The Space exposes its exact GitHub revision through
 [`deployment.json`](https://szlholdings-readme.static.hf.space/deployment.json).
 
 ```bash
@@ -111,7 +113,6 @@ python -m http.server 8000 --directory "$preview_dir"
 
 [Security](https://github.com/szl-holdings/.github/security/policy) ·
 [Trust](https://github.com/szl-holdings/.github/blob/main/TRUST.md) ·
-[Support](https://github.com/szl-holdings/.github/blob/main/SUPPORT.md) ·
 [Limitations](./HONEST_DISCLOSURE.md) ·
 [Hugging Face organization](https://huggingface.co/SZLHOLDINGS)
 
