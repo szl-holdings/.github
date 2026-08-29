@@ -39,52 +39,20 @@
     },
     "open_prs": [
       {
-        "number": 1420,
-        "production_disposition": "HOLD_UNTIL_CHECKS_GREEN",
-        "reason": "Restores killinchu-shared bytes after the vendor pin. Recapture: Demo-critical route-table and Investor smoke bind failed. Do not squash while required checks are red.",
-        "repository": "szl-holdings/a11oy",
-        "title": "fix(vendor): restore killinchu-shared bytes after pin bump",
-        "html_url": "https://github.com/szl-holdings/a11oy/pull/1420"
-      },
-      {
-        "number": 1418,
-        "production_disposition": "HOLD_UNTIL_CHECKS_GREEN",
-        "reason": "Strips remaining KORA/LUMINA/PARAGON live labels. Recapture: killinchu shared-source sync and investor smoke failed. Land only after 1420 is green.",
-        "repository": "szl-holdings/a11oy",
-        "title": "fix(ui): strip remaining KORA/LUMINA/PARAGON from web/src",
-        "html_url": "https://github.com/szl-holdings/a11oy/pull/1418"
-      },
-      {
-        "number": 1419,
-        "production_disposition": "HOLD_KERNEL_ISOLATION_AND_CHECKS",
-        "reason": "Wires fail-closed organ-integrity. Recapture: Frontier model admission failed; isolation/timeouts/budgets remain residual. Pair with anatomy#49.",
-        "repository": "szl-holdings/a11oy",
-        "title": "feat(anatomy): wire fail-closed organ-integrity kernel",
-        "html_url": "https://github.com/szl-holdings/a11oy/pull/1419"
-      },
-      {
-        "number": 49,
-        "production_disposition": "HOLD_WITH_A11OY_1419",
-        "reason": "Anatomy probe for the same organ-integrity kernel. Recapture with a11oy#1419. Isolation evidence is still residual.",
-        "repository": "szl-holdings/anatomy",
-        "title": "feat(anatomy): probe fail-closed organ-integrity kernel",
-        "html_url": "https://github.com/szl-holdings/anatomy/pull/49"
-      },
-      {
-        "number": 488,
-        "production_disposition": "HOLD_UNTIL_EMBED_CONTRACT_GREEN",
-        "reason": "Org-card touch targets. Recapture: Verify host-isolated embed contract failed. Do not squash on a red required check.",
+        "number": 490,
+        "production_disposition": "REFRESH_THEN_SQUASH_ONLY_IF_GREEN",
+        "reason": "Packet-5 snapshot recapture at 2026-08-29T04:00:00Z. Prior 03:22Z open set is stale. Squash only after required checks are terminal green on this refreshed head.",
         "repository": "szl-holdings/.github",
-        "title": "fix(frontend): enlarge org-card navigation hit regions",
-        "html_url": "https://github.com/szl-holdings/.github/pull/488"
+        "title": "chore(production): refresh packet-5 open PR dispositions",
+        "html_url": "https://github.com/szl-holdings/.github/pull/490"
       },
       {
-        "number": 34,
-        "production_disposition": "HOLD_OPS_RECORD_NOT_PRODUCT_PROOF",
-        "reason": "Ops record of native organization convergence. Not a Lyte product proof. Recapture before any squash.",
-        "repository": "szl-holdings/szl-org-health",
-        "title": "chore(ops): record native organization convergence",
-        "html_url": "https://github.com/szl-holdings/szl-org-health/pull/34"
+        "number": 1421,
+        "production_disposition": "HOLD_UNTIL_CHECKS_GREEN",
+        "reason": "Touch targets + HF manifest. Recapture after rebase onto organ-kernel main: DCO failed (unsigned merge commit), Investor smoke bind S7, Investor smoke live probes, Receipt + UDS, Demo-critical route-table, contract, Offline honesty, Frontier HF admission. Green-light does not override a red required check.",
+        "repository": "szl-holdings/a11oy",
+        "title": "fix(frontend): restore live touch targets and Hub manifest",
+        "html_url": "https://github.com/szl-holdings/a11oy/pull/1421"
       }
     ],
     "private": 5,
@@ -115,10 +83,39 @@
     ],
     "merged_since_packet": [
       {
+        "number": 1423,
+        "repository": "szl-holdings/a11oy",
+        "merged_at": "2026-08-29T03:50:32Z",
+        "merged_sha": "83dbdbb2269145c476d56d7d4dc6a54a60a77314",
+        "production_disposition": "MERGED_ORGAN_KERNEL_ISOLATION_RESIDUAL",
+        "title": "feat: wire five-organ fail-closed kernel onto a-11-oy.com"
+      },
+      {
+        "number": 489,
+        "repository": "szl-holdings/.github",
+        "merged_at": "2026-08-29T03:32:53Z",
+        "production_disposition": "MERGED_ORG_CARD_TOUCH_TARGETS",
+        "title": "fix(frontend): enlarge org-card navigation hit regions"
+      },
+      {
+        "number": 1418,
+        "repository": "szl-holdings/a11oy",
+        "merged_at": "2026-08-29T03:22:58Z",
+        "production_disposition": "MERGED_STALE_NAME_STRIP",
+        "title": "fix(ui): strip remaining KORA/LUMINA/PARAGON from web/src"
+      },
+      {
+        "number": 1420,
+        "repository": "szl-holdings/a11oy",
+        "merged_at": "2026-08-29T03:21:35Z",
+        "production_disposition": "MERGED_KILLINCHU_SHARED_BYTES",
+        "title": "fix(vendor): restore killinchu-shared bytes after pin bump"
+      },
+      {
         "number": 1416,
         "repository": "szl-holdings/a11oy",
         "merged_at": "2026-08-29T03:15:31Z",
-        "production_disposition": "MERGED_STALE_NAME_FOLLOWUPS_STILL_OPEN",
+        "production_disposition": "MERGED_VENDOR_PIN",
         "title": "fix(vendor): pin platform@de08cf8e after LUMINA/PARAGON strip"
       }
     ]
@@ -144,8 +141,8 @@
       "surface": "https://huggingface.co/SZLHOLDINGS"
     }
   ],
-  "truth_boundary": "No merge, deployment, Hub mutation, ruleset edit or production certification was performed.",
-  "recaptured_at": "2026-08-29T03:22:00Z",
+  "truth_boundary": "A document or workflow file is not proof of live enforcement. Missing evidence is UNKNOWN or FAIL, never PASS. This recapture performs no Hub mutation, ruleset edit, or production certification. Green-light does not override a red required check.",
+  "recaptured_at": "2026-08-29T04:00:00Z",
   "overall_status": "PARTIALLY_VERIFIED_WITH_EXACT_BLOCKERS",
   "certified_production_ready": false
 }
