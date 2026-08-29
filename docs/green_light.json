@@ -3,7 +3,7 @@
   "terminal": "GREEN_LIGHT",
   "action": "AUTHORIZE_WAVE_1",
   "actor": "founder@szl-holdings",
-  "capturedAt": "2026-08-29T09:05:00-04:00",
+  "capturedAt": "2026-08-29T09:10:00-04:00",
   "signedAt": "2026-08-29T06:47:00-04:00",
   "kind": {
     "estate.sign": "ALLOW",
@@ -16,7 +16,7 @@
     "orgPageShown": 80,
     "privateObserved": 5,
     "archivedObserved": 7,
-    "openPrs": ["szl-holdings/immune#56"]
+    "openPrs": []
   },
   "huggingface": {
     "org": "SZLHOLDINGS",
@@ -25,7 +25,7 @@
     "spaces": 35
   },
   "holds": [
-    "immune#56 QUALIFY_PUBLICATION — Hub-write mirror, checks unstable, not merged",
+    "immune#56 CLOSED without merge after DCO fail — Hub-write not admitted",
     "a11oy trusted-contract job 99096216389 FAILED — green light does not override"
   ],
   "denies": [

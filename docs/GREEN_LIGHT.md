@@ -1,6 +1,6 @@
 # Green light — Wave 0 signed, Wave 1 go
 
-Captured: 2026-08-29T09:05:00-04:00
+Captured: 2026-08-29T09:10:00-04:00
 Actor: founder@szl-holdings
 Kind: estate.sign ALLOW · estate.admit DENY · wave.unlock DENY
 Terminal: GREEN_LIGHT
@@ -21,7 +21,6 @@ certified_production_ready: false
 - No paid pilot, ROI, or live BFT claim.
 - Waves 2–4 stay locked.
 - Green light does not override a red required check.
-- Green light does not merge immune#56.
 
 ## Recapture
 
@@ -30,7 +29,7 @@ certified_production_ready: false
 | GitHub authenticated search | 85 | `user:szl-holdings` |
 | GitHub org page shown | 80 | github.com/szl-holdings |
 | GitHub private / archived | 5 / 7 | same search |
-| Open org pull requests | 1 | immune#56 |
+| Open org pull requests | 0 | live search |
 | Hub model cards | 40 | `/api/models?author=SZLHOLDINGS` |
 | Hub datasets | 28 | `/api/datasets?author=SZLHOLDINGS` |
 | Hub Spaces (API) | 35 | `/api/spaces?author=SZLHOLDINGS` |
@@ -39,12 +38,11 @@ Packet 4 snapshot remains 76 GitHub rows. Delta is classified sprawl, not a new 
 
 ## immune#56
 
-- State: OPEN. Created 2026-08-29T13:02:26Z by stephenlutar2-hash.
+- State: CLOSED without merge 2026-08-29T13:04:27Z by stephenlutar2-hash.
 - Title: ci: mirror szl-khipu onto Hub using Immune write token.
-- Mergeable: unstable. Required checks were still in progress at recapture.
-- Intent: GitHub `szl-khipu` stays canonical. Immune holds the write-scoped Hub token. Workflow would upload existing classified family/kernel sources onto existing Hub Spaces counsel, ayllu, and szl-experiments (`create_repo` with `exist_ok=True`).
-- Those three Spaces already exist. This is not a new GitHub repository.
-- Disposition: QUALIFY_PUBLICATION HOLD. Green light does not merge a Hub-write workflow while checks are unstable. New Hub brands remain denied.
+- DCO sign-off failed. Green light did not merge it.
+- Intent was a Hub mirror of existing classified family Spaces (counsel, ayllu, szl-experiments) using Immune's write-scoped token. GitHub `szl-khipu` stays canonical.
+- Those Spaces already exist. This was not a new GitHub repository. New Hub brands remain denied.
 
 ## a11oy#1425 recapture
 
