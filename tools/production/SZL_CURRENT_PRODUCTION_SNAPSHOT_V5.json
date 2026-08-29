@@ -39,53 +39,52 @@
     },
     "open_prs": [
       {
-        "number": 70,
-        "production_disposition": "HOLD_BEHIND_EVAL_AND_RELEASE_GATE",
-        "reason": "Train loss is not evaluation; publication remains false. Admit only after frozen evaluation, passport, and exact Hub lineage.",
-        "repository": "szl-holdings/szl-forge",
-        "title": "feat(chaski_r2): Unsloth bf16 LoRA; QLoRA not recommended on Qwen3.5"
-      },
-      {
-        "number": 1412,
-        "production_disposition": "REDESIGN_FOR_ISOLATION_THEN_QUALIFY",
-        "reason": "Require per-kernel timeouts, isolation, caching, circuit breaking, provenance, and resource budgets before runtime activation.",
+        "number": 1420,
+        "production_disposition": "HOLD_UNTIL_CHECKS_GREEN",
+        "reason": "Restores killinchu-shared bytes after the vendor pin. Recapture: Demo-critical route-table and Investor smoke bind failed. Do not squash while required checks are red.",
         "repository": "szl-holdings/a11oy",
-        "title": "feat(kernels): register kernel estate organ that import+calls SZL kernels"
+        "title": "fix(vendor): restore killinchu-shared bytes after pin bump",
+        "html_url": "https://github.com/szl-holdings/a11oy/pull/1420"
       },
       {
-        "number": 1333,
-        "production_disposition": "REBASE_REVIEW_AND_KEEP_STANDALONE",
-        "reason": "Keep standalone; current-base review and a separate canonical deployment successor remain required.",
+        "number": 1418,
+        "production_disposition": "HOLD_UNTIL_CHECKS_GREEN",
+        "reason": "Strips remaining KORA/LUMINA/PARAGON live labels. Recapture: killinchu shared-source sync and investor smoke failed. Land only after 1420 is green.",
         "repository": "szl-holdings/a11oy",
-        "title": "feat(oro): add standalone obligation-ranked orbit control plane"
+        "title": "fix(ui): strip remaining KORA/LUMINA/PARAGON from web/src",
+        "html_url": "https://github.com/szl-holdings/a11oy/pull/1418"
       },
       {
-        "number": 1405,
-        "production_disposition": "HOLD_FIRST_FOLD_SIMPLIFICATION",
-        "reason": "Estate cards belong behind /estate and must not increase first-fold cognitive load or imply quality from reachability.",
+        "number": 1419,
+        "production_disposition": "HOLD_KERNEL_ISOLATION_AND_CHECKS",
+        "reason": "Wires fail-closed organ-integrity. Recapture: Frontier model admission failed; isolation/timeouts/budgets remain residual. Pair with anatomy#49.",
         "repository": "szl-holdings/a11oy",
-        "title": "feat(ui): bind Series A models and kernels as holographic estate cards"
+        "title": "feat(anatomy): wire fail-closed organ-integrity kernel",
+        "html_url": "https://github.com/szl-holdings/a11oy/pull/1419"
       },
       {
-        "number": 8,
-        "production_disposition": "QUALIFY_OR_SUPERSEDE_IN_EVIDENCE_STUDIO",
-        "reason": "Complete exact-head proof if canonical; otherwise preserve evidence and migrate into Evidence Studio.",
-        "repository": "szl-holdings/governed-norm-holo",
-        "title": "fix(release): rebind redacted merge revision publicly"
+        "number": 49,
+        "production_disposition": "HOLD_WITH_A11OY_1419",
+        "reason": "Anatomy probe for the same organ-integrity kernel. Recapture with a11oy#1419. Isolation evidence is still residual.",
+        "repository": "szl-holdings/anatomy",
+        "title": "feat(anatomy): probe fail-closed organ-integrity kernel",
+        "html_url": "https://github.com/szl-holdings/anatomy/pull/49"
       },
       {
-        "number": 676,
-        "production_disposition": "QUALIFY_FIRST_THEN_VENDOR_SYNC",
-        "reason": "Small truth/brand correction; land before corresponding a11oy cleanup with generated vendor-sync proof.",
-        "repository": "szl-holdings/platform",
-        "title": "fix(ui): replace LUMINA/PARAGON in vendored a11oy brand data"
-      },
-      {
-        "number": 465,
-        "production_disposition": "EXTERNAL_PERMISSION_BLOCKED",
-        "reason": "Requires live GitHub App permission and exact-head secret-health proof without secret-value disclosure.",
+        "number": 488,
+        "production_disposition": "HOLD_UNTIL_EMBED_CONTRACT_GREEN",
+        "reason": "Org-card touch targets. Recapture: Verify host-isolated embed contract failed. Do not squash on a red required check.",
         "repository": "szl-holdings/.github",
-        "title": "fix(app): grant qillqaq secret-name read"
+        "title": "fix(frontend): enlarge org-card navigation hit regions",
+        "html_url": "https://github.com/szl-holdings/.github/pull/488"
+      },
+      {
+        "number": 34,
+        "production_disposition": "HOLD_OPS_RECORD_NOT_PRODUCT_PROOF",
+        "reason": "Ops record of native organization convergence. Not a Lyte product proof. Recapture before any squash.",
+        "repository": "szl-holdings/szl-org-health",
+        "title": "chore(ops): record native organization convergence",
+        "html_url": "https://github.com/szl-holdings/szl-org-health/pull/34"
       }
     ],
     "private": 5,
@@ -113,6 +112,15 @@
         "severity": "P0",
         "target": "szl-holdings organization"
       }
+    ],
+    "merged_since_packet": [
+      {
+        "number": 1416,
+        "repository": "szl-holdings/a11oy",
+        "merged_at": "2026-08-29T03:15:31Z",
+        "production_disposition": "MERGED_STALE_NAME_FOLLOWUPS_STILL_OPEN",
+        "title": "fix(vendor): pin platform@de08cf8e after LUMINA/PARAGON strip"
+      }
     ]
   },
   "schema": "szl.current-production-snapshot/v5",
@@ -136,5 +144,8 @@
       "surface": "https://huggingface.co/SZLHOLDINGS"
     }
   ],
-  "truth_boundary": "No merge, deployment, Hub mutation, ruleset edit or production certification was performed."
+  "truth_boundary": "No merge, deployment, Hub mutation, ruleset edit or production certification was performed.",
+  "recaptured_at": "2026-08-29T03:22:00Z",
+  "overall_status": "PARTIALLY_VERIFIED_WITH_EXACT_BLOCKERS",
+  "certified_production_ready": false
 }
