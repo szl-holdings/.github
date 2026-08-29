@@ -39,12 +39,12 @@
     },
     "open_prs": [
       {
-        "number": 490,
-        "production_disposition": "SUPERSEDED_UNSIGNED_HISTORY",
-        "reason": "Packet-5 recapture. Branch recapture/packet5-open-prs-20260829 carries unsigned commit 945751eb so DCO cannot pass on that history. Successor is recapture/packet5-open-prs-20260829b: one signed commit from main. Squash the successor only if required checks are terminal green.",
-        "repository": "szl-holdings/.github",
-        "title": "chore(production): recapture packet-5 open PRs at 2026-08-29T04:15Z",
-        "html_url": "https://github.com/szl-holdings/.github/pull/490"
+        "number": 24,
+        "production_disposition": "HOLD_UNTIL_DCO",
+        "reason": "Ready-for-review docs-only Wave 0 copy. self-test succeeded. Commit 34dfb55c has no Signed-off-by. Green light does not squash without DCO.",
+        "repository": "szl-holdings/szl-estate-os",
+        "title": "Wave 0: Approve is perfusion \u2014 case travels the body before the ledger writes",
+        "html_url": "https://github.com/szl-holdings/szl-estate-os/pull/24"
       }
     ],
     "private": 5,
@@ -75,10 +75,16 @@
     ],
     "merged_since_packet": [
       {
+        "number": 491,
+        "repository": "szl-holdings/.github",
+        "merged_at": "2026-08-29T04:21:57Z",
+        "production_disposition": "MERGED_PACKET5_RECAPTURE",
+        "title": "chore(production): recapture packet-5 open PRs at 2026-08-29T04:15Z"
+      },
+      {
         "number": 1421,
         "repository": "szl-holdings/a11oy",
         "merged_at": "2026-08-29T04:06:33Z",
-        "merged_sha": "1e1c30e64212091ef9ff2704cdbfadb1afbc080a",
         "production_disposition": "MERGED_TOUCH_TARGETS_HF_MANIFEST_POST_DEPLOY_RESIDUAL",
         "title": "fix(frontend): restore live touch targets and Hub manifest"
       },
@@ -86,37 +92,8 @@
         "number": 1423,
         "repository": "szl-holdings/a11oy",
         "merged_at": "2026-08-29T03:50:32Z",
-        "merged_sha": "83dbdbb2269145c476d56d7d4dc6a54a60a77314",
         "production_disposition": "MERGED_ORGAN_KERNEL_ISOLATION_RESIDUAL",
         "title": "feat: wire five-organ fail-closed kernel onto a-11-oy.com"
-      },
-      {
-        "number": 489,
-        "repository": "szl-holdings/.github",
-        "merged_at": "2026-08-29T03:32:53Z",
-        "production_disposition": "MERGED_ORG_CARD_TOUCH_TARGETS",
-        "title": "fix(frontend): enlarge org-card navigation hit regions"
-      },
-      {
-        "number": 1418,
-        "repository": "szl-holdings/a11oy",
-        "merged_at": "2026-08-29T03:22:58Z",
-        "production_disposition": "MERGED_STALE_NAME_STRIP",
-        "title": "fix(ui): strip remaining KORA/LUMINA/PARAGON from web/src"
-      },
-      {
-        "number": 1420,
-        "repository": "szl-holdings/a11oy",
-        "merged_at": "2026-08-29T03:21:35Z",
-        "production_disposition": "MERGED_KILLINCHU_SHARED_BYTES",
-        "title": "fix(vendor): restore killinchu-shared bytes after pin bump"
-      },
-      {
-        "number": 1416,
-        "repository": "szl-holdings/a11oy",
-        "merged_at": "2026-08-29T03:15:31Z",
-        "production_disposition": "MERGED_VENDOR_PIN",
-        "title": "fix(vendor): pin platform@de08cf8e after LUMINA/PARAGON strip"
       }
     ]
   },
@@ -142,7 +119,7 @@
     }
   ],
   "truth_boundary": "A document or workflow file is not proof of live enforcement. Missing evidence is UNKNOWN or FAIL, never PASS. This recapture performs no Hub mutation, ruleset edit, or production certification. Green-light does not override a red required check.",
-  "recaptured_at": "2026-08-29T04:15:00Z",
+  "recaptured_at": "2026-08-29T04:34:00Z",
   "overall_status": "PARTIALLY_VERIFIED_WITH_EXACT_BLOCKERS",
   "certified_production_ready": false
 }
