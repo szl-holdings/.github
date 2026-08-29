@@ -1,0 +1,1950 @@
+{
+  "credential_mode": "anonymous_public_api",
+  "generated_at": "2026-08-29T01:32:42.022162+00:00",
+  "github_organization": "szl-holdings",
+  "huggingface_organization": "SZLHOLDINGS",
+  "inventories": {
+    "datasets": [
+      {
+        "disabled": false,
+        "downloads": 1529,
+        "id": "SZLHOLDINGS/a11oy-verifiable-corpus",
+        "last_modified": "2026-08-13T09:44:40.000Z",
+        "likes": 0,
+        "pipeline_tag": null,
+        "private": false,
+        "sdk": null,
+        "sha": "cea2eb4ebb99dffdfee5665d80f95c0ece007581",
+        "source_name_mapping": {
+          "repository": null,
+          "status": "UNMAPPED_BY_NAME"
+        },
+        "stage": null
+      },
+      {
+        "disabled": false,
+        "downloads": 130,
+        "id": "SZLHOLDINGS/alloy-sovereign-eval-runs",
+        "last_modified": "2026-07-22T10:50:14.000Z",
+        "likes": 0,
+        "pipeline_tag": null,
+        "private": false,
+        "sdk": null,
+        "sha": "6926b2d49aee3ef15c0552f604b18e08faab1ee9",
+        "source_name_mapping": {
+          "repository": null,
+          "status": "UNMAPPED_BY_NAME"
+        },
+        "stage": null
+      },
+      {
+        "disabled": false,
+        "downloads": 128,
+        "id": "SZLHOLDINGS/canonical-formulas-v1",
+        "last_modified": "2026-07-22T10:49:39.000Z",
+        "likes": 0,
+        "pipeline_tag": null,
+        "private": false,
+        "sdk": null,
+        "sha": "1395ee1aa26a052ed851df552df30447b695c9e3",
+        "source_name_mapping": {
+          "repository": null,
+          "status": "UNMAPPED_BY_NAME"
+        },
+        "stage": null
+      },
+      {
+        "disabled": false,
+        "downloads": 156,
+        "id": "SZLHOLDINGS/doctrine-v10-v11",
+        "last_modified": "2026-07-22T10:49:43.000Z",
+        "likes": 0,
+        "pipeline_tag": null,
+        "private": false,
+        "sdk": null,
+        "sha": "4bafa5dededac57d1831c617ba249d6666534a40",
+        "source_name_mapping": {
+          "repository": null,
+          "status": "UNMAPPED_BY_NAME"
+        },
+        "stage": null
+      },
+      {
+        "disabled": false,
+        "downloads": 149,
+        "id": "SZLHOLDINGS/energy-attested-runs",
+        "last_modified": "2026-07-22T10:50:11.000Z",
+        "likes": 0,
+        "pipeline_tag": null,
+        "private": false,
+        "sdk": null,
+        "sha": "674fdba8eea3e4f44e4d8d43716ddc2eb4f50215",
+        "source_name_mapping": {
+          "repository": null,
+          "status": "UNMAPPED_BY_NAME"
+        },
+        "stage": null
+      },
+      {
+        "disabled": false,
+        "downloads": 158,
+        "id": "SZLHOLDINGS/governed-agent-bench",
+        "last_modified": "2026-07-28T18:38:53.000Z",
+        "likes": 0,
+        "pipeline_tag": null,
+        "private": false,
+        "sdk": null,
+        "sha": "a182f0e68f15246ec6e0735745152623fdbba190",
+        "source_name_mapping": {
+          "repository": null,
+          "status": "UNMAPPED_BY_NAME"
+        },
+        "stage": null
+      },
+      {
+        "disabled": false,
+        "downloads": 187,
+        "id": "SZLHOLDINGS/governed-receipts-bench",
+        "last_modified": "2026-07-22T10:50:08.000Z",
+        "likes": 0,
+        "pipeline_tag": null,
+        "private": false,
+        "sdk": null,
+        "sha": "235ef348dce7b9eaca915c8668158039d6831a8c",
+        "source_name_mapping": {
+          "repository": null,
+          "status": "UNMAPPED_BY_NAME"
+        },
+        "stage": null
+      },
+      {
+        "disabled": false,
+        "downloads": 167,
+        "id": "SZLHOLDINGS/k-verify-benchmark-v1",
+        "last_modified": "2026-07-22T10:49:45.000Z",
+        "likes": 0,
+        "pipeline_tag": null,
+        "private": false,
+        "sdk": null,
+        "sha": "82bf28814d0b85ddc931fec7fee9c3e5dcbf05ec",
+        "source_name_mapping": {
+          "repository": null,
+          "status": "UNMAPPED_BY_NAME"
+        },
+        "stage": null
+      },
+      {
+        "disabled": false,
+        "downloads": 36171,
+        "id": "SZLHOLDINGS/killinchu-osint-corpus",
+        "last_modified": "2026-08-29T01:28:06.000Z",
+        "likes": 8,
+        "pipeline_tag": null,
+        "private": false,
+        "sdk": null,
+        "sha": "70416fd4ba982f4e40ddd872bf831f8b66ae42bd",
+        "source_name_mapping": {
+          "repository": null,
+          "status": "UNMAPPED_BY_NAME"
+        },
+        "stage": null
+      },
+      {
+        "disabled": false,
+        "downloads": 387,
+        "id": "SZLHOLDINGS/lean-proofs-v1",
+        "last_modified": "2026-07-22T10:49:38.000Z",
+        "likes": 0,
+        "pipeline_tag": null,
+        "private": false,
+        "sdk": null,
+        "sha": "563beb5786a4260cbcfe61d9ea1ccb92c7cd0842",
+        "source_name_mapping": {
+          "repository": null,
+          "status": "UNMAPPED_BY_NAME"
+        },
+        "stage": null
+      },
+      {
+        "disabled": false,
+        "downloads": 88,
+        "id": "SZLHOLDINGS/lean-theorem-tree",
+        "last_modified": "2026-07-22T10:49:34.000Z",
+        "likes": 0,
+        "pipeline_tag": null,
+        "private": false,
+        "sdk": null,
+        "sha": "b93a14cd411e7e9168819cf86915f1a02c6bfa2b",
+        "source_name_mapping": {
+          "repository": null,
+          "status": "UNMAPPED_BY_NAME"
+        },
+        "stage": null
+      },
+      {
+        "disabled": false,
+        "downloads": 179,
+        "id": "SZLHOLDINGS/ouroboros-arxiv-preprint",
+        "last_modified": "2026-07-22T10:49:26.000Z",
+        "likes": 0,
+        "pipeline_tag": null,
+        "private": false,
+        "sdk": null,
+        "sha": "13ee49f4bbb890ad77895677521fc10c7f2212ae",
+        "source_name_mapping": {
+          "repository": null,
+          "status": "UNMAPPED_BY_NAME"
+        },
+        "stage": null
+      },
+      {
+        "disabled": false,
+        "downloads": 236,
+        "id": "SZLHOLDINGS/rag-corpus-v1",
+        "last_modified": "2026-07-22T10:49:36.000Z",
+        "likes": 0,
+        "pipeline_tag": null,
+        "private": false,
+        "sdk": null,
+        "sha": "5287573c5f47f3e41cb0fd5a8e20933647a102dd",
+        "source_name_mapping": {
+          "repository": null,
+          "status": "UNMAPPED_BY_NAME"
+        },
+        "stage": null
+      },
+      {
+        "disabled": false,
+        "downloads": 674,
+        "id": "SZLHOLDINGS/readiness-runs",
+        "last_modified": "2026-07-22T10:49:54.000Z",
+        "likes": 0,
+        "pipeline_tag": null,
+        "private": false,
+        "sdk": null,
+        "sha": "3798719acbfc3ad015e9b2a73d1bfeb0f85ca512",
+        "source_name_mapping": {
+          "repository": null,
+          "status": "UNMAPPED_BY_NAME"
+        },
+        "stage": null
+      },
+      {
+        "disabled": false,
+        "downloads": 0,
+        "id": "SZLHOLDINGS/receipted-unsloth",
+        "last_modified": "2026-08-28T16:43:49.000Z",
+        "likes": 0,
+        "pipeline_tag": null,
+        "private": false,
+        "sdk": null,
+        "sha": "69a45774fcfc0323383dad0e3514c2de2ad4a7ba",
+        "source_name_mapping": {
+          "repository": null,
+          "status": "UNMAPPED_BY_NAME"
+        },
+        "stage": null
+      },
+      {
+        "disabled": false,
+        "downloads": 120,
+        "id": "SZLHOLDINGS/szl-1-doctrine-sft",
+        "last_modified": "2026-07-22T10:50:15.000Z",
+        "likes": 0,
+        "pipeline_tag": null,
+        "private": false,
+        "sdk": null,
+        "sha": "b11a9d6abe332fa4add8c58feed35b66f75304b8",
+        "source_name_mapping": {
+          "repository": null,
+          "status": "UNMAPPED_BY_NAME"
+        },
+        "stage": null
+      },
+      {
+        "disabled": false,
+        "downloads": 705,
+        "id": "SZLHOLDINGS/szl-artifacts",
+        "last_modified": "2026-07-22T10:49:28.000Z",
+        "likes": 0,
+        "pipeline_tag": null,
+        "private": false,
+        "sdk": null,
+        "sha": "feff62cecb94ca3e5e5aedc391228ecf9602135f",
+        "source_name_mapping": {
+          "repository": null,
+          "status": "UNMAPPED_BY_NAME"
+        },
+        "stage": null
+      },
+      {
+        "disabled": false,
+        "downloads": 2440,
+        "id": "SZLHOLDINGS/szl-lake",
+        "last_modified": "2026-08-29T01:05:58.000Z",
+        "likes": 0,
+        "pipeline_tag": null,
+        "private": false,
+        "sdk": null,
+        "sha": "694d35783fa06c093a9970a04a54fbd55fb24499",
+        "source_name_mapping": {
+          "repository": {
+            "archived": false,
+            "default_branch": "main",
+            "disabled": false,
+            "full_name": "szl-holdings/szl-lake",
+            "html_url": "https://github.com/szl-holdings/szl-lake",
+            "id": 1256687378
+          },
+          "status": "EXACT_NAME"
+        },
+        "stage": null
+      },
+      {
+        "disabled": false,
+        "downloads": 125,
+        "id": "SZLHOLDINGS/szl-quant-sft-v1",
+        "last_modified": "2026-07-22T08:49:49.000Z",
+        "likes": 0,
+        "pipeline_tag": null,
+        "private": false,
+        "sdk": null,
+        "sha": "dfe997e573bdc6784bfbb464dabeccab7ee5314b",
+        "source_name_mapping": {
+          "repository": null,
+          "status": "UNMAPPED_BY_NAME"
+        },
+        "stage": null
+      },
+      {
+        "disabled": false,
+        "downloads": 150,
+        "id": "SZLHOLDINGS/szl-second-brain-inrepo",
+        "last_modified": "2026-07-22T08:49:46.000Z",
+        "likes": 0,
+        "pipeline_tag": null,
+        "private": false,
+        "sdk": null,
+        "sha": "d44a595b6c2b94aadd1320680b5aa05f6fe28cab",
+        "source_name_mapping": {
+          "repository": null,
+          "status": "UNMAPPED_BY_NAME"
+        },
+        "stage": null
+      },
+      {
+        "disabled": false,
+        "downloads": 134,
+        "id": "SZLHOLDINGS/SZLHOLDINGS",
+        "last_modified": "2026-07-22T10:49:21.000Z",
+        "likes": 0,
+        "pipeline_tag": null,
+        "private": false,
+        "sdk": null,
+        "sha": "fdca3ff2d26bc25080a87a75c02994055f2e01bb",
+        "source_name_mapping": {
+          "repository": null,
+          "status": "UNMAPPED_BY_NAME"
+        },
+        "stage": null
+      },
+      {
+        "disabled": false,
+        "downloads": 135,
+        "id": "SZLHOLDINGS/test-results",
+        "last_modified": "2026-07-22T08:49:50.000Z",
+        "likes": 0,
+        "pipeline_tag": null,
+        "private": false,
+        "sdk": null,
+        "sha": "b488e7f4b1815cdd8dcba220c775cdbd617955ef",
+        "source_name_mapping": {
+          "repository": null,
+          "status": "UNMAPPED_BY_NAME"
+        },
+        "stage": null
+      },
+      {
+        "disabled": false,
+        "downloads": 165,
+        "id": "SZLHOLDINGS/thesis-corpus-v18",
+        "last_modified": "2026-07-22T10:49:41.000Z",
+        "likes": 0,
+        "pipeline_tag": null,
+        "private": false,
+        "sdk": null,
+        "sha": "8254324026bf280d6eac5023789ff09b2a6b1af0",
+        "source_name_mapping": {
+          "repository": null,
+          "status": "UNMAPPED_BY_NAME"
+        },
+        "stage": null
+      },
+      {
+        "disabled": false,
+        "downloads": 289,
+        "id": "SZLHOLDINGS/thesis-v18-formal-verification",
+        "last_modified": "2026-07-22T10:49:06.000Z",
+        "likes": 0,
+        "pipeline_tag": null,
+        "private": false,
+        "sdk": null,
+        "sha": "50d804156d126457387941f3edb27fd5c98b283c",
+        "source_name_mapping": {
+          "repository": null,
+          "status": "UNMAPPED_BY_NAME"
+        },
+        "stage": null
+      },
+      {
+        "disabled": false,
+        "downloads": 354,
+        "id": "SZLHOLDINGS/uds-bundles-v1",
+        "last_modified": "2026-07-22T10:49:50.000Z",
+        "likes": 0,
+        "pipeline_tag": null,
+        "private": false,
+        "sdk": null,
+        "sha": "797eb62a3d5582e488f7ee73ac0febfaf4194ab7",
+        "source_name_mapping": {
+          "repository": null,
+          "status": "UNMAPPED_BY_NAME"
+        },
+        "stage": null
+      },
+      {
+        "disabled": false,
+        "downloads": 498,
+        "id": "SZLHOLDINGS/uds-governance-receipts",
+        "last_modified": "2026-07-22T10:49:13.000Z",
+        "likes": 0,
+        "pipeline_tag": null,
+        "private": false,
+        "sdk": null,
+        "sha": "aa6b8ab824e421018da1a5076365dc0ec3f31353",
+        "source_name_mapping": {
+          "repository": null,
+          "status": "UNMAPPED_BY_NAME"
+        },
+        "stage": null
+      },
+      {
+        "disabled": false,
+        "downloads": 461,
+        "id": "SZLHOLDINGS/uds-spans-receipts",
+        "last_modified": "2026-07-22T10:49:10.000Z",
+        "likes": 0,
+        "pipeline_tag": null,
+        "private": false,
+        "sdk": null,
+        "sha": "41f07ff6541a418403efb733738e77e37f0bc8fe",
+        "source_name_mapping": {
+          "repository": null,
+          "status": "UNMAPPED_BY_NAME"
+        },
+        "stage": null
+      },
+      {
+        "disabled": false,
+        "downloads": 226,
+        "id": "SZLHOLDINGS/why-we-lead",
+        "last_modified": "2026-08-28T23:03:45.000Z",
+        "likes": 0,
+        "pipeline_tag": null,
+        "private": false,
+        "sdk": null,
+        "sha": "d4831596a0e963b000e0c9abeefd674a86ffb6c7",
+        "source_name_mapping": {
+          "repository": null,
+          "status": "UNMAPPED_BY_NAME"
+        },
+        "stage": null
+      }
+    ],
+    "models": [
+      {
+        "disabled": false,
+        "downloads": 0,
+        "id": "SZLHOLDINGS/A11OY-MINI",
+        "last_modified": "2026-08-28T23:04:07.000Z",
+        "likes": 0,
+        "pipeline_tag": "text-generation",
+        "private": false,
+        "sdk": null,
+        "sha": "4a4b64a95510b2b2c9efe745cfb09cb5f395b082",
+        "source_name_mapping": {
+          "repository": null,
+          "status": "UNMAPPED_BY_NAME"
+        },
+        "stage": null
+      },
+      {
+        "disabled": false,
+        "downloads": 0,
+        "id": "SZLHOLDINGS/a11oy-v19-substrate",
+        "last_modified": "2026-07-26T03:14:43.000Z",
+        "likes": 0,
+        "pipeline_tag": null,
+        "private": false,
+        "sdk": null,
+        "sha": "d3ef7819a1a18879e208b071c7135f933f7d9ff3",
+        "source_name_mapping": {
+          "repository": null,
+          "status": "UNMAPPED_BY_NAME"
+        },
+        "stage": null
+      },
+      {
+        "disabled": false,
+        "downloads": 0,
+        "id": "SZLHOLDINGS/chakana",
+        "last_modified": "2026-08-28T17:25:33.000Z",
+        "likes": 0,
+        "pipeline_tag": null,
+        "private": false,
+        "sdk": null,
+        "sha": "8066479a44d6d4cdf2c7bdc7a113c1d34188ecca",
+        "source_name_mapping": {
+          "repository": null,
+          "status": "UNMAPPED_BY_NAME"
+        },
+        "stage": null
+      },
+      {
+        "disabled": false,
+        "downloads": 0,
+        "id": "SZLHOLDINGS/chaski",
+        "last_modified": "2026-08-28T23:04:00.000Z",
+        "likes": 0,
+        "pipeline_tag": "text-generation",
+        "private": false,
+        "sdk": null,
+        "sha": "6f021ec631caf312c3543874db0f2106f9b5f0d8",
+        "source_name_mapping": {
+          "repository": null,
+          "status": "UNMAPPED_BY_NAME"
+        },
+        "stage": null
+      },
+      {
+        "disabled": false,
+        "downloads": 0,
+        "id": "SZLHOLDINGS/chaski-5050",
+        "last_modified": "2026-08-29T01:15:02.000Z",
+        "likes": 0,
+        "pipeline_tag": "text-generation",
+        "private": false,
+        "sdk": null,
+        "sha": "b98da6c632c49f408c53f25bb7229f30d0faba6c",
+        "source_name_mapping": {
+          "repository": null,
+          "status": "UNMAPPED_BY_NAME"
+        },
+        "stage": null
+      },
+      {
+        "disabled": false,
+        "downloads": 0,
+        "id": "SZLHOLDINGS/chaski-r2",
+        "last_modified": "2026-08-29T01:14:57.000Z",
+        "likes": 0,
+        "pipeline_tag": "text-generation",
+        "private": false,
+        "sdk": null,
+        "sha": "2f9ddfb047708f1e373c3646ddc6b2a61dd88504",
+        "source_name_mapping": {
+          "repository": null,
+          "status": "UNMAPPED_BY_NAME"
+        },
+        "stage": null
+      },
+      {
+        "disabled": false,
+        "downloads": 0,
+        "id": "SZLHOLDINGS/governed-inference-meter",
+        "last_modified": "2026-07-28T16:50:31.000Z",
+        "likes": 0,
+        "pipeline_tag": null,
+        "private": false,
+        "sdk": null,
+        "sha": "52ef72dc6a92aab88d3a50cecb41ddcad941da88",
+        "source_name_mapping": {
+          "repository": {
+            "archived": false,
+            "default_branch": "main",
+            "disabled": false,
+            "full_name": "szl-holdings/governed-inference-meter",
+            "html_url": "https://github.com/szl-holdings/governed-inference-meter",
+            "id": 1278133766
+          },
+          "status": "EXACT_NAME"
+        },
+        "stage": null
+      },
+      {
+        "disabled": false,
+        "downloads": 0,
+        "id": "SZLHOLDINGS/KHIPU-R2",
+        "last_modified": "2026-08-28T23:04:12.000Z",
+        "likes": 0,
+        "pipeline_tag": "text-generation",
+        "private": false,
+        "sdk": null,
+        "sha": "a42db9875b7a6e83547f35c13e5b33d8275c235c",
+        "source_name_mapping": {
+          "repository": null,
+          "status": "UNMAPPED_BY_NAME"
+        },
+        "stage": null
+      },
+      {
+        "disabled": false,
+        "downloads": 0,
+        "id": "SZLHOLDINGS/KILLINCHU-EYE",
+        "last_modified": "2026-08-28T17:10:49.000Z",
+        "likes": 0,
+        "pipeline_tag": "object-detection",
+        "private": false,
+        "sdk": null,
+        "sha": "77455efd89d13a6450af8add7a65e36ed61a66a1",
+        "source_name_mapping": {
+          "repository": null,
+          "status": "UNMAPPED_BY_NAME"
+        },
+        "stage": null
+      },
+      {
+        "disabled": false,
+        "downloads": 0,
+        "id": "SZLHOLDINGS/qantu",
+        "last_modified": "2026-08-28T17:25:29.000Z",
+        "likes": 0,
+        "pipeline_tag": null,
+        "private": false,
+        "sdk": null,
+        "sha": "643cb23a15c986e9be50be4c37818dfd10a9871b",
+        "source_name_mapping": {
+          "repository": null,
+          "status": "UNMAPPED_BY_NAME"
+        },
+        "stage": null
+      },
+      {
+        "disabled": false,
+        "downloads": 0,
+        "id": "SZLHOLDINGS/ReceiptAgent-Nano",
+        "last_modified": "2026-08-29T01:18:47.000Z",
+        "likes": 0,
+        "pipeline_tag": null,
+        "private": false,
+        "sdk": null,
+        "sha": "64f1a82530e08825c04f93faa202855006313d59",
+        "source_name_mapping": {
+          "repository": null,
+          "status": "UNMAPPED_BY_NAME"
+        },
+        "stage": null
+      },
+      {
+        "disabled": false,
+        "downloads": 0,
+        "id": "SZLHOLDINGS/szl-block-kv",
+        "last_modified": "2026-08-29T01:09:36.000Z",
+        "likes": 0,
+        "pipeline_tag": null,
+        "private": false,
+        "sdk": null,
+        "sha": "621df5471241d097b9cb07a12f516720039570e7",
+        "source_name_mapping": {
+          "repository": {
+            "archived": false,
+            "default_branch": "main",
+            "disabled": false,
+            "full_name": "szl-holdings/szl-block-kv",
+            "html_url": "https://github.com/szl-holdings/szl-block-kv",
+            "id": 1349816095
+          },
+          "status": "EXACT_NAME"
+        },
+        "stage": null
+      },
+      {
+        "disabled": false,
+        "downloads": 0,
+        "id": "SZLHOLDINGS/szl-blocked",
+        "last_modified": "2026-08-28T23:02:53.000Z",
+        "likes": 1,
+        "pipeline_tag": null,
+        "private": false,
+        "sdk": null,
+        "sha": "3f1196676f2c36ad93990e919cd16b948a3772ae",
+        "source_name_mapping": {
+          "repository": {
+            "archived": false,
+            "default_branch": "main",
+            "disabled": false,
+            "full_name": "szl-holdings/szl-blocked",
+            "html_url": "https://github.com/szl-holdings/szl-blocked",
+            "id": 1349822616
+          },
+          "status": "EXACT_NAME"
+        },
+        "stage": null
+      },
+      {
+        "disabled": false,
+        "downloads": 212,
+        "id": "SZLHOLDINGS/SZL-Forge-1.5B-ReceiptAgent",
+        "last_modified": "2026-08-28T14:16:35.000Z",
+        "likes": 0,
+        "pipeline_tag": "text-generation",
+        "private": false,
+        "sdk": null,
+        "sha": "a5685f8f8b0a9a4224b1c640830d2ea0442f7fcb",
+        "source_name_mapping": {
+          "repository": null,
+          "status": "UNMAPPED_BY_NAME"
+        },
+        "stage": null
+      },
+      {
+        "disabled": false,
+        "downloads": 0,
+        "id": "SZLHOLDINGS/szl-formulas",
+        "last_modified": "2026-08-28T23:02:48.000Z",
+        "likes": 0,
+        "pipeline_tag": null,
+        "private": false,
+        "sdk": null,
+        "sha": "0b1d48be398e8b1041c8975f9b2f7f70211183a6",
+        "source_name_mapping": {
+          "repository": {
+            "archived": false,
+            "default_branch": "main",
+            "disabled": false,
+            "full_name": "szl-holdings/szl-formulas",
+            "html_url": "https://github.com/szl-holdings/szl-formulas",
+            "id": 1349822695
+          },
+          "status": "EXACT_NAME"
+        },
+        "stage": null
+      },
+      {
+        "disabled": false,
+        "downloads": 204,
+        "id": "SZLHOLDINGS/szl-governed-norm",
+        "last_modified": "2026-08-29T00:10:44.000Z",
+        "likes": 1,
+        "pipeline_tag": null,
+        "private": false,
+        "sdk": null,
+        "sha": "4c84cf7bad26753ea29b74b8bbeecf91b95ed8f7",
+        "source_name_mapping": {
+          "repository": {
+            "archived": false,
+            "default_branch": "main",
+            "disabled": false,
+            "full_name": "szl-holdings/szl-governed-norm",
+            "html_url": "https://github.com/szl-holdings/szl-governed-norm",
+            "id": 1277848144
+          },
+          "status": "EXACT_NAME"
+        },
+        "stage": null
+      },
+      {
+        "disabled": false,
+        "downloads": 0,
+        "id": "SZLHOLDINGS/szl-govsign",
+        "last_modified": "2026-08-28T23:02:50.000Z",
+        "likes": 0,
+        "pipeline_tag": null,
+        "private": false,
+        "sdk": null,
+        "sha": "be526daeb087b2872afeeb9dbfb50c4347d320e0",
+        "source_name_mapping": {
+          "repository": {
+            "archived": false,
+            "default_branch": "main",
+            "disabled": false,
+            "full_name": "szl-holdings/szl-govsign",
+            "html_url": "https://github.com/szl-holdings/szl-govsign",
+            "id": 1349822612
+          },
+          "status": "EXACT_NAME"
+        },
+        "stage": null
+      },
+      {
+        "disabled": false,
+        "downloads": 0,
+        "id": "SZLHOLDINGS/szl-invariants",
+        "last_modified": "2026-08-28T23:02:56.000Z",
+        "likes": 2,
+        "pipeline_tag": null,
+        "private": false,
+        "sdk": null,
+        "sha": "17d3993eb106618af506659147a3a5fa17fe7584",
+        "source_name_mapping": {
+          "repository": {
+            "archived": false,
+            "default_branch": "main",
+            "disabled": false,
+            "full_name": "szl-holdings/szl-invariants",
+            "html_url": "https://github.com/szl-holdings/szl-invariants",
+            "id": 1349822638
+          },
+          "status": "EXACT_NAME"
+        },
+        "stage": null
+      },
+      {
+        "disabled": false,
+        "downloads": 199,
+        "id": "SZLHOLDINGS/szl-kernels",
+        "last_modified": "2026-08-29T01:16:13.000Z",
+        "likes": 0,
+        "pipeline_tag": "feature-extraction",
+        "private": false,
+        "sdk": null,
+        "sha": "8ecf80c120aa61b1c0ac6e28683da8798d2d3a7b",
+        "source_name_mapping": {
+          "repository": {
+            "archived": false,
+            "default_branch": "main",
+            "disabled": false,
+            "full_name": "szl-holdings/szl-kernels",
+            "html_url": "https://github.com/szl-holdings/szl-kernels",
+            "id": 1317620238
+          },
+          "status": "EXACT_NAME"
+        },
+        "stage": null
+      },
+      {
+        "disabled": false,
+        "downloads": 0,
+        "id": "SZLHOLDINGS/szl-khipu",
+        "last_modified": "2026-08-29T01:17:04.000Z",
+        "likes": 0,
+        "pipeline_tag": null,
+        "private": false,
+        "sdk": null,
+        "sha": "c9dde89e92ddaf6aed04f2c7d2119f34a081d7e4",
+        "source_name_mapping": {
+          "repository": {
+            "archived": false,
+            "default_branch": "main",
+            "disabled": false,
+            "full_name": "szl-holdings/szl-khipu",
+            "html_url": "https://github.com/szl-holdings/szl-khipu",
+            "id": 1350153937
+          },
+          "status": "EXACT_NAME"
+        },
+        "stage": null
+      },
+      {
+        "disabled": false,
+        "downloads": 242,
+        "id": "SZLHOLDINGS/SZL-Khipu-1.5B",
+        "last_modified": "2026-08-29T01:15:07.000Z",
+        "likes": 1,
+        "pipeline_tag": "text-generation",
+        "private": false,
+        "sdk": null,
+        "sha": "976b7c61f03bb723d2c68a6bbd4f412b35315b64",
+        "source_name_mapping": {
+          "repository": null,
+          "status": "UNMAPPED_BY_NAME"
+        },
+        "stage": null
+      },
+      {
+        "disabled": false,
+        "downloads": 0,
+        "id": "SZLHOLDINGS/SZL-Khipu-1.5B-abstain",
+        "last_modified": "2026-08-29T00:10:04.000Z",
+        "likes": 0,
+        "pipeline_tag": "text-generation",
+        "private": false,
+        "sdk": null,
+        "sha": "841871fa2d1c28552224de4294e40e2633161bb0",
+        "source_name_mapping": {
+          "repository": null,
+          "status": "UNMAPPED_BY_NAME"
+        },
+        "stage": null
+      },
+      {
+        "disabled": false,
+        "downloads": 482,
+        "id": "SZLHOLDINGS/SZL-Khipu-1.5B-GGUF",
+        "last_modified": "2026-08-28T14:16:29.000Z",
+        "likes": 0,
+        "pipeline_tag": "text-generation",
+        "private": false,
+        "sdk": null,
+        "sha": "f19648dcfb300539c988d1ec8e5165dad4632707",
+        "source_name_mapping": {
+          "repository": null,
+          "status": "UNMAPPED_BY_NAME"
+        },
+        "stage": null
+      },
+      {
+        "disabled": false,
+        "downloads": 0,
+        "id": "SZLHOLDINGS/szl-khipu-kernels",
+        "last_modified": "2026-08-29T01:18:46.000Z",
+        "likes": 0,
+        "pipeline_tag": null,
+        "private": false,
+        "sdk": null,
+        "sha": "3efd72b955e2c540430fd943c0c871dd1da63167",
+        "source_name_mapping": {
+          "repository": null,
+          "status": "UNMAPPED_BY_NAME"
+        },
+        "stage": null
+      },
+      {
+        "disabled": false,
+        "downloads": 94,
+        "id": "SZLHOLDINGS/szl-lambda-gate",
+        "last_modified": "2026-08-29T00:10:45.000Z",
+        "likes": 0,
+        "pipeline_tag": null,
+        "private": false,
+        "sdk": null,
+        "sha": "99ad137d7c95cd5875597b641b4849dde9d03bde",
+        "source_name_mapping": {
+          "repository": {
+            "archived": false,
+            "default_branch": "main",
+            "disabled": false,
+            "full_name": "szl-holdings/szl-lambda-gate",
+            "html_url": "https://github.com/szl-holdings/szl-lambda-gate",
+            "id": 1277848449
+          },
+          "status": "EXACT_NAME"
+        },
+        "stage": null
+      },
+      {
+        "disabled": false,
+        "downloads": 0,
+        "id": "SZLHOLDINGS/szl-maskmod",
+        "last_modified": "2026-08-28T23:04:21.000Z",
+        "likes": 0,
+        "pipeline_tag": null,
+        "private": false,
+        "sdk": null,
+        "sha": "1173646cbcd02b77b8f60dcc8a4268adf3f98e1e",
+        "source_name_mapping": {
+          "repository": {
+            "archived": false,
+            "default_branch": "main",
+            "disabled": false,
+            "full_name": "szl-holdings/szl-maskmod",
+            "html_url": "https://github.com/szl-holdings/szl-maskmod",
+            "id": 1349816092
+          },
+          "status": "EXACT_NAME"
+        },
+        "stage": null
+      },
+      {
+        "disabled": false,
+        "downloads": 5,
+        "id": "SZLHOLDINGS/szl-nemo",
+        "last_modified": "2026-08-29T00:13:30.000Z",
+        "likes": 0,
+        "pipeline_tag": null,
+        "private": false,
+        "sdk": null,
+        "sha": "2aca413ce9c6b7d98a7a6d44da3c6a056adbe534",
+        "source_name_mapping": {
+          "repository": {
+            "archived": false,
+            "default_branch": "main",
+            "disabled": false,
+            "full_name": "szl-holdings/szl-nemo",
+            "html_url": "https://github.com/szl-holdings/szl-nemo",
+            "id": 1350138128
+          },
+          "status": "EXACT_NAME"
+        },
+        "stage": null
+      },
+      {
+        "disabled": false,
+        "downloads": 0,
+        "id": "SZLHOLDINGS/szl-ouroboros",
+        "last_modified": "2026-08-28T23:02:51.000Z",
+        "likes": 0,
+        "pipeline_tag": null,
+        "private": false,
+        "sdk": null,
+        "sha": "febd9edce74af6d362661c50d3a9577274374e13",
+        "source_name_mapping": {
+          "repository": {
+            "archived": false,
+            "default_branch": "main",
+            "disabled": false,
+            "full_name": "szl-holdings/szl-ouroboros",
+            "html_url": "https://github.com/szl-holdings/szl-ouroboros",
+            "id": 1349822659
+          },
+          "status": "EXACT_NAME"
+        },
+        "stage": null
+      },
+      {
+        "disabled": false,
+        "downloads": 0,
+        "id": "SZLHOLDINGS/szl-provctl",
+        "last_modified": "2026-08-28T23:02:55.000Z",
+        "likes": 0,
+        "pipeline_tag": null,
+        "private": false,
+        "sdk": null,
+        "sha": "ad9594e6bb7d9f5d64f82b693e768679d4d404b5",
+        "source_name_mapping": {
+          "repository": {
+            "archived": false,
+            "default_branch": "main",
+            "disabled": false,
+            "full_name": "szl-holdings/szl-provctl",
+            "html_url": "https://github.com/szl-holdings/szl-provctl",
+            "id": 1349822620
+          },
+          "status": "EXACT_NAME"
+        },
+        "stage": null
+      },
+      {
+        "disabled": false,
+        "downloads": 0,
+        "id": "SZLHOLDINGS/szl-receipt-attn",
+        "last_modified": "2026-08-29T01:16:12.000Z",
+        "likes": 0,
+        "pipeline_tag": null,
+        "private": false,
+        "sdk": null,
+        "sha": "efa587f4e24be76eb17092a4dbb1cd324947b51b",
+        "source_name_mapping": {
+          "repository": {
+            "archived": false,
+            "default_branch": "main",
+            "disabled": false,
+            "full_name": "szl-holdings/szl-receipt-attn",
+            "html_url": "https://github.com/szl-holdings/szl-receipt-attn",
+            "id": 1349816074
+          },
+          "status": "EXACT_NAME"
+        },
+        "stage": null
+      },
+      {
+        "disabled": false,
+        "downloads": 11,
+        "id": "SZLHOLDINGS/szl-receiptagent-qwen35-0.8b-v2",
+        "last_modified": "2026-07-29T23:56:41.000Z",
+        "likes": 0,
+        "pipeline_tag": "text-generation",
+        "private": false,
+        "sdk": null,
+        "sha": "bd642c7ff18736248e84fd83dace7ab368fc2288",
+        "source_name_mapping": {
+          "repository": null,
+          "status": "UNMAPPED_BY_NAME"
+        },
+        "stage": null
+      },
+      {
+        "disabled": false,
+        "downloads": 0,
+        "id": "SZLHOLDINGS/szl-training-scripts",
+        "last_modified": "2026-08-29T01:19:04.000Z",
+        "likes": 0,
+        "pipeline_tag": null,
+        "private": false,
+        "sdk": null,
+        "sha": "d0fe8e4b05aa5d0cfd330c3fa9655781c2620700",
+        "source_name_mapping": {
+          "repository": null,
+          "status": "UNMAPPED_BY_NAME"
+        },
+        "stage": null
+      },
+      {
+        "disabled": false,
+        "downloads": 0,
+        "id": "SZLHOLDINGS/SZLHOLDINGS",
+        "last_modified": "2026-08-28T23:03:42.000Z",
+        "likes": 0,
+        "pipeline_tag": null,
+        "private": false,
+        "sdk": null,
+        "sha": "4a0ce5e4ebbc408b791665b9b631a139e6c738ab",
+        "source_name_mapping": {
+          "repository": null,
+          "status": "UNMAPPED_BY_NAME"
+        },
+        "stage": null
+      },
+      {
+        "disabled": false,
+        "downloads": 0,
+        "id": "SZLHOLDINGS/tinku",
+        "last_modified": "2026-08-28T17:25:34.000Z",
+        "likes": 0,
+        "pipeline_tag": null,
+        "private": false,
+        "sdk": null,
+        "sha": "3bfd4cee874be9498e5ae61136e305b8d2a77ab0",
+        "source_name_mapping": {
+          "repository": null,
+          "status": "UNMAPPED_BY_NAME"
+        },
+        "stage": null
+      },
+      {
+        "disabled": false,
+        "downloads": 0,
+        "id": "SZLHOLDINGS/TinyKhipu-Nano",
+        "last_modified": "2026-08-29T01:18:46.000Z",
+        "likes": 0,
+        "pipeline_tag": null,
+        "private": false,
+        "sdk": null,
+        "sha": "a5a4b49feee06eb7de063b9258712fc8119250b9",
+        "source_name_mapping": {
+          "repository": null,
+          "status": "UNMAPPED_BY_NAME"
+        },
+        "stage": null
+      },
+      {
+        "disabled": false,
+        "downloads": 0,
+        "id": "SZLHOLDINGS/waman",
+        "last_modified": "2026-08-28T17:25:31.000Z",
+        "likes": 0,
+        "pipeline_tag": null,
+        "private": false,
+        "sdk": null,
+        "sha": "60000fb57a45fb483fdd2fea6fab0a4bba2aaa65",
+        "source_name_mapping": {
+          "repository": null,
+          "status": "UNMAPPED_BY_NAME"
+        },
+        "stage": null
+      },
+      {
+        "disabled": false,
+        "downloads": 0,
+        "id": "SZLHOLDINGS/WILLAY",
+        "last_modified": "2026-08-29T01:22:23.000Z",
+        "likes": 0,
+        "pipeline_tag": null,
+        "private": false,
+        "sdk": null,
+        "sha": "abdeb804320c83fcce9a8929bad5f5a185c506ff",
+        "source_name_mapping": {
+          "repository": null,
+          "status": "UNMAPPED_BY_NAME"
+        },
+        "stage": null
+      },
+      {
+        "disabled": false,
+        "downloads": 0,
+        "id": "SZLHOLDINGS/YARQA-ATTN",
+        "last_modified": "2026-08-28T23:04:15.000Z",
+        "likes": 0,
+        "pipeline_tag": null,
+        "private": false,
+        "sdk": null,
+        "sha": "19792508f63e2b55ea60df0820fc9f6990edcc54",
+        "source_name_mapping": {
+          "repository": {
+            "archived": false,
+            "default_branch": "main",
+            "disabled": false,
+            "full_name": "szl-holdings/YARQA-ATTN",
+            "html_url": "https://github.com/szl-holdings/YARQA-ATTN",
+            "id": 1349920042
+          },
+          "status": "EXACT_NAME"
+        },
+        "stage": null
+      }
+    ],
+    "spaces": [
+      {
+        "app_file": null,
+        "disabled": false,
+        "downloads": null,
+        "id": "SZLHOLDINGS/a11oy",
+        "last_modified": "2026-08-29T01:32:23.000Z",
+        "likes": 0,
+        "pipeline_tag": null,
+        "private": false,
+        "runtime_hardware": {
+          "current": "cpu-basic",
+          "requested": "cpu-basic"
+        },
+        "runtime_requested_hardware": null,
+        "runtime_stage": "RUNNING_BUILDING",
+        "sdk": "docker",
+        "sha": "201785a66d95991ed6fe714f875658da80196861",
+        "source_name_mapping": {
+          "repository": {
+            "archived": false,
+            "default_branch": "main",
+            "disabled": false,
+            "full_name": "szl-holdings/a11oy",
+            "html_url": "https://github.com/szl-holdings/a11oy",
+            "id": 1225834126
+          },
+          "status": "EXACT_NAME"
+        },
+        "stage": null
+      },
+      {
+        "app_file": null,
+        "disabled": false,
+        "downloads": null,
+        "id": "SZLHOLDINGS/anatomy",
+        "last_modified": "2026-08-02T01:19:37.000Z",
+        "likes": 0,
+        "pipeline_tag": null,
+        "private": false,
+        "runtime_hardware": {
+          "current": "cpu-basic",
+          "requested": "cpu-basic"
+        },
+        "runtime_requested_hardware": null,
+        "runtime_stage": "RUNNING",
+        "sdk": "docker",
+        "sha": "d66357340a13958adffb188ea63ab823f42820b7",
+        "source_name_mapping": {
+          "repository": {
+            "archived": false,
+            "default_branch": "main",
+            "disabled": false,
+            "full_name": "szl-holdings/anatomy",
+            "html_url": "https://github.com/szl-holdings/anatomy",
+            "id": 1263627834
+          },
+          "status": "EXACT_NAME"
+        },
+        "stage": null
+      },
+      {
+        "app_file": null,
+        "disabled": false,
+        "downloads": null,
+        "id": "SZLHOLDINGS/cosmos",
+        "last_modified": "2026-07-16T23:30:33.000Z",
+        "likes": 0,
+        "pipeline_tag": null,
+        "private": false,
+        "runtime_hardware": {
+          "current": "cpu-basic",
+          "requested": "cpu-basic"
+        },
+        "runtime_requested_hardware": null,
+        "runtime_stage": "RUNNING",
+        "sdk": "docker",
+        "sha": "a3862909c43e03c1259ac85ccb89fa2989a346ac",
+        "source_name_mapping": {
+          "repository": null,
+          "status": "UNMAPPED_BY_NAME"
+        },
+        "stage": null
+      },
+      {
+        "app_file": null,
+        "disabled": false,
+        "downloads": null,
+        "id": "SZLHOLDINGS/david-leads",
+        "last_modified": "2026-08-26T21:03:52.000Z",
+        "likes": 0,
+        "pipeline_tag": null,
+        "private": false,
+        "runtime_hardware": {
+          "current": "cpu-basic",
+          "requested": "cpu-basic"
+        },
+        "runtime_requested_hardware": null,
+        "runtime_stage": "RUNNING",
+        "sdk": "docker",
+        "sha": "9b67661d468702b153b5d4a3eaf56865ddde694c",
+        "source_name_mapping": {
+          "repository": {
+            "archived": false,
+            "default_branch": "main",
+            "disabled": false,
+            "full_name": "szl-holdings/david-leads",
+            "html_url": "https://github.com/szl-holdings/david-leads",
+            "id": 1282728872
+          },
+          "status": "EXACT_NAME"
+        },
+        "stage": null
+      },
+      {
+        "app_file": "index.html",
+        "disabled": false,
+        "downloads": null,
+        "id": "SZLHOLDINGS/energy-attest-holo",
+        "last_modified": "2026-07-22T08:50:07.000Z",
+        "likes": 0,
+        "pipeline_tag": null,
+        "private": false,
+        "runtime_hardware": {
+          "current": null,
+          "requested": null
+        },
+        "runtime_requested_hardware": null,
+        "runtime_stage": "RUNNING",
+        "sdk": "static",
+        "sha": "6a738416eaeff8911bb39e9fa164c8472406feaf",
+        "source_name_mapping": {
+          "repository": {
+            "archived": false,
+            "default_branch": "main",
+            "disabled": false,
+            "full_name": "szl-holdings/energy-attest-holo",
+            "html_url": "https://github.com/szl-holdings/energy-attest-holo",
+            "id": 1295929955
+          },
+          "status": "EXACT_NAME"
+        },
+        "stage": null
+      },
+      {
+        "app_file": "index.html",
+        "disabled": false,
+        "downloads": null,
+        "id": "SZLHOLDINGS/energy-attested-runs",
+        "last_modified": "2026-07-22T08:49:57.000Z",
+        "likes": 0,
+        "pipeline_tag": null,
+        "private": false,
+        "runtime_hardware": {
+          "current": null,
+          "requested": null
+        },
+        "runtime_requested_hardware": null,
+        "runtime_stage": "RUNNING",
+        "sdk": "static",
+        "sha": "110f2fffcf173e18d319f5e04c6aff2c5f0a183c",
+        "source_name_mapping": {
+          "repository": null,
+          "status": "UNMAPPED_BY_NAME"
+        },
+        "stage": null
+      },
+      {
+        "app_file": "app.py",
+        "disabled": false,
+        "downloads": null,
+        "id": "SZLHOLDINGS/governed-agent-bench",
+        "last_modified": "2026-07-28T18:39:01.000Z",
+        "likes": 0,
+        "pipeline_tag": null,
+        "private": false,
+        "runtime_hardware": {
+          "current": "cpu-basic",
+          "requested": "cpu-basic"
+        },
+        "runtime_requested_hardware": null,
+        "runtime_stage": "RUNNING",
+        "sdk": "gradio",
+        "sha": "832eaad8447cec83a1be335e2187fd302e89ff60",
+        "source_name_mapping": {
+          "repository": null,
+          "status": "UNMAPPED_BY_NAME"
+        },
+        "stage": null
+      },
+      {
+        "app_file": "index.html",
+        "disabled": false,
+        "downloads": null,
+        "id": "SZLHOLDINGS/governed-norm-holo",
+        "last_modified": "2026-07-22T08:49:59.000Z",
+        "likes": 0,
+        "pipeline_tag": null,
+        "private": false,
+        "runtime_hardware": {
+          "current": null,
+          "requested": null
+        },
+        "runtime_requested_hardware": null,
+        "runtime_stage": "RUNNING",
+        "sdk": "static",
+        "sha": "b21c6a1fa8d62d87d5bae30dd62090f77b4fc773",
+        "source_name_mapping": {
+          "repository": {
+            "archived": false,
+            "default_branch": "main",
+            "disabled": false,
+            "full_name": "szl-holdings/governed-norm-holo",
+            "html_url": "https://github.com/szl-holdings/governed-norm-holo",
+            "id": 1295931607
+          },
+          "status": "EXACT_NAME"
+        },
+        "stage": null
+      },
+      {
+        "app_file": null,
+        "disabled": false,
+        "downloads": null,
+        "id": "SZLHOLDINGS/governed-receipt-verifier",
+        "last_modified": "2026-07-22T08:49:57.000Z",
+        "likes": 0,
+        "pipeline_tag": null,
+        "private": false,
+        "runtime_hardware": {
+          "current": null,
+          "requested": null
+        },
+        "runtime_requested_hardware": null,
+        "runtime_stage": "RUNNING",
+        "sdk": "static",
+        "sha": "be8c33be5d44a177d99136f8e3d08ef86b1d8cf8",
+        "source_name_mapping": {
+          "repository": null,
+          "status": "UNMAPPED_BY_NAME"
+        },
+        "stage": null
+      },
+      {
+        "app_file": "index.html",
+        "disabled": false,
+        "downloads": null,
+        "id": "SZLHOLDINGS/guardrail-receipt",
+        "last_modified": "2026-07-22T08:49:58.000Z",
+        "likes": 0,
+        "pipeline_tag": null,
+        "private": false,
+        "runtime_hardware": {
+          "current": null,
+          "requested": null
+        },
+        "runtime_requested_hardware": null,
+        "runtime_stage": "RUNNING",
+        "sdk": "static",
+        "sha": "25584d5fba590069a1f41a1b28e77894fa89faea",
+        "source_name_mapping": {
+          "repository": null,
+          "status": "UNMAPPED_BY_NAME"
+        },
+        "stage": null
+      },
+      {
+        "app_file": null,
+        "disabled": false,
+        "downloads": null,
+        "id": "SZLHOLDINGS/hatun-mcp",
+        "last_modified": "2026-08-26T14:32:55.000Z",
+        "likes": 0,
+        "pipeline_tag": null,
+        "private": false,
+        "runtime_hardware": {
+          "current": "cpu-basic",
+          "requested": "cpu-basic"
+        },
+        "runtime_requested_hardware": null,
+        "runtime_stage": "RUNNING",
+        "sdk": "docker",
+        "sha": "2caf5eea915317cb0e8719321336d61b76fe1788",
+        "source_name_mapping": {
+          "repository": {
+            "archived": false,
+            "default_branch": "main",
+            "disabled": false,
+            "full_name": "szl-holdings/hatun-mcp",
+            "html_url": "https://github.com/szl-holdings/hatun-mcp",
+            "id": 1255793212
+          },
+          "status": "EXACT_NAME"
+        },
+        "stage": null
+      },
+      {
+        "app_file": null,
+        "disabled": false,
+        "downloads": null,
+        "id": "SZLHOLDINGS/holographic",
+        "last_modified": "2026-07-20T16:44:04.000Z",
+        "likes": 0,
+        "pipeline_tag": null,
+        "private": false,
+        "runtime_hardware": {
+          "current": "cpu-basic",
+          "requested": "cpu-basic"
+        },
+        "runtime_requested_hardware": null,
+        "runtime_stage": "RUNNING",
+        "sdk": "docker",
+        "sha": "8167bade8d9e6c2d0430241555be2b3a7b6307a0",
+        "source_name_mapping": {
+          "repository": null,
+          "status": "UNMAPPED_BY_NAME"
+        },
+        "stage": null
+      },
+      {
+        "app_file": null,
+        "disabled": false,
+        "downloads": null,
+        "id": "SZLHOLDINGS/immune",
+        "last_modified": "2026-08-26T14:32:41.000Z",
+        "likes": 0,
+        "pipeline_tag": null,
+        "private": false,
+        "runtime_hardware": {
+          "current": "cpu-basic",
+          "requested": "cpu-basic"
+        },
+        "runtime_requested_hardware": null,
+        "runtime_stage": "RUNNING",
+        "sdk": "docker",
+        "sha": "801edf3cdfa915ad2b3813cd0f58b648a6a4e8a2",
+        "source_name_mapping": {
+          "repository": {
+            "archived": false,
+            "default_branch": "main",
+            "disabled": false,
+            "full_name": "szl-holdings/immune",
+            "html_url": "https://github.com/szl-holdings/immune",
+            "id": 1287104990
+          },
+          "status": "EXACT_NAME"
+        },
+        "stage": null
+      },
+      {
+        "app_file": null,
+        "disabled": false,
+        "downloads": null,
+        "id": "SZLHOLDINGS/killinchu",
+        "last_modified": "2026-08-29T01:15:25.000Z",
+        "likes": 2,
+        "pipeline_tag": null,
+        "private": false,
+        "runtime_hardware": {
+          "current": "cpu-basic",
+          "requested": "cpu-basic"
+        },
+        "runtime_requested_hardware": null,
+        "runtime_stage": "RUNNING",
+        "sdk": "docker",
+        "sha": "bf5a6c3cb03b2e0c098f9b30b0f1454094f8e402",
+        "source_name_mapping": {
+          "repository": {
+            "archived": false,
+            "default_branch": "main",
+            "disabled": false,
+            "full_name": "szl-holdings/killinchu",
+            "html_url": "https://github.com/szl-holdings/killinchu",
+            "id": 1255732312
+          },
+          "status": "EXACT_NAME"
+        },
+        "stage": null
+      },
+      {
+        "app_file": "index.html",
+        "disabled": false,
+        "downloads": null,
+        "id": "SZLHOLDINGS/lambda-gate-holo",
+        "last_modified": "2026-07-22T08:50:02.000Z",
+        "likes": 0,
+        "pipeline_tag": null,
+        "private": false,
+        "runtime_hardware": {
+          "current": null,
+          "requested": null
+        },
+        "runtime_requested_hardware": null,
+        "runtime_stage": "RUNNING",
+        "sdk": "static",
+        "sha": "c028bd8b4740913740ec4b09887b5a8e7885e1c3",
+        "source_name_mapping": {
+          "repository": {
+            "archived": false,
+            "default_branch": "main",
+            "disabled": false,
+            "full_name": "szl-holdings/lambda-gate-holo",
+            "html_url": "https://github.com/szl-holdings/lambda-gate-holo",
+            "id": 1295931629
+          },
+          "status": "EXACT_NAME"
+        },
+        "stage": null
+      },
+      {
+        "app_file": null,
+        "disabled": false,
+        "downloads": null,
+        "id": "SZLHOLDINGS/llm-router-live",
+        "last_modified": "2026-08-20T10:54:30.000Z",
+        "likes": 0,
+        "pipeline_tag": null,
+        "private": false,
+        "runtime_hardware": {
+          "current": "cpu-basic",
+          "requested": "cpu-basic"
+        },
+        "runtime_requested_hardware": null,
+        "runtime_stage": "RUNNING",
+        "sdk": "docker",
+        "sha": "b71e76a8461c4a9a1ccf2d9610dd8905694a3488",
+        "source_name_mapping": {
+          "repository": null,
+          "status": "UNMAPPED_BY_NAME"
+        },
+        "stage": null
+      },
+      {
+        "app_file": "index.html",
+        "disabled": false,
+        "downloads": null,
+        "id": "SZLHOLDINGS/receipt-chain-live",
+        "last_modified": "2026-08-01T17:34:24.000Z",
+        "likes": 0,
+        "pipeline_tag": null,
+        "private": false,
+        "runtime_hardware": {
+          "current": null,
+          "requested": null
+        },
+        "runtime_requested_hardware": null,
+        "runtime_stage": "RUNNING",
+        "sdk": "static",
+        "sha": "3b6992b5dcad5ebcae64676768aa182f20dc87cf",
+        "source_name_mapping": {
+          "repository": {
+            "archived": false,
+            "default_branch": "main",
+            "disabled": false,
+            "full_name": "szl-holdings/receipt-chain-live",
+            "html_url": "https://github.com/szl-holdings/receipt-chain-live",
+            "id": 1295940016
+          },
+          "status": "EXACT_NAME"
+        },
+        "stage": null
+      },
+      {
+        "app_file": null,
+        "disabled": false,
+        "downloads": null,
+        "id": "SZLHOLDINGS/sda",
+        "last_modified": "2026-08-08T21:01:34.000Z",
+        "likes": 0,
+        "pipeline_tag": null,
+        "private": false,
+        "runtime_hardware": {
+          "current": "cpu-basic",
+          "requested": "cpu-basic"
+        },
+        "runtime_requested_hardware": null,
+        "runtime_stage": "RUNNING",
+        "sdk": "docker",
+        "sha": "3485c33dd907ee040178e06dcf917b2ec5615135",
+        "source_name_mapping": {
+          "repository": {
+            "archived": false,
+            "default_branch": "main",
+            "disabled": false,
+            "full_name": "szl-holdings/sda",
+            "html_url": "https://github.com/szl-holdings/sda",
+            "id": 1317498573
+          },
+          "status": "EXACT_NAME"
+        },
+        "stage": null
+      },
+      {
+        "app_file": null,
+        "disabled": false,
+        "downloads": null,
+        "id": "SZLHOLDINGS/szl-blocked-live",
+        "last_modified": "2026-07-22T08:50:25.000Z",
+        "likes": 0,
+        "pipeline_tag": null,
+        "private": false,
+        "runtime_hardware": {
+          "current": null,
+          "requested": null
+        },
+        "runtime_requested_hardware": null,
+        "runtime_stage": "RUNNING",
+        "sdk": "static",
+        "sha": "4a927e81a126b0253c3e242d10c64d9e323879fb",
+        "source_name_mapping": {
+          "repository": null,
+          "status": "UNMAPPED_BY_NAME"
+        },
+        "stage": null
+      },
+      {
+        "app_file": null,
+        "disabled": false,
+        "downloads": null,
+        "id": "SZLHOLDINGS/szl-estate-live",
+        "last_modified": "2026-08-08T20:26:36.000Z",
+        "likes": 0,
+        "pipeline_tag": null,
+        "private": false,
+        "runtime_hardware": {
+          "current": null,
+          "requested": null
+        },
+        "runtime_requested_hardware": null,
+        "runtime_stage": "RUNNING",
+        "sdk": "static",
+        "sha": "12029395a2a838f707e92e23ca9c12945daa64e3",
+        "source_name_mapping": {
+          "repository": null,
+          "status": "UNMAPPED_BY_NAME"
+        },
+        "stage": null
+      },
+      {
+        "app_file": "index.html",
+        "disabled": false,
+        "downloads": null,
+        "id": "SZLHOLDINGS/szl-forge-lab",
+        "last_modified": "2026-08-01T21:56:09.000Z",
+        "likes": 0,
+        "pipeline_tag": null,
+        "private": false,
+        "runtime_hardware": {
+          "current": null,
+          "requested": null
+        },
+        "runtime_requested_hardware": null,
+        "runtime_stage": "RUNNING",
+        "sdk": "static",
+        "sha": "4107ff178260228b585bf28ad3d90e36c0929372",
+        "source_name_mapping": {
+          "repository": null,
+          "status": "UNMAPPED_BY_NAME"
+        },
+        "stage": null
+      },
+      {
+        "app_file": null,
+        "disabled": false,
+        "downloads": null,
+        "id": "SZLHOLDINGS/szl-govsign-live",
+        "last_modified": "2026-07-22T08:50:21.000Z",
+        "likes": 0,
+        "pipeline_tag": null,
+        "private": false,
+        "runtime_hardware": {
+          "current": null,
+          "requested": null
+        },
+        "runtime_requested_hardware": null,
+        "runtime_stage": "RUNNING",
+        "sdk": "static",
+        "sha": "f11d6dbede9ba277409c5da3728efc0e15e975b4",
+        "source_name_mapping": {
+          "repository": null,
+          "status": "UNMAPPED_BY_NAME"
+        },
+        "stage": null
+      },
+      {
+        "app_file": "index.html",
+        "disabled": false,
+        "downloads": null,
+        "id": "SZLHOLDINGS/szl-kernels-live",
+        "last_modified": "2026-08-02T01:21:54.000Z",
+        "likes": 0,
+        "pipeline_tag": null,
+        "private": false,
+        "runtime_hardware": {
+          "current": null,
+          "requested": null
+        },
+        "runtime_requested_hardware": null,
+        "runtime_stage": "RUNNING",
+        "sdk": "static",
+        "sha": "c9917d43167ef7e2430c52ce67af54c9bfacafcc",
+        "source_name_mapping": {
+          "repository": {
+            "archived": false,
+            "default_branch": "main",
+            "disabled": false,
+            "full_name": "szl-holdings/szl-kernels-live",
+            "html_url": "https://github.com/szl-holdings/szl-kernels-live",
+            "id": 1295941334
+          },
+          "status": "EXACT_NAME"
+        },
+        "stage": null
+      },
+      {
+        "app_file": "app.py",
+        "disabled": false,
+        "downloads": null,
+        "id": "SZLHOLDINGS/szl-khipu",
+        "last_modified": "2026-08-29T01:26:58.000Z",
+        "likes": 0,
+        "pipeline_tag": null,
+        "private": false,
+        "runtime_hardware": {
+          "current": "cpu-basic",
+          "requested": "cpu-basic"
+        },
+        "runtime_requested_hardware": null,
+        "runtime_stage": "RUNNING",
+        "sdk": "gradio",
+        "sha": "170f1df12c0a21544d6e2a1649427e3a75b22306",
+        "source_name_mapping": {
+          "repository": {
+            "archived": false,
+            "default_branch": "main",
+            "disabled": false,
+            "full_name": "szl-holdings/szl-khipu",
+            "html_url": "https://github.com/szl-holdings/szl-khipu",
+            "id": 1350153937
+          },
+          "status": "EXACT_NAME"
+        },
+        "stage": null
+      },
+      {
+        "app_file": null,
+        "disabled": false,
+        "downloads": null,
+        "id": "SZLHOLDINGS/szl-model-inference-lab",
+        "last_modified": "2026-08-26T19:24:49.000Z",
+        "likes": 0,
+        "pipeline_tag": null,
+        "private": false,
+        "runtime_hardware": {
+          "current": "cpu-basic",
+          "requested": "cpu-basic"
+        },
+        "runtime_requested_hardware": null,
+        "runtime_stage": "RUNNING",
+        "sdk": "docker",
+        "sha": "e6a94550422566550941dfea84e03e852a43c82f",
+        "source_name_mapping": {
+          "repository": null,
+          "status": "UNMAPPED_BY_NAME"
+        },
+        "stage": null
+      },
+      {
+        "app_file": "index.html",
+        "disabled": false,
+        "downloads": null,
+        "id": "SZLHOLDINGS/szl-provctl-live",
+        "last_modified": "2026-07-22T08:50:17.000Z",
+        "likes": 0,
+        "pipeline_tag": null,
+        "private": false,
+        "runtime_hardware": {
+          "current": null,
+          "requested": null
+        },
+        "runtime_requested_hardware": null,
+        "runtime_stage": "RUNNING",
+        "sdk": "static",
+        "sha": "dbfc7a8e0e67c6fc77c5436fe37d970748361d32",
+        "source_name_mapping": {
+          "repository": {
+            "archived": false,
+            "default_branch": "main",
+            "disabled": false,
+            "full_name": "szl-holdings/szl-provctl-live",
+            "html_url": "https://github.com/szl-holdings/szl-provctl-live",
+            "id": 1295941247
+          },
+          "status": "EXACT_NAME"
+        },
+        "stage": null
+      },
+      {
+        "app_file": null,
+        "disabled": false,
+        "downloads": null,
+        "id": "SZLHOLDINGS/szl-quant-live",
+        "last_modified": "2026-08-28T23:49:20.000Z",
+        "likes": 0,
+        "pipeline_tag": null,
+        "private": false,
+        "runtime_hardware": {
+          "current": null,
+          "requested": null
+        },
+        "runtime_requested_hardware": null,
+        "runtime_stage": "RUNNING",
+        "sdk": "static",
+        "sha": "0f39457dce1ba83d4e2c2ee5f145565b0f7af18d",
+        "source_name_mapping": {
+          "repository": null,
+          "status": "UNMAPPED_BY_NAME"
+        },
+        "stage": null
+      },
+      {
+        "app_file": null,
+        "disabled": false,
+        "downloads": null,
+        "id": "SZLHOLDINGS/yarqa",
+        "last_modified": "2026-08-28T14:13:39.000Z",
+        "likes": 0,
+        "pipeline_tag": null,
+        "private": false,
+        "runtime_hardware": {
+          "current": "cpu-basic",
+          "requested": "cpu-basic"
+        },
+        "runtime_requested_hardware": null,
+        "runtime_stage": "RUNNING",
+        "sdk": "docker",
+        "sha": "8f0fc8550dd5969e59316f20237517ceb3496647",
+        "source_name_mapping": {
+          "repository": {
+            "archived": false,
+            "default_branch": "main",
+            "disabled": false,
+            "full_name": "szl-holdings/yarqa",
+            "html_url": "https://github.com/szl-holdings/yarqa",
+            "id": 1265641110
+          },
+          "status": "EXACT_NAME"
+        },
+        "stage": null
+      }
+    ]
+  },
+  "schema": "szl.hf-estate-alignment/v1",
+  "summary": {
+    "datasets": 28,
+    "disabled_artifacts": 0,
+    "github_repositories": 71,
+    "models": 38,
+    "private_artifacts": 0,
+    "same_name_mappings": 32,
+    "spaces": 28,
+    "spaces_running": 27,
+    "unmapped_by_name": 62
+  }
+}
