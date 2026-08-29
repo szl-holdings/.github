@@ -40,19 +40,11 @@
     "open_prs": [
       {
         "number": 490,
-        "production_disposition": "REFRESH_THEN_SQUASH_ONLY_IF_GREEN",
-        "reason": "Packet-5 snapshot recapture at 2026-08-29T04:00:00Z. Prior 03:22Z open set is stale. Squash only after required checks are terminal green on this refreshed head.",
+        "production_disposition": "SQUASH_ONLY_IF_GREEN",
+        "reason": "Packet-5 snapshot recapture at 2026-08-29T04:10:00Z after a11oy#1421 squash. Org-wide is:open is:pr returns only this PR. Squash only after required checks are terminal green on this refreshed head.",
         "repository": "szl-holdings/.github",
-        "title": "chore(production): refresh packet-5 open PR dispositions",
+        "title": "chore(production): recapture packet-5 open PRs at 2026-08-29T04:10Z",
         "html_url": "https://github.com/szl-holdings/.github/pull/490"
-      },
-      {
-        "number": 1421,
-        "production_disposition": "HOLD_UNTIL_CHECKS_GREEN",
-        "reason": "Touch targets + HF manifest. Recapture after rebase onto organ-kernel main: DCO failed (unsigned merge commit), Investor smoke bind S7, Investor smoke live probes, Receipt + UDS, Demo-critical route-table, contract, Offline honesty, Frontier HF admission. Green-light does not override a red required check.",
-        "repository": "szl-holdings/a11oy",
-        "title": "fix(frontend): restore live touch targets and Hub manifest",
-        "html_url": "https://github.com/szl-holdings/a11oy/pull/1421"
       }
     ],
     "private": 5,
@@ -82,6 +74,14 @@
       }
     ],
     "merged_since_packet": [
+      {
+        "number": 1421,
+        "repository": "szl-holdings/a11oy",
+        "merged_at": "2026-08-29T04:06:33Z",
+        "merged_sha": "1e1c30e64212091ef9ff2704cdbfadb1afbc080a",
+        "production_disposition": "MERGED_TOUCH_TARGETS_HF_MANIFEST_POST_DEPLOY_RESIDUAL",
+        "title": "fix(frontend): restore live touch targets and Hub manifest"
+      },
       {
         "number": 1423,
         "repository": "szl-holdings/a11oy",
@@ -142,7 +142,7 @@
     }
   ],
   "truth_boundary": "A document or workflow file is not proof of live enforcement. Missing evidence is UNKNOWN or FAIL, never PASS. This recapture performs no Hub mutation, ruleset edit, or production certification. Green-light does not override a red required check.",
-  "recaptured_at": "2026-08-29T04:00:00Z",
+  "recaptured_at": "2026-08-29T04:10:00Z",
   "overall_status": "PARTIALLY_VERIFIED_WITH_EXACT_BLOCKERS",
   "certified_production_ready": false
 }
