@@ -1,4 +1,5 @@
 # Copyright 2026 SZL Holdings — SPDX-License-Identifier: Apache-2.0
+# Mirror GitHub canonical sources onto SZLHOLDINGS Docker Spaces.
 name: Publish operator Spaces
 on:
   workflow_dispatch:
