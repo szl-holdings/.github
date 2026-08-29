@@ -1,0 +1,130 @@
+name: Native SZL organization convergence 2026-08-29
+
+on:
+  push:
+    branches:
+      - ops/native-org-convergence-audit-20260829
+    paths:
+      - .github/scripts/native_org_convergence_20260829.py
+      - .github/workflows/zz-native-org-convergence-20260829.yml
+
+permissions:
+  contents: write
+
+concurrency:
+  group: native-szl-org-convergence-20260829-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  converge:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    steps:
+      - name: Harden runner
+        uses: step-security/harden-runner@b09bb98e06d4d774595224525879c09bc6e98c40 # v2.20.1
+        with:
+          egress-policy: audit
+
+      - name: Check out exact bounded branch
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.ref_name }}
+          fetch-depth: 0
+          persist-credentials: true
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: '3.12'
+
+      - name: Compile the public-safe executor
+        run: |
+          set -euo pipefail
+          python -m py_compile .github/scripts/native_org_convergence_20260829.py
+          git diff --check
+
+      - name: Scan every visible repository and request bounded failed-run recovery
+        env:
+          ORG_TOKEN: ${{ secrets.SZL_GITHUB_TOKEN }}
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+          EXECUTE_RERUNS: 'true'
+        run: |
+          set -euo pipefail
+          python .github/scripts/native_org_convergence_20260829.py
+
+      - name: Prove the reports contain no private names from the authenticated census
+        env:
+          ORG_TOKEN: ${{ secrets.SZL_GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          test -s reports/native-org-convergence-20260829.json
+          test -s reports/native-org-convergence-20260829.md
+          python - <<'PY'
+          import json
+          import os
+          import urllib.request
+          from pathlib import Path
+
+          token = os.environ['ORG_TOKEN']
+          request = urllib.request.Request(
+              'https://api.github.com/orgs/szl-holdings/repos?type=all&per_page=100',
+              headers={
+                  'Accept': 'application/vnd.github+json',
+                  'Authorization': f'Bearer {token}',
+                  'X-GitHub-Api-Version': '2022-11-28',
+                  'User-Agent': 'szl-native-org-convergence-privacy-proof/2026-08-29',
+              },
+          )
+          with urllib.request.urlopen(request, timeout=30) as response:
+              repositories = json.load(response)
+          private_names = {
+              str(item.get('name') or '')
+              for item in repositories
+              if isinstance(item, dict) and item.get('private')
+          }
+          if not private_names:
+              raise SystemExit('private-scope proof unavailable')
+          material = (
+              Path('reports/native-org-convergence-20260829.json').read_text(encoding='utf-8')
+              + '\n'
+              + Path('reports/native-org-convergence-20260829.md').read_text(encoding='utf-8')
+          )
+          leaked = sorted(name for name in private_names if name and name in material)
+          if leaked:
+              raise SystemExit(f'private repository name escaped public evidence: count={len(leaked)}')
+          report = json.loads(
+              Path('reports/native-org-convergence-20260829.json').read_text(encoding='utf-8')
+          )
+          if report.get('github', {}).get('private_repository_count') != len(private_names):
+              raise SystemExit('private repository count does not match authenticated census')
+          print(json.dumps({'private_scope_proved': True, 'private_repository_count': len(private_names)}))
+          PY
+
+      - name: Upload immutable public-safe convergence evidence
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: native-szl-org-convergence-${{ github.run_id }}
+          path: |
+            reports/native-org-convergence-20260829.json
+            reports/native-org-convergence-20260829.md
+          if-no-files-found: error
+          retention-days: 90
+
+      - name: Seal evidence and remove the bounded executor
+        run: |
+          set -euo pipefail
+          git rm \
+            .github/scripts/native_org_convergence_20260829.py \
+            .github/workflows/zz-native-org-convergence-20260829.yml
+          git add \
+            reports/native-org-convergence-20260829.json \
+            reports/native-org-convergence-20260829.md
+          git diff --cached --check
+          git config user.name 'Lutar, Stephen P.'
+          git config user.email 'stephenlutar2@gmail.com'
+          git commit \
+            -m 'chore(ops): seal native organization convergence evidence' \
+            -m 'Record a public-safe scan of every repository visible to the governed organization token, bounded failed-run recovery, the current public Hugging Face estate, and both A11oy public domains. Remove the one-shot executor and workflow after use; no Replit dependency is introduced.' \
+            -m 'Signed-off-by: Lutar, Stephen P. <stephenlutar2@gmail.com>'
+          git push origin "HEAD:${GITHUB_REF_NAME}"
