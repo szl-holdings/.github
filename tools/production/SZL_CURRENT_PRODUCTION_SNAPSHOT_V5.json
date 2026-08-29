@@ -41,9 +41,9 @@
       {
         "number": 490,
         "production_disposition": "SQUASH_ONLY_IF_GREEN",
-        "reason": "Packet-5 snapshot recapture at 2026-08-29T04:10:00Z after a11oy#1421 squash. Org-wide is:open is:pr returns only this PR. Squash only after required checks are terminal green on this refreshed head.",
+        "reason": "Packet-5 snapshot recapture at 2026-08-29T04:15:00Z after a11oy#1421 squash. Org-wide is:open is:pr returns only this PR. Squash only after required checks are terminal green on this refreshed head.",
         "repository": "szl-holdings/.github",
-        "title": "chore(production): recapture packet-5 open PRs at 2026-08-29T04:10Z",
+        "title": "chore(production): recapture packet-5 open PRs at 2026-08-29T04:15Z",
         "html_url": "https://github.com/szl-holdings/.github/pull/490"
       }
     ],
@@ -142,7 +142,7 @@
     }
   ],
   "truth_boundary": "A document or workflow file is not proof of live enforcement. Missing evidence is UNKNOWN or FAIL, never PASS. This recapture performs no Hub mutation, ruleset edit, or production certification. Green-light does not override a red required check.",
-  "recaptured_at": "2026-08-29T04:10:00Z",
+  "recaptured_at": "2026-08-29T04:15:00Z",
   "overall_status": "PARTIALLY_VERIFIED_WITH_EXACT_BLOCKERS",
   "certified_production_ready": false
 }
