@@ -22,6 +22,8 @@ UNPIN = [
     "SZLHOLDINGS/SZL-Cosmos",
     "SZLHOLDINGS/SZL-KHIPU",
     "SZLHOLDINGS/szl-khipu",
+    "SZLHOLDINGS/Khipu-Loom",
+    "SZLHOLDINGS/szl-estate-live",
 ]
 FACTORY = "SZLHOLDINGS/a11oy-factory"
 

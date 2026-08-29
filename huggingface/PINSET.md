@@ -1,7 +1,7 @@
 # Hub pin set
 
 **Pin:** `a11oy`, `killinchu`, `immune`, `szl-atelier`, `holographic`
-**Unpin:** `cosmos` (and `SZL-KHIPU` as an org-front pin if Hub’s cap is 4)
+**Unpin:** `cosmos`, `szl-khipu` / `SZL-KHIPU`, `Khipu-Loom`, `szl-estate-live` (org-front fifth slot was Loom, not holographic)
 **Factory:** RUNNING, unpinned, BIND_AS_A11OY_PACKAGE — not a second flagship
 **Warhacker:** must not be a Space
 
