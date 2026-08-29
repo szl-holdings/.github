@@ -1,0 +1,27 @@
+/* 44px hittable floor for SZLHOLDINGS/README org-card.
+   Linked from index.html. Do not allowlist PRIMARY_TARGET_UNDERSIZED. */
+#szl-hf-org-card header {
+  position: relative;
+  z-index: 30;
+  isolation: isolate;
+}
+#szl-hf-org-card nav a {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 44px;
+  min-height: 44px;
+  height: auto;
+  padding: 12px 16px;
+  position: relative;
+  z-index: 1;
+  pointer-events: auto;
+  touch-action: manipulation;
+}
+@media (max-width: 760px) {
+  #szl-hf-org-card nav a {
+    min-width: 44px;
+    min-height: 44px;
+    padding: 12px 10px;
+  }
+}
