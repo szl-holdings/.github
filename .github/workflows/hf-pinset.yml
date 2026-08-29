@@ -1,10 +1,19 @@
 name: Hub pin set
 
 # Pin flagships. Unpin cosmos / khipu as org-front pins. Factory stays unpinned.
-# Does not freeze any live Space. Requires production environment (HF_TOKEN).
+# Does not freeze any live Space.
+# Default environment is staging (no reviewers). Production still requires Hub admin Approve.
 
 on:
   workflow_dispatch:
+    inputs:
+      environment:
+        description: GitHub environment that supplies HF_TOKEN
+        type: choice
+        options:
+          - staging
+          - production
+        default: staging
 
 permissions:
   contents: read
@@ -14,7 +23,7 @@ jobs:
     name: Apply Hub pin set
     runs-on: ubuntu-latest
     timeout-minutes: 15
-    environment: production
+    environment: ${{ inputs.environment || 'staging' }}
     env:
       HF_TOKEN: ${{ secrets.HF_ORG_TOKEN || secrets.HF_ORG_TOKEN1 || secrets.HF_TOKEN || secrets.HF_WRITE_TOKEN }}
       HF_HUB_DISABLE_PROGRESS_BARS: "1"
