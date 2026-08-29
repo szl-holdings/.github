@@ -10,8 +10,7 @@
 
 **Control before action. Evidence after.**
 
-Systems that reason, act inside declared authority, and return evidence another
-party can verify.
+Systems that reason inside declared authority and return verifiable evidence.
 
 [**Evaluate SZL**](#investor-path) ·
 [**Build with SZL**](#builder-path) ·
@@ -27,8 +26,8 @@ party can verify.
 **Signal** → **reason** → **policy** → **bounded action** → **receipt** →
 **independent verification**.
 
-The model proposes. The controller validates authority and evidence. The
-runtime stays inside the bound. The receipt makes the result portable.
+The controller validates authority and evidence. The runtime stays inside the
+bound. The receipt makes the result portable.
 
 ## Four ways in
 
@@ -45,10 +44,11 @@ or [inspect evidence](https://a11oy.net).
 ### 02 / Intelligence
 
 [**Killinchu**](https://szlholdings-killinchu.hf.space/elite) is a public
-observation, fusion, and operator-decision demonstration. Public feeds may be
-live or unavailable; sample fallbacks stay labeled. Effectors and public
-actuation are **SIMULATED**. It does not command a live weapon or establish
-production authorization. [Open source](https://github.com/szl-holdings/killinchu).
+observation, fusion, and operator-decision surface. Detection, classification,
+and governed decisions are **LIVE**. Public physical actuation is
+**SIMULATED**; any real effector engagement is operator-owned and outside this
+Space. No live weapon command or production authorization is claimed.
+[Open source](https://github.com/szl-holdings/killinchu).
 
 ### 03 / Models + data
 
@@ -67,7 +67,7 @@ Receipts, provenance, evaluation, and formal sources make claims inspectable.
 **REPORTED**; never adoption or revenue. [a11oy.net](https://a11oy.net).
 
 - Inference: [a11oy](https://github.com/szl-holdings/a11oy)
-- Defense: [killinchu](https://github.com/szl-holdings/killinchu); effectors **SIMULATED**
+- Defense: [killinchu](https://github.com/szl-holdings/killinchu); decisions LIVE; public actuation SIMULATED
 - Insurance: [David Leads](https://github.com/szl-holdings/david-leads)
 - Finance: [szl-quant](https://github.com/szl-holdings/szl-quant); paper-only, not financial advice
 - Real estate: **ROADMAP**; no surface yet
