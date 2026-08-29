@@ -6,16 +6,17 @@
      alt="A bounded signal path entering a holographic verification lattice"
      width="100%" />
 
-# Governed decision infrastructure
+# SZL Holdings
 
 **Control before action. Evidence after.**
 
-Systems that reason inside declared authority and return verifiable evidence.
+Governed AI with a signed, verifiable receipt for every decision.
 
-[**Evaluate SZL**](#investor-path) ·
-[**Build with SZL**](#builder-path) ·
-[**Inspect artifacts**](https://huggingface.co/SZLHOLDINGS) ·
-[**Check current state**](#current-state)
+**Product** · [a-11-oy.com](https://a-11-oy.com)  
+**Proof** · [a11oy.net](https://a11oy.net)
+
+Never `a11oy.com`. Hugging Face is the artifact registry, not the front door.
+Warhacker v1.0.0 is archived.
 
 </div>
 
@@ -23,103 +24,51 @@ Systems that reason inside declared authority and return verifiable evidence.
 
 ## One governed loop
 
-**Signal** → **reason** → **policy** → **bounded action** → **receipt** →
-**independent verification**.
+**Signal** → **reason** → **policy** → **bounded action** → **receipt** → **independent verification**.
 
-The controller validates authority and evidence. The runtime stays inside the
-bound. The receipt makes the result portable.
+The controller validates authority and evidence. The runtime stays inside the bound. The receipt makes the result portable. Λ uniqueness remains **Conjecture 1**. Trust ceiling **0.97**. Gold is OPEN, never proven.
 
-## Four ways in
+## Front door
 
-<img src="./assets/hf-portfolio-map.svg"
-     alt="Four SZL paths: command, intelligence, models and data, and evidence"
-     width="100%" />
+- **Product** · [a-11-oy.com](https://a-11-oy.com) — Command Center, console, interactive verify
+- **Proof** · [a11oy.net](https://a11oy.net) — RECORD, diligence, atlas. Not a product host.
+- **Source** · [github.com/szl-holdings/a11oy](https://github.com/szl-holdings/a11oy)
+- **Artifacts** · [huggingface.co/SZLHOLDINGS](https://huggingface.co/SZLHOLDINGS) — pin a11oy, killinchu, immune, atelier, holographic
 
-### 01 / Command
+Factory ([a11oy-factory](https://github.com/szl-holdings/a11oy-factory)) is a **bind**, not a second flagship. Killinchu is a **public synthetic reference** — no public effector. Formulas never grant authority.
 
-[**a11oy**](https://a-11-oy.com) is governed inference and agentic execution
-for regulated workflows. [Open source](https://github.com/szl-holdings/a11oy)
-or [inspect evidence](https://a11oy.net).
+## Index (kept, not on the first fold)
 
-### 02 / Intelligence
-
-[**Killinchu**](https://szlholdings-killinchu.hf.space/elite) is a public
-observation, fusion, and operator-decision surface. Detection, classification,
-and governed decisions are **LIVE**. Public physical actuation is
-**SIMULATED**; any real effector engagement is operator-owned and outside this
-Space. No live weapon command or production authorization is claimed.
-[Open source](https://github.com/szl-holdings/killinchu).
-
-### 03 / Models + data
-
-Weights, software, surrogates, datasets, and Spaces are separate artifact
-classes. Type, downloads, and reachability do not establish quality or
-readiness. [Inspect the portfolio](https://huggingface.co/SZLHOLDINGS).
-
-### 04 / Evidence
-
-Receipts, provenance, evaluation, and formal sources make claims inspectable.
-[Verify a receipt](https://a-11-oy.com/verify) or follow the
-[research lineage](https://github.com/szl-holdings/szl-papers).
-
-## Five verticals
-
-**REPORTED**; never adoption or revenue. [a11oy.net](https://a11oy.net).
-
-- Inference: [a11oy](https://github.com/szl-holdings/a11oy)
-- Defense: [killinchu](https://github.com/szl-holdings/killinchu); decisions LIVE; public actuation SIMULATED
+- Intelligence: [killinchu](https://github.com/szl-holdings/killinchu) — decisions LIVE, public actuation SIMULATED
+- Defense: [immune](https://github.com/szl-holdings/immune)
 - Insurance: [David Leads](https://github.com/szl-holdings/david-leads)
-- Finance: [szl-quant](https://github.com/szl-holdings/szl-quant); paper-only, not financial advice
-- Real estate: **ROADMAP**; no surface yet
+- Finance: [szl-quant](https://github.com/szl-holdings/szl-quant) — paper-only, not financial advice
+- Real estate: ROADMAP
+- Labs: command-lab, khipu-lab, cosmos, ayllu, atelier, experiments — holograms, not origins
 
 ## Investor path
 
-[Company front door](https://huggingface.co/spaces/SZLHOLDINGS/README) ·
-[Evidence registry](https://a11oy.net) ·
-[Security](https://github.com/szl-holdings/.github/security/policy) ·
-[Trust](https://github.com/szl-holdings/.github/blob/main/TRUST.md) ·
-[Support](https://github.com/szl-holdings/.github/blob/main/SUPPORT.md)
+[Evidence registry](https://a11oy.net) · [Diligence](https://a11oy.net/diligence/) · [Security](https://github.com/szl-holdings/.github/security/policy) · [Trust](https://github.com/szl-holdings/.github/blob/main/TRUST.md)
 
-This profile does not claim production authorization, regulatory approval,
-universal safety, customer adoption, or an investment outcome.
+This profile does not claim production authorization, regulatory approval, universal safety, customer adoption, or an investment outcome. a-11-oy.com `/readyz` 200 is not a production certificate.
 
 ## Builder path
 
-[Documentation](https://holdings.a-11-oy.com/docs-site/) ·
-[a11oy source](https://github.com/szl-holdings/a11oy) ·
-[Receipt tooling](https://github.com/szl-holdings/szl-receipt) ·
-[Hatun MCP](https://github.com/szl-holdings/hatun-mcp) ·
-[Runtime substrate](https://github.com/szl-holdings/szl-substrate)
+[Documentation](https://holdings.a-11-oy.com/docs-site/) · [a11oy source](https://github.com/szl-holdings/a11oy) · [Receipt tooling](https://github.com/szl-holdings/szl-receipt) · [Hatun MCP](https://github.com/szl-holdings/hatun-mcp)
 
-[Public experience](https://github.com/szl-holdings/.github/blob/main/docs/PUBLIC_EXPERIENCE_STANDARD.md)
-and [lifecycle](https://github.com/szl-holdings/.github/blob/main/docs/ESTATE_LIFECYCLE.md).
+[Public experience](https://github.com/szl-holdings/.github/blob/main/docs/PUBLIC_EXPERIENCE_STANDARD.md) · [Lifecycle](https://github.com/szl-holdings/.github/blob/main/docs/ESTATE_LIFECYCLE.md) · [GitHub↔HF alignment](https://github.com/szl-holdings/.github/blob/main/docs/GITHUB_HF_ALIGNMENT.md)
 
 ## Current state
 
-- [Served org-card source](https://szlholdings-readme.static.hf.space/deployment.json)
-- [a11oy readiness](https://a-11-oy.com/api/a11oy/v1/readiness)
-- [Killinchu build identity](https://szlholdings-killinchu.hf.space/api/build-info)
-- [Killinchu public-risk status](https://szlholdings-killinchu.hf.space/api/public-risk-status)
-- [Killinchu readiness](https://szlholdings-killinchu.hf.space/api/killinchu/readyz)
+- [a11oy honest](https://a-11-oy.com/api/a11oy/v1/honest) — locked-8, Λ = Conjecture 1, kernel `c7c0ba17`
+- [a11oy.net health.json](https://a11oy.net/health.json) — static document, signer unavailable, not DSSE-LIVE
+- Hub: pin five, unpin cosmos, do not pin factory, do not mint Warhacker
 
-The dataset [`SZLHOLDINGS/SZLHOLDINGS`](https://huggingface.co/datasets/SZLHOLDINGS/SZLHOLDINGS)
-is a **HISTORICAL** mirror, not a current card or runtime source.
-
-
-## GitHub ↔ Hugging Face
-
-GitHub is protected source. Hugging Face is the artifact mirror.
-[Alignment registry](https://github.com/szl-holdings/.github/blob/main/docs/GITHUB_HF_ALIGNMENT.md).
+The dataset [`SZLHOLDINGS/SZLHOLDINGS`](https://huggingface.co/datasets/SZLHOLDINGS/SZLHOLDINGS) is a **HISTORICAL** mirror.
 
 ## Truth language
 
-Claims use **PROVED**, **MEASURED**, **REPORTED**, **MODELED**,
-**CONJECTURE**, or **ROADMAP**. Runtime state is separate:
-**OPERATIONAL**, **PARTIAL**, **DEGRADED**, **UNAVAILABLE**, or
-**HISTORICAL**. Lambda uniqueness remains **Conjecture 1**, not a theorem.
-
-A signature establishes integrity and origin within scope—not accuracy,
-safety, performance, compliance, or authorization to deploy.
+Claims use **PROVED**, **MEASURED**, **REPORTED**, **MODELED**, **CONJECTURE**, **ROADMAP**, **UNKNOWN**, or **UNAVAILABLE**. Runtime state is separate. A signature establishes integrity and origin within scope—not accuracy, safety, performance, compliance, or authorization to deploy.
 
 ---
 
@@ -127,10 +76,6 @@ safety, performance, compliance, or authorization to deploy.
 
 **Govern · execute · prove**
 
-[a-11-oy.com](https://a-11-oy.com) ·
-[a11oy.net](https://a11oy.net) ·
-[Documentation](https://holdings.a-11-oy.com/docs-site/) ·
-[GitHub](https://github.com/szl-holdings) ·
-[Hugging Face](https://huggingface.co/SZLHOLDINGS)
+[a-11-oy.com](https://a-11-oy.com) · [a11oy.net](https://a11oy.net) · [GitHub](https://github.com/szl-holdings) · [Hugging Face](https://huggingface.co/SZLHOLDINGS)
 
 </div>
