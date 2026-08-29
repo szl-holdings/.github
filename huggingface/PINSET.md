@@ -5,6 +5,8 @@
 **Factory:** RUNNING, unpinned, BIND_AS_A11OY_PACKAGE — not a second flagship
 **Warhacker:** must not be a Space
 
-Dispatch **Hub pin set** on `.github` (`hf-pinset.yml`) and approve the `production` environment. This token cannot approve that environment from Ring 1.
+Dispatch **Hub pin set** on `.github` (`hf-pinset.yml`). Default environment is **staging** (no reviewers) so the App token can run without a production reviewer. Production remains an explicit choice and still requires Hub-admin Approve if staging secrets are empty.
+
+This token cannot approve the `production` environment from Ring 1.
 
 Nothing live is frozen. Dual-write, never cut.
