@@ -1,0 +1,181 @@
+{
+  "$id": "https://schemas.a11oy.net/debug-bundle.v1.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": true,
+  "properties": {
+    "artifacts": {
+      "items": {
+        "additionalProperties": false,
+        "properties": {
+          "kind": {
+            "type": "string"
+          },
+          "path": {
+            "type": "string"
+          },
+          "sha256": {
+            "pattern": "^[0-9a-f]{64}$",
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "path",
+          "sha256"
+        ],
+        "type": "object"
+      },
+      "type": "array"
+    },
+    "created_at": {
+      "format": "date-time",
+      "type": "string"
+    },
+    "deployment": {
+      "additionalProperties": true,
+      "properties": {
+        "artifact_digest": {
+          "type": "string"
+        },
+        "environment": {
+          "type": "string"
+        },
+        "release_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "environment",
+        "artifact_digest"
+      ],
+      "type": "object"
+    },
+    "identifiers": {
+      "additionalProperties": false,
+      "properties": {
+        "error_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "receipt_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "request_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "span_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "trace_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "type": "object"
+    },
+    "redaction": {
+      "additionalProperties": false,
+      "properties": {
+        "pii_review": {
+          "enum": [
+            "PASS",
+            "FAIL",
+            "NOT_APPLICABLE"
+          ]
+        },
+        "secret_scan": {
+          "enum": [
+            "PASS",
+            "FAIL"
+          ]
+        }
+      },
+      "required": [
+        "secret_scan",
+        "pii_review"
+      ],
+      "type": "object"
+    },
+    "reproduction": {
+      "additionalProperties": true,
+      "properties": {
+        "deterministic": {
+          "type": "boolean"
+        },
+        "first_bad_revision": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "fixture_digest": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "steps": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "deterministic",
+        "steps"
+      ],
+      "type": "object"
+    },
+    "schema": {
+      "const": "szl.debug-bundle/v1"
+    },
+    "severity": {
+      "enum": [
+        "SEV0",
+        "SEV1",
+        "SEV2",
+        "SEV3",
+        "SEV4"
+      ]
+    },
+    "source_revision": {
+      "pattern": "^[0-9a-f]{40}$",
+      "type": "string"
+    },
+    "summary": {
+      "minLength": 1,
+      "type": "string"
+    }
+  },
+  "required": [
+    "schema",
+    "created_at",
+    "severity",
+    "summary",
+    "source_revision",
+    "deployment",
+    "identifiers",
+    "reproduction",
+    "artifacts",
+    "redaction"
+  ],
+  "title": "SZL Debug Bundle",
+  "type": "object"
+}
