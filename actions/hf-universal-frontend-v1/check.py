@@ -1036,7 +1036,7 @@ def _media_query(prelude: str) -> str | None:
     return None
 
 
-NON_CASCADE_BLOCK_AT_RULES = {"font-face", "keyframes", "-webkit-keyframes"}
+NON_CASCADE_BLOCK_AT_RULES = {"font-face"}
 
 
 def _require_non_cascade_at_rule(prelude: str) -> None:
@@ -1499,6 +1499,109 @@ def _loop_is_fallthrough_barrier(statement: ast.stmt) -> bool:
 
 
 TRY_STATEMENT_TYPES = (ast.Try, getattr(ast, "TryStar", ast.Try))
+FUNCTION_DEFINITION_TYPES = (ast.FunctionDef, ast.AsyncFunctionDef)
+
+
+def _function_definition_is_plain_inert(
+    statement: ast.FunctionDef | ast.AsyncFunctionDef,
+) -> bool:
+    arguments = statement.args
+    parameters = [
+        *arguments.posonlyargs,
+        *arguments.args,
+        *arguments.kwonlyargs,
+    ]
+    if arguments.vararg is not None:
+        parameters.append(arguments.vararg)
+    if arguments.kwarg is not None:
+        parameters.append(arguments.kwarg)
+
+    return (
+        not statement.decorator_list
+        and not arguments.defaults
+        and all(default is None for default in arguments.kw_defaults)
+        and statement.returns is None
+        and all(parameter.annotation is None for parameter in parameters)
+    )
+
+
+def _lambda_definition_is_plain_inert(expression: ast.Lambda) -> bool:
+    arguments = expression.args
+    return not arguments.defaults and all(
+        default is None for default in arguments.kw_defaults
+    )
+
+
+def _eager_expression_children(node: ast.AST) -> tuple[ast.AST, ...]:
+    """Return only child nodes that Python may evaluate for this expression."""
+    if isinstance(node, ast.GeneratorExp):
+        return (node.generators[0].iter,) if node.generators else ()
+    if isinstance(node, ast.IfExp):
+        truth = _literal_truth_value(node.test)
+        if truth is True:
+            return (node.test, node.body)
+        if truth is False:
+            return (node.test, node.orelse)
+        return (node.test, node.body, node.orelse)
+    if isinstance(node, ast.BoolOp):
+        evaluated: list[ast.expr] = []
+        for value in node.values:
+            evaluated.append(value)
+            truth = _literal_truth_value(value)
+            if isinstance(node.op, ast.And) and truth is False:
+                break
+            if isinstance(node.op, ast.Or) and truth is True:
+                break
+        return tuple(evaluated)
+    return tuple(ast.iter_child_nodes(node))
+
+
+def _expression_has_eager_lambda_barrier(expression: ast.AST | None) -> bool:
+    """Reject unsafe lambda creation or invocation in an eager expression."""
+
+    def contains_eager_lambda(node: ast.AST) -> bool:
+        if isinstance(node, ast.Lambda):
+            return True
+        return any(
+            contains_eager_lambda(child)
+            for child in _eager_expression_children(node)
+        )
+
+    def visit_eager(node: ast.AST) -> bool:
+        if isinstance(node, ast.Call) and contains_eager_lambda(node.func):
+            return True
+        if isinstance(node, ast.Lambda):
+            return not _lambda_definition_is_plain_inert(node)
+        return any(visit_eager(child) for child in _eager_expression_children(node))
+
+    return expression is not None and visit_eager(expression)
+
+
+def _statement_eager_expressions(statement: ast.stmt) -> list[ast.expr]:
+    """Return expressions evaluated directly by a statement, excluding bodies."""
+    type_alias = getattr(ast, "TypeAlias", None)
+    if type_alias is not None and isinstance(statement, type_alias):
+        return []
+
+    expressions: list[ast.expr] = []
+
+    def collect(value: object) -> None:
+        if isinstance(value, ast.expr):
+            expressions.append(value)
+            return
+        if isinstance(value, ast.stmt):
+            return
+        if isinstance(value, ast.AST):
+            for _, child in ast.iter_fields(value):
+                collect(child)
+            return
+        if isinstance(value, (list, tuple)):
+            for child in value:
+                collect(child)
+
+    for _, value in ast.iter_fields(statement):
+        collect(value)
+    return expressions
 
 
 def _try_statement_falls_through(statement: ast.Try) -> bool:
@@ -1512,6 +1615,17 @@ def _try_statement_falls_through(statement: ast.Try) -> bool:
 
 def _statements_fall_through(statements: list[ast.stmt]) -> bool:
     for statement in statements:
+        if isinstance(statement, FUNCTION_DEFINITION_TYPES):
+            if not _function_definition_is_plain_inert(statement):
+                return False
+            continue
+        if isinstance(statement, ast.ClassDef):
+            return False
+        if any(
+            _expression_has_eager_lambda_barrier(expression)
+            for expression in _statement_eager_expressions(statement)
+        ):
+            return False
         if isinstance(statement, (ast.Raise, ast.Return, ast.Break, ast.Continue)):
             return False
         if _loop_is_fallthrough_barrier(statement):
@@ -1558,14 +1672,19 @@ def _direct_top_level_calls(tree: ast.Module) -> list[ast.Call]:
     entering the context and executing its body are unconditional module work.
     """
     calls: list[ast.Call] = []
-    local_function_names: set[str] = set()
+    local_sync_function_names: set[str] = set()
 
     def collect(statements: list[ast.stmt]) -> bool:
         """Collect calls until control can no longer reach the next statement."""
         for statement in statements:
-            if isinstance(statement, ast.FunctionDef):
-                local_function_names.add(statement.name)
+            if isinstance(statement, FUNCTION_DEFINITION_TYPES):
+                if not _function_definition_is_plain_inert(statement):
+                    return False
+                if isinstance(statement, ast.FunctionDef):
+                    local_sync_function_names.add(statement.name)
                 continue
+            if isinstance(statement, ast.ClassDef):
+                return False
             if isinstance(statement, (ast.Raise, ast.Return, ast.Break, ast.Continue)):
                 return False
             if _loop_is_fallthrough_barrier(statement):
@@ -1582,10 +1701,16 @@ def _direct_top_level_calls(tree: ast.Module) -> list[ast.Call]:
                 expression = statement.value
             elif isinstance(statement, ast.AnnAssign):
                 expression = statement.value
+            if _expression_has_eager_lambda_barrier(expression):
+                return False
+            if isinstance(expression, ast.Lambda):
+                continue
             if isinstance(expression, ast.Call):
+                if isinstance(expression.func, ast.Lambda):
+                    return False
                 if (
                     isinstance(expression.func, ast.Name)
-                    and expression.func.id in local_function_names
+                    and expression.func.id in local_sync_function_names
                 ):
                     return False
                 calls.append(expression)
