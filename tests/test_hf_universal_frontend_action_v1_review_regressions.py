@@ -560,3 +560,220 @@ stop()
         app_file="app.py",
         css_file="assets/universal.css",
     )
+
+@pytest.mark.parametrize(
+    "keyframe_block",
+    [
+        """
+@keyframes szl-overflow-bypass {
+  from { overflow-x: clip; }
+  to { overflow-x: auto; }
+}
+""",
+        """
+@KeYfRaMeS szl-overflow-bypass {
+  from { overflow-x: clip; }
+  to { overflow-x: auto; }
+}
+""",
+        """
+@-webkit-keyframes szl-overflow-bypass {
+  from { overflow-x: clip; }
+  to { overflow-x: auto; }
+}
+""",
+        """
+@-moz-keyframes szl-overflow-bypass {
+  from { overflow-x: clip; }
+  to { overflow-x: auto; }
+}
+""",
+        r"""
+@\6b eyframes szl-overflow-bypass {
+  from { overflow-x: clip; }
+  to { overflow-x: auto; }
+}
+""",
+        r"""
+@-\77 ebkit-keyframes szl-overflow-bypass {
+  from { overflow-x: clip; }
+  to { overflow-x: auto; }
+}
+""",
+        """
+@media (max-width: 560px) {
+  @keyframes szl-overflow-bypass {
+    from { overflow-x: clip; }
+    to { overflow-x: auto; }
+  }
+}
+""",
+    ],
+    ids=[
+        "standard",
+        "mixed-case",
+        "webkit-prefixed",
+        "other-vendor-prefixed",
+        "escaped-standard-at-keyword",
+        "escaped-webkit-at-keyword",
+        "nested-in-recognized-media",
+    ],
+)
+def test_keyframe_blocks_fail_closed(keyframe_block: str) -> None:
+    valid_css = """
+:root { --szl-touch-target: 44px; }
+* { overflow-wrap: anywhere; overflow-x: clip; }
+@media (max-width: 560px) {
+  body { padding-inline: 0.5rem; }
+}
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: 0.01ms !important; }
+}
+"""
+    activation = """
+html {
+  animation-name: szl-overflow-bypass;
+  animation-duration: 1s;
+  -webkit-animation-name: szl-overflow-bypass;
+  -webkit-animation-duration: 1s;
+}
+"""
+
+    with pytest.raises(
+        CHECKER.ContractError,
+        match=r"unsupported (?:conditional or )?at-rule block",
+    ):
+        CHECKER.validate_css(valid_css + keyframe_block + activation)
+
+
+@pytest.mark.parametrize(
+    ("framework", "framework_import", "binding", "expected_error"),
+    [
+        (
+            "streamlit",
+            "import streamlit as ui",
+            'ui.markdown(f"<style>{css}</style>", unsafe_allow_html=True)',
+            "Streamlit universal CSS binding is absent",
+        ),
+        (
+            "gradio",
+            "import gradio as ui",
+            "demo = ui.Blocks(css=css)",
+            "Gradio universal CSS binding is absent",
+        ),
+    ],
+)
+@pytest.mark.parametrize(
+    "definition",
+    [
+        """@explode()
+def helper():
+    pass""",
+        """def helper(value=explode()):
+    pass""",
+        """def helper(*, value=explode()):
+    pass""",
+        """def helper(value: explode()):
+    pass""",
+        """def helper() -> explode():
+    pass""",
+        """@explode()
+async def helper():
+    pass""",
+        """async def helper(value=explode()):
+    pass""",
+        """async def helper(*, value=explode()):
+    pass""",
+        """async def helper(value: explode()):
+    pass""",
+        """async def helper() -> explode():
+    pass""",
+        """class Helper:
+    raise RuntimeError("stop")""",
+        "helper = lambda value=explode(): value",
+    ],
+    ids=[
+        "sync-decorator",
+        "sync-positional-default",
+        "sync-keyword-default",
+        "sync-parameter-annotation",
+        "sync-return-annotation",
+        "async-decorator",
+        "async-positional-default",
+        "async-keyword-default",
+        "async-parameter-annotation",
+        "async-return-annotation",
+        "class-body",
+        "lambda-default",
+    ],
+)
+def test_definition_time_execution_before_binding_fails_closed(
+    framework: str,
+    framework_import: str,
+    binding: str,
+    expected_error: str,
+    definition: str,
+) -> None:
+    app_text = f"""\
+# SZL_HF_UNIVERSAL_FRONTEND_V1
+from pathlib import Path
+{framework_import}
+
+css = Path("assets/universal.css").read_text(encoding="utf-8")
+
+{definition}
+
+{binding}
+"""
+
+    with pytest.raises(CHECKER.ContractError, match=expected_error):
+        CHECKER.validate_framework_binding(
+            framework,
+            app_text,
+            app_file="app.py",
+            css_file="assets/universal.css",
+        )
+
+
+def test_plain_async_definition_before_binding_is_inert() -> None:
+    app_text = """\
+# SZL_HF_UNIVERSAL_FRONTEND_V1
+from pathlib import Path
+import streamlit as st
+
+css = Path("assets/universal.css").read_text(encoding="utf-8")
+
+async def helper():
+    raise RuntimeError("not invoked")
+
+st.markdown(f"<style>{css}</style>", unsafe_allow_html=True)
+"""
+
+    CHECKER.validate_framework_binding(
+        "streamlit",
+        app_text,
+        app_file="app.py",
+        css_file="assets/universal.css",
+    )
+
+
+def test_lazy_generic_bound_before_binding_is_inert() -> None:
+    app_text = """\
+# SZL_HF_UNIVERSAL_FRONTEND_V1
+from pathlib import Path
+import streamlit as st
+
+css = Path("assets/universal.css").read_text(encoding="utf-8")
+
+def helper[T: explode()]():
+    pass
+
+st.markdown(f"<style>{css}</style>", unsafe_allow_html=True)
+"""
+
+    CHECKER.validate_framework_binding(
+        "streamlit",
+        app_text,
+        app_file="app.py",
+        css_file="assets/universal.css",
+    )

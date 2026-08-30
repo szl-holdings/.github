@@ -1036,7 +1036,7 @@ def _media_query(prelude: str) -> str | None:
     return None
 
 
-NON_CASCADE_BLOCK_AT_RULES = {"font-face", "keyframes", "-webkit-keyframes"}
+NON_CASCADE_BLOCK_AT_RULES = {"font-face"}
 
 
 def _require_non_cascade_at_rule(prelude: str) -> None:
@@ -1499,6 +1499,37 @@ def _loop_is_fallthrough_barrier(statement: ast.stmt) -> bool:
 
 
 TRY_STATEMENT_TYPES = (ast.Try, getattr(ast, "TryStar", ast.Try))
+FUNCTION_DEFINITION_TYPES = (ast.FunctionDef, ast.AsyncFunctionDef)
+
+
+def _function_definition_is_plain_inert(
+    statement: ast.FunctionDef | ast.AsyncFunctionDef,
+) -> bool:
+    arguments = statement.args
+    parameters = [
+        *arguments.posonlyargs,
+        *arguments.args,
+        *arguments.kwonlyargs,
+    ]
+    if arguments.vararg is not None:
+        parameters.append(arguments.vararg)
+    if arguments.kwarg is not None:
+        parameters.append(arguments.kwarg)
+
+    return (
+        not statement.decorator_list
+        and not arguments.defaults
+        and all(default is None for default in arguments.kw_defaults)
+        and statement.returns is None
+        and all(parameter.annotation is None for parameter in parameters)
+    )
+
+
+def _lambda_definition_is_plain_inert(expression: ast.Lambda) -> bool:
+    arguments = expression.args
+    return not arguments.defaults and all(
+        default is None for default in arguments.kw_defaults
+    )
 
 
 def _try_statement_falls_through(statement: ast.Try) -> bool:
@@ -1512,6 +1543,22 @@ def _try_statement_falls_through(statement: ast.Try) -> bool:
 
 def _statements_fall_through(statements: list[ast.stmt]) -> bool:
     for statement in statements:
+        if isinstance(statement, FUNCTION_DEFINITION_TYPES):
+            if not _function_definition_is_plain_inert(statement):
+                return False
+            continue
+        if isinstance(statement, ast.ClassDef):
+            return False
+        lambda_expression: ast.AST | None = None
+        if isinstance(statement, ast.Assign):
+            lambda_expression = statement.value
+        elif isinstance(statement, ast.AnnAssign):
+            lambda_expression = statement.value
+        if (
+            isinstance(lambda_expression, ast.Lambda)
+            and not _lambda_definition_is_plain_inert(lambda_expression)
+        ):
+            return False
         if isinstance(statement, (ast.Raise, ast.Return, ast.Break, ast.Continue)):
             return False
         if _loop_is_fallthrough_barrier(statement):
@@ -1563,9 +1610,13 @@ def _direct_top_level_calls(tree: ast.Module) -> list[ast.Call]:
     def collect(statements: list[ast.stmt]) -> bool:
         """Collect calls until control can no longer reach the next statement."""
         for statement in statements:
-            if isinstance(statement, ast.FunctionDef):
+            if isinstance(statement, FUNCTION_DEFINITION_TYPES):
+                if not _function_definition_is_plain_inert(statement):
+                    return False
                 local_function_names.add(statement.name)
                 continue
+            if isinstance(statement, ast.ClassDef):
+                return False
             if isinstance(statement, (ast.Raise, ast.Return, ast.Break, ast.Continue)):
                 return False
             if _loop_is_fallthrough_barrier(statement):
@@ -1582,7 +1633,13 @@ def _direct_top_level_calls(tree: ast.Module) -> list[ast.Call]:
                 expression = statement.value
             elif isinstance(statement, ast.AnnAssign):
                 expression = statement.value
+            if isinstance(expression, ast.Lambda):
+                if not _lambda_definition_is_plain_inert(expression):
+                    return False
+                continue
             if isinstance(expression, ast.Call):
+                if isinstance(expression.func, ast.Lambda):
+                    return False
                 if (
                     isinstance(expression.func, ast.Name)
                     and expression.func.id in local_function_names
