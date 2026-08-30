@@ -24,11 +24,11 @@ name: Reusable — Anatomy-map Drift Check
 #   jobs:
 #     anatomy-map-drift:
 #       uses: szl-holdings/.github/.github/workflows/reusable-anatomy-map-drift.yml@main
-#       secrets: inherit   # optional: passes GitHub/HF read credentials if defined
+#       secrets: inherit   # optional: passes SZL_GITHUB_TOKEN if the org defines it
 #
-# The check reads same-org repos plus the HF Space. The caller's built-in
-# github.token covers public GitHub sources; SZL_GITHUB_TOKEN and HF_TOKEN are
-# optional fail-closed read fallbacks when a source is private.
+# The check reads only PUBLIC same-org repos + the public HF Space, so the
+# caller's built-in github.token is sufficient; SZL_GITHUB_TOKEN is a fallback
+# for a future private surface.
 
 on:
   workflow_call:
@@ -41,9 +41,6 @@ on:
     secrets:
       SZL_GITHUB_TOKEN:
         description: "Optional PAT fallback for reading a (future) private surface."
-        required: false
-      HF_TOKEN:
-        description: "Optional Hugging Face token for reading a private anatomy Space."
         required: false
 
 permissions:
@@ -84,7 +81,6 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ github.token }}
           SZL_GITHUB_TOKEN: ${{ secrets.SZL_GITHUB_TOKEN }}
-          HF_TOKEN: ${{ secrets.HF_TOKEN }}
         run: |
           set +e
           EXTRA=""
@@ -125,8 +121,7 @@ jobs:
             *)
               echo "::error::Could not complete the anatomy-map drift check"
               echo "::error::(a surface failed to fetch -- network/auth). Set the"
-              echo "::error::HF_TOKEN secret for a private HF Space, or"
-              echo "::error::SZL_GITHUB_TOKEN if a GitHub source is private."
+              echo "::error::SZL_GITHUB_TOKEN secret if a surface repo is private."
               echo "::error::Failed (not passed) so coverage can never look green when"
               echo "::error::the check could not actually run."
               exit 1
