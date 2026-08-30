@@ -15,7 +15,9 @@ name: Anatomy-map cross-surface drift
 #
 # Reading the a11oy / killinchu sources needs repo read access; the built-in
 # Actions token covers same-org repos, with SZL_GITHUB_TOKEN as a fallback. The
-# HF Space is public. On real drift (exit 1) an ntfy alert is pushed through the
+# HF Space may require authentication; the established HF secret fallback is
+# exported to the checker without placing credentials in URLs or logs. On real
+# drift (exit 1) an ntfy alert is pushed through the
 # team's shared relay (SLACK_WEBHOOK_URL -> a-11-oy.com/relay -> a11oy-uptime).
 # A fetch/auth failure is exit 2 (ERROR), never a silent pass.
 
@@ -70,6 +72,7 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ github.token }}
           SZL_GITHUB_TOKEN: ${{ secrets.SZL_GITHUB_TOKEN }}
+          HF_TOKEN: ${{ secrets.HF_ORG_TOKEN || secrets.HF_ORG_TOKEN1 || secrets.HF_TOKEN || secrets.HF_WRITE_TOKEN }}
         run: |
           set +e
           python3 .github/scripts/anatomy_map_drift.py \
@@ -136,7 +139,9 @@ jobs:
               echo "::error::Could not complete the anatomy-map drift check"
               echo "::error::(a surface failed to fetch -- network/auth). Set the"
               echo "::error::SZL_GITHUB_TOKEN secret if the a11oy/killinchu repos are"
-              echo "::error::private. Failed (not passed) so coverage can never look"
+              echo "::error::private, and configure HF_ORG_TOKEN (or the established"
+              echo "::error::HF token fallback) if the anatomy Space requires auth."
+              echo "::error::Failed (not passed) so coverage can never look"
               echo "::error::green when the check could not actually run."
               exit 1
               ;;

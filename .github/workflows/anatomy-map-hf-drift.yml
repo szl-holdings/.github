@@ -81,6 +81,8 @@ jobs:
         run: python3 .github/scripts/test_anatomy_map_drift.py
 
       - name: Check the public anatomy surfaces (HF Space + a-11-oy.com mirror)
+        env:
+          HF_TOKEN: ${{ secrets.HF_ORG_TOKEN || secrets.HF_ORG_TOKEN1 || secrets.HF_TOKEN || secrets.HF_WRITE_TOKEN }}
         run: |
           set +e
           python3 .github/scripts/anatomy_map_drift.py \
@@ -139,8 +141,10 @@ jobs:
               ;;
             *)
               echo "::error::Could not complete the public anatomy-map drift check"
-              echo "::error::(a public surface failed to fetch -- HF Space or"
-              echo "::error::a-11-oy.com unreachable). Failed (not passed) so coverage"
+              echo "::error::(a public surface failed to fetch -- HF Space auth/access"
+              echo "::error::or a-11-oy.com reachability). Configure HF_ORG_TOKEN (or"
+              echo "::error::the established HF token fallback) when the Space requires"
+              echo "::error::authentication. Failed (not passed) so coverage"
               echo "::error::can never look green when the check could not actually run;"
               echo "::error::a public surface being down is itself an alignment problem."
               exit 1
