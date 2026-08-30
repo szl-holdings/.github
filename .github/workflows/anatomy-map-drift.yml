@@ -70,7 +70,6 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ github.token }}
           SZL_GITHUB_TOKEN: ${{ secrets.SZL_GITHUB_TOKEN }}
-          HF_TOKEN: ${{ secrets.HF_TOKEN }}
         run: |
           set +e
           python3 .github/scripts/anatomy_map_drift.py \

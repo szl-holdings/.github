@@ -113,20 +113,6 @@ def _gh_headers():
     return h
 
 
-def _hf_headers():
-    """Return an HF-only read credential without leaking GitHub credentials.
-
-    The anatomy Space is normally public, but organization visibility changes
-    must not turn the drift guard into a permanent HTTP 401.  Reuse the
-    established ``HF_TOKEN`` Actions secret when it is available; the header is
-    attached only to ``huggingface.co`` requests made by ``fetch_hf_file``.
-    """
-    tok = os.environ.get("HF_TOKEN")
-    if not tok:
-        return {}
-    return {"Authorization": f"Bearer {tok}"}
-
-
 def fetch_github_file(repo, path, ref="main"):
     """Raw file content via the contents API (works for PRIVATE repos w/ token)."""
     url = f"{GH_API}/repos/{repo}/contents/{urllib.parse.quote(path)}?ref={ref}"
@@ -138,9 +124,9 @@ def fetch_github_file(repo, path, ref="main"):
 
 
 def fetch_hf_file(repo, path, ref="main"):
-    """Raw file content from a public or authenticated Hugging Face Space."""
+    """Raw file content from a (public) Hugging Face Space."""
     url = f"{HF_HOST}/spaces/{repo}/raw/{ref}/{urllib.parse.quote(path)}"
-    status, body = _http(url, headers=_hf_headers())
+    status, body = _http(url)
     if status != 200:
         raise RuntimeError(f"HF space {repo}:{path}@{ref}: HTTP {status}")
     return body.decode("utf-8", "replace")

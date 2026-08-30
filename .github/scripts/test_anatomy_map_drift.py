@@ -25,7 +25,6 @@ from __future__ import annotations
 import importlib.util
 import os
 import unittest
-from unittest import mock
 
 _HERE = os.path.dirname(os.path.abspath(__file__))
 _MODULE_PATH = os.path.join(_HERE, "anatomy_map_drift.py")
@@ -135,50 +134,6 @@ class TestExtractors(unittest.TestCase):
         caps = amd.parse_capabilities(_block())
         keys = [k for (k, _s, _f) in caps]
         self.assertEqual(keys, ["rag", "khipu", "receipts", "math"])
-
-
-class TestFetchAuthority(unittest.TestCase):
-    def test_hf_token_is_scoped_to_hugging_face_reads(self):
-        with (
-            mock.patch.dict(
-                os.environ,
-                {"HF_TOKEN": "hf-read-secret", "GITHUB_TOKEN": "github-secret"},
-                clear=True,
-            ),
-            mock.patch.object(amd, "_http", return_value=(200, b"honest")) as http,
-        ):
-            self.assertEqual(
-                amd.fetch_hf_file("SZLHOLDINGS/anatomy", "data.js"), "honest"
-            )
-
-        _url, kwargs = http.call_args
-        self.assertTrue(_url[0].startswith("https://huggingface.co/spaces/"))
-        self.assertEqual(
-            kwargs["headers"], {"Authorization": "Bearer hf-read-secret"}
-        )
-        self.assertNotIn("github-secret", repr(http.call_args))
-
-    def test_hf_read_remains_anonymous_when_token_is_absent(self):
-        with (
-            mock.patch.dict(os.environ, {"GITHUB_TOKEN": "github-secret"}, clear=True),
-            mock.patch.object(amd, "_http", return_value=(200, b"public")) as http,
-        ):
-            self.assertEqual(
-                amd.fetch_hf_file("SZLHOLDINGS/anatomy", "index.html"), "public"
-            )
-
-        self.assertEqual(http.call_args.kwargs["headers"], {})
-        self.assertNotIn("github-secret", repr(http.call_args))
-
-    def test_hf_fetch_error_never_echoes_the_token(self):
-        with (
-            mock.patch.dict(os.environ, {"HF_TOKEN": "do-not-print"}, clear=True),
-            mock.patch.object(amd, "_http", return_value=(401, b"")),
-        ):
-            with self.assertRaisesRegex(RuntimeError, "HTTP 401") as caught:
-                amd.fetch_hf_file("SZLHOLDINGS/anatomy", "data.js")
-
-        self.assertNotIn("do-not-print", str(caught.exception))
 
 
 class TestEvaluate(unittest.TestCase):
