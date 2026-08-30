@@ -113,6 +113,14 @@ def _gh_headers():
     return h
 
 
+def _hf_headers():
+    """Return a bearer header only when the workflow supplied an HF token."""
+    tok = os.environ.get("HF_TOKEN")
+    h = {}
+    if tok:
+        h["Authorization"] = f"Bearer {tok}"
+    return h
+
 def fetch_github_file(repo, path, ref="main"):
     """Raw file content via the contents API (works for PRIVATE repos w/ token)."""
     url = f"{GH_API}/repos/{repo}/contents/{urllib.parse.quote(path)}?ref={ref}"
@@ -124,9 +132,9 @@ def fetch_github_file(repo, path, ref="main"):
 
 
 def fetch_hf_file(repo, path, ref="main"):
-    """Raw file content from a (public) Hugging Face Space."""
+    """Raw file content from a Hugging Face Space, authenticated when needed."""
     url = f"{HF_HOST}/spaces/{repo}/raw/{ref}/{urllib.parse.quote(path)}"
-    status, body = _http(url)
+    status, body = _http(url, headers=_hf_headers())
     if status != 200:
         raise RuntimeError(f"HF space {repo}:{path}@{ref}: HTTP {status}")
     return body.decode("utf-8", "replace")

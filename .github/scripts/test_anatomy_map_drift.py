@@ -15,6 +15,7 @@ text trimmed from the actual surfaces, and pin that the guard:
   3. FAILS when one surface drops the Λ=Conjecture-1 label          (exit 1)
   4. FAILS when the capability ladder is edited on ONE side only    (exit 1)
   5. FAILS when the marker block is missing entirely                (exit 1)
+  6. Sends HF bearer auth only when a token is configured
 
 It also pins the pure extractors so a future refactor can't quietly stop
 matching the locked ladder, the Λ label, the capability list, or the markers
@@ -25,6 +26,7 @@ from __future__ import annotations
 import importlib.util
 import os
 import unittest
+from unittest import mock
 
 _HERE = os.path.dirname(os.path.abspath(__file__))
 _MODULE_PATH = os.path.join(_HERE, "anatomy_map_drift.py")
@@ -102,6 +104,15 @@ def _surfaces(a11oy=None, killinchu=None, hf=None):
 
 
 class TestExtractors(unittest.TestCase):
+    def test_hf_headers_are_optional_and_bearer_scoped(self):
+        with mock.patch.dict(os.environ, {"HF_TOKEN": ""}):
+            self.assertNotIn("Authorization", amd._hf_headers())
+        with mock.patch.dict(os.environ, {"HF_TOKEN": "hf_test_secret"}):
+            self.assertEqual(
+                amd._hf_headers()["Authorization"],
+                "Bearer hf_test_secret",
+            )
+
     def test_marker_block_found_and_bounded(self):
         b = amd.extract_marker_block("noise\n" + _block() + "\ntrailing")
         self.assertIsNotNone(b)
