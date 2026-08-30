@@ -1532,6 +1532,21 @@ def _lambda_definition_is_plain_inert(expression: ast.Lambda) -> bool:
     )
 
 
+def _expression_has_eager_lambda_definition_barrier(
+    expression: ast.AST | None,
+) -> bool:
+    """Reject non-plain lambdas created while an expression is evaluated."""
+
+    def visit_eager(node: ast.AST) -> bool:
+        if isinstance(node, ast.Lambda):
+            return not _lambda_definition_is_plain_inert(node)
+        if isinstance(node, ast.GeneratorExp):
+            return bool(node.generators) and visit_eager(node.generators[0].iter)
+        return any(visit_eager(child) for child in ast.iter_child_nodes(node))
+
+    return expression is not None and visit_eager(expression)
+
+
 def _try_statement_falls_through(statement: ast.Try) -> bool:
     """Fail closed on a top-level try before a claimed framework binding."""
     # Reachability depends on runtime name resolution plus evaluation of the
@@ -1554,10 +1569,7 @@ def _statements_fall_through(statements: list[ast.stmt]) -> bool:
             lambda_expression = statement.value
         elif isinstance(statement, ast.AnnAssign):
             lambda_expression = statement.value
-        if (
-            isinstance(lambda_expression, ast.Lambda)
-            and not _lambda_definition_is_plain_inert(lambda_expression)
-        ):
+        if _expression_has_eager_lambda_definition_barrier(lambda_expression):
             return False
         if isinstance(statement, (ast.Raise, ast.Return, ast.Break, ast.Continue)):
             return False
@@ -1633,9 +1645,9 @@ def _direct_top_level_calls(tree: ast.Module) -> list[ast.Call]:
                 expression = statement.value
             elif isinstance(statement, ast.AnnAssign):
                 expression = statement.value
+            if _expression_has_eager_lambda_definition_barrier(expression):
+                return False
             if isinstance(expression, ast.Lambda):
-                if not _lambda_definition_is_plain_inert(expression):
-                    return False
                 continue
             if isinstance(expression, ast.Call):
                 if isinstance(expression.func, ast.Lambda):

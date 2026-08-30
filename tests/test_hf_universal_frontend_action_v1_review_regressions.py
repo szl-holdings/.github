@@ -691,6 +691,12 @@ async def helper():
         """class Helper:
     raise RuntimeError("stop")""",
         "helper = lambda value=explode(): value",
+        "helper = (lambda value=explode(): value,)",
+        "helper = [lambda value=explode(): value]",
+        "helper = {'value': lambda value=explode(): value}",
+        "helper = (lambda value=explode(): value) if choose else None",
+        "helper = (nested := (lambda value=explode(): value))",
+        "helper = (value for value in (lambda value=explode(): value,))",
     ],
     ids=[
         "sync-decorator",
@@ -705,6 +711,12 @@ async def helper():
         "async-return-annotation",
         "class-body",
         "lambda-default",
+        "tuple-lambda-default",
+        "list-lambda-default",
+        "dict-lambda-default",
+        "conditional-lambda-default",
+        "named-expression-lambda-default",
+        "generator-outer-iter-lambda-default",
     ],
 )
 def test_definition_time_execution_before_binding_fails_closed(
@@ -733,6 +745,55 @@ css = Path("assets/universal.css").read_text(encoding="utf-8")
             app_file="app.py",
             css_file="assets/universal.css",
         )
+
+
+@pytest.mark.parametrize(
+    ("framework", "framework_import", "binding"),
+    [
+        (
+            "streamlit",
+            "import streamlit as ui",
+            'ui.markdown(f"<style>{css}</style>", unsafe_allow_html=True)',
+        ),
+        (
+            "gradio",
+            "import gradio as ui",
+            "demo = ui.Blocks(css=css)",
+        ),
+    ],
+)
+@pytest.mark.parametrize(
+    "definition",
+    [
+        "helper = (lambda: explode(),)",
+        "helper = ((lambda value=explode(): value) for _ in ())",
+    ],
+    ids=["tuple-lazy-lambda-body", "lazy-generator-element-default"],
+)
+def test_lazy_nested_lambda_execution_before_binding_is_inert(
+    framework: str,
+    framework_import: str,
+    binding: str,
+    definition: str,
+) -> None:
+    app_text = f"""\
+# SZL_HF_UNIVERSAL_FRONTEND_V1
+from pathlib import Path
+{framework_import}
+
+css = Path("assets/universal.css").read_text(encoding="utf-8")
+
+{definition}
+
+{binding}
+"""
+
+    CHECKER.validate_framework_binding(
+        framework,
+        app_text,
+        app_file="app.py",
+        css_file="assets/universal.css",
+    )
 
 
 def test_plain_async_definition_before_binding_is_inert() -> None:
