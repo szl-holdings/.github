@@ -1,0 +1,45 @@
+# SPDX-License-Identifier: Apache-2.0
+# Doctrine v11 LOCKED · Λ = Conjecture 1 (advisory)
+#
+# Keeps ATTIC.md — the org-wide tombstone index — honest.
+#
+# Fails closed on STRUCTURAL defects (a tombstone pointing at a nonexistent repo,
+# or at another tombstone) and on drift (ATTIC.md stale vs the live estate).
+# Surfaces UNKNOWN successors as warnings: those are open owner decisions, not
+# regressions a PR introduced.
+name: Attic Index
+
+on:
+  pull_request:
+    paths:
+      - "ATTIC.md"
+      - "scripts/build_attic_index.py"
+      - ".github/workflows/attic-index.yml"
+  schedule:
+    # Daily: the estate changes under us as repos are archived or superseded.
+    - cron: "23 7 * * *"
+  workflow_dispatch:
+
+permissions: read-all
+
+concurrency:
+  group: attic-index-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+
+      - name: Set up Python
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
+        with:
+          python-version: "3.12"
+
+      - name: Validate tombstone index against the live estate
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: python scripts/build_attic_index.py --check
