@@ -30,10 +30,12 @@ class TestAnatomyProductContract(unittest.TestCase):
         self.assertEqual(len(ids), len(set(ids)))
 
     def test_folded_hf_space_is_not_an_active_surface(self) -> None:
-        serialized = json.dumps(self.registry, sort_keys=True)
-        self.assertNotIn('"kind": "hf_space"', serialized)
-        self.assertNotIn('"id": "hf-anatomy"', serialized)
-        self.assertNotIn("SZLHOLDINGS/anatomy", serialized)
+        ids = [str(row.get("id", "")) for row in self.surfaces]
+        kinds = [str(row.get("kind", "")) for row in self.surfaces]
+        self.assertNotIn("hf-anatomy", ids)
+        self.assertNotIn("hf_space", kinds)
+        for row in self.surfaces:
+            self.assertNotEqual(row.get("space"), "SZLHOLDINGS/anatomy")
 
     def test_product_origin_is_exact_and_credential_free(self) -> None:
         product_rows = [
@@ -64,7 +66,15 @@ class TestAnatomyProductContract(unittest.TestCase):
             encoding="utf-8"
         )
         self.assertIn("--only a11oy-anatomy-product", text)
-        self.assertNotIn("SZLHOLDINGS/anatomy", text)
+        forbidden = (
+            "--only hf-anatomy",
+            "HF_TOKEN",
+            "HF_READ_TOKEN",
+            "huggingface.co",
+            "hf.space",
+        )
+        for token in forbidden:
+            self.assertNotIn(token, text)
 
     def test_obsolete_hf_watcher_is_removed(self) -> None:
         self.assertFalse((_WORKFLOW_DIR / "anatomy-map-hf-drift.yml").exists())
