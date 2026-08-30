@@ -1,0 +1,145 @@
+name: HF Model Evidence Audit
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - .github/scripts/hf_model_evidence_audit.py
+      - .github/scripts/test_hf_model_evidence_audit.py
+      - .github/workflows/hf-model-evidence-audit.yml
+      - huggingface/MODEL_RELEASE_EVIDENCE.md
+  push:
+    branches: [main]
+    paths:
+      - .github/scripts/hf_model_evidence_audit.py
+      - .github/scripts/test_hf_model_evidence_audit.py
+      - .github/workflows/hf-model-evidence-audit.yml
+      - huggingface/MODEL_RELEASE_EVIDENCE.md
+  schedule:
+    - cron: "17 9 * * *"
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+concurrency:
+  group: hf-model-evidence-audit-${{ github.event_name }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    name: Safe weights and structured evaluation
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      issues: write
+    env:
+      REPORT_JSON: reports/hf-model-evidence-latest.json
+      REPORT_MD: reports/hf-model-evidence-latest.md
+      REPORT_ISSUE_TITLE: "[hf-model-evidence] weighted artifact release gate"
+      GH_TOKEN: ${{ github.token }}
+      HF_ORG_TOKEN: ${{ secrets.HF_ORG_TOKEN || secrets.HF_ORG_TOKEN1 }}
+    steps:
+      - name: Harden runner
+        uses: step-security/harden-runner@b09bb98e06d4d774595224525879c09bc6e98c40 # v2.20.1
+        with:
+          egress-policy: audit
+
+      - name: Checkout verifier
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12.10"
+
+      - name: Run network-free policy self-tests
+        run: |
+          set -euo pipefail
+          python -m py_compile \
+            .github/scripts/hf_model_evidence_audit.py \
+            .github/scripts/test_hf_model_evidence_audit.py
+          python .github/scripts/test_hf_model_evidence_audit.py
+          git diff --check
+
+      - name: Audit exact public Hub revisions
+        if: github.event_name != 'pull_request'
+        id: audit
+        shell: bash
+        run: |
+          set +e
+          python .github/scripts/hf_model_evidence_audit.py \
+            --org SZLHOLDINGS \
+            --min-models 40 \
+            --require-structured-eval-for-weights \
+            --enforce \
+            --report "$REPORT_JSON" \
+            --markdown "$REPORT_MD"
+          code=$?
+          echo "exit_code=${code}" >> "$GITHUB_OUTPUT"
+          exit 0
+
+      - name: Upload immutable audit evidence
+        if: always() && github.event_name != 'pull_request'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: hf-model-evidence-${{ github.run_id }}
+          path: |
+            ${{ env.REPORT_JSON }}
+            ${{ env.REPORT_MD }}
+          if-no-files-found: error
+          retention-days: 90
+
+      - name: Persist deterministic evidence issue
+        if: always() && github.event_name != 'pull_request'
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -f "$REPORT_MD"
+          {
+            echo '<!-- szl-hf-model-evidence-audit -->'
+            echo '# Hugging Face model evidence gate'
+            echo
+            echo "- Run: ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
+            echo "- Source revision: \`${GITHUB_SHA}\`"
+            echo
+            cat "$REPORT_MD"
+          } > /tmp/hf-model-evidence-issue.md
+
+          issue_number="$(gh issue list --repo "$GITHUB_REPOSITORY" --state all \
+            --search "${REPORT_ISSUE_TITLE} in:title" --json number,title \
+            --jq ".[] | select(.title == env.REPORT_ISSUE_TITLE) | .number" | head -n1)"
+          if [ -n "$issue_number" ]; then
+            gh issue edit "$issue_number" --repo "$GITHUB_REPOSITORY" \
+              --body-file /tmp/hf-model-evidence-issue.md
+          else
+            gh issue create --repo "$GITHUB_REPOSITORY" \
+              --title "$REPORT_ISSUE_TITLE" \
+              --body-file /tmp/hf-model-evidence-issue.md >/dev/null
+            issue_number="$(gh issue list --repo "$GITHUB_REPOSITORY" --state all \
+              --search "${REPORT_ISSUE_TITLE} in:title" --json number,title \
+              --jq ".[] | select(.title == env.REPORT_ISSUE_TITLE) | .number" | head -n1)"
+          fi
+
+          if [ "${{ steps.audit.outputs.exit_code }}" = "0" ]; then
+            gh issue close "$issue_number" --repo "$GITHUB_REPOSITORY" \
+              --reason completed \
+              --comment 'All public weighted artifacts expose structured evaluation metadata and no enforced unsafe or unbound-claim finding remains.' || true
+          else
+            gh issue reopen "$issue_number" --repo "$GITHUB_REPOSITORY" || true
+          fi
+
+      - name: Enforce completed evidence result
+        if: always() && github.event_name != 'pull_request'
+        env:
+          EXIT_CODE: ${{ steps.audit.outputs.exit_code }}
+        run: |
+          code="${EXIT_CODE:-2}"
+          if [ "$code" -ne 0 ]; then
+            echo "::error::HF model evidence audit is incomplete or has enforced findings."
+            exit "$code"
+          fi
+          echo 'Weighted artifacts have structured evidence and no enforced unsafe finding.'
