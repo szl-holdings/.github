@@ -4,7 +4,7 @@ name: Reusable — Anatomy-map Drift Check
 # The KEEP-6 architecture treats SZLHOLDINGS/anatomy as intentionally folded,
 # paused, and private. This reusable workflow therefore reads only public
 # GitHub source surfaces and the a-11-oy.com product-origin rendering. It has no
-# Hugging Face secret contract and callers must not use `secrets: inherit`.
+# Hugging Face secret contract and callers pass no provider secrets.
 
 on:
   workflow_call:
