@@ -1532,18 +1532,39 @@ def _lambda_definition_is_plain_inert(expression: ast.Lambda) -> bool:
     )
 
 
+def _eager_expression_children(node: ast.AST) -> tuple[ast.AST, ...]:
+    """Return only child nodes that Python may evaluate for this expression."""
+    if isinstance(node, ast.GeneratorExp):
+        return (node.generators[0].iter,) if node.generators else ()
+    if isinstance(node, ast.IfExp):
+        truth = _literal_truth_value(node.test)
+        if truth is True:
+            return (node.test, node.body)
+        if truth is False:
+            return (node.test, node.orelse)
+        return (node.test, node.body, node.orelse)
+    if isinstance(node, ast.BoolOp):
+        evaluated: list[ast.expr] = []
+        for value in node.values:
+            evaluated.append(value)
+            truth = _literal_truth_value(value)
+            if isinstance(node.op, ast.And) and truth is False:
+                break
+            if isinstance(node.op, ast.Or) and truth is True:
+                break
+        return tuple(evaluated)
+    return tuple(ast.iter_child_nodes(node))
+
+
 def _expression_has_eager_lambda_barrier(expression: ast.AST | None) -> bool:
     """Reject unsafe lambda creation or invocation in an eager expression."""
 
     def contains_eager_lambda(node: ast.AST) -> bool:
         if isinstance(node, ast.Lambda):
             return True
-        if isinstance(node, ast.GeneratorExp):
-            return bool(node.generators) and contains_eager_lambda(
-                node.generators[0].iter
-            )
         return any(
-            contains_eager_lambda(child) for child in ast.iter_child_nodes(node)
+            contains_eager_lambda(child)
+            for child in _eager_expression_children(node)
         )
 
     def visit_eager(node: ast.AST) -> bool:
@@ -1551,9 +1572,7 @@ def _expression_has_eager_lambda_barrier(expression: ast.AST | None) -> bool:
             return True
         if isinstance(node, ast.Lambda):
             return not _lambda_definition_is_plain_inert(node)
-        if isinstance(node, ast.GeneratorExp):
-            return bool(node.generators) and visit_eager(node.generators[0].iter)
-        return any(visit_eager(child) for child in ast.iter_child_nodes(node))
+        return any(visit_eager(child) for child in _eager_expression_children(node))
 
     return expression is not None and visit_eager(expression)
 
@@ -1653,7 +1672,7 @@ def _direct_top_level_calls(tree: ast.Module) -> list[ast.Call]:
     entering the context and executing its body are unconditional module work.
     """
     calls: list[ast.Call] = []
-    local_function_names: set[str] = set()
+    local_sync_function_names: set[str] = set()
 
     def collect(statements: list[ast.stmt]) -> bool:
         """Collect calls until control can no longer reach the next statement."""
@@ -1661,7 +1680,8 @@ def _direct_top_level_calls(tree: ast.Module) -> list[ast.Call]:
             if isinstance(statement, FUNCTION_DEFINITION_TYPES):
                 if not _function_definition_is_plain_inert(statement):
                     return False
-                local_function_names.add(statement.name)
+                if isinstance(statement, ast.FunctionDef):
+                    local_sync_function_names.add(statement.name)
                 continue
             if isinstance(statement, ast.ClassDef):
                 return False
@@ -1690,7 +1710,7 @@ def _direct_top_level_calls(tree: ast.Module) -> list[ast.Call]:
                     return False
                 if (
                     isinstance(expression.func, ast.Name)
-                    and expression.func.id in local_function_names
+                    and expression.func.id in local_sync_function_names
                 ):
                     return False
                 calls.append(expression)
