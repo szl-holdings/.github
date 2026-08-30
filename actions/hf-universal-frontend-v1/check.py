@@ -1582,6 +1582,14 @@ def _statement_eager_expressions(statement: ast.stmt) -> list[ast.expr]:
     type_alias = getattr(ast, "TypeAlias", None)
     if type_alias is not None and isinstance(statement, type_alias):
         return []
+    if isinstance(statement, ast.Assert):
+        expressions = [statement.test]
+        if (
+            statement.msg is not None
+            and _literal_truth_value(statement.test) is not True
+        ):
+            expressions.append(statement.msg)
+        return expressions
 
     expressions: list[ast.expr] = []
 
@@ -1694,6 +1702,11 @@ def _direct_top_level_calls(tree: ast.Module) -> list[ast.Call]:
                 and _literal_truth_value(statement.test) is False
             ):
                 return False
+            if any(
+                _expression_has_eager_lambda_barrier(expression)
+                for expression in _statement_eager_expressions(statement)
+            ):
+                return False
             expression: ast.AST | None = None
             if isinstance(statement, ast.Expr):
                 expression = statement.value
@@ -1701,8 +1714,6 @@ def _direct_top_level_calls(tree: ast.Module) -> list[ast.Call]:
                 expression = statement.value
             elif isinstance(statement, ast.AnnAssign):
                 expression = statement.value
-            if _expression_has_eager_lambda_barrier(expression):
-                return False
             if isinstance(expression, ast.Lambda):
                 continue
             if isinstance(expression, ast.Call):

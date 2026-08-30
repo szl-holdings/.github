@@ -690,6 +690,15 @@ async def helper():
     pass""",
         """class Helper:
     raise RuntimeError("stop")""",
+        "assert (lambda value=explode(): value)",
+        """value = 0
+value += (lambda value=explode(): value)""",
+        """values = {}
+del values[(lambda value=explode(): value)]""",
+        """with (lambda value=explode(): value):
+    pass""",
+        """runtime_condition = False
+assert runtime_condition, (lambda value=explode(): value)""",
         "helper = lambda value=explode(): value",
         "helper = (lambda value=explode(): value,)",
         "helper = [lambda value=explode(): value]",
@@ -722,6 +731,11 @@ pending = helper(lambda value=explode(): value)""",
         "async-parameter-annotation",
         "async-return-annotation",
         "class-body",
+        "assert-test-lambda-default",
+        "augassign-lambda-default",
+        "delete-lambda-default",
+        "with-context-lambda-default",
+        "assert-unknown-message-lambda-default",
         "lambda-default",
         "tuple-lambda-default",
         "list-lambda-default",
@@ -791,6 +805,9 @@ css = Path("assets/universal.css").read_text(encoding="utf-8")
     (lambda: explode())""",
         """if False:
     (lambda value=explode(): value)""",
+        "assert True, (lambda value=explode(): value)",
+        """if True:
+    assert True, (lambda value=explode(): value)""",
         "helper = (lambda value=explode(): value) if False else None",
         "helper = False and (lambda value=explode(): value)",
         "helper = True or (lambda value=explode(): value)",
@@ -803,6 +820,8 @@ pending = helper()""",
         "lazy-generator-element-default",
         "branch-lazy-lambda-body",
         "untaken-branch-lambda-default",
+        "assert-true-skips-message",
+        "branch-assert-true-skips-message",
         "untaken-conditional-lambda-default",
         "false-and-lambda-default",
         "true-or-lambda-default",
