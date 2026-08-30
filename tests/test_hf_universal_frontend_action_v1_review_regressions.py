@@ -876,6 +876,85 @@ st.markdown(f"<style>{css}</style>", unsafe_allow_html=True)
     )
 
 
+@pytest.mark.parametrize(
+    ("framework", "framework_import", "binding_context"),
+    [
+        (
+            "streamlit",
+            "import streamlit as st",
+            'st.markdown(f"<style>{css}</style>", unsafe_allow_html=True)',
+        ),
+        (
+            "gradio",
+            "import gradio as ui",
+            "ui.Blocks(css=css)",
+        ),
+    ],
+)
+def test_with_binding_before_later_barrier_preserves_guaranteed_call(
+    framework: str,
+    framework_import: str,
+    binding_context: str,
+) -> None:
+    app_text = f"""\
+# SZL_HF_UNIVERSAL_FRONTEND_V1
+from pathlib import Path
+{framework_import}
+
+css = Path("assets/universal.css").read_text(encoding="utf-8")
+
+with {binding_context}, (lambda value=explode(): value):
+    pass
+"""
+
+    CHECKER.validate_framework_binding(
+        framework,
+        app_text,
+        app_file="app.py",
+        css_file="assets/universal.css",
+    )
+
+
+@pytest.mark.parametrize(
+    ("framework", "framework_import", "binding_context"),
+    [
+        (
+            "streamlit",
+            "import streamlit as st",
+            'st.markdown(f"<style>{css}</style>", unsafe_allow_html=True)',
+        ),
+        (
+            "gradio",
+            "import gradio as ui",
+            "ui.Blocks(css=css)",
+        ),
+    ],
+)
+def test_with_barrier_before_binding_rejects_unreachable_call(
+    framework: str,
+    framework_import: str,
+    binding_context: str,
+) -> None:
+    app_text = f"""\
+# SZL_HF_UNIVERSAL_FRONTEND_V1
+from pathlib import Path
+{framework_import}
+
+css = Path("assets/universal.css").read_text(encoding="utf-8")
+
+with (lambda value=explode(): value), {binding_context}:
+    pass
+"""
+
+    with pytest.raises(CHECKER.ContractError):
+        CHECKER.validate_framework_binding(
+            framework,
+            app_text,
+            app_file="app.py",
+            css_file="assets/universal.css",
+        )
+
+
 def test_lazy_generic_bound_before_binding_is_inert() -> None:
     app_text = """\
 # SZL_HF_UNIVERSAL_FRONTEND_V1

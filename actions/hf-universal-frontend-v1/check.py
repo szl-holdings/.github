@@ -1702,6 +1702,15 @@ def _direct_top_level_calls(tree: ast.Module) -> list[ast.Call]:
                 and _literal_truth_value(statement.test) is False
             ):
                 return False
+            if isinstance(statement, (ast.With, ast.AsyncWith)):
+                for item in statement.items:
+                    if _expression_has_eager_lambda_barrier(item.context_expr):
+                        return False
+                    if isinstance(item.context_expr, ast.Call):
+                        calls.append(item.context_expr)
+                if not collect(statement.body):
+                    return False
+                continue
             if any(
                 _expression_has_eager_lambda_barrier(expression)
                 for expression in _statement_eager_expressions(statement)
@@ -1726,15 +1735,7 @@ def _direct_top_level_calls(tree: ast.Module) -> list[ast.Call]:
                     return False
                 calls.append(expression)
                 continue
-            if isinstance(statement, (ast.With, ast.AsyncWith)):
-                calls.extend(
-                    item.context_expr
-                    for item in statement.items
-                    if isinstance(item.context_expr, ast.Call)
-                )
-                if not collect(statement.body):
-                    return False
-                continue
+
             if isinstance(
                 statement,
                 (ast.If,) + TRY_STATEMENT_TYPES,
