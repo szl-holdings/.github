@@ -1,12 +1,11 @@
 {
-  "schema": 1,
-  "_comment": "Registry of the surfaces that carry the single honest SZL Anatomy map. The scheduled sweep (workflows/anatomy-map-drift.yml -> scripts/anatomy_map_drift.py) fetches each surface and asserts the SAME honesty doctrine on all of them: the locked-proven ladder is EXACTLY the canonical_locked 8 {F1,F4,F7,F11,F12,F18,F19,F22}, and the Λ=Conjecture-1 label is present. The two surfaces that embed the byte-shared marker block (extract=marker_block: a11oy + killinchu) are additionally compared capability-for-capability so a one-sided edit to the capability/formula ladder is caught even when the locked-8 + Λ invariants still hold. The remaining surfaces are different renderings (extract=invariant_scan), so only the locked-8 + Λ invariants are asserted there. The full publish chain is now guarded end to end: the GitHub SOURCE deck (anatomy-src) -> the HF Space rendering (hf-anatomy) -> the live public site (a11oy-anatomy-mirror, kind=url, which serves its OWN built bundle and can drift via a stale nginx/CDN build even when both repos agree). Add a new surface by appending here -- no per-surface code (kinds: github | hf_space | url). Add a per-surface \"ref\" only if it tracks a non-main branch.",
+  "schema": 2,
+  "_comment": "Active Anatomy-map evidence registry after the KEEP-6 public-cut decision. The SZLHOLDINGS/anatomy Hugging Face Space is intentionally folded, paused, and private; it is not an active public source and must never require a bearer token in CI. The active contract compares the two byte-shared source blocks (a11oy and killinchu), the canonical GitHub source deck, and the product-origin rendering at a-11-oy.com. Every surface must preserve exactly the canonical locked-8 {F1,F4,F7,F11,F12,F18,F19,F22} and the Lambda=Conjecture-1 honesty label. Marker-block sources are additionally compared capability-for-capability. Add an active surface only when it is independently reachable without credentials and belongs to the current product architecture (kinds: github | url).",
   "canonical_locked": ["F1", "F4", "F7", "F11", "F12", "F18", "F19", "F22"],
   "surfaces": [
-    { "id": "a11oy-console",       "kind": "github",   "repo": "szl-holdings/a11oy",     "path": "pages/console.html",          "extract": "marker_block" },
-    { "id": "killinchu-elite",     "kind": "github",   "repo": "szl-holdings/killinchu", "path": "killinchu_elite_console.py",  "extract": "marker_block" },
-    { "id": "anatomy-src",         "kind": "github",   "repo": "szl-holdings/anatomy",   "paths": ["data.js", "index.html"],    "extract": "invariant_scan" },
-    { "id": "hf-anatomy",          "kind": "hf_space", "repo": "SZLHOLDINGS/anatomy",    "paths": ["data.js", "index.html"],    "extract": "invariant_scan" },
-    { "id": "a11oy-anatomy-mirror", "kind": "url",     "urls": ["https://a-11-oy.com/anatomy-map/data.js"], "extract": "invariant_scan" }
+    { "id": "a11oy-console",         "kind": "github", "repo": "szl-holdings/a11oy",     "path": "pages/console.html",         "extract": "marker_block" },
+    { "id": "killinchu-elite",       "kind": "github", "repo": "szl-holdings/killinchu", "path": "killinchu_elite_console.py", "extract": "marker_block" },
+    { "id": "anatomy-src",           "kind": "github", "repo": "szl-holdings/anatomy",   "paths": ["data.js", "index.html"],   "extract": "invariant_scan" },
+    { "id": "a11oy-anatomy-product", "kind": "url",    "urls": ["https://a-11-oy.com/anatomy-map/data.js"], "extract": "invariant_scan" }
   ]
 }

@@ -1,47 +1,19 @@
 name: Reusable — Anatomy-map Drift Check
 
-# Push-time honesty gate for the single SZL Anatomy map. The map is shipped on
-# THREE independently-edited surfaces -- the a11oy /console tab (szl-holdings/a11oy
-# pages/console.html), the killinchu /elite tab (szl-holdings/killinchu
-# killinchu_elite_console.py) and the standalone HF static Space
-# (SZLHOLDINGS/anatomy) -- so the honesty doctrine can silently DRIFT between
-# them. The org-wide sweep (workflows/anatomy-map-drift.yml) already runs weekly
-# and on pushes to szl-holdings/.github itself, but an edit made directly in the
-# a11oy or killinchu repo could otherwise sit undetected for up to a week.
-#
-# A consuming repo wires this into its own CI so an edit to its anatomy block is
-# validated IMMEDIATELY against the canonical locked-8 ladder
-# {F1,F4,F7,F11,F12,F18,F19,F22} and the Λ=Conjecture-1 honesty label (plus, for
-# the two marker-block surfaces, a capability-for-capability comparison). The
-# checker (scripts/anatomy_map_drift.py) + registry live ONCE in
-# szl-holdings/.github, so a fix to the guard reaches every surface at once. The
-# central weekly sweep stays as the cross-surface backstop. This wrapper is
-# read-only: unlike the central sweep it never commits the refreshed report and
-# never pushes ntfy -- the red check is the signal (mirrors
-# reusable-overclaim-guard.yml).
-#
-# Wire it up from a consuming repo:
-#   jobs:
-#     anatomy-map-drift:
-#       uses: szl-holdings/.github/.github/workflows/reusable-anatomy-map-drift.yml@main
-#       secrets: inherit   # optional: passes SZL_GITHUB_TOKEN if the org defines it
-#
-# The check reads only PUBLIC same-org repos + the public HF Space, so the
-# caller's built-in github.token is sufficient; SZL_GITHUB_TOKEN is a fallback
-# for a future private surface.
+# Push-time guard for repositories that carry an active Anatomy source block.
+# The KEEP-6 architecture treats SZLHOLDINGS/anatomy as intentionally folded,
+# paused, and private. This reusable workflow therefore reads only public
+# GitHub source surfaces and the a-11-oy.com product-origin rendering. It has no
+# Hugging Face secret contract and callers pass no provider secrets.
 
 on:
   workflow_call:
     inputs:
       checker-ref:
-        description: "Ref of szl-holdings/.github to take the shared checker + registry from."
+        description: "Immutable ref of szl-holdings/.github containing this checker and registry."
         required: false
         type: string
         default: "main"
-    secrets:
-      SZL_GITHUB_TOKEN:
-        description: "Optional PAT fallback for reading a (future) private surface."
-        required: false
 
 permissions:
   contents: read
@@ -52,7 +24,7 @@ concurrency:
 
 jobs:
   anatomy-map-drift:
-    name: Anatomy map honest & in sync (locked-8 + Λ=Conjecture-1)
+    name: Anatomy map honest and in sync (locked-8 + Lambda=Conjecture-1)
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -61,7 +33,7 @@ jobs:
         with:
           egress-policy: audit
 
-      - name: Checkout szl-holdings/.github (shared checker + registry)
+      - name: Checkout shared checker and registry
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           repository: szl-holdings/.github
@@ -72,24 +44,20 @@ jobs:
         with:
           python-version: "3.12"
 
-      - name: Self-test the drift guard (negative fixtures)
-        # Proves the guard actually FAILS when a surface is mutated, so a future
-        # weakening can't turn it into a silent always-green no-op.
-        run: python3 .github/scripts/test_anatomy_map_drift.py
+      - name: Self-test drift and architecture contracts
+        run: |
+          python3 .github/scripts/test_anatomy_map_drift.py
+          python3 .github/scripts/test_anatomy_product_contract.py
 
-      - name: Compare the anatomy map across all surfaces
+      - name: Compare active Anatomy surfaces
         env:
           GITHUB_TOKEN: ${{ github.token }}
-          SZL_GITHUB_TOKEN: ${{ secrets.SZL_GITHUB_TOKEN }}
         run: |
           set +e
           EXTRA=""
           if [ "${{ github.event_name }}" = "pull_request" ]; then
-            # PR merge gate: validate the PROPOSED content of the calling repo
-            # (its PR-head SHA) against the other GitHub/HF source surfaces.
-            # Skip kind=url so a transient live-CDN/nginx blip can't block an
-            # unrelated PR -- the scheduled sweep + the HF/mirror watcher still
-            # cover the live mirror.
+            # Validate the calling repository's proposed head while excluding
+            # the independently deployed product URL from the PR merge gate.
             EXTRA="--skip-kind url --ref-override ${{ github.repository }}=${{ github.event.pull_request.head.sha }}"
           fi
           python3 .github/scripts/anatomy_map_drift.py $EXTRA \
@@ -103,27 +71,20 @@ jobs:
           name: anatomy-map-drift-report
           path: anatomy_map_report.out.json
           if-no-files-found: ignore
+          retention-days: 14
 
-      - name: Fail if anatomy-map drift or the check could not run
+      - name: Enforce result
         run: |
           case "${CHECK_EXIT:-2}" in
             0)
-              echo "✓ The SZL anatomy map is identical across all three surfaces."
+              echo "Active Anatomy sources are honest and in sync."
               ;;
             1)
-              echo "::error::Anatomy-map drift detected -- see the step output and"
-              echo "::error::the uploaded anatomy_map_report.out.json artifact. Re-sync"
-              echo "::error::the locked-8 ladder {F1,F4,F7,F11,F12,F18,F19,F22}, the"
-              echo "::error::Λ=Conjecture-1 label and the capability ladder across a11oy"
-              echo "::error::/console, killinchu /elite and the SZLHOLDINGS/anatomy HF Space."
+              echo "::error::Anatomy-map drift detected; inspect the uploaded report."
               exit 1
               ;;
             *)
-              echo "::error::Could not complete the anatomy-map drift check"
-              echo "::error::(a surface failed to fetch -- network/auth). Set the"
-              echo "::error::SZL_GITHUB_TOKEN secret if a surface repo is private."
-              echo "::error::Failed (not passed) so coverage can never look green when"
-              echo "::error::the check could not actually run."
+              echo "::error::An active Anatomy source could not be fetched or validated."
               exit 1
               ;;
           esac
