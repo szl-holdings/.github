@@ -1711,6 +1711,37 @@ def _direct_top_level_calls(tree: ast.Module) -> list[ast.Call]:
                 if not collect(statement.body):
                     return False
                 continue
+            if isinstance(statement, (ast.Assign, ast.AnnAssign)):
+                expression = statement.value
+                if _expression_has_eager_lambda_barrier(expression):
+                    return False
+                if isinstance(expression, ast.Call):
+                    if isinstance(expression.func, ast.Lambda):
+                        return False
+                    if (
+                        isinstance(expression.func, ast.Name)
+                        and expression.func.id in local_sync_function_names
+                    ):
+                        return False
+                    calls.append(expression)
+                targets = (
+                    statement.targets
+                    if isinstance(statement, ast.Assign)
+                    else [statement.target]
+                )
+                if any(
+                    _expression_has_eager_lambda_barrier(target)
+                    for target in targets
+                ):
+                    return False
+                if (
+                    isinstance(statement, ast.AnnAssign)
+                    and _expression_has_eager_lambda_barrier(
+                        statement.annotation
+                    )
+                ):
+                    return False
+                continue
             if any(
                 _expression_has_eager_lambda_barrier(expression)
                 for expression in _statement_eager_expressions(statement)
@@ -1718,10 +1749,6 @@ def _direct_top_level_calls(tree: ast.Module) -> list[ast.Call]:
                 return False
             expression: ast.AST | None = None
             if isinstance(statement, ast.Expr):
-                expression = statement.value
-            elif isinstance(statement, ast.Assign):
-                expression = statement.value
-            elif isinstance(statement, ast.AnnAssign):
                 expression = statement.value
             if isinstance(expression, ast.Lambda):
                 continue

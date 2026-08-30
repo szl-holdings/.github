@@ -955,6 +955,95 @@ with (lambda value=explode(): value), {binding_context}:
         )
 
 
+@pytest.mark.parametrize(
+    ("framework", "framework_import", "binding_expression"),
+    [
+        (
+            "streamlit",
+            "import streamlit as st",
+            'st.markdown(f"<style>{css}</style>", unsafe_allow_html=True)',
+        ),
+        (
+            "gradio",
+            "import gradio as ui",
+            "ui.Blocks(css=css)",
+        ),
+    ],
+)
+@pytest.mark.parametrize(
+    "assignment_template",
+    [
+        "targets[(lambda value=explode(): value)] = {binding}",
+        "bound: (lambda value=explode(): value) = {binding}",
+    ],
+    ids=["subscript-target", "annotation-after-rhs"],
+)
+def test_assignment_rhs_binding_before_later_barrier_is_preserved(
+    framework: str,
+    framework_import: str,
+    binding_expression: str,
+    assignment_template: str,
+) -> None:
+    assignment = assignment_template.format(binding=binding_expression)
+    app_text = f"""\
+# SZL_HF_UNIVERSAL_FRONTEND_V1
+from pathlib import Path
+{framework_import}
+
+css = Path("assets/universal.css").read_text(encoding="utf-8")
+targets = {{}}
+
+{assignment}
+"""
+
+    CHECKER.validate_framework_binding(
+        framework,
+        app_text,
+        app_file="app.py",
+        css_file="assets/universal.css",
+    )
+
+
+@pytest.mark.parametrize(
+    ("framework", "framework_import", "binding_expression"),
+    [
+        (
+            "streamlit",
+            "import streamlit as st",
+            'st.markdown(f"<style>{css}</style>", unsafe_allow_html=True)',
+        ),
+        (
+            "gradio",
+            "import gradio as ui",
+            "ui.Blocks(css=css)",
+        ),
+    ],
+)
+def test_augmented_assignment_target_barrier_blocks_rhs_binding(
+    framework: str,
+    framework_import: str,
+    binding_expression: str,
+) -> None:
+    app_text = f"""\
+# SZL_HF_UNIVERSAL_FRONTEND_V1
+from pathlib import Path
+{framework_import}
+
+css = Path("assets/universal.css").read_text(encoding="utf-8")
+targets = {{0: 1}}
+
+targets[(lambda value=explode(): value)] += {binding_expression}
+"""
+
+    with pytest.raises(CHECKER.ContractError):
+        CHECKER.validate_framework_binding(
+            framework,
+            app_text,
+            app_file="app.py",
+            css_file="assets/universal.css",
+        )
+
+
 def test_lazy_generic_bound_before_binding_is_inert() -> None:
     app_text = """\
 # SZL_HF_UNIVERSAL_FRONTEND_V1
