@@ -1532,12 +1532,23 @@ def _lambda_definition_is_plain_inert(expression: ast.Lambda) -> bool:
     )
 
 
-def _expression_has_eager_lambda_definition_barrier(
-    expression: ast.AST | None,
-) -> bool:
-    """Reject non-plain lambdas created while an expression is evaluated."""
+def _expression_has_eager_lambda_barrier(expression: ast.AST | None) -> bool:
+    """Reject unsafe lambda creation or invocation in an eager expression."""
+
+    def contains_eager_lambda(node: ast.AST) -> bool:
+        if isinstance(node, ast.Lambda):
+            return True
+        if isinstance(node, ast.GeneratorExp):
+            return bool(node.generators) and contains_eager_lambda(
+                node.generators[0].iter
+            )
+        return any(
+            contains_eager_lambda(child) for child in ast.iter_child_nodes(node)
+        )
 
     def visit_eager(node: ast.AST) -> bool:
+        if isinstance(node, ast.Call) and contains_eager_lambda(node.func):
+            return True
         if isinstance(node, ast.Lambda):
             return not _lambda_definition_is_plain_inert(node)
         if isinstance(node, ast.GeneratorExp):
@@ -1545,6 +1556,33 @@ def _expression_has_eager_lambda_definition_barrier(
         return any(visit_eager(child) for child in ast.iter_child_nodes(node))
 
     return expression is not None and visit_eager(expression)
+
+
+def _statement_eager_expressions(statement: ast.stmt) -> list[ast.expr]:
+    """Return expressions evaluated directly by a statement, excluding bodies."""
+    type_alias = getattr(ast, "TypeAlias", None)
+    if type_alias is not None and isinstance(statement, type_alias):
+        return []
+
+    expressions: list[ast.expr] = []
+
+    def collect(value: object) -> None:
+        if isinstance(value, ast.expr):
+            expressions.append(value)
+            return
+        if isinstance(value, ast.stmt):
+            return
+        if isinstance(value, ast.AST):
+            for _, child in ast.iter_fields(value):
+                collect(child)
+            return
+        if isinstance(value, (list, tuple)):
+            for child in value:
+                collect(child)
+
+    for _, value in ast.iter_fields(statement):
+        collect(value)
+    return expressions
 
 
 def _try_statement_falls_through(statement: ast.Try) -> bool:
@@ -1564,12 +1602,10 @@ def _statements_fall_through(statements: list[ast.stmt]) -> bool:
             continue
         if isinstance(statement, ast.ClassDef):
             return False
-        lambda_expression: ast.AST | None = None
-        if isinstance(statement, ast.Assign):
-            lambda_expression = statement.value
-        elif isinstance(statement, ast.AnnAssign):
-            lambda_expression = statement.value
-        if _expression_has_eager_lambda_definition_barrier(lambda_expression):
+        if any(
+            _expression_has_eager_lambda_barrier(expression)
+            for expression in _statement_eager_expressions(statement)
+        ):
             return False
         if isinstance(statement, (ast.Raise, ast.Return, ast.Break, ast.Continue)):
             return False
@@ -1645,7 +1681,7 @@ def _direct_top_level_calls(tree: ast.Module) -> list[ast.Call]:
                 expression = statement.value
             elif isinstance(statement, ast.AnnAssign):
                 expression = statement.value
-            if _expression_has_eager_lambda_definition_barrier(expression):
+            if _expression_has_eager_lambda_barrier(expression):
                 return False
             if isinstance(expression, ast.Lambda):
                 continue

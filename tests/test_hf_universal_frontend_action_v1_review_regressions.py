@@ -697,6 +697,12 @@ async def helper():
         "helper = (lambda value=explode(): value) if choose else None",
         "helper = (nested := (lambda value=explode(): value))",
         "helper = (value for value in (lambda value=explode(): value,))",
+        "helper = ((lambda: explode())(),)",
+        "helper = ((nested := (lambda: explode()))(),)",
+        """if True:
+    (lambda value=explode(): value)""",
+        """if True:
+    (lambda: explode())()""",
     ],
     ids=[
         "sync-decorator",
@@ -717,6 +723,10 @@ async def helper():
         "conditional-lambda-default",
         "named-expression-lambda-default",
         "generator-outer-iter-lambda-default",
+        "tuple-direct-lambda-call",
+        "named-expression-direct-lambda-call",
+        "branch-lambda-default-expression",
+        "branch-direct-lambda-call",
     ],
 )
 def test_definition_time_execution_before_binding_fails_closed(
@@ -767,8 +777,17 @@ css = Path("assets/universal.css").read_text(encoding="utf-8")
     [
         "helper = (lambda: explode(),)",
         "helper = ((lambda value=explode(): value) for _ in ())",
+        """if True:
+    (lambda: explode())""",
+        """if False:
+    (lambda value=explode(): value)""",
     ],
-    ids=["tuple-lazy-lambda-body", "lazy-generator-element-default"],
+    ids=[
+        "tuple-lazy-lambda-body",
+        "lazy-generator-element-default",
+        "branch-lazy-lambda-body",
+        "untaken-branch-lambda-default",
+    ],
 )
 def test_lazy_nested_lambda_execution_before_binding_is_inert(
     framework: str,
