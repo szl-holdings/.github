@@ -43,7 +43,7 @@ jobs:
           source = implementation.read_text(encoding='utf-8')
 
           method_anchor = '''    def _read_main_files(self, repo_id: str, expected_revision: str) -> dict[str, bytes]:
-'''
+          '''
           method = '''    @staticmethod
     def _commit_message_args(generation: str) -> list[str]:
         subject = f"release(card): publish reviewed Kernel contract {generation[:12]}"
@@ -53,7 +53,7 @@ jobs:
             raise KernelGitError("Kernel publication commit messages must be non-empty")
         return ["commit", "-q", "-m", subject, "-m", body]
 
-'''
+          '''
           if source.count(method_anchor) != 1:
               raise SystemExit('kernel helper insertion anchor is not exact')
           source = source.replace(method_anchor, method + method_anchor, 1)
@@ -70,10 +70,10 @@ jobs:
                         cwd=repo,
                         env=env,
                     )
-'''
+          '''
           new_call = '''                    commit_args = self._commit_message_args(generation)
                     self._git(commit_args, cwd=repo, env=env)
-'''
+          '''
           if source.count(old_call) != 1:
               raise SystemExit('kernel commit invocation is not exact')
           source = source.replace(old_call, new_call, 1)
@@ -82,7 +82,7 @@ jobs:
           tests = Path('.github/scripts/test_kernel_hub_git.py')
           test_source = tests.read_text(encoding='utf-8')
           test_anchor = '''    def test_card_contract_publication_preserves_complete_build_tree(self) -> None:
-'''
+          '''
           test_method = '''    def test_commit_message_args_have_two_non_empty_messages(self) -> None:
         args = self.transport._commit_message_args("b" * 40)
         self.assertEqual(args[:2], ["commit", "-q"])
@@ -94,7 +94,7 @@ jobs:
             self.assertTrue(args[index + 1].strip())
         self.assertEqual(args[-1], "Card/contract-only update; first-class build variants are preserved.")
 
-'''
+          '''
           if test_source.count(test_anchor) != 1:
               raise SystemExit('kernel test insertion anchor is not exact')
           test_source = test_source.replace(test_anchor, test_method + test_anchor, 1)
