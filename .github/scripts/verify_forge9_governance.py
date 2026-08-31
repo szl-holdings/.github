@@ -461,9 +461,15 @@ def verify_gate_contract() -> None:
         "github.workflow_sha",
         "source_workflow_blob",
         "protected_workflow_blob",
+        ".github/workflows/dco.yml@refs/heads/$EXPECTED_BASE_REF",
         "--paginate --slurp",
         'startswith(".github/workflows/")',
         "merge_base_commit.sha == $base",
+        "TRIGGER_BASE_REF: ${{ github.event.pull_request.base.ref }}",
+        "TRIGGER_BASE_SHA: ${{ github.event.pull_request.base.sha }}",
+        'if [[ "$base_ref" != "$TRIGGER_BASE_REF" \\',
+        '|| "$base_sha" != "$TRIGGER_BASE_SHA" ]]; then',
+        'description="Surviving PR base differs from trigger base"',
         "legacy-dco-compatibility:",
         "name: DCO sign-off check",
         "needs: merge-group-provenance",
@@ -497,6 +503,10 @@ def verify_gate_contract() -> None:
             fail(f"native provenance workflow contains forbidden {forbidden!r}")
     if dco_template.count("statuses: write") != 2:
         fail("only pull-request provenance and reconciliation may write statuses")
+    if dco_template.count("candidate_workflows") != 4:
+        fail("initial and reconciled PR evidence must both reject workflow edits")
+    if '.github/workflows/dco.yml@refs/heads/main"' in dco_template:
+        fail("protected PR provenance must bind workflow source to the target base")
     merge_group_job = dco_template.split("  merge-group-provenance:\n", 1)[1].split(
         "  legacy-dco-compatibility:\n", 1
     )[0]
