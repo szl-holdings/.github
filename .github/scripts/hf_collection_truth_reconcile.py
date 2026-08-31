@@ -24,7 +24,7 @@ from typing import Any
 
 
 ORG = "SZLHOLDINGS"
-START_TITLE = "Start Here — Alloy Estate"
+START_TITLE = "Start Here"
 TRAINED_TITLE = "Trained Models & Weights"
 NEMO_REPO = "SZLHOLDINGS/szl-nemo"
 START_DESCRIPTION = (
