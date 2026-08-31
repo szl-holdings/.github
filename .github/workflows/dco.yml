@@ -58,21 +58,27 @@ jobs:
           ACTUAL_WORKFLOW_REF: ${{ github.workflow_ref }}
           ACTUAL_WORKFLOW_SHA: ${{ github.workflow_sha }}
           EXPECTED_PR_NUMBER: ${{ github.event.pull_request.number }}
+          EXPECTED_BASE_REF: ${{ github.event.pull_request.base.ref }}
+          EXPECTED_BASE_SHA: ${{ github.event.pull_request.base.sha }}
           EXPECTED_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
         run: |
           set -euo pipefail
           [[ "$ACTUAL_WORKFLOW_SHA" =~ ^[0-9a-f]{40}$ ]]
           [[ "$EXPECTED_PR_NUMBER" =~ ^[1-9][0-9]*$ ]]
+          [[ "$EXPECTED_BASE_SHA" =~ ^[0-9a-f]{40}$ ]]
           [[ "$EXPECTED_HEAD_SHA" =~ ^[0-9a-f]{40}$ ]]
+          [[ "$EXPECTED_BASE_REF" == "main" \
+            || "$EXPECTED_BASE_REF" =~ ^release/[^/]+$ ]]
           repository_json="$(gh api "repos/$GITHUB_REPOSITORY")"
           default_branch="$(jq -er '.default_branch' <<<"$repository_json")"
           test "$default_branch" = "main"
           test "$ACTUAL_WORKFLOW_REF" = \
-            "$GITHUB_REPOSITORY/.github/workflows/dco.yml@refs/heads/$default_branch"
+            "$GITHUB_REPOSITORY/.github/workflows/dco.yml@refs/heads/$EXPECTED_BASE_REF"
           protected_sha="$(
-            gh api "repos/$GITHUB_REPOSITORY/git/ref/heads/$default_branch" \
+            gh api "repos/$GITHUB_REPOSITORY/git/ref/heads/$EXPECTED_BASE_REF" \
               --jq '.object.sha'
           )"
+          test "$protected_sha" = "$EXPECTED_BASE_SHA"
           source_compare="$(
             gh api \
               "repos/$GITHUB_REPOSITORY/compare/$ACTUAL_WORKFLOW_SHA...$protected_sha"
@@ -414,15 +420,21 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           ACTUAL_WORKFLOW_REF: ${{ github.workflow_ref }}
           ACTUAL_WORKFLOW_SHA: ${{ github.workflow_sha }}
+          EXPECTED_BASE_REF: ${{ github.event.pull_request.base.ref }}
+          EXPECTED_BASE_SHA: ${{ github.event.pull_request.base.sha }}
         run: |
           set -euo pipefail
           [[ "$ACTUAL_WORKFLOW_SHA" =~ ^[0-9a-f]{40}$ ]]
+          [[ "$EXPECTED_BASE_SHA" =~ ^[0-9a-f]{40}$ ]]
+          [[ "$EXPECTED_BASE_REF" == "main" \
+            || "$EXPECTED_BASE_REF" =~ ^release/[^/]+$ ]]
           test "$ACTUAL_WORKFLOW_REF" = \
-            "$GITHUB_REPOSITORY/.github/workflows/dco.yml@refs/heads/main"
+            "$GITHUB_REPOSITORY/.github/workflows/dco.yml@refs/heads/$EXPECTED_BASE_REF"
           protected_sha="$(
-            gh api "repos/$GITHUB_REPOSITORY/git/ref/heads/main" \
+            gh api "repos/$GITHUB_REPOSITORY/git/ref/heads/$EXPECTED_BASE_REF" \
               --jq '.object.sha'
           )"
+          test "$protected_sha" = "$EXPECTED_BASE_SHA"
           source_compare="$(
             gh api \
               "repos/$GITHUB_REPOSITORY/compare/$ACTUAL_WORKFLOW_SHA...$protected_sha"
@@ -450,9 +462,14 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           AFFECTED_HEAD_SHA: ${{ github.event.action == 'synchronize' && github.event.before || github.event.pull_request.head.sha }}
+          TRIGGER_BASE_REF: ${{ github.event.pull_request.base.ref }}
+          TRIGGER_BASE_SHA: ${{ github.event.pull_request.base.sha }}
         run: |
           set -euo pipefail
           [[ "$AFFECTED_HEAD_SHA" =~ ^[0-9a-f]{40}$ ]]
+          [[ "$TRIGGER_BASE_SHA" =~ ^[0-9a-f]{40}$ ]]
+          [[ "$TRIGGER_BASE_REF" == "main" \
+            || "$TRIGGER_BASE_REF" =~ ^release/[^/]+$ ]]
           governed_prs="$(
             gh api --paginate --slurp \
               "repos/$GITHUB_REPOSITORY/pulls?state=open&per_page=100" \
@@ -490,6 +507,17 @@ jobs:
           head_sha="$(jq -r '.[0].head.sha' <<<"$governed_prs")"
           head_repository="$(jq -r '.[0].head.repo.full_name' <<<"$governed_prs")"
           test "$head_sha" = "$AFFECTED_HEAD_SHA"
+          if [[ "$base_ref" != "$TRIGGER_BASE_REF" \
+            || "$base_sha" != "$TRIGGER_BASE_SHA" ]]; then
+            gh api --method POST \
+              "repos/$GITHUB_REPOSITORY/statuses/$head_sha" \
+              -f state="failure" \
+              -f context="DCO sign-off check" \
+              -f description="Surviving PR base differs from trigger base" \
+              -f target_url="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+            echo "published=true" >>"$GITHUB_OUTPUT"
+            exit 1
+          fi
           {
             echo "reconcile=true"
             echo "pr_number=$pr_number"
@@ -543,6 +571,20 @@ jobs:
               and .head.ref == $head_ref
               and .head.sha == $head_sha
             ' <<<"$current_pr" >/dev/null
+          declared_file_count="$(jq -er '.changed_files' <<<"$current_pr")"
+          candidate_files="$(
+            gh api --paginate --slurp \
+              "repos/$GITHUB_REPOSITORY/pulls/$EXPECTED_PR_NUMBER/files?per_page=100"
+          )"
+          listed_file_count="$(jq -er '[.[][]] | length' <<<"$candidate_files")"
+          test "$listed_file_count" -eq "$declared_file_count"
+          test "$listed_file_count" -le 3000
+          candidate_workflows="$(
+            jq -er \
+              '[.[][] | select(.filename | startswith(".github/workflows/"))] | length' \
+              <<<"$candidate_files"
+          )"
+          test "$candidate_workflows" -eq 0
           live_base_sha="$(
             gh api "repos/$GITHUB_REPOSITORY/git/ref/heads/$EXPECTED_BASE_REF" \
               --jq '.object.sha'
