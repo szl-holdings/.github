@@ -42,6 +42,22 @@ TERMINAL_BY_DESIGN = {
         "Archival preprint + reproducibility package. Immutable by design — "
         "a published record must not be superseded in place."
     ),
+    "szl-fleet-overlay": (
+        "Frozen WarHacker-2026 UDS fleet-overlay evidence snapshot. Retained "
+        "for provenance; it has no active software successor."
+    ),
+    "szl-otel-mesh": (
+        "Published OpenTelemetry/DSSE research artifact with DOI "
+        "10.5281/zenodo.20434276. Immutable archival evidence by design."
+    ),
+    "szl-uds-deployment": (
+        "Frozen WarHacker-2026 UDS deployment evidence snapshot. Retained for "
+        "reproducibility; it has no active software successor."
+    ),
+    "warhacker-demo": (
+        "One-off WarHacker-2026 hardware and air-gap dry-run snapshot. The "
+        "archived demonstration is retained as evidence, not a maintained product."
+    ),
 }
 
 
