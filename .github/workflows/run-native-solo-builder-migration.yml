@@ -37,7 +37,7 @@ jobs:
         shell: bash
         env:
           EXPECTED_BRANCH: chore/native-solo-builder-provenance-20260831
-          EXPECTED_PARENT_SHA: 7297f7d35f90c23f7ef231974729515426802640
+          EXPECTED_PARENT_SHA: cbd35f92a5be72e6abd0811f1bfa5de4c2e80055
         run: |
           set -euo pipefail
           test "$GITHUB_REF_NAME" = "$EXPECTED_BRANCH"
@@ -83,6 +83,13 @@ jobs:
           if normalized.count(old) != 1:
               raise SystemExit('regex helper source is not exact')
           normalized = normalized.replace(old, new, 1)
+
+          comment_old = "# never checked out or executed, and this workflow consumes no secrets."
+          comment_new = "# never checked out or executed, and uses only the ephemeral GitHub token."
+          if normalized.count(comment_old) != 1:
+              raise SystemExit('provenance safety comment is not exact')
+          normalized = normalized.replace(comment_old, comment_new, 1)
+
           target = Path('/tmp/apply_native_solo_builder_governance.py')
           target.write_text(normalized, encoding='utf-8')
           compile(target.read_text(encoding='utf-8'), str(target), 'exec')
