@@ -220,7 +220,7 @@ jobs:
               git -C "$work/repo" add -- README.md contract.json
               git -C "$work/repo" commit \
                 -m "release(card): publish reviewed kernel contract ${GITHUB_SHA:0:12}" \
-\g<line>
+                -m 'Card/contract-only update from protected GitHub source; existing build variants are preserved.'
               git -C "$work/repo" push origin HEAD:main
             fi
 
