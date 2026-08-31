@@ -28,6 +28,64 @@ class DcoActivationWorkflowTests(unittest.TestCase):
             encoding="utf-8"
         )
 
+    def step_block(self, workflow: str, start: str, end: str) -> str:
+        start_marker = f"      - name: {start}\n"
+        end_marker = f"      - name: {end}\n"
+        self.assertEqual(workflow.count(start_marker), 1)
+        block = workflow.split(start_marker, 1)[1]
+        self.assertIn(end_marker, block)
+        return block.split(end_marker, 1)[0]
+
+    def assert_source_is_bound_to_event_base(self, block: str) -> None:
+        for marker in (
+            "EXPECTED_BASE_REF: ${{ github.event.pull_request.base.ref }}",
+            "EXPECTED_BASE_SHA: ${{ github.event.pull_request.base.sha }}",
+            '[[ "$EXPECTED_BASE_REF" == "main" \\',
+            '|| "$EXPECTED_BASE_REF" =~ ^release/[^/]+$ ]]',
+            ".github/workflows/dco.yml@refs/heads/$EXPECTED_BASE_REF",
+            "git/ref/heads/$EXPECTED_BASE_REF",
+            'test "$protected_sha" = "$EXPECTED_BASE_SHA"',
+        ):
+            self.assertIn(marker, block)
+        self.assertNotIn('.github/workflows/dco.yml@refs/heads/main"', block)
+        self.assertNotIn("git/ref/heads/main", block)
+
+    def assert_candidate_workflow_guard(self, block: str) -> None:
+        markers = (
+            "declared_file_count=",
+            "pulls/$EXPECTED_PR_NUMBER/files?per_page=100",
+            "listed_file_count=",
+            'test "$listed_file_count" -eq "$declared_file_count"',
+            'test "$listed_file_count" -le 3000',
+            'startswith(".github/workflows/")',
+            'test "$candidate_workflows" -eq 0',
+        )
+        positions = []
+        for marker in markers:
+            self.assertIn(marker, block)
+            positions.append(block.index(marker))
+        self.assertEqual(positions, sorted(positions))
+
+    def assert_cross_base_reconciliation_fails_closed(self, block: str) -> None:
+        markers = (
+            "TRIGGER_BASE_REF: ${{ github.event.pull_request.base.ref }}",
+            "TRIGGER_BASE_SHA: ${{ github.event.pull_request.base.sha }}",
+            'if [[ "$base_ref" != "$TRIGGER_BASE_REF" \\',
+            '|| "$base_sha" != "$TRIGGER_BASE_SHA" ]]; then',
+            'description="Surviving PR base differs from trigger base"',
+            'echo "published=true" >>"$GITHUB_OUTPUT"',
+            "exit 1",
+        )
+        for marker in markers:
+            self.assertIn(marker, block)
+        self.assertLess(
+            block.index('if [[ "$base_ref" != "$TRIGGER_BASE_REF"'),
+            block.index('echo "reconcile=true"'),
+        )
+        guard_start = block.index('if [[ "$base_ref" != "$TRIGGER_BASE_REF"')
+        guard_end = block.index('echo "reconcile=true"')
+        self.assertIn("exit 1", block[guard_start:guard_end])
+
     def test_native_workflow_preserves_all_governed_event_gates(self) -> None:
         for marker in (
             "name: Solo-builder provenance compatibility",
@@ -59,6 +117,7 @@ class DcoActivationWorkflowTests(unittest.TestCase):
             "github.workflow_ref",
             "source_workflow_blob",
             "protected_workflow_blob",
+            ".github/workflows/dco.yml@refs/heads/$EXPECTED_BASE_REF",
             "--paginate --slurp",
             'startswith(".github/workflows/")',
             "git/ref/heads/$EXPECTED_BASE_REF",
@@ -72,6 +131,10 @@ class DcoActivationWorkflowTests(unittest.TestCase):
         ):
             self.assertIn(marker, self.native)
         self.assertEqual(self.native.count("statuses: write"), 2)
+        self.assertEqual(self.native.count("candidate_workflows"), 4)
+        self.assertNotIn(
+            '.github/workflows/dco.yml@refs/heads/main"', self.native
+        )
         merge_job = self.native.split("  merge-group-provenance:\n", 1)[1].split(
             "  legacy-dco-compatibility:\n", 1
         )[0]
@@ -91,6 +154,109 @@ class DcoActivationWorkflowTests(unittest.TestCase):
         self.assertNotIn("secrets.", self.native)
         self.assertNotIn("contents: write", self.native)
         self.assertNotIn("id-token:", self.native)
+
+    def test_pr_and_reconciliation_sources_follow_the_exact_target_base(self) -> None:
+        blocks = (
+            self.step_block(
+                self.native,
+                "Assert exact protected workflow source",
+                "Validate exact live pull-request provenance",
+            ),
+            self.step_block(
+                self.native,
+                "Assert exact protected reconciliation source",
+                "Resolve the surviving governed pull request",
+            ),
+        )
+        for block in blocks:
+            self.assert_source_is_bound_to_event_base(block)
+            mutations = (
+                block.replace(
+                    "EXPECTED_BASE_REF: ${{ github.event.pull_request.base.ref }}",
+                    "EXPECTED_BASE_REF: main",
+                    1,
+                ),
+                block.replace(
+                    "@refs/heads/$EXPECTED_BASE_REF",
+                    "@refs/heads/main",
+                    1,
+                ),
+                block.replace(
+                    "git/ref/heads/$EXPECTED_BASE_REF",
+                    "git/ref/heads/main",
+                    1,
+                ),
+                block.replace(
+                    'test "$protected_sha" = "$EXPECTED_BASE_SHA"',
+                    "true",
+                    1,
+                ),
+            )
+            for mutated in mutations:
+                with self.assertRaises(AssertionError):
+                    self.assert_source_is_bound_to_event_base(mutated)
+
+    def test_reconciliation_rechecks_candidate_files_and_rejects_cross_base(self) -> None:
+        revalidation = self.step_block(
+            self.native,
+            "Revalidate the surviving exact head",
+            "Publish successful reconciled compatibility status",
+        )
+        self.assert_candidate_workflow_guard(revalidation)
+        candidate_mutations = (
+            revalidation.replace(
+                'test "$listed_file_count" -eq "$declared_file_count"',
+                "true",
+                1,
+            ),
+            revalidation.replace(
+                'startswith(".github/workflows/")',
+                'startswith(".github/actions/")',
+                1,
+            ),
+            revalidation.replace(
+                'test "$candidate_workflows" -eq 0',
+                'test "$candidate_workflows" -ge 0',
+                1,
+            ),
+        )
+        for mutated in candidate_mutations:
+            with self.assertRaises(AssertionError):
+                self.assert_candidate_workflow_guard(mutated)
+
+        resolution = self.step_block(
+            self.native,
+            "Resolve the surviving governed pull request",
+            "Revalidate the surviving exact head",
+        )
+        self.assert_cross_base_reconciliation_fails_closed(resolution)
+        cross_base_mutations = {
+            "main-to-release": resolution.replace(
+                'if [[ "$base_ref" != "$TRIGGER_BASE_REF" \\',
+                "if [[ false \\",
+                1,
+            ),
+            "release-to-main": resolution.replace(
+                '|| "$base_sha" != "$TRIGGER_BASE_SHA" ]]; then',
+                "]]; then",
+                1,
+            ),
+            "fail-open": resolution.replace(
+                'echo "published=true" >>"$GITHUB_OUTPUT"\n'
+                "            exit 1\n"
+                "          fi\n"
+                "          {\n",
+                'echo "published=true" >>"$GITHUB_OUTPUT"\n'
+                "            true\n"
+                "          fi\n"
+                "          {\n",
+                1,
+            ),
+        }
+        for label, mutated in cross_base_mutations.items():
+            with self.subTest(label=label):
+                with self.assertRaises(AssertionError):
+                    self.assert_cross_base_reconciliation_fails_closed(mutated)
 
     def test_reusable_workflow_is_exact_and_secretless(self) -> None:
         for marker in (
