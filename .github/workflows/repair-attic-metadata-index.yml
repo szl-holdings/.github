@@ -84,7 +84,9 @@ jobs:
               "X-GitHub-Api-Version": "2022-11-28",
               "User-Agent": "szl-attic-repair",
           }
-          receipt = {"schema": "szl.attic-metadata-repair.v1", "changes": []}
+          receipt = {"schema": "szl.attic-metadata-repair.v2", "changes": []}
+          report_path = Path("reports/attic-metadata-repair.json")
+          report_path.parent.mkdir(exist_ok=True)
 
           def request(method: str, path: str, payload=None):
               data = None
@@ -101,33 +103,64 @@ jobs:
                   detail = exc.read().decode("utf-8", errors="replace")[:1000]
                   raise RuntimeError(f"{method} {path} returned {exc.code}: {detail}") from exc
 
-          for name, contract in targets.items():
-              path = f"/repos/szl-holdings/{name}"
-              _, live = request("GET", path)
-              if live.get("archived") is not True:
-                  raise RuntimeError(f"Refusing non-archived repository: {name}")
-              current = live.get("description") or ""
-              if current == contract["after"]:
-                  state = "already-correct"
-              elif current == contract["before"]:
-                  _, updated = request("PATCH", path, {"description": contract["after"]})
-                  if updated.get("description") != contract["after"] or updated.get("archived") is not True:
-                      raise RuntimeError(f"Metadata readback failed for {name}")
-                  state = "updated"
-              else:
-                  raise RuntimeError(f"Description drifted for {name}; refusing overwrite")
-              _, verified = request("GET", path)
-              if verified.get("description") != contract["after"] or verified.get("archived") is not True:
-                  raise RuntimeError(f"Final metadata verification failed for {name}")
-              receipt["changes"].append({"repository": name, "state": state})
-              print(f"{name}: {state}")
+          try:
+              for name, contract in targets.items():
+                  path = f"/repos/szl-holdings/{name}"
+                  _, live = request("GET", path)
+                  if live.get("archived") is not True:
+                      raise RuntimeError(f"Refusing non-archived repository: {name}")
+                  current = live.get("description") or ""
+                  if current == contract["after"]:
+                      state = "already-correct"
+                  elif current == contract["before"]:
+                      unarchived = False
+                      operation_error = None
+                      try:
+                          _, writable = request("PATCH", path, {"archived": False})
+                          if writable.get("archived") is not False:
+                              raise RuntimeError(f"Temporary unarchive readback failed for {name}")
+                          unarchived = True
+                          _, updated = request("PATCH", path, {"description": contract["after"]})
+                          if updated.get("description") != contract["after"]:
+                              raise RuntimeError(f"Description readback failed for {name}")
+                      except Exception as exc:
+                          operation_error = exc
+                      finally:
+                          if unarchived:
+                              try:
+                                  _, rearchived = request("PATCH", path, {"archived": True})
+                                  if rearchived.get("archived") is not True:
+                                      raise RuntimeError(f"Rearchive readback failed for {name}")
+                              except Exception as archive_exc:
+                                  if operation_error is None:
+                                      operation_error = archive_exc
+                                  else:
+                                      operation_error = RuntimeError(
+                                          f"{operation_error}; additionally failed to rearchive {name}: {archive_exc}"
+                                      )
+                      if operation_error is not None:
+                          raise operation_error
+                      state = "updated"
+                  else:
+                      raise RuntimeError(f"Description drifted for {name}; refusing overwrite")
 
-          receipt["result"] = "PASS"
-          Path("reports").mkdir(exist_ok=True)
-          Path("reports/attic-metadata-repair.json").write_text(
-              json.dumps(receipt, indent=2, sort_keys=True) + "\n",
-              encoding="utf-8",
-          )
+                  _, verified = request("GET", path)
+                  if verified.get("description") != contract["after"]:
+                      raise RuntimeError(f"Final description verification failed for {name}")
+                  if verified.get("archived") is not True:
+                      raise RuntimeError(f"Final archived-state verification failed for {name}")
+                  receipt["changes"].append({"repository": name, "state": state})
+                  print(f"{name}: {state}, archived=true")
+              receipt["result"] = "PASS"
+          except Exception as exc:
+              receipt["result"] = "FAIL"
+              receipt["error"] = str(exc)
+              raise
+          finally:
+              report_path.write_text(
+                  json.dumps(receipt, indent=2, sort_keys=True) + "\n",
+                  encoding="utf-8",
+              )
           PY
 
       - name: Regenerate and verify the public tombstone index
