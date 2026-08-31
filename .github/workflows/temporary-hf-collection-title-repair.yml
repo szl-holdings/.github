@@ -1,0 +1,65 @@
+name: temporary-hf-collection-title-repair
+
+on:
+  push:
+    branches:
+      - fix/hf-collection-start-title-20260830
+    paths:
+      - .github/workflows/temporary-hf-collection-title-repair.yml
+
+permissions:
+  contents: write
+
+jobs:
+  repair:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out exact repair branch
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: fix/hf-collection-start-title-20260830
+          fetch-depth: 0
+          persist-credentials: true
+
+      - name: Replace only the retired collection title
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+
+          path = Path('.github/scripts/hf_collection_truth_reconcile.py')
+          text = path.read_text(encoding='utf-8')
+          old = 'START_TITLE = "Start Here — Alloy Estate"'
+          new = 'START_TITLE = "Start Here"'
+          if text.count(old) != 1:
+              raise SystemExit(f'expected the stale title exactly once; found {text.count(old)}')
+          text = text.replace(old, new, 1)
+          if 'Start Here — Alloy Estate' in text:
+              raise SystemExit('retired collection title remains')
+          path.write_text(text, encoding='utf-8')
+          PY
+
+      - name: Prove fail-closed collection reconciliation
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m py_compile \
+            .github/scripts/hf_collection_truth_reconcile.py \
+            .github/scripts/test_hf_collection_truth_reconcile.py
+          python .github/scripts/test_hf_collection_truth_reconcile.py
+          git diff --check
+
+      - name: Commit only the controller repair
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm .github/workflows/temporary-hf-collection-title-repair.yml
+          git add -A
+          git config user.name "Lutar, Stephen P."
+          git config user.email "stephenlutar2@gmail.com"
+          git commit \
+            -m "fix(hf): follow the canonical Start Here collection title" \
+            -m "Signed-off-by: Lutar, Stephen P. <stephenlutar2@gmail.com>"
+          git push origin HEAD:refs/heads/fix/hf-collection-start-title-20260830
