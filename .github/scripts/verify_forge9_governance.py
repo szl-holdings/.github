@@ -461,6 +461,7 @@ def verify_gate_contract() -> None:
         "github.workflow_sha",
         "source_workflow_blob",
         "protected_workflow_blob",
+        ".github/workflows/dco.yml@refs/heads/$EXPECTED_BASE_REF",
         "--paginate --slurp",
         'startswith(".github/workflows/")',
         "merge_base_commit.sha == $base",
@@ -471,6 +472,8 @@ def verify_gate_contract() -> None:
         "PROVENANCE_RESULT: ${{ needs.merge-group-provenance.result }}",
         'test "$PROVENANCE_RESULT" = "success"',
         "Reconcile surviving provenance status",
+        "EXPECTED_BASE_REF: ${{ steps.reconciliation-subject.outputs.base_ref }}",
+        "EXPECTED_BASE_SHA: ${{ steps.reconciliation-subject.outputs.base_sha }}",
     ):
         if marker not in dco_template:
             fail(f"trusted provenance workflow is missing {marker!r}")
@@ -497,6 +500,14 @@ def verify_gate_contract() -> None:
             fail(f"native provenance workflow contains forbidden {forbidden!r}")
     if dco_template.count("statuses: write") != 2:
         fail("only pull-request provenance and reconciliation may write statuses")
+    if dco_template.count("candidate_workflows") < 2:
+        fail("initial and reconciled PR evidence must both reject workflow edits")
+    if '.github/workflows/dco.yml@refs/heads/main"' in dco_template:
+        fail("protected PR provenance must bind workflow source to the target base")
+    if dco_template.index("Resolve the surviving governed pull request") > dco_template.index(
+        "Assert exact protected reconciliation source"
+    ):
+        fail("reconciliation must resolve its survivor before binding workflow source")
     merge_group_job = dco_template.split("  merge-group-provenance:\n", 1)[1].split(
         "  legacy-dco-compatibility:\n", 1
     )[0]

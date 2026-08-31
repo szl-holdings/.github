@@ -58,21 +58,27 @@ jobs:
           ACTUAL_WORKFLOW_REF: ${{ github.workflow_ref }}
           ACTUAL_WORKFLOW_SHA: ${{ github.workflow_sha }}
           EXPECTED_PR_NUMBER: ${{ github.event.pull_request.number }}
+          EXPECTED_BASE_REF: ${{ github.event.pull_request.base.ref }}
+          EXPECTED_BASE_SHA: ${{ github.event.pull_request.base.sha }}
           EXPECTED_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
         run: |
           set -euo pipefail
           [[ "$ACTUAL_WORKFLOW_SHA" =~ ^[0-9a-f]{40}$ ]]
           [[ "$EXPECTED_PR_NUMBER" =~ ^[1-9][0-9]*$ ]]
+          [[ "$EXPECTED_BASE_SHA" =~ ^[0-9a-f]{40}$ ]]
           [[ "$EXPECTED_HEAD_SHA" =~ ^[0-9a-f]{40}$ ]]
+          [[ "$EXPECTED_BASE_REF" == "main" \
+            || "$EXPECTED_BASE_REF" =~ ^release/[^/]+$ ]]
           repository_json="$(gh api "repos/$GITHUB_REPOSITORY")"
           default_branch="$(jq -er '.default_branch' <<<"$repository_json")"
           test "$default_branch" = "main"
           test "$ACTUAL_WORKFLOW_REF" = \
-            "$GITHUB_REPOSITORY/.github/workflows/dco.yml@refs/heads/$default_branch"
+            "$GITHUB_REPOSITORY/.github/workflows/dco.yml@refs/heads/$EXPECTED_BASE_REF"
           protected_sha="$(
-            gh api "repos/$GITHUB_REPOSITORY/git/ref/heads/$default_branch" \
+            gh api "repos/$GITHUB_REPOSITORY/git/ref/heads/$EXPECTED_BASE_REF" \
               --jq '.object.sha'
           )"
+          test "$protected_sha" = "$EXPECTED_BASE_SHA"
           source_compare="$(
             gh api \
               "repos/$GITHUB_REPOSITORY/compare/$ACTUAL_WORKFLOW_SHA...$protected_sha"
@@ -409,42 +415,6 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      - name: Assert exact protected reconciliation source
-        env:
-          GH_TOKEN: ${{ github.token }}
-          ACTUAL_WORKFLOW_REF: ${{ github.workflow_ref }}
-          ACTUAL_WORKFLOW_SHA: ${{ github.workflow_sha }}
-        run: |
-          set -euo pipefail
-          [[ "$ACTUAL_WORKFLOW_SHA" =~ ^[0-9a-f]{40}$ ]]
-          test "$ACTUAL_WORKFLOW_REF" = \
-            "$GITHUB_REPOSITORY/.github/workflows/dco.yml@refs/heads/main"
-          protected_sha="$(
-            gh api "repos/$GITHUB_REPOSITORY/git/ref/heads/main" \
-              --jq '.object.sha'
-          )"
-          source_compare="$(
-            gh api \
-              "repos/$GITHUB_REPOSITORY/compare/$ACTUAL_WORKFLOW_SHA...$protected_sha"
-          )"
-          jq -e --arg source "$ACTUAL_WORKFLOW_SHA" '
-              (.status == "ahead" or .status == "identical")
-              and .behind_by == 0
-              and .base_commit.sha == $source
-              and .merge_base_commit.sha == $source
-            ' <<<"$source_compare" >/dev/null
-          protected_workflow_blob="$(
-            gh api \
-              "repos/$GITHUB_REPOSITORY/contents/.github/workflows/dco.yml?ref=$protected_sha" \
-              --jq '.sha'
-          )"
-          source_workflow_blob="$(
-            gh api \
-              "repos/$GITHUB_REPOSITORY/contents/.github/workflows/dco.yml?ref=$ACTUAL_WORKFLOW_SHA" \
-              --jq '.sha'
-          )"
-          test "$source_workflow_blob" = "$protected_workflow_blob"
-
       - name: Resolve the surviving governed pull request
         id: reconciliation-subject
         env:
@@ -507,6 +477,49 @@ jobs:
             -f description="Exact-head provenance reconciliation in progress" \
             -f target_url="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
 
+      - name: Assert exact protected reconciliation source
+        if: steps.reconciliation-subject.outputs.reconcile == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ACTUAL_WORKFLOW_REF: ${{ github.workflow_ref }}
+          ACTUAL_WORKFLOW_SHA: ${{ github.workflow_sha }}
+          EXPECTED_BASE_REF: ${{ steps.reconciliation-subject.outputs.base_ref }}
+          EXPECTED_BASE_SHA: ${{ steps.reconciliation-subject.outputs.base_sha }}
+        run: |
+          set -euo pipefail
+          [[ "$ACTUAL_WORKFLOW_SHA" =~ ^[0-9a-f]{40}$ ]]
+          [[ "$EXPECTED_BASE_SHA" =~ ^[0-9a-f]{40}$ ]]
+          [[ "$EXPECTED_BASE_REF" == "main" \
+            || "$EXPECTED_BASE_REF" =~ ^release/[^/]+$ ]]
+          test "$ACTUAL_WORKFLOW_REF" = \
+            "$GITHUB_REPOSITORY/.github/workflows/dco.yml@refs/heads/$EXPECTED_BASE_REF"
+          protected_sha="$(
+            gh api "repos/$GITHUB_REPOSITORY/git/ref/heads/$EXPECTED_BASE_REF" \
+              --jq '.object.sha'
+          )"
+          test "$protected_sha" = "$EXPECTED_BASE_SHA"
+          source_compare="$(
+            gh api \
+              "repos/$GITHUB_REPOSITORY/compare/$ACTUAL_WORKFLOW_SHA...$protected_sha"
+          )"
+          jq -e --arg source "$ACTUAL_WORKFLOW_SHA" '
+              (.status == "ahead" or .status == "identical")
+              and .behind_by == 0
+              and .base_commit.sha == $source
+              and .merge_base_commit.sha == $source
+            ' <<<"$source_compare" >/dev/null
+          protected_workflow_blob="$(
+            gh api \
+              "repos/$GITHUB_REPOSITORY/contents/.github/workflows/dco.yml?ref=$protected_sha" \
+              --jq '.sha'
+          )"
+          source_workflow_blob="$(
+            gh api \
+              "repos/$GITHUB_REPOSITORY/contents/.github/workflows/dco.yml?ref=$ACTUAL_WORKFLOW_SHA" \
+              --jq '.sha'
+          )"
+          test "$source_workflow_blob" = "$protected_workflow_blob"
+
       - name: Revalidate the surviving exact head
         if: steps.reconciliation-subject.outputs.reconcile == 'true'
         env:
@@ -543,6 +556,20 @@ jobs:
               and .head.ref == $head_ref
               and .head.sha == $head_sha
             ' <<<"$current_pr" >/dev/null
+          declared_file_count="$(jq -er '.changed_files' <<<"$current_pr")"
+          candidate_files="$(
+            gh api --paginate --slurp \
+              "repos/$GITHUB_REPOSITORY/pulls/$EXPECTED_PR_NUMBER/files?per_page=100"
+          )"
+          listed_file_count="$(jq -er '[.[][]] | length' <<<"$candidate_files")"
+          test "$listed_file_count" -eq "$declared_file_count"
+          test "$listed_file_count" -le 3000
+          candidate_workflows="$(
+            jq -er \
+              '[.[][] | select(.filename | startswith(".github/workflows/"))] | length' \
+              <<<"$candidate_files"
+          )"
+          test "$candidate_workflows" -eq 0
           live_base_sha="$(
             gh api "repos/$GITHUB_REPOSITORY/git/ref/heads/$EXPECTED_BASE_REF" \
               --jq '.object.sha'
