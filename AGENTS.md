@@ -19,10 +19,12 @@ templates, and community health files.
   findings (mostly line-length and indentation).
 - `actionlint` passes clean (0 errors) on all 15 workflow files.
 
-### There is no build / run / test step
+### There is no application build or service
 
 - No `package.json`, `requirements.txt`, `Makefile`, or any dependency manifest exists.
 - No services to start. No database. No backend / frontend.
+- The Python governance contract suites under `.github/scripts/test_*.py` are
+  real tests and must remain green when their workflows or policies change.
 - Reusable workflows (`.github/workflows/reusable-*.yml`) are consumed by
   other repos via `uses:` and run on GitHub Actions, not locally.
 
@@ -31,4 +33,6 @@ templates, and community health files.
 - Conventional Commits required (`feat:`, `fix:`, `chore:`, `docs:`, `ci:`, `refactor:`, `test:`).
 - Squash-merge into `main`.
 - All Actions must be SHA-pinned (enforced by `pin-check.yml`).
-- DCO sign-off required on all commits (`git commit -s`).
+- Developer commit signatures and `Signed-off-by` trailers are not required.
+  Protected exact-head provenance and all real build/security checks remain
+  required.

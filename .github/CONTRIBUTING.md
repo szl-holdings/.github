@@ -2,17 +2,12 @@
 
 Thank you for considering a contribution to this SZL Holdings repository.
 
-## Developer Certificate of Origin (DCO)
+## Solo-builder provenance
 
-All commits **must** be signed off under the [Developer Certificate of
-Origin](https://developercertificate.org/). Add a `Signed-off-by:` trailer to
-every commit:
-
-```
-git commit -s -m "your message"
-```
-
-Branch protection on `main` enforces signed commits and the DCO check.
+Developer commit signatures and sign-off trailers are not required. Protected
+automation validates the exact live pull-request base and head without checking
+out or executing proposed content. Required build and security checks remain
+blocking.
 
 ## Workflow
 

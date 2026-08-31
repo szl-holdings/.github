@@ -22,12 +22,13 @@ unverifiable higher level) is recorded in
 Levels 2 and 3 (Sigstore signing + isolated, hardened builders) are roadmap
 items and are NOT claimed here.
 
-## Signed commits (DCO)
+## Pull-request provenance
 
-Commits carry a Developer Certificate of Origin sign-off
-(`Signed-off-by: Stephen P. Lutar Jr. <stephenlutar2@gmail.com>`), enforced by
-the DCO check. This requirement is set in
-[Doctrine v7 §5](doctrine/DOCTRINE_V7.md#5--signed-commits-dco).
+Developer commit signatures and sign-off trailers are not required. The native
+compatibility workflow instead binds its result to the exact live pull-request
+repository, base, and head identities without checking out or executing the
+proposed tree. Real build, security, staging, and attestation checks remain
+separate required evidence.
 
 ## CODEOWNERS coverage
 
@@ -67,7 +68,6 @@ superlatives). The policy and the token list are defined in
 - GitHub: [stephenlutar2-hash](https://github.com/stephenlutar2-hash) and
   [betterwithage](https://github.com/betterwithage)
 - Corporate email: stephen@szlholdings.com
-- DCO sign-off email: stephenlutar2@gmail.com
 
 ## Live numbers
 

@@ -35,11 +35,13 @@
    one-line mandate.
 5. **Repo conventions (from `.github/AGENTS.md`).**
    - Conventional Commits (`feat: fix: chore: docs: ci: refactor: test:`)
-   - DCO sign-off on every commit (`git commit -s`)
+   - Developer commit signatures and sign-off trailers are not required;
+     exact-head provenance is required
    - All GitHub Actions **SHA-pinned** (enforced by `pin-check.yml`)
    - Squash-merge into `main`; one feature branch per task
-   - Never force-merge past a failing **required** check. If a check is failing
-     for an infra reason (e.g. stale scanner DB), fix the infra — don't override.
+   - Never bypass a real build or security failure. An owner migration may
+     bypass only a documented obsolete signature/provenance compatibility
+     context while ruleset settings are being corrected.
 
 ---
 
@@ -96,7 +98,7 @@ For each flagship (**a11oy, killinchu, sentra, rosie, amaru**):
 
 ## 6. Definition of done (every task)
 
-- [ ] Branch + Conventional-Commit title + DCO sign-off
+- [ ] Branch + Conventional-Commit title + exact-head provenance
 - [ ] All **required** checks green for a real reason (no overrides)
 - [ ] Numbers/claims trace to `lean_numbers.json` / lutar-lean
 - [ ] No SLSA-L2+/compliance overclaim; honest reachability states

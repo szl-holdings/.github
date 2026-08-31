@@ -40,7 +40,7 @@ Risk: <A|B|C|D> — reason:
 - [ ] `gate/lean` green; sorry count did not increase
 - [ ] Screenshots attached for UI changes
 - [ ] `KNOWN_LIMITATIONS.md` updated for any downgrade or blocker
-- [ ] Commits include a DCO `Signed-off-by:` trailer
+- [ ] Exact-head provenance and all required build/security checks are green
 - [ ] No force-push, destructive rebase, or safeguard reduction
 
 ## Known limitations introduced

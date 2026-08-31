@@ -448,32 +448,69 @@ def verify_gate_contract() -> None:
 
     dco_template = (ROOT / ".github/workflows/dco.yml").read_text(encoding="utf-8")
     for marker in (
+        "name: Solo-builder provenance compatibility",
         "pull_request_target:",
         "merge_group:",
         "types: [checks_requested]",
-        "persist-credentials: false",
+        "permissions: {}",
+        "pull-request-provenance:",
+        "merge-group-provenance:",
         "github.event.pull_request.base.sha",
         "github.event.pull_request.head.sha",
-        ".github/scripts/dco_check.py",
-        "native-dco-compatibility:",
+        "github.workflow_ref",
+        "github.workflow_sha",
+        "source_workflow_blob",
+        "protected_workflow_blob",
+        ".github/workflows/dco.yml@refs/heads/$EXPECTED_BASE_REF",
+        "--paginate --slurp",
+        'startswith(".github/workflows/")',
+        "merge_base_commit.sha == $base",
+        "legacy-dco-compatibility:",
         "name: DCO sign-off check",
-        "needs: dco",
-        "if: always() && github.event_name != 'pull_request_target'",
-        "NATIVE_DCO_RESULT: ${{ needs.dco.result }}",
-        'test "$NATIVE_DCO_RESULT" = "success"',
+        "needs: merge-group-provenance",
+        "if: always() && github.event_name == 'merge_group'",
+        "PROVENANCE_RESULT: ${{ needs.merge-group-provenance.result }}",
+        'test "$PROVENANCE_RESULT" = "success"',
+        "Reconcile surviving provenance status",
     ):
         if marker not in dco_template:
-            fail(f"trusted DCO workflow is missing {marker!r}")
+            fail(f"trusted provenance workflow is missing {marker!r}")
     if "\n  pull_request:\n" in dco_template:
-        fail("DCO must not execute PR-controlled code under pull_request")
+        fail("provenance compatibility must use protected pull_request_target")
+    if "\n  push:\n" in dco_template:
+        fail("provenance compatibility must not publish post-merge evidence")
     if "workflow_dispatch:" in dco_template:
-        fail("DCO must not publish a manual false-green status")
-    if "github.event_name != 'pull_request'" in dco_template:
-        fail("DCO merge-group and push validation must not use a fallback pass")
+        fail("provenance compatibility must not publish a manual false green")
+    if re.search(r"(?m)^\s*(?:-\s*)?uses:\s", dco_template):
+        fail("native provenance workflow must not invoke an action")
+    for forbidden in (
+        "actions/checkout",
+        "persist-credentials",
+        "GITHUB_WORKSPACE",
+        ".github/scripts/",
+        "dco_check.py",
+        "Signed-off-by",
+        "secrets.",
+        "contents: write",
+        "id-token:",
+    ):
+        if forbidden in dco_template:
+            fail(f"native provenance workflow contains forbidden {forbidden!r}")
+    if dco_template.count("statuses: write") != 2:
+        fail("only pull-request provenance and reconciliation may write statuses")
+    if dco_template.count("candidate_workflows") < 2:
+        fail("initial and reconciled PR evidence must both reject workflow edits")
+    if '.github/workflows/dco.yml@refs/heads/main"' in dco_template:
+        fail("protected PR provenance must bind workflow source to the target base")
+    merge_group_job = dco_template.split("  merge-group-provenance:\n", 1)[1].split(
+        "  legacy-dco-compatibility:\n", 1
+    )[0]
+    if "statuses: write" in merge_group_job or "pull-requests: read" in merge_group_job:
+        fail("merge-group provenance has unnecessary pull-request or status scope")
     if dco_template.count("name: DCO sign-off check\n") != 1:
-        fail("native DCO must expose exactly one legacy compatibility job")
+        fail("native provenance must expose exactly one legacy compatibility job")
     if "continue-on-error" in dco_template:
-        fail("native DCO compatibility must not suppress a failed gate")
+        fail("native provenance compatibility must not suppress a failed gate")
 
     reusable_dco_template = (
         ROOT / ".github/workflows/reusable-dco.yml"
