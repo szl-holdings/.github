@@ -41,7 +41,7 @@ AUTHORITY_ARTIFACT_DIGEST = (
 )
 EXACT_REVISION = re.compile(r"[0-9a-f]{40}")
 EXACT_SHA256 = re.compile(r"[0-9a-f]{64}")
-ALLOWED_ACCESS_TOKEN_ROLES = frozenset({"fineGrained", "write"})
+HUGGING_FACE_ENDPOINT = "https://huggingface.co"
 ALLOWED_REPO_IDS = frozenset(
     {
         "SZLHOLDINGS/README",
@@ -223,7 +223,10 @@ def load_policy(path: Path) -> tuple[dict[str, Any], dict[str, DesiredState]]:
     expected_token_authority = {
         "namespace": ORGANIZATION,
         "required_org_role": "admin",
-        "allowed_access_token_roles": ["fineGrained", "write"],
+        "reported_access_token_role_is_authority": False,
+        "required_target_write_preflight": (
+            'HfApi.auth_check(repo_id=target, repo_type="space", write=True)'
+        ),
     }
     if token_authority != expected_token_authority:
         raise LifecycleError("lifecycle token authority changed")
@@ -288,27 +291,50 @@ class HubSpaceClient:
     def __init__(self, api: Any) -> None:
         self.api = api
 
-    def verify_operator(self) -> dict[str, str]:
+    def verify_operator(self, repo_id: str) -> dict[str, Any]:
+        if repo_id not in ALLOWED_REPO_IDS:
+            raise LifecycleError("target write preflight requires one exact policy Space")
         info = self.api.whoami(cache=False)
         if not isinstance(info, dict) or info.get("type") != "user":
             raise LifecycleError("Hugging Face credential is not a user token")
-        auth = info.get("auth") or {}
+        auth = info.get("auth")
         access = auth.get("accessToken") if isinstance(auth, dict) else None
         token_role = access.get("role") if isinstance(access, dict) else None
-        if token_role not in ALLOWED_ACCESS_TOKEN_ROLES:
-            raise LifecycleError("Hugging Face credential is not an approved write token")
-        org_role = None
-        for org in info.get("orgs") or []:
-            if isinstance(org, dict) and org.get("name") == ORGANIZATION:
-                org_role = org.get("roleInOrg")
-                break
-        if org_role != "admin":
-            raise LifecycleError("Hugging Face credential is not SZLHOLDINGS admin")
+        if not isinstance(token_role, str) or not token_role.strip():
+            raise LifecycleError("Hugging Face credential omitted token role metadata")
+        orgs = info.get("orgs")
+        if not isinstance(orgs, list):
+            raise LifecycleError("Hugging Face credential omitted organization metadata")
+        org_roles = [
+            org.get("roleInOrg")
+            for org in orgs
+            if isinstance(org, dict) and org.get("name") == ORGANIZATION
+        ]
+        if org_roles != ["admin"]:
+            raise LifecycleError("Hugging Face credential is not unambiguously SZLHOLDINGS admin")
+        try:
+            auth_result = self.api.auth_check(
+                repo_id=repo_id,
+                repo_type="space",
+                write=True,
+            )
+        except Exception as exc:
+            raise LifecycleError(
+                "Hugging Face credential lacks verified write authority "
+                f"for exact target {repo_id}"
+            ) from exc
+        if auth_result is not None:
+            raise LifecycleError(
+                "Hugging Face target write preflight returned an ambiguous response"
+            )
         return {
             "credential_type": "user",
-            "access_token_role": str(token_role),
+            "access_token_role_reported": token_role.strip(),
+            "access_token_role_is_authority": False,
             "organization": ORGANIZATION,
             "organization_role": "admin",
+            "target_write_authority": "VERIFIED",
+            "target_write_repository": repo_id,
         }
 
     def read(self, repo_id: str) -> SpaceState:
@@ -580,7 +606,7 @@ def reconcile(
 
         desired = targets[target]
         receipt["desired"] = asdict(desired)
-        receipt["operator"] = client.verify_operator()
+        receipt["operator"] = client.verify_operator(target)
         before = client.read(target)
         receipt["before"] = asdict(before)
         compare_expected(
@@ -761,10 +787,16 @@ def main(argv: list[str] | None = None) -> int:
         try:
             # Do not expose the provider credential to a feature-branch copy.
             require_current_protected_main(os.environ)
-            from huggingface_hub import HfApi
+            import httpx
+            from huggingface_hub import HfApi, set_client_factory
 
+            set_client_factory(
+                lambda: httpx.Client(follow_redirects=False, timeout=30.0)
+            )
             report, exit_code = reconcile(
-                client=HubSpaceClient(HfApi(token=token)),
+                client=HubSpaceClient(
+                    HfApi(endpoint=HUGGING_FACE_ENDPOINT, token=token)
+                ),
                 policy_path=args.policy,
                 target=args.target,
                 mode=args.mode,
