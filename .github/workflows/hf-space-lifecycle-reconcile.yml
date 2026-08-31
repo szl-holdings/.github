@@ -1,0 +1,208 @@
+name: HF Space Lifecycle Reconcile
+
+on:
+  workflow_dispatch:
+    inputs:
+      repo_id:
+        description: One exact Space from the authenticated 46-Space inventory
+        type: choice
+        required: true
+        options:
+          - SZLHOLDINGS/README
+          - SZLHOLDINGS/a11oy
+          - SZLHOLDINGS/a11oy-factory
+          - SZLHOLDINGS/anatomy
+          - SZLHOLDINGS/ayllu
+          - SZLHOLDINGS/cosmos
+          - SZLHOLDINGS/counsel
+          - SZLHOLDINGS/david-leads
+          - SZLHOLDINGS/energy-attest-holo
+          - SZLHOLDINGS/energy-attested-runs
+          - SZLHOLDINGS/evidence-studio
+          - SZLHOLDINGS/experiments
+          - SZLHOLDINGS/governed-agent-bench
+          - SZLHOLDINGS/governed-norm-holo
+          - SZLHOLDINGS/governed-receipt-verifier
+          - SZLHOLDINGS/guardrail-receipt
+          - SZLHOLDINGS/hatun-mcp
+          - SZLHOLDINGS/holographic
+          - SZLHOLDINGS/immune
+          - SZLHOLDINGS/immune-lattice
+          - SZLHOLDINGS/khipu-lab
+          - SZLHOLDINGS/killinchu
+          - SZLHOLDINGS/lambda-gate-holo
+          - SZLHOLDINGS/llm-router-live
+          - SZLHOLDINGS/lyte-services
+          - SZLHOLDINGS/nexus
+          - SZLHOLDINGS/prove-it
+          - SZLHOLDINGS/receipt-chain-live
+          - SZLHOLDINGS/sda
+          - SZLHOLDINGS/second-brain
+          - SZLHOLDINGS/szl-atelier
+          - SZLHOLDINGS/szl-blocked-live
+          - SZLHOLDINGS/szl-command-lab
+          - SZLHOLDINGS/szl-estate-live
+          - SZLHOLDINGS/szl-experiments
+          - SZLHOLDINGS/szl-forge-lab
+          - SZLHOLDINGS/szl-govsign-live
+          - SZLHOLDINGS/szl-kernels-live
+          - SZLHOLDINGS/szl-khipu
+          - SZLHOLDINGS/szl-model-inference-lab
+          - SZLHOLDINGS/szl-provctl-live
+          - SZLHOLDINGS/szl-quant-live
+          - SZLHOLDINGS/szl-real-estate
+          - SZLHOLDINGS/szl-sovereign-os
+          - SZLHOLDINGS/terra-assurance
+          - SZLHOLDINGS/yarqa
+      mode:
+        description: Plan is read-only; apply needs exact plan evidence
+        type: choice
+        required: true
+        default: plan
+        options:
+          - plan
+          - apply
+      transition:
+        description: Inspect for plan; apply can only publish one RUNNING Space
+        type: choice
+        required: true
+        default: inspect
+        options:
+          - inspect
+          - private-to-public
+      expected_policy_sha256:
+        description: Apply requires the exact 64-hex policy digest from plan
+        type: string
+        required: false
+      expected_visibility:
+        description: Apply requires exact visibility from plan
+        type: choice
+        required: true
+        default: unspecified
+        options:
+          - unspecified
+          - public
+          - private
+      expected_stage:
+        description: Apply requires exact runtime stage from plan
+        type: string
+        required: false
+      expected_revision:
+        description: Apply requires exact 40-hex Hub revision from plan
+        type: string
+        required: false
+
+permissions:
+  contents: read
+
+# A single organization-wide key prevents two instances of this controller
+# from crossing provider writes. Other legacy HF writers remain separately
+# governed and must not be dispatched during an apply.
+concurrency:
+  group: hf-provider-mutation-szlholdings
+  cancel-in-progress: false
+
+jobs:
+  reconcile:
+    name: Plan or publish one exact Space with compare-and-set evidence
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment: production
+    env:
+      HF_ORG_TOKEN: ${{ secrets.HF_ORG_TOKEN }}
+      GITHUB_TOKEN: ${{ github.token }}
+      HF_HUB_DISABLE_PROGRESS_BARS: "1"
+      INPUT_REPO_ID: ${{ inputs.repo_id }}
+      INPUT_MODE: ${{ inputs.mode }}
+      INPUT_TRANSITION: ${{ inputs.transition }}
+      INPUT_EXPECTED_POLICY_SHA256: ${{ inputs.expected_policy_sha256 }}
+      INPUT_EXPECTED_VISIBILITY: ${{ inputs.expected_visibility }}
+      INPUT_EXPECTED_STAGE: ${{ inputs.expected_stage }}
+      INPUT_EXPECTED_REVISION: ${{ inputs.expected_revision }}
+      REPORT_PATH: reports/hf-space-lifecycle/evidence-${{ github.run_id }}-${{ github.run_attempt }}.json
+    steps:
+      - name: Harden runner
+        uses: step-security/harden-runner@b09bb98e06d4d774595224525879c09bc6e98c40 # v2.20.1
+        with:
+          egress-policy: audit
+
+      - name: Checkout exact controller
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 1
+
+      - name: Prove exact protected-main checkout
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$GITHUB_EVENT_NAME" = workflow_dispatch
+          test "$GITHUB_REPOSITORY" = szl-holdings/.github
+          test "$GITHUB_REF" = refs/heads/main
+          test "$(git rev-parse --verify HEAD)" = "$GITHUB_SHA"
+
+      - name: Set up exact Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12.10"
+
+      - name: Test publication safety contract
+        run: |
+          set -euo pipefail
+          python3 -m py_compile \
+            .github/scripts/hf_space_lifecycle_reconcile.py \
+            .github/scripts/test_hf_space_lifecycle_reconcile.py
+          python3 .github/scripts/test_hf_space_lifecycle_reconcile.py
+          git diff --check
+
+      - name: Create fresh hash-locked client environment
+        id: runtime
+        shell: bash
+        run: |
+          set -euo pipefail
+          VENV="$RUNNER_TEMP/hf-space-lifecycle-venv"
+          if [ -e "$VENV" ]; then
+            echo '::error::Refusing preexisting lifecycle virtual environment.'
+            exit 2
+          fi
+          python3 -m venv "$VENV"
+          "$VENV/bin/python" -I -P -m pip install \
+            --disable-pip-version-check --require-hashes --only-binary=:all: \
+            --ignore-installed -r requirements/hf-publisher.lock
+          "$VENV/bin/python" -I -P -c \
+            'from importlib.metadata import version; assert version("huggingface-hub") == "1.19.0"'
+          echo "python=$VENV/bin/python" >> "$GITHUB_OUTPUT"
+
+      - name: Bind safe run-scoped evidence identity
+        id: evidence
+        shell: bash
+        run: |
+          set -euo pipefail
+          SAFE_TARGET="${INPUT_REPO_ID//\//-}"
+          echo "safe_target=$SAFE_TARGET" >> "$GITHUB_OUTPUT"
+
+      - name: Plan or apply one expected-state publication
+        shell: bash
+        run: |
+          set -euo pipefail
+          "${{ steps.runtime.outputs.python }}" -I -P \
+            .github/scripts/hf_space_lifecycle_reconcile.py \
+            --policy .github/data/hf-space-lifecycle-policy.json \
+            --target "$INPUT_REPO_ID" \
+            --mode "$INPUT_MODE" \
+            --transition "$INPUT_TRANSITION" \
+            --expected-policy-sha256 "$INPUT_EXPECTED_POLICY_SHA256" \
+            --expected-visibility "$INPUT_EXPECTED_VISIBILITY" \
+            --expected-stage "$INPUT_EXPECTED_STAGE" \
+            --expected-revision "$INPUT_EXPECTED_REVISION" \
+            --report "$REPORT_PATH"
+
+      - name: Upload run-scoped lifecycle evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: hf-space-lifecycle-${{ steps.evidence.outputs.safe_target }}-${{ inputs.transition }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ env.REPORT_PATH }}
+          if-no-files-found: error
+          retention-days: 90
+          overwrite: false
