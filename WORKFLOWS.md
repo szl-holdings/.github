@@ -23,6 +23,22 @@ of redefining the same logic locally.
 | `reusable-hf-candidate-plan.yml` | Build a provider-free exact base-to-head Dockerfile payload plan and revalidate the live PR pair | base-controlled `pull_request_target` |
 | `reusable-hf-module-drift-check.yml` | Detect drift between a repo's source-of-truth and its live Hugging Face Space | caller-chosen |
 
+### Repository-native provenance compatibility
+
+`.github/workflows/dco.yml` is retained under its historical filename because
+ruleset `19755620` still requires the exact status context `DCO sign-off check`.
+It does not require a developer signature or trailer. Protected
+`pull_request_target` logic validates the live PR/base/head tuple without
+checking out or executing proposed content; merge-group logic revalidates the
+live queue refs with read-only permission. All real build and security checks
+remain independent requirements.
+
+Until the ruleset can require this specific workflow (or a distinct App-owned
+status), any context emitted by GitHub Actions has the provider limitation that
+the context name alone does not identify a unique workflow. Proposed changes to
+`.github/workflows/**` therefore fail the protected provenance check and need an
+explicitly reviewed owner migration.
+
 ## Calling a reusable workflow
 
 ```yaml

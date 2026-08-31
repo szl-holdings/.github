@@ -11,62 +11,36 @@ repository (2 critical, 4 high, 23 medium at time of review).
 
 ---
 
-## 1. `DangerousWorkflowID` — `.github/workflows/dco.yml:42` and `:50` (critical ×2)
+## 1. `DangerousWorkflowID` — native provenance workflow (resolved)
 
-**What Scorecard flags.** The `Dangerous-Workflow` check reports the
-combination of a `pull_request_target` trigger with a checkout of an
-attacker-controlled ref (`ref: refs/pull/{N}/head` and
-`ref: ${{ github.event.pull_request.base.sha }}`). In the general case that
-pattern is a privilege-escalation sink, because `pull_request_target` runs with
-the base repository's secrets and write-capable token while the checked-out tree
-is contributor-controlled.
+The earlier implementation combined `pull_request_target` with candidate and
+trusted checkouts. Even though it attempted to keep the proposed tree as data,
+that shape was unnecessarily difficult to audit and produced two critical
+Scorecard findings.
 
-**Why it does not apply here.** The workflow was written specifically to defeat
-that attack, and Scorecard's pattern match cannot observe the mitigations:
+The native workflow has been replaced. It now processes only GitHub event and
+REST API metadata: there is no checkout, local action, candidate script, cache,
+artifact, or repository secret. The protected pull-request jobs validate the
+exact workflow source, live PR/base/head tuple, unique governed head, base
+ancestry, and absence of proposed workflow edits before publishing the legacy
+compatibility context. The merge-group job has read-only Contents permission;
+only the protected pull-request and reconciliation jobs can write a status.
 
-1. **The untrusted tree is never executed.** The PR head is checked out into an
-   isolated `candidate/` path and is only ever read as *git history* — every
-   `python` invocation in the workflow runs a script from `trusted/`, not from
-   `candidate/`. See the `Run strict real-commit DCO self-tests`,
-   `Validate exact pull-request commits from trusted base`,
-   `Validate exact merge-group range` and `Validate exact protected push range`
-   steps: all four execute
-   `"$GITHUB_WORKSPACE/trusted/.github/scripts/..."`.
+**Disposition.** The old false-positive exception is retired. Re-scan after the
+replacement reaches the default branch and close the alerts as fixed when the
+provider observes the new file.
 
-2. **The executed tree is pinned to the workflow's own revision.** The
-   `trusted/` checkout uses `ref: ${{ github.workflow_sha }}` — the exact commit
-   of the workflow file that GitHub decided to run — and the next step asserts
-   the checkout actually landed there:
+**Residual provider limitation.** Ruleset `19755620` still identifies a status
+by the historical context name and GitHub Actions App, not by one workflow
+file. A distinct candidate workflow could otherwise imitate that name. The
+protected pull-request path therefore rejects any `.github/workflows/**` edit;
+workflow migrations require an explicit owner review and bypass of only the
+obsolete compatibility context. Requiring a specific workflow or a distinct
+App-owned status remains the complete fix once ruleset settings are editable.
 
-   ```
-   test "$(git -C "$GITHUB_WORKSPACE/trusted" rev-parse HEAD)" = "$EXPECTED_TRUSTED_SHA"
-   ```
-
-   A contributor cannot substitute their own checker, because changing the
-   checker in their PR changes `candidate/`, not `trusted/`.
-
-3. **No credentials are exposed to any checkout.** Every one of the six
-   `actions/checkout` invocations sets `persist-credentials: false`, so no
-   `.git/config` in any path carries a usable token.
-
-4. **The token is narrowly scoped.** After the change that accompanies this
-   file, the workflow default is `contents: read` + `pull-requests: read`, and
-   `statuses: write` is granted only to the two jobs that publish the commit
-   status. There is no `contents: write`, no `id-token: write`, and no secret
-   other than `github.token` is referenced.
-
-5. **Every action is SHA-pinned** (`actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1`).
-
-**Disposition.** Dismiss both alerts as **false positive**, citing this section.
-Do not "remediate" by rewriting the workflow: replacing
-`pull_request_target` with `pull_request` would remove the ability to publish a
-commit status on the PR head, which is the entire purpose of the native DCO
-gate, and would weaken a control rather than strengthen it.
-
-**Re-review trigger.** Re-open this decision if any future edit causes the
-workflow to (a) execute a path under `candidate/`, (b) drop the
-`EXPECTED_TRUSTED_SHA` assertion, (c) set `persist-credentials: true`, or
-(d) add `contents: write`, `id-token: write`, or any repository secret.
+**Re-review trigger.** Re-open this decision if the workflow gains any `uses:`,
+checkout, candidate execution, repository secret, `contents: write`,
+`id-token: write`, or status-write permission on the merge-group job.
 
 ---
 
@@ -75,7 +49,7 @@ workflow to (a) execute a path under `candidate/`, (b) drop the
 | Alert | Status |
 |---|---|
 | `.github/workflows/notification-inbox-scheduler.yml:13` | **Fixed.** `actions: write` moved from the workflow default to the single `dispatch` job that needs it. |
-| `.github/workflows/dco.yml:17` | **Fixed.** `statuses: write` moved from the workflow default to the two jobs that publish a status. |
+| `.github/workflows/dco.yml` | **Fixed.** The workflow default and merge-group compatibility job use `permissions: {}`; `statuses: write` exists only on the protected PR and reconciliation jobs that publish the legacy context. |
 | `.github/workflows/attest-and-approve.yml:22` | **Accepted.** The workflow default is already the minimum (`contents: read`). The remaining write scopes (`contents: write`, `id-token: write`, `pull-requests: write`) are declared at job level on the single `attest` job and are each load-bearing: `id-token: write` for OIDC-based attestation, `contents: write` to record the attestation, `pull-requests: write` to approve. Scorecard reports the top-level block's line number even when the write scope is job-scoped, so this alert cannot be cleared without removing the workflow's function. |
 | `.github/workflows/hf-kernel-card-publish-v2.yml:28` | **Accepted.** Same shape: workflow default is `contents: read`; the `publish` job needs `actions: write` (to re-dispatch on transient Hub failure) and `issues: write` (to file the publish receipt). |
 

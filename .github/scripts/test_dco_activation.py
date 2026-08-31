@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Static contract for the native and reusable trusted DCO producers."""
+"""Static contract for native provenance compatibility and reusable DCO."""
 
 from pathlib import Path
 import unittest
@@ -30,23 +30,24 @@ class DcoActivationWorkflowTests(unittest.TestCase):
 
     def test_native_workflow_preserves_all_governed_event_gates(self) -> None:
         for marker in (
-            "name: Native DCO enforcement",
+            "name: Solo-builder provenance compatibility",
             "pull_request" + "_target:",
             "- main",
             "- 'release/*'",
-            "types: [opened, synchronize, reopened, ready_for_review, edited, closed]",
+            "- synchronize",
+            "- ready_for_review",
+            "- converted_to_draft",
+            "- closed",
             "merge_" + "group:",
             "types: [checks_requested]",
-            "Reconcile surviving DCO status",
+            "permissions: {}",
+            "pull-request-provenance:",
+            "merge-group-provenance:",
+            "Reconcile surviving provenance status",
             "github.event.before",
             "AFFECTED_HEAD_SHA:",
-            "reconcile-candidate",
-            "reconcile-base",
-            "reconcile-trusted",
-            "dco-reconcile-event.json",
-            "Finalize pull-request DCO failure",
+            "Finalize pull-request provenance failure",
             "Finalize reconciliation failure",
-            "persist-credentials: false",
             "github.event.pull_request.base.sha",
             "github.event.pull_request.head.sha",
             "EXPECTED_BASE_SHA:",
@@ -55,19 +56,41 @@ class DcoActivationWorkflowTests(unittest.TestCase):
             "statuses/$EXPECTED_HEAD_SHA",
             '-f context="DCO sign-off check"',
             "github.workflow_sha",
+            "github.workflow_ref",
+            "source_workflow_blob",
+            "protected_workflow_blob",
             "--paginate --slurp",
-            "trusted/.github/scripts/dco_check.py",
-            "Run strict real-commit DCO self-tests",
-            "native-dco-compatibility:",
+            'startswith(".github/workflows/")',
+            "git/ref/heads/$EXPECTED_BASE_REF",
+            "merge_base_commit.sha == $base",
+            "legacy-dco-compatibility:",
             "name: DCO sign-off check",
-            "needs: dco",
-            "if: always() && github.event_name != 'pull_request_target'",
-            "NATIVE_DCO_RESULT: ${{ needs.dco.result }}",
-            'test "$NATIVE_DCO_RESULT" = "success"',
+            "needs: merge-group-provenance",
+            "if: always() && github.event_name == 'merge_group'",
+            "PROVENANCE_RESULT: ${{ needs.merge-group-provenance.result }}",
+            'test "$PROVENANCE_RESULT" = "success"',
         ):
             self.assertIn(marker, self.native)
+        self.assertEqual(self.native.count("statuses: write"), 2)
+        merge_job = self.native.split("  merge-group-provenance:\n", 1)[1].split(
+            "  legacy-dco-compatibility:\n", 1
+        )[0]
+        self.assertIn("contents: read", merge_job)
+        self.assertNotIn("statuses: write", merge_job)
+        self.assertNotIn("pull-requests: read", merge_job)
         self.assertNotIn("\n  pull_request:\n", self.native)
+        self.assertNotIn("\n  push:\n", self.native)
         self.assertNotIn("workflow_" + "dispatch:", self.native)
+        self.assertNotRegex(self.native, r"(?m)^\s*(?:-\s*)?uses:\s")
+        self.assertNotIn("actions/checkout", self.native)
+        self.assertNotIn("persist-credentials", self.native)
+        self.assertNotIn("GITHUB_WORKSPACE", self.native)
+        self.assertNotIn(".github/scripts/", self.native)
+        self.assertNotIn("dco_check.py", self.native)
+        self.assertNotIn("Signed-off-by", self.native)
+        self.assertNotIn("secrets.", self.native)
+        self.assertNotIn("contents: write", self.native)
+        self.assertNotIn("id-token:", self.native)
 
     def test_reusable_workflow_is_exact_and_secretless(self) -> None:
         for marker in (
@@ -96,11 +119,13 @@ class DcoActivationWorkflowTests(unittest.TestCase):
         self.assertNotIn("continue-on-error", self.reusable)
 
     def test_source_namespaces_are_distinct_and_legacy_status_survives(self) -> None:
-        self.assertNotEqual("Native DCO enforcement", "Reusable DCO validation")
-        self.assertIn("name: Native DCO enforcement", self.native)
+        self.assertNotEqual(
+            "Solo-builder provenance compatibility", "Reusable DCO validation"
+        )
+        self.assertIn("name: Solo-builder provenance compatibility", self.native)
         self.assertNotIn("name: Reusable DCO validation", self.native)
         self.assertIn("name: Reusable DCO validation", self.reusable)
-        self.assertNotIn("name: Native DCO enforcement", self.reusable)
+        self.assertNotIn("name: Solo-builder provenance compatibility", self.reusable)
         self.assertIn('context="DCO sign-off check"', self.native)
         self.assertEqual(self.native.count("name: DCO sign-off check\n"), 1)
         self.assertNotIn("continue-on-error", self.native)

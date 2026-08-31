@@ -65,7 +65,6 @@ jobs:
 | `reusable-node-ci.yml` | Node lint + typecheck + test + build matrix |
 | `reusable-docs-ci.yml` | Markdown lint + link-check for docs repos |
 | `reusable-release-please.yml` | Conventional-commits release automation |
-| `reusable-dco.yml` | Developer Certificate of Origin sign-off check |
 
 **Security & supply chain**
 
@@ -107,7 +106,7 @@ All Actions are SHA-pinned and wrapped with [`step-security/harden-runner`](http
 - Private vulnerability reporting: [security policy](https://github.com/szl-holdings/.github/security/policy)
 - Email: `security@szlholdings.com`
 - Canonical RFC 9116 record: [`security.txt`](./security.txt)
-- Org-wide: branch protection rulesets, signed-commit enforcement, CODEOWNERS, OpenSSF Scorecard
+- Org-wide: branch protection rulesets, exact-head provenance checks, CODEOWNERS, OpenSSF Scorecard
 - This repository's live security status is authoritative only in GitHub's [Dependabot](https://github.com/szl-holdings/.github/security/dependabot), [secret-scanning](https://github.com/szl-holdings/.github/security/secret-scanning), and [CodeQL](https://github.com/szl-holdings/.github/security/code-scanning) dashboards; organization-wide alert state is not asserted here, and this README does not freeze alert counts.
 
 ## Tooling for contributors
@@ -163,4 +162,3 @@ Org page: [github.com/szl-holdings](https://github.com/szl-holdings) · Doctrine
 ![SZL Holdings](./branding/szl-avatar-animated.gif)
 
 *The SZL Holdings animated mark (400×400, 16fps loop). Signed Yachay.*
-
