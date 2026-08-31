@@ -109,7 +109,6 @@ jobs:
     timeout-minutes: 15
     environment: production
     env:
-      HF_ORG_TOKEN: ${{ secrets.HF_ORG_TOKEN }}
       GITHUB_TOKEN: ${{ github.token }}
       HF_HUB_DISABLE_PROGRESS_BARS: "1"
       INPUT_REPO_ID: ${{ inputs.repo_id }}
@@ -182,6 +181,8 @@ jobs:
           echo "safe_target=$SAFE_TARGET" >> "$GITHUB_OUTPUT"
 
       - name: Plan or apply one expected-state publication
+        env:
+          HF_ORG_TOKEN: ${{ secrets.HF_ORG_TOKEN }}
         shell: bash
         run: |
           set -euo pipefail

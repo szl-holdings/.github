@@ -50,11 +50,26 @@ class FakeApi:
             "auth": {"accessToken": {"role": "write"}},
             "orgs": [{"name": "SZLHOLDINGS", "roleInOrg": "admin"}],
         }
+        self.write_authorized_targets = set(states)
+        self.auth_checks: list[dict[str, object]] = []
+        self.auth_check_error: Exception | None = None
+        self.auth_check_result: object | None = None
 
     def whoami(self, *, cache: bool) -> dict:
         if cache:
             raise AssertionError("credential preflight must not use cached identity")
         return copy.deepcopy(self.identity)
+
+    def auth_check(self, *, repo_id: str, repo_type: str, write: bool) -> object:
+        call = {"repo_id": repo_id, "repo_type": repo_type, "write": write}
+        self.auth_checks.append(call)
+        if repo_type != "space" or write is not True:
+            raise AssertionError("credential preflight escaped exact Space write check")
+        if self.auth_check_error is not None:
+            raise self.auth_check_error
+        if repo_id not in self.write_authorized_targets:
+            raise PermissionError("target-specific write access denied")
+        return self.auth_check_result
 
     def space_info(self, *, repo_id: str, expand: list[str]) -> SimpleNamespace:
         if expand != ["private", "runtime", "sdk", "sha"]:
@@ -140,6 +155,13 @@ class LifecycleTests(unittest.TestCase):
             module.AUTHORITY_ARTIFACT_DIGEST,
         )
         self.assertEqual(policy["token_authority"]["required_org_role"], "admin")
+        self.assertFalse(
+            policy["token_authority"]["reported_access_token_role_is_authority"]
+        )
+        self.assertEqual(
+            policy["token_authority"]["required_target_write_preflight"],
+            'HfApi.auth_check(repo_id=target, repo_type="space", write=True)',
+        )
         self.assertTrue(all(target.visibility == "public" for target in targets.values()))
         self.assertTrue(
             all(target.runtime_stage == "RUNNING" for target in targets.values())
@@ -162,6 +184,11 @@ class LifecycleTests(unittest.TestCase):
         weakened = copy.deepcopy(self.policy)
         weakened["boundaries"]["archive"] = True
         mutations.append(weakened)
+        role_authority = copy.deepcopy(self.policy)
+        role_authority["token_authority"][
+            "reported_access_token_role_is_authority"
+        ] = True
+        mutations.append(role_authority)
         repointed = copy.deepcopy(self.policy)
         repointed["authority"]["artifact_digest"] = "sha256:" + "f" * 64
         mutations.append(repointed)
@@ -174,7 +201,7 @@ class LifecycleTests(unittest.TestCase):
 
     def test_arbitrary_target_rejected_before_identity_or_provider_read(self) -> None:
         class ExplodingClient:
-            def verify_operator(self) -> dict:
+            def verify_operator(self, _repo_id: str) -> dict:
                 raise AssertionError("provider must not be called")
 
         report, code = module.reconcile(
@@ -194,18 +221,47 @@ class LifecycleTests(unittest.TestCase):
         self.assertEqual(code, 2)
         self.assertEqual(report["result"], "BLOCKED_PRECONDITION")
 
-    def test_token_preflight_requires_write_and_org_admin(self) -> None:
+    def test_target_write_preflight_is_exact_and_role_is_informational(self) -> None:
         repo_id = "SZLHOLDINGS/a11oy"
         api = FakeApi({repo_id: state(repo_id, "public")})
-        safe = module.HubSpaceClient(api).verify_operator()
-        self.assertEqual(safe["access_token_role"], "write")
+        safe = module.HubSpaceClient(api).verify_operator(repo_id)
+        self.assertEqual(safe["access_token_role_reported"], "write")
+        self.assertFalse(safe["access_token_role_is_authority"])
         self.assertEqual(safe["organization_role"], "admin")
+        self.assertEqual(safe["target_write_authority"], "VERIFIED")
+        self.assertEqual(safe["target_write_repository"], repo_id)
+        self.assertEqual(
+            api.auth_checks,
+            [{"repo_id": repo_id, "repo_type": "space", "write": True}],
+        )
+
+        # A fine-grained label alone proves nothing when this target is read-only.
+        api.identity["auth"]["accessToken"]["role"] = "fineGrained"
+        api.write_authorized_targets.clear()
+        with self.assertRaises(module.LifecycleError):
+            module.HubSpaceClient(api).verify_operator(repo_id)
+        self.assertEqual(api.mutations, [])
+
+        # A token with write authority elsewhere must still fail this exact target.
+        api.identity["auth"]["accessToken"]["role"] = "write"
+        api.write_authorized_targets = {"SZLHOLDINGS/killinchu"}
+        with self.assertRaises(module.LifecycleError):
+            module.HubSpaceClient(api).verify_operator(repo_id)
+        self.assertEqual(api.mutations, [])
+
+    def test_target_write_preflight_rejects_identity_transport_and_malformed_results(self) -> None:
+        repo_id = "SZLHOLDINGS/a11oy"
+        api = FakeApi({repo_id: state(repo_id, "public")})
         for identity in (
             {"type": "org", "auth": {}, "orgs": []},
+            {"type": "user", "orgs": [{"name": "SZLHOLDINGS", "roleInOrg": "admin"}]},
             {
                 "type": "user",
-                "auth": {"accessToken": {"role": "read"}},
-                "orgs": [{"name": "SZLHOLDINGS", "roleInOrg": "admin"}],
+                "auth": {"accessToken": {"role": "write"}},
+                "orgs": [
+                    {"name": "SZLHOLDINGS", "roleInOrg": "admin"},
+                    {"name": "SZLHOLDINGS", "roleInOrg": "admin"},
+                ],
             },
             {
                 "type": "user",
@@ -215,7 +271,30 @@ class LifecycleTests(unittest.TestCase):
         ):
             api.identity = identity
             with self.assertRaises(module.LifecycleError):
-                module.HubSpaceClient(api).verify_operator()
+                module.HubSpaceClient(api).verify_operator(repo_id)
+
+        api.identity = {
+            "type": "user",
+            "auth": {"accessToken": {"role": "fineGrained"}},
+            "orgs": [{"name": "SZLHOLDINGS", "roleInOrg": "admin"}],
+        }
+        for provider_error in (
+            RuntimeError("unexpected redirect with hf_fake_token"),
+            TimeoutError("transport failed with hf_fake_token"),
+            ValueError("malformed provider response with hf_fake_token"),
+        ):
+            api.auth_check_error = provider_error
+            with self.assertRaises(module.LifecycleError) as caught:
+                module.HubSpaceClient(api).verify_operator(repo_id)
+            self.assertNotIn("hf_fake_token", str(caught.exception))
+            self.assertEqual(api.mutations, [])
+
+        api.auth_check_error = None
+        for ambiguous_result in (False, True, {}):
+            api.auth_check_result = ambiguous_result
+            with self.assertRaises(module.LifecycleError):
+                module.HubSpaceClient(api).verify_operator(repo_id)
+            self.assertEqual(api.mutations, [])
 
     def test_unknown_private_state_and_provider_denial_never_mutate(self) -> None:
         repo_id = "SZLHOLDINGS/anatomy"
@@ -484,7 +563,25 @@ class LifecycleTests(unittest.TestCase):
         self.assertNotIn("  push:\n", workflow)
         self.assertIn("group: hf-provider-mutation-szlholdings", workflow)
         self.assertIn("environment: production", workflow)
-        self.assertIn("HF_ORG_TOKEN: ${{ secrets.HF_ORG_TOKEN }}", workflow)
+        secret_binding = "HF_ORG_TOKEN: ${{ secrets.HF_ORG_TOKEN }}"
+        secret_lines = [
+            line for line in workflow.splitlines() if "HF_ORG_TOKEN" in line
+        ]
+        self.assertEqual(secret_lines, [f"          {secret_binding}"])
+        self.assertEqual(workflow.count(secret_binding), 1)
+        step_blocks = re.split(r"(?=^      - name:)", workflow, flags=re.MULTILINE)
+        controller_steps = [
+            block
+            for block in step_blocks
+            if block.startswith(
+                "      - name: Plan or apply one expected-state publication"
+            )
+        ]
+        self.assertEqual(len(controller_steps), 1)
+        self.assertIn(secret_binding, controller_steps[0])
+        for block in step_blocks:
+            if block is not controller_steps[0]:
+                self.assertNotIn("HF_ORG_TOKEN", block)
         self.assertIn("--expected-policy-sha256", workflow)
         self.assertIn("--require-hashes", workflow)
         self.assertIn("persist-credentials: false", workflow)
@@ -493,6 +590,12 @@ class LifecycleTests(unittest.TestCase):
         self.assertTrue(all(re.fullmatch(r"[0-9a-f]{40}", ref) for ref in uses))
 
         source = SCRIPT.read_text(encoding="utf-8")
+        self.assertEqual(source.count("self.api.auth_check("), 1)
+        self.assertIn('repo_type="space"', source)
+        self.assertIn("write=True", source)
+        self.assertIn("if auth_result is not None:", source)
+        self.assertIn("follow_redirects=False", source)
+        self.assertIn("endpoint=HUGGING_FACE_ENDPOINT", source)
         self.assertEqual(source.count("self.api.update_repo_settings("), 1)
         self.assertIn("private=False", source)
         for forbidden in (
@@ -509,6 +612,11 @@ class LifecycleTests(unittest.TestCase):
             "create_commit(",
             "upload_file(",
             "upload_folder(",
+            "duplicate_space(",
+            "request_space_storage(",
+            "set_space_sleep_time(",
+            "delete_space_secret(",
+            "delete_space_variable(",
         ):
             self.assertNotIn(forbidden, source)
         self.assertIn(
