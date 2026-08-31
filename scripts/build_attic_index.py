@@ -31,7 +31,10 @@ from pathlib import Path
 
 ORG = "szl-holdings"
 ATTIC = Path(__file__).resolve().parent.parent / "ATTIC.md"
-CANONICAL_RE = re.compile(r"Canonical:\s*https://github\.com/[\w.-]+/([\w.-]+)")
+CANONICAL_RE = re.compile(
+    r"Canonical:\s*https://github\.com/[A-Za-z0-9_.-]+/"
+    r"([A-Za-z0-9_.-]*[A-Za-z0-9_-])(?=$|[\s),.;:])"
+)
 
 TERMINAL_BY_DESIGN = {
     "evidence-typed-formula-governance": (
