@@ -1,0 +1,164 @@
+name: Repair attic metadata and generated index
+
+on:
+  push:
+    branches:
+      - fix/trusted-secret-health-attic-20260831
+    paths:
+      - .github/workflows/repair-attic-metadata-index.yml
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+
+concurrency:
+  group: repair-attic-metadata-index
+  cancel-in-progress: false
+
+jobs:
+  repair:
+    name: Correct exact metadata and regenerate ATTIC
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Harden runner
+        uses: step-security/harden-runner@b09bb98e06d4d774595224525879c09bc6e98c40 # v2.20.1
+        with:
+          egress-policy: audit
+
+      - name: Checkout exact repair branch
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: fix/trusted-secret-health-attic-20260831
+          fetch-depth: 1
+          persist-credentials: true
+
+      - name: Correct bounded public repository metadata
+        env:
+          GH_ADMIN_TOKEN: ${{ secrets.SZL_GITHUB_TOKEN }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "$GH_ADMIN_TOKEN" || {
+            echo "SZL_GITHUB_TOKEN is unavailable on the trusted repair branch." >&2
+            exit 1
+          }
+          python3 - <<'PY'
+          import json
+          import os
+          import urllib.error
+          import urllib.request
+          from pathlib import Path
+
+          token = os.environ["GH_ADMIN_TOKEN"]
+          api = "https://api.github.com"
+          targets = {
+              "governed-inference-meter": {
+                  "before": "DEPRECATED — folded into https://github.com/szl-holdings/szl-energy-attest. Archived frozen for provenance; HF model SZLHOLDINGS/governed-inference-meter stays live (tagged deprecated). Energy-metered governed inference receipts. Apache-2.0.",
+                  "after": "DEPRECATED. Canonical: https://github.com/szl-holdings/szl-energy-attest. Archived frozen for provenance; HF model SZLHOLDINGS/governed-inference-meter remains tagged deprecated. Apache-2.0.",
+              },
+              "szl-governed-norm": {
+                  "before": "DEPRECATED — folded into https://github.com/szl-holdings/szl-lambda-gate. Archived frozen for provenance; HF model SZLHOLDINGS/szl-governed-norm stays live. Governed RMSNorm/LayerNorm kernel, SHA3-256 receipt option. Apache-2.0.",
+                  "after": "DEPRECATED. Canonical: https://github.com/szl-holdings/szl-lambda-gate. Archived frozen for provenance; HF model SZLHOLDINGS/szl-governed-norm remains available. Apache-2.0.",
+              },
+              "szl-fleet-overlay": {
+                  "before": "ARCHIVED hologram/duplicate. Canonical: https://github.com/szl-holdings/szl-uds-deployment (frozen WarHacker-2026 UDS lineage)",
+                  "after": "ARCHIVED WarHacker-2026 UDS fleet-overlay evidence snapshot. Frozen for provenance; terminal by design with no active software successor. Apache-2.0.",
+              },
+              "szl-uds-deployment": {
+                  "before": "Live UDS governance-receipt deployment (Warhacker 2026) — k3d + uds-cli + Pepr DSSE receipt policy, cosign-verified. Doctrine v11 LOCKED (749/14/163).",
+                  "after": "ARCHIVED WarHacker-2026 UDS deployment evidence snapshot (k3d + uds-cli + Pepr DSSE). Frozen for reproducibility; terminal by design. Apache-2.0.",
+              },
+              "szl-otel-mesh": {
+                  "before": "szl-otel-mesh — UDS cross-component OTel span schemas + DSSE governance receipts onto Khipu Merkle DAG. Layer-5 observability for the SZL 5-organ mesh. Doctrine v11 LOCKED · DOI 10.5281/zenodo.20434276 · Apache-2.0.",
+                  "after": "ARCHIVED OpenTelemetry/DSSE research artifact for the SZL mesh. DOI 10.5281/zenodo.20434276. Immutable evidence terminal by design. Apache-2.0.",
+              },
+              "warhacker-demo": {
+                  "before": "SOVEREIGN Warhacker demo dry-run for the RTX 4060 Ti tower: one-command tower verification, GPU k3d + UDS deploy, airgap test, thermal guard, Khipu 3-of-4 kill-move. Apache-2.0. Doctrine v11 LOCKED (749/14/163).",
+                  "after": "ARCHIVED WarHacker-2026 RTX 4060 Ti tower dry-run snapshot: GPU k3d/UDS, air-gap, thermal guard, Khipu kill-move. Terminal evidence artifact. Apache-2.0.",
+              },
+          }
+          headers = {
+              "Accept": "application/vnd.github+json",
+              "Authorization": f"Bearer {token}",
+              "X-GitHub-Api-Version": "2022-11-28",
+              "User-Agent": "szl-attic-repair",
+          }
+          receipt = {"schema": "szl.attic-metadata-repair.v1", "changes": []}
+
+          def request(method: str, path: str, payload=None):
+              data = None
+              local_headers = dict(headers)
+              if payload is not None:
+                  data = json.dumps(payload, separators=(",", ":")).encode("utf-8")
+                  local_headers["Content-Type"] = "application/json"
+              req = urllib.request.Request(api + path, data=data, headers=local_headers, method=method)
+              try:
+                  with urllib.request.urlopen(req, timeout=30) as response:
+                      raw = response.read()
+                      return response.status, json.loads(raw) if raw else None
+              except urllib.error.HTTPError as exc:
+                  detail = exc.read().decode("utf-8", errors="replace")[:1000]
+                  raise RuntimeError(f"{method} {path} returned {exc.code}: {detail}") from exc
+
+          for name, contract in targets.items():
+              path = f"/repos/szl-holdings/{name}"
+              _, live = request("GET", path)
+              if live.get("archived") is not True:
+                  raise RuntimeError(f"Refusing non-archived repository: {name}")
+              current = live.get("description") or ""
+              if current == contract["after"]:
+                  state = "already-correct"
+              elif current == contract["before"]:
+                  _, updated = request("PATCH", path, {"description": contract["after"]})
+                  if updated.get("description") != contract["after"] or updated.get("archived") is not True:
+                      raise RuntimeError(f"Metadata readback failed for {name}")
+                  state = "updated"
+              else:
+                  raise RuntimeError(f"Description drifted for {name}; refusing overwrite")
+              _, verified = request("GET", path)
+              if verified.get("description") != contract["after"] or verified.get("archived") is not True:
+                  raise RuntimeError(f"Final metadata verification failed for {name}")
+              receipt["changes"].append({"repository": name, "state": state})
+              print(f"{name}: {state}")
+
+          receipt["result"] = "PASS"
+          Path("reports").mkdir(exist_ok=True)
+          Path("reports/attic-metadata-repair.json").write_text(
+              json.dumps(receipt, indent=2, sort_keys=True) + "\n",
+              encoding="utf-8",
+          )
+          PY
+
+      - name: Regenerate and verify the public tombstone index
+        env:
+          GH_TOKEN: ${{ secrets.SZL_GITHUB_TOKEN }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          python scripts/build_attic_index.py --write
+          python scripts/build_attic_index.py --check
+          git diff --check
+          test "$(git diff --name-only)" = "ATTIC.md"
+
+      - name: Commit exact generated index
+        shell: bash
+        env:
+          BRANCH: fix/trusted-secret-health-attic-20260831
+        run: |
+          set -euo pipefail
+          git config user.name 'SZL CI'
+          git config user.email 'noreply@szlholdings.ai'
+          git add ATTIC.md
+          git diff --cached --quiet && { echo "ATTIC.md already current."; exit 0; }
+          git commit -m 'docs: regenerate verified public attic index'
+          git push origin "HEAD:${BRANCH}"
+
+      - name: Upload immutable metadata repair receipt
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: attic-metadata-repair-${{ github.run_id }}
+          path: reports/attic-metadata-repair.json
+          if-no-files-found: error
+          retention-days: 90
