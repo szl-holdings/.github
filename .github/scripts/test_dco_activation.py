@@ -44,6 +44,8 @@ class DcoActivationWorkflowTests(unittest.TestCase):
             "pull-request-provenance:",
             "merge-group-provenance:",
             "Reconcile surviving provenance status",
+            "EXPECTED_BASE_REF: ${{ steps.reconciliation-subject.outputs.base_ref }}",
+            "EXPECTED_BASE_SHA: ${{ steps.reconciliation-subject.outputs.base_sha }}",
             "github.event.before",
             "AFFECTED_HEAD_SHA:",
             "Finalize pull-request provenance failure",
@@ -59,6 +61,7 @@ class DcoActivationWorkflowTests(unittest.TestCase):
             "github.workflow_ref",
             "source_workflow_blob",
             "protected_workflow_blob",
+            ".github/workflows/dco.yml@refs/heads/$EXPECTED_BASE_REF",
             "--paginate --slurp",
             'startswith(".github/workflows/")',
             "git/ref/heads/$EXPECTED_BASE_REF",
@@ -72,6 +75,14 @@ class DcoActivationWorkflowTests(unittest.TestCase):
         ):
             self.assertIn(marker, self.native)
         self.assertEqual(self.native.count("statuses: write"), 2)
+        self.assertGreaterEqual(self.native.count("candidate_workflows"), 2)
+        self.assertNotIn(
+            '.github/workflows/dco.yml@refs/heads/main"', self.native
+        )
+        self.assertLess(
+            self.native.index("Resolve the surviving governed pull request"),
+            self.native.index("Assert exact protected reconciliation source"),
+        )
         merge_job = self.native.split("  merge-group-provenance:\n", 1)[1].split(
             "  legacy-dco-compatibility:\n", 1
         )[0]
