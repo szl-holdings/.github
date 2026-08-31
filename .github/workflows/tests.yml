@@ -245,6 +245,13 @@ jobs:
       - name: HF publisher immutable dependency closure self-test
         run: python3 .github/scripts/test_hf_publisher_lock.py
 
+      # Pins the one-Space lifecycle controller to the authenticated 46-Space
+      # inventory and its public-only compare-and-set boundary. The tests are
+      # network-free and prove that archive/private/runtime/upload/secret paths
+      # cannot enter the controller and that an unverified write is UNKNOWN.
+      - name: HF Space lifecycle public-CAS self-test
+        run: python3 .github/scripts/test_hf_space_lifecycle_reconcile.py
+
       - name: HF publisher clean Linux install and runtime proof
         shell: bash
         run: |
