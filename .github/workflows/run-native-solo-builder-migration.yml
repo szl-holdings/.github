@@ -37,7 +37,7 @@ jobs:
         shell: bash
         env:
           EXPECTED_BRANCH: chore/native-solo-builder-provenance-20260831
-          EXPECTED_PARENT_SHA: 8479c98e5d045e83a7722932c1af82e26a68b8aa
+          EXPECTED_PARENT_SHA: 56063c93a2eda57b305a6a8a3aa422c0328cc5a2
         run: |
           set -euo pipefail
           test "$GITHUB_REF_NAME" = "$EXPECTED_BRANCH"
@@ -67,6 +67,11 @@ jobs:
               line[10:] if line.startswith('          ') else line
               for line in program.splitlines()
           ) + '\n'
+          old = "updated, count = re.subn(pattern, replacement, text, count=1, flags=flags)"
+          new = "updated, count = re.subn(pattern, lambda _match: replacement, text, count=1, flags=flags)"
+          if normalized.count(old) != 1:
+              raise SystemExit('regex helper source is not exact')
+          normalized = normalized.replace(old, new, 1)
           target = Path('/tmp/apply_native_solo_builder_governance.py')
           target.write_text(normalized, encoding='utf-8')
           compile(target.read_text(encoding='utf-8'), str(target), 'exec')
