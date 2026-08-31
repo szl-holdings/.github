@@ -390,7 +390,6 @@ class KernelHubGitTransport:
                             f"release(card): publish reviewed Kernel contract {generation[:12]}",
                             "-m",
                             "Card/contract-only update; first-class build variants are preserved.",
-                            "-m",
                         ],
                         cwd=repo,
                         env=env,
