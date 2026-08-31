@@ -37,7 +37,7 @@ jobs:
         shell: bash
         env:
           EXPECTED_BRANCH: chore/native-solo-builder-provenance-20260831
-          EXPECTED_PARENT_SHA: 56063c93a2eda57b305a6a8a3aa422c0328cc5a2
+          EXPECTED_PARENT_SHA: 3e135b81090811f500baa265533fcd3afca95521
         run: |
           set -euo pipefail
           test "$GITHUB_REF_NAME" = "$EXPECTED_BRANCH"
@@ -67,11 +67,31 @@ jobs:
               line[10:] if line.startswith('          ') else line
               for line in program.splitlines()
           ) + '\n'
-          old = "updated, count = re.subn(pattern, replacement, text, count=1, flags=flags)"
-          new = "updated, count = re.subn(pattern, lambda _match: replacement, text, count=1, flags=flags)"
-          if normalized.count(old) != 1:
+
+          old_subn = "updated, count = re.subn(pattern, replacement, text, count=1, flags=flags)"
+          new_subn = "updated, count = re.subn(pattern, lambda _match: replacement, text, count=1, flags=flags)"
+          if normalized.count(old_subn) != 1:
               raise SystemExit('regex helper source is not exact')
-          normalized = normalized.replace(old, new, 1)
+          normalized = normalized.replace(old_subn, new_subn, 1)
+
+          stale_guard = 'if re.search(r"\\bDCO\\b", workflows, re.I):\n'
+          stale_rewrite = '''workflows = re.sub(
+    r"### Repository-native provenance compatibility\\n.*?\\n## Calling a reusable workflow",
+    """### Native solo-builder provenance
+
+`.github/workflows/solo-builder-provenance.yml` replaces the retired commit-trailer compatibility layer. It validates exact organization-owned pull-request heads and protected base state without checking out candidate code or consuming repository secrets. Build, security, staging, signed-commit, merge-queue, and release-attestation controls remain independent requirements.
+
+## Calling a reusable workflow""",
+    workflows,
+    count=1,
+    flags=re.S,
+)
+if re.search(r"\\bDCO\\b", workflows, re.I):
+'''
+          if normalized.count(stale_guard) != 1:
+              raise SystemExit('WORKFLOWS.md stale-policy guard is not exact')
+          normalized = normalized.replace(stale_guard, stale_rewrite, 1)
+
           target = Path('/tmp/apply_native_solo_builder_governance.py')
           target.write_text(normalized, encoding='utf-8')
           compile(target.read_text(encoding='utf-8'), str(target), 'exec')
