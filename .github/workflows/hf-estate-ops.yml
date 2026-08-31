@@ -1,0 +1,192 @@
+name: HF estate ops (manual)
+
+# Dispatch-only operator workflow for the SZLHOLDINGS Hugging Face estate.
+# Executes the archive waves from docs/HF_SPACES_CONSOLIDATION.md and performs
+# Space restarts, using the repo/org HF token secrets. Conventions match the
+# lifecycle controller: fail-closed, status-only logging, tokens never printed,
+# single org-wide provider-mutation concurrency group.
+#
+# Ops:
+#   probe         - report each token's auth type/role + orgs (read-only)
+#   plan-archive  - list the group's Spaces with sdk/visibility/archive state
+#   apply-archive - archive the group's Spaces, verifying state after each
+#   restart-space - restart one exact Space (repo_id input), report runtime stage
+
+on:
+  workflow_dispatch:
+    inputs:
+      op:
+        description: Operation to perform
+        type: choice
+        options:
+          - probe
+          - plan-archive
+          - apply-archive
+          - restart-space
+        default: probe
+      group:
+        description: Consolidation group (D-K from the merged plan)
+        type: choice
+        options:
+          - D
+          - F
+          - G
+          - H
+          - I
+          - K
+        default: D
+      repo_id:
+        description: Exact Space for restart-space, e.g. SZLHOLDINGS/governed-receipt-verifier
+        type: string
+        required: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: hf-provider-mutation-szlholdings
+  cancel-in-progress: false
+
+jobs:
+  hf-estate-ops:
+    name: HF estate ops
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      HF_TOKEN: ${{ secrets.HF_TOKEN }}
+      HF_ORG_TOKEN: ${{ secrets.HF_ORG_TOKEN }}
+      INPUT_OP: ${{ inputs.op }}
+      INPUT_GROUP: ${{ inputs.group }}
+      INPUT_REPO_ID: ${{ inputs.repo_id }}
+    steps:
+      - name: Harden runner
+        uses: step-security/harden-runner@05e31511f85b41b11d1cf0ef85d0992719546e2c # v2.21.0
+        with:
+          egress-policy: audit
+
+      - name: Prove dispatch context
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$GITHUB_EVENT_NAME" = workflow_dispatch
+          test "$GITHUB_REPOSITORY" = szl-holdings/.github
+          test "$GITHUB_REF" = refs/heads/main
+
+      - name: Run estate op
+        shell: bash
+        run: |
+          python3 <<'PYEOF'
+          import json, os, urllib.request, urllib.error
+
+          ORG = "SZLHOLDINGS"
+          GROUPS = {
+              "D": ["immune-lattice"],
+              "F": ["khipu-lab"],
+              "G": ["lyte-services"],
+              "H": ["counsel"],
+              "I": ["szl-real-estate"],
+              "K": ["holographic", "nexus"],
+          }
+
+          def call(token, method, path, payload=None):
+              req = urllib.request.Request(
+                  f"https://huggingface.co{path}",
+                  method=method,
+                  headers={"Authorization": f"Bearer {token}",
+                           "Content-Type": "application/json"},
+                  data=json.dumps(payload).encode() if payload is not None else None,
+              )
+              try:
+                  with urllib.request.urlopen(req, timeout=30) as resp:
+                      return resp.status, resp.read().decode()
+              except urllib.error.HTTPError as e:
+                  return e.code, e.read().decode()[:300]
+
+          op = os.environ["INPUT_OP"]
+          group = os.environ["INPUT_GROUP"]
+          repo_id_input = (os.environ.get("INPUT_REPO_ID") or "").strip()
+          tokens = {k: v for k, v in {
+              "HF_ORG_TOKEN": os.environ.get("HF_ORG_TOKEN") or "",
+              "HF_TOKEN": os.environ.get("HF_TOKEN") or "",
+          }.items() if v}
+          print(f"op={op} group={group} tokens_present={sorted(tokens)}")
+
+          if not tokens:
+              print("::error::no HF token secrets available")
+              raise SystemExit(1)
+
+          if op == "probe":
+              for name, tok in tokens.items():
+                  status, body = call(tok, "GET", "/api/whoami-v2")
+                  if status != 200:
+                      print(f"{name}: whoami HTTP {status}")
+                      continue
+                  data = json.loads(body)
+                  auth = data.get("auth", {}) or {}
+                  acc = auth.get("accessToken", {}) or {}
+                  orgs = [f"{o.get('name')}:{o.get('roleInOrg', '?')}"
+                          for o in data.get("orgs", [])]
+                  print(f"{name}: type={data.get('type')} auth_type={auth.get('type')} "
+                        f"role={acc.get('role')} orgs={orgs}")
+              raise SystemExit(0)
+
+          # pick the first authenticating token
+          chosen = None
+          for name, tok in tokens.items():
+              status, _ = call(tok, "GET", "/api/whoami-v2")
+              if status == 200:
+                  chosen = (name, tok)
+                  break
+          if not chosen:
+              print("::error::no token authenticated")
+              raise SystemExit(1)
+          tname, token = chosen
+          print(f"acting with {tname}")
+
+          if op == "restart-space":
+              if not repo_id_input.startswith(f"{ORG}/"):
+                  print("::error::repo_id must be an exact SZLHOLDINGS/<space>")
+                  raise SystemExit(1)
+              s, b = call(token, "POST", f"/api/spaces/{repo_id_input}/restart")
+              print(f"restart {repo_id_input}: HTTP {s}")
+              s2, b2 = call(token, "GET", f"/api/spaces/{repo_id_input}")
+              if s2 == 200:
+                  rt = (json.loads(b2).get("runtime") or {})
+                  print(f"verify stage={rt.get('stage')} sdk={json.loads(b2).get('sdk')}")
+              raise SystemExit(0 if s in (200, 201, 204) else 1)
+
+          exit_code = 0
+          for space in GROUPS[group]:
+              rid = f"{ORG}/{space}"
+              status, body = call(token, "GET", f"/api/spaces/{rid}")
+              if status != 200:
+                  print(f"{space}: GET HTTP {status} -> skip")
+                  exit_code = 1
+                  continue
+              info = json.loads(body)
+              archived = info.get("archived")
+              stage = (info.get("runtime") or {}).get("stage")
+              print(f"{space}: sdk={info.get('sdk')} private={info.get('private')} "
+                    f"archived={archived} stage={stage} lastModified={info.get('lastModified')}")
+              if op == "plan-archive":
+                  print(f"{space}: PLAN would archive")
+                  continue
+              if archived:
+                  print(f"{space}: already archived")
+                  continue
+              s1, b1 = call(token, "POST", f"/api/spaces/{rid}/archive")
+              if s1 in (200, 201, 204):
+                  print(f"{space}: archive POST -> {s1}")
+              else:
+                  s2, b2 = call(token, "PUT", f"/api/spaces/{rid}/settings",
+                                {"archived": True})
+                  print(f"{space}: archive POST {s1}; settings PUT -> {s2} {b2[:160]}")
+                  if s2 not in (200, 201, 204):
+                      exit_code = 1
+                      continue
+              s3, b3 = call(token, "GET", f"/api/spaces/{rid}")
+              ok = s3 == 200 and json.loads(b3).get("archived") is True
+              print(f"{space}: verify archived={ok}")
+              exit_code = exit_code or (0 if ok else 1)
+          raise SystemExit(exit_code)
+          PYEOF
