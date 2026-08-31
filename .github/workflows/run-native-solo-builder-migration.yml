@@ -37,7 +37,7 @@ jobs:
         shell: bash
         env:
           EXPECTED_BRANCH: chore/native-solo-builder-provenance-20260831
-          EXPECTED_PARENT_SHA: b81d109143ae2db296cdf1403e19f62a9c9ea17e
+          EXPECTED_PARENT_SHA: 5fa2b88935921156d4d316a22fc821fa35c5acae
         run: |
           set -euo pipefail
           test "$GITHUB_REF_NAME" = "$EXPECTED_BRANCH"
@@ -87,8 +87,8 @@ jobs:
               raise SystemExit('stale workflow documentation anchor is not exact')
           path.write_text(text.replace(old, new, 1), encoding='utf-8')
           PY
-          python3 /tmp/apply_native_solo_builder_governance.py
           rm -f .github/workflows/run-native-solo-builder-migration.yml
+          python3 /tmp/apply_native_solo_builder_governance.py
 
       - name: Verify migrated governance locally
         shell: bash
