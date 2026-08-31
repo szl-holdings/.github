@@ -81,10 +81,6 @@ STAGING_STATUS = {
     "context": "deploy/staging",
     "integration_id": 15368,
 }
-DCO_STATUS = {
-    "context": "DCO sign-off check",
-    "integration_id": 15368,
-}
 COMMIT_MESSAGE_PATTERN = (
     r"^(feat|fix|docs|chore|refactor|test|perf|build|ci|revert)"
     r"(\([a-z0-9._/-]+\))?!?: [^\r\n]{1,100}(\r?\n(.|\r|\n)*)?$"
@@ -114,9 +110,9 @@ FORBIDDEN_EXECUTABLE_PATTERNS = {
 }
 
 ATTESTOR_SELF_EDIT_GUARD = (
-    r"^(\.github/workflows/(attest-and-approve|dco|gates|forge9-staging|"
-    r"merge-queue-enqueue)\.ya?ml|\.github/scripts/(dco_check|test_dco_check)\.py|"
-    r"\.governance/)"
+    r"^(\.github/workflows/(attest-and-approve|gates|forge9-staging|"
+    r"merge-queue-enqueue|solo-builder-provenance)\.ya?ml|"
+    r"\.github/scripts/test_solo_builder_provenance\.py|\.governance/)"
 )
 GOVERNED_BASE_FILTER = (
     '.base.ref == "main"\n'
@@ -374,10 +370,10 @@ def verify_ruleset() -> None:
     contexts = [
         item.get("context") for item in required if isinstance(item, dict)
     ]
-    if contexts != GATES + [STAGING_STATUS["context"], DCO_STATUS["context"]]:
-        fail("main required checks must contain the gates, staging, and DCO")
-    if required[-2:] != [STAGING_STATUS, DCO_STATUS]:
-        fail("main staging and DCO checks must be pinned to GitHub Actions")
+    if contexts != GATES + [STAGING_STATUS["context"]]:
+        fail("main required checks must contain the gates and staging")
+    if required[-1:] != [STAGING_STATUS]:
+        fail("main staging check must be pinned to GitHub Actions")
     if ATTESTATION_STATUS in required:
         fail(
             "main must not require the workflow-run attestation status because "
@@ -446,161 +442,44 @@ def verify_gate_contract() -> None:
     if not (ROOT / ".github/workflows/forge9-staging.yml").is_file():
         fail("the staging deployment workflow is not active")
 
-    dco_template = (ROOT / ".github/workflows/dco.yml").read_text(encoding="utf-8")
+    provenance_template = (
+        ROOT / ".github/workflows/solo-builder-provenance.yml"
+    ).read_text(encoding="utf-8")
     for marker in (
-        "name: Solo-builder provenance compatibility",
+        "name: Required solo-builder provenance",
         "pull_request_target:",
         "merge_group:",
-        "types: [checks_requested]",
         "permissions: {}",
         "pull-request-provenance:",
         "merge-group-provenance:",
-        "github.event.pull_request.base.sha",
-        "github.event.pull_request.head.sha",
-        "github.workflow_ref",
-        "github.workflow_sha",
-        "source_workflow_blob",
-        "protected_workflow_blob",
-        ".github/workflows/dco.yml@refs/heads/$EXPECTED_BASE_REF",
-        "--paginate --slurp",
-        'startswith(".github/workflows/")',
+        "EXPECTED_BASE_REPOSITORY:",
+        "EXPECTED_BASE_SHA:",
+        "EXPECTED_HEAD_REPOSITORY:",
+        "EXPECTED_HEAD_SHA:",
+        "szl-holdings/*",
+        '.state == "open"',
+        ".draft == false",
+        ".base.sha == $base_sha",
+        ".head.sha == $head_sha",
         "merge_base_commit.sha == $base",
-        "legacy-dco-compatibility:",
-        "name: DCO sign-off check",
-        "needs: merge-group-provenance",
-        "if: always() && github.event_name == 'merge_group'",
-        "PROVENANCE_RESULT: ${{ needs.merge-group-provenance.result }}",
-        'test "$PROVENANCE_RESULT" = "success"',
-        "Reconcile surviving provenance status",
-        "EXPECTED_BASE_REF: ${{ steps.reconciliation-subject.outputs.base_ref }}",
-        "EXPECTED_BASE_SHA: ${{ steps.reconciliation-subject.outputs.base_sha }}",
     ):
-        if marker not in dco_template:
-            fail(f"trusted provenance workflow is missing {marker!r}")
-    if "\n  pull_request:\n" in dco_template:
-        fail("provenance compatibility must use protected pull_request_target")
-    if "\n  push:\n" in dco_template:
-        fail("provenance compatibility must not publish post-merge evidence")
-    if "workflow_dispatch:" in dco_template:
-        fail("provenance compatibility must not publish a manual false green")
-    if re.search(r"(?m)^\s*(?:-\s*)?uses:\s", dco_template):
-        fail("native provenance workflow must not invoke an action")
+        if marker not in provenance_template:
+            fail(f"solo-builder provenance workflow is missing {marker!r}")
+    if re.search(r"(?m)^\s*(?:-\s*)?uses:\s", provenance_template):
+        fail("solo-builder provenance must not invoke an action")
     for forbidden in (
         "actions/checkout",
         "persist-credentials",
         "GITHUB_WORKSPACE",
-        ".github/scripts/",
-        "dco_check.py",
-        "Signed-off-by",
         "secrets.",
         "contents: write",
+        "statuses: write",
         "id-token:",
+        "workflow_dispatch:",
+        "\n  push:\n",
     ):
-        if forbidden in dco_template:
-            fail(f"native provenance workflow contains forbidden {forbidden!r}")
-    if dco_template.count("statuses: write") != 2:
-        fail("only pull-request provenance and reconciliation may write statuses")
-    if dco_template.count("candidate_workflows") < 2:
-        fail("initial and reconciled PR evidence must both reject workflow edits")
-    if '.github/workflows/dco.yml@refs/heads/main"' in dco_template:
-        fail("protected PR provenance must bind workflow source to the target base")
-    if dco_template.index("Resolve the surviving governed pull request") > dco_template.index(
-        "Assert exact protected reconciliation source"
-    ):
-        fail("reconciliation must resolve its survivor before binding workflow source")
-    reconciliation_job = dco_template.split("  reconcile-old-head:\n", 1)[1]
-    reconciliation_source = reconciliation_job.split(
-        "      - name: Assert exact protected reconciliation source\n", 1
-    )[1].split("      - name: Revalidate the surviving exact head\n", 1)[0]
-    for marker in (
-        "EXPECTED_BASE_REF: ${{ steps.reconciliation-subject.outputs.base_ref }}",
-        "EXPECTED_BASE_SHA: ${{ steps.reconciliation-subject.outputs.base_sha }}",
-    ):
-        if marker not in reconciliation_source:
-            fail("reconciliation source must bind to the surviving PR base")
-    if "github.event.pull_request.base." in reconciliation_source:
-        fail("reconciliation source must not inherit the triggering PR base")
-    merge_group_job = dco_template.split("  merge-group-provenance:\n", 1)[1].split(
-        "  legacy-dco-compatibility:\n", 1
-    )[0]
-    if "statuses: write" in merge_group_job or "pull-requests: read" in merge_group_job:
-        fail("merge-group provenance has unnecessary pull-request or status scope")
-    if dco_template.count("name: DCO sign-off check\n") != 1:
-        fail("native provenance must expose exactly one legacy compatibility job")
-    if "continue-on-error" in dco_template:
-        fail("native provenance compatibility must not suppress a failed gate")
-
-    reusable_dco_template = (
-        ROOT / ".github/workflows/reusable-dco.yml"
-    ).read_text(encoding="utf-8")
-    for marker in (
-        "name: Reusable DCO validation",
-        "repository: ${{ job.workflow_repository }}",
-        "ref: ${{ job.workflow_sha }}",
-        "GITHUB_TOKEN: ${{ github.token }}",
-        "persist-credentials: false",
-        "trusted-dco/.github/scripts/dco_check.py",
-        "reusable-dco-compatibility:",
-        "name: DCO sign-off",
-        "needs: reusable-dco",
-        "if: always()",
-        "REUSABLE_DCO_RESULT: ${{ needs.reusable-dco.result }}",
-        'test "$REUSABLE_DCO_RESULT" = "success"',
-    ):
-        if marker not in reusable_dco_template:
-            fail(f"reusable DCO workflow is missing {marker!r}")
-    if "secrets." in reusable_dco_template or "secrets: inherit" in reusable_dco_template:
-        fail("reusable DCO workflow must not consume inherited secrets")
-    if reusable_dco_template.count("name: DCO sign-off\n") != 1:
-        fail("reusable DCO must expose exactly one legacy compatibility job")
-    if "continue-on-error" in reusable_dco_template:
-        fail("reusable DCO compatibility must not suppress a failed gate")
-
-    dco_source = (ROOT / ".github/scripts/dco_check.py").read_text(encoding="utf-8")
-    for marker in (
-        'payload.get("action") == "checks_requested"',
-        'group.get("base_ref") == "refs/heads/main"',
-        'group.get("base_sha")',
-        'group.get("head_sha")',
-        "checked_out_head(repo) == head_sha",
-        '"merge-base", "--is-ancestor"',
-        "PATCH_DIVIDER_PATTERN =",
-        "TRAILER_TOKEN_PATTERN =",
-        "def _is_patch_divider(",
-        "def valid_dco_identities(",
-        "Signed-off-by does not exactly match the commit author",
-        "draft pull requests cannot satisfy DCO",
-        "MAX_PULL_REQUEST_COMMITS = 250",
-        "pull-request commit count changed during validation",
-    ):
-        if marker not in dco_source:
-            fail(f"trusted DCO checker is missing {marker!r}")
-
-    dco_parser_tests = (
-        ROOT / ".github/scripts/test_dco_check.py"
-    ).read_text(encoding="utf-8")
-    for marker in (
-        "class RealCommitPhysicalMessageTests",
-        "test_real_commit_exact_author_identity_is_enforced",
-        "test_real_commit_terminal_patch_marker_cannot_hide_postscript",
-        "test_git_density_admission_matches_interpret_trailers",
-        "test_mixed_group_prefix_admission_matches_interpret_trailers",
-        "test_generic_key_to_colon_spacing_and_folds_are_accepted",
-        "test_unterminated_patch_marker_does_not_truncate_message",
-    ):
-        if marker not in dco_parser_tests:
-            fail(f"strict physical DCO parser tests are missing {marker!r}")
-
-    dco_event_tests = (
-        ROOT / ".github/scripts/test_dco_events.py"
-    ).read_text(encoding="utf-8")
-    for marker in (
-        "test_author_identity_comparison_is_exact",
-        "test_pr_pagination_boundaries_and_freshness",
-        "test_merge_group_identity_and_hostile_ref_contract",
-    ):
-        if marker not in dco_event_tests:
-            fail(f"trusted DCO event tests are missing {marker!r}")
+        if forbidden in provenance_template:
+            fail(f"solo-builder provenance contains forbidden {forbidden!r}")
 
     attestor_template = (
         ROOT / ".github/workflows/attest-and-approve.yml"
@@ -615,12 +494,11 @@ def verify_gate_contract() -> None:
         ".github/workflows/gates.yaml",
         ".github/workflows/forge9-staging.yml",
         ".github/workflows/forge9-staging.yaml",
-        ".github/workflows/dco.yml",
-        ".github/workflows/dco.yaml",
+        ".github/workflows/solo-builder-provenance.yml",
+        ".github/workflows/solo-builder-provenance.yaml",
         ".github/workflows/merge-queue-enqueue.yml",
         ".github/workflows/merge-queue-enqueue.yaml",
-        ".github/scripts/dco_check.py",
-        ".github/scripts/test_dco_check.py",
+        ".github/scripts/test_solo_builder_provenance.py",
         ".governance/gates.json",
     )
     for path in guarded_paths:
@@ -803,11 +681,10 @@ def verify_gate_contract() -> None:
     if release_contexts != GATES + [
         STAGING_STATUS["context"],
         ATTESTATION_STATUS["context"],
-        DCO_STATUS["context"],
     ]:
-        fail("release checks must contain gates, staging, attestation, and DCO")
-    if release_required[-3:] != [STAGING_STATUS, ATTESTATION_STATUS, DCO_STATUS]:
-        fail("release staging, attestation, and DCO checks must be App-pinned")
+        fail("release checks must contain gates, staging, and attestation")
+    if release_required[-2:] != [STAGING_STATUS, ATTESTATION_STATUS]:
+        fail("release staging and attestation checks must be App-pinned")
     if any(
         item.get("type") == "required_deployments"
         for item in typed_release_rules
@@ -832,10 +709,7 @@ def verify_legacy_paths_removed() -> None:
                 if (
                     label == "privileged pull request trigger"
                     and path
-                    in {
-                        ROOT / ".github/workflows/dco.yml",
-                        ROOT / ".github/scripts/test_dco_check.py",
-                    }
+                    == ROOT / ".github/workflows/solo-builder-provenance.yml"
                 ):
                     continue
                 if pattern.search(text):

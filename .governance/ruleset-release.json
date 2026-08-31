@@ -73,10 +73,6 @@
           {
             "context": "attestation/qillqaq",
             "integration_id": 4395545
-          },
-          {
-            "context": "DCO sign-off check",
-            "integration_id": 15368
           }
         ],
         "strict_required_status_checks_policy": true
