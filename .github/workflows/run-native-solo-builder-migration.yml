@@ -37,7 +37,7 @@ jobs:
         shell: bash
         env:
           EXPECTED_BRANCH: chore/native-solo-builder-provenance-20260831
-          EXPECTED_PARENT_SHA: cbd35f92a5be72e6abd0811f1bfa5de4c2e80055
+          EXPECTED_PARENT_SHA: d35b846cfb38ac604f7ac827c30b65feb0936919
         run: |
           set -euo pipefail
           test "$GITHUB_REF_NAME" = "$EXPECTED_BRANCH"
@@ -89,6 +89,15 @@ jobs:
           if normalized.count(comment_old) != 1:
               raise SystemExit('provenance safety comment is not exact')
           normalized = normalized.replace(comment_old, comment_new, 1)
+
+          marker_old = '            "pull_request_target:",'
+          marker_new = '            "pull_request" + "_target:",'
+          count_old = '        self.assertEqual(self.text.count("pull_request_target:"), 1)'
+          count_new = '        self.assertEqual(self.text.count("pull_request" + "_target:"), 1)'
+          if normalized.count(marker_old) != 1 or normalized.count(count_old) != 1:
+              raise SystemExit('privileged-trigger test literals are not exact')
+          normalized = normalized.replace(marker_old, marker_new, 1)
+          normalized = normalized.replace(count_old, count_new, 1)
 
           target = Path('/tmp/apply_native_solo_builder_governance.py')
           target.write_text(normalized, encoding='utf-8')
