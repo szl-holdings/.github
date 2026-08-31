@@ -37,7 +37,7 @@ jobs:
         shell: bash
         env:
           EXPECTED_BRANCH: chore/native-solo-builder-provenance-20260831
-          EXPECTED_PARENT_SHA: 3e135b81090811f500baa265533fcd3afca95521
+          EXPECTED_PARENT_SHA: b81d109143ae2db296cdf1403e19f62a9c9ea17e
         run: |
           set -euo pipefail
           test "$GITHUB_REF_NAME" = "$EXPECTED_BRANCH"
@@ -67,34 +67,25 @@ jobs:
               line[10:] if line.startswith('          ') else line
               for line in program.splitlines()
           ) + '\n'
-
-          old_subn = "updated, count = re.subn(pattern, replacement, text, count=1, flags=flags)"
-          new_subn = "updated, count = re.subn(pattern, lambda _match: replacement, text, count=1, flags=flags)"
-          if normalized.count(old_subn) != 1:
+          old = "updated, count = re.subn(pattern, replacement, text, count=1, flags=flags)"
+          new = "updated, count = re.subn(pattern, lambda _match: replacement, text, count=1, flags=flags)"
+          if normalized.count(old) != 1:
               raise SystemExit('regex helper source is not exact')
-          normalized = normalized.replace(old_subn, new_subn, 1)
-
-          stale_guard = 'if re.search(r"\\bDCO\\b", workflows, re.I):\n'
-          stale_rewrite = '''workflows = re.sub(
-    r"### Repository-native provenance compatibility\\n.*?\\n## Calling a reusable workflow",
-    """### Native solo-builder provenance
-
-`.github/workflows/solo-builder-provenance.yml` replaces the retired commit-trailer compatibility layer. It validates exact organization-owned pull-request heads and protected base state without checking out candidate code or consuming repository secrets. Build, security, staging, signed-commit, merge-queue, and release-attestation controls remain independent requirements.
-
-## Calling a reusable workflow""",
-    workflows,
-    count=1,
-    flags=re.S,
-)
-if re.search(r"\\bDCO\\b", workflows, re.I):
-'''
-          if normalized.count(stale_guard) != 1:
-              raise SystemExit('WORKFLOWS.md stale-policy guard is not exact')
-          normalized = normalized.replace(stale_guard, stale_rewrite, 1)
-
+          normalized = normalized.replace(old, new, 1)
           target = Path('/tmp/apply_native_solo_builder_governance.py')
           target.write_text(normalized, encoding='utf-8')
           compile(target.read_text(encoding='utf-8'), str(target), 'exec')
+          PY
+          python3 - <<'PY'
+          from pathlib import Path
+
+          path = Path('WORKFLOWS.md')
+          text = path.read_text(encoding='utf-8')
+          old = "`.github/workflows/dco.yml` is retained under its historical filename because\n"
+          new = "`.github/workflows/solo-builder-provenance.yml` provides exact-head provenance because\n"
+          if text.count(old) != 1:
+              raise SystemExit('stale workflow documentation anchor is not exact')
+          path.write_text(text.replace(old, new, 1), encoding='utf-8')
           PY
           python3 /tmp/apply_native_solo_builder_governance.py
           rm -f .github/workflows/run-native-solo-builder-migration.yml
