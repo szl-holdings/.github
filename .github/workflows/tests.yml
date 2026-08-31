@@ -22,15 +22,8 @@ jobs:
         with:
           python-version: "3.12.10"
 
-      - name: DCO bootstrap and event contract self-tests
-        run: |
-          python3 .github/scripts/test_dco_check.py
-          python3 .github/scripts/test_dco_events.py
-
-      # A full 40-character ref is not enough for a reusable workflow: the
-      # target file can be absent at that exact commit (the a11oy/docs-site
-      # pre-merge-pin startup_failure). This network-free test locks three
-      # distinct outcomes: present=0, missing=1, API/auth unavailable=2.
+      - name: Solo-builder provenance contract self-test
+        run: python3 .github/scripts/test_solo_builder_provenance.py
       - name: Reusable-workflow pinned-target validator self-test
         run: python3 .github/scripts/test_reusable_workflow_target_check.py
 

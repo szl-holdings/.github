@@ -1060,7 +1060,6 @@ def deploy(args):
             f"Reusable Dockerfile-COPY-derived deploy from {args.github_repo} {args.ref}.\n"
             f"Files: {len(files)}  Pruned: {len(deleted)}\n"
             "Derived from Dockerfile COPY sources (NO hand-maintained allowlist).\n\n"
-            "Signed-off-by: SZL Holdings <noreply@szlholdings.ai>\n"
             "Co-Authored-By: Claude Opus 4.7 <noreply@anthropic.com>"),
     )
     print(f"\nHF commit: {commit.oid} -> {args.hf_repo}  added:{len(files)} pruned:{len(deleted)}")

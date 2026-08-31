@@ -1,0 +1,131 @@
+name: Repair kernel publication commit argv
+
+on:
+  push:
+    branches:
+      - chore/native-solo-builder-provenance-20260831
+    paths:
+      - .github/workflows/repair-kernel-commit-argv.yml
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+concurrency:
+  group: repair-kernel-commit-argv
+  cancel-in-progress: false
+
+jobs:
+  repair:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Harden runner
+        uses: step-security/harden-runner@b09bb98e06d4d774595224525879c09bc6e98c40 # v2.20.1
+        with:
+          egress-policy: audit
+
+      - name: Checkout exact branch
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: chore/native-solo-builder-provenance-20260831
+          fetch-depth: 3
+          persist-credentials: false
+
+      - name: Refactor and lock commit argv contract
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+
+          implementation = Path('.github/scripts/kernel_hub_git.py')
+          source = implementation.read_text(encoding='utf-8')
+
+          method_anchor = '''    def _read_main_files(self, repo_id: str, expected_revision: str) -> dict[str, bytes]:
+          '''
+          method = '''    @staticmethod
+    def _commit_message_args(generation: str) -> list[str]:
+        subject = f"release(card): publish reviewed Kernel contract {generation[:12]}"
+        body = "Card/contract-only update; first-class build variants are preserved."
+        messages = (subject, body)
+        if any(not message.strip() for message in messages):
+            raise KernelGitError("Kernel publication commit messages must be non-empty")
+        return ["commit", "-q", "-m", subject, "-m", body]
+
+          '''
+          if source.count(method_anchor) != 1:
+              raise SystemExit('kernel helper insertion anchor is not exact')
+          source = source.replace(method_anchor, method + method_anchor, 1)
+
+          old_call = '''                    self._git(
+                        [
+                            "commit",
+                            "-q",
+                            "-m",
+                            f"release(card): publish reviewed Kernel contract {generation[:12]}",
+                            "-m",
+                            "Card/contract-only update; first-class build variants are preserved.",
+                        ],
+                        cwd=repo,
+                        env=env,
+                    )
+          '''
+          new_call = '''                    commit_args = self._commit_message_args(generation)
+                    self._git(commit_args, cwd=repo, env=env)
+          '''
+          if source.count(old_call) != 1:
+              raise SystemExit('kernel commit invocation is not exact')
+          source = source.replace(old_call, new_call, 1)
+          implementation.write_text(source, encoding='utf-8')
+
+          tests = Path('.github/scripts/test_kernel_hub_git.py')
+          test_source = tests.read_text(encoding='utf-8')
+          test_anchor = '''    def test_card_contract_publication_preserves_complete_build_tree(self) -> None:
+          '''
+          test_method = '''    def test_commit_message_args_have_two_non_empty_messages(self) -> None:
+        args = self.transport._commit_message_args("b" * 40)
+        self.assertEqual(args[:2], ["commit", "-q"])
+        self.assertEqual(args.count("-m"), 2)
+        message_indexes = [index for index, value in enumerate(args) if value == "-m"]
+        self.assertEqual(message_indexes, [2, 4])
+        for index in message_indexes:
+            self.assertLess(index + 1, len(args))
+            self.assertTrue(args[index + 1].strip())
+        self.assertEqual(args[-1], "Card/contract-only update; first-class build variants are preserved.")
+
+          '''
+          if test_source.count(test_anchor) != 1:
+              raise SystemExit('kernel test insertion anchor is not exact')
+          test_source = test_source.replace(test_anchor, test_method + test_anchor, 1)
+          tests.write_text(test_source, encoding='utf-8')
+          PY
+          rm -f .github/workflows/repair-kernel-commit-argv.yml
+
+      - name: Verify exact repaired tree
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m py_compile .github/scripts/kernel_hub_git.py .github/scripts/test_kernel_hub_git.py
+          PYTHONPATH=.github/scripts python3 .github/scripts/test_kernel_hub_git.py
+          python3 .github/scripts/test_solo_builder_provenance.py
+          python3 .github/scripts/verify_forge9_governance.py
+          python3 .github/scripts/run_forge9_gate.py gate/verify-all
+          git diff --check
+          test ! -e .github/workflows/repair-kernel-commit-argv.yml
+
+      - name: Commit repaired exact head
+        shell: bash
+        env:
+          GH_PUSH_TOKEN: ${{ secrets.SZL_GITHUB_TOKEN }}
+          TARGET_BRANCH: chore/native-solo-builder-provenance-20260831
+        run: |
+          set -euo pipefail
+          test -n "$GH_PUSH_TOKEN"
+          git config user.name "SZL Governance Bot"
+          git config user.email "noreply@szlholdings.ai"
+          git add -A
+          git diff --cached --check
+          git diff --cached --quiet && { echo "Repair produced no changes." >&2; exit 1; }
+          git commit -m "fix(hf): enforce two non-empty kernel commit messages"
+          git push "https://x-access-token:${GH_PUSH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" "HEAD:refs/heads/${TARGET_BRANCH}"

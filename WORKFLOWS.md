@@ -25,8 +25,8 @@ of redefining the same logic locally.
 
 ### Repository-native provenance compatibility
 
-`.github/workflows/dco.yml` is retained under its historical filename because
-ruleset `19755620` still requires the exact status context `DCO sign-off check`.
+`.github/workflows/solo-builder-provenance.yml` provides exact-head provenance because
+ruleset `19755620` requires the eight FORGE-9 gates and `deploy/staging`; commit-trailer enforcement is retired for the solo-builder model.
 It does not require a developer signature or trailer. Protected
 `pull_request_target` logic validates the live PR/base/head tuple without
 checking out or executing proposed content; merge-group logic revalidates the

@@ -390,8 +390,6 @@ class KernelHubGitTransport:
                             f"release(card): publish reviewed Kernel contract {generation[:12]}",
                             "-m",
                             "Card/contract-only update; first-class build variants are preserved.",
-                            "-m",
-                            "Signed-off-by: github-actions[bot] <41898282+github-actions[bot]@users.noreply.github.com>",
                         ],
                         cwd=repo,
                         env=env,

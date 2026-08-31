@@ -1,0 +1,146 @@
+name: Required solo-builder provenance
+
+on:
+  pull_request_target:
+    branches:
+      - main
+      - 'release/*'
+    types:
+      - opened
+      - synchronize
+      - reopened
+      - ready_for_review
+      - converted_to_draft
+      - edited
+  merge_group:
+    types: [checks_requested]
+
+# Protected-base metadata validation only. Candidate repository content is
+# never checked out or executed, and uses only the ephemeral GitHub token.
+permissions: {}
+
+jobs:
+  pull-request-provenance:
+    name: Exact-head organization provenance
+    if: github.event_name == 'pull_request_target'
+    permissions:
+      contents: read
+      pull-requests: read
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Verify protected event and organization-owned exact head
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EXPECTED_ACTION: ${{ github.event.action }}
+          EXPECTED_PR_NUMBER: ${{ github.event.pull_request.number }}
+          EXPECTED_BASE_REPOSITORY: ${{ github.event.pull_request.base.repo.full_name }}
+          EXPECTED_BASE_REF: ${{ github.event.pull_request.base.ref }}
+          EXPECTED_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          EXPECTED_HEAD_REPOSITORY: ${{ github.event.pull_request.head.repo.full_name }}
+          EXPECTED_HEAD_REF: ${{ github.event.pull_request.head.ref }}
+          EXPECTED_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -euo pipefail
+          case "$EXPECTED_ACTION" in
+            opened|synchronize|reopened|ready_for_review|converted_to_draft|edited) ;;
+            *) echo "Unsupported pull-request action: $EXPECTED_ACTION" >&2; exit 1 ;;
+          esac
+          [[ "$EXPECTED_PR_NUMBER" =~ ^[1-9][0-9]*$ ]]
+          [[ "$EXPECTED_BASE_SHA" =~ ^[0-9a-f]{40}$ ]]
+          [[ "$EXPECTED_HEAD_SHA" =~ ^[0-9a-f]{40}$ ]]
+          test "$EXPECTED_BASE_REPOSITORY" = "$GITHUB_REPOSITORY"
+          case "$EXPECTED_BASE_REF" in
+            main|release/*) ;;
+            *) echo "Unsupported governed base: $EXPECTED_BASE_REF" >&2; exit 1 ;;
+          esac
+          case "$EXPECTED_HEAD_REPOSITORY" in
+            szl-holdings/*) ;;
+            *) echo "Solo-builder policy requires an organization-owned head repository: $EXPECTED_HEAD_REPOSITORY" >&2; exit 1 ;;
+          esac
+          test -n "$EXPECTED_HEAD_REF"
+
+          current_pr="$(gh api "repos/$GITHUB_REPOSITORY/pulls/$EXPECTED_PR_NUMBER")"
+          jq -e \
+            --arg repository "$GITHUB_REPOSITORY" \
+            --arg base_ref "$EXPECTED_BASE_REF" \
+            --arg base_sha "$EXPECTED_BASE_SHA" \
+            --arg head_repository "$EXPECTED_HEAD_REPOSITORY" \
+            --arg head_ref "$EXPECTED_HEAD_REF" \
+            --arg head_sha "$EXPECTED_HEAD_SHA" '
+              .state == "open"
+              and .draft == false
+              and .base.repo.full_name == $repository
+              and .base.ref == $base_ref
+              and .base.sha == $base_sha
+              and .head.repo.full_name == $head_repository
+              and .head.ref == $head_ref
+              and .head.sha == $head_sha
+            ' <<<"$current_pr" >/dev/null
+
+          live_base_sha="$(
+            gh api "repos/$GITHUB_REPOSITORY/git/ref/heads/$EXPECTED_BASE_REF" \
+              --jq '.object.sha'
+          )"
+          test "$live_base_sha" = "$EXPECTED_BASE_SHA"
+
+          comparison="$(
+            gh api "repos/$GITHUB_REPOSITORY/compare/$EXPECTED_BASE_SHA...$EXPECTED_HEAD_SHA"
+          )"
+          jq -e --arg base "$EXPECTED_BASE_SHA" '
+              .status == "ahead"
+              and .ahead_by >= 1
+              and .behind_by == 0
+              and .base_commit.sha == $base
+              and .merge_base_commit.sha == $base
+            ' <<<"$comparison" >/dev/null
+
+          test "$(
+            gh api "repos/$GITHUB_REPOSITORY/pulls/$EXPECTED_PR_NUMBER" --jq '.head.sha'
+          )" = "$EXPECTED_HEAD_SHA"
+          test "$(
+            gh api "repos/$GITHUB_REPOSITORY/git/ref/heads/$EXPECTED_BASE_REF" --jq '.object.sha'
+          )" = "$EXPECTED_BASE_SHA"
+
+  merge-group-provenance:
+    name: Exact merge-group provenance
+    if: github.event_name == 'merge_group'
+    permissions:
+      contents: read
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Verify protected merge-group graph
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EXPECTED_ACTION: ${{ github.event.action }}
+          EXPECTED_BASE_REF: ${{ github.event.merge_group.base_ref }}
+          EXPECTED_BASE_SHA: ${{ github.event.merge_group.base_sha }}
+          EXPECTED_HEAD_REF: ${{ github.event.merge_group.head_ref }}
+          EXPECTED_HEAD_SHA: ${{ github.event.merge_group.head_sha }}
+        run: |
+          set -euo pipefail
+          test "$EXPECTED_ACTION" = "checks_requested"
+          test "$EXPECTED_BASE_REF" = "refs/heads/main"
+          [[ "$EXPECTED_BASE_SHA" =~ ^[0-9a-f]{40}$ ]]
+          [[ "$EXPECTED_HEAD_SHA" =~ ^[0-9a-f]{40}$ ]]
+          [[ "$EXPECTED_HEAD_REF" =~ ^refs/heads/gh-readonly-queue/main/pr-([1-9][0-9]*)-([0-9a-f]{40})$ ]]
+          test "${BASH_REMATCH[2]}" = "$EXPECTED_BASE_SHA"
+          test "$GITHUB_SHA" = "$EXPECTED_HEAD_SHA"
+          test "$GITHUB_REF" = "$EXPECTED_HEAD_REF"
+
+          live_base_sha="$(gh api "repos/$GITHUB_REPOSITORY/git/ref/heads/main" --jq '.object.sha')"
+          test "$live_base_sha" = "$EXPECTED_BASE_SHA"
+          queue_ref="${EXPECTED_HEAD_REF#refs/}"
+          test "$(gh api "repos/$GITHUB_REPOSITORY/git/ref/$queue_ref" --jq '.object.sha')" = "$EXPECTED_HEAD_SHA"
+
+          comparison="$(gh api "repos/$GITHUB_REPOSITORY/compare/$EXPECTED_BASE_SHA...$EXPECTED_HEAD_SHA")"
+          jq -e --arg base "$EXPECTED_BASE_SHA" '
+              .status == "ahead"
+              and .ahead_by >= 1
+              and .behind_by == 0
+              and .base_commit.sha == $base
+              and .merge_base_commit.sha == $base
+            ' <<<"$comparison" >/dev/null
