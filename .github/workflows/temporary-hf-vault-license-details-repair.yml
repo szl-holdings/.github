@@ -1,0 +1,145 @@
+name: temporary-hf-vault-license-details-repair
+
+on:
+  push:
+    branches:
+      - ops/hf-estate-current-main-dispatch-20260830
+    paths:
+      - .github/workflows/temporary-hf-vault-license-details-repair.yml
+
+permissions:
+  contents: read
+
+jobs:
+  repair:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      HF_ORG_TOKEN: ${{ secrets.HF_ORG_TOKEN }}
+      HF_TOKEN: ${{ secrets.HF_TOKEN }}
+      TARGET_REPO: SZLHOLDINGS/vault-artifacts
+      LICENSE_NAME: LicenseRef-SZL-Proprietary
+      LICENSE_LINK: https://github.com/szl-holdings/platform/blob/2e10ce743977a6e63d1b5c3c94f7210c95eef18a/LICENSE
+    steps:
+      - name: Check out exact protected controller source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: 0a8876aae82c597703c7cd4eb4cfb61fdeae10cc
+          persist-credentials: false
+
+      - name: Install exact supported Hub client
+        shell: bash
+        run: python -m pip install --disable-pip-version-check 'huggingface_hub==1.19.0'
+
+      - name: Complete the bounded private-dataset license declaration
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from __future__ import annotations
+
+          import os
+          import re
+          from pathlib import Path
+          from tempfile import TemporaryDirectory
+
+          from huggingface_hub import HfApi, hf_hub_download
+
+          token = os.environ.get('HF_ORG_TOKEN') or os.environ.get('HF_TOKEN')
+          if not token:
+              raise SystemExit('No Hugging Face organization token is configured')
+
+          repo_id = os.environ['TARGET_REPO']
+          expected_name = os.environ['LICENSE_NAME']
+          expected_link = os.environ['LICENSE_LINK']
+          api = HfApi(token=token)
+          orgs = {str(item.get('name')): str(item.get('roleInOrg', '')) for item in api.whoami().get('orgs', [])}
+          if orgs.get('SZLHOLDINGS') != 'admin':
+              raise SystemExit('Hugging Face identity is not an SZLHOLDINGS admin')
+
+          before = api.dataset_info(repo_id=repo_id, token=token, files_metadata=False)
+          if not bool(before.private):
+              raise SystemExit('Refusing metadata repair because vault-artifacts is not private')
+          before_sha = str(before.sha)
+
+          with TemporaryDirectory() as td:
+              path = Path(hf_hub_download(
+                  repo_id=repo_id,
+                  repo_type='dataset',
+                  filename='README.md',
+                  revision=before_sha,
+                  token=token,
+                  local_dir=td,
+              ))
+              original = path.read_text(encoding='utf-8')
+
+          front = re.match(r'\A---\s*\n(?P<body>.*?)\n---\s*\n', original, flags=re.DOTALL)
+          if not front:
+              raise SystemExit('Expected existing YAML front matter after the first bounded repair')
+          body = front.group('body')
+          license_match = re.search(r'(?m)^license\s*:\s*(.*?)\s*$', body)
+          if not license_match or license_match.group(1).strip().lower() != 'other':
+              raise SystemExit('Refusing to change a non-other license declaration')
+
+          replacements = {
+              'license_name': expected_name,
+              'license_link': expected_link,
+          }
+          updated_body = body
+          changed = False
+          for key, value in replacements.items():
+              pattern = re.compile(rf'(?m)^{re.escape(key)}\s*:\s*(.*?)\s*$')
+              match = pattern.search(updated_body)
+              if match:
+                  if match.group(1).strip() != value:
+                      raise SystemExit(f'Refusing to overwrite conflicting {key}')
+              else:
+                  anchor = re.search(r'(?m)^license\s*:\s*other\s*$', updated_body)
+                  if not anchor:
+                      raise SystemExit('license anchor disappeared')
+                  insert_at = anchor.end()
+                  updated_body = updated_body[:insert_at] + f'\n{key}: {value}' + updated_body[insert_at:]
+                  changed = True
+
+          if not changed:
+              print(f'already compliant at {before_sha}')
+              raise SystemExit(0)
+
+          updated = original[:front.start('body')] + updated_body + original[front.end('body'):]
+          api.upload_file(
+              path_or_fileobj=updated.encode('utf-8'),
+              path_in_repo='README.md',
+              repo_id=repo_id,
+              repo_type='dataset',
+              revision='main',
+              commit_message='chore(metadata): bind private proprietary license details',
+              token=token,
+          )
+
+          after = api.dataset_info(repo_id=repo_id, token=token, files_metadata=False)
+          if not bool(after.private):
+              raise SystemExit('Privacy invariant changed during metadata repair')
+          after_sha = str(after.sha)
+          if after_sha == before_sha:
+              raise SystemExit('Expected a metadata commit but the dataset revision did not move')
+
+          with TemporaryDirectory() as td:
+              verified_path = Path(hf_hub_download(
+                  repo_id=repo_id,
+                  repo_type='dataset',
+                  filename='README.md',
+                  revision=after_sha,
+                  token=token,
+                  local_dir=td,
+              ))
+              verified = verified_path.read_text(encoding='utf-8')
+          required = {
+              'license': 'other',
+              'license_name': expected_name,
+              'license_link': expected_link,
+          }
+          for key, value in required.items():
+              if not re.search(rf'(?m)^{re.escape(key)}\s*:\s*{re.escape(value)}\s*$', verified):
+                  raise SystemExit(f'{key} was not observable at the exact new revision')
+          print(f'private vault license metadata completed: {before_sha} -> {after_sha}')
+          PY
