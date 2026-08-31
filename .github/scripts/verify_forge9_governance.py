@@ -508,6 +508,18 @@ def verify_gate_contract() -> None:
         "Assert exact protected reconciliation source"
     ):
         fail("reconciliation must resolve its survivor before binding workflow source")
+    reconciliation_job = dco_template.split("  reconcile-old-head:\n", 1)[1]
+    reconciliation_source = reconciliation_job.split(
+        "      - name: Assert exact protected reconciliation source\n", 1
+    )[1].split("      - name: Revalidate the surviving exact head\n", 1)[0]
+    for marker in (
+        "EXPECTED_BASE_REF: ${{ steps.reconciliation-subject.outputs.base_ref }}",
+        "EXPECTED_BASE_SHA: ${{ steps.reconciliation-subject.outputs.base_sha }}",
+    ):
+        if marker not in reconciliation_source:
+            fail("reconciliation source must bind to the surviving PR base")
+    if "github.event.pull_request.base." in reconciliation_source:
+        fail("reconciliation source must not inherit the triggering PR base")
     merge_group_job = dco_template.split("  merge-group-provenance:\n", 1)[1].split(
         "  legacy-dco-compatibility:\n", 1
     )[0]
