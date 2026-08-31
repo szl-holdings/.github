@@ -1,7 +1,7 @@
 name: SLSA Provenance (L1 honest)
 
 # Doctrine v11 honesty: this workflow is a SLSA Build L1 supply-chain status
-# indicator (SBOM + DCO baseline). It does NOT itself generate non-forgeable
+# indicator (SBOM + recorded source/build steps). It does NOT itself generate non-forgeable
 # SLSA L2/L3 provenance — do not claim L3 anywhere.
 #
 # Real build provenance for release artifacts is produced per-repo by
@@ -28,7 +28,7 @@ jobs:
     if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - name: SLSA L1 supply-chain baseline (SBOM + DCO; honest — not L3)
+      - name: SLSA L1 supply-chain baseline (SBOM + source record; honest — not L3)
         run: |
-          echo "SLSA Build L1 baseline (SBOM + DCO). No L3 claim."
+          echo "SLSA Build L1 baseline (SBOM + recorded source/build steps). No L3 claim."
           echo "Release-artifact provenance: attest-build-provenance@v2 wired (SLSA L2 roadmap via Wire D); L2 NOT yet earned until cosign verify-attestation passes on the deployed image."

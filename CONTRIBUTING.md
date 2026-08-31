@@ -37,14 +37,12 @@
   
 ---
 
-## Developer Certificate of Origin (DCO)
+## Solo-builder provenance
 
-All commits to this repository must carry a Developer Certificate of Origin sign-off per [DCO v1.1](https://developercertificate.org/). Add with:
-
-```bash
-git commit -s -m "your commit message"
-# Produces: Signed-off-by: Name <email>
-```
+Developer commit signatures and sign-off trailers are not required. Pull
+requests remain mandatory: the protected workflow validates the exact live
+repository, base, and head identities, while build and security checks must
+pass for the same head before merge.
 
 ### Branch naming convention
 

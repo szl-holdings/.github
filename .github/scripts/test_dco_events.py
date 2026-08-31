@@ -581,13 +581,16 @@ class DcoCheckTests(unittest.TestCase):
             Path(__file__).resolve().parents[1] / "workflows" / "dco.yml"
         ).read_text(encoding="utf-8")
         self.assertEqual(workflow.count("name: DCO sign-off check\n"), 1)
-        self.assertIn("needs: dco", workflow)
+        self.assertIn("needs: merge-group-provenance", workflow)
         self.assertIn(
-            "if: always() && github.event_name != 'pull_request_target'",
+            "if: always() && github.event_name == 'merge_group'",
             workflow,
         )
-        self.assertIn("NATIVE_DCO_RESULT: ${{ needs.dco.result }}", workflow)
-        self.assertIn('test "$NATIVE_DCO_RESULT" = "success"', workflow)
+        self.assertIn(
+            "PROVENANCE_RESULT: ${{ needs.merge-group-provenance.result }}",
+            workflow,
+        )
+        self.assertIn('test "$PROVENANCE_RESULT" = "success"', workflow)
         self.assertNotIn("continue-on-error", workflow)
 
     def test_reusable_legacy_context_faithfully_propagates_validation(self) -> None:

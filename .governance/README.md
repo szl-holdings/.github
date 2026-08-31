@@ -9,7 +9,7 @@ that do not yet exist would lock a repository without producing evidence.
 - Every active ruleset has an empty `bypass_actors` array.
 - The estate does not claim independent human review while it has one human
   member. GitHub's human approval count is zero by design.
-- Eight fail-closed checks, App-pinned staging, signed commits, App-owned
+- Eight fail-closed checks, App-pinned staging, exact-head provenance, App-owned
   attestation evidence, and merge queue execution replace the impossible
   second-human requirement.
 - The ordinary `GITHUB_TOKEN` cannot approve pull request reviews.
@@ -84,7 +84,9 @@ separate, identity-bound release control.
    merge-queue ruleset to contain wildcard refs. Its required checks are the
    eight gates and App-pinned staging; the App status remains signed evidence.
 4. Apply `ruleset-release.json` separately to `release/*`; it retains the gates,
-   signatures, App-pinned staging, and App attestation status without a queue.
+   App-pinned staging and App attestation status without a queue. The existing
+   server-side signature setting is retained only as observed configuration
+   drift until repository ruleset administration is available.
 5. Verify the active gate, staging, attestor, BAP, and queue on a pilot PR.
 6. Roll out only to active repositories with mapped gates and staging evidence.
 
