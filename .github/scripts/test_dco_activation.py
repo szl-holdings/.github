@@ -103,6 +103,27 @@ class DcoActivationWorkflowTests(unittest.TestCase):
         self.assertNotIn("contents: write", self.native)
         self.assertNotIn("id-token:", self.native)
 
+    def test_cross_base_reconciliation_uses_surviving_pr_base(self) -> None:
+        reconciliation = self.native.split("  reconcile-old-head:\n", 1)[1]
+        source_step = reconciliation.split(
+            "      - name: Assert exact protected reconciliation source\n", 1
+        )[1].split("      - name: Revalidate the surviving exact head\n", 1)[0]
+
+        self.assertLess(
+            reconciliation.index("Resolve the surviving governed pull request"),
+            reconciliation.index("Assert exact protected reconciliation source"),
+        )
+        self.assertIn(
+            "EXPECTED_BASE_REF: ${{ steps.reconciliation-subject.outputs.base_ref }}",
+            source_step,
+        )
+        self.assertIn(
+            "EXPECTED_BASE_SHA: ${{ steps.reconciliation-subject.outputs.base_sha }}",
+            source_step,
+        )
+        self.assertNotIn("github.event.pull_request.base.ref", source_step)
+        self.assertNotIn("github.event.pull_request.base.sha", source_step)
+
     def test_reusable_workflow_is_exact_and_secretless(self) -> None:
         for marker in (
             "name: Reusable DCO validation",
