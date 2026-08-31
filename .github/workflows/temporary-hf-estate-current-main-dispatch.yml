@@ -1,0 +1,70 @@
+name: temporary-hf-estate-current-main-dispatch
+
+on:
+  push:
+    branches:
+      - ops/hf-estate-current-main-dispatch-20260830
+    paths:
+      - .github/workflows/temporary-hf-estate-current-main-dispatch.yml
+
+permissions:
+  actions: write
+  contents: read
+
+jobs:
+  dispatch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      GH_TOKEN: ${{ github.token }}
+      EXPECTED_MAIN: 0a8876aae82c597703c7cd4eb4cfb61fdeae10cc
+    steps:
+      - name: Require the exact protected-main controller revision
+        shell: bash
+        run: |
+          set -euo pipefail
+          observed="$(gh api "repos/${GITHUB_REPOSITORY}/commits/main" --jq .sha)"
+          if [ "$observed" != "$EXPECTED_MAIN" ]; then
+            echo "::error::protected main moved: expected $EXPECTED_MAIN, observed $observed"
+            exit 1
+          fi
+
+      - name: Dispatch read-only estate audits
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh workflow run hf-license-consistency.yml --repo "$GITHUB_REPOSITORY" --ref main
+          gh workflow run hf-module-drift-check.yml --repo "$GITHUB_REPOSITORY" --ref main
+          gh workflow run hf-dataset-server-diagnostics.yml --repo "$GITHUB_REPOSITORY" --ref main
+          gh workflow run hf-org-card-embed-check.yml --repo "$GITHUB_REPOSITORY" --ref main
+
+      - name: Dispatch bounded non-overlapping publishers
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh workflow run hf-collection-truth-reconcile.yml \
+            --repo "$GITHUB_REPOSITORY" --ref main -f publish=true
+          gh workflow run hf-org-card-deploy.yml \
+            --repo "$GITHUB_REPOSITORY" --ref main
+          gh workflow run hf-release-finalization.yml \
+            --repo "$GITHUB_REPOSITORY" --ref main
+
+      - name: Record dispatch boundary
+        shell: bash
+        run: |
+          cat >> "$GITHUB_STEP_SUMMARY" <<'EOF'
+          ## Bounded Hugging Face estate dispatch
+
+          Dispatched from exact protected `.github/main`:
+
+          - organization-wide license consistency audit
+          - GitHub-to-live-Space module drift audit
+          - Dataset Server diagnostics for the canonical Lake dataset
+          - organization-card embed verification
+          - exact two-collection truth reconciliation
+          - organization-card deployment
+          - Lake plus two first-class Kernel release finalization
+
+          This dispatcher does not change model weights, dataset payloads, Space hardware,
+          visibility, storage, allocation, secrets, or the canonical a11oy Space.
+          EOF
