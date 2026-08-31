@@ -61,9 +61,12 @@ and source/runtime identity checks. A blanket restart is not encoded here.
 
 `HF Space Lifecycle Reconcile` is manual, protected-main-only, serialized on
 `hf-provider-mutation-szlholdings`, and gated by the GitHub `production`
-environment. It accepts the fixed `HF_ORG_TOKEN` secret and verifies, without
-logging identity or token material, that the credential is a write-capable user
-token with SZLHOLDINGS admin role.
+environment. Only the controller step receives the fixed `HF_ORG_TOKEN`
+secret. Without logging identity or token material, it verifies user identity
+and an unambiguous SZLHOLDINGS admin role, then performs a separate,
+non-mutating `HfApi.auth_check(..., repo_type="space", write=True)` against the
+one exact selected Space. The reported access-token role is informational and
+is never accepted as proof of target write authority.
 
 Its only possible provider write is:
 

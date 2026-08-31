@@ -17,10 +17,8 @@
   "token_authority": {
     "namespace": "SZLHOLDINGS",
     "required_org_role": "admin",
-    "allowed_access_token_roles": [
-      "fineGrained",
-      "write"
-    ]
+    "reported_access_token_role_is_authority": false,
+    "required_target_write_preflight": "HfApi.auth_check(repo_id=target, repo_type=\"space\", write=True)"
   },
   "targets": [
     {"repo_id": "SZLHOLDINGS/README", "desired_visibility": "public", "desired_runtime_stage": "RUNNING", "role": "organization-profile"},
