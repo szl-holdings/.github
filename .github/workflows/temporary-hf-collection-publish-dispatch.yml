@@ -1,0 +1,36 @@
+name: temporary-hf-collection-publish-dispatch
+
+on:
+  push:
+    branches:
+      - ops/hf-collection-publish-current-main-20260830
+    paths:
+      - .github/workflows/temporary-hf-collection-publish-dispatch.yml
+
+permissions:
+  actions: write
+  contents: read
+
+jobs:
+  dispatch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      GH_TOKEN: ${{ github.token }}
+      EXPECTED_MAIN: ab1e0669b4ac5715e4e26fdbb529db70e6affc33
+    steps:
+      - name: Require exact protected controller revision
+        shell: bash
+        run: |
+          set -euo pipefail
+          observed="$(gh api "repos/${GITHUB_REPOSITORY}/commits/main" --jq .sha)"
+          test "$observed" = "$EXPECTED_MAIN"
+
+      - name: Dispatch exact two-collection reconcile
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh workflow run hf-collection-truth-reconcile.yml \
+            --repo "$GITHUB_REPOSITORY" \
+            --ref main \
+            -f publish=true
