@@ -1,0 +1,158 @@
+# Copyright 2026 SZL Holdings — SPDX-License-Identifier: Apache-2.0
+name: Bootstrap HF Space Foundry
+
+on:
+  push:
+    branches:
+      - feat/hf-space-foundry-v1-20260901
+    paths:
+      - .github/hf-space-foundry.payload.b64
+      - .github/hf-space-foundry.payload.part*
+      - .github/workflows/bootstrap-hf-space-foundry.yml
+
+permissions:
+  contents: write
+
+concurrency:
+  group: bootstrap-hf-space-foundry-v1
+  cancel-in-progress: false
+
+jobs:
+  install:
+    name: Verify and install permanent Space Foundry source
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Harden runner
+        uses: step-security/harden-runner@05e31511f85b41b11d1cf0ef85d0992719546e2c # v2.21.0
+        with:
+          egress-policy: audit
+
+      - name: Check out exact bootstrap head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: feat/hf-space-foundry-v1-20260901
+          fetch-depth: 0
+          persist-credentials: true
+
+      - name: Prove exact branch execution
+        shell: bash
+        env:
+          EXPECTED_REPOSITORY: szl-holdings/.github
+          EXPECTED_REF: refs/heads/feat/hf-space-foundry-v1-20260901
+        run: |
+          set -euo pipefail
+          test "$GITHUB_REPOSITORY" = "$EXPECTED_REPOSITORY"
+          test "$GITHUB_REF" = "$EXPECTED_REF"
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          test -z "$(git status --porcelain=v1)"
+
+      - name: Reconstruct and verify immutable payload
+        shell: bash
+        env:
+          EXPECTED_SHA256: ee8da3d6fe44692eb74765b0e2cfabea330b00b5b852f2b44643b21f9d9812a7
+        run: |
+          set -euo pipefail
+          PAYLOAD_B64="$RUNNER_TEMP/hf-space-foundry.payload.b64"
+          ARCHIVE="$RUNNER_TEMP/hf-space-foundry.payload.tar.gz"
+          cat \
+            .github/hf-space-foundry.payload.part00 \
+            .github/hf-space-foundry.payload.part01 \
+            .github/hf-space-foundry.payload.part02 \
+            .github/hf-space-foundry.payload.part03 \
+            .github/hf-space-foundry.payload.part04 \
+            .github/hf-space-foundry.payload.part05 \
+            .github/hf-space-foundry.payload.part06 \
+            > "$PAYLOAD_B64"
+          base64 --decode "$PAYLOAD_B64" > "$ARCHIVE"
+          test "$(sha256sum "$ARCHIVE" | awk '{print $1}')" = "$EXPECTED_SHA256"
+          test "$(wc -c < "$ARCHIVE")" -eq 31157
+
+          python3 - "$ARCHIVE" <<'PY'
+          from pathlib import PurePosixPath
+          import sys
+          import tarfile
+
+          archive = sys.argv[1]
+          with tarfile.open(archive, "r:gz") as bundle:
+              for member in bundle.getmembers():
+                  raw = member.name
+                  normalized = raw[2:] if raw.startswith("./") else raw
+                  normalized = normalized.rstrip("/")
+                  path = PurePosixPath(normalized or ".")
+                  if path.is_absolute() or ".." in path.parts:
+                      raise SystemExit(f"unsafe archive path: {raw!r}")
+                  allowed = (
+                      normalized in {"", ".", ".github", ".github/workflows", "hf-estate-foundry"}
+                      or normalized.startswith("hf-estate-foundry/")
+                      or normalized == ".github/workflows/hf-space-foundry.yml"
+                  )
+                  if not allowed:
+                      raise SystemExit(f"unexpected archive member: {raw!r}")
+                  if not (member.isfile() or member.isdir()):
+                      raise SystemExit(f"non-regular archive member: {raw!r}")
+              bundle.extractall(path=".", filter="data")
+          PY
+
+      - name: Set up exact Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12.10"
+
+      - name: Install hash-locked validation closure
+        shell: bash
+        run: |
+          set -euo pipefail
+          VENV="$RUNNER_TEMP/hf-space-foundry-bootstrap"
+          python3 -m venv "$VENV"
+          "$VENV/bin/python" -I -P -m pip install \
+            --disable-pip-version-check \
+            --require-hashes \
+            --only-binary=:all: \
+            --ignore-installed \
+            -r requirements/hf-publisher.lock
+
+      - name: Verify permanent implementation
+        shell: bash
+        run: |
+          set -euo pipefail
+          PY="$RUNNER_TEMP/hf-space-foundry-bootstrap/bin/python"
+          "$PY" -I -P -m py_compile hf-estate-foundry/apply.py hf-estate-foundry/test_foundry.py
+          "$PY" -I -P hf-estate-foundry/test_foundry.py
+          node --check hf-estate-foundry/atlas/atlas.js
+          "$PY" -I -P - <<'PY'
+          from pathlib import Path
+          import yaml
+          workflow = Path('.github/workflows/hf-space-foundry.yml')
+          parsed = yaml.load(workflow.read_text(encoding='utf-8'), Loader=yaml.BaseLoader)
+          if not isinstance(parsed, dict) or 'jobs' not in parsed:
+              raise SystemExit('permanent workflow did not parse as a GitHub workflow')
+          PY
+          git diff --check
+
+      - name: Commit only permanent foundry source
+        shell: bash
+        env:
+          BRANCH: feat/hf-space-foundry-v1-20260901
+        run: |
+          set -euo pipefail
+          git config user.name "SZL Holdings Automation"
+          git config user.email "eng@szlholdings.com"
+
+          git add hf-estate-foundry .github/workflows/hf-space-foundry.yml
+          git rm --ignore-unmatch .github/hf-space-foundry.payload.b64
+          git rm --ignore-unmatch .github/hf-space-foundry.payload.part00
+          git rm --ignore-unmatch .github/hf-space-foundry.payload.part01
+          git rm --ignore-unmatch .github/hf-space-foundry.payload.part02
+          git rm --ignore-unmatch .github/hf-space-foundry.payload.part03
+          git rm --ignore-unmatch .github/hf-space-foundry.payload.part04
+          git rm --ignore-unmatch .github/hf-space-foundry.payload.part05
+          git rm --ignore-unmatch .github/hf-space-foundry.payload.part06
+          git rm --ignore-unmatch .github/workflows/bootstrap-hf-space-foundry.yml
+
+          test ! -e .github/hf-space-foundry.payload.b64
+          test -z "$(find .github -maxdepth 1 -type f -name 'hf-space-foundry.payload.part*' -print -quit)"
+          git diff --cached --check
+          git diff --cached --name-only
+          git commit -m "feat(hf): add unique Space Foundry and living estate"
+          git push origin "HEAD:${BRANCH}"
