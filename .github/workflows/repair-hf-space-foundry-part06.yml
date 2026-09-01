@@ -1,0 +1,106 @@
+# Copyright 2026 SZL Holdings — SPDX-License-Identifier: Apache-2.0
+name: Repair HF Space Foundry shard
+
+on:
+  push:
+    branches:
+      - feat/hf-space-foundry-v1-20260901
+    paths:
+      - .github/workflows/repair-hf-space-foundry-part06.yml
+
+permissions:
+  contents: write
+
+concurrency:
+  group: repair-hf-space-foundry-part06
+  cancel-in-progress: false
+
+jobs:
+  repair:
+    name: Recover the one-byte transport deletion and self-remove
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Harden runner
+        uses: step-security/harden-runner@05e31511f85b41b11d1cf0ef85d0992719546e2c # v2.21.0
+        with:
+          egress-policy: audit
+
+      - name: Check out exact repair head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: feat/hf-space-foundry-v1-20260901
+          fetch-depth: 0
+          persist-credentials: true
+
+      - name: Prove exact branch execution
+        shell: bash
+        env:
+          EXPECTED_REPOSITORY: szl-holdings/.github
+          EXPECTED_REF: refs/heads/feat/hf-space-foundry-v1-20260901
+        run: |
+          set -euo pipefail
+          test "$GITHUB_REPOSITORY" = "$EXPECTED_REPOSITORY"
+          test "$GITHUB_REF" = "$EXPECTED_REF"
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          test -z "$(git status --porcelain=v1)"
+
+      - name: Recover exact shard and prove whole archive
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from __future__ import annotations
+
+          import base64
+          import hashlib
+          from pathlib import Path
+
+          shard = Path('.github/hf-space-foundry.payload.part06')
+          observed = shard.read_bytes()
+          target_shard_sha = 'd8f142ff3a04c1d7264445d97c667bc31ac57c0bc7e0654577c5fbc5a86df5fe'
+          target_archive_sha = 'ee8da3d6fe44692eb74765b0e2cfabea330b00b5b852f2b44643b21f9d9812a7'
+          if len(observed) != 5543:
+              raise SystemExit(f'unexpected damaged shard length: {len(observed)}')
+
+          alphabet = b'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/='
+          recovered = None
+          recovered_at = None
+          recovered_byte = None
+          for offset in range(len(observed) + 1):
+              prefix = observed[:offset]
+              suffix = observed[offset:]
+              for value in alphabet:
+                  candidate = prefix + bytes((value,)) + suffix
+                  if hashlib.sha256(candidate).hexdigest() == target_shard_sha:
+                      if recovered is not None:
+                          raise SystemExit('ambiguous shard recovery')
+                      recovered = candidate
+                      recovered_at = offset
+                      recovered_byte = value
+          if recovered is None:
+              raise SystemExit('no one-byte insertion reproduces the immutable shard digest')
+          shard.write_bytes(recovered)
+          print(f'recovered_offset={recovered_at} recovered_ascii={chr(recovered_byte)}')
+
+          parts = [Path(f'.github/hf-space-foundry.payload.part{index:02d}').read_bytes() for index in range(7)]
+          decoded = base64.b64decode(b''.join(parts), validate=True)
+          actual_archive_sha = hashlib.sha256(decoded).hexdigest()
+          print(f'archive_bytes={len(decoded)} archive_sha256={actual_archive_sha}')
+          if len(decoded) != 31157 or actual_archive_sha != target_archive_sha:
+              raise SystemExit('whole archive did not recover to its immutable identity')
+          PY
+
+      - name: Commit repaired shard and remove repair workflow
+        shell: bash
+        env:
+          BRANCH: feat/hf-space-foundry-v1-20260901
+        run: |
+          set -euo pipefail
+          git config user.name "SZL Holdings Automation"
+          git config user.email "eng@szlholdings.com"
+          git add .github/hf-space-foundry.payload.part06
+          git rm .github/workflows/repair-hf-space-foundry-part06.yml
+          git diff --cached --check
+          git commit -m "fix(hf): repair immutable Space Foundry shard"
+          git push origin "HEAD:${BRANCH}"
