@@ -121,7 +121,7 @@ jobs:
               {
                   'repo': 'szl-real-estate',
                   'hf_repo': 'SZLHOLDINGS/szl-real-estate',
-                  'smoke_paths': '["/"]',
+                  'smoke_paths': '["/","/healthz","/api/second-brain","/api/formulas"]',
               },
               {
                   'repo': 'szl-command-lab',
@@ -131,7 +131,7 @@ jobs:
               {
                   'repo': 'lyte-lattice',
                   'hf_repo': 'SZLHOLDINGS/lyte-lattice',
-                  'smoke_paths': '["/"]',
+                  'smoke_paths': '["/","/healthz","/api/second-brain","/api/formulas"]',
               },
           ]
           matrix = publish.get('strategy', {}).get('matrix', {}).get('include')
@@ -203,13 +203,13 @@ jobs:
         include:
           - repo: szl-real-estate
             hf_repo: SZLHOLDINGS/szl-real-estate
-            smoke_paths: '["/"]'
+            smoke_paths: '["/","/healthz","/api/second-brain","/api/formulas"]'
           - repo: szl-command-lab
             hf_repo: SZLHOLDINGS/szl-command-lab
             smoke_paths: '["/","/healthz"]'
           - repo: lyte-lattice
             hf_repo: SZLHOLDINGS/lyte-lattice
-            smoke_paths: '["/"]'
+            smoke_paths: '["/","/healthz","/api/second-brain","/api/formulas"]'
     concurrency:
       group: hf-central-publish-${{ matrix.repo }}
       cancel-in-progress: false
