@@ -2,12 +2,15 @@
 """Network-free regressions for personal GitHub notification inbox clearance."""
 from __future__ import annotations
 
+import email.message
 import importlib.util
+import io
 import sys
 import unittest
+import urllib.error
 import urllib.parse
 from pathlib import Path
-from unittest.mock import patch
+from unittest.mock import call, patch
 
 MODULE_PATH = Path(__file__).with_name("clear_personal_notifications.py")
 SPEC = importlib.util.spec_from_file_location("clear_personal_notifications", MODULE_PATH)
@@ -67,6 +70,45 @@ class FakeGitHub:
             raise AssertionError("wrong token")
 
 
+class FakeResponse:
+    def __init__(self, status: int, body: bytes = b"") -> None:
+        self.status = status
+        self.body = body
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc, traceback):
+        return False
+
+    def read(self) -> bytes:
+        return self.body
+
+
+def http_error(
+    *,
+    status: int = 403,
+    detail: bytes = b'{"message":"API rate limit exceeded"}',
+    retry_after: str | None = None,
+    remaining: str | None = None,
+    reset: str | None = None,
+) -> urllib.error.HTTPError:
+    headers = email.message.Message()
+    if retry_after is not None:
+        headers["Retry-After"] = retry_after
+    if remaining is not None:
+        headers["X-RateLimit-Remaining"] = remaining
+    if reset is not None:
+        headers["X-RateLimit-Reset"] = reset
+    return urllib.error.HTTPError(
+        url="https://api.github.com/notifications/threads/secret-id",
+        code=status,
+        msg="Forbidden",
+        hdrs=headers,
+        fp=io.BytesIO(detail),
+    )
+
+
 class NotificationClearanceTests(unittest.TestCase):
     def test_inventory_includes_read_threads_and_paginates_at_api_maximum(self):
         api = FakeGitHub(53)
@@ -90,11 +132,15 @@ class NotificationClearanceTests(unittest.TestCase):
 
     def test_clear_inbox_moves_read_and_unread_threads_to_done(self):
         api = FakeGitHub(4)
+        snapshots = []
         with (
             patch.object(clearer, "request", api.request),
             patch.object(clearer.time, "sleep", return_value=None),
         ):
-            report = clearer.clear_inbox("classic-token")
+            report = clearer.clear_inbox(
+                "classic-token",
+                progress=snapshots.append,
+            )
         self.assertEqual(report["before_inbox_count"], 4)
         self.assertEqual(report["before_unread_count"], 2)
         self.assertEqual(report["after_inbox_count"], 0)
@@ -104,6 +150,8 @@ class NotificationClearanceTests(unittest.TestCase):
         self.assertFalse(report["notification_content_recorded"])
         self.assertFalse(report["thread_ids_recorded"])
         self.assertTrue(all(state["done"] for state in api.threads.values()))
+        self.assertTrue(snapshots)
+        self.assertTrue(all(snapshot["status"] == "RUNNING" for snapshot in snapshots))
 
     def test_clear_inbox_catches_notification_arriving_during_clearance(self):
         api = FakeGitHub(2, inject_concurrent=True)
@@ -116,6 +164,85 @@ class NotificationClearanceTests(unittest.TestCase):
         self.assertEqual(report["cleared_count"], 3)
         self.assertGreaterEqual(report["clearance_rounds"], 2)
         self.assertTrue(api.threads["999"]["done"])
+
+    def test_clear_inbox_paces_mutating_requests_serially(self):
+        api = FakeGitHub(3)
+        with (
+            patch.object(clearer, "request", api.request),
+            patch.object(clearer.time, "sleep", return_value=None) as sleeper,
+        ):
+            clearer.clear_inbox("classic-token")
+        self.assertEqual(
+            sleeper.call_args_list.count(call(clearer.MUTATION_DELAY_SECONDS)),
+            2,
+        )
+
+    def test_rate_limit_delay_honors_retry_after(self):
+        self.assertEqual(
+            clearer.rate_limit_delay(
+                status=429,
+                detail="",
+                headers={"Retry-After": "7"},
+                attempt=0,
+                now_epoch=100,
+            ),
+            7,
+        )
+
+    def test_rate_limit_delay_honors_primary_reset_with_safety_margin(self):
+        self.assertEqual(
+            clearer.rate_limit_delay(
+                status=403,
+                detail="API rate limit exceeded",
+                headers={
+                    "X-RateLimit-Remaining": "0",
+                    "X-RateLimit-Reset": "110",
+                },
+                attempt=0,
+                now_epoch=100,
+            ),
+            15,
+        )
+
+    def test_request_retries_rate_limit_then_returns(self):
+        error = http_error(retry_after="1")
+        response = FakeResponse(204)
+        with (
+            patch.object(
+                clearer.urllib.request,
+                "urlopen",
+                side_effect=[error, response],
+            ),
+            patch.object(clearer.time, "sleep", return_value=None) as sleeper,
+        ):
+            status, payload = clearer.request(
+                "classic-token",
+                "DELETE",
+                "/notifications/threads/secret-id",
+            )
+        self.assertEqual(status, 204)
+        self.assertIsNone(payload)
+        sleeper.assert_called_once_with(1.0)
+
+    def test_non_rate_limit_error_redacts_thread_identifier(self):
+        error = http_error(
+            detail=b'{"message":"Forbidden"}',
+            remaining="10",
+        )
+        with patch.object(
+            clearer.urllib.request,
+            "urlopen",
+            side_effect=error,
+        ):
+            with self.assertRaises(clearer.NotificationError) as raised:
+                clearer.request(
+                    "classic-token",
+                    "DELETE",
+                    "/notifications/threads/secret-id",
+                )
+        message = str(raised.exception)
+        self.assertIn("/notifications/threads/{thread_id}", message)
+        self.assertNotIn("secret-id", message)
 
 
 if __name__ == "__main__":
