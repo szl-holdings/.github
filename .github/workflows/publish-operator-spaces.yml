@@ -2,9 +2,9 @@
 name: Publish operator Spaces
 
 # Provider writes are centralized here because reusable workflows execute in the
-# caller repository's secret scope. This repository owns the production
-# environment credential, exact-source resolution, deployment, restart, smoke
-# verification, and immutable evidence.
+# caller repository's secret scope. This repository owns the repository-scoped
+# credential, exact-source resolution, deployment, restart, smoke verification,
+# and immutable evidence.
 on:
   pull_request:
     branches: [main]
@@ -102,8 +102,8 @@ jobs:
               raise SystemExit('validation must remain pull-request only')
           if publish.get('if') != "github.event_name != 'pull_request'":
               raise SystemExit('provider publication must remain disabled on pull requests')
-          if publish.get('environment') != 'production':
-              raise SystemExit('provider writes must use the production environment')
+          if 'environment' in publish:
+              raise SystemExit('publisher must use the proven central repository secret scope')
 
           expected_matrix = [
               {
@@ -127,7 +127,6 @@ jobs:
               raise SystemExit(f'publisher matrix drift: {matrix!r}')
 
           required_fragments = (
-              'environment: production',
               'ref: main',
               '--require-default-branch-tip',
               '--restart-space',
@@ -183,7 +182,6 @@ jobs:
     if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     timeout-minutes: 30
-    environment: production
     strategy:
       fail-fast: false
       matrix:
@@ -259,14 +257,14 @@ jobs:
           printf 'sha=%s\n' "$SOURCE_SHA" >> "$GITHUB_OUTPUT"
           printf 'source=szl-holdings/%s@%s\n' "$REPO" "$SOURCE_SHA"
 
-      - name: Require central production credential
+      - name: Require central repository credential
         shell: bash
         env:
           HF_TOKEN: ${{ secrets.HF_ORG_TOKEN || secrets.HF_ORG_TOKEN1 || secrets.HF_TOKEN || secrets.HF_WRITE_TOKEN }}
         run: |
           set -euo pipefail
           test -n "${HF_TOKEN:-}" || {
-            echo "::error::No Hugging Face write credential is available in the central production environment."
+            echo "::error::No Hugging Face write credential is available in the central repository secret scope."
             exit 2
           }
 
