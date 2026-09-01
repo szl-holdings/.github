@@ -98,7 +98,8 @@ jobs:
           workflow_concurrency = document.get('concurrency')
           if not isinstance(workflow_concurrency, dict):
               raise SystemExit('workflow concurrency must be a mapping')
-          if workflow_concurrency.get('group') != 'publish-operator-spaces-${{ github.event_name }}':
+          expected_group = 'publish-operator-spaces-$' + '{{ github.event_name }}'
+          if workflow_concurrency.get('group') != expected_group:
               raise SystemExit('fleet concurrency group drifted')
           if workflow_concurrency.get('cancel-in-progress') != 'true':
               raise SystemExit('new protected revisions must evict obsolete publisher runs')
