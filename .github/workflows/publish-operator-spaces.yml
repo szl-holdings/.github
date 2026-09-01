@@ -141,6 +141,7 @@ jobs:
           required_fragments = (
               'ref: main',
               'Validate Hugging Face card metadata before mutation',
+              'yaml.safe_load',
               'short_description is',
               '--require-default-branch-tip',
               '--restart-space',
@@ -277,7 +278,7 @@ jobs:
           REPO: ${{ matrix.repo }}
         run: |
           set -euo pipefail
-          python3 -I -P <<'PY'
+          "$RUNNER_TEMP/hf-publisher-venv/bin/python" -I -P <<'PY'
           from __future__ import annotations
 
           import hashlib
@@ -285,16 +286,19 @@ jobs:
           import os
           from pathlib import Path
 
+          import yaml
+
           repo = os.environ['REPO']
           readme = Path('source/README.md')
           if not readme.is_file():
               raise SystemExit('README.md is missing from the exact source checkout')
           text = readme.read_text(encoding='utf-8')
           result = {
-              'schema': 'szl.hf.card-preflight.v1',
+              'schema': 'szl.hf.card-preflight.v2',
               'repository': f'szl-holdings/{repo}',
               'readme_sha256': hashlib.sha256(text.encode()).hexdigest(),
               'frontmatter_present': False,
+              'metadata_yaml_valid': False,
               'short_description_present': False,
               'short_description_length': None,
               'maximum_short_description_length': 60,
@@ -304,14 +308,21 @@ jobs:
               end = text.find('\n---\n', 4)
               if end < 0:
                   raise SystemExit('README.md metadata closing delimiter is missing')
-              descriptions = []
-              for line in text[4:end].splitlines():
-                  if line.startswith('short_description:'):
-                      descriptions.append(line.split(':', 1)[1].strip())
-              if len(descriptions) > 1:
-                  raise SystemExit('README.md defines short_description more than once')
-              if descriptions:
-                  description = descriptions[0]
+              frontmatter = text[4:end]
+              try:
+                  metadata = yaml.safe_load(frontmatter)
+              except yaml.YAMLError as exc:
+                  raise SystemExit(f'Invalid YAML in README.md metadata: {exc}') from exc
+              if metadata is None:
+                  metadata = {}
+              if not isinstance(metadata, dict):
+                  raise SystemExit('README.md metadata must decode to a mapping')
+              result['metadata_yaml_valid'] = True
+              description_value = metadata.get('short_description')
+              if description_value is not None:
+                  if not isinstance(description_value, str):
+                      raise SystemExit('short_description must decode to a string')
+                  description = description_value.strip()
                   if not description:
                       raise SystemExit('short_description must not be empty')
                   length = len(description)
@@ -405,7 +416,7 @@ jobs:
             echo "- GitHub source: \`szl-holdings/${REPO}@${SOURCE_SHA}\`"
             echo "- Hugging Face target: \`${HF_REPO}\`"
             echo "- Default-tip guard: passed"
-            echo "- Card metadata preflight: passed"
+            echo "- Card metadata YAML preflight: passed"
             echo "- Runtime and smoke attestation: passed"
           } >> "$GITHUB_STEP_SUMMARY"
 
