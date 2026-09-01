@@ -98,7 +98,8 @@ jobs:
           workflow_concurrency = document.get('concurrency')
           if not isinstance(workflow_concurrency, dict):
               raise SystemExit('workflow concurrency must be a mapping')
-          if workflow_concurrency.get('group') != 'publish-operator-spaces-${{ github.event_name }}':
+          expected_group = 'publish-operator-spaces-$' + '{{ github.event_name }}'
+          if workflow_concurrency.get('group') != expected_group:
               raise SystemExit('fleet concurrency group drifted')
           if workflow_concurrency.get('cancel-in-progress') != 'true':
               raise SystemExit('new protected revisions must evict obsolete publisher runs')
@@ -139,6 +140,8 @@ jobs:
 
           required_fragments = (
               'ref: main',
+              'Validate Hugging Face card metadata before mutation',
+              'short_description is',
               '--require-default-branch-tip',
               '--restart-space',
               '--attest',
@@ -268,6 +271,64 @@ jobs:
           printf 'sha=%s\n' "$SOURCE_SHA" >> "$GITHUB_OUTPUT"
           printf 'source=szl-holdings/%s@%s\n' "$REPO" "$SOURCE_SHA"
 
+      - name: Validate Hugging Face card metadata before mutation
+        shell: bash
+        env:
+          REPO: ${{ matrix.repo }}
+        run: |
+          set -euo pipefail
+          python3 -I -P <<'PY'
+          from __future__ import annotations
+
+          import hashlib
+          import json
+          import os
+          from pathlib import Path
+
+          repo = os.environ['REPO']
+          readme = Path('source/README.md')
+          if not readme.is_file():
+              raise SystemExit('README.md is missing from the exact source checkout')
+          text = readme.read_text(encoding='utf-8')
+          result = {
+              'schema': 'szl.hf.card-preflight.v1',
+              'repository': f'szl-holdings/{repo}',
+              'readme_sha256': hashlib.sha256(text.encode()).hexdigest(),
+              'frontmatter_present': False,
+              'short_description_present': False,
+              'short_description_length': None,
+              'maximum_short_description_length': 60,
+          }
+          if text.startswith('---\n'):
+              result['frontmatter_present'] = True
+              end = text.find('\n---\n', 4)
+              if end < 0:
+                  raise SystemExit('README.md metadata closing delimiter is missing')
+              descriptions = []
+              for line in text[4:end].splitlines():
+                  if line.startswith('short_description:'):
+                      descriptions.append(line.split(':', 1)[1].strip())
+              if len(descriptions) > 1:
+                  raise SystemExit('README.md defines short_description more than once')
+              if descriptions:
+                  description = descriptions[0]
+                  if not description:
+                      raise SystemExit('short_description must not be empty')
+                  length = len(description)
+                  if length > 60:
+                      raise SystemExit(
+                          f'short_description is {length} characters; maximum is 60'
+                      )
+                  result['short_description_present'] = True
+                  result['short_description_length'] = length
+          output = Path(f'evidence/{repo}/hf-card-preflight.json')
+          output.write_text(
+              json.dumps(result, indent=2, sort_keys=True) + '\n',
+              encoding='utf-8',
+          )
+          print(json.dumps(result, indent=2, sort_keys=True))
+          PY
+
       - name: Require central repository credential
         shell: bash
         env:
@@ -344,6 +405,7 @@ jobs:
             echo "- GitHub source: \`szl-holdings/${REPO}@${SOURCE_SHA}\`"
             echo "- Hugging Face target: \`${HF_REPO}\`"
             echo "- Default-tip guard: passed"
+            echo "- Card metadata preflight: passed"
             echo "- Runtime and smoke attestation: passed"
           } >> "$GITHUB_STEP_SUMMARY"
 
