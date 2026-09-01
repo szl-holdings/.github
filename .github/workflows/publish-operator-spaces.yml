@@ -24,9 +24,12 @@ permissions:
   contents: read
   security-events: write
 
+# A newer protected source revision supersedes any older waiting or running
+# publication. This is required to evict obsolete environment-gated runs before
+# they can indefinitely hold the fleet-wide concurrency lock.
 concurrency:
   group: publish-operator-spaces-${{ github.event_name }}
-  cancel-in-progress: false
+  cancel-in-progress: true
 
 jobs:
   validate:
@@ -91,6 +94,14 @@ jobs:
           expected_triggers = {'pull_request', 'push', 'schedule', 'workflow_dispatch'}
           if not isinstance(triggers, dict) or set(triggers) != expected_triggers:
               raise SystemExit(f'unexpected trigger contract: {triggers!r}')
+
+          workflow_concurrency = document.get('concurrency')
+          if not isinstance(workflow_concurrency, dict):
+              raise SystemExit('workflow concurrency must be a mapping')
+          if workflow_concurrency.get('group') != 'publish-operator-spaces-${{ github.event_name }}':
+              raise SystemExit('fleet concurrency group drifted')
+          if workflow_concurrency.get('cancel-in-progress') != 'true':
+              raise SystemExit('new protected revisions must evict obsolete publisher runs')
 
           jobs = document.get('jobs')
           if not isinstance(jobs, dict) or set(jobs) != {'validate', 'publish'}:
