@@ -30,11 +30,153 @@ concurrency:
 
 jobs:
   validate:
-    name: Validate central publisher (no provider write)
+    name: Validate changed central publisher only
     if: github.event_name == 'pull_request'
-    uses: szl-holdings/.github/.github/workflows/reusable-workflow-lint.yml@4baa6456dcbd4a4d887f8453cc12c2ac6fb1c9f3
-    with:
-      fail-on-zizmor-warning: false
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    steps:
+      - name: Harden runner
+        uses: step-security/harden-runner@05e31511f85b41b11d1cf0ef85d0992719546e2c # v2.21.0
+        with:
+          egress-policy: audit
+
+      - name: Checkout exact pull-request source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 1
+
+      - name: Set up exact Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12.10"
+
+      - name: Install hash-locked YAML parser
+        shell: bash
+        run: |
+          set -euo pipefail
+          VENV="$RUNNER_TEMP/hf-publisher-validation"
+          test ! -e "$VENV"
+          python3 -m venv "$VENV"
+          "$VENV/bin/python" -I -P -m pip install \
+            --disable-pip-version-check \
+            --require-hashes \
+            --only-binary=:all: \
+            --ignore-installed \
+            -r requirements/hf-publisher.lock
+
+      - name: Validate syntax, action pins, shell, and publication contract
+        shell: bash
+        run: |
+          set -euo pipefail
+          "$RUNNER_TEMP/hf-publisher-validation/bin/python" -I -P <<'PY'
+          from __future__ import annotations
+
+          import re
+          import subprocess
+          import tempfile
+          from pathlib import Path
+
+          import yaml
+
+          path = Path('.github/workflows/publish-operator-spaces.yml')
+          text = path.read_text(encoding='utf-8')
+          document = yaml.load(text, Loader=yaml.BaseLoader)
+          if not isinstance(document, dict):
+              raise SystemExit('workflow root must be a mapping')
+
+          triggers = document.get('on')
+          expected_triggers = {'pull_request', 'push', 'schedule', 'workflow_dispatch'}
+          if not isinstance(triggers, dict) or set(triggers) != expected_triggers:
+              raise SystemExit(f'unexpected trigger contract: {triggers!r}')
+
+          jobs = document.get('jobs')
+          if not isinstance(jobs, dict) or set(jobs) != {'validate', 'publish'}:
+              raise SystemExit(f'unexpected job contract: {set(jobs or {})!r}')
+
+          validate = jobs['validate']
+          publish = jobs['publish']
+          if validate.get('if') != "github.event_name == 'pull_request'":
+              raise SystemExit('validation must remain pull-request only')
+          if publish.get('if') != "github.event_name != 'pull_request'":
+              raise SystemExit('provider publication must remain disabled on pull requests')
+          if publish.get('environment') != 'production':
+              raise SystemExit('provider writes must use the production environment')
+
+          expected_matrix = [
+              {
+                  'repo': 'szl-real-estate',
+                  'hf_repo': 'SZLHOLDINGS/szl-real-estate',
+                  'smoke_paths': '["/"]',
+              },
+              {
+                  'repo': 'szl-command-lab',
+                  'hf_repo': 'SZLHOLDINGS/szl-command-lab',
+                  'smoke_paths': '["/","/healthz"]',
+              },
+              {
+                  'repo': 'lyte-lattice',
+                  'hf_repo': 'SZLHOLDINGS/lyte-lattice',
+                  'smoke_paths': '["/"]',
+              },
+          ]
+          matrix = publish.get('strategy', {}).get('matrix', {}).get('include')
+          if matrix != expected_matrix:
+              raise SystemExit(f'publisher matrix drift: {matrix!r}')
+
+          required_fragments = (
+              'environment: production',
+              'ref: main',
+              '--require-default-branch-tip',
+              '--restart-space',
+              '--attest',
+              '--wait-running 1200',
+              'actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a',
+              'secrets.HF_ORG_TOKEN',
+              'secrets.HF_ORG_TOKEN1',
+              'secrets.HF_TOKEN',
+              'secrets.HF_WRITE_TOKEN',
+          )
+          missing = [fragment for fragment in required_fragments if fragment not in text]
+          if missing:
+              raise SystemExit(f'missing governed publisher controls: {missing!r}')
+
+          pin_pattern = re.compile(r'^[^@\s]+@[0-9a-f]{40}$')
+          for job_name, job in jobs.items():
+              for index, step in enumerate(job.get('steps', []), start=1):
+                  uses = step.get('uses')
+                  if uses and not pin_pattern.fullmatch(uses):
+                      raise SystemExit(
+                          f'unpinned action in {job_name} step {index}: {uses!r}'
+                      )
+
+                  script = step.get('run')
+                  if not script:
+                      continue
+                  with tempfile.NamedTemporaryFile(
+                      mode='w', encoding='utf-8', suffix='.bash', delete=False
+                  ) as handle:
+                      handle.write(script)
+                      script_path = Path(handle.name)
+                  try:
+                      result = subprocess.run(
+                          ['bash', '-n', str(script_path)],
+                          text=True,
+                          capture_output=True,
+                          check=False,
+                      )
+                  finally:
+                      script_path.unlink(missing_ok=True)
+                  if result.returncode:
+                      raise SystemExit(
+                          f'bash syntax failure in {job_name} step {index}: '
+                          f'{result.stderr.strip()}'
+                      )
+
+          print('central publisher syntax and governance contract: PASS')
+          PY
 
   publish:
     name: Publish ${{ matrix.repo }} from exact main tip
