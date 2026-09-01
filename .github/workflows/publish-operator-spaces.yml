@@ -1,167 +1,348 @@
 # Copyright 2026 SZL Holdings — SPDX-License-Identifier: Apache-2.0
-# Mirror GitHub canonical sources onto SZLHOLDINGS Docker Spaces.
 name: Publish operator Spaces
+
+# Provider writes are centralized here because reusable workflows execute in the
+# caller repository's secret scope. This repository owns the production
+# environment credential, exact-source resolution, deployment, restart, smoke
+# verification, and immutable evidence.
 on:
-  workflow_dispatch:
-    inputs:
-      repos:
-        description: Comma-separated szl-holdings repo names to mirror as Docker Spaces
-        required: false
-        default: szl-sovereign-os,szl-real-estate
+  pull_request:
+    branches: [main]
+    paths:
+      - .github/workflows/publish-operator-spaces.yml
+      - .github/scripts/hf_deploy_from_dockerfile.py
+      - requirements/hf-publisher.lock
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/publish-operator-spaces.yml
+  schedule:
+    - cron: "17 * * * *"
+  workflow_dispatch: {}
+
 permissions:
   contents: read
+  security-events: write
+
 concurrency:
-  group: publish-operator-spaces
+  group: publish-operator-spaces-${{ github.event_name }}
   cancel-in-progress: false
+
 jobs:
-  publish:
-    name: Publish with repo secrets
+  validate:
+    name: Validate changed central publisher only
+    if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
-    timeout-minutes: 20
-    outputs:
-      published: ${{ steps.push.outputs.published }}
+    timeout-minutes: 5
+    permissions:
+      contents: read
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Harden runner
+        uses: step-security/harden-runner@05e31511f85b41b11d1cf0ef85d0992719546e2c # v2.21.0
+        with:
+          egress-policy: audit
+
+      - name: Checkout exact pull-request source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+          fetch-depth: 1
+
+      - name: Set up exact Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
-          python-version: "3.12"
-      - run: pip install huggingface_hub
-      - name: Clone operator sources
-        env:
-          REPOS: ${{ github.event.inputs.repos }}
+          python-version: "3.12.10"
+
+      - name: Install hash-locked YAML parser
+        shell: bash
         run: |
           set -euo pipefail
-          mkdir -p siblings
-          IFS=',' read -ra RS <<< "${REPOS}"
-          for r in "${RS[@]}"; do
-            r=$(echo "$r" | xargs)
-            git clone --depth 1 "https://github.com/szl-holdings/${r}.git" "siblings/${r}"
-          done
-      - id: push
-        name: Push Docker Spaces
-        env:
-          HF_TOKEN: ${{ secrets.HF_TOKEN }}
-          HF_ORG_TOKEN: ${{ secrets.HF_ORG_TOKEN || secrets.HF_ORG_TOKEN1 }}
-          HF_WRITE_TOKEN: ${{ secrets.HF_WRITE_TOKEN }}
-          REPOS: ${{ github.event.inputs.repos }}
+          VENV="$RUNNER_TEMP/hf-publisher-validation"
+          test ! -e "$VENV"
+          python3 -m venv "$VENV"
+          "$VENV/bin/python" -I -P -m pip install \
+            --disable-pip-version-check \
+            --require-hashes \
+            --only-binary=:all: \
+            --ignore-installed \
+            -r requirements/hf-publisher.lock
+
+      - name: Validate syntax, action pins, shell, and publication contract
+        shell: bash
         run: |
-          python - <<'PY'
-          import os, sys
+          set -euo pipefail
+          "$RUNNER_TEMP/hf-publisher-validation/bin/python" -I -P <<'PY'
+          from __future__ import annotations
+
+          import re
+          import subprocess
+          import tempfile
           from pathlib import Path
-          token = (
-              os.environ.get("HF_TOKEN")
-              or os.environ.get("HF_ORG_TOKEN")
-              or os.environ.get("HF_WRITE_TOKEN")
-              or ""
+
+          import yaml
+
+          path = Path('.github/workflows/publish-operator-spaces.yml')
+          text = path.read_text(encoding='utf-8')
+          document = yaml.load(text, Loader=yaml.BaseLoader)
+          if not isinstance(document, dict):
+              raise SystemExit('workflow root must be a mapping')
+
+          triggers = document.get('on')
+          expected_triggers = {'pull_request', 'push', 'schedule', 'workflow_dispatch'}
+          if not isinstance(triggers, dict) or set(triggers) != expected_triggers:
+              raise SystemExit(f'unexpected trigger contract: {triggers!r}')
+
+          jobs = document.get('jobs')
+          if not isinstance(jobs, dict) or set(jobs) != {'validate', 'publish'}:
+              raise SystemExit(f'unexpected job contract: {set(jobs or {})!r}')
+
+          validate = jobs['validate']
+          publish = jobs['publish']
+          if validate.get('if') != "github.event_name == 'pull_request'":
+              raise SystemExit('validation must remain pull-request only')
+          if publish.get('if') != "github.event_name != 'pull_request'":
+              raise SystemExit('provider publication must remain disabled on pull requests')
+          if publish.get('environment') != 'production':
+              raise SystemExit('provider writes must use the production environment')
+
+          expected_matrix = [
+              {
+                  'repo': 'szl-real-estate',
+                  'hf_repo': 'SZLHOLDINGS/szl-real-estate',
+                  'smoke_paths': '["/"]',
+              },
+              {
+                  'repo': 'szl-command-lab',
+                  'hf_repo': 'SZLHOLDINGS/szl-command-lab',
+                  'smoke_paths': '["/","/healthz"]',
+              },
+              {
+                  'repo': 'lyte-lattice',
+                  'hf_repo': 'SZLHOLDINGS/lyte-lattice',
+                  'smoke_paths': '["/"]',
+              },
+          ]
+          matrix = publish.get('strategy', {}).get('matrix', {}).get('include')
+          if matrix != expected_matrix:
+              raise SystemExit(f'publisher matrix drift: {matrix!r}')
+
+          required_fragments = (
+              'environment: production',
+              'ref: main',
+              '--require-default-branch-tip',
+              '--restart-space',
+              '--attest',
+              '--wait-running 1200',
+              'actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a',
+              'secrets.HF_ORG_TOKEN',
+              'secrets.HF_ORG_TOKEN1',
+              'secrets.HF_TOKEN',
+              'secrets.HF_WRITE_TOKEN',
           )
-          if not token:
-              print("HF_TOKEN UNAVAILABLE on repo secrets — production job will retry. Not fabricated LIVE.")
-              with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as fh:
-                  fh.write("published=false\n")
-              sys.exit(0)
-          from huggingface_hub import HfApi, create_repo, space_info
-          api = HfApi(token=token)
-          published = []
-          for name in [r.strip() for r in os.environ.get("REPOS", "").split(",") if r.strip()]:
-              folder = Path("siblings") / name
-              if not folder.exists():
-                  print(f"UNAVAILABLE source folder {folder}")
-                  sys.exit(2)
-              repo_id = f"SZLHOLDINGS/{name}"
-              create_repo(
-                  repo_id,
-                  repo_type="space",
-                  space_sdk="docker",
-                  exist_ok=True,
-                  token=token,
-                  private=False,
-              )
-              api.upload_folder(
-                  folder_path=str(folder),
-                  repo_id=repo_id,
-                  repo_type="space",
-                  ignore_patterns=[".git*", ".github/**", "tests/*", ".venv/*", "__pycache__/*"],
-              )
-              info = space_info(repo_id, token=token)
-              print(f"published {repo_id} sdk={getattr(info, 'sdk', None)}")
-              published.append(repo_id)
-          print(f"MEASURED published={published}")
-          with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as fh:
-              fh.write("published=true\n")
+          missing = [fragment for fragment in required_fragments if fragment not in text]
+          if missing:
+              raise SystemExit(f'missing governed publisher controls: {missing!r}')
+
+          pin_pattern = re.compile(r'^[^@\s]+@[0-9a-f]{40}$')
+          for job_name, job in jobs.items():
+              for index, step in enumerate(job.get('steps', []), start=1):
+                  uses = step.get('uses')
+                  if uses and not pin_pattern.fullmatch(uses):
+                      raise SystemExit(
+                          f'unpinned action in {job_name} step {index}: {uses!r}'
+                      )
+
+                  script = step.get('run')
+                  if not script:
+                      continue
+                  with tempfile.NamedTemporaryFile(
+                      mode='w', encoding='utf-8', suffix='.bash', delete=False
+                  ) as handle:
+                      handle.write(script)
+                      script_path = Path(handle.name)
+                  try:
+                      result = subprocess.run(
+                          ['bash', '-n', str(script_path)],
+                          text=True,
+                          capture_output=True,
+                          check=False,
+                      )
+                  finally:
+                      script_path.unlink(missing_ok=True)
+                  if result.returncode:
+                      raise SystemExit(
+                          f'bash syntax failure in {job_name} step {index}: '
+                          f'{result.stderr.strip()}'
+                      )
+
+          print('central publisher syntax and governance contract: PASS')
           PY
 
-  publish-production:
-    name: Publish with production environment secrets
-    needs: publish
-    if: needs.publish.outputs.published != 'true'
+  publish:
+    name: Publish ${{ matrix.repo }} from exact main tip
+    if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     environment: production
-    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - repo: szl-real-estate
+            hf_repo: SZLHOLDINGS/szl-real-estate
+            smoke_paths: '["/"]'
+          - repo: szl-command-lab
+            hf_repo: SZLHOLDINGS/szl-command-lab
+            smoke_paths: '["/","/healthz"]'
+          - repo: lyte-lattice
+            hf_repo: SZLHOLDINGS/lyte-lattice
+            smoke_paths: '["/"]'
+    concurrency:
+      group: hf-central-publish-${{ matrix.repo }}
+      cancel-in-progress: false
+
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Harden runner
+        uses: step-security/harden-runner@05e31511f85b41b11d1cf0ef85d0992719546e2c # v2.21.0
         with:
+          egress-policy: audit
+
+      - name: Checkout exact publisher policy
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          path: tools
+          ref: ${{ github.sha }}
           persist-credentials: false
-      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+          fetch-depth: 1
+
+      - name: Checkout current source main tip
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          python-version: "3.12"
-      - run: pip install huggingface_hub
-      - name: Clone operator sources
-        env:
-          REPOS: ${{ github.event.inputs.repos }}
+          repository: szl-holdings/${{ matrix.repo }}
+          ref: main
+          path: source
+          persist-credentials: false
+          fetch-depth: 1
+
+      - name: Set up exact Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12.10"
+
+      - name: Create fresh publisher environment
+        shell: bash
         run: |
           set -euo pipefail
-          mkdir -p siblings
-          IFS=',' read -ra RS <<< "${REPOS}"
-          for r in "${RS[@]}"; do
-            r=$(echo "$r" | xargs)
-            git clone --depth 1 "https://github.com/szl-holdings/${r}.git" "siblings/${r}"
-          done
-      - name: Push Docker Spaces via production
+          VENV="$RUNNER_TEMP/hf-publisher-venv"
+          test ! -e "$VENV"
+          python3 -m venv "$VENV"
+          ACTUAL_VERSION="$("$VENV/bin/python" -I -P -c 'import platform; print(platform.python_version())')"
+          test "$ACTUAL_VERSION" = "3.12.10"
+
+      - name: Install hash-locked publisher closure
+        shell: bash
+        run: >-
+          "$RUNNER_TEMP/hf-publisher-venv/bin/python" -I -P -m pip install
+          --disable-pip-version-check --require-hashes --only-binary=:all:
+          --ignore-installed -r tools/requirements/hf-publisher.lock
+
+      - name: Resolve exact source identity
+        id: source
+        shell: bash
         env:
-          HF_TOKEN: ${{ secrets.HF_TOKEN }}
-          HF_ORG_TOKEN: ${{ secrets.HF_ORG_TOKEN || secrets.HF_ORG_TOKEN1 }}
-          HF_WRITE_TOKEN: ${{ secrets.HF_WRITE_TOKEN }}
-          REPOS: ${{ github.event.inputs.repos }}
+          REPO: ${{ matrix.repo }}
         run: |
-          python - <<'PY'
-          import os, sys
-          from pathlib import Path
-          token = (
-              os.environ.get("HF_TOKEN")
-              or os.environ.get("HF_ORG_TOKEN")
-              or os.environ.get("HF_WRITE_TOKEN")
-              or ""
-          )
-          if not token:
-              print("HF_TOKEN UNAVAILABLE even on production environment. Not fabricated LIVE.")
-              sys.exit(2)
-          from huggingface_hub import HfApi, create_repo, space_info
-          api = HfApi(token=token)
-          published = []
-          for name in [r.strip() for r in os.environ.get("REPOS", "").split(",") if r.strip()]:
-              folder = Path("siblings") / name
-              if not folder.exists():
-                  print(f"UNAVAILABLE source folder {folder}")
-                  sys.exit(2)
-              repo_id = f"SZLHOLDINGS/{name}"
-              create_repo(
-                  repo_id,
-                  repo_type="space",
-                  space_sdk="docker",
-                  exist_ok=True,
-                  token=token,
-                  private=False,
-              )
-              api.upload_folder(
-                  folder_path=str(folder),
-                  repo_id=repo_id,
-                  repo_type="space",
-                  ignore_patterns=[".git*", ".github/**", "tests/*", ".venv/*", "__pycache__/*"],
-              )
-              info = space_info(repo_id, token=token)
-              print(f"published {repo_id} sdk={getattr(info, 'sdk', None)}")
-              published.append(repo_id)
-          print(f"MEASURED published={published}")
-          PY
+          set -euo pipefail
+          SOURCE_SHA="$(git -C source rev-parse --verify HEAD)"
+          [[ "$SOURCE_SHA" =~ ^[0-9a-f]{40}$ ]]
+          mkdir -p "evidence/${REPO}"
+          printf 'sha=%s\n' "$SOURCE_SHA" >> "$GITHUB_OUTPUT"
+          printf 'source=szl-holdings/%s@%s\n' "$REPO" "$SOURCE_SHA"
+
+      - name: Require central production credential
+        shell: bash
+        env:
+          HF_TOKEN: ${{ secrets.HF_ORG_TOKEN || secrets.HF_ORG_TOKEN1 || secrets.HF_TOKEN || secrets.HF_WRITE_TOKEN }}
+        run: |
+          set -euo pipefail
+          test -n "${HF_TOKEN:-}" || {
+            echo "::error::No Hugging Face write credential is available in the central production environment."
+            exit 2
+          }
+
+      - name: Deploy exact Dockerfile-derived closure
+        shell: bash
+        env:
+          HF_TOKEN: ${{ secrets.HF_ORG_TOKEN || secrets.HF_ORG_TOKEN1 || secrets.HF_TOKEN || secrets.HF_WRITE_TOKEN }}
+          GITHUB_TOKEN: ${{ github.token }}
+          REPO: ${{ matrix.repo }}
+          HF_REPO: ${{ matrix.hf_repo }}
+          SMOKE_PATHS: ${{ matrix.smoke_paths }}
+          SOURCE_SHA: ${{ steps.source.outputs.sha }}
+        run: |
+          set -euo pipefail
+          MANIFEST="evidence/${REPO}/hf-deploy-manifest.json"
+          "$RUNNER_TEMP/hf-publisher-venv/bin/python" -I -P tools/.github/scripts/hf_deploy_from_dockerfile.py \
+            --repo-root source \
+            --github-repo "szl-holdings/${REPO}" \
+            --hf-repo "$HF_REPO" \
+            --ref "$SOURCE_SHA" \
+            --source-sha "$SOURCE_SHA" \
+            --dockerfile-path Dockerfile \
+            --include-readme true \
+            --smoke-paths "$SMOKE_PATHS" \
+            --prune \
+            --require-default-branch-tip \
+            --manifest-out "$MANIFEST"
+
+      - name: Restart Space after governed publication
+        shell: bash
+        env:
+          HF_TOKEN: ${{ secrets.HF_ORG_TOKEN || secrets.HF_ORG_TOKEN1 || secrets.HF_TOKEN || secrets.HF_WRITE_TOKEN }}
+          REPO: ${{ matrix.repo }}
+          HF_REPO: ${{ matrix.hf_repo }}
+        run: |
+          set -euo pipefail
+          "$RUNNER_TEMP/hf-publisher-venv/bin/python" -I -P tools/.github/scripts/hf_deploy_from_dockerfile.py \
+            --restart-space \
+            --manifest "evidence/${REPO}/hf-deploy-manifest.json" \
+            --hf-repo "$HF_REPO"
+
+      - name: Attest running commit, bytes, and smoke routes
+        shell: bash
+        env:
+          HF_TOKEN: ${{ secrets.HF_ORG_TOKEN || secrets.HF_ORG_TOKEN1 || secrets.HF_TOKEN || secrets.HF_WRITE_TOKEN }}
+          REPO: ${{ matrix.repo }}
+          HF_REPO: ${{ matrix.hf_repo }}
+        run: |
+          set -euo pipefail
+          "$RUNNER_TEMP/hf-publisher-venv/bin/python" -I -P tools/.github/scripts/hf_deploy_from_dockerfile.py \
+            --attest \
+            --manifest "evidence/${REPO}/hf-deploy-manifest.json" \
+            --hf-repo "$HF_REPO" \
+            --wait-running 1200
+
+      - name: Publish measured summary
+        shell: bash
+        env:
+          REPO: ${{ matrix.repo }}
+          HF_REPO: ${{ matrix.hf_repo }}
+          SOURCE_SHA: ${{ steps.source.outputs.sha }}
+        run: |
+          {
+            echo "### Central Hugging Face publication"
+            echo
+            echo "- GitHub source: \`szl-holdings/${REPO}@${SOURCE_SHA}\`"
+            echo "- Hugging Face target: \`${HF_REPO}\`"
+            echo "- Default-tip guard: passed"
+            echo "- Runtime and smoke attestation: passed"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload immutable deployment evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: hf-central-${{ matrix.repo }}-${{ steps.source.outputs.sha || github.run_id }}
+          path: evidence/${{ matrix.repo }}/
+          if-no-files-found: warn
+          retention-days: 90
