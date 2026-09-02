@@ -1,0 +1,106 @@
+name: One-shot GitHub responsive estate source assembly
+
+on:
+  push:
+    branches:
+      - feat/github-responsive-estate-audit-20260902
+
+permissions:
+  contents: write
+
+concurrency:
+  group: github-responsive-estate-source-assembly-20260902
+  cancel-in-progress: false
+
+jobs:
+  assemble:
+    if: >-
+      github.repository == 'szl-holdings/.github' &&
+      github.ref == 'refs/heads/feat/github-responsive-estate-audit-20260902'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      EXPECTED_FORK_SHA: 0563463f09d4f350e86e649188480466b1426293
+      EXPECTED_SOURCE_SHA256: ff2d17b0ecc356b0dbd54462119a92f47a0f6fcfe814dfe799173da7bec81737
+      EXPECTED_GIT_BLOB: 48492487744bea664caaebb9f647f99877ab80c4
+    steps:
+      - name: Harden runner
+        uses: step-security/harden-runner@05e31511f85b41b11d1cf0ef85d0992719546e2c # v2.21.0
+        with:
+          egress-policy: audit
+
+      - name: Checkout exact branch revision
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+          persist-credentials: true
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: '3.12'
+
+      - name: Bind branch and protected-main ancestry
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$GITHUB_REF" = 'refs/heads/feat/github-responsive-estate-audit-20260902'
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          git fetch --no-tags origin main
+          git merge-base --is-ancestor "$EXPECTED_FORK_SHA" "$GITHUB_SHA"
+          git merge-base --is-ancestor "$EXPECTED_FORK_SHA" origin/main
+          test "$(git ls-remote origin "$GITHUB_REF" | awk '{print $1}')" = "$GITHUB_SHA"
+
+      - name: Assemble exact audited source
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(find .github/tmp/github-responsive-estate -maxdepth 1 -type f -name '*.b64' | wc -l)" -eq 7
+          cat .github/tmp/github-responsive-estate/*.b64 \
+            | tr -d '\n\r\t ' \
+            | base64 --decode \
+            > .github/scripts/github_responsive_estate_audit.py
+          printf '%s  %s\n' "$EXPECTED_SOURCE_SHA256" .github/scripts/github_responsive_estate_audit.py \
+            | sha256sum --check --strict
+          test "$(git hash-object .github/scripts/github_responsive_estate_audit.py)" = "$EXPECTED_GIT_BLOB"
+
+      - name: Prove network-free contract
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m py_compile \
+            .github/scripts/github_responsive_estate_audit.py \
+            .github/scripts/test_github_responsive_estate_audit.py
+          python .github/scripts/test_github_responsive_estate_audit.py
+          git diff --check
+
+      - name: Remove every temporary transport surface
+        shell: bash
+        run: |
+          set -euo pipefail
+          git rm -r -- .github/tmp/github-responsive-estate
+          git rm -- \
+            .github/workflows/one-shot-github-responsive-estate-materialize-20260902.yml \
+            .github/workflows/one-shot-github-responsive-estate-repair-20260902.yml \
+            .github/workflows/one-shot-github-responsive-estate-assemble-20260902.yml
+          git add -- .github/scripts/github_responsive_estate_audit.py
+
+      - name: Prove permanent tree and publish branch commit
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -f .github/scripts/github_responsive_estate_audit.py
+          test -f .github/scripts/test_github_responsive_estate_audit.py
+          test -f .github/workflows/github-responsive-estate-audit.yml
+          test -f docs/GITHUB_RESPONSIVE_ESTATE_AUDIT.md
+          test ! -e .github/tmp/github-responsive-estate
+          test ! -e .github/workflows/one-shot-github-responsive-estate-materialize-20260902.yml
+          test ! -e .github/workflows/one-shot-github-responsive-estate-repair-20260902.yml
+          test ! -e .github/workflows/one-shot-github-responsive-estate-assemble-20260902.yml
+          git diff --cached --check
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git commit -m 'feat(responsive): audit every repository UI contract' \
+            -m 'Signed-off-by: github-actions[bot] <41898282+github-actions[bot]@users.noreply.github.com>'
+          git push origin 'HEAD:feat/github-responsive-estate-audit-20260902'
