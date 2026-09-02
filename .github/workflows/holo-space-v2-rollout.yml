@@ -1,0 +1,103 @@
+name: Holo Space v2 Rollout
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/holo-space-v2-rollout.yml"
+  workflow_dispatch:
+    inputs:
+      repo_filter:
+        description: "Optional regular expression limiting GitHub source repositories"
+        required: false
+        default: ""
+        type: string
+      space_filter:
+        description: "Optional regular expression limiting Hugging Face Space ids"
+        required: false
+        default: ""
+        type: string
+      max_repos:
+        description: "Maximum number of source repositories in this pass"
+        required: false
+        default: "100"
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: holo-space-v2-rollout
+  cancel-in-progress: false
+
+env:
+  GH_ORG_TOKEN: ${{ secrets.SZL_GITHUB_TOKEN || secrets.SZL_GH_PAT || secrets.GH_PAT || secrets.GITHUB_PAT || secrets.ADMIN_PAT || secrets.ORG_GITHUB_TOKEN || secrets.PAT_TOKEN || secrets.CROSS_REPO_TOKEN || github.token }}
+
+jobs:
+  rollout:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - name: Checkout exact main
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: main
+          persist-credentials: false
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12"
+      - name: Validate controller before mutation
+        run: |
+          python -m py_compile .github/scripts/holo_space_rollout_v2.py
+          python .github/tests/test_holo_space_rollout_v2.py
+          python -m json.tool design/holographic-space-v2/space-registry.json >/dev/null
+      - name: Create guarded source pull requests
+        id: apply
+        shell: bash
+        run: |
+          set -euo pipefail
+          args=(
+            --apply
+            --report /tmp/holographic-space-rollout-v2.json
+          )
+          repo_filter="${{ github.event_name == 'workflow_dispatch' && inputs.repo_filter || '' }}"
+          space_filter="${{ github.event_name == 'workflow_dispatch' && inputs.space_filter || '' }}"
+          max_repos="${{ github.event_name == 'workflow_dispatch' && inputs.max_repos || '100' }}"
+          if [ -n "$repo_filter" ]; then args+=(--repo-filter "$repo_filter"); fi
+          if [ -n "$space_filter" ]; then args+=(--space-filter "$space_filter"); fi
+          args+=(--max-repos "$max_repos")
+          python .github/scripts/holo_space_rollout_v2.py "${args[@]}"
+      - name: Upload rollout evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: holo-space-v2-rollout-${{ github.run_id }}-${{ github.run_attempt }}
+          path: /tmp/holographic-space-rollout-v2.json
+          if-no-files-found: error
+          retention-days: 90
+      - name: Publish summary
+        if: always()
+        shell: bash
+        run: |
+          if [ ! -f /tmp/holographic-space-rollout-v2.json ]; then
+            echo "## Holo Space v2 rollout" >> "$GITHUB_STEP_SUMMARY"
+            echo "No machine report was produced." >> "$GITHUB_STEP_SUMMARY"
+            exit 1
+          fi
+          python - <<'PY' >> "$GITHUB_STEP_SUMMARY"
+          import json
+          report = json.load(open('/tmp/holographic-space-rollout-v2.json'))
+          summary = report['summary']
+          print('## Holo Space v2 rollout')
+          print()
+          print(f"- Spaces discovered: **{summary.get('spaces_discovered', 0)}**")
+          print(f"- Source repositories planned: **{summary.get('repositories_planned', 0)}**")
+          print(f"- Pull requests created: **{summary.get('pr-created', 0)}**")
+          print(f"- Existing rollout PRs: **{summary.get('pr-open', 0)}**")
+          print(f"- Report-only sources: **{summary.get('report-only', 0)}**")
+          print(f"- Unmapped/unavailable Spaces: **{summary.get('spaces_unmapped_or_unavailable', 0)}**")
+          print(f"- Write failures: **{summary.get('write_failures', 0)}**")
+          print()
+          print('Default branches, protections, and Hugging Face repositories were not written directly.')
+          PY

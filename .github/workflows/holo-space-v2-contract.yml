@@ -1,0 +1,73 @@
+name: Holo Space v2 Contract
+
+on:
+  pull_request:
+    paths:
+      - "design/holographic-space-v2/**"
+      - ".github/scripts/holo_space_rollout_v2.py"
+      - ".github/tests/test_holo_space_rollout_v2.py"
+      - ".github/workflows/holo-space-v2-contract.yml"
+      - ".github/workflows/holo-space-v2-rollout.yml"
+  push:
+    branches: [main]
+    paths:
+      - "design/holographic-space-v2/**"
+      - ".github/scripts/holo_space_rollout_v2.py"
+      - ".github/tests/test_holo_space_rollout_v2.py"
+      - ".github/workflows/holo-space-v2-contract.yml"
+      - ".github/workflows/holo-space-v2-rollout.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  GH_ORG_TOKEN: ${{ secrets.SZL_GITHUB_TOKEN || secrets.SZL_GH_PAT || secrets.GH_PAT || secrets.GITHUB_PAT || secrets.ADMIN_PAT || secrets.ORG_GITHUB_TOKEN || secrets.PAT_TOKEN || secrets.CROSS_REPO_TOKEN || github.token }}
+
+jobs:
+  contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout exact source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12"
+      - name: Compile and validate local contracts
+        run: |
+          python -m py_compile \
+            .github/scripts/holo_space_rollout_v2.py \
+            .github/tests/test_holo_space_rollout_v2.py
+          python -m json.tool design/holographic-space-v2/space-registry.json >/dev/null
+          python .github/tests/test_holo_space_rollout_v2.py
+      - name: Run current-estate dry run
+        run: |
+          python .github/scripts/holo_space_rollout_v2.py \
+            --report /tmp/holographic-space-rollout-v2.json
+      - name: Prove report safety fields
+        run: |
+          python - <<'PY'
+          import json
+          report = json.load(open('/tmp/holographic-space-rollout-v2.json'))
+          assert report['mode'] == 'dry-run'
+          assert report['default_branch_writes'] is False
+          assert report['force_pushes'] is False
+          assert report['protection_changes'] is False
+          assert report['direct_hugging_face_writes'] is False
+          assert report['secrets_recorded'] is False
+          assert report['summary']['spaces_discovered'] > 0
+          print(json.dumps(report['summary'], indent=2, sort_keys=True))
+          PY
+      - name: Upload dry-run evidence
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: holo-space-v2-dry-run-${{ github.run_id }}-${{ github.run_attempt }}
+          path: /tmp/holographic-space-rollout-v2.json
+          if-no-files-found: error
+          retention-days: 90
+      - name: Whitespace integrity
+        run: git diff --check
