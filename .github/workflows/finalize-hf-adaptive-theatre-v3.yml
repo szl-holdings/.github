@@ -1,0 +1,136 @@
+name: Finalize Hugging Face Adaptive Theatre v3
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - ".github/scripts/finalize_hf_adaptive_theatre_v3.py"
+      - ".github/tests/test_finalize_hf_adaptive_theatre_v3.py"
+      - ".github/workflows/finalize-hf-adaptive-theatre-v3.yml"
+  push:
+    branches: [main]
+    paths:
+      - ".github/scripts/finalize_hf_adaptive_theatre_v3.py"
+      - ".github/tests/test_finalize_hf_adaptive_theatre_v3.py"
+      - ".github/workflows/finalize-hf-adaptive-theatre-v3.yml"
+  workflow_dispatch:
+    inputs:
+      apply:
+        description: "Merge exact generated PRs only after their checks and reviews pass"
+        required: false
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: finalize-hf-adaptive-theatre-v3
+  cancel-in-progress: false
+
+env:
+  FINAL_REPORT: /tmp/hf-adaptive-theatre-v3-final.json
+
+jobs:
+  contract:
+    name: Green-only finalizer contract
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - name: Checkout exact revision
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12"
+      - name: Compile and run network-free contracts
+        run: |
+          python -m py_compile .github/scripts/finalize_hf_adaptive_theatre_v3.py .github/tests/test_finalize_hf_adaptive_theatre_v3.py
+          python .github/tests/test_finalize_hf_adaptive_theatre_v3.py -v
+          git diff --check
+      - name: Prohibit bypass primitives
+        shell: bash
+        run: |
+          set -euo pipefail
+          script=.github/scripts/finalize_hf_adaptive_theatre_v3.py
+          ! grep -E 'force[[:space:]_-]*merge|update_ref|branch protection|dismiss.*review' "$script"
+          grep -F '"sha": row["head_sha"]' "$script"
+          grep -F 'UNRESOLVED_THREADS' "$script"
+          grep -F 'CHANGES_REQUESTED' "$script"
+
+  finalize:
+    name: Merge exact green application PRs and observe publishers
+    needs: contract
+    if: ${{ github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.apply) }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      ORG_ADMIN_TOKEN: ${{ secrets.SZL_ORG_ADMIN_PAT || secrets.ORG_ADMIN_TOKEN || secrets.GH_ORG_TOKEN || secrets.GITHUB_PAT }}
+      GH_TOKEN: ${{ secrets.SZL_ORG_ADMIN_PAT || secrets.ORG_ADMIN_TOKEN || secrets.GH_ORG_TOKEN || secrets.GITHUB_PAT }}
+    steps:
+      - name: Checkout exact protected source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12"
+      - name: Finalize without bypasses
+        id: finalize
+        shell: bash
+        run: |
+          set +e
+          if [ -n "${ORG_ADMIN_TOKEN:-}" ]; then echo "::add-mask::$ORG_ADMIN_TOKEN"; fi
+          python .github/scripts/finalize_hf_adaptive_theatre_v3.py \
+            --apply \
+            --wait-seconds 1800 \
+            --publisher-wait-seconds 1200 \
+            --poll-seconds 15 \
+            --report "$FINAL_REPORT"
+          code=$?
+          echo "exit_code=$code" >> "$GITHUB_OUTPUT"
+          exit 0
+      - name: Upload immutable secret-free finalization receipt
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: hf-adaptive-theatre-v3-final-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ env.FINAL_REPORT }}
+          if-no-files-found: error
+          retention-days: 90
+      - name: Publish exact summary
+        if: always()
+        shell: bash
+        run: |
+          if [ ! -f "$FINAL_REPORT" ]; then
+            echo '### Adaptive Theatre v3 finalization' >> "$GITHUB_STEP_SUMMARY"
+            echo 'No receipt was produced.' >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          python - <<'PY' >> "$GITHUB_STEP_SUMMARY"
+          import json, os
+          from pathlib import Path
+          report = json.loads(Path(os.environ['FINAL_REPORT']).read_text())
+          print('### Adaptive Theatre v3 finalization')
+          print()
+          print(f"Status: `{report.get('status', 'UNKNOWN')}`")
+          summary = report.get('summary') or {}
+          for key in ('discovered', 'ready', 'merged', 'residual', 'merge_failures', 'publisher_failures_or_pending'):
+              if key in summary:
+                  print(f"- {key}: `{summary[key]}`")
+          for row in report.get('residual') or []:
+              print(f"- residual: `{row.get('repository')}#{row.get('number')}` — `{row.get('reason')}`")
+          PY
+      - name: Enforce controller result
+        if: always()
+        shell: bash
+        run: |
+          code="${{ steps.finalize.outputs.exit_code }}"
+          test -n "$code"
+          if [ "$code" -ne 0 ]; then
+            echo "::error::Adaptive Theatre finalization failed with exit $code."
+            exit "$code"
+          fi
