@@ -248,7 +248,9 @@ MEASURE_SCRIPT = r"""
     const rect = node.getBoundingClientRect();
     if (!visible(node, style, rect)) continue;
     interactiveCount += 1;
-    if (rect.width + 0.5 < 44 || rect.height + 0.5 < 44) {
+    const inlineProseLink = node.tagName === 'A' && style.display === 'inline' &&
+      Boolean(node.closest('p,li,dd,dt,figcaption,blockquote'));
+    if (!inlineProseLink && (rect.width + 0.5 < 44 || rect.height + 0.5 < 44)) {
       smallTargets.push({
         tag: node.tagName.toLowerCase(),
         text: String(node.getAttribute('aria-label') || node.textContent || '').trim().slice(0, 80),
