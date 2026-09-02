@@ -1,0 +1,185 @@
+name: Finish Holographic Space v2 Final on Branch
+
+on:
+  push:
+    branches:
+      - feat/holographic-space-fabric-v2-20260902
+    paths:
+      - ".github/workflows/finish-holographic-space-v2-final-on-branch.yml"
+
+permissions:
+  actions: read
+  checks: read
+  contents: write
+  pull-requests: write
+  statuses: read
+
+concurrency:
+  group: finish-holographic-space-v2-final
+  cancel-in-progress: false
+
+jobs:
+  finish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      GH_TOKEN: ${{ github.token }}
+      BRANCH: feat/holographic-space-fabric-v2-20260902
+    steps:
+      - name: Checkout exact feature branch
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: feat/holographic-space-fabric-v2-20260902
+          fetch-depth: 0
+      - name: Finalize complete runner, gates, and clean branch
+        shell: bash
+        run: |
+          set -euo pipefail
+          git pull --ff-only origin "$BRANCH"
+          python - <<'PY'
+          from pathlib import Path
+
+          required = [
+              Path('.github/scripts/rollout_holographic_spaces_v2.py'),
+              Path('.github/scripts/run_holographic_spaces_v2.py'),
+              Path('.github/scripts/run_holographic_spaces_v2_complete.py'),
+              Path('.github/scripts/holographic_target_contract.py'),
+              Path('.github/tests/test_holographic_spaces_v2.py'),
+              Path('.github/tests/test_holographic_target_contract.py'),
+              Path('design/holographic-v2/szl-space-hologram.css'),
+              Path('design/holographic-v2/szl-space-hologram.js'),
+              Path('design/holographic-v2/theme-registry.json'),
+          ]
+          missing = [str(path) for path in required if not path.is_file()]
+          if missing:
+              raise SystemExit('missing required v2 files: ' + ', '.join(missing))
+
+          gate = Path('.github/workflows/holographic-space-fabric-v2-gate-and-merge.yml')
+          text = gate.read_text(encoding='utf-8')
+          old = 'if peers and not pending and legacy.get("state") != "pending":'
+          new = 'if peers and not pending and not any(row.get("state") == "pending" for row in legacy.get("statuses", [])):'
+          if old in text:
+              text = text.replace(old, new)
+          elif new not in text:
+              raise SystemExit('unrecognized bootstrap gate condition')
+          gate.write_text(text, encoding='utf-8')
+
+          core = Path('.github/scripts/rollout_holographic_spaces_v2.py')
+          text = core.read_text(encoding='utf-8')
+          old = 'if checks and not pending and legacy.get("state") != "pending":'
+          new = 'if checks and not pending and not any(row.get("state") == "pending" for row in legacy.get("statuses", [])):'
+          if old in text:
+              text = text.replace(old, new)
+          elif new not in text:
+              raise SystemExit('unrecognized target merge condition')
+          core.write_text(text, encoding='utf-8')
+
+          rollout = Path('.github/workflows/rollout-holographic-space-fabric-v2.yml')
+          text = rollout.read_text(encoding='utf-8')
+          text = text.replace(
+              'python .github/scripts/run_holographic_spaces_v2.py "${args[@]}"',
+              'python .github/scripts/run_holographic_spaces_v2_complete.py "${args[@]}"',
+          )
+          if 'run_holographic_spaces_v2_complete.py "${args[@]}"' not in text:
+              raise SystemExit('complete runner is not active')
+          rollout.write_text(text, encoding='utf-8')
+
+          contract = Path('.github/workflows/holographic-space-fabric-v2-contract.yml')
+          text = contract.read_text(encoding='utf-8')
+          old_compile = 'python -m py_compile .github/scripts/rollout_holographic_spaces_v2.py .github/scripts/run_holographic_spaces_v2.py .github/tests/test_holographic_spaces_v2.py'
+          new_compile = 'python -m py_compile .github/scripts/rollout_holographic_spaces_v2.py .github/scripts/run_holographic_spaces_v2.py .github/scripts/run_holographic_spaces_v2_complete.py .github/scripts/holographic_target_contract.py .github/tests/test_holographic_spaces_v2.py .github/tests/test_holographic_target_contract.py'
+          text = text.replace(old_compile, new_compile)
+          if new_compile not in text:
+              raise SystemExit('complete compile contract is not active')
+          target_test = 'python .github/tests/test_holographic_target_contract.py'
+          if target_test not in text:
+              anchor = 'python .github/tests/test_holographic_spaces_v2.py'
+              if anchor not in text:
+                  raise SystemExit('base contract test command missing')
+              text = text.replace(anchor, anchor + '\n          ' + target_test, 1)
+          contract.write_text(text, encoding='utf-8')
+          PY
+          rm -f \
+            .github/workflows/fix-holographic-space-gates-on-branch.yml \
+            .github/workflows/reconcile-holographic-space-v2-branch.yml \
+            .github/workflows/finish-holographic-space-v2-bootstrap-on-branch.yml \
+            .github/workflows/install-holographic-target-gates-on-branch.yml \
+            .github/workflows/repair-holographic-target-gates-on-branch.yml \
+            .github/workflows/finish-holographic-space-v2-final-on-branch.yml
+          git config user.name "SZL Holographic Space v2 Finalizer"
+          git config user.email "stephenlutar2@gmail.com"
+          git add -A
+          if ! git diff --cached --quiet; then
+            git commit -s -m "fix(ci): finalize complete holographic Space rollout"
+            git push origin HEAD:"$BRANCH"
+          fi
+          echo "FINAL_SHA=$(git rev-parse HEAD)" >> "$GITHUB_ENV"
+      - name: Verify the complete finalized controller
+        run: |
+          python -m py_compile .github/scripts/rollout_holographic_spaces_v2.py .github/scripts/run_holographic_spaces_v2.py .github/scripts/run_holographic_spaces_v2_complete.py .github/scripts/holographic_target_contract.py .github/tests/test_holographic_spaces_v2.py .github/tests/test_holographic_target_contract.py
+          node --check design/holographic-v2/szl-space-hologram.js
+          python .github/tests/test_holographic_spaces_v2.py
+          python .github/tests/test_holographic_target_contract.py
+          git diff --check
+      - name: Wait for stable green peers and merge exact SHA
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json, os, subprocess, time
+          repo = os.environ['GITHUB_REPOSITORY']
+          branch = os.environ['BRANCH']
+          sha = os.environ['FINAL_SHA']
+          allowed = {'success', 'neutral', 'skipped'}
+          def api(path, *extra):
+              return json.loads(subprocess.check_output(['gh', 'api', path, *extra], text=True))
+          pulls = api(f'repos/{repo}/pulls?state=open&head=szl-holdings:{branch}&per_page=20')
+          if len(pulls) != 1:
+              raise SystemExit(f'expected one exact-head PR, found {len(pulls)}')
+          number = pulls[0]['number']
+          if pulls[0]['head']['sha'] != sha:
+              raise SystemExit('PR head moved after finalization')
+          stable = 0
+          last_names = None
+          for _ in range(300):
+              current = api(f'repos/{repo}/pulls/{number}')
+              if current.get('merged'):
+                  raise SystemExit(0)
+              checks = api(f'repos/{repo}/commits/{sha}/check-runs?per_page=100').get('check_runs', [])
+              peers = [row for row in checks if row.get('name') not in {'gate-and-merge', 'finish'}]
+              failed = [row for row in peers if row.get('status') == 'completed' and row.get('conclusion') not in allowed]
+              if failed:
+                  raise SystemExit('peer check failure: ' + json.dumps([{'name': row.get('name'), 'conclusion': row.get('conclusion'), 'url': row.get('html_url')} for row in failed], sort_keys=True))
+              pending = [row for row in peers if row.get('status') != 'completed']
+              legacy = api(f'repos/{repo}/commits/{sha}/status')
+              if any(row.get('state') in {'error', 'failure'} for row in legacy.get('statuses', [])):
+                  raise SystemExit('legacy status failure')
+              names = tuple(sorted((row.get('name'), row.get('status'), row.get('conclusion')) for row in peers))
+              clean = bool(peers) and not pending and not any(row.get('state') == 'pending' for row in legacy.get('statuses', []))
+              if clean and names == last_names:
+                  stable += 1
+              elif clean:
+                  stable = 1
+              else:
+                  stable = 0
+              last_names = names
+              if stable >= 3:
+                  break
+              time.sleep(10)
+          else:
+              raise SystemExit('timed out waiting for a stable green check set')
+          for _ in range(60):
+              current = api(f'repos/{repo}/pulls/{number}')
+              if current.get('merged'):
+                  raise SystemExit(0)
+              result = api(
+                  f'repos/{repo}/pulls/{number}/merge', '--method', 'PUT',
+                  '-f', f'sha={sha}', '-f', 'merge_method=squash',
+                  '-f', f'commit_title=feat(frontend): ship SZL Holographic Space Fabric v2 (#{number})',
+                  '-f', 'commit_message=Add the complete deterministic Space renderer, safe source adapters, generated target-repository green gates, check-gated merges, and evidence reporting.\n\nSigned-off-by: Stephen Lutar <stephenlutar2@gmail.com>',
+              )
+              if result.get('merged'):
+                  raise SystemExit(0)
+              time.sleep(10)
+          raise SystemExit('GitHub did not accept the exact-head merge')
+          PY
