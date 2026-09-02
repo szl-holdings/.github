@@ -1,0 +1,255 @@
+name: SZL Responsive Estate v3
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "assets/szl-space-responsive-v3.css"
+      - "scripts/responsive_estate_v3.py"
+      - "scripts/audit_responsive_estate_v3.mjs"
+      - "tests/test_responsive_estate_v3.py"
+      - ".github/workflows/responsive-estate-v3.yml"
+  schedule:
+    - cron: "17 4,16 * * *"
+  workflow_dispatch:
+    inputs:
+      apply:
+        description: "Open source-native responsive PRs for mapped Space repositories"
+        required: false
+        type: boolean
+        default: false
+      merge_green:
+        description: "Squash-merge only heads whose checks complete green"
+        required: false
+        type: boolean
+        default: false
+      strict_live:
+        description: "Fail the workflow when any browser viewport remains red"
+        required: false
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+  issues: write
+
+concurrency:
+  group: szl-responsive-estate-v3
+  cancel-in-progress: false
+
+env:
+  SOURCE_JSON: reports/responsive-estate-v3-source.json
+  SOURCE_MD: reports/responsive-estate-v3-source.md
+  LIVE_JSON: reports/responsive-estate-v3-live.json
+  LIVE_HTML: reports/responsive-estate-v3-live.html
+  LIVE_EVIDENCE: reports/responsive-estate-v3-evidence
+
+jobs:
+  contract:
+    name: Responsive estate source contract
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout exact controller source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12"
+
+      - name: Set up Node
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: "22"
+
+      - name: Compile and run offline contracts
+        run: |
+          python -m py_compile scripts/responsive_estate_v3.py tests/test_responsive_estate_v3.py
+          python tests/test_responsive_estate_v3.py -v
+          node --check scripts/audit_responsive_estate_v3.mjs
+          git diff --check
+
+  source-rollout:
+    name: Source-native Space rollout and green merge loop
+    needs: contract
+    runs-on: ubuntu-latest
+    timeout-minutes: 55
+    env:
+      GH_TOKEN: ${{ github.token }}
+      ESTATE_GITHUB_TOKEN: ${{ secrets.SZL_ORG_TOKEN || secrets.SZL_GITHUB_TOKEN || secrets.ORG_ADMIN_TOKEN || secrets.GH_PAT || github.token }}
+    steps:
+      - name: Checkout exact controller source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12"
+
+      - name: Inventory, patch reviewed hosts, and merge only green heads
+        id: rollout
+        shell: bash
+        run: |
+          set +e
+          mode="plan"
+          merge_args=()
+          if [ "${{ github.event_name }}" = "push" ] || [ "${{ inputs.apply }}" = "true" ]; then
+            mode="apply"
+          fi
+          if [ "${{ github.event_name }}" = "push" ] || [ "${{ inputs.merge_green }}" = "true" ]; then
+            merge_args=(--merge-green --wait-seconds 2100)
+          fi
+          python scripts/responsive_estate_v3.py \
+            --mode "$mode" \
+            "${merge_args[@]}" \
+            --json-out "$SOURCE_JSON" \
+            --markdown-out "$SOURCE_MD"
+          code=$?
+          echo "exit_code=$code" >> "$GITHUB_OUTPUT"
+          exit 0
+
+      - name: Upload source rollout evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: responsive-estate-v3-source-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            ${{ env.SOURCE_JSON }}
+            ${{ env.SOURCE_MD }}
+          if-no-files-found: error
+          retention-days: 90
+
+      - name: Publish one rolling source-rollout incident
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          title="SZL Responsive Estate v3 rollout"
+          issue="$(gh issue list --repo "$GITHUB_REPOSITORY" --state all --search "\"$title\" in:title" --json number,title --jq '.[] | select(.title == "'"$title"'") | .number' | head -n1)"
+          {
+            echo '<!-- szl-responsive-estate-v3-source -->'
+            echo "# $title"
+            echo
+            echo "- Run: ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
+            echo "- Source-controller exit: ${{ steps.rollout.outputs.exit_code }}"
+            echo
+            cat "$SOURCE_MD"
+          } > /tmp/responsive-source.md
+          if [ -n "$issue" ]; then
+            gh issue edit "$issue" --repo "$GITHUB_REPOSITORY" --body-file /tmp/responsive-source.md
+            gh issue reopen "$issue" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1 || true
+          else
+            issue_url="$(gh issue create --repo "$GITHUB_REPOSITORY" --title "$title" --body-file /tmp/responsive-source.md)"
+            issue="${issue_url##*/}"
+          fi
+          echo "issue=$issue" >> "$GITHUB_OUTPUT"
+
+      - name: Enforce source rollout result
+        if: always()
+        shell: bash
+        run: |
+          code="${{ steps.rollout.outputs.exit_code }}"
+          test -n "$code"
+          if [ "$code" -ne 0 ]; then
+            echo "::error::Responsive source rollout is not fully green (exit $code)."
+            exit "$code"
+          fi
+
+  browser-audit:
+    name: Browser audit every public origin and Space
+    needs: [contract, source-rollout]
+    if: ${{ always() && needs.contract.result == 'success' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 55
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - name: Checkout exact controller source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Node
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: "22"
+
+      - name: Install exact browser harness
+        run: |
+          npm install --no-save --ignore-scripts playwright@1.55.0
+          npx playwright install --with-deps chromium
+
+      - name: Measure all public surfaces
+        id: live
+        shell: bash
+        run: |
+          set +e
+          node scripts/audit_responsive_estate_v3.mjs \
+            --json-out "$LIVE_JSON" \
+            --html-out "$LIVE_HTML" \
+            --evidence-dir "$LIVE_EVIDENCE" \
+            --concurrency 3
+          code=$?
+          echo "exit_code=$code" >> "$GITHUB_OUTPUT"
+          exit 0
+
+      - name: Upload immutable browser evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: responsive-estate-v3-live-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            ${{ env.LIVE_JSON }}
+            ${{ env.LIVE_HTML }}
+            ${{ env.LIVE_EVIDENCE }}
+          if-no-files-found: error
+          retention-days: 90
+
+      - name: Publish live audit summary
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY' > /tmp/responsive-live.md
+          import json, os
+          from pathlib import Path
+          report = json.loads(Path(os.environ["LIVE_JSON"]).read_text(encoding="utf-8"))
+          print("## Browser audit")
+          print()
+          print(f"- Surfaces: **{report['surfaceCount']}**")
+          print(f"- Passed: **{report['passCount']}**")
+          print(f"- Failed: **{report['failCount']}**")
+          print()
+          failed = [row for row in report["surfaces"] if not row["pass"]]
+          if failed:
+              print("### Remaining live failures")
+              print()
+              for surface in failed:
+                  bad = [row["name"] for row in surface["viewports"] if not row.get("pass")]
+                  print(f"- `{surface['id']}` — {', '.join(bad)}")
+          else:
+              print("Every audited public surface passed its assigned viewport matrix.")
+          PY
+          title="SZL Responsive Estate v3 rollout"
+          issue="$(gh issue list --repo "$GITHUB_REPOSITORY" --state all --search "\"$title\" in:title" --json number,title --jq '.[] | select(.title == "'"$title"'") | .number' | head -n1)"
+          if [ -z "$issue" ]; then
+            gh issue create --repo "$GITHUB_REPOSITORY" --title "$title" --body-file /tmp/responsive-live.md
+          else
+            gh issue comment "$issue" --repo "$GITHUB_REPOSITORY" --body-file /tmp/responsive-live.md
+          fi
+
+      - name: Enforce strict live viewport result
+        if: ${{ github.event_name != 'workflow_dispatch' || inputs.strict_live }}
+        shell: bash
+        run: |
+          code="${{ steps.live.outputs.exit_code }}"
+          test -n "$code"
+          if [ "$code" -ne 0 ]; then
+            echo "::error::One or more public surfaces remain outside the Responsive v3 contract."
+            exit "$code"
+          fi
