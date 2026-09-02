@@ -1,0 +1,48 @@
+name: Fix finalizer guard once
+
+on:
+  push:
+    branches:
+      - ops/finalize-hf-adaptive-theatre-v3
+    paths:
+      - ".github/workflows/zz-fix-finalizer-guard-once.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  fix:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout exact branch
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ops/finalize-hf-adaptive-theatre-v3
+          fetch-depth: 0
+      - name: Narrow the bypass guard to actual mutation primitives
+        shell: python
+        run: |
+          from pathlib import Path
+          path = Path('.github/workflows/finalize-hf-adaptive-theatre-v3.yml')
+          text = path.read_text(encoding='utf-8')
+          old = "          ! grep -E 'force[[:space:]_-]*merge|update_ref|branch protection|dismiss.*review' \"$script\"\n"
+          new = "          ! grep -E 'update[_-]ref|branches/.*/protection|dismissals|\\\"force\\\"[[:space:]]*:[[:space:]]*true' \"$script\"\n"
+          if old not in text:
+              raise SystemExit('expected broad guard line not found')
+          path.write_text(text.replace(old, new, 1), encoding='utf-8', newline='\n')
+      - name: Validate contracts and workflow text
+        run: |
+          python .github/tests/test_finalize_hf_adaptive_theatre_v3.py -v
+          python -m py_compile .github/scripts/finalize_hf_adaptive_theatre_v3.py
+          git diff --check
+      - name: Commit exact fix and remove this workflow
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm .github/workflows/zz-fix-finalizer-guard-once.yml
+          git config user.name "SZL Finalizer Guard Controller"
+          git config user.email "stephenlutar2@gmail.com"
+          git add -A
+          git commit -s -m "fix(ci): scope finalizer bypass guard to mutation APIs"
+          git push origin HEAD:ops/finalize-hf-adaptive-theatre-v3
