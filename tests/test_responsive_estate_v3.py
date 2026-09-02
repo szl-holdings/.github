@@ -93,7 +93,7 @@ class ResponsiveEstateV3Contract(unittest.TestCase):
         self.assertIn("CHECKS_FAILED", self.script)
         self.assertIn("MERGE_BLOCKED", self.script)
         self.assertIn("CHECKS_PENDING", self.script)
-        self.assertIn("merge_method\": \"squash", self.script.replace(" ", ""))
+        self.assertIn('"merge_method":"squash"', self.script.replace(" ", ""))
 
 
 if __name__ == "__main__":
