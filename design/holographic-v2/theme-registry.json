@@ -1,0 +1,47 @@
+{
+  "schema": "szl.holographic-space-theme-registry/v2",
+  "version": "2.0.0",
+  "principle": "One governed interaction fabric; a deterministic visual instrument for every Space.",
+  "shared_contract": {
+    "navigation": ["Command", "Proof", "Spaces", "Source"],
+    "minimum_touch_target_px": 44,
+    "viewports": [320, 360, 390, 768, 1024, 1440],
+    "reduced_motion": true,
+    "high_contrast": true,
+    "forced_colors": true,
+    "low_power_mode": true,
+    "local_assets_only": true,
+    "analytics": false,
+    "storage": false,
+    "runtime_fetch": false
+  },
+  "curated_families": {
+    "a11oy": {"motif": "command-grid", "purpose": "governed command and orchestration"},
+    "lyte": {"motif": "signal-aurora", "purpose": "observability and signal intelligence"},
+    "vessels": {"motif": "bathymetric-radar", "purpose": "maritime situational awareness"},
+    "terra": {"motif": "parcel-topography", "purpose": "real-estate and land intelligence"},
+    "aegis": {"motif": "threat-lattice", "purpose": "defense and security operations"},
+    "prism-counsel": {"motif": "case-lines", "purpose": "legal matter command"},
+    "carlota-jo": {"motif": "editorial-orbit", "purpose": "advisory coordination"},
+    "nexus": {"motif": "graph-mesh", "purpose": "integration and ecosystem routing"},
+    "a11oy-factory": {"motif": "build-circuit", "purpose": "governed artifact production"},
+    "ouroboros": {"motif": "recursive-weave", "purpose": "looped computation and research"},
+    "killinchu": {"motif": "agent-swarm", "purpose": "multi-agent orchestration"},
+    "immune": {"motif": "cell-membrane", "purpose": "admission, verification, and resilience"},
+    "governed-receipt-verifier": {"motif": "checksum-ledger", "purpose": "receipt verification"}
+  },
+  "unknown_space_policy": {
+    "identity": "FNV-1a slug hash",
+    "palette": "deterministically selected from an accessibility-reviewed local set",
+    "motif": "deterministically selected from the registered geometry set",
+    "reshuffle_between_deployments": false
+  },
+  "original_synthesis": [
+    "editorial restraint and hierarchy",
+    "cinematic orbital mission-control depth",
+    "technical geometry and high-signal contrast",
+    "telemetry and observability layers",
+    "modular agent and cybersecurity cells",
+    "premium spatial precision"
+  ]
+}

@@ -1,0 +1,117 @@
+name: Roll out Holographic Space Fabric v2
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/rollout-holographic-space-fabric-v2.yml"
+  workflow_dispatch:
+    inputs:
+      apply:
+        description: "Create or update review PRs in mapped Space source repositories"
+        required: false
+        type: boolean
+        default: false
+      merge_green:
+        description: "Squash-merge only after all repository checks complete green"
+        required: false
+        type: boolean
+        default: false
+      repo_filter:
+        description: "Optional case-insensitive repository regex"
+        required: false
+        type: string
+        default: ""
+      max_repos:
+        description: "Maximum mapped source repositories to process"
+        required: false
+        type: number
+        default: 100
+
+permissions:
+  actions: read
+  checks: read
+  contents: read
+  pull-requests: read
+  statuses: read
+
+concurrency:
+  group: rollout-holographic-space-fabric-v2
+  cancel-in-progress: false
+
+jobs:
+  rollout:
+    runs-on: ubuntu-latest
+    timeout-minutes: 70
+    env:
+      SZL_GITHUB_TOKEN: ${{ secrets.ORG_REPO_WORKFLOW_TOKEN || secrets.SZL_ORG_PAT || secrets.SZL_GITHUB_PAT || secrets.GH_PAT || secrets.PAT_TOKEN || secrets.GITHUB_PAT || secrets.GH_TOKEN || github.token }}
+      REPORT: /tmp/holographic-space-rollout-v2.json
+    steps:
+      - name: Checkout exact main
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: main
+          persist-credentials: false
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12"
+      - name: Run network-free contracts first
+        run: |
+          python -m py_compile .github/scripts/rollout_holographic_spaces_v2.py .github/scripts/run_holographic_spaces_v2.py
+          node --check design/holographic-v2/szl-space-hologram.js
+          python .github/tests/test_holographic_spaces_v2.py
+      - name: Discover, patch, review, and merge through repository gates
+        shell: bash
+        run: |
+          set -euo pipefail
+          args=(
+            --org szl-holdings
+            --assets-root design/holographic-v2
+            --report "$REPORT"
+            --max-repos "${{ github.event_name == 'workflow_dispatch' && inputs.max_repos || 100 }}"
+          )
+          filter="${{ github.event_name == 'workflow_dispatch' && inputs.repo_filter || '' }}"
+          if [ -n "$filter" ]; then args+=(--repo-filter "$filter"); fi
+          if [ "${{ github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.apply) }}" = "true" ]; then
+            args+=(--apply)
+          fi
+          if [ "${{ github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.merge_green) }}" = "true" ]; then
+            args+=(--merge-green --merge-wait-seconds 2700)
+          fi
+          python .github/scripts/run_holographic_spaces_v2.py "${args[@]}"
+      - name: Publish secret-free evidence artifact
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: holographic-space-rollout-v2-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ env.REPORT }}
+          if-no-files-found: error
+          retention-days: 90
+      - name: Enforce rollout integrity
+        if: always()
+        shell: bash
+        run: |
+          python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          path = Path(os.environ["REPORT"])
+          if not path.exists():
+              raise SystemExit("rollout report was not produced")
+          report = json.loads(path.read_text(encoding="utf-8"))
+          summary = report.get("summary") or {}
+          print(json.dumps(summary, indent=2, sort_keys=True))
+          if report.get("secrets_recorded") is not False:
+              raise SystemExit("secret-recording invariant failed")
+          if report.get("default_branch_writes") is not False or report.get("force_pushes") is not False:
+              raise SystemExit("source-control safety invariant failed")
+          if summary.get("public_spaces", 0) < 1:
+              raise SystemExit("no public SZLHOLDINGS Spaces were discovered")
+          if summary.get("source_repositories_planned", 0) < 1:
+              raise SystemExit("no Space source repositories were planned")
+          terminal_failures = sum(summary.get(key, 0) for key in ("blocked", "checks-failed", "closed-unmerged"))
+          if terminal_failures:
+              raise SystemExit(f"{terminal_failures} repository rollout(s) reached a terminal failure")
+          PY

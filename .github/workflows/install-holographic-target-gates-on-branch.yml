@@ -1,0 +1,120 @@
+name: Install Holographic Target Gates on Branch
+
+on:
+  push:
+    branches:
+      - feat/holographic-space-fabric-v2-20260902
+    paths:
+      - ".github/workflows/install-holographic-target-gates-on-branch.yml"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: install-holographic-target-gates
+  cancel-in-progress: false
+
+jobs:
+  install:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: feat/holographic-space-fabric-v2-20260902
+          fetch-depth: 0
+      - name: Add a validation workflow to every generated target PR
+        shell: bash
+        run: |
+          set -euo pipefail
+          git pull --ff-only origin feat/holographic-space-fabric-v2-20260902
+          python - <<'PY'
+          from pathlib import Path
+          path = Path('.github/scripts/run_holographic_spaces_v2.py')
+          text = path.read_text(encoding='utf-8')
+          marker = '# SZL target-repository gate injection v2'
+          if marker not in text:
+              needle = 'core.adapt_streamlit = _fixed_streamlit_adapter\n\n\nif __name__ == "__main__":'
+              if needle not in text:
+                  raise SystemExit('runner injection point not found')
+              addition = r'''core.adapt_streamlit = _fixed_streamlit_adapter
+
+# SZL target-repository gate injection v2
+_original_plan_repository = core.plan_repository
+
+def _target_contract(entrypoint: str | None) -> str:
+    encoded_entry = entrypoint or ""
+    return f'''name: SZL Holographic Space v2 Contract
+
+on:
+  pull_request:
+  push:
+    branches: [main, master]
+
+permissions:
+  contents: read
+
+jobs:
+  holographic-contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - name: Checkout exact candidate
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12"
+      - name: Verify local holographic assets and source binding
+        shell: bash
+        env:
+          SZL_HOLO_ENTRYPOINT: "{encoded_entry}"
+        run: |
+          set -euo pipefail
+          mapfile -t css_files < <(find . -type f -name 'szl-space-hologram.css' -not -path './.git/*' | sort)
+          if [ "${{#css_files[@]}}" -lt 1 ]; then echo 'missing holographic CSS'; exit 1; fi
+          for file in "${{css_files[@]}}"; do
+            grep -q 'prefers-reduced-motion' "$file"
+            grep -q 'forced-colors' "$file"
+            grep -q 'data-szl-space-motif' "$file"
+            if grep -Eq '@import|https?://(cdn|unpkg|jsdelivr)' "$file"; then echo "external runtime asset in $file"; exit 1; fi
+          done
+          mapfile -t js_files < <(find . -type f -name 'szl-space-hologram.js' -not -path './.git/*' | sort)
+          for file in "${{js_files[@]}}"; do
+            node --check "$file"
+            if grep -Eq 'fetch\(|XMLHttpRequest|sendBeacon|localStorage|sessionStorage|document\.cookie' "$file"; then echo "prohibited client behavior in $file"; exit 1; fi
+          done
+          mapfile -t py_files < <(find . -type f \( -name 'szl_hologram_assets.py' -o -name 'szl_hologram_streamlit.py' \) -not -path './.git/*' | sort)
+          if [ -n "$SZL_HOLO_ENTRYPOINT" ] && [[ "$SZL_HOLO_ENTRYPOINT" == *.py ]]; then py_files+=("$SZL_HOLO_ENTRYPOINT"); fi
+          if [ "${{#py_files[@]}}" -gt 0 ]; then python -m py_compile "${{py_files[@]}}"; fi
+          if [ -n "$SZL_HOLO_ENTRYPOINT" ]; then
+            test -f "$SZL_HOLO_ENTRYPOINT"
+            grep -Eq 'szl-space-hologram|SZL Holographic Space Fabric v2|szl_hologram' "$SZL_HOLO_ENTRYPOINT"
+          fi
+          git diff --check
+'''
+
+def _plan_with_target_contract(github, repo, spaces, score, reason, css, javascript):
+    plan = _original_plan_repository(github, repo, spaces, score, reason, css, javascript)
+    if plan.status == "planned":
+        plan.changes.append(core.Change(
+            ".github/workflows/szl-holographic-space-v2.yml",
+            _target_contract(plan.entrypoint),
+        ))
+    return plan
+
+core.plan_repository = _plan_with_target_contract
+
+
+if __name__ == "__main__":'''
+              text = text.replace(needle, addition)
+              path.write_text(text, encoding='utf-8')
+          PY
+          rm -f .github/workflows/install-holographic-target-gates-on-branch.yml
+          git config user.name "SZL Target Gate Controller"
+          git config user.email "stephenlutar2@gmail.com"
+          git add .github/scripts/run_holographic_spaces_v2.py .github/workflows/install-holographic-target-gates-on-branch.yml
+          git commit -s -m "feat(ci): add green contract to every Space rollout PR"
+          git push origin HEAD:feat/holographic-space-fabric-v2-20260902

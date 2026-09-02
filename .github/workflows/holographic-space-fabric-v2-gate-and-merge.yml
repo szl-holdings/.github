@@ -1,0 +1,78 @@
+name: Holographic Space Fabric v2 Gate and Merge
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+
+permissions:
+  actions: read
+  checks: read
+  contents: write
+  pull-requests: write
+  statuses: read
+
+concurrency:
+  group: holographic-space-fabric-v2-gate-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  gate-and-merge:
+    if: >-
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      github.head_ref == 'feat/holographic-space-fabric-v2-20260902' &&
+      github.event.pull_request.draft == false
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      GH_TOKEN: ${{ github.token }}
+      HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+      PR_NUMBER: ${{ github.event.pull_request.number }}
+      SELF_RUN_ID: ${{ github.run_id }}
+    steps:
+      - name: Checkout exact candidate
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ env.HEAD_SHA }}
+          persist-credentials: false
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12"
+      - name: Run exact local contracts
+        run: |
+          python -m py_compile .github/scripts/rollout_holographic_spaces_v2.py .github/scripts/run_holographic_spaces_v2.py .github/tests/test_holographic_spaces_v2.py
+          node --check design/holographic-v2/szl-space-hologram.js
+          python .github/tests/test_holographic_spaces_v2.py
+          git diff --check
+      - name: Wait for every peer check to finish green
+        shell: bash
+        run: |
+          python - <<'PY'
+          import json, os, subprocess, time
+          repo = os.environ["GITHUB_REPOSITORY"]
+          sha = os.environ["HEAD_SHA"]
+          self_run = f"/actions/runs/{os.environ['SELF_RUN_ID']}"
+          allowed = {"success", "neutral", "skipped"}
+          def api(path):
+              return json.loads(subprocess.check_output(["gh", "api", path], text=True))
+          for _ in range(180):
+              checks = api(f"repos/{repo}/commits/{sha}/check-runs?per_page=100").get("check_runs", [])
+              peers = [row for row in checks if self_run not in str(row.get("details_url") or "")]
+              bad = [row for row in peers if row.get("status") == "completed" and row.get("conclusion") not in allowed]
+              if bad:
+                  raise SystemExit("peer check failure: " + json.dumps([{"name": row.get("name"), "conclusion": row.get("conclusion")} for row in bad], sort_keys=True))
+              pending = [row for row in peers if row.get("status") != "completed"]
+              legacy = api(f"repos/{repo}/commits/{sha}/status")
+              if any(row.get("state") in {"error", "failure"} for row in legacy.get("statuses", [])):
+                  raise SystemExit("legacy status failure")
+              if peers and not pending and legacy.get("state") != "pending":
+                  break
+              time.sleep(10)
+          else:
+              raise SystemExit("timed out waiting for peer checks")
+          PY
+      - name: Squash merge without bypassing protections
+        run: |
+          gh pr merge "$PR_NUMBER" --repo "$GITHUB_REPOSITORY" --squash --delete-branch --match-head-commit "$HEAD_SHA" \
+            --subject "feat(frontend): ship SZL Holographic Space Fabric v2 (#$PR_NUMBER)" \
+            --body "Add the deterministic local Space renderer, source mapping and safe adapters, per-source PR orchestration, check-gated merges, and evidence reporting.\n\nSigned-off-by: Stephen Lutar <stephenlutar2@gmail.com>"

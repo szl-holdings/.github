@@ -1,0 +1,46 @@
+name: Holographic Space Fabric v2 Contract
+
+on:
+  pull_request:
+    paths:
+      - "design/holographic-v2/**"
+      - ".github/scripts/rollout_holographic_spaces_v2.py"
+      - ".github/scripts/run_holographic_spaces_v2.py"
+      - ".github/tests/test_holographic_spaces_v2.py"
+      - ".github/workflows/holographic-space-fabric-v2-contract.yml"
+      - ".github/workflows/rollout-holographic-space-fabric-v2.yml"
+  push:
+    branches: [main]
+    paths:
+      - "design/holographic-v2/**"
+      - ".github/scripts/rollout_holographic_spaces_v2.py"
+      - ".github/scripts/run_holographic_spaces_v2.py"
+      - ".github/tests/test_holographic_spaces_v2.py"
+      - ".github/workflows/holographic-space-fabric-v2-contract.yml"
+      - ".github/workflows/rollout-holographic-space-fabric-v2.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - name: Checkout exact candidate
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12"
+      - name: Compile controllers
+        run: python -m py_compile .github/scripts/rollout_holographic_spaces_v2.py .github/scripts/run_holographic_spaces_v2.py .github/tests/test_holographic_spaces_v2.py
+      - name: Validate browser asset syntax
+        run: node --check design/holographic-v2/szl-space-hologram.js
+      - name: Run network-free rollout contracts
+        run: python .github/tests/test_holographic_spaces_v2.py
+      - name: Source integrity
+        run: git diff --check
