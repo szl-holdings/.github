@@ -1,0 +1,67 @@
+name: Repair Responsive Estate Controller on Review Branch
+
+on:
+  push:
+    branches:
+      - feat/responsive-estate-v3
+    paths:
+      - ".github/workflows/repair-responsive-estate-controller-on-branch.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  repair:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout exact review branch
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: feat/responsive-estate-v3
+          fetch-depth: 0
+
+      - name: Repair commit/tree separation
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          path = Path("scripts/responsive_estate_v3.py")
+          text = path.read_text(encoding="utf-8")
+          replacements = (
+              (
+                  "    base_sha: str | None = None\n    host_path: str | None = None",
+                  "    base_sha: str | None = None\n    base_tree_sha: str | None = None\n    host_path: str | None = None",
+              ),
+              (
+                  "    assert plan.default_branch and plan.base_sha and plan.host_path",
+                  "    assert plan.default_branch and plan.base_sha and plan.base_tree_sha and plan.host_path",
+              ),
+              (
+                  'payload={"base_tree": plan.base_sha, "tree": entries},',
+                  'payload={"base_tree": plan.base_tree_sha, "tree": entries},',
+              ),
+              (
+                  '            plan.base_sha = str(ref["object"]["sha"])\n            tree = recursive_tree(http, plan.repo, plan.base_sha)',
+                  '            plan.base_sha = str(ref["object"]["sha"])\n            commit = http.json("GET", f"{GITHUB_API}/repos/{ORG}/{plan.repo}/git/commits/{plan.base_sha}")\n            plan.base_tree_sha = str(commit["tree"]["sha"])\n            tree = recursive_tree(http, plan.repo, plan.base_tree_sha)',
+              ),
+          )
+          for old, new in replacements:
+              if old not in text:
+                  raise SystemExit(f"expected controller fragment not found: {old!r}")
+              text = text.replace(old, new, 1)
+          path.write_text(text, encoding="utf-8", newline="\n")
+          PY
+
+      - name: Compile controller
+        run: python -m py_compile scripts/responsive_estate_v3.py
+
+      - name: Commit repair and retire controller
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm .github/workflows/repair-responsive-estate-controller-on-branch.yml
+          git config user.name "SZL Responsive Estate Controller"
+          git config user.email "stephenlutar2@gmail.com"
+          git add scripts/responsive_estate_v3.py .github/workflows/repair-responsive-estate-controller-on-branch.yml
+          git commit -s -m "fix(frontend): separate Git commit and tree identities"
+          git push origin HEAD:feat/responsive-estate-v3
