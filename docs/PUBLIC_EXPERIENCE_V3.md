@@ -50,7 +50,10 @@ A measured case is not green when any of the following is present:
 - the page raises an uncaught browser exception.
 
 Console errors and missing `main` landmarks remain explicit warnings and must be
-triaged; they are not silently converted to PASS.
+triaged; they are not silently converted to PASS. A bounded `networkidle`
+timeout is also recorded as a warning rather than a failure because operational
+dashboards may intentionally retain polling or streaming connections after the
+document is interactive.
 
 ## Shared responsive mechanics
 
