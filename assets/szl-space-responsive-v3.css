@@ -1,0 +1,316 @@
+/*
+ * SZL Space Responsive v3
+ * Framework-neutral, color-neutral responsive contract for Hugging Face Spaces.
+ * Copied into each source repository by the governed estate controller.
+ */
+
+:root {
+  --szl-space-stage: 100rem;
+  --szl-space-reading: 72ch;
+  --szl-space-gutter: clamp(.875rem, 2.4vw, 2.5rem);
+  --szl-space-gap: clamp(.75rem, 1.5vw, 1.35rem);
+  --szl-space-touch: 44px;
+  --szl-space-touch-coarse: 48px;
+  --szl-space-safe-top: env(safe-area-inset-top, 0px);
+  --szl-space-safe-bottom: env(safe-area-inset-bottom, 0px);
+  --szl-space-h1: clamp(2rem, 1.45rem + 2.8vw, 4.75rem);
+  --szl-space-h2: clamp(1.5rem, 1.2rem + 1.5vw, 3rem);
+  --szl-space-body: clamp(.96rem, .93rem + .14vw, 1.08rem);
+}
+
+html {
+  min-inline-size: 20rem;
+  max-inline-size: 100%;
+  overflow-x: clip;
+  text-size-adjust: 100%;
+  -webkit-text-size-adjust: 100%;
+}
+
+*, *::before, *::after {
+  box-sizing: border-box;
+  min-inline-size: 0;
+}
+
+body,
+.gradio-container,
+[data-testid="stAppViewContainer"],
+[data-testid="stApp"],
+#root,
+#__next {
+  max-inline-size: 100%;
+  overflow-x: clip;
+  font-size: var(--szl-space-body);
+}
+
+:where(main, [role="main"], .main, .gradio-container > .main,
+  [data-testid="stMain"], [data-testid="stMainBlockContainer"],
+  .szl-space-stage, [data-szl-space-stage]) {
+  inline-size: min(100%, var(--szl-space-stage));
+  max-inline-size: var(--szl-space-stage);
+  margin-inline: auto;
+  padding-inline: var(--szl-space-gutter);
+}
+
+:where(h1, h2, h3, h4, h5, h6) {
+  max-inline-size: 26ch;
+  overflow-wrap: anywhere;
+  text-wrap: balance;
+}
+h1 { font-size: var(--szl-space-h1); line-height: 1; }
+h2 { font-size: var(--szl-space-h2); line-height: 1.08; }
+
+:where(p, li, dd, dt, figcaption, blockquote, .prose, .description,
+  .markdown, [data-testid="stMarkdownContainer"]) {
+  overflow-wrap: anywhere;
+  text-wrap: pretty;
+}
+
+:where(.prose, .description, .markdown, [data-szl-space-reading]) {
+  max-inline-size: var(--szl-space-reading);
+}
+
+:where(img, picture, video, canvas, svg, iframe, model-viewer) {
+  display: block;
+  max-inline-size: 100%;
+}
+:where(img, video, canvas, svg) { block-size: auto; }
+
+:where(canvas, iframe, model-viewer, .plot, .chart, .visual, .hologram,
+  [data-szl-space-visual]) {
+  inline-size: 100%;
+  max-inline-size: 100%;
+  aspect-ratio: var(--szl-space-ratio, 16 / 9);
+  contain: layout paint;
+}
+
+:where(pre, .code, .json, .log, [data-testid="stCodeBlock"]) {
+  max-inline-size: 100%;
+  overflow: auto;
+  overscroll-behavior-inline: contain;
+  scrollbar-gutter: stable;
+  -webkit-overflow-scrolling: touch;
+  white-space: pre;
+  tab-size: 2;
+}
+
+:where(code, samp, kbd) { font-variant-ligatures: none; }
+
+:where(.table-wrap, .table-scroll, [data-szl-table-scroll],
+  [data-testid="stDataFrame"], [data-testid="stTable"]) {
+  max-inline-size: 100%;
+  overflow-x: auto;
+  overscroll-behavior-inline: contain;
+  scrollbar-gutter: stable;
+  -webkit-overflow-scrolling: touch;
+}
+
+:where(table) {
+  inline-size: 100%;
+  max-inline-size: 100%;
+  border-collapse: collapse;
+}
+:where(th, td) { overflow-wrap: anywhere; vertical-align: top; }
+
+:where(button, [role="button"], input, select, textarea, summary,
+  a[class*="button"], a[class*="btn"], .tab-nav button, [role="tab"],
+  .gr-button, [data-testid="stButton"] button, [data-testid="stDownloadButton"] button) {
+  min-block-size: var(--szl-space-touch);
+  max-inline-size: 100%;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+
+:where(button, [role="button"], a, input, select, textarea, summary, [tabindex]):focus-visible {
+  outline: max(2px, .14em) solid currentColor;
+  outline-offset: 3px;
+}
+
+:where(input:not([type="checkbox"]):not([type="radio"]), select, textarea,
+  .gradio-container input, .gradio-container textarea) {
+  inline-size: 100%;
+  max-inline-size: 100%;
+  font: inherit;
+}
+
+:where(dialog, [role="dialog"], .modal, .drawer, .sheet) {
+  max-inline-size: min(calc(100vw - 2 * var(--szl-space-gutter)), 72rem);
+  max-block-size: min(90dvh, 60rem);
+  overflow: auto;
+  overscroll-behavior: contain;
+}
+
+:where(.grid, .card-grid, .feature-grid, .metric-grid, .product-grid,
+  .surface-grid, [data-szl-space-grid]) {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, var(--szl-space-grid-min, 17rem)), 1fr));
+  gap: var(--szl-space-gap);
+  align-items: stretch;
+}
+
+:where(.cluster, .actions, .button-row, .chip-row, .filters,
+  [data-szl-space-cluster]) {
+  display: flex;
+  flex-wrap: wrap;
+  gap: clamp(.45rem, 1vw, .85rem);
+  align-items: center;
+}
+
+:where(.card, .panel, .tile, .module, .instrument, [data-szl-space-panel]) {
+  container-type: inline-size;
+}
+
+:where(.szl-holo-rail, .szl-space-rail, .szl-command-dock, [data-szl-space-dock]) {
+  max-inline-size: calc(100vw - 2 * max(.5rem, env(safe-area-inset-left, 0px)));
+  max-block-size: calc(100dvh - 1rem - var(--szl-space-safe-top) - var(--szl-space-safe-bottom));
+}
+
+/* Gradio and Streamlit layouts keep their functions but may wrap. */
+:where(.gradio-container .row, .gradio-container .column, .gradio-container .form,
+  [data-testid="stHorizontalBlock"]) {
+  min-inline-size: 0;
+  max-inline-size: 100%;
+}
+
+:where([data-testid="stSidebar"], .sidebar) {
+  max-inline-size: min(90vw, 24rem);
+}
+
+@container (max-width: 28rem) {
+  :where(.card, .panel, .tile, .module, .instrument, [data-szl-space-panel]) {
+    --szl-space-panel-padding: 1rem;
+  }
+}
+
+@media (max-width: 47.999rem) {
+  :root {
+    --szl-space-gutter: clamp(.75rem, 4vw, 1.1rem);
+    --szl-space-gap: .75rem;
+    --szl-space-ratio: 4 / 3;
+  }
+
+  :where(main, [role="main"], .main, .gradio-container > .main,
+    [data-testid="stMain"], [data-testid="stMainBlockContainer"],
+    .szl-space-stage, [data-szl-space-stage]) {
+    padding-inline: var(--szl-space-gutter);
+  }
+
+  :where(.grid, .card-grid, .feature-grid, .metric-grid, .product-grid,
+    .surface-grid, [data-szl-space-grid]) {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  :where(.hero-grid, .split, .two-column, [data-szl-space-split]) {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 1.25rem;
+  }
+
+  :where(.actions, .button-row, [data-szl-space-actions]) > :where(a, button) {
+    flex: 1 1 9rem;
+    justify-content: center;
+  }
+
+  :where(.gradio-container .row, [data-testid="stHorizontalBlock"]) {
+    flex-wrap: wrap !important;
+  }
+
+  :where(.gradio-container .row > *, [data-testid="stHorizontalBlock"] > *) {
+    flex: 1 1 100% !important;
+    inline-size: 100% !important;
+    max-inline-size: 100% !important;
+  }
+
+  :where(.szl-holo-rail, .szl-space-rail, .szl-command-dock, [data-szl-space-dock]) {
+    inset-inline: max(.5rem, env(safe-area-inset-left, 0px));
+    inline-size: auto;
+    transform: none;
+  }
+}
+
+@media (max-height: 31rem) and (orientation: landscape) {
+  :where(.szl-holo-rail, .szl-space-rail, .szl-command-dock, [data-szl-space-dock]) {
+    max-block-size: calc(100dvh - 1rem);
+    overflow-y: auto;
+  }
+}
+
+@media (min-width: 48rem) and (max-width: 79.999rem) {
+  :root {
+    --szl-space-stage: 76rem;
+    --szl-space-grid-min: 15rem;
+  }
+}
+
+@media (min-width: 100rem) {
+  :root {
+    --szl-space-stage: min(92vw, 120rem);
+    --szl-space-reading: 76ch;
+    --szl-space-gutter: clamp(2rem, 3vw, 4.5rem);
+    --szl-space-gap: clamp(1.15rem, 1.4vw, 2rem);
+    --szl-space-grid-min: 20rem;
+  }
+
+  :where(.surface-grid[data-szl-space-theatre], [data-szl-space-theatre-grid]) {
+    grid-template-columns: repeat(12, minmax(0, 1fr));
+  }
+  :where([data-szl-space-span="3"]) { grid-column: span 3; }
+  :where([data-szl-space-span="4"]) { grid-column: span 4; }
+  :where([data-szl-space-span="6"]) { grid-column: span 6; }
+  :where([data-szl-space-span="8"]) { grid-column: span 8; }
+  :where([data-szl-space-span="12"]) { grid-column: 1 / -1; }
+}
+
+@media (min-width: 150rem) {
+  :root {
+    --szl-space-stage: 136rem;
+    --szl-space-body: 1.14rem;
+    --szl-space-grid-min: 22rem;
+  }
+}
+
+@media (pointer: coarse) {
+  :where(input:not([type="checkbox"]):not([type="radio"]), select, textarea) {
+    font-size: max(16px, 1em);
+  }
+  :where(button, [role="button"], summary, a[class*="button"], a[class*="btn"],
+    [role="tab"], .gr-button, [data-testid="stButton"] button) {
+    min-block-size: var(--szl-space-touch-coarse);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto !important; }
+  *, *::before, *::after {
+    scroll-behavior: auto !important;
+    animation-duration: .001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: .001ms !important;
+  }
+}
+
+@media (prefers-contrast: more) {
+  :where(.card, .panel, .tile, .module, .instrument, [data-szl-space-panel]) {
+    border-width: max(1px, .08em);
+  }
+}
+
+@media (forced-colors: active) {
+  :where(button, [role="button"], input, select, textarea, summary, a,
+    .card, .panel, .tile, .module, .instrument) {
+    forced-color-adjust: auto;
+  }
+}
+
+@media print {
+  :root { --szl-space-stage: none; }
+  html, body { overflow: visible; }
+  :where(.szl-holo-rail, .szl-space-rail, .szl-command-dock,
+    [data-szl-space-dock], canvas[aria-hidden="true"], .ambient-field) {
+    display: none !important;
+  }
+  :where(main, [role="main"], .main, .gradio-container,
+    [data-testid="stMainBlockContainer"]) {
+    max-inline-size: none;
+    padding: 0;
+  }
+}
