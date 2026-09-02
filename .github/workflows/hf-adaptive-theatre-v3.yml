@@ -1,0 +1,156 @@
+name: Hugging Face Adaptive Theatre v3
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - ".github/assets/szl-space-adaptive-v3.css"
+      - ".github/assets/szl-space-adaptive-v3.js"
+      - ".github/scripts/rollout_hf_adaptive_theatre_v3.py"
+      - ".github/tests/test_hf_adaptive_theatre_v3.py"
+      - ".github/workflows/hf-adaptive-theatre-v3.yml"
+  push:
+    branches: [main]
+    paths:
+      - ".github/assets/szl-space-adaptive-v3.css"
+      - ".github/assets/szl-space-adaptive-v3.js"
+      - ".github/scripts/rollout_hf_adaptive_theatre_v3.py"
+      - ".github/tests/test_hf_adaptive_theatre_v3.py"
+      - ".github/workflows/hf-adaptive-theatre-v3.yml"
+  workflow_dispatch:
+    inputs:
+      apply:
+        description: "Open or refresh source-native Adaptive Theatre PRs"
+        required: false
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: hf-adaptive-theatre-v3-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  REPORT_PATH: /tmp/hf-adaptive-theatre-v3.json
+
+jobs:
+  contract:
+    name: Adaptive Theatre v3 contract
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - name: Checkout exact revision
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12"
+      - name: Set up Node
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: "22"
+      - name: Compile and run offline rollout contracts
+        run: |
+          python -m py_compile .github/scripts/rollout_hf_adaptive_theatre_v3.py .github/tests/test_hf_adaptive_theatre_v3.py
+          python .github/tests/test_hf_adaptive_theatre_v3.py -v
+      - name: Validate shared browser assets
+        run: |
+          node --check .github/assets/szl-space-adaptive-v3.js
+          python - <<'PY'
+          from pathlib import Path
+          css = Path('.github/assets/szl-space-adaptive-v3.css').read_text(encoding='utf-8')
+          if css.count('{') != css.count('}'):
+              raise SystemExit('unbalanced CSS braces')
+          if any(token in css for token in ('cdn.', 'unpkg.com', 'jsdelivr.net')):
+              raise SystemExit('runtime CDN reference is forbidden')
+          print('shared CSS contract: PASS')
+          PY
+          git diff --check
+
+  rollout:
+    name: Open source-native Space responsive PRs
+    needs: contract
+    if: ${{ github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.apply) }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    permissions:
+      contents: read
+    env:
+      ORG_ADMIN_TOKEN: ${{ secrets.SZL_ORG_ADMIN_PAT || secrets.ORG_ADMIN_TOKEN || secrets.GH_ORG_TOKEN || secrets.GITHUB_PAT }}
+      GH_TOKEN: ${{ secrets.SZL_ORG_ADMIN_PAT || secrets.ORG_ADMIN_TOKEN || secrets.GH_ORG_TOKEN || secrets.GITHUB_PAT }}
+    steps:
+      - name: Checkout exact protected source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12"
+      - name: Set up Node
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: "22"
+      - name: Require an explicit cross-repository publisher
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ -z "${ORG_ADMIN_TOKEN:-}" ]; then
+            python - <<'PY'
+          import json, os
+          from pathlib import Path
+          path = Path(os.environ['REPORT_PATH'])
+          path.write_text(json.dumps({
+              'schema': 'szl.hf-adaptive-theatre-rollout/v3',
+              'status': 'UNAVAILABLE',
+              'error': 'No supported cross-repository GitHub token is configured.',
+              'token_recorded': False,
+          }, indent=2, sort_keys=True) + '\n', encoding='utf-8')
+          PY
+            echo "::error::Cross-repository publisher token is unavailable."
+            exit 2
+          fi
+          echo "::add-mask::$ORG_ADMIN_TOKEN"
+      - name: Open or refresh reviewable source PRs
+        run: >-
+          python .github/scripts/rollout_hf_adaptive_theatre_v3.py
+          --apply
+          --css .github/assets/szl-space-adaptive-v3.css
+          --js .github/assets/szl-space-adaptive-v3.js
+          --report "$REPORT_PATH"
+      - name: Upload secret-free rollout receipt
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: hf-adaptive-theatre-v3-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ env.REPORT_PATH }}
+          if-no-files-found: error
+          retention-days: 90
+      - name: Publish rollout summary
+        if: always()
+        shell: bash
+        run: |
+          if [ ! -f "$REPORT_PATH" ]; then
+            echo '### Adaptive Theatre v3 rollout' >> "$GITHUB_STEP_SUMMARY"
+            echo 'No receipt was produced.' >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          python - <<'PY' >> "$GITHUB_STEP_SUMMARY"
+          import json, os
+          from pathlib import Path
+          report = json.loads(Path(os.environ['REPORT_PATH']).read_text())
+          print('### Adaptive Theatre v3 rollout')
+          print()
+          print(f"Status: `{report.get('status', 'UNKNOWN')}`")
+          summary = report.get('summary') or {}
+          if summary:
+              print(f"Spaces observed: `{summary.get('spaces')}`")
+              print(f"Mapped repositories: `{summary.get('mapped_repositories')}`")
+              print(f"States: `{json.dumps(summary.get('status_counts') or {}, sort_keys=True)}`")
+          if report.get('error'):
+              print(f"Blocker: `{report['error']}`")
+          PY
