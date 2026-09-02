@@ -1,0 +1,165 @@
+name: GitHub Responsive Estate Audit
+
+on:
+  pull_request:
+    paths:
+      - ".github/scripts/github_responsive_estate_audit.py"
+      - ".github/scripts/test_github_responsive_estate_audit.py"
+      - ".github/workflows/github-responsive-estate-audit.yml"
+      - "docs/GITHUB_RESPONSIVE_ESTATE_AUDIT.md"
+  push:
+    branches: [main]
+    paths:
+      - ".github/scripts/github_responsive_estate_audit.py"
+      - ".github/scripts/test_github_responsive_estate_audit.py"
+      - ".github/workflows/github-responsive-estate-audit.yml"
+      - "docs/GITHUB_RESPONSIVE_ESTATE_AUDIT.md"
+  schedule:
+    - cron: "43 12 * * *"
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+concurrency:
+  group: github-responsive-estate-audit
+  cancel-in-progress: true
+
+env:
+  REPORT_JSON: reports/github-responsive-estate.json
+  REPORT_MD: reports/github-responsive-estate.md
+  ORG_REPOSITORY_FLOOR: "57"
+
+jobs:
+  contract:
+    name: Network-free classification and responsive-source contract
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - name: Harden runner
+        uses: step-security/harden-runner@05e31511f85b41b11d1cf0ef85d0992719546e2c # v2.21.0
+        with:
+          egress-policy: audit
+      - name: Checkout exact source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12"
+      - name: Compile and run source-contract tests
+        run: |
+          set -euo pipefail
+          python -m py_compile \
+            .github/scripts/github_responsive_estate_audit.py \
+            .github/scripts/test_github_responsive_estate_audit.py
+          python .github/scripts/test_github_responsive_estate_audit.py
+          git diff --check
+
+  live:
+    name: Complete authenticated repository and screen-coverage census
+    permissions:
+      contents: read
+      issues: write
+    needs: contract
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 55
+    steps:
+      - name: Harden runner
+        uses: step-security/harden-runner@05e31511f85b41b11d1cf0ef85d0992719546e2c # v2.21.0
+        with:
+          egress-policy: audit
+      - name: Checkout protected main
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: main
+          persist-credentials: false
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12"
+      - name: Mint preferred qillqaq organization reader
+        id: app-token
+        continue-on-error: true
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        with:
+          client-id: ${{ vars.QILLQAQ_CLIENT_ID }}
+          private-key: ${{ secrets.QILLQAQ_PRIVATE_KEY }}
+          owner: ${{ github.repository_owner }}
+          permission-actions: read
+          permission-contents: read
+          permission-organization-administration: read
+      - name: Audit every accessible repository
+        id: audit
+        env:
+          DIGEST_APP_TOKEN: ${{ steps.app-token.outputs.token }}
+          APP_TOKEN_OUTCOME: ${{ steps.app-token.outcome }}
+          SZL_GITHUB_TOKEN: ${{ secrets.SZL_GITHUB_TOKEN }}
+        shell: bash
+        run: |
+          set +e
+          python .github/scripts/github_responsive_estate_audit.py \
+            --output "$REPORT_JSON" \
+            --markdown "$REPORT_MD"
+          code=$?
+          echo "exit_code=$code" >> "$GITHUB_OUTPUT"
+          exit 0
+      - name: Publish readable summary
+        if: always()
+        run: |
+          test -f "$REPORT_MD"
+          cat "$REPORT_MD" >> "$GITHUB_STEP_SUMMARY"
+      - name: Upload immutable audit evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: github-responsive-estate-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            ${{ env.REPORT_JSON }}
+            ${{ env.REPORT_MD }}
+          if-no-files-found: error
+          retention-days: 90
+      - name: Reconcile durable remediation issue
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -f "$REPORT_JSON"
+          test -f "$REPORT_MD"
+          title='[GitHub responsive estate] source and screen coverage'
+          number="$(gh issue list --repo "$GITHUB_REPOSITORY" --state all --search "$title in:title" --json number,title --jq '.[] | select(.title == "[GitHub responsive estate] source and screen coverage") | .number' | head -n1)"
+          blocking="$(python -c 'import json,os; print(json.load(open(os.environ["REPORT_JSON"]))["summary"]["blocking"])')"
+          incomplete="$(python -c 'import json,os; print(str(not json.load(open(os.environ["REPORT_JSON"]))["inventory_complete"]).lower())')"
+          {
+            echo '<!-- szl-github-responsive-estate -->'
+            echo '# GitHub responsive estate receipt'
+            echo
+            echo "Run: ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
+            echo
+            cat "$REPORT_MD"
+          } > /tmp/github-responsive-estate.md
+          if [ "$blocking" -gt 0 ] || [ "$incomplete" = true ]; then
+            if [ -n "$number" ]; then
+              gh issue edit "$number" --repo "$GITHUB_REPOSITORY" --body-file /tmp/github-responsive-estate.md
+              gh issue reopen "$number" --repo "$GITHUB_REPOSITORY" || true
+            else
+              gh issue create --repo "$GITHUB_REPOSITORY" --title "$title" --body-file /tmp/github-responsive-estate.md
+            fi
+          elif [ -n "$number" ]; then
+            gh issue edit "$number" --repo "$GITHUB_REPOSITORY" --body-file /tmp/github-responsive-estate.md
+            gh issue close "$number" --repo "$GITHUB_REPOSITORY" --reason completed --comment 'Complete source inventory has no release-blocking public UI findings.' || true
+          fi
+      - name: Enforce complete inventory and public UI baseline
+        if: always()
+        env:
+          EXIT_CODE: ${{ steps.audit.outputs.exit_code }}
+        run: |
+          code="${EXIT_CODE:-2}"
+          if [ "$code" -ne 0 ]; then
+            echo "::error::GitHub responsive estate is not fully source-ready. The artifact and durable issue contain exact repository findings."
+            exit "$code"
+          fi
