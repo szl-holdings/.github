@@ -10,6 +10,11 @@ adds the missing runtime identity plane:
 3. after deployment, GET a same-host standard build-info endpoint and require
    ``build.state=OBSERVED`` plus ``build.revision=<exact Git SHA>``.
 
+Runtime probes always use the caller's canonical path verbatim. Retry identity and
+cache-control signals travel in request headers, never in synthetic query
+parameters. This avoids changing application routing while preserving bounded,
+independently attributable convergence attempts.
+
 It never changes Space hardware, visibility, sleep policy, secrets, models, or data.
 """
 from __future__ import annotations
@@ -31,6 +36,8 @@ SHA40 = re.compile(r"^[0-9a-f]{40}$")
 VARIABLE = re.compile(r"^[A-Z][A-Z0-9_]{0,63}$")
 REPO_ID = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]*/[A-Za-z0-9][A-Za-z0-9._-]*$")
 REPORT_SCHEMA = "szl.hf-space-source-binding/v1"
+PROBE_SOURCE_HEADER = "X-SZL-Source-Revision"
+PROBE_ATTEMPT_HEADER = "X-SZL-Probe-Attempt"
 
 
 class SourceBindingError(RuntimeError):
@@ -116,6 +123,18 @@ def bind_variable(api: HfApi, binding: Mapping[str, str]) -> dict[str, Any]:
     return verify_variable(api, binding)
 
 
+def _probe_headers(binding: Mapping[str, str], attempt: int) -> dict[str, str]:
+    """Return per-attempt transport identity without changing application routing."""
+    return {
+        "Accept": "application/json",
+        "Cache-Control": "no-cache, no-store, max-age=0",
+        "Pragma": "no-cache",
+        "User-Agent": "szl-hf-space-source-binding/1",
+        PROBE_SOURCE_HEADER: binding["revision"],
+        PROBE_ATTEMPT_HEADER: str(attempt),
+    }
+
+
 def _runtime_probe_observation(
     binding: Mapping[str, str],
     *,
@@ -124,23 +143,20 @@ def _runtime_probe_observation(
     request_timeout_seconds: float,
 ) -> dict[str, Any]:
     canonical_url = live_origin(binding["repo_id"]) + binding["probe_path"]
-    separator = "&" if "?" in canonical_url else "?"
-    request_url = (
-        f"{canonical_url}{separator}__szl_source_revision={binding['revision']}"
-        f"&__szl_probe_attempt={attempt}"
-    )
     observation: dict[str, Any] = {
         "attempt": attempt,
         "observed_at": datetime.now(timezone.utc).isoformat(),
-        "url": request_url,
+        "url": canonical_url,
         "expected_revision": binding["revision"],
+        "request_identity": "headers",
         "matched": False,
     }
     try:
         response = session.get(
-            request_url,
+            canonical_url,
             allow_redirects=False,
             timeout=request_timeout_seconds,
+            headers=_probe_headers(binding, attempt),
         )
     except Exception as exc:  # noqa: BLE001 - preserve a bounded transport observation
         observation.update(
@@ -208,14 +224,6 @@ def verify_runtime_probe(
     if not 0 < interval_seconds <= 60:
         raise SourceBindingError("runtime probe interval must be greater than 0 and at most 60 seconds")
     session = session or requests.Session()
-    session.headers.update(
-        {
-            "Accept": "application/json",
-            "Cache-Control": "no-cache, no-store, max-age=0",
-            "Pragma": "no-cache",
-            "User-Agent": "szl-hf-space-source-binding/1",
-        }
-    )
     started = monotonic()
     deadline = started + timeout_seconds
     observations: list[dict[str, Any]] = []
@@ -298,6 +306,7 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
         "boundaries": [
             "Only one non-secret Space variable may be added or updated.",
             "Verification uses supported HfApi variable readback and bounded same-host GET convergence.",
+            "Probe retries preserve the canonical application URL and carry attempt identity only in headers.",
             "No Space hardware, visibility, sleep policy, secret, model, dataset, or branch state is changed.",
         ],
     }

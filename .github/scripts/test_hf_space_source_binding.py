@@ -86,6 +86,15 @@ class SourceBindingTests(unittest.TestCase):
             "SZLHOLDINGS/a11oy", "SZL_GIT_SHA", self.sha, "/api/build-info"
         )
 
+    @staticmethod
+    def observed_payload(revision: str) -> dict[str, object]:
+        return {
+            "status": "OBSERVED",
+            "build": {"state": "OBSERVED", "revision": revision},
+            "runtime": {"python": "3.12"},
+            "receipt_minted": False,
+        }
+
     def test_normalize_requires_exact_repo_key_sha_and_same_host_path(self):
         self.assertEqual(self.normalized["revision"], self.sha)
         for args in (
@@ -115,21 +124,25 @@ class SourceBindingTests(unittest.TestCase):
             binding.verify_variable(api, self.normalized)
 
     def test_runtime_probe_requires_observed_exact_revision_and_no_receipt(self):
-        payload = {
-            "status": "OBSERVED",
-            "build": {"state": "OBSERVED", "revision": self.sha},
-            "runtime": {"python": "3.12"},
-            "receipt_minted": False,
-        }
+        payload = self.observed_payload(self.sha)
         session = FakeSession(FakeResponse(payload))
         report = binding.verify_runtime_probe(self.normalized, session=session)
+        canonical = "https://szlholdings-a11oy.hf.space/api/build-info"
         self.assertTrue(report["matched"])
+        self.assertEqual(report["url"], canonical)
+        self.assertEqual(session.calls[0][0], canonical)
+        self.assertNotIn("__szl_", session.calls[0][0])
+        request = session.calls[0][1]
+        self.assertFalse(request["allow_redirects"])
         self.assertEqual(
-            report["url"],
-            "https://szlholdings-a11oy.hf.space/api/build-info",
+            request["headers"][binding.PROBE_SOURCE_HEADER],
+            self.sha,
         )
-        self.assertIn("__szl_source_revision=" + self.sha, session.calls[0][0])
-        self.assertFalse(session.calls[0][1]["allow_redirects"])
+        self.assertEqual(request["headers"][binding.PROBE_ATTEMPT_HEADER], "1")
+        self.assertEqual(
+            request["headers"]["Cache-Control"],
+            "no-cache, no-store, max-age=0",
+        )
 
         payload["build"]["revision"] = "b" * 40
         with self.assertRaisesRegex(binding.SourceBindingError, "did not converge"):
@@ -139,15 +152,27 @@ class SourceBindingTests(unittest.TestCase):
                 timeout_seconds=0,
             )
 
+    def test_runtime_probe_preserves_caller_query_verbatim(self):
+        normalized = binding.normalize_binding(
+            "SZLHOLDINGS/a11oy",
+            "SZL_GIT_SHA",
+            self.sha,
+            "/api/build-info?refresh=1&mode=full",
+        )
+        session = FakeSession(FakeResponse(self.observed_payload(self.sha)))
+        report = binding.verify_runtime_probe(normalized, session=session)
+        canonical = (
+            "https://szlholdings-a11oy.hf.space/"
+            "api/build-info?refresh=1&mode=full"
+        )
+        self.assertEqual(report["url"], canonical)
+        self.assertEqual(session.calls[0][0], canonical)
+        self.assertNotIn("__szl_source_revision", session.calls[0][0])
+        self.assertNotIn("__szl_probe_attempt", session.calls[0][0])
+
     def test_runtime_probe_converges_from_stale_revision_and_records_every_attempt(self):
-        stale = {
-            "build": {"state": "OBSERVED", "revision": "b" * 40},
-            "receipt_minted": False,
-        }
-        current = {
-            "build": {"state": "OBSERVED", "revision": self.sha},
-            "receipt_minted": False,
-        }
+        stale = self.observed_payload("b" * 40)
+        current = self.observed_payload(self.sha)
         clock = FakeClock()
         session = FakeSession([FakeResponse(stale), FakeResponse(current)])
         report = binding.verify_runtime_probe(
@@ -163,13 +188,44 @@ class SourceBindingTests(unittest.TestCase):
         self.assertEqual(len(report["observations"]), 2)
         self.assertFalse(report["observations"][0]["matched"])
         self.assertTrue(report["observations"][1]["matched"])
-        self.assertNotEqual(session.calls[0][0], session.calls[1][0])
+        self.assertEqual(session.calls[0][0], session.calls[1][0])
+        first_headers = session.calls[0][1]["headers"]
+        second_headers = session.calls[1][1]["headers"]
+        self.assertEqual(first_headers[binding.PROBE_ATTEMPT_HEADER], "1")
+        self.assertEqual(second_headers[binding.PROBE_ATTEMPT_HEADER], "2")
+        self.assertEqual(first_headers[binding.PROBE_SOURCE_HEADER], self.sha)
+        self.assertEqual(second_headers[binding.PROBE_SOURCE_HEADER], self.sha)
+
+    def test_runtime_probe_retries_transient_404_without_changing_url(self):
+        current = self.observed_payload(self.sha)
+        clock = FakeClock()
+        session = FakeSession(
+            [
+                FakeResponse(
+                    {"detail": "Application not found"},
+                    status=404,
+                    content_type="text/html",
+                ),
+                FakeResponse(current),
+            ]
+        )
+        report = binding.verify_runtime_probe(
+            self.normalized,
+            session=session,
+            timeout_seconds=10,
+            interval_seconds=2,
+            monotonic=clock.monotonic,
+            sleep=clock.sleep,
+        )
+        self.assertTrue(report["matched"])
+        self.assertEqual(report["attempt_count"], 2)
+        self.assertEqual(report["observations"][0]["http_status"], 404)
+        self.assertEqual(report["observations"][1]["http_status"], 200)
+        self.assertEqual(session.calls[0][0], session.calls[1][0])
+        self.assertNotIn("__szl_", session.calls[0][0])
 
     def test_runtime_probe_exhaustion_is_bounded_and_retains_observations(self):
-        stale = {
-            "build": {"state": "OBSERVED", "revision": "b" * 40},
-            "receipt_minted": False,
-        }
+        stale = self.observed_payload("b" * 40)
         clock = FakeClock()
         with self.assertRaises(binding.SourceBindingError) as raised:
             binding.verify_runtime_probe(
@@ -202,10 +258,12 @@ class SourceBindingTests(unittest.TestCase):
                 timeout_seconds=0,
             )
 
-    def test_source_contains_no_secret_or_hardware_mutation(self):
+    def test_source_contains_no_synthetic_query_or_privileged_mutation(self):
         with open(MODULE_PATH, encoding="utf-8") as fh:
             source = fh.read()
         for forbidden in (
+            "__szl_source_revision",
+            "__szl_probe_attempt",
             "add_space_secret",
             "delete_space_secret",
             "request_space_hardware",
