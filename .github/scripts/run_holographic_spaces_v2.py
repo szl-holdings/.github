@@ -1,18 +1,30 @@
 #!/usr/bin/env python3
-"""Execute the Holographic Space Fabric v2 controller with hardened adapters."""
+"""Execute the Holographic Space Fabric controller with hardened adapters."""
 from __future__ import annotations
 
 import ast
 import importlib.util
 import sys
 from pathlib import Path
+from types import ModuleType
 
-CORE_PATH = Path(__file__).with_name("rollout_holographic_spaces_v2.py")
-spec = importlib.util.spec_from_file_location("szl_holographic_space_core", CORE_PATH)
-assert spec and spec.loader
-core = importlib.util.module_from_spec(spec)
-sys.modules[spec.name] = core
-spec.loader.exec_module(core)
+HERE = Path(__file__).resolve().parent
+
+
+def load_module(name: str, path: Path) -> ModuleType:
+    spec = importlib.util.spec_from_file_location(name, path)
+    if not spec or not spec.loader:
+        raise RuntimeError(f"unable to load {path}")
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = module
+    spec.loader.exec_module(module)
+    return module
+
+
+core = load_module(
+    "szl_holographic_space_core",
+    HERE / "rollout_holographic_spaces_v2.py",
+)
 
 
 def _fixed_streamlit_adapter(content: str, slug: str) -> str:
@@ -41,7 +53,10 @@ def _fixed_streamlit_adapter(content: str, slug: str) -> str:
         and node.func.attr == "set_page_config"
     ]
     if calls:
-        _, insert_at = core.node_span(min(calls, key=lambda item: (item.lineno, item.col_offset)), offsets)
+        _, insert_at = core.node_span(
+            min(calls, key=lambda item: (item.lineno, item.col_offset)),
+            offsets,
+        )
     else:
         imports = [
             node
@@ -59,6 +74,20 @@ def _fixed_streamlit_adapter(content: str, slug: str) -> str:
 
 
 core.adapt_streamlit = _fixed_streamlit_adapter
+
+# Install the additive responsive refresh before the target-repository gate so
+# already-bound repositories are promoted back into a reviewable v3 plan.
+responsive = load_module(
+    "szl_responsive_space_contract",
+    HERE / "responsive_space_contract.py",
+)
+responsive.install(core)
+
+targets = load_module(
+    "szl_holographic_target_contract",
+    HERE / "holographic_target_contract.py",
+)
+targets.install(core)
 
 
 if __name__ == "__main__":
