@@ -65,6 +65,7 @@ class RepoPlan:
     spaces: list[str] = field(default_factory=list)
     default_branch: str | None = None
     base_sha: str | None = None
+    base_tree_sha: str | None = None
     host_path: str | None = None
     responsive_path: str | None = None
     status: str = "PLANNED"
@@ -301,7 +302,7 @@ def create_blob(http: Http, repo: str, content: str) -> str:
 
 
 def create_commit_for_plan(http: Http, plan: RepoPlan, asset: str, run_id: str) -> None:
-    assert plan.default_branch and plan.base_sha and plan.host_path
+    assert plan.default_branch and plan.base_sha and plan.base_tree_sha and plan.host_path
     tree = recursive_tree(http, plan.repo, plan.base_sha)
     host_item = next(item for item in tree if item.get("path") == plan.host_path)
     host = fetch_blob_text(http, plan.repo, str(host_item["sha"]))
@@ -345,7 +346,7 @@ def create_commit_for_plan(http: Http, plan: RepoPlan, asset: str, run_id: str) 
     new_tree = http.json(
         "POST",
         f"{GITHUB_API}/repos/{ORG}/{plan.repo}/git/trees",
-        payload={"base_tree": plan.base_sha, "tree": entries},
+        payload={"base_tree": plan.base_tree_sha, "tree": entries},
     )
     message = (
         "feat(frontend): adopt SZL responsive experience v3\n\n"
@@ -519,7 +520,9 @@ def build_plans(spaces: list[Space], http: Http) -> list[RepoPlan]:
             plan.default_branch = str(details.get("default_branch") or "main")
             ref = http.json("GET", f"{GITHUB_API}/repos/{ORG}/{plan.repo}/git/ref/heads/{urllib.parse.quote(plan.default_branch, safe='')}")
             plan.base_sha = str(ref["object"]["sha"])
-            tree = recursive_tree(http, plan.repo, plan.base_sha)
+            commit = http.json("GET", f"{GITHUB_API}/repos/{ORG}/{plan.repo}/git/commits/{plan.base_sha}")
+            plan.base_tree_sha = str(commit["tree"]["sha"])
+            tree = recursive_tree(http, plan.repo, plan.base_tree_sha)
             picked = pick_host(tree)
             if not picked:
                 plan.status = "NO_REVIEWED_HOLOGRAPHIC_HOST"
