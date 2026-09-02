@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Attach a self-contained green gate to every generated Space rollout PR."""
+"""Attach a self-contained Public Experience v3 gate to generated Space PRs."""
 from __future__ import annotations
 
 import json
@@ -10,7 +10,7 @@ from typing import Any
 def target_contract(entrypoint: str | None) -> str:
     """Return a dependency-light target repository GitHub Actions contract."""
     template = r'''
-name: SZL Holographic Space v2 Contract
+name: SZL Public Experience v3 Contract
 
 on:
   pull_request:
@@ -21,7 +21,7 @@ permissions:
   contents: read
 
 jobs:
-  holographic-contract:
+  public-experience-contract:
     runs-on: ubuntu-latest
     timeout-minutes: 12
     steps:
@@ -33,32 +33,100 @@ jobs:
         uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
           python-version: "3.12"
-      - name: Verify local holographic assets and source binding
+      - name: Verify local responsive assets and source binding
         shell: bash
         env:
           SZL_HOLO_ENTRYPOINT: __ENTRYPOINT__
         run: |
           set -euo pipefail
-          mapfile -t css_files < <(find . -type f -name 'szl-space-hologram.css' -not -path './.git/*' | sort)
-          if [ "${#css_files[@]}" -lt 1 ]; then echo 'missing holographic CSS'; exit 1; fi
-          for file in "${css_files[@]}"; do
-            grep -q 'prefers-reduced-motion' "$file"
-            grep -q 'forced-colors' "$file"
-            grep -q 'data-szl-space-motif' "$file"
-            if grep -Eq '@import|https?://(cdn|unpkg|jsdelivr)' "$file"; then echo "external runtime asset in $file"; exit 1; fi
-          done
-          mapfile -t js_files < <(find . -type f -name 'szl-space-hologram.js' -not -path './.git/*' | sort)
-          for file in "${js_files[@]}"; do
-            node --check "$file"
-            if grep -Eq 'fetch\(|XMLHttpRequest|sendBeacon|localStorage|sessionStorage|document\.cookie' "$file"; then echo "prohibited client behavior in $file"; exit 1; fi
-          done
-          mapfile -t py_files < <(find . -type f \( -name 'szl_hologram_assets.py' -o -name 'szl_hologram_streamlit.py' \) -not -path './.git/*' | sort)
-          if [ -n "$SZL_HOLO_ENTRYPOINT" ] && [[ "$SZL_HOLO_ENTRYPOINT" == *.py ]]; then py_files+=("$SZL_HOLO_ENTRYPOINT"); fi
-          if [ "${#py_files[@]}" -gt 0 ]; then python -m py_compile "${py_files[@]}"; fi
-          if [ -n "$SZL_HOLO_ENTRYPOINT" ]; then
-            test -f "$SZL_HOLO_ENTRYPOINT"
-            grep -Eq 'szl-space-hologram|SZL Holographic Space Fabric v2|szl_hologram' "$SZL_HOLO_ENTRYPOINT"
-          fi
+          python - <<'PY'
+          from pathlib import Path
+          import os
+          import py_compile
+          import subprocess
+
+          css_files = sorted(
+              path for path in Path('.').rglob('szl-space-hologram.css')
+              if '.git' not in path.parts
+          )
+          if not css_files:
+              raise SystemExit('missing holographic CSS')
+          css_required = (
+              'SZL Public Experience v3',
+              'data-szl-space-motif',
+              '--szl-touch-target',
+              '100dvh',
+              'safe-area-inset',
+              'overflow-x: clip',
+              'max-width: 479px',
+              'min-width: 768px',
+              'min-width: 1440px',
+              'min-width: 1920px',
+              'min-width: 2560px',
+              'prefers-reduced-motion',
+              'prefers-contrast',
+              'forced-colors',
+              '@media print',
+          )
+          for path in css_files:
+              text = path.read_text(encoding='utf-8')
+              missing = [item for item in css_required if item not in text]
+              if missing:
+                  raise SystemExit(f'{path}: missing responsive contracts: {missing}')
+              prohibited = ('@import', 'cdn.', 'unpkg.', 'jsdelivr.')
+              if any(item in text for item in prohibited):
+                  raise SystemExit(f'{path}: external runtime asset')
+              if text.count('{') != text.count('}'):
+                  raise SystemExit(f'{path}: unbalanced CSS braces')
+
+          js_files = sorted(
+              path for path in Path('.').rglob('szl-space-hologram.js')
+              if '.git' not in path.parts
+          )
+          prohibited_js = (
+              'fetch(', 'XMLHttpRequest', 'sendBeacon', 'localStorage',
+              'sessionStorage', 'document.cookie',
+          )
+          for path in js_files:
+              text = path.read_text(encoding='utf-8')
+              for marker in (
+                  '__SZL_PUBLIC_EXPERIENCE_V3__',
+                  'szlPublicExperienceV3',
+                  'szlViewportTier',
+                  'visualViewport',
+                  'requestAnimationFrame',
+              ):
+                  if marker not in text:
+                      raise SystemExit(f'{path}: missing {marker}')
+              if any(item in text for item in prohibited_js):
+                  raise SystemExit(f'{path}: prohibited client behavior')
+              subprocess.run(['node', '--check', str(path)], check=True)
+
+          py_files = sorted(
+              path for path in Path('.').rglob('*.py')
+              if path.name in {
+                  'szl_hologram_assets.py',
+                  'szl_hologram_streamlit.py',
+              } and '.git' not in path.parts
+          )
+          entrypoint = os.environ.get('SZL_HOLO_ENTRYPOINT', '')
+          if entrypoint and entrypoint.endswith('.py'):
+              py_files.append(Path(entrypoint))
+          for path in dict.fromkeys(py_files):
+              py_compile.compile(str(path), doraise=True)
+
+          if entrypoint:
+              target = Path(entrypoint)
+              if not target.is_file():
+                  raise SystemExit(f'missing entrypoint: {entrypoint}')
+              text = target.read_text(encoding='utf-8')
+              if not any(marker in text for marker in (
+                  'szl-space-hologram',
+                  'SZL Holographic Space Fabric v2',
+                  'szl_hologram',
+              )):
+                  raise SystemExit(f'{entrypoint}: source binding missing')
+          PY
           git diff --check
 '''
     return textwrap.dedent(template).lstrip().replace(
@@ -74,16 +142,22 @@ def install(core: Any) -> None:
 
     def plan_with_target_contract(*args: Any, **kwargs: Any):
         plan = original(*args, **kwargs)
-        if plan.status == "planned" and not any(
-            change.path == ".github/workflows/szl-holographic-space-v2.yml"
-            for change in plan.changes
-        ):
-            plan.changes.append(
-                core.Change(
-                    ".github/workflows/szl-holographic-space-v2.yml",
-                    target_contract(plan.entrypoint),
-                )
+        if plan.status == "planned":
+            workflow_path = ".github/workflows/szl-holographic-space-v2.yml"
+            rendered = target_contract(plan.entrypoint)
+            existing = next(
+                (change for change in plan.changes if change.path == workflow_path),
+                None,
             )
+            if existing is None:
+                plan.changes.append(core.Change(workflow_path, rendered))
+            else:
+                plan.changes = [
+                    core.Change(workflow_path, rendered)
+                    if change.path == workflow_path
+                    else change
+                    for change in plan.changes
+                ]
         return plan
 
     core.plan_repository = plan_with_target_contract
