@@ -1,0 +1,209 @@
+# Copyright 2026 SZL Holdings — SPDX-License-Identifier: Apache-2.0
+name: Public Estate Convergence
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - .github/scripts/public_estate_convergence.py
+      - tests/test_public_estate_convergence.py
+      - .github/workflows/public-estate-convergence.yml
+  push:
+    branches: [main]
+    paths:
+      - .github/scripts/public_estate_convergence.py
+      - tests/test_public_estate_convergence.py
+      - .github/workflows/public-estate-convergence.yml
+  schedule:
+    - cron: "37 * * * *"
+  workflow_dispatch:
+    inputs:
+      repair:
+        description: Request only the existing deploy paths when live readback fails
+        required: false
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+  issues: write
+
+env:
+  REPORT_PATH: /tmp/public-estate-convergence-v2.json
+
+concurrency:
+  group: public-estate-convergence-${{ github.event_name }}
+  cancel-in-progress: true
+
+jobs:
+  contract:
+    name: Convergence boundary contract
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - name: Harden runner
+        uses: step-security/harden-runner@05e31511f85b41b11d1cf0ef85d0992719546e2c # v2.21.0
+        with:
+          egress-policy: audit
+
+      - name: Checkout exact source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 1
+
+      - name: Set up exact Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12.10"
+
+      - name: Compile and run network-free contracts
+        run: |
+          python -I -P -m py_compile .github/scripts/public_estate_convergence.py tests/test_public_estate_convergence.py
+          python -I -P tests/test_public_estate_convergence.py
+
+      - name: Verify action pins and whitespace
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -I -P <<'PY'
+          from pathlib import Path
+          import re
+
+          text = Path(".github/workflows/public-estate-convergence.yml").read_text(encoding="utf-8")
+          uses = re.findall(r"^\s*uses:\s*(\S+)\s*(?:#.*)?$", text, re.MULTILINE)
+          bad = [value for value in uses if not re.fullmatch(r"[^@\s]+@[0-9a-f]{40}", value)]
+          if bad:
+              raise SystemExit(f"unpinned actions: {bad}")
+          print("action pins: PASS")
+          PY
+          git diff --check
+
+  converge:
+    name: Verify and selectively repair both public origins
+    if: github.event_name != 'pull_request'
+    needs: contract
+    runs-on: ubuntu-latest
+    timeout-minutes: 18
+    env:
+      GH_TOKEN: ${{ github.token }}
+      SZL_GITHUB_TOKEN: ${{ secrets.SZL_GITHUB_TOKEN || github.token }}
+    steps:
+      - name: Harden runner
+        uses: step-security/harden-runner@05e31511f85b41b11d1cf0ef85d0992719546e2c # v2.21.0
+        with:
+          egress-policy: audit
+
+      - name: Checkout protected convergence policy
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: main
+          persist-credentials: false
+          fetch-depth: 1
+
+      - name: Set up exact Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12.10"
+
+      - name: Probe, request bounded repair, and read back
+        id: converge
+        shell: bash
+        env:
+          INPUT_REPAIR: ${{ github.event_name != 'workflow_dispatch' || inputs.repair }}
+        run: |
+          set +e
+          args=(--report "$REPORT_PATH" --wait-seconds 360)
+          if [ "$INPUT_REPAIR" = "true" ]; then args+=(--repair); fi
+          python -I -P .github/scripts/public_estate_convergence.py "${args[@]}"
+          code=$?
+          echo "exit_code=$code" >> "$GITHUB_OUTPUT"
+          exit 0
+
+      - name: Publish exact origin summary
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -I -P <<'PY' >> "$GITHUB_STEP_SUMMARY"
+          import json
+          import os
+          from pathlib import Path
+
+          report = json.loads(Path(os.environ["REPORT_PATH"]).read_text(encoding="utf-8"))
+          summary = report["summary"]
+          print("## Canonical public origins")
+          print()
+          print(f"- Operational: **{summary['origins_operational']} / {summary['origins_total']}**")
+          print(f"- Complete: **{summary['complete']}**")
+          print()
+          for row in report["after"]:
+              print(
+                  f"- `{row['name']}` — `{'OPERATIONAL' if row['operational'] else 'NOT PROVEN'}`; "
+                  f"root `{row['root']['http_status']}`; spectral asset `{row['spectral_asset']['http_status']}`; "
+                  f"controller `{row['controller_asset']['http_status']}`"
+              )
+          if report["repairs"]:
+              print()
+              print("### Repair requests")
+              for row in report["repairs"]:
+                  print(f"- `{row['origin']}` — `{row['action']}` / `{row['state']}`")
+          PY
+
+      - name: Upload immutable convergence evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: public-estate-convergence-v2-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ env.REPORT_PATH }}
+          if-no-files-found: error
+          retention-days: 90
+
+      - name: Reconcile the public-origin drift issue
+        if: always()
+        shell: bash
+        run: |
+          set +e
+          python -I -P <<'PY' > /tmp/public-origin-drift.md
+          import json
+          import os
+          from pathlib import Path
+
+          report = json.loads(Path(os.environ["REPORT_PATH"]).read_text(encoding="utf-8"))
+          print("## Public Estate convergence receipt")
+          print()
+          print(f"- Run: {os.environ['GITHUB_SERVER_URL']}/{os.environ['GITHUB_REPOSITORY']}/actions/runs/{os.environ['GITHUB_RUN_ID']}")
+          print(f"- Complete: `{report['summary']['complete']}`")
+          print("- Source, DNS, and Cloudflare mutations: `false`")
+          for row in report["after"]:
+              print(
+                  f"- `{row['name']}` — `{'OPERATIONAL' if row['operational'] else 'NOT PROVEN'}`; "
+                  f"root `{row['root']['http_status']}`; spectral `{row['spectral_asset']['http_status']}`; "
+                  f"controller `{row['controller_asset']['http_status']}`"
+              )
+          PY
+          title='[runtime] Canonical public-origin drift'
+          issue="$(gh issue list --state open --search \"$title in:title\" --json number,title --jq '.[] | select(.title == "'"$title"'") | .number' | head -n1)"
+          complete="$(python -I -P -c 'import json,os; print(str(bool(json.load(open(os.environ["REPORT_PATH"]))["summary"]["complete"])).lower())')"
+          if [ "$complete" = true ]; then
+            if [ -n "$issue" ]; then
+              gh issue comment "$issue" --body-file /tmp/public-origin-drift.md
+              gh issue close "$issue" --reason completed
+            fi
+          elif [ -n "$issue" ]; then
+            gh issue comment "$issue" --body-file /tmp/public-origin-drift.md
+          else
+            gh issue create --title "$title" --body-file /tmp/public-origin-drift.md
+          fi
+          exit 0
+
+      - name: Enforce canonical origins
+        if: always()
+        shell: bash
+        run: |
+          code="${{ steps.converge.outputs.exit_code }}"
+          test -n "$code"
+          if [ "$code" -ne 0 ]; then
+            echo "::error::One or more canonical origins were not proven operational; inspect the exact artifact."
+            exit "$code"
+          fi
