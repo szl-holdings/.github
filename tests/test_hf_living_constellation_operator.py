@@ -139,6 +139,90 @@ def test_source_contains_no_hardware_or_repository_mutation_endpoint() -> None:
         assert fragment not in text
 
 
+def test_provider_app_starting_stage_is_transitional() -> None:
+    assert "RUNNING_APP_STARTING" in operator.TRANSITIONAL_STAGES
+    assert "RUNNING_CONTAINER_STARTING" in operator.TRANSITIONAL_STAGES
+    assert "UNAVAILABLE" not in operator.RESTART_ELIGIBLE_STAGES
+    assert "UNKNOWN" not in operator.RESTART_ELIGIBLE_STAGES
+
+
+def test_static_space_is_probed_without_restart() -> None:
+    space = operator.Space(
+        repo_id="SZLHOLDINGS/proof",
+        slug="proof",
+        sdk="static",
+        stage="UNAVAILABLE",
+        private=False,
+        host_candidates=("https://szlholdings-proof.static.hf.space/",),
+    )
+    detail = operator.Space(
+        repo_id=space.repo_id,
+        slug=space.slug,
+        sdk="static",
+        stage="RUNNING",
+        private=False,
+        host_candidates=space.host_candidates,
+    )
+    with mock.patch.object(operator, "fetch_space", return_value=detail), mock.patch.object(
+        operator, "restart_space"
+    ) as restart, mock.patch.object(
+        operator, "probe_runtime", return_value=(space.host_candidates[0], 200, [])
+    ):
+        result = operator.operate_one(space, token="hf_secret", repair=True, wait_seconds=30)
+    restart.assert_not_called()
+    assert result.operational is True
+    assert result.state == "OPERATIONAL"
+
+
+def test_unknown_inventory_stage_resolves_detail_before_mutation() -> None:
+    space = operator.Space(
+        repo_id="SZLHOLDINGS/lyte",
+        slug="lyte",
+        sdk="docker",
+        stage="UNAVAILABLE",
+        private=False,
+        host_candidates=("https://szlholdings-lyte.hf.space/",),
+    )
+    detail = operator.Space(
+        repo_id=space.repo_id,
+        slug=space.slug,
+        sdk="docker",
+        stage="RUNNING",
+        private=False,
+        host_candidates=space.host_candidates,
+    )
+    with mock.patch.object(operator, "fetch_space", return_value=detail) as fetch, mock.patch.object(
+        operator, "restart_space"
+    ) as restart, mock.patch.object(
+        operator, "probe_runtime", return_value=(space.host_candidates[0], 200, [])
+    ):
+        result = operator.operate_one(space, token="hf_secret", repair=True, wait_seconds=30)
+    fetch.assert_called_once_with(space.repo_id, "hf_secret")
+    restart.assert_not_called()
+    assert result.operational is True
+
+
+def test_running_app_starting_waits_instead_of_restarting() -> None:
+    space = operator.Space(
+        repo_id="SZLHOLDINGS/lyte",
+        slug="lyte",
+        sdk="docker",
+        stage="RUNNING_APP_STARTING",
+        private=False,
+        host_candidates=("https://szlholdings-lyte.hf.space/",),
+    )
+    with mock.patch.object(operator, "restart_space") as restart, mock.patch.object(
+        operator, "wait_for_terminal", return_value=("RUNNING", space.host_candidates, 5)
+    ) as wait, mock.patch.object(
+        operator, "probe_runtime", return_value=(space.host_candidates[0], 200, [])
+    ):
+        result = operator.operate_one(space, token="hf_secret", repair=True, wait_seconds=540)
+    restart.assert_not_called()
+    wait.assert_called_once()
+    assert result.polls == 5
+    assert result.operational is True
+
+
 if __name__ == "__main__":
     import pytest
 

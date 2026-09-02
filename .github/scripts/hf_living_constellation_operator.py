@@ -44,6 +44,8 @@ TRANSITIONAL_STAGES = frozenset(
         "STARTING",
         "RESTARTING",
         "APP_STARTING",
+        "RUNNING_APP_STARTING",
+        "RUNNING_CONTAINER_STARTING",
         "CREATING",
     }
 )
@@ -57,8 +59,6 @@ RESTART_ELIGIBLE_STAGES = frozenset(
         "BUILD_ERROR",
         "CONFIG_ERROR",
         "NO_APP_FILE",
-        "UNKNOWN",
-        "UNAVAILABLE",
     }
 )
 TOKEN_NAMES = (
@@ -332,36 +332,67 @@ def operate_one(
     stage = space.stage
     hosts = space.host_candidates
 
-    if repair and stage in RESTART_ELIGIBLE_STAGES:
-        if not token:
-            result.blockers.append("repair requested but no supported Hugging Face token is configured")
-        else:
-            result.restart_attempted = True
-            try:
-                result.restart_http_status = restart_space(space.repo_id, token)
-            except OperatorError as exc:
-                result.blockers.append(str(exc))
-
-    if stage not in HEALTHY_STAGES or result.restart_attempted:
+    # The organization inventory frequently omits runtime.stage. Resolve exact
+    # Space detail before deciding whether any mutation is justified.
+    if stage in {"UNKNOWN", "UNAVAILABLE"}:
         try:
-            stage, hosts, polls = wait_for_terminal(
-                space.repo_id,
-                token,
-                deadline=time.monotonic() + wait_seconds,
-                initial_hosts=hosts,
-            )
+            current = fetch_space(space.repo_id, token)
+            stage = current.stage
+            hosts = tuple(dict.fromkeys((*current.host_candidates, *hosts)))
             result.final_stage = stage
-            result.polls = polls
         except OperatorError as exc:
             result.blockers.append(str(exc))
 
-    if result.final_stage in HEALTHY_STAGES:
+    # Static Spaces have no restartable container. Their operational contract is
+    # the public static origin itself, so probe it directly and never POST.
+    if space.sdk == "static":
         url, status, blockers = probe_runtime(hosts)
         result.runtime_url = url
         result.runtime_http_status = status
         result.blockers.extend(blockers[-2:] if url else blockers)
         result.operational = bool(url and status == 200)
     else:
+        should_wait = stage in TRANSITIONAL_STAGES
+        if repair and stage in RESTART_ELIGIBLE_STAGES:
+            if not token:
+                result.blockers.append("repair requested but no supported Hugging Face token is configured")
+            else:
+                result.restart_attempted = True
+                try:
+                    result.restart_http_status = restart_space(space.repo_id, token)
+                    should_wait = True
+                except OperatorError as exc:
+                    result.blockers.append(str(exc))
+
+        if should_wait:
+            try:
+                stage, hosts, polls = wait_for_terminal(
+                    space.repo_id,
+                    token,
+                    deadline=time.monotonic() + wait_seconds,
+                    initial_hosts=hosts,
+                )
+                result.final_stage = stage
+                result.polls = polls
+            except OperatorError as exc:
+                result.blockers.append(str(exc))
+
+        if result.final_stage in HEALTHY_STAGES:
+            url, status, blockers = probe_runtime(hosts)
+            result.runtime_url = url
+            result.runtime_http_status = status
+            result.blockers.extend(blockers[-2:] if url else blockers)
+            result.operational = bool(url and status == 200)
+        elif not should_wait and result.final_stage in {"UNKNOWN", "UNAVAILABLE"}:
+            # Read-only reachability can still prove an application is serving
+            # when provider stage metadata is temporarily absent.
+            url, status, blockers = probe_runtime(hosts)
+            result.runtime_url = url
+            result.runtime_http_status = status
+            result.blockers.extend(blockers[-2:] if url else blockers)
+            result.operational = bool(url and status == 200)
+
+    if not result.operational and result.final_stage not in HEALTHY_STAGES:
         result.blockers.append(f"runtime stage is {result.final_stage}")
 
     if result.operational:

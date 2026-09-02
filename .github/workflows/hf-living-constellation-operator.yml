@@ -240,7 +240,7 @@ jobs:
               print(f"- `{row.get('repo_id')}` — `{row.get('state')}` / `{row.get('final_stage')}` — {blockers}")
           PY
           title='[runtime] Living Constellation public Space drift'
-          issue="$(gh issue list --state open --search \"$title in:title\" --json number,title --jq '.[] | select(.title == "'"$title"'") | .number' | head -n1)"
+          issue="$(gh issue list --state all --limit 100 --json number,title --jq '.[] | select(.title == "[runtime] Living Constellation public Space drift") | .number' | head -n1)"
           complete="$(python -I -P -c 'import json,os; print(str(bool(json.load(open(os.environ["REPORT_PATH"]))["summary"].get("complete"))).lower())')"
           if [ "$complete" = "true" ]; then
             if [ -n "$issue" ]; then
