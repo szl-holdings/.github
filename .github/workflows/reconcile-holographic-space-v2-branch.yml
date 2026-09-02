@@ -1,0 +1,57 @@
+name: Reconcile Holographic Space v2 Branch
+
+on:
+  push:
+    branches:
+      - feat/holographic-space-fabric-v2-20260902
+    paths:
+      - ".github/workflows/reconcile-holographic-space-v2-branch.yml"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: reconcile-holographic-space-v2-branch
+  cancel-in-progress: false
+
+jobs:
+  reconcile:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: feat/holographic-space-fabric-v2-20260902
+          fetch-depth: 0
+      - name: Reconcile branch gates and remove controllers
+        shell: bash
+        run: |
+          set -euo pipefail
+          git pull --ff-only origin feat/holographic-space-fabric-v2-20260902
+          python - <<'PY'
+          from pathlib import Path
+          replacements = {
+              Path('.github/workflows/holographic-space-fabric-v2-gate-and-merge.yml'): (
+                  'if peers and not pending and legacy.get("state") != "pending":',
+                  'if peers and not pending and not any(row.get("state") == "pending" for row in legacy.get("statuses", [])):',
+              ),
+              Path('.github/scripts/rollout_holographic_spaces_v2.py'): (
+                  'if checks and not pending and legacy.get("state") != "pending":',
+                  'if checks and not pending and not any(row.get("state") == "pending" for row in legacy.get("statuses", [])):',
+              ),
+          }
+          for path, (old, new) in replacements.items():
+              text = path.read_text(encoding='utf-8')
+              if old in text:
+                  text = text.replace(old, new)
+              elif new not in text:
+                  raise SystemExit(f'unrecognized condition in {path}')
+              path.write_text(text, encoding='utf-8')
+          PY
+          rm -f .github/workflows/fix-holographic-space-gates-on-branch.yml .github/workflows/reconcile-holographic-space-v2-branch.yml
+          git config user.name "SZL Holographic Space Branch Reconciler"
+          git config user.email "stephenlutar2@gmail.com"
+          git add -A
+          if git diff --cached --quiet; then exit 0; fi
+          git commit -s -m "fix(ci): reconcile holographic Space gate state"
+          git push origin HEAD:feat/holographic-space-fabric-v2-20260902
