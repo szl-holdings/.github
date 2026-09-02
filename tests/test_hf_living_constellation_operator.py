@@ -6,6 +6,7 @@ from __future__ import annotations
 import importlib.util
 import json
 import os
+import sys
 import tempfile
 from pathlib import Path
 from unittest import mock
@@ -15,6 +16,7 @@ MODULE_PATH = ROOT / ".github" / "scripts" / "hf_living_constellation_operator.p
 SPEC = importlib.util.spec_from_file_location("hf_living_constellation_operator", MODULE_PATH)
 assert SPEC and SPEC.loader
 operator = importlib.util.module_from_spec(SPEC)
+sys.modules[SPEC.name] = operator
 SPEC.loader.exec_module(operator)
 
 
