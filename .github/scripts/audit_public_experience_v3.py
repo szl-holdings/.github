@@ -13,13 +13,12 @@ import asyncio
 import dataclasses
 import json
 import re
-import sys
 import urllib.error
 import urllib.parse
 import urllib.request
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Iterable, Mapping, Sequence
+from typing import Any, Mapping, Sequence
 
 SCHEMA = "szl.public-experience-audit/v3"
 HF_API = "https://huggingface.co/api/spaces"
@@ -322,6 +321,7 @@ async def audit_case(
         page = await context.new_page()
         page_errors: list[str] = []
         console_errors: list[str] = []
+        navigation_warnings: list[str] = []
         page.on("pageerror", lambda error: page_errors.append(str(error)[:500]))
         page.on(
             "console",
@@ -346,8 +346,11 @@ async def audit_case(
                 response = None
         try:
             await page.wait_for_load_state("networkidle", timeout=min(timeout_ms, 5000))
-        except Exception:
-            pass
+        except Exception as exc:
+            # Live dashboards may retain intentional polling or streaming connections.
+            navigation_warnings.append(
+                f"networkidle not reached before bounded timeout: {exc}"[:500]
+            )
         await page.wait_for_timeout(900)
         if case.zoom != 1.0:
             await page.evaluate(
@@ -402,6 +405,7 @@ async def audit_case(
             require_v3=target.require_v3,
             page_errors=page_errors,
         )
+        result.warnings.extend(navigation_warnings)
 
         if result.failures:
             screenshots_dir.mkdir(parents=True, exist_ok=True)
