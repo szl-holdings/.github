@@ -245,6 +245,26 @@ nav[data-szl-fixed] {
   grid-template-columns: repeat(auto-fit, minmax(min(100%, 320px), 1fr));
 }
 
+@media (min-width: 1680px) {
+  :root {
+    --szl-space-gutter: clamp(32px, 3vw, 72px);
+    --szl-space-gap: clamp(20px, 1.5vw, 34px);
+    --szl-space-section: clamp(88px, 7vw, 150px);
+  }
+
+  main,
+  [role="main"],
+  .szl-space-main,
+  .gradio-container > .main {
+    width: min(100%, 1920px);
+  }
+
+  .szl-space-grid,
+  .szl-holo-grid {
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 320px), 1fr));
+  }
+}
+
 @container (max-width: 420px) {
   .szl-space-actions,
   [data-szl-space-actions] {
