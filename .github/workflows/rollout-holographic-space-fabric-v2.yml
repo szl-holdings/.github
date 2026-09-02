@@ -5,6 +5,15 @@ on:
     branches: [main]
     paths:
       - ".github/workflows/rollout-holographic-space-fabric-v2.yml"
+      - ".github/scripts/rollout_holographic_spaces_v2.py"
+      - ".github/scripts/run_holographic_spaces_v2.py"
+      - ".github/scripts/responsive_space_contract.py"
+      - ".github/scripts/holographic_target_contract.py"
+      - ".github/tests/test_holographic_spaces_v2.py"
+      - ".github/tests/test_responsive_space_contract.py"
+      - ".github/tests/test_holographic_target_contract.py"
+      - "design/holographic-v2/**"
+      - "design/responsive-v3/**"
   workflow_dispatch:
     inputs:
       apply:
@@ -39,13 +48,15 @@ concurrency:
   group: rollout-holographic-space-fabric-v2
   cancel-in-progress: false
 
+env:
+  REPORT: /tmp/public-experience-space-rollout-v3.json
+
 jobs:
   rollout:
     runs-on: ubuntu-latest
     timeout-minutes: 70
     env:
       SZL_GITHUB_TOKEN: ${{ secrets.ORG_REPO_WORKFLOW_TOKEN || secrets.SZL_ORG_PAT || secrets.SZL_GITHUB_PAT || secrets.GH_PAT || secrets.PAT_TOKEN || secrets.GITHUB_PAT || secrets.GH_TOKEN || github.token }}
-      REPORT: /tmp/holographic-space-rollout-v2.json
     steps:
       - name: Checkout exact main
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -58,10 +69,17 @@ jobs:
           python-version: "3.12"
       - name: Run network-free contracts first
         run: |
-          python -m py_compile .github/scripts/rollout_holographic_spaces_v2.py .github/scripts/run_holographic_spaces_v2.py
+          python -m py_compile \
+            .github/scripts/rollout_holographic_spaces_v2.py \
+            .github/scripts/run_holographic_spaces_v2.py \
+            .github/scripts/responsive_space_contract.py \
+            .github/scripts/holographic_target_contract.py
           node --check design/holographic-v2/szl-space-hologram.js
+          node --check design/responsive-v3/szl-responsive-v3.js
           python .github/tests/test_holographic_spaces_v2.py
-      - name: Discover, patch, review, and merge through repository gates
+          python .github/tests/test_responsive_space_contract.py
+          python .github/tests/test_holographic_target_contract.py
+      - name: Discover, refresh, review, and merge through repository gates
         shell: bash
         run: |
           set -euo pipefail
@@ -80,11 +98,11 @@ jobs:
             args+=(--merge-green --merge-wait-seconds 2700)
           fi
           python .github/scripts/run_holographic_spaces_v2.py "${args[@]}"
-      - name: Publish secret-free evidence artifact
+      - name: Publish secret-free rollout evidence
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: holographic-space-rollout-v2-${{ github.run_id }}-${{ github.run_attempt }}
+          name: public-experience-space-rollout-v3-${{ github.run_id }}-${{ github.run_attempt }}
           path: ${{ env.REPORT }}
           if-no-files-found: error
           retention-days: 90
@@ -111,7 +129,13 @@ jobs:
               raise SystemExit("no public SZLHOLDINGS Spaces were discovered")
           if summary.get("source_repositories_planned", 0) < 1:
               raise SystemExit("no Space source repositories were planned")
-          terminal_failures = sum(summary.get(key, 0) for key in ("blocked", "checks-failed", "closed-unmerged"))
+          terminal_keys = (
+              "blocked",
+              "checks-failed",
+              "closed-unmerged",
+              "report-only",
+          )
+          terminal_failures = sum(int(summary.get(key, 0) or 0) for key in terminal_keys)
           if terminal_failures:
-              raise SystemExit(f"{terminal_failures} repository rollout(s) reached a terminal failure")
+              raise SystemExit(f"{terminal_failures} repository rollout(s) remain unresolved")
           PY
