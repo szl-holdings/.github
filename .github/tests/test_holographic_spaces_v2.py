@@ -131,14 +131,16 @@ class AdapterContract(unittest.TestCase):
     def test_streamlit_adapter_orders_import_before_render_with_or_without_page_config(self) -> None:
         with_config = "import streamlit as st\nst.set_page_config(page_title='Demo')\nst.title('Hello')\n"
         patched = runner._fixed_streamlit_adapter(with_config, "demo-space")
-        self.assertLess(patched.index("from szl_hologram_streamlit"), patched.index("render_szl_hologram"))
-        self.assertLess(patched.index("st.set_page_config"), patched.index("render_szl_hologram"))
+        render_call = patched.index("render_szl_hologram(")
+        self.assertLess(patched.index("from szl_hologram_streamlit"), render_call)
+        self.assertLess(patched.index("st.set_page_config"), render_call)
         compile(patched, "app.py", "exec")
 
         without_config = "import streamlit as st\nst.title('Hello')\n"
         patched = runner._fixed_streamlit_adapter(without_config, "demo-space")
-        self.assertLess(patched.index("from szl_hologram_streamlit"), patched.index("render_szl_hologram"))
-        self.assertLess(patched.index("render_szl_hologram"), patched.index("st.title"))
+        render_call = patched.index("render_szl_hologram(")
+        self.assertLess(patched.index("from szl_hologram_streamlit"), render_call)
+        self.assertLess(render_call, patched.index("st.title"))
         compile(patched, "app.py", "exec")
 
     def test_generated_helpers_compile(self) -> None:
