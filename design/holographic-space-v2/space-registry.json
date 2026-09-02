@@ -1,0 +1,44 @@
+{
+  "schema": "szl.holographic-space-registry/v2",
+  "version": "2.0.0",
+  "canonical_assets": {
+    "repository": "szl-holdings/a11oy",
+    "ref": "main",
+    "css": "console/assets/szl-holo-v2.css",
+    "javascript": "console/assets/szl-holo-v2.js"
+  },
+  "organization": {
+    "github": "szl-holdings",
+    "hugging_face": "SZLHOLDINGS"
+  },
+  "shared_journeys": [
+    {"label": "Command", "href": "https://a-11-oy.com/"},
+    {"label": "Products", "href": "https://a-11-oy.com/console"},
+    {"label": "Proof", "href": "https://a11oy.net/record/"},
+    {"label": "Source", "href": "https://github.com/szl-holdings"},
+    {"label": "Spaces", "href": "https://huggingface.co/SZLHOLDINGS"}
+  ],
+  "archetype_hints": {
+    "lyte": ["lyte", "observability", "signals", "lattice"],
+    "vessels": ["vessels", "maritime", "fleet", "voyage", "ais"],
+    "terra": ["terra", "real-estate", "realestate", "property", "parcel"],
+    "aegis": ["aegis", "security", "defense", "threat", "cyber"],
+    "prism-counsel": ["prism", "counsel", "legal", "matter"],
+    "carlota-jo": ["carlota", "advisory"],
+    "nexus": ["nexus", "integration", "router", "bridge"],
+    "factory": ["factory", "forge", "atelier", "builder"],
+    "ouroboros": ["ouroboros", "research", "loop", "thesis"],
+    "khipu": ["khipu", "kernel", "consensus", "receipt"],
+    "killinchu": ["killinchu", "agent", "swarm", "orchestration"]
+  },
+  "supported_adapters": ["static-html", "next-layout", "gradio-python", "streamlit-python"],
+  "safety": {
+    "default_branch_write": false,
+    "force_push": false,
+    "branch_protection_change": false,
+    "direct_hugging_face_write": false,
+    "ambiguous_source_action": "report-only",
+    "existing_custom_gradio_css_head": "compose-with-existing-expression",
+    "decorative_motion_is_measured_telemetry": false
+  }
+}
