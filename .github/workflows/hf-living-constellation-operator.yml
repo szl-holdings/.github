@@ -1,0 +1,266 @@
+# Copyright 2026 SZL Holdings — SPDX-License-Identifier: Apache-2.0
+name: HF Living Constellation Operator
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - .github/scripts/hf_living_constellation_operator.py
+      - tests/test_hf_living_constellation_operator.py
+      - tests/conftest.py
+      - .github/workflows/hf-living-constellation-operator.yml
+  push:
+    branches: [main]
+    paths:
+      - .github/scripts/hf_living_constellation_operator.py
+      - tests/test_hf_living_constellation_operator.py
+      - tests/conftest.py
+      - .github/workflows/hf-living-constellation-operator.yml
+  schedule:
+    - cron: "23 * * * *"
+  workflow_dispatch:
+    inputs:
+      repair:
+        description: Restart only stalled/error public Spaces before readback
+        required: false
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+  issues: write
+
+concurrency:
+  group: hf-living-constellation-operator-${{ github.event_name }}
+  cancel-in-progress: true
+
+env:
+  REPORT_PATH: /tmp/hf-living-constellation-v2.json
+
+jobs:
+  contract:
+    name: Operator boundary contract
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - name: Harden runner
+        uses: step-security/harden-runner@05e31511f85b41b11d1cf0ef85d0992719546e2c # v2.21.0
+        with:
+          egress-policy: audit
+
+      - name: Checkout exact source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 1
+
+      - name: Set up exact Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12.10"
+
+      - name: Compile the operator
+        run: >-
+          python -I -P -m py_compile
+          .github/scripts/hf_living_constellation_operator.py
+          tests/test_hf_living_constellation_operator.py
+
+      - name: Run network-free operator contracts
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -I -P <<'PY'
+          from __future__ import annotations
+
+          import importlib.util
+          import sys
+          from pathlib import Path
+
+          path = Path("tests/test_hf_living_constellation_operator.py")
+          spec = importlib.util.spec_from_file_location("living_constellation_contract", path)
+          if spec is None or spec.loader is None:
+              raise SystemExit("unable to load operator contract")
+          module = importlib.util.module_from_spec(spec)
+          sys.modules[spec.name] = module
+          spec.loader.exec_module(module)
+          tests = [
+              value
+              for name, value in sorted(vars(module).items())
+              if name.startswith("test_") and callable(value)
+          ]
+          if not tests:
+              raise SystemExit("no operator contract tests discovered")
+          for test in tests:
+              test()
+          print(f"living-constellation operator contract: PASS ({len(tests)} tests)")
+          PY
+
+      - name: Verify action pins and mutation boundary
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -I -P <<'PY'
+          from pathlib import Path
+          import re
+
+          workflow = Path(".github/workflows/hf-living-constellation-operator.yml").read_text(encoding="utf-8")
+          script = Path(".github/scripts/hf_living_constellation_operator.py").read_text(encoding="utf-8")
+          uses = re.findall(r"^\s*uses:\s*(\S+)\s*(?:#.*)?$", workflow, re.MULTILINE)
+          bad = [value for value in uses if not re.fullmatch(r"[^@\s]+@[0-9a-f]{40}", value)]
+          if bad:
+              raise SystemExit(f"unpinned actions: {bad}")
+          forbidden = (
+              "/hardware",
+              "request_space_hardware",
+              "create_repo",
+              "delete_repo",
+              "upload_file",
+              "create_commit",
+          )
+          found = [value for value in forbidden if value in script]
+          if found:
+              raise SystemExit(f"operator exceeded runtime-only boundary: {found}")
+          print("pins and runtime-only mutation boundary: PASS")
+          PY
+          git diff --check
+
+  operate:
+    name: Repair and prove public Space runtimes
+    if: github.event_name != 'pull_request'
+    needs: contract
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    env:
+      GH_TOKEN: ${{ github.token }}
+      HF_ORG_TOKEN: ${{ secrets.HF_ORG_TOKEN || secrets.HF_ORG_TOKEN1 || secrets.HF_TOKEN || secrets.HF_WRITE_TOKEN }}
+    steps:
+      - name: Harden runner
+        uses: step-security/harden-runner@05e31511f85b41b11d1cf0ef85d0992719546e2c # v2.21.0
+        with:
+          egress-policy: audit
+
+      - name: Checkout protected operator policy
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: main
+          persist-credentials: false
+          fetch-depth: 1
+
+      - name: Set up exact Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12.10"
+
+      - name: Audit, repair eligible runtimes, and read back
+        id: operate
+        shell: bash
+        env:
+          INPUT_REPAIR: ${{ github.event_name != 'workflow_dispatch' || inputs.repair }}
+        run: |
+          set +e
+          args=(--report "$REPORT_PATH" --workers 12 --wait-seconds 540)
+          if [ "$INPUT_REPAIR" = "true" ]; then
+            args+=(--repair)
+          fi
+          python -I -P .github/scripts/hf_living_constellation_operator.py "${args[@]}"
+          code=$?
+          echo "exit_code=$code" >> "$GITHUB_OUTPUT"
+          exit 0
+
+      - name: Publish exact fleet summary
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -I -P <<'PY' >> "$GITHUB_STEP_SUMMARY"
+          import json
+          import os
+          from pathlib import Path
+
+          path = Path(os.environ["REPORT_PATH"])
+          print("## SZLHOLDINGS public Space fleet")
+          print()
+          if not path.is_file():
+              print("The operator did not produce a report.")
+              raise SystemExit(0)
+          report = json.loads(path.read_text(encoding="utf-8"))
+          summary = report.get("summary") or {}
+          print(f"- Public Spaces: **{summary.get('total_public_spaces', 0)}**")
+          print(f"- Operational and HTTP 200: **{summary.get('operational', 0)}**")
+          print(f"- Not operational: **{summary.get('not_operational', 0)}**")
+          print(f"- Restarts attempted: **{summary.get('restart_attempted', 0)}**")
+          print(f"- Complete: **{summary.get('complete', False)}**")
+          print()
+          failed = [row for row in report.get("spaces", []) if not row.get("operational")]
+          if failed:
+              print("### Remaining exceptions")
+              for row in failed:
+                  blockers = "; ".join(row.get("blockers") or [])[:500]
+                  print(
+                      f"- `{row.get('repo_id')}` — `{row.get('state')}` / "
+                      f"`{row.get('final_stage')}` — {blockers}"
+                  )
+          PY
+
+      - name: Upload immutable fleet evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: hf-living-constellation-v2-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ env.REPORT_PATH }}
+          if-no-files-found: error
+          retention-days: 90
+
+      - name: Reconcile the runtime-drift issue
+        if: always()
+        shell: bash
+        run: |
+          set +e
+          python -I -P <<'PY' > /tmp/hf-runtime-drift.md
+          import json
+          import os
+          from pathlib import Path
+
+          report = json.loads(Path(os.environ["REPORT_PATH"]).read_text(encoding="utf-8"))
+          summary = report.get("summary") or {}
+          print("## Living Constellation runtime receipt")
+          print()
+          print(f"- Run: {os.environ['GITHUB_SERVER_URL']}/{os.environ['GITHUB_REPOSITORY']}/actions/runs/{os.environ['GITHUB_RUN_ID']}")
+          print(f"- Public Spaces: `{summary.get('total_public_spaces', 0)}`")
+          print(f"- Operational: `{summary.get('operational', 0)}`")
+          print(f"- Not operational: `{summary.get('not_operational', 0)}`")
+          print(f"- Restarts attempted: `{summary.get('restart_attempted', 0)}`")
+          print(f"- Complete: `{summary.get('complete', False)}`")
+          print("- Hardware/source/visibility mutations: `false`")
+          print()
+          for row in report.get("spaces", []):
+              if row.get("operational"):
+                  continue
+              blockers = "; ".join(row.get("blockers") or [])[:700]
+              print(f"- `{row.get('repo_id')}` — `{row.get('state')}` / `{row.get('final_stage')}` — {blockers}")
+          PY
+          title='[runtime] Living Constellation public Space drift'
+          issue="$(gh issue list --state open --search \"$title in:title\" --json number,title --jq '.[] | select(.title == "'"$title"'") | .number' | head -n1)"
+          complete="$(python -I -P -c 'import json,os; print(str(bool(json.load(open(os.environ["REPORT_PATH"]))["summary"].get("complete"))).lower())')"
+          if [ "$complete" = "true" ]; then
+            if [ -n "$issue" ]; then
+              gh issue comment "$issue" --body-file /tmp/hf-runtime-drift.md
+              gh issue close "$issue" --reason completed
+            fi
+          elif [ -n "$issue" ]; then
+            gh issue comment "$issue" --body-file /tmp/hf-runtime-drift.md
+          else
+            gh issue create --title "$title" --body-file /tmp/hf-runtime-drift.md
+          fi
+          exit 0
+
+      - name: Enforce operational fleet
+        if: always()
+        shell: bash
+        run: |
+          code="${{ steps.operate.outputs.exit_code }}"
+          test -n "$code"
+          if [ "$code" -ne 0 ]; then
+            echo "::error::One or more public Spaces were not proven operational; inspect the uploaded exact fleet receipt."
+            exit "$code"
+          fi
