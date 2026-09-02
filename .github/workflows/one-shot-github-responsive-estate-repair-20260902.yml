@@ -1,0 +1,129 @@
+name: One-shot GitHub responsive estate materialization repair
+
+on:
+  push:
+    branches:
+      - feat/github-responsive-estate-audit-20260902
+
+permissions:
+  contents: write
+
+concurrency:
+  group: github-responsive-estate-materialize-repair-20260902
+  cancel-in-progress: false
+
+jobs:
+  materialize:
+    if: >-
+      github.repository == 'szl-holdings/.github' &&
+      github.ref == 'refs/heads/feat/github-responsive-estate-audit-20260902'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      EXPECTED_FORK_SHA: 0563463f09d4f350e86e649188480466b1426293
+    steps:
+      - name: Harden runner
+        uses: step-security/harden-runner@05e31511f85b41b11d1cf0ef85d0992719546e2c # v2.21.0
+        with:
+          egress-policy: audit
+
+      - name: Checkout exact branch revision
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+          persist-credentials: true
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: '3.12'
+
+      - name: Bind branch and protected-main ancestry
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$GITHUB_REF" = 'refs/heads/feat/github-responsive-estate-audit-20260902'
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          git fetch --no-tags origin main
+          git merge-base --is-ancestor "$EXPECTED_FORK_SHA" "$GITHUB_SHA"
+          git merge-base --is-ancestor "$EXPECTED_FORK_SHA" origin/main
+          test "$(git ls-remote origin "$GITHUB_REF" | awk '{print $1}')" = "$GITHUB_SHA"
+
+      - name: Recover and materialize reviewed source bundle
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import base64
+          import io
+          import re
+          import tarfile
+          from pathlib import Path
+
+          controller = Path('.github/workflows/one-shot-github-responsive-estate-materialize-20260902.yml')
+          text = controller.read_text(encoding='utf-8')
+          match = re.search(r"<<'PAYLOAD'\n(?P<body>.*?)\n\s+PAYLOAD\n", text, re.DOTALL)
+          if match is None:
+              raise SystemExit('embedded reviewed source bundle not found')
+          encoded = ''.join(line.strip() for line in match.group('body').splitlines())
+          raw = base64.b64decode(encoded, validate=True)
+          expected = {
+              '.github/scripts/github_responsive_estate_audit.py',
+              '.github/scripts/test_github_responsive_estate_audit.py',
+              'docs/GITHUB_RESPONSIVE_ESTATE_AUDIT.md',
+          }
+          with tarfile.open(fileobj=io.BytesIO(raw), mode='r:gz') as archive:
+              members = archive.getmembers()
+              file_names = {member.name for member in members if member.isfile()}
+              if file_names != expected:
+                  raise SystemExit(f'unexpected archive file members: {sorted(file_names ^ expected)}')
+              for member in members:
+                  if member.isdir():
+                      continue
+                  if not member.isfile() or member.issym() or member.islnk():
+                      raise SystemExit(f'unsafe archive member: {member.name}')
+                  source = archive.extractfile(member)
+                  if source is None:
+                      raise SystemExit(f'unreadable archive member: {member.name}')
+                  destination = Path(member.name)
+                  destination.parent.mkdir(parents=True, exist_ok=True)
+                  destination.write_bytes(source.read())
+          PY
+
+      - name: Prove network-free contract
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m py_compile \
+            .github/scripts/github_responsive_estate_audit.py \
+            .github/scripts/test_github_responsive_estate_audit.py
+          python .github/scripts/test_github_responsive_estate_audit.py
+
+      - name: Prove bounded delta and commit once
+        shell: bash
+        run: |
+          set -euo pipefail
+          git add -- \
+            .github/scripts/github_responsive_estate_audit.py \
+            .github/scripts/test_github_responsive_estate_audit.py \
+            docs/GITHUB_RESPONSIVE_ESTATE_AUDIT.md
+          if git diff --cached --quiet; then
+            echo 'Reviewed source bundle is already materialized.'
+            exit 0
+          fi
+          expected="$(mktemp)"
+          actual="$(mktemp)"
+          printf '%s\n' \
+            .github/scripts/github_responsive_estate_audit.py \
+            .github/scripts/test_github_responsive_estate_audit.py \
+            docs/GITHUB_RESPONSIVE_ESTATE_AUDIT.md \
+            | sort > "$expected"
+          git diff --cached --name-only | sort > "$actual"
+          diff -u "$expected" "$actual"
+          git diff --cached --check
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git commit -m 'feat(responsive): audit every repository UI contract' \
+            -m 'Signed-off-by: github-actions[bot] <41898282+github-actions[bot]@users.noreply.github.com>'
+          git push origin 'HEAD:feat/github-responsive-estate-audit-20260902'
