@@ -1,0 +1,70 @@
+name: Repair Holographic Target Gates on Branch
+
+on:
+  push:
+    branches:
+      - feat/holographic-space-fabric-v2-20260902
+    paths:
+      - ".github/workflows/repair-holographic-target-gates-on-branch.yml"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: repair-holographic-target-gates
+  cancel-in-progress: false
+
+jobs:
+  repair:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: feat/holographic-space-fabric-v2-20260902
+          fetch-depth: 0
+      - name: Activate complete runner, expand contracts, and remove temporary controllers
+        shell: bash
+        run: |
+          set -euo pipefail
+          git pull --ff-only origin feat/holographic-space-fabric-v2-20260902
+          python - <<'PY'
+          from pathlib import Path
+
+          rollout = Path('.github/workflows/rollout-holographic-space-fabric-v2.yml')
+          text = rollout.read_text(encoding='utf-8')
+          old = 'python .github/scripts/run_holographic_spaces_v2.py "${args[@]}"'
+          new = 'python .github/scripts/run_holographic_spaces_v2_complete.py "${args[@]}"'
+          if old in text:
+              text = text.replace(old, new)
+          elif new not in text:
+              raise SystemExit('rollout runner command not recognized')
+          rollout.write_text(text, encoding='utf-8')
+
+          contract = Path('.github/workflows/holographic-space-fabric-v2-contract.yml')
+          text = contract.read_text(encoding='utf-8')
+          old_compile = 'python -m py_compile .github/scripts/rollout_holographic_spaces_v2.py .github/scripts/run_holographic_spaces_v2.py .github/tests/test_holographic_spaces_v2.py'
+          new_compile = 'python -m py_compile .github/scripts/rollout_holographic_spaces_v2.py .github/scripts/run_holographic_spaces_v2.py .github/scripts/run_holographic_spaces_v2_complete.py .github/scripts/holographic_target_contract.py .github/tests/test_holographic_spaces_v2.py .github/tests/test_holographic_target_contract.py'
+          if old_compile in text:
+              text = text.replace(old_compile, new_compile)
+          elif new_compile not in text:
+              raise SystemExit('contract compile command not recognized')
+          old_tests = 'python .github/tests/test_holographic_spaces_v2.py'
+          new_tests = 'python .github/tests/test_holographic_spaces_v2.py\n          python .github/tests/test_holographic_target_contract.py'
+          if new_tests not in text:
+              if old_tests not in text:
+                  raise SystemExit('contract test command not recognized')
+              text = text.replace(old_tests, new_tests, 1)
+          contract.write_text(text, encoding='utf-8')
+          PY
+          rm -f \
+            .github/workflows/install-holographic-target-gates-on-branch.yml \
+            .github/workflows/repair-holographic-target-gates-on-branch.yml \
+            .github/workflows/fix-holographic-space-gates-on-branch.yml \
+            .github/workflows/reconcile-holographic-space-v2-branch.yml \
+            .github/workflows/finish-holographic-space-v2-bootstrap-on-branch.yml
+          git config user.name "SZL Holographic Target Gate Repair"
+          git config user.email "stephenlutar2@gmail.com"
+          git add -A
+          git commit -s -m "fix(ci): activate tested target-repository gates"
+          git push origin HEAD:feat/holographic-space-fabric-v2-20260902
