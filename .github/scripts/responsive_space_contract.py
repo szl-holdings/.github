@@ -2,9 +2,10 @@
 """Extend Holographic Space Fabric v2 with SZL Public Experience v3.
 
 The extension is additive and source-native. It appends the reviewed responsive
-CSS and JavaScript to the existing local Space assets, refreshes already-bound
-repositories instead of treating them as terminal, and moves the review branch
-to a v3-specific name. It never writes a default branch directly.
+CSS and JavaScript to existing trusted product assets, refreshes centrally
+managed Holo assets, and moves the review branch to a v3-specific name. It never
+writes a default branch directly or replaces product-owned information
+architecture, workflows, evidence semantics, or visual identity.
 """
 from __future__ import annotations
 
@@ -17,6 +18,13 @@ CSS_MARKER = "SZL Public Experience v3"
 JS_MARKER = "__SZL_PUBLIC_EXPERIENCE_V3__"
 BRANCH = "design/szl-public-experience-v3"
 TARGET_WORKFLOW = ".github/workflows/szl-holographic-space-v2.yml"
+CUSTOM_ASSET_PAIRS = (
+    ("app/static/holo.css", "app/static/holo.js"),
+    ("static/szl-universal-frontend.css", "static/truth-cop.js"),
+    ("space/szl-holo-v2.css", "space/szl-holo-v2.js"),
+)
+GENERATED_CSS_SUFFIX = "szl-space-hologram.css"
+GENERATED_JS_SUFFIX = "szl-space-hologram.js"
 
 
 def _read_assets() -> tuple[str, str]:
@@ -41,6 +49,7 @@ def _streamlit_helper(core: Any, original: Any) -> str:
     needle = "document.documentElement.dataset.szlSpaceSlug={slug!r};</script>"
     replacement = (
         "document.documentElement.dataset.szlSpaceSlug={slug!r};"
+        "document.documentElement.dataset.szlSpaceHoloV2='true';"
         "document.documentElement.dataset.szlPublicExperienceV3='true';"
         "document.documentElement.dataset.szlViewportTier="
         "(innerWidth<480?'phone':innerWidth<768?'compact':innerWidth<1024?'tablet':"
@@ -54,33 +63,64 @@ def _streamlit_helper(core: Any, original: Any) -> str:
     return source.replace(needle, replacement)
 
 
+def _entrypoint(paths: set[str], core: Any) -> str | None:
+    preferred = (
+        "app/static/index.html",
+        "static/index.html",
+        "space/index.html",
+        *core.NEXT_LAYOUTS,
+        *core.STATIC_INDEXES,
+        *core.PYTHON_ENTRIES,
+    )
+    return next((candidate for candidate in preferred if candidate in paths), None)
+
+
+def _custom_pairs(paths: set[str]) -> list[tuple[str, str]]:
+    pairs = [pair for pair in CUSTOM_ASSET_PAIRS if pair[0] in paths and pair[1] in paths]
+    generated_css = sorted(path for path in paths if path.endswith(GENERATED_CSS_SUFFIX))
+    generated_js = set(path for path in paths if path.endswith(GENERATED_JS_SUFFIX))
+    for css_path in generated_css:
+        js_path = css_path[: -len(GENERATED_CSS_SUFFIX)] + GENERATED_JS_SUFFIX
+        if js_path in generated_js:
+            pairs.append((css_path, js_path))
+    return pairs
+
+
 def _existing_asset_changes(
     core: Any,
     github: Any,
     repo: Mapping[str, Any],
     plan: Any,
-    css: str,
-    javascript: str,
+    combined_css: str,
+    combined_javascript: str,
+    responsive_css: str,
+    responsive_javascript: str,
 ) -> list[Any]:
+    """Refresh an already reviewed asset host without adding a second shell.
+
+    Centrally generated `szl-space-hologram.*` files are replaced by the newest
+    combined Holo + responsive bytes. Product-owned asset hosts receive only the
+    additive responsive layer, preserving their own palette, motifs, and logic.
+    """
     full_name = str(repo["full_name"])
     default_branch = str(repo.get("default_branch") or "main")
     blobs = github.tree(full_name, default_branch)
-    paths = sorted(str(item.get("path")) for item in blobs)
+    paths = {str(item.get("path")) for item in blobs}
     changes: list[Any] = []
 
-    css_paths = [path for path in paths if path.endswith("szl-space-hologram.css")]
-    js_paths = [path for path in paths if path.endswith("szl-space-hologram.js")]
-    streamlit_helpers = [path for path in paths if path.endswith("szl_hologram_streamlit.py")]
-    gradio_helpers = [path for path in paths if path.endswith("szl_hologram_assets.py")]
+    for css_path, js_path in _custom_pairs(paths):
+        current_css, _ = github.file(full_name, css_path, default_branch)
+        current_js, _ = github.file(full_name, js_path, default_branch)
+        generated = css_path.endswith(GENERATED_CSS_SUFFIX) and js_path.endswith(GENERATED_JS_SUFFIX)
+        next_css = combined_css if generated else _append_once(current_css, responsive_css, CSS_MARKER)
+        next_js = combined_javascript if generated else _append_once(current_js, responsive_javascript, JS_MARKER)
+        if next_css != current_css:
+            changes.append(core.Change(css_path, next_css))
+        if next_js != current_js:
+            changes.append(core.Change(js_path, next_js))
 
-    for path in css_paths:
-        current, _ = github.file(full_name, path, default_branch)
-        if CSS_MARKER not in current:
-            changes.append(core.Change(path, css))
-    for path in js_paths:
-        current, _ = github.file(full_name, path, default_branch)
-        if JS_MARKER not in current:
-            changes.append(core.Change(path, javascript))
+    streamlit_helpers = sorted(path for path in paths if path.endswith("szl_hologram_streamlit.py"))
+    gradio_helpers = sorted(path for path in paths if path.endswith("szl_hologram_assets.py"))
     for path in streamlit_helpers:
         current, _ = github.file(full_name, path, default_branch)
         rendered = core.streamlit_helper()
@@ -93,11 +133,8 @@ def _existing_asset_changes(
             changes.append(core.Change(path, rendered))
 
     if changes:
-        plan.adapter = "responsive-refresh"
-        for candidate in (*core.NEXT_LAYOUTS, *core.STATIC_INDEXES, *core.PYTHON_ENTRIES):
-            if candidate in paths:
-                plan.entrypoint = candidate
-                break
+        plan.adapter = "responsive-existing-host"
+        plan.entrypoint = _entrypoint(paths, core)
     return changes
 
 
@@ -136,11 +173,23 @@ def install(core: Any) -> None:
         javascript: str,
     ) -> Any:
         plan = original_plan_repository(github, repo, spaces, score, reason, css, javascript)
-        if plan.status == "already-integrated":
-            changes = _existing_asset_changes(core, github, repo, plan, css, javascript)
-            if changes:
-                plan.changes = changes
-                plan.status = "planned"
+        existing = _existing_asset_changes(
+            core,
+            github,
+            repo,
+            plan,
+            css,
+            javascript,
+            responsive_css,
+            responsive_javascript,
+        )
+        if existing:
+            # Prefer a reviewed existing asset host over creating a duplicate
+            # navigation shell or second theme runtime in the same product.
+            plan.changes = existing
+            plan.status = "planned"
+        elif plan.status == "already-integrated":
+            plan.status = "already-integrated"
         if plan.status == "planned":
             deduped: dict[str, Any] = {}
             for change in plan.changes:
@@ -175,7 +224,9 @@ This rollout also applies the estate-wide responsive contract:
   a local data attribute, without changing product behavior or making claims.
 
 The responsive layer is additive. It does not replace the product's own layout,
-data, workflows, copy, model behavior, or evidence semantics.
+data, workflows, copy, model behavior, or evidence semantics. When a reviewed
+product-owned asset host already exists, this PR refreshes that host rather than
+creating a second navigation or visual runtime.
 """
 
     core.pr_body = pr_body
