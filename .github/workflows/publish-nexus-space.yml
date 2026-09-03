@@ -84,7 +84,7 @@ jobs:
           bad = [value for value in uses if not re.fullmatch(r'[^@\s]+@[0-9a-f]{40}', value)]
           if bad:
               raise SystemExit(f'unpinned actions: {bad!r}')
-          if 'environment:' in text:
+          if re.search(r'(?m)^    environment:', text):
               raise SystemExit('central Nexus publisher must not add a duplicate environment gate')
           print('central Nexus publisher contract: PASS')
           PY
