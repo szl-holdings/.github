@@ -63,12 +63,17 @@ jobs:
               + "{{ github.run_id }}-$"
               + "{{ github.run_attempt }}"
           )
+          token_chain = (
+              "secrets.SZL_ORG_ADMIN_TOKEN || secrets.ORG_ADMIN_TOKEN || "
+              "secrets.SZL_GITHUB_TOKEN || secrets.GH_PAT || github.token"
+          )
           required = (
               "permissions:\n  contents: read\n  issues: write\n  security-events: write",
               "python .github/scripts/org_code_scanning_baseline_v2.py",
               "--apply",
               "if-no-files-found: error",
               artifact_template,
+              token_chain,
           )
           for token in required:
               if workflow.count(token) != 1:
