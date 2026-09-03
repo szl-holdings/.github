@@ -228,6 +228,13 @@ def test_nonidentical_issue_bodies_are_only_classified() -> None:
     assert api.set_classification.call_count == 2
 
 
+def test_workflow_accepts_the_established_org_token_alias() -> None:
+    workflow = (ROOT / ".github" / "workflows" / "frontier-issue-operator.yml").read_text(encoding="utf-8")
+    assert "secrets.SZL_GITHUB_TOKEN" in workflow
+    assert "github.token" in workflow
+
+
+
 def test_source_contains_no_protection_visibility_archive_or_secret_mutation() -> None:
     source = MODULE_PATH.read_text(encoding="utf-8")
     forbidden = (
