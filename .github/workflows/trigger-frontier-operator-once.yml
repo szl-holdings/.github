@@ -1,0 +1,35 @@
+name: Trigger frontier operator once
+
+on:
+  push:
+    branches:
+      - ops/run-frontier-operator-20260902
+    paths:
+      - ".github/workflows/trigger-frontier-operator-once.yml"
+
+permissions:
+  actions: write
+  contents: write
+
+jobs:
+  dispatch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - name: Dispatch the protected-main operator in apply mode
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh workflow run frontier-issue-operator.yml \
+            --repo "$GITHUB_REPOSITORY" \
+            --ref main \
+            -f apply=true
+
+      - name: Remove the transient trigger branch
+        shell: bash
+        run: |
+          set -euo pipefail
+          git ls-remote --exit-code --heads "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" "refs/heads/${GITHUB_REF_NAME}" >/dev/null
+          git push "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" --delete "$GITHUB_REF_NAME"
