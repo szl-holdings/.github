@@ -1,0 +1,42 @@
+name: Public Experience Frontier v4
+
+on:
+  pull_request:
+    paths:
+      - 'scripts/check_public_experience_v4.py'
+      - 'tests/test_public_experience_gate_v4.py'
+      - 'docs/PUBLIC_EXPERIENCE_FRONTIER_V4.md'
+      - 'docs/PUBLIC_EXPERIENCE_RELEASE_CHECKLIST.md'
+      - '.github/workflows/public-experience-frontier-v4.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'scripts/check_public_experience_v4.py'
+      - 'tests/test_public_experience_gate_v4.py'
+      - 'docs/PUBLIC_EXPERIENCE_FRONTIER_V4.md'
+      - 'docs/PUBLIC_EXPERIENCE_RELEASE_CHECKLIST.md'
+      - '.github/workflows/public-experience-frontier-v4.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  contract:
+    name: Portable public-experience gate self-test
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Check out exact source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: '3.12'
+      - name: Compile and prove positive + negative controls
+        run: |
+          python -m py_compile scripts/check_public_experience_v4.py tests/test_public_experience_gate_v4.py
+          python tests/test_public_experience_gate_v4.py
+          git diff --check
