@@ -20,8 +20,10 @@
     },
     {
       "space": "sentra",
-      "repo": "szl-holdings/szl-defensive-control-plane",
-      "ownership": "source-owned-flagship"
+      "repo": "szl-holdings/platform",
+      "source_root": "artifacts/sentra",
+      "ownership": "active-monorepo-product-source",
+      "supersedes": "szl-holdings/szl-defensive-control-plane for the public frontend only"
     },
     {
       "space": "counsel",
@@ -35,8 +37,10 @@
     },
     {
       "space": "vessels",
-      "repo": "szl-holdings/szl-fleet-overlay",
-      "ownership": "source-owned-flagship"
+      "repo": "szl-holdings/platform",
+      "source_root": "artifacts/vessels",
+      "ownership": "active-monorepo-product-source",
+      "supersedes": "archived szl-holdings/szl-fleet-overlay for the public frontend"
     },
     {
       "space": "lyte",
@@ -52,6 +56,7 @@
   "truth_boundary": [
     "A source mapping identifies the repository responsible for the public product surface; it does not prove that a deployment is current or healthy.",
     "The map is a protected local fallback. Public provider metadata may enrich it but cannot silently override it.",
+    "Sentra's API/control-plane service and Vessels' archived deployment packaging remain separate from their active platform-monorepo frontend sources.",
     "A mapped repository without a reviewed public entrypoint remains BLOCKED rather than receiving a guessed edit."
   ]
 }
