@@ -1,0 +1,61 @@
+name: Frontier issue operator contract
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - ".github/scripts/frontier_issue_operator.py"
+      - ".github/workflows/frontier-issue-operator.yml"
+      - ".github/workflows/frontier-issue-operator-contract.yml"
+      - "tests/test_frontier_issue_operator.py"
+  push:
+    branches: [main]
+    paths:
+      - ".github/scripts/frontier_issue_operator.py"
+      - ".github/workflows/frontier-issue-operator.yml"
+      - ".github/workflows/frontier-issue-operator-contract.yml"
+      - "tests/test_frontier_issue_operator.py"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  contract:
+    name: Fail-closed operator boundaries
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Harden runner
+        uses: step-security/harden-runner@bf7454d06d71f1098171f2acdf0cd4708d7b5920 # v2.20.0
+        with:
+          egress-policy: audit
+
+      - name: Checkout exact source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12"
+
+      - name: Run network-free contracts
+        run: |
+          python -m pip install --disable-pip-version-check pytest
+          python -m pytest -q tests/test_frontier_issue_operator.py
+          python -m py_compile .github/scripts/frontier_issue_operator.py
+
+      - name: Reject secret and protection mutation primitives
+        shell: bash
+        run: |
+          set -euo pipefail
+          ! grep -R -n -E '/branches/.*/protection|/rulesets|actions/secrets|dependabot/secrets|codespaces/secrets|"(visibility|private|archived)"[[:space:]]*:' \
+            .github/scripts/frontier_issue_operator.py
+
+      - name: Diff hygiene
+        run: git diff --check
