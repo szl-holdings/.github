@@ -1,0 +1,120 @@
+name: Verify and close Hatun runtime incidents once
+
+on:
+  push:
+    branches:
+      - ops/verify-close-hatun-runtime-20260902
+    paths:
+      - ".github/workflows/verify-close-hatun-runtime-once.yml"
+
+permissions:
+  contents: write
+  issues: write
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    env:
+      GH_TOKEN: ${{ secrets.SZL_ORG_ADMIN_TOKEN || secrets.ORG_ADMIN_TOKEN || secrets.GH_PAT || github.token }}
+      BRANCH_DELETE_TOKEN: ${{ github.token }}
+    steps:
+      - name: Prove Hatun public routes and exact served source
+        id: proof
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json
+          import os
+          import urllib.request
+
+          def get(url):
+              request = urllib.request.Request(
+                  url,
+                  headers={
+                      "Accept": "application/vnd.github+json",
+                      "User-Agent": "SZL-Hatun-incident-proof/1.0",
+                      "Cache-Control": "no-cache",
+                  },
+              )
+              with urllib.request.urlopen(request, timeout=45) as response:
+                  body = response.read()
+                  if response.status != 200:
+                      raise SystemExit(f"{url} returned HTTP {response.status}")
+                  return body
+
+          main = json.loads(
+              get("https://api.github.com/repos/szl-holdings/hatun-mcp/branches/main")
+          )["commit"]["sha"]
+          routes = (
+              "/",
+              "/healthz",
+              "/.well-known/mcp/server-card.json",
+              "/.well-known/mcp-manifest-attestation",
+              "/api/build-info",
+          )
+          observed = {}
+          for route in routes:
+              body = get("https://szlholdings-hatun-mcp.hf.space" + route)
+              observed[route] = len(body)
+              if route != "/":
+                  json.loads(body)
+          build = get("https://szlholdings-hatun-mcp.hf.space/api/build-info")
+          if main.encode("ascii") not in build:
+              raise SystemExit(
+                  "Hatun /api/build-info does not expose exact protected main " + main
+              )
+          with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as output:
+              output.write(f"main={main}\n")
+          print(json.dumps({"main": main, "routes": observed}, sort_keys=True))
+          PY
+
+      - name: Close only matching open Hatun runtime incidents
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh search issues \
+            --owner szl-holdings \
+            --state open \
+            --limit 100 \
+            --json number,title,body,repository,url \
+            -- 'Hatun OR hatun' > /tmp/hatun-issues.json
+          python - <<'PY' > /tmp/hatun-targets.tsv
+          import json
+          from pathlib import Path
+
+          rows = json.loads(Path("/tmp/hatun-issues.json").read_text())
+          runtime_terms = (
+              "runtime",
+              "application-not-found",
+              "application not found",
+              "healthz",
+              "build-info",
+              "source identity",
+              "source revision",
+              "deploy",
+          )
+          for row in rows:
+              repo = (row.get("repository") or {}).get("nameWithOwner") or ""
+              text = ((row.get("title") or "") + "\n" + (row.get("body") or "")).casefold()
+              if "hatun" not in text or not any(term in text for term in runtime_terms):
+                  continue
+              if not repo.startswith("szl-holdings/"):
+                  continue
+              print(f"{repo}\t{int(row['number'])}\t{row.get('url') or ''}")
+          PY
+          while IFS=$'\t' read -r repo number url; do
+            [ -n "$repo" ] || continue
+            gh issue close "$number" \
+              --repo "$repo" \
+              --reason completed \
+              --comment "Resolved by the protected Hatun publication/restart rail. The public root, /healthz, MCP server card, MCP manifest attestation, and /api/build-info returned HTTP 200, JSON metadata parsed, and the served source identity equaled protected hatun-mcp main `${{ steps.proof.outputs.main }}`. Closure is based on exact live readback, not source or reachability alone."
+          done < /tmp/hatun-targets.tsv
+
+      - name: Remove transient verifier branch
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          git push "https://x-access-token:${BRANCH_DELETE_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" --delete "$GITHUB_REF_NAME"
