@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import json
 import os
+import subprocess
 import sys
 import tempfile
 from pathlib import Path
@@ -186,6 +187,17 @@ def test_main_receipt_never_records_tokens_or_guarded_mutations() -> None:
         ):
             assert payload[key] is False
         assert payload["status"] == "AUTOMATED_FRONTIER_COMPLETE_OWNER_SIGNATURE_REMAINS"
+
+
+def test_entrypoint_imports_under_isolated_safe_path() -> None:
+    completed = subprocess.run(
+        [sys.executable, "-I", "-P", str(ROOT / ".github" / "scripts" / "frontier_payload_convergence.py"), "--help"],
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    assert completed.returncode == 0, completed.stderr
+    assert "automatable remainder" in completed.stdout
 
 
 def test_workflow_contract_is_pinned_and_visibility_safe() -> None:
