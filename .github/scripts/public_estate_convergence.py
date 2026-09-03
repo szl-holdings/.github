@@ -2,11 +2,14 @@
 # SPDX-License-Identifier: Apache-2.0
 """Verify and selectively repair the two canonical SZL public origins.
 
-The controller proves the root document, the local Spectral v2 stylesheet, and
-the local Flow v2 controller for each origin. When explicitly authorized it may
-request the existing A11oy Hugging Face sync workflow or the existing GitHub
-Pages rebuild endpoint. It never edits source, DNS, Cloudflare, secrets, pages,
-models, datasets, or application state.
+The controller proves each origin's root document and its exact local visual
+contract. The product front door is the GitHub Pages site published from
+``szl-holdings.github.io`` and uses Responsive Apex v3. The independent proof
+origin is published from ``a11oy-net`` and uses Spectral Proof v2.
+
+When explicitly authorized, this controller may request only the corresponding
+existing GitHub Pages rebuild endpoint. It never edits source, DNS, Cloudflare,
+secrets, pages, models, datasets, Hugging Face resources, or application state.
 """
 from __future__ import annotations
 
@@ -17,13 +20,12 @@ import json
 import os
 import time
 import urllib.error
-import urllib.parse
 import urllib.request
 from pathlib import Path
 from typing import Any, Mapping
 
 GITHUB_API = "https://api.github.com"
-USER_AGENT = "SZL-Public-Estate-Convergence/2.0"
+USER_AGENT = "SZL-Public-Estate-Convergence/3.0"
 TOKEN_NAMES = ("SZL_GITHUB_TOKEN", "GH_CONTROL_TOKEN", "GH_TOKEN", "GITHUB_TOKEN")
 
 
@@ -48,13 +50,16 @@ CONTRACTS = (
     OriginContract(
         name="a-11-oy.com",
         root="https://a-11-oy.com/",
-        spectral_asset="https://a-11-oy.com/assets/szl-spectral-v2.css",
-        controller_asset="https://a-11-oy.com/assets/szl-flow.js",
-        root_literals=("/assets/szl-flow.js",),
-        spectral_literals=("SZL Spectral Fabric v2", ".szl-spectral-field"),
-        controller_literals=("SZL Flow Shell v2", "/assets/szl-spectral-v2.css"),
-        advisory_health="https://a-11-oy.com/healthz",
-        repair="A11OY_HF_SYNC",
+        spectral_asset="https://a-11-oy.com/assets/szl-responsive-apex-v3.css",
+        controller_asset="https://a-11-oy.com/assets/szl-responsive-apex-v3.js",
+        root_literals=(
+            "/assets/szl-responsive-apex-v3.css",
+            "/assets/szl-responsive-apex-v3.js",
+        ),
+        spectral_literals=("SZL Apex Responsive Experience v3", "--apex-touch: 44px"),
+        controller_literals=("SZL Apex Responsive Experience v3", "__SZL_APEX_RESPONSIVE_V3__"),
+        advisory_health="https://a-11-oy.com/origin-status.json",
+        repair="PRODUCT_PAGES_BUILD",
     ),
     OriginContract(
         name="a11oy.net",
@@ -161,12 +166,11 @@ def github_action(
 
 
 def request_repair(contract: OriginContract, token: str) -> dict[str, Any]:
-    if contract.repair == "A11OY_HF_SYNC":
+    if contract.repair == "PRODUCT_PAGES_BUILD":
         status = github_action(
             "POST",
-            "/repos/szl-holdings/a11oy/actions/workflows/hf-sync.yml/dispatches",
+            "/repos/szl-holdings/szl-holdings.github.io/pages/builds",
             token,
-            {"ref": "main"},
         )
         return {"action": contract.repair, "http_status": status, "source_mutation": False}
     if contract.repair == "A11OY_NET_PAGES_BUILD":
@@ -238,7 +242,7 @@ def main() -> int:
 
     complete = all(row["operational"] for row in after)
     report = {
-        "schema": "szl.public-estate-convergence/v2",
+        "schema": "szl.public-estate-convergence/v3",
         "generated_at": utc_now(),
         "repair_requested": args.repair,
         "token_available": bool(token),
