@@ -24,7 +24,7 @@ class Change:
 
 
 class ResponsiveSpaceContractTests(unittest.TestCase):
-    def test_assets_cover_phone_tablet_desktop_and_theatre(self) -> None:
+    def test_assets_cover_phone_tablet_desktop_theatre_and_zoom(self) -> None:
         css, javascript = responsive._read_assets()
         for marker in (
             "max-width: 479px",
@@ -36,6 +36,9 @@ class ResponsiveSpaceContractTests(unittest.TestCase):
             "100dvh",
             "safe-area-inset",
             "--szl-touch-target",
+            "--szl-touch-target-coarse",
+            "--szl-effective-inline-size",
+            "data-szl-zoom-tier",
             "overflow-x: clip",
             "prefers-reduced-motion",
             "prefers-contrast",
@@ -47,8 +50,13 @@ class ResponsiveSpaceContractTests(unittest.TestCase):
             "__SZL_PUBLIC_EXPERIENCE_V3__",
             "szlPublicExperienceV3",
             "szlViewportTier",
+            "szlZoomTier",
+            "szlAudience",
             "visualViewport",
             "requestAnimationFrame",
+            "MutationObserver",
+            "document.title",
+            "effectiveWidth",
             "phone",
             "tablet",
             "theatre",
@@ -69,6 +77,23 @@ class ResponsiveSpaceContractTests(unittest.TestCase):
         ):
             self.assertNotIn(token, javascript)
         self.assertEqual(css.count("{"), css.count("}"))
+
+    def test_zoom_navigation_is_bounded_and_not_a_fixed_viewport_sheet(self) -> None:
+        _, javascript = responsive._read_assets()
+        self.assertIn(":host([data-szl-zoom-tier=high])", javascript)
+        self.assertIn("position:absolute!important", javascript)
+        self.assertIn("max-height:min(56dvh,420px)", javascript)
+        self.assertIn("min-width:54px!important", javascript)
+        self.assertIn("min-height:48px!important", javascript)
+        self.assertIn("border-radius:10px!important", javascript)
+        self.assertNotIn("nav{position:fixed!important", javascript)
+
+    def test_empty_title_fallback_is_non_destructive(self) -> None:
+        _, javascript = responsive._read_assets()
+        self.assertIn('if (String(document.title || "").trim()) return;', javascript)
+        self.assertIn('document.title = declaredIdentity() + " · SZL Holdings";', javascript)
+        self.assertIn("SZLPublicExperience", javascript)
+        self.assertIn("snapshot: snapshot", javascript)
 
     def test_append_once_is_idempotent(self) -> None:
         once = responsive._append_once("base", "SZL Public Experience v3\n", responsive.CSS_MARKER)
@@ -115,6 +140,9 @@ class ResponsiveSpaceContractTests(unittest.TestCase):
         helper = core.streamlit_helper()
         self.assertIn("dataset.szlPublicExperienceV3", helper)
         self.assertIn("dataset.szlViewportTier", helper)
+        self.assertIn("dataset.szlZoomTier", helper)
+        self.assertIn("document.title", helper)
+        self.assertIn("SZL Holdings", helper)
 
     def test_already_integrated_repository_becomes_reviewable_refresh(self) -> None:
         core = self._core(
@@ -167,8 +195,11 @@ class ResponsiveSpaceContractTests(unittest.TestCase):
         )
         responsive.install(core)
         body = core.pr_body(SimpleNamespace(), "digest")
-        self.assertIn("SZL Public Experience v3", body)
+        self.assertIn("SZL Public Experience v3.1", body)
         self.assertIn("phone widths from 320px", body)
+        self.assertIn("400% zoom", body)
+        self.assertIn("fallback title", body)
+        self.assertIn("investor", body)
         self.assertIn("additive", body.lower())
         self.assertIn("does not replace", body.lower())
 
