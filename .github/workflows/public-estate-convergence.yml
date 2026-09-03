@@ -19,7 +19,7 @@ on:
   workflow_dispatch:
     inputs:
       repair:
-        description: Request only the existing deploy paths when live readback fails
+        description: Request only bounded deploy paths when live readback fails
         required: false
         type: boolean
         default: true
@@ -140,8 +140,8 @@ jobs:
           for row in report["after"]:
               print(
                   f"- `{row['name']}` — `{'OPERATIONAL' if row['operational'] else 'NOT PROVEN'}`; "
-                  f"root `{row['root']['http_status']}`; spectral asset `{row['spectral_asset']['http_status']}`; "
-                  f"controller `{row['controller_asset']['http_status']}`"
+                  f"root `{row['root']['http_status']}`; surface probe `{row['spectral_asset']['http_status']}`; "
+                  f"controller `{row['controller_asset']['http_status']}`; health `{row['advisory_health']['http_status']}`"
               )
           if report["repairs"]:
               print()
@@ -178,12 +178,12 @@ jobs:
           for row in report["after"]:
               print(
                   f"- `{row['name']}` — `{'OPERATIONAL' if row['operational'] else 'NOT PROVEN'}`; "
-                  f"root `{row['root']['http_status']}`; spectral `{row['spectral_asset']['http_status']}`; "
-                  f"controller `{row['controller_asset']['http_status']}`"
+                  f"root `{row['root']['http_status']}`; surface `{row['spectral_asset']['http_status']}`; "
+                  f"controller `{row['controller_asset']['http_status']}`; health `{row['advisory_health']['http_status']}`"
               )
           PY
           title='[runtime] Canonical public-origin drift'
-          issue="$(gh issue list --state open --search \"$title in:title\" --json number,title --jq '.[] | select(.title == "'"$title"'") | .number' | head -n1)"
+          issue="$(gh issue list --state open --limit 100 --json number,title --jq '.[] | select(.title == "[runtime] Canonical public-origin drift") | .number' | head -n1)"
           complete="$(python -I -P -c 'import json,os; print(str(bool(json.load(open(os.environ["REPORT_PATH"]))["summary"]["complete"])).lower())')"
           if [ "$complete" = true ]; then
             if [ -n "$issue" ]; then

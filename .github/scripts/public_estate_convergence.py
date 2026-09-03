@@ -2,14 +2,17 @@
 # SPDX-License-Identifier: Apache-2.0
 """Verify and selectively repair the two canonical SZL public origins.
 
-The controller proves each origin's root document and its exact local visual
-contract. The product front door is the GitHub Pages site published from
-``szl-holdings.github.io`` and uses Responsive Apex v3. The independent proof
-origin is published from ``a11oy-net`` and uses Spectral Proof v2.
+The controller proves each origin from the bytes served by that origin. The
+product front door is ``a-11-oy.com`` with canonical source
+``szl-holdings/a11oy@main``; its deployment authority is external to this
+controller, so product drift is observe-only until a bounded deploy action is
+explicitly bound here. The independent proof origin ``a11oy.net`` is published
+from ``a11oy-net`` and keeps its existing GitHub Pages rebuild path.
 
-When explicitly authorized, this controller may request only the corresponding
-existing GitHub Pages rebuild endpoint. It never edits source, DNS, Cloudflare,
-secrets, pages, models, datasets, Hugging Face resources, or application state.
+When explicitly authorized, this controller may request only a repair action
+that is declared on the corresponding origin contract. It never edits source,
+DNS, Cloudflare, secrets, pages, models, datasets, Hugging Face resources, or
+application state.
 """
 from __future__ import annotations
 
@@ -25,7 +28,7 @@ from pathlib import Path
 from typing import Any, Mapping
 
 GITHUB_API = "https://api.github.com"
-USER_AGENT = "SZL-Public-Estate-Convergence/3.0"
+USER_AGENT = "SZL-Public-Estate-Convergence/3.1"
 TOKEN_NAMES = ("SZL_GITHUB_TOKEN", "GH_CONTROL_TOKEN", "GH_TOKEN", "GITHUB_TOKEN")
 
 
@@ -43,23 +46,25 @@ class OriginContract:
     spectral_literals: tuple[str, ...]
     controller_literals: tuple[str, ...]
     advisory_health: str
-    repair: str
+    health_literals: tuple[str, ...]
+    repair: str | None
 
 
 CONTRACTS = (
     OriginContract(
         name="a-11-oy.com",
         root="https://a-11-oy.com/",
-        spectral_asset="https://a-11-oy.com/assets/szl-responsive-apex-v3.css",
-        controller_asset="https://a-11-oy.com/assets/szl-responsive-apex-v3.js",
+        spectral_asset="https://a-11-oy.com/static/3d/holographic.html",
+        controller_asset="https://a-11-oy.com/api/a11oy/v1/honest",
         root_literals=(
-            "/assets/szl-responsive-apex-v3.css",
-            "/assets/szl-responsive-apex-v3.js",
+            "TASK-FIRST ENTRY POINTS",
+            "Choose the view that matches your job.",
         ),
-        spectral_literals=("SZL Apex Responsive Experience v3", "--apex-touch: 44px"),
-        controller_literals=("SZL Apex Responsive Experience v3", "__SZL_APEX_RESPONSIVE_V3__"),
-        advisory_health="https://a-11-oy.com/origin-status.json",
-        repair="PRODUCT_PAGES_BUILD",
+        spectral_literals=("A11oy Holographic Operations", "Evidence status"),
+        controller_literals=('"organ":"a11oy"', '"locked_formula_count":8'),
+        advisory_health="https://a-11-oy.com/healthz",
+        health_literals=('"status":"ok"', '"organ":"a11oy"'),
+        repair=None,
     ),
     OriginContract(
         name="a11oy.net",
@@ -70,6 +75,7 @@ CONTRACTS = (
         spectral_literals=("SZL Spectral Proof v2", ".szl-proof-spectral-field"),
         controller_literals=("SZL Proof Flow Shell v2", "/assets/szl-spectral-proof-v2.css"),
         advisory_health="https://a11oy.net/health.json",
+        health_literals=(),
         repair="A11OY_NET_PAGES_BUILD",
     ),
 )
@@ -136,19 +142,19 @@ def probe_origin(contract: OriginContract) -> dict[str, Any]:
     root = probe(contract.root, contract.root_literals)
     spectral = probe(contract.spectral_asset, contract.spectral_literals)
     controller = probe(contract.controller_asset, contract.controller_literals)
-    health_status, health_raw, _, health_final = request("GET", contract.advisory_health)
+    health = probe(contract.advisory_health, contract.health_literals)
     return {
         "name": contract.name,
         "root": root,
         "spectral_asset": spectral,
         "controller_asset": controller,
-        "advisory_health": {
-            "url": contract.advisory_health,
-            "final_url": health_final,
-            "http_status": health_status,
-            "bytes": len(health_raw),
-        },
-        "operational": root["verified"] and spectral["verified"] and controller["verified"],
+        "advisory_health": health,
+        "operational": (
+            root["verified"]
+            and spectral["verified"]
+            and controller["verified"]
+            and health["verified"]
+        ),
     }
 
 
@@ -166,13 +172,6 @@ def github_action(
 
 
 def request_repair(contract: OriginContract, token: str) -> dict[str, Any]:
-    if contract.repair == "PRODUCT_PAGES_BUILD":
-        status = github_action(
-            "POST",
-            "/repos/szl-holdings/szl-holdings.github.io/pages/builds",
-            token,
-        )
-        return {"action": contract.repair, "http_status": status, "source_mutation": False}
     if contract.repair == "A11OY_NET_PAGES_BUILD":
         status = github_action(
             "POST",
@@ -209,6 +208,16 @@ def main() -> int:
         for contract, observed in zip(CONTRACTS, before, strict=True):
             if observed["operational"]:
                 continue
+            if contract.repair is None:
+                repairs.append(
+                    {
+                        "origin": contract.name,
+                        "action": "OBSERVE_ONLY",
+                        "state": "NO_BOUNDED_REPAIR",
+                        "source_mutation": False,
+                    }
+                )
+                continue
             if not token:
                 repairs.append(
                     {
@@ -242,7 +251,7 @@ def main() -> int:
 
     complete = all(row["operational"] for row in after)
     report = {
-        "schema": "szl.public-estate-convergence/v3",
+        "schema": "szl.public-estate-convergence/v3.1",
         "generated_at": utc_now(),
         "repair_requested": args.repair,
         "token_available": bool(token),
