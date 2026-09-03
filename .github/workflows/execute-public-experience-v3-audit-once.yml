@@ -1,0 +1,161 @@
+name: Execute Public Experience v3 audit once
+
+on:
+  push:
+    branches:
+      - exec/public-experience-v3-audit-20260903
+    paths:
+      - .github/workflows/execute-public-experience-v3-audit-once.yml
+
+permissions:
+  contents: read
+  issues: write
+
+concurrency:
+  group: execute-public-experience-v3-audit-once
+  cancel-in-progress: false
+
+env:
+  BASE_SHA: 4f916583a05c1208dcb34e0e4f2d78ccf3636ced
+  REPORT_JSON: protected-source/reports/public-experience-v3.json
+  REPORT_MD: protected-source/reports/public-experience-v3.md
+  SCREENSHOTS: protected-source/reports/public-experience-v3-screenshots
+  GH_TOKEN: ${{ github.token }}
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 75
+    steps:
+      - name: Harden runner
+        uses: step-security/harden-runner@05e31511f85b41b11d1cf0ef85d0992719546e2c # v2.21.0
+        with:
+          egress-policy: audit
+
+      - name: Check out exact execution head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 2
+          persist-credentials: false
+
+      - name: Prove protected lineage and one-file execution diff
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD^)" = "$BASE_SHA"
+          git fetch --no-tags --depth=1 origin main
+          git merge-base --is-ancestor "$BASE_SHA" FETCH_HEAD
+          mapfile -t changed < <(git diff --name-only "$BASE_SHA" "$GITHUB_SHA")
+          test "${#changed[@]}" -eq 1
+          test "${changed[0]}" = .github/workflows/execute-public-experience-v3-audit-once.yml
+
+      - name: Check out the exact protected auditor
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ env.BASE_SHA }}
+          path: protected-source
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12"
+
+      - name: Prove the offline audit contracts
+        working-directory: protected-source
+        run: |
+          set -euo pipefail
+          python -m py_compile \
+            .github/scripts/audit_public_experience_v3.py \
+            .github/scripts/responsive_space_contract.py \
+            .github/scripts/holographic_target_contract.py \
+            .github/scripts/run_holographic_spaces_v2.py
+          node --check design/responsive-v3/szl-responsive-v3.js
+          python .github/tests/test_public_experience_v3.py
+          python .github/tests/test_responsive_space_contract.py
+          python .github/tests/test_holographic_target_contract.py
+          git diff --check
+
+      - name: Install exact Chromium auditor
+        run: |
+          set -euo pipefail
+          python -m pip install --disable-pip-version-check "playwright==1.55.0"
+          python -m playwright install --with-deps chromium
+
+      - name: Measure both origins and every public Space
+        id: measure
+        working-directory: protected-source
+        shell: bash
+        run: |
+          set +e
+          mkdir -p reports/public-experience-v3-screenshots
+          python .github/scripts/audit_public_experience_v3.py \
+            --output reports/public-experience-v3.json \
+            --markdown reports/public-experience-v3.md \
+            --screenshots-dir reports/public-experience-v3-screenshots \
+            --max-spaces 100 \
+            --concurrency 6 \
+            --timeout-ms 30000
+          code=$?
+          echo "exit_code=$code" >> "$GITHUB_OUTPUT"
+          exit 0
+
+      - name: Publish readable summary
+        if: always()
+        run: |
+          set -euo pipefail
+          test -f "$REPORT_MD"
+          cat "$REPORT_MD" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload immutable browser evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: public-experience-v3-fresh-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            ${{ env.REPORT_JSON }}
+            ${{ env.REPORT_MD }}
+            ${{ env.SCREENSHOTS }}
+          if-no-files-found: error
+          retention-days: 180
+
+      - name: Reconcile the exact runtime exception issue
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -f "$REPORT_JSON"
+          title='[Public Experience v3] live responsive exceptions'
+          number="$(gh issue list --repo "$GITHUB_REPOSITORY" --state all --search "$title in:title" --json number,title --jq '.[] | select(.title == "[Public Experience v3] live responsive exceptions") | .number' | head -n1)"
+          failed="$(python -c 'import json,os; print(json.load(open(os.environ["REPORT_JSON"]))["summary"]["failed_cases"])')"
+          {
+            echo '<!-- szl-public-experience-v3 -->'
+            echo '# Public Experience v3 fresh runtime receipt'
+            echo
+            echo "Run: ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
+            echo "Auditor source: ${BASE_SHA}"
+            echo
+            cat "$REPORT_MD"
+          } > /tmp/public-experience-v3-issue.md
+          if [ "$failed" -gt 0 ]; then
+            if [ -n "$number" ]; then
+              gh issue edit "$number" --repo "$GITHUB_REPOSITORY" --body-file /tmp/public-experience-v3-issue.md
+              gh issue reopen "$number" --repo "$GITHUB_REPOSITORY" || true
+            else
+              gh issue create --repo "$GITHUB_REPOSITORY" --title "$title" --body-file /tmp/public-experience-v3-issue.md
+            fi
+          elif [ -n "$number" ]; then
+            gh issue edit "$number" --repo "$GITHUB_REPOSITORY" --body-file /tmp/public-experience-v3-issue.md
+            gh issue close "$number" --repo "$GITHUB_REPOSITORY" --reason completed --comment 'All measured phone-through-theatre cases passed in the fresh exact-source audit.' || true
+          fi
+
+      - name: Enforce measured live state
+        if: always()
+        env:
+          EXIT_CODE: ${{ steps.measure.outputs.exit_code }}
+        run: |
+          set -euo pipefail
+          test -n "${EXIT_CODE:-}"
+          test "$EXIT_CODE" -eq 0
