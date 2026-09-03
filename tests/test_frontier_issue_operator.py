@@ -301,3 +301,69 @@ def test_classification_replaces_stale_estate_labels_and_preserves_human_labels(
         {"labels": ["bug", "estate:runtime-drift"]},
         expected=(200,),
     )
+
+
+
+def test_comment_review_does_not_clear_change_request() -> None:
+    api = operator.GitHub("test-token", apply=False)
+    api.request = mock.Mock(
+        return_value=(
+            [
+                {"user": {"login": "reviewer"}, "state": "CHANGES_REQUESTED"},
+                {"user": {"login": "reviewer"}, "state": "COMMENTED"},
+            ],
+            {},
+            200,
+        )
+    )
+    assert api.reviews("szl-holdings/example", 7) == ["reviewer"]
+
+
+def test_approval_clears_prior_change_request() -> None:
+    api = operator.GitHub("test-token", apply=False)
+    api.request = mock.Mock(
+        return_value=(
+            [
+                {"user": {"login": "reviewer"}, "state": "CHANGES_REQUESTED"},
+                {"user": {"login": "reviewer"}, "state": "APPROVED"},
+            ],
+            {},
+            200,
+        )
+    )
+    assert api.reviews("szl-holdings/example", 7) == []
+
+
+def test_stale_estate_label_does_not_drive_reclassification() -> None:
+    api = mock.create_autospec(operator.GitHub, instance=True)
+    api.apply = True
+    api.search.return_value = [
+        {
+            "repository_url": "https://api.github.com/repos/szl-holdings/example",
+            "number": 11,
+            "title": "Fix documentation link",
+            "body": "Update the README documentation and exact local link contract with no protected-state mutation.",
+            "html_url": "https://github.com/szl-holdings/example/issues/11",
+            "updated_at": "2026-09-02T00:00:00Z",
+            "labels": [{"name": "estate:p0"}],
+        }
+    ]
+    rows = operator.reconcile_issues(api, "szl-holdings", limit=10)
+    assert rows[0].classification == "estate:code-actionable"
+    api.set_classification.assert_called_once_with(
+        "szl-holdings/example", 11, "estate:code-actionable", ["estate:p0"]
+    )
+
+
+def test_exact_classification_is_a_noop() -> None:
+    api = operator.GitHub("test-token", apply=True)
+    api.ensure_label = mock.Mock()
+    api.request = mock.Mock()
+    api.set_classification(
+        "szl-holdings/example",
+        9,
+        "estate:runtime-drift",
+        ["estate:runtime-drift", "bug"],
+    )
+    api.ensure_label.assert_not_called()
+    api.request.assert_not_called()

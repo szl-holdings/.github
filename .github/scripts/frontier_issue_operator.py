@@ -264,13 +264,20 @@ class GitHub:
         result, _headers, _status = self.request(
             "GET", f"/repos/{full_name}/pulls/{number}/reviews?per_page=100"
         )
-        latest: dict[str, str] = {}
+        # COMMENTED and PENDING reviews do not revoke an earlier change
+        # request. Only a later APPROVED or DISMISSED decision clears it.
+        latest_decisive: dict[str, str] = {}
+        decisive = {"CHANGES_REQUESTED", "APPROVED", "DISMISSED"}
         for row in result if isinstance(result, list) else []:
             login = str((row.get("user") or {}).get("login") or "")
-            state = str(row.get("state") or "")
-            if login and state:
-                latest[login] = state
-        return sorted(login for login, state in latest.items() if state == "CHANGES_REQUESTED")
+            state = str(row.get("state") or "").upper()
+            if login and state in decisive:
+                latest_decisive[login] = state
+        return sorted(
+            login
+            for login, state in latest_decisive.items()
+            if state == "CHANGES_REQUESTED"
+        )
 
     def unresolved_threads(self, full_name: str, number: int) -> int:
         owner, name = full_name.split("/", 1)
@@ -354,13 +361,12 @@ class GitHub:
         """Preserve human labels while enforcing exactly one estate label."""
         if not self.apply:
             return
-        self.ensure_label(full_name, label)
-        preserved = [
-            name
-            for name in existing_labels
-            if name and not name.startswith("estate:")
-        ]
+        current = [name for name in existing_labels if name]
+        preserved = [name for name in current if not name.startswith("estate:")]
         labels = sorted(set([*preserved, label]))
+        if sorted(set(current)) == labels:
+            return
+        self.ensure_label(full_name, label)
         self.request(
             "PATCH",
             f"/repos/{full_name}/issues/{number}",
@@ -547,8 +553,11 @@ def reconcile_issues(api: GitHub, org: str, *, limit: int) -> list[IssueState]:
     for row in raw:
         repository = repository_from_api_url(str(row["repository_url"]))
         labels = [str(label.get("name") or "") for label in row.get("labels") or []]
+        classification_labels = [
+            label for label in labels if not label.startswith("estate:")
+        ]
         classification = classify_issue(
-            str(row.get("title") or ""), row.get("body"), labels
+            str(row.get("title") or ""), row.get("body"), classification_labels
         )
         state = IssueState(
             repository=repository,
