@@ -1,0 +1,87 @@
+name: Temporary HF publisher generator repair
+
+on:
+  push:
+    branches:
+      - fix/hf-publisher-429-retry-20260903
+
+permissions:
+  contents: write
+
+concurrency:
+  group: tmp-hf-publisher-generator-repair-20260903
+  cancel-in-progress: false
+
+jobs:
+  repair-generator:
+    if: >-
+      github.repository == 'szl-holdings/.github' &&
+      github.actor == 'stephenlutar2-hash'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout exact candidate
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          ref: ${{ github.ref_name }}
+
+      - name: Preserve nested Python indentation in the branch-only generator
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          python3 - <<'PY'
+          from pathlib import Path
+
+          path = Path('.github/workflows/_tmp-hf-publisher-429-retry.yml')
+          text = path.read_text(encoding='utf-8')
+          import_marker = "          from pathlib import Path\n\n"
+          if text.count(import_marker) != 1:
+              raise SystemExit('embedded import marker was not unique')
+          text = text.replace(
+              import_marker,
+              "          from pathlib import Path\n"
+              "          from textwrap import dedent\n\n",
+              1,
+          )
+          old_helper = """          helper = '\\n'.join(
+              line[10:] if line.startswith('          ') else line
+              for line in helper.splitlines()
+          )
+"""
+          new_helper = "          helper = dedent(helper)\n"
+          if text.count(old_helper) != 1:
+              raise SystemExit('helper dedent marker was not unique')
+          text = text.replace(old_helper, new_helper, 1)
+
+          old_tests = """          test_block = '\\n'.join(
+              line[10:] if line.startswith('          ') else line
+              for line in test_block.splitlines()
+          )
+"""
+          new_tests = "          test_block = dedent(test_block)\n"
+          if text.count(old_tests) != 1:
+              raise SystemExit('test dedent marker was not unique')
+          text = text.replace(old_tests, new_tests, 1)
+          path.write_text(text, encoding='utf-8')
+          PY
+          grep -F 'helper = dedent(helper)' .github/workflows/_tmp-hf-publisher-429-retry.yml
+          grep -F 'test_block = dedent(test_block)' .github/workflows/_tmp-hf-publisher-429-retry.yml
+          git diff --check
+
+      - name: Commit the corrected generator and retire this repair workflow
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm .github/workflows/_tmp-hf-publisher-generator-fix.yml
+          git config user.name 'Stephen Lutar'
+          git config user.email 'stephenlutar2@gmail.com'
+          git add \
+            .github/workflows/_tmp-hf-publisher-429-retry.yml \
+            .github/workflows/_tmp-hf-publisher-generator-fix.yml
+          git commit \
+            -m 'fix(hf): preserve retry patch indentation' \
+            -m 'Use textwrap.dedent instead of stripping every nested line by a fixed width in the branch-only source transformer.' \
+            -m 'Signed-off-by: Stephen Lutar <stephenlutar2@gmail.com>'
+          git push origin "HEAD:${GITHUB_REF_NAME}"
