@@ -1,0 +1,67 @@
+name: Normalize CodeQL baseline v2 once
+
+on:
+  push:
+    branches:
+      - feat/org-code-scanning-baseline-v2-20260902
+    paths:
+      - ".github/workflows/normalize-codeql-baseline-v2-once.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  normalize:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout exact CodeQL v2 branch
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: feat/org-code-scanning-baseline-v2-20260902
+          fetch-depth: 0
+
+      - name: Make the artifact-template assertion interpolation-safe
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+
+          path = Path(".github/workflows/org-code-scanning-baseline-contract.yml")
+          lines = path.read_text(encoding="utf-8").splitlines()
+          matches = [
+              index
+              for index, line in enumerate(lines)
+              if "org-code-scanning-baseline-" in line
+              and "github.run_id" in line
+              and "github.run_attempt" in line
+          ]
+          if len(matches) != 1:
+              raise SystemExit(f"expected one artifact-template assertion, found {len(matches)}")
+          index = matches[0]
+          indentation = lines[index][: len(lines[index]) - len(lines[index].lstrip())]
+          lines[index] = (
+              indentation
+              + '"org-code-scanning-baseline-$" + "{{ github.run_id }}-$" + "{{ github.run_attempt }}",'
+          )
+          path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+          PY
+
+      - name: Run exact v2 contracts
+        run: |
+          python -m pip install --disable-pip-version-check pytest
+          python -m pytest -q tests/test_org_code_scanning_baseline_v2.py
+          python -m py_compile .github/scripts/org_code_scanning_baseline_v2.py
+          git diff --check
+
+      - name: Commit normalization and remove this one-shot workflow
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm .github/workflows/normalize-codeql-baseline-v2-once.yml
+          git config user.name "SZL CodeQL Baseline Controller"
+          git config user.email "stephenlutar2@gmail.com"
+          git add .github/workflows/org-code-scanning-baseline-contract.yml .github/workflows/normalize-codeql-baseline-v2-once.yml
+          git commit -s -m "fix(security): make the CodeQL contract interpolation-safe"
+          git push origin HEAD:feat/org-code-scanning-baseline-v2-20260902
