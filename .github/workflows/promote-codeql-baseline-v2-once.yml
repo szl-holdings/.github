@@ -1,0 +1,203 @@
+name: Promote CodeQL baseline v2 once
+
+on:
+  push:
+    branches:
+      - ops/promote-codeql-baseline-v2-20260902
+    paths:
+      - ".github/workflows/promote-codeql-baseline-v2-once.yml"
+
+permissions:
+  actions: read
+  checks: read
+  contents: write
+  pull-requests: write
+
+jobs:
+  promote:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    env:
+      GH_TOKEN: ${{ github.token }}
+      TARGET_HEAD: feat/org-code-scanning-baseline-v2-20260902
+    steps:
+      - name: Resolve the exact CodeQL v2 pull request
+        id: pr
+        shell: bash
+        run: |
+          set -euo pipefail
+          row="$(gh pr list \
+            --repo "$GITHUB_REPOSITORY" \
+            --state open \
+            --head "$TARGET_HEAD" \
+            --json number,headRefOid,isDraft,baseRefName \
+            --jq '.[] | select(.isDraft == false and .baseRefName == "main") | [.number,.headRefOid] | @tsv' | head -n1)"
+          test -n "$row"
+          number="${row%%$'\t'*}"
+          sha="${row#*$'\t'}"
+          test -n "$number"
+          test "$sha" != "$row"
+          echo "number=$number" >> "$GITHUB_OUTPUT"
+          echo "sha=$sha" >> "$GITHUB_OUTPUT"
+
+      - name: Require current-main ancestry and clean mergeability
+        shell: bash
+        env:
+          PR_NUMBER: ${{ steps.pr.outputs.number }}
+          HEAD_SHA: ${{ steps.pr.outputs.sha }}
+        run: |
+          set -euo pipefail
+          for attempt in $(seq 1 18); do
+            row="$(gh pr view "$PR_NUMBER" \
+              --repo "$GITHUB_REPOSITORY" \
+              --json headRefOid,mergeable,mergeStateStatus,baseRefName,isDraft \
+              --jq '[.headRefOid,.mergeable,.mergeStateStatus,.baseRefName,.isDraft] | @tsv')"
+            sha="${row%%$'\t'*}"
+            rest="${row#*$'\t'}"
+            mergeable="${rest%%$'\t'*}"
+            rest="${rest#*$'\t'}"
+            state="${rest%%$'\t'*}"
+            rest="${rest#*$'\t'}"
+            base="${rest%%$'\t'*}"
+            draft="${rest#*$'\t'}"
+            test "$sha" = "$HEAD_SHA"
+            test "$base" = "main"
+            test "$draft" = "false"
+            if [ "$mergeable" = "MERGEABLE" ] && { [ "$state" = "CLEAN" ] || [ "$state" = "HAS_HOOKS" ] || [ "$state" = "UNSTABLE" ] || [ "$state" = "BLOCKED" ]; }; then
+              break
+            fi
+            if [ "$mergeable" = "CONFLICTING" ] || [ "$state" = "DIRTY" ]; then
+              echo "::error::CodeQL v2 conflicts with current protected main."
+              exit 1
+            fi
+            sleep 5
+          done
+          gh api "/repos/${GITHUB_REPOSITORY}/compare/main...${HEAD_SHA}" \
+            --jq 'if .status == "ahead" or .status == "identical" then .status else error("candidate is not current-main-descended: " + .status) end'
+
+      - name: Wait for all exact-head checks
+        shell: bash
+        env:
+          HEAD_SHA: ${{ steps.pr.outputs.sha }}
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json
+          import os
+          import time
+          import urllib.request
+
+          repo = os.environ["GITHUB_REPOSITORY"]
+          sha = os.environ["HEAD_SHA"]
+          token = os.environ["GH_TOKEN"]
+          headers = {
+              "Accept": "application/vnd.github+json",
+              "Authorization": f"Bearer {token}",
+              "X-GitHub-Api-Version": "2022-11-28",
+              "User-Agent": "SZL-CodeQL-v2-promotion/1.0",
+          }
+          allowed = {"success", "neutral", "skipped"}
+
+          def get(path):
+              request = urllib.request.Request(
+                  "https://api.github.com" + path,
+                  headers=headers,
+              )
+              with urllib.request.urlopen(request, timeout=45) as response:
+                  return json.loads(response.read())
+
+          deadline = time.monotonic() + 34 * 60
+          observed = False
+          while time.monotonic() < deadline:
+              checks = get(
+                  f"/repos/{repo}/commits/{sha}/check-runs?per_page=100"
+              ).get("check_runs", [])
+              statuses = get(
+                  f"/repos/{repo}/commits/{sha}/status"
+              ).get("statuses", [])
+              observed = observed or bool(checks or statuses)
+              failures = [
+                  f"{row.get('name')}:{row.get('conclusion')}"
+                  for row in checks
+                  if row.get("status") == "completed"
+                  and str(row.get("conclusion") or "").casefold() not in allowed
+              ] + [
+                  f"{row.get('context')}:{row.get('state')}"
+                  for row in statuses
+                  if row.get("state") in {"failure", "error"}
+              ]
+              active = [
+                  str(row.get("name") or row.get("id"))
+                  for row in checks
+                  if row.get("status") != "completed"
+              ] + [
+                  str(row.get("context") or row.get("id"))
+                  for row in statuses
+                  if row.get("state") == "pending"
+              ]
+              if failures:
+                  raise SystemExit(
+                      "CodeQL v2 exact-head checks failed: " + ", ".join(failures)
+                  )
+              if observed and not active:
+                  print(
+                      json.dumps(
+                          {
+                              "head": sha,
+                              "checks": len(checks),
+                              "legacy_statuses": len(statuses),
+                              "result": "PASS",
+                          },
+                          sort_keys=True,
+                      )
+                  )
+                  break
+              print("waiting for CodeQL v2 checks:", active or ["none observed yet"])
+              time.sleep(10)
+          else:
+              raise SystemExit("timed out waiting for CodeQL v2 exact-head checks")
+          PY
+
+      - name: Reject review objections, unresolved threads, or head drift
+        shell: bash
+        env:
+          PR_NUMBER: ${{ steps.pr.outputs.number }}
+          HEAD_SHA: ${{ steps.pr.outputs.sha }}
+        run: |
+          set -euo pipefail
+          row="$(gh pr view "$PR_NUMBER" \
+            --repo "$GITHUB_REPOSITORY" \
+            --json headRefOid,reviewDecision \
+            --jq '[.headRefOid,(.reviewDecision // "")] | @tsv')"
+          test "${row%%$'\t'*}" = "$HEAD_SHA"
+          test "${row#*$'\t'}" != "CHANGES_REQUESTED"
+          owner="${GITHUB_REPOSITORY%%/*}"
+          name="${GITHUB_REPOSITORY#*/}"
+          unresolved="$(gh api graphql \
+            -f query='query($owner:String!,$name:String!,$number:Int!,$cursor:String){repository(owner:$owner,name:$name){pullRequest(number:$number){reviewThreads(first:100,after:$cursor){nodes{isResolved}pageInfo{hasNextPage endCursor}}}}}' \
+            -f owner="$owner" \
+            -f name="$name" \
+            -F number="$PR_NUMBER" \
+            --jq '[.data.repository.pullRequest.reviewThreads.nodes[] | select(.isResolved == false)] | length')"
+          test "$unresolved" = "0"
+
+      - name: Merge CodeQL v2 through ordinary protection
+        shell: bash
+        env:
+          PR_NUMBER: ${{ steps.pr.outputs.number }}
+          HEAD_SHA: ${{ steps.pr.outputs.sha }}
+        run: |
+          set -euo pipefail
+          gh pr merge "$PR_NUMBER" \
+            --repo "$GITHUB_REPOSITORY" \
+            --squash \
+            --delete-branch \
+            --match-head-commit "$HEAD_SHA" \
+            --subject "feat(security): converge CodeQL across the public repository estate"
+
+      - name: Remove transient promoter branch
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          git push "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" --delete "$GITHUB_REF_NAME"
