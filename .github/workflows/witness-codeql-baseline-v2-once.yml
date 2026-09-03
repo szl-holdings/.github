@@ -1,0 +1,95 @@
+name: Witness CodeQL baseline v2 once
+
+on:
+  push:
+    branches:
+      - ops/witness-codeql-baseline-v2-20260902
+    paths:
+      - ".github/workflows/witness-codeql-baseline-v2-once.yml"
+
+permissions:
+  actions: write
+  contents: write
+
+jobs:
+  witness:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - name: Dispatch the protected-main CodeQL baseline
+        id: run
+        shell: bash
+        run: |
+          set -euo pipefail
+          marker="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          gh workflow run org-code-scanning-baseline.yml \
+            --repo "$GITHUB_REPOSITORY" \
+            --ref main \
+            -f apply=true
+          run_id=""
+          for attempt in $(seq 1 45); do
+            run_id="$(gh run list \
+              --repo "$GITHUB_REPOSITORY" \
+              --workflow org-code-scanning-baseline.yml \
+              --event workflow_dispatch \
+              --branch main \
+              --limit 20 \
+              --json databaseId,createdAt \
+              --jq '.[] | select(.createdAt >= "'"$marker"'") | .databaseId' | head -n1)"
+            if [ -n "$run_id" ]; then break; fi
+            sleep 2
+          done
+          test -n "$run_id"
+          echo "run_id=$run_id" >> "$GITHUB_OUTPUT"
+
+      - name: Wait for the exact provider sweep to finish
+        id: terminal
+        shell: bash
+        run: |
+          set +e
+          gh run watch "${{ steps.run.outputs.run_id }}" \
+            --repo "$GITHUB_REPOSITORY" \
+            --exit-status \
+            --interval 10
+          code=$?
+          echo "exit_code=$code" >> "$GITHUB_OUTPUT"
+          exit 0
+
+      - name: Capture the exact terminal state
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh run view "${{ steps.run.outputs.run_id }}" \
+            --repo "$GITHUB_REPOSITORY" \
+            --json databaseId,status,conclusion,headSha,event,jobs \
+            > codeql-baseline-run.json
+          cat codeql-baseline-run.json
+
+      - name: Upload the witness state
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: codeql-baseline-witness-${{ github.run_id }}-${{ github.run_attempt }}
+          path: codeql-baseline-run.json
+          if-no-files-found: error
+          retention-days: 90
+
+      - name: Preserve partial/blocker semantics
+        shell: bash
+        run: |
+          set -euo pipefail
+          conclusion="$(python -c 'import json; print(json.load(open("codeql-baseline-run.json")).get("conclusion") or "")')"
+          if [ "$conclusion" = "success" ]; then
+            echo "Organization CodeQL baseline completed without a blocked eligible repository."
+            exit 0
+          fi
+          echo "::error::Organization CodeQL baseline completed with one or more managed prerequisites or repository-specific blockers. See its command issue and immutable receipt."
+          exit 1
+
+      - name: Remove the transient witness branch
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          git push "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" --delete "$GITHUB_REF_NAME"
