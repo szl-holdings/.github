@@ -1,0 +1,110 @@
+name: Execute Public Experience v3 rollout
+
+on:
+  push:
+    branches:
+      - ops/execute-public-experience-v3-rollout-20260903
+    paths:
+      - .github/workflows/execute-public-experience-v3-rollout.yml
+
+permissions:
+  actions: read
+  checks: read
+  contents: read
+  pull-requests: read
+  statuses: read
+
+concurrency:
+  group: execute-public-experience-v3-rollout-20260903
+  cancel-in-progress: false
+
+env:
+  REPORT: /tmp/public-experience-space-rollout-v3.json
+
+jobs:
+  rollout:
+    runs-on: ubuntu-latest
+    timeout-minutes: 70
+    env:
+      SZL_GITHUB_TOKEN: ${{ secrets.ORG_REPO_WORKFLOW_TOKEN || secrets.SZL_ORG_PAT || secrets.SZL_GITHUB_PAT || secrets.GH_PAT || secrets.PAT_TOKEN || secrets.GITHUB_PAT || secrets.GH_TOKEN || github.token }}
+    steps:
+      - name: Harden runner
+        uses: step-security/harden-runner@bf7454d06d71f1098171f2acdf0cd4708d7b5920 # v2.20.0
+        with:
+          egress-policy: audit
+
+      - name: Checkout exact protected rollout source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: a35a2f63e38e8931f1f670d8a1ec06d101bb962b
+          persist-credentials: false
+
+      - name: Prove the rollout controller before remote writes
+        run: |
+          set -euo pipefail
+          python -m py_compile \
+            .github/scripts/rollout_holographic_spaces_v2.py \
+            .github/scripts/run_holographic_spaces_v2.py \
+            .github/scripts/responsive_space_contract.py \
+            .github/scripts/holographic_target_contract.py
+          node --check design/holographic-v2/szl-space-hologram.js
+          node --check design/responsive-v3/szl-responsive-v3.js
+          python .github/tests/test_holographic_spaces_v2.py
+          python .github/tests/test_responsive_space_contract.py
+          python .github/tests/test_holographic_target_contract.py
+
+      - name: Create review PRs and merge only exact-head green repositories
+        shell: bash
+        run: |
+          set -euo pipefail
+          python .github/scripts/run_holographic_spaces_v2.py \
+            --org szl-holdings \
+            --assets-root design/holographic-v2 \
+            --report "$REPORT" \
+            --max-repos 100 \
+            --apply \
+            --merge-green \
+            --merge-wait-seconds 2700
+
+      - name: Publish secret-free rollout evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: public-experience-space-rollout-v3-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ env.REPORT }}
+          if-no-files-found: error
+          retention-days: 90
+
+      - name: Enforce terminal rollout integrity
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          path = Path(os.environ["REPORT"])
+          if not path.exists():
+              raise SystemExit("rollout report was not produced")
+          report = json.loads(path.read_text(encoding="utf-8"))
+          summary = report.get("summary") or {}
+          print(json.dumps(summary, indent=2, sort_keys=True))
+          if report.get("secrets_recorded") is not False:
+              raise SystemExit("secret-recording invariant failed")
+          if report.get("default_branch_writes") is not False:
+              raise SystemExit("default-branch write invariant failed")
+          if report.get("force_pushes") is not False:
+              raise SystemExit("force-push invariant failed")
+          if int(summary.get("public_spaces", 0) or 0) < 1:
+              raise SystemExit("no public SZLHOLDINGS Spaces were discovered")
+          if int(summary.get("source_repositories_planned", 0) or 0) < 1:
+              raise SystemExit("no mapped source repositories were planned")
+          unresolved = sum(
+              int(summary.get(key, 0) or 0)
+              for key in ("blocked", "checks-failed", "closed-unmerged", "report-only")
+          )
+          if unresolved:
+              raise SystemExit(f"{unresolved} repository rollout(s) remain unresolved")
+          PY
