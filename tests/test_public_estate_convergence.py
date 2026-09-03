@@ -11,6 +11,7 @@ from unittest import mock
 
 ROOT = Path(__file__).resolve().parents[1]
 MODULE_PATH = ROOT / ".github" / "scripts" / "public_estate_convergence.py"
+WORKFLOW_PATH = ROOT / ".github" / "workflows" / "public-estate-convergence.yml"
 SPEC = importlib.util.spec_from_file_location("public_estate_convergence", MODULE_PATH)
 assert SPEC and SPEC.loader
 convergence = importlib.util.module_from_spec(SPEC)
@@ -18,26 +19,27 @@ sys.modules[SPEC.name] = convergence
 SPEC.loader.exec_module(convergence)
 
 
-def test_two_canonical_origins_have_source_native_visual_contracts() -> None:
+def test_two_canonical_origins_have_source_native_contracts() -> None:
     assert [row.name for row in convergence.CONTRACTS] == ["a-11-oy.com", "a11oy.net"]
     product, proof = convergence.CONTRACTS
-    assert product.spectral_asset.endswith("/assets/szl-responsive-apex-v3.css")
-    assert product.controller_asset.endswith("/assets/szl-responsive-apex-v3.js")
-    assert product.advisory_health.endswith("/origin-status.json")
-    assert product.repair == "PRODUCT_PAGES_BUILD"
+    assert product.spectral_asset.endswith("/static/3d/holographic.html")
+    assert product.controller_asset.endswith("/api/a11oy/v1/honest")
+    assert product.advisory_health.endswith("/healthz")
+    assert product.repair is None
     assert proof.spectral_asset.endswith("/assets/szl-spectral-proof-v2.css")
     assert proof.controller_asset.endswith("/scripts/szl-flow-proof.js")
     assert proof.repair == "A11OY_NET_PAGES_BUILD"
 
 
-def test_product_root_requires_both_published_responsive_assets() -> None:
+def test_product_root_tracks_the_live_a11oy_front_door() -> None:
     product = convergence.CONTRACTS[0]
     assert product.root_literals == (
-        "/assets/szl-responsive-apex-v3.css",
-        "/assets/szl-responsive-apex-v3.js",
+        "TASK-FIRST ENTRY POINTS",
+        "Choose the view that matches your job.",
     )
-    assert "SZL Apex Responsive Experience v3" in product.spectral_literals
-    assert "__SZL_APEX_RESPONSIVE_V3__" in product.controller_literals
+    assert "A11oy Holographic Operations" in product.spectral_literals
+    assert '"organ":"a11oy"' in product.controller_literals
+    assert '"status":"ok"' in product.health_literals
 
 
 def test_probe_requires_http_200_bytes_and_every_literal() -> None:
@@ -56,17 +58,11 @@ def test_probe_requires_http_200_bytes_and_every_literal() -> None:
         assert convergence.probe("https://example.test/", ("alpha",))["verified"] is False
 
 
-def test_product_repair_requests_the_actual_front_door_pages_build() -> None:
-    contract = convergence.CONTRACTS[0]
-    with mock.patch.object(convergence, "github_action", return_value=201) as action:
-        receipt = convergence.request_repair(contract, "secret")
-    action.assert_called_once_with(
-        "POST",
-        "/repos/szl-holdings/szl-holdings.github.io/pages/builds",
-        "secret",
-    )
-    assert receipt["source_mutation"] is False
-    assert receipt["action"] == "PRODUCT_PAGES_BUILD"
+def test_product_has_no_misbound_pages_repair() -> None:
+    product = convergence.CONTRACTS[0]
+    assert product.repair is None
+    text = MODULE_PATH.read_text(encoding="utf-8")
+    assert "/repos/szl-holdings/szl-holdings.github.io/pages/builds" not in text
 
 
 def test_proof_repair_requests_existing_pages_build_only() -> None:
@@ -107,6 +103,12 @@ def test_source_contains_no_content_dns_cloudflare_or_hf_mutator() -> None:
     )
     for fragment in forbidden:
         assert fragment not in text
+
+
+def test_drift_issue_lookup_does_not_shell_split_the_title() -> None:
+    text = WORKFLOW_PATH.read_text(encoding="utf-8")
+    assert '--search \\"$title in:title\\"' not in text
+    assert 'select(.title == "[runtime] Canonical public-origin drift")' in text
 
 
 if __name__ == "__main__":
