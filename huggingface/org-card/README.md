@@ -1,11 +1,11 @@
 ---
-title: SZL Holdings — Governed Decision Infrastructure
+title: SZL — Governed AI Command Fabric
 emoji: 🛡️
 colorFrom: gray
 colorTo: indigo
 sdk: static
-short_description: Control before action. Evidence after.
-thumbnail: https://huggingface.co/spaces/SZLHOLDINGS/README/resolve/main/assets/evidence-lattice-v2.webp
+short_description: Governed AI, inference, kernels, and verifiable outcomes.
+thumbnail: https://huggingface.co/spaces/SZLHOLDINGS/README/resolve/main/assets/szl-command-fabric-v3.svg
 pinned: true
 license: apache-2.0
 ---
@@ -13,92 +13,81 @@ license: apache-2.0
 <!-- markdownlint-disable MD013 MD033 MD041 -->
 
 <p align="center">
-  <img src="https://huggingface.co/spaces/SZLHOLDINGS/README/resolve/main/assets/evidence-lattice-v2.webp"
-       alt="A bounded signal path entering a holographic verification lattice"
+  <img src="https://huggingface.co/spaces/SZLHOLDINGS/README/resolve/main/assets/szl-command-fabric-v3.svg"
+       alt="SZL governed AI command fabric with a pixel-built mark, holographic evidence chamber, and paths to understand, build, and verify"
        width="100%" />
 </p>
 
 <div align="center">
 
-# Control before action. Evidence after.
+# Governed AI. Inference. Command systems.
 
-Models, kernels, data, and demonstrations that operate within authority and
-leave inspectable evidence.
+Frontier infrastructure for decisions that must remain bounded, inspectable,
+and reproducible.
 
-[**Open a11oy**](https://a-11-oy.com) ·
-[**Verify evidence**](https://a11oy.net) ·
-[**Killinchu**](https://huggingface.co/spaces/SZLHOLDINGS/killinchu) ·
-[**Source**](https://github.com/szl-holdings)
+[**Enter the product**](https://a-11-oy.com) ·
+[**Build from source**](https://github.com/szl-holdings) ·
+[**Inspect the evidence**](https://a11oy.net) ·
+[**Browse the Hub**](https://huggingface.co/SZLHOLDINGS)
 
 </div>
 
-## Four paths
+## Choose a path
 
-### 01 / Command
+| You are here to… | Start here | Verify here |
+| --- | --- | --- |
+| **Understand** the company, products, and operating boundaries | [a-11-oy.com](https://a-11-oy.com) | [Diligence and evidence](https://a11oy.net) |
+| **Build** with source, models, kernels, datasets, and demonstrations | [GitHub source](https://github.com/szl-holdings) | [Hub artifacts](https://huggingface.co/SZLHOLDINGS) |
+| **Review** exact revisions, limitations, and receipts | [Trust boundary](https://github.com/szl-holdings/.github/blob/main/TRUST.md) | [Served source binding](https://szlholdings-readme.static.hf.space/deployment.json) |
 
-[**a11oy**](https://huggingface.co/spaces/SZLHOLDINGS/a11oy) provides governed
-inference, bounded action, and portable receipts.
+## Command fabric
 
-### 02 / Intelligence
+```text
+signal → reason → policy → bounded action → receipt → independent verification
+                     ↑                                      │
+                     └──────────── evidence loop ────────────┘
+```
 
-[**Killinchu**](https://huggingface.co/spaces/SZLHOLDINGS/killinchu) supports
-public observation, fusion, and operator decisions. Feeds may be live or
-unavailable; samples remain labeled. Effectors and public actuation are
-**SIMULATED**. The Space does not command a live weapon or establish production
-authorization.
+| Surface | Role | Public boundary |
+| --- | --- | --- |
+| [**A11oy**](https://a-11-oy.com) | Governed decision and execution fabric | Product origin; source and live state must be checked separately |
+| [**Khipu model family**](https://huggingface.co/SZLHOLDINGS/SZL-Khipu-1.5B) | Compact model artifacts and governed reasoning experiments | Each model card governs its own lineage, evaluation, and intended-use claims |
+| [**SZL kernels**](https://huggingface.co/SZLHOLDINGS/szl-kernels) | Reproducible compute and inference primitives | Publication does not establish benchmark superiority or production suitability |
+| [**Killinchu**](https://huggingface.co/spaces/SZLHOLDINGS/killinchu) | Public synthetic counter-UAS reference | Public actuation is **SIMULATED**; no live weapon command is claimed |
+| [**Receipt verifier**](https://huggingface.co/spaces/SZLHOLDINGS/governed-receipt-verifier) | Independent receipt inspection and replay | Verification proves scoped integrity and origin, not truth or authorization |
+| [**SZL Lake**](https://huggingface.co/datasets/SZLHOLDINGS/szl-lake) | Admitted public evidence and data artifacts | Freshness, completeness, jurisdiction, and source limitations remain explicit |
 
-### 03 / Models + kernels
+## Artifact contract
 
-Ready-to-wear—weights exist, proposal-only:
-[**Khipu 1.5B**](https://huggingface.co/SZLHOLDINGS/SZL-Khipu-1.5B),
-[**Forge ReceiptAgent**](https://huggingface.co/SZLHOLDINGS/SZL-Forge-1.5B-ReceiptAgent),
-[**ReceiptAgent 0.8B**](https://huggingface.co/SZLHOLDINGS/szl-receiptagent-qwen35-0.8b-v2),
-and [**szl-kernels**](https://huggingface.co/SZLHOLDINGS/szl-kernels).
+A polished card is navigation—not evidence. Every consequential artifact should
+identify its exact source, revision, license, intended use, known limitations,
+and evaluation or benchmark evidence when that evidence exists.
 
-Fall 2026—**CUTTING**, cards only, no weights:
-[**KHIPU-R2**](https://huggingface.co/SZLHOLDINGS/KHIPU-R2),
-[**WILLAY**](https://huggingface.co/SZLHOLDINGS/WILLAY),
-[**KILLINCHU-EYE**](https://huggingface.co/SZLHOLDINGS/KILLINCHU-EYE),
-[**YARQA-ATTN**](https://huggingface.co/SZLHOLDINGS/YARQA-ATTN), and
-[**A11OY-MINI**](https://huggingface.co/SZLHOLDINGS/A11OY-MINI).
-
-Admitted evidence lives in
-[**szl-lake**](https://huggingface.co/datasets/SZLHOLDINGS/szl-lake).
-We use public research as inspiration while preserving original SZL
-implementations and lineage; third-party weights are never relabeled.
-
-### 04 / Evidence
-
-[**Receipt verifier**](https://huggingface.co/spaces/SZLHOLDINGS/governed-receipt-verifier)
-supports replay. A running Space proves reachability, not capability; a
-signature establishes scoped integrity and origin, not accuracy, safety, or
-authorization.
-
-<details>
-<summary><strong>Artifact and truth contract</strong></summary>
-
-- Weights require lineage, hashes, evaluation, and an autonomy boundary.
-- Claims use PROVED, MEASURED, REPORTED, MODELED, CONJECTURE, or ROADMAP.
-- Lambda uniqueness remains Conjecture 1, not a theorem.
+- Evidence labels use **PROVED**, **MEASURED**, **REPORTED**, **MODELED**,
+  **CONJECTURE**, **ROADMAP**, **UNKNOWN**, or **UNAVAILABLE**.
+- Operational state is separate: **OPERATIONAL**, **PARTIAL**, **DEGRADED**,
+  **UNAVAILABLE**, or **HISTORICAL**.
+- A running Space or HTTP 200 proves reachability only.
+- A signature establishes scoped integrity and origin; it does not establish
+  accuracy, safety, compliance, performance, or authorization to deploy.
+- Lambda uniqueness remains **Conjecture 1**, not a theorem.
 - [`SZLHOLDINGS/SZLHOLDINGS`](https://huggingface.co/datasets/SZLHOLDINGS/SZLHOLDINGS)
-  is a **HISTORICAL** mirror, not the current card, inventory, or runtime source.
-
-</details>
+  is a **HISTORICAL** mirror, not the current inventory or runtime source.
 
 ## Current state
 
 [Served source](https://szlholdings-readme.static.hf.space/deployment.json) ·
-[a11oy readiness](https://a-11-oy.com/api/a11oy/v1/readiness) ·
+[A11oy readiness](https://a-11-oy.com/api/a11oy/v1/readiness) ·
 [Killinchu build](https://szlholdings-killinchu.hf.space/api/build-info)
 
-Links change. No authorization, approval, adoption, or investment outcome is
-claimed.
+Links and runtime state can change. This card does not claim production
+authorization, regulatory approval, customer adoption, or an investment outcome.
 
 ## Reproduce and verify
 
-Source:
+The canonical card source is
 [`szl-holdings/.github`](https://github.com/szl-holdings/.github/tree/main/huggingface/org-card).
-The Space exposes its exact GitHub revision through
+The published Space exposes the exact GitHub revision through
 [`deployment.json`](https://szlholdings-readme.static.hf.space/deployment.json).
 
 ```bash
@@ -120,6 +109,6 @@ python -m http.server 8000 --directory "$preview_dir"
 
 <div align="center">
 
-**Govern · execute · prove**
+**Understand · build · verify**
 
 </div>
