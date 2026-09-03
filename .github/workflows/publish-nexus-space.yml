@@ -1,0 +1,316 @@
+# Copyright 2026 SZL Holdings — SPDX-License-Identifier: Apache-2.0
+name: Publish Nexus Space
+
+# Nexus is source-owned by szl-holdings/nexus, but provider credentials are
+# intentionally owned by this central control repository. Pull requests perform
+# network-free contract validation only. Protected main, schedule, or owner
+# dispatch publishes the exact current Nexus main tip and attests live readback.
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - .github/workflows/publish-nexus-space.yml
+      - .github/scripts/hf_deploy_from_dockerfile.py
+      - requirements/hf-publisher.lock
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/publish-nexus-space.yml
+  schedule:
+    - cron: "23 * * * *"
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+  security-events: write
+
+concurrency:
+  group: publish-nexus-space-${{ github.event_name }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    name: Validate central Nexus publisher contract
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+    permissions:
+      contents: read
+    steps:
+      - name: Harden runner
+        uses: step-security/harden-runner@05e31511f85b41b11d1cf0ef85d0992719546e2c # v2.21.0
+        with:
+          egress-policy: audit
+
+      - name: Checkout exact policy source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 1
+
+      - name: Set up exact Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12.10"
+
+      - name: Validate syntax, pins, and immutable boundary
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -I -P <<'PY'
+          from pathlib import Path
+          import re
+
+          path = Path('.github/workflows/publish-nexus-space.yml')
+          text = path.read_text(encoding='utf-8')
+          required = (
+              'repository: szl-holdings/nexus',
+              'HF_REPO: SZLHOLDINGS/nexus',
+              '--dockerfile-path space/Dockerfile',
+              '--require-default-branch-tip',
+              '--restart-space',
+              '--attest',
+              '--wait-running 1200',
+              'secrets.HF_ORG_TOKEN',
+              'secrets.HF_ORG_TOKEN1',
+              'secrets.HF_TOKEN',
+              'secrets.HF_WRITE_TOKEN',
+              'github.event_name != \'pull_request\'',
+          )
+          missing = [item for item in required if item not in text]
+          if missing:
+              raise SystemExit(f'missing central Nexus publisher controls: {missing!r}')
+          uses = re.findall(r'^\s*uses:\s*(\S+)\s*(?:#.*)?$', text, re.MULTILINE)
+          bad = [value for value in uses if not re.fullmatch(r'[^@\s]+@[0-9a-f]{40}', value)]
+          if bad:
+              raise SystemExit(f'unpinned actions: {bad!r}')
+          if re.search(r'(?m)^    environment:', text):
+              raise SystemExit('central Nexus publisher must not add a duplicate environment gate')
+          print('central Nexus publisher contract: PASS')
+          PY
+          git diff --check
+
+  publish:
+    name: Publish exact Nexus main and attest live state
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - name: Harden runner
+        uses: step-security/harden-runner@05e31511f85b41b11d1cf0ef85d0992719546e2c # v2.21.0
+        with:
+          egress-policy: audit
+
+      - name: Checkout exact publisher policy
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          path: tools
+          ref: ${{ github.sha }}
+          persist-credentials: false
+          fetch-depth: 1
+
+      - name: Checkout current Nexus source main tip
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: szl-holdings/nexus
+          ref: main
+          path: source
+          persist-credentials: false
+          fetch-depth: 1
+
+      - name: Set up exact Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12.10"
+
+      - name: Create fresh publisher environment
+        shell: bash
+        run: |
+          set -euo pipefail
+          VENV="$RUNNER_TEMP/hf-publisher-venv"
+          test ! -e "$VENV"
+          python3 -m venv "$VENV"
+          ACTUAL_VERSION="$("$VENV/bin/python" -I -P -c 'import platform; print(platform.python_version())')"
+          test "$ACTUAL_VERSION" = "3.12.10"
+
+      - name: Install hash-locked publisher closure
+        shell: bash
+        run: >-
+          "$RUNNER_TEMP/hf-publisher-venv/bin/python" -I -P -m pip install
+          --disable-pip-version-check --require-hashes --only-binary=:all:
+          --ignore-installed -r tools/requirements/hf-publisher.lock
+
+      - name: Resolve exact source and publication mode
+        id: source
+        shell: bash
+        run: |
+          set -euo pipefail
+          SOURCE_SHA="$(git -C source rev-parse --verify HEAD)"
+          [[ "$SOURCE_SHA" =~ ^[0-9a-f]{40}$ ]]
+          mkdir -p evidence/nexus
+          binding=false
+          smoke='["/","/healthz"]'
+          if grep -Eq '^COPY[[:space:]]+SOURCE_GITHUB_SHA[[:space:]]' source/space/Dockerfile; then
+            binding=true
+            smoke='["/","/healthz","/api/build-info"]'
+          fi
+          echo "sha=$SOURCE_SHA" >> "$GITHUB_OUTPUT"
+          echo "binding=$binding" >> "$GITHUB_OUTPUT"
+          echo "smoke=$smoke" >> "$GITHUB_OUTPUT"
+          printf 'source=szl-holdings/nexus@%s binding=%s smoke=%s\n' "$SOURCE_SHA" "$binding" "$smoke"
+
+      - name: Validate Nexus Hugging Face card before mutation
+        shell: bash
+        run: |
+          set -euo pipefail
+          "$RUNNER_TEMP/hf-publisher-venv/bin/python" -I -P <<'PY'
+          from pathlib import Path
+          import yaml
+
+          readme = Path('source/README.md')
+          text = readme.read_text(encoding='utf-8')
+          if not text.startswith('---\n'):
+              raise SystemExit('Nexus README.md has no Hugging Face front matter')
+          end = text.find('\n---\n', 4)
+          if end < 0:
+              raise SystemExit('Nexus README.md front matter is unterminated')
+          meta = yaml.safe_load(text[4:end])
+          if not isinstance(meta, dict):
+              raise SystemExit('Nexus Hugging Face metadata must be a mapping')
+          if meta.get('license') != 'apache-2.0':
+              raise SystemExit('Nexus card must retain apache-2.0 license metadata')
+          desc = str(meta.get('short_description') or '').strip()
+          if not desc or len(desc) > 60:
+              raise SystemExit('Nexus short_description must be 1..60 characters')
+          if meta.get('sdk') != 'docker' or str(meta.get('app_port')) != '7860':
+              raise SystemExit('Nexus card Docker runtime metadata drifted')
+          print('Nexus Hugging Face card: PASS')
+          PY
+
+      - name: Require central repository credential
+        shell: bash
+        env:
+          HF_TOKEN: ${{ secrets.HF_ORG_TOKEN || secrets.HF_ORG_TOKEN1 || secrets.HF_TOKEN || secrets.HF_WRITE_TOKEN }}
+        run: |
+          set -euo pipefail
+          test -n "${HF_TOKEN:-}" || {
+            echo "::error::No Hugging Face write credential is available in the central repository secret scope."
+            exit 2
+          }
+
+      - name: Deploy exact Dockerfile-derived Nexus closure
+        shell: bash
+        env:
+          HF_TOKEN: ${{ secrets.HF_ORG_TOKEN || secrets.HF_ORG_TOKEN1 || secrets.HF_TOKEN || secrets.HF_WRITE_TOKEN }}
+          GITHUB_TOKEN: ${{ github.token }}
+          SOURCE_SHA: ${{ steps.source.outputs.sha }}
+          SOURCE_BINDING: ${{ steps.source.outputs.binding }}
+          SMOKE_PATHS: ${{ steps.source.outputs.smoke }}
+          HF_REPO: SZLHOLDINGS/nexus
+        run: |
+          set -euo pipefail
+          REVISION_ARGS=()
+          if [ "$SOURCE_BINDING" = true ]; then
+            REVISION_ARGS+=(--source-revision-file SOURCE_GITHUB_SHA)
+          fi
+          "$RUNNER_TEMP/hf-publisher-venv/bin/python" -I -P tools/.github/scripts/hf_deploy_from_dockerfile.py \
+            --repo-root source \
+            --github-repo szl-holdings/nexus \
+            --hf-repo "$HF_REPO" \
+            --ref "$SOURCE_SHA" \
+            --source-sha "$SOURCE_SHA" \
+            --dockerfile-path space/Dockerfile \
+            "${REVISION_ARGS[@]}" \
+            --include-readme true \
+            --smoke-paths "$SMOKE_PATHS" \
+            --prune \
+            --require-default-branch-tip \
+            --manifest-out evidence/nexus/hf-deploy-manifest.json
+
+      - name: Restart Space after governed publication
+        shell: bash
+        env:
+          HF_TOKEN: ${{ secrets.HF_ORG_TOKEN || secrets.HF_ORG_TOKEN1 || secrets.HF_TOKEN || secrets.HF_WRITE_TOKEN }}
+          HF_REPO: SZLHOLDINGS/nexus
+        run: |
+          set -euo pipefail
+          "$RUNNER_TEMP/hf-publisher-venv/bin/python" -I -P tools/.github/scripts/hf_deploy_from_dockerfile.py \
+            --restart-space \
+            --manifest evidence/nexus/hf-deploy-manifest.json \
+            --hf-repo "$HF_REPO"
+
+      - name: Attest exact running commit, bytes, and smoke routes
+        shell: bash
+        env:
+          HF_TOKEN: ${{ secrets.HF_ORG_TOKEN || secrets.HF_ORG_TOKEN1 || secrets.HF_TOKEN || secrets.HF_WRITE_TOKEN }}
+          HF_REPO: SZLHOLDINGS/nexus
+        run: |
+          set -euo pipefail
+          "$RUNNER_TEMP/hf-publisher-venv/bin/python" -I -P tools/.github/scripts/hf_deploy_from_dockerfile.py \
+            --attest \
+            --manifest evidence/nexus/hf-deploy-manifest.json \
+            --hf-repo "$HF_REPO" \
+            --wait-running 1200
+
+      - name: Verify embedded source revision when supported
+        if: steps.source.outputs.binding == 'true'
+        shell: bash
+        env:
+          SOURCE_SHA: ${{ steps.source.outputs.sha }}
+        run: |
+          set -euo pipefail
+          "$RUNNER_TEMP/hf-publisher-venv/bin/python" -I -P <<'PY'
+          import json
+          import os
+          import time
+          import urllib.request
+          from pathlib import Path
+
+          expected = os.environ['SOURCE_SHA']
+          url = 'https://szlholdings-nexus.hf.space/api/build-info'
+          deadline = time.monotonic() + 240
+          last = None
+          while time.monotonic() < deadline:
+              try:
+                  req = urllib.request.Request(url, headers={'Cache-Control': 'no-cache'})
+                  with urllib.request.urlopen(req, timeout=20) as response:
+                      body = json.loads(response.read().decode('utf-8'))
+                  revision = body.get('source_revision') or body.get('build', {}).get('revision')
+                  last = {'http_status': response.status, 'revision': revision, 'body': body}
+                  if response.status == 200 and revision == expected:
+                      Path('evidence/nexus/live-source-binding.json').write_text(
+                          json.dumps(last, indent=2, sort_keys=True) + '\n', encoding='utf-8'
+                      )
+                      break
+              except Exception as exc:
+                  last = {'error': f'{type(exc).__name__}: {exc}'}
+              time.sleep(5)
+          else:
+              raise SystemExit(f'Nexus live source binding did not converge: {last!r}')
+          print(json.dumps(last, indent=2, sort_keys=True))
+          PY
+
+      - name: Publish measured summary
+        shell: bash
+        env:
+          SOURCE_SHA: ${{ steps.source.outputs.sha }}
+          SOURCE_BINDING: ${{ steps.source.outputs.binding }}
+        run: |
+          {
+            echo "### Central Nexus publication"
+            echo
+            echo "- GitHub source: \`szl-holdings/nexus@${SOURCE_SHA}\`"
+            echo "- Hugging Face target: \`SZLHOLDINGS/nexus\`"
+            echo "- Default-tip guard: passed"
+            echo "- Runtime and byte attestation: passed"
+            echo "- Embedded source binding supported: \`${SOURCE_BINDING}\`"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload immutable Nexus deployment evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: hf-central-nexus-${{ steps.source.outputs.sha || github.run_id }}
+          path: evidence/nexus/
+          if-no-files-found: warn
+          retention-days: 90
