@@ -180,7 +180,7 @@ class ResponsiveSpaceContractTests(unittest.TestCase):
             javascript,
         )
         self.assertEqual(plan.status, "planned")
-        self.assertEqual(plan.adapter, "responsive-refresh")
+        self.assertEqual(plan.adapter, "responsive-existing-host")
         self.assertEqual(plan.entrypoint, "index.html")
         self.assertEqual(
             {change.path for change in plan.changes},
