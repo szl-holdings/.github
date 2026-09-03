@@ -1,0 +1,107 @@
+name: Frontier issue operator
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/scripts/frontier_issue_operator.py"
+      - ".github/workflows/frontier-issue-operator.yml"
+      - ".github/workflows/frontier-issue-operator-contract.yml"
+      - "tests/test_frontier_issue_operator.py"
+  schedule:
+    - cron: "17 */2 * * *"
+  workflow_dispatch:
+    inputs:
+      apply:
+        description: "Apply bounded green-PR merges, exact-duplicate closures, and issue labels"
+        required: false
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+  actions: read
+  checks: read
+  issues: write
+  pull-requests: write
+
+concurrency:
+  group: frontier-issue-operator
+  cancel-in-progress: false
+
+env:
+  REPORT_PATH: frontier-issue-operator.json
+
+jobs:
+  operate:
+    name: Reconcile pull requests and issues without bypass
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      # Prefer an organization-capable credential. The repository token remains
+      # a fail-closed fallback and cannot silently acquire cross-repository scope.
+      SZL_ORG_TOKEN: ${{ secrets.SZL_ORG_ADMIN_TOKEN || secrets.ORG_ADMIN_TOKEN || secrets.SZL_GITHUB_TOKEN || secrets.GH_PAT || github.token }}
+    steps:
+      - name: Harden runner
+        uses: step-security/harden-runner@bf7454d06d71f1098171f2acdf0cd4708d7b5920 # v2.20.0
+        with:
+          egress-policy: audit
+
+      - name: Checkout exact protected source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12"
+
+      - name: Run network-free operator contracts
+        run: |
+          python -m pip install --disable-pip-version-check pytest
+          python -m pytest -q tests/test_frontier_issue_operator.py
+          python -m py_compile .github/scripts/frontier_issue_operator.py
+
+      - name: Execute bounded organization reconciliation
+        shell: bash
+        run: |
+          set -euo pipefail
+          args=(--org szl-holdings --report "$REPORT_PATH")
+          if [ "${{ github.event_name != 'workflow_dispatch' || inputs.apply }}" = "true" ]; then
+            args+=(--apply)
+          fi
+          python .github/scripts/frontier_issue_operator.py "${args[@]}"
+
+      - name: Verify the receipt is secret-free and structurally complete
+        if: always()
+        shell: bash
+        run: |
+          python - <<'PY'
+          import json
+          import re
+          from pathlib import Path
+
+          path = Path("frontier-issue-operator.json")
+          if not path.is_file():
+              raise SystemExit("frontier operator did not emit its receipt")
+          text = path.read_text(encoding="utf-8")
+          payload = json.loads(text)
+          if payload.get("token_value_recorded") is not False:
+              raise SystemExit("operator receipt did not explicitly deny token recording")
+          if re.search(r"(?:gh[pousr]_|github_pat_|hf_)[A-Za-z0-9_]{20,}", text):
+              raise SystemExit("credential-shaped string appeared in operator receipt")
+          if payload.get("schema") != "szl.frontier-issue-operator/v1":
+              raise SystemExit("unexpected operator receipt schema")
+          summary = payload.get("summary") or {}
+          print(json.dumps(summary, indent=2, sort_keys=True))
+          PY
+
+      - name: Upload immutable reconciliation receipt
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: frontier-issue-operator-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ env.REPORT_PATH }}
+          if-no-files-found: error
+          retention-days: 90
