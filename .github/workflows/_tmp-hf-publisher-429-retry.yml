@@ -1,0 +1,341 @@
+name: Temporary HF publisher 429 hardening
+
+on:
+  push:
+    branches:
+      - fix/hf-publisher-429-retry-20260903
+
+permissions:
+  contents: write
+
+concurrency:
+  group: tmp-hf-publisher-429-retry-20260903
+  cancel-in-progress: false
+
+jobs:
+  harden:
+    if: >-
+      github.repository == 'szl-holdings/.github' &&
+      github.actor == 'stephenlutar2-hash'
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - name: Checkout exact candidate
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          ref: ${{ github.ref_name }}
+
+      - name: Patch safe Hugging Face reads and lock regression coverage
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          python3 - <<'PY'
+          from pathlib import Path
+
+          script_path = Path('.github/scripts/hf_deploy_from_dockerfile.py')
+          script = script_path.read_text(encoding='utf-8')
+          if 'def hf_read_with_retry(' in script:
+              raise SystemExit('retry helper already exists; refusing a duplicate patch')
+
+          helper = r'''
+
+          HF_TRANSIENT_READ_STATUS_CODES = frozenset({429, 502, 503, 504})
+          HF_READ_RETRY_ATTEMPTS = 5
+          HF_READ_RETRY_BASE_DELAY_SECONDS = 2.0
+          HF_READ_RETRY_MAX_DELAY_SECONDS = 30.0
+
+
+          def _hf_response_status_code(error):
+              """Return an integer HTTP status from a huggingface_hub exception."""
+              response = getattr(error, "response", None)
+              value = getattr(response, "status_code", None)
+              try:
+                  return int(value)
+              except (TypeError, ValueError):
+                  return None
+
+
+          def _hf_retry_after_seconds(error, *, wall_time):
+              """Parse Retry-After as delta-seconds or an RFC 7231 HTTP date."""
+              response = getattr(error, "response", None)
+              headers = getattr(response, "headers", None)
+              raw = headers.get("Retry-After") if hasattr(headers, "get") else None
+              if raw is None:
+                  return None
+              value = str(raw).strip()
+              if not value:
+                  return None
+              try:
+                  seconds = float(value)
+              except ValueError:
+                  from datetime import timezone
+                  from email.utils import parsedate_to_datetime
+
+                  try:
+                      retry_at = parsedate_to_datetime(value)
+                  except (TypeError, ValueError, OverflowError):
+                      return None
+                  if retry_at is None:
+                      return None
+                  if retry_at.tzinfo is None:
+                      retry_at = retry_at.replace(tzinfo=timezone.utc)
+                  seconds = retry_at.timestamp() - float(wall_time())
+              if seconds != seconds or seconds in (float("inf"), float("-inf")):
+                  return None
+              return max(0.0, seconds)
+
+
+          def hf_read_with_retry(
+              label,
+              operation,
+              *,
+              attempts=HF_READ_RETRY_ATTEMPTS,
+              base_delay=HF_READ_RETRY_BASE_DELAY_SECONDS,
+              max_delay=HF_READ_RETRY_MAX_DELAY_SECONDS,
+              sleep=time.sleep,
+              wall_time=time.time,
+              random_value=random.random,
+          ):
+              """Retry only safe HF reads on bounded transient HTTP responses.
+
+              Authentication, authorization, validation, and every non-HTTP error
+              remain immediate failures. Exhaustion re-raises the original provider
+              exception, so the deployment stays fail closed and retains its trace.
+              """
+              if not isinstance(attempts, int) or attempts < 1:
+                  raise ValueError("attempts must be a positive integer")
+              if base_delay < 0 or max_delay < 0:
+                  raise ValueError("retry delays must be non-negative")
+
+              for attempt in range(1, attempts + 1):
+                  try:
+                      return operation()
+                  except Exception as error:  # noqa: BLE001 - provider boundary
+                      status = _hf_response_status_code(error)
+                      if (
+                          status not in HF_TRANSIENT_READ_STATUS_CODES
+                          or attempt >= attempts
+                      ):
+                          raise
+
+                      retry_after = _hf_retry_after_seconds(
+                          error,
+                          wall_time=wall_time,
+                      )
+                      if retry_after is None:
+                          exponential = min(
+                              max_delay,
+                              base_delay * (2 ** (attempt - 1)),
+                          )
+                          jitter_fraction = min(
+                              1.0,
+                              max(0.0, float(random_value())),
+                          )
+                          jitter_window = min(1.0, exponential * 0.25)
+                          delay = min(
+                              max_delay,
+                              exponential + (jitter_window * jitter_fraction),
+                          )
+                      else:
+                          delay = min(max_delay, retry_after)
+
+                      print(
+                          "::warning::Hugging Face safe read "
+                          f"{label!r} returned HTTP {status}; "
+                          f"retrying {attempt + 1}/{attempts} in {delay:.2f}s"
+                      )
+                      sleep(delay)
+          '''
+          helper = '\n'.join(
+              line[10:] if line.startswith('          ') else line
+              for line in helper.splitlines()
+          )
+          marker = '\n\ndef deploy(args):\n'
+          if script.count(marker) != 1:
+              raise SystemExit('deploy insertion marker was not unique')
+          script = script.replace(marker, helper + marker, 1)
+
+          old = (
+              '        live = api.list_repo_files('
+              'repo_id=args.hf_repo, repo_type="space")\n'
+          )
+          new = (
+              '        live = hf_read_with_retry(\n'
+              '            "Space repository file listing",\n'
+              '            lambda: api.list_repo_files(\n'
+              '                repo_id=args.hf_repo, repo_type="space"\n'
+              '            ),\n'
+              '        )\n'
+          )
+          if script.count(old) != 1:
+              raise SystemExit('list_repo_files mutation boundary was not unique')
+          script_path.write_text(script.replace(old, new, 1), encoding='utf-8')
+
+          test_path = Path('.github/scripts/test_hf_deploy_from_dockerfile.py')
+          tests = test_path.read_text(encoding='utf-8')
+          if 'class TestHfSafeReadRetry(' in tests:
+              raise SystemExit('retry tests already exist; refusing duplicate coverage')
+          test_block = r'''
+
+          class _FakeHfHttpError(RuntimeError):
+              def __init__(self, status, retry_after=None):
+                  super().__init__(f"HTTP {status}")
+                  headers = {}
+                  if retry_after is not None:
+                      headers["Retry-After"] = retry_after
+                  self.response = types.SimpleNamespace(
+                      status_code=status,
+                      headers=headers,
+                  )
+
+
+          class TestHfSafeReadRetry(unittest.TestCase):
+              def test_429_honors_numeric_retry_after_then_returns(self):
+                  operation = mock.Mock(
+                      side_effect=[_FakeHfHttpError(429, "0.25"), ["app.py"]]
+                  )
+                  sleep = mock.Mock()
+
+                  result = dep.hf_read_with_retry(
+                      "tree",
+                      operation,
+                      sleep=sleep,
+                      wall_time=lambda: 0.0,
+                      random_value=lambda: 0.0,
+                  )
+
+                  self.assertEqual(result, ["app.py"])
+                  self.assertEqual(operation.call_count, 2)
+                  sleep.assert_called_once_with(0.25)
+
+              def test_http_date_retry_after_is_supported(self):
+                  operation = mock.Mock(
+                      side_effect=[
+                          _FakeHfHttpError(
+                              429,
+                              "Thu, 01 Jan 1970 00:00:10 GMT",
+                          ),
+                          "ok",
+                      ]
+                  )
+                  sleep = mock.Mock()
+
+                  self.assertEqual(
+                      dep.hf_read_with_retry(
+                          "tree",
+                          operation,
+                          sleep=sleep,
+                          wall_time=lambda: 7.0,
+                          random_value=lambda: 0.0,
+                      ),
+                      "ok",
+                  )
+                  sleep.assert_called_once_with(3.0)
+
+              def test_transient_fallback_is_bounded_exponential(self):
+                  operation = mock.Mock(
+                      side_effect=[
+                          _FakeHfHttpError(503),
+                          _FakeHfHttpError(504),
+                          "ok",
+                      ]
+                  )
+                  sleep = mock.Mock()
+
+                  self.assertEqual(
+                      dep.hf_read_with_retry(
+                          "tree",
+                          operation,
+                          attempts=3,
+                          base_delay=2.0,
+                          max_delay=3.0,
+                          sleep=sleep,
+                          wall_time=lambda: 0.0,
+                          random_value=lambda: 0.0,
+                      ),
+                      "ok",
+                  )
+                  self.assertEqual(
+                      [call.args[0] for call in sleep.call_args_list],
+                      [2.0, 3.0],
+                  )
+
+              def test_401_is_never_retried(self):
+                  failure = _FakeHfHttpError(401, "30")
+                  operation = mock.Mock(side_effect=failure)
+                  sleep = mock.Mock()
+
+                  with self.assertRaises(_FakeHfHttpError) as raised:
+                      dep.hf_read_with_retry("tree", operation, sleep=sleep)
+
+                  self.assertIs(raised.exception, failure)
+                  operation.assert_called_once_with()
+                  sleep.assert_not_called()
+
+              def test_exhaustion_re_raises_provider_failure(self):
+                  first = _FakeHfHttpError(429, "0")
+                  second = _FakeHfHttpError(429, "0")
+                  operation = mock.Mock(side_effect=[first, second])
+                  sleep = mock.Mock()
+
+                  with self.assertRaises(_FakeHfHttpError) as raised:
+                      dep.hf_read_with_retry(
+                          "tree",
+                          operation,
+                          attempts=2,
+                          sleep=sleep,
+                      )
+
+                  self.assertIs(raised.exception, second)
+                  self.assertEqual(operation.call_count, 2)
+                  sleep.assert_called_once_with(0.0)
+
+              def test_only_the_prune_read_is_wrapped(self):
+                  with open(dep.__file__, encoding="utf-8") as fh:
+                      source = fh.read()
+                  self.assertIn("live = hf_read_with_retry(", source)
+                  self.assertIn("lambda: api.list_repo_files(", source)
+                  self.assertNotIn("hf_read_with_retry(\n        repo_id", source)
+          '''
+          test_block = '\n'.join(
+              line[10:] if line.startswith('          ') else line
+              for line in test_block.splitlines()
+          )
+          test_marker = '\n\nclass TestReusableWorkflowContract(unittest.TestCase):\n'
+          if tests.count(test_marker) != 1:
+              raise SystemExit('test insertion marker was not unique')
+          test_path.write_text(
+              tests.replace(test_marker, test_block + test_marker, 1),
+              encoding='utf-8',
+          )
+          PY
+
+          python3 -m py_compile \
+            .github/scripts/hf_deploy_from_dockerfile.py \
+            .github/scripts/test_hf_deploy_from_dockerfile.py
+          python3 .github/scripts/test_hf_deploy_from_dockerfile.py
+          git diff --check
+          grep -F 'live = hf_read_with_retry(' \
+            .github/scripts/hf_deploy_from_dockerfile.py
+          grep -F 'status not in HF_TRANSIENT_READ_STATUS_CODES' \
+            .github/scripts/hf_deploy_from_dockerfile.py
+
+      - name: Commit reviewed branch result and remove temporary workflow
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm .github/workflows/_tmp-hf-publisher-429-retry.yml
+          git diff --check
+          git config user.name 'Stephen Lutar'
+          git config user.email 'stephenlutar2@gmail.com'
+          git add \
+            .github/scripts/hf_deploy_from_dockerfile.py \
+            .github/scripts/test_hf_deploy_from_dockerfile.py \
+            .github/workflows/_tmp-hf-publisher-429-retry.yml
+          git commit \
+            -m 'fix(hf): retry transient repository-tree reads' \
+            -m 'Retry only idempotent Hugging Face repository-tree reads on bounded 429/502/503/504 responses, honor Retry-After, and preserve fail-closed provider errors after exhaustion.' \
+            -m 'Signed-off-by: Stephen Lutar <stephenlutar2@gmail.com>'
+          git push origin "HEAD:${GITHUB_REF_NAME}"
