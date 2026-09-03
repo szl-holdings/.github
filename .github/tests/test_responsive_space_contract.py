@@ -49,6 +49,7 @@ class ResponsiveSpaceContractTests(unittest.TestCase):
         for marker in (
             "__SZL_PUBLIC_EXPERIENCE_V3__",
             "szlPublicExperienceV3",
+            "szlSpaceHoloV2",
             "szlViewportTier",
             "szlZoomTier",
             "szlAudience",
@@ -186,6 +187,49 @@ class ResponsiveSpaceContractTests(unittest.TestCase):
             {change.path for change in plan.changes},
             {"szl-space-hologram.css", "szl-space-hologram.js"},
         )
+
+    def test_product_owned_asset_host_is_refreshed_without_duplicate_shell(self) -> None:
+        core = self._core(
+            lambda *args, **kwargs: SimpleNamespace(
+                status="planned",
+                adapter="static",
+                entrypoint="app/static/index.html",
+                changes=[Change("app/static/szl-space-hologram.css", args[-2])],
+            )
+        )
+        responsive.install(core)
+
+        class GitHub:
+            @staticmethod
+            def tree(full_name, default_branch):
+                return [
+                    {"path": "app/static/index.html"},
+                    {"path": "app/static/holo.css"},
+                    {"path": "app/static/holo.js"},
+                ]
+
+            @staticmethod
+            def file(full_name, path, default_branch):
+                return ("product-owned asset", "sha")
+
+        plan = core.plan_repository(
+            GitHub(),
+            {"full_name": "szl-holdings/david-leads", "default_branch": "main"},
+            [],
+            1000,
+            "canonical source map",
+            "combined css",
+            "combined js",
+        )
+        self.assertEqual(plan.status, "planned")
+        self.assertEqual(plan.adapter, "responsive-existing-host")
+        self.assertEqual(plan.entrypoint, "app/static/index.html")
+        self.assertEqual(
+            {change.path for change in plan.changes},
+            {"app/static/holo.css", "app/static/holo.js"},
+        )
+        for change in plan.changes:
+            self.assertIn("SZL Public Experience v3" if change.path.endswith(".css") else "__SZL_PUBLIC_EXPERIENCE_V3__", change.content)
 
     def test_pr_body_states_additive_truth_boundary(self) -> None:
         core = self._core(

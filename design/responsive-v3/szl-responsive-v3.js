@@ -137,6 +137,7 @@
     if (key === lastViewportState) return;
     lastViewportState = key;
 
+    ROOT.dataset.szlSpaceHoloV2 = "true";
     ROOT.dataset.szlPublicExperienceV3 = "true";
     ROOT.dataset.szlViewportTier = state.viewportTier;
     ROOT.dataset.szlViewportOrientation = state.orientation;
