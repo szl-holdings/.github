@@ -1,0 +1,400 @@
+name: Materialize Public Experience source-map adapters
+
+on:
+  push:
+    branches:
+      - fix/public-experience-source-map-adapters-v1
+    paths:
+      - .github/workflows/materialize-public-experience-source-map-adapters.yml
+
+permissions:
+  contents: write
+
+concurrency:
+  group: materialize-public-experience-source-map-adapters-v1
+  cancel-in-progress: false
+
+jobs:
+  materialize:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout exact repair branch
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: fix/public-experience-source-map-adapters-v1
+          fetch-depth: 0
+
+      - name: Patch guarded rollout controllers and tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+
+          rollout_path = Path('.github/scripts/rollout_holographic_spaces_v2.py')
+          rollout = rollout_path.read_text(encoding='utf-8')
+
+          constants_old = '''ASSETS_ROOT = Path("design/holographic-v2")
+          STATIC_INDEXES = (
+              "index.html",
+          '''
+          constants_new = '''ASSETS_ROOT = Path("design/holographic-v2")
+          LOCAL_SOURCE_MAP = Path("design/responsive-v3/flagship-space-sources.json")
+          MONOREPO_STATIC_ROOTS = {
+              "sentra": "artifacts/sentra",
+              "vessels": "artifacts/vessels",
+          }
+          STATIC_INDEXES = (
+              "index.html",
+              "app/static/index.html",
+              "static/index.html",
+          '''
+          if rollout.count(constants_old) != 1:
+              raise SystemExit('rollout constants anchor changed')
+          rollout = rollout.replace(constants_old, constants_new, 1)
+
+          start = rollout.index('def source_map() -> dict[str, str]:\n')
+          end = rollout.index('\ndef mapping_score(', start)
+          source_map = '''def _canonical_repo(value: Any) -> str | None:
+              if not isinstance(value, str):
+                  return None
+              match = re.search(r"(?:github\\.com/)?(szl-holdings/[A-Za-z0-9_.-]+)", value)
+              return match.group(1).removesuffix(".git") if match else None
+
+
+          def _space_slug(value: Any) -> str | None:
+              if not isinstance(value, str) or not value.strip():
+                  return None
+              return normalize(value.split("/", 1)[-1])
+
+
+          def _local_source_map() -> dict[str, str]:
+              if not LOCAL_SOURCE_MAP.is_file():
+                  return {}
+              payload = json.loads(LOCAL_SOURCE_MAP.read_text(encoding="utf-8"))
+              if payload.get("schema") != "szl.public-space-source-map/v1":
+                  raise RolloutError("LOCAL_SOURCE_MAP_SCHEMA_INVALID", str(payload.get("schema")))
+              values = payload.get("sources")
+              if not isinstance(values, list):
+                  raise RolloutError("LOCAL_SOURCE_MAP_INVALID", "sources must be a list")
+              found: dict[str, str] = {}
+              for item in values:
+                  if not isinstance(item, dict):
+                      raise RolloutError("LOCAL_SOURCE_MAP_INVALID", "source entries must be objects")
+                  slug = _space_slug(item.get("space"))
+                  repo = _canonical_repo(item.get("repo"))
+                  if not slug or not repo:
+                      raise RolloutError("LOCAL_SOURCE_MAP_INVALID", json.dumps(item, sort_keys=True))
+                  if slug in found and found[slug] != repo:
+                      raise RolloutError("LOCAL_SOURCE_MAP_CONFLICT", slug)
+                  found[slug] = repo
+              return found
+
+
+          def source_map() -> dict[str, str]:
+              # The protected local map is authoritative. Provider and a11oy
+              # metadata may fill gaps, but can never silently override it.
+              found = _local_source_map()
+              url = "https://raw.githubusercontent.com/szl-holdings/a11oy/main/docs/huggingface-space-source-map-v1.json"
+              try:
+                  payload = retry_get(url)
+              except RolloutError:
+                  return found
+              slug_keys = ("space", "space_id", "hf_space", "slug", "huggingface_space", "id")
+              repo_keys = ("source_repo", "repository", "github_repo", "source_repository", "repo", "full_name")
+
+              def direct_repo(value: Mapping[str, Any]) -> str | None:
+                  for key in repo_keys:
+                      repo = _canonical_repo(value.get(key))
+                      if repo:
+                          return repo
+                  mapping = value.get("source_mapping")
+                  if isinstance(mapping, dict):
+                      canonical = mapping.get("canonical")
+                      if isinstance(canonical, dict):
+                          repo = _canonical_repo(canonical.get("full_name") or canonical.get("repository"))
+                          if repo:
+                              return repo
+                      repo = _canonical_repo(mapping.get("full_name") or mapping.get("repository"))
+                      if repo:
+                          return repo
+                  source = value.get("source")
+                  if isinstance(source, dict):
+                      repo = _canonical_repo(source.get("full_name") or source.get("repository") or source.get("repo"))
+                      if repo:
+                          return repo
+                  return None
+
+              def direct_slug(value: Mapping[str, Any]) -> str | None:
+                  for key in slug_keys:
+                      candidate = value.get(key)
+                      if isinstance(candidate, dict):
+                          candidate = candidate.get("id") or candidate.get("slug") or candidate.get("name")
+                      slug = _space_slug(candidate)
+                      if slug and (key != "id" or str(candidate).lower().startswith("szlholdings/")):
+                          return slug
+                  return None
+
+              def visit(value: Any) -> None:
+                  if isinstance(value, dict):
+                      slug = direct_slug(value)
+                      repo = direct_repo(value)
+                      if slug and repo and slug not in found:
+                          found[slug] = repo
+                      for child in value.values():
+                          visit(child)
+                  elif isinstance(value, list):
+                      for child in value:
+                          visit(child)
+
+              visit(payload)
+              return found
+          '''
+          rollout = rollout[:start] + source_map + rollout[end:]
+
+          anchor = '    primary_slug = spaces[0].slug\n\n    for path in NEXT_LAYOUTS:\n'
+          monorepo = '''    primary_slug = spaces[0].slug
+
+              if full_name == "szl-holdings/platform":
+                  changes: list[Change] = []
+                  entrypoints: list[str] = []
+                  for space in spaces:
+                      root = MONOREPO_STATIC_ROOTS.get(normalize(space.slug))
+                      if not root:
+                          continue
+                      index_path = f"{root}/index.html"
+                      package_path = f"{root}/package.json"
+                      public_prefix = f"{root}/public/"
+                      if index_path not in paths or package_path not in paths or not any(path.startswith(public_prefix) for path in paths):
+                          plan.status = "report-only"
+                          plan.error = {
+                              "code": "MONOREPO_FRONTEND_SHAPE_INVALID",
+                              "message": f"{space.slug} is mapped to {root}, but its Vite index/package/public shape is incomplete.",
+                          }
+                          return plan
+                      content, _ = github.file(full_name, index_path, default_branch)
+                      patched = adapt_static(
+                          content,
+                          "/szl-space-hologram.css",
+                          "/szl-space-hologram.js",
+                          space.slug,
+                      )
+                      css_path = f"{root}/public/szl-space-hologram.css"
+                      js_path = f"{root}/public/szl-space-hologram.js"
+                      entrypoints.append(index_path)
+                      if patched != content:
+                          changes.extend(
+                              [
+                                  Change(css_path, css),
+                                  Change(js_path, javascript),
+                                  Change(index_path, patched),
+                              ]
+                          )
+                      elif css_path not in paths or js_path not in paths:
+                          plan.status = "report-only"
+                          plan.error = {
+                              "code": "MONOREPO_ASSET_BINDING_INCOMPLETE",
+                              "message": f"{space.slug} declares Holo markers without both public assets.",
+                          }
+                          return plan
+                  if entrypoints:
+                      plan.adapter = "monorepo-static"
+                      plan.entrypoint = ", ".join(entrypoints)
+                      if changes:
+                          deduped = {change.path: change for change in changes}
+                          plan.changes = list(deduped.values())
+                      else:
+                          plan.status = "already-integrated"
+                      return plan
+
+              for path in NEXT_LAYOUTS:
+          '''
+          if rollout.count(anchor) != 1:
+              raise SystemExit('plan_repository anchor changed')
+          rollout = rollout.replace(anchor, monorepo, 1)
+          rollout_path.write_text(rollout, encoding='utf-8')
+
+          runtime_path = Path('design/responsive-v3/szl-responsive-v3.js')
+          runtime = runtime_path.read_text(encoding='utf-8')
+          runtime_anchor = '    ROOT.dataset.szlPublicExperienceV3 = "true";\n'
+          runtime_replacement = '    ROOT.dataset.szlSpaceHoloV2 = "true";\n' + runtime_anchor
+          if runtime.count(runtime_anchor) != 1:
+              raise SystemExit('responsive runtime marker anchor changed')
+          runtime = runtime.replace(runtime_anchor, runtime_replacement, 1)
+          runtime_path.write_text(runtime, encoding='utf-8')
+
+          workflow_path = Path('.github/workflows/rollout-holographic-space-fabric-v2.yml')
+          workflow = workflow_path.read_text(encoding='utf-8')
+          trigger_anchor = '      - "design/responsive-v3/**"\n'
+          if trigger_anchor not in workflow:
+              trigger_anchor = '      - "design/holographic-v2/**"\n'
+              trigger_replacement = trigger_anchor + '      - "design/responsive-v3/**"\n'
+              if workflow.count(trigger_anchor) != 1:
+                  raise SystemExit('rollout workflow trigger anchor changed')
+              workflow = workflow.replace(trigger_anchor, trigger_replacement, 1)
+          workflow_path.write_text(workflow, encoding='utf-8')
+
+          responsive_test = Path('.github/tests/test_responsive_space_contract.py')
+          text = responsive_test.read_text(encoding='utf-8')
+          marker_anchor = '            "szlPublicExperienceV3",\n'
+          if '            "szlSpaceHoloV2",\n' not in text:
+              if text.count(marker_anchor) != 1:
+                  raise SystemExit('responsive test marker anchor changed')
+              text = text.replace(marker_anchor, marker_anchor + '            "szlSpaceHoloV2",\n', 1)
+          method_anchor = '    def test_pr_body_states_additive_truth_boundary(self) -> None:\n'
+          custom_method = '''    def test_product_owned_asset_host_is_refreshed_without_duplicate_shell(self) -> None:
+                  core = self._core(
+                      lambda *args, **kwargs: SimpleNamespace(
+                          status="planned",
+                          adapter="static",
+                          entrypoint="app/static/index.html",
+                          changes=[Change("app/static/szl-space-hologram.css", args[-2])],
+                      )
+                  )
+                  responsive.install(core)
+
+                  class GitHub:
+                      @staticmethod
+                      def tree(full_name, default_branch):
+                          return [
+                              {"path": "app/static/index.html"},
+                              {"path": "app/static/holo.css"},
+                              {"path": "app/static/holo.js"},
+                          ]
+
+                      @staticmethod
+                      def file(full_name, path, default_branch):
+                          return ("product-owned asset", "sha")
+
+                  plan = core.plan_repository(
+                      GitHub(),
+                      {"full_name": "szl-holdings/david-leads", "default_branch": "main"},
+                      [],
+                      1000,
+                      "canonical source map",
+                      "combined css",
+                      "combined js",
+                  )
+                  self.assertEqual(plan.status, "planned")
+                  self.assertEqual(plan.adapter, "responsive-existing-host")
+                  self.assertEqual(plan.entrypoint, "app/static/index.html")
+                  self.assertEqual(
+                      {change.path for change in plan.changes},
+                      {"app/static/holo.css", "app/static/holo.js"},
+                  )
+                  for change in plan.changes:
+                      self.assertIn("SZL Public Experience v3" if change.path.endswith(".css") else "__SZL_PUBLIC_EXPERIENCE_V3__", change.content)
+
+          '''
+          if 'test_product_owned_asset_host_is_refreshed_without_duplicate_shell' not in text:
+              if text.count(method_anchor) != 1:
+                  raise SystemExit('responsive test insertion anchor changed')
+              text = text.replace(method_anchor, custom_method + method_anchor, 1)
+          responsive_test.write_text(text, encoding='utf-8')
+
+          holo_test = Path('.github/tests/test_holographic_spaces_v2.py')
+          text = holo_test.read_text(encoding='utf-8')
+          insertion = '''    def test_protected_local_source_map_is_authoritative(self) -> None:
+                  mapping = core._local_source_map()
+                  self.assertEqual(mapping["sentra"], "szl-holdings/platform")
+                  self.assertEqual(mapping["vessels"], "szl-holdings/platform")
+                  self.assertEqual(mapping["david-leads"], "szl-holdings/david-leads")
+                  self.assertEqual(len(mapping), 9)
+
+              def test_platform_monorepo_adapter_updates_both_public_frontends(self) -> None:
+                  class GitHub:
+                      @staticmethod
+                      def tree(full_name, default_branch):
+                          return [
+                              {"path": "artifacts/sentra/index.html"},
+                              {"path": "artifacts/sentra/package.json"},
+                              {"path": "artifacts/sentra/public/keep.txt"},
+                              {"path": "artifacts/vessels/index.html"},
+                              {"path": "artifacts/vessels/package.json"},
+                              {"path": "artifacts/vessels/public/keep.txt"},
+                          ]
+
+                      @staticmethod
+                      def file(full_name, path, default_branch):
+                          return ("<!doctype html><html><head><title>X</title></head><body><main>X</main></body></html>", "sha")
+
+                  spaces = [
+                      core.Space("sentra", "docker", "RUNNING", "https://huggingface.co/spaces/SZLHOLDINGS/sentra"),
+                      core.Space("vessels", "docker", "RUNNING", "https://huggingface.co/spaces/SZLHOLDINGS/vessels"),
+                  ]
+                  plan = core.plan_repository(
+                      GitHub(),
+                      {"full_name": "szl-holdings/platform", "default_branch": "main"},
+                      spaces,
+                      1000,
+                      "canonical source map",
+                      "css",
+                      "javascript",
+                  )
+                  self.assertEqual(plan.status, "planned")
+                  self.assertEqual(plan.adapter, "monorepo-static")
+                  self.assertEqual(
+                      {change.path for change in plan.changes},
+                      {
+                          "artifacts/sentra/index.html",
+                          "artifacts/sentra/public/szl-space-hologram.css",
+                          "artifacts/sentra/public/szl-space-hologram.js",
+                          "artifacts/vessels/index.html",
+                          "artifacts/vessels/public/szl-space-hologram.css",
+                          "artifacts/vessels/public/szl-space-hologram.js",
+                      },
+                  )
+
+          '''
+          if 'test_protected_local_source_map_is_authoritative' not in text:
+              anchor = '    def test_asset_loader_verifies_schema(self) -> None:\n'
+              if text.count(anchor) != 1:
+                  raise SystemExit('holographic test insertion anchor changed')
+              text = text.replace(anchor, insertion + anchor, 1)
+          holo_test.write_text(text, encoding='utf-8')
+          PY
+
+      - name: Verify patched controllers and contracts
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m py_compile \
+            .github/scripts/rollout_holographic_spaces_v2.py \
+            .github/scripts/responsive_space_contract.py \
+            .github/tests/test_holographic_spaces_v2.py \
+            .github/tests/test_responsive_space_contract.py
+          node --check design/responsive-v3/szl-responsive-v3.js
+          python3 .github/tests/test_holographic_spaces_v2.py
+          python3 .github/tests/test_responsive_space_contract.py
+          python3 -m json.tool design/responsive-v3/flagship-space-sources.json >/dev/null
+          git diff --check
+
+      - name: Commit permanent controller repair
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'SZL Public Experience Controller'
+          git config user.email 'stephenlutar2@gmail.com'
+          git add \
+            .github/scripts/rollout_holographic_spaces_v2.py \
+            .github/scripts/responsive_space_contract.py \
+            .github/tests/test_holographic_spaces_v2.py \
+            .github/tests/test_responsive_space_contract.py \
+            .github/workflows/rollout-holographic-space-fabric-v2.yml \
+            design/responsive-v3/szl-responsive-v3.js \
+            design/responsive-v3/flagship-space-sources.json
+          git commit -m 'fix(frontend): map and adapt every flagship Space source' \
+            -m 'Use a protected local source map, support David Leads and Killinchu static roots, refresh product-owned asset hosts without duplicate shells, and adapt Sentra plus Vessels from their maintained platform monorepo roots.' \
+            -m 'Signed-off-by: Stephen Lutar <stephenlutar2@gmail.com>'
+          git push origin HEAD:fix/public-experience-source-map-adapters-v1
+
+      - name: Remove one-shot materializer from final tree
+        shell: bash
+        run: |
+          set -euo pipefail
+          git rm .github/workflows/materialize-public-experience-source-map-adapters.yml
+          git commit -m 'chore(frontend): retire one-shot source-map materializer' \
+            -m 'The permanent rollout controller and regression contracts are now source material.' \
+            -m 'Signed-off-by: Stephen Lutar <stephenlutar2@gmail.com>'
+          git push origin HEAD:fix/public-experience-source-map-adapters-v1
