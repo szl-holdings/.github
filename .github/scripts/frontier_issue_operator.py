@@ -345,14 +345,27 @@ class GitHub:
                 expected=(201,),
             )
 
-    def add_label(self, full_name: str, number: int, label: str) -> None:
+    def set_classification(
+        self,
+        full_name: str,
+        number: int,
+        label: str,
+        existing_labels: Iterable[str],
+    ) -> None:
+        """Preserve human labels while enforcing exactly one estate label."""
         if not self.apply:
             return
         self.ensure_label(full_name, label)
+        preserved = [
+            name
+            for name in existing_labels
+            if name and not name.startswith("estate:")
+        ]
+        labels = sorted(set([*preserved, label]))
         self.request(
-            "POST",
-            f"/repos/{full_name}/issues/{number}/labels",
-            {"labels": [label]},
+            "PATCH",
+            f"/repos/{full_name}/issues/{number}",
+            {"labels": labels},
             expected=(200,),
         )
 
@@ -399,6 +412,7 @@ class GitHub:
             return url
         if not self.apply:
             return "DRY_RUN"
+        self.ensure_label(f"{org}/.github", "estate:execution-ledger")
         result, _headers, _status = self.request(
             "POST",
             f"/repos/{org}/.github/issues",
@@ -513,13 +527,16 @@ def issue_rows(api: GitHub, org: str, *, limit: int) -> list[dict[str, Any]]:
 
 def reconcile_issues(api: GitHub, org: str, *, limit: int) -> list[IssueState]:
     raw = issue_rows(api, org, limit=limit)
-    by_fingerprint: dict[str, list[dict[str, Any]]] = defaultdict(list)
+    # Duplicate closure is repository-local. Identical text can represent an
+    # independently valid defect when filed against two different components.
+    by_fingerprint: dict[tuple[str, str], list[dict[str, Any]]] = defaultdict(list)
     for row in raw:
+        repository = repository_from_api_url(str(row["repository_url"]))
         fingerprint = issue_fingerprint(str(row.get("title") or ""), row.get("body"))
         if fingerprint:
-            by_fingerprint[fingerprint].append(row)
+            by_fingerprint[(repository, fingerprint)].append(row)
 
-    canonical_for: dict[str, dict[str, Any]] = {}
+    canonical_for: dict[tuple[str, str], dict[str, Any]] = {}
     for fingerprint, group in by_fingerprint.items():
         if len(group) > 1:
             canonical_for[fingerprint] = max(
@@ -544,13 +561,15 @@ def reconcile_issues(api: GitHub, org: str, *, limit: int) -> list[IssueState]:
         )
         try:
             fingerprint = issue_fingerprint(state.title, row.get("body"))
-            canonical = canonical_for.get(fingerprint or "")
+            canonical = canonical_for.get((repository, fingerprint or ""))
             if canonical and int(canonical["number"]) != state.number:
                 state.duplicate_of = str(canonical.get("html_url") or "")
                 api.close_duplicate(repository, state.number, state.duplicate_of)
                 state.action = "WOULD_CLOSE_EXACT_DUPLICATE" if not api.apply else "CLOSED_EXACT_DUPLICATE"
             else:
-                api.add_label(repository, state.number, classification)
+                api.set_classification(
+                    repository, state.number, classification, labels
+                )
                 state.action = "WOULD_CLASSIFY" if not api.apply else "CLASSIFIED"
         except Exception as exc:
             state.error = str(redact(str(exc)))

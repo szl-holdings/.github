@@ -225,7 +225,7 @@ def test_nonidentical_issue_bodies_are_only_classified() -> None:
     rows = operator.reconcile_issues(api, "szl-holdings", limit=10)
     assert all(row.action == "CLASSIFIED" for row in rows)
     api.close_duplicate.assert_not_called()
-    assert api.add_label.call_count == 2
+    assert api.set_classification.call_count == 2
 
 
 def test_source_contains_no_protection_visibility_archive_or_secret_mutation() -> None:
@@ -242,3 +242,55 @@ def test_source_contains_no_protection_visibility_archive_or_secret_mutation() -
     )
     for token in forbidden:
         assert token not in source
+
+
+
+def test_identical_issues_in_different_repositories_are_not_closed() -> None:
+    api = mock.create_autospec(operator.GitHub, instance=True)
+    api.apply = True
+    body = "This exact long issue text is valid independently for two repository components."
+    api.search.return_value = [
+        {
+            "repository_url": "https://api.github.com/repos/szl-holdings/alpha",
+            "number": 1,
+            "title": "Same component defect",
+            "body": body,
+            "html_url": "https://github.com/szl-holdings/alpha/issues/1",
+            "updated_at": "2026-09-01T00:00:00Z",
+            "labels": [],
+        },
+        {
+            "repository_url": "https://api.github.com/repos/szl-holdings/beta",
+            "number": 1,
+            "title": "Same component defect",
+            "body": body,
+            "html_url": "https://github.com/szl-holdings/beta/issues/1",
+            "updated_at": "2026-09-02T00:00:00Z",
+            "labels": [],
+        },
+    ]
+    rows = operator.reconcile_issues(api, "szl-holdings", limit=10)
+    assert all(row.action == "CLASSIFIED" for row in rows)
+    api.close_duplicate.assert_not_called()
+    assert api.set_classification.call_count == 2
+
+
+def test_classification_replaces_stale_estate_labels_and_preserves_human_labels() -> None:
+    api = operator.GitHub("test-token", apply=True)
+    api.ensure_label = mock.Mock()
+    api.request = mock.Mock(return_value=({}, {}, 200))
+    api.set_classification(
+        "szl-holdings/example",
+        9,
+        "estate:runtime-drift",
+        ["bug", "estate:backlog", "estate:code-actionable"],
+    )
+    api.ensure_label.assert_called_once_with(
+        "szl-holdings/example", "estate:runtime-drift"
+    )
+    api.request.assert_called_once_with(
+        "PATCH",
+        "/repos/szl-holdings/example/issues/9",
+        {"labels": ["bug", "estate:runtime-drift"]},
+        expected=(200,),
+    )
