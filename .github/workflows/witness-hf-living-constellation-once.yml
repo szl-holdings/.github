@@ -1,0 +1,110 @@
+name: Witness HF Living Constellation once
+
+on:
+  push:
+    branches:
+      - ops/witness-hf-living-constellation-20260902
+    paths:
+      - ".github/workflows/witness-hf-living-constellation-once.yml"
+
+permissions:
+  actions: write
+  contents: write
+
+jobs:
+  witness:
+    runs-on: ubuntu-latest
+    timeout-minutes: 70
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - name: Dispatch the protected fleet operator
+        id: dispatch
+        shell: bash
+        run: |
+          set -euo pipefail
+          marker="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          workflow="hf-living-constellation-operator.yml"
+          source="$(gh api "/repos/${GITHUB_REPOSITORY}/contents/.github/workflows/${workflow}?ref=main" --jq '.content' | base64 -d)"
+          if printf '%s\n' "$source" | grep -qE '^      repair:'; then
+            gh workflow run "$workflow" --repo "$GITHUB_REPOSITORY" --ref main -f repair=true
+            mode="repair-input"
+          else
+            gh workflow run "$workflow" --repo "$GITHUB_REPOSITORY" --ref main
+            mode="default-dispatch"
+          fi
+          run_id=""
+          for attempt in $(seq 1 60); do
+            run_id="$(gh run list \
+              --repo "$GITHUB_REPOSITORY" \
+              --workflow "$workflow" \
+              --event workflow_dispatch \
+              --branch main \
+              --limit 20 \
+              --json databaseId,createdAt \
+              --jq '.[] | select(.createdAt >= "'"$marker"'") | .databaseId' | head -n1)"
+            if [ -n "$run_id" ]; then break; fi
+            sleep 2
+          done
+          test -n "$run_id"
+          echo "run_id=$run_id" >> "$GITHUB_OUTPUT"
+          echo "mode=$mode" >> "$GITHUB_OUTPUT"
+
+      - name: Require the exact fleet run to finish successfully
+        id: watch
+        shell: bash
+        run: |
+          set +e
+          gh run watch "${{ steps.dispatch.outputs.run_id }}" \
+            --repo "$GITHUB_REPOSITORY" \
+            --exit-status \
+            --interval 15
+          code=$?
+          echo "exit_code=$code" >> "$GITHUB_OUTPUT"
+          exit 0
+
+      - name: Capture the exact terminal run state
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh run view "${{ steps.dispatch.outputs.run_id }}" \
+            --repo "$GITHUB_REPOSITORY" \
+            --json databaseId,status,conclusion,headSha,event,jobs,url \
+            > hf-living-constellation-witness.json
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          path = Path("hf-living-constellation-witness.json")
+          data = json.loads(path.read_text(encoding="utf-8"))
+          data["schema"] = "szl.hf-living-constellation-witness/v1"
+          data["dispatch_mode"] = "${{ steps.dispatch.outputs.mode }}"
+          data["token_value_recorded"] = False
+          path.write_text(json.dumps(data, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+          print(json.dumps(data, indent=2, sort_keys=True))
+          PY
+
+      - name: Upload the fleet witness
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: hf-living-constellation-witness-${{ github.run_id }}-${{ github.run_attempt }}
+          path: hf-living-constellation-witness.json
+          if-no-files-found: error
+          retention-days: 90
+
+      - name: Preserve fail-closed fleet semantics
+        shell: bash
+        run: |
+          set -euo pipefail
+          conclusion="$(python -c 'import json; print(json.load(open("hf-living-constellation-witness.json")).get("conclusion") or "")')"
+          if [ "$conclusion" != "success" ]; then
+            echo "::error::The protected Living Constellation run did not prove the complete public Space fleet operational."
+            exit 1
+          fi
+
+      - name: Remove the transient witness branch
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          git push "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" --delete "$GITHUB_REF_NAME"
