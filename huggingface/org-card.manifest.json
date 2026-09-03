@@ -24,6 +24,10 @@
       "destination": "index.html"
     },
     {
+      "source": "profile/assets/szl-command-fabric-v3.svg",
+      "destination": "assets/szl-command-fabric-v3.svg"
+    },
+    {
       "source": "profile/assets/estate-command-system.svg",
       "destination": "assets/estate-command-system.svg"
     },
@@ -60,10 +64,10 @@
     "README.md": {
       "mode": "rendered_markdown",
       "required_markers": [
-        "Current state",
+        "Choose a path",
         "HISTORICAL",
         "SIMULATED",
-        "assets/evidence-lattice-v2.webp"
+        "assets/szl-command-fabric-v3.svg"
       ]
     },
     "index.html": {
