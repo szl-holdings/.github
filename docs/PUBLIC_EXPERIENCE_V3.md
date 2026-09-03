@@ -1,4 +1,4 @@
-# SZL Public Experience v3
+# SZL Public Experience v3.1
 
 ## Purpose
 
@@ -6,6 +6,58 @@ Every public SZL product must remain functional and legible from a 320px phone
 through a 3440px ultrawide theatre display while retaining its own product
 identity. Shared mechanics may be centralized; product information architecture,
 data, workflows, evidence semantics, and visual motif remain source-owned.
+
+The target is not one generic skin. The target is one predictable operating
+language across distinct products: clear purpose, one obvious first action,
+progressive disclosure, inspectable proof, and full reflow for touch, keyboard,
+zoom, assistive technology, and command-room displays.
+
+## Design synthesis
+
+The standard adapts established public principles without copying proprietary
+layouts, branding, assets, or source code:
+
+- **Apple:** fit primary content to the screen, avoid horizontal scrolling,
+  preserve familiar interactions, provide comfortable hit targets, support
+  larger text, and keep controls near the content they affect.
+- **NVIDIA:** treat WCAG 2.2 AA as a development standard rather than a final
+  audit checkbox, and continuously audit the whole public surface.
+- **Material:** change the scaffold at meaningful breakpoints instead of merely
+  shrinking a desktop canvas.
+- **Fluent:** retain functionality at 400% zoom, manage keyboard focus, and
+  collapse complex controls into simpler responsive forms when space is tight.
+- **SZL:** preserve a unique motif and business workflow for every product while
+  sharing accessibility, navigation, evidence labels, and source/proof handoffs.
+
+Authoritative references:
+
+- Apple Human Interface Guidelines — Accessibility:
+  `https://developer.apple.com/design/human-interface-guidelines/accessibility/`
+- Apple UI Design Dos and Don'ts:
+  `https://developer.apple.com/design/tips/`
+- NVIDIA.com Accessibility Help:
+  `https://www.nvidia.com/en-us/about-nvidia/accessibility/`
+- Material Design canonical adaptive layouts:
+  `https://m3.material.io/foundations/layout/canonical-examples/overview`
+- Fluent 2 Accessibility:
+  `https://fluent2.microsoft.design/accessibility`
+
+## Audience-first information contract
+
+Every flagship surface must support four concise journeys without duplicating
+or falsifying information:
+
+| Audience | First question | Required first-order path |
+|---|---|---|
+| User | What can I accomplish here? | Outcome, primary action, current state, next step |
+| Operator | What requires attention now? | Signals, blocked actions, approvals, evidence, rollback |
+| Developer | How does this work and how do I reproduce it? | Source, API or contract, local run path, tests, limitations |
+| Investor | What is the wedge and what is proved? | Market problem, product differentiation, live proof, architecture, explicit gaps |
+
+The shared runtime exposes only a local `data-szl-audience` state and a
+read-only `window.SZLPublicExperience.snapshot()` helper. Products may use that
+state to prioritize navigation or documentation, but it never changes business
+logic, claims, model behavior, policy, or evidence status.
 
 ## Public origin roles
 
@@ -60,11 +112,16 @@ document is interactive.
 The shared layer provides:
 
 - dynamic viewport units with a JavaScript `visualViewport` fallback;
-- safe-area-aware shared navigation;
+- explicit CSS-zoom detection and an effective layout width for 200% and 400%
+  reflow tests;
+- safe-area-aware shared navigation whose mobile menu is bounded in document
+  flow rather than becoming a full-screen fixed sheet;
 - phone, compact, tablet, desktop, wide, theatre, and ultrawide tiers;
-- bounded media, dialogs, code blocks, and wide tables;
+- bounded media, dialogs, code blocks, wide tables, Gradio, and Streamlit
+  containers;
 - long-token and URL wrapping;
-- 44px coarse-pointer controls;
+- 44px minimum controls and 48px coarse-pointer controls;
+- a non-destructive fallback title only when a public Space has no title;
 - local-only assets with no analytics, cookies, storage, external fonts, or
   runtime CDN;
 - reduced-motion, increased-contrast, forced-colors, print, and zoom behavior;
@@ -79,11 +136,26 @@ build circuit, recursive weave, agent swarm, cell membrane, and checksum ledger.
 Unknown public Space slugs receive a stable deterministic identity rather than a
 random theme.
 
+## Developer contract
+
+Every generated source PR must identify:
+
+- canonical GitHub source and mapped Hugging Face Space;
+- exact adapter and entrypoint;
+- changed paths and asset digest;
+- viewport, touch, zoom, keyboard, motion, contrast, forced-color, and print
+  requirements;
+- the repository's own required checks;
+- deployment and live-verification boundaries.
+
+The shared assets expose no network calls, analytics, cookies, storage, model
+state, or hidden telemetry. A source merge is not a deployment claim.
+
 ## Delivery sequence
 
 1. Audit the current public inventory and canonical source map.
-2. Refresh every already-integrated source repository on
-   `design/szl-public-experience-v3`.
+2. Bootstrap or refresh every high-confidence static, Next.js, Gradio, or
+   Streamlit source repository on `design/szl-public-experience-v3`.
 3. Run the repository-owned `SZL Public Experience v3 Contract`.
 4. Squash-merge only after reported checks complete green.
 5. Let the source-owned publisher deploy the application.
