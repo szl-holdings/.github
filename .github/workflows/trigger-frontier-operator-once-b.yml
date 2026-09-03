@@ -1,0 +1,27 @@
+name: Trigger frontier operator once B
+
+on:
+  push:
+    branches:
+      - ops/run-frontier-operator-20260902b
+    paths:
+      - ".github/workflows/trigger-frontier-operator-once-b.yml"
+
+permissions:
+  actions: write
+  contents: write
+
+jobs:
+  dispatch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - name: Dispatch protected-main reconciliation
+        run: gh workflow run frontier-issue-operator.yml --repo "$GITHUB_REPOSITORY" --ref main -f apply=true
+      - name: Remove transient branch
+        shell: bash
+        run: |
+          set -euo pipefail
+          git push "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" --delete "$GITHUB_REF_NAME"
