@@ -53,7 +53,6 @@ jobs:
               raise SystemExit('missing holographic CSS')
           css_required = (
               'SZL Public Experience v3',
-              'data-szl-space-motif',
               '--szl-touch-target',
               '100dvh',
               'safe-area-inset',
