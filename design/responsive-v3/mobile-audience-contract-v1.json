@@ -1,0 +1,161 @@
+{
+  "schema": "szl.public-experience/mobile-audience-contract/v1",
+  "version": "1.0.0",
+  "effective_date": "2026-09-03",
+  "scope": [
+    "public-websites",
+    "hugging-face-spaces",
+    "product-surfaces",
+    "developer-docs",
+    "proof-surfaces",
+    "investor-surfaces"
+  ],
+  "principles": [
+    "purpose-before-spectacle",
+    "progressive-disclosure",
+    "audience-aware-navigation",
+    "proof-before-pitch",
+    "mobile-first-operation",
+    "wcag-2.2-aa",
+    "independent-szl-identity"
+  ],
+  "audiences": {
+    "user": [
+      "plain-language-product-purpose",
+      "one-primary-task",
+      "honest-data-state",
+      "help-and-recovery"
+    ],
+    "developer": [
+      "canonical-source",
+      "exact-build-revision",
+      "five-step-or-shorter-quickstart",
+      "api-and-schema",
+      "tests-license-security-contribution"
+    ],
+    "investor": [
+      "problem-wedge-product-outcome",
+      "verified-operating-evidence",
+      "architecture-and-defensibility",
+      "shipped-versus-roadmap",
+      "dated-diligence-handoff"
+    ],
+    "operator": [
+      "health-and-build-identity",
+      "dependency-state",
+      "approval-boundaries",
+      "freshness-receipts-audit",
+      "next-safe-action"
+    ]
+  },
+  "viewports": [
+    [320, 568],
+    [375, 812],
+    [430, 932],
+    [812, 375],
+    [768, 1024],
+    [1440, 900],
+    [1920, 1080],
+    [2560, 1440],
+    [3440, 1440]
+  ],
+  "zoom_percent": [200, 400],
+  "layout": {
+    "maximum_page_overflow_px": 2,
+    "minimum_touch_target_px": 44,
+    "minimum_coarse_pointer_target_px": 48,
+    "maximum_compact_fixed_overlay_vh": 40,
+    "safe_area_aware": true,
+    "single_column_reflow": true,
+    "orientation_independent": true,
+    "optional_media_must_not_block_core_task": true
+  },
+  "accessibility": {
+    "target": "WCAG-2.2-AA",
+    "unique_nonempty_title": true,
+    "document_language": true,
+    "semantic_landmarks": true,
+    "skip_link": true,
+    "visible_unobscured_focus": true,
+    "keyboard_complete": true,
+    "status_not_color_only": true,
+    "reduced_motion": true,
+    "increased_contrast": true,
+    "forced_colors": true,
+    "no_hover_only_information": true,
+    "no_gesture_only_core_task": true
+  },
+  "information_architecture": {
+    "maximum_primary_navigation_choices": 5,
+    "first_viewport_requires": [
+      "product-identity",
+      "value-proposition",
+      "primary-action",
+      "release-or-live-state",
+      "evidence-path"
+    ],
+    "large_catalog_pattern": [
+      "search",
+      "filters",
+      "grouped-secondary-navigation",
+      "command-palette"
+    ]
+  },
+  "performance_field_goals_p75": {
+    "lcp_seconds_max": 2.5,
+    "inp_milliseconds_max": 200,
+    "cls_max": 0.1,
+    "unavailable_field_data_label": "UNAVAILABLE"
+  },
+  "internationalization": {
+    "document_lang_and_dir": true,
+    "minimum_text_expansion_percent": 30,
+    "locale_aware_dates_numbers_currency_units": true,
+    "essential_text_outside_images": true,
+    "rtl_requires_test_receipt": true
+  },
+  "truth_labels": [
+    "MEASURED",
+    "REPORTED",
+    "MODELED",
+    "SAMPLE",
+    "ROADMAP",
+    "UNAVAILABLE"
+  ],
+  "release_blockers": [
+    "empty-title-or-primary-content",
+    "missing-public-experience-v3-marker",
+    "page-overflow-over-tolerance",
+    "undersized-primary-control",
+    "absent-or-obscured-focus",
+    "oversized-fixed-interactive-overlay",
+    "core-content-lost-under-accessibility-mode-or-zoom",
+    "unverifiable-source-or-build-identity"
+  ],
+  "rollout": [
+    "audit-live-estate",
+    "resolve-canonical-source",
+    "patch-reviewed-host",
+    "open-source-native-pr",
+    "run-repository-and-responsive-tests",
+    "merge-only-green-nonstale-head",
+    "deploy-through-existing-single-writer",
+    "verify-live-build-and-browser-matrix",
+    "publish-secret-free-receipt"
+  ],
+  "prohibited": [
+    "blind-entrypoint-edit",
+    "direct-default-branch-write",
+    "force-push",
+    "secret-recording",
+    "silent-exception",
+    "third-party-visual-copy"
+  ],
+  "references": {
+    "nvidia": "WCAG 2.2 AA integrated into brand, development, and sitewide audit workflow",
+    "w3c": "reflow, focus, input, and target-size requirements",
+    "apple": "adaptable interfaces, 44-point default touch controls, multiple input methods",
+    "material": "adaptive components and reusable design-system tokens",
+    "web_vitals": "LCP, INP, and CLS user-experience measurements"
+  }
+}
