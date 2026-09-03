@@ -1,0 +1,50 @@
+name: Patch frontier operator hardening contracts
+
+on:
+  push:
+    branches:
+      - feat/frontier-issue-operator-v1-20260902
+    paths:
+      - ".github/workflows/patch-frontier-operator-hardening.yml"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: patch-frontier-operator-hardening-v1
+  cancel-in-progress: false
+
+jobs:
+  patch:
+    name: Apply and verify final operator hardening
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout exact candidate branch
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: feat/frontier-issue-operator-v1-20260902
+          fetch-depth: 0
+
+      - name: Apply deterministic hardening patch
+        run: python .github/scripts/patch_frontier_operator_hardening.py
+
+      - name: Run complete operator contracts
+        run: |
+          set -euo pipefail
+          python -m pip install --disable-pip-version-check pytest
+          python -m pytest -q tests/test_frontier_issue_operator.py
+          python -m py_compile .github/scripts/frontier_issue_operator.py
+          git diff --check
+
+      - name: Commit hardened candidate and remove one-shot files
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm .github/workflows/patch-frontier-operator-hardening.yml
+          rm .github/scripts/patch_frontier_operator_hardening.py
+          git config user.name "SZL Frontier Hardening Controller"
+          git config user.email "stephenlutar2@gmail.com"
+          git add -A
+          git commit -s -m "fix(ops): preserve decisive reviews and idempotent labels"
+          git push origin HEAD:feat/frontier-issue-operator-v1-20260902
