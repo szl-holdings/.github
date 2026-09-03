@@ -18,12 +18,26 @@ sys.modules[SPEC.name] = convergence
 SPEC.loader.exec_module(convergence)
 
 
-def test_two_canonical_origins_have_local_spectral_contracts() -> None:
+def test_two_canonical_origins_have_source_native_visual_contracts() -> None:
     assert [row.name for row in convergence.CONTRACTS] == ["a-11-oy.com", "a11oy.net"]
-    assert convergence.CONTRACTS[0].spectral_asset.endswith("/assets/szl-spectral-v2.css")
-    assert convergence.CONTRACTS[1].spectral_asset.endswith("/assets/szl-spectral-proof-v2.css")
-    assert convergence.CONTRACTS[0].controller_asset.endswith("/assets/szl-flow.js")
-    assert convergence.CONTRACTS[1].controller_asset.endswith("/scripts/szl-flow-proof.js")
+    product, proof = convergence.CONTRACTS
+    assert product.spectral_asset.endswith("/assets/szl-responsive-apex-v3.css")
+    assert product.controller_asset.endswith("/assets/szl-responsive-apex-v3.js")
+    assert product.advisory_health.endswith("/origin-status.json")
+    assert product.repair == "PRODUCT_PAGES_BUILD"
+    assert proof.spectral_asset.endswith("/assets/szl-spectral-proof-v2.css")
+    assert proof.controller_asset.endswith("/scripts/szl-flow-proof.js")
+    assert proof.repair == "A11OY_NET_PAGES_BUILD"
+
+
+def test_product_root_requires_both_published_responsive_assets() -> None:
+    product = convergence.CONTRACTS[0]
+    assert product.root_literals == (
+        "/assets/szl-responsive-apex-v3.css",
+        "/assets/szl-responsive-apex-v3.js",
+    )
+    assert "SZL Apex Responsive Experience v3" in product.spectral_literals
+    assert "__SZL_APEX_RESPONSIVE_V3__" in product.controller_literals
 
 
 def test_probe_requires_http_200_bytes_and_every_literal() -> None:
@@ -42,17 +56,17 @@ def test_probe_requires_http_200_bytes_and_every_literal() -> None:
         assert convergence.probe("https://example.test/", ("alpha",))["verified"] is False
 
 
-def test_product_repair_dispatches_existing_main_sync_only() -> None:
+def test_product_repair_requests_the_actual_front_door_pages_build() -> None:
     contract = convergence.CONTRACTS[0]
-    with mock.patch.object(convergence, "github_action", return_value=204) as action:
+    with mock.patch.object(convergence, "github_action", return_value=201) as action:
         receipt = convergence.request_repair(contract, "secret")
     action.assert_called_once_with(
         "POST",
-        "/repos/szl-holdings/a11oy/actions/workflows/hf-sync.yml/dispatches",
+        "/repos/szl-holdings/szl-holdings.github.io/pages/builds",
         "secret",
-        {"ref": "main"},
     )
     assert receipt["source_mutation"] is False
+    assert receipt["action"] == "PRODUCT_PAGES_BUILD"
 
 
 def test_proof_repair_requests_existing_pages_build_only() -> None:
@@ -76,7 +90,7 @@ def test_token_precedence_prefers_governed_pat() -> None:
         assert convergence.token_from_environment() == ("governed", "SZL_GITHUB_TOKEN")
 
 
-def test_source_contains_no_content_dns_or_cloudflare_mutator() -> None:
+def test_source_contains_no_content_dns_cloudflare_or_hf_mutator() -> None:
     text = MODULE_PATH.read_text(encoding="utf-8")
     forbidden = (
         "/contents/",
@@ -86,6 +100,7 @@ def test_source_contains_no_content_dns_or_cloudflare_mutator() -> None:
         "/git/commits",
         "cloudflare.com/client",
         "/dns_records",
+        "hf-sync.yml/dispatches",
         "create_commit",
         "update_file",
         "delete_file",
