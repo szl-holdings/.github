@@ -45,6 +45,8 @@ def _streamlit_helper(core: Any, original: Any) -> str:
         "document.documentElement.dataset.szlViewportTier="
         "(innerWidth<480?'phone':innerWidth<768?'compact':innerWidth<1024?'tablet':"
         "innerWidth<1440?'desktop':innerWidth<1920?'wide':innerWidth<2560?'theatre':'ultrawide');"
+        "document.documentElement.dataset.szlZoomTier='normal';"
+        "if(!String(document.title||'').trim()){document.title=String({slug!r}).replace(/[_-]+/g,' ').replace(/\\b\\w/g,function(c){return c.toUpperCase();})+' · SZL Holdings';}"
         "</script>"
     )
     if needle not in source:
@@ -152,7 +154,7 @@ def install(core: Any) -> None:
         body = original_pr_body(plan, digest)
         return body + """
 
-## SZL Public Experience v3
+## SZL Public Experience v3.1
 
 This rollout also applies the estate-wide responsive contract:
 
@@ -160,12 +162,17 @@ This rollout also applies the estate-wide responsive contract:
   and ultrawide theatre presentation;
 - no document-level horizontal overflow; wide tables and code remain locally
   scrollable instead of being clipped;
-- dynamic viewport units, mobile safe areas, 44px coarse-pointer controls,
+- dynamic viewport units, mobile safe areas, 48px coarse-pointer controls,
   readable form sizing, media containment, and bounded dialogs;
+- 200% and 400% zoom reflow with shared chrome prevented from becoming a
+  viewport-blocking fixed overlay;
 - reduced-motion, increased-contrast, forced-colors, zoom/reflow, and print
   behavior;
+- a non-destructive fallback title for otherwise untitled public Spaces;
 - a concise shared ecosystem rail whose Shadow DOM is independently hardened
-  for phone through theatre displays.
+  for phone through theatre displays;
+- stable `user`, `developer`, `investor`, and `operator` audience state through
+  a local data attribute, without changing product behavior or making claims.
 
 The responsive layer is additive. It does not replace the product's own layout,
 data, workflows, copy, model behavior, or evidence semantics.
