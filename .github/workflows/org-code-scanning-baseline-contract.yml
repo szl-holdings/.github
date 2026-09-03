@@ -58,12 +58,17 @@ jobs:
           from pathlib import Path
 
           workflow = Path(".github/workflows/org-code-scanning-baseline.yml").read_text(encoding="utf-8")
+          artifact_template = (
+              "org-code-scanning-baseline-$"
+              + "{{ github.run_id }}-$"
+              + "{{ github.run_attempt }}"
+          )
           required = (
               "permissions:\n  contents: read\n  issues: write\n  security-events: write",
               "python .github/scripts/org_code_scanning_baseline_v2.py",
               "--apply",
               "if-no-files-found: error",
-              "org-code-scanning-baseline-${{ github.run_id }}-${{ github.run_attempt }}",
+              artifact_template,
           )
           for token in required:
               if workflow.count(token) != 1:
