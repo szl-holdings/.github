@@ -1,0 +1,57 @@
+{
+  "schema": "szl.public-space-source-map/v1",
+  "organization": "SZLHOLDINGS",
+  "scope": "current public flagship Spaces",
+  "sources": [
+    {
+      "space": "a11oy",
+      "repo": "szl-holdings/a11oy",
+      "ownership": "source-owned-core"
+    },
+    {
+      "space": "killinchu",
+      "repo": "szl-holdings/killinchu",
+      "ownership": "source-owned-flagship"
+    },
+    {
+      "space": "terra",
+      "repo": "szl-holdings/szl-real-estate",
+      "ownership": "source-owned-flagship"
+    },
+    {
+      "space": "sentra",
+      "repo": "szl-holdings/szl-defensive-control-plane",
+      "ownership": "source-owned-flagship"
+    },
+    {
+      "space": "counsel",
+      "repo": "szl-holdings/counsel",
+      "ownership": "source-owned-flagship"
+    },
+    {
+      "space": "finance",
+      "repo": "szl-holdings/puriq-live",
+      "ownership": "source-owned-flagship"
+    },
+    {
+      "space": "vessels",
+      "repo": "szl-holdings/szl-fleet-overlay",
+      "ownership": "source-owned-flagship"
+    },
+    {
+      "space": "lyte",
+      "repo": "szl-holdings/lyte-lattice",
+      "ownership": "source-owned-flagship"
+    },
+    {
+      "space": "david-leads",
+      "repo": "szl-holdings/david-leads",
+      "ownership": "source-owned-flagship"
+    }
+  ],
+  "truth_boundary": [
+    "A source mapping identifies the repository responsible for the public product surface; it does not prove that a deployment is current or healthy.",
+    "The map is a protected local fallback. Public provider metadata may enrich it but cannot silently override it.",
+    "A mapped repository without a reviewed public entrypoint remains BLOCKED rather than receiving a guessed edit."
+  ]
+}
