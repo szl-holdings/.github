@@ -25,7 +25,7 @@ jobs:
           ref: feat/frontier-issue-operator-v1-20260902
           fetch-depth: 0
 
-      - name: Apply bounded corrections
+      - name: Apply bounded code corrections
         shell: bash
         run: |
           set -euo pipefail
@@ -36,17 +36,11 @@ jobs:
           source = script.read_text(encoding='utf-8')
           old = 'import os\nimport re\nimport sys\nimport time\n'
           new = 'import os\nimport re\nimport time\n'
-          if source.count(old) != 1:
-              raise SystemExit('unexpected frontier operator import block')
-          script.write_text(source.replace(old, new, 1), encoding='utf-8')
-
-          workflow = Path('.github/workflows/frontier-issue-operator.yml')
-          text = workflow.read_text(encoding='utf-8')
-          old_alias = 'secrets.SZL_ORG_ADMIN_TOKEN || secrets.ORG_ADMIN_TOKEN || secrets.GH_PAT || github.token'
-          new_alias = 'secrets.SZL_ORG_ADMIN_TOKEN || secrets.ORG_ADMIN_TOKEN || secrets.SZL_GITHUB_TOKEN || secrets.GH_PAT || github.token'
-          if text.count(old_alias) != 1:
-              raise SystemExit('unexpected organization token alias chain')
-          workflow.write_text(text.replace(old_alias, new_alias, 1), encoding='utf-8')
+          if old in source:
+              source = source.replace(old, new, 1)
+          if 'import sys\n' in source:
+              raise SystemExit('unexpected remaining sys import')
+          script.write_text(source, encoding='utf-8')
 
           tests = Path('tests/test_frontier_issue_operator.py')
           test_text = tests.read_text(encoding='utf-8')
@@ -66,21 +60,19 @@ jobs:
           python -m py_compile .github/scripts/frontier_issue_operator.py
           git diff --check
 
-      - name: Commit corrected candidate and self-remove
+      - name: Commit reviewed code corrections
         shell: bash
         run: |
           set -euo pipefail
           git config user.name 'SZL Frontier Operator Review Fix'
           git config user.email 'stephenlutar2@gmail.com'
-          git rm .github/workflows/patch-frontier-operator-final.yml
           git add .github/scripts/frontier_issue_operator.py \
-                  .github/workflows/frontier-issue-operator.yml \
                   tests/test_frontier_issue_operator.py
           if git diff --cached --quiet; then
-            echo 'No correction remained to commit.'
+            echo 'No code correction remained to commit.'
             exit 0
           fi
           git commit -m 'fix(ops): clear frontier operator review finding' \
-            -m 'Remove the unused import, support the established organization token alias, and lock the alias contract in tests.' \
+            -m 'Remove the unused import and lock the established organization token alias in the operator contract.' \
             -m 'Signed-off-by: Stephen Lutar <stephenlutar2@gmail.com>'
           git push origin HEAD:feat/frontier-issue-operator-v1-20260902
