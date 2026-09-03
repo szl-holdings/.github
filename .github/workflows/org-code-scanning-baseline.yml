@@ -1,0 +1,108 @@
+name: Organization CodeQL baseline
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/scripts/org_code_scanning_baseline_v2.py"
+      - ".github/workflows/org-code-scanning-baseline.yml"
+      - ".github/workflows/org-code-scanning-baseline-contract.yml"
+      - "tests/test_org_code_scanning_baseline_v2.py"
+  schedule:
+    - cron: "17 7 * * 1"
+  workflow_dispatch:
+    inputs:
+      apply:
+        description: "Configure eligible repositories instead of dry-run only"
+        required: false
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+  issues: write
+  security-events: write
+
+concurrency:
+  group: organization-codeql-baseline
+  cancel-in-progress: false
+
+env:
+  CODEQL_REPORT: org-code-scanning-baseline-v2.json
+
+jobs:
+  converge:
+    name: Preserve existing analysis; configure uncovered public repos
+    runs-on: ubuntu-latest
+    timeout-minutes: 50
+    env:
+      SZL_ORG_TOKEN: ${{ secrets.SZL_ORG_ADMIN_TOKEN || secrets.ORG_ADMIN_TOKEN || secrets.GH_PAT || github.token }}
+    steps:
+      - name: Harden runner
+        uses: step-security/harden-runner@bf7454d06d71f1098171f2acdf0cd4708d7b5920 # v2.20.0
+        with:
+          egress-policy: audit
+
+      - name: Checkout exact protected source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12"
+
+      - name: Run network-free CodeQL baseline contracts
+        run: |
+          python -m pip install --disable-pip-version-check pytest
+          python -m pytest -q tests/test_org_code_scanning_baseline_v2.py
+          python -m py_compile .github/scripts/org_code_scanning_baseline_v2.py
+
+      - name: Converge native code scanning
+        shell: bash
+        run: |
+          set -euo pipefail
+          args=(--org szl-holdings --max-repositories 500 --report "$CODEQL_REPORT")
+          if [ "${{ github.event_name != 'workflow_dispatch' || inputs.apply }}" = "true" ]; then
+            args+=(--apply)
+          fi
+          python .github/scripts/org_code_scanning_baseline_v2.py "${args[@]}"
+
+      - name: Verify secret-free provider readback receipt
+        if: always()
+        shell: bash
+        run: |
+          python - <<'PY'
+          import json
+          import re
+          from pathlib import Path
+
+          path = Path("org-code-scanning-baseline-v2.json")
+          if not path.is_file():
+              raise SystemExit("CodeQL baseline emitted no receipt")
+          text = path.read_text(encoding="utf-8")
+          payload = json.loads(text)
+          if payload.get("schema") != "szl.org-code-scanning-baseline/v2":
+              raise SystemExit("unexpected CodeQL baseline schema")
+          if payload.get("token_value_recorded") is not False:
+              raise SystemExit("CodeQL baseline did not deny token recording")
+          if re.search(r"(?:gh[pousr]_|github_pat_)[A-Za-z0-9_]{20,}", text):
+              raise SystemExit("credential-shaped value appeared in CodeQL evidence")
+          if payload.get("status") not in {
+              "COMPLETE",
+              "PARTIAL",
+              "BLOCKED_MANAGED_PREREQUISITE",
+          }:
+              raise SystemExit("unknown CodeQL baseline terminal state")
+          print(json.dumps(payload.get("summary") or {}, indent=2, sort_keys=True))
+          PY
+
+      - name: Upload immutable CodeQL convergence evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: org-code-scanning-baseline-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ env.CODEQL_REPORT }}
+          if-no-files-found: error
+          retention-days: 90
