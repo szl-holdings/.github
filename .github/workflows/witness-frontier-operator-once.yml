@@ -1,0 +1,55 @@
+name: Witness frontier operator once
+
+on:
+  push:
+    branches:
+      - ops/witness-frontier-operator-20260902
+    paths:
+      - ".github/workflows/witness-frontier-operator-once.yml"
+
+permissions:
+  actions: write
+  contents: write
+
+jobs:
+  witness:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - name: Dispatch and identify the exact protected-main run
+        id: run
+        shell: bash
+        run: |
+          set -euo pipefail
+          marker="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          gh workflow run frontier-issue-operator.yml \
+            --repo "$GITHUB_REPOSITORY" \
+            --ref main \
+            -f apply=true
+          run_id=""
+          for attempt in $(seq 1 30); do
+            run_id="$(gh run list \
+              --repo "$GITHUB_REPOSITORY" \
+              --workflow frontier-issue-operator.yml \
+              --event workflow_dispatch \
+              --branch main \
+              --limit 10 \
+              --json databaseId,createdAt \
+              --jq '.[] | select(.createdAt >= "'"$marker"'") | .databaseId' | head -n1)"
+            if [ -n "$run_id" ]; then break; fi
+            sleep 2
+          done
+          test -n "$run_id"
+          echo "run_id=$run_id" >> "$GITHUB_OUTPUT"
+
+      - name: Require the exact reconciliation run to succeed
+        run: gh run watch "${{ steps.run.outputs.run_id }}" --repo "$GITHUB_REPOSITORY" --exit-status --interval 10
+
+      - name: Remove the transient witness branch
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          git push "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" --delete "$GITHUB_REF_NAME"
