@@ -6,12 +6,13 @@ on:
       - feat/frontier-issue-operator-v1-20260902
     paths:
       - ".github/workflows/patch-frontier-operator-hardening.yml"
+      - ".github/scripts/patch_frontier_operator_hardening.py"
 
 permissions:
   contents: write
 
 concurrency:
-  group: patch-frontier-operator-hardening-v1
+  group: patch-frontier-operator-hardening-v2
   cancel-in-progress: false
 
 jobs:
