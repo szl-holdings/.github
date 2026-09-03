@@ -177,6 +177,57 @@ class ControllerSafetyContract(unittest.TestCase):
         self.assertEqual(score, 1000)
         self.assertEqual(reason, "canonical source map")
 
+    def test_protected_local_source_map_is_authoritative(self) -> None:
+        mapping = core._local_source_map()
+        self.assertEqual(mapping["sentra"], "szl-holdings/platform")
+        self.assertEqual(mapping["vessels"], "szl-holdings/platform")
+        self.assertEqual(mapping["david-leads"], "szl-holdings/david-leads")
+        self.assertEqual(len(mapping), 9)
+
+    def test_platform_monorepo_adapter_updates_both_public_frontends(self) -> None:
+        class GitHub:
+            @staticmethod
+            def tree(full_name, default_branch):
+                return [
+                    {"path": "artifacts/sentra/index.html"},
+                    {"path": "artifacts/sentra/package.json"},
+                    {"path": "artifacts/sentra/public/keep.txt"},
+                    {"path": "artifacts/vessels/index.html"},
+                    {"path": "artifacts/vessels/package.json"},
+                    {"path": "artifacts/vessels/public/keep.txt"},
+                ]
+
+            @staticmethod
+            def file(full_name, path, default_branch):
+                return ("<!doctype html><html><head><title>X</title></head><body><main>X</main></body></html>", "sha")
+
+        spaces = [
+            core.Space("sentra", "docker", "RUNNING", "https://huggingface.co/spaces/SZLHOLDINGS/sentra"),
+            core.Space("vessels", "docker", "RUNNING", "https://huggingface.co/spaces/SZLHOLDINGS/vessels"),
+        ]
+        plan = core.plan_repository(
+            GitHub(),
+            {"full_name": "szl-holdings/platform", "default_branch": "main"},
+            spaces,
+            1000,
+            "canonical source map",
+            "css",
+            "javascript",
+        )
+        self.assertEqual(plan.status, "planned")
+        self.assertEqual(plan.adapter, "monorepo-static")
+        self.assertEqual(
+            {change.path for change in plan.changes},
+            {
+                "artifacts/sentra/index.html",
+                "artifacts/sentra/public/szl-space-hologram.css",
+                "artifacts/sentra/public/szl-space-hologram.js",
+                "artifacts/vessels/index.html",
+                "artifacts/vessels/public/szl-space-hologram.css",
+                "artifacts/vessels/public/szl-space-hologram.js",
+            },
+        )
+
     def test_asset_loader_verifies_schema(self) -> None:
         css, javascript, registry = core.read_assets(ASSETS)
         self.assertTrue(css)

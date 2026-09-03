@@ -35,8 +35,15 @@ MARKER = 'data-szl-space-holo-v2="true"'
 STYLE_MARKER = 'data-szl-space-holo-v2="style"'
 SCRIPT_MARKER = 'data-szl-space-holo-v2="script"'
 ASSETS_ROOT = Path("design/holographic-v2")
+LOCAL_SOURCE_MAP = Path("design/responsive-v3/flagship-space-sources.json")
+MONOREPO_STATIC_ROOTS = {
+    "sentra": "artifacts/sentra",
+    "vessels": "artifacts/vessels",
+}
 STATIC_INDEXES = (
     "index.html",
+    "app/static/index.html",
+    "static/index.html",
     "public/index.html",
     "site/index.html",
     "web/index.html",
@@ -396,25 +403,92 @@ def list_spaces() -> list[Space]:
     return sorted(spaces, key=lambda item: item.slug.lower())
 
 
+def _canonical_repo(value: Any) -> str | None:
+    if not isinstance(value, str):
+        return None
+    match = re.search(r"(?:github\.com/)?(szl-holdings/[A-Za-z0-9_.-]+)", value)
+    return match.group(1).removesuffix(".git") if match else None
+
+
+def _space_slug(value: Any) -> str | None:
+    if not isinstance(value, str) or not value.strip():
+        return None
+    return normalize(value.split("/", 1)[-1])
+
+
+def _local_source_map() -> dict[str, str]:
+    if not LOCAL_SOURCE_MAP.is_file():
+        return {}
+    payload = json.loads(LOCAL_SOURCE_MAP.read_text(encoding="utf-8"))
+    if payload.get("schema") != "szl.public-space-source-map/v1":
+        raise RolloutError("LOCAL_SOURCE_MAP_SCHEMA_INVALID", str(payload.get("schema")))
+    values = payload.get("sources")
+    if not isinstance(values, list):
+        raise RolloutError("LOCAL_SOURCE_MAP_INVALID", "sources must be a list")
+    found: dict[str, str] = {}
+    for item in values:
+        if not isinstance(item, dict):
+            raise RolloutError("LOCAL_SOURCE_MAP_INVALID", "source entries must be objects")
+        slug = _space_slug(item.get("space"))
+        repo = _canonical_repo(item.get("repo"))
+        if not slug or not repo:
+            raise RolloutError("LOCAL_SOURCE_MAP_INVALID", json.dumps(item, sort_keys=True))
+        if slug in found and found[slug] != repo:
+            raise RolloutError("LOCAL_SOURCE_MAP_CONFLICT", slug)
+        found[slug] = repo
+    return found
+
+
 def source_map() -> dict[str, str]:
+    # The protected local map is authoritative. Provider and a11oy
+    # metadata may fill gaps, but can never silently override it.
+    found = _local_source_map()
     url = "https://raw.githubusercontent.com/szl-holdings/a11oy/main/docs/huggingface-space-source-map-v1.json"
     try:
         payload = retry_get(url)
     except RolloutError:
-        return {}
-    found: dict[str, str] = {}
-    slug_keys = ("space", "space_id", "hf_space", "slug", "huggingface_space")
-    repo_keys = ("source_repo", "repository", "github_repo", "source_repository", "repo")
+        return found
+    slug_keys = ("space", "space_id", "hf_space", "slug", "huggingface_space", "id")
+    repo_keys = ("source_repo", "repository", "github_repo", "source_repository", "repo", "full_name")
+
+    def direct_repo(value: Mapping[str, Any]) -> str | None:
+        for key in repo_keys:
+            repo = _canonical_repo(value.get(key))
+            if repo:
+                return repo
+        mapping = value.get("source_mapping")
+        if isinstance(mapping, dict):
+            canonical = mapping.get("canonical")
+            if isinstance(canonical, dict):
+                repo = _canonical_repo(canonical.get("full_name") or canonical.get("repository"))
+                if repo:
+                    return repo
+            repo = _canonical_repo(mapping.get("full_name") or mapping.get("repository"))
+            if repo:
+                return repo
+        source = value.get("source")
+        if isinstance(source, dict):
+            repo = _canonical_repo(source.get("full_name") or source.get("repository") or source.get("repo"))
+            if repo:
+                return repo
+        return None
+
+    def direct_slug(value: Mapping[str, Any]) -> str | None:
+        for key in slug_keys:
+            candidate = value.get(key)
+            if isinstance(candidate, dict):
+                candidate = candidate.get("id") or candidate.get("slug") or candidate.get("name")
+            slug = _space_slug(candidate)
+            if slug and (key != "id" or str(candidate).lower().startswith("szlholdings/")):
+                return slug
+        return None
 
     def visit(value: Any) -> None:
         if isinstance(value, dict):
-            slug = next((value.get(key) for key in slug_keys if value.get(key)), None)
-            repo = next((value.get(key) for key in repo_keys if value.get(key)), None)
-            if isinstance(slug, str) and isinstance(repo, str):
-                clean_slug = slug.split("/", 1)[-1]
-                match = re.search(r"(?:github\.com/)?(szl-holdings/[A-Za-z0-9_.-]+)", repo)
-                if match:
-                    found[normalize(clean_slug)] = match.group(1).removesuffix(".git")
+            slug = direct_slug(value)
+            repo = direct_repo(value)
+            if slug and repo and slug not in found:
+                found[slug] = repo
             for child in value.values():
                 visit(child)
         elif isinstance(value, list):
@@ -423,7 +497,6 @@ def source_map() -> dict[str, str]:
 
     visit(payload)
     return found
-
 
 def mapping_score(space: Space, repo: Mapping[str, Any], explicit: Mapping[str, str]) -> tuple[int, str]:
     full_name = str(repo.get("full_name") or "")
@@ -655,6 +728,58 @@ def plan_repository(github: GitHub, repo: Mapping[str, Any], spaces: list[Space]
     blobs = github.tree(full_name, default_branch)
     paths = {str(item.get("path")) for item in blobs}
     primary_slug = spaces[0].slug
+
+    if full_name == "szl-holdings/platform":
+        changes: list[Change] = []
+        entrypoints: list[str] = []
+        for space in spaces:
+            root = MONOREPO_STATIC_ROOTS.get(normalize(space.slug))
+            if not root:
+                continue
+            index_path = f"{root}/index.html"
+            package_path = f"{root}/package.json"
+            public_prefix = f"{root}/public/"
+            if index_path not in paths or package_path not in paths or not any(path.startswith(public_prefix) for path in paths):
+                plan.status = "report-only"
+                plan.error = {
+                    "code": "MONOREPO_FRONTEND_SHAPE_INVALID",
+                    "message": f"{space.slug} is mapped to {root}, but its Vite index/package/public shape is incomplete.",
+                }
+                return plan
+            content, _ = github.file(full_name, index_path, default_branch)
+            patched = adapt_static(
+                content,
+                "/szl-space-hologram.css",
+                "/szl-space-hologram.js",
+                space.slug,
+            )
+            css_path = f"{root}/public/szl-space-hologram.css"
+            js_path = f"{root}/public/szl-space-hologram.js"
+            entrypoints.append(index_path)
+            if patched != content:
+                changes.extend(
+                    [
+                        Change(css_path, css),
+                        Change(js_path, javascript),
+                        Change(index_path, patched),
+                    ]
+                )
+            elif css_path not in paths or js_path not in paths:
+                plan.status = "report-only"
+                plan.error = {
+                    "code": "MONOREPO_ASSET_BINDING_INCOMPLETE",
+                    "message": f"{space.slug} declares Holo markers without both public assets.",
+                }
+                return plan
+        if entrypoints:
+            plan.adapter = "monorepo-static"
+            plan.entrypoint = ", ".join(entrypoints)
+            if changes:
+                deduped = {change.path: change for change in changes}
+                plan.changes = list(deduped.values())
+            else:
+                plan.status = "already-integrated"
+            return plan
 
     for path in NEXT_LAYOUTS:
         if path in paths:
