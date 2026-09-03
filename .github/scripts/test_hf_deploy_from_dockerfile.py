@@ -1173,6 +1173,83 @@ class TestDefaultBranchTipGuard(unittest.TestCase):
                 dep.require_current_default_branch_tip(self._args())
 
 
+class TestHuggingFaceTreeListRetry(unittest.TestCase):
+    @staticmethod
+    def _error(status, retry_after=None):
+        error = RuntimeError(f"HTTP {status}")
+        headers = {}
+        if retry_after is not None:
+            headers["Retry-After"] = retry_after
+        error.response = types.SimpleNamespace(
+            status_code=status,
+            headers=headers,
+        )
+        return error
+
+    def test_retries_rate_limited_read_and_honors_server_hint(self):
+        api = mock.Mock()
+        api.list_repo_files.side_effect = [
+            self._error(429, "7"),
+            ["README.md", "app.py"],
+        ]
+        with mock.patch.object(dep.time, "sleep") as sleep:
+            files = dep.list_repo_files_with_rate_limit_retry(
+                api,
+                repo_id="SZLHOLDINGS/a11oy",
+                repo_type="space",
+            )
+        self.assertEqual(files, ["README.md", "app.py"])
+        self.assertEqual(api.list_repo_files.call_count, 2)
+        sleep.assert_called_once_with(7.0)
+
+    def test_non_429_propagates_without_retry_or_sleep(self):
+        api = mock.Mock()
+        error = self._error(503)
+        api.list_repo_files.side_effect = error
+        with mock.patch.object(dep.time, "sleep") as sleep:
+            with self.assertRaisesRegex(RuntimeError, "HTTP 503"):
+                dep.list_repo_files_with_rate_limit_retry(
+                    api,
+                    repo_id="SZLHOLDINGS/a11oy",
+                    repo_type="space",
+                )
+        api.list_repo_files.assert_called_once_with(
+            repo_id="SZLHOLDINGS/a11oy",
+            repo_type="space",
+        )
+        sleep.assert_not_called()
+
+    def test_429_exhaustion_is_bounded_and_fail_closed(self):
+        api = mock.Mock()
+        api.list_repo_files.side_effect = [self._error(429) for _ in range(5)]
+        with mock.patch.object(dep.time, "sleep") as sleep:
+            with self.assertRaisesRegex(RuntimeError, "HTTP 429"):
+                dep.list_repo_files_with_rate_limit_retry(
+                    api,
+                    repo_id="SZLHOLDINGS/a11oy",
+                    repo_type="space",
+                )
+        self.assertEqual(api.list_repo_files.call_count, 5)
+        self.assertEqual(
+            [call.args[0] for call in sleep.call_args_list],
+            [2.0, 4.0, 8.0, 16.0],
+        )
+
+    def test_retry_count_is_strictly_bounded(self):
+        api = mock.Mock()
+        for value in (0, 11, "not-an-integer"):
+            with self.subTest(value=value), self.assertRaises(
+                dep.DeployContractError
+            ):
+                dep.list_repo_files_with_rate_limit_retry(
+                    api,
+                    repo_id="SZLHOLDINGS/a11oy",
+                    repo_type="space",
+                    max_attempts=value,
+                )
+        api.list_repo_files.assert_not_called()
+
+
 class TestContentIdentity(unittest.TestCase):
     def test_git_blob_sha1_matches_git(self):
         # `printf '' | git hash-object --stdin` == e69de29... (empty blob)

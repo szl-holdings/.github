@@ -60,6 +60,9 @@ HF_HOST = "https://huggingface.co"
 UA = {"User-Agent": "hf-deploy-from-dockerfile/1.0"}
 TERMINAL_RUNTIME_STAGES = {"BUILD_ERROR", "CONFIG_ERROR", "RUNTIME_ERROR"}
 RESERVED_HF_ROOT_TARGETS = {"dockerfile", "dockerfile.dockerignore"}
+HF_TREE_LIST_MAX_ATTEMPTS = 5
+HF_TREE_LIST_BASE_DELAY_S = 2.0
+HF_TREE_LIST_MAX_DELAY_S = 30.0
 
 
 class DeployContractError(ValueError):
@@ -924,6 +927,69 @@ def build_add_operations(repo_root, files, operation_class):
     return operations
 
 
+def _http_status_from_exception(exc):
+    """Extract an HTTP status from requests-, urllib-, or SDK-style errors."""
+    response = getattr(exc, "response", None)
+    status = getattr(response, "status_code", None)
+    if status is None:
+        status = getattr(exc, "status_code", None)
+    if status is None:
+        status = getattr(exc, "code", None)
+    try:
+        return int(status)
+    except (TypeError, ValueError):
+        return None
+
+
+def _retry_after_seconds(exc):
+    """Return a non-negative numeric Retry-After hint, or zero when absent."""
+    response = getattr(exc, "response", None)
+    headers = getattr(response, "headers", None) or {}
+    raw = headers.get("Retry-After") or headers.get("retry-after")
+    try:
+        return max(0.0, float(raw))
+    except (TypeError, ValueError):
+        return 0.0
+
+
+def list_repo_files_with_rate_limit_retry(
+        api, *, repo_id, repo_type, max_attempts=HF_TREE_LIST_MAX_ATTEMPTS):
+    """Retry only the idempotent HF tree-list read on HTTP 429.
+
+    Uploads, commits, deletes, source binding, and restart calls are intentionally
+    outside this helper. Non-429 failures propagate immediately. Exhaustion
+    propagates the final SDK exception so the deployment remains fail-closed.
+    """
+    try:
+        attempts = int(max_attempts)
+    except (TypeError, ValueError) as exc:
+        raise DeployContractError("HF tree-list retry attempts must be an integer") from exc
+    if not 1 <= attempts <= 10:
+        raise DeployContractError("HF tree-list retry attempts must be between 1 and 10")
+
+    for attempt in range(1, attempts + 1):
+        try:
+            return api.list_repo_files(repo_id=repo_id, repo_type=repo_type)
+        except Exception as exc:  # noqa: BLE001 - SDK error type is lazy-imported
+            if _http_status_from_exception(exc) != 429 or attempt >= attempts:
+                raise
+            backoff = min(
+                HF_TREE_LIST_MAX_DELAY_S,
+                HF_TREE_LIST_BASE_DELAY_S * (2 ** (attempt - 1)),
+            )
+            server_hint = min(
+                HF_TREE_LIST_MAX_DELAY_S,
+                _retry_after_seconds(exc),
+            )
+            delay = max(backoff, server_hint)
+            print(
+                "::warning::HF tree listing rate-limited (HTTP 429); "
+                f"retry {attempt + 1}/{attempts} in {delay:.1f}s"
+            )
+            time.sleep(delay)
+    raise AssertionError("bounded HF tree-list retry loop exited unexpectedly")
+
+
 def fetch_github_json(url, token):
     """Fetch one authenticated GitHub API object."""
     request = urllib.request.Request(
@@ -1040,7 +1106,11 @@ def deploy(args):
             # a dir source is one where the checkout has children under s/
             if any(p.startswith(s + "/") for p in files):
                 dir_sources.add(s + "/")
-        live = api.list_repo_files(repo_id=args.hf_repo, repo_type="space")
+        live = list_repo_files_with_rate_limit_retry(
+            api,
+            repo_id=args.hf_repo,
+            repo_type="space",
+        )
         local_set = set(files)
         for p in live:
             if p in local_set:
