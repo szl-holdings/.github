@@ -1,0 +1,71 @@
+name: Final frontier reconcile once
+
+on:
+  push:
+    branches:
+      - ops/final-frontier-reconcile-20260902
+    paths:
+      - ".github/workflows/final-frontier-reconcile-once.yml"
+
+permissions:
+  actions: write
+  contents: write
+
+jobs:
+  reconcile:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - name: Dispatch the protected-main frontier operator
+        id: run
+        shell: bash
+        run: |
+          set -euo pipefail
+          marker="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          gh workflow run frontier-issue-operator.yml \
+            --repo "$GITHUB_REPOSITORY" \
+            --ref main \
+            -f apply=true
+          run_id=""
+          for attempt in $(seq 1 45); do
+            run_id="$(gh run list \
+              --repo "$GITHUB_REPOSITORY" \
+              --workflow frontier-issue-operator.yml \
+              --event workflow_dispatch \
+              --branch main \
+              --limit 20 \
+              --json databaseId,createdAt \
+              --jq '.[] | select(.createdAt >= "'"$marker"'") | .databaseId' | head -n1)"
+            if [ -n "$run_id" ]; then break; fi
+            sleep 2
+          done
+          test -n "$run_id"
+          echo "run_id=$run_id" >> "$GITHUB_OUTPUT"
+
+      - name: Require terminal successful reconciliation
+        run: gh run watch "${{ steps.run.outputs.run_id }}" --repo "$GITHUB_REPOSITORY" --exit-status --interval 10
+
+      - name: Capture exact terminal state
+        run: |
+          gh run view "${{ steps.run.outputs.run_id }}" \
+            --repo "$GITHUB_REPOSITORY" \
+            --json databaseId,status,conclusion,headSha,event,jobs,url \
+            > final-frontier-reconcile.json
+          cat final-frontier-reconcile.json
+
+      - name: Upload final reconciliation witness
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: final-frontier-reconcile-${{ github.run_id }}-${{ github.run_attempt }}
+          path: final-frontier-reconcile.json
+          if-no-files-found: error
+          retention-days: 90
+
+      - name: Remove transient reconciliation branch
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          git push "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" --delete "$GITHUB_REF_NAME"
