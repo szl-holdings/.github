@@ -18,31 +18,71 @@
     "frontier_admission": "szl-holdings/szl-frontier"
   },
   "public_bodies": [
-    {"id":"terra","source":"szl-holdings/szl-real-estate","surface":"SZLHOLDINGS/terra","domain":"real-estate"},
-    {"id":"killinchu","source":"szl-holdings/killinchu","surface":"SZLHOLDINGS/killinchu","domain":"cyber-physical-resilience"},
-    {"id":"prism-counsel","source":"szl-holdings/platform","surface":"SZLHOLDINGS/prism-counsel","domain":"legal"},
-    {"id":"puriq","source":"szl-holdings/puriq-live","surface":"SZLHOLDINGS/puriq","domain":"financial-intelligence"},
-    {"id":"lyte","source":"szl-holdings/lyte-services","surface":"SZLHOLDINGS/lyte","domain":"business-and-agent-observability"}
+    {
+      "id": "terra",
+      "brand": "Terra",
+      "backend_source": "szl-holdings/szl-real-estate",
+      "presentation_source": "szl-holdings/szl-real-estate",
+      "hub_surface": "SZLHOLDINGS/terra",
+      "domain": "real-estate"
+    },
+    {
+      "id": "killinchu",
+      "brand": "Killinchu",
+      "backend_source": "szl-holdings/killinchu",
+      "presentation_source": "szl-holdings/killinchu",
+      "hub_surface": "SZLHOLDINGS/killinchu",
+      "domain": "cyber-physical-resilience"
+    },
+    {
+      "id": "prism-counsel",
+      "brand": "PRISM Counsel",
+      "backend_source": "szl-holdings/platform",
+      "presentation_source": "szl-holdings/a11oy:verticals/counsel",
+      "hub_surface": "SZLHOLDINGS/counsel",
+      "domain": "legal"
+    },
+    {
+      "id": "puriq",
+      "brand": "PURIQ Finance",
+      "backend_source": "szl-holdings/puriq-live",
+      "presentation_source": "szl-holdings/a11oy:verticals/finance",
+      "hub_surface": "SZLHOLDINGS/finance",
+      "domain": "financial-intelligence"
+    },
+    {
+      "id": "lyte",
+      "brand": "Lyte",
+      "backend_source": "szl-holdings/lyte-services",
+      "presentation_source": "szl-holdings/lyte-lattice",
+      "hub_surface": "SZLHOLDINGS/lyte",
+      "domain": "business-and-agent-observability"
+    }
   ],
-  "killinchu_capability_planes": ["aegis","sentra-defend","immune","vessels-maritime","counter-uas-airspace"],
+  "hub_alias_policy": {
+    "brand_names_do_not_require_matching_space_slugs": true,
+    "canonical_public_space_slugs": ["a11oy", "killinchu", "terra", "counsel", "finance", "lyte"],
+    "duplicate_authority_spaces_forbidden": true
+  },
+  "killinchu_capability_planes": ["aegis", "sentra-defend", "immune", "vessels-maritime", "counter-uas-airspace"],
   "shared_invariants": {
     "default_effect": "deny",
     "model_authority": "proposal-only",
     "human_approval_for_consequential_action": true,
     "receipt_required_for_promoted_state_change": true,
     "frontier_release_default": "HOLD",
-    "locked_formula_set": ["F1","F4","F7","F11","F12","F18","F19","F22"],
+    "locked_formula_set": ["F1", "F4", "F7", "F11", "F12", "F18", "F19", "F22"],
     "lambda_status": "Conjecture 1",
     "no_vertical_may_redefine_formula_ids": true,
     "no_hf_card_implies_production": true,
     "no_runtime_claim_without_live_evidence": true
   },
   "frontier_wave_2026_09_04": {
-    "webgpu_kernels": ["szl-kernels","szl-serve"],
-    "neomme": ["szl-second-brain","lyte-services"],
+    "webgpu_kernels": ["szl-kernels", "szl-serve"],
+    "neomme": ["szl-second-brain", "lyte-services"],
     "funes_memory_pattern": ["szl-second-brain"],
     "vibevoice_streaming_asr": ["szl-serve"],
-    "fineweb_supernova": ["szl-second-brain","lyte-services","szl-frontier"],
+    "fineweb_supernova": ["szl-second-brain", "lyte-services", "szl-frontier"],
     "puffin_world": ["szl-khipu"],
     "granite_timeseries": ["lyte-services"]
   }
