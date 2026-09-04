@@ -1,0 +1,86 @@
+# SPDX-License-Identifier: Apache-2.0
+name: Owner-authorized estate recovery once
+
+on:
+  push:
+    branches:
+      - ops/owner-authorized-estate-recovery-20260904-2238
+    paths:
+      - .github/workflows/owner-authorized-estate-recovery-once.yml
+
+permissions:
+  contents: read
+  actions: write
+  checks: read
+  issues: write
+  pull-requests: write
+
+concurrency:
+  group: owner-authorized-estate-recovery-20260904-2238
+  cancel-in-progress: false
+
+jobs:
+  recover:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    env:
+      SZL_ORG_GITHUB_TOKEN: ${{ secrets.SZL_ORG_GITHUB_TOKEN }}
+      SZL_GITHUB_TOKEN: ${{ secrets.SZL_GITHUB_TOKEN }}
+      ORG_ADMIN_TOKEN: ${{ secrets.ORG_ADMIN_TOKEN }}
+      GH_ADMIN_TOKEN: ${{ secrets.GH_ADMIN_TOKEN }}
+      GH_PAT: ${{ secrets.GH_PAT }}
+      GITHUB_PAT: ${{ secrets.GITHUB_PAT }}
+      PAT_TOKEN: ${{ secrets.PAT_TOKEN }}
+      FRONTIER_TOKEN: ${{ secrets.FRONTIER_TOKEN }}
+      GITHUB_TOKEN: ${{ github.token }}
+      HF_ORG_TOKEN: ${{ secrets.HF_ORG_TOKEN }}
+      HF_ORG_TOKEN1: ${{ secrets.HF_ORG_TOKEN1 }}
+      HF_WRITE_TOKEN: ${{ secrets.HF_WRITE_TOKEN }}
+      HF_TOKEN: ${{ secrets.HF_TOKEN }}
+      HUGGINGFACE_TOKEN: ${{ secrets.HUGGINGFACE_TOKEN }}
+      HUGGING_FACE_HUB_TOKEN: ${{ secrets.HUGGING_FACE_HUB_TOKEN }}
+    steps:
+      - name: Harden runner
+        uses: step-security/harden-runner@05e31511f85b41b11d1cf0ef85d0992719546e2c # v2.21.0
+        with:
+          egress-policy: audit
+
+      - name: Check out exact authorized controller
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Verify one-shot branch identity
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$GITHUB_REF" = "refs/heads/ops/owner-authorized-estate-recovery-20260904-2238"
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12"
+
+      - name: Install exact Hugging Face client
+        run: >-
+          python -m pip install --disable-pip-version-check --no-cache-dir
+          "huggingface_hub==1.29.0"
+
+      - name: Execute bounded organization recovery
+        run: >-
+          python scripts/estate_recovery_executor_v2.py
+          --github-org szl-holdings
+          --hf-org SZLHOLDINGS
+          --output reports/estate-recovery-v2.json
+
+      - name: Upload immutable secret-free recovery receipt
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: owner-authorized-estate-recovery-${{ github.run_id }}-${{ github.run_attempt }}
+          path: reports/estate-recovery-v2.json
+          if-no-files-found: error
+          retention-days: 90
