@@ -1,0 +1,31 @@
+{
+  "schema": "szl.space-provenance-lineage/v2",
+  "state": "LEGACY_RECEIPT_SUPERSEDED",
+  "claim_boundary": "This document preserves lineage for a legacy pre-publication observation. It does not establish current inventory, current served bytes, runtime readiness, model quality, deployment persistence, or current protected-main parity.",
+  "legacy_observation": {
+    "observed_at": "2026-08-31T03:03:44Z",
+    "space": "SZLHOLDINGS/README",
+    "repository_type": "space",
+    "observed_parent_revision": "806359f5f0c627df50e8a038c943bf14f6a8b3da",
+    "candidate_state": "LOCAL_ONLY_NOT_PUBLISHED",
+    "original_import": {
+      "source_space_revision": "311fd2e2be172e0ab78cb83b5edfaba7fe328144",
+      "sha256": "b7d5c024a260ac0aec3d5e630410f50c462af07372d089b98b67e20146e8352d",
+      "size": 2829
+    }
+  },
+  "supersession": {
+    "reason": "A protected-main manifest publisher now emits an exact revision-bound deployment receipt and verifies the immutable Hub commit, exact remote file set, runtime files, smoke marker, and served deployment manifest.",
+    "source_repository": "szl-holdings/.github",
+    "source_branch": "main",
+    "manifest_path": "huggingface/org-card.manifest.json",
+    "live_receipt_path": "deployment.json",
+    "current_rule": "The public Space is current only when deployment.json binds to the latest protected-main revision and all publisher readback checks pass."
+  },
+  "preservation": {
+    "policy": "PRESERVE_ORIGINAL_HASH_AND_SOURCE_REVISION_WITHOUT_REPUBLISHING_STALE_OPERATIONAL_CLAIMS",
+    "import_receipt": "docs/evidence/hf-org-card-governance-import.json"
+  },
+  "blockers": [],
+  "operational_status": "NOT_ASSERTED_BY_THIS_LINEAGE_FILE"
+}

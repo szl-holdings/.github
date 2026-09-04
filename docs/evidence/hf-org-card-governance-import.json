@@ -1,0 +1,49 @@
+{
+  "schema": "szl.hf-org-card-governance-import/v2",
+  "claim": "Existing public governance artifacts were imported byte-for-byte and hashed before truth-safe canonical rewrites. The receipt preserves their immutable source revision and original digests; it does not claim the historical contents remain current.",
+  "source": {
+    "repo_id": "SZLHOLDINGS/README",
+    "repo_type": "space",
+    "revision": "311fd2e2be172e0ab78cb83b5edfaba7fe328144"
+  },
+  "observed_at": "2026-09-04T00:20:50.598969Z",
+  "files": [
+    {
+      "path": "GOVERNANCE.md",
+      "sha256": "805f70998b96128163fc6121d1efe3b86f8fdc77f206fe9abaf9e39cb73170c6",
+      "size": 552,
+      "canonical_disposition": "REWRITTEN_AS_REVISION_AWARE_GOVERNANCE_BOUNDARY"
+    },
+    {
+      "path": "MODELS.txt",
+      "sha256": "0baf30b8aefccd40bdebf27ab6274b0d057cbc75f1e18068d3f7f9bb32650d1c",
+      "size": 251,
+      "canonical_disposition": "RETAINED_AS_NON_READINESS_BACKLINK_INDEX"
+    },
+    {
+      "path": "SEVEN_SPACES.md",
+      "sha256": "63d8e8edead1988e69a1bb82aaeeca485b946eb37977f2f162413300b3b35f4e",
+      "size": 2683,
+      "canonical_disposition": "REWRITTEN_AS_HISTORICAL_SUPERSEDED_LEDGER"
+    },
+    {
+      "path": "SPACE_PROVENANCE_FRONTIER.json",
+      "sha256": "b7d5c024a260ac0aec3d5e630410f50c462af07372d089b98b67e20146e8352d",
+      "size": 2829,
+      "canonical_disposition": "REWRITTEN_AS_LEGACY_RECEIPT_LINEAGE"
+    },
+    {
+      "path": "seven-spaces.yaml",
+      "sha256": "0a098f9dbf6cba44285e63c2eab897aa69d552cfad8795182551484b2d966661",
+      "size": 875,
+      "canonical_disposition": "REWRITTEN_AS_MACHINE_READABLE_HISTORICAL_SNAPSHOT"
+    }
+  ],
+  "publication_policy": {
+    "delete_existing_remote_artifacts": false,
+    "disable_exact_remote_file_verification": false,
+    "preserve_original_bytes_by_source_revision": true,
+    "publish_stale_operational_claims_as_current": false,
+    "canonical_manifest": "huggingface/org-card.manifest.json"
+  }
+}

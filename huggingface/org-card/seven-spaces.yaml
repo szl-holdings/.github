@@ -1,0 +1,48 @@
+schema: szl.hf-space-inventory-history/v2
+state: HISTORICAL_SUPERSEDED
+claims_current_inventory: false
+historical_as_of: "2026-08-29"
+source_snapshot:
+  repo_id: SZLHOLDINGS/README
+  repo_type: space
+  revision: 311fd2e2be172e0ab78cb83b5edfaba7fe328144
+  imported_sha256: 0a098f9dbf6cba44285e63c2eab897aa69d552cfad8795182551484b2d966661
+historical_snapshot:
+  action: pause_and_private_never_delete
+  counts:
+    spaces_total: 45
+    spaces_public: 7
+    spaces_private: 38
+    models: 43
+    datasets: 36
+  keep:
+    - id: SZLHOLDINGS/README
+      role: org_card
+    - id: SZLHOLDINGS/a11oy
+      role: product
+    - id: SZLHOLDINGS/killinchu
+      role: defense_vertical
+    - id: SZLHOLDINGS/immune
+      role: safety_kernel
+    - id: SZLHOLDINGS/szl-khipu
+      role: model_demo
+    - id: SZLHOLDINGS/szl-atelier
+      role: artifact_walk
+    - id: SZLHOLDINGS/governed-receipt-verifier
+      role: receipt_replay
+known_superseding_changes:
+  living_anatomy:
+    state: promoted_to_public_flagship_policy
+    merge: bbb75c4f2b60e20c537054d90b65c08906160484
+    witness_merge: 920f28e0ed1d787b34568b234469a955cc571a78
+  vessels:
+    state: retained_space_consolidated_into_killinchu
+    card_publisher_merge: b050198c7bccb690abe5e8932487e5c81fc55806
+  canonical_hf_writer:
+    merge: 662d20099465dda29aa7c86a377c37902d4dc17f
+current_authority:
+  source_repository: szl-holdings/.github
+  source_branch: main
+  manifest: huggingface/org-card.manifest.json
+  live_receipt: deployment.json
+  readiness_rule: public receipt revision must equal protected-main revision and all immutable/runtime readbacks must pass
