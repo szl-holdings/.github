@@ -1,0 +1,257 @@
+name: Refresh and finish exact-green HF source-binding PR 651
+
+on:
+  push:
+    branches:
+      - ops/finish-hf-source-binding-651-20260904
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+  pull-requests: write
+  checks: read
+  actions: read
+
+concurrency:
+  group: refresh-finish-exact-green-hf-source-binding-pr-651
+  cancel-in-progress: false
+
+jobs:
+  finish:
+    name: Refresh branch, wait for exact-head checks, and squash-merge PR 651
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - name: Harden runner
+        uses: step-security/harden-runner@05e31511f85b41b11d1cf0ef85d0992719546e2c # v2.21.0
+        with:
+          egress-policy: audit
+
+      - name: Finish PR 651 without bypassing protection
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p reports
+          python - <<'PY'
+          from __future__ import annotations
+
+          import datetime as dt
+          import json
+          import os
+          import time
+          import urllib.error
+          import urllib.parse
+          import urllib.request
+          from pathlib import Path
+          from typing import Any
+
+          repo = os.environ["GITHUB_REPOSITORY"]
+          token = os.environ["GH_TOKEN"]
+          number = 651
+          success = {"success", "neutral", "skipped"}
+          failure = {"failure", "cancelled", "timed_out", "action_required", "startup_failure", "stale"}
+          active_states = {"queued", "in_progress", "waiting", "pending", "requested"}
+
+          def api(method: str, path: str, payload: dict[str, Any] | None = None) -> tuple[int, Any]:
+              headers = {
+                  "Accept": "application/vnd.github+json",
+                  "Authorization": f"Bearer {token}",
+                  "X-GitHub-Api-Version": "2022-11-28",
+                  "User-Agent": "SZL-Refresh-Exact-Green-651/2.0",
+              }
+              data = None
+              if payload is not None:
+                  data = json.dumps(payload, separators=(",", ":")).encode("utf-8")
+                  headers["Content-Type"] = "application/json"
+              req = urllib.request.Request(
+                  "https://api.github.com" + path,
+                  data=data,
+                  headers=headers,
+                  method=method,
+              )
+              try:
+                  with urllib.request.urlopen(req, timeout=30) as response:
+                      body = response.read(4_000_000)
+                      return response.status, json.loads(body.decode("utf-8")) if body else None
+              except urllib.error.HTTPError as exc:
+                  body = exc.read(1_000_000)
+                  try:
+                      parsed = json.loads(body.decode("utf-8")) if body else None
+                  except Exception:
+                      parsed = None
+                  return exc.code, parsed
+
+          def read_pr() -> dict[str, Any]:
+              status, payload = api("GET", f"/repos/{repo}/pulls/{number}")
+              if status != 200 or not isinstance(payload, dict):
+                  raise RuntimeError(f"PR read failed with HTTP {status}")
+              return payload
+
+          def exact_checks(sha: str) -> dict[str, Any]:
+              _, checks_payload = api("GET", f"/repos/{repo}/commits/{sha}/check-runs?per_page=100")
+              _, statuses_payload = api("GET", f"/repos/{repo}/commits/{sha}/status")
+              active: list[dict[str, Any]] = []
+              failed: list[dict[str, Any]] = []
+              passed: list[str] = []
+              for row in (checks_payload or {}).get("check_runs", []):
+                  if not isinstance(row, dict):
+                      continue
+                  item = {
+                      "name": row.get("name"),
+                      "status": row.get("status"),
+                      "conclusion": row.get("conclusion"),
+                      "url": row.get("html_url"),
+                  }
+                  if row.get("status") != "completed":
+                      active.append(item)
+                  elif str(row.get("conclusion") or "") in failure:
+                      failed.append(item)
+                  elif str(row.get("conclusion") or "") in success:
+                      passed.append(str(row.get("name")))
+              for row in (statuses_payload or {}).get("statuses", []):
+                  if not isinstance(row, dict):
+                      continue
+                  state = str(row.get("state") or "")
+                  item = {
+                      "name": row.get("context"),
+                      "status": state,
+                      "conclusion": state,
+                      "url": row.get("target_url"),
+                  }
+                  if state == "pending":
+                      active.append(item)
+                  elif state in {"failure", "error"}:
+                      failed.append(item)
+                  elif state == "success":
+                      passed.append(str(row.get("context")))
+              return {"active": active, "failed": failed, "passed": sorted(set(passed))}
+
+          report: dict[str, Any] = {
+              "schema": "szl.refresh-exact-green-pr-651/v2",
+              "generated_at": dt.datetime.now(dt.timezone.utc).isoformat().replace("+00:00", "Z"),
+              "repository": repo,
+              "number": number,
+              "steps": [],
+              "branch_protection_bypassed": False,
+              "secret_values_recorded": False,
+          }
+
+          current = read_pr()
+          if current.get("state") != "open":
+              report.update({
+                  "result": "already-closed",
+                  "merged": current.get("merged") is True,
+                  "merged_at": current.get("merged_at"),
+              })
+          elif current.get("draft") is True:
+              report.update({"result": "blocked-draft", "merged": False})
+          else:
+              head_sha = str((current.get("head") or {}).get("sha") or "")
+              base_sha = str((current.get("base") or {}).get("sha") or "")
+              compare_status, compare = api(
+                  "GET",
+                  f"/repos/{repo}/compare/{urllib.parse.quote(base_sha, safe='')}...{urllib.parse.quote(head_sha, safe='')}",
+              )
+              behind = int((compare or {}).get("behind_by") or 0) if compare_status == 200 else 0
+              if behind > 0:
+                  update_status, update_payload = api(
+                      "PUT",
+                      f"/repos/{repo}/pulls/{number}/update-branch",
+                      {"expected_head_sha": head_sha},
+                  )
+                  report["steps"].append({
+                      "operation": "update-branch",
+                      "http": update_status,
+                      "previous_head": head_sha,
+                      "behind_by": behind,
+                      "message": (update_payload or {}).get("message") if isinstance(update_payload, dict) else None,
+                  })
+                  if update_status not in {200, 202}:
+                      report.update({"result": "update-branch-rejected", "merged": False})
+                      Path("reports/pr-651-finisher-v2.json").write_text(json.dumps(report, indent=2, sort_keys=True) + "\n")
+                      print(json.dumps(report, indent=2, sort_keys=True))
+                      raise SystemExit(1)
+                  old_head = head_sha
+                  for _ in range(120):
+                      time.sleep(5)
+                      current = read_pr()
+                      head_sha = str((current.get("head") or {}).get("sha") or "")
+                      if head_sha and head_sha != old_head:
+                          break
+
+              deadline = time.monotonic() + 30 * 60
+              final = {"active": [], "failed": [], "passed": []}
+              while time.monotonic() < deadline:
+                  current = read_pr()
+                  if current.get("state") != "open":
+                      break
+                  observed = str((current.get("head") or {}).get("sha") or "")
+                  if observed:
+                      head_sha = observed
+                  final = exact_checks(head_sha)
+                  if final["failed"] or (not final["active"] and final["passed"]):
+                      break
+                  time.sleep(15)
+
+              current = read_pr()
+              report["head_sha"] = head_sha
+              report["checks"] = final
+              if current.get("state") != "open":
+                  report.update({
+                      "result": "closed-during-wait",
+                      "merged": current.get("merged") is True,
+                      "merged_at": current.get("merged_at"),
+                  })
+              elif final["failed"]:
+                  report.update({"result": "terminal-red", "merged": False})
+              elif final["active"] or not final["passed"]:
+                  report.update({"result": "checks-not-terminal", "merged": False})
+              else:
+                  current = read_pr()
+                  exact_head = str((current.get("head") or {}).get("sha") or "")
+                  if exact_head != head_sha:
+                      report.update({"result": "head-moved-before-merge", "merged": False})
+                  else:
+                      status, payload = api(
+                          "PUT",
+                          f"/repos/{repo}/pulls/{number}/merge",
+                          {
+                              "sha": exact_head,
+                              "merge_method": "squash",
+                              "commit_title": "fix(hf): accept exact-source receipts and restore public profile budget (#651)",
+                              "commit_message": (
+                                  "Accept rigorously validated pre-existing GitHub OIDC release receipts and restore "
+                                  "the public organization profile budget without weakening source or truth contracts.\n\n"
+                                  "Signed-off-by: Stephen Lutar <stephenlutar2@gmail.com>"
+                              ),
+                          },
+                      )
+                      merged = status == 200 and isinstance(payload, dict) and payload.get("merged") is True
+                      report.update({
+                          "result": "merged" if merged else "merge-rejected",
+                          "merged": merged,
+                          "merge_http": status,
+                          "merge_sha": payload.get("sha") if isinstance(payload, dict) else None,
+                          "merge_message": payload.get("message") if isinstance(payload, dict) else None,
+                      })
+
+          report["complete"] = bool(report.get("merged"))
+          Path("reports/pr-651-finisher-v2.json").write_text(
+              json.dumps(report, indent=2, sort_keys=True) + "\n",
+              encoding="utf-8",
+          )
+          print(json.dumps(report, indent=2, sort_keys=True))
+          if not report["complete"]:
+              raise SystemExit(1)
+          PY
+
+      - name: Upload exact-head receipt
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: refresh-exact-green-pr-651-${{ github.run_id }}-${{ github.run_attempt }}
+          path: reports/pr-651-finisher-v2.json
+          if-no-files-found: error
+          retention-days: 90
