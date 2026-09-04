@@ -1,0 +1,76 @@
+name: Fix Frontier kernel contract once
+
+on:
+  push:
+    branches:
+      - feat/frontier-design-kernel-v1-20260903
+    paths:
+      - .github/workflows/fix-frontier-kernel-contract-once.yml
+
+permissions:
+  contents: write
+
+concurrency:
+  group: fix-frontier-kernel-contract-once
+  cancel-in-progress: false
+
+jobs:
+  repair:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+    steps:
+      - name: Checkout exact candidate branch
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: feat/frontier-design-kernel-v1-20260903
+          fetch-depth: 0
+          persist-credentials: true
+
+      - name: Apply measured kernel corrections
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git hash-object .github/design/frontier-v1/szl-frontier.css)" = b8960d2bfc4e5e58fbe97e2c783642a96866ff3b
+          test "$(git hash-object .github/scripts/rollout_frontier_design.py)" = db294f2a5dcb595ae017967b22672587e878d2e0
+          python - <<'PY'
+          from pathlib import Path
+
+          css_path = Path('.github/design/frontier-v1/szl-frontier.css')
+          css = css_path.read_text(encoding='utf-8')
+          for brand in ('killinchu', 'hatun'):
+              old = f'  body[data-szl-frontier="{brand}"]::after {{'
+              new = f'  body.szl-frontier[data-szl-frontier="{brand}"]::after {{'
+              if css.count(old) != 1:
+                  raise SystemExit(f'CSS selector repair target drifted: {brand}')
+              css = css.replace(old, new, 1)
+          css_path.write_text(css, encoding='utf-8')
+
+          script_path = Path('.github/scripts/rollout_frontier_design.py')
+          script = script_path.read_text(encoding='utf-8')
+          old = '    pattern = re.compile(re.escape(start) + r".*?" + re.escape(end) + r"\\s*", re.DOTALL)'
+          new = '    pattern = re.compile(r"(?:[ \\t]*\\r?\\n)?" + re.escape(start) + r".*?" + re.escape(end) + r"[ \\t]*(?:\\r?\\n)?", re.DOTALL)'
+          if script.count(old) != 1:
+              raise SystemExit('marker-strip repair target drifted')
+          script = script.replace(old, new, 1)
+          script_path.write_text(script, encoding='utf-8')
+          PY
+          python -m py_compile .github/scripts/rollout_frontier_design.py
+          python .github/scripts/test_frontier_design.py
+          git rm .github/workflows/fix-frontier-kernel-contract-once.yml
+          git diff --check
+          mapfile -t changed < <(git diff --name-only | sort)
+          test "${#changed[@]}" -eq 3
+          test "${changed[0]}" = .github/design/frontier-v1/szl-frontier.css
+          test "${changed[1]}" = .github/scripts/rollout_frontier_design.py
+          test "${changed[2]}" = .github/workflows/fix-frontier-kernel-contract-once.yml
+
+      - name: Commit clean candidate
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add .github/design/frontier-v1/szl-frontier.css .github/scripts/rollout_frontier_design.py .github/workflows/fix-frontier-kernel-contract-once.yml
+          git commit -m 'fix(frontier): make selectors unique and patching idempotent' -m 'Signed-off-by: Stephen Lutar <stephenlutar2@gmail.com>'
+          git push origin HEAD:feat/frontier-design-kernel-v1-20260903
