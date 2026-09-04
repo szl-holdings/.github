@@ -1,0 +1,399 @@
+name: Repair HF remote ADD context semantics
+
+on:
+  push:
+    branches:
+      - fix/hf-remote-add-context-semantics-20260904
+    paths:
+      - .github/workflows/repair-hf-remote-add-context-semantics.yml
+
+permissions:
+  contents: write
+
+concurrency:
+  group: repair-hf-remote-add-context-semantics
+  cancel-in-progress: false
+
+jobs:
+  repair:
+    name: Patch parsers and prove remote ADD behavior
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - name: Harden runner
+        uses: step-security/harden-runner@bf7454d06d71f1098171f2acdf0cd4708d7b5920 # v2.20.0
+        with:
+          egress-policy: audit
+
+      - name: Checkout exact repair branch
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.ref_name }}
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12"
+
+      - name: Apply deterministic parser and regression repair
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+
+
+          def replace_once(path: str, old: str, new: str, label: str) -> None:
+              target = Path(path)
+              text = target.read_text(encoding="utf-8")
+              count = text.count(old)
+              if count != 1:
+                  raise SystemExit(f"{label}: expected one match, found {count}")
+              target.write_text(text.replace(old, new, 1), encoding="utf-8", newline="\n")
+
+
+          deploy = ".github/scripts/hf_deploy_from_dockerfile.py"
+          replace_once(
+              deploy,
+              '''def sha256(data: bytes) -> str:
+              return hashlib.sha256(data).hexdigest()
+
+
+          # --------------------------------------------------------------------------- #
+          # Dockerfile COPY parsing (shared logic with hf_module_drift_check.py)
+          # --------------------------------------------------------------------------- #
+          ''',
+              '''def sha256(data: bytes) -> str:
+              return hashlib.sha256(data).hexdigest()
+
+
+          def is_remote_add_source(source):
+              """Return True when Docker resolves an ADD source outside build context."""
+              value = str(source or "").strip()
+              if not value:
+                  return False
+              parsed = urllib.parse.urlsplit(value)
+              if parsed.scheme.lower() in {"http", "https", "git", "ssh"} and parsed.netloc:
+                  return True
+              return bool(re.fullmatch(r"[A-Za-z0-9._-]+@[A-Za-z0-9.-]+:.+", value))
+
+
+          # --------------------------------------------------------------------------- #
+          # Dockerfile COPY parsing (shared logic with hf_module_drift_check.py)
+          # --------------------------------------------------------------------------- #
+          ''',
+              "deployer remote-source helper",
+          )
+          replace_once(
+              deploy,
+              '''        m = re.match(r"^\\s*(COPY|ADD)\\s+(.*)$", line, re.IGNORECASE)
+              if not m:
+                  continue
+              rest = m.group(2).strip()
+          ''',
+              '''        m = re.match(r"^\\s*(COPY|ADD)\\s+(.*)$", line, re.IGNORECASE)
+              if not m:
+                  continue
+              instruction = m.group(1).upper()
+              rest = m.group(2).strip()
+          ''',
+              "deployer instruction identity",
+          )
+          replace_once(
+              deploy,
+              '''            sources.extend(arr[:-1])
+              revision_eligible.extend(arr[:-1])
+              continue
+          ''',
+              '''            srcs = arr[:-1]
+              if instruction == "ADD":
+                  srcs = [source for source in srcs if not is_remote_add_source(source)]
+              sources.extend(srcs)
+              revision_eligible.extend(srcs)
+              continue
+          ''',
+              "deployer JSON remote ADD filter",
+          )
+          replace_once(
+              deploy,
+              '''        srcs = clean[:-1]
+              for source in srcs:
+          ''',
+              '''        srcs = clean[:-1]
+              if instruction == "ADD":
+                  srcs = [source for source in srcs if not is_remote_add_source(source)]
+              for source in srcs:
+          ''',
+              "deployer shell remote ADD filter",
+          )
+          replace_once(
+              deploy,
+              '''    JSON-array form, drops --flag options, and SKIPS `--from=` build-stage
+              copies. A whole-context source is rejected because it cannot be represented
+          ''',
+              '''    JSON-array form, drops --flag options, and SKIPS `--from=` build-stage
+              copies plus remote `ADD` sources that Docker resolves outside the build
+              context. A whole-context source is rejected because it cannot be represented
+          ''',
+              "deployer parser documentation",
+          )
+
+          drift = ".github/scripts/hf_module_drift_check.py"
+          replace_once(
+              drift,
+              '''# --------------------------------------------------------------------------- #
+          # Dockerfile COPY parsing
+          # --------------------------------------------------------------------------- #
+          def parse_copy_sources(dockerfile_text):
+          ''',
+              '''def is_remote_add_source(source):
+              """Return True when Docker resolves an ADD source outside build context."""
+              value = str(source or "").strip()
+              if not value:
+                  return False
+              parsed = urllib.parse.urlsplit(value)
+              if parsed.scheme.lower() in {"http", "https", "git", "ssh"} and parsed.netloc:
+                  return True
+              return bool(re.fullmatch(r"[A-Za-z0-9._-]+@[A-Za-z0-9.-]+:.+", value))
+
+
+          # --------------------------------------------------------------------------- #
+          # Dockerfile COPY parsing
+          # --------------------------------------------------------------------------- #
+          def parse_copy_sources(dockerfile_text):
+          ''',
+              "drift remote-source helper",
+          )
+          replace_once(
+              drift,
+              '''        m = re.match(r"^\\s*(COPY|ADD)\\s+(.*)$", line, re.IGNORECASE)
+              if not m:
+                  continue
+              rest = m.group(2).strip()
+          ''',
+              '''        m = re.match(r"^\\s*(COPY|ADD)\\s+(.*)$", line, re.IGNORECASE)
+              if not m:
+                  continue
+              instruction = m.group(1).upper()
+              rest = m.group(2).strip()
+          ''',
+              "drift instruction identity",
+          )
+          replace_once(
+              drift,
+              '''            if len(arr) >= 2:
+                  sources.extend(arr[:-1])
+              continue
+          ''',
+              '''            if len(arr) >= 2:
+                  srcs = arr[:-1]
+                  if instruction == "ADD":
+                      srcs = [source for source in srcs if not is_remote_add_source(source)]
+                  sources.extend(srcs)
+              continue
+          ''',
+              "drift JSON remote ADD filter",
+          )
+          replace_once(
+              drift,
+              '''        # Last token is the destination.
+              sources.extend(clean[:-1])
+          ''',
+              '''        # Last token is the destination. Remote ADD inputs are fetched by
+              # Docker itself and are not repository build-context files.
+              srcs = clean[:-1]
+              if instruction == "ADD":
+                  srcs = [source for source in srcs if not is_remote_add_source(source)]
+              sources.extend(srcs)
+          ''',
+              "drift shell remote ADD filter",
+          )
+          replace_once(
+              drift,
+              '''    Handles line continuations, --flag options, the JSON-array form, and skips
+              multi-stage `COPY --from=<stage>` lines (those sources are not repo files).
+          ''',
+              '''    Handles line continuations, --flag options, the JSON-array form, and skips
+              multi-stage `COPY --from=<stage>` plus remote `ADD` sources because neither
+              is a repository build-context file.
+          ''',
+              "drift parser documentation",
+          )
+
+          planner = ".github/scripts/hf_candidate_plan.py"
+          replace_once(
+              planner,
+              '''        instruction, rest = match.groups()
+              rest = rest.strip()
+              if instruction.upper() != "COPY":
+                  raise CandidatePlanError("candidate planner forbids ADD instructions")
+              if rest.startswith("["):
+          ''',
+              '''        instruction, rest = match.groups()
+              instruction = instruction.upper()
+              rest = rest.strip()
+              if instruction == "ADD":
+                  if rest.startswith("["):
+                      raise CandidatePlanError("candidate planner forbids JSON-form ADD")
+                  if any(character in rest for character in ('"', "'", "\\\\", "$", "#")):
+                      raise CandidatePlanError(
+                          f"candidate planner forbids ambiguous ADD syntax: {line.strip()}"
+                      )
+                  tokens = rest.split()
+                  flags = [token for token in tokens if token.startswith("--")]
+                  clean = [token for token in tokens if not token.startswith("--")]
+                  if len(clean) != 2 or not publisher.is_remote_add_source(clean[0]):
+                      raise CandidatePlanError(
+                          "candidate planner forbids local or ambiguous ADD instructions"
+                      )
+                  if not clean[0].lower().startswith(("http://", "https://")):
+                      raise CandidatePlanError(
+                          "candidate planner supports only checksum-pinned HTTP(S) remote ADD"
+                      )
+                  checksum_pattern = r"--checksum=sha256:[0-9a-f]{64}"
+                  if len(flags) != 1 or re.fullmatch(checksum_pattern, flags[0]) is None:
+                      raise CandidatePlanError(
+                          "candidate planner requires one lowercase SHA-256 checksum for remote ADD"
+                      )
+                  continue
+              if rest.startswith("["):
+          ''',
+              "candidate planner remote ADD admission",
+          )
+
+          deploy_test = ".github/scripts/test_hf_deploy_from_dockerfile.py"
+          replace_once(
+              deploy_test,
+              '''    def test_rejects_bare_whole_context(self):
+          ''',
+              '''    def test_skips_checksum_pinned_remote_add(self):
+                  checksum = "a" * 64
+                  df = (
+                      "FROM python:3.12\\n"
+                      f"ADD --checksum=sha256:{checksum} https://example.invalid/wheel.whl /wheels/wheel.whl\\n"
+                      "COPY serve.py /app/serve.py\\n"
+                  )
+                  self.assertEqual(dep.parse_copy_sources(df), ["serve.py"])
+
+              def test_skips_json_form_remote_add(self):
+                  df = (
+                      "FROM scratch\\n"
+                      'ADD ["https://example.invalid/archive.tgz", "/tmp/archive.tgz"]\\n'
+                      "COPY serve.py /app/serve.py\\n"
+                  )
+                  self.assertEqual(dep.parse_copy_sources(df), ["serve.py"])
+
+              def test_local_add_remains_a_managed_context_source(self):
+                  df = "FROM scratch\\nADD local.tar /tmp/local.tar\\n"
+                  self.assertEqual(dep.parse_copy_sources(df), ["local.tar"])
+
+              def test_rejects_bare_whole_context(self):
+          ''',
+              "deployer remote ADD tests",
+          )
+
+          drift_test = ".github/scripts/test_hf_module_drift_check.py"
+          replace_once(
+              drift_test,
+              '''class TestClassifyLineage(unittest.TestCase):
+          ''',
+              '''class TestParseCopySources(unittest.TestCase):
+              def test_remote_add_is_not_repository_managed(self):
+                  checksum = "b" * 64
+                  dockerfile = (
+                      "FROM scratch\\n"
+                      f"ADD --checksum=sha256:{checksum} https://example.invalid/archive.tgz /tmp/archive.tgz\\n"
+                      "COPY module.py /app/module.py\\n"
+                  )
+                  self.assertEqual(drift.parse_copy_sources(dockerfile), ["module.py"])
+
+              def test_local_add_remains_repository_managed(self):
+                  dockerfile = "FROM scratch\\nADD local.tgz /tmp/local.tgz\\n"
+                  self.assertEqual(drift.parse_copy_sources(dockerfile), ["local.tgz"])
+
+
+          class TestClassifyLineage(unittest.TestCase):
+          ''',
+              "drift remote ADD tests",
+          )
+
+          planner_test = ".github/scripts/test_hf_candidate_plan.py"
+          replace_once(
+              planner_test,
+              '''    def test_unresolved_copy_source_fails_closed(self) -> None:
+          ''',
+              '''    def test_checksum_pinned_remote_add_is_not_a_context_source(self) -> None:
+                  checksum = "c" * 64
+                  dockerfile = (
+                      "FROM python:3.12-slim\\n"
+                      f"ADD --checksum=sha256:{checksum} https://example.invalid/wheel.whl /wheels/wheel.whl\\n"
+                      "COPY app/ /app/\\n"
+                  )
+                  strict = candidate_plan._strict_copy_sources(dockerfile)
+                  production = candidate_plan.publisher.parse_copy_sources(dockerfile)
+                  self.assertEqual(strict, ["app/"])
+                  self.assertEqual(strict, production)
+
+                  fixture = self.fixture(dockerfile=dockerfile)
+                  candidate = fixture.commit(
+                      "managed change with remote add",
+                      {"app/mod.py": "VALUE = 'candidate'\\n"},
+                  )
+                  report = fixture.plan(candidate)
+                  self.assertEqual(report["candidate"]["copy_sources"], ["app/"])
+
+              def test_unresolved_copy_source_fails_closed(self) -> None:
+          ''',
+              "candidate planner remote ADD positive test",
+          )
+          replace_once(
+              planner_test,
+              '''            "add": "FROM scratch\\nADD app/mod.py /app/\\n",
+              "flag": "FROM scratch\\nCOPY --chown=1000 app/mod.py /app/\\n",
+          ''',
+              '''            "add": "FROM scratch\\nADD app/mod.py /app/\\n",
+              "remote-add-no-checksum": (
+                  "FROM scratch\\n"
+                  "ADD https://example.invalid/archive.tgz /tmp/archive.tgz\\n"
+                  "COPY app/ /app/\\n"
+              ),
+              "flag": "FROM scratch\\nCOPY --chown=1000 app/mod.py /app/\\n",
+          ''',
+              "candidate planner unpinned remote ADD rejection test",
+          )
+          PY
+
+      - name: Run focused and integrated parser tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m py_compile \
+            .github/scripts/hf_deploy_from_dockerfile.py \
+            .github/scripts/hf_module_drift_check.py \
+            .github/scripts/hf_candidate_plan.py \
+            .github/scripts/test_hf_deploy_from_dockerfile.py \
+            .github/scripts/test_hf_module_drift_check.py \
+            .github/scripts/test_hf_candidate_plan.py
+          python3 .github/scripts/test_hf_deploy_from_dockerfile.py
+          python3 .github/scripts/test_hf_module_drift_check.py
+          python3 .github/scripts/test_hf_candidate_plan.py
+          git diff --check
+
+      - name: Commit only permanent source and tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "Lutar, Stephen P."
+          git config user.email "stephenlutar2@gmail.com"
+          git rm .github/workflows/repair-hf-remote-add-context-semantics.yml
+          git add \
+            .github/scripts/hf_deploy_from_dockerfile.py \
+            .github/scripts/hf_module_drift_check.py \
+            .github/scripts/hf_candidate_plan.py \
+            .github/scripts/test_hf_deploy_from_dockerfile.py \
+            .github/scripts/test_hf_module_drift_check.py \
+            .github/scripts/test_hf_candidate_plan.py
+          git diff --cached --check
+          git commit -s -m "fix(hf): distinguish remote ADD from build context"
+          git push origin "HEAD:${GITHUB_REF_NAME}"
