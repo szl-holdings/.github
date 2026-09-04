@@ -1,8 +1,8 @@
 import io
 import tempfile
 import unittest
+import unittest.mock as mock
 from pathlib import Path
-from unittest import mock
 
 import hf_org_card_autopublish as publisher
 import hf_space_visibility as visibility
