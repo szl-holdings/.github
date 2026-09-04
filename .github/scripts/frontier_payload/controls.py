@@ -105,6 +105,7 @@ def converge_vessels_card(hf_token: str | None, *, apply: bool) -> dict[str, Any
         "source_url": VESSELS_CARD_URL,
         "visibility_mutated": False,
         "hardware_mutated": False,
+        "provider_write_performed": False,
     }
     source = request("GET", VESSELS_CARD_URL, timeout=30)
     if source.get("status") != 200:
@@ -121,6 +122,21 @@ def converge_vessels_card(hf_token: str | None, *, apply: bool) -> dict[str, Any
         row.update(state="BLOCKED_SOURCE", verified=False, error=str(exc))
         return row
     row.update(source_sha256=digest(card), source_bytes=len(card))
+
+    # Read first and make the operator idempotent. A matching public README is
+    # already the desired terminal state and must not mint a duplicate commit.
+    try:
+        before = _anonymous_hf_readback()
+        row.update(readback_before_status=200, readback_before_sha256=digest(before))
+        if before == card:
+            row.update(state="VERIFIED_NOOP", verified=True)
+            return row
+    except Exception as exc:
+        row.update(
+            readback_before_status=None,
+            readback_before_sha256=None,
+            readback_before_error=str(redact(str(exc))),
+        )
 
     if apply:
         if not hf_token:
@@ -140,7 +156,7 @@ def converge_vessels_card(hf_token: str | None, *, apply: bool) -> dict[str, Any
                 repo_type="space",
                 commit_message="docs: mark vessels consolidated into killinchu",
             )
-            row["provider_commit"] = str(commit)
+            row.update(provider_commit=str(commit), provider_write_performed=True)
         except Exception as exc:
             row.update(state="BLOCKED_WRITE", verified=False, error=str(redact(str(exc))))
             return row
