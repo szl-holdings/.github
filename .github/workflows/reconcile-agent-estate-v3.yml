@@ -1,0 +1,126 @@
+# SPDX-License-Identifier: Apache-2.0
+name: Reconcile Codex and Perplexity estate v3
+
+on:
+  push:
+    branches:
+      - ops/estate-reconciliation-2026-09-04-v1
+    paths:
+      - scripts/run_reconcile_agent_estate.py
+      - .github/workflows/reconcile-agent-estate-v3.yml
+  workflow_dispatch:
+
+permissions:
+  actions: write
+  contents: read
+  issues: write
+  pull-requests: write
+
+concurrency:
+  group: szl-agent-estate-reconciliation
+  cancel-in-progress: true
+
+jobs:
+  reconcile:
+    name: Authority-hardened exact-head estate reconciliation
+    runs-on: ubuntu-24.04
+    timeout-minutes: 70
+    env:
+      GH_ORG_ADMIN_TOKEN: ${{ secrets.GH_ORG_ADMIN_TOKEN }}
+      ORG_ADMIN_TOKEN: ${{ secrets.ORG_ADMIN_TOKEN }}
+      GH_ADMIN_TOKEN: ${{ secrets.GH_ADMIN_TOKEN }}
+      SZL_GITHUB_TOKEN: ${{ secrets.SZL_GITHUB_TOKEN }}
+      GITHUB_PAT: ${{ secrets.GITHUB_PAT }}
+      GH_PAT: ${{ secrets.GH_PAT }}
+      GH_TOKEN_SECRET: ${{ secrets.GH_TOKEN }}
+      REPOSITORY_TOKEN: ${{ github.token }}
+      HF_ORG_TOKEN: ${{ secrets.HF_ORG_TOKEN }}
+      HF_ORG_TOKEN1: ${{ secrets.HF_ORG_TOKEN1 }}
+      HF_WRITE_TOKEN: ${{ secrets.HF_WRITE_TOKEN }}
+      HF_TOKEN: ${{ secrets.HF_TOKEN }}
+      HUGGINGFACE_TOKEN: ${{ secrets.HUGGINGFACE_TOKEN }}
+      HUGGING_FACE_HUB_TOKEN: ${{ secrets.HUGGING_FACE_HUB_TOKEN }}
+      REPORT_PATH: ${{ runner.temp }}/szl-agent-estate-reconciliation-v3.json
+    steps:
+      - name: Harden runner
+        uses: step-security/harden-runner@05e31511f85b41b11d1cf0ef85d0992719546e2c # v2.21.0
+        with:
+          egress-policy: audit
+
+      - name: Check out exact operator source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+          fetch-depth: 1
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12"
+
+      - name: Install exact Hugging Face client
+        run: >-
+          python -m pip install --disable-pip-version-check --no-cache-dir
+          "huggingface_hub==1.23.0"
+
+      - name: Validate authority-hardened operator
+        run: |
+          set -euo pipefail
+          python -m py_compile \
+            scripts/reconcile_agent_estate.py \
+            scripts/run_reconcile_agent_estate.py
+          git diff --check
+
+      - name: Execute bounded reconciliation
+        id: execute
+        continue-on-error: true
+        run: |
+          set +e
+          python scripts/run_reconcile_agent_estate.py \
+            --output "$REPORT_PATH" \
+            --passes 4 \
+            --pass-delay 150
+          code=$?
+          echo "exit_code=$code" >> "$GITHUB_OUTPUT"
+          exit 0
+
+      - name: Upload immutable secret-free ledger
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: szl-agent-estate-reconciliation-v3-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ env.REPORT_PATH }}
+          if-no-files-found: error
+          retention-days: 180
+
+      - name: Enforce terminal truth
+        if: always()
+        run: |
+          python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          path = Path(os.environ["REPORT_PATH"])
+          if not path.is_file():
+              raise SystemExit("reconciliation ledger is missing")
+          report = json.loads(path.read_text(encoding="utf-8"))
+          terminal = report.get("terminal") or {}
+          counts = terminal.get("counts") or {}
+          hf = report.get("hugging_face_summary") or {}
+          with Path(os.environ["GITHUB_STEP_SUMMARY"]).open("a", encoding="utf-8") as stream:
+              stream.write("# SZL authority-hardened estate reconciliation\n\n")
+              stream.write(f"- State: `{report.get('state')}`\n")
+              stream.write(f"- GitHub authority: `{(report.get('github_authority') or {}).get('state')}`\n")
+              stream.write(f"- Hugging Face authority: `{(report.get('hugging_face_authority') or {}).get('state')}`\n")
+              stream.write(f"- Repositories: `{report.get('repository_count')}`\n")
+              stream.write(f"- Open PRs: `{counts.get('open_pull_requests')}`\n")
+              stream.write(f"- Stale runs: `{counts.get('stale_runs')}`\n")
+              stream.write(f"- Latest failed default workflows: `{counts.get('latest_failed_default_workflows')}`\n")
+              stream.write(f"- HF running/observed: `{hf.get('running')}` / `{hf.get('spaces')}`\n")
+              stream.write(f"- HF failures: `{hf.get('failed')}`\n")
+              stream.write(f"- Evidence SHA-256: `{report.get('report_sha256')}`\n")
+          if report.get("state") != "VERIFIED_COMPLETE":
+              raise SystemExit(f"estate did not reach VERIFIED_COMPLETE: {report.get('state')}")
+          PY
