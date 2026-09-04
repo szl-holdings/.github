@@ -1,49 +1,44 @@
-# Hub Space consolidation — 2026-08-29
+# Historical Hub consolidation ledger — 2026-08-29
 
-**State:** LIVE. Authenticated as org admin `betterwithage` on `SZLHOLDINGS`.
-**Action:** pause + private. **Never deleted.**
-**Product:** https://a-11-oy.com
-**Proof:** https://a11oy.net
-**Hub:** https://huggingface.co/SZLHOLDINGS
-**Collection:** https://huggingface.co/collections/SZLHOLDINGS/canonical-public-spaces-7-6a9315ac72207f841dff230d
+**State:** `HISTORICAL_SUPERSEDED`
 
-Λ = Conjecture 1. Doctrine v11 LOCKED. Kernel pin c7c0ba17.
+This file preserves a point-in-time Hugging Face estate inventory from August 29, 2026. It is not a current operational-status page, current keep policy, or publication authority.
 
-Operator instruction this pass: consolidate Spaces, land strangers on a-11-oy.com and a11oy.net, leave 5–7 public Spaces.
+The exact pre-migration bytes remain recoverable from:
 
-## Public keep set (7) — re-read LIVE
+- Space: `SZLHOLDINGS/README`
+- immutable revision: `311fd2e2be172e0ab78cb83b5edfaba7fe328144`
+- imported SHA-256: `63d8e8edead1988e69a1bb82aaeeca485b946eb37977f2f162413300b3b35f4e`
 
-| Space | Role | Destination |
-|---|---|---|
-| SZLHOLDINGS/README | Org card | huggingface.co/SZLHOLDINGS |
-| SZLHOLDINGS/a11oy | Product Command Center | a-11-oy.com |
-| SZLHOLDINGS/killinchu | Defense vertical | Hub Space |
-| SZLHOLDINGS/immune | Safety kernel | Hub Space |
-| SZLHOLDINGS/szl-khipu | Model demo | Hub Space |
-| SZLHOLDINGS/szl-atelier | Artifact walk | Hub Space |
-| SZLHOLDINGS/governed-receipt-verifier | Receipt replay | a11oy.net is the proof origin |
+## Historical snapshot
 
-`amaru` / `sentra` / `vessels` / `rosie` do not exist as Spaces. Prior pinset wanted `holographic` public and `a11oy-factory` RUNNING; this pass follows the 5–7 operator instruction instead. Code remains on GitHub.
+The August 29 ledger recorded:
 
-## Counts (authenticated API)
+- 45 Spaces: 7 public and 38 private
+- 43 models
+- 36 datasets
+- a seven-Space public keep set
+- private/paused treatment for non-keep Spaces
 
-- Spaces: 45 total · 7 public · 38 private
-- Models: 43 (left public)
-- Datasets: 36 (left public)
-- GitHub org search: 98 repositories
-- GPU: `szl-command-lab` T4 paused, CPU_BASIC requested
-- a11oy Space: **not mutated**. Runtime RUNNING cpu-basic. Custom domain `a-11-oy.com` still PENDING in Hub API. Live origin already returns `x-szl-space: a11oy`.
-- a11oy.net: GitHub Pages, not a Space.
+Those values and classifications are retained only as historical evidence. They must not be reused as current counts or current visibility assertions.
 
-## Archive set (38) — private, paused if docker, retained
+## Known superseding changes
 
-a11oy-factory, anatomy, ayllu, cosmos, counsel, david-leads, energy-attest-holo, energy-attested-runs, evidence-studio, experiments, governed-agent-bench, governed-norm-holo, guardrail-receipt, hatun-mcp, holographic, immune-lattice, khipu-lab, lambda-gate-holo, llm-router-live, lyte-services, nexus, receipt-chain-live, sda, second-brain, szl-blocked-live, szl-command-lab, szl-estate-live, szl-experiments, szl-forge-lab, szl-govsign-live, szl-kernels-live, szl-model-inference-lab, szl-provctl-live, szl-quant-live, szl-real-estate, szl-sovereign-os, terra-assurance, yarqa.
+- Living Anatomy was promoted into the public flagship keep policy and bound to the Second Brain through `szl-holdings/a11oy#1760`, merged as `bbb75c4f2b60e20c537054d90b65c08906160484`.
+- Its cross-surface witness was repinned through `szl-holdings/a11oy#1762`, merged as `920f28e0ed1d787b34568b234469a955cc571a78`.
+- Vessels exists as a retained Hugging Face Space but is consolidated into Killinchu as the canonical maritime surface; the reviewed card publisher landed through `szl-holdings/killinchu#383`, merged as `b050198c7bccb690abe5e8932487e5c81fc55806`.
+- The canonical protected-main Hugging Face writer for A11oy and the six vertical flagships landed through `szl-holdings/a11oy#1758`, merged as `662d20099465dda29aa7c86a377c37902d4dc17f`.
 
-Static Spaces cannot pause (HTTP 400). They were still set private.
+## Current authority
 
-## Honesty
+Current organization-card publication authority is:
 
-- Token was pasted in chat. Used in-memory. **Rotate it.**
-- Telemetry (downloads, likes) is not evidence of adoption.
-- DSSE/LIVE_SIGNED not claimed. This ledger is LIVE for inventory only.
-- No 96th GitHub repo minted.
+- source: `szl-holdings/.github` protected `main`
+- contract: `huggingface/org-card.manifest.json`
+- public deployment receipt: `deployment.json` on `SZLHOLDINGS/README`
+
+A current deployment claim is valid only when the public receipt binds to the latest protected-main revision and the immutable Hub readback, runtime file set, and served-byte checks all pass.
+
+## Honesty boundary
+
+No credential value is stored in this ledger. Historical telemetry, counts, visibility, runtime stages, custom-domain state, and GPU state are not evidence of present readiness or adoption.
