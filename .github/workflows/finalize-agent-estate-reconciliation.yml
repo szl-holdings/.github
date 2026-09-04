@@ -1,0 +1,240 @@
+# SPDX-License-Identifier: Apache-2.0
+name: Finalize agent-estate reconciliation
+
+on:
+  push:
+    branches:
+      - ops/estate-reconciliation-2026-09-04-v1
+    paths:
+      - reports/agent-estate/latest.json
+      - reports/agent-estate/recovery-latest.json
+      - .github/workflows/finalize-agent-estate-reconciliation.yml
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: szl-agent-estate-finalizer
+  cancel-in-progress: true
+
+jobs:
+  finalize:
+    name: Collapse temporary operators after terminal proof
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Harden runner
+        uses: step-security/harden-runner@05e31511f85b41b11d1cf0ef85d0992719546e2c # v2.21.0
+        with:
+          egress-policy: audit
+
+      - name: Check out current review branch
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ops/estate-reconciliation-2026-09-04-v1
+          persist-credentials: true
+          fetch-depth: 0
+
+      - name: Require terminal machine evidence
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          estate_path = Path("reports/agent-estate/latest.json")
+          recovery_path = Path("reports/agent-estate/recovery-latest.json")
+          if not estate_path.is_file() or not recovery_path.is_file():
+              raise SystemExit("terminal reconciliation ledgers are not present")
+          estate = json.loads(estate_path.read_text(encoding="utf-8"))
+          recovery = json.loads(recovery_path.read_text(encoding="utf-8"))
+          terminal = estate.get("terminal") or {}
+          counts = terminal.get("counts") or {}
+          hf = estate.get("hugging_face_summary") or {}
+          blockers = {
+              "estate_state": estate.get("state") != "VERIFIED_COMPLETE",
+              "recovery_blockers": any(
+                  "BLOCKED" in str(row.get("action") or "")
+                  for group in ("reopened", "drafts", "dco_recoveries")
+                  for row in recovery.get(group, [])
+              ),
+              "product_prs": int(counts.get("open_pull_requests") or 0) != 0,
+              "stale_runs": int(counts.get("stale_runs") or 0) != 0,
+              "failed_default_workflows": int(counts.get("latest_failed_default_workflows") or 0) != 0,
+              "hf_failures": int(hf.get("failed") or 0) != 0,
+          }
+          active = [key for key, value in blockers.items() if value]
+          if active:
+              raise SystemExit("terminal finalization blocked: " + ", ".join(active))
+          PY
+
+      - name: Install one canonical bounded operator
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat > .github/workflows/reconcile-agent-estate.yml <<'YAML'
+          # SPDX-License-Identifier: Apache-2.0
+          name: Reconcile agent estate
+
+          on:
+            workflow_dispatch:
+              inputs:
+                passes:
+                  description: Bounded reconciliation passes
+                  required: false
+                  default: "4"
+            schedule:
+              - cron: "17 7 * * 1-5"
+
+          permissions:
+            actions: write
+            contents: write
+            issues: write
+            pull-requests: write
+
+          concurrency:
+            group: szl-agent-estate-reconciliation
+            cancel-in-progress: false
+
+          jobs:
+            reconcile:
+              name: Recover half-builds and converge exact heads
+              runs-on: ubuntu-24.04
+              timeout-minutes: 85
+              env:
+                GH_ORG_ADMIN_TOKEN: ${{ secrets.GH_ORG_ADMIN_TOKEN || secrets.ORG_ADMIN_TOKEN || secrets.GH_ADMIN_TOKEN || secrets.GITHUB_ORG_TOKEN || secrets.GH_ORG_TOKEN || secrets.SZL_GITHUB_TOKEN || secrets.A11OY_GITHUB_TOKEN || secrets.GITHUB_PAT || secrets.GH_PAT || secrets.PAT_TOKEN || secrets.PERSONAL_ACCESS_TOKEN || secrets.ADMIN_TOKEN || secrets.REPO_TOKEN || secrets.REPOSITORY_ACCESS_TOKEN || secrets.AUTOMATION_TOKEN || secrets.BOT_TOKEN || secrets.GH_TOKEN }}
+                ORG_ADMIN_TOKEN: ${{ secrets.ORG_ADMIN_TOKEN }}
+                GH_ADMIN_TOKEN: ${{ secrets.GH_ADMIN_TOKEN }}
+                SZL_GITHUB_TOKEN: ${{ secrets.SZL_GITHUB_TOKEN }}
+                GITHUB_PAT: ${{ secrets.GITHUB_PAT }}
+                GH_PAT: ${{ secrets.GH_PAT }}
+                GH_TOKEN_SECRET: ${{ secrets.GH_TOKEN }}
+                REPOSITORY_TOKEN: ${{ github.token }}
+                HF_ORG_TOKEN: ${{ secrets.HF_ORG_TOKEN || secrets.HF_ORG_TOKEN1 || secrets.HF_WRITE_TOKEN || secrets.HF_TOKEN || secrets.HUGGINGFACE_TOKEN || secrets.HUGGING_FACE_HUB_TOKEN }}
+                HF_ORG_TOKEN1: ${{ secrets.HF_ORG_TOKEN1 }}
+                HF_WRITE_TOKEN: ${{ secrets.HF_WRITE_TOKEN }}
+                HF_TOKEN: ${{ secrets.HF_TOKEN }}
+                HUGGINGFACE_TOKEN: ${{ secrets.HUGGINGFACE_TOKEN }}
+                HUGGING_FACE_HUB_TOKEN: ${{ secrets.HUGGING_FACE_HUB_TOKEN }}
+                RECOVERY_REPORT: ${{ runner.temp }}/szl-agent-work-recovery.json
+                ESTATE_REPORT: ${{ runner.temp }}/szl-agent-estate-reconciliation.json
+              steps:
+                - name: Harden runner
+                  uses: step-security/harden-runner@05e31511f85b41b11d1cf0ef85d0992719546e2c # v2.21.0
+                  with:
+                    egress-policy: audit
+
+                - name: Check out exact protected source
+                  uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+                  with:
+                    ref: ${{ github.sha }}
+                    persist-credentials: false
+                    fetch-depth: 1
+
+                - name: Set up Python
+                  uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+                  with:
+                    python-version: "3.12"
+
+                - name: Install exact Hub client
+                  run: >-
+                    python -m pip install --disable-pip-version-check --no-cache-dir
+                    "huggingface_hub==1.23.0"
+
+                - name: Validate operators
+                  run: |
+                    set -euo pipefail
+                    python -m py_compile \
+                      scripts/recover_agent_work.py \
+                      scripts/run_recover_agent_work_v2.py \
+                      scripts/reconcile_agent_estate.py \
+                      scripts/run_reconcile_agent_estate_v4.py
+                    git diff --check
+
+                - name: Recover recent half-builds
+                  continue-on-error: true
+                  run: >-
+                    python scripts/run_recover_agent_work_v2.py
+                    --output "$RECOVERY_REPORT"
+
+                - name: Reconcile active GitHub and Hugging Face estate
+                  continue-on-error: true
+                  env:
+                    PASSES: ${{ inputs.passes || '4' }}
+                  run: >-
+                    python scripts/run_reconcile_agent_estate_v4.py
+                    --output "$ESTATE_REPORT"
+                    --passes "$PASSES"
+                    --pass-delay 150
+
+                - name: Upload immutable secret-free evidence
+                  if: always()
+                  uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+                  with:
+                    name: szl-agent-estate-${{ github.run_id }}-${{ github.run_attempt }}
+                    path: |
+                      ${{ env.RECOVERY_REPORT }}
+                      ${{ env.ESTATE_REPORT }}
+                    if-no-files-found: error
+                    retention-days: 180
+
+                - name: Enforce terminal truth
+                  if: always()
+                  run: |
+                    python - <<'PY'
+                    import json
+                    import os
+                    from pathlib import Path
+                    recovery = json.loads(Path(os.environ["RECOVERY_REPORT"]).read_text(encoding="utf-8"))
+                    estate = json.loads(Path(os.environ["ESTATE_REPORT"]).read_text(encoding="utf-8"))
+                    blocked = any(
+                        "BLOCKED" in str(row.get("action") or "")
+                        for group in ("reopened", "drafts", "dco_recoveries")
+                        for row in recovery.get(group, [])
+                    )
+                    if blocked or estate.get("state") != "VERIFIED_COMPLETE":
+                        raise SystemExit(
+                            f"estate not terminal: recovery={recovery.get('state')} estate={estate.get('state')}"
+                        )
+                    PY
+          YAML
+
+      - name: Remove superseded one-shot controllers
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -f \
+            .github/workflows/reconcile-agent-estate-v2.yml \
+            .github/workflows/reconcile-agent-estate-v3.yml \
+            .github/workflows/reconcile-agent-estate-v4.yml \
+            .github/workflows/reconcile-agent-estate-v5.yml \
+            .github/workflows/reconcile-agent-estate-v6.yml \
+            .github/workflows/reconcile-agent-estate-v7.yml \
+            .github/workflows/reconcile-agent-estate-v8.yml \
+            .github/workflows/reconcile-agent-estate-v9.yml \
+            .github/workflows/finalize-agent-estate-reconciliation.yml \
+            scripts/run_reconcile_agent_estate.py \
+            scripts/run_reconcile_agent_estate_v2.py \
+            scripts/run_reconcile_agent_estate_v3.py
+          python -m py_compile \
+            scripts/recover_agent_work.py \
+            scripts/run_recover_agent_work_v2.py \
+            scripts/reconcile_agent_estate.py \
+            scripts/run_reconcile_agent_estate_v4.py
+          git diff --check
+
+      - name: Commit canonical operator and remove finalizer
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "Lutar, Stephen P."
+          git config user.email "stephenlutar2@gmail.com"
+          git add -A .github/workflows scripts
+          if git diff --cached --quiet; then
+            echo "Canonical operator already installed"
+            exit 0
+          fi
+          git commit -s -m "chore(ops): finalize canonical agent-estate reconciler"
+          git push origin HEAD:ops/estate-reconciliation-2026-09-04-v1
