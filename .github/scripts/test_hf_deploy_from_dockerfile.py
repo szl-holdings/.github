@@ -111,33 +111,6 @@ class TestParseCopySources(unittest.TestCase):
         df = "FROM python:3.12\n# COPY ghost.py /app/ghost.py\nCOPY serve.py /app/\n"
         self.assertEqual(dep.parse_copy_sources(df), ["serve.py"])
 
-    def test_checksum_pinned_remote_add_is_not_a_local_source(self):
-        digest = "a" * 64
-        url = "https://example.invalid/releases/tool.whl"
-        df = (
-            "FROM python:3.12\n"
-            f"ADD --checksum=sha256:{digest} {url} /wheels/tool.whl\n"
-            "COPY serve.py /app/serve.py\n"
-        )
-        eligible = []
-        self.assertEqual(
-            dep.parse_copy_sources(df, eligible_sources=eligible),
-            ["serve.py"],
-        )
-        self.assertEqual(eligible, ["serve.py"])
-        self.assertTrue(dep.is_remote_add_source("ADD", url))
-
-    def test_remote_copy_is_not_exempted(self):
-        url = "https://example.invalid/not-supported-for-copy.whl"
-        df = f"FROM python:3.12\nCOPY {url} /wheels/tool.whl\n"
-        self.assertEqual(dep.parse_copy_sources(df), [url])
-        self.assertFalse(dep.is_remote_add_source("COPY", url))
-
-    def test_json_form_remote_add_is_not_a_local_source(self):
-        url = "https://example.invalid/archive.tar.gz"
-        df = 'FROM scratch\nADD ["' + url + '", "/src/archive.tar.gz"]\n'
-        self.assertEqual(dep.parse_copy_sources(df), [])
-
 
 class TestExpandSources(unittest.TestCase):
     def setUp(self):
@@ -191,25 +164,6 @@ class TestExpandSources(unittest.TestCase):
 
 
 class TestDeriveReadmePolicy(unittest.TestCase):
-    def test_checksum_pinned_remote_add_is_bound_only_by_dockerfile(self):
-        digest = "b" * 64
-        url = "https://example.invalid/releases/tool.whl"
-        manifest, files = self._derive(
-            (
-                "FROM python:3.12\n"
-                f"ADD --checksum=sha256:{digest} {url} /wheels/tool.whl\n"
-                "COPY serve.py /app/serve.py\n"
-            ),
-            {"serve.py": "pass\n"},
-            include_readme=False,
-        )
-        self.assertEqual(
-            set(files),
-            {"Dockerfile", "Dockerfile.dockerignore", "serve.py"},
-        )
-        self.assertEqual(manifest["files_resolved"], 1)
-        self.assertEqual(manifest["copy_sources"], 1)
-
     def _derive(
         self, dockerfile, files, *, include_readme, readme_path="README.md",
         dockerfile_path="Dockerfile", smoke_paths=None,
@@ -1317,6 +1271,35 @@ class TestContentIdentity(unittest.TestCase):
             "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
         )
 
+
+class TestRemoteAddContextSemantics(unittest.TestCase):
+    def test_checksum_pinned_remote_add_is_not_a_context_source(self):
+        checksum = "a" * 64
+        dockerfile = (
+            "FROM python:3.12-slim\n"
+            f"ADD --checksum=sha256:{checksum} https://example.invalid/wheel.whl /wheels/wheel.whl\n"
+            "COPY serve.py /app/serve.py\n"
+        )
+        eligible = []
+        self.assertEqual(
+            dep.parse_copy_sources(dockerfile, eligible_sources=eligible),
+            ["serve.py"],
+        )
+        self.assertEqual(eligible, ["serve.py"])
+
+    def test_json_remote_add_is_not_a_context_source(self):
+        dockerfile = (
+            "FROM scratch\n"
+            'ADD ["https://example.invalid/archive.tgz", "/tmp/archive.tgz"]\n'
+            "COPY serve.py /app/serve.py\n"
+        )
+        self.assertEqual(dep.parse_copy_sources(dockerfile), ["serve.py"])
+
+    def test_local_add_remains_a_managed_context_source(self):
+        self.assertEqual(
+            dep.parse_copy_sources("FROM scratch\nADD local.tar /tmp/local.tar\n"),
+            ["local.tar"],
+        )
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)

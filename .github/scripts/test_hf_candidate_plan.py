@@ -744,5 +744,42 @@ class TestReusableWorkflowContract(TestCase):
         self.assertIn("        if: always()\n", self.workflow)
 
 
+class TestRemoteAddContextSemantics(CandidatePlanTestCase):
+    def test_checksum_pinned_remote_add_is_external_to_context(self) -> None:
+        checksum = "c" * 64
+        dockerfile = (
+            "FROM python:3.12-slim\n"
+            f"ADD --checksum=sha256:{checksum} https://example.invalid/wheel.whl /wheels/wheel.whl\n"
+            "COPY app/ /app/\n"
+        )
+        self.assertEqual(candidate_plan._strict_copy_sources(dockerfile), ["app/"])
+        self.assertEqual(
+            candidate_plan._strict_copy_sources(dockerfile),
+            candidate_plan.publisher.parse_copy_sources(dockerfile),
+        )
+        fixture = self.fixture(dockerfile=dockerfile)
+        candidate = fixture.commit(
+            "managed change with remote add",
+            {"app/mod.py": "VALUE = 'candidate'\n"},
+        )
+        report = fixture.plan(candidate)
+        self.assertEqual(report["candidate"]["copy_sources"], ["app/"])
+        self.assertEqual(report["delta_count"], 1)
+
+    def test_unpinned_or_local_add_fails_closed(self) -> None:
+        invalid = {
+            "remote-unpinned": (
+                "FROM scratch\n"
+                "ADD https://example.invalid/archive.tgz /tmp/archive.tgz\n"
+                "COPY app/ /app/\n"
+            ),
+            "local": "FROM scratch\nADD app/mod.py /app/mod.py\n",
+        }
+        for name, dockerfile in invalid.items():
+            with self.subTest(name=name), self.assertRaises(
+                candidate_plan.CandidatePlanError
+            ):
+                candidate_plan._strict_copy_sources(dockerfile)
+
 if __name__ == "__main__":
     main(verbosity=2)
