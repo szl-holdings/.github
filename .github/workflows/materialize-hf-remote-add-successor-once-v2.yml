@@ -1,0 +1,135 @@
+name: Materialize strict remote ADD successor once v2
+
+on:
+  push:
+    branches:
+      - fix/hf-remote-add-context-semantics-successor-20260904
+    paths:
+      - .github/workflows/materialize-hf-remote-add-successor-once-v2.yml
+
+permissions:
+  contents: write
+
+concurrency:
+  group: materialize-strict-remote-add-successor-once-v2
+  cancel-in-progress: false
+
+jobs:
+  materialize:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - name: Harden runner
+        uses: step-security/harden-runner@05e31511f85b41b11d1cf0ef85d0992719546e2c # v2.21.0
+        with:
+          egress-policy: audit
+
+      - name: Checkout exact successor base
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: fix/hf-remote-add-context-semantics-successor-20260904
+          fetch-depth: 0
+          persist-credentials: true
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12.10"
+
+      - name: Import exactly the reviewed six-file repair
+        shell: bash
+        env:
+          REVIEWED_BRANCH: fix/hf-remote-add-context-semantics-20260904
+          REVIEWED_SHA: 7c782b1277cf9d11b25438285b070bfbc10d39df
+        run: |
+          set -euo pipefail
+          files=(
+            .github/scripts/hf_candidate_plan.py
+            .github/scripts/hf_deploy_from_dockerfile.py
+            .github/scripts/hf_module_drift_check.py
+            .github/scripts/test_hf_candidate_plan.py
+            .github/scripts/test_hf_deploy_from_dockerfile.py
+            .github/scripts/test_hf_module_drift_check.py
+          )
+          git fetch --no-tags origin "$REVIEWED_BRANCH"
+          test "$(git rev-parse FETCH_HEAD)" = "$REVIEWED_SHA"
+          git checkout "$REVIEWED_SHA" -- "${files[@]}"
+          observed="$(git diff --cached --name-only -- "${files[@]}" | sort)"
+          expected="$(printf '%s\n' "${files[@]}" | sort)"
+          test "$observed" = "$expected" || {
+            echo "::error::Six-file successor inventory drifted."
+            printf 'expected:\n%s\nobserved:\n%s\n' "$expected" "$observed" >&2
+            exit 3
+          }
+
+      - name: Run complete parser, planner, and drift regression closure
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m py_compile \
+            .github/scripts/hf_candidate_plan.py \
+            .github/scripts/hf_deploy_from_dockerfile.py \
+            .github/scripts/hf_module_drift_check.py \
+            .github/scripts/test_hf_candidate_plan.py \
+            .github/scripts/test_hf_deploy_from_dockerfile.py \
+            .github/scripts/test_hf_module_drift_check.py
+          python .github/scripts/test_hf_deploy_from_dockerfile.py
+          python .github/scripts/test_hf_module_drift_check.py
+          python .github/scripts/test_hf_candidate_plan.py
+          python - <<'PY'
+          import importlib.util
+          from pathlib import Path
+
+          def load(name, path):
+              spec = importlib.util.spec_from_file_location(name, Path(path))
+              assert spec and spec.loader
+              module = importlib.util.module_from_spec(spec)
+              spec.loader.exec_module(module)
+              return module
+
+          publisher = load('publisher', '.github/scripts/hf_deploy_from_dockerfile.py')
+          planner = load('planner', '.github/scripts/hf_candidate_plan.py')
+          digest = 'd172f3d3c8cdd194c3c47c71cb077ed6e61354a2d0f939ceeac0c8fd29999596'
+          url = 'https://github.com/abetlen/llama-cpp-python/releases/download/v0.3.35/llama_cpp_python-0.3.35.whl'
+          dockerfile = (
+              'FROM python:3.12-slim\n'
+              f'ADD --checksum=sha256:{digest} {url} /wheels/llama_cpp_python.whl\n'
+              'COPY serve.py /app/serve.py\n'
+          )
+          assert publisher.parse_copy_sources(dockerfile) == ['serve.py']
+          assert planner._strict_copy_sources(dockerfile) == ['serve.py']
+          for invalid in (
+              f'ADD {url} /wheels/tool.whl\nCOPY serve.py /app/serve.py\n',
+              'ADD local.tar.gz /src/\nCOPY serve.py /app/serve.py\n',
+              f'ADD ["{url}", "/wheels/tool.whl"]\nCOPY serve.py /app/serve.py\n',
+          ):
+              try:
+                  planner._strict_copy_sources(invalid)
+              except Exception:
+                  pass
+              else:
+                  raise SystemExit('candidate planner admitted a forbidden ADD shape')
+          PY
+          git diff --check
+
+      - name: Remove transport, commit signed successor, and push without force
+        shell: bash
+        run: |
+          set -euo pipefail
+          git rm -f \
+            .github/workflows/materialize-hf-remote-add-successor-once.yml \
+            .github/workflows/materialize-hf-remote-add-successor-once-v2.yml
+          git add \
+            .github/scripts/hf_candidate_plan.py \
+            .github/scripts/hf_deploy_from_dockerfile.py \
+            .github/scripts/hf_module_drift_check.py \
+            .github/scripts/test_hf_candidate_plan.py \
+            .github/scripts/test_hf_deploy_from_dockerfile.py \
+            .github/scripts/test_hf_module_drift_check.py
+          git diff --cached --check
+          test "$(git diff --cached --name-only | wc -l)" -eq 8
+          git config user.name "Lutar, Stephen P."
+          git config user.email "stephenlutar2@gmail.com"
+          git commit -s -m "fix(hf): enforce strict remote ADD build-context semantics" \
+            -m "Rebuild the reviewed six-file #675 repair on current protected main. Remote ADD remains excluded from the local manifest, while the candidate planner admits only lowercase SHA-256 checksum-pinned HTTP(S) inputs and rejects local, JSON-form, ambiguous, or unpinned ADD."
+          git push origin HEAD:fix/hf-remote-add-context-semantics-successor-20260904
