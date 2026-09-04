@@ -1,9 +1,11 @@
 # Copyright 2026 SZL Holdings — SPDX-License-Identifier: Apache-2.0
-name: Repair David flagship repository metadata
+name: Cancel stale David archive rebalance
 
-# One-purpose metadata repair after David Leads was restored as an active
-# flagship. It changes only the repository description, homepage, and archived
-# state; branch protection, visibility, permissions, and source are untouched.
+# The first archive-rebalance run captured a pre-restoration David Leads Git
+# revision and is intentionally fail-closed. This one-purpose workflow cancels
+# only that exact stale run so it can be re-run against the now-attested current
+# flagship revision. It changes no workflow, environment, secret, or protection
+# setting in the target repository.
 
 on:
   push:
@@ -16,21 +18,22 @@ permissions:
   contents: read
 
 concurrency:
-  group: repair-david-flagship-repository-metadata
+  group: cancel-exact-stale-david-rebalance
   cancel-in-progress: false
 
 jobs:
-  repair:
+  cancel:
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     env:
-      TARGET_REPOSITORY: szl-holdings/david-leads
+      TARGET_REPOSITORY: szl-holdings/immune
+      TARGET_RUN_ID: "33825818682"
+      TARGET_WORKFLOW_NAME: hf-restore-david-and-rebalance-49
+      TARGET_HEAD_SHA: ee2924bc0d829d78eb160565b7066d6e1bba97e4
       EXPECTED_ACTOR: stephenlutar2-hash
-      EXPECTED_DESCRIPTION: David Leads — SZL Holdings flagship for evidence-backed broker research, governed lead intelligence, and auditable public-data workflows.
-      EXPECTED_HOMEPAGE: https://huggingface.co/spaces/SZLHOLDINGS/david-leads
       GH_ADMIN_TOKEN: ${{ secrets.SZL_ORG_ADMIN_PAT || secrets.ORG_ADMIN_TOKEN || secrets.GH_ORG_TOKEN || secrets.GITHUB_PAT || secrets.SZL_GITHUB_TOKEN || secrets.SZL_GH_PAT || secrets.GH_PAT || secrets.ADMIN_PAT || secrets.ORG_GITHUB_TOKEN || secrets.PAT_TOKEN || secrets.CROSS_REPO_TOKEN }}
     steps:
-      - name: Repair and verify only the public repository metadata
+      - name: Cancel only the exact stale rebalance run
         shell: bash
         run: |
           set -euo pipefail
@@ -43,22 +46,25 @@ jobs:
           python3 - <<'PY'
           import json
           import os
+          import time
+          import urllib.error
           import urllib.request
 
           token = os.environ["GH_ADMIN_TOKEN"]
           repository = os.environ["TARGET_REPOSITORY"]
+          run_id = os.environ["TARGET_RUN_ID"]
+          workflow_name = os.environ["TARGET_WORKFLOW_NAME"]
+          expected_head_sha = os.environ["TARGET_HEAD_SHA"]
           expected_actor = os.environ["EXPECTED_ACTOR"]
-          expected_description = os.environ["EXPECTED_DESCRIPTION"]
-          expected_homepage = os.environ["EXPECTED_HOMEPAGE"]
           api_root = "https://api.github.com"
 
-          def request_json(method: str, path: str, payload=None):
+          def request_json(method: str, path: str, payload=None, allow_empty=False):
               body = None
               headers = {
                   "Accept": "application/vnd.github+json",
                   "Authorization": f"Bearer {token}",
                   "X-GitHub-Api-Version": "2022-11-28",
-                  "User-Agent": "szl-david-metadata-repair/1.0",
+                  "User-Agent": "szl-exact-workflow-canceller/1.0",
               }
               if payload is not None:
                   body = json.dumps(payload).encode("utf-8")
@@ -71,64 +77,80 @@ jobs:
               )
               with urllib.request.urlopen(request, timeout=30) as response:
                   raw = response.read()
-                  return json.loads(raw) if raw else None
+                  if not raw:
+                      return None
+                  return json.loads(raw)
 
           identity = request_json("GET", "/user") or {}
           actor = str(identity.get("login") or "")
           if actor != expected_actor:
               raise SystemExit(
-                  f"refusing metadata repair: expected {expected_actor!r}, got {actor!r}"
+                  f"refusing cancellation: expected {expected_actor!r}, got {actor!r}"
               )
 
-          before = request_json("GET", f"/repos/{repository}") or {}
-          if before.get("full_name") != repository:
-              raise SystemExit("target repository identity mismatch")
-          if before.get("visibility") != "public":
-              raise SystemExit("refusing to alter unexpected repository visibility")
-          if before.get("default_branch") != "main":
-              raise SystemExit("refusing to alter repository with unexpected default branch")
-
-          request_json(
-              "PATCH",
-              f"/repos/{repository}",
-              {
-                  "description": expected_description,
-                  "homepage": expected_homepage,
-                  "archived": False,
-              },
-          )
-          after = request_json("GET", f"/repos/{repository}") or {}
-          failures = []
-          if after.get("description") != expected_description:
-              failures.append("description")
-          if after.get("homepage") != expected_homepage:
-              failures.append("homepage")
-          if after.get("archived") is not False:
-              failures.append("archived")
-          if after.get("visibility") != "public":
-              failures.append("visibility")
-          if after.get("default_branch") != "main":
-              failures.append("default_branch")
-          if failures:
+          run_path = f"/repos/{repository}/actions/runs/{run_id}"
+          run = request_json("GET", run_path) or {}
+          checks = {
+              "id": int(run.get("id") or 0) == int(run_id),
+              "name": run.get("name") == workflow_name,
+              "head_sha": run.get("head_sha") == expected_head_sha,
+              "head_branch": run.get("head_branch") == "main",
+              "event": run.get("event") == "push",
+              "actor": (run.get("actor") or {}).get("login") == expected_actor,
+          }
+          failed = sorted(name for name, passed in checks.items() if not passed)
+          if failed:
               raise SystemExit(
-                  "David repository metadata verification failed: "
-                  + ", ".join(failures)
+                  "refusing cancellation; target identity checks failed: "
+                  + ", ".join(failed)
               )
+
+          status = str(run.get("status") or "")
+          conclusion = run.get("conclusion")
+          action = "NO_ACTION"
+          if status in {"queued", "in_progress", "waiting", "requested", "pending"}:
+              request_json("POST", run_path + "/cancel", allow_empty=True)
+              action = "CANCEL_REQUESTED"
+              deadline = time.monotonic() + 120
+              while time.monotonic() < deadline:
+                  after = request_json("GET", run_path) or {}
+                  if after.get("status") == "completed":
+                      status = "completed"
+                      conclusion = after.get("conclusion")
+                      break
+                  time.sleep(3)
+              else:
+                  raise SystemExit("exact stale run did not reach a completed state")
+          elif status == "completed":
+              action = "ALREADY_COMPLETED"
+          else:
+              raise SystemExit(f"unexpected target run status: {status!r}")
+
+          if status != "completed":
+              raise SystemExit(f"target run is not completed after cancellation: {status!r}")
+          if conclusion not in {"cancelled", "failure", "timed_out"}:
+              if conclusion == "success":
+                  action = "ALREADY_SUCCEEDED"
+              else:
+                  raise SystemExit(
+                      f"unexpected completed conclusion: {conclusion!r}"
+                  )
 
           print(
-              "DAVID FLAGSHIP REPOSITORY METADATA PASS "
+              "STALE DAVID REBALANCE CLOSED "
               + json.dumps(
                   {
-                      "schema": "szl.david-repository-metadata/v1",
+                      "schema": "szl.exact-workflow-cancellation/v1",
                       "status": "PASS",
                       "actor": actor,
                       "repository": repository,
-                      "description": expected_description,
-                      "homepage": expected_homepage,
-                      "archived": False,
-                      "visibility": "public",
-                      "default_branch": "main",
-                      "branch_protection_changed": False,
+                      "run_id": int(run_id),
+                      "workflow_name": workflow_name,
+                      "head_sha": expected_head_sha,
+                      "action": action,
+                      "conclusion": conclusion,
+                      "target_configuration_changed": False,
+                      "secret_values_accessed": False,
                   },
                   sort_keys=True,
               )
