@@ -24,10 +24,6 @@
       "destination": "index.html"
     },
     {
-      "source": "profile/assets/szl-command-fabric-v3.svg",
-      "destination": "assets/szl-command-fabric-v3.svg"
-    },
-    {
       "source": "profile/assets/estate-command-system.svg",
       "destination": "assets/estate-command-system.svg"
     },
@@ -67,7 +63,7 @@
         "Choose a path",
         "HISTORICAL",
         "SIMULATED",
-        "assets/szl-command-fabric-v3.svg"
+        "assets/estate-command-system.svg"
       ]
     },
     "index.html": {
