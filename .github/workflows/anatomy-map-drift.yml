@@ -1,11 +1,11 @@
-name: Anatomy-map cross-surface drift
+name: Living Anatomy cross-surface drift
 
-# Active Anatomy evidence follows the KEEP-6 architecture: GitHub source blocks
-# plus the public product-origin rendering. SZLHOLDINGS/anatomy is intentionally
-# folded, paused, and private; it is not an active public source and this guard
-# never forwards a Hugging Face credential. Fetch/auth failure is ERROR, never a
-# silent pass. The checker enforces exactly the locked-8
-# {F1,F4,F7,F11,F12,F18,F19,F22}, Lambda=Conjecture-1, and marker-block parity.
+# GitHub szl-holdings/anatomy is authoritative. The public
+# SZLHOLDINGS/anatomy Docker Space is its source-bound deployment mirror, and
+# a-11-oy.com is the product entry point. All reads are public and
+# credential-free. Fetch/auth failure is ERROR, never a silent pass. The
+# checker enforces exactly the locked-8 {F1,F4,F7,F11,F12,F18,F19,F22},
+# Lambda=Conjecture-1, and marker-block parity across the active surfaces.
 
 on:
   schedule:
@@ -42,7 +42,7 @@ concurrency:
 
 jobs:
   check:
-    name: Anatomy sources and product origin are honest and in sync
+    name: GitHub source, HF Space, and product origin are honest and in sync
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -64,7 +64,7 @@ jobs:
           python3 .github/scripts/test_anatomy_map_drift.py
           python3 .github/scripts/test_anatomy_product_contract.py
 
-      - name: Compare active Anatomy surfaces
+      - name: Compare active Living Anatomy surfaces
         env:
           GITHUB_TOKEN: ${{ github.token }}
         run: |
@@ -94,7 +94,7 @@ jobs:
           fi
           drift="$(python3 -c 'import json; r=json.load(open("anatomy_map_report.out.json")); print(" | ".join(r.get("findings", [])) or "see report")')"
           run_url="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
-          payload="$(python3 -c 'import json,sys; print(json.dumps({"text": sys.argv[1]}))' ":rotating_light: Anatomy product-origin drift: ${drift} Run: ${run_url}")"
+          payload="$(python3 -c 'import json,sys; print(json.dumps({"text": sys.argv[1]}))' ":rotating_light: Living Anatomy cross-surface drift: ${drift} Run: ${run_url}")"
           code="$(curl -sS -o /dev/null -w '%{http_code}' -X POST -H 'Content-Type: application/json' -d "$payload" "$SLACK_WEBHOOK_URL" || echo 000)"
           [ "$code" = "200" ] || echo "::warning::alert receiver returned HTTP ${code}; the red workflow remains authoritative."
 
@@ -102,14 +102,14 @@ jobs:
         run: |
           case "${CHECK_EXIT:-2}" in
             0)
-              echo "Active Anatomy sources and product origin are honest and in sync."
+              echo "GitHub source, HF Space, and product origin are honest and in sync."
               ;;
             1)
-              echo "::error::Anatomy drift detected. Inspect anatomy-map-drift-report."
+              echo "::error::Living Anatomy drift detected. Inspect anatomy-map-drift-report."
               exit 1
               ;;
             *)
-              echo "::error::An active Anatomy surface could not be fetched or validated."
+              echo "::error::An active Living Anatomy surface could not be fetched or validated."
               exit 1
               ;;
           esac

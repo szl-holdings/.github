@@ -1,10 +1,10 @@
-name: Reusable — Anatomy-map Drift Check
+name: Reusable — Living Anatomy Drift Check
 
 # Push-time guard for repositories that carry an active Anatomy source block.
-# The KEEP-6 architecture treats SZLHOLDINGS/anatomy as intentionally folded,
-# paused, and private. This reusable workflow therefore reads only public
-# GitHub source surfaces and the a-11-oy.com product-origin rendering. It has no
-# Hugging Face secret contract and callers pass no provider secrets.
+# GitHub is authoritative; the public SZLHOLDINGS/anatomy Space and the
+# a-11-oy.com product rendering are active credential-free witnesses. Callers
+# pass no provider secrets. Pull requests validate proposed GitHub source while
+# excluding independently deployed URL surfaces until protected main publishes.
 
 on:
   workflow_call:
@@ -24,7 +24,7 @@ concurrency:
 
 jobs:
   anatomy-map-drift:
-    name: Anatomy map honest and in sync (locked-8 + Lambda=Conjecture-1)
+    name: Living Anatomy honest and in sync (locked-8 + Lambda=Conjecture-1)
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -49,7 +49,7 @@ jobs:
           python3 .github/scripts/test_anatomy_map_drift.py
           python3 .github/scripts/test_anatomy_product_contract.py
 
-      - name: Compare active Anatomy surfaces
+      - name: Compare active Living Anatomy surfaces
         env:
           GITHUB_TOKEN: ${{ github.token }}
         run: |
@@ -57,7 +57,7 @@ jobs:
           EXTRA=""
           if [ "${{ github.event_name }}" = "pull_request" ]; then
             # Validate the calling repository's proposed head while excluding
-            # the independently deployed product URL from the PR merge gate.
+            # independently deployed URL surfaces from the PR merge gate.
             EXTRA="--skip-kind url --ref-override ${{ github.repository }}=${{ github.event.pull_request.head.sha }}"
           fi
           python3 .github/scripts/anatomy_map_drift.py $EXTRA \
@@ -77,14 +77,14 @@ jobs:
         run: |
           case "${CHECK_EXIT:-2}" in
             0)
-              echo "Active Anatomy sources are honest and in sync."
+              echo "Active Living Anatomy sources are honest and in sync."
               ;;
             1)
-              echo "::error::Anatomy-map drift detected; inspect the uploaded report."
+              echo "::error::Living Anatomy drift detected; inspect the uploaded report."
               exit 1
               ;;
             *)
-              echo "::error::An active Anatomy source could not be fetched or validated."
+              echo "::error::An active Living Anatomy source could not be fetched or validated."
               exit 1
               ;;
           esac

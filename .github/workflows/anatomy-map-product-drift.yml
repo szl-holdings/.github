@@ -1,9 +1,9 @@
-name: Anatomy-map product-origin drift watch
+name: Living Anatomy product-origin drift watch
 
-# The active public Anatomy rendering is the product-origin bundle at
-# a-11-oy.com/anatomy-map. The former SZLHOLDINGS/anatomy Space is intentionally
-# folded, paused, and private under KEEP-6 and is not probed here. This watcher
-# detects stale or dishonest product deployment without any provider credential.
+# This high-frequency watcher remains scoped to the product-origin bundle at
+# a-11-oy.com/anatomy-map. The credential-free cross-surface workflow separately
+# compares GitHub source, the active public Hugging Face deployment mirror, and
+# this product rendering. A product fetch or honesty failure is never hidden.
 
 on:
   schedule:
@@ -37,7 +37,7 @@ concurrency:
 
 jobs:
   product-drift:
-    name: Product-origin Anatomy is reachable and honest
+    name: Product-origin Living Anatomy is reachable and honest
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -88,7 +88,7 @@ jobs:
           fi
           drift="$(python3 -c 'import json; r=json.load(open("anatomy_map_product_report.out.json")); print(" | ".join(r.get("findings", [])) or "see report")')"
           run_url="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
-          payload="$(python3 -c 'import json,sys; print(json.dumps({"text": sys.argv[1]}))' ":rotating_light: Anatomy product-origin drift: ${drift} Run: ${run_url}")"
+          payload="$(python3 -c 'import json,sys; print(json.dumps({"text": sys.argv[1]}))' ":rotating_light: Living Anatomy product-origin drift: ${drift} Run: ${run_url}")"
           code="$(curl -sS -o /dev/null -w '%{http_code}' -X POST -H 'Content-Type: application/json' -d "$payload" "$SLACK_WEBHOOK_URL" || echo 000)"
           [ "$code" = "200" ] || echo "::warning::alert receiver returned HTTP ${code}; the red workflow remains authoritative."
 
@@ -96,14 +96,14 @@ jobs:
         run: |
           case "${CHECK_EXIT:-2}" in
             0)
-              echo "Product-origin Anatomy is reachable and preserves the honesty contract."
+              echo "Product-origin Living Anatomy is reachable and preserves the honesty contract."
               ;;
             1)
-              echo "::error::Product-origin Anatomy drift detected."
+              echo "::error::Product-origin Living Anatomy drift detected."
               exit 1
               ;;
             *)
-              echo "::error::Product-origin Anatomy could not be fetched or validated."
+              echo "::error::Product-origin Living Anatomy could not be fetched or validated."
               exit 1
               ;;
           esac
