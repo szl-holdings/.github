@@ -1,10 +1,9 @@
 # Copyright 2026 SZL Holdings — SPDX-License-Identifier: Apache-2.0
-name: Publish operator Spaces
+name: Publish SZL Atlas
 
-# Provider writes are centralized here because reusable workflows execute in the
-# caller repository's secret scope. This repository owns the repository-scoped
-# credential, exact-source resolution, deployment, restart, smoke verification,
-# and immutable evidence.
+# The organization estate has one public exploration surface. Product verticals
+# retain their own canonical publishers; obsolete thin-adapter Spaces are not
+# recreated here. This workflow owns only the exact SZL Atlas source/target pair.
 on:
   pull_request:
     branches: [main]
@@ -24,19 +23,16 @@ permissions:
   contents: read
   security-events: write
 
-# A newer protected source revision supersedes any older waiting or running
-# publication. This is required to evict obsolete environment-gated runs before
-# they can indefinitely hold the fleet-wide concurrency lock.
 concurrency:
-  group: publish-operator-spaces-${{ github.event_name }}
+  group: publish-szl-atlas-${{ github.event_name }}
   cancel-in-progress: true
 
 jobs:
   validate:
-    name: Validate changed central publisher only
+    name: Validate Atlas publisher
     if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 8
     permissions:
       contents: read
     steps:
@@ -70,7 +66,7 @@ jobs:
             --ignore-installed \
             -r requirements/hf-publisher.lock
 
-      - name: Validate syntax, action pins, shell, and publication contract
+      - name: Validate syntax, pins, authority, and shell
         shell: bash
         run: |
           set -euo pipefail
@@ -95,58 +91,46 @@ jobs:
           if not isinstance(triggers, dict) or set(triggers) != expected_triggers:
               raise SystemExit(f'unexpected trigger contract: {triggers!r}')
 
-          workflow_concurrency = document.get('concurrency')
-          if not isinstance(workflow_concurrency, dict):
+          concurrency = document.get('concurrency')
+          if not isinstance(concurrency, dict):
               raise SystemExit('workflow concurrency must be a mapping')
-          expected_group = 'publish-operator-spaces-$' + '{{ github.event_name }}'
-          if workflow_concurrency.get('group') != expected_group:
-              raise SystemExit('fleet concurrency group drifted')
-          if workflow_concurrency.get('cancel-in-progress') != 'true':
-              raise SystemExit('new protected revisions must evict obsolete publisher runs')
+          expected_group = 'publish-szl-atlas-$' + '{{ github.event_name }}'
+          if concurrency.get('group') != expected_group:
+              raise SystemExit('Atlas concurrency group drifted')
+          if concurrency.get('cancel-in-progress') != 'true':
+              raise SystemExit('new protected revisions must evict obsolete runs')
 
           jobs = document.get('jobs')
           if not isinstance(jobs, dict) or set(jobs) != {'validate', 'publish'}:
               raise SystemExit(f'unexpected job contract: {set(jobs or {})!r}')
-
           validate = jobs['validate']
           publish = jobs['publish']
           if validate.get('if') != "github.event_name == 'pull_request'":
               raise SystemExit('validation must remain pull-request only')
           if publish.get('if') != "github.event_name != 'pull_request'":
-              raise SystemExit('provider publication must remain disabled on pull requests')
+              raise SystemExit('provider writes must remain disabled on pull requests')
           if 'environment' in publish:
-              raise SystemExit('publisher must use the proven central repository secret scope')
+              raise SystemExit('publisher must use central repository secret scope')
+          if 'strategy' in publish:
+              raise SystemExit('Atlas publisher must not recreate a fleet matrix')
 
-          expected_matrix = [
-              {
-                  'repo': 'szl-real-estate',
-                  'hf_repo': 'SZLHOLDINGS/szl-real-estate',
-                  'smoke_paths': '["/","/healthz","/api/second-brain","/api/formulas"]',
-                  'create_if_missing': 'false',
-              },
-              {
-                  'repo': 'szl-command-lab',
-                  'hf_repo': 'SZLHOLDINGS/szl-command-lab',
-                  'smoke_paths': '["/","/healthz"]',
-                  'create_if_missing': 'true',
-              },
-              {
-                  'repo': 'lyte-lattice',
-                  'hf_repo': 'SZLHOLDINGS/lyte-lattice',
-                  'smoke_paths': '["/","/healthz","/api/second-brain","/api/formulas"]',
-                  'create_if_missing': 'false',
-              },
-          ]
-          matrix = publish.get('strategy', {}).get('matrix', {}).get('include')
-          if matrix != expected_matrix:
-              raise SystemExit(f'publisher matrix drift: {matrix!r}')
+          forbidden = (
+              'SZLHOLDINGS/szl-real-estate',
+              'SZLHOLDINGS/lyte-lattice',
+              'matrix.repo',
+              'matrix.hf_repo',
+          )
+          present = [value for value in forbidden if value in text]
+          if present:
+              raise SystemExit(f'obsolete Space authority remains: {present!r}')
 
-          required_fragments = (
-              'ref: main',
-              'Validate Hugging Face card metadata before mutation',
-              'Create missing Space under exact matrix authority',
-              'CREATE_IF_MISSING',
+          required = (
+              'repository: szl-holdings/szl-command-lab',
+              'HF_REPO: SZLHOLDINGS/szl-command-lab',
+              "github_repo = 'szl-holdings/szl-command-lab'",
+              "hf_repo = 'SZLHOLDINGS/szl-command-lab'",
               "api.create_repo(",
+              "metadata.get('emoji') != '🧭'",
               '--require-default-branch-tip',
               '--restart-space',
               '--attest',
@@ -157,9 +141,9 @@ jobs:
               'secrets.HF_TOKEN',
               'secrets.HF_WRITE_TOKEN',
           )
-          missing = [fragment for fragment in required_fragments if fragment not in text]
+          missing = [fragment for fragment in required if fragment not in text]
           if missing:
-              raise SystemExit(f'missing governed publisher controls: {missing!r}')
+              raise SystemExit(f'missing governed Atlas controls: {missing!r}')
 
           pin_pattern = re.compile(r'^[^@\s]+@[0-9a-f]{40}$')
           for job_name, job in jobs.items():
@@ -169,7 +153,6 @@ jobs:
                       raise SystemExit(
                           f'unpinned action in {job_name} step {index}: {uses!r}'
                       )
-
                   script = step.get('run')
                   if not script:
                       continue
@@ -193,32 +176,16 @@ jobs:
                           f'{result.stderr.strip()}'
                       )
 
-          print('central publisher syntax and governance contract: PASS')
+          print('Atlas publisher syntax and authority contract: PASS')
           PY
 
   publish:
-    name: Publish ${{ matrix.repo }} from exact main tip
+    name: Publish SZL Atlas from exact source main
     if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     timeout-minutes: 30
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - repo: szl-real-estate
-            hf_repo: SZLHOLDINGS/szl-real-estate
-            smoke_paths: '["/","/healthz","/api/second-brain","/api/formulas"]'
-            create_if_missing: 'false'
-          - repo: szl-command-lab
-            hf_repo: SZLHOLDINGS/szl-command-lab
-            smoke_paths: '["/","/healthz"]'
-            create_if_missing: 'true'
-          - repo: lyte-lattice
-            hf_repo: SZLHOLDINGS/lyte-lattice
-            smoke_paths: '["/","/healthz","/api/second-brain","/api/formulas"]'
-            create_if_missing: 'false'
     concurrency:
-      group: hf-central-publish-${{ matrix.repo }}
+      group: hf-central-publish-szl-command-lab
       cancel-in-progress: false
 
     steps:
@@ -235,10 +202,10 @@ jobs:
           persist-credentials: false
           fetch-depth: 1
 
-      - name: Checkout current source main tip
+      - name: Checkout current Atlas source main tip
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          repository: szl-holdings/${{ matrix.repo }}
+          repository: szl-holdings/szl-command-lab
           ref: main
           path: source
           persist-credentials: false
@@ -266,23 +233,19 @@ jobs:
           --disable-pip-version-check --require-hashes --only-binary=:all:
           --ignore-installed -r tools/requirements/hf-publisher.lock
 
-      - name: Resolve exact source identity
+      - name: Resolve exact Atlas source identity
         id: source
         shell: bash
-        env:
-          REPO: ${{ matrix.repo }}
         run: |
           set -euo pipefail
           SOURCE_SHA="$(git -C source rev-parse --verify HEAD)"
           [[ "$SOURCE_SHA" =~ ^[0-9a-f]{40}$ ]]
-          mkdir -p "evidence/${REPO}"
+          mkdir -p evidence/szl-command-lab
           printf 'sha=%s\n' "$SOURCE_SHA" >> "$GITHUB_OUTPUT"
-          printf 'source=szl-holdings/%s@%s\n' "$REPO" "$SOURCE_SHA"
+          printf 'source=szl-holdings/szl-command-lab@%s\n' "$SOURCE_SHA"
 
-      - name: Validate Hugging Face card metadata before mutation
+      - name: Validate exact Atlas card metadata before mutation
         shell: bash
-        env:
-          REPO: ${{ matrix.repo }}
         run: |
           set -euo pipefail
           "$RUNNER_TEMP/hf-publisher-venv/bin/python" -I -P <<'PY'
@@ -290,61 +253,58 @@ jobs:
 
           import hashlib
           import json
-          import os
           from pathlib import Path
 
           import yaml
 
-          repo = os.environ['REPO']
           readme = Path('source/README.md')
           if not readme.is_file():
-              raise SystemExit('README.md is missing from the exact source checkout')
+              raise SystemExit('Atlas README.md is missing')
           text = readme.read_text(encoding='utf-8')
-          result = {
-              'schema': 'szl.hf.card-preflight.v2',
-              'repository': f'szl-holdings/{repo}',
+          if not text.startswith('---\n'):
+              raise SystemExit('Atlas README.md metadata is missing')
+          end = text.find('\n---\n', 4)
+          if end < 0:
+              raise SystemExit('Atlas README.md metadata closing delimiter is missing')
+          try:
+              metadata = yaml.safe_load(text[4:end])
+          except yaml.YAMLError as exc:
+              raise SystemExit(f'Invalid Atlas card YAML: {exc}') from exc
+          if not isinstance(metadata, dict):
+              raise SystemExit('Atlas metadata must decode to a mapping')
+          if metadata.get('title') != 'SZL Atlas — Governed AI Estate':
+              raise SystemExit('Atlas title drifted')
+          if metadata.get('emoji') != '🧭':
+              raise SystemExit('Atlas emoji must remain the provider-valid compass')
+          if metadata.get('sdk') != 'docker':
+              raise SystemExit('Atlas SDK must remain docker')
+          if metadata.get('app_port') != 7860:
+              raise SystemExit('Atlas app_port must remain 7860')
+          if metadata.get('pinned') is not True:
+              raise SystemExit('Atlas must remain pinned')
+          description = metadata.get('short_description')
+          if not isinstance(description, str) or not description.strip():
+              raise SystemExit('Atlas short_description is required')
+          if len(description.strip()) > 60:
+              raise SystemExit('Atlas short_description exceeds 60 characters')
+          report = {
+              'schema': 'szl.hf.atlas-card-preflight/v1',
+              'repository': 'szl-holdings/szl-command-lab',
               'readme_sha256': hashlib.sha256(text.encode()).hexdigest(),
-              'frontmatter_present': False,
-              'metadata_yaml_valid': False,
-              'short_description_present': False,
-              'short_description_length': None,
-              'maximum_short_description_length': 60,
+              'title': metadata['title'],
+              'emoji': metadata['emoji'],
+              'sdk': metadata['sdk'],
+              'app_port': metadata['app_port'],
+              'pinned': metadata['pinned'],
+              'short_description_length': len(description.strip()),
+              'state': 'VERIFIED',
           }
-          if text.startswith('---\n'):
-              result['frontmatter_present'] = True
-              end = text.find('\n---\n', 4)
-              if end < 0:
-                  raise SystemExit('README.md metadata closing delimiter is missing')
-              frontmatter = text[4:end]
-              try:
-                  metadata = yaml.safe_load(frontmatter)
-              except yaml.YAMLError as exc:
-                  raise SystemExit(f'Invalid YAML in README.md metadata: {exc}') from exc
-              if metadata is None:
-                  metadata = {}
-              if not isinstance(metadata, dict):
-                  raise SystemExit('README.md metadata must decode to a mapping')
-              result['metadata_yaml_valid'] = True
-              description_value = metadata.get('short_description')
-              if description_value is not None:
-                  if not isinstance(description_value, str):
-                      raise SystemExit('short_description must decode to a string')
-                  description = description_value.strip()
-                  if not description:
-                      raise SystemExit('short_description must not be empty')
-                  length = len(description)
-                  if length > 60:
-                      raise SystemExit(
-                          f'short_description is {length} characters; maximum is 60'
-                      )
-                  result['short_description_present'] = True
-                  result['short_description_length'] = length
-          output = Path(f'evidence/{repo}/hf-card-preflight.json')
+          output = Path('evidence/szl-command-lab/hf-card-preflight.json')
           output.write_text(
-              json.dumps(result, indent=2, sort_keys=True) + '\n',
+              json.dumps(report, indent=2, sort_keys=True) + '\n',
               encoding='utf-8',
           )
-          print(json.dumps(result, indent=2, sort_keys=True))
+          print(json.dumps(report, indent=2, sort_keys=True))
           PY
 
       - name: Require central repository credential
@@ -358,16 +318,13 @@ jobs:
             exit 2
           }
 
-      - name: Create missing Space under exact matrix authority
+      - name: Ensure exact public Atlas Space exists
         shell: bash
         env:
           HF_TOKEN: ${{ secrets.HF_ORG_TOKEN || secrets.HF_ORG_TOKEN1 || secrets.HF_TOKEN || secrets.HF_WRITE_TOKEN }}
           GITHUB_TOKEN: ${{ github.token }}
           GITHUB_API_URL: ${{ github.api_url }}
           GITHUB_REF: ${{ github.ref }}
-          REPO: ${{ matrix.repo }}
-          HF_REPO: ${{ matrix.hf_repo }}
-          CREATE_IF_MISSING: ${{ matrix.create_if_missing }}
           SOURCE_SHA: ${{ steps.source.outputs.sha }}
         run: |
           set -euo pipefail
@@ -384,14 +341,9 @@ jobs:
 
           from huggingface_hub import HfApi
 
-          repo = os.environ['REPO']
-          github_repo = f'szl-holdings/{repo}'
-          hf_repo = os.environ['HF_REPO']
+          github_repo = 'szl-holdings/szl-command-lab'
+          hf_repo = 'SZLHOLDINGS/szl-command-lab'
           source_sha = os.environ['SOURCE_SHA'].lower()
-          create_raw = os.environ['CREATE_IF_MISSING'].strip().lower()
-          if create_raw not in {'true', 'false'}:
-              raise SystemExit('create_if_missing must be exactly true or false')
-          create_if_missing = create_raw == 'true'
           if not re.fullmatch(r'[0-9a-f]{40}', source_sha):
               raise SystemExit('source SHA is not exact')
 
@@ -406,39 +358,18 @@ jobs:
 
           api = HfApi(token=os.environ['HF_TOKEN'])
           report = {
-              'schema': 'szl.hf-space-create/v1',
+              'schema': 'szl.hf-atlas-space/v1',
               'github_repository': github_repo,
               'source_revision': source_sha,
               'target': hf_repo,
-              'authorized_create': create_if_missing,
               'state': 'UNKNOWN',
               'created': False,
           }
-
           try:
               info = api.repo_info(repo_id=hf_repo, repo_type='space')
-          except Exception as exc:  # SDK exception classes are version-bound
-              status = deployer._http_status_from_exception(exc)
-              if status != 404:
+          except Exception as exc:
+              if deployer._http_status_from_exception(exc) != 404:
                   raise
-              if not create_if_missing:
-                  raise SystemExit(
-                      f'{hf_repo} is missing and this matrix row cannot create it'
-                  ) from exc
-              exact_create_authority = {
-                  (
-                      'szl-holdings/szl-command-lab',
-                      'SZLHOLDINGS/szl-command-lab',
-                  )
-              }
-              if (github_repo, hf_repo) not in exact_create_authority:
-                  raise SystemExit(
-                      'missing-Space creation is not authorized for this source/target pair'
-                  ) from exc
-
-              # Creation is a provider mutation, so revalidate the source default
-              # branch immediately before the write. The normal deployer repeats
-              # this guard immediately before the subsequent content commit.
               deployer.require_current_default_branch_tip(
                   SimpleNamespace(
                       github_repo=github_repo,
@@ -464,18 +395,17 @@ jobs:
                           raise
                       time.sleep(2)
               if info is None:
-                  raise SystemExit('created Space did not become readable after bounded retries')
+                  raise SystemExit('created Atlas Space did not become readable')
 
           observed_id = str(getattr(info, 'id', '') or getattr(info, 'repo_id', ''))
-          observed_private = bool(getattr(info, 'private', False))
           if observed_id and observed_id != hf_repo:
               raise SystemExit(
                   f'provider identity mismatch: expected {hf_repo}, observed {observed_id}'
               )
-          if observed_private:
-              raise SystemExit('public Atlas target unexpectedly resolved as private')
+          if bool(getattr(info, 'private', False)):
+              raise SystemExit('Atlas Space unexpectedly resolved as private')
           report['state'] = 'CREATED' if report['created'] else 'EXISTING'
-          output = Path(f'evidence/{repo}/hf-space-create-report.json')
+          output = Path('evidence/szl-command-lab/hf-space-report.json')
           output.write_text(
               json.dumps(report, indent=2, sort_keys=True) + '\n',
               encoding='utf-8',
@@ -483,80 +413,74 @@ jobs:
           print(json.dumps(report, indent=2, sort_keys=True))
           PY
 
-      - name: Deploy exact Dockerfile-derived closure
+      - name: Deploy exact Dockerfile-derived Atlas closure
         shell: bash
         env:
           HF_TOKEN: ${{ secrets.HF_ORG_TOKEN || secrets.HF_ORG_TOKEN1 || secrets.HF_TOKEN || secrets.HF_WRITE_TOKEN }}
           GITHUB_TOKEN: ${{ github.token }}
-          REPO: ${{ matrix.repo }}
-          HF_REPO: ${{ matrix.hf_repo }}
-          SMOKE_PATHS: ${{ matrix.smoke_paths }}
+          HF_REPO: SZLHOLDINGS/szl-command-lab
           SOURCE_SHA: ${{ steps.source.outputs.sha }}
         run: |
           set -euo pipefail
-          MANIFEST="evidence/${REPO}/hf-deploy-manifest.json"
           "$RUNNER_TEMP/hf-publisher-venv/bin/python" -I -P tools/.github/scripts/hf_deploy_from_dockerfile.py \
             --repo-root source \
-            --github-repo "szl-holdings/${REPO}" \
+            --github-repo szl-holdings/szl-command-lab \
             --hf-repo "$HF_REPO" \
             --ref "$SOURCE_SHA" \
             --source-sha "$SOURCE_SHA" \
             --dockerfile-path Dockerfile \
             --include-readme true \
-            --smoke-paths "$SMOKE_PATHS" \
+            --smoke-paths '["/","/healthz","/api/build-info","/api/organs/integrity"]' \
             --prune \
             --require-default-branch-tip \
-            --manifest-out "$MANIFEST"
+            --manifest-out evidence/szl-command-lab/hf-deploy-manifest.json
 
-      - name: Restart Space after governed publication
+      - name: Restart Atlas after governed publication
         shell: bash
         env:
           HF_TOKEN: ${{ secrets.HF_ORG_TOKEN || secrets.HF_ORG_TOKEN1 || secrets.HF_TOKEN || secrets.HF_WRITE_TOKEN }}
-          REPO: ${{ matrix.repo }}
-          HF_REPO: ${{ matrix.hf_repo }}
+          HF_REPO: SZLHOLDINGS/szl-command-lab
         run: |
           set -euo pipefail
           "$RUNNER_TEMP/hf-publisher-venv/bin/python" -I -P tools/.github/scripts/hf_deploy_from_dockerfile.py \
             --restart-space \
-            --manifest "evidence/${REPO}/hf-deploy-manifest.json" \
+            --manifest evidence/szl-command-lab/hf-deploy-manifest.json \
             --hf-repo "$HF_REPO"
 
-      - name: Attest running commit, bytes, and smoke routes
+      - name: Attest running commit, bytes, and public routes
         shell: bash
         env:
           HF_TOKEN: ${{ secrets.HF_ORG_TOKEN || secrets.HF_ORG_TOKEN1 || secrets.HF_TOKEN || secrets.HF_WRITE_TOKEN }}
-          REPO: ${{ matrix.repo }}
-          HF_REPO: ${{ matrix.hf_repo }}
+          HF_REPO: SZLHOLDINGS/szl-command-lab
         run: |
           set -euo pipefail
           "$RUNNER_TEMP/hf-publisher-venv/bin/python" -I -P tools/.github/scripts/hf_deploy_from_dockerfile.py \
             --attest \
-            --manifest "evidence/${REPO}/hf-deploy-manifest.json" \
+            --manifest evidence/szl-command-lab/hf-deploy-manifest.json \
             --hf-repo "$HF_REPO" \
             --wait-running 1200
 
       - name: Publish measured summary
         shell: bash
         env:
-          REPO: ${{ matrix.repo }}
-          HF_REPO: ${{ matrix.hf_repo }}
           SOURCE_SHA: ${{ steps.source.outputs.sha }}
         run: |
           {
-            echo "### Central Hugging Face publication"
+            echo "### SZL Atlas publication"
             echo
-            echo "- GitHub source: \`szl-holdings/${REPO}@${SOURCE_SHA}\`"
-            echo "- Hugging Face target: \`${HF_REPO}\`"
-            echo "- Default-tip guard: passed"
-            echo "- Card metadata YAML preflight: passed"
-            echo "- Runtime and smoke attestation: passed"
+            echo "- GitHub source: \`szl-holdings/szl-command-lab@${SOURCE_SHA}\`"
+            echo "- Hugging Face target: \`SZLHOLDINGS/szl-command-lab\`"
+            echo "- Obsolete adapter Spaces recreated: **no**"
+            echo "- Card metadata preflight: **passed**"
+            echo "- Default-tip guard: **passed**"
+            echo "- Running commit, bytes, and routes: **attested**"
           } >> "$GITHUB_STEP_SUMMARY"
 
-      - name: Upload immutable deployment evidence
+      - name: Upload immutable Atlas deployment evidence
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: hf-central-${{ matrix.repo }}-${{ steps.source.outputs.sha || github.run_id }}
-          path: evidence/${{ matrix.repo }}/
+          name: hf-central-szl-atlas-${{ steps.source.outputs.sha || github.run_id }}
+          path: evidence/szl-command-lab/
           if-no-files-found: warn
           retention-days: 90
