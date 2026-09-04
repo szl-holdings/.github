@@ -75,7 +75,13 @@
     }
   },
   "prune": true,
-  "allowed_deletions": [],
+  "allowed_deletions": [
+    "GOVERNANCE.md",
+    "MODELS.txt",
+    "SEVEN_SPACES.md",
+    "SPACE_PROVENANCE_FRONTIER.json",
+    "seven-spaces.yaml"
+  ],
   "smoke": {
     "path": "/",
     "required_marker": "data-szl-surface=\"company-front-door\""
