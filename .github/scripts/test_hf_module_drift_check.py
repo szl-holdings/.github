@@ -938,5 +938,21 @@ class TestRegistryInconclusiveHonesty(unittest.TestCase):
         self.assertNotIn("\nINCONCLUSIVE:", output)
 
 
+class TestRemoteAddContextSemantics(unittest.TestCase):
+    def test_remote_add_is_not_repository_managed(self):
+        checksum = "b" * 64
+        dockerfile = (
+            "FROM scratch\n"
+            f"ADD --checksum=sha256:{checksum} https://example.invalid/archive.tgz /tmp/archive.tgz\n"
+            "COPY module.py /app/module.py\n"
+        )
+        self.assertEqual(drift.parse_copy_sources(dockerfile), ["module.py"])
+
+    def test_local_add_remains_repository_managed(self):
+        self.assertEqual(
+            drift.parse_copy_sources("FROM scratch\nADD local.tgz /tmp/local.tgz\n"),
+            ["local.tgz"],
+        )
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

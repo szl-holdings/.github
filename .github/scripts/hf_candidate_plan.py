@@ -300,6 +300,7 @@ def _transform_attributes(
     return {path: tuple(values) for path, values in observed.items()}
 
 
+
 def _strict_copy_sources(dockerfile: str) -> list[str]:
     if dockerfile.startswith("\ufeff"):
         raise CandidatePlanError("Dockerfile UTF-8 BOM is forbidden")
@@ -331,9 +332,38 @@ def _strict_copy_sources(dockerfile: str) -> list[str]:
         if match is None:
             continue
         instruction, rest = match.groups()
+        instruction = instruction.upper()
         rest = rest.strip()
-        if instruction.upper() != "COPY":
-            raise CandidatePlanError("candidate planner forbids ADD instructions")
+
+        if instruction == "ADD":
+            if rest.startswith("["):
+                raise CandidatePlanError("candidate planner forbids JSON-form ADD")
+            if "<<" in rest:
+                raise CandidatePlanError(
+                    "candidate planner forbids ADD heredoc syntax"
+                )
+            if any(character in rest for character in ('"', "'", "\\", "$", "#")):
+                raise CandidatePlanError(
+                    f"candidate planner forbids ambiguous ADD syntax: {line.strip()}"
+                )
+            tokens = rest.split()
+            flags = [token for token in tokens if token.startswith("--")]
+            clean = [token for token in tokens if not token.startswith("--")]
+            if len(clean) != 2 or not publisher.is_remote_add_source(clean[0]):
+                raise CandidatePlanError(
+                    "candidate planner forbids local or ambiguous ADD instructions"
+                )
+            if not clean[0].lower().startswith(("http://", "https://")):
+                raise CandidatePlanError(
+                    "candidate planner supports only checksum-pinned HTTP(S) remote ADD"
+                )
+            checksum_pattern = r"--checksum=sha256:[0-9a-f]{64}"
+            if len(flags) != 1 or re.fullmatch(checksum_pattern, flags[0]) is None:
+                raise CandidatePlanError(
+                    "candidate planner requires one lowercase SHA-256 checksum for remote ADD"
+                )
+            continue
+
         if rest.startswith("["):
             raise CandidatePlanError("candidate planner forbids JSON-form COPY")
         if rest.startswith("--"):
@@ -369,7 +399,6 @@ def _strict_copy_sources(dockerfile: str) -> list[str]:
     if not publisher_sources:
         raise CandidatePlanError("Dockerfile has no supported COPY sources")
     return publisher_sources
-
 
 def _ignore_patterns(data: bytes) -> list[tuple[bool, re.Pattern[str]]]:
     with tempfile.TemporaryDirectory(prefix="szl-hf-plan-ignore-") as directory:
