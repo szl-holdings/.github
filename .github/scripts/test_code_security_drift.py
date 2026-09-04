@@ -344,6 +344,12 @@ class TestProductionWorkflowAuthContract(unittest.TestCase):
                         "permission-organization-administration": "read",
                     },
                 ),
+                ".github/workflows/estate-deadman.yml": (
+                    {
+                        "permission-actions": "read",
+                        "permission-contents": "read",
+                    },
+                ),
                 ".github/workflows/organization-control-sweep.yml": (
                     {
                         "permission-actions": "read",
