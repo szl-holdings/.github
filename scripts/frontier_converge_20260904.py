@@ -107,7 +107,6 @@ POST_MERGE_WORKFLOWS: tuple[tuple[str, str], ...] = (
     ("anatomy", "holographic-v7-live-witness.yml"),
     ("killinchu", "hf-sync.yml"),
     ("killinchu", "asset-exposure-live-witness.yml"),
-    ("killinchu", "retire-legacy-resilience-spaces.yml"),
     ("szl-org-health", "autonomic-slo.yml"),
     (".github", "estate-deadman.yml"),
     ("szl-gpu-bridge", "windows-watchdog-install.yml"),
@@ -843,7 +842,7 @@ def audit_hf(token: str | None) -> dict[str, Any]:
     return {
         "spaces": spaces,
         "mutation_performed": False,
-        "retirement_rule": "Vessels/Aegis deletion only through the source-bound Killinchu retirement workflow; Sentra remains the sole Assurance Command; IMMUNE remains gated.",
+        "retirement_rule": "Vessels retirement requires a Killinchu replacement receipt. Aegis retirement must point to Sentra under the final owner directive. Sentra remains the sole Assurance Command; IMMUNE remains gated.",
     }
 
 
