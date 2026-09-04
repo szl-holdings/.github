@@ -111,6 +111,33 @@ class TestParseCopySources(unittest.TestCase):
         df = "FROM python:3.12\n# COPY ghost.py /app/ghost.py\nCOPY serve.py /app/\n"
         self.assertEqual(dep.parse_copy_sources(df), ["serve.py"])
 
+    def test_checksum_pinned_remote_add_is_not_a_local_source(self):
+        digest = "a" * 64
+        url = "https://example.invalid/releases/tool.whl"
+        df = (
+            "FROM python:3.12\n"
+            f"ADD --checksum=sha256:{digest} {url} /wheels/tool.whl\n"
+            "COPY serve.py /app/serve.py\n"
+        )
+        eligible = []
+        self.assertEqual(
+            dep.parse_copy_sources(df, eligible_sources=eligible),
+            ["serve.py"],
+        )
+        self.assertEqual(eligible, ["serve.py"])
+        self.assertTrue(dep.is_remote_add_source("ADD", url))
+
+    def test_remote_copy_is_not_exempted(self):
+        url = "https://example.invalid/not-supported-for-copy.whl"
+        df = f"FROM python:3.12\nCOPY {url} /wheels/tool.whl\n"
+        self.assertEqual(dep.parse_copy_sources(df), [url])
+        self.assertFalse(dep.is_remote_add_source("COPY", url))
+
+    def test_json_form_remote_add_is_not_a_local_source(self):
+        url = "https://example.invalid/archive.tar.gz"
+        df = 'FROM scratch\nADD ["' + url + '", "/src/archive.tar.gz"]\n'
+        self.assertEqual(dep.parse_copy_sources(df), [])
+
 
 class TestExpandSources(unittest.TestCase):
     def setUp(self):
@@ -164,6 +191,25 @@ class TestExpandSources(unittest.TestCase):
 
 
 class TestDeriveReadmePolicy(unittest.TestCase):
+    def test_checksum_pinned_remote_add_is_bound_only_by_dockerfile(self):
+        digest = "b" * 64
+        url = "https://example.invalid/releases/tool.whl"
+        manifest, files = self._derive(
+            (
+                "FROM python:3.12\n"
+                f"ADD --checksum=sha256:{digest} {url} /wheels/tool.whl\n"
+                "COPY serve.py /app/serve.py\n"
+            ),
+            {"serve.py": "pass\n"},
+            include_readme=False,
+        )
+        self.assertEqual(
+            set(files),
+            {"Dockerfile", "Dockerfile.dockerignore", "serve.py"},
+        )
+        self.assertEqual(manifest["files_resolved"], 1)
+        self.assertEqual(manifest["copy_sources"], 1)
+
     def _derive(
         self, dockerfile, files, *, include_readme, readme_path="README.md",
         dockerfile_path="Dockerfile", smoke_paths=None,
