@@ -316,13 +316,39 @@ def sha256(data: bytes) -> str:
 # --------------------------------------------------------------------------- #
 # Dockerfile COPY parsing (shared logic with hf_module_drift_check.py)
 # --------------------------------------------------------------------------- #
+_REMOTE_ADD_SCHEMES = frozenset({"http", "https", "git", "ssh"})
+_REMOTE_ADD_SCP_RE = re.compile(r"^[^/@\s]+@[^:/\s]+:.+$")
+
+
+def is_remote_add_source(instruction, source):
+    """Return whether one ADD source is external to the Git build context.
+
+    Docker permits ADD to fetch HTTP(S) resources and Git repositories.
+    Those inputs remain cryptographically bound by the published Dockerfile,
+    but they are not local checkout paths and therefore must not enter the
+    GitHub-to-Hub file manifest. COPY never receives this exemption.
+    """
+    if str(instruction or "").upper() != "ADD":
+        return False
+    value = str(source or "").strip()
+    if _REMOTE_ADD_SCP_RE.fullmatch(value):
+        return True
+    parsed = urllib.parse.urlsplit(value)
+    return (
+        parsed.scheme.casefold() in _REMOTE_ADD_SCHEMES
+        and bool(parsed.netloc or parsed.path)
+    )
+
+
 def parse_copy_sources(dockerfile_text, *, eligible_sources=None):
-    """Return COPY/ADD *source* tokens. Joins line-continuations, handles the
-    JSON-array form, drops --flag options, and SKIPS `--from=` build-stage
-    copies. A whole-context source is rejected because it cannot be represented
-    as a curated, independently attestable deploy set. When requested,
-    eligible_sources receives only sources from instructions without
-    `--exclude`, which are safe to use as source-revision coverage."""
+    """Return local COPY/ADD source tokens from the Git build context.
+
+    Joins line-continuations, handles the JSON-array form, drops --flag
+    options, skips `--from=` build-stage copies, and excludes remote ADD
+    inputs. Remote inputs remain bound by the Dockerfile bytes but are not
+    uploaded as repository files. A whole-context local source is rejected.
+    When requested, eligible_sources receives only local sources from
+    instructions without `--exclude`."""
     logical = []
     buf = ""
     for raw in dockerfile_text.splitlines():
@@ -345,6 +371,7 @@ def parse_copy_sources(dockerfile_text, *, eligible_sources=None):
         m = re.match(r"^\s*(COPY|ADD)\s+(.*)$", line, re.IGNORECASE)
         if not m:
             continue
+        instruction = m.group(1).upper()
         rest = m.group(2).strip()
         if rest.startswith("["):
             try:
@@ -359,8 +386,13 @@ def parse_copy_sources(dockerfile_text, *, eligible_sources=None):
                 raise DeployContractError(
                     f"invalid JSON-form Dockerfile instruction: {line.strip()}"
                 )
-            sources.extend(arr[:-1])
-            revision_eligible.extend(arr[:-1])
+            local_sources = [
+                source
+                for source in arr[:-1]
+                if not is_remote_add_source(instruction, source)
+            ]
+            sources.extend(local_sources)
+            revision_eligible.extend(local_sources)
             continue
         toks = rest.split()
         skip = False
@@ -381,7 +413,11 @@ def parse_copy_sources(dockerfile_text, *, eligible_sources=None):
                 f"COPY/ADD instruction has no complete source/destination pair: "
                 f"{line.strip()}"
             )
-        srcs = clean[:-1]
+        srcs = [
+            source
+            for source in clean[:-1]
+            if not is_remote_add_source(instruction, source)
+        ]
         for source in srcs:
             normalized = source
             while normalized.startswith("./"):
