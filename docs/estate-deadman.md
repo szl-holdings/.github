@@ -16,21 +16,40 @@ newer red run. Active runs are accepted only inside their bounded duration and
 only when backed by a fresh success or a newly installed workflow's first-run
 grace period.
 
-A suspected failure is sampled twice, sixty seconds apart. Only a confirmed
-failure creates or refreshes the single `[ESTATE-DEADMAN]` incident. Recovered
-evidence closes that incident automatically. Refreshes are throttled to one per
-hour so a provider outage cannot create an issue or notification storm.
+A suspected failure is sampled twice, sixty seconds apart. Only the same target
+failing both samples creates or refreshes the single `[ESTATE-DEADMAN]`
+incident. Alternating or recovered samples are `INCONCLUSIVE`, fail the run,
+and cannot create, refresh, or close an incident. A later wholly healthy cycle
+closes the incident. Every confirmed-failure cycle refreshes the reserved issue;
+there is no marker-controlled throttle that another workflow could replay to
+suppress current evidence. Each accepted marker is structurally consistent
+with an immutable provider-authenticated scheduled workflow attempt. It does
+not claim causal authorship because same-repository workflows using the built-in
+Actions identity can also write issues; every confirmed cycle overwrites the
+reserved issue with current evidence.
 
-Each cycle writes a JSON receipt and SHA-256 digest. The receipt contains public
+Each cycle writes a JSON receipt and a `.sha256` sidecar containing the SHA-256
+of the exact emitted JSON file bytes. The receipt contains public
 workflow identifiers, timestamps, conclusions, bounded age calculations, and
-the incident action. It contains no credential value.
+the incident action. Its `policy_sha256` binds the exact canonical-LF policy
+source bytes, and duplicate JSON object keys are rejected. It contains no
+credential value.
 
 ## Authority boundary
 
-The supervisor can read exact GitHub workflow and run metadata and can manage
-one incident issue. It cannot edit workflow definitions, branches, repository
-contents, deployments, DNS, Hugging Face assets, models, products, or public
-effectors. It accepts no caller-supplied repository, workflow, branch, or URL.
+The supervisor mints the existing QILLQAQ GitHub App into a read-only token
+restricted to `.github`, `szl-org-health`, and `a11oy`; that token can read
+Actions and contents metadata only. The built-in `.github` job token is kept in
+a separate client and can manage one incident issue only. Neither credential
+can edit workflow definitions, branches, repository contents, deployments,
+DNS, Hugging Face assets, models, products, or public effectors. The controller
+accepts no caller-supplied repository, workflow, branch, or URL.
+
+The private cross-repository App installation is an operational prerequisite,
+not a source-level claim. The controller is not operationally proven until a
+real provider-scheduled run reads all three repositories and emits a terminal
+receipt. Missing App authority fails closed; there is no fallback to a broader
+personal token or to the repository-scoped incident token.
 
 ## Independent failure domains
 

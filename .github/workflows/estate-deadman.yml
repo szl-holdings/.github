@@ -47,18 +47,36 @@ jobs:
           python-version: "3.12"
 
       - name: Re-prove dead-man contracts before live observation
+        env:
+          PYTHONDONTWRITEBYTECODE: "1"
         run: |
           set -euo pipefail
-          python -m py_compile .github/scripts/estate_deadman.py tests/test_estate_deadman.py
           python -m unittest discover -s tests -p 'test_estate_deadman.py' -v
+          python .github/scripts/validate_estate_deadman_workflow.py
           python .github/scripts/estate_deadman.py \
             --offline-contract-only \
-            --output reports/estate-deadman-contract.json
+            --output "$RUNNER_TEMP/estate-deadman-contract.json"
           git diff --check
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          test "$(git status --porcelain --untracked-files=all)" = ""
+          mkdir -p reports
+          cp "$RUNNER_TEMP/estate-deadman-contract.json" reports/estate-deadman-contract.json
+
+      - name: Mint exact read-only estate observer
+        id: reader
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        with:
+          client-id: ${{ vars.QILLQAQ_CLIENT_ID }}
+          private-key: ${{ secrets.QILLQAQ_PRIVATE_KEY }}
+          owner: szl-holdings
+          repositories: ".github,szl-org-health,a11oy"
+          permission-actions: read
+          permission-contents: read
 
       - name: Observe and reconcile the critical scheduled control planes
         id: supervisor
         env:
+          ESTATE_READ_TOKEN: ${{ steps.reader.outputs.token }}
           GITHUB_TOKEN: ${{ github.token }}
         shell: bash
         run: |
@@ -94,9 +112,13 @@ jobs:
               stream.write(
                   f"- Incident action: `{(report.get('incident') or {}).get('action', 'UNAVAILABLE')}`\n"
               )
-              stream.write(
-                  f"- Receipt SHA-256: `{report.get('receipt_sha256', 'UNAVAILABLE')}`\n\n"
+              digest_path = Path('reports/estate-deadman.json.sha256')
+              digest = (
+                  digest_path.read_text(encoding='ascii').strip()
+                  if digest_path.exists()
+                  else 'UNAVAILABLE'
               )
+              stream.write(f"- Receipt file SHA-256: `{digest}`\n\n")
               stream.write('| Target | State | Latest run | Conclusion | Success age |\n')
               stream.write('|---|---|---:|---|---:|\n')
               for row in report.get('final_sample', []):
@@ -125,8 +147,12 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          receipt_sha="$(sha256sum reports/estate-deadman.json | cut -d' ' -f1)"
+          expected_sha="$(tr -d '\r\n' < reports/estate-deadman.json.sha256)"
+          test "$receipt_sha" = "$expected_sha"
           jq -e '.schema == "szl.estate-deadman-receipt/v1"' reports/estate-deadman.json >/dev/null
           jq -e '.secret_values_recorded == false' reports/estate-deadman.json >/dev/null
+          jq -e '.authority.controller_tip_reverified == true' reports/estate-deadman.json >/dev/null
           jq -e '.authority.workflow_mutation == false and .authority.deployment_mutation == false' reports/estate-deadman.json >/dev/null
           jq -e '.incident.ok == true' reports/estate-deadman.json >/dev/null
           jq -e '.confirmed_healthy == true' reports/estate-deadman.json >/dev/null

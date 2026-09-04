@@ -48,6 +48,12 @@ APP_TOKEN_PERMISSION_CONTRACTS = {
             "permission-organization-administration": "read",
         },
     ),
+    ".github/workflows/estate-deadman.yml": (
+        {
+            "permission-actions": "read",
+            "permission-contents": "read",
+        },
+    ),
     ".github/workflows/organization-control-sweep.yml": (
         {
             "permission-actions": "read",
@@ -285,7 +291,10 @@ def verify_app_token_permissions() -> None:
     for path in workflow_root.iterdir():
         if not path.is_file() or path.suffix.lower() not in {".yml", ".yaml"}:
             continue
-        relative = str(path.relative_to(ROOT))
+        # Keep the governed inventory stable across Linux CI and Windows
+        # operator workstations; contract keys are repository paths, not
+        # host-native filesystem spellings.
+        relative = path.relative_to(ROOT).as_posix()
         blocks = app_token_permission_blocks(relative)
         if blocks:
             discovered[relative] = blocks

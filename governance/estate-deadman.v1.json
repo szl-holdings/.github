@@ -7,8 +7,7 @@
     "interval_seconds": 60
   },
   "incident": {
-    "title": "[ESTATE-DEADMAN] Critical scheduled control plane degraded",
-    "refresh_minutes": 60
+    "title": "[ESTATE-DEADMAN] Critical scheduled control plane degraded"
   },
   "targets": [
     {
