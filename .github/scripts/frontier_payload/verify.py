@@ -61,6 +61,7 @@ def terminal_status(report: Mapping[str, Any]) -> str:
 
 def markdown_summary(report: Mapping[str, Any]) -> str:
     public, card = report["public_estate"], report["vessels_card"]
+    held_count = len(report.get("private_spaces") or [])
     lines = [
         "<!-- SZL-FRONTIER-PAYLOAD-CONVERGENCE-V1 -->",
         "## Frontier payload convergence receipt",
@@ -86,9 +87,10 @@ def markdown_summary(report: Mapping[str, Any]) -> str:
         "",
         "### Guarded external boundary",
         "",
-        "- The five named private Spaces were not made public. Each remains held for build and claims review.",
+        f"- The `{held_count}` Spaces still in the private hold set were not made public; each remains held for build and claims review.",
+        "- `SZLHOLDINGS/anatomy` is outside that hold set after its source-controlled guardian proved public `RUNNING` / `HANDLES_ONLY` operation.",
         "- Nemo-v3 reviewed jobspecs remain expired; no signature or queue authorization was attempted.",
-        "- The owner must regenerate a fresh reviewed spec through the repository controller and complete the enrolled-key ceremony.",
+        "- Current `szl-gpu-bridge` main exposes no safe expiration-only regenerator. A new immutable successor must be reviewed with updated admitted bindings/tests before the enrolled-key ceremony.",
         "- No token value is present in this receipt.",
         "",
     ]

@@ -70,8 +70,10 @@ def main(argv: list[str] | None = None) -> int:
             ],
             "state": "EXPIRED_AWAITING_ENGINE_SIGNATURE",
             "next_action": (
-                "regenerate a fresh reviewed jobspec through the repository controller, "
-                "then run the enrolled owner-key signing ceremony"
+                "create and review a new immutable successor jobspec with a fresh "
+                "expires_at window and updated admitted bindings/tests; current main "
+                "exposes no safe expiration-only regenerator; then complete the "
+                "enrolled owner-key signing ceremony"
             ),
             "automated_here": False,
         },

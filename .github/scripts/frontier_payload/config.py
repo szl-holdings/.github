@@ -31,23 +31,23 @@ VESSELS_CARD_URL = (
     "main/docs/hf-cards/SZLHOLDINGS-vessels.README.md"
 )
 VESSELS_SPACE = "SZLHOLDINGS/vessels"
+# Anatomy left this hold set only after the source-controlled lifecycle guardian
+# proved public RUNNING/HANDLES_ONLY operation on 2026-09-03.
 PRIVATE_SPACES = (
-    "hatun-mcp", "immune", "szl-model-inference-lab", "yarqa", "anatomy",
+    "hatun-mcp", "immune", "szl-model-inference-lab", "yarqa",
 )
 
 REPOSITORY_METADATA = {
     "szl-holdings/david-leads": {
         "description": (
-            "Canonical public investor and lead-qualification surface; "
-            "evidence-labelled company, product, market, diligence, and "
-            "contact dossiers generated from live/public source inventories."
+            "David Leads — official-source broker research with evidence receipts. "
+            "Public Space: SZLHOLDINGS/david-leads."
         ),
     },
     "szl-holdings/szl-atelier": {
         "description": (
-            "Canonical SZL visual-asset and image-rendering studio; "
-            "generated-media workflows, model adapters, and provenance-aware "
-            "creative tooling."
+            "SZL Atelier — walk SZLHOLDINGS model cards. Public Space: "
+            "SZLHOLDINGS/szl-atelier. Sibling of szl-forge, not a discarded hologram."
         ),
         "archived": False,
     },
