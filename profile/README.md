@@ -30,13 +30,15 @@ Authority and evidence are validated before action. Runtime stays inside the bou
 - **Product** · [a-11-oy.com](https://a-11-oy.com): Command Center, console, interactive verify
 - **Proof** · [a11oy.net](https://a11oy.net): RECORD, diligence, atlas; not a product host
 - **Source** · [github.com/szl-holdings/a11oy](https://github.com/szl-holdings/a11oy)
-- **Artifacts** · [huggingface.co/SZLHOLDINGS](https://huggingface.co/SZLHOLDINGS): pin a11oy, szl-khipu, szl-atelier, killinchu, and immune
+- **Artifacts** · [huggingface.co/SZLHOLDINGS](https://huggingface.co/SZLHOLDINGS): 15 public Spaces, 44 models, 32 datasets
+- **IMMUNE** · product [a-11-oy.com/immune](https://a-11-oy.com/immune) · Channel A [SZLHOLDINGS/immune](https://huggingface.co/spaces/SZLHOLDINGS/immune) · Channel B [SZLHOLDINGS/immune-lattice](https://huggingface.co/spaces/SZLHOLDINGS/immune-lattice) · NEXUS plane lives on Channel A `/nexus.html` — Hub Space `SZLHOLDINGS/nexus` is **not** a public product
+- **Source twins** · [github.com/szl-holdings](https://github.com/szl-holdings) homepages point at the matching Hub card when the twin is public
 
 [a11oy-factory](https://github.com/szl-holdings/a11oy-factory) is a bind, not a second flagship. Killinchu is a public synthetic reference with **SIMULATED** public actuation. The verifier Space points to the product and proof surfaces; it is not a flagship.
 
 ## Portfolio
 
-- **Defense** · [immune](https://github.com/szl-holdings/immune)
+- **Defense** · [immune](https://github.com/szl-holdings/immune) · tab [a-11-oy.com/immune](https://a-11-oy.com/immune) · Lorenz OP MEASURED on Channel A/B hashes `c5fcc502…` / `4071a2f2…`
 - **Finance** · [szl-quant](https://github.com/szl-holdings/szl-quant): paper-only, not financial advice
 - **Real estate** · [szl-real-estate](https://github.com/szl-holdings/szl-real-estate): occupancy **UNAVAILABLE**
 - **Insurance** · **ROADMAP**
@@ -54,7 +56,8 @@ Authority and evidence are validated before action. Runtime stays inside the bou
 
 - [a11oy honest](https://a-11-oy.com/api/a11oy/v1/honest): locked-8, Λ = Conjecture 1, kernel `c7c0ba17`
 - [a11oy.net health.json](https://a11oy.net/health.json): static document, signer unavailable, not DSSE-LIVE
-- Hub: pin five Spaces. Unpin holograms. Do not pin factory. The verifier is a pointer.
+- Hub public Spaces (measured 2026-09-04): `immune`, `immune-lattice`, `a11oy`, `killinchu`, `counsel`, `terra`, `sentra`, `finance`, `lyte`, `vertical-services`, `szl-command-lab`, `david-leads`, `szl-constellation`, `szl-frontier`, `szl-model-inference-lab`. Keep both IMMUNE channels. Do not mint `SZLHOLDINGS/nexus`. `SZLHOLDINGS/anatomy` and `SZLHOLDINGS/szl-khipu` Spaces are **not** public — GitHub `szl-khipu` homepage is the [SZL-Khipu-1.5B](https://huggingface.co/SZLHOLDINGS/SZL-Khipu-1.5B) model.
+- Recapture: [GITHUB_HF_ALIGNMENT_2026-09-04.md](https://github.com/szl-holdings/.github/blob/main/docs/GITHUB_HF_ALIGNMENT_2026-09-04.md)
 
 The dataset [`SZLHOLDINGS/SZLHOLDINGS`](https://huggingface.co/datasets/SZLHOLDINGS/SZLHOLDINGS) is a **HISTORICAL** mirror.
 
