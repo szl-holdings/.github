@@ -36,13 +36,15 @@ jobs:
           path = Path('.github/scripts/public_front_door_check.py')
           text = path.read_text(encoding='utf-8')
           needle = '    WEBP_DESTINATION: CANONICAL_WEBP,\n}'
-          replacement = '''    WEBP_DESTINATION: CANONICAL_WEBP,
-    "GOVERNANCE.md": "huggingface/org-card/GOVERNANCE.md",
-    "MODELS.txt": "huggingface/org-card/MODELS.txt",
-    "SEVEN_SPACES.md": "huggingface/org-card/SEVEN_SPACES.md",
-    "SPACE_PROVENANCE_FRONTIER.json": "huggingface/org-card/SPACE_PROVENANCE_FRONTIER.json",
-    "seven-spaces.yaml": "huggingface/org-card/seven-spaces.yaml",
-}'''
+          replacement = (
+              '    WEBP_DESTINATION: CANONICAL_WEBP,\n'
+              '    "GOVERNANCE.md": "huggingface/org-card/GOVERNANCE.md",\n'
+              '    "MODELS.txt": "huggingface/org-card/MODELS.txt",\n'
+              '    "SEVEN_SPACES.md": "huggingface/org-card/SEVEN_SPACES.md",\n'
+              '    "SPACE_PROVENANCE_FRONTIER.json": "huggingface/org-card/SPACE_PROVENANCE_FRONTIER.json",\n'
+              '    "seven-spaces.yaml": "huggingface/org-card/seven-spaces.yaml",\n'
+              '}'
+          )
           count = text.count(needle)
           if count != 1:
               raise SystemExit(f'expected one publication-binding terminator; found {count}')
