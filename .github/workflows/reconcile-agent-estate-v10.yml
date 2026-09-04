@@ -1,0 +1,223 @@
+# SPDX-License-Identifier: Apache-2.0
+name: Reconcile Codex and Perplexity estate v10
+
+on:
+  push:
+    branches:
+      - ops/estate-reconciliation-2026-09-04-v1
+    paths:
+      - .github/workflows/reconcile-agent-estate-v10.yml
+  workflow_dispatch:
+
+permissions:
+  actions: write
+  contents: write
+  issues: write
+  pull-requests: write
+
+concurrency:
+  group: szl-agent-estate-reconciliation
+  cancel-in-progress: true
+
+jobs:
+  residual:
+    name: Eight-pass residual estate convergence
+    runs-on: ubuntu-24.04
+    timeout-minutes: 95
+    env:
+      GH_ORG_ADMIN_TOKEN: ${{ secrets.GH_ORG_ADMIN_TOKEN || secrets.ORG_ADMIN_TOKEN || secrets.GH_ADMIN_TOKEN || secrets.GITHUB_ORG_TOKEN || secrets.GH_ORG_TOKEN || secrets.SZL_GITHUB_TOKEN || secrets.A11OY_GITHUB_TOKEN || secrets.GITHUB_PAT || secrets.GH_PAT || secrets.PAT_TOKEN || secrets.PERSONAL_ACCESS_TOKEN || secrets.ADMIN_TOKEN || secrets.REPO_TOKEN || secrets.REPOSITORY_ACCESS_TOKEN || secrets.AUTOMATION_TOKEN || secrets.BOT_TOKEN || secrets.GH_TOKEN }}
+      ORG_ADMIN_TOKEN: ${{ secrets.ORG_ADMIN_TOKEN }}
+      GH_ADMIN_TOKEN: ${{ secrets.GH_ADMIN_TOKEN }}
+      SZL_GITHUB_TOKEN: ${{ secrets.SZL_GITHUB_TOKEN }}
+      GITHUB_PAT: ${{ secrets.GITHUB_PAT }}
+      GH_PAT: ${{ secrets.GH_PAT }}
+      GH_TOKEN_SECRET: ${{ secrets.GH_TOKEN }}
+      REPOSITORY_TOKEN: ${{ github.token }}
+      HF_ORG_TOKEN: ${{ secrets.HF_ORG_TOKEN || secrets.HF_ORG_TOKEN1 || secrets.HF_WRITE_TOKEN || secrets.HF_TOKEN || secrets.HUGGINGFACE_TOKEN || secrets.HUGGING_FACE_HUB_TOKEN }}
+      HF_ORG_TOKEN1: ${{ secrets.HF_ORG_TOKEN1 }}
+      HF_WRITE_TOKEN: ${{ secrets.HF_WRITE_TOKEN }}
+      HF_TOKEN: ${{ secrets.HF_TOKEN }}
+      HUGGINGFACE_TOKEN: ${{ secrets.HUGGINGFACE_TOKEN }}
+      HUGGING_FACE_HUB_TOKEN: ${{ secrets.HUGGING_FACE_HUB_TOKEN }}
+      RECOVERY_REPORT: ${{ runner.temp }}/szl-agent-work-recovery-v10.json
+      ESTATE_REPORT: ${{ runner.temp }}/szl-agent-estate-reconciliation-v10.json
+      OPERATOR_BRANCH: ops/estate-reconciliation-2026-09-04-v1
+    steps:
+      - name: Harden runner
+        uses: step-security/harden-runner@05e31511f85b41b11d1cf0ef85d0992719546e2c # v2.21.0
+        with:
+          egress-policy: audit
+
+      - name: Check out exact residual source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: true
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12"
+
+      - name: Install exact Hugging Face client
+        run: >-
+          python -m pip install --disable-pip-version-check --no-cache-dir
+          "huggingface_hub==1.23.0"
+
+      - name: Validate current operators
+        run: |
+          set -euo pipefail
+          python -m py_compile \
+            scripts/recover_agent_work.py \
+            scripts/run_recover_agent_work_v2.py \
+            scripts/reconcile_agent_estate.py \
+            scripts/run_reconcile_agent_estate_v4.py
+          git diff --check
+
+      - name: Detect an already terminal ledger
+        id: prior
+        continue-on-error: true
+        run: |
+          set +e
+          git fetch --no-tags origin "$OPERATOR_BRANCH"
+          git show "origin/$OPERATOR_BRANCH:reports/agent-estate/latest.json" > "$RUNNER_TEMP/prior-estate.json" 2>/dev/null
+          git show "origin/$OPERATOR_BRANCH:reports/agent-estate/recovery-latest.json" > "$RUNNER_TEMP/prior-recovery.json" 2>/dev/null
+          python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          estate_path = Path(os.environ["RUNNER_TEMP"]) / "prior-estate.json"
+          recovery_path = Path(os.environ["RUNNER_TEMP"]) / "prior-recovery.json"
+          terminal = False
+          if estate_path.is_file() and recovery_path.is_file():
+              try:
+                  estate = json.loads(estate_path.read_text(encoding="utf-8"))
+                  recovery = json.loads(recovery_path.read_text(encoding="utf-8"))
+                  blocked = any(
+                      "BLOCKED" in str(row.get("action") or "")
+                      for group in ("reopened", "drafts", "dco_recoveries")
+                      for row in recovery.get(group, [])
+                  )
+                  terminal = estate.get("state") == "VERIFIED_COMPLETE" and not blocked
+              except Exception:
+                  terminal = False
+          with Path(os.environ["GITHUB_OUTPUT"]).open("a", encoding="utf-8") as stream:
+              stream.write(f"terminal={'true' if terminal else 'false'}\n")
+          PY
+          exit 0
+
+      - name: Reuse already terminal ledgers
+        if: ${{ steps.prior.outputs.terminal == 'true' }}
+        run: |
+          cp "$RUNNER_TEMP/prior-recovery.json" "$RECOVERY_REPORT"
+          cp "$RUNNER_TEMP/prior-estate.json" "$ESTATE_REPORT"
+
+      - name: Recover residual agent work
+        if: ${{ steps.prior.outputs.terminal != 'true' }}
+        continue-on-error: true
+        run: >-
+          python scripts/run_recover_agent_work_v2.py
+          --output "$RECOVERY_REPORT"
+
+      - name: Run eight bounded reconciliation passes
+        if: ${{ steps.prior.outputs.terminal != 'true' }}
+        continue-on-error: true
+        run: >-
+          python scripts/run_reconcile_agent_estate_v4.py
+          --output "$ESTATE_REPORT"
+          --passes 8
+          --pass-delay 120
+
+      - name: Persist the newest terminal or blocker ledgers
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -s "$RECOVERY_REPORT"
+          test -s "$ESTATE_REPORT"
+          cp "$RECOVERY_REPORT" "$RUNNER_TEMP/recovery-latest.json"
+          cp "$ESTATE_REPORT" "$RUNNER_TEMP/latest.json"
+          python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          recovery = json.loads(Path(os.environ["RECOVERY_REPORT"]).read_text(encoding="utf-8"))
+          estate = json.loads(Path(os.environ["ESTATE_REPORT"]).read_text(encoding="utf-8"))
+          terminal = estate.get("terminal") or {}
+          counts = terminal.get("counts") or {}
+          hf = estate.get("hugging_face_summary") or {}
+          blocked = sum(
+              1
+              for group in ("reopened", "drafts", "dco_recoveries")
+              for row in recovery.get(group, [])
+              if "BLOCKED" in str(row.get("action") or "")
+          )
+          lines = [
+              "# SZL Agent Estate — Terminal Reconciliation",
+              "",
+              f"- Finished: `{estate.get('finished_at')}`",
+              f"- Estate state: **`{estate.get('state')}`**",
+              f"- Recovery state: **`{recovery.get('state')}`**",
+              f"- GitHub authority: `{(estate.get('github_authority') or {}).get('state')}`",
+              f"- Hugging Face authority: `{(estate.get('hugging_face_authority') or {}).get('state')}`",
+              f"- Repositories scanned: `{estate.get('repository_count')}`",
+              f"- Product PRs remaining: `{counts.get('open_pull_requests')}`",
+              f"- Operator PRs pending: `{counts.get('operator_pull_requests')}`",
+              f"- Stale Actions remaining: `{counts.get('stale_runs')}`",
+              f"- Failed default workflows: `{counts.get('latest_failed_default_workflows')}`",
+              f"- HF Spaces running/observed: `{hf.get('running')}` / `{hf.get('spaces')}`",
+              f"- HF terminal failures: `{hf.get('failed')}`",
+              f"- Recovery blockers: `{blocked}`",
+              f"- Estate evidence SHA-256: `{estate.get('report_sha256')}`",
+              f"- Recovery evidence SHA-256: `{recovery.get('report_sha256')}`",
+          ]
+          Path(os.environ["RUNNER_TEMP"] + "/latest.md").write_text("\n".join(lines) + "\n", encoding="utf-8")
+          PY
+          git fetch --no-tags origin "$OPERATOR_BRANCH"
+          git checkout -B "$OPERATOR_BRANCH" "origin/$OPERATOR_BRANCH"
+          mkdir -p reports/agent-estate
+          cp "$RUNNER_TEMP/latest.json" reports/agent-estate/latest.json
+          cp "$RUNNER_TEMP/recovery-latest.json" reports/agent-estate/recovery-latest.json
+          cp "$RUNNER_TEMP/latest.md" reports/agent-estate/latest.md
+          git config user.name "Lutar, Stephen P."
+          git config user.email "stephenlutar2@gmail.com"
+          git add reports/agent-estate
+          if ! git diff --cached --quiet; then
+            git commit -s -m "chore(ops): record residual estate convergence"
+            git push origin HEAD:"$OPERATOR_BRANCH"
+          fi
+
+      - name: Upload immutable residual evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: szl-agent-estate-reconciliation-v10-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            ${{ env.RECOVERY_REPORT }}
+            ${{ env.ESTATE_REPORT }}
+          if-no-files-found: error
+          retention-days: 180
+
+      - name: Enforce terminal truth
+        if: always()
+        run: |
+          python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          recovery = json.loads(Path(os.environ["RECOVERY_REPORT"]).read_text(encoding="utf-8"))
+          estate = json.loads(Path(os.environ["ESTATE_REPORT"]).read_text(encoding="utf-8"))
+          blocked = any(
+              "BLOCKED" in str(row.get("action") or "")
+              for group in ("reopened", "drafts", "dco_recoveries")
+              for row in recovery.get(group, [])
+          )
+          if blocked or estate.get("state") != "VERIFIED_COMPLETE":
+              raise SystemExit(
+                  f"residual estate not terminal: recovery={recovery.get('state')} estate={estate.get('state')}"
+              )
+          PY
