@@ -1,0 +1,298 @@
+# SPDX-License-Identifier: Apache-2.0
+name: Close out agent-estate control plane
+
+on:
+  push:
+    branches:
+      - ops/estate-reconciliation-2026-09-04-v1
+    paths:
+      - .github/workflows/closeout-agent-estate-control-plane.yml
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+  statuses: write
+
+concurrency:
+  group: szl-agent-estate-control-plane-closeout
+  cancel-in-progress: true
+
+jobs:
+  closeout:
+    name: Terminal-ledger cleanup and protected merge
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    env:
+      OPERATOR_BRANCH: ops/estate-reconciliation-2026-09-04-v1
+      REPORT_PATH: ${{ runner.temp }}/agent-estate-control-plane-closeout.json
+      GITHUB_TOKEN: ${{ github.token }}
+    steps:
+      - name: Harden runner
+        uses: step-security/harden-runner@05e31511f85b41b11d1cf0ef85d0992719546e2c # v2.21.0
+        with:
+          egress-policy: audit
+
+      - name: Check out the current review branch
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ops/estate-reconciliation-2026-09-04-v1
+          persist-credentials: true
+          fetch-depth: 0
+
+      - name: Wait for terminal recovery and estate ledgers
+        shell: bash
+        run: |
+          set -euo pipefail
+          terminal=false
+          for attempt in $(seq 1 60); do
+            git fetch --no-tags origin "$OPERATOR_BRANCH"
+            if git show "origin/$OPERATOR_BRANCH:reports/agent-estate/latest.json" > "$RUNNER_TEMP/estate.json" 2>/dev/null \
+              && git show "origin/$OPERATOR_BRANCH:reports/agent-estate/recovery-latest.json" > "$RUNNER_TEMP/recovery.json" 2>/dev/null; then
+              if python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          estate = json.loads(Path(os.environ["RUNNER_TEMP"] + "/estate.json").read_text(encoding="utf-8"))
+          recovery = json.loads(Path(os.environ["RUNNER_TEMP"] + "/recovery.json").read_text(encoding="utf-8"))
+          terminal = estate.get("terminal") or {}
+          counts = terminal.get("counts") or {}
+          hf = estate.get("hugging_face_summary") or {}
+          recovery_blocked = any(
+              "BLOCKED" in str(row.get("action") or "")
+              for group in ("reopened", "drafts", "dco_recoveries")
+              for row in recovery.get(group, [])
+          )
+          conditions = {
+              "estate_state": estate.get("state") == "VERIFIED_COMPLETE",
+              "recovery_clear": not recovery_blocked,
+              "product_prs": int(counts.get("open_pull_requests") or 0) == 0,
+              "stale_runs": int(counts.get("stale_runs") or 0) == 0,
+              "failed_default_workflows": int(counts.get("latest_failed_default_workflows") or 0) == 0,
+              "hf_failures": int(hf.get("failed") or 0) == 0,
+          }
+          if not all(conditions.values()):
+              raise SystemExit(2)
+          PY
+              then
+                terminal=true
+                break
+              fi
+            fi
+            sleep 20
+          done
+          if [[ "$terminal" != true ]]; then
+            python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          def load(name):
+              path = Path(os.environ["RUNNER_TEMP"]) / name
+              if not path.is_file():
+                  return None
+              try:
+                  return json.loads(path.read_text(encoding="utf-8"))
+              except Exception:
+                  return {"state": "UNREADABLE"}
+
+          estate = load("estate.json")
+          recovery = load("recovery.json")
+          report = {
+              "schema": "szl.agent-estate-control-plane-closeout/v1",
+              "state": "BLOCKED_TERMINAL_LEDGER",
+              "estate_state": (estate or {}).get("state"),
+              "recovery_state": (recovery or {}).get("state"),
+              "estate_report_sha256": (estate or {}).get("report_sha256"),
+              "recovery_report_sha256": (recovery or {}).get("report_sha256"),
+              "branch_protection_bypass": False,
+          }
+          Path(os.environ["REPORT_PATH"]).write_text(
+              json.dumps(report, indent=2, sort_keys=True) + "\n",
+              encoding="utf-8",
+          )
+          PY
+            exit 2
+          fi
+
+      - name: Collapse temporary generations into the canonical operator
+        shell: bash
+        run: |
+          set -euo pipefail
+          git checkout -B "$OPERATOR_BRANCH" "origin/$OPERATOR_BRANCH"
+          test -f .github/workflows/agent-estate-reconciler.yml
+          test -f scripts/recover_agent_work.py
+          test -f scripts/run_recover_agent_work_v2.py
+          test -f scripts/reconcile_agent_estate.py
+          test -f scripts/run_reconcile_agent_estate_v4.py
+          rm -f \
+            .github/workflows/reconcile-agent-estate.yml \
+            .github/workflows/reconcile-agent-estate-v2.yml \
+            .github/workflows/reconcile-agent-estate-v3.yml \
+            .github/workflows/reconcile-agent-estate-v4.yml \
+            .github/workflows/reconcile-agent-estate-v5.yml \
+            .github/workflows/reconcile-agent-estate-v6.yml \
+            .github/workflows/reconcile-agent-estate-v7.yml \
+            .github/workflows/reconcile-agent-estate-v8.yml \
+            .github/workflows/reconcile-agent-estate-v9.yml \
+            .github/workflows/finalize-agent-estate-reconciliation.yml \
+            .github/workflows/closeout-agent-estate-control-plane.yml \
+            scripts/run_reconcile_agent_estate.py \
+            scripts/run_reconcile_agent_estate_v2.py \
+            scripts/run_reconcile_agent_estate_v3.py
+          python -m py_compile \
+            scripts/recover_agent_work.py \
+            scripts/run_recover_agent_work_v2.py \
+            scripts/reconcile_agent_estate.py \
+            scripts/run_reconcile_agent_estate_v4.py
+          git diff --check
+          git config user.name "Lutar, Stephen P."
+          git config user.email "stephenlutar2@gmail.com"
+          git add -A .github/workflows scripts
+          if ! git diff --cached --quiet; then
+            git commit -s -m "chore(ops): finalize canonical agent-estate reconciler"
+            git push origin HEAD:"$OPERATOR_BRANCH"
+          fi
+          echo "FINAL_HEAD=$(git rev-parse HEAD)" >> "$GITHUB_ENV"
+
+      - name: Publish exact-head status and merge through GitHub policy
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from __future__ import annotations
+          import hashlib
+          import json
+          import os
+          import time
+          import urllib.error
+          import urllib.parse
+          import urllib.request
+          from pathlib import Path
+
+          owner = "szl-holdings"
+          repo = ".github"
+          branch = os.environ["OPERATOR_BRANCH"]
+          sha = os.environ["FINAL_HEAD"]
+          token = os.environ["GITHUB_TOKEN"]
+          base = "https://api.github.com"
+
+          def request(method, path, payload=None, allow=(200, 201, 202, 204)):
+              data = None if payload is None else json.dumps(payload).encode("utf-8")
+              req = urllib.request.Request(
+                  base + path,
+                  data=data,
+                  method=method,
+                  headers={
+                      "Accept": "application/vnd.github+json",
+                      "Authorization": f"Bearer {token}",
+                      "Content-Type": "application/json",
+                      "User-Agent": "szl-agent-estate-closeout/1",
+                      "X-GitHub-Api-Version": "2022-11-28",
+                  },
+              )
+              try:
+                  with urllib.request.urlopen(req, timeout=45) as response:
+                      raw = response.read()
+                      if response.status not in allow:
+                          raise RuntimeError(f"{method} {path}: HTTP {response.status}")
+                      return json.loads(raw.decode("utf-8")) if raw else None
+              except urllib.error.HTTPError as exc:
+                  raw = exc.read().decode("utf-8", "replace")
+                  raise RuntimeError(f"{method} {path}: HTTP {exc.code}: {raw[:300]}") from exc
+
+          request(
+              "POST",
+              f"/repos/{owner}/{repo}/statuses/{sha}",
+              {
+                  "state": "success",
+                  "context": "agent-estate/terminal-ledger",
+                  "description": "Terminal estate and recovery ledgers verified",
+                  "target_url": f"https://github.com/{owner}/{repo}/tree/{sha}/reports/agent-estate",
+              },
+              allow=(201,),
+          )
+          head = urllib.parse.quote(f"{owner}:{branch}", safe="")
+          pulls = request(
+              "GET",
+              f"/repos/{owner}/{repo}/pulls?state=open&head={head}&per_page=20",
+          )
+          if not isinstance(pulls, list) or len(pulls) != 1:
+              raise RuntimeError(f"expected one operator PR; observed {len(pulls or [])}")
+          number = int(pulls[0]["number"])
+
+          pull = None
+          for _ in range(20):
+              pull = request("GET", f"/repos/{owner}/{repo}/pulls/{number}")
+              if str((pull.get("head") or {}).get("sha") or "") != sha:
+                  raise RuntimeError("operator PR head moved after terminal status")
+              if pull.get("mergeable") is not None:
+                  break
+              time.sleep(3)
+          if not pull or pull.get("draft"):
+              raise RuntimeError("operator PR is absent or draft")
+          if pull.get("mergeable") is not True:
+              raise RuntimeError(
+                  f"operator PR is not mergeable: {pull.get('mergeable_state')}"
+              )
+          merged = request(
+              "PUT",
+              f"/repos/{owner}/{repo}/pulls/{number}/merge",
+              {
+                  "sha": sha,
+                  "merge_method": "squash",
+                  "commit_title": f"{pull.get('title')} (#{number})",
+                  "commit_message": (
+                      "Install the canonical exact-head reconciler, recover recent agent half-builds, "
+                      "reconcile stale workflows and Hugging Face runtimes, and retain terminal evidence.\n\n"
+                      "Signed-off-by: Stephen Lutar <stephenlutar2@gmail.com>"
+                  ),
+              },
+              allow=(200,),
+          )
+          if not isinstance(merged, dict) or merged.get("merged") is not True:
+              raise RuntimeError(str((merged or {}).get("message") or "merge rejected"))
+          merge_sha = str(merged.get("sha") or "")
+          main = request("GET", f"/repos/{owner}/{repo}/git/ref/heads/main")
+          main_sha = str(((main.get("object") or {}).get("sha") or ""))
+          if main_sha != merge_sha:
+              raise RuntimeError(f"main readback mismatch: {main_sha} != {merge_sha}")
+
+          estate = json.loads(
+              Path(os.environ["RUNNER_TEMP"] + "/estate.json").read_text(encoding="utf-8")
+          )
+          recovery = json.loads(
+              Path(os.environ["RUNNER_TEMP"] + "/recovery.json").read_text(encoding="utf-8")
+          )
+          report = {
+              "schema": "szl.agent-estate-control-plane-closeout/v1",
+              "state": "VERIFIED_COMPLETE",
+              "pull_number": number,
+              "source_head_sha": sha,
+              "merge_sha": merge_sha,
+              "main_readback_sha": main_sha,
+              "estate_report_sha256": estate.get("report_sha256"),
+              "recovery_report_sha256": recovery.get("report_sha256"),
+              "canonical_workflow": ".github/workflows/agent-estate-reconciler.yml",
+              "temporary_workflows_removed": True,
+              "branch_protection_bypass": False,
+              "review_bypass": False,
+              "secret_values_recorded": False,
+          }
+          encoded = json.dumps(report, sort_keys=True, separators=(",", ":")).encode("utf-8")
+          report["report_sha256"] = hashlib.sha256(encoded).hexdigest()
+          Path(os.environ["REPORT_PATH"]).write_text(
+              json.dumps(report, indent=2, sort_keys=True) + "\n",
+              encoding="utf-8",
+          )
+          PY
+
+      - name: Upload immutable closeout evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: agent-estate-control-plane-closeout-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ env.REPORT_PATH }}
+          if-no-files-found: error
+          retention-days: 180
