@@ -6,55 +6,64 @@
      alt="A bounded signal path entering a holographic verification lattice"
      width="100%" />
 
-# SZL
+# SZL Holdings
 
 **Control before action. Evidence after.**
 
-Governed AI command systems with evidence-bound decisions and portable verification.
+Governed AI systems with source-bound execution and portable verification receipts.
 
-[Product](https://a-11-oy.com) · [Proof](https://a11oy.net) · [Source](https://github.com/szl-holdings) · [Artifacts](https://huggingface.co/SZLHOLDINGS)
+**Product** · [a-11-oy.com](https://a-11-oy.com)  
+**Proof** · [a11oy.net](https://a11oy.net)
 
 </div>
 
 ---
 
-## One governed loop
+## Governed loop
 
-**Signal → reason → policy → bounded action → receipt → independent verification.**
+**Signal** → **reason** → **policy** → **bounded action** → **receipt** → **independent verification**.
 
-Models propose. Independent policy constrains. Humans bind consequential action. Receipts preserve scoped integrity and origin; they do not prove accuracy, safety, performance, compliance, or authorization. Lambda remains advisory, and uniqueness remains **Conjecture 1 — OPEN**.
+Authority and evidence are checked before action. Runtime stays inside its declared boundary. Λ uniqueness remains **Conjecture 1 OPEN**.
+
+## Public paths
+
+- **A11oy** · [product](https://a-11-oy.com) · [source](https://github.com/szl-holdings/a11oy)
+- **Proof registry** · [a11oy.net](https://a11oy.net) for records, diligence, and atlas evidence
+- **Artifacts** · [Hugging Face](https://huggingface.co/SZLHOLDINGS): 15 public Spaces, 44 models, and 32 datasets measured on 2026-09-04
+- **IMMUNE** · [product tab](https://a-11-oy.com/immune) · [Channel A](https://huggingface.co/spaces/SZLHOLDINGS/immune) · [Channel B](https://huggingface.co/spaces/SZLHOLDINGS/immune-lattice)
+- **Organization source** · [github.com/szl-holdings](https://github.com/szl-holdings)
+
+NEXUS is an internal IMMUNE capability plane, not a second product. Killinchu public actuation is **SIMULATED** unless a separately authorized effector proves otherwise.
 
 ## Portfolio
 
-- **A11oy** — governed decision and execution fabric.
-- **Killinchu** — defense and maritime intelligence; public actuation is **SIMULATED**.
-- **Lyte** — business, service, and agent observability.
-- **Terra** — parcel, ownership, zoning, and property intelligence.
-- **PURIQ Finance** — source-linked research and scenario analysis; no trading authority.
-- **PRISM Counsel** — matter, authority, argument, deadline, and evidence workflows; attorney review required.
-- **Hatun** — executive memory, commitments, delegation, and decision retrospectives.
-- **Living Anatomy** — interactive system dependencies, bounded failure simulation, and recovery evidence.
-- **SZL Atlas** — public discovery across models, kernels, datasets, Spaces, source, and limitations.
+- **Killinchu** · defense, cyber-resilience, and maritime command
+- **IMMUNE** · governed AI admission, receipts, tripwires, graph, and NEXUS
+- **Lyte** · business observability
+- **PURIQ Finance** · evidence-bound market analysis; no trading or custody
+- **Terra** · real-estate intelligence; occupancy **UNAVAILABLE**
+- **PRISM Counsel** · attorney-led legal intelligence; no filing authority
+- **David Leads** · commercial workflow flagship
 
-[Open A11oy](https://a-11-oy.com) · [Inspect evidence](https://a11oy.net) · [Explore GitHub](https://github.com/szl-holdings) · [Explore Hugging Face](https://huggingface.co/SZLHOLDINGS)
+Labs and research packages are components, holograms, or archives—not competing origins.
 
-## Builder path
-
-Start with the [A11oy source](https://github.com/szl-holdings/a11oy), [trust boundary](https://github.com/szl-holdings/.github/blob/main/TRUST.md), [public surface atlas](https://github.com/szl-holdings/.github/blob/main/docs/PUBLIC-SURFACE-ATLAS.md), and [receipt tooling](https://github.com/szl-holdings/szl-receipt).
-
-Each active artifact should expose its intended use, source revision, operational state, evaluation evidence, limitations, license, and verification route. Archives and binds remain labeled rather than presented as independent flagships.
+[Public surface atlas](https://github.com/szl-holdings/.github/blob/main/docs/PUBLIC-SURFACE-ATLAS.md) · [Lifecycle](https://github.com/szl-holdings/.github/blob/main/docs/ESTATE_LIFECYCLE.md) · [Security](https://github.com/szl-holdings/.github/security/policy) · [Trust](https://github.com/szl-holdings/.github/blob/main/TRUST.md)
 
 ## Current state
 
-Public surfaces are recaptured from provider and source evidence. A reachable URL, download count, polished card, model repository, or HTTP 200 does not establish readiness or superiority. Killinchu’s public effect path remains **SIMULATED**. The dataset [`SZLHOLDINGS/SZLHOLDINGS`](https://huggingface.co/datasets/SZLHOLDINGS/SZLHOLDINGS) remains a **HISTORICAL** mirror.
+- A11oy publishes locked-eight kernel evidence; Λ remains a conjecture.
+- Both IMMUNE channels remain public while parity and retirement evidence are completed.
+- `SZLHOLDINGS/nexus` is not a public product. Nexus source remains preserved.
+- [`SZLHOLDINGS/SZLHOLDINGS`](https://huggingface.co/datasets/SZLHOLDINGS/SZLHOLDINGS) is a **HISTORICAL** dataset mirror.
+- A signature proves integrity and origin within scope—not accuracy, safety, performance, compliance, or deployment authorization.
 
-Claims use **PROVED, MEASURED, REPORTED, MODELED, CONJECTURE, ROADMAP, UNKNOWN,** or **UNAVAILABLE**. Runtime state is separate. No production authorization, regulatory approval, customer adoption, funding, revenue, or investment outcome is claimed.
+This profile does not claim regulatory approval, universal safety, customer adoption, or an investment outcome. An HTTP 200 response is not a production certificate.
 
 ---
 
 <div align="center">
 
-**Understand · build · verify**
+**Govern · execute · prove**
 
 [a-11-oy.com](https://a-11-oy.com) · [a11oy.net](https://a11oy.net) · [GitHub](https://github.com/szl-holdings) · [Hugging Face](https://huggingface.co/SZLHOLDINGS)
 
