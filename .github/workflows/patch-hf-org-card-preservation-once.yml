@@ -1,0 +1,196 @@
+name: Patch HF org-card preservation once
+
+on:
+  push:
+    branches:
+      - fix/hf-org-card-preserve-unmanaged-20260903
+    paths:
+      - .github/workflows/patch-hf-org-card-preservation-once.yml
+
+permissions:
+  contents: write
+
+concurrency:
+  group: patch-hf-org-card-preservation-once
+  cancel-in-progress: false
+
+jobs:
+  patch:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Harden runner
+        uses: step-security/harden-runner@05e31511f85b41b11d1cf0ef85d0992719546e2c # v2.21.0
+        with:
+          egress-policy: audit
+
+      - name: Check out exact repair branch
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: fix/hf-org-card-preserve-unmanaged-20260903
+          token: ${{ secrets.SZL_GITHUB_TOKEN || secrets.GH_PAT || github.token }}
+          persist-credentials: true
+          fetch-depth: 1
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12"
+
+      - name: Apply bounded non-destructive publication repair
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from __future__ import annotations
+
+          import json
+          from pathlib import Path
+
+          def replace_once(path: Path, old: str, new: str) -> None:
+              text = path.read_text(encoding="utf-8")
+              count = text.count(old)
+              if count != 1:
+                  raise SystemExit(f"{path}: expected one replacement target, observed {count}")
+              path.write_text(text.replace(old, new, 1), encoding="utf-8", newline="\n")
+
+          manifest_path = Path("huggingface/org-card.manifest.json")
+          manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+          if manifest.get("prune") is not True:
+              raise SystemExit("org-card manifest no longer has the reviewed prune=true predecessor")
+          if manifest.get("allowed_deletions") != []:
+              raise SystemExit("org-card manifest deletion allowlist changed unexpectedly")
+          manifest["prune"] = False
+          manifest_path.write_text(
+              json.dumps(manifest, indent=2, ensure_ascii=False) + "\n",
+              encoding="utf-8",
+              newline="\n",
+          )
+
+          deploy_path = Path(".github/scripts/hf_static_space_deploy.py")
+          replace_once(
+              deploy_path,
+              "    return candidates\n\n\ndef publish(\n",
+              '''    return candidates
+
+
+def remote_file_set_matches(
+    contract: dict[str, Any], remote_files: set[str], wanted: set[str]
+) -> bool:
+    """Require exact parity when pruning and managed-file coverage otherwise."""
+
+    if bool(contract.get("prune")):
+        return remote_files == wanted
+    return wanted.issubset(remote_files)
+
+
+def publish(
+''',
+          )
+          replace_once(
+              deploy_path,
+              "    remote_file_set_match = False\n    immutable_files_match = False\n",
+              "    remote_file_set_match = False\n    preserved_paths: list[str] = []\n    immutable_files_match = False\n",
+          )
+          replace_once(
+              deploy_path,
+              "            remote_file_set_match = commit_files == wanted\n            if (\n",
+              '''            remote_file_set_match = remote_file_set_matches(
+                contract, commit_files, wanted
+            )
+            preserved_paths = (
+                sorted(commit_files - wanted)
+                if not bool(contract.get("prune"))
+                else []
+            )
+            if (
+''',
+          )
+          replace_once(
+              deploy_path,
+              '                    "deleted_paths": deleted,\n                    "remote_file_set": sorted(commit_files),\n',
+              '                    "deleted_paths": deleted,\n                    "preserved_paths": preserved_paths,\n                    "remote_file_set": sorted(commit_files),\n',
+          )
+          replace_once(
+              deploy_path,
+              '            "deleted_paths": deleted,\n            "remote_file_set_match": remote_file_set_match,\n',
+              '            "deleted_paths": deleted,\n            "preserved_paths": preserved_paths,\n            "remote_file_set_match": remote_file_set_match,\n',
+          )
+
+          static_tests = Path(".github/scripts/test_hf_static_space_deploy.py")
+          replace_once(
+              static_tests,
+              "    def test_prune_aborts_on_unexpected_remote_path(self):\n",
+              '''    def test_non_prune_preserves_unmanaged_remote_paths(self):
+        contract, _ = deploy.load_contract(self.root, self.manifest)
+        contract["prune"] = False
+        remote = {"README.md", "index.html", "unmanaged.txt"}
+        wanted = {"README.md", "index.html"}
+
+        self.assertEqual(deploy.planned_deletions(contract, remote, wanted), [])
+        self.assertTrue(deploy.remote_file_set_matches(contract, remote, wanted))
+        self.assertFalse(
+            deploy.remote_file_set_matches(contract, {"README.md"}, wanted)
+        )
+
+    def test_prune_requires_exact_remote_file_set(self):
+        contract, _ = deploy.load_contract(self.root, self.manifest)
+        wanted = {"README.md", "index.html"}
+
+        self.assertTrue(deploy.remote_file_set_matches(contract, wanted, wanted))
+        self.assertFalse(
+            deploy.remote_file_set_matches(
+                contract,
+                {"README.md", "index.html", "unmanaged.txt"},
+                wanted,
+            )
+        )
+
+    def test_prune_aborts_on_unexpected_remote_path(self):
+''',
+          )
+
+          central_tests = Path(".github/scripts/test_hf_org_card_autopublish.py")
+          replace_once(
+              central_tests,
+              "    def test_report_redacts_provider_tokens(self):\n",
+              '''    def test_production_manifest_preserves_unmanaged_remote_files(self):
+        repo_root = Path(__file__).resolve().parents[2]
+        contract, _ = publisher.deploy.load_contract(
+            repo_root,
+            repo_root / "huggingface" / "org-card.manifest.json",
+        )
+        self.assertFalse(contract["prune"])
+        self.assertEqual(contract.get("allowed_deletions"), [])
+
+    def test_report_redacts_provider_tokens(self):
+''',
+          )
+          PY
+
+          python -m py_compile \
+            .github/scripts/hf_static_space_deploy.py \
+            .github/scripts/hf_org_card_autopublish.py
+          python -m unittest discover \
+            -s .github/scripts -p 'test_hf_static_space_deploy.py'
+          python -m unittest discover \
+            -s .github/scripts -p 'test_hf_org_card_autopublish.py'
+
+      - name: Remove one-shot workflow and commit reviewed patch
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm .github/workflows/patch-hf-org-card-preservation-once.yml
+          git diff --check
+          git config user.name "szl-frontier-bot"
+          git config user.email "stephenlutar2+frontier@gmail.com"
+          git add \
+            .github/scripts/hf_static_space_deploy.py \
+            .github/scripts/test_hf_static_space_deploy.py \
+            .github/scripts/test_hf_org_card_autopublish.py \
+            huggingface/org-card.manifest.json \
+            .github/workflows/patch-hf-org-card-preservation-once.yml
+          git commit \
+            -m "fix(hf): preserve unmanaged organization-card files" \
+            -m "Signed-off-by: Stephen P. Lutar Jr. <stephenlutar2@gmail.com>"
+          git push origin HEAD:fix/hf-org-card-preserve-unmanaged-20260903
