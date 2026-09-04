@@ -1,0 +1,277 @@
+# SPDX-License-Identifier: Apache-2.0
+name: Publish Vertical Frontier
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - .github/workflows/publish-vertical-frontier.yml
+      - .github/scripts/publish_vertical_frontier.py
+      - requirements/hf-publisher.lock
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/publish-vertical-frontier.yml
+      - .github/scripts/publish_vertical_frontier.py
+      - requirements/hf-publisher.lock
+  schedule:
+    - cron: "37 * * * *"
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+  security-events: write
+
+concurrency:
+  group: publish-vertical-frontier-${{ github.event_name }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    name: Validate source, publisher, and runtime image
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Harden runner
+        uses: step-security/harden-runner@05e31511f85b41b11d1cf0ef85d0992719546e2c # v2.21.0
+        with:
+          egress-policy: audit
+
+      - name: Checkout exact publisher change
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          path: tools
+          persist-credentials: false
+          fetch-depth: 1
+
+      - name: Checkout current Vertical Frontier source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: szl-holdings/vertical-services
+          ref: main
+          path: source
+          persist-credentials: false
+          fetch-depth: 1
+
+      - name: Set up exact Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12.10"
+
+      - name: Compile and self-test publisher
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m py_compile tools/.github/scripts/publish_vertical_frontier.py
+          python -I -P tools/.github/scripts/publish_vertical_frontier.py --self-test
+
+      - name: Validate exact eight-product source contract
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -I -P tools/.github/scripts/publish_vertical_frontier.py \
+            --source-root source/frontier \
+            --validate-only \
+            > /tmp/source-validation.json
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          report = json.loads(Path('/tmp/source-validation.json').read_text())
+          assert report['state'] == 'VERIFIED'
+          assert len(report['verticals']) == 8
+          assert report['authority']['model_may_authorize'] is False
+          assert report['authority']['kernel_may_authorize'] is False
+          assert report['authority']['public_effectors_enabled'] is False
+          PY
+
+      - name: Materialize exact Space closure
+        id: source
+        shell: bash
+        run: |
+          set -euo pipefail
+          SOURCE_SHA="$(git -C source rev-parse --verify HEAD)"
+          PUBLISHER_SHA="$(git -C tools rev-parse --verify HEAD)"
+          [[ "$SOURCE_SHA" =~ ^[0-9a-f]{40}$ ]]
+          [[ "$PUBLISHER_SHA" =~ ^[0-9a-f]{40}$ ]]
+          STAGE="$(mktemp -d)"
+          printf 'stage=%s\n' "$STAGE" >> "$GITHUB_OUTPUT"
+          printf 'sha=%s\n' "$SOURCE_SHA" >> "$GITHUB_OUTPUT"
+          python -I -P tools/.github/scripts/publish_vertical_frontier.py \
+            --source-root source/frontier \
+            --source-sha "$SOURCE_SHA" \
+            --publisher-sha "$PUBLISHER_SHA" \
+            --materialize "$STAGE" \
+            > /tmp/materialization.json
+
+      - name: Build the materialized non-root image
+        shell: bash
+        env:
+          STAGE: ${{ steps.source.outputs.stage }}
+        run: docker build --pull --tag szl-vertical-frontier:validation --file "$STAGE/Dockerfile" "$STAGE"
+
+      - name: Smoke the materialized route-only runtime
+        shell: bash
+        env:
+          SOURCE_SHA: ${{ steps.source.outputs.sha }}
+        run: |
+          set -euo pipefail
+          docker run --detach --rm --name szl-vertical-frontier-validation \
+            --publish 127.0.0.1:17867:7860 \
+            --env SZL_GIT_SHA="$SOURCE_SHA" \
+            szl-vertical-frontier:validation
+          trap 'docker stop szl-vertical-frontier-validation >/dev/null 2>&1 || true' EXIT
+          for attempt in $(seq 1 30); do
+            if curl --fail --silent --show-error \
+              http://127.0.0.1:17867/healthz > /tmp/health.json; then
+              break
+            fi
+            sleep 1
+          done
+          curl --fail --silent --show-error \
+            http://127.0.0.1:17867/api/v1/runtime-capabilities \
+            > /tmp/capabilities.json
+          curl --fail --silent --show-error \
+            --header 'Content-Type: application/json' \
+            --data '{"vertical":"a11oy","objective":"inspect exact evidence","requested_action":"prepare a recommendation","risk":0.2,"evidence":[{"source":"validation","claim":"source checked"}],"human_approved":true}' \
+            http://127.0.0.1:17867/api/v1/decision \
+            > /tmp/receipt.json
+          python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          health = json.loads(Path('/tmp/health.json').read_text())
+          caps = json.loads(Path('/tmp/capabilities.json').read_text())
+          receipt = json.loads(Path('/tmp/receipt.json').read_text())
+          assert health['ok'] is True
+          assert health['build']['source_revision'] == os.environ['SOURCE_SHA']
+          assert caps['model_gateway']['state'] == 'ROUTE_ONLY'
+          assert caps['kernel_engine']['state'] == 'LIVE_EMBEDDED_REFERENCE'
+          assert caps['decision_contract']['external_execution_available'] is False
+          assert receipt['schema'] == 'szl.vertical-decision-receipt.v2'
+          assert receipt['model_proposal']['state'] == 'ROUTE_ONLY'
+          assert receipt['authorization'] == 'NONE'
+          assert receipt['execution_performed'] is False
+          PY
+
+  publish:
+    name: Publish exact Vertical Frontier source
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Harden runner
+        uses: step-security/harden-runner@05e31511f85b41b11d1cf0ef85d0992719546e2c # v2.21.0
+        with:
+          egress-policy: audit
+
+      - name: Checkout exact publisher policy
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          path: tools
+          ref: ${{ github.sha }}
+          persist-credentials: false
+          fetch-depth: 1
+
+      - name: Checkout current Vertical Frontier source main tip
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: szl-holdings/vertical-services
+          ref: main
+          path: source
+          persist-credentials: false
+          fetch-depth: 1
+
+      - name: Set up exact Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12.10"
+
+      - name: Create fresh publisher environment
+        shell: bash
+        run: |
+          set -euo pipefail
+          VENV="$RUNNER_TEMP/vertical-frontier-publisher"
+          test ! -e "$VENV"
+          python3 -m venv "$VENV"
+          test "$("$VENV/bin/python" -I -P -c 'import platform; print(platform.python_version())')" = "3.12.10"
+
+      - name: Install hash-locked publisher closure
+        shell: bash
+        run: >-
+          "$RUNNER_TEMP/vertical-frontier-publisher/bin/python" -I -P -m pip install
+          --disable-pip-version-check --require-hashes --only-binary=:all:
+          --ignore-installed -r tools/requirements/hf-publisher.lock
+
+      - name: Resolve exact source and publisher revisions
+        id: revisions
+        shell: bash
+        run: |
+          set -euo pipefail
+          SOURCE_SHA="$(git -C source rev-parse --verify HEAD)"
+          PUBLISHER_SHA="$(git -C tools rev-parse --verify HEAD)"
+          [[ "$SOURCE_SHA" =~ ^[0-9a-f]{40}$ ]]
+          [[ "$PUBLISHER_SHA" =~ ^[0-9a-f]{40}$ ]]
+          mkdir -p evidence/vertical-frontier
+          printf 'source_sha=%s\n' "$SOURCE_SHA" >> "$GITHUB_OUTPUT"
+          printf 'publisher_sha=%s\n' "$PUBLISHER_SHA" >> "$GITHUB_OUTPUT"
+          printf 'source=%s@%s\n' 'szl-holdings/vertical-services' "$SOURCE_SHA"
+
+      - name: Require central provider credential
+        shell: bash
+        env:
+          HF_TOKEN: ${{ secrets.HF_ORG_TOKEN || secrets.HF_ORG_TOKEN1 || secrets.HF_TOKEN || secrets.HF_WRITE_TOKEN }}
+        run: |
+          set -euo pipefail
+          test -n "${HF_TOKEN:-}" || {
+            echo "::error::No Hugging Face write credential is available in the central repository secret scope."
+            exit 2
+          }
+
+      - name: Publish, restart, byte-verify, and smoke
+        shell: bash
+        env:
+          HF_TOKEN: ${{ secrets.HF_ORG_TOKEN || secrets.HF_ORG_TOKEN1 || secrets.HF_TOKEN || secrets.HF_WRITE_TOKEN }}
+          GITHUB_TOKEN: ${{ github.token }}
+          SOURCE_SHA: ${{ steps.revisions.outputs.source_sha }}
+          PUBLISHER_SHA: ${{ steps.revisions.outputs.publisher_sha }}
+        run: |
+          set -euo pipefail
+          "$RUNNER_TEMP/vertical-frontier-publisher/bin/python" -I -P \
+            tools/.github/scripts/publish_vertical_frontier.py \
+            --source-root source/frontier \
+            --source-sha "$SOURCE_SHA" \
+            --publisher-sha "$PUBLISHER_SHA" \
+            --runtime-url https://szlholdings-vertical-frontier.hf.space \
+            --evidence-out evidence/vertical-frontier \
+            --publish
+
+      - name: Publish measured summary
+        shell: bash
+        env:
+          SOURCE_SHA: ${{ steps.revisions.outputs.source_sha }}
+          PUBLISHER_SHA: ${{ steps.revisions.outputs.publisher_sha }}
+        run: |
+          {
+            echo '### SZL Vertical Frontier publication'
+            echo
+            echo "- Source: \`szl-holdings/vertical-services@${SOURCE_SHA}\`"
+            echo "- Publisher: \`szl-holdings/.github@${PUBLISHER_SHA}\`"
+            echo '- Target: `SZLHOLDINGS/vertical-frontier`'
+            echo '- Vertical experiences: **8 distinct contracts**'
+            echo '- Public inference default: **ROUTE_ONLY**'
+            echo '- Kernel claim: **EMBEDDED_REFERENCE_ONLY**'
+            echo '- Public effectors: **disabled**'
+            echo '- Runtime, bytes, source revision, safe proposal, and prohibited-action hold: **verified**'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload immutable publication evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: vertical-frontier-${{ steps.revisions.outputs.source_sha || github.run_id }}
+          path: evidence/vertical-frontier/
+          if-no-files-found: error
+          retention-days: 90
