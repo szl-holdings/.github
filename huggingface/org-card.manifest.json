@@ -60,10 +60,10 @@
     "README.md": {
       "mode": "rendered_markdown",
       "required_markers": [
-        "Current state",
+        "Choose a path",
         "HISTORICAL",
         "SIMULATED",
-        "assets/evidence-lattice-v2.webp"
+        "assets/estate-command-system.svg"
       ]
     },
     "index.html": {

@@ -1,10 +1,10 @@
 ---
-title: SZL Holdings — Governed Decision Infrastructure
+title: SZL — Governed AI Command Fabric
 emoji: 🛡️
 colorFrom: gray
 colorTo: indigo
 sdk: static
-short_description: Control before action. Evidence after.
+short_description: Governed AI, inference, kernels, and verifiable outcomes.
 thumbnail: https://huggingface.co/spaces/SZLHOLDINGS/README/resolve/main/assets/evidence-lattice-v2.webp
 pinned: true
 license: apache-2.0
@@ -13,93 +13,87 @@ license: apache-2.0
 <!-- markdownlint-disable MD013 MD033 MD041 -->
 
 <p align="center">
-  <img src="https://huggingface.co/spaces/SZLHOLDINGS/README/resolve/main/assets/evidence-lattice-v2.webp"
-       alt="A bounded signal path entering a holographic verification lattice"
+  <img src="https://huggingface.co/spaces/SZLHOLDINGS/README/resolve/main/assets/estate-command-system.svg"
+       alt="SZL governed AI command fabric with a pixel-built mark, holographic evidence chamber, and clear paths to understand, build, and verify"
        width="100%" />
 </p>
 
 <div align="center">
 
-# Control before action. Evidence after.
+# Governed AI. Inference. Command systems.
 
-Models, kernels, data, and demonstrations that operate within authority and
-leave inspectable evidence.
+Frontier infrastructure for decisions that must remain bounded, inspectable,
+and reproducible.
 
-[**Open a11oy**](https://a-11-oy.com) ·
-[**Verify evidence**](https://a11oy.net) ·
-[**Killinchu**](https://huggingface.co/spaces/SZLHOLDINGS/killinchu) ·
-[**Source**](https://github.com/szl-holdings)
+[**Enter the product**](https://a-11-oy.com) ·
+[**Build from source**](https://github.com/szl-holdings) ·
+[**Inspect evidence**](https://a11oy.net) ·
+[**Browse the Hub**](https://huggingface.co/SZLHOLDINGS)
 
 </div>
 
-## Four paths
+## Choose a path
 
-### 01 / Command
+### Understand
 
-[**a11oy**](https://huggingface.co/spaces/SZLHOLDINGS/a11oy) provides governed
-inference, bounded action, and portable receipts.
+Start with [A11oy](https://a-11-oy.com) for the product, operating boundary,
+and outcome. Review [diligence and evidence](https://a11oy.net) before relying
+on a capability claim.
 
-### 02 / Intelligence
+### Build
 
-[**Killinchu**](https://huggingface.co/spaces/SZLHOLDINGS/killinchu) supports
-public observation, fusion, and operator decisions. Feeds may be live or
-unavailable; samples remain labeled. Effectors and public actuation are
-**SIMULATED**. The Space does not command a live weapon or establish production
-authorization.
+Use [GitHub](https://github.com/szl-holdings) for source, tests, contracts, and
+quick starts. Use the [Hub](https://huggingface.co/SZLHOLDINGS) for published
+models, kernels, datasets, and demonstrations.
 
-### 03 / Models + kernels
+### Verify
 
-Ready-to-wear—weights exist, proposal-only:
-[**Khipu 1.5B**](https://huggingface.co/SZLHOLDINGS/SZL-Khipu-1.5B),
-[**Forge ReceiptAgent**](https://huggingface.co/SZLHOLDINGS/SZL-Forge-1.5B-ReceiptAgent),
-[**ReceiptAgent 0.8B**](https://huggingface.co/SZLHOLDINGS/szl-receiptagent-qwen35-0.8b-v2),
-and [**szl-kernels**](https://huggingface.co/SZLHOLDINGS/szl-kernels).
+Inspect the [trust boundary](https://github.com/szl-holdings/.github/blob/main/TRUST.md),
+exact revisions, limitations, and the
+[served source binding](https://szlholdings-readme.static.hf.space/deployment.json).
 
-Fall 2026—**CUTTING**, cards only, no weights:
-[**KHIPU-R2**](https://huggingface.co/SZLHOLDINGS/KHIPU-R2),
-[**WILLAY**](https://huggingface.co/SZLHOLDINGS/WILLAY),
-[**KILLINCHU-EYE**](https://huggingface.co/SZLHOLDINGS/KILLINCHU-EYE),
-[**YARQA-ATTN**](https://huggingface.co/SZLHOLDINGS/YARQA-ATTN), and
-[**A11OY-MINI**](https://huggingface.co/SZLHOLDINGS/A11OY-MINI).
+## Command fabric
 
-Admitted evidence lives in
-[**szl-lake**](https://huggingface.co/datasets/SZLHOLDINGS/szl-lake).
-We use public research as inspiration while preserving original SZL
-implementations and lineage; third-party weights are never relabeled.
+**A11oy** governs decisions and bounded execution.
 
-### 04 / Evidence
+**Khipu models** and **SZL kernels** expose their own lineage, intended use,
+evaluation, compatibility, and limitation claims.
 
-[**Receipt verifier**](https://huggingface.co/spaces/SZLHOLDINGS/governed-receipt-verifier)
-supports replay. A running Space proves reachability, not capability; a
-signature establishes scoped integrity and origin, not accuracy, safety, or
-authorization.
+**Killinchu** is a public synthetic counter-UAS reference. Public actuation is
+**SIMULATED**; no live weapon command is claimed.
+
+**Receipt Verifier** checks scoped integrity and origin. It does not prove
+truth, safety, performance, compliance, or authorization.
+
+**SZL Lake** carries admitted evidence and data artifacts. Freshness,
+completeness, jurisdiction, and source limits remain explicit.
 
 <details>
-<summary><strong>Artifact and truth contract</strong></summary>
+<summary><strong>Evidence architecture</strong></summary>
 
-- Weights require lineage, hashes, evaluation, and an autonomy boundary.
-- Claims use PROVED, MEASURED, REPORTED, MODELED, CONJECTURE, or ROADMAP.
-- Lambda uniqueness remains Conjecture 1, not a theorem.
-- [`SZLHOLDINGS/SZLHOLDINGS`](https://huggingface.co/datasets/SZLHOLDINGS/SZLHOLDINGS)
-  is a **HISTORICAL** mirror, not the current card, inventory, or runtime source.
+<img src="https://huggingface.co/spaces/SZLHOLDINGS/README/resolve/main/assets/evidence-lattice-v2.webp"
+     alt="A bounded signal path entering a verification lattice"
+     width="100%" />
 
 </details>
 
+## Artifact contract
+
+Evidence labels and operational state are separate. A running Space or HTTP
+200 proves reachability only. Lambda uniqueness remains **Conjecture 1**.
+[`SZLHOLDINGS/SZLHOLDINGS`](https://huggingface.co/datasets/SZLHOLDINGS/SZLHOLDINGS)
+is a **HISTORICAL** mirror.
+
 ## Current state
 
-[Served source](https://szlholdings-readme.static.hf.space/deployment.json) ·
-[a11oy readiness](https://a-11-oy.com/api/a11oy/v1/readiness) ·
-[Killinchu build](https://szlholdings-killinchu.hf.space/api/build-info)
+[A11oy readiness](https://a-11-oy.com/api/a11oy/v1/readiness) ·
+[Killinchu build](https://szlholdings-killinchu.hf.space/api/build-info) ·
+[Served source](https://szlholdings-readme.static.hf.space/deployment.json)
 
-Links change. No authorization, approval, adoption, or investment outcome is
-claimed.
+No production authorization, regulatory approval, adoption, or investment
+outcome is claimed.
 
 ## Reproduce and verify
-
-Source:
-[`szl-holdings/.github`](https://github.com/szl-holdings/.github/tree/main/huggingface/org-card).
-The Space exposes its exact GitHub revision through
-[`deployment.json`](https://szlholdings-readme.static.hf.space/deployment.json).
 
 ```bash
 preview_dir="$(mktemp -d)"
@@ -111,15 +105,10 @@ python .github/scripts/hf_static_space_deploy.py \
 python -m http.server 8000 --directory "$preview_dir"
 ```
 
-[Security](https://github.com/szl-holdings/.github/security/policy) ·
-[Trust](https://github.com/szl-holdings/.github/blob/main/TRUST.md) ·
-[Limitations](./HONEST_DISCLOSURE.md) ·
-[Hugging Face organization](https://huggingface.co/SZLHOLDINGS)
-
 ---
 
 <div align="center">
 
-**Govern · execute · prove**
+**Understand · build · verify**
 
 </div>

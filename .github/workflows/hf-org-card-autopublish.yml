@@ -1,0 +1,160 @@
+name: Hugging Face organization front door (central)
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "huggingface/org-card/**"
+      - "huggingface/org-card.manifest.json"
+      - "profile/assets/estate-command-system.svg"
+      - ".github/scripts/hf_org_card_autopublish.py"
+      - ".github/scripts/hf_space_visibility.py"
+      - ".github/scripts/hf_static_space_deploy.py"
+      - ".github/scripts/test_hf_org_card_autopublish.py"
+      - ".github/scripts/test_hf_space_visibility.py"
+      - ".github/scripts/test_hf_static_space_deploy.py"
+      - ".github/workflows/hf-org-card-autopublish.yml"
+  push:
+    branches: [main]
+    paths:
+      - "huggingface/org-card/**"
+      - "huggingface/org-card.manifest.json"
+      - "profile/assets/estate-command-system.svg"
+      - ".github/scripts/hf_org_card_autopublish.py"
+      - ".github/scripts/hf_space_visibility.py"
+      - ".github/scripts/hf_static_space_deploy.py"
+      - ".github/scripts/test_hf_org_card_autopublish.py"
+      - ".github/scripts/test_hf_space_visibility.py"
+      - ".github/scripts/test_hf_static_space_deploy.py"
+      - ".github/workflows/hf-org-card-autopublish.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: hf-org-card-central-${{ github.event_name }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    name: Validate exact-source organization card
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Harden runner
+        uses: step-security/harden-runner@05e31511f85b41b11d1cf0ef85d0992719546e2c # v2.21.0
+        with:
+          egress-policy: audit
+
+      - name: Checkout exact pull-request source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+          fetch-depth: 1
+
+      - name: Set up exact Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12.10"
+
+      - name: Test organization-card publishers
+        run: >-
+          python -m unittest discover
+          -s .github/scripts
+          -p 'test_hf_*publish*.py'
+
+      - name: Test public visibility contract
+        run: >-
+          python -m unittest discover
+          -s .github/scripts
+          -p test_hf_space_visibility.py
+
+      - name: Materialize the exact publication set
+        run: |
+          set -euo pipefail
+          OUTPUT="$(mktemp -d)"
+          python .github/scripts/hf_static_space_deploy.py \
+            --repo-root . \
+            --manifest huggingface/org-card.manifest.json \
+            --source-sha "$(git rev-parse HEAD)" \
+            --materialize "$OUTPUT" \
+            --report hf-org-card-materialization.json
+          test -s "$OUTPUT/assets/estate-command-system.svg"
+          grep -Fq 'Choose a path' "$OUTPUT/README.md"
+          grep -Fq 'SZL' "$OUTPUT/assets/estate-command-system.svg"
+
+      - name: Upload validation evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: hf-org-card-validation-${{ github.run_id }}
+          path: hf-org-card-materialization.json
+          if-no-files-found: warn
+          retention-days: 30
+
+  publish:
+    name: Publish exact protected-main card and verify public readback
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Harden runner
+        uses: step-security/harden-runner@05e31511f85b41b11d1cf0ef85d0992719546e2c # v2.21.0
+        with:
+          egress-policy: audit
+
+      - name: Checkout exact protected-main source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+          fetch-depth: 1
+
+      - name: Set up exact Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12.10"
+
+      - name: Test central publisher before provider access
+        run: >-
+          python -m unittest discover
+          -s .github/scripts
+          -p test_hf_org_card_autopublish.py
+
+      - name: Install exact Hub client
+        run: >-
+          python -m pip install --disable-pip-version-check
+          "huggingface_hub==1.19.0"
+
+      - name: Require central repository credential
+        env:
+          HF_TOKEN: ${{ secrets.HF_ORG_TOKEN || secrets.HF_ORG_TOKEN1 || secrets.HF_TOKEN || secrets.HF_WRITE_TOKEN }}
+        run: |
+          set -euo pipefail
+          test -n "${HF_TOKEN:-}" || {
+            echo "::error::No Hugging Face write credential is available in the central repository secret scope."
+            exit 2
+          }
+
+      - name: Restore visibility, publish exact bytes, and verify readback
+        env:
+          HF_TOKEN: ${{ secrets.HF_ORG_TOKEN || secrets.HF_ORG_TOKEN1 || secrets.HF_TOKEN || secrets.HF_WRITE_TOKEN }}
+          GITHUB_TOKEN: ${{ github.token }}
+        run: >-
+          python .github/scripts/hf_org_card_autopublish.py
+          --repo-root .
+          --manifest huggingface/org-card.manifest.json
+          --source-sha "${GITHUB_SHA}"
+          --wait-seconds 600
+          --report hf-org-card-autopublish-report.json
+
+      - name: Upload immutable publication evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: hf-org-card-autopublish-${{ github.run_id }}
+          path: hf-org-card-autopublish-report.json
+          if-no-files-found: warn
+          retention-days: 90
