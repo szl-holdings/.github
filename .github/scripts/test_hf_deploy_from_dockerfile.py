@@ -1272,5 +1272,34 @@ class TestContentIdentity(unittest.TestCase):
         )
 
 
+class TestRemoteAddContextSemantics(unittest.TestCase):
+    def test_checksum_pinned_remote_add_is_not_a_context_source(self):
+        checksum = "a" * 64
+        dockerfile = (
+            "FROM python:3.12-slim\n"
+            f"ADD --checksum=sha256:{checksum} https://example.invalid/wheel.whl /wheels/wheel.whl\n"
+            "COPY serve.py /app/serve.py\n"
+        )
+        eligible = []
+        self.assertEqual(
+            dep.parse_copy_sources(dockerfile, eligible_sources=eligible),
+            ["serve.py"],
+        )
+        self.assertEqual(eligible, ["serve.py"])
+
+    def test_json_remote_add_is_not_a_context_source(self):
+        dockerfile = (
+            "FROM scratch\n"
+            'ADD ["https://example.invalid/archive.tgz", "/tmp/archive.tgz"]\n'
+            "COPY serve.py /app/serve.py\n"
+        )
+        self.assertEqual(dep.parse_copy_sources(dockerfile), ["serve.py"])
+
+    def test_local_add_remains_a_managed_context_source(self):
+        self.assertEqual(
+            dep.parse_copy_sources("FROM scratch\nADD local.tar /tmp/local.tar\n"),
+            ["local.tar"],
+        )
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

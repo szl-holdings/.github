@@ -410,69 +410,90 @@ def hf_space_state(hf_repo, observation_count=HF_METADATA_OBSERVATIONS):
 # --------------------------------------------------------------------------- #
 # Dockerfile COPY parsing
 # --------------------------------------------------------------------------- #
-def parse_copy_sources(dockerfile_text):
-    """Return the list of COPY/ADD *source* paths declared in the Dockerfile.
 
-    Handles line continuations, --flag options, the JSON-array form, and skips
-    multi-stage `COPY --from=<stage>` lines (those sources are not repo files).
+def is_remote_add_source(source):
+    """Return True when Docker resolves an ADD source outside build context."""
+    value = str(source or "").strip()
+    if not value:
+        return False
+    parsed = urllib.parse.urlsplit(value)
+    if parsed.scheme.lower() in {"http", "https", "git", "ssh"} and parsed.netloc:
+        return True
+    return bool(re.fullmatch(r"[A-Za-z0-9._-]+@[A-Za-z0-9.-]+:.+", value))
+
+
+def parse_copy_sources(dockerfile_text):
+    """Return repository build-context sources from COPY and local ADD.
+
+    Multi-stage ``COPY --from`` and remote ``ADD`` inputs are excluded
+    because Docker resolves them outside the repository context.
     """
-    # Join backslash line-continuations into single logical lines.
     logical = []
-    buf = ""
+    buffer = ""
     for raw in dockerfile_text.splitlines():
         line = raw.rstrip("\n")
         stripped = line.strip()
-        if not buf and (stripped.startswith("#") or stripped == ""):
+        if not buffer and (stripped.startswith("#") or stripped == ""):
             continue
         if line.rstrip().endswith("\\"):
-            buf += line.rstrip()[:-1] + " "
+            buffer += line.rstrip()[:-1] + " "
             continue
-        buf += line
-        logical.append(buf)
-        buf = ""
-    if buf:
-        logical.append(buf)
+        buffer += line
+        logical.append(buffer)
+        buffer = ""
+    if buffer:
+        logical.append(buffer)
 
     sources = []
     for line in logical:
-        m = re.match(r"^\s*(COPY|ADD)\s+(.*)$", line, re.IGNORECASE)
-        if not m:
+        match = re.match(r"^\s*(COPY|ADD)\s+(.*)$", line, re.IGNORECASE)
+        if not match:
             continue
-        rest = m.group(2).strip()
-        # Strip an inline comment that isn't part of a quoted path.
-        # JSON-array form: COPY ["src", "dest"]
+        instruction = match.group(1).upper()
+        rest = match.group(2).strip()
         if rest.startswith("["):
             try:
-                arr = json.loads(rest)
+                array = json.loads(rest)
             except json.JSONDecodeError:
                 continue
-            if len(arr) >= 2:
-                sources.extend(arr[:-1])
+            if len(array) >= 2:
+                context_sources = array[:-1]
+                if instruction == "ADD":
+                    context_sources = [
+                        source
+                        for source in context_sources
+                        if not is_remote_add_source(source)
+                    ]
+                sources.extend(context_sources)
             continue
-        toks = rest.split()
-        # Drop --flag options; skip the whole line if it's a build-stage copy.
+        tokens = rest.split()
         skip = False
         clean = []
-        for t in toks:
-            if t.startswith("--"):
-                if t.lower().startswith("--from"):
+        for token in tokens:
+            if token.startswith("--"):
+                if token.lower().startswith("--from"):
                     skip = True
                 continue
-            clean.append(t)
+            clean.append(token)
         if skip or len(clean) < 2:
             continue
-        # Last token is the destination.
-        sources.extend(clean[:-1])
-    # Normalise: drop "./" prefix, dedupe, keep order.
+        context_sources = clean[:-1]
+        if instruction == "ADD":
+            context_sources = [
+                source
+                for source in context_sources
+                if not is_remote_add_source(source)
+            ]
+        sources.extend(context_sources)
+
     out = []
     seen = set()
-    for s in sources:
-        s = s.strip().lstrip("./") or s.strip()
-        if s and s not in seen:
-            seen.add(s)
-            out.append(s)
+    for source in sources:
+        source = source.strip().lstrip("./") or source.strip()
+        if source and source not in seen:
+            seen.add(source)
+            out.append(source)
     return out
-
 
 # --------------------------------------------------------------------------- #
 # GitHub side: file -> git-blob-sha map

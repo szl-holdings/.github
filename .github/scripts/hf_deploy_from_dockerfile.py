@@ -316,13 +316,25 @@ def sha256(data: bytes) -> str:
 # --------------------------------------------------------------------------- #
 # Dockerfile COPY parsing (shared logic with hf_module_drift_check.py)
 # --------------------------------------------------------------------------- #
+
+def is_remote_add_source(source):
+    """Return True when Docker resolves an ADD source outside build context."""
+    value = str(source or "").strip()
+    if not value:
+        return False
+    parsed = urllib.parse.urlsplit(value)
+    if parsed.scheme.lower() in {"http", "https", "git", "ssh"} and parsed.netloc:
+        return True
+    return bool(re.fullmatch(r"[A-Za-z0-9._-]+@[A-Za-z0-9.-]+:.+", value))
+
+
 def parse_copy_sources(dockerfile_text, *, eligible_sources=None):
-    """Return COPY/ADD *source* tokens. Joins line-continuations, handles the
-    JSON-array form, drops --flag options, and SKIPS `--from=` build-stage
-    copies. A whole-context source is rejected because it cannot be represented
-    as a curated, independently attestable deploy set. When requested,
-    eligible_sources receives only sources from instructions without
-    `--exclude`, which are safe to use as source-revision coverage."""
+    """Return repository build-context sources from COPY and local ADD.
+
+    Line continuations, flags, JSON form, directories, files, and globs are
+    retained. Multi-stage ``COPY --from`` and remote ``ADD`` inputs are
+    excluded because Docker resolves them outside the repository context.
+    """
     logical = []
     buf = ""
     for raw in dockerfile_text.splitlines():
@@ -342,47 +354,62 @@ def parse_copy_sources(dockerfile_text, *, eligible_sources=None):
     sources = []
     revision_eligible = []
     for line in logical:
-        m = re.match(r"^\s*(COPY|ADD)\s+(.*)$", line, re.IGNORECASE)
-        if not m:
+        match = re.match(r"^\s*(COPY|ADD)\s+(.*)$", line, re.IGNORECASE)
+        if not match:
             continue
-        rest = m.group(2).strip()
+        instruction = match.group(1).upper()
+        rest = match.group(2).strip()
         if rest.startswith("["):
             try:
-                arr = json.loads(rest)
+                array = json.loads(rest)
             except json.JSONDecodeError as exc:
                 raise DeployContractError(
                     f"malformed JSON-form Dockerfile instruction: {line.strip()}"
                 ) from exc
-            if not isinstance(arr, list) or len(arr) < 2 or not all(
-                isinstance(item, str) for item in arr
+            if not isinstance(array, list) or len(array) < 2 or not all(
+                isinstance(item, str) for item in array
             ):
                 raise DeployContractError(
                     f"invalid JSON-form Dockerfile instruction: {line.strip()}"
                 )
-            sources.extend(arr[:-1])
-            revision_eligible.extend(arr[:-1])
+            context_sources = array[:-1]
+            if instruction == "ADD":
+                context_sources = [
+                    source
+                    for source in context_sources
+                    if not is_remote_add_source(source)
+                ]
+            sources.extend(context_sources)
+            revision_eligible.extend(context_sources)
             continue
-        toks = rest.split()
+
+        tokens = rest.split()
         skip = False
         has_exclude = False
         clean = []
-        for t in toks:
-            if t.startswith("--"):
-                if t.lower().startswith("--from"):
+        for token in tokens:
+            if token.startswith("--"):
+                if token.lower().startswith("--from"):
                     skip = True
-                if t.lower().startswith("--exclude"):
+                if token.lower().startswith("--exclude"):
                     has_exclude = True
                 continue
-            clean.append(t)
+            clean.append(token)
         if skip:
             continue
         if len(clean) < 2:
             raise DeployContractError(
-                f"COPY/ADD instruction has no complete source/destination pair: "
+                "COPY/ADD instruction has no complete source/destination pair: "
                 f"{line.strip()}"
             )
-        srcs = clean[:-1]
-        for source in srcs:
+        context_sources = clean[:-1]
+        if instruction == "ADD":
+            context_sources = [
+                source
+                for source in context_sources
+                if not is_remote_add_source(source)
+            ]
+        for source in context_sources:
             normalized = source
             while normalized.startswith("./"):
                 normalized = normalized[2:]
@@ -391,16 +418,14 @@ def parse_copy_sources(dockerfile_text, *, eligible_sources=None):
                     "bare `COPY . <dest>` / `ADD . <dest>` is forbidden: "
                     "the deployer requires an explicit curated source set"
                 )
-        sources.extend(srcs)
+        sources.extend(context_sources)
         if not has_exclude:
-            revision_eligible.extend(srcs)
+            revision_eligible.extend(context_sources)
 
     def normalized_unique(raw_sources):
         out, seen = [], set()
         for source in raw_sources:
             source = source.strip()
-            # Strip a literal leading "./" only -- NOT arbitrary leading "."/"/"
-            # chars, or a dotdir source like ".compliance/x" collapses.
             while source.startswith("./"):
                 source = source[2:]
             if source in ("", "."):
@@ -417,7 +442,6 @@ def parse_copy_sources(dockerfile_text, *, eligible_sources=None):
     if eligible_sources is not None:
         eligible_sources.extend(normalized_unique(revision_eligible))
     return out
-
 
 # --------------------------------------------------------------------------- #
 # Local checkout -> path -> blob sha1 (the GitHub source-of-truth side)
