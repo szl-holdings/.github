@@ -1,11 +1,9 @@
 # Copyright 2026 SZL Holdings — SPDX-License-Identifier: Apache-2.0
-name: Approve exact David runtime restoration
+name: Repair David flagship repository metadata
 
-# One-purpose, receipt-bound environment approval. The user explicitly approved
-# restoring David Leads as a flagship. This workflow uses an existing user PAT,
-# refuses every identity except stephenlutar2-hash, inspects the exact pending
-# deployment, approves only the named environment on the exact run, and changes
-# no environment protection rule.
+# One-purpose metadata repair after David Leads was restored as an active
+# flagship. It changes only the repository description, homepage, and archived
+# state; branch protection, visibility, permissions, and source are untouched.
 
 on:
   push:
@@ -18,43 +16,40 @@ permissions:
   contents: read
 
 concurrency:
-  group: approve-exact-david-runtime-restoration
+  group: repair-david-flagship-repository-metadata
   cancel-in-progress: false
 
 jobs:
-  approve:
+  repair:
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     env:
       TARGET_REPOSITORY: szl-holdings/david-leads
-      TARGET_RUN_ID: "33826525333"
-      TARGET_ENVIRONMENT_ID: "18903698016"
-      TARGET_ENVIRONMENT_NAME: david-space-credential-rotation
-      EXPECTED_APPROVER: stephenlutar2-hash
-      GH_APPROVER_TOKEN: ${{ secrets.SZL_ORG_ADMIN_PAT || secrets.ORG_ADMIN_TOKEN || secrets.GH_ORG_TOKEN || secrets.GITHUB_PAT || secrets.SZL_GITHUB_TOKEN || secrets.SZL_GH_PAT || secrets.GH_PAT || secrets.ADMIN_PAT || secrets.ORG_GITHUB_TOKEN || secrets.PAT_TOKEN || secrets.CROSS_REPO_TOKEN }}
+      EXPECTED_ACTOR: stephenlutar2-hash
+      EXPECTED_DESCRIPTION: David Leads — SZL Holdings flagship for evidence-backed broker research, governed lead intelligence, and auditable public-data workflows.
+      EXPECTED_HOMEPAGE: https://huggingface.co/spaces/SZLHOLDINGS/david-leads
+      GH_ADMIN_TOKEN: ${{ secrets.SZL_ORG_ADMIN_PAT || secrets.ORG_ADMIN_TOKEN || secrets.GH_ORG_TOKEN || secrets.GITHUB_PAT || secrets.SZL_GITHUB_TOKEN || secrets.SZL_GH_PAT || secrets.GH_PAT || secrets.ADMIN_PAT || secrets.ORG_GITHUB_TOKEN || secrets.PAT_TOKEN || secrets.CROSS_REPO_TOKEN }}
     steps:
-      - name: Approve only the exact pending environment deployment
+      - name: Repair and verify only the public repository metadata
         shell: bash
         run: |
           set -euo pipefail
-          test -n "${GH_APPROVER_TOKEN:-}" || {
+          test -n "${GH_ADMIN_TOKEN:-}" || {
             echo "::error::No user-scoped organization administration token is available"
             exit 2
           }
-          echo "::add-mask::$GH_APPROVER_TOKEN"
+          echo "::add-mask::$GH_ADMIN_TOKEN"
 
           python3 - <<'PY'
           import json
           import os
-          import urllib.error
           import urllib.request
 
-          token = os.environ["GH_APPROVER_TOKEN"]
+          token = os.environ["GH_ADMIN_TOKEN"]
           repository = os.environ["TARGET_REPOSITORY"]
-          run_id = os.environ["TARGET_RUN_ID"]
-          environment_id = int(os.environ["TARGET_ENVIRONMENT_ID"])
-          environment_name = os.environ["TARGET_ENVIRONMENT_NAME"]
-          expected_approver = os.environ["EXPECTED_APPROVER"]
+          expected_actor = os.environ["EXPECTED_ACTOR"]
+          expected_description = os.environ["EXPECTED_DESCRIPTION"]
+          expected_homepage = os.environ["EXPECTED_HOMEPAGE"]
           api_root = "https://api.github.com"
 
           def request_json(method: str, path: str, payload=None):
@@ -63,7 +58,7 @@ jobs:
                   "Accept": "application/vnd.github+json",
                   "Authorization": f"Bearer {token}",
                   "X-GitHub-Api-Version": "2022-11-28",
-                  "User-Agent": "szl-exact-environment-approver/1.0",
+                  "User-Agent": "szl-david-metadata-repair/1.0",
               }
               if payload is not None:
                   body = json.dumps(payload).encode("utf-8")
@@ -76,111 +71,64 @@ jobs:
               )
               with urllib.request.urlopen(request, timeout=30) as response:
                   raw = response.read()
-                  if not raw:
-                      return None
-                  return json.loads(raw)
+                  return json.loads(raw) if raw else None
 
-          identity = request_json("GET", "/user")
-          login = str((identity or {}).get("login") or "")
-          if login != expected_approver:
+          identity = request_json("GET", "/user") or {}
+          actor = str(identity.get("login") or "")
+          if actor != expected_actor:
               raise SystemExit(
-                  f"refusing approval: expected PAT identity {expected_approver!r}, got {login!r}"
+                  f"refusing metadata repair: expected {expected_actor!r}, got {actor!r}"
               )
 
-          run = request_json(
-              "GET",
-              f"/repos/{repository}/actions/runs/{run_id}",
-          )
-          if not isinstance(run, dict):
-              raise SystemExit("target workflow run could not be read")
-          if run.get("name") != "Restore David Leads Space runtime":
-              raise SystemExit(
-                  f"unexpected target workflow name: {run.get('name')!r}"
-              )
-          if run.get("event") != "push" or run.get("head_branch") != "main":
-              raise SystemExit("target workflow is not a protected-main push run")
-          if run.get("status") == "completed":
-              if run.get("conclusion") == "success":
-                  print(
-                      "DAVID ENVIRONMENT APPROVAL ALREADY CONSUMED "
-                      + json.dumps(
-                          {
-                              "approver": login,
-                              "run_id": run_id,
-                              "status": "completed",
-                              "conclusion": "success",
-                          },
-                          sort_keys=True,
-                      )
-                  )
-                  raise SystemExit(0)
-              raise SystemExit(
-                  f"target workflow already completed as {run.get('conclusion')!r}"
-              )
-          if run.get("status") != "waiting":
-              raise SystemExit(
-                  f"target workflow is not waiting for approval: {run.get('status')!r}"
-              )
-
-          pending = request_json(
-              "GET",
-              f"/repos/{repository}/actions/runs/{run_id}/pending_deployments",
-          )
-          if not isinstance(pending, list) or len(pending) != 1:
-              raise SystemExit(
-                  f"expected exactly one pending deployment, found {len(pending) if isinstance(pending, list) else 'non-list'}"
-              )
-          deployment = pending[0]
-          environment = deployment.get("environment") or {}
-          actual_id = int(environment.get("id") or 0)
-          actual_name = str(environment.get("name") or "")
-          if actual_id != environment_id or actual_name != environment_name:
-              raise SystemExit(
-                  "pending environment mismatch: "
-                  f"expected {environment_name}/{environment_id}, got {actual_name}/{actual_id}"
-              )
-          if deployment.get("current_user_can_approve") is not True:
-              raise SystemExit("authenticated user is not allowed to approve this deployment")
-          reviewer_logins = {
-              str((reviewer.get("reviewer") or {}).get("login") or "")
-              for reviewer in deployment.get("reviewers") or []
-              if isinstance(reviewer, dict)
-          }
-          if expected_approver not in reviewer_logins:
-              raise SystemExit(
-                  f"expected approver is not an environment reviewer: {sorted(reviewer_logins)}"
-              )
+          before = request_json("GET", f"/repos/{repository}") or {}
+          if before.get("full_name") != repository:
+              raise SystemExit("target repository identity mismatch")
+          if before.get("visibility") != "public":
+              raise SystemExit("refusing to alter unexpected repository visibility")
+          if before.get("default_branch") != "main":
+              raise SystemExit("refusing to alter repository with unexpected default branch")
 
           request_json(
-              "POST",
-              f"/repos/{repository}/actions/runs/{run_id}/pending_deployments",
+              "PATCH",
+              f"/repos/{repository}",
               {
-                  "environment_ids": [environment_id],
-                  "state": "approved",
-                  "comment": (
-                      "Explicit user authorization: restore the recreated David Leads "
-                      "flagship runtime secrets and verify fail-closed health."
-                  ),
+                  "description": expected_description,
+                  "homepage": expected_homepage,
+                  "archived": False,
               },
           )
+          after = request_json("GET", f"/repos/{repository}") or {}
+          failures = []
+          if after.get("description") != expected_description:
+              failures.append("description")
+          if after.get("homepage") != expected_homepage:
+              failures.append("homepage")
+          if after.get("archived") is not False:
+              failures.append("archived")
+          if after.get("visibility") != "public":
+              failures.append("visibility")
+          if after.get("default_branch") != "main":
+              failures.append("default_branch")
+          if failures:
+              raise SystemExit(
+                  "David repository metadata verification failed: "
+                  + ", ".join(failures)
+              )
 
-          after = request_json(
-              "GET",
-              f"/repos/{repository}/actions/runs/{run_id}",
-          )
           print(
-              "DAVID ENVIRONMENT APPROVED "
+              "DAVID FLAGSHIP REPOSITORY METADATA PASS "
               + json.dumps(
                   {
-                      "schema": "szl.exact-environment-approval/v1",
-                      "approver": login,
+                      "schema": "szl.david-repository-metadata/v1",
+                      "status": "PASS",
+                      "actor": actor,
                       "repository": repository,
-                      "run_id": run_id,
-                      "environment_id": environment_id,
-                      "environment_name": environment_name,
-                      "run_status_after": (after or {}).get("status"),
-                      "protection_rules_changed": False,
-                      "secret_values_accessed": False,
+                      "description": expected_description,
+                      "homepage": expected_homepage,
+                      "archived": False,
+                      "visibility": "public",
+                      "default_branch": "main",
+                      "branch_protection_changed": False,
                   },
                   sort_keys=True,
               )
