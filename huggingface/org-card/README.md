@@ -14,7 +14,7 @@ license: apache-2.0
 
 <p align="center">
   <img src="https://huggingface.co/spaces/SZLHOLDINGS/README/resolve/main/assets/estate-command-system.svg"
-       alt="SZL governed AI command fabric with a pixel-built mark, holographic evidence chamber, and clear paths to understand, build, and verify"
+       alt="SZL governed AI command fabric with a pixel-built mark, holographic evidence chamber, and clear paths to understand, experience, explore, build, and verify"
        width="100%" />
 </p>
 
@@ -25,8 +25,9 @@ license: apache-2.0
 Frontier infrastructure for decisions that must remain bounded, inspectable,
 and reproducible.
 
-[**Enter the product**](https://a-11-oy.com) ·
-[**Explore SZL Atlas**](https://huggingface.co/spaces/SZLHOLDINGS/szl-command-lab) ·
+[**Enter A11oy**](https://a-11-oy.com) ·
+[**Experience eight verticals**](https://huggingface.co/spaces/SZLHOLDINGS/vertical-frontier) ·
+[**Search SZL Atlas**](https://huggingface.co/spaces/SZLHOLDINGS/szl-command-lab) ·
 [**Inspect evidence**](https://a11oy.net) ·
 [**Build from source**](https://github.com/szl-holdings)
 
@@ -36,9 +37,21 @@ and reproducible.
 
 ### Understand
 
-Start with [A11oy](https://a-11-oy.com) for the product, operating boundary,
-and outcome. Review [diligence and evidence](https://a11oy.net) before relying
-on a capability claim.
+Start with [A11oy](https://a-11-oy.com) for the flagship product, operating
+boundary, and decision fabric. Review [diligence and evidence](https://a11oy.net)
+before relying on a capability claim.
+
+### Experience
+
+[**SZL Vertical Frontier**](https://huggingface.co/spaces/SZLHOLDINGS/vertical-frontier)
+is the public eight-product experience and governed proposal workbench. A11oy,
+Killinchu, Lyte, Sentra, Terra, PURIQ Finance, PRISM Counsel, and Living Anatomy
+each own a distinct visual instrument, operating wedge, source contract, model
+route, kernel route, and refusal boundary.
+
+Its public inference default is **ROUTE_ONLY**. Models propose, embedded kernel
+references check, and consequential authority remains human-bound. Public
+effectors are disabled.
 
 ### Explore
 
@@ -93,6 +106,11 @@ is a **HISTORICAL** mirror.
 
 ## Current state
 
+[Frontier health](https://szlholdings-vertical-frontier.hf.space/healthz) ·
+[Eight-system registry](https://szlholdings-vertical-frontier.hf.space/api/v1/verticals) ·
+[Runtime capabilities](https://szlholdings-vertical-frontier.hf.space/api/v1/runtime-capabilities) ·
+[Frontier source binding](https://szlholdings-vertical-frontier.hf.space/api/build-info)
+
 [Atlas health](https://szlholdings-szl-command-lab.hf.space/healthz) ·
 [Live catalog](https://szlholdings-szl-command-lab.hf.space/api/catalog) ·
 [Atlas source binding](https://szlholdings-szl-command-lab.hf.space/api/build-info) ·
@@ -117,6 +135,6 @@ python -m http.server 8000 --directory "$preview_dir"
 
 <div align="center">
 
-**Understand · explore · build · verify**
+**Understand · experience · explore · build · verify**
 
 </div>
