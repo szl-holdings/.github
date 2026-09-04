@@ -5,12 +5,15 @@ Actor: founder@szl-holdings
 Kind: estate.sign ALLOW · estate.align ALLOW · estate.admit DENY
 Terminal: GREEN_LIGHT
 Live surface: this Estate OS `/brain` (pulse)
-Public fold: https://holdings.a-11-oy.com/brain/
+Public fold: https://a11oy.net/estate/thread-ops/
+Holdings Pages fold: https://holdings.a-11-oy.com/brain/ (404 at root; owner-gated DNS)
+Product /brain: https://a-11-oy.com/brain (Hickok Dual-Stream; do not overwrite)
+Hub second-brain: ARCHIVE / family. Minting DENY.
 certified_production_ready: false
 
 ## What is now available
 
-The second brain is a **derived, handles-only** navigator. It is live on the Estate OS, recaptured onto existing GitHub docs, and folded onto the existing Pages domain. No new GitHub repository. No new Hugging Face Space minted by this OS.
+The second brain is a **derived, handles-only** navigator. It is live on the Estate OS, recaptured onto existing GitHub docs, and folded onto the existing proof origin at a11oy.net/estate/thread-ops/. No new GitHub repository. No new Hugging Face Space minted by this OS. holdings.a-11-oy.com remains 404 at root.
 
 - Six organs. Twelve folds (command, kernels, khipu, forge, evidence, bodies, showcase, family, wedge, leaders, backdoors, held).
 - Local retrieve returns handles. A miss abstains.
@@ -41,7 +44,7 @@ The second brain is a **derived, handles-only** navigator. It is live on the Est
 
 New public GitHub since green light includes factory, second-brain, puriq-live, sovereign-os, real-estate, khipu-pages, lyte-services, evidence-studio, immune-lattice, command-lab, drift, cosmos.
 
-Hub Spaces now include `SZLHOLDINGS/second-brain`, `a11oy-factory`, `lyte-services`, `szl-sovereign-os`, `szl-real-estate`. This OS did not mint them. Fold. Do not flagship. The live navigator remains `/brain` and the Pages fold.
+Hub Spaces now include `SZLHOLDINGS/second-brain`, `a11oy-factory`, `lyte-services`, `szl-sovereign-os`, `szl-real-estate`. This OS did not mint them. Fold. Do not flagship. The live pulse navigator remains Estate OS `/brain`. The public RECORD fold is a11oy.net/estate/thread-ops/. Product a-11-oy.com/brain stays Hickok Dual-Stream.
 
 ## Leaders (open web, REPORTED, not partners)
 
