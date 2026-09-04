@@ -23,11 +23,9 @@ import re
 import shutil
 import tempfile
 import time
-from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Final, Iterable, Mapping, Sequence
-from urllib.error import HTTPError, URLError
+from typing import Any, Final, Iterable, Mapping
 from urllib.parse import urlparse
 from urllib.request import Request, urlopen
 
