@@ -122,16 +122,19 @@ jobs:
                   'repo': 'szl-real-estate',
                   'hf_repo': 'SZLHOLDINGS/szl-real-estate',
                   'smoke_paths': '["/","/healthz","/api/second-brain","/api/formulas"]',
+                  'create_if_missing': 'false',
               },
               {
                   'repo': 'szl-command-lab',
                   'hf_repo': 'SZLHOLDINGS/szl-command-lab',
                   'smoke_paths': '["/","/healthz"]',
+                  'create_if_missing': 'true',
               },
               {
                   'repo': 'lyte-lattice',
                   'hf_repo': 'SZLHOLDINGS/lyte-lattice',
                   'smoke_paths': '["/","/healthz","/api/second-brain","/api/formulas"]',
+                  'create_if_missing': 'false',
               },
           ]
           matrix = publish.get('strategy', {}).get('matrix', {}).get('include')
@@ -141,8 +144,9 @@ jobs:
           required_fragments = (
               'ref: main',
               'Validate Hugging Face card metadata before mutation',
-              'yaml.safe_load',
-              'short_description is',
+              'Create missing Space under exact matrix authority',
+              'CREATE_IF_MISSING',
+              "api.create_repo(",
               '--require-default-branch-tip',
               '--restart-space',
               '--attest',
@@ -204,12 +208,15 @@ jobs:
           - repo: szl-real-estate
             hf_repo: SZLHOLDINGS/szl-real-estate
             smoke_paths: '["/","/healthz","/api/second-brain","/api/formulas"]'
+            create_if_missing: 'false'
           - repo: szl-command-lab
             hf_repo: SZLHOLDINGS/szl-command-lab
             smoke_paths: '["/","/healthz"]'
+            create_if_missing: 'true'
           - repo: lyte-lattice
             hf_repo: SZLHOLDINGS/lyte-lattice
             smoke_paths: '["/","/healthz","/api/second-brain","/api/formulas"]'
+            create_if_missing: 'false'
     concurrency:
       group: hf-central-publish-${{ matrix.repo }}
       cancel-in-progress: false
@@ -350,6 +357,131 @@ jobs:
             echo "::error::No Hugging Face write credential is available in the central repository secret scope."
             exit 2
           }
+
+      - name: Create missing Space under exact matrix authority
+        shell: bash
+        env:
+          HF_TOKEN: ${{ secrets.HF_ORG_TOKEN || secrets.HF_ORG_TOKEN1 || secrets.HF_TOKEN || secrets.HF_WRITE_TOKEN }}
+          GITHUB_TOKEN: ${{ github.token }}
+          GITHUB_API_URL: ${{ github.api_url }}
+          GITHUB_REF: ${{ github.ref }}
+          REPO: ${{ matrix.repo }}
+          HF_REPO: ${{ matrix.hf_repo }}
+          CREATE_IF_MISSING: ${{ matrix.create_if_missing }}
+          SOURCE_SHA: ${{ steps.source.outputs.sha }}
+        run: |
+          set -euo pipefail
+          "$RUNNER_TEMP/hf-publisher-venv/bin/python" -I -P <<'PY'
+          from __future__ import annotations
+
+          import importlib.util
+          import json
+          import os
+          import re
+          import time
+          from pathlib import Path
+          from types import SimpleNamespace
+
+          from huggingface_hub import HfApi
+
+          repo = os.environ['REPO']
+          github_repo = f'szl-holdings/{repo}'
+          hf_repo = os.environ['HF_REPO']
+          source_sha = os.environ['SOURCE_SHA'].lower()
+          create_raw = os.environ['CREATE_IF_MISSING'].strip().lower()
+          if create_raw not in {'true', 'false'}:
+              raise SystemExit('create_if_missing must be exactly true or false')
+          create_if_missing = create_raw == 'true'
+          if not re.fullmatch(r'[0-9a-f]{40}', source_sha):
+              raise SystemExit('source SHA is not exact')
+
+          spec = importlib.util.spec_from_file_location(
+              'hf_deployer',
+              'tools/.github/scripts/hf_deploy_from_dockerfile.py',
+          )
+          if spec is None or spec.loader is None:
+              raise SystemExit('could not load exact central deployer')
+          deployer = importlib.util.module_from_spec(spec)
+          spec.loader.exec_module(deployer)
+
+          api = HfApi(token=os.environ['HF_TOKEN'])
+          report = {
+              'schema': 'szl.hf-space-create/v1',
+              'github_repository': github_repo,
+              'source_revision': source_sha,
+              'target': hf_repo,
+              'authorized_create': create_if_missing,
+              'state': 'UNKNOWN',
+              'created': False,
+          }
+
+          try:
+              info = api.repo_info(repo_id=hf_repo, repo_type='space')
+          except Exception as exc:  # SDK exception classes are version-bound
+              status = deployer._http_status_from_exception(exc)
+              if status != 404:
+                  raise
+              if not create_if_missing:
+                  raise SystemExit(
+                      f'{hf_repo} is missing and this matrix row cannot create it'
+                  ) from exc
+              exact_create_authority = {
+                  (
+                      'szl-holdings/szl-command-lab',
+                      'SZLHOLDINGS/szl-command-lab',
+                  )
+              }
+              if (github_repo, hf_repo) not in exact_create_authority:
+                  raise SystemExit(
+                      'missing-Space creation is not authorized for this source/target pair'
+                  ) from exc
+
+              # Creation is a provider mutation, so revalidate the source default
+              # branch immediately before the write. The normal deployer repeats
+              # this guard immediately before the subsequent content commit.
+              deployer.require_current_default_branch_tip(
+                  SimpleNamespace(
+                      github_repo=github_repo,
+                      source_sha=source_sha,
+                      require_default_branch_tip=True,
+                  )
+              )
+              api.create_repo(
+                  repo_id=hf_repo,
+                  repo_type='space',
+                  space_sdk='docker',
+                  private=False,
+                  exist_ok=False,
+              )
+              report['created'] = True
+              info = None
+              for _ in range(6):
+                  try:
+                      info = api.repo_info(repo_id=hf_repo, repo_type='space')
+                      break
+                  except Exception as read_exc:
+                      if deployer._http_status_from_exception(read_exc) != 404:
+                          raise
+                      time.sleep(2)
+              if info is None:
+                  raise SystemExit('created Space did not become readable after bounded retries')
+
+          observed_id = str(getattr(info, 'id', '') or getattr(info, 'repo_id', ''))
+          observed_private = bool(getattr(info, 'private', False))
+          if observed_id and observed_id != hf_repo:
+              raise SystemExit(
+                  f'provider identity mismatch: expected {hf_repo}, observed {observed_id}'
+              )
+          if observed_private:
+              raise SystemExit('public Atlas target unexpectedly resolved as private')
+          report['state'] = 'CREATED' if report['created'] else 'EXISTING'
+          output = Path(f'evidence/{repo}/hf-space-create-report.json')
+          output.write_text(
+              json.dumps(report, indent=2, sort_keys=True) + '\n',
+              encoding='utf-8',
+          )
+          print(json.dumps(report, indent=2, sort_keys=True))
+          PY
 
       - name: Deploy exact Dockerfile-derived closure
         shell: bash
