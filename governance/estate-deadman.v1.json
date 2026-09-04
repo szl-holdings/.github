@@ -1,0 +1,45 @@
+{
+  "schema": "szl.estate-deadman-policy/v1",
+  "controller_repository": "szl-holdings/.github",
+  "controller_branch": "main",
+  "confirmation": {
+    "samples": 2,
+    "interval_seconds": 60
+  },
+  "incident": {
+    "title": "[ESTATE-DEADMAN] Critical scheduled control plane degraded",
+    "refresh_minutes": 60
+  },
+  "targets": [
+    {
+      "id": "autonomic-public-estate-sre",
+      "repository": "szl-holdings/szl-org-health",
+      "workflow_path": ".github/workflows/autonomic-sre.yml",
+      "branch": "main",
+      "event": "schedule",
+      "max_success_age_minutes": 30,
+      "max_active_age_minutes": 20,
+      "bootstrap_grace_minutes": 45
+    },
+    {
+      "id": "scheduled-estate-census",
+      "repository": "szl-holdings/szl-org-health",
+      "workflow_path": ".github/workflows/scheduled-estate-census.yml",
+      "branch": "main",
+      "event": "schedule",
+      "max_success_age_minutes": 480,
+      "max_active_age_minutes": 45,
+      "bootstrap_grace_minutes": 540
+    },
+    {
+      "id": "public-estate-live-witness",
+      "repository": "szl-holdings/a11oy",
+      "workflow_path": ".github/workflows/public-estate-live-witness.yml",
+      "branch": "main",
+      "event": "schedule",
+      "max_success_age_minutes": 480,
+      "max_active_age_minutes": 45,
+      "bootstrap_grace_minutes": 540
+    }
+  ]
+}
