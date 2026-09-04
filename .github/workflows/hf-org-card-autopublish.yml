@@ -6,7 +6,7 @@ on:
     paths:
       - "huggingface/org-card/**"
       - "huggingface/org-card.manifest.json"
-      - "profile/assets/szl-command-fabric-v3.svg"
+      - "profile/assets/estate-command-system.svg"
       - ".github/scripts/hf_org_card_autopublish.py"
       - ".github/scripts/hf_space_visibility.py"
       - ".github/scripts/hf_static_space_deploy.py"
@@ -19,7 +19,7 @@ on:
     paths:
       - "huggingface/org-card/**"
       - "huggingface/org-card.manifest.json"
-      - "profile/assets/szl-command-fabric-v3.svg"
+      - "profile/assets/estate-command-system.svg"
       - ".github/scripts/hf_org_card_autopublish.py"
       - ".github/scripts/hf_space_visibility.py"
       - ".github/scripts/hf_static_space_deploy.py"
@@ -81,9 +81,9 @@ jobs:
             --source-sha "$(git rev-parse HEAD)" \
             --materialize "$OUTPUT" \
             --report hf-org-card-materialization.json
-          test -s "$OUTPUT/assets/szl-command-fabric-v3.svg"
+          test -s "$OUTPUT/assets/estate-command-system.svg"
           grep -Fq 'Choose a path' "$OUTPUT/README.md"
-          grep -Fq 'SZL' "$OUTPUT/assets/szl-command-fabric-v3.svg"
+          grep -Fq 'SZL' "$OUTPUT/assets/estate-command-system.svg"
 
       - name: Upload validation evidence
         if: always()
