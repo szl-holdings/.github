@@ -1,0 +1,170 @@
+# SPDX-License-Identifier: Apache-2.0
+name: Close out agent-estate control plane v2
+
+on:
+  push:
+    branches:
+      - ops/estate-reconciliation-2026-09-04-v1
+    paths:
+      - scripts/closeout_agent_estate_control_plane.py
+      - .github/workflows/closeout-agent-estate-control-plane-v2.yml
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+  statuses: write
+
+concurrency:
+  group: szl-agent-estate-control-plane-closeout
+  cancel-in-progress: true
+
+jobs:
+  closeout:
+    name: Long terminal wait, cleanup, and protected merge
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    env:
+      OPERATOR_BRANCH: ops/estate-reconciliation-2026-09-04-v1
+      ESTATE_REPORT: ${{ runner.temp }}/estate.json
+      RECOVERY_REPORT: ${{ runner.temp }}/recovery.json
+      CLOSEOUT_REPORT: ${{ runner.temp }}/control-plane-closeout.json
+      GITHUB_TOKEN: ${{ github.token }}
+    steps:
+      - name: Harden runner
+        uses: step-security/harden-runner@05e31511f85b41b11d1cf0ef85d0992719546e2c # v2.21.0
+        with:
+          egress-policy: audit
+
+      - name: Check out current review branch
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ops/estate-reconciliation-2026-09-04-v1
+          persist-credentials: true
+          fetch-depth: 0
+
+      - name: Wait for terminal ledgers
+        shell: bash
+        run: |
+          set -euo pipefail
+          ready=false
+          for attempt in $(seq 1 210); do
+            git fetch --no-tags origin "$OPERATOR_BRANCH"
+            if git show "origin/$OPERATOR_BRANCH:reports/agent-estate/latest.json" > "$ESTATE_REPORT" 2>/dev/null \
+              && git show "origin/$OPERATOR_BRANCH:reports/agent-estate/recovery-latest.json" > "$RECOVERY_REPORT" 2>/dev/null; then
+              if python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          estate = json.loads(Path(os.environ["ESTATE_REPORT"]).read_text(encoding="utf-8"))
+          recovery = json.loads(Path(os.environ["RECOVERY_REPORT"]).read_text(encoding="utf-8"))
+          terminal = estate.get("terminal") or {}
+          counts = terminal.get("counts") or {}
+          hf = estate.get("hugging_face_summary") or {}
+          blocked = any(
+              "BLOCKED" in str(row.get("action") or "")
+              for group in ("reopened", "drafts", "dco_recoveries")
+              for row in recovery.get(group, [])
+          )
+          ok = (
+              estate.get("state") == "VERIFIED_COMPLETE"
+              and not blocked
+              and int(counts.get("open_pull_requests") or 0) == 0
+              and int(counts.get("stale_runs") or 0) == 0
+              and int(counts.get("latest_failed_default_workflows") or 0) == 0
+              and int(hf.get("failed") or 0) == 0
+          )
+          raise SystemExit(0 if ok else 2)
+          PY
+              then
+                ready=true
+                break
+              fi
+            fi
+            sleep 20
+          done
+          if [[ "$ready" != true ]]; then
+            python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          def load(path):
+              value = Path(path)
+              if not value.is_file():
+                  return None
+              try:
+                  return json.loads(value.read_text(encoding="utf-8"))
+              except Exception:
+                  return {"state": "UNREADABLE"}
+          estate = load(os.environ["ESTATE_REPORT"])
+          recovery = load(os.environ["RECOVERY_REPORT"])
+          report = {
+              "schema": "szl.agent-estate-control-plane-closeout/v2",
+              "state": "BLOCKED_TERMINAL_LEDGER",
+              "estate_state": (estate or {}).get("state"),
+              "recovery_state": (recovery or {}).get("state"),
+              "estate_report_sha256": (estate or {}).get("report_sha256"),
+              "recovery_report_sha256": (recovery or {}).get("report_sha256"),
+              "branch_protection_bypass": False,
+          }
+          Path(os.environ["CLOSEOUT_REPORT"]).write_text(
+              json.dumps(report, indent=2, sort_keys=True) + "\n",
+              encoding="utf-8",
+          )
+          PY
+            exit 2
+          fi
+
+      - name: Collapse all temporary reconciliation controllers
+        shell: bash
+        run: |
+          set -euo pipefail
+          git checkout -B "$OPERATOR_BRANCH" "origin/$OPERATOR_BRANCH"
+          test -f .github/workflows/agent-estate-reconciler.yml
+          test -f scripts/recover_agent_work.py
+          test -f scripts/run_recover_agent_work_v2.py
+          test -f scripts/reconcile_agent_estate.py
+          test -f scripts/run_reconcile_agent_estate_v4.py
+          find .github/workflows -maxdepth 1 -type f -name 'reconcile-agent-estate*.yml' -delete
+          find .github/workflows -maxdepth 1 -type f -name 'finalize-agent-estate-reconciliation*.yml' -delete
+          find .github/workflows -maxdepth 1 -type f -name 'closeout-agent-estate-control-plane*.yml' -delete
+          rm -f \
+            scripts/run_reconcile_agent_estate.py \
+            scripts/run_reconcile_agent_estate_v2.py \
+            scripts/run_reconcile_agent_estate_v3.py
+          python -m py_compile \
+            scripts/recover_agent_work.py \
+            scripts/run_recover_agent_work_v2.py \
+            scripts/reconcile_agent_estate.py \
+            scripts/run_reconcile_agent_estate_v4.py \
+            scripts/closeout_agent_estate_control_plane.py
+          git diff --check
+          git config user.name "Lutar, Stephen P."
+          git config user.email "stephenlutar2@gmail.com"
+          git add -A .github/workflows scripts
+          if ! git diff --cached --quiet; then
+            git commit -s -m "chore(ops): finalize canonical agent-estate reconciler"
+            git push origin HEAD:"$OPERATOR_BRANCH"
+          fi
+          echo "FINAL_HEAD=$(git rev-parse HEAD)" >> "$GITHUB_ENV"
+
+      - name: Merge exact final head through GitHub policy
+        shell: bash
+        run: |
+          set -euo pipefail
+          python scripts/closeout_agent_estate_control_plane.py \
+            --head-sha "$FINAL_HEAD" \
+            --estate "$ESTATE_REPORT" \
+            --recovery "$RECOVERY_REPORT" \
+            --report "$CLOSEOUT_REPORT"
+
+      - name: Upload immutable closeout evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: agent-estate-control-plane-closeout-v2-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ env.CLOSEOUT_REPORT }}
+          if-no-files-found: error
+          retention-days: 180
