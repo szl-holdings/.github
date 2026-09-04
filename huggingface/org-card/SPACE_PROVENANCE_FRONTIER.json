@@ -1,0 +1,75 @@
+{
+  "binding": {
+    "claim_boundary": "This candidate binds only the observed Hugging Face repository parent. It does not establish GitHub parity, deployment completion, served revision, persistence, or production readiness.",
+    "external_source": {
+      "binding_addable_without_invention": false,
+      "evidence_path": null,
+      "repository": null,
+      "revision": null,
+      "status": "UNKNOWN"
+    },
+    "hugging_face_repository": {
+      "repository": "SZLHOLDINGS/README",
+      "revision": "806359f5f0c627df50e8a038c943bf14f6a8b3da",
+      "scope": "PRE_PUBLICATION_REPOSITORY_SNAPSHOT",
+      "status": "EXACT_OBSERVED"
+    },
+    "machine_readable_hf_binding_addable_without_external_source_invention": true
+  },
+  "blockers": [
+    "SERVED_REVISION_NOT_OBSERVED",
+    "DURABLE_PERSISTENCE_NOT_ESTABLISHED",
+    "PRODUCTION_READINESS_BLOCKED",
+    "EXTERNAL_SOURCE_IMMUTABLE_BINDING_MISSING"
+  ],
+  "candidate_state": "LOCAL_ONLY_NOT_PUBLISHED",
+  "evidence_state": {
+    "deployment_completion": "UNKNOWN",
+    "durable_persistence": "UNKNOWN",
+    "external_source": "UNKNOWN",
+    "production_ready": "BLOCKED",
+    "repository_revision": "OBSERVED_EXACT",
+    "served_bytes": "UNKNOWN",
+    "served_revision": "UNKNOWN"
+  },
+  "observed_at": "2026-08-31T03:03:44Z",
+  "preservation": {
+    "candidate_destination_path": "SPACE_PROVENANCE_FRONTIER.json",
+    "existing_stronger_evidence_present": false,
+    "policy": "ADD_ONLY_DO_NOT_REPLACE_OR_DOWNGRADE_EXISTING_EVIDENCE"
+  },
+  "publication_contract": {
+    "allowed_paths": [
+      "SPACE_PROVENANCE_FRONTIER.json"
+    ],
+    "destination_path": "SPACE_PROVENANCE_FRONTIER.json",
+    "operation": "ADD_ONLY",
+    "post_publication_requirements": [
+      "REREAD_EXACT_REMOTE_HEAD",
+      "HASH_PUBLISHED_MANIFEST",
+      "OBSERVE_DEPLOYMENT_TERMINAL_STATE",
+      "BIND_SERVED_REVISION_OR_RETAIN_UNKNOWN"
+    ],
+    "reject_if_destination_exists": true,
+    "reject_on_head_drift": true,
+    "required_parent_revision": "806359f5f0c627df50e8a038c943bf14f6a8b3da"
+  },
+  "schema": "szl.space-provenance-frontier/v1",
+  "source_provenance_inventory": {
+    "discovered_named_paths": [
+      "README.md"
+    ],
+    "path_discovery_semantics": "Names were selected by provenance, source, attestation, deployment, release, receipt, manifest, or README patterns; presence alone is not validation.",
+    "stronger_existing_evidence_paths": []
+  },
+  "space": {
+    "id": "SZLHOLDINGS/README",
+    "parent_revision": "806359f5f0c627df50e8a038c943bf14f6a8b3da",
+    "repository_file_count_observed": 16,
+    "repository_type": "space",
+    "runtime_observation_semantics": "Point-in-time Hub control-plane state only; not served-byte or functional-runtime proof.",
+    "runtime_stage_observed": "RUNNING",
+    "sdk": "static",
+    "visibility": "PUBLIC"
+  }
+}

@@ -54,6 +54,26 @@
     {
       "source": "profile/assets/evidence-lattice-v2.webp",
       "destination": "assets/evidence-lattice-v2.webp"
+    },
+    {
+      "source": "huggingface/org-card/GOVERNANCE.md",
+      "destination": "GOVERNANCE.md"
+    },
+    {
+      "source": "huggingface/org-card/MODELS.txt",
+      "destination": "MODELS.txt"
+    },
+    {
+      "source": "huggingface/org-card/SEVEN_SPACES.md",
+      "destination": "SEVEN_SPACES.md"
+    },
+    {
+      "source": "huggingface/org-card/SPACE_PROVENANCE_FRONTIER.json",
+      "destination": "SPACE_PROVENANCE_FRONTIER.json"
+    },
+    {
+      "source": "huggingface/org-card/seven-spaces.yaml",
+      "destination": "seven-spaces.yaml"
     }
   ],
   "runtime_transforms": {

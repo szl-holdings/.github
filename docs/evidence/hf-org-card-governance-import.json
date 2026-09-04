@@ -1,0 +1,37 @@
+{
+  "claim": "Existing public governance artifacts imported without mutation before canonical publication.",
+  "files": [
+    {
+      "path": "GOVERNANCE.md",
+      "sha256": "805f70998b96128163fc6121d1efe3b86f8fdc77f206fe9abaf9e39cb73170c6",
+      "size": 552
+    },
+    {
+      "path": "MODELS.txt",
+      "sha256": "0baf30b8aefccd40bdebf27ab6274b0d057cbc75f1e18068d3f7f9bb32650d1c",
+      "size": 251
+    },
+    {
+      "path": "SEVEN_SPACES.md",
+      "sha256": "63d8e8edead1988e69a1bb82aaeeca485b946eb37977f2f162413300b3b35f4e",
+      "size": 2683
+    },
+    {
+      "path": "SPACE_PROVENANCE_FRONTIER.json",
+      "sha256": "b7d5c024a260ac0aec3d5e630410f50c462af07372d089b98b67e20146e8352d",
+      "size": 2829
+    },
+    {
+      "path": "seven-spaces.yaml",
+      "sha256": "0a098f9dbf6cba44285e63c2eab897aa69d552cfad8795182551484b2d966661",
+      "size": 875
+    }
+  ],
+  "observed_at": "2026-09-04T00:20:50.598969Z",
+  "schema": "szl.hf-org-card-governance-import/v1",
+  "source": {
+    "repo_id": "SZLHOLDINGS/README",
+    "repo_type": "space",
+    "revision": "311fd2e2be172e0ab78cb83b5edfaba7fe328144"
+  }
+}
