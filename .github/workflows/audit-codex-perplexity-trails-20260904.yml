@@ -1,0 +1,313 @@
+name: Audit Codex and Perplexity build trails — 2026-09-04
+
+on:
+  push:
+    branches:
+      - frontier/converge-all-stalled-builds-20260904
+    paths:
+      - .github/workflows/audit-codex-perplexity-trails-20260904.yml
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+  issues: write
+  pull-requests: read
+
+concurrency:
+  group: audit-codex-perplexity-trails-20260904
+  cancel-in-progress: true
+
+jobs:
+  audit:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - name: Harden runner
+        uses: step-security/harden-runner@05e31511f85b41b11d1cf0ef85d0992719546e2c # v2.21.0
+        with:
+          egress-policy: audit
+
+      - name: Checkout exact audit source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+          fetch-depth: 1
+
+      - name: Trace task IDs, links, PRs, commits, and orphan branches
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p reports
+          python - <<'PY'
+          from __future__ import annotations
+
+          import datetime as dt
+          import hashlib
+          import json
+          import os
+          import re
+          import urllib.error
+          import urllib.parse
+          import urllib.request
+          from pathlib import Path
+
+          ORG = 'szl-holdings'
+          API = 'https://api.github.com'
+          TASK_IDS = (
+              '6938cea2-070a-4cd4-afea-1be8ee8ef9e9',
+              '5ef92f6b-71f1-454c-9985-bcb28fd07e80',
+              '6420a522-c3d5-4042-b17d-ffa639bbe11a',
+              '20663549-f94b-4177-8684-f98123611f55',
+              '9f3c6da0-6736-4b1b-aa25-ab6c32e9ecf7',
+              'ccc9bf3e-223a-4ab7-aee4-c3f03e12cc4b',
+              '7b6a82a3-7eb0-4a72-8f04-086958a1fa2c',
+              '28d217cf-fff0-4b6b-afe1-3698328a071a',
+              'e7b9c4b5-7e0d-45e7-ad90-f665f8dced30',
+              'f8df08e6-3ca5-4184-991e-66fa246cddf7',
+              'ed122ece-1c33-4fa8-b839-8c89f03a1a67',
+              'a5bf2f18-c500-4e8a-9172-32978ca2ea76',
+          )
+          AGENT_PATTERN = re.compile(r'(?:codex|perplexity|agent|frontier|repair|cursor|computer-task)', re.I)
+          token = os.environ['GITHUB_TOKEN']
+
+          def request(path: str, *, accept: str = 'application/vnd.github+json'):
+              req = urllib.request.Request(
+                  API + path,
+                  headers={
+                      'Accept': accept,
+                      'Authorization': 'Bearer ' + token,
+                      'User-Agent': 'SZLHOLDINGS-AgentTrailAudit/1.0',
+                      'X-GitHub-Api-Version': '2022-11-28',
+                  },
+              )
+              try:
+                  with urllib.request.urlopen(req, timeout=30) as response:
+                      return json.load(response)
+              except urllib.error.HTTPError as error:
+                  raw = error.read(4096).decode('utf-8', errors='replace')
+                  return {'_error': f'HTTP {error.code}', '_body': raw[:500]}
+
+          def search(endpoint: str, query: str, *, accept: str = 'application/vnd.github+json'):
+              encoded = urllib.parse.quote(query, safe='')
+              payload = request(f'/search/{endpoint}?q={encoded}&per_page=100', accept=accept)
+              return payload.get('items', []) if isinstance(payload, dict) else []
+
+          traces = []
+          for task_id in TASK_IDS:
+              issue_hits = search('issues', f'org:{ORG} "{task_id}"')
+              code_hits = search('code', f'org:{ORG} "{task_id}"')
+              commit_hits = search(
+                  'commits',
+                  f'org:{ORG} "{task_id}"',
+                  accept='application/vnd.github+json, application/vnd.github.cloak-preview+json',
+              )
+              traces.append(
+                  {
+                      'task_id': task_id,
+                      'issue_or_pr_hits': [
+                          {
+                              'repository_url': item.get('repository_url'),
+                              'number': item.get('number'),
+                              'title': item.get('title'),
+                              'state': item.get('state'),
+                              'url': item.get('html_url'),
+                          }
+                          for item in issue_hits
+                      ],
+                      'code_hits': [
+                          {
+                              'repository': (item.get('repository') or {}).get('full_name'),
+                              'path': item.get('path'),
+                              'url': item.get('html_url'),
+                          }
+                          for item in code_hits
+                      ],
+                      'commit_hits': [
+                          {
+                              'repository': (item.get('repository') or {}).get('full_name'),
+                              'sha': item.get('sha'),
+                              'message': ((item.get('commit') or {}).get('message') or '')[:300],
+                              'url': item.get('html_url'),
+                          }
+                          for item in commit_hits
+                      ],
+                  }
+              )
+
+          generic_hits = {
+              'perplexity_issues': [
+                  {
+                      'repository_url': item.get('repository_url'),
+                      'number': item.get('number'),
+                      'title': item.get('title'),
+                      'state': item.get('state'),
+                      'url': item.get('html_url'),
+                  }
+                  for item in search('issues', f'org:{ORG} ("perplexity.ai" OR perplexity)')
+              ],
+              'codex_issues': [
+                  {
+                      'repository_url': item.get('repository_url'),
+                      'number': item.get('number'),
+                      'title': item.get('title'),
+                      'state': item.get('state'),
+                      'url': item.get('html_url'),
+                  }
+                  for item in search('issues', f'org:{ORG} codex')
+              ],
+          }
+
+          open_pr_items = search('issues', f'org:{ORG} is:pr is:open')
+          open_heads = set()
+          open_prs = []
+          for item in open_pr_items:
+              repo = str(item.get('repository_url') or '').rsplit('/', 1)[-1]
+              pr = request(f'/repos/{ORG}/{repo}/pulls/{item["number"]}')
+              head = (pr.get('head') or {}).get('ref') if isinstance(pr, dict) else None
+              if head:
+                  open_heads.add((repo, head))
+              open_prs.append(
+                  {
+                      'repository': f'{ORG}/{repo}',
+                      'number': item.get('number'),
+                      'title': item.get('title'),
+                      'state': item.get('state'),
+                      'head': head,
+                      'head_sha': (pr.get('head') or {}).get('sha') if isinstance(pr, dict) else None,
+                      'base': (pr.get('base') or {}).get('ref') if isinstance(pr, dict) else None,
+                      'draft': pr.get('draft') if isinstance(pr, dict) else None,
+                      'mergeable_state': pr.get('mergeable_state') if isinstance(pr, dict) else None,
+                      'url': item.get('html_url'),
+                  }
+              )
+
+          repos = request(f'/orgs/{ORG}/repos?type=all&per_page=100&sort=updated')
+          cutoff = dt.datetime.now(dt.timezone.utc) - dt.timedelta(days=30)
+          orphaned = []
+          if isinstance(repos, list):
+              for repo_info in repos:
+                  if repo_info.get('archived') or repo_info.get('disabled'):
+                      continue
+                  repo = repo_info['name']
+                  default = repo_info.get('default_branch') or 'main'
+                  branches = request(f'/repos/{ORG}/{repo}/branches?per_page=100')
+                  if not isinstance(branches, list):
+                      continue
+                  for branch in branches:
+                      name = branch.get('name')
+                      if not name or name == default or (repo, name) in open_heads:
+                          continue
+                      if not AGENT_PATTERN.search(name):
+                          continue
+                      compare = request(
+                          f'/repos/{ORG}/{repo}/compare/'
+                          + urllib.parse.quote(default, safe='')
+                          + '...'
+                          + urllib.parse.quote(name, safe='')
+                      )
+                      if not isinstance(compare, dict) or compare.get('_error'):
+                          continue
+                      ahead = int(compare.get('ahead_by') or 0)
+                      if ahead <= 0:
+                          continue
+                      commits = compare.get('commits') or []
+                      newest = None
+                      if commits:
+                          raw = (((commits[-1].get('commit') or {}).get('committer') or {}).get('date'))
+                          if raw:
+                              newest = dt.datetime.fromisoformat(raw.replace('Z', '+00:00'))
+                      if newest and newest < cutoff:
+                          continue
+                      orphaned.append(
+                          {
+                              'repository': f'{ORG}/{repo}',
+                              'branch': name,
+                              'status': compare.get('status'),
+                              'ahead_by': ahead,
+                              'behind_by': compare.get('behind_by'),
+                              'newest_commit': newest.isoformat() if newest else None,
+                              'changed_files': [
+                                  {'path': file.get('filename'), 'status': file.get('status')}
+                                  for file in (compare.get('files') or [])[:100]
+                              ],
+                              'commits': [
+                                  {
+                                      'sha': commit.get('sha'),
+                                      'message': ((commit.get('commit') or {}).get('message') or '')[:300],
+                                      'url': commit.get('html_url'),
+                                  }
+                                  for commit in commits[-20:]
+                              ],
+                          }
+                      )
+
+          receipt = {
+              'schema': 'szl.codex-perplexity-trail-audit/v1',
+              'observed_at': dt.datetime.now(dt.timezone.utc).isoformat().replace('+00:00', 'Z'),
+              'organization': ORG,
+              'task_ids': list(TASK_IDS),
+              'traces': traces,
+              'generic_hits': generic_hits,
+              'open_prs': open_prs,
+              'orphaned_agent_branches': orphaned,
+              'mutation_performed': False,
+              'credential_values_recorded': False,
+          }
+          unsigned = json.dumps(receipt, sort_keys=True, separators=(',', ':')).encode()
+          receipt['receipt_sha256'] = hashlib.sha256(unsigned).hexdigest()
+          Path('reports/codex-perplexity-trail-audit.json').write_text(
+              json.dumps(receipt, indent=2, sort_keys=True) + '\n', encoding='utf-8'
+          )
+
+          lines = [
+              '# Codex and Perplexity build-trail audit',
+              '',
+              f"Observed: `{receipt['observed_at']}`",
+              f"Open PRs: `{len(open_prs)}`",
+              f"Recent orphaned agent branches: `{len(orphaned)}`",
+              f"Receipt SHA-256: `{receipt['receipt_sha256']}`",
+              '',
+              '## Exact Perplexity task traces',
+              '',
+          ]
+          for trace in traces:
+              count = len(trace['issue_or_pr_hits']) + len(trace['code_hits']) + len(trace['commit_hits'])
+              lines.append(f"- `{trace['task_id']}` — `{count}` GitHub trail hit(s)")
+          lines.extend(['', '## Open pull requests', ''])
+          for pr in open_prs:
+              lines.append(f"- `{pr['repository']}#{pr['number']}` — `{pr['mergeable_state']}` — {pr['title']}")
+          lines.extend(['', '## Recent orphaned agent branches', ''])
+          for branch in orphaned:
+              lines.append(
+                  f"- `{branch['repository']}:{branch['branch']}` — ahead `{branch['ahead_by']}`, behind `{branch['behind_by']}`"
+              )
+          Path('reports/codex-perplexity-trail-audit.md').write_text('\n'.join(lines) + '\n', encoding='utf-8')
+          PY
+
+      - name: Create or update the persistent trail issue
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          title='Codex and Perplexity build-trail audit'
+          issue="$(gh issue list --state open --search "$title in:title" --json number,title --jq '.[] | select(.title == env.title) | .number' | head -n1)"
+          summary="$(cat reports/codex-perplexity-trail-audit.md)"
+          if [ -n "$issue" ]; then
+            gh issue comment "$issue" --body "$summary"
+          else
+            gh issue create --title "$title" --body "$summary"
+          fi
+
+      - name: Upload immutable trail evidence
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: codex-perplexity-trail-audit-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            reports/codex-perplexity-trail-audit.json
+            reports/codex-perplexity-trail-audit.md
+          if-no-files-found: error
+          retention-days: 180
