@@ -1,0 +1,167 @@
+name: SZL Frontier design rollout
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - ".github/design/frontier-v1/**"
+      - ".github/scripts/rollout_frontier_design.py"
+      - ".github/scripts/test_frontier_design.py"
+      - ".github/workflows/frontier-design-rollout.yml"
+      - "docs/FRONTIER_DESIGN_KERNEL.md"
+  push:
+    branches: [main]
+    paths:
+      - ".github/design/frontier-v1/**"
+      - ".github/scripts/rollout_frontier_design.py"
+      - ".github/scripts/test_frontier_design.py"
+      - ".github/workflows/frontier-design-rollout.yml"
+      - "docs/FRONTIER_DESIGN_KERNEL.md"
+  workflow_dispatch:
+    inputs:
+      apply:
+        description: "Open or refresh protected rollout pull requests"
+        required: true
+        default: true
+        type: boolean
+
+permissions:
+  contents: read
+
+concurrency:
+  group: szl-frontier-design-v1-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  contract:
+    name: Validate shared kernel and protected rollout contract
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Harden runner
+        uses: step-security/harden-runner@05e31511f85b41b11d1cf0ef85d0992719546e2c # v2.21.0
+        with:
+          egress-policy: audit
+
+      - name: Checkout exact candidate
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 1
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12"
+
+      - name: Compile rollout operator
+        run: python -m py_compile .github/scripts/rollout_frontier_design.py
+
+      - name: Run network-free design contracts
+        run: python .github/scripts/test_frontier_design.py
+
+  rollout:
+    name: Vendor exact kernel and open target pull requests
+    needs: contract
+    if: >-
+      github.event_name == 'push' ||
+      (github.event_name == 'workflow_dispatch' && inputs.apply == true)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      GH_ADMIN_TOKEN: ${{ secrets.GH_ADMIN_TOKEN || secrets.ORG_ADMIN_TOKEN || secrets.GH_ORG_TOKEN || secrets.GH_TOKEN }}
+      GITHUB_TOKEN: ${{ github.token }}
+      RECEIPT: frontier-design-rollout-receipt.json
+    steps:
+      - name: Harden runner
+        uses: step-security/harden-runner@05e31511f85b41b11d1cf0ef85d0992719546e2c # v2.21.0
+        with:
+          egress-policy: audit
+
+      - name: Checkout exact protected-main design source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 1
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12"
+
+      - name: Assert exact protected-main source
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$GITHUB_REF" = refs/heads/main
+          git fetch --no-tags --depth=1 origin main
+          test "$(git rev-parse HEAD)" = "$(git rev-parse FETCH_HEAD)"
+
+      - name: Roll out source-bound design candidates
+        id: rollout
+        shell: bash
+        run: |
+          set +e
+          python .github/scripts/rollout_frontier_design.py \
+            --apply \
+            --source-root . \
+            --receipt "$RECEIPT"
+          code=$?
+          echo "exit_code=$code" >> "$GITHUB_OUTPUT"
+          exit 0
+
+      - name: Publish compact job summary
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ ! -f "$RECEIPT" ]; then
+            echo '## SZL Frontier design rollout' >> "$GITHUB_STEP_SUMMARY"
+            echo '' >> "$GITHUB_STEP_SUMMARY"
+            echo '**BLOCKED:** rollout receipt was not produced.' >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          python - <<'PY' >> "$GITHUB_STEP_SUMMARY"
+          import json
+          from pathlib import Path
+
+          data = json.loads(Path("frontier-design-rollout-receipt.json").read_text())
+          print("## SZL Frontier design rollout")
+          print()
+          print(f"- Status: **{data.get('status', 'UNKNOWN')}**")
+          print(f"- Source: `{data.get('source', {}).get('revision', 'UNAVAILABLE')}`")
+          print(f"- Target repositories: **{len(data.get('targets', []))}**")
+          print(f"- Blockers: **{len(data.get('blockers', []))}**")
+          for row in data.get("targets", []):
+              pr = row.get("pull_request") or {}
+              url = pr.get("url")
+              suffix = f" — {url}" if url else ""
+              print(f"- `{row.get('repository')}` · {', '.join(row.get('brands', []))} · **{row.get('state')}**{suffix}")
+          for blocker in data.get("blockers", []):
+              print(f"- BLOCKED `{blocker.get('repository') or blocker.get('brand') or 'rollout'}`: {blocker.get('reason')}")
+          PY
+
+      - name: Upload immutable rollout receipt
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: frontier-design-rollout-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ env.RECEIPT }}
+          if-no-files-found: warn
+          retention-days: 180
+
+      - name: Enforce rollout result
+        shell: bash
+        env:
+          EXIT_CODE: ${{ steps.rollout.outputs.exit_code }}
+        run: |
+          set -euo pipefail
+          test -f "$RECEIPT"
+          test "${EXIT_CODE:-2}" = "0"
+          python - <<'PY'
+          import json
+          data = json.load(open("frontier-design-rollout-receipt.json", encoding="utf-8"))
+          assert data.get("status") == "PASS", data
+          assert not data.get("blockers"), data.get("blockers")
+          assert data.get("targets"), data
+          PY
