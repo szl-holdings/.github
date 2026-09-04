@@ -982,13 +982,13 @@ def main() -> int:
     try:
         contract, files = deploy.load_contract(root, manifest_path)
         require(
-            contract.get("prune") is True,
-            "org-card publication must prune unmanaged legacy files",
+            contract.get("prune") is False,
+            "org-card publication must preserve unmanaged remote files",
             failures,
         )
         require(
             contract.get("allowed_deletions") == [],
-            "org-card publication must fail closed on every unexpected deletion",
+            "org-card publication must have no deletion authority",
             failures,
         )
         contract_issues = publication_contract_issues(contract)
