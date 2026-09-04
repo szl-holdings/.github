@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import ast
 import datetime as dt
-import json
 import sys
 import unittest
 from importlib.util import module_from_spec, spec_from_file_location

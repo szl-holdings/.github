@@ -939,8 +939,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         }
         try:
             write_json_atomic(args.output, failure)
-        except Exception:
-            pass
+        except Exception as write_exc:
+            failure["failure_write_error_kind"] = safe_error_kind(write_exc)
         print(json.dumps(failure, sort_keys=True), file=sys.stderr)
         return 1
 
