@@ -2,6 +2,9 @@ name: Reusable — Trivy filesystem scan
 
 # Runs Trivy in filesystem mode against the checked-out tree. Catches
 # vulnerable dependencies, exposed secrets, and misconfigured IaC files.
+# SARIF normally includes all severities regardless of `severity`; the explicit
+# limiter below keeps both the report and failing exit code aligned to the
+# caller's declared policy while preserving the selected findings for upload.
 
 on:
   workflow_call:
@@ -44,6 +47,7 @@ jobs:
           format: sarif
           output: trivy-results.sarif
           severity: ${{ inputs.severity }}
+          limit-severities-for-sarif: true
           ignore-unfixed: ${{ inputs.ignore-unfixed }}
           exit-code: '1'
 
