@@ -1,0 +1,44 @@
+name: Finalize frontier convergence rail once
+
+on:
+  push:
+    branches:
+      - frontier/converge-all-stalled-builds-20260904
+    paths:
+      - .github/workflows/finalize-frontier-convergence-rail-once.yml
+
+permissions:
+  actions: write
+  contents: write
+
+jobs:
+  finalize:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Checkout exact controller branch
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: frontier/converge-all-stalled-builds-20260904
+          fetch-depth: 0
+          persist-credentials: true
+
+      - name: Keep one final execution workflow and retrigger it
+        shell: bash
+        run: |
+          set -euo pipefail
+          final=.github/workflows/frontier-converge-all-stalled-builds-20260904-v3.yml
+          test -s "$final"
+          git rm -f --ignore-unmatch \
+            .github/workflows/frontier-converge-all-stalled-builds-20260904.yml \
+            .github/workflows/frontier-converge-all-stalled-builds-20260904-v2.yml \
+            .github/workflows/finalize-frontier-convergence-rail-once.yml
+          if ! grep -Fq '# final serialized convergence generation: v3' "$final"; then
+            printf '\n# final serialized convergence generation: v3\n' >> "$final"
+          fi
+          git add "$final"
+          git diff --cached --check
+          git config user.name "Lutar, Stephen P."
+          git config user.email "stephenlutar2@gmail.com"
+          git commit -s -m "fix(frontier): serialize full-estate convergence on v3"
+          git push origin HEAD:frontier/converge-all-stalled-builds-20260904
