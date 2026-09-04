@@ -1,0 +1,56 @@
+name: Repair Public Experience v4 issue query once
+
+on:
+  push:
+    branches:
+      - feat/public-experience-v4-audience-contract
+    paths:
+      - .github/workflows/zz-fix-public-experience-v4-issue-query-once.yml
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Harden runner
+        uses: step-security/harden-runner@05e31511f85b41b11d1cf0ef85d0992719546e2c # v2.21.0
+        with:
+          egress-policy: audit
+      - name: Checkout exact branch
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: feat/public-experience-v4-audience-contract
+          fetch-depth: 0
+          persist-credentials: true
+      - name: Patch and verify permanent workflow
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+
+          path = Path('.github/workflows/public-experience-v4.yml')
+          source = path.read_text(encoding='utf-8')
+          old = '''          issue="$(gh issue list --repo "$GITHUB_REPOSITORY" --state all --search "$title in:title" --json number,title --jq '.[] | select(.title == $title) | .number' --arg title "$title" | head -n1)"'''
+          new = '''          issue="$(gh issue list --repo "$GITHUB_REPOSITORY" --state all --search "$title in:title" --json number,title | jq -r --arg title "$title" 'map(select(.title == $title)) | first | .number // empty')"'''
+          if old in source:
+              source = source.replace(old, new, 1)
+          elif new not in source:
+              raise SystemExit('issue query anchor not found')
+          path.write_text(source, encoding='utf-8')
+          PY
+          rm -f .github/workflows/zz-fix-public-experience-v4-issue-query-once.yml
+          python -m py_compile .github/scripts/audit_public_experience_v4.py .github/tests/test_public_experience_v4.py
+          git diff --check
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -A
+          git commit \
+            -m 'fix(frontend): make v4 current-issue lookup deterministic' \
+            -m 'Pipe the GitHub issue list through jq with an explicit title argument; retain the read-only browser and provider boundary.' \
+            -m 'Signed-off-by: Stephen Lutar <stephenlutar2@gmail.com>'
+          git push origin HEAD:feat/public-experience-v4-audience-contract
