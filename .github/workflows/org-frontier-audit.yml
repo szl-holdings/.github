@@ -1,0 +1,86 @@
+name: SZL organization frontier audit
+
+on:
+  push:
+    branches:
+      - feat/org-frontier-audit-v1
+    paths:
+      - "scripts/audit_org_frontier.py"
+      - "tests/test_audit_org_frontier.py"
+      - "docs/architecture/org-frontier-authorities.v1.json"
+      - ".github/workflows/org-frontier-audit.yml"
+  pull_request:
+    paths:
+      - "scripts/audit_org_frontier.py"
+      - "tests/test_audit_org_frontier.py"
+      - "docs/architecture/org-frontier-authorities.v1.json"
+      - ".github/workflows/org-frontier-audit.yml"
+  workflow_dispatch: {}
+  schedule:
+    - cron: "17 7 * * 1"
+
+permissions:
+  actions: read
+  contents: read
+  issues: write
+
+concurrency:
+  group: org-frontier-audit-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  audit:
+    name: Census repositories, controls, workflows and vertical authority
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - name: Harden runner
+        uses: step-security/harden-runner@05e31511f85b41b11d1cf0ef85d0992719546e2c # v2.21.0
+        with:
+          egress-policy: audit
+
+      - name: Check out exact audit source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 1
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12"
+
+      - name: Run network-free audit contracts
+        run: |
+          set -euo pipefail
+          python -m unittest tests.test_audit_org_frontier -v
+          python -m py_compile scripts/audit_org_frontier.py tests/test_audit_org_frontier.py
+          python -m json.tool docs/architecture/org-frontier-authorities.v1.json >/dev/null
+
+      - name: Collect the authenticated organization census
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          python scripts/audit_org_frontier.py \
+            --org szl-holdings \
+            --authority docs/architecture/org-frontier-authorities.v1.json \
+            --json reports/org-frontier-audit.json \
+            --markdown reports/org-frontier-audit.md
+
+      - name: Upload immutable audit evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: org-frontier-audit-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            reports/org-frontier-audit.json
+            reports/org-frontier-audit.md
+          if-no-files-found: error
+          retention-days: 180
+
+      - name: Reconcile the organization command-center record
+        if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh issue comment 585 --body-file reports/org-frontier-audit.md

@@ -1,0 +1,82 @@
+{
+  "schema": "szl.org-frontier-authorities/v1",
+  "organization": "szl-holdings",
+  "vision": "One Living Command Fabric with source-bound domain bodies, qualified inference, evidence handles, policy gates, human approval, verification and honest receipts.",
+  "locked_formula_ids": ["F1", "F4", "F7", "F11", "F12", "F18", "F19", "F22"],
+  "lambda_status": "CONJECTURE_1_ADVISORY",
+  "canonical_control_planes": {
+    "action_and_proof": "a11oy",
+    "living_anatomy": "anatomy",
+    "evidence_retrieval": "szl-second-brain",
+    "typed_formulas": "szl-formulas",
+    "formal_kernel": "lutar-lean",
+    "inference_and_training": "szl-forge",
+    "owner_compute_bridge": "szl-gpu-bridge",
+    "domain_services": "vertical-services"
+  },
+  "verticals": [
+    {
+      "slug": "lyte",
+      "brand": "Lyte",
+      "canonical_repositories": ["lyte-lattice"],
+      "runtime_surfaces": ["SZLHOLDINGS/lyte"],
+      "product_routes": ["https://a-11-oy.com/lyte"],
+      "formula_binding": "complete_locked_eight_via_shared_anatomy"
+    },
+    {
+      "slug": "vessels-killinchu",
+      "brand": "Vessels / Killinchu",
+      "canonical_repositories": ["killinchu"],
+      "runtime_surfaces": ["SZLHOLDINGS/killinchu", "SZLHOLDINGS/vessels"],
+      "product_routes": ["https://a-11-oy.com/killinchu"],
+      "formula_binding": "complete_locked_eight_via_shared_anatomy"
+    },
+    {
+      "slug": "terra",
+      "brand": "Terra",
+      "canonical_repositories": ["szl-real-estate"],
+      "runtime_surfaces": ["SZLHOLDINGS/terra"],
+      "product_routes": ["https://a-11-oy.com/terra"],
+      "formula_binding": "complete_locked_eight_via_shared_anatomy"
+    },
+    {
+      "slug": "prism-counsel",
+      "brand": "PRISM Counsel",
+      "canonical_repositories": ["a11oy"],
+      "source_paths": ["verticals/counsel"],
+      "runtime_surfaces": ["SZLHOLDINGS/counsel"],
+      "product_routes": ["https://a-11-oy.com/counsel"],
+      "formula_binding": "complete_locked_eight_via_shared_anatomy"
+    },
+    {
+      "slug": "aegis-sentra",
+      "brand": "Aegis / Sentra",
+      "canonical_repositories": ["szl-defensive-control-plane"],
+      "runtime_surfaces": ["SZLHOLDINGS/sentra"],
+      "product_routes": ["https://a-11-oy.com/aegis"],
+      "formula_binding": "complete_locked_eight_via_shared_anatomy"
+    },
+    {
+      "slug": "puriq-finance",
+      "brand": "PURIQ Finance",
+      "canonical_repositories": ["puriq-live"],
+      "runtime_surfaces": ["SZLHOLDINGS/finance"],
+      "product_routes": ["https://a-11-oy.com/puriq-markets"],
+      "formula_binding": "complete_locked_eight_via_shared_anatomy"
+    }
+  ],
+  "incubation": [
+    {
+      "brand": "Carlota Jo",
+      "status": "INCUBATING",
+      "graduation_requirement": "Declare one canonical repository, one domain object, one runtime authority and one measurable workflow before promotion."
+    }
+  ],
+  "audit_policy": {
+    "stale_after_days": 180,
+    "max_workflow_files_per_repository": 40,
+    "required_community_files": ["readme", "license", "security"],
+    "duplicate_description_prefix": "ARCHIVED duplicate/hologram. Canonical:",
+    "workflow_pinning": "Third-party actions must use a full 40-character commit SHA. Local actions are exempt."
+  }
+}
