@@ -1,0 +1,72 @@
+name: Patch frontier credential selector v3 once
+
+on:
+  push:
+    branches:
+      - frontier/converge-all-stalled-builds-20260904
+    paths:
+      - .github/workflows/patch-frontier-selector-v3-once.yml
+
+permissions:
+  actions: write
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Checkout exact operator branch
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: frontier/converge-all-stalled-builds-20260904
+          fetch-depth: 0
+          persist-credentials: true
+
+      - name: Replace selector with independent candidate validation
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+          path = Path('scripts/frontier_converge_20260904.py')
+          source = path.read_text(encoding='utf-8')
+          start = source.index('TOKEN_ENV_ORDER: tuple[tuple[str, str], ...] = (')
+          end = source.index('\n)\nHF_TOKEN_ENV_ORDER:', start) + 3
+          replacement = '''TOKEN_ENV_ORDER: tuple[tuple[str, str], ...] = (
+    ("FRONTIER_OPERATOR_TOKEN", "FRONTIER_OPERATOR_TOKEN_CANDIDATE"),
+    ("FRONTIER_GITHUB_TOKEN", "FRONTIER_GITHUB_TOKEN_CANDIDATE"),
+    ("OPERATOR_GITHUB_TOKEN", "OPERATOR_GITHUB_TOKEN_CANDIDATE"),
+    ("AUTONOMY_GITHUB_TOKEN", "AUTONOMY_GITHUB_TOKEN_CANDIDATE"),
+    ("SZL_GITHUB_TOKEN", "SZL_GITHUB_TOKEN_CANDIDATE"),
+    ("SZL_GITHUB_PAT", "SZL_GITHUB_PAT_CANDIDATE"),
+    ("SZL_ORG_ADMIN_TOKEN", "SZL_ORG_ADMIN_TOKEN_CANDIDATE"),
+    ("ORG_ADMIN_TOKEN", "ORG_ADMIN_TOKEN_CANDIDATE"),
+    ("ORG_GITHUB_TOKEN", "ORG_GITHUB_TOKEN_CANDIDATE"),
+    ("GH_ADMIN_TOKEN", "GH_ADMIN_TOKEN_CANDIDATE"),
+    ("GITHUB_ADMIN_TOKEN", "GITHUB_ADMIN_TOKEN_CANDIDATE"),
+    ("GH_ORG_TOKEN", "GH_ORG_TOKEN_CANDIDATE"),
+    ("GH_PAT", "GH_PAT_CANDIDATE"),
+    ("ORG_PAT", "ORG_PAT_CANDIDATE"),
+    ("ADMIN_PAT", "ADMIN_PAT_CANDIDATE"),
+    ("GITHUB_PAT", "GITHUB_PAT_CANDIDATE"),
+    ("PAT", "PAT_CANDIDATE"),
+    ("PERSONAL_ACCESS_TOKEN", "PERSONAL_ACCESS_TOKEN_CANDIDATE"),
+    ("REPO_TOKEN", "REPO_TOKEN_CANDIDATE"),
+    ("CROSS_REPO_TOKEN", "CROSS_REPO_TOKEN_CANDIDATE"),
+    ("AUTOMATION_TOKEN", "AUTOMATION_TOKEN_CANDIDATE"),
+    ("SZL_BOT_TOKEN", "SZL_BOT_TOKEN_CANDIDATE"),
+    ("GITHUB_TOKEN", "GITHUB_TOKEN_CANDIDATE"),
+)
+'''
+          source = source[:start] + replacement + source[end:]
+          path.write_text(source, encoding='utf-8', newline='\n')
+          PY
+          python -m py_compile scripts/frontier_converge_20260904.py
+          git rm .github/workflows/patch-frontier-selector-v3-once.yml
+          git add scripts/frontier_converge_20260904.py
+          git diff --cached --check
+          git config user.name "Lutar, Stephen P."
+          git config user.email "stephenlutar2@gmail.com"
+          git commit -s -m "fix(frontier): validate every operator credential independently"
+          git push origin HEAD:frontier/converge-all-stalled-builds-20260904
