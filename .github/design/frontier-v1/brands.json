@@ -1,0 +1,105 @@
+{
+  "schema": "szl.frontier-design.registry/v1",
+  "version": "1.0.0",
+  "source_repository": "szl-holdings/.github",
+  "asset_contract": {
+    "css": "szl-frontier.css",
+    "javascript": "szl-frontier.js",
+    "runtime_dependencies": [],
+    "network_fetches": 0,
+    "authority": "PRESENTATION_ONLY"
+  },
+  "brands": {
+    "a11oy": {
+      "title": "A11oy",
+      "descriptor": "Governed command fabric",
+      "motif": "alloy lattice",
+      "home": "https://a-11-oy.com/",
+      "hostnames": ["a-11-oy.com", "www.a-11-oy.com", "szlholdings-a11oy.hf.space"],
+      "repository_candidates": ["szl-holdings/a11oy"],
+      "entrypoint_candidates": [
+        "pages/console.html",
+        "web/index.html",
+        "index.html",
+        "templates/index.html",
+        "web/living-anatomy.html"
+      ],
+      "python_entrypoint_candidates": ["serve.py", "app.py"]
+    },
+    "killinchu": {
+      "title": "Killinchu",
+      "descriptor": "Aerial intelligence & defense",
+      "motif": "condor flight lines",
+      "home": "https://killinchu.net/",
+      "hostnames": ["killinchu.net", "www.killinchu.net", "szlholdings-killinchu.hf.space"],
+      "repository_candidates": ["szl-holdings/killinchu"],
+      "entrypoint_candidates": [
+        "elite/index.html",
+        "web/elite.html",
+        "web/index.html",
+        "index.html",
+        "templates/index.html"
+      ],
+      "python_entrypoint_candidates": [
+        "killinchu_elite_console.py",
+        "serve.py",
+        "app.py"
+      ]
+    },
+    "hatun": {
+      "title": "Hatun",
+      "descriptor": "Sovereign orchestration layer",
+      "motif": "radial khipu rings",
+      "home": "https://a-11-oy.com/wires",
+      "hostnames": ["hatun.a-11-oy.com", "szlholdings-hatun.hf.space", "szlholdings-hatun-mcp.hf.space"],
+      "repository_candidates": [
+        "szl-holdings/hatun",
+        "szl-holdings/hatun-mcp",
+        "szl-holdings/szl-hatun"
+      ],
+      "entrypoint_candidates": [
+        "web/hatun.html",
+        "web/wires.html",
+        "pages/hatun.html",
+        "pages/wires.html",
+        "templates/index.html",
+        "index.html"
+      ],
+      "python_entrypoint_candidates": ["serve.py", "server.py", "app.py"],
+      "fallback": {
+        "repository": "szl-holdings/a11oy",
+        "entrypoint_candidates": [
+          "web/wires.html",
+          "pages/wires.html",
+          "web/hatun.html",
+          "pages/hatun.html"
+        ]
+      }
+    }
+  },
+  "patch_policy": {
+    "html_markers": {
+      "head_start": "<!-- szl-frontier-design:head:v1 -->",
+      "head_end": "<!-- /szl-frontier-design:head:v1 -->",
+      "body_start": "<!-- szl-frontier-design:body:v1 -->",
+      "body_end": "<!-- /szl-frontier-design:body:v1 -->"
+    },
+    "excluded_directories": [
+      ".git",
+      ".venv",
+      "node_modules",
+      "vendor",
+      "dist",
+      "build",
+      "coverage",
+      "docs",
+      "tests",
+      "test",
+      "third_party"
+    ],
+    "maximum_entrypoints_per_brand": 3,
+    "direct_main_push": false,
+    "delete_existing_content": false,
+    "runtime_cdn": false
+  }
+}
