@@ -41,31 +41,17 @@ jobs:
 
           path = Path('.github/scripts/public_front_door_check.py')
           text = path.read_text(encoding='utf-8')
-          old = '''        require(
-              contract.get("prune") is True,
-              "org-card publication must prune unmanaged legacy files",
-              failures,
-          )
-          require(
-              contract.get("allowed_deletions") == [],
-              "org-card publication must fail closed on every unexpected deletion",
-              failures,
-          )
-          '''
-          new = '''        require(
-              contract.get("prune") is False,
-              "org-card publication must preserve unmanaged remote files",
-              failures,
-          )
-          require(
-              contract.get("allowed_deletions") == [],
-              "org-card publication must have no deletion authority",
-              failures,
-          )
-          '''
-          if text.count(old) != 1:
-              raise SystemExit(f'expected one stale publication invariant, observed {text.count(old)}')
-          path.write_text(text.replace(old, new, 1), encoding='utf-8', newline='\n')
+          replacements = {
+              'contract.get("prune") is True': 'contract.get("prune") is False',
+              'org-card publication must prune unmanaged legacy files': 'org-card publication must preserve unmanaged remote files',
+              'org-card publication must fail closed on every unexpected deletion': 'org-card publication must have no deletion authority',
+          }
+          for old, new in replacements.items():
+              count = text.count(old)
+              if count != 1:
+                  raise SystemExit(f'expected one occurrence of {old!r}, observed {count}')
+              text = text.replace(old, new, 1)
+          path.write_text(text, encoding='utf-8', newline='\n')
           PY
 
           python -m py_compile .github/scripts/public_front_door_check.py
