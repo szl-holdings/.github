@@ -1,0 +1,66 @@
+name: Patch frontier convergence topology once
+
+on:
+  push:
+    branches:
+      - frontier/converge-all-stalled-builds-20260904
+    paths:
+      - .github/workflows/patch-frontier-convergence-safety-once.yml
+
+permissions:
+  actions: write
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Checkout exact operator branch
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: frontier/converge-all-stalled-builds-20260904
+          fetch-depth: 0
+          persist-credentials: true
+
+      - name: Cancel older convergence executions before topology correction
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh api \
+            "repos/$GITHUB_REPOSITORY/actions/workflows/frontier-converge-all-stalled-builds-20260904.yml/runs?branch=frontier/converge-all-stalled-builds-20260904&per_page=30" \
+            --jq '.workflow_runs[] | select((.status == "queued" or .status == "in_progress" or .status == "waiting") and .head_sha != env.GITHUB_SHA) | .id' \
+          | while read -r run_id; do
+              [ -n "$run_id" ] || continue
+              gh api --method POST "repos/$GITHUB_REPOSITORY/actions/runs/$run_id/cancel" || true
+            done
+
+      - name: Remove stale Aegis-to-Killinchu deletion dispatch
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+          path = Path('scripts/frontier_converge_20260904.py')
+          source = path.read_text(encoding='utf-8')
+          stale = '    ("killinchu", "retire-legacy-resilience-spaces.yml"),\n'
+          if source.count(stale) != 1:
+              raise SystemExit('expected one stale retirement dispatch')
+          source = source.replace(stale, '', 1)
+          source = source.replace(
+              '"Vessels/Aegis deletion only through the source-bound Killinchu retirement workflow; Sentra remains the sole Assurance Command; IMMUNE remains gated."',
+              '"Vessels retirement requires a Killinchu replacement receipt. Aegis retirement must point to Sentra under the final owner directive. Sentra remains the sole Assurance Command; IMMUNE remains gated."',
+              1,
+          )
+          path.write_text(source, encoding='utf-8', newline='\n')
+          PY
+          python -m py_compile scripts/frontier_converge_20260904.py
+          git rm .github/workflows/patch-frontier-convergence-safety-once.yml
+          git diff --cached --check
+          git add scripts/frontier_converge_20260904.py
+          git config user.name "Lutar, Stephen P."
+          git config user.email "stephenlutar2@gmail.com"
+          git commit -s -m "fix(frontier): bind Aegis retirement to final Sentra topology"
+          git push origin HEAD:frontier/converge-all-stalled-builds-20260904
