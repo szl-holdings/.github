@@ -37,7 +37,8 @@ jobs:
         run: |
           set -euo pipefail
           python -c 'from pathlib import Path; p=Path(".github/scripts/public_front_door_check.py"); t=p.read_text(encoding="utf-8"); old="    WEBP_DESTINATION: CANONICAL_WEBP,\n}"; new="    WEBP_DESTINATION: CANONICAL_WEBP,\n    \"GOVERNANCE.md\": \"huggingface/org-card/GOVERNANCE.md\",\n    \"MODELS.txt\": \"huggingface/org-card/MODELS.txt\",\n    \"SEVEN_SPACES.md\": \"huggingface/org-card/SEVEN_SPACES.md\",\n    \"SPACE_PROVENANCE_FRONTIER.json\": (\n        \"huggingface/org-card/SPACE_PROVENANCE_FRONTIER.json\"\n    ),\n    \"seven-spaces.yaml\": \"huggingface/org-card/seven-spaces.yaml\",\n}"; assert t.count(old) == 1, f"expected one binding terminator, observed {t.count(old)}"; p.write_text(t.replace(old, new, 1), encoding="utf-8", newline="\n")'
-          python -m py_compile .github/scripts/public_front_door_check.py
+          python -c 'from pathlib import Path; p=Path(".github/scripts/test_public_front_door_check.py"); t=p.read_text(encoding="utf-8"); a="test_requires_exact_twelve_source_destination_pairs"; b="test_requires_exact_seventeen_source_destination_pairs"; c="self.assertEqual(len(check.REQUIRED_PUBLICATION_BINDINGS), 12)"; d="self.assertEqual(len(check.REQUIRED_PUBLICATION_BINDINGS), 17)"; assert t.count(a) == 1 and t.count(c) == 1, "stale binding-count test shape changed"; p.write_text(t.replace(a, b, 1).replace(c, d, 1), encoding="utf-8", newline="\n")'
+          python -m py_compile .github/scripts/public_front_door_check.py .github/scripts/test_public_front_door_check.py
           python .github/scripts/public_front_door_check.py
           python .github/scripts/test_public_front_door_check.py
           git diff --check
@@ -49,6 +50,6 @@ jobs:
           rm .github/workflows/patch-hf-org-binding-inventory-once.yml
           git config user.name "szl-frontier-bot"
           git config user.email "stephenlutar2+frontier@gmail.com"
-          git add .github/scripts/public_front_door_check.py .github/workflows/patch-hf-org-binding-inventory-once.yml
+          git add .github/scripts/public_front_door_check.py .github/scripts/test_public_front_door_check.py .github/workflows/patch-hf-org-binding-inventory-once.yml
           git commit -m "fix(hf): align organization binding inventory" -m "Signed-off-by: Stephen P. Lutar Jr. <stephenlutar2@gmail.com>"
           git push origin HEAD:fix/hf-org-card-binding-inventory-20260903
