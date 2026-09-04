@@ -140,6 +140,15 @@ class OrgCardAutopublishTests(unittest.TestCase):
         self.assertTrue(ensure_public.call_args_list[1].kwargs["check_only"])
         publish.assert_called_once()
 
+    def test_production_manifest_preserves_unmanaged_remote_files(self):
+        repo_root = Path(__file__).resolve().parents[2]
+        contract, _ = publisher.deploy.load_contract(
+            repo_root,
+            repo_root / "huggingface" / "org-card.manifest.json",
+        )
+        self.assertFalse(contract["prune"])
+        self.assertEqual(contract.get("allowed_deletions"), [])
+
     def test_report_redacts_provider_tokens(self):
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / "report.json"

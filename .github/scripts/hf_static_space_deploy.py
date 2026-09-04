@@ -761,6 +761,16 @@ def planned_deletions(
     return candidates
 
 
+def remote_file_set_matches(
+    contract: dict[str, Any], remote_files: set[str], wanted: set[str]
+) -> bool:
+    """Require exact parity when pruning and managed-file coverage otherwise."""
+
+    if bool(contract.get("prune")):
+        return remote_files == wanted
+    return wanted.issubset(remote_files)
+
+
 def publish(
     contract: dict[str, Any],
     files: list[PublicationFile],
@@ -820,6 +830,7 @@ def publish(
     stage = "UNKNOWN"
     hub_head = ""
     remote_file_set_match = False
+    preserved_paths: list[str] = []
     immutable_files_match = False
     immutable_file_readback: list[dict[str, Any]] = []
     manifest_status = 0
@@ -848,7 +859,14 @@ def publish(
                     revision=commit_oid,
                 )
             )
-            remote_file_set_match = commit_files == wanted
+            remote_file_set_match = remote_file_set_matches(
+                contract, commit_files, wanted
+            )
+            preserved_paths = (
+                sorted(commit_files - wanted)
+                if not bool(contract.get("prune"))
+                else []
+            )
             if (
                 hub_head == commit_oid
                 and remote_file_set_match
@@ -913,6 +931,7 @@ def publish(
                     "hub_head": hub_head,
                     "runtime_stage": stage,
                     "deleted_paths": deleted,
+                    "preserved_paths": preserved_paths,
                     "remote_file_set": sorted(commit_files),
                     "remote_file_set_match": remote_file_set_match,
                     "immutable_files_match": immutable_files_match,
@@ -950,6 +969,7 @@ def publish(
             "hub_head": hub_head,
             "runtime_stage": stage,
             "deleted_paths": deleted,
+            "preserved_paths": preserved_paths,
             "remote_file_set_match": remote_file_set_match,
             "immutable_files_match": immutable_files_match,
             "immutable_file_readback": immutable_file_readback,

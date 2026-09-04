@@ -357,6 +357,31 @@ class StaticSpaceDeployTests(unittest.TestCase):
         self.assertTrue(any(not row["same_origin"] for row in rows))
         self.assertTrue(any("error" in row for row in rows))
 
+    def test_non_prune_preserves_unmanaged_remote_paths(self):
+        contract, _ = deploy.load_contract(self.root, self.manifest)
+        contract["prune"] = False
+        remote = {"README.md", "index.html", "unmanaged.txt"}
+        wanted = {"README.md", "index.html"}
+
+        self.assertEqual(deploy.planned_deletions(contract, remote, wanted), [])
+        self.assertTrue(deploy.remote_file_set_matches(contract, remote, wanted))
+        self.assertFalse(
+            deploy.remote_file_set_matches(contract, {"README.md"}, wanted)
+        )
+
+    def test_prune_requires_exact_remote_file_set(self):
+        contract, _ = deploy.load_contract(self.root, self.manifest)
+        wanted = {"README.md", "index.html"}
+
+        self.assertTrue(deploy.remote_file_set_matches(contract, wanted, wanted))
+        self.assertFalse(
+            deploy.remote_file_set_matches(
+                contract,
+                {"README.md", "index.html", "unmanaged.txt"},
+                wanted,
+            )
+        )
+
     def test_prune_aborts_on_unexpected_remote_path(self):
         contract, _ = deploy.load_contract(self.root, self.manifest)
         with self.assertRaisesRegex(deploy.ContractError, "unexpected remote paths"):
