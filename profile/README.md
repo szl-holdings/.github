@@ -10,7 +10,7 @@
 
 **Control before action. Evidence after.**
 
-Governed AI with a signed, verifiable receipt for every decision.
+Governed AI with verifiable decision receipts.
 
 **Product** · [a-11-oy.com](https://a-11-oy.com)  
 **Proof** · [a11oy.net](https://a11oy.net)
@@ -23,7 +23,7 @@ Governed AI with a signed, verifiable receipt for every decision.
 
 **Signal** → **reason** → **policy** → **bounded action** → **receipt** → **independent verification**.
 
-Authority and evidence are validated before action. Runtime stays inside the bound, and the receipt makes the result portable. Λ uniqueness remains **Conjecture 1**. Gold is **OPEN**, never proven.
+Authority and evidence precede action; receipts make results portable. Λ uniqueness remains **Conjecture 1**. Gold is **OPEN**, never proven.
 
 ## Public paths
 
@@ -34,7 +34,7 @@ Authority and evidence are validated before action. Runtime stays inside the bou
 - **IMMUNE** · product [a-11-oy.com/immune](https://a-11-oy.com/immune) · Channel A [SZLHOLDINGS/immune](https://huggingface.co/spaces/SZLHOLDINGS/immune) · Channel B [SZLHOLDINGS/immune-lattice](https://huggingface.co/spaces/SZLHOLDINGS/immune-lattice) · NEXUS plane lives on Channel A `/nexus.html` — Hub Space `SZLHOLDINGS/nexus` is **not** a public product
 - **Source twins** · [github.com/szl-holdings](https://github.com/szl-holdings) homepages point at the matching Hub card when the twin is public
 
-[a11oy-factory](https://github.com/szl-holdings/a11oy-factory) is a bind, not a second flagship. Killinchu is a public synthetic reference with **SIMULATED** public actuation. The verifier Space points to the product and proof surfaces; it is not a flagship.
+[a11oy-factory](https://github.com/szl-holdings/a11oy-factory) is a bind, not a flagship. Killinchu is a public synthetic reference with **SIMULATED** actuation. The verifier Space is not a flagship.
 
 ## Portfolio
 
