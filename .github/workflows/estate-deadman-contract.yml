@@ -1,0 +1,114 @@
+name: Estate dead-man contracts
+
+on:
+  pull_request:
+    paths:
+      - "governance/estate-deadman.v1.json"
+      - ".github/scripts/estate_deadman.py"
+      - "tests/test_estate_deadman.py"
+      - ".github/workflows/estate-deadman.yml"
+      - ".github/workflows/estate-deadman-contract.yml"
+      - "docs/estate-deadman.md"
+  push:
+    branches: [main]
+    paths:
+      - "governance/estate-deadman.v1.json"
+      - ".github/scripts/estate_deadman.py"
+      - "tests/test_estate_deadman.py"
+      - ".github/workflows/estate-deadman.yml"
+      - ".github/workflows/estate-deadman-contract.yml"
+      - "docs/estate-deadman.md"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: estate-deadman-contract-${{ github.event.pull_request.number || github.sha }}
+  cancel-in-progress: true
+
+jobs:
+  contract:
+    name: Fixed-origin supervisor contract
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Harden runner
+        uses: step-security/harden-runner@05e31511f85b41b11d1cf0ef85d0992719546e2c # v2.21.0
+        with:
+          egress-policy: audit
+
+      - name: Checkout exact change revision
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+          fetch-depth: 1
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12"
+
+      - name: Prove policy, state evaluation, and bounded authority
+        run: |
+          set -euo pipefail
+          python -m py_compile .github/scripts/estate_deadman.py tests/test_estate_deadman.py
+          python -m unittest discover -s tests -p 'test_estate_deadman.py' -v
+          python .github/scripts/estate_deadman.py \
+            --offline-contract-only \
+            --output reports/estate-deadman-contract.json
+          git diff --check
+
+      - name: Prove live workflow is provider-scheduled and least privilege
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          source = Path('.github/workflows/estate-deadman.yml').read_text(encoding='utf-8')
+          required = (
+              'name: Estate dead-man supervisor',
+              '  schedule:',
+              'cron: "7,22,37,52 * * * *"',
+              'actions: read',
+              'contents: read',
+              'issues: write',
+              'persist-credentials: false',
+              'ref: ${{ github.sha }}',
+              'github.event.repository.default_branch',
+              'cancel-in-progress: false',
+          )
+          for marker in required:
+              assert marker in source, marker
+          forbidden = (
+              'pull_request_target',
+              'contents: write',
+              'actions: write',
+              'deployments: write',
+              'packages: write',
+              'secrets.',
+              'self-hosted',
+          )
+          for marker in forbidden:
+              assert marker not in source, marker
+          events = []
+          in_on = False
+          for line in source.splitlines():
+              if line == 'on:':
+                  in_on = True
+                  continue
+              if in_on and line and not line.startswith(' '):
+                  break
+              if in_on and line.startswith('  ') and not line.startswith('    '):
+                  stripped = line.strip()
+                  if stripped.endswith(':'):
+                      events.append(stripped[:-1])
+          assert events == ['schedule'], events
+          PY
+
+      - name: Upload immutable contract receipt
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: estate-deadman-contract-${{ github.run_id }}-${{ github.run_attempt }}
+          path: reports/estate-deadman-contract.json
+          if-no-files-found: error
+          retention-days: 90
