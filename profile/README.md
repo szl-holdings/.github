@@ -29,11 +29,13 @@ Authority and evidence are checked before action. Runtime stays inside its decla
 
 - **A11oy** · [product](https://a-11-oy.com) · [source](https://github.com/szl-holdings/a11oy)
 - **Proof registry** · [a11oy.net](https://a11oy.net) for records, diligence, and atlas evidence
-- **Artifacts** · [Hugging Face](https://huggingface.co/SZLHOLDINGS): 15 public Spaces, 44 models, and 32 datasets measured on 2026-09-04
+- **Artifacts** · [Hugging Face](https://huggingface.co/SZLHOLDINGS): **16 public Spaces, 44 models, and 33 datasets** measured 2026-09-04 23:34 UTC via Hub API. Previous profile line (15 / 44 / 32) is superseded.
 - **IMMUNE** · [product tab](https://a-11-oy.com/immune) · [Channel A](https://huggingface.co/spaces/SZLHOLDINGS/immune) · [Channel B](https://huggingface.co/spaces/SZLHOLDINGS/immune-lattice)
 - **Organization source** · [github.com/szl-holdings](https://github.com/szl-holdings)
 
-NEXUS is an internal IMMUNE capability plane, not a second product. Killinchu public actuation is **SIMULATED** unless a separately authorized effector proves otherwise.
+Public Spaces measured this hour: `a11oy`, `killinchu`, `immune`, `immune-lattice`, `counsel`, `terra`, `sentra`, `finance`, `lyte`, `vertical-services`, `szl-command-lab`, `david-leads`, `szl-constellation`, `szl-frontier`, `szl-model-inference-lab`, `ayllu`.
+
+NEXUS is an internal IMMUNE capability plane, not a second product. Do not mint `SZLHOLDINGS/nexus`. Killinchu public actuation is **SIMULATED** unless a separately authorized effector proves otherwise.
 
 ## Portfolio
 
@@ -52,10 +54,12 @@ Labs and research packages are components, holograms, or archives—not competin
 ## Current state
 
 - A11oy publishes locked-eight kernel evidence; Λ remains a conjecture.
+- Product origin [a-11-oy.com](https://a-11-oy.com) is the live `SZLHOLDINGS/a11oy` Space (`server=szl`). Proof stays on [a11oy.net](https://a11oy.net).
 - Both IMMUNE channels remain public while parity and retirement evidence are completed.
 - `SZLHOLDINGS/nexus` is not a public product. Nexus source remains preserved.
 - [`SZLHOLDINGS/SZLHOLDINGS`](https://huggingface.co/datasets/SZLHOLDINGS/SZLHOLDINGS) is a **HISTORICAL** dataset mirror.
 - A signature proves integrity and origin within scope—not accuracy, safety, performance, compliance, or deployment authorization.
+- Estate is **not READY**. ReceiptAgent v3 is quarantined. Khipu-abstain has no adapter bytes. Chaski / A11OY-MINI stay research-only. ROADMAP cards (`qantu`, `waman`, `chakana`, `tinku`, `KILLINCHU-EYE`) are empty and are not production SKUs.
 
 This profile does not claim regulatory approval, universal safety, customer adoption, or an investment outcome. An HTTP 200 response is not a production certificate.
 
