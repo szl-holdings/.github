@@ -1,0 +1,85 @@
+name: Patch public front-door preservation once
+
+on:
+  push:
+    branches:
+      - fix/hf-org-card-preserve-unmanaged-20260903
+    paths:
+      - .github/workflows/patch-public-front-door-preservation-once.yml
+
+permissions:
+  contents: write
+
+concurrency:
+  group: patch-public-front-door-preservation-once
+  cancel-in-progress: false
+
+jobs:
+  patch:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Harden runner
+        uses: step-security/harden-runner@05e31511f85b41b11d1cf0ef85d0992719546e2c # v2.21.0
+        with:
+          egress-policy: audit
+
+      - name: Check out exact repair branch
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: fix/hf-org-card-preserve-unmanaged-20260903
+          token: ${{ secrets.SZL_GITHUB_TOKEN || secrets.GH_PAT || github.token }}
+          persist-credentials: true
+          fetch-depth: 1
+
+      - name: Replace stale destructive invariant
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+
+          path = Path('.github/scripts/public_front_door_check.py')
+          text = path.read_text(encoding='utf-8')
+          old = '''        require(
+              contract.get("prune") is True,
+              "org-card publication must prune unmanaged legacy files",
+              failures,
+          )
+          require(
+              contract.get("allowed_deletions") == [],
+              "org-card publication must fail closed on every unexpected deletion",
+              failures,
+          )
+          '''
+          new = '''        require(
+              contract.get("prune") is False,
+              "org-card publication must preserve unmanaged remote files",
+              failures,
+          )
+          require(
+              contract.get("allowed_deletions") == [],
+              "org-card publication must have no deletion authority",
+              failures,
+          )
+          '''
+          if text.count(old) != 1:
+              raise SystemExit(f'expected one stale publication invariant, observed {text.count(old)}')
+          path.write_text(text.replace(old, new, 1), encoding='utf-8', newline='\n')
+          PY
+
+          python -m py_compile .github/scripts/public_front_door_check.py
+          python .github/scripts/public_front_door_check.py
+          python .github/scripts/test_public_front_door_check.py
+          git diff --check
+
+      - name: Remove one-shot workflow and commit
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm .github/workflows/patch-public-front-door-preservation-once.yml
+          git config user.name "szl-frontier-bot"
+          git config user.email "stephenlutar2+frontier@gmail.com"
+          git add .github/scripts/public_front_door_check.py .github/workflows/patch-public-front-door-preservation-once.yml
+          git commit -m "test(hf): enforce non-destructive org-card publication" -m "Signed-off-by: Stephen P. Lutar Jr. <stephenlutar2@gmail.com>"
+          git push origin HEAD:fix/hf-org-card-preserve-unmanaged-20260903
