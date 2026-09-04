@@ -14,7 +14,7 @@ license: apache-2.0
 
 <p align="center">
   <img src="https://huggingface.co/spaces/SZLHOLDINGS/README/resolve/main/assets/estate-command-system.svg"
-       alt="SZL governed AI command fabric with clear paths to understand, experience, explore, build, and verify"
+       alt="SZL governed AI command fabric: understand, experience, explore, build, and verify"
        width="100%" />
 </p>
 
@@ -22,7 +22,7 @@ license: apache-2.0
 
 # Governed AI. Inference. Command systems.
 
-Bounded, inspectable, reproducible decision infrastructure.
+Bounded, inspectable decision infrastructure.
 
 [**Enter A11oy**](https://a-11-oy.com) ·
 [**Experience eight verticals**](https://huggingface.co/spaces/SZLHOLDINGS/vertical-frontier) ·
@@ -51,7 +51,7 @@ check, humans bind consequential authority, and public effectors remain disabled
 ### Explore
 
 [**SZL Atlas**](https://huggingface.co/spaces/SZLHOLDINGS/szl-command-lab)
-indexes the public estate, source links, usage signals, and evidence boundaries.
+indexes the public estate, source, usage signals, and evidence boundaries.
 
 [Models](https://huggingface.co/SZLHOLDINGS/models) ·
 [Kernels](https://huggingface.co/SZLHOLDINGS/kernels) ·
@@ -59,16 +59,12 @@ indexes the public estate, source links, usage signals, and evidence boundaries.
 [Spaces](https://huggingface.co/SZLHOLDINGS/spaces) ·
 [Collections](https://huggingface.co/SZLHOLDINGS/collections)
 
-### Build
+### Build and verify
 
 Use [GitHub](https://github.com/szl-holdings) for source, tests, contracts,
-lineage, intended use, evaluation, compatibility, and limitations.
-
-### Verify
-
-Inspect the [trust boundary](https://github.com/szl-holdings/.github/blob/main/TRUST.md),
-exact revisions, and the
-[served source binding](https://szlholdings-readme.static.hf.space/deployment.json).
+lineage, intended use, evaluation, and limitations. Inspect the
+[trust boundary](https://github.com/szl-holdings/.github/blob/main/TRUST.md)
+and [served source binding](https://szlholdings-readme.static.hf.space/deployment.json).
 
 ## Command fabric
 
