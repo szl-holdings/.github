@@ -41,140 +41,12 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          python - <<'PY'
-          from __future__ import annotations
-
-          import json
-          from pathlib import Path
-
-          def replace_once(path: Path, old: str, new: str) -> None:
-              text = path.read_text(encoding="utf-8")
-              count = text.count(old)
-              if count != 1:
-                  raise SystemExit(f"{path}: expected one replacement target, observed {count}")
-              path.write_text(text.replace(old, new, 1), encoding="utf-8", newline="\n")
-
-          manifest_path = Path("huggingface/org-card.manifest.json")
-          manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
-          if manifest.get("prune") is not True:
-              raise SystemExit("org-card manifest no longer has the reviewed prune=true predecessor")
-          if manifest.get("allowed_deletions") != []:
-              raise SystemExit("org-card manifest deletion allowlist changed unexpectedly")
-          manifest["prune"] = False
-          manifest_path.write_text(
-              json.dumps(manifest, indent=2, ensure_ascii=False) + "\n",
-              encoding="utf-8",
-              newline="\n",
-          )
-
-          deploy_path = Path(".github/scripts/hf_static_space_deploy.py")
-          replace_once(
-              deploy_path,
-              "    return candidates\n\n\ndef publish(\n",
-              '''    return candidates
-
-
-def remote_file_set_matches(
-    contract: dict[str, Any], remote_files: set[str], wanted: set[str]
-) -> bool:
-    """Require exact parity when pruning and managed-file coverage otherwise."""
-
-    if bool(contract.get("prune")):
-        return remote_files == wanted
-    return wanted.issubset(remote_files)
-
-
-def publish(
-''',
-          )
-          replace_once(
-              deploy_path,
-              "    remote_file_set_match = False\n    immutable_files_match = False\n",
-              "    remote_file_set_match = False\n    preserved_paths: list[str] = []\n    immutable_files_match = False\n",
-          )
-          replace_once(
-              deploy_path,
-              "            remote_file_set_match = commit_files == wanted\n            if (\n",
-              '''            remote_file_set_match = remote_file_set_matches(
-                contract, commit_files, wanted
-            )
-            preserved_paths = (
-                sorted(commit_files - wanted)
-                if not bool(contract.get("prune"))
-                else []
-            )
-            if (
-''',
-          )
-          replace_once(
-              deploy_path,
-              '                    "deleted_paths": deleted,\n                    "remote_file_set": sorted(commit_files),\n',
-              '                    "deleted_paths": deleted,\n                    "preserved_paths": preserved_paths,\n                    "remote_file_set": sorted(commit_files),\n',
-          )
-          replace_once(
-              deploy_path,
-              '            "deleted_paths": deleted,\n            "remote_file_set_match": remote_file_set_match,\n',
-              '            "deleted_paths": deleted,\n            "preserved_paths": preserved_paths,\n            "remote_file_set_match": remote_file_set_match,\n',
-          )
-
-          static_tests = Path(".github/scripts/test_hf_static_space_deploy.py")
-          replace_once(
-              static_tests,
-              "    def test_prune_aborts_on_unexpected_remote_path(self):\n",
-              '''    def test_non_prune_preserves_unmanaged_remote_paths(self):
-        contract, _ = deploy.load_contract(self.root, self.manifest)
-        contract["prune"] = False
-        remote = {"README.md", "index.html", "unmanaged.txt"}
-        wanted = {"README.md", "index.html"}
-
-        self.assertEqual(deploy.planned_deletions(contract, remote, wanted), [])
-        self.assertTrue(deploy.remote_file_set_matches(contract, remote, wanted))
-        self.assertFalse(
-            deploy.remote_file_set_matches(contract, {"README.md"}, wanted)
-        )
-
-    def test_prune_requires_exact_remote_file_set(self):
-        contract, _ = deploy.load_contract(self.root, self.manifest)
-        wanted = {"README.md", "index.html"}
-
-        self.assertTrue(deploy.remote_file_set_matches(contract, wanted, wanted))
-        self.assertFalse(
-            deploy.remote_file_set_matches(
-                contract,
-                {"README.md", "index.html", "unmanaged.txt"},
-                wanted,
-            )
-        )
-
-    def test_prune_aborts_on_unexpected_remote_path(self):
-''',
-          )
-
-          central_tests = Path(".github/scripts/test_hf_org_card_autopublish.py")
-          replace_once(
-              central_tests,
-              "    def test_report_redacts_provider_tokens(self):\n",
-              '''    def test_production_manifest_preserves_unmanaged_remote_files(self):
-        repo_root = Path(__file__).resolve().parents[2]
-        contract, _ = publisher.deploy.load_contract(
-            repo_root,
-            repo_root / "huggingface" / "org-card.manifest.json",
-        )
-        self.assertFalse(contract["prune"])
-        self.assertEqual(contract.get("allowed_deletions"), [])
-
-    def test_report_redacts_provider_tokens(self):
-''',
-          )
-          PY
-
-          python -m py_compile \
-            .github/scripts/hf_static_space_deploy.py \
-            .github/scripts/hf_org_card_autopublish.py
-          python -m unittest discover \
-            -s .github/scripts -p 'test_hf_static_space_deploy.py'
-          python -m unittest discover \
-            -s .github/scripts -p 'test_hf_org_card_autopublish.py'
+          printf '%s' 'ZnJvbSBfX2Z1dHVyZV9fIGltcG9ydCBhbm5vdGF0aW9ucwoKaW1wb3J0IGpzb24KZnJvbSBwYXRobGliIGltcG9ydCBQYXRoCgoKZGVmIHJlcGxhY2Vfb25jZShwYXRoOiBQYXRoLCBvbGQ6IHN0ciwgbmV3OiBzdHIpIC0+IE5vbmU6CiAgICB0ZXh0ID0gcGF0aC5yZWFkX3RleHQoZW5jb2Rpbmc9InV0Zi04IikKICAgIGNvdW50ID0gdGV4dC5jb3VudChvbGQpCiAgICBpZiBjb3VudCAhPSAxOgogICAgICAgIHJhaXNlIFN5c3RlbUV4aXQoZiJ7cGF0aH06IGV4cGVjdGVkIG9uZSByZXBsYWNlbWVudCB0YXJnZXQsIG9ic2VydmVkIHtjb3VudH0iKQogICAgcGF0aC53cml0ZV90ZXh0KHRleHQucmVwbGFjZShvbGQsIG5ldywgMSksIGVuY29kaW5nPSJ1dGYtOCIsIG5ld2xpbmU9IlxuIikKCgptYW5pZmVzdF9wYXRoID0gUGF0aCgiaHVnZ2luZ2ZhY2Uvb3JnLWNhcmQubWFuaWZlc3QuanNvbiIpCm1hbmlmZXN0ID0ganNvbi5sb2FkcyhtYW5pZmVzdF9wYXRoLnJlYWRfdGV4dChlbmNvZGluZz0idXRmLTgiKSkKaWYgbWFuaWZlc3QuZ2V0KCJwcnVuZSIpIGlzIG5vdCBUcnVlOgogICAgcmFpc2UgU3lzdGVtRXhpdCgib3JnLWNhcmQgbWFuaWZlc3Qgbm8gbG9uZ2VyIGhhcyB0aGUgcmV2aWV3ZWQgcHJ1bmU9dHJ1ZSBwcmVkZWNlc3NvciIpCmlmIG1hbmlmZXN0LmdldCgiYWxsb3dlZF9kZWxldGlvbnMiKSAhPSBbXToKICAgIHJhaXNlIFN5c3RlbUV4aXQoIm9yZy1jYXJkIG1hbmlmZXN0IGRlbGV0aW9uIGFsbG93bGlzdCBjaGFuZ2VkIHVuZXhwZWN0ZWRseSIpCm1hbmlmZXN0WyJwcnVuZSJdID0gRmFsc2UKbWFuaWZlc3RfcGF0aC53cml0ZV90ZXh0KAogICAganNvbi5kdW1wcyhtYW5pZmVzdCwgaW5kZW50PTIsIGVuc3VyZV9hc2NpaT1GYWxzZSkgKyAiXG4iLAogICAgZW5jb2Rpbmc9InV0Zi04IiwKICAgIG5ld2xpbmU9IlxuIiwKKQoKZGVwbG95X3BhdGggPSBQYXRoKCIuZ2l0aHViL3NjcmlwdHMvaGZfc3RhdGljX3NwYWNlX2RlcGxveS5weSIpCnJlcGxhY2Vfb25jZSgKICAgIGRlcGxveV9wYXRoLAogICAgIiAgICByZXR1cm4gY2FuZGlkYXRlc1xuXG5cbmRlZiBwdWJsaXNoKFxuIiwKICAgICIgICAgcmV0dXJuIGNhbmRpZGF0ZXNcblxuXG4iCiAgICAiZGVmIHJlbW90ZV9maWxlX3NldF9tYXRjaGVzKFxuIgogICAgIiAgICBjb250cmFjdDogZGljdFtzdHIsIEFueV0sIHJlbW90ZV9maWxlczogc2V0W3N0cl0sIHdhbnRlZDogc2V0W3N0cl1cbiIKICAgICIpIC0+IGJvb2w6XG4iCiAgICAnICAgICIiIlJlcXVpcmUgZXhhY3QgcGFyaXR5IHdoZW4gcHJ1bmluZyBhbmQgbWFuYWdlZC1maWxlIGNvdmVyYWdlIG90aGVyd2lzZS4iIiJcbicKICAgICJcbiIKICAgICcgICAgaWYgYm9vbChjb250cmFjdC5nZXQoInBydW5lIikpOlxuJwogICAgIiAgICAgICAgcmV0dXJuIHJlbW90ZV9maWxlcyA9PSB3YW50ZWRcbiIKICAgICIgICAgcmV0dXJuIHdhbnRlZC5pc3N1YnNldChyZW1vdGVfZmlsZXMpXG4iCiAgICAiXG4iCiAgICAiXG4iCiAgICAiZGVmIHB1Ymxpc2goXG4iLAopCnJlcGxhY2Vfb25jZSgKICAgIGRlcGxveV9wYXRoLAogICAgIiAgICByZW1vdGVfZmlsZV9zZXRfbWF0Y2ggPSBGYWxzZVxuICAgIGltbXV0YWJsZV9maWxlc19tYXRjaCA9IEZhbHNlXG4iLAogICAgIiAgICByZW1vdGVfZmlsZV9zZXRfbWF0Y2ggPSBGYWxzZVxuIgogICAgIiAgICBwcmVzZXJ2ZWRfcGF0aHM6IGxpc3Rbc3RyXSA9IFtdXG4iCiAgICAiICAgIGltbXV0YWJsZV9maWxlc19tYXRjaCA9IEZhbHNlXG4iLAopCnJlcGxhY2Vfb25jZSgKICAgIGRlcGxveV9wYXRoLAogICAgIiAgICAgICAgICAgIHJlbW90ZV9maWxlX3NldF9tYXRjaCA9IGNvbW1pdF9maWxlcyA9PSB3YW50ZWRcbiIKICAgICIgICAgICAgICAgICBpZiAoXG4iLAogICAgIiAgICAgICAgICAgIHJlbW90ZV9maWxlX3NldF9tYXRjaCA9IHJlbW90ZV9maWxlX3NldF9tYXRjaGVzKFxuIgogICAgIiAgICAgICAgICAgICAgICBjb250cmFjdCwgY29tbWl0X2ZpbGVzLCB3YW50ZWRcbiIKICAgICIgICAgICAgICAgICApXG4iCiAgICAiICAgICAgICAgICAgcHJlc2VydmVkX3BhdGhzID0gKFxuIgogICAgIiAgICAgICAgICAgICAgICBzb3J0ZWQoY29tbWl0X2ZpbGVzIC0gd2FudGVkKVxuIgogICAgJyAgICAgICAgICAgICAgICBpZiBub3QgYm9vbChjb250cmFjdC5nZXQoInBydW5lIikpXG4nCiAgICAiICAgICAgICAgICAgICAgIGVsc2UgW11cbiIKICAgICIgICAgICAgICAgICApXG4iCiAgICAiICAgICAgICAgICAgaWYgKFxuIiwKKQpyZXBsYWNlX29uY2UoCiAgICBkZXBsb3lfcGF0aCwKICAgICcgICAgICAgICAgICAgICAgICAgICJkZWxldGVkX3BhdGhzIjogZGVsZXRlZCxcbicKICAgICcgICAgICAgICAgICAgICAgICAgICJyZW1vdGVfZmlsZV9zZXQiOiBzb3J0ZWQoY29tbWl0X2ZpbGVzKSxcbicsCiAgICAnICAgICAgICAgICAgICAgICAgICAiZGVsZXRlZF9wYXRocyI6IGRlbGV0ZWQsXG4nCiAgICAnICAgICAgICAgICAgICAgICAgICAicHJlc2VydmVkX3BhdGhzIjogcHJlc2VydmVkX3BhdGhzLFxuJwogICAgJyAgICAgICAgICAgICAgICAgICAgInJlbW90ZV9maWxlX3NldCI6IHNvcnRlZChjb21taXRfZmlsZXMpLFxuJywKKQpyZXBsYWNlX29uY2UoCiAgICBkZXBsb3lfcGF0aCwKICAgICcgICAgICAgICAgICAiZGVsZXRlZF9wYXRocyI6IGRlbGV0ZWQsXG4nCiAgICAnICAgICAgICAgICAgInJlbW90ZV9maWxlX3NldF9tYXRjaCI6IHJlbW90ZV9maWxlX3NldF9tYXRjaCxcbicsCiAgICAnICAgICAgICAgICAgImRlbGV0ZWRfcGF0aHMiOiBkZWxldGVkLFxuJwogICAgJyAgICAgICAgICAgICJwcmVzZXJ2ZWRfcGF0aHMiOiBwcmVzZXJ2ZWRfcGF0aHMsXG4nCiAgICAnICAgICAgICAgICAgInJlbW90ZV9maWxlX3NldF9tYXRjaCI6IHJlbW90ZV9maWxlX3NldF9tYXRjaCxcbicsCikKCnN0YXRpY190ZXN0cyA9IFBhdGgoIi5naXRodWIvc2NyaXB0cy90ZXN0X2hmX3N0YXRpY19zcGFjZV9kZXBsb3kucHkiKQpyZXBsYWNlX29uY2UoCiAgICBzdGF0aWNfdGVzdHMsCiAgICAiICAgIGRlZiB0ZXN0X3BydW5lX2Fib3J0c19vbl91bmV4cGVjdGVkX3JlbW90ZV9wYXRoKHNlbGYpOlxuIiwKICAgICIgICAgZGVmIHRlc3Rfbm9uX3BydW5lX3ByZXNlcnZlc191bm1hbmFnZWRfcmVtb3RlX3BhdGhzKHNlbGYpOlxuIgogICAgIiAgICAgICAgY29udHJhY3QsIF8gPSBkZXBsb3kubG9hZF9jb250cmFjdChzZWxmLnJvb3QsIHNlbGYubWFuaWZlc3QpXG4iCiAgICAnICAgICAgICBjb250cmFjdFsicHJ1bmUiXSA9IEZhbHNlXG4nCiAgICAnICAgICAgICByZW1vdGUgPSB7IlJFQURNRS5tZCIsICJpbmRleC5odG1sIiwgInVubWFuYWdlZC50eHQifVxuJwogICAgJyAgICAgICAgd2FudGVkID0geyJSRUFETUUubWQiLCAiaW5kZXguaHRtbCJ9XG4nCiAgICAiXG4iCiAgICAiICAgICAgICBzZWxmLmFzc2VydEVxdWFsKGRlcGxveS5wbGFubmVkX2RlbGV0aW9ucyhjb250cmFjdCwgcmVtb3RlLCB3YW50ZWQpLCBbXSlcbiIKICAgICIgICAgICAgIHNlbGYuYXNzZXJ0VHJ1ZShkZXBsb3kucmVtb3RlX2ZpbGVfc2V0X21hdGNoZXMoY29udHJhY3QsIHJlbW90ZSwgd2FudGVkKSlcbiIKICAgICIgICAgICAgIHNlbGYuYXNzZXJ0RmFsc2UoXG4iCiAgICAnICAgICAgICAgICAgZGVwbG95LnJlbW90ZV9maWxlX3NldF9tYXRjaGVzKGNvbnRyYWN0LCB7IlJFQURNRS5tZCJ9LCB3YW50ZWQpXG4nCiAgICAiICAgICAgICApXG4iCiAgICAiXG4iCiAgICAiICAgIGRlZiB0ZXN0X3BydW5lX3JlcXVpcmVzX2V4YWN0X3JlbW90ZV9maWxlX3NldChzZWxmKTpcbiIKICAgICIgICAgICAgIGNvbnRyY3QsIF8gPSBkZXBsb3kubG9hZF9jb250cmFjdChzZWxmLnJvb3QsIHNlbGYubWFuaWZlc3QpXG4iCiAgICAnICAgICAgICB3YW50ZWQgPSB7IlJFQURNRS5tZCIsICJpbmRleC5odG1sIn1cbi' | base64 --decode > "$RUNNER_TEMP/patch_hf_preservation.py"
+          printf '%s' 'CgogICAgICAgIHNlbGYuYXNzZXJ0VHJ1ZShkZXBsb3kucmVtb3RlX2ZpbGVfc2V0X21hdGNoZXMoY29udHJhY3QsIHdhbnRlZCwgd2FudGVkKSlcbiIKICAgICIgICAgICAgIHNlbGYuYXNzZXJ0RmFsc2UoXG4iCiAgICAiICAgICAgICAgICAgZGVwbG95LnJlbW90ZV9maWxlX3NldF9tYXRjaGVzKFxuIgogICAgIiAgICAgICAgICAgICAgICBjb250cmFjdCxcbiIKICAgICcgICAgICAgICAgICAgICAgeyJSRUFETUUubWQiLCAiaW5kZXguaHRtbCIsICJ1bm1hbmFnZWQudHh0In0sXG4nCiAgICAiICAgICAgICAgICAgICAgIHdhbnRlZCxcbiIKICAgICIgICAgICAgICAgICApXG4iCiAgICAiICAgICAgICApXG4iCiAgICAiXG4iCiAgICAiICAgIGRlZiB0ZXN0X3BydW5lX2Fib3J0c19vbl91bmV4cGVjdGVkX3JlbW90ZV9wYXRoKHNlbGYpOlxuIiwKKQpyZXBsYWNlX29uY2UoCiAgICBkZXBsb3lfcGF0aCwKICAgICcgICAgICAgICAgICAgICAgICAgICJkZWxldGVkX3BhdGhzIjogZGVsZXRlZCxcbicKICAgICcgICAgICAgICAgICAgICAgICAgICJyZW1vdGVfZmlsZV9zZXQiOiBzb3J0ZWQoY29tbWl0X2ZpbGVzKSxcbicsCiAgICAnICAgICAgICAgICAgICAgICAgICAiZGVsZXRlZF9wYXRocyI6IGRlbGV0ZWQsXG4nCiAgICAnICAgICAgICAgICAgICAgICAgICAicHJlc2VydmVkX3BhdGhzIjogcHJlc2VydmVkX3BhdGhzLFxuJwogICAgJyAgICAgICAgICAgICAgICAgICAgInJlbW90ZV9maWxlX3NldCI6IHNvcnRlZChjb21taXRfZmlsZXMpLFxuJywKKQpyZXBsYWNlX29uY2UoCiAgICBkZXBsb3lfcGF0aCwKICAgICcgICAgICAgICAgICAiZGVsZXRlZF9wYXRocyI6IGRlbGV0ZWQsXG4nCiAgICAnICAgICAgICAgICAgInJlbW90ZV9maWxlX3NldF9tYXRjaCI6IHJlbW90ZV9maWxlX3NldF9tYXRjaCxcbicsCiAgICAnICAgICAgICAgICAgImRlbGV0ZWRfcGF0aHMiOiBkZWxldGVkLFxuJwogICAgJyAgICAgICAgICAgICJwcmVzZXJ2ZWRfcGF0aHMiOiBwcmVzZXJ2ZWRfcGF0aHMsXG4nCiAgICAnICAgICAgICAgICAgInJlbW90ZV9maWxlX3NldF9tYXRjaCI6IHJlbW90ZV9maWxlX3NldF9tYXRjaCxcbicsCikKCnN0YXRpY190ZXN0cyA9IFBhdGgoIi5naXRodWIvc2NyaXB0cy90ZXN0X2hmX3N0YXRpY19zcGFjZV9kZXBsb3kucHkiKQpyZXBsYWNlX29uY2UoCiAgICBzdGF0aWNfdGVzdHMsCiAgICAiICAgIGRlZiB0ZXN0X3BydW5lX2Fib3J0c19vbl91bmV4cGVjdGVkX3JlbW90ZV9wYXRoKHNlbGYpOlxuIiwKICAgICIgICAgZGVmIHRlc3Rfbm9uX3BydW5lX3ByZXNlcnZlc191bm1hbmFnZWRfcmVtb3RlX3BhdGhzKHNlbGYpOlxuIgogICAgIiAgICAgICAgY29udHJhY3QsIF8gPSBkZXBsb3kubG9hZF9jb250cmFjdChzZWxmLnJvb3QsIHNlbGYubWFuaWZlc3QpXG4iCiAgICAnICAgICAgICBjb250cmFjdFsicHJ1bmUiXSA9IEZhbHNlXG4nCiAgICAnICAgICAgICByZW1vdGUgPSB7IlJFQURNRS5tZCIsICJpbmRleC5odG1sIiwgInVubWFuYWdlZC50eHQifVxuJwogICAgJyAgICAgICAgd2FudGVkID0geyJSRUFETUUubWQiLCAiaW5kZXguaHRtbCJ9XG4nCiAgICAiXG4iCiAgICAiICAgICAgICBzZWxmLmFzc2VydEVxdWFsKGRlcGxveS5wbGFubmVkX2RlbGV0aW9ucyhjb250cmFjdCwgcmVtb3RlLCB3YW50ZWQpLCBbXSlcbiIKICAgICIgICAgICAgIHNlbGYuYXNzZXJ0VHJ1ZShkZXBsb3kucmVtb3RlX2ZpbGVfc2V0X21hdGNoZXMoY29udHJhY3QsIHJlbW90ZSwgd2FudGVkKSlcbiIKICAgICIgICAgICAgIHNlbGYuYXNzZXJ0RmFsc2UoXG4iCiAgICAnICAgICAgICAgICAgZGVwbG95LnJlbW90ZV9maWxlX3NldF9tYXRjaGVzKGNvbnRyYWN0LCB7IlJFQURNRS5tZCJ9LCB3YW50ZWQpXG4nCiAgICAiICAgICAgICApXG4iCiAgICAiXG4iCiAgICAiICAgIGRlZiB0ZXN0X3BydW5lX3JlcXVpcmVzX2V4YWN0X3JlbW90ZV9maWxlX3NldChzZWxmKTpcbiIKICAgICIgICAgICAgIGNvbnRyYWN0LCBfID0gZGVwbG95LmxvYWRfY29udHJhY3Qoc2VsZi5yb290LCBzZWxmLm1hbmlmZXN0KVxuIgogICAgJyAgICAgICAgd2FudGVkID0geyJSRUFETUUubWQiLCAiaW5kZXguaHRtbCJ9XG4nCiAgICAiXG4iCiAgICAiICAgICAgICBzZWxmLmFzc2VydFRydWUoZGVwbG95LnJlbW90ZV9maWxlX3NldF9tYXRjaGVzKGNvbnRyYWN0LCB3YW50ZWQsIHdhbnRlZCkpXG4iCiAgICAiICAgICAgICBzZWxmLmFzc2VydEZhbHNlKFxuIgogICAgIiAgICAgICAgICAgIGRlcGxveS5yZW1vdGVfZmlsZV9zZXRfbWF0Y2hlcyhcbiIKICAgICIgICAgICAgICAgICAgICAgY29udHJhY3QsXG4iCiAgICAnICAgICAgICAgICAgICAgIHsiUkVBRE1FLm1kIiwgImluZGV4Lmh0bWwiLCAidW5tYW5hZ2VkLnR4dCJ9LFxuJwogICAgIiAgICAgICAgICAgICAgICB3YW50ZWQsXG4iCiAgICAiICAgICAgICAgICAgKVxuIgogICAgIiAgICAgICAgKVxuIgogICAgIlxuIgogICAgIiAgICBkZWYgdGVzdF9wcnVuZV9hYm9ydHNfb25fdW5leHBlY3RlZF9yZW1vdGVfcGF0aChzZWxmKTpcbiIsCikKCmNlbnRyYWxfdGVzdHMgPSBQYXRoKCIuZ2l0aHViL3NjcmlwdHMvdGVzdF9oZl9vcmdfY2FyZF9hdXRvcHVibGlzaC5weSIpCnJlcGxhY2Vfb25jZSgKICAgIGNlbnRyYWxfdGVzdHMsCiAgICAiICAgIGRlZiB0ZXN0X3JlcG9ydF9yZWRhY3RzX3Byb3ZpZGVyX3Rva2VucyhzZWxmKTpcbiIsCiAgICAiICAgIGRlZiB0ZXN0X3Byb2R1Y3Rpb25fbWFuaWZlc3RfcHJlc2VydmVzX3VubWFuYWdlZF9yZW1vdGVfZmlsZXMoc2VsZik6XG4iCiAgICAiICAgICAgICByZXBvX3Jvb3QgPSBQYXRoKF9fZmlsZV9fKS5yZXNvbHZlKCkucGFyZW50c1syXVxuIgogICAgIiAgICAgICAgY29udHJhY3QsIF8gPSBwdWJsaXNoZXIuZGVwbG95LmxvYWRfY29udHJhY3QoXG4iCiAgICAiICAgICAgICAgICAgcmVwb19yb290LFxuIgogICAgJyAgICAgICAgICAgIHJlcG9fcm9vdCAvICJodWdnaW5nZmFjZSIgLyAib3JnLWNhcmQubWFuaWZlc3QuanNvbiIsXG4nCiAgICAiICAgICAgICApXG4iCiAgICAnICAgICAgICBzZWxmLmFzc2VydEZhbHNlKGNvbnRyYWN0WyJwcnVuZSJdKVxuJwogICAgJyAgICAgICAgc2VsZi5hc3NlcnRFcXVhbChjb250cmFjdC5nZXQoImFsbG93ZWRfZGVsZXRpb25zIiksIFtdKVxuJwogICAgIlxuIgogICAgIiAgICBkZWYgdGVzdF9yZXBvcnRfcmVkYWN0c19wcm92aWRlcl90b2tlbnMoc2VsZik6XG4iLAopCg==' | base64 --decode >> "$RUNNER_TEMP/patch_hf_preservation.py"
+          python "$RUNNER_TEMP/patch_hf_preservation.py"
+          python -m py_compile .github/scripts/hf_static_space_deploy.py .github/scripts/hf_org_card_autopublish.py
+          python -m unittest discover -s .github/scripts -p 'test_hf_static_space_deploy.py'
+          python -m unittest discover -s .github/scripts -p 'test_hf_org_card_autopublish.py'
 
       - name: Remove one-shot workflow and commit reviewed patch
         shell: bash
@@ -184,13 +56,6 @@ def publish(
           git diff --check
           git config user.name "szl-frontier-bot"
           git config user.email "stephenlutar2+frontier@gmail.com"
-          git add \
-            .github/scripts/hf_static_space_deploy.py \
-            .github/scripts/test_hf_static_space_deploy.py \
-            .github/scripts/test_hf_org_card_autopublish.py \
-            huggingface/org-card.manifest.json \
-            .github/workflows/patch-hf-org-card-preservation-once.yml
-          git commit \
-            -m "fix(hf): preserve unmanaged organization-card files" \
-            -m "Signed-off-by: Stephen P. Lutar Jr. <stephenlutar2@gmail.com>"
+          git add .github/scripts/hf_static_space_deploy.py .github/scripts/test_hf_static_space_deploy.py .github/scripts/test_hf_org_card_autopublish.py huggingface/org-card.manifest.json .github/workflows/patch-hf-org-card-preservation-once.yml
+          git commit -m "fix(hf): preserve unmanaged organization-card files" -m "Signed-off-by: Stephen P. Lutar Jr. <stephenlutar2@gmail.com>"
           git push origin HEAD:fix/hf-org-card-preserve-unmanaged-20260903
