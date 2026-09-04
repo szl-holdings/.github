@@ -383,7 +383,7 @@ def resolve_targets(
 
 
 def strip_marker_block(text: str, start: str, end: str) -> str:
-    pattern = re.compile(re.escape(start) + r".*?" + re.escape(end) + r"\s*", re.DOTALL)
+    pattern = re.compile(r"(?:[ \t]*\r?\n)?" + re.escape(start) + r".*?" + re.escape(end) + r"[ \t]*(?:\r?\n)?", re.DOTALL)
     return pattern.sub("", text)
 
 

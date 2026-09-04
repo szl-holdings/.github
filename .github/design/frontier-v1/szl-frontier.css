@@ -162,13 +162,13 @@
     mask-image: linear-gradient(to bottom, black, transparent 78%);
   }
 
-  body[data-szl-frontier="killinchu"]::after {
+  body.szl-frontier[data-szl-frontier="killinchu"]::after {
     transform: skewY(-2deg) scale(1.05);
     transform-origin: top right;
     background-size: 82px 24px;
   }
 
-  body[data-szl-frontier="hatun"]::after {
+  body.szl-frontier[data-szl-frontier="hatun"]::after {
     opacity: .3;
     background-image:
       radial-gradient(circle at center, transparent 0 20px, rgba(var(--szl-accent-rgb), .075) 21px 22px, transparent 23px),
