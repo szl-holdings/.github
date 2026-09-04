@@ -114,13 +114,17 @@ jobs:
           if 'strategy' in publish:
               raise SystemExit('Atlas publisher must not recreate a fleet matrix')
 
+          # Inspect only the provider-writing job. The validator's own negative
+          # controls intentionally name forbidden patterns and must not trip
+          # themselves.
+          publish_text = yaml.safe_dump(publish, sort_keys=True)
           forbidden = (
-              'SZLHOLDINGS/szl-real-estate',
-              'SZLHOLDINGS/lyte-lattice',
-              'matrix.repo',
-              'matrix.hf_repo',
+              'SZL' + 'HOLDINGS/szl-real-estate',
+              'SZL' + 'HOLDINGS/lyte-lattice',
+              'matrix' + '.repo',
+              'matrix' + '.hf_repo',
           )
-          present = [value for value in forbidden if value in text]
+          present = [value for value in forbidden if value in publish_text]
           if present:
               raise SystemExit(f'obsolete Space authority remains: {present!r}')
 
