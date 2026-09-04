@@ -1,0 +1,49 @@
+{
+  "schema": "szl.estate.alignment/v1",
+  "effective_date": "2026-09-04",
+  "public_front_door": "https://a-11-oy.com",
+  "proof_registry": "https://a11oy.net",
+  "hub_org": "SZLHOLDINGS",
+  "github_org": "szl-holdings",
+  "authority": {
+    "governed_fabric": "szl-holdings/a11oy",
+    "policy_veto": "szl-holdings/hatun-mcp",
+    "memory": "szl-holdings/szl-second-brain",
+    "inference_qualification": "szl-holdings/szl-forge",
+    "serving": "szl-holdings/szl-serve",
+    "kernels": "szl-holdings/szl-kernels",
+    "receipts": "szl-holdings/szl-receipt",
+    "formula_authority": "szl-holdings/szl-formulas",
+    "anatomy": "szl-holdings/anatomy",
+    "frontier_admission": "szl-holdings/szl-frontier"
+  },
+  "public_bodies": [
+    {"id":"terra","source":"szl-holdings/szl-real-estate","surface":"SZLHOLDINGS/terra","domain":"real-estate"},
+    {"id":"killinchu","source":"szl-holdings/killinchu","surface":"SZLHOLDINGS/killinchu","domain":"cyber-physical-resilience"},
+    {"id":"prism-counsel","source":"szl-holdings/platform","surface":"SZLHOLDINGS/prism-counsel","domain":"legal"},
+    {"id":"puriq","source":"szl-holdings/puriq-live","surface":"SZLHOLDINGS/puriq","domain":"financial-intelligence"},
+    {"id":"lyte","source":"szl-holdings/lyte-services","surface":"SZLHOLDINGS/lyte","domain":"business-and-agent-observability"}
+  ],
+  "killinchu_capability_planes": ["aegis","sentra-defend","immune","vessels-maritime","counter-uas-airspace"],
+  "shared_invariants": {
+    "default_effect": "deny",
+    "model_authority": "proposal-only",
+    "human_approval_for_consequential_action": true,
+    "receipt_required_for_promoted_state_change": true,
+    "frontier_release_default": "HOLD",
+    "locked_formula_set": ["F1","F4","F7","F11","F12","F18","F19","F22"],
+    "lambda_status": "Conjecture 1",
+    "no_vertical_may_redefine_formula_ids": true,
+    "no_hf_card_implies_production": true,
+    "no_runtime_claim_without_live_evidence": true
+  },
+  "frontier_wave_2026_09_04": {
+    "webgpu_kernels": ["szl-kernels","szl-serve"],
+    "neomme": ["szl-second-brain","lyte-services"],
+    "funes_memory_pattern": ["szl-second-brain"],
+    "vibevoice_streaming_asr": ["szl-serve"],
+    "fineweb_supernova": ["szl-second-brain","lyte-services","szl-frontier"],
+    "puffin_world": ["szl-khipu"],
+    "granite_timeseries": ["lyte-services"]
+  }
+}
