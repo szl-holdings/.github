@@ -73,7 +73,7 @@ jobs:
               'contents: read',
               'issues: write',
               'persist-credentials: false',
-              'ref: ${{ github.sha }}',
+              'ref: ${{ '${{ github.sha }}' }}',
               'github.event.repository.default_branch',
               'cancel-in-progress: false',
           )
