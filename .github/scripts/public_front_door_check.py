@@ -62,6 +62,13 @@ REQUIRED_PUBLICATION_BINDINGS = {
     "assets/hf-card-models.svg": "profile/assets/hf-card-models.svg",
     "assets/hf-card-evidence.svg": "profile/assets/hf-card-evidence.svg",
     WEBP_DESTINATION: CANONICAL_WEBP,
+    "GOVERNANCE.md": "huggingface/org-card/GOVERNANCE.md",
+    "MODELS.txt": "huggingface/org-card/MODELS.txt",
+    "SEVEN_SPACES.md": "huggingface/org-card/SEVEN_SPACES.md",
+    "SPACE_PROVENANCE_FRONTIER.json": (
+        "huggingface/org-card/SPACE_PROVENANCE_FRONTIER.json"
+    ),
+    "seven-spaces.yaml": "huggingface/org-card/seven-spaces.yaml",
 }
 REQUIRED_PUSH_PATHS = {
     "huggingface/org-card/**",
