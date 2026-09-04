@@ -71,6 +71,6 @@ jobs:
           set -euo pipefail
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add .github/design/frontier-v1/szl-frontier.css .github/scripts/rollout_frontier_design.py .github/workflows/fix-frontier-kernel-contract-once.yml
+          git add -A
           git commit -m 'fix(frontier): make selectors unique and patching idempotent' -m 'Signed-off-by: Stephen Lutar <stephenlutar2@gmail.com>'
           git push origin HEAD:feat/frontier-design-kernel-v1-20260903
