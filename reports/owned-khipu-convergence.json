@@ -1,0 +1,19 @@
+{
+  "admin_bypass": false,
+  "error": "GitHub GET /repos/szl-holdings/a11oy/contents/a11oy_owned_cortex.py?ref=420fcfc36b71858e46a81f669546be1ce2f8a2b6: HTTP 404: {\"message\":\"Not Found\",\"documentation_url\":\"https://docs.github.com/rest/repos/contents#get-repository-content\",\"status\":\"404\"}",
+  "error_type": "RuntimeError",
+  "finished_at": "2026-09-04T22:14:24.188772+00:00",
+  "force_push": false,
+  "github_token_alias": "SZL_GITHUB_TOKEN",
+  "head_branch": "feat/hf-owned-khipu-cortex-v1",
+  "hf_origin": "https://szlholdings-a11oy.hf.space",
+  "main_sha": "420fcfc36b71858e46a81f669546be1ce2f8a2b6",
+  "pull_request_state": "NO_OPEN_PR",
+  "report_sha256": "debaa76d5127a3446480a96ebb2ffe644b334bf53ec530d06a96028fa5e60e8e",
+  "repository": "szl-holdings/a11oy",
+  "schema": "szl.owned-khipu-convergence/v1",
+  "secret_values_recorded": false,
+  "self_approval": false,
+  "started_at": "2026-09-04T22:14:23.405294+00:00",
+  "state": "FAILED"
+}
