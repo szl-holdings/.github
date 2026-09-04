@@ -6,6 +6,7 @@ from __future__ import annotations
 import importlib.util
 import json
 import re
+import sys
 import unittest
 from pathlib import Path
 
@@ -17,6 +18,7 @@ WORKFLOW = ROOT / ".github" / "workflows" / "frontier-design-rollout.yml"
 _spec = importlib.util.spec_from_file_location("rollout_frontier_design", SCRIPT)
 assert _spec and _spec.loader
 rollout = importlib.util.module_from_spec(_spec)
+sys.modules[_spec.name] = rollout
 _spec.loader.exec_module(rollout)
 
 
