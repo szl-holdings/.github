@@ -26,9 +26,9 @@ Frontier infrastructure for decisions that must remain bounded, inspectable,
 and reproducible.
 
 [**Enter the product**](https://a-11-oy.com) ·
-[**Build from source**](https://github.com/szl-holdings) ·
+[**Explore SZL Atlas**](https://huggingface.co/spaces/SZLHOLDINGS/szl-command-lab) ·
 [**Inspect evidence**](https://a11oy.net) ·
-[**Browse the Hub**](https://huggingface.co/SZLHOLDINGS)
+[**Build from source**](https://github.com/szl-holdings)
 
 </div>
 
@@ -40,11 +40,23 @@ Start with [A11oy](https://a-11-oy.com) for the product, operating boundary,
 and outcome. Review [diligence and evidence](https://a11oy.net) before relying
 on a capability claim.
 
+### Explore
+
+[**SZL Atlas**](https://huggingface.co/spaces/SZLHOLDINGS/szl-command-lab)
+is the searchable public estate: models, first-class kernels, datasets, Spaces,
+usage signals, source links, and evidence boundaries in one responsive surface.
+
+[Models](https://huggingface.co/SZLHOLDINGS/models) ·
+[Kernels](https://huggingface.co/SZLHOLDINGS/kernels) ·
+[Datasets](https://huggingface.co/SZLHOLDINGS/datasets) ·
+[Spaces](https://huggingface.co/SZLHOLDINGS/spaces) ·
+[Collections](https://huggingface.co/SZLHOLDINGS/collections)
+
 ### Build
 
 Use [GitHub](https://github.com/szl-holdings) for source, tests, contracts, and
-quick starts. Use the [Hub](https://huggingface.co/SZLHOLDINGS) for published
-models, kernels, datasets, and demonstrations.
+quick starts. Each published artifact owns its lineage, intended use,
+evaluation, compatibility, and limitations.
 
 ### Verify
 
@@ -54,19 +66,14 @@ exact revisions, limitations, and the
 
 ## Command fabric
 
-**A11oy** governs decisions and bounded execution.
-
-**Khipu models** and **SZL kernels** expose their own lineage, intended use,
-evaluation, compatibility, and limitation claims.
+**A11oy** governs decisions and bounded execution. **Khipu models** and
+**SZL kernels** provide portable reasoning and compute primitives.
 
 **Killinchu** is a public synthetic counter-UAS reference. Public actuation is
 **SIMULATED**; no live weapon command is claimed.
 
 **Receipt Verifier** checks scoped integrity and origin. It does not prove
 truth, safety, performance, compliance, or authorization.
-
-**SZL Lake** carries admitted evidence and data artifacts. Freshness,
-completeness, jurisdiction, and source limits remain explicit.
 
 <details>
 <summary><strong>Evidence architecture</strong></summary>
@@ -79,19 +86,20 @@ completeness, jurisdiction, and source limits remain explicit.
 
 ## Artifact contract
 
-Evidence labels and operational state are separate. A running Space or HTTP
-200 proves reachability only. Lambda uniqueness remains **Conjecture 1**.
+A running Space, public listing, download count, or HTTP 200 proves neither
+readiness nor superiority. Lambda uniqueness remains **Conjecture 1**.
 [`SZLHOLDINGS/SZLHOLDINGS`](https://huggingface.co/datasets/SZLHOLDINGS/SZLHOLDINGS)
 is a **HISTORICAL** mirror.
 
 ## Current state
 
-[A11oy readiness](https://a-11-oy.com/api/a11oy/v1/readiness) ·
-[Killinchu build](https://szlholdings-killinchu.hf.space/api/build-info) ·
-[Served source](https://szlholdings-readme.static.hf.space/deployment.json)
+[Atlas health](https://szlholdings-szl-command-lab.hf.space/healthz) ·
+[Live catalog](https://szlholdings-szl-command-lab.hf.space/api/catalog) ·
+[Atlas source binding](https://szlholdings-szl-command-lab.hf.space/api/build-info) ·
+[A11oy readiness](https://a-11-oy.com/api/a11oy/v1/readiness)
 
-No production authorization, regulatory approval, adoption, or investment
-outcome is claimed.
+No production authorization, regulatory approval, adoption, funding, revenue,
+or investment outcome is claimed.
 
 ## Reproduce and verify
 
@@ -109,6 +117,6 @@ python -m http.server 8000 --directory "$preview_dir"
 
 <div align="center">
 
-**Understand · build · verify**
+**Understand · explore · build · verify**
 
 </div>
