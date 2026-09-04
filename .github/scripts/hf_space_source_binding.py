@@ -33,6 +33,8 @@ import requests
 from huggingface_hub import HfApi
 
 SHA40 = re.compile(r"^[0-9a-f]{40}$")
+SHA256 = re.compile(r"^[0-9a-f]{64}$")
+ATTESTATION_ID = re.compile(r"^[0-9]+$")
 VARIABLE = re.compile(r"^[A-Z][A-Z0-9_]{0,63}$")
 REPO_ID = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]*/[A-Za-z0-9][A-Za-z0-9._-]*$")
 REPORT_SCHEMA = "szl.hf-space-source-binding/v1"
@@ -135,6 +137,72 @@ def _probe_headers(binding: Mapping[str, str], attempt: int) -> dict[str, str]:
     }
 
 
+def _reported_receipt_status(
+    payload: Mapping[str, Any], expected_revision: str
+) -> dict[str, Any]:
+    """Validate a read-only receipt observation without requiring absence.
+
+    A GET probe must never mint a receipt, but it may observe a release
+    attestation that the runtime loaded at startup. An asserted receipt is
+    admitted only when it is exact-source bound and has a canonical GitHub
+    OIDC attestation reference.
+    """
+
+    minted = payload.get("receipt_minted")
+    if minted is False:
+        return {
+            "minted": False,
+            "valid": True,
+            "state": "NOT_REPORTED_AS_MINTED",
+        }
+    if minted is not True:
+        return {
+            "minted": minted,
+            "valid": False,
+            "state": "INVALID_RECEIPT_FLAG",
+        }
+
+    receipt = payload.get("release_receipt")
+    if not isinstance(receipt, Mapping):
+        return {
+            "minted": True,
+            "valid": False,
+            "state": "MISSING_RELEASE_RECEIPT",
+        }
+
+    source_revision = str(receipt.get("source_revision") or "").lower()
+    subject = str(receipt.get("subject") or "")
+    digest = str(receipt.get("subject_sha256") or "").lower()
+    attestation_id = str(receipt.get("attestation_id") or "")
+    attestation_url = str(receipt.get("attestation_url") or "")
+    parsed = urlsplit(attestation_url)
+    parts = [part for part in parsed.path.split("/") if part]
+    canonical_url = (
+        parsed.scheme == "https"
+        and parsed.netloc == "github.com"
+        and parsed.username is None
+        and parsed.password is None
+        and not parsed.query
+        and not parsed.fragment
+        and len(parts) == 4
+        and parts[2] == "attestations"
+        and parts[3] == attestation_id
+    )
+    valid = (
+        str(receipt.get("state") or "").upper() == "GITHUB_OIDC_ATTESTED"
+        and source_revision == expected_revision
+        and subject == "hf-deploy-manifest.json"
+        and SHA256.fullmatch(digest) is not None
+        and ATTESTATION_ID.fullmatch(attestation_id) is not None
+        and canonical_url
+    )
+    return {
+        "minted": True,
+        "valid": valid,
+        "state": "GITHUB_OIDC_ATTESTED" if valid else "INVALID_RELEASE_RECEIPT",
+    }
+
+
 def _runtime_probe_observation(
     binding: Mapping[str, str],
     *,
@@ -191,17 +259,19 @@ def _runtime_probe_observation(
         return observation
     observed = str(build.get("revision") or "").lower()
     state = str(build.get("state") or "").upper()
-    receipt_minted = payload.get("receipt_minted")
+    receipt = _reported_receipt_status(payload, binding["revision"])
     matched = (
         observed == binding["revision"]
         and state == "OBSERVED"
-        and receipt_minted is False
+        and receipt["valid"] is True
     )
     observation.update(
         {
             "build_state": state,
             "observed_revision": observed,
-            "receipt_minted": receipt_minted,
+            "receipt_minted": receipt["minted"],
+            "receipt_state": receipt["state"],
+            "receipt_valid": receipt["valid"],
             "matched": matched,
         }
     )

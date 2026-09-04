@@ -87,12 +87,35 @@ class SourceBindingTests(unittest.TestCase):
         )
 
     @staticmethod
-    def observed_payload(revision: str) -> dict[str, object]:
-        return {
+    def observed_payload(
+        revision: str,
+        *,
+        receipt_minted: bool = False,
+        release_receipt: dict[str, object] | None = None,
+    ) -> dict[str, object]:
+        payload: dict[str, object] = {
             "status": "OBSERVED",
             "build": {"state": "OBSERVED", "revision": revision},
             "runtime": {"python": "3.12"},
-            "receipt_minted": False,
+            "receipt_minted": receipt_minted,
+        }
+        if release_receipt is not None:
+            payload["release_receipt"] = release_receipt
+        return payload
+
+    def valid_receipt(self, revision: str | None = None) -> dict[str, object]:
+        source_revision = revision or self.sha
+        attestation_id = "123456789"
+        return {
+            "state": "GITHUB_OIDC_ATTESTED",
+            "source_revision": source_revision,
+            "subject": "hf-deploy-manifest.json",
+            "subject_sha256": "c" * 64,
+            "attestation_id": attestation_id,
+            "attestation_url": (
+                "https://github.com/szl-holdings/killinchu/attestations/"
+                + attestation_id
+            ),
         }
 
     def test_normalize_requires_exact_repo_key_sha_and_same_host_path(self):
@@ -151,6 +174,61 @@ class SourceBindingTests(unittest.TestCase):
                 session=FakeSession(FakeResponse(payload)),
                 timeout_seconds=0,
             )
+
+    def test_runtime_probe_accepts_valid_existing_oidc_receipt(self):
+        payload = self.observed_payload(
+            self.sha,
+            receipt_minted=True,
+            release_receipt=self.valid_receipt(),
+        )
+        report = binding.verify_runtime_probe(
+            self.normalized,
+            session=FakeSession(FakeResponse(payload)),
+        )
+        observation = report["observations"][0]
+        self.assertTrue(report["matched"])
+        self.assertTrue(observation["receipt_minted"])
+        self.assertTrue(observation["receipt_valid"])
+        self.assertEqual(observation["receipt_state"], "GITHUB_OIDC_ATTESTED")
+
+    def test_runtime_probe_rejects_unbound_or_malformed_existing_receipt(self):
+        invalid_receipts = [
+            None,
+            self.valid_receipt("b" * 40),
+            {**self.valid_receipt(), "subject_sha256": "short"},
+            {**self.valid_receipt(), "attestation_id": "not-numeric"},
+            {
+                **self.valid_receipt(),
+                "attestation_url": "https://evil.example/attestations/123456789",
+            },
+        ]
+        for receipt in invalid_receipts:
+            with self.subTest(receipt=receipt):
+                payload = self.observed_payload(
+                    self.sha,
+                    receipt_minted=True,
+                    release_receipt=receipt,
+                )
+                with self.assertRaisesRegex(
+                    binding.SourceBindingError, "did not converge"
+                ):
+                    binding.verify_runtime_probe(
+                        self.normalized,
+                        session=FakeSession(FakeResponse(payload)),
+                        timeout_seconds=0,
+                    )
+
+    def test_runtime_probe_rejects_missing_or_non_boolean_receipt_flag(self):
+        for value in (None, "false", 0, 1):
+            with self.subTest(value=value):
+                payload = self.observed_payload(self.sha)
+                payload["receipt_minted"] = value
+                with self.assertRaises(binding.SourceBindingError):
+                    binding.verify_runtime_probe(
+                        self.normalized,
+                        session=FakeSession(FakeResponse(payload)),
+                        timeout_seconds=0,
+                    )
 
     def test_runtime_probe_preserves_caller_query_verbatim(self):
         normalized = binding.normalize_binding(
