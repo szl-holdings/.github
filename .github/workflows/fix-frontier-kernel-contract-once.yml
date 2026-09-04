@@ -58,8 +58,8 @@ jobs:
           python -m py_compile .github/scripts/rollout_frontier_design.py
           python .github/scripts/test_frontier_design.py
           git rm .github/workflows/fix-frontier-kernel-contract-once.yml
-          git diff --check
-          mapfile -t changed < <(git diff --name-only | sort)
+          git diff --check HEAD
+          mapfile -t changed < <(git diff --name-only HEAD | sort)
           test "${#changed[@]}" -eq 3
           test "${changed[0]}" = .github/design/frontier-v1/szl-frontier.css
           test "${changed[1]}" = .github/scripts/rollout_frontier_design.py
