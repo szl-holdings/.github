@@ -8,9 +8,11 @@ on:
       - "huggingface/org-card.manifest.json"
       - "profile/assets/estate-command-system.svg"
       - ".github/scripts/hf_org_card_autopublish.py"
+      - ".github/scripts/hf_org_card_publish_cleanup.py"
       - ".github/scripts/hf_space_visibility.py"
       - ".github/scripts/hf_static_space_deploy.py"
       - ".github/scripts/test_hf_org_card_autopublish.py"
+      - ".github/scripts/test_hf_org_card_publish_cleanup.py"
       - ".github/scripts/test_hf_space_visibility.py"
       - ".github/scripts/test_hf_static_space_deploy.py"
       - ".github/workflows/hf-org-card-autopublish.yml"
@@ -21,9 +23,11 @@ on:
       - "huggingface/org-card.manifest.json"
       - "profile/assets/estate-command-system.svg"
       - ".github/scripts/hf_org_card_autopublish.py"
+      - ".github/scripts/hf_org_card_publish_cleanup.py"
       - ".github/scripts/hf_space_visibility.py"
       - ".github/scripts/hf_static_space_deploy.py"
       - ".github/scripts/test_hf_org_card_autopublish.py"
+      - ".github/scripts/test_hf_org_card_publish_cleanup.py"
       - ".github/scripts/test_hf_space_visibility.py"
       - ".github/scripts/test_hf_static_space_deploy.py"
       - ".github/workflows/hf-org-card-autopublish.yml"
@@ -117,11 +121,11 @@ jobs:
         with:
           python-version: "3.12.10"
 
-      - name: Test central publisher before provider access
+      - name: Test cleanup and central publisher before provider access
         run: >-
           python -m unittest discover
           -s .github/scripts
-          -p test_hf_org_card_autopublish.py
+          -p 'test_hf_org_card_*publish*.py'
 
       - name: Install exact Hub client
         run: >-
@@ -137,6 +141,15 @@ jobs:
             echo "::error::No Hugging Face write credential is available in the central repository secret scope."
             exit 2
           }
+
+      - name: Retire exact legacy organization-card collateral
+        env:
+          HF_TOKEN: ${{ secrets.HF_ORG_TOKEN || secrets.HF_ORG_TOKEN1 || secrets.HF_TOKEN || secrets.HF_WRITE_TOKEN }}
+        run: >-
+          python .github/scripts/hf_org_card_publish_cleanup.py
+          --source-sha "${GITHUB_SHA}"
+          --wait-seconds 120
+          --report hf-org-card-cleanup-report.json
 
       - name: Restore visibility, publish exact bytes, and verify readback
         env:
@@ -155,6 +168,8 @@ jobs:
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: hf-org-card-autopublish-${{ github.run_id }}
-          path: hf-org-card-autopublish-report.json
+          path: |
+            hf-org-card-cleanup-report.json
+            hf-org-card-autopublish-report.json
           if-no-files-found: warn
           retention-days: 90
