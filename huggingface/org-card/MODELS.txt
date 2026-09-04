@@ -1,3 +1,5 @@
+# Retained Hugging Face model backlink index.
+# Presence in this file does not establish availability, readiness, quality, or performance.
 SZLHOLDINGS/SZL-Khipu-1.5B
 SZLHOLDINGS/SZL-Forge-1.5B-ReceiptAgent
 SZLHOLDINGS/KILLINCHU-EYE
