@@ -25,18 +25,18 @@ Do not mint `SZLHOLDINGS/nexus`. Do not delete Channel A or Channel B.
 | [killinchu](https://huggingface.co/spaces/SZLHOLDINGS/killinchu) | Drone-intel organ | Keep. Product tab [a-11-oy.com/killinchu](https://a-11-oy.com/killinchu). |
 | [immune](https://huggingface.co/spaces/SZLHOLDINGS/immune) | Channel A HUD | Keep. One product, this URL. |
 | [immune-lattice](https://huggingface.co/spaces/SZLHOLDINGS/immune-lattice) | Channel B COP | Keep. Not a duplicate product. GitHub `immune-lattice` repo stays archived hologram. |
-| [ayllu](https://huggingface.co/spaces/SZLHOLDINGS/ayllu) | Counsel product runtime | Keep. Title should stay **Ayllu**, not a second Counsel flagship. |
-| [counsel](https://huggingface.co/spaces/SZLHOLDINGS/counsel) | Vertical PRISM runtime | Evolve title/README into a pointer at `ayllu`. Do not delete the URL. |
+| [counsel](https://huggingface.co/spaces/SZLHOLDINGS/counsel) | PRISM Counsel legal flagship | Keep title **PRISM Counsel**. Product, not a pointer. |
+| [ayllu](https://huggingface.co/spaces/SZLHOLDINGS/ayllu) | 11-seat council hologram | Evolve title off “Ayllu Counsel”. Point at `counsel` + a-11-oy.com. Do not delete. |
 | [terra](https://huggingface.co/spaces/SZLHOLDINGS/terra) | Land vertical | Keep as child of vertical-services. |
-| [sentra](https://huggingface.co/spaces/SZLHOLDINGS/sentra) | Policy-gate vertical | Keep as child. |
+| [sentra](https://huggingface.co/spaces/SZLHOLDINGS/sentra) | Cyber-intel vertical | Keep. Docs must split SENTRA organ vs this Space. |
 | [finance](https://huggingface.co/spaces/SZLHOLDINGS/finance) | Finance vertical | Keep slug. Display name PURIQ is brand, not a second Space. |
 | [lyte](https://huggingface.co/spaces/SZLHOLDINGS/lyte) | Signal lattice | Keep. Twin [lyte-lattice](https://github.com/szl-holdings/lyte-lattice). |
-| [vertical-services](https://huggingface.co/spaces/SZLHOLDINGS/vertical-services) | Multiplex parent | Keep. Not a duplicate of the four children. |
-| [szl-command-lab](https://huggingface.co/spaces/SZLHOLDINGS/szl-command-lab) | Lab hologram | Evolve: lab, not flagship. Flagship remains `a11oy`. |
+| [vertical-services](https://huggingface.co/spaces/SZLHOLDINGS/vertical-services) | Multiplex fabric | Keep. Not a duplicate of the four children. |
+| [szl-command-lab](https://huggingface.co/spaces/SZLHOLDINGS/szl-command-lab) | Lab hologram | Evolve: pointer/atlas under a11oy. Not flagship. |
 | [david-leads](https://huggingface.co/spaces/SZLHOLDINGS/david-leads) | Lead command | Keep. |
-| [szl-constellation](https://huggingface.co/spaces/SZLHOLDINGS/szl-constellation) | Public hologram atlas | Keep as the public map. Runtime error on rebuild is UNAVAILABLE, not LIVE. |
-| [szl-frontier](https://huggingface.co/spaces/SZLHOLDINGS/szl-frontier) | Memory covenant | Keep. |
-| [szl-model-inference-lab](https://huggingface.co/spaces/SZLHOLDINGS/szl-model-inference-lab) | Inference lab | Fold narrative into command-lab / atelier. Keep URL. |
+| [szl-constellation](https://huggingface.co/spaces/SZLHOLDINGS/szl-constellation) | Atlas hologram | Keep URL. Rebuild/503 is UNAVAILABLE, not LIVE. |
+| [szl-frontier](https://huggingface.co/spaces/SZLHOLDINGS/szl-frontier) | Memory-covenant lab | Evolve: lab, not flagship. |
+| [szl-model-inference-lab](https://huggingface.co/spaces/SZLHOLDINGS/szl-model-inference-lab) | Inference lab | Fold narrative into command-lab. Keep URL. |
 
 ## Duplicate-name clusters — evolve, do not wipe
 
@@ -49,8 +49,9 @@ Old consolidation that archives the Hub Space `immune-lattice` is **void**.
 ### 2. Counsel collision
 
 Observed titles: **PRISM Counsel** (`counsel`) and **Ayllu Counsel** (`ayllu`).
-Evolve `counsel` README + card into “PRISM vertical runtime — counsel product lives at `SZLHOLDINGS/ayllu`”.
-Keep both URLs. GitHub `counsel` stays archived.
+`counsel` stays the legal flagship.
+`ayllu` evolves to an 11-seat council hologram pointing at `counsel` and a-11-oy.com.
+Keep both URLs. GitHub `counsel` repo stays archived; Hub Space stays public.
 
 ### 3. Hologram cluster
 
@@ -63,22 +64,24 @@ Nervous lineage for IMMUNE is Channel A + Channel B, not the anatomy Space.
 
 `SZLHOLDINGS/szl-khipu` Space is 401.
 Public artifact is the **model** [SZL-Khipu-1.5B](https://huggingface.co/SZLHOLDINGS/SZL-Khipu-1.5B).
-Do not mint a replacement Space. Homepage of GitHub `szl-khipu` points at the model.
+Do not mint a replacement Space.
 
 ### 5. Command cluster
 
 `a11oy` = product command.
-`szl-command-lab` = lab / energy-honest hologram.
+`szl-command-lab` = lab / energy-honest hologram under a11oy.
 Do not pin both as flagship.
 
-### 6. Energy cluster
+### 6. SENTRA organ vs sentra Space
 
-Collection cards named Energy Attestation Holo / Energy-Attested Inference are not in the public Spaces API.
-Energy class on IMMUNE remains **UNAVAILABLE**. Do not fabricate joules.
+IMMUNE organ SENTRA is admission inside the kernel.
+Hub Space `sentra` is the cyber-intel vertical.
+Same name, different artifacts. Docs must keep them apart.
 
-### 7. Verifier cluster
+### 7. Energy + verifier
 
-`governed-receipt-verifier` is 401. Proof lives on [a11oy.net](https://a11oy.net). Leave the Space as a pointer when it is public again. Do not mint a twin.
+Energy cards are not in the public Spaces API. IMMUNE energy stays **UNAVAILABLE**.
+`governed-receipt-verifier` is 401. Proof lives on [a11oy.net](https://a11oy.net).
 
 ## Placement chosen
 
@@ -99,4 +102,4 @@ No fourth product. No new Hub Space for this thread.
 - energy UNAVAILABLE
 - Λ = Conjecture 1 OPEN
 
-Owner action still required to retitle Hub cards and to open protected Spaces. This file is the public map, not a Hub write token.
+Owner action still required to retitle Hub cards (`ayllu` off “Ayllu Counsel”) and to open protected Spaces. This file is the public map, not a Hub write token.
