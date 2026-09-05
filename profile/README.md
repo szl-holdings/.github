@@ -10,7 +10,7 @@
 
 **Control before action. Evidence after.**
 
-Governed AI systems with source-bound execution and portable verification receipts.
+Source-bound governed AI.
 
 **Product** · [a-11-oy.com](https://a-11-oy.com)  
 **Proof** · [a11oy.net](https://a11oy.net)
@@ -29,13 +29,23 @@ Authority and evidence are checked before action. Runtime stays inside its decla
 
 - **A11oy** · [product](https://a-11-oy.com) · [source](https://github.com/szl-holdings/a11oy)
 - **Proof registry** · [a11oy.net](https://a11oy.net) for records, diligence, and atlas evidence
-- **Artifacts** · [Hugging Face](https://huggingface.co/SZLHOLDINGS): **16 public Spaces, 44 models, and 33 datasets** measured 2026-09-04 23:34 UTC via Hub API. Previous profile line (15 / 44 / 32) is superseded.
+- **Artifacts** · [Hugging Face](https://huggingface.co/SZLHOLDINGS): **16 public Spaces, 44 models, and 33 datasets** measured 2026-09-04 23:34 UTC via Hub API.
 - **IMMUNE** · [product tab](https://a-11-oy.com/immune) · [Channel A](https://huggingface.co/spaces/SZLHOLDINGS/immune) · [Channel B](https://huggingface.co/spaces/SZLHOLDINGS/immune-lattice)
 - **Organization source** · [github.com/szl-holdings](https://github.com/szl-holdings)
 
-Public Spaces measured this hour: `a11oy`, `killinchu`, `immune`, `immune-lattice`, `counsel`, `terra`, `sentra`, `finance`, `lyte`, `vertical-services`, `szl-command-lab`, `david-leads`, `szl-constellation`, `szl-frontier`, `szl-model-inference-lab`, `ayllu`.
-
 NEXUS is an internal IMMUNE capability plane, not a second product. Do not mint `SZLHOLDINGS/nexus`. Killinchu public actuation is **SIMULATED** unless a separately authorized effector proves otherwise.
+
+## Estate map
+
+Three commercial flagships: A11oy,Killinchu,Forge. Five public domain bodies:
+Terra,Killinchu,PRISM Counsel,PURIQ Finance,LYTE. Six internal engines:
+Sentra,Lyte,Killinchu,Finance,Terra,Counsel.
+
+**16 portfolio Spaces · 44 models · 33 datasets.**
+
+Hub inventory is registry-only—not availability, operational readiness, or
+publication policy. KEEP authority:
+[`docs/CANONICAL_FLEET.md`](https://github.com/szl-holdings/.github/blob/main/docs/CANONICAL_FLEET.md).
 
 ## Portfolio
 
