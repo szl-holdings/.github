@@ -137,7 +137,7 @@ jobs:
         run: |
           set -euo pipefail
           python .github/scripts/test_estate_alignment_contract.py
-          python .github/scripts/estate_alignment_contract.py --offline
+          python .github/scripts/estate_alignment_contract.py
           python -m unittest discover -s .github/scripts -p test_public_front_door_check.py
           python -m unittest discover -s .github/scripts -p test_hf_org_card_embed_check.py
           python .github/scripts/public_front_door_check.py
