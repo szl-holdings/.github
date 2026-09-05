@@ -4,7 +4,7 @@ emoji: 🛡️
 colorFrom: gray
 colorTo: indigo
 sdk: static
-short_description: Three flagships, five domain bodies, six engines—one source-bound system.
+short_description: Three flagships. Five bodies. Six engines. One fabric.
 thumbnail: https://huggingface.co/spaces/SZLHOLDINGS/README/resolve/main/assets/evidence-lattice-v2.webp
 pinned: true
 license: apache-2.0
