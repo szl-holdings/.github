@@ -66,6 +66,13 @@ jobs:
           required = (
               'repository: szl-holdings/nexus',
               'HF_REPO: SZLHOLDINGS/nexus',
+              'acquire_hf_publisher_token.py',
+              'HF_ORG_TOKEN_CANDIDATE',
+              'HF_ORG_TOKEN1_CANDIDATE',
+              'HF_WRITE_TOKEN_CANDIDATE',
+              'HF_TOKEN_CANDIDATE',
+              '--token-file "$RUNNER_TEMP/nexus-hf-token"',
+              '--target-type space',
               '--dockerfile-path space/Dockerfile',
               '--require-default-branch-tip',
               '--restart-space',
@@ -187,21 +194,26 @@ jobs:
           print('Nexus Hugging Face card: PASS')
           PY
 
-      - name: Require central repository credential
+      - name: Acquire independently validated Nexus publisher credential
         shell: bash
         env:
-          HF_TOKEN: ${{ secrets.HF_ORG_TOKEN || secrets.HF_ORG_TOKEN1 || secrets.HF_TOKEN || secrets.HF_WRITE_TOKEN }}
+          HF_ORG_TOKEN_CANDIDATE: ${{ secrets.HF_ORG_TOKEN }}
+          HF_ORG_TOKEN1_CANDIDATE: ${{ secrets.HF_ORG_TOKEN1 }}
+          HF_WRITE_TOKEN_CANDIDATE: ${{ secrets.HF_WRITE_TOKEN }}
+          HF_TOKEN_CANDIDATE: ${{ secrets.HF_TOKEN }}
+          HF_REPO: SZLHOLDINGS/nexus
         run: |
           set -euo pipefail
-          test -n "${HF_TOKEN:-}" || {
-            echo "::error::No Hugging Face write credential is available in the central repository secret scope."
-            exit 2
-          }
+          "$RUNNER_TEMP/hf-publisher-venv/bin/python" -I -P \
+            tools/.github/scripts/acquire_hf_publisher_token.py \
+            --target-repo "$HF_REPO" \
+            --target-type space \
+            --token-file "$RUNNER_TEMP/nexus-hf-token" \
+            --report evidence/nexus/hf-publisher-credential.json
 
       - name: Deploy exact Dockerfile-derived Nexus closure
         shell: bash
         env:
-          HF_TOKEN: ${{ secrets.HF_ORG_TOKEN || secrets.HF_ORG_TOKEN1 || secrets.HF_TOKEN || secrets.HF_WRITE_TOKEN }}
           GITHUB_TOKEN: ${{ github.token }}
           SOURCE_SHA: ${{ steps.source.outputs.sha }}
           SOURCE_BINDING: ${{ steps.source.outputs.binding }}
@@ -209,11 +221,16 @@ jobs:
           HF_REPO: SZLHOLDINGS/nexus
         run: |
           set -euo pipefail
+          set +x
+          TOKEN_FILE="$RUNNER_TEMP/nexus-hf-token"
+          test -f "$TOKEN_FILE" && test ! -L "$TOKEN_FILE"
+          test "$(stat -c '%a' "$TOKEN_FILE")" = "600"
           REVISION_ARGS=()
           if [ "$SOURCE_BINDING" = true ]; then
             REVISION_ARGS+=(--source-revision-file SOURCE_GITHUB_SHA)
           fi
-          "$RUNNER_TEMP/hf-publisher-venv/bin/python" -I -P tools/.github/scripts/hf_deploy_from_dockerfile.py \
+          HF_TOKEN="$(<"$TOKEN_FILE")" \
+            "$RUNNER_TEMP/hf-publisher-venv/bin/python" -I -P tools/.github/scripts/hf_deploy_from_dockerfile.py \
             --repo-root source \
             --github-repo szl-holdings/nexus \
             --hf-repo "$HF_REPO" \
@@ -230,11 +247,15 @@ jobs:
       - name: Restart Space after governed publication
         shell: bash
         env:
-          HF_TOKEN: ${{ secrets.HF_ORG_TOKEN || secrets.HF_ORG_TOKEN1 || secrets.HF_TOKEN || secrets.HF_WRITE_TOKEN }}
           HF_REPO: SZLHOLDINGS/nexus
         run: |
           set -euo pipefail
-          "$RUNNER_TEMP/hf-publisher-venv/bin/python" -I -P tools/.github/scripts/hf_deploy_from_dockerfile.py \
+          set +x
+          TOKEN_FILE="$RUNNER_TEMP/nexus-hf-token"
+          test -f "$TOKEN_FILE" && test ! -L "$TOKEN_FILE"
+          test "$(stat -c '%a' "$TOKEN_FILE")" = "600"
+          HF_TOKEN="$(<"$TOKEN_FILE")" \
+            "$RUNNER_TEMP/hf-publisher-venv/bin/python" -I -P tools/.github/scripts/hf_deploy_from_dockerfile.py \
             --restart-space \
             --manifest evidence/nexus/hf-deploy-manifest.json \
             --hf-repo "$HF_REPO"
@@ -242,15 +263,33 @@ jobs:
       - name: Attest exact running commit, bytes, and smoke routes
         shell: bash
         env:
-          HF_TOKEN: ${{ secrets.HF_ORG_TOKEN || secrets.HF_ORG_TOKEN1 || secrets.HF_TOKEN || secrets.HF_WRITE_TOKEN }}
           HF_REPO: SZLHOLDINGS/nexus
         run: |
           set -euo pipefail
-          "$RUNNER_TEMP/hf-publisher-venv/bin/python" -I -P tools/.github/scripts/hf_deploy_from_dockerfile.py \
+          set +x
+          TOKEN_FILE="$RUNNER_TEMP/nexus-hf-token"
+          test -f "$TOKEN_FILE" && test ! -L "$TOKEN_FILE"
+          test "$(stat -c '%a' "$TOKEN_FILE")" = "600"
+          HF_TOKEN="$(<"$TOKEN_FILE")" \
+            "$RUNNER_TEMP/hf-publisher-venv/bin/python" -I -P tools/.github/scripts/hf_deploy_from_dockerfile.py \
             --attest \
             --manifest evidence/nexus/hf-deploy-manifest.json \
             --hf-repo "$HF_REPO" \
             --wait-running 1200
+
+      - name: Remove the ephemeral publisher credential
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          set +x
+          TOKEN_FILE="$RUNNER_TEMP/nexus-hf-token"
+          if [ -e "$TOKEN_FILE" ] || [ -L "$TOKEN_FILE" ]; then
+            test ! -L "$TOKEN_FILE"
+            chmod 600 "$TOKEN_FILE"
+            rm -f -- "$TOKEN_FILE"
+          fi
+          test ! -e "$TOKEN_FILE"
 
       - name: Verify embedded source revision when supported
         if: steps.source.outputs.binding == 'true'
