@@ -23,6 +23,10 @@ on:
       - .github/scripts/test_estate_alignment_contract.py
       - .github/scripts/test_estate_alignment_org_card.py
       - .github/workflows/estate-one-fabric-alignment.yml
+  workflow_run:
+    workflows: ["Hugging Face organization front door"]
+    types: [completed]
+    branches: [main]
   schedule:
     - cron: "23 5 * * *"
   workflow_dispatch: {}
@@ -36,6 +40,7 @@ concurrency:
 
 jobs:
   local-contract:
+    if: github.event_name != 'workflow_run'
     name: Exact taxonomy, front doors, and publication set
     runs-on: ubuntu-24.04
     timeout-minutes: 10
@@ -48,7 +53,7 @@ jobs:
       - name: Checkout exact source
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          ref: ${{ github.event.workflow_run.head_sha || github.event.pull_request.head.sha || github.sha }}
           persist-credentials: false
           fetch-depth: 1
 
@@ -71,7 +76,7 @@ jobs:
 
       - name: Emit secret-free source receipt
         env:
-          GITHUB_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+          GITHUB_SHA: ${{ github.event.workflow_run.head_sha || github.event.pull_request.head.sha || github.sha }}
         run: >-
           python .github/scripts/estate_alignment_contract.py
           --repo-root .
@@ -83,7 +88,7 @@ jobs:
           python .github/scripts/hf_static_space_deploy.py \
             --repo-root . \
             --manifest huggingface/org-card.manifest.json \
-            --source-sha "${{ github.event.pull_request.head.sha || github.sha }}" \
+            --source-sha "${{ github.event.workflow_run.head_sha || github.event.pull_request.head.sha || github.sha }}" \
             --materialize "$(mktemp -d)" \
             --report hf-org-card-alignment-materialization.json
 
@@ -99,8 +104,16 @@ jobs:
           retention-days: 90
 
   live-contract:
-    name: Product, GitHub, and Hugging Face live readback
     needs: local-contract
+    if: >-
+      always() &&
+      (
+        (github.event_name == 'workflow_run' &&
+         github.event.workflow_run.conclusion == 'success') ||
+        ((github.event_name == 'schedule' || github.event_name == 'workflow_dispatch') &&
+         needs.local-contract.result == 'success')
+      )
+    name: Product, GitHub, and Hugging Face live readback
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
@@ -109,10 +122,10 @@ jobs:
         with:
           egress-policy: audit
 
-      - name: Checkout exact candidate source
+      - name: Checkout exact deployed source
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          ref: ${{ github.event.workflow_run.head_sha || github.event.pull_request.head.sha || github.sha }}
           persist-credentials: false
           fetch-depth: 1
 
@@ -124,7 +137,7 @@ jobs:
       - name: Compare live product, source, and artifact authorities
         env:
           GITHUB_TOKEN: ${{ github.token }}
-          GITHUB_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+          GITHUB_SHA: ${{ github.event.workflow_run.head_sha || github.event.pull_request.head.sha || github.sha }}
         run: >-
           python .github/scripts/estate_alignment_contract.py
           --repo-root .
