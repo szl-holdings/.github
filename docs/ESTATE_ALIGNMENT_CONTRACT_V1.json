@@ -217,6 +217,17 @@
       }
     ]
   },
+  "organization_card_control_surface": {
+    "repo_id": "SZLHOLDINGS/README",
+    "class": "organization_card_control_surface",
+    "deployment_source": "szl-holdings/.github",
+    "runtime_origin": "https://szlholdings-readme.static.hf.space",
+    "binding_paths": [
+      "/deployment.json"
+    ],
+    "portfolio_member": false,
+    "claim_boundary": "Source-bound organization front door; excluded from the 16 portfolio-Space count."
+  },
   "movement_contract": {
     "github_is_source_authority": true,
     "huggingface_is_generated_artifact_registry": true,

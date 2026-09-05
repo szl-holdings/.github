@@ -66,6 +66,10 @@ HF_API = "https://huggingface.co/api"
 USER_AGENT = "SZL-Estate-Alignment/1.0"
 PRODUCT_PATH = "docs/strategy/living-command-fabric.v1.json"
 RUNTIME_BINDING_PATHS = ("/api/build-info", "/deployment.json")
+ORG_CARD_SPACE_ID = "SZLHOLDINGS/README"
+ORG_CARD_RUNTIME_ORIGIN = "https://szlholdings-readme.static.hf.space"
+ORG_CARD_DEPLOYMENT_SOURCE = "szl-holdings/.github"
+ORG_CARD_BINDING_PATHS = ("/deployment.json",)
 RUNTIME_OBSERVATIONS = 2
 MAX_RUNTIME_WORKERS = 8
 SOURCE_REVISION_KEYS = (
@@ -184,7 +188,23 @@ def validate_contract(contract: Mapping[str, Any]) -> list[str]:
         require(snapshot.get("portfolio_space_count") == 16, "portfolio_space_count must be 16", failures)
         require(snapshot.get("model_count") == 44, "model_count must be 44", failures)
         require(snapshot.get("dataset_count") == 33, "dataset_count must be 33", failures)
-        require(snapshot.get("organization_card_space_excluded_from_portfolio_count") == "SZLHOLDINGS/README", "README control-surface exclusion missing", failures)
+        require(snapshot.get("organization_card_space_excluded_from_portfolio_count") == ORG_CARD_SPACE_ID, "README control-surface exclusion missing", failures)
+
+    org_card = contract.get("organization_card_control_surface")
+    require(isinstance(org_card, dict), "organization_card_control_surface must be an object", failures)
+    if isinstance(org_card, dict):
+        require(org_card.get("repo_id") == ORG_CARD_SPACE_ID, "organization-card repo_id mismatch", failures)
+        require(org_card.get("class") == "organization_card_control_surface", "organization-card class mismatch", failures)
+        require(org_card.get("deployment_source") == ORG_CARD_DEPLOYMENT_SOURCE, "organization-card deployment source mismatch", failures)
+        require(org_card.get("runtime_origin") == ORG_CARD_RUNTIME_ORIGIN, "organization-card runtime origin mismatch", failures)
+        require(org_card.get("binding_paths") == list(ORG_CARD_BINDING_PATHS), "organization-card binding path mismatch", failures)
+        require(org_card.get("portfolio_member") is False, "organization-card must remain outside the portfolio count", failures)
+        require(
+            org_card.get("claim_boundary")
+            == "Source-bound organization front door; excluded from the 16 portfolio-Space count.",
+            "organization-card claim boundary mismatch",
+            failures,
+        )
 
     movement = contract.get("movement_contract")
     require(isinstance(movement, dict), "movement_contract must be an object", failures)
@@ -435,9 +455,28 @@ def runtime_source_binding(
     expected = str(expected_revision or "").lower()
     if SHA40.fullmatch(expected) is None:
         raise AlignmentError(f"invalid expected source revision for {repo_id}: {expected!r}")
-    origin = runtime_origin(repo_id)
+    if repo_id == ORG_CARD_SPACE_ID:
+        configured_origin = str(row.get("runtime_origin") or "")
+        if configured_origin != ORG_CARD_RUNTIME_ORIGIN:
+            raise AlignmentError(
+                f"organization-card runtime origin mismatch: {configured_origin!r}"
+            )
+        configured_paths = row.get("binding_paths")
+        if configured_paths != list(ORG_CARD_BINDING_PATHS):
+            raise AlignmentError(
+                f"organization-card binding paths mismatch: {configured_paths!r}"
+            )
+        origin = ORG_CARD_RUNTIME_ORIGIN
+        binding_paths = ORG_CARD_BINDING_PATHS
+    else:
+        if row.get("runtime_origin") is not None or row.get("binding_paths") is not None:
+            raise AlignmentError(
+                f"custom runtime binding is reserved for {ORG_CARD_SPACE_ID}"
+            )
+        origin = runtime_origin(repo_id)
+        binding_paths = RUNTIME_BINDING_PATHS
     attempts: list[dict[str, Any]] = []
-    for path in RUNTIME_BINDING_PATHS:
+    for path in binding_paths:
         observations: list[dict[str, Any]] = []
         for ordinal in range(1, RUNTIME_OBSERVATIONS + 1):
             url = cache_busted_runtime_url(origin, path, ordinal)
@@ -606,12 +645,12 @@ def validate_live(contract: Mapping[str, Any]) -> tuple[list[str], dict[str, Any
     datasets = list_hf("datasets")
     spaces = list_hf("spaces")
     space_ids = {str(row.get("id") or "") for row in spaces}
-    portfolio_ids = space_ids - {"SZLHOLDINGS/README"}
+    portfolio_ids = space_ids - {ORG_CARD_SPACE_ID}
     expected = {row["repo_id"] for row in contract["huggingface_inventory_snapshot"]["portfolio_spaces"]}
     require(portfolio_ids == expected, f"public portfolio Space drift: missing={sorted(expected - portfolio_ids)} unexpected={sorted(portfolio_ids - expected)}", failures)
     require(len(models) == contract["huggingface_inventory_snapshot"]["model_count"], f"model count drift: {len(models)}", failures)
     require(len(datasets) == contract["huggingface_inventory_snapshot"]["dataset_count"], f"dataset count drift: {len(datasets)}", failures)
-    require("SZLHOLDINGS/README" in space_ids, "Hugging Face organization-card Space missing", failures)
+    require(ORG_CARD_SPACE_ID in space_ids, "Hugging Face organization-card Space missing", failures)
 
     runtime_rows = list(
         contract["huggingface_inventory_snapshot"]["portfolio_spaces"]
@@ -652,10 +691,40 @@ def validate_live(contract: Mapping[str, Any]) -> tuple[list[str], dict[str, Any
             runtime_bindings.append(observation)
         if failure is not None:
             failures.append(failure)
+
+    org_card_binding: dict[str, Any] | None = None
+    org_card = contract.get("organization_card_control_surface")
+    if not isinstance(org_card, Mapping):
+        failures.append("organization-card source contract unavailable")
+    else:
+        org_card_repository = source_repository(org_card.get("deployment_source"))
+        org_card_revision = repository_revisions.get(org_card_repository)
+        if org_card_revision is None:
+            failures.append(
+                f"organization-card source authority unavailable: {org_card_repository}"
+            )
+        else:
+            try:
+                org_card_binding = runtime_source_binding(org_card, org_card_revision)
+            except Exception as exc:
+                failures.append(
+                    "organization-card source binding unavailable: "
+                    f"{type(exc).__name__}"
+                )
+            else:
+                if org_card_binding.get("matched") is not True:
+                    failures.append(
+                        "organization-card source revision drift: "
+                        f"expected {org_card_repository}@{org_card_revision}, observed "
+                        f"{org_card_binding.get('observed_source')}@"
+                        f"{org_card_binding.get('observed_revision')}"
+                    )
+
     return failures, {
         "a11oy_contract_revision": a11oy_sha,
         "canonical_repositories": repository_observations,
         "runtime_source_bindings": runtime_bindings,
+        "organization_card_source_binding": org_card_binding,
         "huggingface": {
             "models": len(models),
             "datasets": len(datasets),

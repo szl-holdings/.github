@@ -370,8 +370,15 @@ class EstateAlignmentContractTests(unittest.TestCase):
         ):
             failures, observation = alignment.validate_live(self.contract)
 
-        self.assertEqual(set(seen), alignment.EXPECTED_PORTFOLIO_SPACES)
+        self.assertEqual(
+            set(seen),
+            alignment.EXPECTED_PORTFOLIO_SPACES | {alignment.ORG_CARD_SPACE_ID},
+        )
         self.assertEqual(len(observation["runtime_source_bindings"]), 16)
+        self.assertEqual(
+            observation["organization_card_source_binding"]["repo_id"],
+            alignment.ORG_CARD_SPACE_ID,
+        )
         self.assertEqual(
             [row["repo_id"] for row in observation["runtime_source_bindings"]],
             [
@@ -383,6 +390,105 @@ class EstateAlignmentContractTests(unittest.TestCase):
         )
         self.assertTrue(
             any("runtime source revision drift for SZLHOLDINGS/ayllu" in row for row in failures)
+        )
+
+
+    def test_org_card_contract_is_exact_and_outside_portfolio_count(self) -> None:
+        org_card = self.contract["organization_card_control_surface"]
+        self.assertEqual(org_card["repo_id"], alignment.ORG_CARD_SPACE_ID)
+        self.assertEqual(
+            org_card["deployment_source"], alignment.ORG_CARD_DEPLOYMENT_SOURCE
+        )
+        self.assertEqual(org_card["runtime_origin"], alignment.ORG_CARD_RUNTIME_ORIGIN)
+        self.assertEqual(org_card["binding_paths"], list(alignment.ORG_CARD_BINDING_PATHS))
+        self.assertIs(org_card["portfolio_member"], False)
+        portfolio_ids = {
+            row["repo_id"]
+            for row in self.contract["huggingface_inventory_snapshot"]["portfolio_spaces"]
+        }
+        self.assertEqual(len(portfolio_ids), 16)
+        self.assertNotIn(alignment.ORG_CARD_SPACE_ID, portfolio_ids)
+
+    def test_org_card_runtime_binding_uses_static_deployment_receipt_only(self) -> None:
+        expected = "a" * 40
+        requested: list[tuple[str, str | None]] = []
+
+        def fetch(url: str, **kwargs) -> bytes:
+            requested.append((url, kwargs.get("required_origin")))
+            return json.dumps(
+                {
+                    "source": {
+                        "repository": alignment.ORG_CARD_DEPLOYMENT_SOURCE,
+                        "revision": expected,
+                    }
+                }
+            ).encode()
+
+        observation = alignment.runtime_source_binding(
+            self.contract["organization_card_control_surface"],
+            expected,
+            fetch=fetch,
+        )
+
+        self.assertTrue(observation["matched"])
+        self.assertEqual(observation["binding_path"], "/deployment.json")
+        self.assertEqual(len(requested), alignment.RUNTIME_OBSERVATIONS)
+        for url, required_origin in requested:
+            parsed = alignment.urllib.parse.urlsplit(url)
+            self.assertEqual(parsed.netloc, "szlholdings-readme.static.hf.space")
+            self.assertEqual(parsed.path, "/deployment.json")
+            self.assertEqual(required_origin, alignment.ORG_CARD_RUNTIME_ORIGIN)
+
+    def test_org_card_binding_fails_closed_on_stale_conflicting_or_redirected_evidence(self) -> None:
+        expected = "b" * 40
+        row = self.contract["organization_card_control_surface"]
+
+        stale = alignment.runtime_source_binding(
+            row,
+            expected,
+            fetch=lambda _url, **_kwargs: json.dumps(
+                {
+                    "source": {
+                        "repository": alignment.ORG_CARD_DEPLOYMENT_SOURCE,
+                        "revision": "c" * 40,
+                    }
+                }
+            ).encode(),
+        )
+        self.assertFalse(stale["matched"])
+
+        conflicting = alignment.runtime_source_binding(
+            row,
+            expected,
+            fetch=lambda _url, **_kwargs: json.dumps(
+                {
+                    "source_repository": alignment.ORG_CARD_DEPLOYMENT_SOURCE,
+                    "source_revision": expected,
+                    "build": {"revision": "d" * 40},
+                }
+            ).encode(),
+        )
+        self.assertFalse(conflicting["matched"])
+
+        redirected = alignment.runtime_source_binding(
+            row,
+            expected,
+            fetch=lambda _url, **_kwargs: (_ for _ in ()).throw(
+                alignment.AlignmentError("cross-origin redirect rejected")
+            ),
+        )
+        self.assertFalse(redirected["matched"])
+
+    def test_org_card_contract_rejects_wrong_origin_and_membership(self) -> None:
+        candidate = copy.deepcopy(self.contract)
+        candidate["organization_card_control_surface"]["runtime_origin"] = (
+            "https://szlholdings-readme.hf.space"
+        )
+        candidate["organization_card_control_surface"]["portfolio_member"] = True
+        failures = alignment.validate_contract(candidate)
+        self.assertIn("organization-card runtime origin mismatch", failures)
+        self.assertIn(
+            "organization-card must remain outside the portfolio count", failures
         )
 
 
