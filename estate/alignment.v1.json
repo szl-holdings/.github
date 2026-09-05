@@ -22,7 +22,9 @@
       "id": "terra",
       "brand": "Terra",
       "backend_source": "szl-holdings/szl-real-estate",
-      "presentation_source": "szl-holdings/szl-real-estate",
+      "presentation_source": "szl-holdings/a11oy:scripts/hf_publish_vertical_flagships_v4_impl.py",
+      "publisher_workflow": "szl-holdings/a11oy:.github/workflows/hf-sync.yml",
+      "product_source_deployment_state": "LINKED_NOT_PUBLISHED",
       "hub_surface": "SZLHOLDINGS/terra",
       "domain": "real-estate"
     },
