@@ -68,7 +68,7 @@ jobs:
             echo "No durable change was produced." >&2
             exit 1
           fi
-          if git diff --cached --name-only | grep -E 'reconcile_estate_alignment_live_v[34]|reconcile-estate-alignment-live-v[34]'; then
+          if git diff --cached --diff-filter=ACMR --name-only | grep -E 'reconcile_estate_alignment_live_v[34]|reconcile-estate-alignment-live-v[34]'; then
             echo "Bootstrap residue remains staged." >&2
             exit 1
           fi
