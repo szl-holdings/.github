@@ -95,29 +95,22 @@ on:
 permissions:
   contents: read
 
-# A single organization-wide key prevents two instances of this controller
-# from crossing provider writes. Other legacy HF writers remain separately
-# governed and must not be dispatched during an apply.
+# GitHub concurrency is repository-scoped. This key serializes participating
+# workflows here, but does not lock writers in other repositories or clients.
+# Other HF writers must be coordinated separately before an apply.
 concurrency:
   group: hf-provider-mutation-szlholdings
   cancel-in-progress: false
 
 jobs:
   reconcile:
-    name: Plan or publish one exact Space with compare-and-set evidence
+    name: Plan or publish one Space with optimistic expected-state evidence
     runs-on: ubuntu-latest
     timeout-minutes: 15
     environment: production
     env:
       GITHUB_TOKEN: ${{ github.token }}
       HF_HUB_DISABLE_PROGRESS_BARS: "1"
-      INPUT_REPO_ID: ${{ inputs.repo_id }}
-      INPUT_MODE: ${{ inputs.mode }}
-      INPUT_TRANSITION: ${{ inputs.transition }}
-      INPUT_EXPECTED_POLICY_SHA256: ${{ inputs.expected_policy_sha256 }}
-      INPUT_EXPECTED_VISIBILITY: ${{ inputs.expected_visibility }}
-      INPUT_EXPECTED_STAGE: ${{ inputs.expected_stage }}
-      INPUT_EXPECTED_REVISION: ${{ inputs.expected_revision }}
       REPORT_PATH: reports/hf-space-lifecycle/evidence-${{ github.run_id }}-${{ github.run_attempt }}.json
     steps:
       - name: Harden runner
@@ -172,14 +165,6 @@ jobs:
             'from importlib.metadata import version; assert version("huggingface-hub") == "1.19.0"'
           echo "python=$VENV/bin/python" >> "$GITHUB_OUTPUT"
 
-      - name: Bind safe run-scoped evidence identity
-        id: evidence
-        shell: bash
-        run: |
-          set -euo pipefail
-          SAFE_TARGET="${INPUT_REPO_ID//\//-}"
-          echo "safe_target=$SAFE_TARGET" >> "$GITHUB_OUTPUT"
-
       - name: Plan or apply one expected-state publication
         env:
           HF_ORG_TOKEN: ${{ secrets.HF_ORG_TOKEN }}
@@ -189,20 +174,14 @@ jobs:
           "${{ steps.runtime.outputs.python }}" -I -P \
             .github/scripts/hf_space_lifecycle_reconcile.py \
             --policy .github/data/hf-space-lifecycle-policy.json \
-            --target "$INPUT_REPO_ID" \
-            --mode "$INPUT_MODE" \
-            --transition "$INPUT_TRANSITION" \
-            --expected-policy-sha256 "$INPUT_EXPECTED_POLICY_SHA256" \
-            --expected-visibility "$INPUT_EXPECTED_VISIBILITY" \
-            --expected-stage "$INPUT_EXPECTED_STAGE" \
-            --expected-revision "$INPUT_EXPECTED_REVISION" \
+            --dispatch-event "$GITHUB_EVENT_PATH" \
             --report "$REPORT_PATH"
 
       - name: Upload run-scoped lifecycle evidence
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: hf-space-lifecycle-${{ steps.evidence.outputs.safe_target }}-${{ inputs.transition }}-${{ github.run_id }}-${{ github.run_attempt }}
+          name: hf-space-lifecycle-${{ github.run_id }}-${{ github.run_attempt }}
           path: ${{ env.REPORT_PATH }}
           if-no-files-found: error
           retention-days: 90
