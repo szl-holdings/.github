@@ -5,6 +5,7 @@ from __future__ import annotations
 import importlib.util
 import json
 import sys
+import tempfile
 import unittest
 from pathlib import Path
 
@@ -100,6 +101,63 @@ class SourceAuthorityContract(unittest.TestCase):
                 and "managed outside" in item["reason"]
                 for item in unmapped
             )
+        )
+
+    def test_provider_mapping_cannot_bypass_excluded_repositories(self) -> None:
+        remote = core.Space(
+            "provider-only",
+            "docker",
+            "RUNNING",
+            "https://example.invalid/provider-only",
+        )
+        grouped, unmapped = core.group_mappings(
+            [remote],
+            [repo("szl-holdings/a11oy")],
+            {"provider-only": "szl-holdings/a11oy"},
+        )
+        self.assertEqual(grouped, {})
+        self.assertEqual(unmapped[0]["slug"], "provider-only")
+        self.assertIn("no source repository", unmapped[0]["reason"])
+
+    def test_local_excluded_mapping_requires_publisher_ownership(self) -> None:
+        original = core.LOCAL_SOURCE_MAP
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "source-map.json"
+            path.write_text(
+                json.dumps(
+                    {
+                        "schema": "szl.public-space-source-map/v1",
+                        "sources": [
+                            {
+                                "space": "unauthorized-central",
+                                "repo": "szl-holdings/a11oy",
+                                "ownership": "source-owned-flagship",
+                            }
+                        ],
+                    }
+                ),
+                encoding="utf-8",
+            )
+            core.LOCAL_SOURCE_MAP = path
+            try:
+                with self.assertRaises(core.RolloutError) as context:
+                    core.group_mappings(
+                        [
+                            core.Space(
+                                "unauthorized-central",
+                                "docker",
+                                "RUNNING",
+                                "https://example.invalid/unauthorized-central",
+                            )
+                        ],
+                        [repo("szl-holdings/a11oy")],
+                        {"unauthorized-central": "szl-holdings/a11oy"},
+                    )
+            finally:
+                core.LOCAL_SOURCE_MAP = original
+        self.assertEqual(
+            context.exception.code,
+            "LOCAL_EXCLUDED_REPOSITORY_UNAUTHORIZED",
         )
 
     def test_missing_explicit_repository_never_falls_back_to_product_repo(self) -> None:

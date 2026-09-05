@@ -2,9 +2,10 @@
 """Bind rollout automation to the reviewed Space presentation authority.
 
 The base rollout controller intentionally excludes central repositories from
-heuristic matching. This extension preserves that safety boundary while making
-the protected local source map truly authoritative: an explicit mapping is
-resolved exactly, never replaced by a heuristic fallback, and generated
+heuristic and provider-derived matching. This extension preserves that safety
+boundary while making the protected local source map truly authoritative: only
+a locally reviewed mapping can bypass the central-repository exclusion, no
+declared local target falls back to a heuristic candidate, and generated
 publisher surfaces are recorded as publisher-managed instead of receiving a
 guessed frontend edit in a product repository.
 """
@@ -27,6 +28,10 @@ def _active_repository(repo: Mapping[str, Any]) -> bool:
             repo.get("fork"),
         )
     )
+
+
+def _repository_is_excluded(core: Any, full_name: str) -> bool:
+    return full_name.split("/", 1)[-1] in core.EXCLUDED_REPOS
 
 
 def _source_entries(core: Any) -> dict[str, dict[str, Any]]:
@@ -106,7 +111,8 @@ def install(core: Any) -> None:
         dict[str, tuple[list[Any], int, str]],
         list[dict[str, Any]],
     ]:
-        exact_spaces: list[Any] = []
+        local_entries = _source_entries(core)
+        reviewed_exact: list[tuple[Any, dict[str, Any]]] = []
         heuristic_spaces: list[Any] = []
         unmapped: list[dict[str, Any]] = []
 
@@ -124,10 +130,33 @@ def install(core: Any) -> None:
                         ),
                     }
                 )
-            elif explicit.get(slug):
-                exact_spaces.append(space)
-            else:
+                continue
+
+            entry = local_entries.get(slug)
+            if entry is None:
+                # Provider metadata can still improve ordinary matching, but it
+                # remains inside the base controller's excluded-repository
+                # boundary and therefore cannot acquire local review authority.
                 heuristic_spaces.append(space)
+                continue
+
+            repository = str(entry["repo"])
+            if _repository_is_excluded(core, repository):
+                if entry.get("ownership") != PUBLISHER_OWNERSHIP:
+                    raise core.RolloutError(
+                        "LOCAL_EXCLUDED_REPOSITORY_UNAUTHORIZED",
+                        (
+                            f"{space.slug} maps to excluded repository "
+                            f"{repository} without publisher ownership"
+                        ),
+                    )
+                source_root = entry.get("source_root")
+                if not isinstance(source_root, str) or not source_root:
+                    raise core.RolloutError(
+                        "PUBLISHER_ENTRYPOINT_UNDECLARED",
+                        f"{space.slug} has no publisher source_root",
+                    )
+            reviewed_exact.append((space, entry))
 
         grouped, heuristic_unmapped = original_group_mappings(
             heuristic_spaces,
@@ -141,9 +170,9 @@ def install(core: Any) -> None:
             for repo in repos
             if _active_repository(repo) and repo.get("full_name")
         }
-        for space in exact_spaces:
+        for space, entry in reviewed_exact:
             slug = core.normalize(space.slug)
-            repository = str(explicit[slug])
+            repository = str(entry["repo"])
             repo = available.get(repository)
             if repo is None:
                 unmapped.append(
@@ -152,14 +181,18 @@ def install(core: Any) -> None:
                         "sdk": space.sdk,
                         "stage": space.stage,
                         "reason": (
-                            "declared source repository is unavailable; "
+                            "declared local source repository is unavailable; "
                             "heuristic fallback is forbidden"
                         ),
                         "declared_repository": repository,
                     }
                 )
                 continue
-            score, reason = core.mapping_score(space, repo, explicit)
+            score, reason = core.mapping_score(
+                space,
+                repo,
+                {slug: repository},
+            )
             if score != 1000:
                 raise core.RolloutError(
                     "LOCAL_SOURCE_MAP_NOT_AUTHORITATIVE",
