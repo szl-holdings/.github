@@ -33,6 +33,12 @@ def main() -> int:
         '    for marker in ("16 portfolio Spaces", "44 models", "33 datasets"):',
         '    for marker in ("17 portfolio Spaces", "45 models", "34 datasets"): ',
     )
+    text = CONTROLLER.read_text(encoding="utf-8")
+    generated = '    for marker in ("17 portfolio Spaces", "45 models", "34 datasets"): \n'
+    final = '    for marker in ("17 portfolio Spaces", "45 models", "34 datasets"):\n'
+    if generated not in text:
+        raise SystemExit("generated document-validator marker missing")
+    CONTROLLER.write_text(text.replace(generated, final, 1), encoding="utf-8")
 
     text = CONTROLLER.read_text(encoding="utf-8")
     for stale in ("16 portfolio Spaces", "44 models", "33 datasets"):
