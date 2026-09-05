@@ -1,0 +1,166 @@
+name: Rerun and finish exact-green HF source-binding PR 651 v3
+
+on:
+  push:
+    branches:
+      - ops/finish-hf-source-binding-651-20260904
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+  pull-requests: write
+  checks: read
+  actions: write
+
+concurrency:
+  group: rerun-finish-exact-green-hf-source-binding-pr-651-v3
+  cancel-in-progress: false
+
+jobs:
+  finish:
+    name: Refresh, rerun exact-head terminal failures once, and protected-squash merge
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - name: Harden runner
+        uses: step-security/harden-runner@05e31511f85b41b11d1cf0ef85d0992719546e2c # v2.21.0
+        with:
+          egress-policy: audit
+
+      - name: Finish only PR 651
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p reports
+          python - <<'PY'
+          from __future__ import annotations
+
+          import datetime as dt
+          import json
+          import os
+          import re
+          import time
+          import urllib.error
+          import urllib.parse
+          import urllib.request
+          from pathlib import Path
+          from typing import Any
+
+          repo=os.environ["GITHUB_REPOSITORY"]
+          token=os.environ["GH_TOKEN"]
+          number=651
+          success={"success","neutral","skipped"}
+          bad={"failure","cancelled","timed_out","action_required","startup_failure","stale"}
+          run_re=re.compile(r"/actions/runs/(\d+)(?:/|$)")
+
+          def api(method:str,path:str,payload:dict[str,Any]|None=None)->tuple[int,Any]:
+              h={"Accept":"application/vnd.github+json","Authorization":f"Bearer {token}","X-GitHub-Api-Version":"2022-11-28","User-Agent":"SZL-PR651-Finisher/3.0"};data=None
+              if payload is not None:data=json.dumps(payload,separators=(",",":")).encode();h["Content-Type"]="application/json"
+              req=urllib.request.Request("https://api.github.com"+path,data=data,headers=h,method=method)
+              try:
+                  with urllib.request.urlopen(req,timeout=30) as r:
+                      b=r.read(4000000);return r.status,json.loads(b.decode()) if b else None
+              except urllib.error.HTTPError as e:
+                  b=e.read(1000000)
+                  try:p=json.loads(b.decode()) if b else None
+                  except Exception:p=None
+                  return e.code,p
+
+          def pr():
+              s,p=api("GET",f"/repos/{repo}/pulls/{number}")
+              if s!=200 or not isinstance(p,dict):raise RuntimeError(f"PR read failed HTTP {s}")
+              return p
+
+          def inspect(sha):
+              _,cp=api("GET",f"/repos/{repo}/commits/{sha}/check-runs?per_page=100")
+              _,sp=api("GET",f"/repos/{repo}/commits/{sha}/status")
+              active=[];failed=[];passed=[];runs=set()
+              for r in (cp or {}).get("check_runs",[]):
+                  if not isinstance(r,dict):continue
+                  item={"name":r.get("name"),"status":r.get("status"),"conclusion":r.get("conclusion"),"url":r.get("html_url")}
+                  if r.get("status")!="completed":active.append(item)
+                  elif str(r.get("conclusion") or "") in bad:
+                      failed.append(item)
+                      for k in ("html_url","details_url"):
+                          m=run_re.search(str(r.get(k) or ""))
+                          if m:runs.add(int(m.group(1)))
+                  elif str(r.get("conclusion") or "") in success:passed.append(str(r.get("name")))
+              for r in (sp or {}).get("statuses",[]):
+                  if not isinstance(r,dict):continue
+                  state=str(r.get("state") or "");item={"name":r.get("context"),"status":state,"conclusion":state,"url":r.get("target_url")}
+                  if state=="pending":active.append(item)
+                  elif state in {"failure","error"}:failed.append(item)
+                  elif state=="success":passed.append(str(r.get("context")))
+              return {"active":active,"failed":failed,"passed":sorted(set(passed)),"failed_run_ids":sorted(runs)}
+
+          report={"schema":"szl.pr651-finisher/v3","generated_at":dt.datetime.now(dt.timezone.utc).isoformat().replace("+00:00","Z"),"repository":repo,"number":number,"steps":[],"branch_protection_bypassed":False,"secret_values_recorded":False}
+          current=pr()
+          if current.get("state")!="open":
+              report.update(result="already-closed",merged=current.get("merged") is True,merged_at=current.get("merged_at"))
+          elif current.get("draft") is True:
+              report.update(result="blocked-draft",merged=False)
+          else:
+              head=str((current.get("head") or {}).get("sha") or "");base=str((current.get("base") or {}).get("sha") or "")
+              cs,cmp=api("GET",f"/repos/{repo}/compare/{urllib.parse.quote(base,safe='')}...{urllib.parse.quote(head,safe='')}")
+              behind=int((cmp or {}).get("behind_by") or 0) if cs==200 else 0
+              if behind>0:
+                  us,up=api("PUT",f"/repos/{repo}/pulls/{number}/update-branch",{"expected_head_sha":head})
+                  report["steps"].append({"operation":"update-branch","http":us,"behind_by":behind,"old_head":head,"message":(up or {}).get("message") if isinstance(up,dict) else None})
+                  if us not in {200,202}:
+                      report.update(result="update-branch-rejected",merged=False)
+                      Path("reports/pr651-finisher-v3.json").write_text(json.dumps(report,indent=2,sort_keys=True)+"\n");print(json.dumps(report,indent=2,sort_keys=True));raise SystemExit(1)
+                  old=head
+                  for _ in range(120):
+                      time.sleep(5);current=pr();head=str((current.get("head") or {}).get("sha") or "")
+                      if head and head!=old:break
+
+              final={"active":[],"failed":[],"passed":[],"failed_run_ids":[]}
+              for _ in range(80):
+                  current=pr()
+                  if current.get("state")!="open":break
+                  head=str((current.get("head") or {}).get("sha") or head);final=inspect(head)
+                  if final["failed"] or (not final["active"] and final["passed"]):break
+                  time.sleep(15)
+
+              rerun=[]
+              if final["failed"]:
+                  for run_id in final["failed_run_ids"]:
+                      rs,_=api("POST",f"/repos/{repo}/actions/runs/{run_id}/rerun-failed-jobs")
+                      if rs not in {201,202}:rs,_=api("POST",f"/repos/{repo}/actions/runs/{run_id}/rerun")
+                      report["steps"].append({"operation":"rerun-failed","run_id":run_id,"http":rs,"head_sha":head})
+                      if rs in {201,202}:rerun.append(run_id)
+              if rerun:
+                  for _ in range(100):
+                      current=pr()
+                      if current.get("state")!="open":break
+                      head=str((current.get("head") or {}).get("sha") or head);final=inspect(head)
+                      if final["failed"] or (not final["active"] and final["passed"]):break
+                      time.sleep(15)
+
+              current=pr();report.update(head_sha=head,checks=final)
+              if current.get("state")!="open":report.update(result="closed-during-run",merged=current.get("merged") is True,merged_at=current.get("merged_at"))
+              elif final["failed"]:report.update(result="terminal-red-after-rerun",merged=False)
+              elif final["active"] or not final["passed"]:report.update(result="checks-not-terminal",merged=False)
+              else:
+                  exact=str((pr().get("head") or {}).get("sha") or "")
+                  if exact!=head:report.update(result="head-moved-before-merge",merged=False)
+                  else:
+                      ms,mp=api("PUT",f"/repos/{repo}/pulls/{number}/merge",{"sha":exact,"merge_method":"squash","commit_title":"fix(hf): accept exact-source receipts and restore public profile budget (#651)","commit_message":"Accept rigorously validated pre-existing GitHub OIDC release receipts and restore the public organization profile budget without weakening source or truth contracts.\n\nSigned-off-by: Stephen Lutar <stephenlutar2@gmail.com>"})
+                      merged=ms==200 and isinstance(mp,dict) and mp.get("merged") is True
+                      report.update(result="merged" if merged else "merge-rejected",merged=merged,merge_http=ms,merge_sha=(mp or {}).get("sha") if isinstance(mp,dict) else None,merge_message=(mp or {}).get("message") if isinstance(mp,dict) else None)
+          report["complete"]=report.get("merged") is True
+          Path("reports/pr651-finisher-v3.json").write_text(json.dumps(report,indent=2,sort_keys=True)+"\n")
+          print(json.dumps(report,indent=2,sort_keys=True))
+          if not report["complete"]:raise SystemExit(1)
+          PY
+
+      - name: Upload exact-head finisher evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: pr651-finisher-v3-${{ github.run_id }}-${{ github.run_attempt }}
+          path: reports/pr651-finisher-v3.json
+          if-no-files-found: error
+          retention-days: 90
