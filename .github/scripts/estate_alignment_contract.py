@@ -46,9 +46,9 @@ EXPECTED_PORTFOLIO_SPACES = {
     "SZLHOLDINGS/szl-constellation",
     "SZLHOLDINGS/szl-frontier",
     "SZLHOLDINGS/szl-model-inference-lab",
-    "SZLHOLDINGS/yarqa",
     "SZLHOLDINGS/ayllu",
 }
+EXPECTED_INVENTORY_ONLY_SPACES = {"SZLHOLDINGS/yarqa"}
 ALLOWED_SPACE_CLASSES = {
     "commercial_flagship_runtime",
     "killinchu_capability_channel",
@@ -182,11 +182,23 @@ def validate_contract(contract: Mapping[str, Any]) -> list[str]:
         if isinstance(rows, list):
             ids = [row.get("repo_id") if isinstance(row, dict) else None for row in rows]
             require(set(ids) == EXPECTED_PORTFOLIO_SPACES, "portfolio Space set mismatch", failures)
-            require(len(ids) == len(set(ids)) == 17, "portfolio Spaces must contain 17 unique IDs", failures)
+            require(len(ids) == len(set(ids)) == 16, "portfolio Spaces must contain 16 unique IDs", failures)
             require(all(isinstance(row, dict) and row.get("class") in ALLOWED_SPACE_CLASSES for row in rows), "unknown portfolio Space class", failures)
             require(all(isinstance(row, dict) and str(row.get("canonical_source", "")).startswith("szl-holdings/") for row in rows), "every Space requires canonical GitHub source", failures)
             require(all(isinstance(row, dict) and str(row.get("deployment_source", "")).startswith("szl-holdings/") for row in rows), "every Space requires canonical deployment source", failures)
-        require(snapshot.get("portfolio_space_count") == 17, "portfolio_space_count must be 17", failures)
+        inventory_only = snapshot.get("inventory_only_spaces")
+        require(isinstance(inventory_only, list), "inventory_only_spaces must be an array", failures)
+        if isinstance(inventory_only, list):
+            inventory_ids = [row.get("repo_id") if isinstance(row, dict) else None for row in inventory_only]
+            require(set(inventory_ids) == EXPECTED_INVENTORY_ONLY_SPACES, "inventory-only Space set mismatch", failures)
+            require(len(inventory_ids) == len(set(inventory_ids)) == 1, "inventory-only Spaces must contain one unique ID", failures)
+            require(all(isinstance(row, dict) and row.get("class") == "inventory_only" for row in inventory_only), "inventory-only class mismatch", failures)
+            require(all(isinstance(row, dict) and row.get("governed_keep") is False for row in inventory_only), "inventory-only Space cannot be a keeper", failures)
+            require(all(isinstance(row, dict) and row.get("disposition") == "FOLD" for row in inventory_only), "inventory-only disposition must be FOLD", failures)
+            require(all(isinstance(row, dict) and str(row.get("canonical_source", "")).startswith("szl-holdings/") for row in inventory_only), "inventory-only Space requires canonical GitHub source", failures)
+        require(snapshot.get("portfolio_space_count") == 16, "portfolio_space_count must be 16", failures)
+        require(snapshot.get("public_space_count") == 17, "public_space_count must be 17", failures)
+        require(snapshot.get("public_space_count") == snapshot.get("portfolio_space_count") + len(inventory_only or []), "public Space decomposition mismatch", failures)
         require(snapshot.get("model_count") == 45, "model_count must be 45", failures)
         require(snapshot.get("dataset_count") == 34, "dataset_count must be 34", failures)
         require(snapshot.get("organization_card_space_excluded_from_portfolio_count") == ORG_CARD_SPACE_ID, "README control-surface exclusion missing", failures)
@@ -202,7 +214,7 @@ def validate_contract(contract: Mapping[str, Any]) -> list[str]:
         require(org_card.get("portfolio_member") is False, "organization-card must remain outside the portfolio count", failures)
         require(
             org_card.get("claim_boundary")
-            == "Source-bound organization front door; excluded from the 17 portfolio-Space count.",
+            == "Source-bound organization front door; excluded from the 16 portfolio-Space count.",
             "organization-card claim boundary mismatch",
             failures,
         )
@@ -242,7 +254,7 @@ def validate_documents(root: Path, contract: Mapping[str, Any]) -> list[str]:
             require(marker.casefold() in text.casefold(), f"{label} missing {marker!r}", failures)
         for name in ("A11oy", "Killinchu", "Forge", "Terra", "PRISM Counsel", "PURIQ Finance", "LYTE"):
             require(name.casefold() in text.casefold(), f"{label} missing {name}", failures)
-    for marker in ("17 portfolio Spaces", "45 models", "34 datasets"):
+    for marker in ("16 portfolio Spaces", "1 inventory-only Space", "45 models", "34 datasets"):
         require(marker.casefold() in profile.casefold(), f"GitHub profile missing {marker}", failures)
         require(marker.casefold() in hf_readme.casefold(), f"Hugging Face README missing {marker}", failures)
     for label, text in documents.items():
@@ -660,11 +672,19 @@ def validate_live(contract: Mapping[str, Any]) -> tuple[list[str], dict[str, Any
     datasets = list_hf("datasets")
     spaces = list_hf("spaces")
     space_ids = {str(row.get("id") or "") for row in spaces}
-    portfolio_ids = space_ids - {ORG_CARD_SPACE_ID}
-    expected = {row["repo_id"] for row in contract["huggingface_inventory_snapshot"]["portfolio_spaces"]}
-    require(portfolio_ids == expected, f"public portfolio Space drift: missing={sorted(expected - portfolio_ids)} unexpected={sorted(portfolio_ids - expected)}", failures)
-    require(len(models) == contract["huggingface_inventory_snapshot"]["model_count"], f"model count drift: {len(models)}", failures)
-    require(len(datasets) == contract["huggingface_inventory_snapshot"]["dataset_count"], f"dataset count drift: {len(datasets)}", failures)
+    listed_space_ids = space_ids - {ORG_CARD_SPACE_ID}
+    snapshot = contract["huggingface_inventory_snapshot"]
+    expected_portfolio = {row["repo_id"] for row in snapshot["portfolio_spaces"]}
+    expected_inventory_only = {row["repo_id"] for row in snapshot["inventory_only_spaces"]}
+    expected_public = expected_portfolio | expected_inventory_only
+    portfolio_ids = listed_space_ids & expected_portfolio
+    inventory_only_ids = listed_space_ids & expected_inventory_only
+    require(listed_space_ids == expected_public, f"public Space inventory drift: missing={sorted(expected_public - listed_space_ids)} unexpected={sorted(listed_space_ids - expected_public)}", failures)
+    require(len(listed_space_ids) == snapshot["public_space_count"], f"public Space count drift: {len(listed_space_ids)}", failures)
+    require(portfolio_ids == expected_portfolio, f"public portfolio Space drift: missing={sorted(expected_portfolio - portfolio_ids)} unexpected={sorted(portfolio_ids - expected_portfolio)}", failures)
+    require(inventory_only_ids == expected_inventory_only, f"inventory-only Space drift: missing={sorted(expected_inventory_only - inventory_only_ids)} unexpected={sorted(inventory_only_ids - expected_inventory_only)}", failures)
+    require(len(models) == snapshot["model_count"], f"model count drift: {len(models)}", failures)
+    require(len(datasets) == snapshot["dataset_count"], f"dataset count drift: {len(datasets)}", failures)
 
     # The static README control surface is intentionally outside the portfolio
     # count and is not guaranteed to appear in the author-filtered bulk Space
@@ -766,10 +786,13 @@ def validate_live(contract: Mapping[str, Any]) -> tuple[list[str], dict[str, Any
             "models": len(models),
             "datasets": len(datasets),
             "spaces_including_org_card": len(
-                space_ids | ({ORG_CARD_SPACE_ID} if org_card_present else set())
+                listed_space_ids | ({ORG_CARD_SPACE_ID} if org_card_present else set())
             ),
+            "public_listed_spaces": len(listed_space_ids),
             "portfolio_spaces": len(portfolio_ids),
             "portfolio_space_ids": sorted(portfolio_ids),
+            "inventory_only_spaces": len(inventory_only_ids),
+            "inventory_only_space_ids": sorted(inventory_only_ids),
         },
     }
 

@@ -29,7 +29,7 @@ Authority and evidence are checked before action. Runtime stays inside its decla
 
 - **A11oy** · [product](https://a-11-oy.com) · [source](https://github.com/szl-holdings/a11oy)
 - **Proof registry** · [a11oy.net](https://a11oy.net) for records, diligence, and atlas evidence
-- **Artifacts** · [Hugging Face](https://huggingface.co/SZLHOLDINGS): **17 public Spaces, 45 models, and 34 datasets** measured 2026-09-04 23:34 UTC via Hub API.
+- **Artifacts** · [Hugging Face](https://huggingface.co/SZLHOLDINGS): **17 public Spaces, 45 models, and 34 datasets** measured 2026-09-05 via Hub API.
 - **IMMUNE** · [product tab](https://a-11-oy.com/immune) · [Channel A](https://huggingface.co/spaces/SZLHOLDINGS/immune) · [Channel B](https://huggingface.co/spaces/SZLHOLDINGS/immune-lattice)
 - **Organization source** · [github.com/szl-holdings](https://github.com/szl-holdings)
 
@@ -41,7 +41,9 @@ Three commercial flagships: A11oy,Killinchu,Forge. Five public domain bodies:
 Terra,Killinchu,PRISM Counsel,PURIQ Finance,LYTE. Six internal engines:
 Sentra,Lyte,Killinchu,Finance,Terra,Counsel.
 
-**17 portfolio Spaces · 45 models · 34 datasets.**
+**16 portfolio Spaces · 45 models · 34 datasets.**
+
+**1 inventory-only Space: Yarqa · governedKeep=false · disposition=FOLD.**
 
 Hub inventory is registry-only—not availability, operational readiness, or
 publication policy. KEEP authority:

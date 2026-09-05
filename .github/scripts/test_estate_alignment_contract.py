@@ -47,6 +47,31 @@ class EstateAlignmentContractTests(unittest.TestCase):
         failures = alignment.validate_contract(candidate)
         self.assertIn("unknown portfolio Space class", failures)
 
+    def test_inventory_only_space_cannot_be_promoted_or_hidden(self) -> None:
+        snapshot = self.contract["huggingface_inventory_snapshot"]
+        self.assertEqual(
+            {row["repo_id"] for row in snapshot["inventory_only_spaces"]},
+            alignment.EXPECTED_INVENTORY_ONLY_SPACES,
+        )
+        self.assertEqual(snapshot["public_space_count"], 17)
+        self.assertEqual(snapshot["portfolio_space_count"], 16)
+
+        promoted = copy.deepcopy(self.contract)
+        promoted["huggingface_inventory_snapshot"]["inventory_only_spaces"][0][
+            "governed_keep"
+        ] = True
+        self.assertIn(
+            "inventory-only Space cannot be a keeper",
+            alignment.validate_contract(promoted),
+        )
+
+        hidden = copy.deepcopy(self.contract)
+        row = hidden["huggingface_inventory_snapshot"]["inventory_only_spaces"].pop()
+        hidden["huggingface_inventory_snapshot"]["portfolio_spaces"].append(row)
+        failures = alignment.validate_contract(hidden)
+        self.assertTrue(any("portfolio Space set mismatch" in item for item in failures))
+        self.assertTrue(any("inventory-only Space set mismatch" in item for item in failures))
+
     def test_hub_inventory_cannot_become_publication_policy(self) -> None:
         candidate = copy.deepcopy(self.contract)
         candidate["huggingface_inventory_snapshot"]["policy_authority"] = True
@@ -58,15 +83,21 @@ class EstateAlignmentContractTests(unittest.TestCase):
         failures = alignment.validate_contract(candidate)
         self.assertIn("governed keep-list authority mismatch", failures)
 
-    def test_live_readback_qualifies_the_exact_pull_request_head(self) -> None:
+    def test_live_readback_runs_after_publication_or_explicit_audit(self) -> None:
         workflow = (
             ROOT / ".github" / "workflows" / "estate-one-fabric-alignment.yml"
         ).read_text(encoding="utf-8")
-        live_job = workflow.split("  live-contract:\n", 1)[1]
-        self.assertNotIn("github.event_name != 'pull_request'", live_job)
-        exact_head = "${{ github.event.pull_request.head.sha || github.sha }}"
-        self.assertGreaterEqual(live_job.count(exact_head), 2)
-        self.assertIn("--live", live_job)
+        self.assertIn("workflow_run:", workflow)
+        self.assertIn('workflows: ["Hugging Face organization front door"]', workflow)
+        local_job, live_job = workflow.split("  live-contract:\n", 1)
+        self.assertIn("github.event_name != 'workflow_run'", local_job)
+        self.assertIn("github.event.workflow_run.conclusion == 'success'", live_job)
+        self.assertIn("github.event_name == 'schedule'", live_job)
+        self.assertIn("github.event_name == 'workflow_dispatch'", live_job)
+        self.assertNotIn("github.event_name == 'pull_request'", live_job)
+        self.assertNotIn("github.event_name == 'push'", live_job)
+        exact_head = "${{ github.event.workflow_run.head_sha || github.event.pull_request.head.sha || github.sha }}"
+        self.assertGreaterEqual(workflow.count(exact_head), 4)
 
     def test_strict_loader_rejects_duplicate_keys_and_nonfinite_numbers(self) -> None:
         with self.assertRaisesRegex(alignment.AlignmentError, "duplicate JSON key"):
@@ -348,7 +379,10 @@ class EstateAlignmentContractTests(unittest.TestCase):
             ],
         }
         revision = "f" * 40
-        space_ids = sorted(alignment.EXPECTED_PORTFOLIO_SPACES)
+        space_ids = sorted(
+            alignment.EXPECTED_PORTFOLIO_SPACES
+            | alignment.EXPECTED_INVENTORY_ONLY_SPACES
+        )
 
         def fetch(url: str, **_kwargs) -> bytes:
             if "/repos/" in url:
@@ -368,12 +402,11 @@ class EstateAlignmentContractTests(unittest.TestCase):
 
         def binding(row, expected_revision):
             seen.append(row["repo_id"])
-            matched = row["repo_id"] != "SZLHOLDINGS/ayllu"
             return {
                 "repo_id": row["repo_id"],
                 "expected_revision": expected_revision,
-                "observed_revision": expected_revision if matched else "0" * 40,
-                "matched": matched,
+                "observed_revision": expected_revision,
+                "matched": True,
             }
 
         with (
@@ -384,11 +417,20 @@ class EstateAlignmentContractTests(unittest.TestCase):
         ):
             failures, observation = alignment.validate_live(self.contract)
 
+        self.assertEqual(failures, [])
         self.assertEqual(
             set(seen),
             alignment.EXPECTED_PORTFOLIO_SPACES | {alignment.ORG_CARD_SPACE_ID},
         )
-        self.assertEqual(len(observation["runtime_source_bindings"]), 17)
+        self.assertNotIn("SZLHOLDINGS/yarqa", seen)
+        self.assertEqual(len(observation["runtime_source_bindings"]), 16)
+        self.assertEqual(observation["huggingface"]["public_listed_spaces"], 17)
+        self.assertEqual(observation["huggingface"]["portfolio_spaces"], 16)
+        self.assertEqual(observation["huggingface"]["inventory_only_spaces"], 1)
+        self.assertEqual(
+            observation["huggingface"]["inventory_only_space_ids"],
+            ["SZLHOLDINGS/yarqa"],
+        )
         self.assertEqual(
             observation["organization_card_source_binding"]["repo_id"],
             alignment.ORG_CARD_SPACE_ID,
@@ -401,9 +443,6 @@ class EstateAlignmentContractTests(unittest.TestCase):
                     "portfolio_spaces"
                 ]
             ],
-        )
-        self.assertTrue(
-            any("runtime source revision drift for SZLHOLDINGS/ayllu" in row for row in failures)
         )
 
 
@@ -420,7 +459,7 @@ class EstateAlignmentContractTests(unittest.TestCase):
             row["repo_id"]
             for row in self.contract["huggingface_inventory_snapshot"]["portfolio_spaces"]
         }
-        self.assertEqual(len(portfolio_ids), 17)
+        self.assertEqual(len(portfolio_ids), 16)
         self.assertNotIn(alignment.ORG_CARD_SPACE_ID, portfolio_ids)
 
     def test_org_card_runtime_binding_uses_static_deployment_receipt_only(self) -> None:

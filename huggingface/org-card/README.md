@@ -68,7 +68,9 @@ Three commercial flagships: A11oy,Killinchu,Forge. Five public domain bodies:
 Terra,Killinchu,PRISM Counsel,PURIQ Finance,LYTE. Six internal engines:
 Sentra,Lyte,Killinchu,Finance,Terra,Counsel.
 
-**17 portfolio Spaces · 45 models · 34 datasets.**
+**16 portfolio Spaces · 45 models · 34 datasets.**
+
+**1 inventory-only Space: Yarqa · governedKeep=false · disposition=FOLD.**
 
 Hub inventory is registry-only—not availability, operational readiness, or
 publication policy. KEEP authority:

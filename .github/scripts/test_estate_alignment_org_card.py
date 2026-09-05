@@ -42,7 +42,7 @@ class OrganizationCardSourceBindingTests(unittest.TestCase):
         self.row = self.contract["organization_card_control_surface"]
         self.expected = "a" * 40
 
-    def test_control_surface_is_not_a_seventeenth_portfolio_member(self) -> None:
+    def test_control_surface_is_not_a_portfolio_member(self) -> None:
         self.assertEqual(self.row["repo_id"], alignment.ORG_CARD_SPACE_ID)
         self.assertFalse(self.row["portfolio_member"])
         self.assertEqual(
@@ -53,7 +53,7 @@ class OrganizationCardSourceBindingTests(unittest.TestCase):
         )
         portfolio = self.contract["huggingface_inventory_snapshot"]["portfolio_spaces"]
         portfolio_ids = {row["repo_id"] for row in portfolio}
-        self.assertEqual(len(portfolio_ids), 17)
+        self.assertEqual(len(portfolio_ids), 16)
         self.assertNotIn(alignment.ORG_CARD_SPACE_ID, portfolio_ids)
 
     def test_exact_static_deployment_receipt_is_required(self) -> None:

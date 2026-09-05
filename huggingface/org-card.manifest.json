@@ -90,7 +90,9 @@
         "Six internal engines",
         "HISTORICAL",
         "SIMULATED",
-        "assets/estate-command-system.svg"
+        "assets/estate-command-system.svg",
+        "16 portfolio Spaces",
+        "1 inventory-only Space"
       ]
     },
     "index.html": {

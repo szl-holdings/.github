@@ -114,7 +114,7 @@
     "governed_keep_list": "docs/CANONICAL_FLEET.md",
     "claim_boundary": "Public Hub inventory evidence only; not availability, operational readiness, or publication policy.",
     "observed_at": "2026-09-05T21:41:24Z",
-    "portfolio_space_count": 17,
+    "portfolio_space_count": 16,
     "model_count": 45,
     "dataset_count": 34,
     "organization_card_space_excluded_from_portfolio_count": "SZLHOLDINGS/README",
@@ -204,12 +204,6 @@
         "deployment_source": "szl-holdings/szl-frontier"
       },
       {
-        "repo_id": "SZLHOLDINGS/yarqa",
-        "class": "research_surface",
-        "canonical_source": "szl-holdings/yarqa",
-        "deployment_source": "szl-holdings/yarqa"
-      },
-      {
         "repo_id": "SZLHOLDINGS/szl-model-inference-lab",
         "class": "forge_inference_surface",
         "canonical_source": "szl-holdings/szl-forge",
@@ -220,6 +214,17 @@
         "class": "incubation_lab",
         "canonical_source": "szl-holdings/ayllu",
         "deployment_source": "szl-holdings/ayllu"
+      }
+    ],
+    "public_space_count": 17,
+    "inventory_only_spaces": [
+      {
+        "repo_id": "SZLHOLDINGS/yarqa",
+        "class": "inventory_only",
+        "governed_keep": false,
+        "disposition": "FOLD",
+        "canonical_source": "szl-holdings/yarqa",
+        "claim_boundary": "Observed public inventory only; not a product, topology binding, portfolio member, keeper, runtime readiness, or publication policy."
       }
     ]
   },
@@ -232,7 +237,7 @@
       "/deployment.json"
     ],
     "portfolio_member": false,
-    "claim_boundary": "Source-bound organization front door; excluded from the 17 portfolio-Space count."
+    "claim_boundary": "Source-bound organization front door; excluded from the 16 portfolio-Space count."
   },
   "movement_contract": {
     "github_is_source_authority": true,
