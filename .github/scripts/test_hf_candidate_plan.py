@@ -190,6 +190,51 @@ class TestExactCandidatePlan(CandidatePlanTestCase):
         ).encode()
         self.assertEqual(digest, hashlib.sha256(canonical_bytes).hexdigest())
 
+    def test_tracelease_managed_additions_are_planned_without_allowlist(self) -> None:
+        fixture = self.fixture()
+        candidate = fixture.commit(
+            "add TraceLease managed modules",
+            {
+                "Dockerfile": (
+                    "FROM python:3.12-slim\n"
+                    "COPY app/ /app/\n"
+                    "COPY szl_tracelease_durable.py szl_tracelease_routes.py ./\n"
+                ),
+                "szl_tracelease_durable.py": "DURABLE = True\n",
+                "szl_tracelease_routes.py": "ROUTES = True\n",
+            },
+        )
+
+        first = fixture.plan(candidate)
+        second = fixture.plan(candidate)
+
+        self.assertEqual(first, second)
+        self.assertEqual(first["canonical_sha256"], second["canonical_sha256"])
+        self.assertNotIn("szl_tracelease_durable.py", first["baseline"]["files"])
+        self.assertNotIn("szl_tracelease_routes.py", first["baseline"]["files"])
+        for path in (
+            "szl_tracelease_durable.py",
+            "szl_tracelease_routes.py",
+        ):
+            self.assertEqual(
+                first["candidate"]["source_files"][path],
+                first["candidate"]["files"][path]["oid"],
+            )
+        self.assertEqual(
+            [
+                (delta["path"], delta["kind"])
+                for delta in first["deltas"]
+            ],
+            [
+                ("Dockerfile", "modified"),
+                ("szl_tracelease_durable.py", "managed-added"),
+                ("szl_tracelease_routes.py", "managed-added"),
+            ],
+        )
+        self.assertEqual(first["delta_count"], 3)
+        self.assertEqual(first["network_requests"], 0)
+        self.assertFalse(first["allowlist_used"])
+
     def test_directory_copy_recurses_through_git_tree(self) -> None:
         fixture = self.fixture(
             extra_files={
