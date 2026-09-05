@@ -1,0 +1,115 @@
+# SPDX-License-Identifier: Apache-2.0
+name: Repair estate alignment content v4 once
+
+on:
+  push:
+    branches:
+      - feat/estate-alignment-current-main-20260905
+    paths:
+      - .github/workflows/_repair_estate_alignment_scope_v4_once.yml
+
+permissions:
+  contents: write
+
+concurrency:
+  group: repair-estate-alignment-content-v4-once
+  cancel-in-progress: false
+
+jobs:
+  repair:
+    if: github.repository == 'szl-holdings/.github' && github.ref == 'refs/heads/feat/estate-alignment-current-main-20260905'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Harden runner
+        uses: step-security/harden-runner@05e31511f85b41b11d1cf0ef85d0992719546e2c # v2.21.0
+        with:
+          egress-policy: audit
+
+      - name: Check out exact repair trigger
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 1
+          persist-credentials: true
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12.10"
+
+      - name: Generate the previously proven content repair
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+
+          source = Path('.github/workflows/_repair_estate_alignment_scope_once.yml')
+          text = source.read_text(encoding='utf-8')
+          marker = "          python - <<'PY'\n"
+          start = text.index(marker) + len(marker)
+          end = text.index("\n          PY", start)
+          block = text[start:end]
+          lines = [line[10:] if line.startswith('          ') else line for line in block.splitlines()]
+          payload = '\n'.join(lines) + '\n'
+          old = "updated, count = re.subn(pattern, replacement, text, count=1, flags=re.S)"
+          new = "updated, count = re.subn(pattern, lambda _match: replacement, text, count=1, flags=re.S)"
+          if payload.count(old) != 1:
+              raise SystemExit(f'expected one regex helper anchor, observed {payload.count(old)}')
+          payload = payload.replace(old, new, 1)
+          target = Path('/tmp/repair_estate_alignment_scope.py')
+          target.write_text(payload, encoding='utf-8')
+          PY
+          python -m py_compile /tmp/repair_estate_alignment_scope.py
+          python /tmp/repair_estate_alignment_scope.py
+
+      - name: Verify the content repair before publication
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m py_compile \
+            .github/scripts/estate_alignment_contract.py \
+            .github/scripts/test_estate_alignment_contract.py \
+            .github/scripts/test_estate_alignment_org_card.py
+          python .github/scripts/test_estate_alignment_contract.py
+          python .github/scripts/test_estate_alignment_org_card.py
+          preview="$(mktemp -d)"
+          python .github/scripts/hf_static_space_deploy.py \
+            --repo-root . \
+            --manifest huggingface/org-card.manifest.json \
+            --source-sha "$GITHUB_SHA" \
+            --materialize "$preview" \
+            --report hf-org-card-scope-repair-materialization.json
+          git diff --check
+
+      - name: Commit only non-workflow content
+        shell: bash
+        run: |
+          set -euo pipefail
+          branch=feat/estate-alignment-current-main-20260905
+          remote_head="$(git ls-remote origin "refs/heads/$branch" | cut -f1)"
+          test "$remote_head" = "$GITHUB_SHA"
+
+          # The desired workflow was already proven by the focused tests, but a
+          # GitHub App token is not permitted to update workflow files. Preserve
+          # the current workflow here; the authorized GitHub API applies that
+          # exact workflow in the next controlled commit.
+          git checkout -- .github/workflows/estate-one-fabric-alignment.yml
+
+          git add -- \
+            .github/scripts/estate_alignment_contract.py \
+            .github/scripts/test_estate_alignment_contract.py \
+            .github/scripts/test_estate_alignment_org_card.py \
+            docs/ESTATE_ALIGNMENT_CONTRACT_V1.json \
+            profile/README.md \
+            huggingface/org-card/README.md \
+            huggingface/org-card/index.html \
+            huggingface/org-card.manifest.json
+          git diff --cached --check
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git commit -s -m 'fix(alignment): separate inventory from portfolio authority' \
+            -m 'Preserve the reviewed 16-Space portfolio, record Yarqa as one inventory-only FOLD surface, and retain the measured 45-model/34-dataset/17-Space public inventory. Workflow sequencing is applied through the authorized GitHub API in a separate exact-head commit.'
+          test "$(git ls-remote origin "refs/heads/$branch" | cut -f1)" = "$GITHUB_SHA"
+          git push origin "HEAD:refs/heads/$branch"
