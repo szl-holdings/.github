@@ -1,0 +1,397 @@
+# SPDX-License-Identifier: Apache-2.0
+name: Materialize estate alignment current-main successor once
+
+on:
+  push:
+    branches:
+      - feat/estate-alignment-current-main-20260905
+    paths:
+      - .github/workflows/_materialize_estate_alignment_current_main_once.yml
+
+permissions:
+  contents: write
+
+concurrency:
+  group: materialize-estate-alignment-current-main
+  cancel-in-progress: false
+
+jobs:
+  materialize:
+    if: github.repository == 'szl-holdings/.github' && github.ref == 'refs/heads/feat/estate-alignment-current-main-20260905'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - name: Harden runner
+        uses: step-security/harden-runner@05e31511f85b41b11d1cf0ef85d0992719546e2c # v2.21.0
+        with:
+          egress-policy: audit
+
+      - name: Check out exact successor branch
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: feat/estate-alignment-current-main-20260905
+          fetch-depth: 0
+          persist-credentials: true
+
+      - name: Set up exact Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: '3.12.10'
+
+      - name: Port reviewed source files without replaying history
+        shell: bash
+        run: |
+          set -euo pipefail
+          source_head=98ee6e11cb550fca3a806220274404e39a4df721
+          git fetch --no-tags origin '+refs/pull/682/head:refs/remotes/origin/reviewed-682'
+          test "$(git rev-parse refs/remotes/origin/reviewed-682)" = "$source_head"
+          while IFS= read -r path; do
+            mkdir -p "$(dirname "$path")"
+            git show "$source_head:$path" > "$path"
+          done <<'EOF'
+          .github/scripts/estate_alignment_contract.py
+          .github/scripts/public_front_door_check.py
+          .github/scripts/test_estate_alignment_contract.py
+          .github/scripts/test_public_front_door_check.py
+          .github/workflows/estate-one-fabric-alignment.yml
+          .github/workflows/hf-org-card-deploy.yml
+          docs/ESTATE_ALIGNMENT_CONTRACT_V1.json
+          huggingface/org-card.manifest.json
+          huggingface/org-card/README.md
+          huggingface/org-card/index.html
+          profile/README.md
+          EOF
+
+      - name: Add exact organization-card source binding
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+          import json
+
+          script_path = Path('.github/scripts/estate_alignment_contract.py')
+          text = script_path.read_text(encoding='utf-8')
+
+          old = 'RUNTIME_BINDING_PATHS = ("/api/build-info", "/deployment.json")\nRUNTIME_OBSERVATIONS = 2\n'
+          new = '''RUNTIME_BINDING_PATHS = ("/api/build-info", "/deployment.json")
+          ORG_CARD_SPACE_ID = "SZLHOLDINGS/README"
+          ORG_CARD_ORIGIN = "https://szlholdings-readme.static.hf.space"
+          ORG_CARD_BINDING_PATHS = ("/deployment.json",)
+          RUNTIME_OBSERVATIONS = 2
+          '''
+          if text.count(old) != 1:
+              raise SystemExit('runtime constant insertion point changed')
+          text = text.replace(old, new, 1)
+
+          old = '        require(snapshot.get("organization_card_space_excluded_from_portfolio_count") == "SZLHOLDINGS/README", "README control-surface exclusion missing", failures)\n\n    movement = contract.get("movement_contract")\n'
+          new = '''        require(snapshot.get("organization_card_space_excluded_from_portfolio_count") == "SZLHOLDINGS/README", "README control-surface exclusion missing", failures)
+
+          org_card = contract.get("organization_card_control_surface")
+          require(isinstance(org_card, dict), "organization_card_control_surface must be an object", failures)
+          if isinstance(org_card, dict):
+              require(org_card.get("repo_id") == ORG_CARD_SPACE_ID, "organization-card repo id mismatch", failures)
+              require(org_card.get("class") == "organization_card_control_surface", "organization-card class mismatch", failures)
+              require(org_card.get("deployment_source") == "szl-holdings/.github", "organization-card source authority mismatch", failures)
+              require(org_card.get("runtime_origin") == ORG_CARD_ORIGIN, "organization-card origin mismatch", failures)
+              require(org_card.get("binding_paths") == list(ORG_CARD_BINDING_PATHS), "organization-card binding path mismatch", failures)
+              require(org_card.get("portfolio_member") is False, "organization card must remain outside the portfolio count", failures)
+
+          movement = contract.get("movement_contract")
+          '''
+          if text.count(old) != 1:
+              raise SystemExit('contract validation insertion point changed')
+          text = text.replace(old, new, 1)
+
+          old = '    origin = runtime_origin(repo_id)\n    attempts: list[dict[str, Any]] = []\n    for path in RUNTIME_BINDING_PATHS:\n'
+          new = '''    configured_origin = row.get("runtime_origin")
+          origin = str(configured_origin) if configured_origin is not None else runtime_origin(repo_id)
+          url_origin(origin)
+          raw_paths = row.get("binding_paths")
+          binding_paths = tuple(raw_paths) if isinstance(raw_paths, list) else RUNTIME_BINDING_PATHS
+          if not binding_paths or any(path not in RUNTIME_BINDING_PATHS for path in binding_paths):
+              raise AlignmentError(f"invalid runtime binding paths for {repo_id}: {binding_paths!r}")
+          if repo_id == ORG_CARD_SPACE_ID and (
+              origin != ORG_CARD_ORIGIN or binding_paths != ORG_CARD_BINDING_PATHS
+          ):
+              raise AlignmentError("organization-card binding must use its exact static origin and deployment receipt")
+          attempts: list[dict[str, Any]] = []
+          for path in binding_paths:
+          '''
+          if text.count(old) != 1:
+              raise SystemExit('runtime source binding insertion point changed')
+          text = text.replace(old, new, 1)
+
+          old = '    rows = list(taxonomy["commercial_flagships"]) + list(taxonomy["public_domain_bodies"]) + list(snapshot["portfolio_spaces"])\n'
+          new = '''    rows = list(taxonomy["commercial_flagships"]) + list(taxonomy["public_domain_bodies"]) + list(snapshot["portfolio_spaces"])
+          org_card = contract.get("organization_card_control_surface")
+          if isinstance(org_card, Mapping):
+              rows.append(org_card)
+          '''
+          if text.count(old) != 1:
+              raise SystemExit('canonical repository row insertion point changed')
+          text = text.replace(old, new, 1)
+
+          old = 'def validate_live(contract: Mapping[str, Any]) -> tuple[list[str], dict[str, Any]]:\n'
+          new = '''def runtime_binding_rows(contract: Mapping[str, Any]) -> list[Mapping[str, Any]]:
+              """Return 16 portfolio runtimes plus the source-bound org-card control surface."""
+              rows: list[Mapping[str, Any]] = list(
+                  contract["huggingface_inventory_snapshot"]["portfolio_spaces"]
+              )
+              org_card = contract.get("organization_card_control_surface")
+              if not isinstance(org_card, Mapping):
+                  raise AlignmentError("organization-card control surface is unavailable")
+              rows.append(org_card)
+              return rows
+
+
+          def validate_live(contract: Mapping[str, Any]) -> tuple[list[str], dict[str, Any]]:
+          '''
+          if text.count(old) != 1:
+              raise SystemExit('validate_live insertion point changed')
+          text = text.replace(old, new, 1)
+
+          old = '''    runtime_rows = list(
+              contract["huggingface_inventory_snapshot"]["portfolio_spaces"]
+          )
+          '''
+          new = '    runtime_rows = runtime_binding_rows(contract)\n'
+          if text.count(old) != 1:
+              raise SystemExit('runtime row selection point changed')
+          text = text.replace(old, new, 1)
+          script_path.write_text(text, encoding='utf-8')
+
+          contract_path = Path('docs/ESTATE_ALIGNMENT_CONTRACT_V1.json')
+          contract = json.loads(contract_path.read_text(encoding='utf-8'))
+          contract['organization_card_control_surface'] = {
+              'repo_id': 'SZLHOLDINGS/README',
+              'class': 'organization_card_control_surface',
+              'deployment_source': 'szl-holdings/.github',
+              'runtime_origin': 'https://szlholdings-readme.static.hf.space',
+              'binding_paths': ['/deployment.json'],
+              'portfolio_member': False,
+              'claim_boundary': 'Source-bound organization front door; excluded from the 16 portfolio-Space count.',
+          }
+          contract_path.write_text(json.dumps(contract, indent=2) + '\n', encoding='utf-8')
+
+          Path('.github/scripts/test_estate_alignment_org_card.py').write_text('''#!/usr/bin/env python3
+          # SPDX-License-Identifier: Apache-2.0
+          from __future__ import annotations
+
+          import copy
+          import importlib.util
+          import json
+          import unittest
+          from pathlib import Path
+          from unittest.mock import patch
+
+          ROOT = Path(__file__).resolve().parents[2]
+          MODULE_PATH = Path(__file__).with_name("estate_alignment_contract.py")
+          SPEC = importlib.util.spec_from_file_location("estate_alignment_contract_org_card", MODULE_PATH)
+          assert SPEC and SPEC.loader
+          alignment = importlib.util.module_from_spec(SPEC)
+          SPEC.loader.exec_module(alignment)
+
+
+          class FakeResponse:
+              def __init__(self, final_url: str, payload: bytes = b"{}") -> None:
+                  self.final_url = final_url
+                  self.payload = payload
+
+              def __enter__(self):
+                  return self
+
+              def __exit__(self, *_args):
+                  return False
+
+              def geturl(self) -> str:
+                  return self.final_url
+
+              def read(self, _limit: int) -> bytes:
+                  return self.payload
+
+
+          class OrganizationCardBindingTests(unittest.TestCase):
+              def setUp(self) -> None:
+                  self.contract = alignment.load_json(ROOT / "docs" / "ESTATE_ALIGNMENT_CONTRACT_V1.json")
+                  self.row = self.contract["organization_card_control_surface"]
+                  self.expected = "a" * 40
+
+              def test_control_surface_is_exact_and_not_a_seventeenth_portfolio_space(self) -> None:
+                  self.assertEqual(alignment.validate_contract(self.contract), [])
+                  self.assertEqual(len(self.contract["huggingface_inventory_snapshot"]["portfolio_spaces"]), 16)
+                  rows = alignment.runtime_binding_rows(self.contract)
+                  self.assertEqual(len(rows), 17)
+                  self.assertEqual(rows[-1]["repo_id"], alignment.ORG_CARD_SPACE_ID)
+                  self.assertFalse(rows[-1]["portfolio_member"])
+
+              def test_exact_static_deployment_receipt_is_required(self) -> None:
+                  requested: list[tuple[str, str | None]] = []
+
+                  def fetch(url: str, **kwargs) -> bytes:
+                      requested.append((url, kwargs.get("required_origin")))
+                      return json.dumps({
+                          "source": {
+                              "repository": "szl-holdings/.github",
+                              "revision": self.expected,
+                          }
+                      }).encode()
+
+                  observation = alignment.runtime_source_binding(self.row, self.expected, fetch=fetch)
+                  self.assertTrue(observation["matched"])
+                  self.assertEqual(observation["binding_path"], "/deployment.json")
+                  self.assertEqual(len(requested), alignment.RUNTIME_OBSERVATIONS)
+                  for url, required_origin in requested:
+                      parsed = alignment.urllib.parse.urlsplit(url)
+                      self.assertEqual(parsed.netloc, "szlholdings-readme.static.hf.space")
+                      self.assertEqual(parsed.path, "/deployment.json")
+                      self.assertEqual(required_origin, alignment.ORG_CARD_ORIGIN)
+
+              def test_missing_stale_and_conflicting_receipts_fail_closed(self) -> None:
+                  missing = alignment.runtime_source_binding(
+                      self.row,
+                      self.expected,
+                      fetch=lambda *_args, **_kwargs: (_ for _ in ()).throw(OSError("missing")),
+                  )
+                  self.assertFalse(missing["matched"])
+
+                  stale = alignment.runtime_source_binding(
+                      self.row,
+                      self.expected,
+                      fetch=lambda *_args, **_kwargs: json.dumps({
+                          "source_repository": "szl-holdings/.github",
+                          "source_revision": "b" * 40,
+                      }).encode(),
+                  )
+                  self.assertFalse(stale["matched"])
+                  self.assertEqual(stale["observed_revision"], "b" * 40)
+
+                  revisions = iter((self.expected, "c" * 40))
+                  conflicting = alignment.runtime_source_binding(
+                      self.row,
+                      self.expected,
+                      fetch=lambda *_args, **_kwargs: json.dumps({
+                          "source_repository": "szl-holdings/.github",
+                          "source_revision": next(revisions),
+                      }).encode(),
+                  )
+                  self.assertFalse(conflicting["matched"])
+                  self.assertFalse(conflicting["attempts"][0]["stable"])
+
+              def test_cross_origin_redirect_is_rejected(self) -> None:
+                  with patch.object(
+                      alignment.urllib.request,
+                      "urlopen",
+                      return_value=FakeResponse(
+                          "https://shared-receipts.invalid/deployment.json",
+                          b'{"source_revision":"' + self.expected.encode() + b'"}',
+                      ),
+                  ):
+                      with self.assertRaisesRegex(alignment.AlignmentError, "cross-origin redirect"):
+                          alignment.fetch_bytes(
+                              alignment.ORG_CARD_ORIGIN + "/deployment.json",
+                              attempts=1,
+                              required_origin=alignment.ORG_CARD_ORIGIN,
+                              sleep=lambda _seconds: None,
+                          )
+
+              def test_wrong_org_card_contract_values_are_rejected(self) -> None:
+                  candidate = copy.deepcopy(self.contract)
+                  candidate["organization_card_control_surface"]["runtime_origin"] = "https://szlholdings-readme.hf.space"
+                  failures = alignment.validate_contract(candidate)
+                  self.assertIn("organization-card origin mismatch", failures)
+
+
+          if __name__ == "__main__":
+              unittest.main()
+          ''', encoding='utf-8')
+
+          workflow_path = Path('.github/workflows/estate-one-fabric-alignment.yml')
+          workflow = workflow_path.read_text(encoding='utf-8')
+          needle = '      - .github/scripts/test_estate_alignment_contract.py\n      - .github/workflows/estate-one-fabric-alignment.yml\n'
+          replacement = '      - .github/scripts/test_estate_alignment_contract.py\n      - .github/scripts/test_estate_alignment_org_card.py\n      - .github/workflows/estate-one-fabric-alignment.yml\n'
+          if workflow.count(needle) != 2:
+              raise SystemExit('workflow path filters changed')
+          workflow = workflow.replace(needle, replacement)
+          needle = '          .github/scripts/test_estate_alignment_contract.py\n'
+          replacement = '          .github/scripts/test_estate_alignment_contract.py\n          .github/scripts/test_estate_alignment_org_card.py\n'
+          if workflow.count(needle) != 1:
+              raise SystemExit('workflow compile list changed')
+          workflow = workflow.replace(needle, replacement, 1)
+          needle = '      - name: Prove exact one-fabric contract offline\n        run: python .github/scripts/test_estate_alignment_contract.py\n'
+          replacement = '      - name: Prove exact one-fabric contract offline\n        run: |\n          python .github/scripts/test_estate_alignment_contract.py\n          python .github/scripts/test_estate_alignment_org_card.py\n'
+          if workflow.count(needle) != 1:
+              raise SystemExit('workflow test step changed')
+          workflow_path.write_text(workflow.replace(needle, replacement, 1), encoding='utf-8')
+
+          audit_path = Path('audit/ESTATE_ALIGNMENT_CURRENT_MAIN_SUCCESSOR_2026-09-05.md')
+          audit = audit_path.read_text(encoding='utf-8')
+          audit = audit.replace('`state`: `OPEN_REPAIR`', '`state`: `MATERIALIZED_FOR_REVIEW`', 1)
+          audit += '''
+
+          ## Materialization evidence
+
+          - Reviewed source set: `.github#682@98ee6e11cb550fca3a806220274404e39a4df721`.
+          - Current protected base: `.github@48af5555ddd103f37b4d27de4e99b21ee5b91251`.
+          - Added exact `SZLHOLDINGS/README` static-origin `/deployment.json` binding to current `.github` main.
+          - Preserved the 16-member portfolio count and treated README only as a source-bound control surface.
+          - Missing, stale, unstable, conflicting, and cross-origin receipts fail closed.
+          '''
+          audit_path.write_text(audit, encoding='utf-8')
+          PY
+
+      - name: Prove source, publication, front-door, and org-card contracts
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m py_compile \
+            .github/scripts/estate_alignment_contract.py \
+            .github/scripts/test_estate_alignment_contract.py \
+            .github/scripts/test_estate_alignment_org_card.py \
+            .github/scripts/public_front_door_check.py \
+            .github/scripts/test_public_front_door_check.py
+          python .github/scripts/test_estate_alignment_contract.py
+          python .github/scripts/test_estate_alignment_org_card.py
+          python .github/scripts/test_public_front_door_check.py
+          python .github/scripts/estate_alignment_contract.py \
+            --repo-root . \
+            --output /tmp/estate-alignment-local-receipt.json
+          python .github/scripts/hf_static_space_deploy.py \
+            --repo-root . \
+            --manifest huggingface/org-card.manifest.json \
+            --source-sha "$GITHUB_SHA" \
+            --materialize "$(mktemp -d)" \
+            --report /tmp/hf-org-card-materialization.json
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          receipt = json.loads(Path('/tmp/estate-alignment-local-receipt.json').read_text())
+          assert receipt['state'] == 'ALIGNED', receipt['failures']
+          report = json.loads(Path('/tmp/hf-org-card-materialization.json').read_text())
+          assert report
+          PY
+          git diff --check
+
+      - name: Commit verified non-workflow source set
+        shell: bash
+        run: |
+          set -euo pipefail
+          branch=feat/estate-alignment-current-main-20260905
+          test "$(git ls-remote origin refs/heads/$branch | cut -f1)" = "$GITHUB_SHA"
+          git add -- \
+            .github/scripts/estate_alignment_contract.py \
+            .github/scripts/public_front_door_check.py \
+            .github/scripts/test_estate_alignment_contract.py \
+            .github/scripts/test_estate_alignment_org_card.py \
+            .github/scripts/test_public_front_door_check.py \
+            docs/ESTATE_ALIGNMENT_CONTRACT_V1.json \
+            huggingface/org-card.manifest.json \
+            huggingface/org-card/README.md \
+            huggingface/org-card/index.html \
+            profile/README.md \
+            audit/ESTATE_ALIGNMENT_CURRENT_MAIN_SUCCESSOR_2026-09-05.md
+          git diff --cached --check
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git commit -s -m 'feat(alignment): source-bind the estate and org-card control surface'
+          git push origin "HEAD:refs/heads/$branch"
