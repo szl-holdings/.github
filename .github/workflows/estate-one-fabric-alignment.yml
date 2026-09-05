@@ -10,6 +10,7 @@ on:
       - huggingface/org-card.manifest.json
       - .github/scripts/estate_alignment_contract.py
       - .github/scripts/test_estate_alignment_contract.py
+      - .github/scripts/test_estate_alignment_org_card.py
       - .github/workflows/estate-one-fabric-alignment.yml
   push:
     branches: [main]
@@ -20,6 +21,7 @@ on:
       - huggingface/org-card.manifest.json
       - .github/scripts/estate_alignment_contract.py
       - .github/scripts/test_estate_alignment_contract.py
+      - .github/scripts/test_estate_alignment_org_card.py
       - .github/workflows/estate-one-fabric-alignment.yml
   schedule:
     - cron: "23 5 * * *"
@@ -60,9 +62,12 @@ jobs:
           python -m py_compile
           .github/scripts/estate_alignment_contract.py
           .github/scripts/test_estate_alignment_contract.py
+          .github/scripts/test_estate_alignment_org_card.py
 
       - name: Prove exact one-fabric contract offline
-        run: python .github/scripts/test_estate_alignment_contract.py
+        run: |
+          python .github/scripts/test_estate_alignment_contract.py
+          python .github/scripts/test_estate_alignment_org_card.py
 
       - name: Emit secret-free source receipt
         env:
