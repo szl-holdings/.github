@@ -22,8 +22,7 @@ license: apache-2.0
 
 # Governed AI. Inference. Command systems.
 
-Frontier infrastructure for decisions that must remain bounded, inspectable,
-and reproducible.
+Bounded, inspectable, reproducible.
 
 [**Enter the product**](https://a-11-oy.com) ·
 [**Explore SZL Atlas**](https://huggingface.co/spaces/SZLHOLDINGS/szl-command-lab) ·
@@ -43,8 +42,7 @@ on a capability claim.
 ### Explore
 
 [**SZL Atlas**](https://huggingface.co/spaces/SZLHOLDINGS/szl-command-lab)
-is the searchable public estate: models, first-class kernels, datasets, Spaces,
-usage signals, source links, and evidence boundaries in one responsive surface.
+maps models, kernels, datasets, Spaces, source links, and evidence boundaries.
 
 [Models](https://huggingface.co/SZLHOLDINGS/models) ·
 [Kernels](https://huggingface.co/SZLHOLDINGS/kernels) ·
@@ -63,6 +61,20 @@ evaluation, compatibility, and limitations.
 Inspect the [trust boundary](https://github.com/szl-holdings/.github/blob/main/TRUST.md),
 exact revisions, limitations, and the
 [served source binding](https://szlholdings-readme.static.hf.space/deployment.json).
+
+## Estate map
+
+Three commercial flagships: A11oy,Killinchu,Forge. Five public domain bodies:
+Terra,Killinchu,PRISM Counsel,PURIQ Finance,LYTE. Six internal engines:
+Sentra,Lyte,Killinchu,Finance,Terra,Counsel.
+
+**16 portfolio Spaces · 45 models · 34 datasets.**
+
+**1 inventory-only Space: Yarqa · governedKeep=false · disposition=FOLD.**
+
+Hub inventory is registry-only—not availability, operational readiness, or
+publication policy. KEEP authority:
+[`docs/CANONICAL_FLEET.md`](https://github.com/szl-holdings/.github/blob/main/docs/CANONICAL_FLEET.md).
 
 ## Command fabric
 
@@ -98,8 +110,7 @@ is a **HISTORICAL** mirror.
 [Atlas source binding](https://szlholdings-szl-command-lab.hf.space/api/build-info) ·
 [A11oy readiness](https://a-11-oy.com/api/a11oy/v1/readiness)
 
-No production authorization, regulatory approval, adoption, funding, revenue,
-or investment outcome is claimed.
+No production authorization or approval is claimed.
 
 ## Reproduce and verify
 

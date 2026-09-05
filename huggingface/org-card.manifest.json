@@ -24,6 +24,10 @@
       "destination": "index.html"
     },
     {
+      "source": "docs/ESTATE_ALIGNMENT_CONTRACT_V1.json",
+      "destination": "estate-alignment.json"
+    },
+    {
       "source": "profile/assets/estate-command-system.svg",
       "destination": "assets/estate-command-system.svg"
     },
@@ -81,9 +85,14 @@
       "mode": "rendered_markdown",
       "required_markers": [
         "Choose a path",
+        "Three commercial flagships",
+        "Five public domain bodies",
+        "Six internal engines",
         "HISTORICAL",
         "SIMULATED",
-        "assets/estate-command-system.svg"
+        "assets/estate-command-system.svg",
+        "16 portfolio Spaces",
+        "1 inventory-only Space"
       ]
     },
     "index.html": {

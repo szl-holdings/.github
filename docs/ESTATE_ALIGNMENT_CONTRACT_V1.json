@@ -1,0 +1,276 @@
+{
+  "schema": "szl.estate-alignment/v1",
+  "version": "1.0.0",
+  "effective_at": "2026-09-05T00:00:00Z",
+  "authority": {
+    "product_origin": "https://a-11-oy.com",
+    "proof_origin": "https://a11oy.net",
+    "canonical_source_organization": "https://github.com/szl-holdings",
+    "artifact_registry": "https://huggingface.co/SZLHOLDINGS",
+    "product_contract": {
+      "repository": "szl-holdings/a11oy",
+      "branch": "main",
+      "path": "docs/strategy/living-command-fabric.v1.json"
+    },
+    "organization_profile_repository": "szl-holdings/.github",
+    "huggingface_front_door": "SZLHOLDINGS/README"
+  },
+  "taxonomy": {
+    "commercial_flagship_count": 3,
+    "commercial_flagships": [
+      {
+        "slug": "a11oy",
+        "name": "A11oy Command",
+        "role": "governed action, policy, receipts, and product routing",
+        "product_url": "https://a-11-oy.com",
+        "source": "szl-holdings/a11oy",
+        "huggingface": [
+          "SZLHOLDINGS/a11oy"
+        ]
+      },
+      {
+        "slug": "killinchu",
+        "name": "Killinchu",
+        "role": "cyber-physical resilience and defensive command",
+        "product_url": "https://a-11-oy.com/killinchu",
+        "source": "szl-holdings/killinchu",
+        "huggingface": [
+          "SZLHOLDINGS/killinchu"
+        ]
+      },
+      {
+        "slug": "forge",
+        "name": "Forge / Own-Metal",
+        "role": "model lifecycle, qualification, kernels, and bounded inference",
+        "product_url": "https://a-11-oy.com/frontier",
+        "source": "szl-holdings/szl-forge",
+        "huggingface": [
+          "SZLHOLDINGS/szl-model-inference-lab"
+        ]
+      }
+    ],
+    "public_domain_body_count": 5,
+    "public_domain_bodies": [
+      {
+        "slug": "terra",
+        "name": "Terra",
+        "domain": "real-estate intelligence",
+        "source": "szl-holdings/szl-real-estate",
+        "service_source": "szl-holdings/vertical-services",
+        "huggingface": "SZLHOLDINGS/terra"
+      },
+      {
+        "slug": "killinchu",
+        "name": "Killinchu",
+        "domain": "cyber-physical resilience intelligence",
+        "source": "szl-holdings/killinchu",
+        "service_source": "szl-holdings/vertical-services",
+        "huggingface": "SZLHOLDINGS/killinchu"
+      },
+      {
+        "slug": "counsel",
+        "name": "PRISM Counsel",
+        "domain": "legal matter intelligence",
+        "source": "szl-holdings/a11oy:verticals/counsel",
+        "service_source": "szl-holdings/vertical-services",
+        "huggingface": "SZLHOLDINGS/counsel"
+      },
+      {
+        "slug": "finance",
+        "name": "PURIQ Finance",
+        "domain": "financial intelligence",
+        "source": "szl-holdings/puriq-live",
+        "service_source": "szl-holdings/vertical-services",
+        "huggingface": "SZLHOLDINGS/finance"
+      },
+      {
+        "slug": "lyte",
+        "name": "LYTE",
+        "domain": "business and agent observability",
+        "source": "szl-holdings/lyte-services",
+        "service_source": "szl-holdings/lyte-services",
+        "huggingface": "SZLHOLDINGS/lyte"
+      }
+    ],
+    "internal_engine_count": 6,
+    "internal_engines": [
+      "sentra",
+      "lyte",
+      "killinchu",
+      "finance",
+      "terra",
+      "counsel"
+    ],
+    "folded_capabilities": {
+      "aegis": "killinchu",
+      "sentra": "killinchu",
+      "immune": "killinchu",
+      "vessels": "killinchu"
+    }
+  },
+  "huggingface_inventory_snapshot": {
+    "evidence_class": "MEASURED_PUBLIC_API_SNAPSHOT",
+    "policy_authority": false,
+    "governed_keep_list": "docs/CANONICAL_FLEET.md",
+    "claim_boundary": "Public Hub inventory evidence only; not availability, operational readiness, or publication policy.",
+    "observed_at": "2026-09-05T21:41:24Z",
+    "portfolio_space_count": 16,
+    "model_count": 45,
+    "dataset_count": 34,
+    "organization_card_space_excluded_from_portfolio_count": "SZLHOLDINGS/README",
+    "portfolio_spaces": [
+      {
+        "repo_id": "SZLHOLDINGS/a11oy",
+        "class": "commercial_flagship_runtime",
+        "canonical_source": "szl-holdings/a11oy",
+        "deployment_source": "szl-holdings/a11oy"
+      },
+      {
+        "repo_id": "SZLHOLDINGS/killinchu",
+        "class": "commercial_flagship_runtime",
+        "canonical_source": "szl-holdings/killinchu",
+        "deployment_source": "szl-holdings/killinchu"
+      },
+      {
+        "repo_id": "SZLHOLDINGS/immune",
+        "class": "killinchu_capability_channel",
+        "canonical_source": "szl-holdings/immune",
+        "deployment_source": "szl-holdings/immune"
+      },
+      {
+        "repo_id": "SZLHOLDINGS/immune-lattice",
+        "class": "killinchu_capability_channel",
+        "canonical_source": "szl-holdings/immune",
+        "deployment_source": "szl-holdings/immune"
+      },
+      {
+        "repo_id": "SZLHOLDINGS/terra",
+        "class": "public_domain_body_runtime",
+        "canonical_source": "szl-holdings/szl-real-estate",
+        "deployment_source": "szl-holdings/a11oy"
+      },
+      {
+        "repo_id": "SZLHOLDINGS/sentra",
+        "class": "internal_engine_surface",
+        "canonical_source": "szl-holdings/vertical-services",
+        "deployment_source": "szl-holdings/a11oy"
+      },
+      {
+        "repo_id": "SZLHOLDINGS/counsel",
+        "class": "public_domain_body_runtime",
+        "canonical_source": "szl-holdings/a11oy:verticals/counsel",
+        "deployment_source": "szl-holdings/a11oy"
+      },
+      {
+        "repo_id": "SZLHOLDINGS/finance",
+        "class": "public_domain_body_runtime",
+        "canonical_source": "szl-holdings/puriq-live",
+        "deployment_source": "szl-holdings/a11oy"
+      },
+      {
+        "repo_id": "SZLHOLDINGS/lyte",
+        "class": "public_domain_body_runtime",
+        "canonical_source": "szl-holdings/lyte-services",
+        "deployment_source": "szl-holdings/lyte-services"
+      },
+      {
+        "repo_id": "SZLHOLDINGS/vertical-services",
+        "class": "shared_internal_engine_runtime",
+        "canonical_source": "szl-holdings/vertical-services",
+        "deployment_source": "szl-holdings/vertical-services"
+      },
+      {
+        "repo_id": "SZLHOLDINGS/szl-command-lab",
+        "class": "estate_atlas",
+        "canonical_source": "szl-holdings/szl-command-lab",
+        "deployment_source": "szl-holdings/szl-command-lab"
+      },
+      {
+        "repo_id": "SZLHOLDINGS/david-leads",
+        "class": "reference_workflow",
+        "canonical_source": "szl-holdings/david-leads",
+        "deployment_source": "szl-holdings/david-leads"
+      },
+      {
+        "repo_id": "SZLHOLDINGS/szl-constellation",
+        "class": "lab_surface",
+        "canonical_source": "szl-holdings/holographic-unify",
+        "deployment_source": "szl-holdings/holographic-unify"
+      },
+      {
+        "repo_id": "SZLHOLDINGS/szl-frontier",
+        "class": "research_surface",
+        "canonical_source": "szl-holdings/szl-frontier",
+        "deployment_source": "szl-holdings/szl-frontier"
+      },
+      {
+        "repo_id": "SZLHOLDINGS/szl-model-inference-lab",
+        "class": "forge_inference_surface",
+        "canonical_source": "szl-holdings/szl-forge",
+        "deployment_source": "szl-holdings/szl-forge"
+      },
+      {
+        "repo_id": "SZLHOLDINGS/ayllu",
+        "class": "incubation_lab",
+        "canonical_source": "szl-holdings/ayllu",
+        "deployment_source": "szl-holdings/ayllu"
+      }
+    ],
+    "public_space_count": 17,
+    "inventory_only_spaces": [
+      {
+        "repo_id": "SZLHOLDINGS/yarqa",
+        "class": "inventory_only",
+        "governed_keep": false,
+        "disposition": "FOLD",
+        "canonical_source": "szl-holdings/yarqa",
+        "claim_boundary": "Observed public inventory only; not a product, topology binding, portfolio member, keeper, runtime readiness, or publication policy."
+      }
+    ]
+  },
+  "organization_card_control_surface": {
+    "repo_id": "SZLHOLDINGS/README",
+    "class": "organization_card_control_surface",
+    "deployment_source": "szl-holdings/.github",
+    "runtime_origin": "https://szlholdings-readme.static.hf.space",
+    "binding_paths": [
+      "/deployment.json"
+    ],
+    "portfolio_member": false,
+    "claim_boundary": "Source-bound organization front door; excluded from the 16 portfolio-Space count."
+  },
+  "movement_contract": {
+    "github_is_source_authority": true,
+    "huggingface_is_generated_artifact_registry": true,
+    "a11oy_net_is_proof_not_product": true,
+    "one_canonical_writer_per_huggingface_target": true,
+    "source_revision_required_for_runtime_claims": true,
+    "public_effectors_enabled": false,
+    "human_authority_required": true,
+    "lambda_status": "CONJECTURE_1_ADVISORY",
+    "locked_formula_ids": [
+      "F1",
+      "F4",
+      "F7",
+      "F11",
+      "F12",
+      "F18",
+      "F19",
+      "F22"
+    ],
+    "forbidden_public_products": [
+      "nexus",
+      "aegis",
+      "sentra",
+      "immune",
+      "vessels"
+    ],
+    "rules": [
+      "A site change that alters product taxonomy must update this contract and both organization front doors in the same protected change wave.",
+      "A GitHub source change is not an operational release until the canonical Hugging Face writer publishes and source-binding readback succeeds.",
+      "A Hugging Face listing is an artifact or runtime surface, not automatically a product.",
+      "Labs, capability planes, datasets, kernels, and model cards must not be promoted to peer product status without a new reviewed contract version.",
+      "Unproven, unavailable, sample, simulated, and roadmap states remain explicitly labelled."
+    ]
+  }
+}

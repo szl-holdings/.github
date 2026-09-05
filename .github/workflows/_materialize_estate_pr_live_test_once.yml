@@ -1,0 +1,78 @@
+# SPDX-License-Identifier: Apache-2.0
+name: Materialize estate PR live-readback regression once
+
+on:
+  push:
+    branches:
+      - feat/estate-alignment-current-main-20260905
+    paths:
+      - .github/workflows/_materialize_estate_pr_live_test_once.yml
+
+permissions:
+  contents: write
+
+concurrency:
+  group: materialize-estate-pr-live-test-once
+  cancel-in-progress: false
+
+jobs:
+  materialize:
+    if: github.repository == 'szl-holdings/.github' && github.ref == 'refs/heads/feat/estate-alignment-current-main-20260905'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Harden runner
+        uses: step-security/harden-runner@05e31511f85b41b11d1cf0ef85d0992719546e2c # v2.21.0
+        with:
+          egress-policy: audit
+
+      - name: Check out exact repair branch
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: feat/estate-alignment-current-main-20260905
+          fetch-depth: 0
+          persist-credentials: true
+
+      - name: Update the permanent workflow regression and retire this controller
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+
+          path = Path('.github/scripts/test_estate_alignment_contract.py')
+          text = path.read_text(encoding='utf-8')
+          old = '''        self.assertIn("github.event.workflow_run.conclusion == 'success'", live_job)
+          self.assertIn("github.event_name == 'schedule'", live_job)
+          self.assertIn("github.event_name == 'workflow_dispatch'", live_job)
+          self.assertNotIn("github.event_name == 'pull_request'", live_job)
+          self.assertNotIn("github.event_name == 'push'", live_job)
+'''
+          new = '''        self.assertIn("github.event.workflow_run.conclusion == 'success'", live_job)
+          self.assertIn("github.event_name == 'pull_request'", live_job)
+          self.assertIn("github.event_name == 'schedule'", live_job)
+          self.assertIn("github.event_name == 'workflow_dispatch'", live_job)
+          self.assertIn("needs.local-contract.result == 'success'", live_job)
+          self.assertNotIn("github.event_name == 'push'", live_job)
+'''
+          if text.count(old) != 1:
+              raise SystemExit('estate live-readback regression anchor changed')
+          path.write_text(text.replace(old, new, 1), encoding='utf-8')
+          PY
+
+          python -m py_compile \
+            .github/scripts/estate_alignment_contract.py \
+            .github/scripts/test_estate_alignment_contract.py \
+            .github/scripts/test_estate_alignment_org_card.py
+          python .github/scripts/test_estate_alignment_contract.py
+          python .github/scripts/test_estate_alignment_org_card.py
+          git diff --check
+
+          rm -f -- .github/workflows/_materialize_estate_pr_live_test_once.yml
+          git add \
+            .github/scripts/test_estate_alignment_contract.py \
+            .github/workflows/_materialize_estate_pr_live_test_once.yml
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git commit -s -m 'test(alignment): require pre-merge live readback'
+          git push origin HEAD:feat/estate-alignment-current-main-20260905

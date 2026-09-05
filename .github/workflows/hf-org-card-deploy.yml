@@ -7,6 +7,7 @@ on:
     paths:
       - "huggingface/org-card/**"
       - "huggingface/org-card.manifest.json"
+      - "docs/ESTATE_ALIGNMENT_CONTRACT_V1.json"
       - "profile/assets/**"
       - "profile/assets/evidence-lattice-v2.webp"
       - ".github/scripts/hf_static_space_deploy.py"
