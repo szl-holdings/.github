@@ -16,6 +16,9 @@ newer red run. Active runs are accepted only inside their bounded duration and
 only when backed by a fresh success or a newly installed workflow's first-run
 grace period.
 
+Completed runs must have a terminal update time at or after their creation time.
+An impossible timestamp sequence is rejected before it can influence health.
+
 A suspected failure is sampled twice, sixty seconds apart. Only the same target
 failing both samples creates or refreshes the single `[ESTATE-DEADMAN]`
 incident. Alternating or recovered samples are `INCONCLUSIVE`, fail the run,
@@ -27,6 +30,18 @@ with an immutable provider-authenticated scheduled workflow attempt. It does
 not claim causal authorship because same-repository workflows using the built-in
 Actions identity can also write issues; every confirmed cycle overwrites the
 reserved issue with current evidence.
+
+The controller checks the protected branch revision again after incident
+discovery and immediately before every create, comment, refresh, or close.
+If the branch changes between a recovery comment and closing the issue, the
+close is withheld and the receipt records the failed reconciliation.
+
+Legacy incident records that predate run-bound markers are not trusted as
+current incidents. An operator can preserve the original body and open state,
+retitle the record outside the exact reserved title, and document the migration.
+The next scheduled cycle creates current evidence under the reserved title if
+failure is confirmed. Migration never supplies a synthetic run marker or claims
+that the underlying outage recovered.
 
 Each cycle writes a JSON receipt and a `.sha256` sidecar containing the SHA-256
 of the exact emitted JSON file bytes. The receipt contains public
