@@ -13,7 +13,7 @@ Port the reviewed estate-alignment source/workflow/publication contract from #68
 
 `SZLHOLDINGS/README` must be a first-class source-bound control surface tied to the exact current `szl-holdings/.github` protected-main SHA through the static Space origin `https://szlholdings-readme.static.hf.space` and its `deployment.json` evidence. Presence-only evidence is insufficient. Missing, stale, conflicting, or cross-origin evidence must fail closed.
 
-Preserve the 16 portfolio-Space count: README is a control surface, not a portfolio member. Preserve existing publisher authority, host-isolated front-door rules, publication manifest ownership, and provider boundaries.
+Preserve the 17 portfolio-Space count: README is a control surface, not a portfolio member. Preserve existing publisher authority, host-isolated front-door rules, publication manifest ownership, and provider boundaries.
 
 ## Acceptance
 
@@ -28,7 +28,7 @@ with cache-busting and constrained to the same origin, and it must match the
 exact protected-main revision of `szl-holdings/.github`.
 
 The evidence is emitted separately as `organization_card_source_binding`;
-`runtime_source_bindings` remains exactly the 16 portfolio Spaces. Focused
+`runtime_source_bindings` remains exactly the 17 portfolio Spaces. Focused
 regressions cover stale revisions, conflicting revisions, cross-origin
 failures, the static-host path, and count preservation. This is not a merge or
 live-deployment claim; exact-head CI and protected review remain required.

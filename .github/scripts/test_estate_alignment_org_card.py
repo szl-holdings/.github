@@ -53,7 +53,7 @@ class OrganizationCardSourceBindingTests(unittest.TestCase):
         )
         portfolio = self.contract["huggingface_inventory_snapshot"]["portfolio_spaces"]
         portfolio_ids = {row["repo_id"] for row in portfolio}
-        self.assertEqual(len(portfolio_ids), 16)
+        self.assertEqual(len(portfolio_ids), 17)
         self.assertNotIn(alignment.ORG_CARD_SPACE_ID, portfolio_ids)
 
     def test_exact_static_deployment_receipt_is_required(self) -> None:

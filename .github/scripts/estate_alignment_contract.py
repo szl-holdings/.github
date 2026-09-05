@@ -46,6 +46,7 @@ EXPECTED_PORTFOLIO_SPACES = {
     "SZLHOLDINGS/szl-constellation",
     "SZLHOLDINGS/szl-frontier",
     "SZLHOLDINGS/szl-model-inference-lab",
+    "SZLHOLDINGS/yarqa",
     "SZLHOLDINGS/ayllu",
 }
 ALLOWED_SPACE_CLASSES = {
@@ -181,13 +182,13 @@ def validate_contract(contract: Mapping[str, Any]) -> list[str]:
         if isinstance(rows, list):
             ids = [row.get("repo_id") if isinstance(row, dict) else None for row in rows]
             require(set(ids) == EXPECTED_PORTFOLIO_SPACES, "portfolio Space set mismatch", failures)
-            require(len(ids) == len(set(ids)) == 16, "portfolio Spaces must contain 16 unique IDs", failures)
+            require(len(ids) == len(set(ids)) == 17, "portfolio Spaces must contain 17 unique IDs", failures)
             require(all(isinstance(row, dict) and row.get("class") in ALLOWED_SPACE_CLASSES for row in rows), "unknown portfolio Space class", failures)
             require(all(isinstance(row, dict) and str(row.get("canonical_source", "")).startswith("szl-holdings/") for row in rows), "every Space requires canonical GitHub source", failures)
             require(all(isinstance(row, dict) and str(row.get("deployment_source", "")).startswith("szl-holdings/") for row in rows), "every Space requires canonical deployment source", failures)
-        require(snapshot.get("portfolio_space_count") == 16, "portfolio_space_count must be 16", failures)
-        require(snapshot.get("model_count") == 44, "model_count must be 44", failures)
-        require(snapshot.get("dataset_count") == 33, "dataset_count must be 33", failures)
+        require(snapshot.get("portfolio_space_count") == 17, "portfolio_space_count must be 17", failures)
+        require(snapshot.get("model_count") == 45, "model_count must be 45", failures)
+        require(snapshot.get("dataset_count") == 34, "dataset_count must be 34", failures)
         require(snapshot.get("organization_card_space_excluded_from_portfolio_count") == ORG_CARD_SPACE_ID, "README control-surface exclusion missing", failures)
 
     org_card = contract.get("organization_card_control_surface")
@@ -201,7 +202,7 @@ def validate_contract(contract: Mapping[str, Any]) -> list[str]:
         require(org_card.get("portfolio_member") is False, "organization-card must remain outside the portfolio count", failures)
         require(
             org_card.get("claim_boundary")
-            == "Source-bound organization front door; excluded from the 16 portfolio-Space count.",
+            == "Source-bound organization front door; excluded from the 17 portfolio-Space count.",
             "organization-card claim boundary mismatch",
             failures,
         )
@@ -241,7 +242,7 @@ def validate_documents(root: Path, contract: Mapping[str, Any]) -> list[str]:
             require(marker.casefold() in text.casefold(), f"{label} missing {marker!r}", failures)
         for name in ("A11oy", "Killinchu", "Forge", "Terra", "PRISM Counsel", "PURIQ Finance", "LYTE"):
             require(name.casefold() in text.casefold(), f"{label} missing {name}", failures)
-    for marker in ("16 portfolio Spaces", "44 models", "33 datasets"):
+    for marker in ("17 portfolio Spaces", "45 models", "34 datasets"):
         require(marker.casefold() in profile.casefold(), f"GitHub profile missing {marker}", failures)
         require(marker.casefold() in hf_readme.casefold(), f"Hugging Face README missing {marker}", failures)
     for label, text in documents.items():
@@ -532,7 +533,19 @@ def runtime_source_binding(
         observed, observed_repository = (
             next(iter(identities)) if stable else (None, None)
         )
-        complete = observed is not None and observed_repository is not None
+        complete = observed is not None
+        # The runtime origin and deployment_source are already contract-bound.
+        # An explicit repository field strengthens that evidence, but absence of the
+        # redundant field must not invalidate a stable exact-SHA witness. A conflicting
+        # explicit repository still fails closed.
+        source_compatible = observed_repository in (None, repository)
+        source_evidence = (
+            "reported"
+            if observed_repository == repository
+            else "contract-bound-origin"
+            if observed_repository is None
+            else "conflicting"
+        )
         attempt = {
             "path": path,
             "observation_count": RUNTIME_OBSERVATIONS,
@@ -540,11 +553,12 @@ def runtime_source_binding(
             "complete": complete,
             "observed_revision": observed,
             "observed_source": observed_repository,
+            "source_evidence": source_evidence,
             "matched": (
                 stable
                 and complete
                 and observed == expected
-                and observed_repository == repository
+                and source_compatible
             ),
             "observations": observations,
         }
@@ -558,6 +572,7 @@ def runtime_source_binding(
                 "binding_path": path,
                 "observed_revision": observed,
                 "observed_source": observed_repository,
+                "source_evidence": source_evidence,
                 "matched": attempt["matched"],
                 "attempts": attempts,
             }
@@ -650,7 +665,29 @@ def validate_live(contract: Mapping[str, Any]) -> tuple[list[str], dict[str, Any
     require(portfolio_ids == expected, f"public portfolio Space drift: missing={sorted(expected - portfolio_ids)} unexpected={sorted(portfolio_ids - expected)}", failures)
     require(len(models) == contract["huggingface_inventory_snapshot"]["model_count"], f"model count drift: {len(models)}", failures)
     require(len(datasets) == contract["huggingface_inventory_snapshot"]["dataset_count"], f"dataset count drift: {len(datasets)}", failures)
-    require(ORG_CARD_SPACE_ID in space_ids, "Hugging Face organization-card Space missing", failures)
+
+    # The static README control surface is intentionally outside the portfolio
+    # count and is not guaranteed to appear in the author-filtered bulk Space
+    # listing. Prove its existence directly instead of turning a Hub listing
+    # quirk into a false source-alignment failure.
+    try:
+        org_card_detail = load_json_bytes(
+            fetch_bytes(f"{HF_API}/spaces/{ORG_CARD_SPACE_ID}"),
+            label="Hugging Face organization-card Space",
+        )
+    except Exception as exc:
+        org_card_present = False
+        failures.append(
+            "Hugging Face organization-card Space unavailable: "
+            f"{type(exc).__name__}"
+        )
+    else:
+        org_card_present = str(org_card_detail.get("id") or "") == ORG_CARD_SPACE_ID
+        require(
+            org_card_present,
+            "Hugging Face organization-card Space identity mismatch",
+            failures,
+        )
 
     runtime_rows = list(
         contract["huggingface_inventory_snapshot"]["portfolio_spaces"]
@@ -728,7 +765,9 @@ def validate_live(contract: Mapping[str, Any]) -> tuple[list[str], dict[str, Any
         "huggingface": {
             "models": len(models),
             "datasets": len(datasets),
-            "spaces_including_org_card": len(space_ids),
+            "spaces_including_org_card": len(
+                space_ids | ({ORG_CARD_SPACE_ID} if org_card_present else set())
+            ),
             "portfolio_spaces": len(portfolio_ids),
             "portfolio_space_ids": sorted(portfolio_ids),
         },

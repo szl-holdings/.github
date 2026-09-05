@@ -156,6 +156,21 @@ class EstateAlignmentContractTests(unittest.TestCase):
         self.assertEqual(stale["observed_revision"], "b" * 40)
         self.assertEqual(stale["observed_source"], "szl-holdings/szl-real-estate")
 
+        wrong_source = alignment.runtime_source_binding(
+            row,
+            expected,
+            fetch=lambda _url, **_kwargs: json.dumps(
+                {
+                    "source_repository": "szl-holdings/szl-real-estate",
+                    "source_revision": expected,
+                }
+            ).encode(),
+        )
+        self.assertFalse(wrong_source["matched"])
+        self.assertEqual(
+            wrong_source["attempts"][0]["source_evidence"], "conflicting"
+        )
+
     def test_runtime_binding_falls_back_to_static_deployment_receipt(self) -> None:
         row = {
             "repo_id": "SZLHOLDINGS/szl-command-lab",
@@ -183,7 +198,7 @@ class EstateAlignmentContractTests(unittest.TestCase):
         self.assertEqual(observation["binding_path"], "/deployment.json")
         self.assertEqual(len(requested), 2 * alignment.RUNTIME_OBSERVATIONS)
 
-    def test_incomplete_build_info_falls_back_to_complete_deployment(self) -> None:
+    def test_exact_revision_only_build_info_is_bound_by_contract_origin(self) -> None:
         row = {
             "repo_id": "SZLHOLDINGS/terra",
             "canonical_source": "szl-holdings/a11oy:verticals/terra",
@@ -194,26 +209,23 @@ class EstateAlignmentContractTests(unittest.TestCase):
 
         def fetch(url: str, **_kwargs) -> bytes:
             requested.append(url)
-            path = alignment.urllib.parse.urlsplit(url).path
-            if path == "/api/build-info":
-                return json.dumps({"build": {"revision": expected}}).encode()
-            return json.dumps(
-                {
-                    "source": {
-                        "repository": "szl-holdings/a11oy",
-                        "revision": expected,
-                    }
-                }
-            ).encode()
+            self.assertEqual(
+                alignment.urllib.parse.urlsplit(url).path,
+                "/api/build-info",
+            )
+            return json.dumps({"build": {"revision": expected}}).encode()
 
         observation = alignment.runtime_source_binding(row, expected, fetch=fetch)
 
         self.assertTrue(observation["matched"])
-        self.assertEqual(observation["binding_path"], "/deployment.json")
-        self.assertEqual(len(observation["attempts"]), 2)
-        self.assertFalse(observation["attempts"][0]["complete"])
-        self.assertTrue(observation["attempts"][0]["stable"])
-        self.assertEqual(len(requested), 2 * alignment.RUNTIME_OBSERVATIONS)
+        self.assertEqual(observation["binding_path"], "/api/build-info")
+        self.assertIsNone(observation["observed_source"])
+        self.assertEqual(
+            observation["attempts"][0]["source_evidence"],
+            "contract-bound-origin",
+        )
+        self.assertEqual(len(observation["attempts"]), 1)
+        self.assertEqual(len(requested), alignment.RUNTIME_OBSERVATIONS)
 
     def test_inconsistent_runtime_observations_fail_closed(self) -> None:
         row = {
@@ -336,18 +348,20 @@ class EstateAlignmentContractTests(unittest.TestCase):
             ],
         }
         revision = "f" * 40
-        space_ids = sorted(alignment.EXPECTED_PORTFOLIO_SPACES | {"SZLHOLDINGS/README"})
+        space_ids = sorted(alignment.EXPECTED_PORTFOLIO_SPACES)
 
         def fetch(url: str, **_kwargs) -> bytes:
             if "/repos/" in url:
                 return b'{"archived":false,"visibility":"public","default_branch":"main"}'
+            if url == f"{alignment.HF_API}/spaces/{alignment.ORG_CARD_SPACE_ID}":
+                return json.dumps({"id": alignment.ORG_CARD_SPACE_ID}).encode()
             return json.dumps(product).encode()
 
         def list_hf(kind: str):
             if kind == "models":
-                return [{}] * 44
+                return [{}] * 45
             if kind == "datasets":
-                return [{}] * 33
+                return [{}] * 34
             return [{"id": repo_id} for repo_id in space_ids]
 
         seen: list[str] = []
@@ -374,7 +388,7 @@ class EstateAlignmentContractTests(unittest.TestCase):
             set(seen),
             alignment.EXPECTED_PORTFOLIO_SPACES | {alignment.ORG_CARD_SPACE_ID},
         )
-        self.assertEqual(len(observation["runtime_source_bindings"]), 16)
+        self.assertEqual(len(observation["runtime_source_bindings"]), 17)
         self.assertEqual(
             observation["organization_card_source_binding"]["repo_id"],
             alignment.ORG_CARD_SPACE_ID,
@@ -406,7 +420,7 @@ class EstateAlignmentContractTests(unittest.TestCase):
             row["repo_id"]
             for row in self.contract["huggingface_inventory_snapshot"]["portfolio_spaces"]
         }
-        self.assertEqual(len(portfolio_ids), 16)
+        self.assertEqual(len(portfolio_ids), 17)
         self.assertNotIn(alignment.ORG_CARD_SPACE_ID, portfolio_ids)
 
     def test_org_card_runtime_binding_uses_static_deployment_receipt_only(self) -> None:
