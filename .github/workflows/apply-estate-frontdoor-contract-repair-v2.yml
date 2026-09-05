@@ -1,0 +1,164 @@
+name: Apply estate front-door contract repair v2
+
+on:
+  push:
+    branches:
+      - feat/estate-one-fabric-alignment-v1
+    paths:
+      - .github/workflows/apply-estate-frontdoor-contract-repair-v2.yml
+
+permissions:
+  contents: write
+
+concurrency:
+  group: apply-estate-frontdoor-contract-repair-v2
+  cancel-in-progress: false
+
+jobs:
+  materialize:
+    name: Preserve truth while exposing one-fabric taxonomy
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - name: Harden runner
+        uses: step-security/harden-runner@05e31511f85b41b11d1cf0ef85d0992719546e2c # v2.21.0
+        with:
+          egress-policy: audit
+
+      - name: Check out exact alignment branch
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: feat/estate-one-fabric-alignment-v1
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12"
+
+      - name: Restore reviewed front doors and add compact authority map
+        env:
+          REVIEWED_BASE: e25adbe3d39b988ced35740a6b58cbfc5ffa920b
+        run: |
+          set -euo pipefail
+          git checkout "${REVIEWED_BASE}" -- \
+            profile/README.md \
+            huggingface/org-card/README.md \
+            huggingface/org-card/index.html
+          python - <<'PY'
+          from pathlib import Path
+
+          def replace_once(text: str, old: str, new: str, label: str) -> str:
+              count = text.count(old)
+              if count != 1:
+                  raise SystemExit(f"{label}: expected one match, found {count}")
+              return text.replace(old, new, 1)
+
+          profile_path = Path("profile/README.md")
+          profile = profile_path.read_text(encoding="utf-8")
+          profile = replace_once(
+              profile,
+              "- **IMMUNE** · [product tab](https://a-11-oy.com/immune) · [Channel A](https://huggingface.co/spaces/SZLHOLDINGS/immune) · [Channel B](https://huggingface.co/spaces/SZLHOLDINGS/immune-lattice)\n",
+              "- **Killinchu capability channels** · [IMMUNE A](https://huggingface.co/spaces/SZLHOLDINGS/immune) · [IMMUNE B](https://huggingface.co/spaces/SZLHOLDINGS/immune-lattice); neither is an independent product\n",
+              "profile capability path",
+          )
+          start = profile.index("## Portfolio\n")
+          end = profile.index("\n[Public surface atlas]", start)
+          alignment = "\n".join([
+              "## Estate alignment",
+              "",
+              "**Three commercial flagships:** A11oy, Killinchu, and Forge.",
+              "",
+              "**Five public domain bodies:** Terra, Killinchu, PRISM Counsel, PURIQ Finance, and LYTE.",
+              "",
+              "**Six internal engines:** Sentra, Lyte, Killinchu, Finance, Terra, and Counsel.",
+              "",
+              "Aegis, Sentra, IMMUNE, and Vessels are Killinchu capability channels—not independent products. The measured registry contains **16 portfolio Spaces, 44 models, and 33 datasets**. Labs, research packages, and David Leads remain components or reference workflows, not competing origins.",
+              "",
+          ])
+          profile = profile[:start] + alignment + profile[end:]
+          profile = profile.replace(
+              "NEXUS is an internal IMMUNE capability plane, not a second product.",
+              "NEXUS is an internal Killinchu/IMMUNE capability plane, not a second product.",
+              1,
+          )
+          profile_path.write_text(profile, encoding="utf-8")
+
+          readme_path = Path("huggingface/org-card/README.md")
+          readme = readme_path.read_text(encoding="utf-8")
+          section = "\n".join([
+              "## Estate alignment",
+              "",
+              "**Three commercial flagships:** A11oy, Killinchu, and Forge.  ",
+              "**Five public domain bodies:** Terra, Killinchu, PRISM Counsel, PURIQ Finance, and LYTE.  ",
+              "**Six internal engines:** Sentra, Lyte, Killinchu, Finance, Terra, and Counsel.",
+              "",
+              "Aegis, Sentra, IMMUNE, and Vessels are governed Killinchu capability channels, not competing products. The measured registry contains **16 portfolio Spaces, 44 models, and 33 datasets**.",
+              "",
+          ])
+          readme = replace_once(
+              readme,
+              "## Command fabric\n",
+              section + "## Command fabric\n",
+              "Hub alignment section",
+          )
+          readme_path.write_text(readme, encoding="utf-8")
+
+          index_path = Path("huggingface/org-card/index.html")
+          html = index_path.read_text(encoding="utf-8")
+          html = replace_once(
+              html,
+              '<body data-szl-surface="company-front-door">',
+              '<body data-szl-surface="company-front-door" data-szl-estate-alignment="1.0.0">',
+              "alignment smoke marker",
+          )
+          html_section = "\n".join([
+              "      <section id=\"estate-alignment\" aria-labelledby=\"estate-alignment-title\">",
+              "        <div class=\"szl-hf-shell\">",
+              "          <div class=\"szl-hf-section-head\">",
+              "            <div><p class=\"szl-hf-eyebrow\">One governed estate</p><h2 id=\"estate-alignment-title\">Product, source, runtime, and proof move as one.</h2></div>",
+              "            <p class=\"szl-hf-section-copy\">Three commercial flagships: A11oy, Killinchu, and Forge. Five public domain bodies: Terra, Killinchu, PRISM Counsel, PURIQ Finance, and LYTE. Six internal engines: Sentra, Lyte, Killinchu, Finance, Terra, and Counsel.</p>",
+              "          </div>",
+              "          <div class=\"szl-hf-truth-panel\"><p><strong>Authority boundary.</strong> Aegis, Sentra, IMMUNE, and Vessels are Killinchu capability channels—not independent products. Current state: 16 portfolio Spaces, 44 models, and 33 datasets. Runtime claims remain UNAVAILABLE or DEGRADED until exact source and proof agree; public effectors remain SIMULATED. Lambda uniqueness remains Conjecture 1.</p></div>",
+              "        </div>",
+              "      </section>",
+              "",
+          ])
+          html = replace_once(
+              html,
+              "    </main>\n\n    <footer>",
+              html_section + "    </main>\n\n    <footer>",
+              "HTML alignment section",
+          )
+          index_path.write_text(html, encoding="utf-8")
+          PY
+
+      - name: Run exact alignment and public-front-door contracts
+        run: |
+          set -euo pipefail
+          python .github/scripts/test_estate_alignment_contract.py
+          python .github/scripts/estate_alignment_contract.py --offline
+          python -m unittest discover -s .github/scripts -p test_public_front_door_check.py
+          python -m unittest discover -s .github/scripts -p test_hf_org_card_embed_check.py
+          python .github/scripts/public_front_door_check.py
+          python .github/scripts/hf_org_card_embed_check.py
+          git diff --check
+
+      - name: Commit only durable front-door repair
+        env:
+          BRANCH: feat/estate-one-fabric-alignment-v1
+        run: |
+          set -euo pipefail
+          git rm .github/workflows/apply-estate-frontdoor-contract-repair-v1.yml
+          git rm .github/workflows/apply-estate-frontdoor-contract-repair-v2.yml
+          git add \
+            profile/README.md \
+            huggingface/org-card/README.md \
+            huggingface/org-card/index.html
+          git config user.name "SZL Frontier Operator"
+          git config user.email "stephenlutar2@gmail.com"
+          git commit \
+            -m "fix(alignment): preserve the proven public front doors" \
+            -m "Expose the three-flagship, five-body, six-engine authority map without dropping canonical links, source binding, reproduction, mobile, accessibility, truth-state, or proof contracts." \
+            -m "Signed-off-by: Stephen Lutar <stephenlutar2@gmail.com>"
+          git push origin "HEAD:${BRANCH}"
