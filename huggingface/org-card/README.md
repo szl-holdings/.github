@@ -22,8 +22,7 @@ license: apache-2.0
 
 # Governed AI. Inference. Command systems.
 
-Frontier infrastructure for decisions that must remain bounded, inspectable,
-and reproducible.
+Bounded, inspectable, reproducible.
 
 [**Enter the product**](https://a-11-oy.com) ·
 [**Explore SZL Atlas**](https://huggingface.co/spaces/SZLHOLDINGS/szl-command-lab) ·
@@ -64,6 +63,18 @@ Inspect the [trust boundary](https://github.com/szl-holdings/.github/blob/main/T
 exact revisions, limitations, and the
 [served source binding](https://szlholdings-readme.static.hf.space/deployment.json).
 
+## Estate map
+
+Three commercial flagships: A11oy,Killinchu,Forge. Five public domain bodies:
+Terra,Killinchu,PRISM Counsel,PURIQ Finance,LYTE. Six internal engines:
+Sentra,Lyte,Killinchu,Finance,Terra,Counsel.
+
+**16 portfolio Spaces · 44 models · 33 datasets.**
+
+This measured Hub inventory is registry evidence only—not availability,
+operational readiness, or publication policy. The governed KEEP list remains
+[`docs/CANONICAL_FLEET.md`](https://github.com/szl-holdings/.github/blob/main/docs/CANONICAL_FLEET.md).
+
 ## Command fabric
 
 **A11oy** governs decisions and bounded execution. **Khipu models** and
@@ -98,8 +109,7 @@ is a **HISTORICAL** mirror.
 [Atlas source binding](https://szlholdings-szl-command-lab.hf.space/api/build-info) ·
 [A11oy readiness](https://a-11-oy.com/api/a11oy/v1/readiness)
 
-No production authorization, regulatory approval, adoption, funding, revenue,
-or investment outcome is claimed.
+No production authorization or approval is claimed.
 
 ## Reproduce and verify
 
