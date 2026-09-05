@@ -4,6 +4,8 @@ import ast
 import datetime as dt
 import hashlib
 import io
+import json
+import os
 import sys
 import tempfile
 import unittest
@@ -11,7 +13,7 @@ from contextlib import redirect_stderr
 from importlib.util import module_from_spec, spec_from_file_location
 from pathlib import Path
 from typing import Any, Mapping
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 ROOT = Path(__file__).resolve().parents[1]
 MODULE_PATH = ROOT / ".github" / "scripts" / "estate_deadman.py"
@@ -310,7 +312,7 @@ class EvaluationTests(unittest.TestCase):
                     status="completed",
                     conclusion="success",
                     created_minutes_ago=-5,
-                    completed_minutes_ago=-4,
+                    completed_minutes_ago=-6,
                 )
             ]
         )
@@ -332,6 +334,19 @@ class EvaluationTests(unittest.TestCase):
         )
         self.assertFalse(observed.healthy)
         self.assertEqual(observed.state, "STALE_SUCCESS")
+
+    def test_completed_run_cannot_finish_before_it_was_created(self) -> None:
+        impossible = run(
+            run_id=10,
+            status="completed",
+            conclusion="success",
+            created_minutes_ago=5,
+            completed_minutes_ago=6,
+        )
+        with self.assertRaisesRegex(ContractError, "terminal update precedes creation"):
+            self.observe([impossible])
+        impossible["updated_at"] = impossible["created_at"]
+        self.assertTrue(self.observe([impossible]).healthy)
 
     def test_malformed_newest_run_cannot_hide_behind_older_green(self) -> None:
         malformed = run(
@@ -708,9 +723,159 @@ class IncidentContractTests(unittest.TestCase):
                 }
 
         api = ReconcileApi()
-        result = reconcile_incident(api, policy(), report(), NOW)
+        result = reconcile_incident(
+            api, policy(), report(), NOW, before_mutation=lambda: None
+        )
         self.assertEqual(result["action"], "refreshed")
         self.assertTrue(api.updated)
+
+    def test_reconciliation_rechecks_authority_before_every_write(self) -> None:
+        class RecordingApi:
+            def __init__(self, exists: bool) -> None:
+                self.exists = exists
+                self.events: list[str] = []
+                self.body = ""
+                self.state = "open"
+
+            def find_incident(self, repository: str, title: str) -> Any:
+                self.events.append("discovery")
+                return {"number": 42} if self.exists else None
+
+            def create_issue(self, repository: str, title: str, body: str) -> Any:
+                self.events.append("create")
+                self.body = body
+                return {"number": 42}
+
+            def add_comment(self, repository: str, number: int, body: str) -> None:
+                self.events.append("comment")
+
+            def update_issue(self, repository: str, number: int, **values: Any) -> Any:
+                self.events.append("close" if "state" in values else "refresh")
+                self.body = values.get("body", self.body)
+                self.state = values.get("state", self.state)
+                return {"number": number}
+
+            def issue(self, repository: str, number: int) -> Any:
+                self.events.append("readback")
+                return {
+                    "number": number,
+                    "title": policy()["incident"]["title"],
+                    "state": self.state,
+                    "body": self.body,
+                }
+
+        scenarios = (
+            (False, False, ["create"]),
+            (True, False, ["refresh"]),
+            (True, True, ["comment", "close"]),
+        )
+        for exists, healthy, writes in scenarios:
+            for blocked_at in range(len(writes) + 1):
+                with self.subTest(
+                    exists=exists, healthy=healthy, blocked_at=blocked_at
+                ):
+                    api = RecordingApi(exists)
+                    rechecks = 0
+
+                    def check_authority() -> None:
+                        nonlocal rechecks
+                        rechecks += 1
+                        api.events.append("recheck")
+                        if blocked_at and rechecks == blocked_at:
+                            raise ContractError("controller authority changed")
+
+                    def reconcile() -> None:
+                        reconcile_incident(
+                            api,
+                            policy(),
+                            report(healthy=healthy),
+                            NOW,
+                            before_mutation=check_authority,
+                        )
+
+                    if blocked_at:
+                        with self.assertRaisesRegex(ContractError, "authority changed"):
+                            reconcile()
+                        expected = ["discovery"]
+                        for write in writes[: blocked_at - 1]:
+                            expected.extend(("recheck", write))
+                        expected.append("recheck")
+                    else:
+                        reconcile()
+                        expected = ["discovery"]
+                        for write in writes:
+                            expected.extend(("recheck", write))
+                        expected.append("readback")
+                    self.assertEqual(api.events, expected)
+
+    def test_late_authority_failure_keeps_receipt_digest_consistent(self) -> None:
+        for healthy in (False, True):
+            with (
+                self.subTest(healthy=healthy),
+                tempfile.TemporaryDirectory() as directory,
+            ):
+                read_api = Mock()
+                read_api.verified_branch_tip.side_effect = (
+                    ["a" * 40, "a" * 40, "a" * 40, "b" * 40]
+                    if healthy
+                    else ["a" * 40, "a" * 40, "b" * 40]
+                )
+                incident_api = Mock()
+                incident_api.find_incident.return_value = (
+                    {"number": 42} if healthy else None
+                )
+                output = Path(directory) / "receipt.json"
+                environment = {
+                    "ESTATE_READ_TOKEN": "offline-test",
+                    "GITHUB_TOKEN": "offline-test",
+                    "GITHUB_REPOSITORY": "szl-holdings/.github",
+                    "GITHUB_SHA": "a" * 40,
+                    "GITHUB_RUN_ID": "123",
+                    "GITHUB_RUN_ATTEMPT": "1",
+                }
+                with (
+                    patch.dict(os.environ, environment, clear=True),
+                    patch.object(
+                        estate_deadman,
+                        "GitHubApi",
+                        side_effect=[read_api, incident_api],
+                    ),
+                    patch.object(
+                        estate_deadman,
+                        "observe_all",
+                        return_value=[
+                            observation("autonomic-public-estate-sre", healthy)
+                        ],
+                    ),
+                ):
+                    result = estate_deadman.run_live(
+                        policy(), "c" * 64, output, sleep_fn=lambda _: None
+                    )
+                receipt = json.loads(output.read_text(encoding="utf-8"))
+                projection = {
+                    key: value
+                    for key, value in receipt.items()
+                    if key not in {"incident", "evidence_sha256"}
+                }
+                self.assertEqual(result, 2)
+                self.assertFalse(receipt["authority"]["controller_tip_reverified"])
+                self.assertFalse(receipt["incident"]["ok"])
+                self.assertEqual(
+                    receipt["evidence_sha256"],
+                    estate_deadman.sha256_hex(
+                        estate_deadman.canonical_json(projection)
+                    ),
+                )
+                self.assertEqual(
+                    output.with_suffix(".json.sha256").read_text().strip(),
+                    hashlib.sha256(output.read_bytes()).hexdigest(),
+                )
+                incident_api.create_issue.assert_not_called()
+                incident_api.update_issue.assert_not_called()
+                if healthy:
+                    incident_api.add_comment.assert_called_once()
+                else:
+                    incident_api.add_comment.assert_not_called()
 
     def test_workflow_permissions_are_exact_and_structural(self) -> None:
         source = (ROOT / ".github" / "workflows" / "estate-deadman.yml").read_text(

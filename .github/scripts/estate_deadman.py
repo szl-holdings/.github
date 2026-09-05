@@ -692,8 +692,9 @@ def validate_run_rows(runs: Sequence[Mapping[str, Any]]) -> None:
         )
         require(run_id not in ids, "workflow run ids repeat")
         ids.add(run_id)
+        created_time = parse_time(item.get("created_at"))
         require(
-            parse_time(item.get("created_at")) is not None,
+            created_time is not None,
             f"workflow run {run_id} creation timestamp is invalid",
         )
         status = item.get("status")
@@ -704,9 +705,14 @@ def validate_run_rows(runs: Sequence[Mapping[str, Any]]) -> None:
                 conclusion in RUN_CONCLUSIONS,
                 f"workflow run {run_id} conclusion is invalid",
             )
+            updated_time = parse_time(item.get("updated_at"))
             require(
-                parse_time(item.get("updated_at")) is not None,
+                updated_time is not None,
                 f"workflow run {run_id} terminal update timestamp is invalid",
+            )
+            require(
+                updated_time >= created_time,
+                f"workflow run {run_id} terminal update precedes creation",
             )
         else:
             require(
@@ -1066,6 +1072,8 @@ def reconcile_incident(
     policy: Mapping[str, Any],
     report: Mapping[str, Any],
     _now: dt.datetime,
+    *,
+    before_mutation: Callable[[], None],
 ) -> dict[str, Any]:
     repository = policy["controller_repository"]
     title = policy["incident"]["title"]
@@ -1092,11 +1100,13 @@ def reconcile_incident(
             return {"action": "none", "ok": True}
         number = current.get("number")
         require(isinstance(number, int), "incident number is invalid")
+        before_mutation()
         api.add_comment(
             repository,
             number,
             f"Independent scheduled-control evidence recovered at `{report['generated_at']}`. Closing automatically.",
         )
+        before_mutation()
         api.update_issue(repository, number, state="closed")
         prove_readback(number, state="closed")
         return {"action": "closed", "ok": True, "issue_number": number}
@@ -1106,6 +1116,7 @@ def reconcile_incident(
 
     body = issue_body(report)
     if current is None:
+        before_mutation()
         created = api.create_issue(repository, title, body)
         number = created.get("number")
         require(isinstance(number, int), "created incident number is invalid")
@@ -1117,6 +1128,7 @@ def reconcile_incident(
         }
     number = current.get("number")
     require(isinstance(number, int), "incident number is invalid")
+    before_mutation()
     api.update_issue(repository, number, body=body)
     prove_readback(number, state="open", body=body)
     return {"action": "refreshed", "ok": True, "issue_number": number}
@@ -1240,7 +1252,9 @@ def run_live(
         },
         "secret_values_recorded": False,
     }
-    try:
+
+    def reverify_controller_tip() -> None:
+        report["authority"]["controller_tip_reverified"] = False
         current_controller_tip = read_api.verified_branch_tip(
             policy["controller_repository"], policy["controller_branch"]
         )
@@ -1249,15 +1263,24 @@ def run_live(
             "controller authority changed during observation",
         )
         report["authority"]["controller_tip_reverified"] = True
+
+    try:
+        reverify_controller_tip()
         report["evidence_sha256"] = sha256_hex(canonical_json(report))
         report["incident"] = reconcile_incident(
             incident_api,
             policy,
             report,
             dt.datetime.now(dt.timezone.utc),
+            before_mutation=reverify_controller_tip,
         )
     except Exception as exc:
-        report.setdefault("evidence_sha256", sha256_hex(canonical_json(report)))
+        final_evidence = {
+            key: value
+            for key, value in report.items()
+            if key not in {"evidence_sha256", "incident"}
+        }
+        report["evidence_sha256"] = sha256_hex(canonical_json(final_evidence))
         report["incident"] = {
             "action": "failed",
             "ok": False,
@@ -1268,7 +1291,7 @@ def run_live(
     output.with_suffix(output.suffix + ".sha256").write_text(
         receipt_file_sha256 + "\n", encoding="ascii"
     )
-    return 0 if confirmation_state == "HEALTHY" else 2
+    return 0 if confirmed_healthy and report["incident"]["ok"] else 2
 
 
 def build_parser() -> argparse.ArgumentParser:
