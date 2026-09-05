@@ -70,91 +70,96 @@ jobs:
           from pathlib import Path
           import json
 
+          def block(*lines: str) -> str:
+              return "\n".join(lines) + "\n"
+
           script_path = Path('.github/scripts/estate_alignment_contract.py')
           text = script_path.read_text(encoding='utf-8')
 
           old = 'RUNTIME_BINDING_PATHS = ("/api/build-info", "/deployment.json")\nRUNTIME_OBSERVATIONS = 2\n'
-          new = '''RUNTIME_BINDING_PATHS = ("/api/build-info", "/deployment.json")
-          ORG_CARD_SPACE_ID = "SZLHOLDINGS/README"
-          ORG_CARD_ORIGIN = "https://szlholdings-readme.static.hf.space"
-          ORG_CARD_BINDING_PATHS = ("/deployment.json",)
-          RUNTIME_OBSERVATIONS = 2
-          '''
+          new = block(
+              'RUNTIME_BINDING_PATHS = ("/api/build-info", "/deployment.json")',
+              'ORG_CARD_SPACE_ID = "SZLHOLDINGS/README"',
+              'ORG_CARD_ORIGIN = "https://szlholdings-readme.static.hf.space"',
+              'ORG_CARD_BINDING_PATHS = ("/deployment.json",)',
+              'RUNTIME_OBSERVATIONS = 2',
+          )
           if text.count(old) != 1:
               raise SystemExit('runtime constant insertion point changed')
           text = text.replace(old, new, 1)
 
           old = '        require(snapshot.get("organization_card_space_excluded_from_portfolio_count") == "SZLHOLDINGS/README", "README control-surface exclusion missing", failures)\n\n    movement = contract.get("movement_contract")\n'
-          new = '''        require(snapshot.get("organization_card_space_excluded_from_portfolio_count") == "SZLHOLDINGS/README", "README control-surface exclusion missing", failures)
-
-          org_card = contract.get("organization_card_control_surface")
-          require(isinstance(org_card, dict), "organization_card_control_surface must be an object", failures)
-          if isinstance(org_card, dict):
-              require(org_card.get("repo_id") == ORG_CARD_SPACE_ID, "organization-card repo id mismatch", failures)
-              require(org_card.get("class") == "organization_card_control_surface", "organization-card class mismatch", failures)
-              require(org_card.get("deployment_source") == "szl-holdings/.github", "organization-card source authority mismatch", failures)
-              require(org_card.get("runtime_origin") == ORG_CARD_ORIGIN, "organization-card origin mismatch", failures)
-              require(org_card.get("binding_paths") == list(ORG_CARD_BINDING_PATHS), "organization-card binding path mismatch", failures)
-              require(org_card.get("portfolio_member") is False, "organization card must remain outside the portfolio count", failures)
-
-          movement = contract.get("movement_contract")
-          '''
+          new = block(
+              '        require(snapshot.get("organization_card_space_excluded_from_portfolio_count") == "SZLHOLDINGS/README", "README control-surface exclusion missing", failures)',
+              '',
+              '    org_card = contract.get("organization_card_control_surface")',
+              '    require(isinstance(org_card, dict), "organization_card_control_surface must be an object", failures)',
+              '    if isinstance(org_card, dict):',
+              '        require(org_card.get("repo_id") == ORG_CARD_SPACE_ID, "organization-card repo id mismatch", failures)',
+              '        require(org_card.get("class") == "organization_card_control_surface", "organization-card class mismatch", failures)',
+              '        require(org_card.get("deployment_source") == "szl-holdings/.github", "organization-card source authority mismatch", failures)',
+              '        require(org_card.get("runtime_origin") == ORG_CARD_ORIGIN, "organization-card origin mismatch", failures)',
+              '        require(org_card.get("binding_paths") == list(ORG_CARD_BINDING_PATHS), "organization-card binding path mismatch", failures)',
+              '        require(org_card.get("portfolio_member") is False, "organization card must remain outside the portfolio count", failures)',
+              '',
+              '    movement = contract.get("movement_contract")',
+          )
           if text.count(old) != 1:
               raise SystemExit('contract validation insertion point changed')
           text = text.replace(old, new, 1)
 
           old = '    origin = runtime_origin(repo_id)\n    attempts: list[dict[str, Any]] = []\n    for path in RUNTIME_BINDING_PATHS:\n'
-          new = '''    configured_origin = row.get("runtime_origin")
-          origin = str(configured_origin) if configured_origin is not None else runtime_origin(repo_id)
-          url_origin(origin)
-          raw_paths = row.get("binding_paths")
-          binding_paths = tuple(raw_paths) if isinstance(raw_paths, list) else RUNTIME_BINDING_PATHS
-          if not binding_paths or any(path not in RUNTIME_BINDING_PATHS for path in binding_paths):
-              raise AlignmentError(f"invalid runtime binding paths for {repo_id}: {binding_paths!r}")
-          if repo_id == ORG_CARD_SPACE_ID and (
-              origin != ORG_CARD_ORIGIN or binding_paths != ORG_CARD_BINDING_PATHS
-          ):
-              raise AlignmentError("organization-card binding must use its exact static origin and deployment receipt")
-          attempts: list[dict[str, Any]] = []
-          for path in binding_paths:
-          '''
+          new = block(
+              '    configured_origin = row.get("runtime_origin")',
+              '    origin = str(configured_origin) if configured_origin is not None else runtime_origin(repo_id)',
+              '    url_origin(origin)',
+              '    raw_paths = row.get("binding_paths")',
+              '    binding_paths = tuple(raw_paths) if isinstance(raw_paths, list) else RUNTIME_BINDING_PATHS',
+              '    if not binding_paths or any(path not in RUNTIME_BINDING_PATHS for path in binding_paths):',
+              '        raise AlignmentError(f"invalid runtime binding paths for {repo_id}: {binding_paths!r}")',
+              '    if repo_id == ORG_CARD_SPACE_ID and (',
+              '        origin != ORG_CARD_ORIGIN or binding_paths != ORG_CARD_BINDING_PATHS',
+              '    ):',
+              '        raise AlignmentError("organization-card binding must use its exact static origin and deployment receipt")',
+              '    attempts: list[dict[str, Any]] = []',
+              '    for path in binding_paths:',
+          )
           if text.count(old) != 1:
               raise SystemExit('runtime source binding insertion point changed')
           text = text.replace(old, new, 1)
 
           old = '    rows = list(taxonomy["commercial_flagships"]) + list(taxonomy["public_domain_bodies"]) + list(snapshot["portfolio_spaces"])\n'
-          new = '''    rows = list(taxonomy["commercial_flagships"]) + list(taxonomy["public_domain_bodies"]) + list(snapshot["portfolio_spaces"])
-          org_card = contract.get("organization_card_control_surface")
-          if isinstance(org_card, Mapping):
-              rows.append(org_card)
-          '''
+          new = block(
+              '    rows = list(taxonomy["commercial_flagships"]) + list(taxonomy["public_domain_bodies"]) + list(snapshot["portfolio_spaces"])',
+              '    org_card = contract.get("organization_card_control_surface")',
+              '    if isinstance(org_card, Mapping):',
+              '        rows.append(org_card)',
+          )
           if text.count(old) != 1:
               raise SystemExit('canonical repository row insertion point changed')
           text = text.replace(old, new, 1)
 
           old = 'def validate_live(contract: Mapping[str, Any]) -> tuple[list[str], dict[str, Any]]:\n'
-          new = '''def runtime_binding_rows(contract: Mapping[str, Any]) -> list[Mapping[str, Any]]:
-              """Return 16 portfolio runtimes plus the source-bound org-card control surface."""
-              rows: list[Mapping[str, Any]] = list(
-                  contract["huggingface_inventory_snapshot"]["portfolio_spaces"]
-              )
-              org_card = contract.get("organization_card_control_surface")
-              if not isinstance(org_card, Mapping):
-                  raise AlignmentError("organization-card control surface is unavailable")
-              rows.append(org_card)
-              return rows
-
-
-          def validate_live(contract: Mapping[str, Any]) -> tuple[list[str], dict[str, Any]]:
-          '''
+          new = block(
+              'def runtime_binding_rows(contract: Mapping[str, Any]) -> list[Mapping[str, Any]]:',
+              '    """Return 16 portfolio runtimes plus the source-bound org-card control surface."""',
+              '    rows: list[Mapping[str, Any]] = list(',
+              '        contract["huggingface_inventory_snapshot"]["portfolio_spaces"]',
+              '    )',
+              '    org_card = contract.get("organization_card_control_surface")',
+              '    if not isinstance(org_card, Mapping):',
+              '        raise AlignmentError("organization-card control surface is unavailable")',
+              '    rows.append(org_card)',
+              '    return rows',
+              '',
+              '',
+              'def validate_live(contract: Mapping[str, Any]) -> tuple[list[str], dict[str, Any]]:',
+          )
           if text.count(old) != 1:
               raise SystemExit('validate_live insertion point changed')
           text = text.replace(old, new, 1)
 
-          old = '''    runtime_rows = list(
-              contract["huggingface_inventory_snapshot"]["portfolio_spaces"]
-          )
-          '''
+          old = '    runtime_rows = list(\n        contract["huggingface_inventory_snapshot"]["portfolio_spaces"]\n    )\n'
           new = '    runtime_rows = runtime_binding_rows(contract)\n'
           if text.count(old) != 1:
               raise SystemExit('runtime row selection point changed')
