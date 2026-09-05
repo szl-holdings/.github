@@ -43,6 +43,12 @@ jobs:
         run: |
           set -euo pipefail
           python .github/scripts/repair_estate_org_card_once.py
+          python - <<'PY'
+          from pathlib import Path
+
+          path = Path("audit/ESTATE_ALIGNMENT_CURRENT_MAIN_SUCCESSOR_2026-09-05.md")
+          path.write_text(path.read_text(encoding="utf-8").rstrip() + "\n", encoding="utf-8")
+          PY
           git diff --check
 
       - name: Prove focused estate and front-door contracts
