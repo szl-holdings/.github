@@ -1,3 +1,4 @@
+# Branch-confined one-shot migration; the final job removes this workflow and its script.
 name: Reconcile estate alignment live contract v3
 
 on:
