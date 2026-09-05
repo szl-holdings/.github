@@ -113,10 +113,10 @@ jobs:
               "alignment smoke marker",
           )
           html_section = "\n".join([
-              "      <section id=\"estate-alignment\" aria-labelledby=\"estate-alignment-title\">",
+              "      <section id=\"szl-hf-estate-alignment\" aria-labelledby=\"szl-hf-estate-alignment-title\">",
               "        <div class=\"szl-hf-shell\">",
               "          <div class=\"szl-hf-section-head\">",
-              "            <div><p class=\"szl-hf-eyebrow\">One governed estate</p><h2 id=\"estate-alignment-title\">Product, source, runtime, and proof move as one.</h2></div>",
+              "            <div><p class=\"szl-hf-eyebrow\">One governed estate</p><h2 id=\"szl-hf-estate-alignment-title\">Product, source, runtime, and proof move as one.</h2></div>",
               "            <p class=\"szl-hf-section-copy\">Three commercial flagships: A11oy, Killinchu, and Forge. Five public domain bodies: Terra, Killinchu, PRISM Counsel, PURIQ Finance, and LYTE. Six internal engines: Sentra, Lyte, Killinchu, Finance, Terra, and Counsel.</p>",
               "          </div>",
               "          <div class=\"szl-hf-truth-panel\"><p><strong>Authority boundary.</strong> Aegis, Sentra, IMMUNE, and Vessels are Killinchu capability channels—not independent products. Current state: 16 portfolio Spaces, 44 models, and 33 datasets. Runtime claims remain UNAVAILABLE or DEGRADED until exact source and proof agree; public effectors remain SIMULATED. Lambda uniqueness remains Conjecture 1.</p></div>",
