@@ -1,0 +1,441 @@
+# SPDX-License-Identifier: Apache-2.0
+name: Repair estate alignment scope and sequencing once
+
+on:
+  push:
+    branches:
+      - feat/estate-alignment-current-main-20260905
+    paths:
+      - .github/workflows/_repair_estate_alignment_scope_once.yml
+
+permissions:
+  contents: write
+
+concurrency:
+  group: repair-estate-alignment-scope-once
+  cancel-in-progress: false
+
+jobs:
+  repair:
+    if: github.repository == 'szl-holdings/.github' && github.ref == 'refs/heads/feat/estate-alignment-current-main-20260905'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Harden runner
+        uses: step-security/harden-runner@05e31511f85b41b11d1cf0ef85d0992719546e2c # v2.21.0
+        with:
+          egress-policy: audit
+
+      - name: Check out exact repair trigger
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 1
+          persist-credentials: true
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12.10"
+
+      - name: Restore reviewed portfolio scope and deterministic live sequencing
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from __future__ import annotations
+
+          import json
+          import re
+          from pathlib import Path
+
+          CONTROLLER = Path('.github/scripts/estate_alignment_contract.py')
+          TESTS = Path('.github/scripts/test_estate_alignment_contract.py')
+          ORG_TESTS = Path('.github/scripts/test_estate_alignment_org_card.py')
+          CONTRACT = Path('docs/ESTATE_ALIGNMENT_CONTRACT_V1.json')
+          PROFILE = Path('profile/README.md')
+          HF_README = Path('huggingface/org-card/README.md')
+          HF_INDEX = Path('huggingface/org-card/index.html')
+          HF_MANIFEST = Path('huggingface/org-card.manifest.json')
+          WORKFLOW = Path('.github/workflows/estate-one-fabric-alignment.yml')
+
+          EXPECTED_PORTFOLIO = {
+              'SZLHOLDINGS/a11oy',
+              'SZLHOLDINGS/killinchu',
+              'SZLHOLDINGS/immune',
+              'SZLHOLDINGS/immune-lattice',
+              'SZLHOLDINGS/terra',
+              'SZLHOLDINGS/sentra',
+              'SZLHOLDINGS/counsel',
+              'SZLHOLDINGS/finance',
+              'SZLHOLDINGS/lyte',
+              'SZLHOLDINGS/vertical-services',
+              'SZLHOLDINGS/szl-command-lab',
+              'SZLHOLDINGS/david-leads',
+              'SZLHOLDINGS/szl-constellation',
+              'SZLHOLDINGS/szl-frontier',
+              'SZLHOLDINGS/szl-model-inference-lab',
+              'SZLHOLDINGS/ayllu',
+          }
+          EXPECTED_INVENTORY_ONLY = {'SZLHOLDINGS/yarqa'}
+
+          def replace_once(path: Path, old: str, new: str) -> None:
+              text = path.read_text(encoding='utf-8')
+              count = text.count(old)
+              if count != 1:
+                  raise SystemExit(f'{path}: expected one replacement anchor, observed {count}: {old[:120]!r}')
+              path.write_text(text.replace(old, new, 1), encoding='utf-8')
+
+          def regex_once(path: Path, pattern: str, replacement: str) -> None:
+              text = path.read_text(encoding='utf-8')
+              updated, count = re.subn(pattern, replacement, text, count=1, flags=re.S)
+              if count != 1:
+                  raise SystemExit(f'{path}: expected one regex replacement, observed {count}: {pattern[:120]!r}')
+              path.write_text(updated, encoding='utf-8')
+
+          # Contract: keep the reviewed 16-Space portfolio, preserve the measured
+          # 17-item public listing, and classify Yarqa without granting policy or
+          # runtime authority.
+          contract = json.loads(CONTRACT.read_text(encoding='utf-8'))
+          snapshot = contract['huggingface_inventory_snapshot']
+          rows = snapshot['portfolio_spaces']
+          yarqa_rows = [row for row in rows if row.get('repo_id') == 'SZLHOLDINGS/yarqa']
+          if len(yarqa_rows) != 1:
+              raise SystemExit(f'expected exactly one Yarqa portfolio row, observed {len(yarqa_rows)}')
+          portfolio = [row for row in rows if row.get('repo_id') != 'SZLHOLDINGS/yarqa']
+          observed_portfolio = {row.get('repo_id') for row in portfolio}
+          if observed_portfolio != EXPECTED_PORTFOLIO or len(portfolio) != 16:
+              raise SystemExit(
+                  f'portfolio drift before repair: missing={sorted(EXPECTED_PORTFOLIO - observed_portfolio)} '
+                  f'unexpected={sorted(observed_portfolio - EXPECTED_PORTFOLIO)}'
+              )
+          snapshot['portfolio_spaces'] = portfolio
+          snapshot['portfolio_space_count'] = 16
+          snapshot['public_space_count'] = 17
+          snapshot['inventory_only_spaces'] = [
+              {
+                  'repo_id': 'SZLHOLDINGS/yarqa',
+                  'class': 'inventory_only',
+                  'governed_keep': False,
+                  'disposition': 'FOLD',
+                  'canonical_source': 'szl-holdings/yarqa',
+                  'claim_boundary': (
+                      'Observed public inventory only; not a product, topology binding, '
+                      'portfolio member, keeper, runtime readiness, or publication policy.'
+                  ),
+              }
+          ]
+          contract['organization_card_control_surface']['claim_boundary'] = (
+              'Source-bound organization front door; excluded from the 16 portfolio-Space count.'
+          )
+          CONTRACT.write_text(
+              json.dumps(contract, indent=2, ensure_ascii=False) + '\n',
+              encoding='utf-8',
+          )
+
+          replace_once(
+              CONTROLLER,
+              '''    "SZLHOLDINGS/szl-model-inference-lab",\n    "SZLHOLDINGS/yarqa",\n    "SZLHOLDINGS/ayllu",\n}\n''',
+              '''    "SZLHOLDINGS/szl-model-inference-lab",\n    "SZLHOLDINGS/ayllu",\n}\nEXPECTED_INVENTORY_ONLY_SPACES = {"SZLHOLDINGS/yarqa"}\n''',
+          )
+
+          replace_once(
+              CONTROLLER,
+              '''        rows = snapshot.get("portfolio_spaces")\n        require(isinstance(rows, list), "portfolio_spaces must be an array", failures)\n        if isinstance(rows, list):\n            ids = [row.get("repo_id") if isinstance(row, dict) else None for row in rows]\n            require(set(ids) == EXPECTED_PORTFOLIO_SPACES, "portfolio Space set mismatch", failures)\n            require(len(ids) == len(set(ids)) == 17, "portfolio Spaces must contain 17 unique IDs", failures)\n            require(all(isinstance(row, dict) and row.get("class") in ALLOWED_SPACE_CLASSES for row in rows), "unknown portfolio Space class", failures)\n            require(all(isinstance(row, dict) and str(row.get("canonical_source", "")).startswith("szl-holdings/") for row in rows), "every Space requires canonical GitHub source", failures)\n            require(all(isinstance(row, dict) and str(row.get("deployment_source", "")).startswith("szl-holdings/") for row in rows), "every Space requires canonical deployment source", failures)\n        require(snapshot.get("portfolio_space_count") == 17, "portfolio_space_count must be 17", failures)\n        require(snapshot.get("model_count") == 45, "model_count must be 45", failures)\n        require(snapshot.get("dataset_count") == 34, "dataset_count must be 34", failures)\n        require(snapshot.get("organization_card_space_excluded_from_portfolio_count") == ORG_CARD_SPACE_ID, "README control-surface exclusion missing", failures)\n''',
+              '''        rows = snapshot.get("portfolio_spaces")\n        require(isinstance(rows, list), "portfolio_spaces must be an array", failures)\n        if isinstance(rows, list):\n            ids = [row.get("repo_id") if isinstance(row, dict) else None for row in rows]\n            require(set(ids) == EXPECTED_PORTFOLIO_SPACES, "portfolio Space set mismatch", failures)\n            require(len(ids) == len(set(ids)) == 16, "portfolio Spaces must contain 16 unique IDs", failures)\n            require(all(isinstance(row, dict) and row.get("class") in ALLOWED_SPACE_CLASSES for row in rows), "unknown portfolio Space class", failures)\n            require(all(isinstance(row, dict) and str(row.get("canonical_source", "")).startswith("szl-holdings/") for row in rows), "every Space requires canonical GitHub source", failures)\n            require(all(isinstance(row, dict) and str(row.get("deployment_source", "")).startswith("szl-holdings/") for row in rows), "every Space requires canonical deployment source", failures)\n        inventory_only = snapshot.get("inventory_only_spaces")\n        require(isinstance(inventory_only, list), "inventory_only_spaces must be an array", failures)\n        if isinstance(inventory_only, list):\n            inventory_ids = [row.get("repo_id") if isinstance(row, dict) else None for row in inventory_only]\n            require(set(inventory_ids) == EXPECTED_INVENTORY_ONLY_SPACES, "inventory-only Space set mismatch", failures)\n            require(len(inventory_ids) == len(set(inventory_ids)) == 1, "inventory-only Spaces must contain one unique ID", failures)\n            require(all(isinstance(row, dict) and row.get("class") == "inventory_only" for row in inventory_only), "inventory-only class mismatch", failures)\n            require(all(isinstance(row, dict) and row.get("governed_keep") is False for row in inventory_only), "inventory-only Space cannot be a keeper", failures)\n            require(all(isinstance(row, dict) and row.get("disposition") == "FOLD" for row in inventory_only), "inventory-only disposition must be FOLD", failures)\n            require(all(isinstance(row, dict) and str(row.get("canonical_source", "")).startswith("szl-holdings/") for row in inventory_only), "inventory-only Space requires canonical GitHub source", failures)\n        require(snapshot.get("portfolio_space_count") == 16, "portfolio_space_count must be 16", failures)\n        require(snapshot.get("public_space_count") == 17, "public_space_count must be 17", failures)\n        require(snapshot.get("public_space_count") == snapshot.get("portfolio_space_count") + len(inventory_only or []), "public Space decomposition mismatch", failures)\n        require(snapshot.get("model_count") == 45, "model_count must be 45", failures)\n        require(snapshot.get("dataset_count") == 34, "dataset_count must be 34", failures)\n        require(snapshot.get("organization_card_space_excluded_from_portfolio_count") == ORG_CARD_SPACE_ID, "README control-surface exclusion missing", failures)\n''',
+          )
+
+          replace_once(
+              CONTROLLER,
+              'Source-bound organization front door; excluded from the 17 portfolio-Space count.',
+              'Source-bound organization front door; excluded from the 16 portfolio-Space count.',
+          )
+          replace_once(
+              CONTROLLER,
+              'for marker in ("17 portfolio Spaces", "45 models", "34 datasets"):',
+              'for marker in ("16 portfolio Spaces", "1 inventory-only Space", "45 models", "34 datasets"):',
+          )
+
+          replace_once(
+              CONTROLLER,
+              '''    space_ids = {str(row.get("id") or "") for row in spaces}\n    portfolio_ids = space_ids - {ORG_CARD_SPACE_ID}\n    expected = {row["repo_id"] for row in contract["huggingface_inventory_snapshot"]["portfolio_spaces"]}\n    require(portfolio_ids == expected, f"public portfolio Space drift: missing={sorted(expected - portfolio_ids)} unexpected={sorted(portfolio_ids - expected)}", failures)\n    require(len(models) == contract["huggingface_inventory_snapshot"]["model_count"], f"model count drift: {len(models)}", failures)\n    require(len(datasets) == contract["huggingface_inventory_snapshot"]["dataset_count"], f"dataset count drift: {len(datasets)}", failures)\n''',
+              '''    space_ids = {str(row.get("id") or "") for row in spaces}\n    listed_space_ids = space_ids - {ORG_CARD_SPACE_ID}\n    snapshot = contract["huggingface_inventory_snapshot"]\n    expected_portfolio = {row["repo_id"] for row in snapshot["portfolio_spaces"]}\n    expected_inventory_only = {row["repo_id"] for row in snapshot["inventory_only_spaces"]}\n    expected_public = expected_portfolio | expected_inventory_only\n    portfolio_ids = listed_space_ids & expected_portfolio\n    inventory_only_ids = listed_space_ids & expected_inventory_only\n    require(listed_space_ids == expected_public, f"public Space inventory drift: missing={sorted(expected_public - listed_space_ids)} unexpected={sorted(listed_space_ids - expected_public)}", failures)\n    require(len(listed_space_ids) == snapshot["public_space_count"], f"public Space count drift: {len(listed_space_ids)}", failures)\n    require(portfolio_ids == expected_portfolio, f"public portfolio Space drift: missing={sorted(expected_portfolio - portfolio_ids)} unexpected={sorted(portfolio_ids - expected_portfolio)}", failures)\n    require(inventory_only_ids == expected_inventory_only, f"inventory-only Space drift: missing={sorted(expected_inventory_only - inventory_only_ids)} unexpected={sorted(inventory_only_ids - expected_inventory_only)}", failures)\n    require(len(models) == snapshot["model_count"], f"model count drift: {len(models)}", failures)\n    require(len(datasets) == snapshot["dataset_count"], f"dataset count drift: {len(datasets)}", failures)\n''',
+          )
+          replace_once(
+              CONTROLLER,
+              '''            "spaces_including_org_card": len(\n                space_ids | ({ORG_CARD_SPACE_ID} if org_card_present else set())\n            ),\n            "portfolio_spaces": len(portfolio_ids),\n            "portfolio_space_ids": sorted(portfolio_ids),\n''',
+              '''            "spaces_including_org_card": len(\n                listed_space_ids | ({ORG_CARD_SPACE_ID} if org_card_present else set())\n            ),\n            "public_listed_spaces": len(listed_space_ids),\n            "portfolio_spaces": len(portfolio_ids),\n            "portfolio_space_ids": sorted(portfolio_ids),\n            "inventory_only_spaces": len(inventory_only_ids),\n            "inventory_only_space_ids": sorted(inventory_only_ids),\n''',
+          )
+
+          # Front-door copy: distinguish measured public inventory from reviewed
+          # portfolio membership without hiding Yarqa.
+          replace_once(
+              PROFILE,
+              '**17 portfolio Spaces · 45 models · 34 datasets.**',
+              '**16 portfolio Spaces · 45 models · 34 datasets.**\n\n**1 inventory-only Space: Yarqa · governedKeep=false · disposition=FOLD.**',
+          )
+          replace_once(
+              PROFILE,
+              '**17 public Spaces, 45 models, and 34 datasets** measured 2026-09-04 23:34 UTC via Hub API.',
+              '**17 public Spaces, 45 models, and 34 datasets** measured 2026-09-05 via Hub API.',
+          )
+          replace_once(
+              HF_README,
+              '**17 portfolio Spaces · 45 models · 34 datasets.**',
+              '**16 portfolio Spaces · 45 models · 34 datasets.**\n\n**1 inventory-only Space: Yarqa · governedKeep=false · disposition=FOLD.**',
+          )
+          replace_once(
+              HF_INDEX,
+              '<p>17 portfolio Spaces · 45 models · 34 datasets.</p>',
+              '<p>16 portfolio Spaces · 45 models · 34 datasets.</p>\n            <p>1 inventory-only Space: Yarqa · governedKeep=false · disposition=FOLD.</p>',
+          )
+
+          manifest = json.loads(HF_MANIFEST.read_text(encoding='utf-8'))
+          markers = manifest['runtime_transforms']['README.md']['required_markers']
+          for marker in ('16 portfolio Spaces', '1 inventory-only Space'):
+              if marker not in markers:
+                  markers.append(marker)
+          HF_MANIFEST.write_text(
+              json.dumps(manifest, indent=2, ensure_ascii=False) + '\n',
+              encoding='utf-8',
+          )
+
+          # Tests: enforce the decomposition and ensure the inventory-only surface
+          # never enters runtime-binding or keeper authority.
+          replace_once(ORG_TESTS, 'def test_control_surface_is_not_a_seventeenth_portfolio_member', 'def test_control_surface_is_not_a_portfolio_member')
+          replace_once(ORG_TESTS, 'self.assertEqual(len(portfolio_ids), 17)', 'self.assertEqual(len(portfolio_ids), 16)')
+          replace_once(TESTS, 'self.assertEqual(len(portfolio_ids), 17)', 'self.assertEqual(len(portfolio_ids), 16)')
+
+          regex_once(
+              TESTS,
+              r'    def test_live_readback_qualifies_the_exact_pull_request_head\(self\) -> None:\n.*?(?=    def test_strict_loader_rejects_duplicate_keys_and_nonfinite_numbers)',
+              '''    def test_live_readback_runs_after_publication_or_explicit_audit(self) -> None:\n        workflow = (\n            ROOT / ".github" / "workflows" / "estate-one-fabric-alignment.yml"\n        ).read_text(encoding="utf-8")\n        self.assertIn("workflow_run:", workflow)\n        self.assertIn('workflows: ["Hugging Face organization front door"]', workflow)\n        local_job, live_job = workflow.split("  live-contract:\\n", 1)\n        self.assertIn("github.event_name != 'workflow_run'", local_job)\n        self.assertIn("github.event.workflow_run.conclusion == 'success'", live_job)\n        self.assertIn("github.event_name == 'schedule'", live_job)\n        self.assertIn("github.event_name == 'workflow_dispatch'", live_job)\n        self.assertNotIn("github.event_name == 'pull_request'", live_job)\n        self.assertNotIn("github.event_name == 'push'", live_job)\n        exact_head = "${{ github.event.workflow_run.head_sha || github.event.pull_request.head.sha || github.sha }}"\n        self.assertGreaterEqual(workflow.count(exact_head), 4)\n\n''',
+          )
+
+          inventory_test_anchor = '    def test_hub_inventory_cannot_become_publication_policy(self) -> None:\n'
+          inventory_test = '''    def test_inventory_only_space_cannot_be_promoted_or_hidden(self) -> None:\n        snapshot = self.contract["huggingface_inventory_snapshot"]\n        self.assertEqual(\n            {row["repo_id"] for row in snapshot["inventory_only_spaces"]},\n            alignment.EXPECTED_INVENTORY_ONLY_SPACES,\n        )\n        self.assertEqual(snapshot["public_space_count"], 17)\n        self.assertEqual(snapshot["portfolio_space_count"], 16)\n\n        promoted = copy.deepcopy(self.contract)\n        promoted["huggingface_inventory_snapshot"]["inventory_only_spaces"][0][\n            "governed_keep"\n        ] = True\n        self.assertIn(\n            "inventory-only Space cannot be a keeper",\n            alignment.validate_contract(promoted),\n        )\n\n        hidden = copy.deepcopy(self.contract)\n        row = hidden["huggingface_inventory_snapshot"]["inventory_only_spaces"].pop()\n        hidden["huggingface_inventory_snapshot"]["portfolio_spaces"].append(row)\n        failures = alignment.validate_contract(hidden)\n        self.assertTrue(any("portfolio Space set mismatch" in item for item in failures))\n        self.assertTrue(any("inventory-only Space set mismatch" in item for item in failures))\n\n'''
+          replace_once(TESTS, inventory_test_anchor, inventory_test + inventory_test_anchor)
+
+          regex_once(
+              TESTS,
+              r'    def test_live_alignment_checks_every_portfolio_runtime\(self\) -> None:\n.*?(?=    def test_org_card_contract_is_exact_and_outside_portfolio_count)',
+              '''    def test_live_alignment_checks_every_portfolio_runtime(self) -> None:\n        product = {\n            "estate": {\n                "product_surface": "https://a-11-oy.com",\n                "proof_surface": "https://a11oy.net",\n                "artifact_organization": "SZLHOLDINGS",\n            },\n            "authorities": {\n                "lean_kernel": {"locked_proven_ids": alignment.LOCKED_EIGHT}\n            },\n            "public_product_taxonomy": {\n                "public_domain_bodies": alignment.EXPECTED_BODIES,\n                "internal_engines": alignment.EXPECTED_ENGINES,\n                "folded_into_killinchu": list(alignment.EXPECTED_FOLDS),\n            },\n            "verticals": [\n                {"slug": row["slug"], "canonical_source": row["source"]}\n                for row in self.contract["taxonomy"]["public_domain_bodies"]\n            ],\n        }\n        revision = "f" * 40\n        space_ids = sorted(\n            alignment.EXPECTED_PORTFOLIO_SPACES\n            | alignment.EXPECTED_INVENTORY_ONLY_SPACES\n        )\n\n        def fetch(url: str, **_kwargs) -> bytes:\n            if "/repos/" in url:\n                return b'{"archived":false,"visibility":"public","default_branch":"main"}'\n            if url == f"{alignment.HF_API}/spaces/{alignment.ORG_CARD_SPACE_ID}":\n                return json.dumps({"id": alignment.ORG_CARD_SPACE_ID}).encode()\n            return json.dumps(product).encode()\n\n        def list_hf(kind: str):\n            if kind == "models":\n                return [{}] * 45\n            if kind == "datasets":\n                return [{}] * 34\n            return [{"id": repo_id} for repo_id in space_ids]\n\n        seen: list[str] = []\n\n        def binding(row, expected_revision):\n            seen.append(row["repo_id"])\n            return {\n                "repo_id": row["repo_id"],\n                "expected_revision": expected_revision,\n                "observed_revision": expected_revision,\n                "matched": True,\n            }\n\n        with (\n            patch.object(alignment, "fetch_bytes", side_effect=fetch),\n            patch.object(alignment, "github_main_sha", return_value=revision),\n            patch.object(alignment, "list_hf", side_effect=list_hf),\n            patch.object(alignment, "runtime_source_binding", side_effect=binding),\n        ):\n            failures, observation = alignment.validate_live(self.contract)\n\n        self.assertEqual(failures, [])\n        self.assertEqual(\n            set(seen),\n            alignment.EXPECTED_PORTFOLIO_SPACES | {alignment.ORG_CARD_SPACE_ID},\n        )\n        self.assertNotIn("SZLHOLDINGS/yarqa", seen)\n        self.assertEqual(len(observation["runtime_source_bindings"]), 16)\n        self.assertEqual(observation["huggingface"]["public_listed_spaces"], 17)\n        self.assertEqual(observation["huggingface"]["portfolio_spaces"], 16)\n        self.assertEqual(observation["huggingface"]["inventory_only_spaces"], 1)\n        self.assertEqual(\n            observation["huggingface"]["inventory_only_space_ids"],\n            ["SZLHOLDINGS/yarqa"],\n        )\n        self.assertEqual(\n            observation["organization_card_source_binding"]["repo_id"],\n            alignment.ORG_CARD_SPACE_ID,\n        )\n        self.assertEqual(\n            [row["repo_id"] for row in observation["runtime_source_bindings"]],\n            [\n                row["repo_id"]\n                for row in self.contract["huggingface_inventory_snapshot"][\n                    "portfolio_spaces"\n                ]\n            ],\n        )\n\n\n''',
+          )
+
+          desired_workflow = '''name: Estate one-fabric alignment
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - docs/ESTATE_ALIGNMENT_CONTRACT_V1.json
+      - profile/README.md
+      - huggingface/org-card/**
+      - huggingface/org-card.manifest.json
+      - .github/scripts/estate_alignment_contract.py
+      - .github/scripts/test_estate_alignment_contract.py
+      - .github/scripts/test_estate_alignment_org_card.py
+      - .github/workflows/estate-one-fabric-alignment.yml
+  push:
+    branches: [main]
+    paths:
+      - docs/ESTATE_ALIGNMENT_CONTRACT_V1.json
+      - profile/README.md
+      - huggingface/org-card/**
+      - huggingface/org-card.manifest.json
+      - .github/scripts/estate_alignment_contract.py
+      - .github/scripts/test_estate_alignment_contract.py
+      - .github/scripts/test_estate_alignment_org_card.py
+      - .github/workflows/estate-one-fabric-alignment.yml
+  workflow_run:
+    workflows: ["Hugging Face organization front door"]
+    types: [completed]
+    branches: [main]
+  schedule:
+    - cron: "23 5 * * *"
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+concurrency:
+  group: estate-one-fabric-alignment-${{ github.event_name }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  local-contract:
+    if: github.event_name != 'workflow_run'
+    name: Exact taxonomy, front doors, and publication set
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Harden runner
+        uses: step-security/harden-runner@05e31511f85b41b11d1cf0ef85d0992719546e2c # v2.21.0
+        with:
+          egress-policy: audit
+
+      - name: Checkout exact source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.workflow_run.head_sha || github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+          fetch-depth: 1
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12.10"
+
+      - name: Compile controller and tests
+        run: >-
+          python -m py_compile
+          .github/scripts/estate_alignment_contract.py
+          .github/scripts/test_estate_alignment_contract.py
+          .github/scripts/test_estate_alignment_org_card.py
+
+      - name: Prove exact one-fabric contract offline
+        run: |
+          python .github/scripts/test_estate_alignment_contract.py
+          python .github/scripts/test_estate_alignment_org_card.py
+
+      - name: Emit secret-free source receipt
+        env:
+          GITHUB_SHA: ${{ github.event.workflow_run.head_sha || github.event.pull_request.head.sha || github.sha }}
+        run: >-
+          python .github/scripts/estate_alignment_contract.py
+          --repo-root .
+          --output estate-alignment-local-receipt.json
+
+      - name: Prove static organization-card publication closure
+        run: |
+          set -euo pipefail
+          python .github/scripts/hf_static_space_deploy.py \
+            --repo-root . \
+            --manifest huggingface/org-card.manifest.json \
+            --source-sha "${{ github.event.workflow_run.head_sha || github.event.pull_request.head.sha || github.sha }}" \
+            --materialize "$(mktemp -d)" \
+            --report hf-org-card-alignment-materialization.json
+
+      - name: Upload immutable local evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: estate-alignment-local-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            estate-alignment-local-receipt.json
+            hf-org-card-alignment-materialization.json
+          if-no-files-found: error
+          retention-days: 90
+
+  live-contract:
+    needs: local-contract
+    if: >-
+      always() &&
+      (
+        (github.event_name == 'workflow_run' &&
+         github.event.workflow_run.conclusion == 'success') ||
+        ((github.event_name == 'schedule' || github.event_name == 'workflow_dispatch') &&
+         needs.local-contract.result == 'success')
+      )
+    name: Product, GitHub, and Hugging Face live readback
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Harden runner
+        uses: step-security/harden-runner@05e31511f85b41b11d1cf0ef85d0992719546e2c # v2.21.0
+        with:
+          egress-policy: audit
+
+      - name: Checkout exact deployed source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.workflow_run.head_sha || github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+          fetch-depth: 1
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12.10"
+
+      - name: Compare live product, source, and artifact authorities
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          GITHUB_SHA: ${{ github.event.workflow_run.head_sha || github.event.pull_request.head.sha || github.sha }}
+        run: >-
+          python .github/scripts/estate_alignment_contract.py
+          --repo-root .
+          --live
+          --output estate-alignment-live-receipt.json
+
+      - name: Upload immutable live evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: estate-alignment-live-${{ github.run_id }}-${{ github.run_attempt }}
+          path: estate-alignment-live-receipt.json
+          if-no-files-found: error
+          retention-days: 180
+'''
+          WORKFLOW.write_text(desired_workflow, encoding='utf-8')
+
+          # Fail closed if the final source still conflates inventory and policy.
+          controller_text = CONTROLLER.read_text(encoding='utf-8')
+          contract_check = json.loads(CONTRACT.read_text(encoding='utf-8'))
+          final_snapshot = contract_check['huggingface_inventory_snapshot']
+          if {row['repo_id'] for row in final_snapshot['portfolio_spaces']} != EXPECTED_PORTFOLIO:
+              raise SystemExit('final portfolio set mismatch')
+          if {row['repo_id'] for row in final_snapshot['inventory_only_spaces']} != EXPECTED_INVENTORY_ONLY:
+              raise SystemExit('final inventory-only set mismatch')
+          if '"SZLHOLDINGS/yarqa",\n    "SZLHOLDINGS/ayllu"' in controller_text:
+              raise SystemExit('Yarqa remains in EXPECTED_PORTFOLIO_SPACES')
+          if '17 portfolio Spaces' in PROFILE.read_text(encoding='utf-8'):
+              raise SystemExit('GitHub profile still promotes all public Spaces')
+          if '17 portfolio Spaces' in HF_README.read_text(encoding='utf-8'):
+              raise SystemExit('Hugging Face README still promotes all public Spaces')
+          PY
+
+      - name: Verify focused contract and publication closure
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m py_compile \
+            .github/scripts/estate_alignment_contract.py \
+            .github/scripts/test_estate_alignment_contract.py \
+            .github/scripts/test_estate_alignment_org_card.py
+          python .github/scripts/test_estate_alignment_contract.py
+          python .github/scripts/test_estate_alignment_org_card.py
+          preview="$(mktemp -d)"
+          python .github/scripts/hf_static_space_deploy.py \
+            --repo-root . \
+            --manifest huggingface/org-card.manifest.json \
+            --source-sha "$GITHUB_SHA" \
+            --materialize "$preview" \
+            --report hf-org-card-scope-repair-materialization.json
+          git diff --check
+
+      - name: Commit permanent repair and self-remove
+        shell: bash
+        run: |
+          set -euo pipefail
+          branch=feat/estate-alignment-current-main-20260905
+          remote_head="$(git ls-remote origin "refs/heads/$branch" | cut -f1)"
+          test "$remote_head" = "$GITHUB_SHA"
+          git rm -- .github/workflows/_repair_estate_alignment_scope_once.yml
+          git add -- \
+            .github/scripts/estate_alignment_contract.py \
+            .github/scripts/test_estate_alignment_contract.py \
+            .github/scripts/test_estate_alignment_org_card.py \
+            .github/workflows/estate-one-fabric-alignment.yml \
+            docs/ESTATE_ALIGNMENT_CONTRACT_V1.json \
+            profile/README.md \
+            huggingface/org-card/README.md \
+            huggingface/org-card/index.html \
+            huggingface/org-card.manifest.json
+          git diff --cached --check
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git commit -s -m 'fix(alignment): separate inventory from portfolio authority' \
+            -m 'Preserve the reviewed 16-Space portfolio, record Yarqa as one inventory-only FOLD surface, retain the measured 45-model/34-dataset/17-Space public inventory, and run live alignment only after the canonical organization-card deployment or an explicit audit.'
+          test "$(git ls-remote origin "refs/heads/$branch" | cut -f1)" = "$GITHUB_SHA"
+          git push origin "HEAD:refs/heads/$branch"
