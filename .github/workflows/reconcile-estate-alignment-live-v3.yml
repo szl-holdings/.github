@@ -1,0 +1,80 @@
+name: Reconcile estate alignment live contract v3
+
+on:
+  push:
+    branches:
+      - feat/estate-alignment-current-main-20260905
+    paths:
+      - .github/scripts/reconcile_estate_alignment_live_v3.py
+      - .github/workflows/reconcile-estate-alignment-live-v3.yml
+
+permissions:
+  contents: write
+
+concurrency:
+  group: reconcile-estate-alignment-live-v3
+  cancel-in-progress: false
+
+jobs:
+  reconcile:
+    name: Separate contract defects from deployment drift
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - name: Harden runner
+        uses: step-security/harden-runner@05e31511f85b41b11d1cf0ef85d0992719546e2c # v2.21.0
+        with:
+          egress-policy: audit
+
+      - name: Check out exact PR branch
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: feat/estate-alignment-current-main-20260905
+          fetch-depth: 1
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12"
+
+      - name: Apply the measured-state contract migration
+        run: python .github/scripts/reconcile_estate_alignment_live_v3.py
+
+      - name: Prove strict source and org-card controls
+        run: |
+          set -euo pipefail
+          python -m py_compile \
+            .github/scripts/estate_alignment_contract.py \
+            .github/scripts/test_estate_alignment_contract.py \
+            .github/scripts/test_estate_alignment_org_card.py
+          python .github/scripts/test_estate_alignment_contract.py -v
+          python .github/scripts/test_estate_alignment_org_card.py -v
+          python .github/scripts/test_public_front_door_check.py -v
+          python -m json.tool docs/ESTATE_ALIGNMENT_CONTRACT_V1.json >/dev/null
+          git diff --check
+
+      - name: Commit only durable alignment changes
+        env:
+          BRANCH: feat/estate-alignment-current-main-20260905
+        run: |
+          set -euo pipefail
+          git rm \
+            .github/scripts/reconcile_estate_alignment_live_v3.py \
+            .github/workflows/reconcile-estate-alignment-live-v3.yml
+          git add -A
+          if git diff --cached --quiet; then
+            echo "No durable change was produced." >&2
+            exit 1
+          fi
+          if git diff --cached --name-only | grep -E 'reconcile_estate_alignment_live_v3|reconcile-estate-alignment-live-v3'; then
+            echo "Bootstrap residue remains staged." >&2
+            exit 1
+          fi
+          git diff --cached --check
+          git config user.name "SZL Frontier Operator"
+          git config user.email "stephenlutar2@gmail.com"
+          git commit \
+            -m "fix(alignment): reconcile measured Hub and runtime authority" \
+            -m "Record Yarqa and the current 45/34 inventory, bind Lyte to its actual publisher, validate the README control surface directly, and accept stable exact-SHA evidence from contract-bound runtime origins while rejecting explicit source conflicts." \
+            -m "Signed-off-by: Stephen P. Lutar <stephenlutar2@gmail.com>"
+          git push origin "HEAD:${BRANCH}"
