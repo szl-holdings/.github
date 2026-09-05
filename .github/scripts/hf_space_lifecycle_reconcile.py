@@ -150,7 +150,7 @@ def normalize_revision(value: Any) -> str:
     revision = str(value or "").strip().lower()
     if not EXACT_REVISION.fullmatch(revision):
         raise LifecycleError(
-            f"Hugging Face Space revision is not an exact 40-hex SHA: {revision!r}"
+            "Hugging Face Space revision must be an exact 40-hex SHA"
         )
     return revision
 
@@ -526,6 +526,41 @@ def error_record(exc: Exception) -> dict[str, Any]:
     return record
 
 
+def validate_dispatch_inputs(
+    *,
+    target: str,
+    mode: str,
+    requested_transition: str,
+    expected_policy_sha256: str | None,
+    expected_visibility: str | None,
+    expected_runtime_stage: str | None,
+    expected_revision: str | None,
+) -> dict[str, Any]:
+    """Validate before retaining dispatch values or contacting either provider."""
+
+    if mode not in {"plan", "apply"}:
+        raise LifecycleError("unsupported mode")
+    if requested_transition not in {"inspect", "private-to-public"}:
+        raise LifecycleError("unsupported transition")
+    if target not in ALLOWED_REPO_IDS:
+        raise LifecycleError("target is not in the fixed inventory")
+    visibility = _optional_visibility(expected_visibility)
+    stage = _optional_stage(expected_runtime_stage)
+    revision = _optional_revision(expected_revision)
+    digest = _optional_policy_sha256(expected_policy_sha256)
+    return {
+        "mode": mode,
+        "target": target,
+        "requested_transition": requested_transition,
+        "expected_policy_sha256": digest,
+        "expected_before": {
+            "visibility": visibility,
+            "runtime_stage": stage,
+            "revision": revision,
+        },
+    }
+
+
 def reconcile(
     *,
     client: HubSpaceClient,
@@ -549,15 +584,6 @@ def reconcile(
         "schema": RECEIPT_SCHEMA,
         "generated_at": utc_now(),
         "organization": ORGANIZATION,
-        "mode": mode,
-        "target": target,
-        "requested_transition": requested_transition,
-        "expected_policy_sha256": expected_policy_sha256,
-        "expected_before": {
-            "visibility": expected_visibility,
-            "runtime_stage": expected_runtime_stage,
-            "revision": expected_revision,
-        },
         "controller": {
             "repository": environ.get("GITHUB_REPOSITORY") or CONTROL_REPOSITORY,
             "ref": environ.get("GITHUB_REF") or "LOCAL_UNBOUND",
@@ -571,6 +597,8 @@ def reconcile(
             "At most one private-to-public transition is applied.",
             "Private, archive, pause, restart, upload, hardware, storage, variable, and secret writes are impossible through this controller.",
             "RUNNING is provider-stage evidence, not product correctness or uptime proof.",
+            "Expected-state checks are optimistic: the provider visibility write has no atomic compare-and-set precondition.",
+            "A plan receipt is not consumed or replay-protected by this controller.",
         ],
         "provider_request": {
             "attempted": False,
@@ -581,12 +609,20 @@ def reconcile(
         "readbacks": [],
     }
     try:
-        if mode not in {"plan", "apply"}:
-            raise LifecycleError(f"unsupported mode: {mode!r}")
-        if requested_transition not in {"inspect", "private-to-public"}:
-            raise LifecycleError(f"unsupported transition: {requested_transition!r}")
-        if target not in ALLOWED_REPO_IDS:
-            raise LifecycleError(f"target is not in the fixed inventory: {target!r}")
+        validated = validate_dispatch_inputs(
+            target=target,
+            mode=mode,
+            requested_transition=requested_transition,
+            expected_policy_sha256=expected_policy_sha256,
+            expected_visibility=expected_visibility,
+            expected_runtime_stage=expected_runtime_stage,
+            expected_revision=expected_revision,
+        )
+        receipt.update(validated)
+        expected_policy_sha256 = validated["expected_policy_sha256"]
+        expected_visibility = validated["expected_before"]["visibility"]
+        expected_runtime_stage = validated["expected_before"]["runtime_stage"]
+        expected_revision = validated["expected_before"]["revision"]
 
         policy, targets = load_policy(policy_path)
         digest = policy_digest(policy)
@@ -649,6 +685,16 @@ def reconcile(
 
         control_revision = main_guard(environ)
         receipt["controller"]["live_default_before"] = control_revision
+        # This narrows the race window; update_repo_settings has no atomic CAS.
+        final_before = client.read(target)
+        receipt["prewrite"] = {
+            "observed_at": utc_now(),
+            "state": asdict(final_before),
+            "matches_initial_observation": final_before == before,
+            "check_semantics": "OPTIMISTIC_NON_ATOMIC",
+        }
+        if final_before != before:
+            raise LifecycleError("provider state changed before the publication write")
         receipt["provider_request"] = {
             "attempted": True,
             "method": transition.method,
@@ -722,69 +768,125 @@ def reconcile(
         return receipt, 2
 
 
-def _optional_visibility(value: str) -> str | None:
+def _optional_visibility(value: str | None) -> str | None:
     if not value or value == "unspecified":
         return None
     if value not in {"public", "private"}:
-        raise argparse.ArgumentTypeError("visibility must be unspecified, public, or private")
+        raise LifecycleError("visibility must be unspecified, public, or private")
     return value
 
 
-def _optional_stage(value: str) -> str | None:
-    return normalize_stage(value) if value else None
+def _optional_stage(value: str | None) -> str | None:
+    if not value:
+        return None
+    stage = value.strip().upper()
+    if stage not in {
+        "NO_APP_FILE", "CONFIG_ERROR", "BUILDING", "BUILD_ERROR", "RUNNING",
+        "RUNNING_BUILDING", "RUNTIME_ERROR", "DELETING", "PAUSED", "SLEEPING",
+    }:
+        raise LifecycleError("expected runtime stage is not a supported provider stage")
+    return stage
 
 
-def _optional_revision(value: str) -> str | None:
+def _optional_revision(value: str | None) -> str | None:
     return normalize_revision(value) if value else None
 
 
-def _optional_policy_sha256(value: str) -> str | None:
+def _optional_policy_sha256(value: str | None) -> str | None:
     return normalize_policy_sha256(value) if value else None
 
 
+class ReceiptArgumentParser(argparse.ArgumentParser):
+    def error(self, message: str) -> None:
+        # argparse includes raw argument values in errors; retain neither.
+        raise LifecycleError("invalid lifecycle command-line arguments")
+
+
+def dispatch_values(args: argparse.Namespace) -> dict[str, Any]:
+    """Read Actions inputs from its event file without placing them in logs."""
+
+    fields = {
+        "target": "repo_id",
+        "mode": "mode",
+        "requested_transition": "transition",
+        "expected_policy_sha256": "expected_policy_sha256",
+        "expected_visibility": "expected_visibility",
+        "expected_runtime_stage": "expected_stage",
+        "expected_revision": "expected_revision",
+    }
+    cli = {
+        "target": args.target,
+        "mode": args.mode,
+        "requested_transition": args.transition,
+        "expected_policy_sha256": args.expected_policy_sha256,
+        "expected_visibility": args.expected_visibility,
+        "expected_runtime_stage": args.expected_stage,
+        "expected_revision": args.expected_revision,
+    }
+    if args.dispatch_event is None:
+        cli["mode"] = "plan" if cli["mode"] is None else cli["mode"]
+        cli["requested_transition"] = (
+            "inspect" if cli["requested_transition"] is None
+            else cli["requested_transition"]
+        )
+        return cli
+    if any(value is not None for value in cli.values()):
+        raise LifecycleError("dispatch event inputs cannot be mixed with CLI inputs")
+    try:
+        event = json.loads(args.dispatch_event.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        raise LifecycleError("cannot read lifecycle dispatch event") from None
+    inputs = event.get("inputs") if isinstance(event, dict) else None
+    if (
+        not isinstance(inputs, dict)
+        or set(inputs) - set(fields.values())
+        or not all(isinstance(value, str) for value in inputs.values())
+    ):
+        raise LifecycleError("lifecycle dispatch inputs must be a supported string mapping")
+    return {key: inputs.get(event_key) for key, event_key in fields.items()}
+
+
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description=__doc__)
+    parser = ReceiptArgumentParser(description=__doc__, allow_abbrev=False)
     parser.add_argument(
         "--policy",
         type=Path,
         default=Path(".github/data/hf-space-lifecycle-policy.json"),
     )
-    parser.add_argument("--target", required=True, choices=sorted(ALLOWED_REPO_IDS))
-    parser.add_argument("--mode", choices=("plan", "apply"), default="plan")
+    parser.add_argument("--dispatch-event", type=Path)
+    parser.add_argument("--target")
+    parser.add_argument("--mode")
+    parser.add_argument("--transition")
+    parser.add_argument("--expected-policy-sha256")
+    parser.add_argument("--expected-visibility")
+    parser.add_argument("--expected-stage")
+    parser.add_argument("--expected-revision")
     parser.add_argument(
-        "--transition", choices=("inspect", "private-to-public"), default="inspect"
+        "--report", type=Path,
+        default=Path(os.environ.get("REPORT_PATH", "reports/hf-space-lifecycle/receipt.json")),
     )
-    parser.add_argument("--expected-policy-sha256", type=_optional_policy_sha256)
-    parser.add_argument(
-        "--expected-visibility", type=_optional_visibility, default=None
-    )
-    parser.add_argument("--expected-stage", type=_optional_stage, default=None)
-    parser.add_argument("--expected-revision", type=_optional_revision, default=None)
-    parser.add_argument(
-        "--report", type=Path, default=Path("reports/hf-space-lifecycle/receipt.json")
-    )
-    args = parser.parse_args(argv)
-    args.report.parent.mkdir(parents=True, exist_ok=True)
-
-    token = os.environ.get("HF_ORG_TOKEN")
-    if not token:
-        report = {
-            "schema": RECEIPT_SCHEMA,
-            "generated_at": utc_now(),
-            "organization": ORGANIZATION,
-            "mode": args.mode,
-            "target": args.target,
-            "requested_transition": args.transition,
-            "result": "FAILED_BEFORE_ATTEMPT",
-            "error": {
-                "class": "LifecycleError",
-                "detail": "authenticated plan/apply requires the fixed HF_ORG_TOKEN secret",
-            },
-            "exit_code": 2,
-        }
-        exit_code = 2
-    else:
-        try:
+    args = argparse.Namespace()
+    report: dict[str, Any] = {
+        "schema": RECEIPT_SCHEMA,
+        "generated_at": utc_now(),
+        "organization": ORGANIZATION,
+        "provider_request": {"attempted": False},
+    }
+    try:
+        parser.parse_args(argv, namespace=args)
+        report.update(validate_dispatch_inputs(**dispatch_values(args)))
+        token = os.environ.get("HF_ORG_TOKEN")
+        if not token:
+            report.update({
+                "result": "FAILED_BEFORE_ATTEMPT",
+                "error": {
+                    "class": "LifecycleError",
+                    "detail": "authenticated plan/apply requires the fixed HF_ORG_TOKEN secret",
+                },
+                "exit_code": 2,
+            })
+            exit_code = 2
+        else:
             # Do not expose the provider credential to a feature-branch copy.
             require_current_protected_main(os.environ)
             import httpx
@@ -798,33 +900,28 @@ def main(argv: list[str] | None = None) -> int:
                     HfApi(endpoint=HUGGING_FACE_ENDPOINT, token=token)
                 ),
                 policy_path=args.policy,
-                target=args.target,
-                mode=args.mode,
-                requested_transition=args.transition,
-                expected_policy_sha256=args.expected_policy_sha256,
-                expected_visibility=args.expected_visibility,
-                expected_runtime_stage=args.expected_stage,
-                expected_revision=args.expected_revision,
+                target=report["target"],
+                mode=report["mode"],
+                requested_transition=report["requested_transition"],
+                expected_policy_sha256=report["expected_policy_sha256"],
+                expected_visibility=report["expected_before"]["visibility"],
+                expected_runtime_stage=report["expected_before"]["runtime_stage"],
+                expected_revision=report["expected_before"]["revision"],
                 environ=os.environ,
             )
-        except Exception as exc:
-            report = {
-                "schema": RECEIPT_SCHEMA,
-                "generated_at": utc_now(),
-                "organization": ORGANIZATION,
-                "mode": args.mode,
-                "target": args.target,
-                "requested_transition": args.transition,
-                "result": (
-                    "BLOCKED_PRECONDITION"
-                    if isinstance(exc, LifecycleError)
-                    else "FAILED_BEFORE_ATTEMPT"
-                ),
-                "error": error_record(exc),
-                "exit_code": 2,
-            }
-            exit_code = 2
+    except Exception as exc:
+        report.update({
+            "result": (
+                "BLOCKED_PRECONDITION"
+                if isinstance(exc, LifecycleError)
+                else "FAILED_BEFORE_ATTEMPT"
+            ),
+            "error": error_record(exc),
+            "exit_code": 2,
+        })
+        exit_code = 2
 
+    args.report.parent.mkdir(parents=True, exist_ok=True)
     args.report.write_text(
         json.dumps(report, indent=2, sort_keys=True) + "\n", encoding="utf-8"
     )

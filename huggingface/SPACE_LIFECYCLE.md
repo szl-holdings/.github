@@ -3,7 +3,7 @@
 **Status:** protected source policy. A source merge is not a provider mutation,
 and a provider `RUNNING` stage is not end-to-end product proof.
 
-## Current authenticated authority
+## Historical authenticated policy authority
 
 The policy is bound to the supported-API inventory at protected `.github/main`:
 
@@ -16,6 +16,11 @@ The policy is bound to the supported-API inventory at protected `.github/main`:
 - Authenticated role: SZLHOLDINGS organization admin
 - Counts: 44 models, 37 datasets, 46 Spaces, 14 Kernels, 18 collections,
   and 6 buckets
+
+This fixed policy is based on the August 31 inventory; it is not a current
+estate census and does not admit every Space that may exist today. Deleted
+targets fail provider reads, and new targets require a separate policy review.
+The lifecycle hardening does not refresh the inventory or change visibility.
 
 The immutable inventory enumerated 46 existing Spaces and all 46 were public
 and enabled. A later bounded runtime census observed 27 `RUNNING` and 19
@@ -30,7 +35,7 @@ inventory as public. New repositories do not match a wildcard and require a new
 protected policy revision with content, privacy, license, and source review.
 
 The desired runtime stage is `RUNNING` for every admitted Space. This first
-controller reports runtime drift but cannot repair it. At the current census,
+controller reports runtime drift but cannot repair it. At the August 31 census,
 the following 19 public Spaces were paused:
 
 - `a11oy-factory`
@@ -61,7 +66,9 @@ and source/runtime identity checks. A blanket restart is not encoded here.
 
 `HF Space Lifecycle Reconcile` is manual, protected-main-only, serialized on
 `hf-provider-mutation-szlholdings`, and gated by the GitHub `production`
-environment. Only the controller step receives the fixed `HF_ORG_TOKEN`
+environment. GitHub concurrency only serializes participating workflows in
+this repository; it is not an organization-wide or provider-side lock.
+Only the controller step receives the fixed `HF_ORG_TOKEN`
 secret. Without logging identity or token material, it verifies user identity
 and an unambiguous SZLHOLDINGS admin role, then performs a separate,
 non-mutating `HfApi.auth_check(..., repo_type="space", write=True)` against the
@@ -78,7 +85,7 @@ HfApi.update_repo_settings(
 )
 ```
 
-An apply requires all of the following from an immediately preceding plan:
+An operator must obtain all of the following from a fresh plan for an apply:
 
 1. Exact 64-hex policy digest.
 2. Exact observed visibility.
@@ -86,11 +93,30 @@ An apply requires all of the following from an immediately preceding plan:
 4. Exact 40-hex Hub revision.
 5. The precise `private-to-public` transition.
 
-The controller rechecks the live provider state and protected-main identity,
-attempts at most one call, retries authenticated reads only, and verifies that
+The controller checks provider state and protected-main identity, then reads
+provider state again immediately before attempting the write. Any change in
+Space identity, visibility, revision, runtime stage, or SDK between those two
+reads blocks the write. It attempts at most one call, retries authenticated
+reads only, and verifies that
 visibility changed while revision, runtime stage, and SDK did not. If the call
 may have escaped but readback cannot prove the result, the receipt is
 `UNKNOWN_AFTER_ATTEMPT` and the job fails. It must not be retried blindly.
+
+These checks are optimistic, not atomic compare-and-set (CAS). The supported
+visibility API does not accept an expected revision or other atomic state
+precondition, so a competing writer can still act between the final read and
+the write. Expected values supplied by an operator are not a signed plan
+receipt, and the controller does not check plan age or consume a receipt once.
+Matching readback proves the observed state, not sole authorship of the change.
+Coordinate all competing writers before applying; this patch does not provide
+provider-wide serialization or replay protection.
+
+Malformed dispatch values fail with a receipt and exit code 2 before provider
+access. Actions passes its event-file path to the controller; it does not bind
+raw inputs into step environments or commands that the runner prints.
+Receipts and CLI errors exclude invalid input values. Artifact names
+use only the GitHub run ID and attempt, so invalid targets or transitions are
+not copied into workflow outputs or artifact names.
 
 The controller cannot:
 
@@ -108,10 +134,10 @@ to merge as an operator. It can log an `archived` readback without asserting
 that the state became true, can leave some failed reads green, selects the first
 token that answers `whoami` without proving SZLHOLDINGS manage authority, has a
 two-target partial-write group, and has no exact-policy digest, expected-state
-CAS, production environment, protected-main recheck, or immutable receipt.
+checks, production environment, protected-main recheck, or immutable receipt.
 
 It also implements an older consolidation snapshot that conflicts with the
-current authenticated fact that all 46 Spaces are public. It must be closed as
+August 31 authenticated snapshot in which all 46 Spaces were public. It must be closed as
 superseded, not dispatched or merged.
 
 ## Private datasets and buckets remain gated

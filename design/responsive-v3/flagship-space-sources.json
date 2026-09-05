@@ -15,8 +15,11 @@
     },
     {
       "space": "terra",
-      "repo": "szl-holdings/szl-real-estate",
-      "ownership": "source-owned-flagship"
+      "repo": "szl-holdings/a11oy",
+      "source_root": "scripts/hf_publish_vertical_flagships_v4_impl.py",
+      "ownership": "publisher-generated-flagship",
+      "product_source": "szl-holdings/szl-real-estate",
+      "product_source_deployment_state": "LINKED_NOT_PUBLISHED"
     },
     {
       "space": "sentra",
@@ -57,6 +60,7 @@
     "A source mapping identifies the repository responsible for the public product surface; it does not prove that a deployment is current or healthy.",
     "The map is a protected local fallback. Public provider metadata may enrich it but cannot silently override it.",
     "Sentra's API/control-plane service and Vessels' archived deployment packaging remain separate from their active platform-monorepo frontend sources.",
+    "A publisher-generated mapping records the exact generator entrypoint and never authorizes a guessed frontend edit in the linked product repository.",
     "A mapped repository without a reviewed public entrypoint remains BLOCKED rather than receiving a guessed edit."
   ]
 }

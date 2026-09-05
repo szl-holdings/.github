@@ -4,7 +4,9 @@
 from __future__ import annotations
 
 import copy
+import contextlib
 import importlib.util
+import io
 import json
 import re
 import sys
@@ -12,6 +14,7 @@ import tempfile
 import unittest
 from pathlib import Path
 from types import SimpleNamespace
+from unittest.mock import patch
 
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -406,6 +409,8 @@ class LifecycleTests(unittest.TestCase):
         )
         self.assertEqual(code, 0)
         self.assertEqual(report["result"], "VERIFIED")
+        self.assertTrue(report["prewrite"]["matches_initial_observation"])
+        self.assertEqual(report["prewrite"]["check_semantics"], "OPTIMISTIC_NON_ATOMIC")
         self.assertEqual(
             api.mutations,
             [
@@ -415,6 +420,169 @@ class LifecycleTests(unittest.TestCase):
                 )
             ],
         )
+
+    def test_provider_drift_during_main_guard_blocks_final_write(self) -> None:
+        repo_id = "SZLHOLDINGS/szl-khipu"
+        current = state(repo_id, "private")
+        changed_states = {
+            "visibility": state(repo_id, "public"),
+            "stage": state(repo_id, "private", stage="PAUSED"),
+            "revision": state(repo_id, "private", revision="d" * 40),
+            "sdk": state(repo_id, "private", sdk="static"),
+        }
+        for field, changed in changed_states.items():
+            with self.subTest(field=field):
+                api = FakeApi({repo_id: current})
+
+                def changing_guard(_env: object) -> str:
+                    api.states[repo_id] = changed
+                    return MAIN_SHA
+
+                report, code, _ = self.run_controller(
+                    repo_id, current, mode="apply", transition="private-to-public",
+                    expected=True, expected_policy=True, api=api, guard=changing_guard,
+                )
+                self.assertEqual(code, 2)
+                self.assertEqual(report["result"], "BLOCKED_PRECONDITION")
+                self.assertFalse(report["provider_request"]["attempted"])
+                self.assertFalse(report["prewrite"]["matches_initial_observation"])
+                self.assertEqual(api.mutations, [])
+
+    def test_failed_final_provider_read_blocks_write_without_raw_error(self) -> None:
+        repo_id = "SZLHOLDINGS/szl-khipu"
+        current = state(repo_id, "private")
+
+        class FinalReadDeniedApi(FakeApi):
+            reads = 0
+
+            def space_info(self, *, repo_id: str, expand: list[str]) -> SimpleNamespace:
+                self.reads += 1
+                if self.reads == 2:
+                    raise RuntimeError("raw-provider-response-do-not-retain")
+                return super().space_info(repo_id=repo_id, expand=expand)
+
+        api = FinalReadDeniedApi({repo_id: current})
+        report, code, _ = self.run_controller(
+            repo_id, current, mode="apply", transition="private-to-public",
+            expected=True, expected_policy=True, api=api,
+        )
+        self.assertEqual(code, 2)
+        self.assertEqual(report["result"], "FAILED_BEFORE_ATTEMPT")
+        self.assertFalse(report["provider_request"]["attempted"])
+        self.assertEqual(api.mutations, [])
+        self.assertNotIn("raw-provider-response", json.dumps(report))
+
+    def test_cli_invalid_dispatch_emits_safe_receipt_before_provider_access(self) -> None:
+        invalid = "raw-invalid-dispatch-value-do-not-retain"
+        fields = (
+            "target", "mode", "transition", "expected-policy-sha256",
+            "expected-visibility", "expected-stage", "expected-revision",
+        )
+        with tempfile.TemporaryDirectory() as directory:
+            report_path = Path(directory) / "receipt.json"
+            for field in fields:
+                with self.subTest(field=field):
+                    argv = ["--target=SZLHOLDINGS/a11oy", f"--report={report_path}"]
+                    argv.append(f"--{field}={invalid}")
+                    output, errors = io.StringIO(), io.StringIO()
+                    with (
+                        patch.dict(module.os.environ, {"HF_ORG_TOKEN": "fake-test-only"}),
+                        patch.object(module, "require_current_protected_main") as guard,
+                        contextlib.redirect_stdout(output),
+                        contextlib.redirect_stderr(errors),
+                    ):
+                        code = module.main(argv)
+                    self.assertEqual(code, 2)
+                    guard.assert_not_called()
+                    report = json.loads(report_path.read_text(encoding="utf-8"))
+                    self.assertEqual(report["result"], "BLOCKED_PRECONDITION")
+                    self.assertFalse(report["provider_request"]["attempted"])
+                    self.assertNotIn(invalid, json.dumps(report))
+                    self.assertNotIn(invalid, output.getvalue() + errors.getvalue())
+
+    def test_cli_syntax_error_emits_run_scoped_receipt_without_raw_arguments(self) -> None:
+        invalid = "raw-invalid-cli-option-do-not-retain"
+        with tempfile.TemporaryDirectory() as directory:
+            report_path = Path(directory) / "run-evidence.json"
+            output, errors = io.StringIO(), io.StringIO()
+            with (
+                patch.dict(module.os.environ, {"REPORT_PATH": str(report_path)}),
+                patch.object(module, "require_current_protected_main") as guard,
+                contextlib.redirect_stdout(output),
+                contextlib.redirect_stderr(errors),
+            ):
+                code = module.main(["--target=SZLHOLDINGS/a11oy", f"--{invalid}"])
+            self.assertEqual(code, 2)
+            guard.assert_not_called()
+            report = json.loads(report_path.read_text(encoding="utf-8"))
+            self.assertEqual(report["result"], "BLOCKED_PRECONDITION")
+            self.assertFalse(report["provider_request"]["attempted"])
+            self.assertNotIn(invalid, output.getvalue() + errors.getvalue())
+
+    def test_event_inputs_are_validated_without_logging_raw_values(self) -> None:
+        invalid = "raw-event-value-do-not-retain"
+        base = {"repo_id": "SZLHOLDINGS/a11oy", "mode": "plan", "transition": "inspect"}
+        cases = [
+            {"inputs": {**base, field: invalid}}
+            for field in (
+                "repo_id", "mode", "transition", "expected_policy_sha256",
+                "expected_visibility", "expected_stage", "expected_revision", "unknown",
+            )
+        ]
+        cases.extend([
+            {"inputs": {**base, "mode": {"raw": invalid}}},
+            {"inputs": None},
+            [],
+        ])
+        with tempfile.TemporaryDirectory() as directory:
+            event_path = Path(directory) / "event.json"
+            report_path = Path(directory) / "receipt.json"
+            for event in cases:
+                with self.subTest(event=event):
+                    event_path.write_text(json.dumps(event), encoding="utf-8")
+                    output, errors = io.StringIO(), io.StringIO()
+                    with (
+                        patch.dict(module.os.environ, {"HF_ORG_TOKEN": "fake-test-only"}),
+                        patch.object(module, "require_current_protected_main") as guard,
+                        contextlib.redirect_stdout(output),
+                        contextlib.redirect_stderr(errors),
+                    ):
+                        code = module.main([
+                            f"--dispatch-event={event_path}", f"--report={report_path}",
+                        ])
+                    self.assertEqual(code, 2)
+                    guard.assert_not_called()
+                    report = json.loads(report_path.read_text(encoding="utf-8"))
+                    self.assertEqual(report["result"], "BLOCKED_PRECONDITION")
+                    self.assertFalse(report["provider_request"]["attempted"])
+                    self.assertNotIn(invalid, json.dumps(report))
+                    self.assertNotIn(invalid, output.getvalue() + errors.getvalue())
+
+    def test_event_inputs_retain_valid_identity_and_reject_cli_overrides(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            event_path = Path(directory) / "event.json"
+            report_path = Path(directory) / "receipt.json"
+            event_path.write_text(json.dumps({"inputs": {
+                "repo_id": "SZLHOLDINGS/a11oy", "mode": "plan", "transition": "inspect",
+                "expected_visibility": "unspecified", "expected_stage": "",
+                "expected_revision": "", "expected_policy_sha256": "",
+            }}), encoding="utf-8")
+            argv = [f"--dispatch-event={event_path}", f"--report={report_path}"]
+            with (
+                patch.dict(module.os.environ, {}, clear=True),
+                contextlib.redirect_stdout(io.StringIO()),
+            ):
+                self.assertEqual(module.main(argv), 2)
+            report = json.loads(report_path.read_text(encoding="utf-8"))
+            self.assertEqual(report["result"], "FAILED_BEFORE_ATTEMPT")
+            self.assertEqual(report["target"], "SZLHOLDINGS/a11oy")
+            self.assertEqual(report["mode"], "plan")
+            self.assertIsNone(report["expected_before"]["revision"])
+            with contextlib.redirect_stdout(io.StringIO()):
+                self.assertEqual(module.main([*argv, "--target=SZLHOLDINGS/nexus"]), 2)
+            report = json.loads(report_path.read_text(encoding="utf-8"))
+            self.assertEqual(report["result"], "BLOCKED_PRECONDITION")
+            self.assertFalse(report["provider_request"]["attempted"])
 
     def test_public_apply_is_precondition_failure(self) -> None:
         repo_id = "SZLHOLDINGS/a11oy"
@@ -582,7 +750,9 @@ class LifecycleTests(unittest.TestCase):
         for block in step_blocks:
             if block is not controller_steps[0]:
                 self.assertNotIn("HF_ORG_TOKEN", block)
-        self.assertIn("--expected-policy-sha256", workflow)
+        self.assertIn('--dispatch-event "$GITHUB_EVENT_PATH"', workflow)
+        self.assertNotIn("${{ inputs.", workflow)
+        self.assertNotIn("INPUT_EXPECTED_", workflow)
         self.assertIn("--require-hashes", workflow)
         self.assertIn("persist-credentials: false", workflow)
         uses = re.findall(r"uses:\s+[^@\s]+@([^\s]+)", workflow)
