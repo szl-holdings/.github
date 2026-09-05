@@ -75,13 +75,20 @@ def _fixed_streamlit_adapter(content: str, slug: str) -> str:
 
 core.adapt_streamlit = _fixed_streamlit_adapter
 
-# Install the additive responsive refresh before the target-repository gate so
-# already-bound repositories are promoted back into a reviewable v3 plan.
+# Install the additive responsive refresh before the source-authority and target
+# contracts so publisher-managed surfaces cannot be converted back into guessed
+# product-repository edits by an inner adapter.
 responsive = load_module(
     "szl_responsive_space_contract",
     HERE / "responsive_space_contract.py",
 )
 responsive.install(core)
+
+authority = load_module(
+    "szl_source_authority_contract",
+    HERE / "source_authority_contract.py",
+)
+authority.install(core)
 
 targets = load_module(
     "szl_holographic_target_contract",

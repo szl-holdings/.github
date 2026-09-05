@@ -8,9 +8,11 @@ on:
       - ".github/scripts/rollout_holographic_spaces_v2.py"
       - ".github/scripts/run_holographic_spaces_v2.py"
       - ".github/scripts/responsive_space_contract.py"
+      - ".github/scripts/source_authority_contract.py"
       - ".github/scripts/holographic_target_contract.py"
       - ".github/tests/test_holographic_spaces_v2.py"
       - ".github/tests/test_responsive_space_contract.py"
+      - ".github/tests/test_rollout_source_authority.py"
       - ".github/tests/test_holographic_target_contract.py"
       - "design/holographic-v2/**"
       - "design/responsive-v3/**"
@@ -73,11 +75,13 @@ jobs:
             .github/scripts/rollout_holographic_spaces_v2.py \
             .github/scripts/run_holographic_spaces_v2.py \
             .github/scripts/responsive_space_contract.py \
+            .github/scripts/source_authority_contract.py \
             .github/scripts/holographic_target_contract.py
           node --check design/holographic-v2/szl-space-hologram.js
           node --check design/responsive-v3/szl-responsive-v3.js
           python .github/tests/test_holographic_spaces_v2.py
           python .github/tests/test_responsive_space_contract.py
+          python .github/tests/test_rollout_source_authority.py
           python .github/tests/test_holographic_target_contract.py
       - name: Discover, refresh, review, and merge through repository gates
         shell: bash
