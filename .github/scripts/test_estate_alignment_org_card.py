@@ -11,7 +11,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 MODULE_PATH = Path(__file__).with_name("estate_alignment_contract.py")
-CONTRACT_PATH = MODULE_PATH.parents[1] / "docs" / "ESTATE_ALIGNMENT_CONTRACT_V1.json"
+CONTRACT_PATH = MODULE_PATH.parents[2] / "docs" / "ESTATE_ALIGNMENT_CONTRACT_V1.json"
 SPEC = importlib.util.spec_from_file_location("estate_alignment_contract_org_card", MODULE_PATH)
 assert SPEC and SPEC.loader
 alignment = importlib.util.module_from_spec(SPEC)
