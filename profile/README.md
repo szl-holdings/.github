@@ -8,60 +8,83 @@
 
 # SZL Holdings
 
-**Control before action. Evidence after.**
-
-Governed AI systems with source-bound execution and portable verification receipts.
+**One governed fabric. Source-bound execution. Portable proof.**
 
 **Product** · [a-11-oy.com](https://a-11-oy.com)  
-**Proof** · [a11oy.net](https://a11oy.net)
+**Proof** · [a11oy.net](https://a11oy.net)  
+**Artifacts** · [Hugging Face](https://huggingface.co/SZLHOLDINGS)
 
 </div>
 
 ---
 
-## Governed loop
+## One fabric, three commercial flagships
 
-**Signal** → **reason** → **policy** → **bounded action** → **receipt** → **independent verification**.
+| Flagship | Purpose | Product | Canonical source | Runtime / artifacts |
+| --- | --- | --- | --- | --- |
+| **A11oy Command** | Policy-gated AI actions, receipts, routing, and refusal | [a-11-oy.com](https://a-11-oy.com) | [szl-holdings/a11oy](https://github.com/szl-holdings/a11oy) | [SZLHOLDINGS/a11oy](https://huggingface.co/spaces/SZLHOLDINGS/a11oy) |
+| **Killinchu** | Cyber-physical resilience and defensive command | [a-11-oy.com/killinchu](https://a-11-oy.com/killinchu) | [szl-holdings/killinchu](https://github.com/szl-holdings/killinchu) | [SZLHOLDINGS/killinchu](https://huggingface.co/spaces/SZLHOLDINGS/killinchu) |
+| **Forge / Own-Metal** | Model lifecycle, qualification, kernels, and bounded inference | [a-11-oy.com/frontier](https://a-11-oy.com/frontier) | [szl-holdings/szl-forge](https://github.com/szl-holdings/szl-forge) | [Inference lab](https://huggingface.co/spaces/SZLHOLDINGS/szl-model-inference-lab) |
 
-Authority and evidence are checked before action. Runtime stays inside its declared boundary. Λ uniqueness remains **Conjecture 1 OPEN**.
+Everything else is a domain body, internal engine, capability plane, evidence asset, or lab. A public repository or Hub card is not automatically a product.
 
-## Public paths
+## Five public domain bodies
 
-- **A11oy** · [product](https://a-11-oy.com) · [source](https://github.com/szl-holdings/a11oy)
-- **Proof registry** · [a11oy.net](https://a11oy.net) for records, diligence, and atlas evidence
-- **Artifacts** · [Hugging Face](https://huggingface.co/SZLHOLDINGS): **16 public Spaces, 44 models, and 33 datasets** measured 2026-09-04 23:34 UTC via Hub API. Previous profile line (15 / 44 / 32) is superseded.
-- **IMMUNE** · [product tab](https://a-11-oy.com/immune) · [Channel A](https://huggingface.co/spaces/SZLHOLDINGS/immune) · [Channel B](https://huggingface.co/spaces/SZLHOLDINGS/immune-lattice)
-- **Organization source** · [github.com/szl-holdings](https://github.com/szl-holdings)
+| Body | Domain | Canonical source | Hugging Face surface |
+| --- | --- | --- | --- |
+| **Terra** | Real-estate intelligence | [szl-real-estate](https://github.com/szl-holdings/szl-real-estate) + `vertical-services` | [terra](https://huggingface.co/spaces/SZLHOLDINGS/terra) |
+| **Killinchu** | Cyber-physical resilience intelligence | [killinchu](https://github.com/szl-holdings/killinchu) | [killinchu](https://huggingface.co/spaces/SZLHOLDINGS/killinchu) |
+| **PRISM Counsel** | Attorney-led legal matter intelligence | `a11oy/verticals/counsel` + `vertical-services` | [counsel](https://huggingface.co/spaces/SZLHOLDINGS/counsel) |
+| **PURIQ Finance** | Evidence-bound financial intelligence; no trading or custody | [puriq-live](https://github.com/szl-holdings/puriq-live) | [finance](https://huggingface.co/spaces/SZLHOLDINGS/finance) |
+| **LYTE** | Business and AI-agent observability | [lyte-services](https://github.com/szl-holdings/lyte-services) | [lyte](https://huggingface.co/spaces/SZLHOLDINGS/lyte) |
 
-Public Spaces measured this hour: `a11oy`, `killinchu`, `immune`, `immune-lattice`, `counsel`, `terra`, `sentra`, `finance`, `lyte`, `vertical-services`, `szl-command-lab`, `david-leads`, `szl-constellation`, `szl-frontier`, `szl-model-inference-lab`, `ayllu`.
+## Six internal engines
 
-NEXUS is an internal IMMUNE capability plane, not a second product. Do not mint `SZLHOLDINGS/nexus`. Killinchu public actuation is **SIMULATED** unless a separately authorized effector proves otherwise.
+`sentra` · `lyte` · `killinchu` · `finance` · `terra` · `counsel`
 
-## Portfolio
+Aegis, Sentra, IMMUNE, and Vessels are folded capability planes under Killinchu’s public authority; they do not become four additional commercial products. `vertical-services` is a shared Python intelligence runtime. Command Lab, David Leads, Constellation, Frontier, the inference lab, and Ayllu are supporting or research surfaces.
 
-- **Killinchu** · defense, cyber-resilience, and maritime command
-- **IMMUNE** · governed AI admission, receipts, tripwires, graph, and NEXUS
-- **Lyte** · business observability
-- **PURIQ Finance** · evidence-bound market analysis; no trading or custody
-- **Terra** · real-estate intelligence; occupancy **UNAVAILABLE**
-- **PRISM Counsel** · attorney-led legal intelligence; no filing authority
-- **David Leads** · commercial workflow flagship
+## One governed movement contract
 
-Labs and research packages are components, holograms, or archives—not competing origins.
+**GitHub is canonical source.** **Hugging Face is the generated artifact/runtime registry.** **a11oy.net is proof and diligence, not a second product origin.**
 
-[Public surface atlas](https://github.com/szl-holdings/.github/blob/main/docs/PUBLIC-SURFACE-ATLAS.md) · [Lifecycle](https://github.com/szl-holdings/.github/blob/main/docs/ESTATE_LIFECYCLE.md) · [Security](https://github.com/szl-holdings/.github/security/policy) · [Trust](https://github.com/szl-holdings/.github/blob/main/TRUST.md)
+Every consequential release follows:
 
-## Current state
+**Signal → reason → policy → bounded action → receipt → independent verification.**
 
-- A11oy publishes locked-eight kernel evidence; Λ remains a conjecture.
-- Product origin [a-11-oy.com](https://a-11-oy.com) is the live `SZLHOLDINGS/a11oy` Space (`server=szl`). Proof stays on [a11oy.net](https://a11oy.net).
-- Both IMMUNE channels remain public while parity and retirement evidence are completed.
-- `SZLHOLDINGS/nexus` is not a public product. Nexus source remains preserved.
-- [`SZLHOLDINGS/SZLHOLDINGS`](https://huggingface.co/datasets/SZLHOLDINGS/SZLHOLDINGS) is a **HISTORICAL** dataset mirror.
-- A signature proves integrity and origin within scope—not accuracy, safety, performance, compliance, or deployment authorization.
-- Estate is **not READY**. ReceiptAgent v3 is quarantined. Khipu-abstain has no adapter bytes. Chaski / A11OY-MINI stay research-only. ROADMAP cards (`qantu`, `waman`, `chakana`, `tinku`, `KILLINCHU-EYE`) are empty and are not production SKUs.
+A source change is not operational merely because CI is green. The canonical publisher must deploy the exact source revision, the runtime must report that revision, and the product/proof surfaces must retain honest evidence labels.
 
-This profile does not claim regulatory approval, universal safety, customer adoption, or an investment outcome. An HTTP 200 response is not a production certificate.
+[Machine-readable estate alignment contract](https://github.com/szl-holdings/.github/blob/main/docs/ESTATE_ALIGNMENT_CONTRACT_V1.json)
+
+## Current public artifact snapshot
+
+Measured through the public Hub inventory on **2026-09-04 23:34 UTC**:
+
+- **16 portfolio Spaces**
+- **44 models**
+- **33 datasets**
+- `SZLHOLDINGS/README` is the organization-card control surface and is excluded from the 16-Space portfolio count.
+
+The 16 portfolio Spaces are:
+
+`a11oy`, `killinchu`, `immune`, `immune-lattice`, `terra`, `sentra`, `counsel`, `finance`, `lyte`, `vertical-services`, `szl-command-lab`, `david-leads`, `szl-constellation`, `szl-frontier`, `szl-model-inference-lab`, and `ayllu`.
+
+NEXUS remains an internal IMMUNE capability plane; do not mint `SZLHOLDINGS/nexus` as another public product. Both IMMUNE channels remain public until an explicit parity and retirement receipt says otherwise.
+
+## Build and verify
+
+- [A11oy source and contracts](https://github.com/szl-holdings/a11oy)
+- [Public proof registry](https://a11oy.net)
+- [Hugging Face estate](https://huggingface.co/SZLHOLDINGS)
+- [Security policy](https://github.com/szl-holdings/.github/security/policy)
+- [Trust boundary](https://github.com/szl-holdings/.github/blob/main/TRUST.md)
+- [Public surface atlas](https://github.com/szl-holdings/.github/blob/main/docs/PUBLIC-SURFACE-ATLAS.md)
+
+## Truth boundary
+
+Claims use **PROVED**, **MEASURED**, **REPORTED**, **MODELED**, **CONJECTURE**, **ROADMAP**, **UNKNOWN**, **UNAVAILABLE**, or **SIMULATED**. The locked Lean kernel is exactly `{F1,F4,F7,F11,F12,F18,F19,F22}`. Λ uniqueness remains **Conjecture 1** and cannot authorize an action.
+
+Killinchu public actuation remains **SIMULATED** unless a separately authorized effector is proved. Public effectors are disabled by default. A signature proves integrity and origin within scope—not accuracy, safety, performance, regulatory approval, customer adoption, or an investment outcome.
 
 ---
 
