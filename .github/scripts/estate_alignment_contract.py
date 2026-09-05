@@ -11,10 +11,9 @@ import os
 import re
 import time
 import urllib.error
-import urllib.parse
 import urllib.request
 from pathlib import Path
-from typing import Any, Callable, Iterable, Mapping
+from typing import Any, Callable, Mapping
 
 SCHEMA = "szl.estate-alignment/v1"
 SHA40 = re.compile(r"^[0-9a-f]{40}$")
@@ -28,6 +27,7 @@ EXPECTED_FOLDS = {
     "immune": "killinchu",
     "vessels": "killinchu",
 }
+EXPECTED_FORBIDDEN_PRODUCTS = {"nexus", *EXPECTED_FOLDS}
 EXPECTED_PORTFOLIO_SPACES = {
     "SZLHOLDINGS/a11oy",
     "SZLHOLDINGS/killinchu",
@@ -59,26 +59,23 @@ ALLOWED_SPACE_CLASSES = {
     "forge_inference_surface",
     "incubation_lab",
 }
-PRODUCT_CONTRACT_URL = (
-    "https://raw.githubusercontent.com/szl-holdings/a11oy/"
-    "{revision}/docs/strategy/living-command-fabric.v1.json"
-)
 GITHUB_API = "https://api.github.com"
 HF_API = "https://huggingface.co/api"
 USER_AGENT = "SZL-Estate-Alignment/1.0"
+PRODUCT_PATH = "docs/strategy/living-command-fabric.v1.json"
 
 
 class AlignmentError(RuntimeError):
-    """Raised when the estate contract or live evidence diverges."""
+    """Raised when alignment evidence is malformed or unavailable."""
 
 
 def _reject_duplicate_keys(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
-    result: dict[str, Any] = {}
-    for key, value in pairs:
-        if key in result:
+    value: dict[str, Any] = {}
+    for key, item in pairs:
+        if key in value:
             raise AlignmentError(f"duplicate JSON key: {key}")
-        result[key] = value
-    return result
+        value[key] = item
+    return value
 
 
 def _reject_nonfinite(value: str) -> None:
@@ -116,9 +113,9 @@ def exact_slugs(rows: Any, label: str, expected: list[str], failures: list[str])
     require(isinstance(rows, list), f"{label} must be an array", failures)
     if not isinstance(rows, list):
         return
-    slugs = [row.get("slug") if isinstance(row, dict) else None for row in rows]
-    require(slugs == expected, f"{label} slugs must be {expected}; observed {slugs}", failures)
-    require(len(slugs) == len(set(slugs)), f"{label} contains duplicate slugs", failures)
+    observed = [row.get("slug") if isinstance(row, dict) else None for row in rows]
+    require(observed == expected, f"{label} slugs must be {expected}; observed {observed}", failures)
+    require(len(observed) == len(set(observed)), f"{label} contains duplicate slugs", failures)
 
 
 def validate_contract(contract: Mapping[str, Any]) -> list[str]:
@@ -127,27 +124,31 @@ def validate_contract(contract: Mapping[str, Any]) -> list[str]:
     authority = contract.get("authority")
     require(isinstance(authority, dict), "authority must be an object", failures)
     if isinstance(authority, dict):
-        require(authority.get("product_origin") == "https://a-11-oy.com", "wrong product origin", failures)
-        require(authority.get("proof_origin") == "https://a11oy.net", "wrong proof origin", failures)
-        require(authority.get("canonical_source_organization") == "https://github.com/szl-holdings", "wrong GitHub authority", failures)
-        require(authority.get("artifact_registry") == "https://huggingface.co/SZLHOLDINGS", "wrong artifact registry", failures)
-        require(authority.get("huggingface_front_door") == "SZLHOLDINGS/README", "wrong Hugging Face front door", failures)
+        expected_authority = {
+            "product_origin": "https://a-11-oy.com",
+            "proof_origin": "https://a11oy.net",
+            "canonical_source_organization": "https://github.com/szl-holdings",
+            "artifact_registry": "https://huggingface.co/SZLHOLDINGS",
+            "huggingface_front_door": "SZLHOLDINGS/README",
+        }
+        for key, expected in expected_authority.items():
+            require(authority.get(key) == expected, f"{key} must be {expected}", failures)
 
     taxonomy = contract.get("taxonomy")
     require(isinstance(taxonomy, dict), "taxonomy must be an object", failures)
     if isinstance(taxonomy, dict):
         flagships = taxonomy.get("commercial_flagships")
         bodies = taxonomy.get("public_domain_bodies")
-        engines = taxonomy.get("internal_engines")
         exact_slugs(flagships, "commercial_flagships", EXPECTED_FLAGSHIPS, failures)
         exact_slugs(bodies, "public_domain_bodies", EXPECTED_BODIES, failures)
-        require(taxonomy.get("commercial_flagship_count") == len(EXPECTED_FLAGSHIPS), "commercial flagship count mismatch", failures)
-        require(taxonomy.get("public_domain_body_count") == len(EXPECTED_BODIES), "public body count mismatch", failures)
-        require(taxonomy.get("internal_engine_count") == len(EXPECTED_ENGINES), "internal engine count mismatch", failures)
-        require(engines == EXPECTED_ENGINES, f"internal engines must be {EXPECTED_ENGINES}", failures)
+        require(taxonomy.get("commercial_flagship_count") == 3, "commercial flagship count mismatch", failures)
+        require(taxonomy.get("public_domain_body_count") == 5, "public body count mismatch", failures)
+        require(taxonomy.get("internal_engine_count") == 6, "internal engine count mismatch", failures)
+        require(taxonomy.get("internal_engines") == EXPECTED_ENGINES, "internal engine set mismatch", failures)
         require(taxonomy.get("folded_capabilities") == EXPECTED_FOLDS, "folded capability map mismatch", failures)
         if isinstance(flagships, list):
-            require(not (set(EXPECTED_FOLDS) & {row.get("slug") for row in flagships if isinstance(row, dict)}), "folded capability promoted to flagship", failures)
+            flagship_slugs = {row.get("slug") for row in flagships if isinstance(row, dict)}
+            require(not (set(EXPECTED_FOLDS) & flagship_slugs), "folded capability promoted to flagship", failures)
 
     snapshot = contract.get("huggingface_inventory_snapshot")
     require(isinstance(snapshot, dict), "huggingface_inventory_snapshot must be an object", failures)
@@ -163,21 +164,24 @@ def validate_contract(contract: Mapping[str, Any]) -> list[str]:
         require(snapshot.get("portfolio_space_count") == 16, "portfolio_space_count must be 16", failures)
         require(snapshot.get("model_count") == 44, "model_count must be 44", failures)
         require(snapshot.get("dataset_count") == 33, "dataset_count must be 33", failures)
-        require(snapshot.get("organization_card_space_excluded_from_portfolio_count") == "SZLHOLDINGS/README", "README control surface exclusion missing", failures)
+        require(snapshot.get("organization_card_space_excluded_from_portfolio_count") == "SZLHOLDINGS/README", "README control-surface exclusion missing", failures)
 
     movement = contract.get("movement_contract")
     require(isinstance(movement, dict), "movement_contract must be an object", failures)
     if isinstance(movement, dict):
-        require(movement.get("github_is_source_authority") is True, "GitHub source authority must be true", failures)
-        require(movement.get("huggingface_is_generated_artifact_registry") is True, "Hugging Face generated registry must be true", failures)
-        require(movement.get("a11oy_net_is_proof_not_product") is True, "a11oy.net proof boundary missing", failures)
-        require(movement.get("one_canonical_writer_per_huggingface_target") is True, "single-writer contract missing", failures)
-        require(movement.get("source_revision_required_for_runtime_claims") is True, "source-revision requirement missing", failures)
+        for key in (
+            "github_is_source_authority",
+            "huggingface_is_generated_artifact_registry",
+            "a11oy_net_is_proof_not_product",
+            "one_canonical_writer_per_huggingface_target",
+            "source_revision_required_for_runtime_claims",
+            "human_authority_required",
+        ):
+            require(movement.get(key) is True, f"{key} must be true", failures)
         require(movement.get("public_effectors_enabled") is False, "public effectors must be disabled", failures)
-        require(movement.get("human_authority_required") is True, "human authority must be required", failures)
         require(movement.get("lambda_status") == "CONJECTURE_1_ADVISORY", "Lambda status mismatch", failures)
         require(movement.get("locked_formula_ids") == LOCKED_EIGHT, "locked formula IDs mismatch", failures)
-        require(set(movement.get("forbidden_public_products") or []) == set(EXPECTED_FOLDS), "forbidden product set mismatch", failures)
+        require(set(movement.get("forbidden_public_products") or []) == EXPECTED_FORBIDDEN_PRODUCTS, "forbidden public-product set mismatch", failures)
     return failures
 
 
@@ -187,7 +191,11 @@ def validate_documents(root: Path, contract: Mapping[str, Any]) -> list[str]:
     hf_readme = (root / "huggingface/org-card/README.md").read_text(encoding="utf-8")
     hf_index = (root / "huggingface/org-card/index.html").read_text(encoding="utf-8")
     manifest = load_json(root / "huggingface/org-card.manifest.json")
-    documents = {"GitHub profile": profile, "Hugging Face README": hf_readme, "Hugging Face index": hf_index}
+    documents = {
+        "GitHub profile": profile,
+        "Hugging Face README": hf_readme,
+        "Hugging Face index": hf_index,
+    }
     for label, text in documents.items():
         for marker in ("Three commercial flagships", "Five public domain bodies", "Six internal engines"):
             require(marker.casefold() in text.casefold(), f"{label} missing {marker!r}", failures)
@@ -207,49 +215,11 @@ def validate_documents(root: Path, contract: Mapping[str, Any]) -> list[str]:
     return failures
 
 
-def _retry_after(error: urllib.error.HTTPError, fallback: float) -> float:
-    raw = error.headers.get("Retry-After") if error.headers else None
-    if raw:
-        try:
-            return min(max(float(raw), fallback), 60.0)
-        except (TypeError, ValueError):
-            pass
-    return fallback
-
-
-def fetch_bytes(url: str, *, token: str | None = None, attempts: int = 5, max_bytes: int = 4_000_000, sleep: Callable[[float], None] = time.sleep) -> bytes:
-    headers = {"Accept": "application/json", "User-Agent": USER_AGENT, "Cache-Control": "no-cache"}
-    if token:
-        headers["Authorization"] = f"Bearer {token}"
-    for attempt in range(attempts):
-        request = urllib.request.Request(url, headers=headers)
-        try:
-            with urllib.request.urlopen(request, timeout=45) as response:
-                payload = response.read(max_bytes + 1)
-                if len(payload) > max_bytes:
-                    raise AlignmentError(f"response exceeds {max_bytes} bytes: {url}")
-                return payload
-        except urllib.error.HTTPError as exc:
-            if exc.code not in {429, 500, 502, 503, 504} or attempt + 1 == attempts:
-                raise
-            sleep(_retry_after(exc, float(2**attempt)))
-        except (urllib.error.URLError, TimeoutError, ConnectionError):
-            if attempt + 1 == attempts:
-                raise
-            sleep(float(2**attempt))
-    raise AlignmentError("unreachable retry state")
-
-
-def github_main_sha(repository: str, token: str | None) -> str:
-    value = load_json_bytes(fetch_bytes(f"{GITHUB_API}/repos/{repository}/branches/main", token=token), label=f"{repository} main")
-    sha = str((value.get("commit") or {}).get("sha") or "").lower()
-    if not SHA40.fullmatch(sha):
-        raise AlignmentError(f"{repository} main did not resolve to exact SHA")
-    return sha
-
-
 def normalize_product_source(value: str) -> str:
-    return value.replace("szl-holdings/a11oy/verticals/counsel", "szl-holdings/a11oy:verticals/counsel")
+    return value.replace(
+        "szl-holdings/a11oy/verticals/counsel",
+        "szl-holdings/a11oy:verticals/counsel",
+    )
 
 
 def validate_product_contract(product: Mapping[str, Any], local: Mapping[str, Any]) -> list[str]:
@@ -265,7 +235,7 @@ def validate_product_contract(product: Mapping[str, Any], local: Mapping[str, An
     estate = product.get("estate") or {}
     require(estate.get("product_surface") == local["authority"]["product_origin"], "A11oy product origin drift", failures)
     require(estate.get("proof_surface") == local["authority"]["proof_origin"], "A11oy proof origin drift", failures)
-    require(estate.get("artifact_organization") == "SZLHOLDINGS", "A11oy artifact org drift", failures)
+    require(estate.get("artifact_organization") == "SZLHOLDINGS", "A11oy artifact organization drift", failures)
     local_sources = {row["slug"]: row["source"] for row in taxonomy["public_domain_bodies"]}
     for row in product.get("verticals", []):
         if not isinstance(row, dict) or row.get("slug") not in local_sources:
@@ -275,11 +245,67 @@ def validate_product_contract(product: Mapping[str, Any], local: Mapping[str, An
     return failures
 
 
+def retry_delay(error: urllib.error.HTTPError, fallback: float) -> float:
+    raw = error.headers.get("Retry-After") if error.headers else None
+    if raw:
+        try:
+            return min(max(float(raw), fallback), 60.0)
+        except (TypeError, ValueError):
+            pass
+    return fallback
+
+
+def fetch_bytes(
+    url: str,
+    *,
+    token: str | None = None,
+    attempts: int = 5,
+    max_bytes: int = 4_000_000,
+    sleep: Callable[[float], None] = time.sleep,
+) -> bytes:
+    headers = {
+        "Accept": "application/json",
+        "User-Agent": USER_AGENT,
+        "Cache-Control": "no-cache",
+    }
+    if token:
+        headers["Authorization"] = f"Bearer {token}"
+    for attempt in range(attempts):
+        try:
+            request = urllib.request.Request(url, headers=headers)
+            with urllib.request.urlopen(request, timeout=45) as response:
+                payload = response.read(max_bytes + 1)
+                if len(payload) > max_bytes:
+                    raise AlignmentError(f"response exceeds {max_bytes} bytes: {url}")
+                return payload
+        except urllib.error.HTTPError as exc:
+            if exc.code not in {429, 500, 502, 503, 504} or attempt + 1 == attempts:
+                raise
+            sleep(retry_delay(exc, float(2**attempt)))
+        except (urllib.error.URLError, TimeoutError, ConnectionError):
+            if attempt + 1 == attempts:
+                raise
+            sleep(float(2**attempt))
+    raise AlignmentError("unreachable retry state")
+
+
+def github_main_sha(repository: str, token: str | None) -> str:
+    value = load_json_bytes(
+        fetch_bytes(f"{GITHUB_API}/repos/{repository}/branches/main", token=token),
+        label=f"{repository} main",
+    )
+    sha = str((value.get("commit") or {}).get("sha") or "").lower()
+    if not SHA40.fullmatch(sha):
+        raise AlignmentError(f"{repository} main did not resolve to exact SHA")
+    return sha
+
+
 def canonical_repositories(contract: Mapping[str, Any]) -> set[str]:
-    repositories: set[str] = {"szl-holdings/a11oy", "szl-holdings/.github"}
+    repositories = {"szl-holdings/a11oy", "szl-holdings/.github"}
     taxonomy = contract["taxonomy"]
     snapshot = contract["huggingface_inventory_snapshot"]
-    for row in list(taxonomy["commercial_flagships"]) + list(taxonomy["public_domain_bodies"]) + list(snapshot["portfolio_spaces"]):
+    rows = list(taxonomy["commercial_flagships"]) + list(taxonomy["public_domain_bodies"]) + list(snapshot["portfolio_spaces"])
+    for row in rows:
         if not isinstance(row, dict):
             continue
         for key in ("source", "service_source", "canonical_source"):
@@ -290,8 +316,9 @@ def canonical_repositories(contract: Mapping[str, Any]) -> set[str]:
 
 
 def list_hf(kind: str) -> list[dict[str, Any]]:
-    url = f"{HF_API}/{kind}?author=SZLHOLDINGS&limit=100&full=true"
-    value = json.loads(fetch_bytes(url))
+    value = json.loads(
+        fetch_bytes(f"https://huggingface.co/api/{kind}?author=SZLHOLDINGS&limit=100&full=true")
+    )
     if not isinstance(value, list):
         raise AlignmentError(f"Hugging Face {kind} endpoint did not return an array")
     return [row for row in value if isinstance(row, dict)]
@@ -301,14 +328,29 @@ def validate_live(contract: Mapping[str, Any]) -> tuple[list[str], dict[str, Any
     failures: list[str] = []
     token = os.getenv("GITHUB_TOKEN") or os.getenv("GH_TOKEN")
     a11oy_sha = github_main_sha("szl-holdings/a11oy", token)
-    product = load_json_bytes(fetch_bytes(PRODUCT_CONTRACT_URL.format(revision=a11oy_sha)), label="A11oy living-command contract")
+    product = load_json_bytes(
+        fetch_bytes(
+            f"https://raw.githubusercontent.com/szl-holdings/a11oy/{a11oy_sha}/{PRODUCT_PATH}"
+        ),
+        label="A11oy living-command contract",
+    )
     failures.extend(validate_product_contract(product, contract))
 
-    repo_observations: list[dict[str, Any]] = []
+    repository_observations: list[dict[str, Any]] = []
     for repository in sorted(canonical_repositories(contract)):
         try:
-            value = load_json_bytes(fetch_bytes(f"{GITHUB_API}/repos/{repository}", token=token), label=repository)
-            repo_observations.append({"repository": repository, "archived": value.get("archived"), "visibility": value.get("visibility"), "default_branch": value.get("default_branch")})
+            value = load_json_bytes(
+                fetch_bytes(f"{GITHUB_API}/repos/{repository}", token=token),
+                label=repository,
+            )
+            repository_observations.append(
+                {
+                    "repository": repository,
+                    "archived": value.get("archived"),
+                    "visibility": value.get("visibility"),
+                    "default_branch": value.get("default_branch"),
+                }
+            )
             require(value.get("archived") is False, f"canonical repository is archived: {repository}", failures)
         except Exception as exc:
             failures.append(f"canonical repository unavailable: {repository}: {type(exc).__name__}")
@@ -323,9 +365,9 @@ def validate_live(contract: Mapping[str, Any]) -> tuple[list[str], dict[str, Any
     require(len(models) == contract["huggingface_inventory_snapshot"]["model_count"], f"model count drift: {len(models)}", failures)
     require(len(datasets) == contract["huggingface_inventory_snapshot"]["dataset_count"], f"dataset count drift: {len(datasets)}", failures)
     require("SZLHOLDINGS/README" in space_ids, "Hugging Face organization-card Space missing", failures)
-    observation = {
+    return failures, {
         "a11oy_contract_revision": a11oy_sha,
-        "canonical_repositories": repo_observations,
+        "canonical_repositories": repository_observations,
         "huggingface": {
             "models": len(models),
             "datasets": len(datasets),
@@ -334,7 +376,6 @@ def validate_live(contract: Mapping[str, Any]) -> tuple[list[str], dict[str, Any
             "portfolio_space_ids": sorted(portfolio_ids),
         },
     }
-    return failures, observation
 
 
 def build_receipt(root: Path, *, live: bool) -> dict[str, Any]:
@@ -364,7 +405,9 @@ def build_receipt(root: Path, *, live: bool) -> dict[str, Any]:
             "public_effectors_enabled": False,
         },
     }
-    receipt["receipt_sha256"] = sha256_bytes((json.dumps(receipt, sort_keys=True, separators=(",", ":")) + "\n").encode("utf-8"))
+    receipt["receipt_sha256"] = sha256_bytes(
+        (json.dumps(receipt, sort_keys=True, separators=(",", ":")) + "\n").encode("utf-8")
+    )
     return receipt
 
 
@@ -375,8 +418,20 @@ def main() -> int:
     parser.add_argument("--output", type=Path, default=Path("estate-alignment-receipt.json"))
     args = parser.parse_args()
     receipt = build_receipt(args.repo_root.resolve(), live=args.live)
-    args.output.write_text(json.dumps(receipt, indent=2, sort_keys=True) + "\n", encoding="utf-8")
-    print(json.dumps({"state": receipt["state"], "failure_count": len(receipt["failures"]), "receipt_sha256": receipt["receipt_sha256"]}, indent=2))
+    args.output.write_text(
+        json.dumps(receipt, indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
+    print(
+        json.dumps(
+            {
+                "state": receipt["state"],
+                "failure_count": len(receipt["failures"]),
+                "receipt_sha256": receipt["receipt_sha256"],
+            },
+            indent=2,
+        )
+    )
     return 0 if receipt["state"] == "ALIGNED" else 1
 
 
