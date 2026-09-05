@@ -1,0 +1,136 @@
+name: Estate one-fabric alignment
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - docs/ESTATE_ALIGNMENT_CONTRACT_V1.json
+      - profile/README.md
+      - huggingface/org-card/**
+      - huggingface/org-card.manifest.json
+      - .github/scripts/estate_alignment_contract.py
+      - .github/scripts/test_estate_alignment_contract.py
+      - .github/workflows/estate-one-fabric-alignment.yml
+  push:
+    branches: [main]
+    paths:
+      - docs/ESTATE_ALIGNMENT_CONTRACT_V1.json
+      - profile/README.md
+      - huggingface/org-card/**
+      - huggingface/org-card.manifest.json
+      - .github/scripts/estate_alignment_contract.py
+      - .github/scripts/test_estate_alignment_contract.py
+      - .github/workflows/estate-one-fabric-alignment.yml
+  schedule:
+    - cron: "23 5 * * *"
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+concurrency:
+  group: estate-one-fabric-alignment-${{ github.event_name }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  local-contract:
+    name: Exact taxonomy, front doors, and publication set
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Harden runner
+        uses: step-security/harden-runner@05e31511f85b41b11d1cf0ef85d0992719546e2c # v2.21.0
+        with:
+          egress-policy: audit
+
+      - name: Checkout exact source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+          fetch-depth: 1
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12.10"
+
+      - name: Compile controller and tests
+        run: >-
+          python -m py_compile
+          .github/scripts/estate_alignment_contract.py
+          .github/scripts/test_estate_alignment_contract.py
+
+      - name: Prove exact one-fabric contract offline
+        run: python .github/scripts/test_estate_alignment_contract.py
+
+      - name: Emit secret-free source receipt
+        env:
+          GITHUB_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: >-
+          python .github/scripts/estate_alignment_contract.py
+          --repo-root .
+          --output estate-alignment-local-receipt.json
+
+      - name: Prove static organization-card publication closure
+        run: |
+          set -euo pipefail
+          python .github/scripts/hf_static_space_deploy.py \
+            --repo-root . \
+            --manifest huggingface/org-card.manifest.json \
+            --source-sha "${{ github.event.pull_request.head.sha || github.sha }}" \
+            --materialize "$(mktemp -d)" \
+            --report hf-org-card-alignment-materialization.json
+
+      - name: Upload immutable local evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: estate-alignment-local-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            estate-alignment-local-receipt.json
+            hf-org-card-alignment-materialization.json
+          if-no-files-found: error
+          retention-days: 90
+
+  live-contract:
+    name: Product, GitHub, and Hugging Face live readback
+    needs: local-contract
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Harden runner
+        uses: step-security/harden-runner@05e31511f85b41b11d1cf0ef85d0992719546e2c # v2.21.0
+        with:
+          egress-policy: audit
+
+      - name: Checkout exact candidate source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+          fetch-depth: 1
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12.10"
+
+      - name: Compare live product, source, and artifact authorities
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          GITHUB_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: >-
+          python .github/scripts/estate_alignment_contract.py
+          --repo-root .
+          --live
+          --output estate-alignment-live-receipt.json
+
+      - name: Upload immutable live evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: estate-alignment-live-${{ github.run_id }}-${{ github.run_attempt }}
+          path: estate-alignment-live-receipt.json
+          if-no-files-found: error
+          retention-days: 180

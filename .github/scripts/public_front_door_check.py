@@ -54,6 +54,7 @@ REQUIRED_PUBLICATION_BINDINGS = {
     "README.md": "huggingface/org-card/README.md",
     "HONEST_DISCLOSURE.md": "huggingface/org-card/HONEST_DISCLOSURE.md",
     "index.html": "huggingface/org-card/index.html",
+    "estate-alignment.json": "docs/ESTATE_ALIGNMENT_CONTRACT_V1.json",
     "assets/estate-command-system.svg": "profile/assets/estate-command-system.svg",
     "assets/estate-banner-v2.svg": "profile/assets/estate-banner-v2.svg",
     "assets/hf-portfolio-map.svg": "profile/assets/hf-portfolio-map.svg",
@@ -71,6 +72,7 @@ REQUIRED_PUBLICATION_BINDINGS = {
 REQUIRED_PUSH_PATHS = {
     "huggingface/org-card/**",
     "huggingface/org-card.manifest.json",
+    "docs/ESTATE_ALIGNMENT_CONTRACT_V1.json",
     "profile/assets/**",
     "profile/assets/evidence-lattice-v2.webp",
     ".github/scripts/hf_static_space_deploy.py",
