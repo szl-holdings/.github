@@ -436,20 +436,31 @@ def source_revision(payload: Any) -> str | None:
 
 
 def reported_source_repository(payload: Any) -> str | None:
+    """Distinguish absent identity from an explicit invalid or conflicting claim.
+
+    Origin inference is allowed only when no repository field was supplied.
+    Check every supported envelope; a valid sibling cannot hide an invalid one.
+    Do not reflect untrusted field values into retained errors or receipts.
+    """
     if not isinstance(payload, Mapping):
         return None
-    candidates = [payload.get("source_repository"), payload.get("repository")]
+    envelopes = [payload]
     for name in ("build", "source", "deployment", "runtime"):
         nested = payload.get(name)
         if isinstance(nested, Mapping):
-            candidates.extend(
-                (nested.get("source_repository"), nested.get("repository"))
-            )
-    repositories = {
-        source_repository(candidate)
-        for candidate in candidates
-        if isinstance(candidate, str) and candidate.startswith("szl-holdings/")
-    }
+            envelopes.append(nested)
+    repositories: set[str] = set()
+    for envelope in envelopes:
+        for key in ("source_repository", "repository"):
+            if key not in envelope:
+                continue
+            candidate = envelope[key]
+            if not isinstance(candidate, str) or re.fullmatch(
+                r"szl-holdings/[A-Za-z0-9_.-]+(?::[A-Za-z0-9_./-]+)?",
+                candidate,
+            ) is None:
+                raise AlignmentError("runtime binding reports invalid source repository")
+            repositories.add(source_repository(candidate))
     if len(repositories) > 1:
         raise AlignmentError("runtime binding reports conflicting source repositories")
     return next(iter(repositories), None)
