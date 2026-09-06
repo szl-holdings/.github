@@ -92,9 +92,10 @@ class EstateAlignmentContractTests(unittest.TestCase):
         local_job, live_job = workflow.split("  live-contract:\n", 1)
         self.assertIn("github.event_name != 'workflow_run'", local_job)
         self.assertIn("github.event.workflow_run.conclusion == 'success'", live_job)
+        self.assertNotIn("github.event_name == 'pull_request'", live_job)
         self.assertIn("github.event_name == 'schedule'", live_job)
         self.assertIn("github.event_name == 'workflow_dispatch'", live_job)
-        self.assertNotIn("github.event_name == 'pull_request'", live_job)
+        self.assertIn("needs.local-contract.result == 'success'", live_job)
         self.assertNotIn("github.event_name == 'push'", live_job)
         exact_head = "${{ github.event.workflow_run.head_sha || github.event.pull_request.head.sha || github.sha }}"
         self.assertGreaterEqual(workflow.count(exact_head), 4)
