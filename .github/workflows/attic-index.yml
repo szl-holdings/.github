@@ -1,22 +1,22 @@
 # SPDX-License-Identifier: Apache-2.0
 # Doctrine v11 LOCKED · Λ = Conjecture 1 (advisory)
 #
-# Keeps ATTIC.md — the org-wide tombstone index — honest.
-#
-# Fails closed on STRUCTURAL defects (a tombstone pointing at a nonexistent repo,
-# or at another tombstone) and on drift (ATTIC.md stale vs the live estate).
-# Surfaces UNKNOWN successors as warnings: those are open owner decisions, not
-# regressions a PR introduced.
+# Keeps ATTIC.md — the org-wide repository lifecycle index — honest.
+# Lifecycle disposition comes from archive-portfolio-v1; current active/archive
+# state comes from the public GitHub API. Neither source may silently override
+# the other.
 name: Attic Index
 
 on:
   pull_request:
     paths:
       - "ATTIC.md"
+      - "governance/archive-portfolio-v1.json"
       - "scripts/build_attic_index.py"
+      - ".github/tests/test_attic_portfolio.py"
       - ".github/workflows/attic-index.yml"
   schedule:
-    # Daily: the estate changes under us as repos are archived or superseded.
+    # Daily: provider state can move after a reviewed restoration wave.
     - cron: "23 7 * * *"
   workflow_dispatch:
 
@@ -31,15 +31,24 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - name: Checkout
+      - name: Checkout exact candidate
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
 
       - name: Set up Python
         uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
           python-version: "3.12"
 
-      - name: Validate tombstone index against the live estate
+      - name: Validate offline lifecycle contracts
+        run: |
+          set -euo pipefail
+          python -m py_compile scripts/build_attic_index.py
+          python .github/tests/test_attic_portfolio.py
+          git diff --check
+
+      - name: Validate lifecycle index against the live public estate
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: python scripts/build_attic_index.py --check
