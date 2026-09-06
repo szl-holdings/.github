@@ -128,6 +128,73 @@ class StaticSpaceDeployTests(unittest.TestCase):
         with self.assertRaisesRegex(deploy.ContractError, "reserved destination"):
             deploy.load_contract(self.root, self.manifest)
 
+    def test_github_main_lookup_uses_compact_bounded_ref_endpoint(self):
+        expected = "a" * 40
+        expected_url = (
+            "https://api.github.com/repos/szl-holdings/.github"
+            "/git/ref/heads/main"
+        )
+
+        class FakeResponse:
+            status = 200
+
+            def __init__(self):
+                self.read_size = None
+
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *_args):
+                return False
+
+            def geturl(self):
+                return expected_url
+
+            def read(self, size):
+                self.read_size = size
+                return json.dumps({"object": {"sha": expected}}).encode()
+
+        response = FakeResponse()
+        with mock.patch.object(deploy, "urlopen", return_value=response) as opener:
+            self.assertEqual(
+                deploy.fetch_github_main_sha(
+                    "szl-holdings/.github", "ghp_test_token_redacted"
+                ),
+                expected,
+            )
+        request = opener.call_args.args[0]
+        self.assertEqual(request.full_url, expected_url)
+        self.assertEqual(response.read_size, 65_537)
+
+    def test_github_main_lookup_fails_closed_on_oversized_ref_response(self):
+        expected_url = (
+            "https://api.github.com/repos/szl-holdings/.github"
+            "/git/ref/heads/main"
+        )
+
+        class OversizedResponse:
+            status = 200
+
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *_args):
+                return False
+
+            def geturl(self):
+                return expected_url
+
+            def read(self, size):
+                return b"x" * size
+
+        with mock.patch.object(
+            deploy, "urlopen", return_value=OversizedResponse()
+        ):
+            with self.assertRaisesRegex(deploy.ContractError, "oversized"):
+                deploy.fetch_github_main_sha(
+                    "szl-holdings/.github", "ghp_test_token_redacted"
+                )
+
     def test_space_stage_enum_is_normalized(self):
         class SpaceStage(Enum):
             RUNNING = "RUNNING"
