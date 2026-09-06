@@ -76,9 +76,10 @@
     },
     {
       "space": "szl-constellation",
-      "repo": "szl-holdings/holographic-unify",
-      "source_root": "space/index.html",
-      "ownership": "source-owned-lab-surface"
+      "repo": "szl-holdings/szl-constellation",
+      "source_root": "space/app.py",
+      "ownership": "source-owned-lab-surface",
+      "supersedes": "szl-holdings/holographic-unify as the GitHub-to-Hub source authority"
     },
     {
       "space": "ayllu",
