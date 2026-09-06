@@ -10,6 +10,7 @@ import hashlib
 import json
 import os
 import re
+import subprocess
 import time
 import urllib.error
 import urllib.parse
@@ -808,11 +809,39 @@ def validate_live(contract: Mapping[str, Any]) -> tuple[list[str], dict[str, Any
     }
 
 
+def checked_out_revision(root: Path) -> str:
+    """Read the actual checkout, not a PR event's synthetic GITHUB_SHA.
+
+    This only reads local Git metadata. It neither fetches nor changes refs.
+    A missing or invalid checkout identity is not replaced with an environment
+    value that could describe a different source tree.
+    """
+    try:
+        result = subprocess.run(
+            ["git", "-C", str(root), "rev-parse", "--verify", "HEAD^{commit}"],
+            capture_output=True,
+            text=True,
+            check=True,
+            timeout=10,
+        )
+    except (OSError, subprocess.SubprocessError):
+        raise AlignmentError("checked-out Git source identity unavailable") from None
+    revision = result.stdout.strip()
+    if SHA40.fullmatch(revision) is None:
+        raise AlignmentError("checked-out Git source identity is not an exact commit")
+    return revision
+
+
 def build_receipt(root: Path, *, live: bool) -> dict[str, Any]:
     contract_path = root / "docs/ESTATE_ALIGNMENT_CONTRACT_V1.json"
     contract = load_json(contract_path)
     failures = validate_contract(contract)
     failures.extend(validate_documents(root, contract))
+    try:
+        checkout_revision = checked_out_revision(root)
+    except AlignmentError as exc:
+        checkout_revision = "UNAVAILABLE"
+        failures.append(str(exc))
     live_observation: dict[str, Any] | None = None
     if live:
         try:
@@ -825,7 +854,7 @@ def build_receipt(root: Path, *, live: bool) -> dict[str, Any]:
         "observed_at": dt.datetime.now(dt.timezone.utc).isoformat().replace("+00:00", "Z"),
         "state": "ALIGNED" if not failures else "DIVERGENT",
         "contract_sha256": sha256_bytes(contract_path.read_bytes()),
-        "source_revision": os.getenv("GITHUB_SHA", "UNAVAILABLE"),
+        "source_revision": checkout_revision,
         "live_requested": live,
         "live_observation": live_observation,
         "failures": failures,
