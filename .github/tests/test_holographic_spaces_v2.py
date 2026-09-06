@@ -192,7 +192,7 @@ class ControllerSafetyContract(unittest.TestCase):
         self.assertEqual(mapping["immune"], "szl-holdings/immune")
         self.assertEqual(mapping["immune-lattice"], "szl-holdings/immune")
         self.assertEqual(mapping["szl-command-lab"], "szl-holdings/szl-command-lab")
-        self.assertEqual(mapping["szl-constellation"], "szl-holdings/holographic-unify")
+        self.assertEqual(mapping["szl-constellation"], "szl-holdings/szl-constellation")
         self.assertEqual(mapping["ayllu"], "szl-holdings/ayllu")
         self.assertEqual(mapping["yarqa"], "szl-holdings/yarqa")
         self.assertEqual(len(mapping), 15)
