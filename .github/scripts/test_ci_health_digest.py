@@ -49,9 +49,10 @@ def empty_reader_environment(**overrides: str) -> dict[str, str]:
 class ReaderSelectionTests(unittest.TestCase):
     def test_prefers_verified_short_lived_app_reader(self):
         estate = repositories(123, archived=5, private=3)
+        secret = "app-secret-value-that-must-never-be-rendered"
         environment = empty_reader_environment(
-            DIGEST_APP_TOKEN="app",
-            ORG_REPO_WORKFLOW_TOKEN="fallback",
+            DIGEST_APP_TOKEN=secret,
+            ORG_REPO_WORKFLOW_TOKEN="fallback-secret-value",
         )
         with patch.dict(os.environ, environment, clear=False), patch.object(
             http, "list_repositories", return_value=estate
@@ -63,15 +64,16 @@ class ReaderSelectionTests(unittest.TestCase):
             selected = http.select_reader()
         self.assertEqual(selected.mode, "github_app")
         self.assertEqual(selected.credential_name, "qillqaq_app_installation")
+        self.assertEqual(selected.token, secret)
         self.assertEqual(len(selected.repositories), 123)
         self.assertEqual(selected.attempts[-1]["result"], "selected")
-        self.assertNotIn("app", repr(selected))
+        self.assertNotIn(secret, repr(selected))
 
     def test_falls_back_only_after_app_reader_is_rejected(self):
         estate = repositories(123, archived=5, private=3)
 
         def inventory(token):
-            if token == "app":
+            if token == "app-secret":
                 raise http.ApiError(
                     operation="inventory",
                     status=403,
@@ -80,8 +82,8 @@ class ReaderSelectionTests(unittest.TestCase):
             return estate
 
         environment = empty_reader_environment(
-            DIGEST_APP_TOKEN="app",
-            ORG_REPO_WORKFLOW_TOKEN="complete",
+            DIGEST_APP_TOKEN="app-secret",
+            ORG_REPO_WORKFLOW_TOKEN="complete-secret",
         )
         with patch.dict(os.environ, environment, clear=False), patch.object(
             http, "list_repositories", side_effect=inventory
@@ -103,7 +105,7 @@ class ReaderSelectionTests(unittest.TestCase):
         estate = repositories(123, private=3)
 
         def inventory(token):
-            if token == "stale":
+            if token == "stale-secret":
                 raise http.ApiError(
                     operation="inventory",
                     status=401,
@@ -112,8 +114,8 @@ class ReaderSelectionTests(unittest.TestCase):
             return estate
 
         environment = empty_reader_environment(
-            ORG_REPO_WORKFLOW_TOKEN="stale",
-            SZL_ORG_PAT="complete",
+            ORG_REPO_WORKFLOW_TOKEN="stale-secret",
+            SZL_ORG_PAT="complete-secret",
         )
         with patch.dict(os.environ, environment, clear=False), patch.object(
             http, "list_repositories", side_effect=inventory
@@ -124,7 +126,12 @@ class ReaderSelectionTests(unittest.TestCase):
         ):
             selected = http.select_reader()
         self.assertEqual(selected.credential_name, "SZL_ORG_PAT")
-        self.assertEqual(selected.attempts[1]["failure_class"], "unauthenticated")
+        rejected = next(
+            item
+            for item in selected.attempts
+            if item["credential_name"] == "ORG_REPO_WORKFLOW_TOKEN"
+        )
+        self.assertEqual(rejected["failure_class"], "unauthenticated")
 
     def test_duplicate_secret_values_are_probed_once(self):
         calls: list[str] = []
@@ -134,15 +141,15 @@ class ReaderSelectionTests(unittest.TestCase):
             raise http.DigestError("rejected")
 
         environment = empty_reader_environment(
-            ORG_REPO_WORKFLOW_TOKEN="same",
-            SZL_GITHUB_TOKEN="same",
+            ORG_REPO_WORKFLOW_TOKEN="same-secret",
+            SZL_GITHUB_TOKEN="same-secret",
         )
         with patch.dict(os.environ, environment, clear=False), patch.object(
             http, "list_repositories", side_effect=inventory
         ):
             with self.assertRaises(http.ReaderSelectionError):
                 http.select_reader()
-        self.assertEqual(calls, ["same"])
+        self.assertEqual(calls, ["same-secret"])
 
     def test_no_reader_is_a_typed_terminal_failure(self):
         with patch.dict(
@@ -169,20 +176,17 @@ class RepositoryCoverageTests(unittest.TestCase):
         with patch.dict(
             os.environ, {"ORG_REPOSITORY_FLOOR": "123"}, clear=False
         ), patch.object(
-            http,
-            "request_json",
-            return_value=(200, []),
+            http, "_paginated_list", return_value=()
         ), patch.object(http, "validate_authoritative_inventory"):
             with self.assertRaisesRegex(http.DigestError, "below reviewed floor"):
                 http.list_repositories("present-token")
 
     def test_partial_repository_listing_fails_closed(self):
+        estate = repositories(122, private=3)
         with patch.dict(
             os.environ, {"ORG_REPOSITORY_FLOOR": "123"}, clear=False
         ), patch.object(
-            http,
-            "request_json",
-            return_value=(200, list(repositories(122, private=3))),
+            http, "_paginated_list", return_value=estate
         ), patch.object(http, "validate_authoritative_inventory"):
             with self.assertRaisesRegex(
                 http.DigestError, "observed=122 floor=123"
@@ -194,16 +198,14 @@ class RepositoryCoverageTests(unittest.TestCase):
         with patch.dict(
             os.environ, {"ORG_REPOSITORY_FLOOR": "123"}, clear=False
         ), patch.object(
-            http,
-            "request_json",
-            return_value=(200, list(estate)),
+            http, "_paginated_list", return_value=estate
         ), patch.object(
             http, "validate_authoritative_inventory"
         ) as authoritative:
             observed = http.list_repositories("present-token")
         self.assertEqual(len(observed), 123)
         self.assertEqual(sum(bool(item["archived"]) for item in observed), 5)
-        authoritative.assert_called_once()
+        authoritative.assert_called_once_with("present-token", list(estate))
 
 
 class AuthoritativeInventoryTests(unittest.TestCase):
@@ -369,7 +371,7 @@ class IssueAndReportTests(unittest.TestCase):
         selected = http.ReaderSelection(
             mode="governed_pat_fallback",
             credential_name="ORG_REPO_WORKFLOW_TOKEN",
-            token="never-recorded",
+            token="never-recorded-secret",
             repositories=estate,
             attempts=(
                 {
@@ -410,7 +412,7 @@ class IssueAndReportTests(unittest.TestCase):
         self.assertEqual(report["status"], "VERIFIED")
         self.assertEqual(report["coverage"]["queried_active_repositories"], 118)
         self.assertEqual(report["summary"]["red_total"], 0)
-        self.assertNotIn("never-recorded", report_text)
+        self.assertNotIn("never-recorded-secret", report_text)
 
 
 class WorkflowContractTests(unittest.TestCase):
