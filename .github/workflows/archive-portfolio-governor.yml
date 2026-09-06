@@ -1,0 +1,159 @@
+name: Archive portfolio governor v1
+
+on:
+  pull_request:
+    paths:
+      - "governance/archive-portfolio-v1.json"
+      - ".github/scripts/archive_portfolio_governor.py"
+      - ".github/tests/test_archive_portfolio_governor.py"
+      - ".github/workflows/archive-portfolio-governor.yml"
+      - "docs/ARCHIVE_PORTFOLIO_V1.md"
+  push:
+    branches: [main]
+    paths:
+      - "governance/archive-portfolio-v1.json"
+      - ".github/scripts/archive_portfolio_governor.py"
+      - ".github/tests/test_archive_portfolio_governor.py"
+      - ".github/workflows/archive-portfolio-governor.yml"
+      - "docs/ARCHIVE_PORTFOLIO_V1.md"
+  workflow_dispatch:
+    inputs:
+      apply:
+        description: "Apply only manifest-authorized unarchives"
+        required: false
+        type: boolean
+        default: false
+
+permissions:
+  actions: read
+  contents: read
+
+concurrency:
+  group: archive-portfolio-governor-v1
+  cancel-in-progress: false
+
+env:
+  REPORT: /tmp/archive-portfolio-v1.json
+  ATTIC_CANDIDATE: /tmp/ATTIC.next.md
+
+jobs:
+  validate:
+    name: portfolio/validate
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - name: Checkout exact candidate
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12"
+      - name: Compile and validate
+        run: |
+          set -euo pipefail
+          python -m py_compile .github/scripts/archive_portfolio_governor.py
+          python .github/scripts/archive_portfolio_governor.py \
+            --mode validate \
+            --report "$REPORT"
+          python .github/tests/test_archive_portfolio_governor.py
+          git diff --check
+      - name: Upload validation receipt
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: archive-portfolio-validation-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ env.REPORT }}
+          if-no-files-found: error
+          retention-days: 90
+
+  restore:
+    name: portfolio/restore
+    if: >-
+      github.event_name == 'push' ||
+      (github.event_name == 'workflow_dispatch' && inputs.apply)
+    needs: validate
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout exact protected main
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: main
+          persist-credentials: false
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12"
+
+      - name: Require configured repository-administration authority
+        env:
+          SZL_REPO_ADMIN_TOKEN: ${{ secrets.ORG_REPO_ADMIN_TOKEN || secrets.ORG_REPO_WORKFLOW_TOKEN || secrets.SZL_ORG_PAT || secrets.SZL_GITHUB_PAT || secrets.GH_PAT || secrets.PAT_TOKEN || secrets.GITHUB_PAT || secrets.GH_TOKEN }}
+        run: |
+          set -euo pipefail
+          if [ -z "${SZL_REPO_ADMIN_TOKEN:-}" ]; then
+            echo "::error::No repository-administration credential is configured for the manifest-bound restoration wave."
+            exit 1
+          fi
+
+      - name: Apply the manifest-bound restoration wave
+        env:
+          SZL_REPO_ADMIN_TOKEN: ${{ secrets.ORG_REPO_ADMIN_TOKEN || secrets.ORG_REPO_WORKFLOW_TOKEN || secrets.SZL_ORG_PAT || secrets.SZL_GITHUB_PAT || secrets.GH_PAT || secrets.PAT_TOKEN || secrets.GITHUB_PAT || secrets.GH_TOKEN }}
+        run: |
+          set -euo pipefail
+          python .github/scripts/archive_portfolio_governor.py \
+            --mode apply \
+            --report "$REPORT"
+
+      - name: Generate next ATTIC candidate from provider readback
+        if: always()
+        env:
+          GH_TOKEN: ${{ secrets.ORG_REPO_ADMIN_TOKEN || secrets.ORG_REPO_WORKFLOW_TOKEN || secrets.SZL_ORG_PAT || secrets.SZL_GITHUB_PAT || secrets.GH_PAT || secrets.PAT_TOKEN || secrets.GITHUB_PAT || secrets.GH_TOKEN }}
+        run: |
+          set -euo pipefail
+          if [ -n "${GH_TOKEN:-}" ]; then
+            python scripts/build_attic_index.py > "$ATTIC_CANDIDATE"
+          else
+            printf '%s\n' 'UNAVAILABLE: no organization reader token' > "$ATTIC_CANDIDATE"
+          fi
+
+      - name: Publish restoration and tombstone evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: archive-portfolio-restoration-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            ${{ env.REPORT }}
+            ${{ env.ATTIC_CANDIDATE }}
+          if-no-files-found: error
+          retention-days: 90
+
+      - name: Enforce exact provider readback
+        if: always()
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+          report = json.loads(Path(os.environ["REPORT"]).read_text(encoding="utf-8"))
+          if report.get("status") != "PASS":
+              raise SystemExit(f"portfolio restoration did not pass: {report.get('error') or report.get('failures')}")
+          final = report.get("final") or {}
+          if final.get("restore"):
+              raise SystemExit(f"repositories remained archived: {final['restore']}")
+          if final.get("unclassified_archived"):
+              raise SystemExit(f"unclassified archived repos: {final['unclassified_archived']}")
+          if final.get("unexpected_active_tombstones"):
+              raise SystemExit(f"unexpected active tombstones: {final['unexpected_active_tombstones']}")
+          if report.get("archive_mutations") is not False:
+              raise SystemExit("archive mutation invariant failed")
+          if report.get("visibility_mutations") is not False:
+              raise SystemExit("visibility mutation invariant failed")
+          if report.get("history_deletions") is not False:
+              raise SystemExit("history preservation invariant failed")
+          if report.get("secrets_recorded") is not False:
+              raise SystemExit("secret-recording invariant failed")
+          PY
