@@ -8,6 +8,7 @@ on:
       - "huggingface/org-card/**"
       - "huggingface/org-card.manifest.json"
       - "docs/ESTATE_ALIGNMENT_CONTRACT_V1.json"
+      - "profile/README.md"
       - "profile/assets/**"
       - "profile/assets/evidence-lattice-v2.webp"
       - ".github/scripts/hf_static_space_deploy.py"
@@ -18,6 +19,7 @@ on:
       - ".github/scripts/test_hf_org_card_embed_check.py"
       - ".github/scripts/test_hf_static_space_deploy.py"
       - ".github/scripts/test_public_front_door_check.py"
+      - ".github/scripts/test_profile_inventory_contract.py"
       - ".github/workflows/hf-org-card-deploy.yml"
       - ".github/workflows/hf-org-card-embed-check.yml"
 
@@ -67,6 +69,12 @@ jobs:
           python -m unittest discover
           -s .github/scripts
           -p test_public_front_door_check.py
+
+      - name: Test public inventory and text integrity
+        run: >-
+          python -m unittest discover
+          -s .github/scripts
+          -p test_profile_inventory_contract.py
 
       - name: Test org-card embed contract
         run: >-
