@@ -1,0 +1,74 @@
+# SPDX-License-Identifier: Apache-2.0
+name: Fix estate post-publication readback regression once
+
+on:
+  push:
+    branches:
+      - fix/postmerge-alignment-green-20260906
+    paths:
+      - .github/workflows/_fix_estate_pr_readback_regression_once.yml
+
+permissions:
+  contents: write
+
+concurrency:
+  group: fix-estate-post-publication-readback-regression
+  cancel-in-progress: false
+
+jobs:
+  repair:
+    if: github.repository == 'szl-holdings/.github' && github.ref == 'refs/heads/fix/postmerge-alignment-green-20260906'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Harden runner
+        uses: step-security/harden-runner@05e31511f85b41b11d1cf0ef85d0992719546e2c # v2.21.0
+        with:
+          egress-policy: audit
+
+      - name: Check out exact repair branch
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: fix/postmerge-alignment-green-20260906
+          fetch-depth: 0
+          persist-credentials: true
+
+      - name: Align regression with post-publication authority
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          test "$(git ls-remote origin refs/heads/fix/postmerge-alignment-green-20260906 | cut -f1)" = "$GITHUB_SHA"
+          python - <<'PY'
+          from pathlib import Path
+
+          path = Path('.github/scripts/test_estate_alignment_contract.py')
+          text = path.read_text(encoding='utf-8')
+          old = '        self.assertIn("github.event_name == \'pull_request\'", live_job)\n'
+          new = '        self.assertNotIn("github.event_name == \'pull_request\'", live_job)\n'
+          if text.count(old) != 1:
+              raise SystemExit(f'expected one stale PR-live assertion, found {text.count(old)}')
+          path.write_text(text.replace(old, new, 1), encoding='utf-8', newline='\n')
+          PY
+          python -m py_compile \
+            .github/scripts/estate_alignment_contract.py \
+            .github/scripts/test_estate_alignment_contract.py
+          python .github/scripts/test_estate_alignment_contract.py
+          python .github/scripts/test_estate_alignment_org_card.py
+          git diff --check
+
+      - name: Commit permanent regression fix and self-remove
+        shell: bash
+        run: |
+          set -euo pipefail
+          branch=fix/postmerge-alignment-green-20260906
+          test "$(git ls-remote origin refs/heads/$branch | cut -f1)" = "$GITHUB_SHA"
+          git rm -- .github/workflows/_fix_estate_pr_readback_regression_once.yml
+          git add -- .github/scripts/test_estate_alignment_contract.py
+          git diff --cached --check
+          expected_paths=$'.github/scripts/test_estate_alignment_contract.py\n.github/workflows/_fix_estate_pr_readback_regression_once.yml'
+          test "$(git diff --cached --name-only | sort)" = "$expected_paths"
+          git config user.name 'Lutar, Stephen P.'
+          git config user.email 'stephenlutar2@gmail.com'
+          git commit -s -m 'test(alignment): bind live readback to published source'
+          git push origin "HEAD:refs/heads/$branch"
