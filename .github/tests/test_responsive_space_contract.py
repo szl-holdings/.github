@@ -341,7 +341,7 @@ class ResponsiveSpaceContractTests(unittest.TestCase):
         )
         self.assertIn("./szl-space-hologram.css", html)
         self.assertIn("./szl-space-hologram.js", html)
-        self.assertIn("data-szl-holo-space-v2", html)
+        self.assertIn("data-szl-space-holo-v2", html)
 
     def test_existing_immune_asset_host_prevents_duplicate_shell(self) -> None:
         original_map = rollout_core.LOCAL_SOURCE_MAP
