@@ -59,7 +59,9 @@ class RateBudgetTests(unittest.TestCase):
             "rate_limited",
         )
         self.assertEqual(
-            http.classify_http_detail("Resource not accessible by integration"),
+            http.classify_http_detail(
+                "Resource not accessible by integration"
+            ),
             "unauthorized",
         )
 
@@ -118,8 +120,7 @@ class RateBudgetTests(unittest.TestCase):
                 operation="rate-limited fixture",
                 attempts=2,
             )
-        self.assertEqual(status, 200)
-        self.assertEqual(payload, {"ok": True})
+        self.assertEqual((status, payload), (200, {"ok": True}))
         self.assertEqual(opener.call_count, 2)
         publish.assert_called_once_with(
             1.0,
@@ -147,7 +148,7 @@ class RateBudgetTests(unittest.TestCase):
         self.assertEqual(opener.call_count, 1)
         self.assertEqual(raised.exception.detail_class, "unauthorized")
 
-    def test_success_with_exhausted_primary_budget_coordinates_next_call(self):
+    def test_success_at_zero_remaining_coordinates_next_call(self):
         headers = Message()
         headers["X-RateLimit-Remaining"] = "0"
         headers["X-RateLimit-Reset"] = "1010"
@@ -168,8 +169,7 @@ class RateBudgetTests(unittest.TestCase):
                 "https://api.github.com/example",
                 operation="last-budget fixture",
             )
-        self.assertEqual(status, 200)
-        self.assertEqual(payload, {"ok": True})
+        self.assertEqual((status, payload), (200, {"ok": True}))
         publish.assert_called_once_with(
             12.0,
             operation="last-budget fixture",
@@ -178,7 +178,7 @@ class RateBudgetTests(unittest.TestCase):
 
 
 class WorkflowRateBudgetContractTests(unittest.TestCase):
-    def test_workflow_is_deadline_bounded_and_app_mint_is_least_privilege(self):
+    def test_workflow_is_bounded_and_app_profile_is_exact(self):
         source = (ROOT / ".github/workflows/ci-health-digest.yml").read_text(
             encoding="utf-8"
         )
@@ -188,6 +188,7 @@ class WorkflowRateBudgetContractTests(unittest.TestCase):
             'CI_HEALTH_DEADLINE_SECONDS: "5400"',
             "test_ci_health_digest_rate_budget.py",
             "timeout-minutes: 100",
+            "vars.QILLQAQ_ORG_ADMIN_GRANTED == 'true'",
         ):
             self.assertIn(marker, source)
 
@@ -200,8 +201,12 @@ class WorkflowRateBudgetContractTests(unittest.TestCase):
         )[0]
         self.assertIn("permission-actions: read", app_step)
         self.assertIn("permission-contents: read", app_step)
-        self.assertNotIn(
+        self.assertIn(
             "permission-organization-administration: read",
+            app_step,
+        )
+        self.assertIn(
+            "vars.QILLQAQ_ORG_ADMIN_GRANTED == 'true'",
             app_step,
         )
 
