@@ -105,6 +105,8 @@ jobs:
 
   live-contract:
     needs: local-contract
+    # A pull-request head is not yet the served Hugging Face revision; live
+    # comparison begins only after protected-main publication or an explicit audit.
     if: >-
       always() &&
       (
