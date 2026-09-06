@@ -19,27 +19,43 @@ import ci_health_digest as chd
 import ci_health_digest_http as http
 
 
-def repositories(count: int, *, archived: int = 0):
+def repositories(count: int, *, archived: int = 0, private: int = 0):
     values = []
+    private_start = max(0, count - private)
     for index in range(count):
+        is_private = index >= private_start and private > 0
         values.append(
             {
                 "name": f"repo-{index:03d}",
+                "full_name": f"szl-holdings/repo-{index:03d}",
                 "default_branch": "main",
                 "archived": index < archived,
+                "private": is_private,
+                "visibility": "private" if is_private else "public",
             }
         )
     return tuple(values)
 
 
+def empty_reader_environment(**overrides: str) -> dict[str, str]:
+    values = {
+        environment_name: ""
+        for _, _, environment_name in http.CANDIDATE_ENVIRONMENT
+    }
+    values.update(overrides)
+    return values
+
+
 class ReaderSelectionTests(unittest.TestCase):
     def test_prefers_verified_short_lived_app_reader(self):
-        estate = repositories(57, archived=5)
-        with patch.dict(
-            os.environ,
-            {"DIGEST_APP_TOKEN": "app", "SZL_GITHUB_TOKEN": "pat"},
-            clear=False,
-        ), patch.object(http, "list_repositories", return_value=estate), patch.object(
+        estate = repositories(123, archived=5, private=3)
+        environment = empty_reader_environment(
+            DIGEST_APP_TOKEN="app",
+            ORG_REPO_WORKFLOW_TOKEN="fallback",
+        )
+        with patch.dict(os.environ, environment, clear=False), patch.object(
+            http, "list_repositories", return_value=estate
+        ), patch.object(
             http,
             "request_json",
             return_value=(200, {"workflows": []}),
@@ -47,11 +63,12 @@ class ReaderSelectionTests(unittest.TestCase):
             selected = http.select_reader()
         self.assertEqual(selected.mode, "github_app")
         self.assertEqual(selected.credential_name, "qillqaq_app_installation")
-        self.assertEqual(len(selected.repositories), 57)
+        self.assertEqual(len(selected.repositories), 123)
         self.assertEqual(selected.attempts[-1]["result"], "selected")
+        self.assertNotIn("app", repr(selected))
 
     def test_falls_back_only_after_app_reader_is_rejected(self):
-        estate = repositories(57, archived=5)
+        estate = repositories(123, archived=5, private=3)
 
         def inventory(token):
             if token == "app":
@@ -62,130 +79,201 @@ class ReaderSelectionTests(unittest.TestCase):
                 )
             return estate
 
-        with patch.dict(
-            os.environ,
-            {"DIGEST_APP_TOKEN": "app", "SZL_GITHUB_TOKEN": "pat"},
-            clear=False,
-        ), patch.object(http, "list_repositories", side_effect=inventory), patch.object(
+        environment = empty_reader_environment(
+            DIGEST_APP_TOKEN="app",
+            ORG_REPO_WORKFLOW_TOKEN="complete",
+        )
+        with patch.dict(os.environ, environment, clear=False), patch.object(
+            http, "list_repositories", side_effect=inventory
+        ), patch.object(
             http,
             "request_json",
             return_value=(200, {"workflows": []}),
         ):
             selected = http.select_reader()
         self.assertEqual(selected.mode, "governed_pat_fallback")
+        self.assertEqual(selected.credential_name, "ORG_REPO_WORKFLOW_TOKEN")
         self.assertEqual(selected.attempts[0]["result"], "rejected")
         self.assertEqual(selected.attempts[0]["failure_class"], "unauthorized")
-        self.assertFalse(any("token" in key.lower() for key in selected.attempts[0]))
+        self.assertFalse(
+            any("token" in key.lower() for key in selected.attempts[0])
+        )
+
+    def test_stale_named_pat_cannot_mask_later_valid_alias(self):
+        estate = repositories(123, private=3)
+
+        def inventory(token):
+            if token == "stale":
+                raise http.ApiError(
+                    operation="inventory",
+                    status=401,
+                    detail_class="unauthenticated",
+                )
+            return estate
+
+        environment = empty_reader_environment(
+            ORG_REPO_WORKFLOW_TOKEN="stale",
+            SZL_ORG_PAT="complete",
+        )
+        with patch.dict(os.environ, environment, clear=False), patch.object(
+            http, "list_repositories", side_effect=inventory
+        ), patch.object(
+            http,
+            "request_json",
+            return_value=(200, {"workflows": []}),
+        ):
+            selected = http.select_reader()
+        self.assertEqual(selected.credential_name, "SZL_ORG_PAT")
+        self.assertEqual(selected.attempts[1]["failure_class"], "unauthenticated")
+
+    def test_duplicate_secret_values_are_probed_once(self):
+        calls: list[str] = []
+
+        def inventory(token):
+            calls.append(token)
+            raise http.DigestError("rejected")
+
+        environment = empty_reader_environment(
+            ORG_REPO_WORKFLOW_TOKEN="same",
+            SZL_GITHUB_TOKEN="same",
+        )
+        with patch.dict(os.environ, environment, clear=False), patch.object(
+            http, "list_repositories", side_effect=inventory
+        ):
+            with self.assertRaises(http.ReaderSelectionError):
+                http.select_reader()
+        self.assertEqual(calls, ["same"])
 
     def test_no_reader_is_a_typed_terminal_failure(self):
         with patch.dict(
             os.environ,
-            {"DIGEST_APP_TOKEN": "", "SZL_GITHUB_TOKEN": ""},
+            empty_reader_environment(),
             clear=False,
         ):
             with self.assertRaises(http.ReaderSelectionError) as context:
                 http.select_reader()
-        self.assertEqual(len(context.exception.attempts), 2)
+        self.assertEqual(
+            len(context.exception.attempts),
+            len(http.CANDIDATE_ENVIRONMENT),
+        )
         self.assertTrue(
-            all(item["result"] == "not_configured" for item in context.exception.attempts)
+            all(
+                item["result"] == "not_configured"
+                for item in context.exception.attempts
+            )
         )
 
 
 class RepositoryCoverageTests(unittest.TestCase):
     def test_present_token_with_zero_repositories_fails_closed(self):
-        with patch.dict(os.environ, {"ORG_REPOSITORY_FLOOR": "57"}, clear=False), patch.object(
+        with patch.dict(
+            os.environ, {"ORG_REPOSITORY_FLOOR": "123"}, clear=False
+        ), patch.object(
             http,
             "request_json",
             return_value=(200, []),
-        ), patch.object(http, "validate_canonical_inventory"):
+        ), patch.object(http, "validate_authoritative_inventory"):
             with self.assertRaisesRegex(http.DigestError, "below reviewed floor"):
                 http.list_repositories("present-token")
 
     def test_partial_repository_listing_fails_closed(self):
-        with patch.dict(os.environ, {"ORG_REPOSITORY_FLOOR": "57"}, clear=False), patch.object(
+        with patch.dict(
+            os.environ, {"ORG_REPOSITORY_FLOOR": "123"}, clear=False
+        ), patch.object(
             http,
             "request_json",
-            return_value=(200, list(repositories(56))),
-        ), patch.object(http, "validate_canonical_inventory"):
-            with self.assertRaisesRegex(http.DigestError, "observed=56 floor=57"):
+            return_value=(200, list(repositories(122, private=3))),
+        ), patch.object(http, "validate_authoritative_inventory"):
+            with self.assertRaisesRegex(
+                http.DigestError, "observed=122 floor=123"
+            ):
                 http.list_repositories("present-token")
 
     def test_complete_repository_listing_passes(self):
-        with patch.dict(os.environ, {"ORG_REPOSITORY_FLOOR": "57"}, clear=False), patch.object(
+        estate = repositories(123, archived=5, private=3)
+        with patch.dict(
+            os.environ, {"ORG_REPOSITORY_FLOOR": "123"}, clear=False
+        ), patch.object(
             http,
             "request_json",
-            return_value=(200, list(repositories(57, archived=5))),
-        ), patch.object(http, "validate_canonical_inventory") as canonical:
+            return_value=(200, list(estate)),
+        ), patch.object(
+            http, "validate_authoritative_inventory"
+        ) as authoritative:
             observed = http.list_repositories("present-token")
-        self.assertEqual(len(observed), 57)
+        self.assertEqual(len(observed), 123)
         self.assertEqual(sum(bool(item["archived"]) for item in observed), 5)
-        canonical.assert_called_once()
+        authoritative.assert_called_once()
 
 
-class CanonicalInventoryTests(unittest.TestCase):
-    def test_exact_code_security_inventory_match_passes(self):
-        estate = repositories(2)
-        payloads = [
-            (
+class AuthoritativeInventoryTests(unittest.TestCase):
+    def test_exact_public_private_inventory_match_passes(self):
+        estate = repositories(123, private=3)
+        with patch.dict(
+            os.environ, {"ORG_REPOSITORY_FLOOR": "123"}, clear=False
+        ), patch.object(
+            http,
+            "request_json",
+            return_value=(
                 200,
-                [
-                    {
-                        "id": http.CANONICAL_CONFIG_ID,
-                        "name": "SZL Holdings Managed Security",
-                        "target_type": "organization",
-                        "enforcement": "enforced",
-                    }
-                ],
+                {"public_repos": 120, "total_private_repos": 3},
             ),
-            (
-                200,
-                [
-                    {
-                        "repository": {"full_name": "szl-holdings/repo-000"},
-                        "status": "enforced",
-                    },
-                    {
-                        "repository": {"full_name": "szl-holdings/repo-001"},
-                        "status": "enforced",
-                    },
-                ],
-            ),
-        ]
-        with patch.object(http, "request_json", side_effect=payloads):
-            result = http.validate_canonical_inventory("token", estate)
+        ):
+            result = http.validate_authoritative_inventory("token", estate)
         self.assertTrue(result["inventory_match"])
-        self.assertEqual(result["repository_count"], 2)
+        self.assertEqual(result["repository_count"], 123)
+        self.assertEqual(result["private_repositories"], 3)
 
-    def test_repository_missing_from_canonical_inventory_fails(self):
-        estate = repositories(2)
-        payloads = [
-            (
-                200,
-                [
-                    {
-                        "id": http.CANONICAL_CONFIG_ID,
-                        "name": "SZL Holdings Managed Security",
-                        "target_type": "organization",
-                        "enforcement": "enforced",
-                    }
-                ],
-            ),
-            (
-                200,
-                [
-                    {
-                        "repository": {"full_name": "szl-holdings/repo-000"},
-                        "status": "enforced",
-                    }
-                ],
-            ),
-        ]
-        with patch.object(http, "request_json", side_effect=payloads):
+    def test_missing_authoritative_private_total_fails(self):
+        with patch.dict(
+            os.environ, {"ORG_REPOSITORY_FLOOR": "123"}, clear=False
+        ), patch.object(
+            http,
+            "request_json",
+            return_value=(200, {"public_repos": 123}),
+        ):
             with self.assertRaisesRegex(
-                http.DigestError,
-                "does not match canonical code-security inventory",
+                http.DigestError, "private repository total is unavailable"
             ):
-                http.validate_canonical_inventory("token", estate)
+                http.validate_authoritative_inventory(
+                    "token", repositories(123, private=3)
+                )
+
+    def test_partial_listing_cannot_match_authoritative_total(self):
+        with patch.dict(
+            os.environ, {"ORG_REPOSITORY_FLOOR": "123"}, clear=False
+        ), patch.object(
+            http,
+            "request_json",
+            return_value=(
+                200,
+                {"public_repos": 120, "total_private_repos": 3},
+            ),
+        ):
+            with self.assertRaisesRegex(
+                http.DigestError, "listed=122 authoritative=123"
+            ):
+                http.validate_authoritative_inventory(
+                    "token", repositories(122, private=2)
+                )
+
+    def test_private_listing_must_match_authoritative_private_total(self):
+        with patch.dict(
+            os.environ, {"ORG_REPOSITORY_FLOOR": "123"}, clear=False
+        ), patch.object(
+            http,
+            "request_json",
+            return_value=(
+                200,
+                {"public_repos": 120, "total_private_repos": 3},
+            ),
+        ):
+            with self.assertRaisesRegex(
+                http.DigestError, "private repository listing"
+            ):
+                http.validate_authoritative_inventory(
+                    "token", repositories(123, private=2)
+                )
 
 
 class IssueAndReportTests(unittest.TestCase):
@@ -206,7 +294,7 @@ class IssueAndReportTests(unittest.TestCase):
                 "number": 158,
                 "state": kwargs["body"]["state"],
                 "html_url": "https://github.com/szl-holdings/.github/issues/158",
-                "updated_at": "2026-07-26T00:00:00Z",
+                "updated_at": "2026-09-06T00:00:00Z",
             }
 
         with patch.object(chd, "_issue_token", return_value="issue-token"), patch.object(
@@ -237,7 +325,7 @@ class IssueAndReportTests(unittest.TestCase):
                 "number": 158,
                 "state": kwargs["body"]["state"],
                 "html_url": "https://github.com/szl-holdings/.github/issues/158",
-                "updated_at": "2026-07-26T00:00:00Z",
+                "updated_at": "2026-09-06T00:00:00Z",
             }
 
         with patch.object(chd, "_issue_token", return_value="issue-token"), patch.object(
@@ -277,28 +365,28 @@ class IssueAndReportTests(unittest.TestCase):
         self.assertEqual(report["issue"]["state"], "open")
 
     def test_complete_sweep_writes_verified_receipt(self):
-        estate = repositories(57, archived=5)
+        estate = repositories(123, archived=5, private=3)
         selected = http.ReaderSelection(
             mode="governed_pat_fallback",
-            credential_name="SZL_GITHUB_TOKEN",
+            credential_name="ORG_REPO_WORKFLOW_TOKEN",
             token="never-recorded",
             repositories=estate,
             attempts=(
                 {
                     "mode": "governed_pat_fallback",
-                    "credential_name": "SZL_GITHUB_TOKEN",
+                    "credential_name": "ORG_REPO_WORKFLOW_TOKEN",
                     "result": "selected",
                     "value_recorded": False,
                 },
             ),
         )
         coverage = {
-            "organization_repositories": 57,
-            "active_repositories": 52,
+            "organization_repositories": 123,
+            "active_repositories": 118,
             "archived_repositories": 5,
-            "queried_active_repositories": 52,
+            "queried_active_repositories": 118,
             "active_workflows": 100,
-            "repository_floor": 57,
+            "repository_floor": 123,
         }
         with tempfile.TemporaryDirectory() as directory:
             report_path = Path(directory) / "report.json"
@@ -320,7 +408,7 @@ class IssueAndReportTests(unittest.TestCase):
             report = json.loads(report_text)
         self.assertEqual(code, 0)
         self.assertEqual(report["status"], "VERIFIED")
-        self.assertEqual(report["coverage"]["queried_active_repositories"], 52)
+        self.assertEqual(report["coverage"]["queried_active_repositories"], 118)
         self.assertEqual(report["summary"]["red_total"], 0)
         self.assertNotIn("never-recorded", report_text)
 
@@ -332,13 +420,23 @@ class WorkflowContractTests(unittest.TestCase):
         )
         required = (
             "actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1",
+            "if: vars.QILLQAQ_CLIENT_ID != ''",
             "permission-actions: read",
             "permission-contents: read",
             "permission-organization-administration: read",
             "DIGEST_APP_TOKEN: ${{ steps.app-token.outputs.token }}",
+            "ORG_REPO_WORKFLOW_TOKEN: ${{ secrets.ORG_REPO_WORKFLOW_TOKEN }}",
+            "SZL_ORG_PAT: ${{ secrets.SZL_ORG_PAT }}",
+            "SZL_GITHUB_PAT: ${{ secrets.SZL_GITHUB_PAT }}",
+            "GH_PAT: ${{ secrets.GH_PAT }}",
+            "PAT_TOKEN: ${{ secrets.PAT_TOKEN }}",
+            "GITHUB_PAT: ${{ secrets.GITHUB_PAT }}",
+            "GH_TOKEN: ${{ secrets.GH_TOKEN }}",
             "SZL_GITHUB_TOKEN: ${{ secrets.SZL_GITHUB_TOKEN }}",
+            "REPOSITORY_GITHUB_TOKEN: ${{ github.token }}",
             "CI_DIGEST_ISSUE_TOKEN: ${{ github.token }}",
-            'ORG_REPOSITORY_FLOOR: "57"',
+            'ORG_REPOSITORY_FLOOR: "123"',
+            "test_ci_health_digest_reader_inventory.py",
             "actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a",
             "if-no-files-found: error",
             "Enforce complete authenticated coverage",

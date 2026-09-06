@@ -1,10 +1,10 @@
 name: CI Health Digest
 
 # Org-wide CI health sweep + one rolling issue. Authentication is App-first,
-# migration-safe, and fail-closed. The short-lived qillqaq installation token is
-# accepted only after it proves the reviewed repository floor, canonical
-# code-security inventory parity, and Actions-read capability. Until that path
-# is active, the existing governed SZL_GITHUB_TOKEN is used read-only. The
+# migration-safe, and fail-closed. Every configured reader is independently
+# validated against GitHub's authoritative public/private repository totals,
+# the complete paginated organization inventory, and Actions-read capability.
+# A stale or partial credential cannot mask a later complete reader. The
 # ephemeral workflow token writes only issue #158 (or its exact-title
 # replacement) in this repository.
 #
@@ -24,6 +24,7 @@ on:
       - .github/scripts/ci_health_digest_http.py
       - .github/scripts/ci_health_digest_sweep.py
       - .github/scripts/test_ci_health_digest.py
+      - .github/scripts/test_ci_health_digest_reader_inventory.py
       - .github/scripts/test_ci_health_digest_default_branch.py
       - .github/workflows/ci-health-digest.yml
       - .github/workflows/ci-health-digest-default-branch-pr.yml
@@ -39,7 +40,7 @@ concurrency:
 
 env:
   REPORT_PATH: reports/ci-health-digest.json
-  ORG_REPOSITORY_FLOOR: "57"
+  ORG_REPOSITORY_FLOOR: "123"
 
 jobs:
   digest:
@@ -71,13 +72,16 @@ jobs:
             .github/scripts/ci_health_digest_http.py \
             .github/scripts/ci_health_digest_sweep.py \
             .github/scripts/test_ci_health_digest.py \
+            .github/scripts/test_ci_health_digest_reader_inventory.py \
             .github/scripts/test_ci_health_digest_default_branch.py
           python .github/scripts/test_ci_health_digest.py
+          python .github/scripts/test_ci_health_digest_reader_inventory.py
           python .github/scripts/test_ci_health_digest_default_branch.py
           git diff --check
 
       - name: Mint preferred qillqaq organization reader
         id: app-token
+        if: vars.QILLQAQ_CLIENT_ID != ''
         continue-on-error: true
         uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
         with:
@@ -93,7 +97,15 @@ jobs:
         env:
           DIGEST_APP_TOKEN: ${{ steps.app-token.outputs.token }}
           APP_TOKEN_OUTCOME: ${{ steps.app-token.outcome }}
+          ORG_REPO_WORKFLOW_TOKEN: ${{ secrets.ORG_REPO_WORKFLOW_TOKEN }}
+          SZL_ORG_PAT: ${{ secrets.SZL_ORG_PAT }}
+          SZL_GITHUB_PAT: ${{ secrets.SZL_GITHUB_PAT }}
+          GH_PAT: ${{ secrets.GH_PAT }}
+          PAT_TOKEN: ${{ secrets.PAT_TOKEN }}
+          GITHUB_PAT: ${{ secrets.GITHUB_PAT }}
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
           SZL_GITHUB_TOKEN: ${{ secrets.SZL_GITHUB_TOKEN }}
+          REPOSITORY_GITHUB_TOKEN: ${{ github.token }}
           CI_DIGEST_ISSUE_TOKEN: ${{ github.token }}
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
         shell: bash
