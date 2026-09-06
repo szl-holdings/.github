@@ -4,7 +4,10 @@
 from __future__ import annotations
 
 import json
+import subprocess
 import unittest
+from pathlib import Path
+from unittest.mock import patch
 
 import estate_alignment_contract as alignment
 
@@ -13,6 +16,7 @@ REVISION = "a" * 40
 ROW = {"repo_id": "SZLHOLDINGS/a11oy", "deployment_source": REPOSITORY}
 ENVELOPES = (None, "build", "source", "deployment", "runtime")
 FIELDS = ("repository", "source_repository")
+ROOT = Path(__file__).resolve().parents[2]
 
 
 def envelope(name: str | None, key: str, value: object) -> dict:
@@ -134,6 +138,59 @@ class ExplicitSourceIdentityTests(unittest.TestCase):
         self.assertFalse(result["matched"])
         self.assertNotIn(sentinel, json.dumps(result))
         self.assertNotIn("DO_NOT_RECORD", json.dumps(result))
+
+
+class CheckedOutReceiptIdentityTests(unittest.TestCase):
+    def test_event_merge_sha_cannot_replace_checked_out_commit(self) -> None:
+        result = subprocess.CompletedProcess(["git"], 0, stdout=REVISION + "\n")
+        with patch.dict(alignment.os.environ, {"GITHUB_SHA": "b" * 40}), patch.object(
+            alignment.subprocess, "run", return_value=result
+        ) as run:
+            receipt = alignment.build_receipt(ROOT, live=False)
+        self.assertEqual(receipt["source_revision"], REVISION)
+        self.assertEqual(receipt["state"], "ALIGNED")
+        run.assert_called_once_with(
+            ["git", "-C", str(ROOT), "rev-parse", "--verify", "HEAD^{commit}"],
+            capture_output=True, text=True, check=True, timeout=10,
+        )
+
+    def test_actual_git_checkout_is_read_not_environment_hint(self) -> None:
+        expected = subprocess.run(
+            ["git", "-C", str(ROOT), "rev-parse", "HEAD"],
+            check=True, capture_output=True, text=True, timeout=10,
+        ).stdout.strip()
+        with patch.dict(alignment.os.environ, {"GITHUB_SHA": "b" * 40}):
+            self.assertEqual(alignment.checked_out_revision(ROOT), expected)
+
+    def test_git_failure_retains_failed_receipt_without_error_values(self) -> None:
+        error = subprocess.CalledProcessError(1, ["git"], stderr="DO_NOT_RECORD")
+        with patch.object(alignment.subprocess, "run", side_effect=error):
+            receipt = alignment.build_receipt(ROOT, live=False)
+        self.assertEqual(receipt["state"], "DIVERGENT")
+        self.assertEqual(receipt["source_revision"], "UNAVAILABLE")
+        self.assertIn("checked-out Git source identity unavailable", receipt["failures"])
+        self.assertNotIn("DO_NOT_RECORD", json.dumps(receipt))
+
+    def test_invalid_commit_output_is_not_an_identity(self) -> None:
+        for value in ("main", "", "a" * 39, "A" * 40, REVISION + "\n" + REVISION):
+            result = subprocess.CompletedProcess(["git"], 0, stdout=value)
+            with self.subTest(value=value), patch.object(
+                alignment.subprocess, "run", return_value=result
+            ), self.assertRaises(alignment.AlignmentError):
+                alignment.checked_out_revision(ROOT)
+
+    def test_git_timeout_is_bounded_and_does_not_use_event_fallback(self) -> None:
+        with patch.dict(alignment.os.environ, {"GITHUB_SHA": REVISION}), patch.object(
+            alignment.subprocess, "run", side_effect=subprocess.TimeoutExpired(["git"], 10)
+        ), self.assertRaisesRegex(alignment.AlignmentError, "unavailable"):
+            alignment.checked_out_revision(ROOT)
+
+    def test_missing_git_cannot_become_a_source_claim(self) -> None:
+        with patch.object(alignment.subprocess, "run", side_effect=FileNotFoundError("DO_NOT_RECORD")):
+            receipt = alignment.build_receipt(ROOT, live=False)
+        self.assertEqual(receipt["state"], "DIVERGENT")
+        self.assertEqual(receipt["source_revision"], "UNAVAILABLE")
+        self.assertNotIn("DO_NOT_RECORD", json.dumps(receipt))
 
 
 if __name__ == "__main__":
