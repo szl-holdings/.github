@@ -114,7 +114,13 @@ class AdapterContract(unittest.TestCase):
         self.assertIn("/szl-space-hologram.js", once)
 
     def test_gradio_adapter_adds_and_merges_shell_arguments(self) -> None:
-        original = '''"""demo"""\nfrom __future__ import annotations\nimport gradio as gr\n\nwith gr.Blocks(title="Demo") as demo:\n    gr.Markdown("Hello")\n'''
+        original = (
+            '"""demo"""\n'
+            "from __future__ import annotations\n"
+            "import gradio as gr\n\n"
+            'with gr.Blocks(title="Demo") as demo:\n'
+            '    gr.Markdown("Hello")\n'
+        )
         patched = core.adapt_gradio(original)
         self.assertLess(patched.index("from __future__ import annotations"), patched.index("from szl_hologram_assets"))
         self.assertIn("css=A11OY_HOLO_CSS", patched)
@@ -182,7 +188,14 @@ class ControllerSafetyContract(unittest.TestCase):
         self.assertEqual(mapping["sentra"], "szl-holdings/platform")
         self.assertEqual(mapping["vessels"], "szl-holdings/platform")
         self.assertEqual(mapping["david-leads"], "szl-holdings/david-leads")
-        self.assertEqual(len(mapping), 9)
+        self.assertEqual(mapping["lyte"], "szl-holdings/lyte-services")
+        self.assertEqual(mapping["immune"], "szl-holdings/immune")
+        self.assertEqual(mapping["immune-lattice"], "szl-holdings/immune")
+        self.assertEqual(mapping["szl-command-lab"], "szl-holdings/szl-command-lab")
+        self.assertEqual(mapping["szl-constellation"], "szl-holdings/holographic-unify")
+        self.assertEqual(mapping["ayllu"], "szl-holdings/ayllu")
+        self.assertEqual(mapping["yarqa"], "szl-holdings/yarqa")
+        self.assertEqual(len(mapping), 15)
 
     def test_platform_monorepo_adapter_updates_both_public_frontends(self) -> None:
         class GitHub:
