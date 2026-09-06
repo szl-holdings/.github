@@ -1,0 +1,27 @@
+{
+  "schema": "szl.public-experience-source-root-repair/v1",
+  "recorded_at": "2026-09-06T16:40:00Z",
+  "repository": "szl-holdings/.github",
+  "pull_request": 700,
+  "branch": "fix/public-experience-source-roots-20260906",
+  "failed_head": "0edf45820ba35f2e6fae8e113bb682765d580613",
+  "failed_workflow_run": 34043343368,
+  "failure": {
+    "test": "ResponsiveSpaceContractTests.test_reviewed_nested_static_root_receives_adjacent_assets",
+    "expected_token": "data-szl-holo-space-v2",
+    "actual_canonical_token": "data-szl-space-holo-v2"
+  },
+  "repair": {
+    "commit": "b1f3e2bc700ac55bec780b1d8901cb1d4d5908dd",
+    "scope": "test assertion only",
+    "network_free_contract_run": 34046139683,
+    "network_free_contract_result": "PASS"
+  },
+  "authority": {
+    "default_branch_write": false,
+    "hugging_face_write": false,
+    "dns_write": false,
+    "provider_configuration_write": false,
+    "branch_protection_write": false
+  }
+}
