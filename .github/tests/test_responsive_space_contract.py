@@ -3,24 +3,63 @@
 from __future__ import annotations
 
 import importlib.util
+import json
 import sys
+import tempfile
 import unittest
 from pathlib import Path
 from types import SimpleNamespace
 
 ROOT = Path(__file__).resolve().parents[2]
 MODULE = ROOT / ".github" / "scripts" / "responsive_space_contract.py"
-spec = importlib.util.spec_from_file_location("responsive_space_contract_test", MODULE)
-assert spec and spec.loader
-responsive = importlib.util.module_from_spec(spec)
-sys.modules[spec.name] = responsive
-spec.loader.exec_module(responsive)
+CORE_MODULE = ROOT / ".github" / "scripts" / "rollout_holographic_spaces_v2.py"
+
+
+def _load(name: str, path: Path):
+    spec = importlib.util.spec_from_file_location(name, path)
+    assert spec and spec.loader
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = module
+    spec.loader.exec_module(module)
+    return module
+
+
+responsive = _load("responsive_space_contract_test", MODULE)
+rollout_core = _load("responsive_source_root_core_test", CORE_MODULE)
+responsive.install(rollout_core)
 
 
 class Change:
     def __init__(self, path: str, content: str):
         self.path = path
         self.content = content
+
+
+class FakeGitHub:
+    def __init__(self, files: dict[str, str]):
+        self.files = dict(files)
+
+    def tree(self, _full_name: str, _default_branch: str):
+        return [{"path": path} for path in sorted(self.files)]
+
+    def file(self, _full_name: str, path: str, _default_branch: str):
+        if path not in self.files:
+            raise AssertionError(f"unexpected file read: {path}")
+        return self.files[path], "sha"
+
+
+def _repo(full_name: str) -> dict[str, object]:
+    return {
+        "full_name": full_name,
+        "name": full_name.split("/", 1)[-1],
+        "default_branch": "main",
+        "homepage": "",
+        "description": "",
+        "topics": [],
+        "archived": False,
+        "disabled": False,
+        "fork": False,
+    }
 
 
 class ResponsiveSpaceContractTests(unittest.TestCase):
@@ -229,7 +268,197 @@ class ResponsiveSpaceContractTests(unittest.TestCase):
             {"app/static/holo.css", "app/static/holo.js"},
         )
         for change in plan.changes:
-            self.assertIn("SZL Public Experience v3" if change.path.endswith(".css") else "__SZL_PUBLIC_EXPERIENCE_V3__", change.content)
+            self.assertIn(
+                "SZL Public Experience v3"
+                if change.path.endswith(".css")
+                else "__SZL_PUBLIC_EXPERIENCE_V3__",
+                change.content,
+            )
+
+    def test_reviewed_nested_static_root_receives_adjacent_assets(self) -> None:
+        original_map = rollout_core.LOCAL_SOURCE_MAP
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "source-map.json"
+            path.write_text(
+                json.dumps(
+                    {
+                        "schema": "szl.public-space-source-map/v1",
+                        "sources": [
+                            {
+                                "space": "ayllu",
+                                "repo": "szl-holdings/ayllu",
+                                "source_root": "ayllu/static/chamber.html",
+                                "ownership": "source-owned-incubation-lab",
+                            }
+                        ],
+                    }
+                ),
+                encoding="utf-8",
+            )
+            rollout_core.LOCAL_SOURCE_MAP = path
+            try:
+                github = FakeGitHub(
+                    {
+                        "ayllu/static/chamber.html": (
+                            "<!doctype html><html><head><title>Ayllu</title></head>"
+                            "<body><main>Council</main></body></html>"
+                        )
+                    }
+                )
+                space = rollout_core.Space(
+                    "ayllu",
+                    "docker",
+                    "RUNNING",
+                    "https://huggingface.co/spaces/SZLHOLDINGS/ayllu",
+                )
+                plan = rollout_core.plan_repository(
+                    github,
+                    _repo("szl-holdings/ayllu"),
+                    [space],
+                    1000,
+                    "canonical source map",
+                    "combined css",
+                    "combined javascript",
+                )
+            finally:
+                rollout_core.LOCAL_SOURCE_MAP = original_map
+
+        self.assertEqual(plan.status, "planned")
+        self.assertEqual(plan.adapter, "responsive-explicit-static")
+        self.assertEqual(plan.entrypoint, "ayllu/static/chamber.html")
+        self.assertEqual(
+            {change.path for change in plan.changes},
+            {
+                "ayllu/static/chamber.html",
+                "ayllu/static/szl-space-hologram.css",
+                "ayllu/static/szl-space-hologram.js",
+            },
+        )
+        html = next(
+            change.content
+            for change in plan.changes
+            if change.path == "ayllu/static/chamber.html"
+        )
+        self.assertIn("./szl-space-hologram.css", html)
+        self.assertIn("./szl-space-hologram.js", html)
+        self.assertIn("data-szl-holo-space-v2", html)
+
+    def test_existing_immune_asset_host_prevents_duplicate_shell(self) -> None:
+        original_map = rollout_core.LOCAL_SOURCE_MAP
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "source-map.json"
+            path.write_text(
+                json.dumps(
+                    {
+                        "schema": "szl.public-space-source-map/v1",
+                        "sources": [
+                            {
+                                "space": "immune",
+                                "repo": "szl-holdings/immune",
+                                "source_root": "frontend/index.html",
+                                "ownership": "source-owned-capability-channel",
+                            },
+                            {
+                                "space": "immune-lattice",
+                                "repo": "szl-holdings/immune",
+                                "source_root": "frontend/index.html",
+                                "ownership": "source-owned-capability-channel",
+                            },
+                        ],
+                    }
+                ),
+                encoding="utf-8",
+            )
+            rollout_core.LOCAL_SOURCE_MAP = path
+            try:
+                github = FakeGitHub(
+                    {
+                        "frontend/index.html": (
+                            "<!doctype html><html><head><title>Immune</title></head>"
+                            "<body><main>Immune</main></body></html>"
+                        ),
+                        "frontend/szl-holo-v2.css": "product css",
+                        "frontend/szl-holo-v2.js": "product js",
+                    }
+                )
+                spaces = [
+                    rollout_core.Space(
+                        "immune",
+                        "docker",
+                        "RUNNING",
+                        "https://huggingface.co/spaces/SZLHOLDINGS/immune",
+                    ),
+                    rollout_core.Space(
+                        "immune-lattice",
+                        "docker",
+                        "RUNNING",
+                        "https://huggingface.co/spaces/SZLHOLDINGS/immune-lattice",
+                    ),
+                ]
+                plan = rollout_core.plan_repository(
+                    github,
+                    _repo("szl-holdings/immune"),
+                    spaces,
+                    1000,
+                    "canonical source map",
+                    "combined css",
+                    "combined javascript",
+                )
+            finally:
+                rollout_core.LOCAL_SOURCE_MAP = original_map
+
+        self.assertEqual(plan.status, "planned")
+        self.assertEqual(plan.adapter, "responsive-existing-host")
+        self.assertEqual(
+            {change.path for change in plan.changes},
+            {"frontend/szl-holo-v2.css", "frontend/szl-holo-v2.js"},
+        )
+        self.assertNotIn(
+            "frontend/szl-space-hologram.css",
+            {change.path for change in plan.changes},
+        )
+
+    def test_unsafe_explicit_root_fails_closed(self) -> None:
+        original_map = rollout_core.LOCAL_SOURCE_MAP
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "source-map.json"
+            path.write_text(
+                json.dumps(
+                    {
+                        "schema": "szl.public-space-source-map/v1",
+                        "sources": [
+                            {
+                                "space": "ayllu",
+                                "repo": "szl-holdings/ayllu",
+                                "source_root": "../outside.html",
+                                "ownership": "source-owned-incubation-lab",
+                            }
+                        ],
+                    }
+                ),
+                encoding="utf-8",
+            )
+            rollout_core.LOCAL_SOURCE_MAP = path
+            try:
+                space = rollout_core.Space(
+                    "ayllu",
+                    "docker",
+                    "RUNNING",
+                    "https://huggingface.co/spaces/SZLHOLDINGS/ayllu",
+                )
+                with self.assertRaises(rollout_core.RolloutError) as context:
+                    rollout_core.plan_repository(
+                        FakeGitHub({}),
+                        _repo("szl-holdings/ayllu"),
+                        [space],
+                        1000,
+                        "canonical source map",
+                        "combined css",
+                        "combined javascript",
+                    )
+            finally:
+                rollout_core.LOCAL_SOURCE_MAP = original_map
+        self.assertEqual(context.exception.code, "EXPLICIT_STATIC_ROOT_INVALID")
 
     def test_pr_body_states_additive_truth_boundary(self) -> None:
         core = self._core(
@@ -246,6 +475,7 @@ class ResponsiveSpaceContractTests(unittest.TestCase):
         self.assertIn("investor", body)
         self.assertIn("additive", body.lower())
         self.assertIn("does not replace", body.lower())
+        self.assertIn("protected source map", body.lower())
 
 
 if __name__ == "__main__":
