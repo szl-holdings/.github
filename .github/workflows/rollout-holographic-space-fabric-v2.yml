@@ -14,6 +14,7 @@ on:
       - ".github/tests/test_responsive_space_contract.py"
       - ".github/tests/test_rollout_source_authority.py"
       - ".github/tests/test_holographic_target_contract.py"
+      - ".github/tests/test_rollout_writer_workflow.py"
       - "design/holographic-v2/**"
       - "design/responsive-v3/**"
   workflow_dispatch:
@@ -52,13 +53,35 @@ concurrency:
 
 env:
   REPORT: /tmp/public-experience-space-rollout-v3.json
+  WRITER_RECEIPT: /tmp/public-experience-rollout-writer.json
+  WRITER_PROBE_REPOSITORIES: |
+    szl-holdings/ayllu
+    szl-holdings/david-leads
+    szl-holdings/immune
+    szl-holdings/killinchu
+    szl-holdings/lyte-services
+    szl-holdings/platform
+    szl-holdings/szl-command-lab
+    szl-holdings/szl-constellation
+    szl-holdings/yarqa
 
 jobs:
   rollout:
     runs-on: ubuntu-latest
     timeout-minutes: 70
     env:
-      SZL_GITHUB_TOKEN: ${{ secrets.ORG_REPO_WORKFLOW_TOKEN || secrets.SZL_ORG_PAT || secrets.SZL_GITHUB_PAT || secrets.GH_PAT || secrets.PAT_TOKEN || secrets.GITHUB_PAT || secrets.GH_TOKEN || github.token }}
+      WRITER_SZL_ORG_GITHUB_TOKEN: ${{ secrets.SZL_ORG_GITHUB_TOKEN }}
+      WRITER_SZL_GITHUB_TOKEN: ${{ secrets.SZL_GITHUB_TOKEN }}
+      WRITER_ORG_ADMIN_TOKEN: ${{ secrets.ORG_ADMIN_TOKEN }}
+      WRITER_GH_ADMIN_TOKEN: ${{ secrets.GH_ADMIN_TOKEN }}
+      WRITER_ORG_REPO_WORKFLOW_TOKEN: ${{ secrets.ORG_REPO_WORKFLOW_TOKEN }}
+      WRITER_SZL_ORG_PAT: ${{ secrets.SZL_ORG_PAT }}
+      WRITER_SZL_GITHUB_PAT: ${{ secrets.SZL_GITHUB_PAT }}
+      WRITER_GH_PAT: ${{ secrets.GH_PAT }}
+      WRITER_GITHUB_PAT: ${{ secrets.GITHUB_PAT }}
+      WRITER_PAT_TOKEN: ${{ secrets.PAT_TOKEN }}
+      WRITER_FRONTIER_TOKEN: ${{ secrets.FRONTIER_TOKEN }}
+      WRITER_GH_TOKEN: ${{ secrets.GH_TOKEN }}
     steps:
       - name: Checkout exact main
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -76,13 +99,147 @@ jobs:
             .github/scripts/run_holographic_spaces_v2.py \
             .github/scripts/responsive_space_contract.py \
             .github/scripts/source_authority_contract.py \
-            .github/scripts/holographic_target_contract.py
+            .github/scripts/holographic_target_contract.py \
+            .github/tests/test_rollout_writer_workflow.py
           node --check design/holographic-v2/szl-space-hologram.js
           node --check design/responsive-v3/szl-responsive-v3.js
           python .github/tests/test_holographic_spaces_v2.py
           python .github/tests/test_responsive_space_contract.py
           python .github/tests/test_rollout_source_authority.py
           python .github/tests/test_holographic_target_contract.py
+          python .github/tests/test_rollout_writer_workflow.py
+      - name: Resolve governed cross-repository writer
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from __future__ import annotations
+
+          import json
+          import os
+          import urllib.error
+          import urllib.request
+          from pathlib import Path
+
+          candidate_names = (
+              "SZL_ORG_GITHUB_TOKEN",
+              "SZL_GITHUB_TOKEN",
+              "ORG_ADMIN_TOKEN",
+              "GH_ADMIN_TOKEN",
+              "ORG_REPO_WORKFLOW_TOKEN",
+              "SZL_ORG_PAT",
+              "SZL_GITHUB_PAT",
+              "GH_PAT",
+              "GITHUB_PAT",
+              "PAT_TOKEN",
+              "FRONTIER_TOKEN",
+              "GH_TOKEN",
+          )
+          repositories = tuple(
+              line.strip()
+              for line in os.environ["WRITER_PROBE_REPOSITORIES"].splitlines()
+              if line.strip()
+          )
+          receipt_path = Path(os.environ["WRITER_RECEIPT"])
+          attempts: list[dict[str, object]] = []
+          selected_name: str | None = None
+          selected_token: str | None = None
+
+          def write_receipt() -> None:
+              payload = {
+                  "schema": "szl.public-experience-rollout-writer/v1",
+                  "selected_credential": selected_name,
+                  "probe_repositories": list(repositories),
+                  "attempts": attempts,
+                  "secret_values_recorded": False,
+              }
+              receipt_path.write_text(
+                  json.dumps(payload, indent=2, sort_keys=True) + "\n",
+                  encoding="utf-8",
+              )
+
+          for name in candidate_names:
+              token = os.environ.get(f"WRITER_{name}", "").strip()
+              if not token:
+                  attempts.append({"credential": name, "state": "ABSENT"})
+                  continue
+              if "\n" in token or "\r" in token:
+                  attempts.append({"credential": name, "state": "INVALID_SHAPE"})
+                  continue
+              print(f"::add-mask::{token}")
+              denied: list[dict[str, object]] = []
+              for repository in repositories:
+                  request = urllib.request.Request(
+                      f"https://api.github.com/repos/{repository}",
+                      headers={
+                          "Accept": "application/vnd.github+json",
+                          "Authorization": f"Bearer {token}",
+                          "User-Agent": "szl-public-experience-writer-probe/1",
+                          "X-GitHub-Api-Version": "2022-11-28",
+                      },
+                  )
+                  try:
+                      with urllib.request.urlopen(request, timeout=30) as response:
+                          payload = json.loads(response.read().decode("utf-8"))
+                      permissions = payload.get("permissions") or {}
+                      can_push = permissions.get("push") is True
+                      if not can_push:
+                          denied.append(
+                              {
+                                  "repository": repository,
+                                  "http_status": response.status,
+                                  "reason": "PUSH_PERMISSION_FALSE_OR_ABSENT",
+                              }
+                          )
+                  except urllib.error.HTTPError as exc:
+                      denied.append(
+                          {
+                              "repository": repository,
+                              "http_status": exc.code,
+                              "reason": "HTTP_ERROR",
+                          }
+                      )
+                  except (urllib.error.URLError, TimeoutError, json.JSONDecodeError) as exc:
+                      denied.append(
+                          {
+                              "repository": repository,
+                              "http_status": None,
+                              "reason": type(exc).__name__,
+                          }
+                      )
+              attempts.append(
+                  {
+                      "credential": name,
+                      "state": "WRITE_CAPABLE" if not denied else "INSUFFICIENT",
+                      "denied": denied,
+                  }
+              )
+              if not denied:
+                  selected_name = name
+                  selected_token = token
+                  break
+
+          write_receipt()
+          if selected_token is None:
+              print(json.dumps({"writer_selected": False, "attempts": attempts}, sort_keys=True))
+              raise SystemExit(
+                  "no configured credential has measured push permission across every rollout repository"
+              )
+
+          with open(os.environ["GITHUB_ENV"], "a", encoding="utf-8") as handle:
+              handle.write(f"SZL_GITHUB_TOKEN={selected_token}\n")
+          print(
+              json.dumps(
+                  {
+                      "writer_selected": True,
+                      "credential": selected_name,
+                      "repository_count": len(repositories),
+                      "secret_values_recorded": False,
+                  },
+                  sort_keys=True,
+              )
+          )
+          PY
       - name: Discover, refresh, review, and merge through repository gates
         shell: bash
         run: |
@@ -107,7 +264,9 @@ jobs:
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: public-experience-space-rollout-v3-${{ github.run_id }}-${{ github.run_attempt }}
-          path: ${{ env.REPORT }}
+          path: |
+            ${{ env.REPORT }}
+            ${{ env.WRITER_RECEIPT }}
           if-no-files-found: error
           retention-days: 90
       - name: Enforce rollout integrity
