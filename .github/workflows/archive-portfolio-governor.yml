@@ -83,26 +83,24 @@ jobs:
           ref: main
           persist-credentials: false
 
-      - name: Mint bounded organization administration token
-        id: app-token
-        continue-on-error: true
-        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
-        with:
-          client-id: ${{ vars.QILLQAQ_CLIENT_ID }}
-          private-key: ${{ secrets.QILLQAQ_PRIVATE_KEY }}
-          owner: ${{ github.repository_owner }}
-          permission-administration: write
-          permission-contents: read
-          permission-metadata: read
-
       - name: Set up Python
         uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
           python-version: "3.12"
 
+      - name: Require configured repository-administration authority
+        env:
+          SZL_REPO_ADMIN_TOKEN: ${{ secrets.ORG_REPO_ADMIN_TOKEN || secrets.ORG_REPO_WORKFLOW_TOKEN || secrets.SZL_ORG_PAT || secrets.SZL_GITHUB_PAT || secrets.GH_PAT || secrets.PAT_TOKEN || secrets.GITHUB_PAT || secrets.GH_TOKEN }}
+        run: |
+          set -euo pipefail
+          if [ -z "${SZL_REPO_ADMIN_TOKEN:-}" ]; then
+            echo "::error::No repository-administration credential is configured for the manifest-bound restoration wave."
+            exit 1
+          fi
+
       - name: Apply the manifest-bound restoration wave
         env:
-          SZL_REPO_ADMIN_TOKEN: ${{ steps.app-token.outputs.token || secrets.ORG_REPO_ADMIN_TOKEN || secrets.ORG_REPO_WORKFLOW_TOKEN || secrets.SZL_ORG_PAT || secrets.SZL_GITHUB_PAT || secrets.GH_PAT || secrets.PAT_TOKEN || secrets.GITHUB_PAT || secrets.GH_TOKEN }}
+          SZL_REPO_ADMIN_TOKEN: ${{ secrets.ORG_REPO_ADMIN_TOKEN || secrets.ORG_REPO_WORKFLOW_TOKEN || secrets.SZL_ORG_PAT || secrets.SZL_GITHUB_PAT || secrets.GH_PAT || secrets.PAT_TOKEN || secrets.GITHUB_PAT || secrets.GH_TOKEN }}
         run: |
           set -euo pipefail
           python .github/scripts/archive_portfolio_governor.py \
@@ -112,7 +110,7 @@ jobs:
       - name: Generate next ATTIC candidate from provider readback
         if: always()
         env:
-          GH_TOKEN: ${{ steps.app-token.outputs.token || secrets.ORG_REPO_ADMIN_TOKEN || secrets.ORG_REPO_WORKFLOW_TOKEN || secrets.SZL_ORG_PAT || secrets.SZL_GITHUB_PAT || secrets.GH_PAT || secrets.PAT_TOKEN || secrets.GITHUB_PAT || secrets.GH_TOKEN }}
+          GH_TOKEN: ${{ secrets.ORG_REPO_ADMIN_TOKEN || secrets.ORG_REPO_WORKFLOW_TOKEN || secrets.SZL_ORG_PAT || secrets.SZL_GITHUB_PAT || secrets.GH_PAT || secrets.PAT_TOKEN || secrets.GITHUB_PAT || secrets.GH_TOKEN }}
         run: |
           set -euo pipefail
           if [ -n "${GH_TOKEN:-}" ]; then
