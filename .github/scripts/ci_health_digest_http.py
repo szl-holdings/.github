@@ -1,19 +1,36 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: Apache-2.0
-"""Fail-closed GitHub HTTP and organization-reader selection for CI health."""
+"""Fail-closed GitHub HTTP and organization-reader selection for CI health.
+
+A credential is selected only after it proves the complete organization
+inventory against GitHub's authoritative public/private repository totals and
+can read Actions metadata. Candidate values are never included in receipts.
+"""
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import time
 import urllib.error
 import urllib.request
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any, Mapping, Sequence
 
 ORG = "szl-holdings"
-CANONICAL_CONFIG_ID = 252588
 TRANSIENT_HTTP = {429, 500, 502, 503, 504}
+CANDIDATE_ENVIRONMENT = (
+    ("github_app", "qillqaq_app_installation", "DIGEST_APP_TOKEN"),
+    ("governed_pat_fallback", "ORG_REPO_WORKFLOW_TOKEN", "ORG_REPO_WORKFLOW_TOKEN"),
+    ("governed_pat_fallback", "SZL_ORG_PAT", "SZL_ORG_PAT"),
+    ("governed_pat_fallback", "SZL_GITHUB_PAT", "SZL_GITHUB_PAT"),
+    ("governed_pat_fallback", "GH_PAT", "GH_PAT"),
+    ("governed_pat_fallback", "PAT_TOKEN", "PAT_TOKEN"),
+    ("governed_pat_fallback", "GITHUB_PAT", "GITHUB_PAT"),
+    ("governed_pat_fallback", "GH_TOKEN", "GH_TOKEN"),
+    ("governed_pat_fallback", "SZL_GITHUB_TOKEN", "SZL_GITHUB_TOKEN"),
+    ("repository_token_probe", "repository_github_token", "REPOSITORY_GITHUB_TOKEN"),
+)
 
 
 class DigestError(RuntimeError):
@@ -44,7 +61,7 @@ class ApiError(DigestError):
 class ReaderSelection:
     mode: str
     credential_name: str
-    token: str
+    token: str = field(repr=False)
     repositories: tuple[dict[str, Any], ...]
     attempts: tuple[dict[str, Any], ...]
 
@@ -82,7 +99,7 @@ def request_json(
         "Authorization": f"Bearer {token}",
         "Accept": "application/vnd.github+json",
         "X-GitHub-Api-Version": "2022-11-28",
-        "User-Agent": "szl-ci-health-digest/2",
+        "User-Agent": "szl-ci-health-digest/3",
     }
     last_status = 0
     last_detail = "request_failed"
@@ -142,7 +159,7 @@ def request_json(
 
 
 def repository_floor() -> int:
-    value = str(os.environ.get("ORG_REPOSITORY_FLOOR") or "57").strip()
+    value = str(os.environ.get("ORG_REPOSITORY_FLOOR") or "123").strip()
     try:
         floor = int(value)
     except ValueError as exc:
@@ -187,88 +204,72 @@ def _paginated_list(
             raise DigestError(f"{operation} exceeded 100 pages")
 
 
-def validate_canonical_inventory(
+def _nonnegative_integer(value: Any, label: str) -> int:
+    if isinstance(value, bool) or not isinstance(value, int) or value < 0:
+        raise DigestError(f"authoritative {label} repository total is unavailable")
+    return value
+
+
+def validate_authoritative_inventory(
     token: str,
     repositories: Sequence[Mapping[str, Any]],
 ) -> dict[str, Any]:
-    _, configurations = request_json(
+    """Prove exact public/private inventory equality without admin-only coupling."""
+
+    _, metadata = request_json(
         token,
-        f"https://api.github.com/orgs/{ORG}/code-security/configurations",
-        operation="read organization code-security configurations",
+        f"https://api.github.com/orgs/{ORG}",
+        operation="read authoritative organization repository totals",
     )
-    if not isinstance(configurations, list):
-        raise DigestError("code-security configuration inventory is malformed")
-    canonical = next(
-        (
-            item
-            for item in configurations
-            if isinstance(item, dict)
-            and item.get("id") == CANONICAL_CONFIG_ID
-        ),
-        None,
-    )
-    if canonical is None:
+    if not isinstance(metadata, dict):
+        raise DigestError("organization metadata payload is malformed")
+
+    public_total = _nonnegative_integer(metadata.get("public_repos"), "public")
+    private_value = metadata.get("total_private_repos")
+    if private_value is None:
+        private_value = metadata.get("owned_private_repos")
+    private_total = _nonnegative_integer(private_value, "private")
+    authoritative_total = public_total + private_total
+    floor = repository_floor()
+    if authoritative_total < floor:
         raise DigestError(
-            f"canonical code-security configuration {CANONICAL_CONFIG_ID} is missing"
-        )
-    if canonical.get("target_type") != "organization":
-        raise DigestError(
-            "canonical code-security configuration is not organization-scoped"
-        )
-    if canonical.get("enforcement") != "enforced":
-        raise DigestError(
-            "canonical code-security configuration is not enforced"
+            "authoritative organization total below reviewed floor: "
+            f"observed={authoritative_total} floor={floor}"
         )
 
-    attachments = _paginated_list(
-        token,
-        (
-            f"https://api.github.com/orgs/{ORG}/code-security/"
-            f"configurations/{CANONICAL_CONFIG_ID}/repositories"
-        ),
-        operation="read canonical code-security repository inventory",
-    )
-    attached_status: dict[str, str | None] = {}
-    for item in attachments:
-        repository = item.get("repository") or {}
-        full_name = str(repository.get("full_name") or "").strip()
-        if not full_name:
+    identities: list[str] = []
+    observed_private = 0
+    for item in repositories:
+        full_name = str(item.get("full_name") or "").strip()
+        if not full_name.startswith(f"{ORG}/"):
             raise DigestError(
-                "canonical code-security repository entry has no full name"
+                f"organization inventory contains foreign or empty identity: {full_name!r}"
             )
-        if full_name in attached_status:
-            raise DigestError(
-                f"canonical repository inventory contains duplicate {full_name}"
-            )
-        attached_status[full_name] = (
-            str(item.get("status")) if item.get("status") is not None else None
+        identities.append(full_name)
+        if item.get("private") is True or item.get("visibility") in {
+            "private",
+            "internal",
+        }:
+            observed_private += 1
+
+    if len(identities) != len(set(identities)):
+        raise DigestError("organization inventory contains duplicate repositories")
+    if len(repositories) != authoritative_total:
+        raise DigestError(
+            "organization repository listing does not match authoritative totals: "
+            f"listed={len(repositories)} authoritative={authoritative_total}"
+        )
+    if observed_private != private_total:
+        raise DigestError(
+            "organization private repository listing does not match authoritative total: "
+            f"listed={observed_private} authoritative={private_total}"
         )
 
-    observed_names = {
-        str(item.get("full_name") or f"{ORG}/{item.get('name')}")
-        for item in repositories
-    }
-    attached_names = set(attached_status)
-    if observed_names != attached_names:
-        missing_from_org_listing = sorted(attached_names - observed_names)
-        missing_from_canonical = sorted(observed_names - attached_names)
-        raise DigestError(
-            "organization repository inventory does not match canonical "
-            "code-security inventory: "
-            f"missing_from_org_listing={missing_from_org_listing}; "
-            f"missing_from_canonical={missing_from_canonical}"
-        )
     return {
-        "configuration_id": CANONICAL_CONFIG_ID,
-        "configuration_name": canonical.get("name"),
-        "repository_count": len(attached_names),
+        "public_repositories": public_total,
+        "private_repositories": private_total,
+        "repository_count": authoritative_total,
         "inventory_match": True,
-        "status_counts": {
-            status or "missing": sum(
-                1 for value in attached_status.values() if value == status
-            )
-            for status in set(attached_status.values())
-        },
     }
 
 
@@ -276,7 +277,7 @@ def list_repositories(token: str) -> tuple[dict[str, Any], ...]:
     repositories = list(
         _paginated_list(
             token,
-            f"https://api.github.com/orgs/{ORG}/repos?type=all",
+            f"https://api.github.com/orgs/{ORG}/repos?type=all&sort=full_name&direction=asc",
             operation="list organization repositories",
         )
     )
@@ -306,25 +307,29 @@ def list_repositories(token: str) -> tuple[dict[str, Any], ...]:
             raise DigestError(
                 f"active repository {item.get('name')!r} lacks a default branch"
             )
-    validate_canonical_inventory(token, repositories)
+    validate_authoritative_inventory(token, repositories)
     return tuple(repositories)
 
 
+def _candidate_values() -> tuple[tuple[str, str, str], ...]:
+    values: list[tuple[str, str, str]] = []
+    seen: set[str] = set()
+    for mode, name, environment_name in CANDIDATE_ENVIRONMENT:
+        token = str(os.environ.get(environment_name) or "").strip()
+        if not token:
+            values.append((mode, name, ""))
+            continue
+        digest = hashlib.sha256(token.encode("utf-8")).hexdigest()
+        if digest in seen:
+            continue
+        seen.add(digest)
+        values.append((mode, name, token))
+    return tuple(values)
+
+
 def select_reader() -> ReaderSelection:
-    candidates = (
-        (
-            "github_app",
-            "qillqaq_app_installation",
-            os.environ.get("DIGEST_APP_TOKEN") or "",
-        ),
-        (
-            "governed_pat_fallback",
-            "SZL_GITHUB_TOKEN",
-            os.environ.get("SZL_GITHUB_TOKEN") or "",
-        ),
-    )
     attempts: list[dict[str, Any]] = []
-    for mode, name, token in candidates:
+    for mode, name, token in _candidate_values():
         if not token:
             attempts.append(
                 {
@@ -382,7 +387,7 @@ def select_reader() -> ReaderSelection:
                 "present": True,
                 "result": "selected",
                 "repository_count": len(repositories),
-                "canonical_inventory_match": True,
+                "authoritative_inventory_match": True,
                 "value_recorded": False,
             }
         )
