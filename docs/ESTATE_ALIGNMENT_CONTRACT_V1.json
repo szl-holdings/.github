@@ -194,8 +194,8 @@
       {
         "repo_id": "SZLHOLDINGS/szl-constellation",
         "class": "lab_surface",
-        "canonical_source": "szl-holdings/holographic-unify",
-        "deployment_source": "szl-holdings/holographic-unify"
+        "canonical_source": "szl-holdings/szl-constellation",
+        "deployment_source": "szl-holdings/szl-constellation"
       },
       {
         "repo_id": "SZLHOLDINGS/szl-frontier",
