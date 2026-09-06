@@ -518,7 +518,12 @@ def assert_local_source(repo_root: Path, source_sha: str) -> None:
 
 
 def fetch_github_main_sha(repository: str, token: str) -> str:
-    url = f"https://api.github.com/repos/{quote(repository, safe='/')}/commits/main"
+    """Resolve protected main through GitHub's compact, bounded ref endpoint."""
+
+    url = (
+        f"https://api.github.com/repos/{quote(repository, safe='/')}"
+        "/git/ref/heads/main"
+    )
     request = Request(
         url,
         headers={
@@ -531,10 +536,12 @@ def fetch_github_main_sha(repository: str, token: str) -> str:
     with urlopen(request, timeout=20) as response:
         if response.status != 200 or not same_origin(response.geturl(), url):
             raise ContractError("protected main lookup left the GitHub API origin")
-        payload = response.read(100_001)
-    if len(payload) > 100_000:
+        payload = response.read(65_537)
+    if len(payload) > 65_536:
         raise ContractError("protected main lookup response is oversized")
-    sha = json.loads(payload).get("sha")
+    value = json.loads(payload)
+    reference = value.get("object") if isinstance(value, dict) else None
+    sha = reference.get("sha") if isinstance(reference, dict) else None
     if not isinstance(sha, str) or not SHA_RE.fullmatch(sha):
         raise ContractError("protected main lookup returned an invalid SHA")
     return sha
