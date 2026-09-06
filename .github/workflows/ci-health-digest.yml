@@ -4,9 +4,13 @@ name: CI Health Digest
 # migration-safe, and fail-closed. Every configured reader is independently
 # validated against GitHub's authoritative public/private repository totals,
 # the complete paginated organization inventory, and Actions-read capability.
-# A stale or partial credential cannot mask a later complete reader. The
-# ephemeral workflow token writes only issue #158 (or its exact-title
-# replacement) in this repository.
+# A stale or partial credential cannot mask a later complete reader.
+#
+# The qillqaq mint deliberately omits
+# `permission-organization-administration: read`: that permission is not granted
+# to the installation. The selector accepts the App only when its actual API
+# responses still prove the private inventory; otherwise it continues to the
+# complete governed PAT. The inventory contract itself is never weakened.
 #
 # Default-branch evidence boundary: GitHub's Actions registry can retain workflow
 # entries from feature or closed-PR branches. The digest proves every inspected
@@ -25,6 +29,7 @@ on:
       - .github/scripts/ci_health_digest_sweep.py
       - .github/scripts/test_ci_health_digest.py
       - .github/scripts/test_ci_health_digest_reader_inventory.py
+      - .github/scripts/test_ci_health_digest_rate_budget.py
       - .github/scripts/test_ci_health_digest_default_branch.py
       - .github/workflows/ci-health-digest.yml
       - .github/workflows/ci-health-digest-default-branch-pr.yml
@@ -41,12 +46,16 @@ concurrency:
 env:
   REPORT_PATH: reports/ci-health-digest.json
   ORG_REPOSITORY_FLOOR: "123"
+  CI_HEALTH_HTTP_CONCURRENCY: "3"
+  CI_HEALTH_MAX_RATE_LIMIT_WAIT_SECONDS: "3900"
+  CI_HEALTH_DEADLINE_SECONDS: "5400"
+  PYTHONDONTWRITEBYTECODE: "1"
 
 jobs:
   digest:
     name: Authenticated organization sweep and rolling evidence issue
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 100
     steps:
       - name: Harden runner
         uses: step-security/harden-runner@05e31511f85b41b11d1cf0ef85d0992719546e2c # v2.21.0
@@ -73,9 +82,11 @@ jobs:
             .github/scripts/ci_health_digest_sweep.py \
             .github/scripts/test_ci_health_digest.py \
             .github/scripts/test_ci_health_digest_reader_inventory.py \
+            .github/scripts/test_ci_health_digest_rate_budget.py \
             .github/scripts/test_ci_health_digest_default_branch.py
           python .github/scripts/test_ci_health_digest.py
           python .github/scripts/test_ci_health_digest_reader_inventory.py
+          python .github/scripts/test_ci_health_digest_rate_budget.py
           python .github/scripts/test_ci_health_digest_default_branch.py
           git diff --check
 
@@ -90,7 +101,6 @@ jobs:
           owner: ${{ github.repository_owner }}
           permission-actions: read
           permission-contents: read
-          permission-organization-administration: read
 
       - name: Sweep the verified organization estate and publish issue evidence
         id: digest
