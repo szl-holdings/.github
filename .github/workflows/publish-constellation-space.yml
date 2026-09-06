@@ -1,0 +1,210 @@
+# Copyright 2026 SZL Holdings — SPDX-License-Identifier: Apache-2.0
+name: Publish Constellation Space (central)
+
+# Constellation source is owned by szl-holdings/szl-constellation. Provider
+# credentials remain in this central control repository, matching the existing
+# central-publisher boundary used elsewhere in the estate. Pull requests prove
+# the workflow contract only. Protected main, schedule, or owner dispatch
+# publishes the exact current Constellation main tip and verifies live readback.
+"on":
+  pull_request:
+    branches: [main]
+    paths:
+      - .github/workflows/publish-constellation-space.yml
+      - .github/scripts/test_central_constellation_publisher.py
+      - .github/scripts/acquire_hf_publisher_token.py
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/publish-constellation-space.yml
+      - .github/scripts/test_central_constellation_publisher.py
+  schedule:
+    - cron: "41 * * * *"
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: publish-constellation-space-central
+  cancel-in-progress: false
+
+jobs:
+  validate:
+    name: Validate central Constellation publisher contract
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - name: Harden runner
+        uses: step-security/harden-runner@05e31511f85b41b11d1cf0ef85d0992719546e2c # v2.21.0
+        with:
+          egress-policy: audit
+
+      - name: Checkout exact policy source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+          fetch-depth: 1
+
+      - name: Set up exact Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.13.5"
+
+      - name: Prove publisher authority, pins, and token transport
+        run: |
+          set -euo pipefail
+          python .github/scripts/test_central_constellation_publisher.py
+          git diff --check
+
+  publish:
+    name: Publish exact Constellation main and attest live state
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - name: Harden runner
+        uses: step-security/harden-runner@05e31511f85b41b11d1cf0ef85d0992719546e2c # v2.21.0
+        with:
+          egress-policy: audit
+
+      - name: Checkout exact central publisher policy
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          path: tools
+          ref: ${{ github.sha }}
+          persist-credentials: false
+          fetch-depth: 1
+
+      - name: Checkout current Constellation protected-main source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: szl-holdings/szl-constellation
+          ref: main
+          path: source
+          persist-credentials: false
+          fetch-depth: 1
+
+      - name: Set up declared Constellation Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.13.5"
+
+      - name: Install exact source, test, and publisher dependencies
+        run: >-
+          python -m pip install --disable-pip-version-check --no-cache-dir
+          -r source/space/requirements.txt
+          -r source/space/requirements-test.txt
+          -r source/tools/requirements-publish.txt
+
+      - name: Resolve and prove exact current source
+        id: source
+        shell: bash
+        run: |
+          set -euo pipefail
+          SOURCE_SHA="$(git -C source rev-parse --verify HEAD)"
+          [[ "$SOURCE_SHA" =~ ^[0-9a-f]{40}$ ]]
+          test "$(git ls-remote https://github.com/szl-holdings/szl-constellation.git refs/heads/main | cut -f1)" = "$SOURCE_SHA"
+          echo "sha=$SOURCE_SHA" >> "$GITHUB_OUTPUT"
+          printf 'source=szl-holdings/szl-constellation@%s\n' "$SOURCE_SHA"
+
+      - name: Re-prove source, dependency, listener, and application contracts
+        shell: bash
+        run: |
+          set -euo pipefail
+          python source/tools/verify_constellation.py
+          python -m py_compile \
+            source/space/app.py \
+            source/space/crosscheck.py \
+            source/space/test_runtime_contract.py \
+            source/space/tests/test_app.py \
+            source/tools/verify_constellation.py \
+            source/tools/publish_constellation.py \
+            source/tools/run_publish_constellation.py
+          (
+            cd source/space
+            python -m pytest -q
+          )
+          python -m pip check
+          find source -type d -name __pycache__ -prune -exec rm -rf {} +
+          find source -type d -name .pytest_cache -prune -exec rm -rf {} +
+          find source -type f \( -name '*.pyc' -o -name '*.pyo' \) -delete
+          git -C source diff --check
+          test -z "$(git -C source status --porcelain)"
+
+      - name: Acquire independently validated Space publisher credential
+        env:
+          HF_ORG_TOKEN_CANDIDATE: ${{ secrets.HF_ORG_TOKEN }}
+          HF_ORG_TOKEN1_CANDIDATE: ${{ secrets.HF_ORG_TOKEN1 }}
+          HF_WRITE_TOKEN_CANDIDATE: ${{ secrets.HF_WRITE_TOKEN }}
+          HF_TOKEN_CANDIDATE: ${{ secrets.HF_TOKEN }}
+          HUGGINGFACE_TOKEN_CANDIDATE: ${{ secrets.HUGGINGFACE_TOKEN }}
+          HUGGING_FACE_HUB_TOKEN_CANDIDATE: ${{ secrets.HUGGING_FACE_HUB_TOKEN }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p evidence/constellation
+          python tools/.github/scripts/acquire_hf_publisher_token.py \
+            --target-repo SZLHOLDINGS/szl-constellation \
+            --target-type space \
+            --oidc-resource spaces/SZLHOLDINGS/szl-constellation \
+            --token-file "$RUNNER_TEMP/constellation-hf-token" \
+            --report evidence/constellation/hf-publisher-credential.json
+
+      - name: Publish exact source and verify immutable and live readback
+        env:
+          SOURCE_SHA: ${{ steps.source.outputs.sha }}
+          GITHUB_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          set +x
+          TOKEN_FILE="$RUNNER_TEMP/constellation-hf-token"
+          test -f "$TOKEN_FILE" && test ! -L "$TOKEN_FILE"
+          test "$(stat -c '%a' "$TOKEN_FILE")" = "600"
+          HF_TOKEN="$(<"$TOKEN_FILE")" \
+          SOURCE_SHA="$SOURCE_SHA" \
+          python -I -P <<'PY'
+          import os
+          import sys
+          from pathlib import Path
+
+          source = Path('source').resolve()
+          os.chdir(source)
+          os.environ['GITHUB_REPOSITORY'] = 'szl-holdings/szl-constellation'
+          os.environ['GITHUB_SHA'] = os.environ['SOURCE_SHA']
+          sys.path.insert(0, str(source / 'tools'))
+          from run_publish_constellation import main
+          raise SystemExit(main())
+          PY
+          mkdir -p evidence/constellation
+          cp source/artifacts/constellation-deployment-receipt.json \
+            evidence/constellation/constellation-deployment-receipt.json
+
+      - name: Remove the ephemeral publisher credential
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          set +x
+          TOKEN_FILE="$RUNNER_TEMP/constellation-hf-token"
+          if [ -e "$TOKEN_FILE" ] || [ -L "$TOKEN_FILE" ]; then
+            test ! -L "$TOKEN_FILE"
+            chmod 600 "$TOKEN_FILE"
+            rm -f -- "$TOKEN_FILE"
+          fi
+          test ! -e "$TOKEN_FILE"
+
+      - name: Upload immutable central publication evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: hf-central-constellation-${{ steps.source.outputs.sha || github.run_id }}
+          path: evidence/constellation/
+          if-no-files-found: warn
+          retention-days: 90
