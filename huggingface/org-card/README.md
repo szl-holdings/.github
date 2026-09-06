@@ -49,9 +49,9 @@ Five public domain bodies: **Terra, Killinchu, PRISM Counsel, PURIQ Finance, LYT
 
 Six internal engines: **Sentra, Lyte, Killinchu, Finance, Terra, Counsel**.
 
-**16 portfolio Spaces · 45 models · 34 datasets.**
+**17 public Spaces, 45 models, 34 datasets.**
 
-**1 inventory-only Space: Yarqa · governedKeep=false ·disposition=FOLD.**
+Portfolio authority is narrower: **16 portfolio Spaces** plus **1 inventory-only Space**, Yarqa, with `governedKeep=false` and disposition `FOLD`.
 
 Hub inventory is registry-only—not availability, operational readiness, or publication policy. KEEP authority: [`docs/CANONICAL_FLEET.md`](https://github.com/szl-holdings/.github/blob/main/docs/CANONICAL_FLEET.md).
 
