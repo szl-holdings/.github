@@ -10,6 +10,7 @@ on:
       - ".github/scripts/run_holographic_spaces_v2.py"
       - ".github/tests/test_public_experience_v3.py"
       - ".github/tests/test_responsive_space_contract.py"
+      - ".github/tests/test_responsive_host_idempotence.py"
       - ".github/tests/test_holographic_target_contract.py"
       - ".github/workflows/public-experience-v3.yml"
       - ".github/workflows/rollout-holographic-space-fabric-v2.yml"
@@ -24,6 +25,7 @@ on:
       - ".github/scripts/run_holographic_spaces_v2.py"
       - ".github/tests/test_public_experience_v3.py"
       - ".github/tests/test_responsive_space_contract.py"
+      - ".github/tests/test_responsive_host_idempotence.py"
       - ".github/tests/test_holographic_target_contract.py"
       - ".github/workflows/public-experience-v3.yml"
       - ".github/workflows/rollout-holographic-space-fabric-v2.yml"
@@ -82,6 +84,7 @@ jobs:
         run: |
           python .github/tests/test_public_experience_v3.py
           python .github/tests/test_responsive_space_contract.py
+          python .github/tests/test_responsive_host_idempotence.py
           python .github/tests/test_holographic_target_contract.py
       - name: Whitespace integrity
         run: git diff --check
