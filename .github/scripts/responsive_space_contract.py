@@ -277,8 +277,11 @@ def _existing_asset_changes(
     combined_javascript: str,
     responsive_css: str,
     responsive_javascript: str,
-) -> list[Any]:
-    """Refresh an already reviewed asset host without adding a second shell.
+) -> list[Any] | None:
+    """Refresh a reviewed asset host, distinguishing absence from a no-op.
+
+    ``None`` means no recognized host. An empty list means its assets are
+    already current and must not fall through to another shell adapter.
 
     Centrally generated `szl-space-hologram.*` files are replaced by the newest
     combined Holo + responsive bytes. Product-owned asset hosts receive only the
@@ -291,7 +294,8 @@ def _existing_asset_changes(
     paths = {str(item.get("path")) for item in blobs}
     changes: list[Any] = []
 
-    for css_path, js_path in _custom_pairs(paths):
+    pairs = _custom_pairs(paths)
+    for css_path, js_path in pairs:
         current_css, _ = github.file(full_name, css_path, default_branch)
         current_js, _ = github.file(full_name, js_path, default_branch)
         generated = css_path.endswith(GENERATED_CSS_SUFFIX) and js_path.endswith(GENERATED_JS_SUFFIX)
@@ -315,10 +319,11 @@ def _existing_asset_changes(
         if current != rendered:
             changes.append(core.Change(path, rendered))
 
-    if changes:
+    if pairs or streamlit_helpers or gradio_helpers:
         plan.adapter = "responsive-existing-host"
         plan.entrypoint = _entrypoint(paths, core)
-    return changes
+        return changes
+    return None
 
 
 def install(core: Any) -> None:
@@ -375,11 +380,11 @@ def install(core: Any) -> None:
             responsive_css,
             responsive_javascript,
         )
-        if existing:
+        if existing is not None:
             # Prefer a reviewed existing asset host over creating a duplicate
             # navigation shell or second theme runtime in the same product.
             plan.changes = existing
-            plan.status = "planned"
+            plan.status = "planned" if existing else "already-integrated"
         else:
             explicit = _explicit_static_changes(
                 core,
