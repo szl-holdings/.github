@@ -4,11 +4,29 @@ from __future__ import annotations
 
 import json
 import textwrap
-from typing import Any
+from typing import Any, Sequence
 
 
-def target_contract(entrypoint: str | None) -> str:
-    """Return a dependency-light target repository GitHub Actions contract."""
+def target_contract(
+    entrypoint: str | None,
+    asset_paths: Sequence[str] = (),
+) -> str:
+    """Return a dependency-light target repository GitHub Actions contract.
+
+    The rollout planner already knows the exact reviewed asset host it is
+    changing. Carry those repository-relative paths into the target gate rather
+    than rediscovering one hard-coded filename family inside the candidate
+    checkout. This preserves product-owned hosts such as ``szl-holo-v2.*``
+    without weakening the responsive, local-asset, or source-binding checks.
+    """
+
+    declared_assets = sorted(
+        {
+            str(path)
+            for path in asset_paths
+            if str(path).lower().endswith((".css", ".js"))
+        }
+    )
     template = r'''
 name: SZL Public Experience v3 Contract
 
@@ -45,10 +63,18 @@ jobs:
           import py_compile
           import subprocess
 
-          css_files = sorted(
-              path for path in Path('.').rglob('szl-space-hologram.css')
-              if '.git' not in path.parts
-          )
+          raw_asset_paths = __ASSET_PATHS__
+          asset_paths = []
+          for raw in raw_asset_paths:
+              path = Path(raw)
+              if path.is_absolute() or '\\' in raw or '..' in path.parts:
+                  raise SystemExit(f'unsafe declared holographic asset path: {raw}')
+              asset_paths.append(path)
+          missing_assets = [str(path) for path in asset_paths if not path.is_file()]
+          if missing_assets:
+              raise SystemExit(f'missing declared holographic assets: {missing_assets}')
+
+          css_files = sorted(path for path in asset_paths if path.suffix.lower() == '.css')
           if not css_files:
               raise SystemExit('missing holographic CSS')
           css_required = (
@@ -78,10 +104,7 @@ jobs:
               if text.count('{') != text.count('}'):
                   raise SystemExit(f'{path}: unbalanced CSS braces')
 
-          js_files = sorted(
-              path for path in Path('.').rglob('szl-space-hologram.js')
-              if '.git' not in path.parts
-          )
+          js_files = sorted(path for path in asset_paths if path.suffix.lower() == '.js')
           prohibited_js = (
               'fetch(', 'XMLHttpRequest', 'sendBeacon', 'localStorage',
               'sessionStorage', 'document.cookie',
@@ -119,17 +142,23 @@ jobs:
               if not target.is_file():
                   raise SystemExit(f'missing entrypoint: {entrypoint}')
               text = target.read_text(encoding='utf-8')
-              if not any(marker in text for marker in (
+              source_markers = (
                   'szl-space-hologram',
                   'SZL Holographic Space Fabric v2',
                   'szl_hologram',
-              )):
+                  'data-szl-holo-space-v2',
+              )
+              asset_names = tuple(path.name for path in asset_paths)
+              if not any(marker in text for marker in (*source_markers, *asset_names)):
                   raise SystemExit(f'{entrypoint}: source binding missing')
           PY
           git diff --check
 '''
-    return textwrap.dedent(template).lstrip().replace(
-        "__ENTRYPOINT__", json.dumps(entrypoint or "")
+    return (
+        textwrap.dedent(template)
+        .lstrip()
+        .replace("__ENTRYPOINT__", json.dumps(entrypoint or ""))
+        .replace("__ASSET_PATHS__", json.dumps(declared_assets))
     )
 
 
@@ -143,7 +172,14 @@ def install(core: Any) -> None:
         plan = original(*args, **kwargs)
         if plan.status == "planned":
             workflow_path = ".github/workflows/szl-holographic-space-v2.yml"
-            rendered = target_contract(plan.entrypoint)
+            asset_paths = sorted(
+                {
+                    change.path
+                    for change in plan.changes
+                    if change.path.lower().endswith((".css", ".js"))
+                }
+            )
+            rendered = target_contract(plan.entrypoint, asset_paths)
             existing = next(
                 (change for change in plan.changes if change.path == workflow_path),
                 None,
