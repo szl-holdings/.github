@@ -28,6 +28,17 @@ ATTIC = ROOT / "ATTIC.md"
 PORTFOLIO = ROOT / "governance" / "archive-portfolio-v1.json"
 SCHEMA = "szl.archive-portfolio/v1"
 DISPOSITIONS = frozenset({"restore", "consolidate", "historical"})
+HF_SPACES = frozenset(
+    {
+        "SZLHOLDINGS/anatomy",
+        "SZLHOLDINGS/ayllu",
+        "SZLHOLDINGS/governed-receipt-verifier",
+        "SZLHOLDINGS/immune",
+        "SZLHOLDINGS/lyte-lattice",
+        "SZLHOLDINGS/szl-atelier",
+        "SZLHOLDINGS/szl-constellation",
+    }
+)
 
 
 class AtticError(RuntimeError):
@@ -215,9 +226,12 @@ def _targets(values: list[str]) -> str:
     )
 
 
-def _space(value: str) -> str:
-    slug = value.split("/", 1)[-1]
-    return f"[`{value}`](https://huggingface.co/spaces/{value})"
+def _hf(value: str) -> str:
+    if value in HF_SPACES:
+        url = f"https://huggingface.co/spaces/{value}"
+    else:
+        url = f"https://huggingface.co/{value}"
+    return f"[`{value}`]({url})"
 
 
 def render(analysis: Mapping[str, Any]) -> str:
@@ -285,7 +299,7 @@ def render(analysis: Mapping[str, Any]) -> str:
         for row in rows:
             lines.append(
                 f"| `{row['name']}` | `{state}` | {row['rationale']} | "
-                f"{_space(row['hugging_face_showcase'])} |"
+                f"{_hf(row['hugging_face_showcase'])} |"
             )
     lines.append("")
 
@@ -300,7 +314,7 @@ def render(analysis: Mapping[str, Any]) -> str:
     for row in analysis["consolidated"]:
         lines.append(
             f"| `{row['name']}` | {_targets(row['canonical_targets'])} | "
-            f"{_space(row['hugging_face_showcase'])} | {row['rationale']} |"
+            f"{_hf(row['hugging_face_showcase'])} | {row['rationale']} |"
         )
     lines.append("")
 
@@ -314,7 +328,7 @@ def render(analysis: Mapping[str, Any]) -> str:
     )
     for row in analysis["historical"]:
         lines.append(
-            f"| `{row['name']}` | {_space(row['hugging_face_showcase'])} | "
+            f"| `{row['name']}` | {_hf(row['hugging_face_showcase'])} | "
             f"{row['rationale']} |"
         )
     lines.extend(
