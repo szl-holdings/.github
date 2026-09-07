@@ -74,7 +74,7 @@ jobs:
           python -I -P .github/tests/test_archive_portfolio_governor_v2.py
           git diff --check
 
-      - name: Verify workflow mutation boundary, exact checkout, and action pins
+      - name: Verify mutation boundary, exact checkout, and action pins
         shell: bash
         run: |
           set -euo pipefail
@@ -93,7 +93,7 @@ jobs:
               raise SystemExit(f"unpinned actions: {bad}")
 
           required_workflow = (
-              "ref: ${{ github.sha }}",
+              "ref: $" + "{{ github.sha }}",
               "needs.preflight.outputs.needs_restore == 'true'",
               "environment: production",
               "test \"$(git rev-parse HEAD)\" = \"$GITHUB_SHA\"",
@@ -194,7 +194,7 @@ jobs:
             --mode audit \
             --report "$PREFLIGHT_REPORT"
 
-      - name: Classify whether a protected restoration is still required
+      - name: Classify whether protected restoration is required
         id: classify
         shell: bash
         run: |
@@ -205,8 +205,8 @@ jobs:
           import re
           from pathlib import Path
 
-          report_path = Path(os.environ["PREFLIGHT_REPORT"])
-          text = report_path.read_text(encoding="utf-8")
+          path = Path(os.environ["PREFLIGHT_REPORT"])
+          text = path.read_text(encoding="utf-8")
           if re.search(r"(?:github_pat_|gh[pousr]_|hf_)[A-Za-z0-9_]{12,}", text):
               raise SystemExit("credential-shaped material in preflight receipt")
           report = json.loads(text)
