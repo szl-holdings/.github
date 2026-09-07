@@ -37,6 +37,7 @@ concurrency:
 
 env:
   VALIDATION_REPORT: /tmp/archive-portfolio-v2-validation.json
+  PREFLIGHT_REPORT: /tmp/archive-portfolio-v2-preflight.json
   AUDIT_REPORT: /tmp/archive-portfolio-v2-audit.json
   APPLY_REPORT: /tmp/archive-portfolio-v2-apply.json
 
@@ -73,7 +74,7 @@ jobs:
           python -I -P .github/tests/test_archive_portfolio_governor_v2.py
           git diff --check
 
-      - name: Verify workflow mutation boundary and action pins
+      - name: Verify workflow mutation boundary, exact checkout, and action pins
         shell: bash
         run: |
           set -euo pipefail
@@ -83,32 +84,58 @@ jobs:
 
           workflow = Path(".github/workflows/archive-portfolio-governor-v2.yml").read_text()
           uses = re.findall(r"^\s*uses:\s*(\S+)\s*(?:#.*)?$", workflow, re.MULTILINE)
-          bad = [value for value in uses if not re.fullmatch(r"[^@\s]+@[0-9a-f]{40}", value)]
+          bad = [
+              value
+              for value in uses
+              if not re.fullmatch(r"[^@\s]+@[0-9a-f]{40}", value)
+          ]
           if bad:
               raise SystemExit(f"unpinned actions: {bad}")
 
+          required_workflow = (
+              "ref: ${{ github.sha }}",
+              "needs.preflight.outputs.needs_restore == 'true'",
+              "environment: production",
+              "test \"$(git rev-parse HEAD)\" = \"$GITHUB_SHA\"",
+          )
+          missing_workflow = [
+              value for value in required_workflow if value not in workflow
+          ]
+          if missing_workflow:
+              raise SystemExit(
+                  f"missing exact-head workflow contracts: {missing_workflow}"
+              )
+
           source = Path(".github/scripts/archive_portfolio_governor_v2.py").read_text()
-          required = (
+          required_source = (
               '{"archived": False}',
               '"archive_true_mutations": False',
               '"visibility_mutations": False',
               '"history_deletions": False',
               '"hugging_face_mutations": False',
           )
-          missing = [value for value in required if value not in source]
-          if missing:
-              raise SystemExit(f"missing mutation-boundary literals: {missing}")
+          missing_source = [
+              value for value in required_source if value not in source
+          ]
+          if missing_source:
+              raise SystemExit(
+                  f"missing mutation-boundary literals: {missing_source}"
+              )
 
-          forbidden = (
+          forbidden_source = (
               '{"archived": True}',
               '"visibility":',
               "/branches/protection",
               "/rulesets",
               "/actions/secrets",
           )
-          present = [value for value in forbidden if value in source]
+          present = [
+              value for value in forbidden_source if value in source
+          ]
           if present:
-              raise SystemExit(f"forbidden mutation literal present: {present}")
+              raise SystemExit(
+                  f"forbidden mutation literal present: {present}"
+              )
           print("workflow/controller boundary: PASS")
           PY
 
@@ -121,12 +148,104 @@ jobs:
           if-no-files-found: error
           retention-days: 90
 
-  restore:
-    name: portfolio-v2/restore
+  preflight:
+    name: portfolio-v2/preflight
     if: >-
       github.event_name == 'push' ||
       (github.event_name == 'workflow_dispatch' && inputs.apply)
     needs: validate
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    outputs:
+      needs_restore: ${{ steps.classify.outputs.needs_restore }}
+      restore_count: ${{ steps.classify.outputs.restore_count }}
+      source_revision: ${{ steps.classify.outputs.source_revision }}
+    steps:
+      - name: Harden runner
+        uses: step-security/harden-runner@05e31511f85b41b11d1cf0ef85d0992719546e2c # v2.21.0
+        with:
+          egress-policy: audit
+
+      - name: Checkout exact workflow-event source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+          fetch-depth: 1
+
+      - name: Set up exact Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12.10"
+
+      - name: Verify exact event source
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+
+      - name: Audit live archive state without production authority
+        env:
+          SZL_REPO_ADMIN_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -I -P .github/scripts/archive_portfolio_governor_v2.py \
+            --mode audit \
+            --report "$PREFLIGHT_REPORT"
+
+      - name: Classify whether a protected restoration is still required
+        id: classify
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json
+          import os
+          import re
+          from pathlib import Path
+
+          report_path = Path(os.environ["PREFLIGHT_REPORT"])
+          text = report_path.read_text(encoding="utf-8")
+          if re.search(r"(?:github_pat_|gh[pousr]_|hf_)[A-Za-z0-9_]{12,}", text):
+              raise SystemExit("credential-shaped material in preflight receipt")
+          report = json.loads(text)
+          if report.get("status") != "PASS":
+              raise SystemExit(
+                  f"preflight failed: {report.get('error') or report.get('failures')}"
+              )
+          plan = report.get("final") or {}
+          restore = plan.get("restore") or []
+          allowed = ["szl-atelier", "szl-mesh", "szl-router", "uds-bundles"]
+          if any(name not in allowed for name in restore):
+              raise SystemExit(f"preflight restore set escaped allowlist: {restore}")
+          with Path(os.environ["GITHUB_OUTPUT"]).open("a", encoding="utf-8") as output:
+              output.write(f"needs_restore={'true' if restore else 'false'}\n")
+              output.write(f"restore_count={len(restore)}\n")
+              output.write(f"source_revision={report.get('source_revision', 'UNAVAILABLE')}\n")
+          print(json.dumps({
+              "needs_restore": bool(restore),
+              "restore": restore,
+              "already_restored": plan.get("already_restored") or [],
+              "retained_archived": len(plan.get("retain_archived") or []),
+          }, indent=2, sort_keys=True))
+          PY
+
+      - name: Upload preflight receipt
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: archive-portfolio-v2-preflight-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ env.PREFLIGHT_REPORT }}
+          if-no-files-found: error
+          retention-days: 90
+
+  restore:
+    name: portfolio-v2/restore
+    if: >-
+      needs.preflight.result == 'success' &&
+      needs.preflight.outputs.needs_restore == 'true'
+    needs: [validate, preflight]
     runs-on: ubuntu-24.04
     timeout-minutes: 25
     environment: production
@@ -136,10 +255,10 @@ jobs:
         with:
           egress-policy: audit
 
-      - name: Checkout exact protected-main source
+      - name: Checkout immutable workflow-event source
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: main
+          ref: ${{ github.sha }}
           persist-credentials: false
           fetch-depth: 1
 
@@ -153,6 +272,7 @@ jobs:
         run: |
           set -euo pipefail
           test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          test "${{ needs.preflight.outputs.source_revision }}" = "$GITHUB_SHA"
 
       - name: Audit live provider state before mutation
         id: audit
@@ -216,6 +336,10 @@ jobs:
               raise SystemExit(
                   f"restoration failed: {report.get('error') or report.get('failures')}"
               )
+          if report.get("source_revision") != os.environ["GITHUB_SHA"]:
+              raise SystemExit(
+                  f"receipt source drift: {report.get('source_revision')}"
+              )
           final = report.get("final") or {}
           expected = ["szl-atelier", "szl-mesh", "szl-router", "uds-bundles"]
           if final.get("restore"):
@@ -253,3 +377,21 @@ jobs:
               "source_revision": report.get("source_revision"),
           }, indent=2, sort_keys=True))
           PY
+
+  converged:
+    name: portfolio-v2/already-converged
+    if: >-
+      needs.preflight.result == 'success' &&
+      needs.preflight.outputs.needs_restore == 'false'
+    needs: [validate, preflight]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 3
+    steps:
+      - name: Record idempotent convergence
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "${{ needs.preflight.outputs.restore_count }}" = "0"
+          test "${{ needs.preflight.outputs.source_revision }}" = "$GITHUB_SHA"
+          printf '%s\n' \
+            'Archive portfolio v2 is already converged; no production environment review or repository mutation was requested.'
