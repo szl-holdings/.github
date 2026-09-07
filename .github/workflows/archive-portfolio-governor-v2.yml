@@ -1,0 +1,255 @@
+name: Archive portfolio governor v2
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "governance/archive-portfolio-v2.json"
+      - ".github/scripts/archive_portfolio_governor_v2.py"
+      - ".github/tests/test_archive_portfolio_governor_v2.py"
+      - ".github/workflows/archive-portfolio-governor-v2.yml"
+      - "docs/ARCHIVE_PORTFOLIO_V2.md"
+      - "audit/archive-revival-wave-20260906/README.md"
+  push:
+    branches: [main]
+    paths:
+      - "governance/archive-portfolio-v2.json"
+      - ".github/scripts/archive_portfolio_governor_v2.py"
+      - ".github/tests/test_archive_portfolio_governor_v2.py"
+      - ".github/workflows/archive-portfolio-governor-v2.yml"
+      - "docs/ARCHIVE_PORTFOLIO_V2.md"
+      - "audit/archive-revival-wave-20260906/README.md"
+  workflow_dispatch:
+    inputs:
+      apply:
+        description: "Apply the four exact manifest-authorized unarchives"
+        required: false
+        type: boolean
+        default: true
+
+permissions:
+  actions: read
+  contents: read
+
+concurrency:
+  group: archive-portfolio-governor-v2
+  cancel-in-progress: false
+
+env:
+  VALIDATION_REPORT: /tmp/archive-portfolio-v2-validation.json
+  AUDIT_REPORT: /tmp/archive-portfolio-v2-audit.json
+  APPLY_REPORT: /tmp/archive-portfolio-v2-apply.json
+
+jobs:
+  validate:
+    name: portfolio-v2/validate
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - name: Harden runner
+        uses: step-security/harden-runner@05e31511f85b41b11d1cf0ef85d0992719546e2c # v2.21.0
+        with:
+          egress-policy: audit
+
+      - name: Checkout exact candidate
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 1
+
+      - name: Set up exact Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12.10"
+
+      - name: Prove manifest, controller, and adversarial contracts
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -I -P -m py_compile .github/scripts/archive_portfolio_governor_v2.py
+          python -I -P .github/scripts/archive_portfolio_governor_v2.py \
+            --mode validate \
+            --report "$VALIDATION_REPORT"
+          python -I -P .github/tests/test_archive_portfolio_governor_v2.py
+          git diff --check
+
+      - name: Verify workflow mutation boundary and action pins
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+          import re
+
+          workflow = Path(".github/workflows/archive-portfolio-governor-v2.yml").read_text()
+          uses = re.findall(r"^\s*uses:\s*(\S+)\s*(?:#.*)?$", workflow, re.MULTILINE)
+          bad = [value for value in uses if not re.fullmatch(r"[^@\s]+@[0-9a-f]{40}", value)]
+          if bad:
+              raise SystemExit(f"unpinned actions: {bad}")
+
+          source = Path(".github/scripts/archive_portfolio_governor_v2.py").read_text()
+          required = (
+              '{"archived": False}',
+              '"archive_true_mutations": False',
+              '"visibility_mutations": False',
+              '"history_deletions": False',
+              '"hugging_face_mutations": False',
+          )
+          missing = [value for value in required if value not in source]
+          if missing:
+              raise SystemExit(f"missing mutation-boundary literals: {missing}")
+
+          forbidden = (
+              '{"archived": True}',
+              '"visibility":',
+              "/branches/protection",
+              "/rulesets",
+              "/actions/secrets",
+          )
+          present = [value for value in forbidden if value in source]
+          if present:
+              raise SystemExit(f"forbidden mutation literal present: {present}")
+          print("workflow/controller boundary: PASS")
+          PY
+
+      - name: Upload validation receipt
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: archive-portfolio-v2-validation-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ env.VALIDATION_REPORT }}
+          if-no-files-found: error
+          retention-days: 90
+
+  restore:
+    name: portfolio-v2/restore
+    if: >-
+      github.event_name == 'push' ||
+      (github.event_name == 'workflow_dispatch' && inputs.apply)
+    needs: validate
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    environment: production
+    steps:
+      - name: Harden runner
+        uses: step-security/harden-runner@05e31511f85b41b11d1cf0ef85d0992719546e2c # v2.21.0
+        with:
+          egress-policy: audit
+
+      - name: Checkout exact protected-main source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: main
+          persist-credentials: false
+          fetch-depth: 1
+
+      - name: Set up exact Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12.10"
+
+      - name: Verify checkout identity
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+
+      - name: Audit live provider state before mutation
+        id: audit
+        continue-on-error: true
+        env:
+          SZL_REPO_ADMIN_TOKEN: ${{ secrets.SZL_ORG_ADMIN_TOKEN || secrets.ORG_ADMIN_TOKEN || secrets.SZL_GITHUB_TOKEN || secrets.GH_PAT || github.token }}
+        shell: bash
+        run: |
+          set +e
+          python -I -P .github/scripts/archive_portfolio_governor_v2.py \
+            --mode audit \
+            --report "$AUDIT_REPORT"
+          code=$?
+          echo "exit_code=$code" >> "$GITHUB_OUTPUT"
+          exit 0
+
+      - name: Apply exact manifest-authorized restoration wave
+        id: apply
+        env:
+          SZL_REPO_ADMIN_TOKEN: ${{ secrets.SZL_ORG_ADMIN_TOKEN || secrets.ORG_ADMIN_TOKEN || secrets.SZL_GITHUB_TOKEN || secrets.GH_PAT || github.token }}
+        shell: bash
+        run: |
+          set +e
+          python -I -P .github/scripts/archive_portfolio_governor_v2.py \
+            --mode apply \
+            --report "$APPLY_REPORT"
+          code=$?
+          echo "exit_code=$code" >> "$GITHUB_OUTPUT"
+          exit 0
+
+      - name: Publish secret-free restoration evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: archive-portfolio-v2-restoration-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            ${{ env.AUDIT_REPORT }}
+            ${{ env.APPLY_REPORT }}
+          if-no-files-found: error
+          retention-days: 90
+
+      - name: Enforce exact readback and retained-tombstone count
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json
+          import os
+          import re
+          from pathlib import Path
+
+          path = Path(os.environ["APPLY_REPORT"])
+          if not path.is_file():
+              raise SystemExit("apply receipt missing")
+          text = path.read_text(encoding="utf-8")
+          if re.search(r"(?:github_pat_|gh[pousr]_|hf_)[A-Za-z0-9_]{12,}", text):
+              raise SystemExit("credential-shaped material in receipt")
+          report = json.loads(text)
+          if report.get("status") != "PASS":
+              raise SystemExit(
+                  f"restoration failed: {report.get('error') or report.get('failures')}"
+              )
+          final = report.get("final") or {}
+          expected = ["szl-atelier", "szl-mesh", "szl-router", "uds-bundles"]
+          if final.get("restore"):
+              raise SystemExit(f"repositories remained archived: {final['restore']}")
+          if final.get("already_restored") != expected:
+              raise SystemExit(
+                  f"restored set mismatch: {final.get('already_restored')}"
+              )
+          if len(final.get("retain_archived") or []) != 30:
+              raise SystemExit("retained tombstone count must remain 30")
+          if final.get("unclassified_archived"):
+              raise SystemExit(
+                  f"unclassified archives: {final['unclassified_archived']}"
+              )
+          if final.get("unexpected_active_tombstones"):
+              raise SystemExit(
+                  "unexpected active tombstones: "
+                  + repr(final["unexpected_active_tombstones"])
+              )
+          for key in (
+              "archive_true_mutations",
+              "visibility_mutations",
+              "history_deletions",
+              "default_branch_mutations",
+              "protection_or_ruleset_mutations",
+              "hugging_face_mutations",
+              "secrets_recorded",
+          ):
+              if report.get(key) is not False:
+                  raise SystemExit(f"mutation invariant failed: {key}")
+          print(json.dumps({
+              "status": report["status"],
+              "restored": final["already_restored"],
+              "retained_archived": len(final["retain_archived"]),
+              "source_revision": report.get("source_revision"),
+          }, indent=2, sort_keys=True))
+          PY
