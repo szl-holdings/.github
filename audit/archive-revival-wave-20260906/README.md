@@ -24,6 +24,20 @@ Retain twenty-four consolidation tombstones and six immutable historical records
 The manifest contains the exact canonical target and Hugging Face showcase for
 every archived repository.
 
+## Production review
+
+The restoration job retains the `production` environment gate. A solo-builder
+owner review is admitted only through
+`.github/workflows/owner-deployment-review-bridge.yml`, which requires an issue
+authored by the exact estate owner and binds the decision to one repository, one
+protected-main SHA, one workflow run, one workflow path, and the exact
+`production` environment ID. Its provider review and post-review readback are
+retained as a secret-free artifact and issue receipt.
+
+The review bridge cannot approve another workflow, environment, branch, SHA, or
+repository, and it cannot mutate repository settings, source, visibility,
+protections, secrets, or Hugging Face.
+
 ## Evidence boundary
 
 Merging this source contract is not an unarchive claim. The protected-main
