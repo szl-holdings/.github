@@ -26,7 +26,7 @@ SHA = "79a8f2add42913b0831260574145437efe56af4a"
 SUCCESSOR_SHA = "1" * 40
 RUN_ID = 34069683698
 ENV_ID = 18757132984
-REQUIRED_SUCCESSOR_PATHS = {
+SUCCESSOR_PATHS = {
     ".github/scripts/owner_deployment_review_bridge.py",
     ".github/tests/test_owner_deployment_review_bridge.py",
     ".github/workflows/owner-deployment-review-bridge.yml",
@@ -45,9 +45,7 @@ def command(**overrides):
         "head_sha": SHA,
         "workflow_path": MODULE.WORKFLOW_PATH,
         "decision": "approved",
-        "reason": (
-            "Execute the reviewed four-source archive restoration wave."
-        ),
+        "reason": "Execute the reviewed four-source archive restoration wave.",
     }
     value.update(overrides)
     return value
@@ -87,9 +85,7 @@ class ParsingContracts(unittest.TestCase):
 
     def test_duplicate_json_key_is_rejected(self):
         body = '```json\n{"schema":"a","schema":"b"}\n```'
-        with self.assertRaisesRegex(
-            MODULE.ReviewError, "duplicate JSON key"
-        ):
+        with self.assertRaisesRegex(MODULE.ReviewError, "duplicate JSON key"):
             MODULE.parse_command(body)
 
     def test_extra_key_is_rejected(self):
@@ -108,9 +104,7 @@ class ParsingContracts(unittest.TestCase):
 
     def test_wrong_environment_is_rejected(self):
         value = command(environment_name="staging")
-        with self.assertRaisesRegex(
-            MODULE.ReviewError, "environment_name"
-        ):
+        with self.assertRaisesRegex(MODULE.ReviewError, "environment_name"):
             MODULE.parse_command(
                 "```json\n" + json.dumps(value) + "\n```"
             )
@@ -124,9 +118,7 @@ class ParsingContracts(unittest.TestCase):
 
     def test_credential_shape_is_rejected(self):
         value = command(reason="Approve with github_pat_" + "x" * 40)
-        with self.assertRaisesRegex(
-            MODULE.ReviewError, "credential-shaped"
-        ):
+        with self.assertRaisesRegex(MODULE.ReviewError, "credential-shaped"):
             MODULE.parse_command(
                 "```json\n" + json.dumps(value) + "\n```"
             )
@@ -135,14 +127,10 @@ class ParsingContracts(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / "event.json"
             path.write_text(
-                json.dumps(
-                    issue_event(user={"login": "someone-else"})
-                ),
+                json.dumps(issue_event(user={"login": "someone-else"})),
                 encoding="utf-8",
             )
-            with self.assertRaisesRegex(
-                MODULE.ReviewError, "exact estate owner"
-            ):
+            with self.assertRaisesRegex(MODULE.ReviewError, "exact estate owner"):
                 MODULE.load_event(path)
 
 
@@ -154,124 +142,140 @@ class FakeClient:
         current_user_can_approve=True,
         compare_paths=None,
         ahead_by=1,
-        behind_by=0,
-        compare_status="ahead",
-        merge_base_sha=SHA,
+        stale_pending_reads=0,
+        never_release=False,
+        initially_released=False,
+        released_conclusion=None,
     ):
         self.branch_sha = branch_sha
         self.current_user_can_approve = current_user_can_approve
-        self.compare_paths = (
-            set(compare_paths)
-            if compare_paths is not None
-            else set(REQUIRED_SUCCESSOR_PATHS)
-        )
+        self.compare_paths = set(compare_paths or SUCCESSOR_PATHS)
         self.ahead_by = ahead_by
-        self.behind_by = behind_by
-        self.compare_status = compare_status
-        self.merge_base_sha = merge_base_sha
-        self.approved = False
+        self.stale_pending_reads = stale_pending_reads
+        self.never_release = never_release
+        self.released = initially_released
+        self.released_conclusion = released_conclusion
+        self.posted = False
+        self.pending_reads_after_post = 0
         self.posts = []
-        self.completed = False
+
+    def _run(self):
+        status = "waiting"
+        if self.released:
+            status = "completed" if self.released_conclusion else "in_progress"
+        return {
+            "head_branch": "main",
+            "head_sha": SHA,
+            "path": MODULE.WORKFLOW_PATH,
+            "event": "push",
+            "status": status,
+            "conclusion": self.released_conclusion,
+        }
+
+    def _pending(self):
+        if self.posted:
+            self.pending_reads_after_post += 1
+            if (
+                not self.never_release
+                and self.pending_reads_after_post > self.stale_pending_reads
+            ):
+                self.released = True
+        if self.released:
+            return []
+        return [
+            {
+                "environment": {
+                    "id": ENV_ID,
+                    "name": MODULE.ENVIRONMENT,
+                },
+                "current_user_can_approve": self.current_user_can_approve,
+            }
+        ]
 
     def get(self, path):
         if path.endswith("/branches/main"):
             return {"commit": {"sha": self.branch_sha}}
         if "/compare/" in path:
             return {
-                "status": self.compare_status,
+                "status": "ahead",
                 "ahead_by": self.ahead_by,
-                "behind_by": self.behind_by,
-                "merge_base_commit": {"sha": self.merge_base_sha},
+                "behind_by": 0,
+                "merge_base_commit": {"sha": SHA},
                 "files": [
                     {"filename": value}
                     for value in sorted(self.compare_paths)
                 ],
             }
         if path.endswith("/pending_deployments"):
-            if self.approved or self.completed:
-                return []
-            return [
-                {
-                    "environment": {
-                        "id": ENV_ID,
-                        "name": MODULE.ENVIRONMENT,
-                    },
-                    "current_user_can_approve": (
-                        self.current_user_can_approve
-                    ),
-                }
-            ]
+            return self._pending()
         if path.endswith(str(RUN_ID)):
-            if self.completed:
-                return {
-                    "head_branch": "main",
-                    "head_sha": SHA,
-                    "path": MODULE.WORKFLOW_PATH,
-                    "event": "push",
-                    "status": "completed",
-                    "conclusion": "success",
-                }
-            return {
-                "head_branch": "main",
-                "head_sha": SHA,
-                "path": MODULE.WORKFLOW_PATH,
-                "event": "push",
-                "status": (
-                    "in_progress" if self.approved else "waiting"
-                ),
-                "conclusion": None,
-            }
+            return self._run()
         raise AssertionError(path)
 
     def post(self, path, payload):
         self.posts.append((path, payload))
-        self.approved = True
-        return {"status": "approved"}
+        self.posted = True
+        return {"status": "accepted"}
+
+
+def review(client, *, attempts=6):
+    return MODULE.review(
+        command(),
+        client,
+        release_attempts=attempts,
+        release_initial_delay=0,
+        release_max_delay=0,
+        sleeper=lambda _seconds: None,
+    )
 
 
 class ProviderContracts(unittest.TestCase):
-    def test_exact_pending_deployment_is_approved_and_read_back(self):
+    def test_immediate_release_is_approved_and_read_back(self):
         client = FakeClient()
-        report = MODULE.review(command(), client)
-        self.assertEqual(
-            report["status"], "APPROVED_READBACK_VERIFIED"
-        )
-        self.assertEqual(
-            report["main_binding"]["mode"], "EXACT_PROTECTED_MAIN"
-        )
-        self.assertTrue(report["mutated"])
+        report = review(client)
+        self.assertEqual(report["status"], "APPROVED_READBACK_VERIFIED")
+        self.assertEqual(report["release"]["attempts"], 1)
+        self.assertEqual(report["main_binding"]["mode"], "EXACT_PROTECTED_MAIN")
         self.assertEqual(len(client.posts), 1)
-        self.assertEqual(
-            client.posts[0][1]["environment_ids"], [ENV_ID]
-        )
+        self.assertEqual(client.posts[0][1]["environment_ids"], [ENV_ID])
         self.assertEqual(client.posts[0][1]["state"], "approved")
         self.assertNotIn(command()["reason"], json.dumps(report))
 
+    def test_eventually_consistent_pending_state_is_polled(self):
+        client = FakeClient(stale_pending_reads=2)
+        report = review(client)
+        self.assertEqual(report["status"], "APPROVED_READBACK_VERIFIED")
+        self.assertEqual(report["release"]["attempts"], 3)
+        self.assertFalse(
+            report["release"]["final"]["exact_environment_pending"]
+        )
+        self.assertEqual(len(client.posts), 1)
+
+    def test_bounded_polling_times_out_fail_closed(self):
+        client = FakeClient(never_release=True)
+        with self.assertRaisesRegex(MODULE.ReviewError, "bounded release polling"):
+            review(client, attempts=3)
+        self.assertEqual(len(client.posts), 1)
+
     def test_one_commit_review_bridge_successor_is_approved(self):
         client = FakeClient(branch_sha=SUCCESSOR_SHA)
-        report = MODULE.review(command(), client)
+        report = review(client)
         self.assertEqual(
             report["main_binding"]["mode"],
             "EXACT_REVIEW_BRIDGE_SUCCESSOR",
         )
         self.assertEqual(
             set(report["main_binding"]["successor_paths"]),
-            REQUIRED_SUCCESSOR_PATHS,
+            SUCCESSOR_PATHS,
         )
-        self.assertEqual(len(client.posts), 1)
 
     def test_unrelated_successor_path_blocks_review(self):
         client = FakeClient(
             branch_sha=SUCCESSOR_SHA,
-            compare_paths=(
-                REQUIRED_SUCCESSOR_PATHS
-                | {"governance/archive-portfolio-v2.json"}
-            ),
+            compare_paths=SUCCESSOR_PATHS | {"governance/archive-portfolio-v2.json"},
         )
-        with self.assertRaisesRegex(
-            MODULE.ReviewError, "successor paths invalid"
-        ):
-            MODULE.review(command(), client)
+        with self.assertRaisesRegex(MODULE.ReviewError, "successor paths invalid"):
+            review(client)
         self.assertEqual(client.posts, [])
 
     def test_multi_commit_successor_blocks_review(self):
@@ -279,28 +283,35 @@ class ProviderContracts(unittest.TestCase):
         with self.assertRaisesRegex(
             MODULE.ReviewError, "one-commit review-bridge successor"
         ):
-            MODULE.review(command(), client)
+            review(client)
         self.assertEqual(client.posts, [])
 
     def test_provider_cannot_approve_blocks_review(self):
         client = FakeClient(current_user_can_approve=False)
         with self.assertRaisesRegex(MODULE.ReviewError, "cannot approve"):
-            MODULE.review(command(), client)
+            review(client)
         self.assertEqual(client.posts, [])
 
-    def test_successfully_completed_run_is_idempotent(self):
-        client = FakeClient()
-        client.completed = True
-        report = MODULE.review(command(), client)
-        self.assertEqual(report["status"], "ALREADY_COMPLETED")
+    def test_already_released_run_is_idempotent(self):
+        client = FakeClient(initially_released=True)
+        report = review(client)
+        self.assertEqual(report["status"], "ALREADY_RELEASED")
         self.assertFalse(report["mutated"])
+        self.assertEqual(client.posts, [])
+
+    def test_completed_failed_run_is_still_an_already_released_gate(self):
+        client = FakeClient(
+            initially_released=True,
+            released_conclusion="failure",
+        )
+        report = review(client)
+        self.assertEqual(report["status"], "ALREADY_RELEASED")
+        self.assertEqual(report["provider_conclusion"], "failure")
         self.assertEqual(client.posts, [])
 
     def test_report_rejects_token_shape(self):
         with tempfile.TemporaryDirectory() as directory:
-            with self.assertRaisesRegex(
-                MODULE.ReviewError, "credential-shaped"
-            ):
+            with self.assertRaisesRegex(MODULE.ReviewError, "credential-shaped"):
                 MODULE.write_report(
                     Path(directory) / "receipt.json",
                     {"value": "ghp_" + "x" * 30},
