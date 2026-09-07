@@ -1,12 +1,12 @@
 {
   "schema": 3,
-  "_comment": "Active Living Anatomy evidence registry after the 2026-09-03 source-bound restoration. GitHub szl-holdings/anatomy is authoritative; the public SZLHOLDINGS/anatomy Hugging Face Space is an active Docker deployment mirror; a-11-oy.com is the product entry point. All public checks are credential-free and fail closed. Every invariant surface must preserve exactly the canonical locked-8 {F1,F4,F7,F11,F12,F18,F19,F22} and the Lambda=Conjecture-1 honesty label. Marker-block sources are additionally compared capability-for-capability. The HF runtime also exposes exact Anatomy and Second Brain source revisions, 575 public handles, handles-only retrieval, zero private graph nodes, and read-only authority through its version, evidence, and Brain contracts.",
+  "_comment": "Active Living Anatomy evidence registry after the source-bound restoration. GitHub szl-holdings/anatomy is authoritative; betterwithage/anatomy is the active public Docker deployment mirror; a-11-oy.com is the product entry point. The retired SZLHOLDINGS/anatomy origin is not an active surface. All public checks are credential-free and fail closed. Every invariant surface must preserve exactly the canonical locked-8 {F1,F4,F7,F11,F12,F18,F19,F22} and the Lambda=Conjecture-1 honesty label. Marker-block sources are additionally compared capability-for-capability. The HF runtime also exposes exact Anatomy and Second Brain source revisions, public handles, handles-only retrieval, zero private graph nodes, and read-only authority through its version, evidence, and Brain contracts.",
   "canonical_locked": ["F1", "F4", "F7", "F11", "F12", "F18", "F19", "F22"],
   "surfaces": [
     { "id": "a11oy-console",         "kind": "github", "repo": "szl-holdings/a11oy",     "path": "pages/console.html",         "extract": "marker_block" },
     { "id": "killinchu-elite",       "kind": "github", "repo": "szl-holdings/killinchu", "path": "killinchu_elite_console.py", "extract": "marker_block" },
     { "id": "anatomy-src",           "kind": "github", "repo": "szl-holdings/anatomy",   "paths": ["data.js", "index.html"],   "extract": "invariant_scan" },
-    { "id": "hf-anatomy",            "kind": "url",    "urls": ["https://szlholdings-anatomy.hf.space/data.js", "https://szlholdings-anatomy.hf.space/index.html"], "extract": "invariant_scan" },
+    { "id": "hf-anatomy",            "kind": "url",    "urls": ["https://betterwithage-anatomy.hf.space/data.js", "https://betterwithage-anatomy.hf.space/index.html"], "extract": "invariant_scan" },
     { "id": "a11oy-anatomy-product", "kind": "url",    "urls": ["https://a-11-oy.com/anatomy-map/data.js"], "extract": "invariant_scan" }
   ]
 }
