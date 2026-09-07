@@ -15,6 +15,8 @@ _ACTIVE_WORKFLOWS = (
     _WORKFLOW_DIR / "anatomy-map-product-drift.yml",
     _WORKFLOW_DIR / "reusable-anatomy-map-drift.yml",
 )
+_CANONICAL_HF_HOST = "betterwithage-anatomy.hf.space"
+_RETIRED_HF_HOST = "szlholdings-anatomy.hf.space"
 
 
 class TestAnatomyProductContract(unittest.TestCase):
@@ -39,14 +41,15 @@ class TestAnatomyProductContract(unittest.TestCase):
         self.assertEqual(
             urls,
             [
-                "https://szlholdings-anatomy.hf.space/data.js",
-                "https://szlholdings-anatomy.hf.space/index.html",
+                f"https://{_CANONICAL_HF_HOST}/data.js",
+                f"https://{_CANONICAL_HF_HOST}/index.html",
             ],
         )
         for url in urls:
             parsed = urlsplit(url)
             self.assertEqual(parsed.scheme, "https")
-            self.assertEqual(parsed.hostname, "szlholdings-anatomy.hf.space")
+            self.assertEqual(parsed.hostname, _CANONICAL_HF_HOST)
+            self.assertNotEqual(parsed.hostname, _RETIRED_HF_HOST)
             self.assertIsNone(parsed.username)
             self.assertIsNone(parsed.password)
 
