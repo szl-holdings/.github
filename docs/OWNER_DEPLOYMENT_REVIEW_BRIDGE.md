@@ -41,7 +41,7 @@ The issue body must contain exactly one fenced JSON object:
 }
 ```
 
-The actual run ID, environment ID, and protected-main SHA must come from live
+The actual run ID, environment ID, and protected-main SHA come from live
 provider readback. The bridge rejects placeholders and stale values.
 
 ## Admission checks
@@ -52,15 +52,45 @@ Before the review endpoint can be called, the bridge proves:
 2. the title, schema, key set, repository, workflow path, decision, and
    environment name are exact;
 3. the run was triggered by `push` on `main` from the declared SHA;
-4. protected `main` still points to that exact SHA;
+4. protected `main` still points to that exact SHA, or is the exact one-commit
+   successor composed only of the reviewed bridge files;
 5. the run is waiting on one and only one pending deployment;
 6. the pending deployment has the declared `production` environment ID;
 7. GitHub reports that the selected owner credential can approve;
 8. the command and resulting receipt contain no credential-shaped material.
 
-After approval, the bridge re-reads the pending deployment set and workflow run.
-The exact environment must no longer be pending and the run identity must remain
-unchanged.
+## Eventual-consistency readback
+
+GitHub may accept a deployment review before its pending-deployment read API
+reflects the release. A single immediate GET is therefore not sufficient proof.
+After the review POST, the bridge polls the exact workflow run and exact
+production environment with bounded exponential backoff. Every observation
+revalidates repository, branch, workflow path, event, and head SHA.
+
+Release is proven when either:
+
+- the exact environment no longer appears in the pending set; or
+- the exact workflow run moves out of `waiting` while retaining the same
+  immutable identity.
+
+The polling window is bounded. If neither signal appears, the command fails
+closed and the issue remains open. The receipt stores the number of observations
+and a SHA-256 commitment to the observation sequence, not raw credentials.
+
+Environment release and workflow success remain separate states. The bridge can
+prove that the production gate released; only the archive governor can prove
+that the four repository settings changed and passed provider readback.
+
+## Archive workflow exact-head contract
+
+Before the environment gate is requested, a read-only preflight checks the live
+archive plan from the immutable workflow-event SHA. If no restoration remains,
+the production job is skipped entirely. When restoration is required, both
+preflight and mutation jobs check out `${{ github.sha }}` rather than the moving
+`main` ref and verify it against `GITHUB_SHA` before provider access.
+
+This prevents an owner issue or later protected merge from changing the source
+bytes beneath an already-created workflow run.
 
 ## Authority and mutation boundary
 
@@ -85,5 +115,5 @@ The bridge can review the pending deployment. It cannot:
 Every admitted or blocked command emits
 `szl.deployment-review-receipt/v1`, uploads it as a 90-day workflow artifact, and
 posts a compact, secret-free result on the owner issue. Successful commands are
-closed only after the provider review is read back. Blocked commands remain open
-with the exact bounded failure reason.
+closed only after bounded release readback. Blocked commands remain open with
+the exact bounded failure reason.
