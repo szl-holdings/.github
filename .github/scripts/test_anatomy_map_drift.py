@@ -105,13 +105,29 @@ def _surfaces(a11oy=None, killinchu=None, hf=None):
 
 class TestExtractors(unittest.TestCase):
     def test_hf_headers_are_optional_and_bearer_scoped(self):
-        with mock.patch.dict(os.environ, {"HF_TOKEN": ""}):
+        with mock.patch.dict(os.environ, {"HF_READ_TOKEN": ""}):
             self.assertNotIn("Authorization", amd._hf_headers())
-        with mock.patch.dict(os.environ, {"HF_TOKEN": "hf_test_secret"}):
+        with mock.patch.dict(os.environ, {"HF_READ_TOKEN": "hf_test_secret__000000"}):
             self.assertEqual(
                 amd._hf_headers()["Authorization"],
-                "Bearer hf_test_secret",
+                "Bearer hf_test_secret__000000",
             )
+
+    def test_hf_read_token_is_validated(self):
+        with mock.patch.dict(os.environ, {"HF_READ_TOKEN": "nonsense_token"}):
+            with self.assertRaisesRegex(
+                RuntimeError, "HF_READ_TOKEN is invalid format"
+            ):
+                amd._hf_headers()
+
+    def test_rejects_cross_origin_redirect_chain(self):
+        guard = amd._StrictHFRedirect(amd.HF_HOST)
+        req = mock.Mock()
+        req.full_url = f"{amd.HF_HOST}/spaces/szl-holdings/anatomy/raw/main/data.js"
+        with self.assertRaisesRegex(
+            RuntimeError, "HF fetch redirected to a different origin"
+        ):
+            guard.redirect_request(req, None, 302, "", {}, "https://evil.example/")
 
     def test_marker_block_found_and_bounded(self):
         b = amd.extract_marker_block("noise\n" + _block() + "\ntrailing")

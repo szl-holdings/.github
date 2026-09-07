@@ -62,6 +62,8 @@ import urllib.request
 
 GH_API = "https://api.github.com"
 HF_HOST = "https://huggingface.co"
+HF_READ_TOKEN_RE = re.compile(r"^hf_[A-Za-z0-9_-]{20,}$")
+HF_READ_TOKEN_ENV = "HF_READ_TOKEN"
 UA = {"User-Agent": "anatomy-map-drift/1.0"}
 
 # The one canonical locked-proven set. Doctrine v11, kernel c7c0ba17.
@@ -72,20 +74,56 @@ _BLOCK_START = "anatomy-map-tab-patch ::"
 _BLOCK_END = "end anatomy-map-tab-patch"
 
 
+def _is_same_origin(url: str, expected_origin: str) -> bool:
+    parsed = urllib.parse.urlsplit(url)
+    expected = urllib.parse.urlsplit(expected_origin)
+    return (
+        bool(parsed.scheme and parsed.netloc and expected.scheme and expected.netloc)
+        and parsed.scheme.lower() == expected.scheme.lower()
+        and parsed.netloc.lower() == expected.netloc.lower()
+    )
+
+
+class _StrictHFRedirect(urllib.request.HTTPRedirectHandler):
+    def __init__(self, expected_origin: str):
+        super().__init__()
+        self._expected_origin = expected_origin
+
+    def redirect_request(self, req, fp, code, msg, headers, newurl):  # noqa: ANN001
+        target = urllib.parse.urljoin(req.full_url, newurl)
+        if not _is_same_origin(target, self._expected_origin):
+            raise RuntimeError(
+                "HF fetch redirected to a different origin: "
+                f"{req.full_url} -> {target}"
+            )
+        return super().redirect_request(req, fp, code, msg, headers, newurl)
+
+
 # --------------------------------------------------------------------------- #
 # HTTP (stdlib, retry + backoff)
 # --------------------------------------------------------------------------- #
-def _http(url, headers=None, accept=None, retries=6):
+def _http(
+    url,
+    headers=None,
+    accept=None,
+    retries=6,
+    follow_redirects=True,
+    expected_origin: str | None = None,
+):
     last = None
     hdrs = dict(UA)
     if accept:
         hdrs["Accept"] = accept
     if headers:
         hdrs.update(headers)
+    opener = urllib.request.build_opener()
+    if follow_redirects and expected_origin:
+        opener = urllib.request.build_opener(_StrictHFRedirect(expected_origin))
+
     for attempt in range(retries):
         try:
             req = urllib.request.Request(url, headers=hdrs)
-            with urllib.request.urlopen(req, timeout=45) as resp:
+            with opener.open(req, timeout=45) as resp:
                 return resp.status, resp.read()
         except urllib.error.HTTPError as e:
             if e.code in (401, 403, 404):
@@ -114,8 +152,12 @@ def _gh_headers():
 
 
 def _hf_headers():
-    """Return a bearer header only when the workflow supplied an HF token."""
-    tok = os.environ.get("HF_TOKEN")
+    """Return a bearer header only when a valid HF read token is supplied."""
+    tok = os.environ.get(HF_READ_TOKEN_ENV, "").strip()
+    if tok and HF_READ_TOKEN_RE.fullmatch(tok) is None:
+        raise RuntimeError(
+            "HF_READ_TOKEN is invalid format (expected HF token-like 'hf_*' value)."
+        )
     h = {}
     if tok:
         h["Authorization"] = f"Bearer {tok}"
@@ -134,7 +176,9 @@ def fetch_github_file(repo, path, ref="main"):
 def fetch_hf_file(repo, path, ref="main"):
     """Raw file content from a Hugging Face Space, authenticated when needed."""
     url = f"{HF_HOST}/spaces/{repo}/raw/{ref}/{urllib.parse.quote(path)}"
-    status, body = _http(url, headers=_hf_headers())
+    status, body = _http(
+        url, headers=_hf_headers(), expected_origin=HF_HOST
+    )
     if status != 200:
         raise RuntimeError(f"HF space {repo}:{path}@{ref}: HTTP {status}")
     return body.decode("utf-8", "replace")

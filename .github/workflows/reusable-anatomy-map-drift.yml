@@ -28,7 +28,8 @@ name: Reusable — Anatomy-map Drift Check
 #
 # The caller's built-in github.token covers public same-org repositories.
 # SZL_GITHUB_TOKEN remains an optional fallback for private GitHub surfaces;
-# the HF token fallback chain supports the anatomy Space whether public or private.
+# HF_READ_TOKEN provides read-only Hugging Face access when the Space needs
+# authentication.
 
 on:
   workflow_call:
@@ -42,17 +43,8 @@ on:
       SZL_GITHUB_TOKEN:
         description: "Optional PAT fallback for reading a (future) private surface."
         required: false
-      HF_ORG_TOKEN:
-        description: "Preferred organization token for reading a private HF Space."
-        required: false
-      HF_ORG_TOKEN1:
-        description: "Legacy organization token fallback for HF reads."
-        required: false
-      HF_TOKEN:
-        description: "Standard Hugging Face token fallback."
-        required: false
-      HF_WRITE_TOKEN:
-        description: "Legacy final fallback; only read access is used by this job."
+      HF_READ_TOKEN:
+        description: "Read-only Hugging Face token for anatomy map fetches."
         required: false
 
 permissions:
@@ -93,7 +85,7 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ github.token }}
           SZL_GITHUB_TOKEN: ${{ secrets.SZL_GITHUB_TOKEN }}
-          HF_TOKEN: ${{ secrets.HF_ORG_TOKEN || secrets.HF_ORG_TOKEN1 || secrets.HF_TOKEN || secrets.HF_WRITE_TOKEN }}
+          HF_READ_TOKEN: ${{ secrets.HF_READ_TOKEN }}
         run: |
           set +e
           EXTRA=""
@@ -135,7 +127,7 @@ jobs:
               echo "::error::Could not complete the anatomy-map drift check"
               echo "::error::(a surface failed to fetch -- network/auth). Set"
               echo "::error::SZL_GITHUB_TOKEN for private GitHub sources or an"
-              echo "::error::HF_ORG_TOKEN/HF_TOKEN secret for a private HF Space."
+              echo "::error::HF_READ_TOKEN for a private HF Space."
               echo "::error::Failed (not passed) so coverage can never look green when"
               echo "::error::the check could not actually run."
               exit 1

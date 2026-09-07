@@ -72,7 +72,7 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ github.token }}
           SZL_GITHUB_TOKEN: ${{ secrets.SZL_GITHUB_TOKEN }}
-          HF_TOKEN: ${{ secrets.HF_ORG_TOKEN || secrets.HF_ORG_TOKEN1 || secrets.HF_TOKEN || secrets.HF_WRITE_TOKEN }}
+          HF_READ_TOKEN: ${{ secrets.HF_READ_TOKEN }}
         run: |
           set +e
           python3 .github/scripts/anatomy_map_drift.py \
@@ -139,8 +139,8 @@ jobs:
               echo "::error::Could not complete the anatomy-map drift check"
               echo "::error::(a surface failed to fetch -- network/auth). Set the"
               echo "::error::SZL_GITHUB_TOKEN secret if the a11oy/killinchu repos are"
-              echo "::error::private, and configure HF_ORG_TOKEN (or the established"
-              echo "::error::HF token fallback) if the anatomy Space requires auth."
+              echo "::error::private, and configure HF_READ_TOKEN if the anatomy Space"
+              echo "::error::requires authentication."
               echo "::error::Failed (not passed) so coverage can never look"
               echo "::error::green when the check could not actually run."
               exit 1
