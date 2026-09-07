@@ -8,6 +8,7 @@ on:
       - ".github/tests/test_owner_deployment_review_bridge.py"
       - ".github/workflows/owner-deployment-review-bridge.yml"
       - "docs/OWNER_DEPLOYMENT_REVIEW_BRIDGE.md"
+      - "audit/archive-revival-wave-20260906/README.md"
   issues:
     types: [opened, reopened, edited]
 
@@ -60,7 +61,11 @@ jobs:
 
           workflow = Path(".github/workflows/owner-deployment-review-bridge.yml").read_text()
           uses = re.findall(r"^\s*uses:\s*(\S+)\s*(?:#.*)?$", workflow, re.MULTILINE)
-          unpinned = [value for value in uses if not re.fullmatch(r"[^@\s]+@[0-9a-f]{40}", value)]
+          unpinned = [
+              value
+              for value in uses
+              if not re.fullmatch(r"[^@\s]+@[0-9a-f]{40}", value)
+          ]
           if unpinned:
               raise SystemExit(f"unpinned actions: {unpinned}")
 
@@ -70,22 +75,24 @@ jobs:
               'REPOSITORY = "szl-holdings/.github"',
               'WORKFLOW_PATH = ".github/workflows/archive-portfolio-governor-v2.yml"',
               'ENVIRONMENT = "production"',
-              '"Deployments"',
           )
-          # The provider permission name is documented rather than requested in YAML;
-          # the workflow only receives an existing PAT from the secret store.
-          missing = [value for value in required[:-1] if value not in source]
+          missing = [value for value in required if value not in source]
           if missing:
               raise SystemExit(f"narrow authority markers missing: {missing}")
-          forbidden = (
-              "workflow_dispatch:",
-              "schedule:",
-              "pull_request_target:",
-              "environment:",
-              "contents: write",
-              "deployments: write",
+
+          forbidden_keys = (
+              r"^\s*workflow_dispatch\s*:",
+              r"^\s*schedule\s*:",
+              r"^\s*pull_request_target\s*:",
+              r"^\s*environment\s*:",
+              r"^\s*contents\s*:\s*write\s*$",
+              r"^\s*deployments\s*:\s*write\s*$",
           )
-          present = [value for value in forbidden if value in workflow]
+          present = [
+              pattern
+              for pattern in forbidden_keys
+              if re.search(pattern, workflow, re.MULTILINE)
+          ]
           if present:
               raise SystemExit(f"forbidden workflow authority present: {present}")
           print("owner deployment review authority: PASS")
@@ -167,7 +174,10 @@ jobs:
           ]
           if receipt.get('error'):
               lines.extend(['', f"Blocked: `{receipt['error']}`"])
-          Path('/tmp/deployment-review-comment.md').write_text('\n'.join(lines) + '\n', encoding='utf-8')
+          Path('/tmp/deployment-review-comment.md').write_text(
+              '\n'.join(lines) + '\n',
+              encoding='utf-8',
+          )
           PY
 
       - name: Publish deployment-review evidence
