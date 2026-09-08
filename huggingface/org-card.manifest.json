@@ -56,6 +56,10 @@
       "destination": "assets/hf-card-evidence.svg"
     },
     {
+      "source": "profile/assets/hf-card-router.svg",
+      "destination": "assets/hf-card-router.svg"
+    },
+    {
       "source": "profile/assets/evidence-lattice-v2.webp",
       "destination": "assets/evidence-lattice-v2.webp"
     },
@@ -85,12 +89,16 @@
       "mode": "rendered_markdown",
       "required_markers": [
         "Choose a path",
+        "Inference flagship",
+        "SZL Router",
         "Three commercial flagships",
+        "One inference flagship",
         "Five public domain bodies",
         "Six internal engines",
         "HISTORICAL",
         "SIMULATED",
         "assets/estate-command-system.svg",
+        "assets/hf-card-router.svg",
         "16 portfolio Spaces",
         "1 inventory-only Space"
       ]
