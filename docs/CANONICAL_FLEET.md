@@ -20,6 +20,8 @@ Source of the original public seven: `szl-holdings/platform` pull request #718 (
 |---|---|---|---|
 | `szl-holdings/szl-router` | `SZLHOLDINGS/llm-router-live` | `https://a-11-oy.com/code` | Source-owned, OpenAI-compatible sovereign-first LLM gateway with bounded fallback and per-answer receipts. |
 
+Proof origin: https://a11oy.net
+
 The inference flagship is counted separately from the original product-space seven because its Hugging Face Space is a generated public status and evidence surface; the credential-bearing gateway is deployed independently from this repository. The Space must be public and source-bound, but it must not expose provider credentials, private hosts, model weights, or internal network topology.
 
 The router authority chain is:
