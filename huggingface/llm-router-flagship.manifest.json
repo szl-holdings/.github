@@ -1,0 +1,59 @@
+{
+  "schema": "szl.flagship-binding/v1",
+  "id": "llm-router",
+  "display_name": "SZL LLM Router",
+  "classification": "FLAGSHIP",
+  "status_policy": "FAIL_CLOSED",
+  "authority_chain": [
+    "github-source",
+    "hugging-face-runtime",
+    "product-surface",
+    "proof-surface"
+  ],
+  "github_source": {
+    "repository": "szl-holdings/szl-router",
+    "default_branch": "main",
+    "canonical": true,
+    "must_be_archived": false
+  },
+  "hugging_face_runtime": {
+    "repository": "SZLHOLDINGS/llm-router-live",
+    "repo_type": "space",
+    "must_be_private": false,
+    "must_be_running": true,
+    "showcase_on_org_card": true,
+    "requested_pin_class": "FLAGSHIP"
+  },
+  "product_surface": {
+    "url": "https://a-11-oy.com/code",
+    "role": "integrated operator interface"
+  },
+  "proof_surface": {
+    "url": "https://a11oy.net",
+    "role": "receipts, evaluations, known bounds"
+  },
+  "runtime_contract": {
+    "openai_compatible": true,
+    "logical_models": ["szl-auto", "szl-fast", "szl-large", "szl-coder"],
+    "sovereign_first": true,
+    "routing_receipt_required": true,
+    "provider_keys_committed": false,
+    "public_effect_authority": false,
+    "honest_states": [
+      "LIVE",
+      "CONFIGURED_UNVERIFIED",
+      "OFFLINE_UNTIL_KEYED",
+      "UNAVAILABLE"
+    ]
+  },
+  "supersedes": {
+    "record": "a11oy/docs/series-a/HF_SPACE_CONSOLIDATION.md",
+    "scope": "The 2026-08-29 private/paused treatment for llm-router-live is superseded for this asset only. Historical records remain unchanged."
+  },
+  "doctrine": {
+    "lambda_uniqueness": "CONJECTURE_1_OPEN",
+    "model_proposes": true,
+    "policy_constrains": true,
+    "human_binds_consequential_action": true
+  }
+}
