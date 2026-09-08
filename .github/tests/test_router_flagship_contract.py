@@ -1,8 +1,6 @@
 from __future__ import annotations
 
-import copy
 import importlib.util
-import json
 import tempfile
 import unittest
 from pathlib import Path
@@ -28,7 +26,9 @@ class RouterFlagshipContractTests(unittest.TestCase):
         self.assertEqual("szl.router-flagship/v1", policy["schema"])
         self.assertEqual("INFERENCE_FLAGSHIP", policy["program"]["class"])
         self.assertFalse(
-            policy["authority_chain"]["hugging_face_mirror"]["credential_bearing_gateway"]
+            policy["authority_chain"]["hugging_face_mirror"][
+                "credential_bearing_gateway"
+            ]
         )
         self.assertFalse(policy["publication"]["target_creation_allowed"])
         self.assertFalse(policy["authority_boundary"]["router_can_self_authorize"])
@@ -41,31 +41,33 @@ class RouterFlagshipContractTests(unittest.TestCase):
                 MODULE.load_json(path)
 
     def test_router_asset_is_script_free(self) -> None:
-        svg = (ROOT / "profile/assets/hf-card-router.svg").read_text(encoding="utf-8")
+        svg = (ROOT / "profile/assets/hf-card-router.svg").read_text(
+            encoding="utf-8"
+        )
         self.assertIn("INFERENCE FLAGSHIP", svg)
         self.assertIn("szl-holdings/szl-router", svg)
         self.assertIn("SZLHOLDINGS/llm-router-live", svg)
         self.assertNotIn("<script", svg.casefold())
         self.assertNotIn("javascript:", svg.casefold())
 
-    def test_manifest_publishes_exact_router_asset(self) -> None:
+    def test_hub_card_renders_source_owned_router_asset_without_bundle_drift(self) -> None:
         manifest = MODULE.load_json(ROOT / "huggingface/org-card.manifest.json")
-        mapping = {
-            row["source"]: row["destination"]
-            for row in manifest["files"]
-        }
-        self.assertEqual(
-            "assets/hf-card-router.svg",
-            mapping["profile/assets/hf-card-router.svg"],
-        )
+        sources = {row["source"] for row in manifest["files"]}
+        self.assertNotIn("profile/assets/hf-card-router.svg", sources)
+
         markers = manifest["runtime_transforms"]["README.md"]["required_markers"]
         for marker in (
             "Inference flagship",
             "SZL Router",
             "One inference flagship",
-            "assets/hf-card-router.svg",
+            MODULE.HUB_ASSET_URL,
         ):
             self.assertIn(marker, markers)
+
+        card = (ROOT / "huggingface/org-card/README.md").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn(MODULE.HUB_ASSET_URL, card)
 
 
 if __name__ == "__main__":
