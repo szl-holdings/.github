@@ -50,24 +50,41 @@ class RouterFlagshipContractTests(unittest.TestCase):
         self.assertNotIn("<script", svg.casefold())
         self.assertNotIn("javascript:", svg.casefold())
 
-    def test_hub_card_renders_source_owned_router_asset_without_bundle_drift(self) -> None:
+    def test_portfolio_links_source_owned_router_asset_without_bundle_drift(self) -> None:
         manifest = MODULE.load_json(ROOT / "huggingface/org-card.manifest.json")
         sources = {row["source"] for row in manifest["files"]}
         self.assertNotIn("profile/assets/hf-card-router.svg", sources)
 
-        markers = manifest["runtime_transforms"]["README.md"]["required_markers"]
-        for marker in (
-            "Inference flagship",
-            "SZL Router",
-            "One inference flagship",
-            MODULE.HUB_ASSET_URL,
-        ):
-            self.assertIn(marker, markers)
-
-        card = (ROOT / "huggingface/org-card/README.md").read_text(
+        card = (ROOT / "profile/README.md").read_text(
             encoding="utf-8"
         )
         self.assertIn(MODULE.HUB_ASSET_URL, card)
+
+    def validate_with_profile_change(self, transform):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            for relative in (
+                "governance/router-flagship-v1.json", "profile/README.md",
+                "huggingface/org-card/README.md", "docs/CANONICAL_FLEET.md",
+                "huggingface/org-card/GOVERNANCE.md", MODULE.ASSET,
+                "huggingface/org-card.manifest.json",
+            ):
+                target = root / relative
+                target.parent.mkdir(parents=True, exist_ok=True)
+                target.write_bytes((ROOT / relative).read_bytes())
+            profile = root / "profile/README.md"
+            profile.write_text(transform(profile.read_text(encoding="utf-8")), encoding="utf-8")
+            return MODULE.validate(root)
+
+    def test_portfolio_cannot_drop_router_product_authority(self) -> None:
+        result = self.validate_with_profile_change(lambda text: text.replace(MODULE.PRODUCT, "https://example.com"))
+        self.assertEqual(result["status"], "FAIL")
+        self.assertIn(f"GitHub profile missing {MODULE.PRODUCT}", result["failures"])
+
+    def test_portfolio_cannot_drop_source_owned_router_art(self) -> None:
+        result = self.validate_with_profile_change(lambda text: text.replace(MODULE.HUB_ASSET_URL, "https://example.com/route.svg"))
+        self.assertEqual(result["status"], "FAIL")
+        self.assertIn("GitHub profile does not link source-owned router art", result["failures"])
 
 
 if __name__ == "__main__":

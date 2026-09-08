@@ -5,6 +5,7 @@ from __future__ import annotations
 import copy
 import importlib.util
 import json
+import tempfile
 import unittest
 from pathlib import Path
 from unittest.mock import patch
@@ -26,6 +27,54 @@ class EstateAlignmentContractTests(unittest.TestCase):
     def test_current_contract_and_documents_are_aligned(self) -> None:
         self.assertEqual(alignment.validate_contract(self.contract), [])
         self.assertEqual(alignment.validate_documents(ROOT, self.contract), [])
+
+    def document_failures_after(self, relative_path, transform):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            for relative in (
+                "profile/README.md",
+                "huggingface/org-card/README.md",
+                "huggingface/org-card/index.html",
+                "huggingface/org-card.manifest.json",
+            ):
+                target = root / relative
+                target.parent.mkdir(parents=True, exist_ok=True)
+                target.write_text((ROOT / relative).read_text(encoding="utf-8"), encoding="utf-8")
+            target = root / relative_path
+            target.write_text(transform(target.read_text(encoding="utf-8")), encoding="utf-8")
+            return alignment.validate_documents(root, self.contract)
+
+    def test_scientist_entry_points_cannot_lose_the_unsigned_boundary(self) -> None:
+        for relative, label in (
+            ("huggingface/org-card/README.md", "Hugging Face README"),
+            ("huggingface/org-card/index.html", "Hugging Face index"),
+        ):
+            with self.subTest(document=relative):
+                failures = self.document_failures_after(relative, lambda text: text.replace("unsigned", "signed").replace("Unsigned", "Signed"))
+                self.assertIn(f"{label}: missing scientific scope or limitation: unsigned", failures)
+
+    def test_github_portfolio_still_requires_its_taxonomy(self) -> None:
+        failures = self.document_failures_after(
+            "profile/README.md",
+            lambda text: text.replace("Three commercial flagships", "Products"),
+        )
+        self.assertIn("GitHub profile missing 'Three commercial flagships'", failures)
+
+    def test_manifest_must_preserve_the_scientific_readback_gate(self) -> None:
+        def remove_unsigned_marker(text):
+            manifest = json.loads(text)
+            manifest["runtime_transforms"]["README.md"]["required_markers"].remove("unsigned")
+            return json.dumps(manifest)
+        failures = self.document_failures_after("huggingface/org-card.manifest.json", remove_unsigned_marker)
+        self.assertIn("rendered README gate missing unsigned", failures)
+
+    def test_manifest_must_continue_publishing_the_machine_alignment_contract(self) -> None:
+        def remove_contract(text):
+            manifest = json.loads(text)
+            manifest["files"] = [row for row in manifest["files"] if row["source"] != "docs/ESTATE_ALIGNMENT_CONTRACT_V1.json"]
+            return json.dumps(manifest)
+        failures = self.document_failures_after("huggingface/org-card.manifest.json", remove_contract)
+        self.assertIn("manifest does not publish alignment contract", failures)
 
     def test_exact_taxonomy_is_not_inferred_from_counts(self) -> None:
         candidate = copy.deepcopy(self.contract)

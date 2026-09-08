@@ -9,6 +9,8 @@ on:
       - huggingface/org-card/**
       - huggingface/org-card.manifest.json
       - .github/scripts/estate_alignment_contract.py
+      - .github/scripts/public_front_door_check.py
+      - .github/scripts/test_public_front_door_check.py
       - .github/scripts/test_estate_alignment_contract.py
       - .github/scripts/test_estate_alignment_org_card.py
       - .github/scripts/test_estate_alignment_identity.py
@@ -21,6 +23,8 @@ on:
       - huggingface/org-card/**
       - huggingface/org-card.manifest.json
       - .github/scripts/estate_alignment_contract.py
+      - .github/scripts/public_front_door_check.py
+      - .github/scripts/test_public_front_door_check.py
       - .github/scripts/test_estate_alignment_contract.py
       - .github/scripts/test_estate_alignment_org_card.py
       - .github/scripts/test_estate_alignment_identity.py

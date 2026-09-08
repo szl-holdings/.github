@@ -83,9 +83,9 @@ jobs:
             --source-sha "$GITHUB_SHA" \
             --materialize "$preview_dir"
           test -f "profile/assets/hf-card-router.svg"
-          grep -F "One inference flagship" "$preview_dir/README.md"
-          grep -F "SZL Router" "$preview_dir/README.md"
-          grep -F "https://raw.githubusercontent.com/szl-holdings/.github/main/profile/assets/hf-card-router.svg" "$preview_dir/README.md"
+          grep -F "See it on real data" "$preview_dir/README.md"
+          grep -F "GEO GSE85241" "$preview_dir/README.md"
+          grep -F "unsigned" "$preview_dir/README.md"
 
       - name: Upload validation evidence
         if: always()

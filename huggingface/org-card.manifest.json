@@ -84,19 +84,20 @@
     "README.md": {
       "mode": "rendered_markdown",
       "required_markers": [
-        "Choose a path",
-        "Inference flagship",
-        "SZL Router",
-        "Three commercial flagships",
-        "One inference flagship",
-        "Five public domain bodies",
-        "Six internal engines",
-        "HISTORICAL",
-        "SIMULATED",
-        "assets/estate-command-system.svg",
-        "https://raw.githubusercontent.com/szl-holdings/.github/main/profile/assets/hf-card-router.svg",
-        "16 portfolio Spaces",
-        "1 inventory-only Space"
+        "See it on real data",
+        "GEO GSE85241",
+        "3,072",
+        "4 source donor labels",
+        "19,059",
+        "81 ERCC",
+        "integrity and reproducibility",
+        "unsigned",
+        "no biological findings",
+        "no clinical-use claim",
+        "not verified",
+        "https://github.com/szl-holdings/governed-receipt-spec/tree/320983d22e76fc9b26af0b2cd20799c5000543fc/examples/public-single-cell",
+        "https://huggingface.co/datasets/SZLHOLDINGS/szl-frontier-evaluation-receipts",
+        "https://a-11-oy.com"
       ]
     },
     "index.html": {

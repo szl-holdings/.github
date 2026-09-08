@@ -5,6 +5,42 @@ from types import SimpleNamespace
 import public_front_door_check as check
 
 
+class ScientistCopyTests(unittest.TestCase):
+    def setUp(self):
+        root = Path(__file__).resolve().parents[2]
+        self.card = (root / "huggingface/org-card/README.md").read_text(encoding="utf-8")
+        self.html = (root / "huggingface/org-card/index.html").read_text(encoding="utf-8")
+
+    def test_published_surfaces_link_the_existing_example_with_explicit_limits(self):
+        self.assertEqual(check.scientist_copy_failures(self.card), [])
+        self.assertEqual(check.scientist_copy_failures(self.html), [])
+
+    def test_unsigned_boundary_cannot_be_silently_replaced_with_signed(self):
+        failures = check.scientist_copy_failures(self.card.replace("**unsigned**", "**signed**"))
+        self.assertIn("missing scientific scope or limitation: unsigned", failures)
+
+    def test_unavailable_checks_must_remain_not_verified(self):
+        failures = check.scientist_copy_failures(self.card.replace("**not verified**", "**passed**"))
+        self.assertIn("missing scientific scope or limitation: not verified", failures)
+
+    def test_organization_root_cannot_replace_the_specific_dataset(self):
+        dataset = "https://huggingface.co/datasets/SZLHOLDINGS/szl-frontier-evaluation-receipts"
+        failures = check.scientist_copy_failures(self.card.replace(dataset, "https://huggingface.co/SZLHOLDINGS"))
+        self.assertIn("scientist-facing links must point to a specific artifact", failures)
+        self.assertIn(f"missing direct artifact link: {dataset}", failures)
+
+    def test_example_url_in_prose_does_not_satisfy_navigation(self):
+        example = next(url for url in check.SCIENTIST_LINKS if "governed-receipt-spec" in url)
+        document = self.card.replace(f"]({example})", "](https://example.com)") + "\n" + example
+        self.assertIn(f"missing direct artifact link: {example}", check.scientist_copy_failures(document))
+
+    def test_internal_vocabulary_is_rejected_in_public_copy(self):
+        for phrase in ("Lambda-Spine", "Doctrine v11", "Khipu", "PURIQ", "IMMUNE", "Yachay", "Kitaev-surface", "estate", "wave", "lane", "wheel", "Λ"):
+            with self.subTest(phrase=phrase):
+                failures = check.scientist_copy_failures(self.card + "\n" + phrase)
+                self.assertIn("internal vocabulary remains in scientist-facing copy", failures)
+
+
 class FrontMatterTests(unittest.TestCase):
     def test_reads_emoji_from_leading_front_matter(self):
         document = "---\nsdk: static\nemoji: 🛡️\n---\n# Card\n"

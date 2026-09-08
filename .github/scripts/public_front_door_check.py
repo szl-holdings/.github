@@ -37,6 +37,46 @@ UNSUPPORTED_PUSH_VALUE = "!__UNSUPPORTED_YAML_NODE__"
 SIMPLE_METADATA_KEY = re.compile(r"^[A-Za-z_][A-Za-z0-9_-]*$")
 SAFE_PLAIN_METADATA_VALUE = re.compile(r"^[A-Za-z][A-Za-z0-9 ./_+,&'()-]*$")
 TRUTH_MARKERS = {"Current state", "HISTORICAL", "SIMULATED"}
+SCIENTIST_LINKS = {
+    "https://github.com/szl-holdings/governed-receipt-spec/tree/320983d22e76fc9b26af0b2cd20799c5000543fc/examples/public-single-cell",
+    "https://huggingface.co/datasets/SZLHOLDINGS/szl-frontier-evaluation-receipts",
+    "https://a-11-oy.com",
+}
+SCIENTIST_MARKERS = {
+    "GEO GSE85241", "3,072", "4 source donor labels", "19,059", "81 ERCC",
+    "integrity and reproducibility", "unsigned", "no biological findings",
+    "no clinical-use claim", "not verified",
+}
+SCIENTIST_BANNED_WORDS = re.compile(
+    r"\b(?:Lambda(?:-Spine)?|Doctrine|Khipu|PURIQ|IMMUNE|Yachay|Kitaev-surface|"
+    r"estate|wave|lane|wheel)\b|Λ", re.IGNORECASE
+)
+
+
+def scientist_copy_failures(document: str) -> list[str]:
+    """Check public text and direct links without treating URLs as prose."""
+    links = re.findall(r'''href=["']([^"']+)["']''', document)
+    links += re.findall(r"\]\((https?://[^)]+)\)", document)
+    failures = [
+        f"missing direct artifact link: {url}"
+        for url in sorted(SCIENTIST_LINKS) if url not in links
+    ]
+    if any(url.rstrip("/") == "https://huggingface.co/SZLHOLDINGS" for url in links):
+        failures.append("scientist-facing links must point to a specific artifact")
+    # Keep existing repository identifiers in URLs while checking their labels.
+    prose = re.sub(r"^---\n.*?\n---\n", "", document, count=1, flags=re.S)
+    prose = re.sub(r"<(?:style|script)\b[^>]*>.*?</(?:style|script)>", "", prose, flags=re.S | re.I)
+    prose = re.sub(r"\[([^]]+)\]\([^)]+\)", r"\1", prose)
+    prose = re.sub(r"<[^>]+>", " ", prose)
+    prose = " ".join(prose.replace("**", "").split())
+    for marker in sorted(SCIENTIST_MARKERS):
+        if marker.casefold() not in prose.casefold():
+            failures.append(f"missing scientific scope or limitation: {marker}")
+    if SCIENTIST_BANNED_WORDS.search(prose):
+        failures.append("internal vocabulary remains in scientist-facing copy")
+    return failures
+
+
 HUB_CARD_PATH_CLASS = "szl-hf-path"
 HUB_CARD_CARD_CLASS = "szl-hf-card"
 CANONICAL_WEBP = "profile/assets/evidence-lattice-v2.webp"
@@ -712,14 +752,9 @@ def main() -> int:
         require(
             url in profile, f"GitHub profile missing canonical link: {url}", failures
         )
-        require(
-            url in hub_card,
-            f"Hugging Face card missing canonical link: {url}",
-            failures,
-        )
-        require(
-            url in html, f"Static front door missing canonical link: {url}", failures
-        )
+    for name, document in (("Hub card", hub_card), ("Static front door", html)):
+        for failure in scientist_copy_failures(document):
+            require(False, f"{name}: {failure}", failures)
 
     require(
         "./assets/evidence-lattice-v2.webp" in profile,
@@ -747,8 +782,8 @@ def main() -> int:
         failures,
     )
     require(
-        "--materialize" in hub_card and "python -m http.server 8000" in hub_card,
-        "Hub card does not expose a manifest-materialized reproduction command",
+        "reproduction commands" in hub_card,
+        "Hub card does not direct readers to the existing reproduction commands",
         failures,
     )
 
@@ -803,8 +838,8 @@ def main() -> int:
         )
     for marker in TRUTH_MARKERS:
         require(
-            marker in profile and marker in hub_card and marker in html,
-            f"truth boundary marker must remain on every front door: {marker}",
+            marker in profile,
+            f"GitHub portfolio profile is missing its truth boundary: {marker}",
             failures,
         )
 

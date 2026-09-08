@@ -199,7 +199,6 @@ def validate(root: Path) -> dict[str, Any]:
 
     documents = {
         "GitHub profile": profile,
-        "Hugging Face README": hub_readme,
         "canonical fleet": fleet,
         "Hub governance": governance,
     }
@@ -213,7 +212,6 @@ def validate(root: Path) -> dict[str, Any]:
 
     for label, text in {
         "GitHub profile": profile,
-        "Hugging Face README": hub_readme,
     }.items():
         folded = _fold(text)
         for marker in (
@@ -226,7 +224,10 @@ def validate(root: Path) -> dict[str, Any]:
         ):
             require(marker in folded, f"{label} missing {marker}", failures)
 
-    require(HUB_ASSET_URL in hub_readme, "Hub card does not render source-owned router art", failures)
+    # Router authority belongs on the portfolio profile and its source docs.
+    # The Hub front door links one reproducible scientific example; its copy
+    # and rendered markers are checked by the public and alignment validators.
+    require(HUB_ASSET_URL in profile, "GitHub profile does not link source-owned router art", failures)
     require('<title id="title">SZL Router flagship</title>' in svg, "router SVG title missing", failures)
     require("INFERENCE FLAGSHIP" in svg, "router SVG flagship marker missing", failures)
     require(SOURCE in svg, "router SVG source marker missing", failures)
@@ -245,20 +246,6 @@ def validate(root: Path) -> dict[str, Any]:
         "router art must remain source-owned instead of duplicating the static bundle",
         failures,
     )
-    markers = (
-        ((manifest.get("runtime_transforms") or {}).get("README.md") or {}).get(
-            "required_markers"
-        )
-        or []
-    )
-    for marker in (
-        "Inference flagship",
-        "SZL Router",
-        "One inference flagship",
-        HUB_ASSET_URL,
-    ):
-        require(marker in markers, f"org-card gate missing {marker}", failures)
-
     aggregate = "\n".join(
         (profile, hub_readme, fleet, governance, svg, policy_path.read_text(encoding="utf-8"))
     )

@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import json
-from html import unescape
 from pathlib import Path
 import re
 import unittest
@@ -33,8 +32,8 @@ class PublicInventoryContractTests(unittest.TestCase):
             "hub_card": ROOT / "huggingface/org-card/README.md",
         }
 
-    def test_front_doors_bind_current_counts_to_the_dated_public_snapshot(self) -> None:
-        for name, path in self.documents.items():
+    def test_portfolio_profile_binds_current_counts_to_the_dated_public_snapshot(self) -> None:
+        for name, path in {"profile": self.documents["profile"]}.items():
             with self.subTest(document=name):
                 source = path.read_text(encoding="utf-8")
                 # A historical paragraph must never satisfy the current-state gate.
@@ -59,44 +58,14 @@ class PublicInventoryContractTests(unittest.TestCase):
                 self.assertIn("16 portfolio Spaces", source)
                 self.assertIn("1 inventory-only Space", source)
 
-    def test_static_front_door_uses_the_same_dated_public_snapshot(self) -> None:
-        source = (ROOT / "huggingface/org-card/index.html").read_text(encoding="utf-8")
-        current = re.search(
-            r'<p data-szl-inventory="current">(.*?)</p>', source, re.DOTALL
-        )
-        self.assertIsNotNone(current)
-        text = unescape(re.sub(r"<[^>]+>", "", current.group(1)))
-        match = COUNT_LINE.search(text)
-        self.assertIsNotNone(match)
-        self.assertEqual(
-            {key: int(value) for key, value in match.groupdict().items()},
-            self.expected,
-        )
-        self.assertIn(self.inventory["observed_at"], text)
-        self.assertIn(self.inventory["scope"]["id"], text)
-        self.assertIn("not a live count", text)
-        self.assertIn("profile/public-inventory.json", source)
-        self.assertIn(self.inventory["source_revision"], source)
-
-    def test_static_historical_inventory_is_explicitly_separate(self) -> None:
-        source = (ROOT / "huggingface/org-card/index.html").read_text(encoding="utf-8")
-        historical = re.search(
-            r'<p data-szl-inventory="historical">(.*?)</p>', source, re.DOTALL
-        )
-        self.assertIsNotNone(historical)
-        snapshot = self.contract["huggingface_inventory_snapshot"]
-        for marker in (
-            "HISTORICAL",
-            f'{snapshot["portfolio_space_count"]} portfolio Spaces',
-            f'{snapshot["model_count"]} models',
-            f'{snapshot["dataset_count"]} datasets',
-            "1 inventory-only Space",
-            "Yarqa",
-            "governedKeep=false",
-            "not current Hub membership or visibility",
-        ):
-            self.assertIn(marker, historical.group(1))
-        self.assertNotIn("This measured Hub inventory", source)
+    def test_scientist_entry_points_do_not_present_inventory_counts(self) -> None:
+        for path in (self.documents["hub_card"], ROOT / "huggingface/org-card/index.html"):
+            with self.subTest(document=path):
+                source = path.read_text(encoding="utf-8")
+                self.assertIsNone(COUNT_LINE.search(source))
+                self.assertNotIn("portfolio Spaces", source)
+                self.assertNotIn("governedKeep", source)
+                self.assertIn("GEO GSE85241", source)
 
     def test_public_markdown_has_no_hidden_control_characters(self) -> None:
         for name, path in self.documents.items():
