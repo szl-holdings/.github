@@ -1,0 +1,30 @@
+name: Auto-merge LLM Router flagship v2
+
+"on":
+  pull_request:
+    branches: [main]
+    paths:
+      - .github/workflows/restore-llm-router-flagship-v2.yml
+      - .github/workflows/auto-merge-llm-router-flagship-v2.yml
+      - scripts/restore_llm_router_flagship_v2.py
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  enable:
+    name: Enable protected squash auto-merge
+    if: github.event.pull_request.head.ref == 'fix/llm-router-exact-runtime-attestation-v2-20260908'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Harden runner
+        uses: step-security/harden-runner@05e31511f85b41b11d1cf0ef85d0992719546e2c # v2.21.0
+        with:
+          egress-policy: audit
+      - name: Enable exact pull-request auto-merge
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_URL: ${{ github.event.pull_request.html_url }}
+        run: gh pr merge --auto --squash "$PR_URL"
