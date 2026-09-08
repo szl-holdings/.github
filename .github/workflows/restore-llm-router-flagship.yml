@@ -1,0 +1,100 @@
+name: Restore LLM Router flagship
+
+"on":
+  pull_request:
+    branches: [main]
+    paths:
+      - .github/workflows/restore-llm-router-flagship.yml
+      - scripts/restore_llm_router_flagship.py
+      - huggingface/llm-router-flagship.manifest.json
+      - huggingface/llm-router-flagship.card.md
+      - docs/LLM_ROUTER_FLAGSHIP_RECOVERY.md
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/restore-llm-router-flagship.yml
+      - scripts/restore_llm_router_flagship.py
+      - huggingface/llm-router-flagship.manifest.json
+      - huggingface/llm-router-flagship.card.md
+      - docs/LLM_ROUTER_FLAGSHIP_RECOVERY.md
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+concurrency:
+  group: restore-llm-router-flagship-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  validate:
+    name: Validate exact flagship contract
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - name: Harden runner
+        uses: step-security/harden-runner@05e31511f85b41b11d1cf0ef85d0992719546e2c # v2.21.0
+        with:
+          egress-policy: audit
+      - name: Checkout exact PR head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12.10"
+      - name: Compile and validate the recovery controller
+        run: |
+          set -euo pipefail
+          python -m py_compile scripts/restore_llm_router_flagship.py
+          python scripts/restore_llm_router_flagship.py \
+            --manifest huggingface/llm-router-flagship.manifest.json \
+            --card huggingface/llm-router-flagship.card.md
+
+  restore:
+    name: Restore GitHub source and Hugging Face flagship
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    env:
+      ROUTER_GH_TOKEN: ${{ secrets.SZL_ADMIN_TOKEN || secrets.ORG_ADMIN_TOKEN || secrets.SZL_GITHUB_TOKEN || secrets.GH_PAT || secrets.ADMIN_TOKEN || secrets.PAT || github.token }}
+      HF_TOKEN: ${{ secrets.HF_TOKEN || secrets.HUGGINGFACE_TOKEN || secrets.HF_API_TOKEN }}
+    steps:
+      - name: Harden runner
+        uses: step-security/harden-runner@05e31511f85b41b11d1cf0ef85d0992719546e2c # v2.21.0
+        with:
+          egress-policy: audit
+      - name: Checkout exact admitted source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12.10"
+      - name: Install exact Hub client
+        run: python -m pip install --disable-pip-version-check --no-cache-dir huggingface_hub==1.10.1
+      - name: Restore and attest the flagship authority chain
+        run: |
+          set -euo pipefail
+          test -n "${ROUTER_GH_TOKEN:-}" || { echo 'No GitHub administration token is available'; exit 31; }
+          test -n "${HF_TOKEN:-}" || { echo 'No Hugging Face write token is available'; exit 32; }
+          mkdir -p artifacts
+          python scripts/restore_llm_router_flagship.py \
+            --apply \
+            --manifest huggingface/llm-router-flagship.manifest.json \
+            --card huggingface/llm-router-flagship.card.md \
+            --receipt artifacts/llm-router-flagship-restoration.json \
+            --wait-seconds 1200
+      - name: Upload immutable restoration receipt
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: llm-router-flagship-restoration-${{ github.run_id }}-${{ github.run_attempt }}
+          path: artifacts/llm-router-flagship-restoration.json
+          if-no-files-found: warn
+          retention-days: 90
