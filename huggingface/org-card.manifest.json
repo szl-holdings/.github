@@ -56,10 +56,6 @@
       "destination": "assets/hf-card-evidence.svg"
     },
     {
-      "source": "profile/assets/hf-card-router.svg",
-      "destination": "assets/hf-card-router.svg"
-    },
-    {
       "source": "profile/assets/evidence-lattice-v2.webp",
       "destination": "assets/evidence-lattice-v2.webp"
     },
@@ -98,7 +94,7 @@
         "HISTORICAL",
         "SIMULATED",
         "assets/estate-command-system.svg",
-        "assets/hf-card-router.svg",
+        "https://raw.githubusercontent.com/szl-holdings/.github/main/profile/assets/hf-card-router.svg",
         "16 portfolio Spaces",
         "1 inventory-only Space"
       ]
