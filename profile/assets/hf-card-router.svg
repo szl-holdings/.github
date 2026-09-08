@@ -1,0 +1,110 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="900" viewBox="0 0 1600 900" role="img" aria-labelledby="title desc">
+  <title id="title">SZL Router flagship</title>
+  <desc id="desc">A dark holographic model-routing field connecting owned compute, hosted fallback, and verifiable receipts around an SZL Router core.</desc>
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#05070b"/>
+      <stop offset="0.55" stop-color="#09111c"/>
+      <stop offset="1" stop-color="#070812"/>
+    </linearGradient>
+    <radialGradient id="aura" cx="50%" cy="47%" r="56%">
+      <stop offset="0" stop-color="#48e4d2" stop-opacity="0.2"/>
+      <stop offset="0.42" stop-color="#8e7cff" stop-opacity="0.09"/>
+      <stop offset="1" stop-color="#05070b" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="route" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#48e4d2"/>
+      <stop offset="0.5" stop-color="#52c7ff"/>
+      <stop offset="1" stop-color="#9f85ff"/>
+    </linearGradient>
+    <linearGradient id="mark" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#f5f1e8"/>
+      <stop offset="0.55" stop-color="#52d9ff"/>
+      <stop offset="1" stop-color="#9b84ff"/>
+    </linearGradient>
+    <pattern id="grid" width="44" height="44" patternUnits="userSpaceOnUse">
+      <path d="M44 0H0V44" fill="none" stroke="#5edee8" stroke-opacity="0.055" stroke-width="1"/>
+    </pattern>
+    <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="8" result="blur"/>
+      <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <filter id="soft" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="30"/>
+    </filter>
+  </defs>
+
+  <rect width="1600" height="900" rx="34" fill="url(#bg)"/>
+  <rect width="1600" height="900" rx="34" fill="url(#grid)"/>
+  <rect width="1600" height="900" rx="34" fill="url(#aura)"/>
+  <circle cx="925" cy="440" r="286" fill="none" stroke="#49dacb" stroke-opacity="0.15"/>
+  <circle cx="925" cy="440" r="214" fill="none" stroke="#8f7cff" stroke-opacity="0.17"/>
+  <circle cx="925" cy="440" r="138" fill="none" stroke="#55d9ff" stroke-opacity="0.18"/>
+  <ellipse cx="930" cy="440" rx="390" ry="110" fill="none" stroke="#59e0e5" stroke-opacity="0.12" transform="rotate(-13 930 440)"/>
+  <ellipse cx="930" cy="440" rx="390" ry="110" fill="none" stroke="#9980ff" stroke-opacity="0.11" transform="rotate(48 930 440)"/>
+
+  <g opacity="0.52" filter="url(#soft)">
+    <circle cx="965" cy="418" r="95" fill="#38e6d0"/>
+    <circle cx="840" cy="505" r="82" fill="#735aff"/>
+  </g>
+
+  <g stroke="url(#route)" stroke-width="3" fill="none" filter="url(#glow)">
+    <path d="M925 440C782 352 728 255 610 209"/>
+    <path d="M925 440C1080 352 1158 258 1295 220"/>
+    <path d="M925 440C778 540 714 645 580 700"/>
+    <path d="M925 440C1077 536 1160 640 1302 688"/>
+  </g>
+
+  <g font-family="Inter,Segoe UI,Arial,sans-serif">
+    <g transform="translate(515 153)">
+      <rect width="216" height="108" rx="18" fill="#0b1520" fill-opacity="0.94" stroke="#48e4d2" stroke-opacity="0.55"/>
+      <text x="22" y="34" fill="#7b8f9f" font-size="14" font-weight="700" letter-spacing="2">ROUTE 01</text>
+      <text x="22" y="67" fill="#eefaf8" font-size="24" font-weight="600">Owned compute</text>
+      <text x="22" y="91" fill="#48e4d2" font-size="14">sovereign · first</text>
+    </g>
+    <g transform="translate(1194 166)">
+      <rect width="238" height="108" rx="18" fill="#0b1520" fill-opacity="0.94" stroke="#54cfff" stroke-opacity="0.48"/>
+      <text x="22" y="34" fill="#7b8f9f" font-size="14" font-weight="700" letter-spacing="2">ROUTE 02</text>
+      <text x="22" y="67" fill="#eef5fb" font-size="24" font-weight="600">Hosted fallback</text>
+      <text x="22" y="91" fill="#54cfff" font-size="14">bounded · explicit</text>
+    </g>
+    <g transform="translate(475 646)">
+      <rect width="238" height="108" rx="18" fill="#0b1520" fill-opacity="0.94" stroke="#9b84ff" stroke-opacity="0.48"/>
+      <text x="22" y="34" fill="#7b8f9f" font-size="14" font-weight="700" letter-spacing="2">ROUTE 03</text>
+      <text x="22" y="67" fill="#f0edff" font-size="24" font-weight="600">Paid fallback</text>
+      <text x="22" y="91" fill="#a58fff" font-size="14">last resort · cost basis</text>
+    </g>
+    <g transform="translate(1201 635)">
+      <rect width="240" height="108" rx="18" fill="#0b1520" fill-opacity="0.94" stroke="#48e4d2" stroke-opacity="0.4"/>
+      <text x="22" y="34" fill="#7b8f9f" font-size="14" font-weight="700" letter-spacing="2">PROOF PLANE</text>
+      <text x="22" y="67" fill="#eefaf8" font-size="24" font-weight="600">Receipt verifier</text>
+      <text x="22" y="91" fill="#48e4d2" font-size="14">route · observer · evidence</text>
+    </g>
+  </g>
+
+  <g transform="translate(805 320)" filter="url(#glow)">
+    <circle cx="120" cy="120" r="118" fill="#071019" fill-opacity="0.94" stroke="url(#route)" stroke-width="2"/>
+    <circle cx="120" cy="120" r="92" fill="none" stroke="#6de9e3" stroke-opacity="0.18"/>
+    <text x="120" y="86" text-anchor="middle" fill="#71eadc" font-family="ui-monospace,SFMono-Regular,Consolas,monospace" font-size="18" font-weight="700" letter-spacing="6">SZL</text>
+    <text x="120" y="128" text-anchor="middle" fill="#f6f2e9" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="31" font-weight="650" letter-spacing="1">ROUTER</text>
+    <text x="120" y="158" text-anchor="middle" fill="#8294a3" font-family="ui-monospace,SFMono-Regular,Consolas,monospace" font-size="12" font-weight="600" letter-spacing="1.4">POLICY BEFORE PROVIDER</text>
+  </g>
+
+  <g transform="translate(86 86)" font-family="Inter,Segoe UI,Arial,sans-serif">
+    <text x="0" y="0" dominant-baseline="hanging" fill="#6ce8db" font-size="15" font-weight="800" letter-spacing="4">INFERENCE FLAGSHIP</text>
+    <text x="0" y="58" dominant-baseline="hanging" fill="#f6f2e9" font-size="72" font-weight="560" letter-spacing="-3">One gateway.</text>
+    <text x="0" y="140" dominant-baseline="hanging" fill="url(#mark)" font-size="72" font-weight="560" letter-spacing="-3">Every route accounted for.</text>
+    <text x="2" y="246" dominant-baseline="hanging" fill="#8ea0ae" font-size="24">OpenAI-compatible routing · owned compute first · per-answer receipts</text>
+  </g>
+
+  <g transform="translate(88 786)" font-family="ui-monospace,SFMono-Regular,Consolas,monospace">
+    <text fill="#738493" font-size="14" letter-spacing="1.5">GITHUB SOURCE</text>
+    <text x="0" y="28" fill="#edf5f5" font-size="17">szl-holdings/szl-router</text>
+    <text x="480" fill="#738493" font-size="14" letter-spacing="1.5">PUBLIC MIRROR</text>
+    <text x="480" y="28" fill="#edf5f5" font-size="17">SZLHOLDINGS/llm-router-live</text>
+    <text x="1032" fill="#738493" font-size="14" letter-spacing="1.5">AUTHORITY</text>
+    <text x="1032" y="28" fill="#edf5f5" font-size="17">model proposes · human binds</text>
+  </g>
+
+  <rect x="1" y="1" width="1598" height="898" rx="33" fill="none" stroke="#d8f7f2" stroke-opacity="0.13" stroke-width="2"/>
+</svg>
