@@ -3,7 +3,7 @@
 """Restore only source owners admitted by archive-portfolio-v2.json.
 
 The only provider mutation implemented here is ``archived: true -> false`` for
-four exact repository names. Git history, visibility, default branches,
+six exact repository names. Git history, visibility, default branches,
 protections, rulesets, secrets, and Hugging Face are outside this controller.
 """
 from __future__ import annotations
@@ -25,7 +25,7 @@ from typing import Any, Mapping
 API = "https://api.github.com"
 SCHEMA = "szl.archive-portfolio/v2"
 DISPOSITIONS = {"restore", "consolidate", "historical"}
-EXACT_RESTORES = {"szl-atelier", "szl-mesh", "szl-router", "uds-bundles"}
+EXACT_RESTORES = {"szl-atelier", "szl-build-env", "szl-mesh", "szl-router", "uds-bundles", "vsp-otel"}
 TOKEN_RE = re.compile(r"(?:github_pat_|gh[pousr]_|hf_)[A-Za-z0-9_]{12,}")
 MAX_BYTES = 1_000_000
 
@@ -202,7 +202,7 @@ def validate_manifest(value: Mapping[str, Any]) -> None:
         or wave.get("count") != len(restores)
     ):
         raise PortfolioError("restoration wave mismatch")
-    if wave.get("maximum_restore_count") != 4 or len(restores) > 4:
+    if wave.get("maximum_restore_count") != 6 or len(restores) > 6:
         raise PortfolioError("restoration wave exceeds bounded maximum")
     if restores != EXACT_RESTORES:
         raise PortfolioError(
@@ -551,7 +551,7 @@ def main() -> int:
                 "schema": "szl.archive-portfolio-validation/v2",
                 "status": "PASS",
                 "classified_count": 34,
-                "restore_count": 4,
+                "restore_count": len(EXACT_RESTORES),
                 "restore_set": sorted(EXACT_RESTORES),
                 "secrets_recorded": False,
                 "validated_at": now(),

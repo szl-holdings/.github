@@ -22,7 +22,7 @@ on:
   workflow_dispatch:
     inputs:
       apply:
-        description: "Apply the four exact manifest-authorized unarchives"
+        description: "Apply the six exact manifest-authorized unarchives"
         required: false
         type: boolean
         default: true
@@ -216,7 +216,7 @@ jobs:
               )
           plan = report.get("final") or {}
           restore = plan.get("restore") or []
-          allowed = ["szl-atelier", "szl-mesh", "szl-router", "uds-bundles"]
+          allowed = ["szl-atelier", "szl-build-env", "szl-mesh", "szl-router", "uds-bundles", "vsp-otel"]
           if any(name not in allowed for name in restore):
               raise SystemExit(f"preflight restore set escaped allowlist: {restore}")
           with Path(os.environ["GITHUB_OUTPUT"]).open("a", encoding="utf-8") as output:
@@ -341,15 +341,15 @@ jobs:
                   f"receipt source drift: {report.get('source_revision')}"
               )
           final = report.get("final") or {}
-          expected = ["szl-atelier", "szl-mesh", "szl-router", "uds-bundles"]
+          expected = ["szl-atelier", "szl-build-env", "szl-mesh", "szl-router", "uds-bundles", "vsp-otel"]
           if final.get("restore"):
               raise SystemExit(f"repositories remained archived: {final['restore']}")
           if final.get("already_restored") != expected:
               raise SystemExit(
                   f"restored set mismatch: {final.get('already_restored')}"
               )
-          if len(final.get("retain_archived") or []) != 30:
-              raise SystemExit("retained tombstone count must remain 30")
+          if len(final.get("retain_archived") or []) != 28:
+              raise SystemExit("retained tombstone count must remain 28")
           if final.get("unclassified_archived"):
               raise SystemExit(
                   f"unclassified archives: {final['unclassified_archived']}"

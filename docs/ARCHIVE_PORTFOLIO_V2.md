@@ -3,14 +3,14 @@
 ## Decision
 
 The authenticated GitHub inventory observed **34 public archived repositories** on
-2026-09-06. This contract restores four repositories because they still own
-unique, maintained capabilities. The other thirty remain archived: twenty-four
+2026-09-06. The September 8 recovery review expands the original four to six repositories because they still own
+unique, maintained capabilities. The other twenty-eight remain archived: twenty-two
 are consolidation sources and six are immutable historical records.
 
 | Disposition | Count | Meaning |
 |---|---:|---|
-| Restore | 4 | Active source owner with a distinct operational role |
-| Consolidate | 24 | Reusable material moves through reviewed PRs into an active canonical owner |
+| Restore | 6 | Active source owner with a distinct operational role |
+| Consolidate | 22 | Reusable material moves through reviewed PRs into an active canonical owner |
 | Historical | 6 | Evidence or reproducibility record remains immutable |
 
 ## Exact restoration wave
@@ -21,8 +21,12 @@ are consolidation sources and six are immutable historical records.
 | `szl-mesh` | Declared active DDIL/CRDT coordination authority; distinct from the frozen OTel evidence record and from the general substrate | A source-owned module inside `SZLHOLDINGS/szl-constellation` |
 | `szl-router` | OpenAI-compatible sovereign-first routing gateway with bounded failover, per-answer receipts, cost/provider evidence, and a source-owned status surface | Forge inference module plus Constellation discovery; not a new product |
 | `uds-bundles` | Maintained UDS/Zarf manifest, signed air-gap packaging, SBOM and provenance authority | Deployment/air-gap module inside `SZLHOLDINGS/szl-constellation` |
+| `szl-build-env` | Source-owned development and runtime acceptance tools missing from Forge, including router receipt verification | Existing estate discovery only; no new Space |
+| `vsp-otel` | Source-owned OTLP collector, signed-span exporter and Helm package missing from substrate | Existing Lyte/Constellation discovery only; no new Space |
 
-The restoration governor permits only `archived: true -> false` for these four
+See [the September 8 source comparison](ARCHIVE_RECOVERY_20260908.md) for the recovery evidence and remaining runtime limits.
+
+The restoration governor permits only `archived: true -> false` for these six
 exact names. It does not write into their source trees. Each repository receives
 its own modernization PR after provider readback confirms that GitHub restored
 write access.
@@ -91,7 +95,7 @@ represented as a running, source-matched Space until exact readback succeeds.
 
 1. merge this reviewed contract through the normal checks;
 2. run the protected-main restoration job;
-3. verify all four repositories report `archived=false`;
+3. verify all six repositories report `archived=false`;
 4. create dedicated backend/frontend modernization PRs in each restored source;
 5. qualify and merge those exact heads;
 6. publish only through the existing canonical Hugging Face writer;
