@@ -1,0 +1,98 @@
+name: Enforce LLM Router flagship card
+
+"on":
+  pull_request:
+    branches: [main]
+    paths:
+      - .github/workflows/enforce-llm-router-flagship-card.yml
+      - scripts/enforce_llm_router_flagship_card.py
+      - huggingface/llm-router-flagship.card.md
+      - huggingface/llm-router-flagship.manifest.json
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/enforce-llm-router-flagship-card.yml
+      - scripts/enforce_llm_router_flagship_card.py
+      - huggingface/llm-router-flagship.card.md
+      - huggingface/llm-router-flagship.manifest.json
+      - huggingface/org-card.manifest.json
+  schedule:
+    - cron: "17 8 * * *"
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+concurrency:
+  group: enforce-llm-router-flagship-card
+  cancel-in-progress: false
+
+jobs:
+  validate:
+    name: Validate durable showcase contract
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    steps:
+      - name: Harden runner
+        uses: step-security/harden-runner@05e31511f85b41b11d1cf0ef85d0992719546e2c # v2.21.0
+        with:
+          egress-policy: audit
+      - name: Checkout exact PR head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12.10"
+      - name: Compile and validate
+        run: |
+          set -euo pipefail
+          python -m py_compile scripts/enforce_llm_router_flagship_card.py
+          python scripts/enforce_llm_router_flagship_card.py \
+            --card huggingface/llm-router-flagship.card.md \
+            --receipt /tmp/not-written.json
+
+  enforce:
+    name: Enforce public running Space and org-card showcase
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      HF_TOKEN: ${{ secrets.HF_TOKEN || secrets.HUGGINGFACE_TOKEN || secrets.HF_API_TOKEN }}
+    steps:
+      - name: Harden runner
+        uses: step-security/harden-runner@05e31511f85b41b11d1cf0ef85d0992719546e2c # v2.21.0
+        with:
+          egress-policy: audit
+      - name: Checkout exact source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12.10"
+      - name: Install exact Hub client
+        run: python -m pip install --disable-pip-version-check --no-cache-dir huggingface_hub==1.10.1
+      - name: Enforce the flagship
+        run: |
+          set -euo pipefail
+          test -n "${HF_TOKEN:-}" || { echo 'No Hugging Face write token is available'; exit 32; }
+          mkdir -p artifacts
+          python scripts/enforce_llm_router_flagship_card.py \
+            --apply \
+            --card huggingface/llm-router-flagship.card.md \
+            --receipt artifacts/llm-router-flagship-card-enforcement.json \
+            --wait-seconds 900
+      - name: Upload enforcement receipt
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: llm-router-flagship-card-${{ github.run_id }}-${{ github.run_attempt }}
+          path: artifacts/llm-router-flagship-card-enforcement.json
+          if-no-files-found: warn
+          retention-days: 90
