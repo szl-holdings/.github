@@ -1,0 +1,103 @@
+{
+  "schema": "szl.router-flagship/v1",
+  "status": "ACTIVE_SOURCE_OWNER",
+  "program": {
+    "name": "SZL Router",
+    "class": "INFERENCE_FLAGSHIP",
+    "role": "Sovereign-first OpenAI-compatible LLM gateway with bounded fallback and per-answer receipts"
+  },
+  "authority_chain": {
+    "github_source": {
+      "repository": "szl-holdings/szl-router",
+      "branch": "main",
+      "source_owner": true,
+      "responsibilities": [
+        "gateway runtime",
+        "logical route selection",
+        "provider admission and failover",
+        "provenance",
+        "receipt emission",
+        "public status source"
+      ]
+    },
+    "hugging_face_mirror": {
+      "repo_id": "SZLHOLDINGS/llm-router-live",
+      "repo_type": "space",
+      "visibility": "public",
+      "presentation": "flagship",
+      "source_path": "space",
+      "generated_only": true,
+      "credential_bearing_gateway": false
+    },
+    "product_integration": {
+      "origin": "https://a-11-oy.com",
+      "path": "/code",
+      "source_repository": "szl-holdings/a11oy",
+      "role": "integrated model registry, router visualization, governance context, and operator interface",
+      "replaces_gateway_source": false
+    },
+    "proof_origin": {
+      "origin": "https://a11oy.net",
+      "role": "evidence, exact revisions, receipts, historical state, and known bounds"
+    }
+  },
+  "publication": {
+    "single_writer_repository": "szl-holdings/szl-router",
+    "workflow": ".github/workflows/hf-space-deploy.yml",
+    "target_creation_allowed": false,
+    "target_rename_allowed": false,
+    "exact_source_revision_required": true,
+    "immutable_hugging_face_revision_required": true,
+    "runtime_revision_match_required": true,
+    "live_readiness_witness_required": true,
+    "org_card_manifest": "huggingface/org-card.manifest.json"
+  },
+  "runtime_truth": {
+    "provider_credentials_public": false,
+    "private_topology_public": false,
+    "public_status_contracts": [
+      "/api/a11oy/v1/router/health",
+      "/api/a11oy/v1/router/models",
+      "/api/a11oy/v1/router/provenance",
+      "/api/build-info",
+      "/.well-known/szl-source.json",
+      "/readyz"
+    ],
+    "allowed_provider_states": [
+      "UNAVAILABLE",
+      "OFFLINE_UNTIL_KEYED",
+      "CONFIGURED_UNVERIFIED",
+      "REACHABLE_MODEL_MISMATCH",
+      "REACHABLE_UNRECEIPTED",
+      "LIVE_RECEIPTED"
+    ],
+    "http_200_is_production_certificate": false,
+    "space_running_is_inference_readiness": false,
+    "signature_is_truth_proof": false
+  },
+  "authority_boundary": {
+    "model_proposes": true,
+    "router_routes": true,
+    "independent_policy_constrains": true,
+    "human_binds_consequential_action": true,
+    "router_can_self_authorize": false,
+    "public_effectors_enabled": false,
+    "lambda_status": "CONJECTURE_1_ADVISORY"
+  },
+  "profile_contract": {
+    "github_profile": "profile/README.md",
+    "hugging_face_org_card": "huggingface/org-card/README.md",
+    "visual_asset": "profile/assets/hf-card-router.svg",
+    "required_label": "One inference flagship: SZL Router"
+  },
+  "supersedes": {
+    "scope": "router presentation and source ownership only",
+    "historical_archive_treatment": "The August 29 private/paused treatment for llm-router-live is superseded.",
+    "does_not_change": [
+      "three-commercial-flagship taxonomy",
+      "public-domain body taxonomy",
+      "internal-engine taxonomy",
+      "other archived repository dispositions"
+    ]
+  }
+}

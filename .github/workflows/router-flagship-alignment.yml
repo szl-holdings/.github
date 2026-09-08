@@ -1,0 +1,234 @@
+name: SZL Router flagship alignment
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "profile/README.md"
+      - "profile/assets/hf-card-router.svg"
+      - "huggingface/org-card/**"
+      - "huggingface/org-card.manifest.json"
+      - "docs/CANONICAL_FLEET.md"
+      - "governance/router-flagship-v1.json"
+      - ".github/scripts/router_flagship_contract.py"
+      - ".github/tests/test_router_flagship_contract.py"
+      - ".github/workflows/router-flagship-alignment.yml"
+  push:
+    branches: [main]
+    paths:
+      - "profile/README.md"
+      - "profile/assets/hf-card-router.svg"
+      - "huggingface/org-card/**"
+      - "huggingface/org-card.manifest.json"
+      - "docs/CANONICAL_FLEET.md"
+      - "governance/router-flagship-v1.json"
+      - ".github/scripts/router_flagship_contract.py"
+      - ".github/tests/test_router_flagship_contract.py"
+      - ".github/workflows/router-flagship-alignment.yml"
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+concurrency:
+  group: router-flagship-alignment-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  VALIDATION_REPORT: /tmp/router-flagship-validation.json
+  LIVE_REPORT: /tmp/router-flagship-live.json
+
+jobs:
+  validate:
+    name: router-flagship/validate
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - name: Harden runner
+        uses: step-security/harden-runner@05e31511f85b41b11d1cf0ef85d0992719546e2c # v2.21.0
+        with:
+          egress-policy: audit
+
+      - name: Checkout exact candidate
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+          fetch-depth: 1
+
+      - name: Set up exact Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12.10"
+
+      - name: Validate authority, cards, asset, and publication manifest
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          python -I -P -m py_compile .github/scripts/router_flagship_contract.py
+          python -I -P .github/scripts/router_flagship_contract.py \
+            --report "$VALIDATION_REPORT"
+          python -I -P .github/tests/test_router_flagship_contract.py
+          git diff --check
+
+      - name: Prove exact static org-card materialization
+        shell: bash
+        run: |
+          set -euo pipefail
+          preview_dir="$(mktemp -d)"
+          python .github/scripts/hf_static_space_deploy.py \
+            --repo-root . \
+            --manifest huggingface/org-card.manifest.json \
+            --source-sha "$GITHUB_SHA" \
+            --materialize "$preview_dir"
+          test -f "profile/assets/hf-card-router.svg"
+          grep -F "One inference flagship" "$preview_dir/README.md"
+          grep -F "SZL Router" "$preview_dir/README.md"
+          grep -F "https://raw.githubusercontent.com/szl-holdings/.github/main/profile/assets/hf-card-router.svg" "$preview_dir/README.md"
+
+      - name: Upload validation evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: router-flagship-validation-${{ github.sha }}
+          path: ${{ env.VALIDATION_REPORT }}
+          if-no-files-found: error
+          retention-days: 90
+
+  live:
+    name: router-flagship/live-source-binding
+    if: github.event_name != 'pull_request'
+    needs: validate
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    environment: production
+    steps:
+      - name: Harden runner
+        uses: step-security/harden-runner@05e31511f85b41b11d1cf0ef85d0992719546e2c # v2.21.0
+        with:
+          egress-policy: audit
+
+      - name: Verify public Space against current router main
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from __future__ import annotations
+
+          import json
+          import os
+          import re
+          import time
+          import urllib.error
+          import urllib.parse
+          import urllib.request
+          from datetime import datetime, timezone
+          from pathlib import Path
+
+          SHA = re.compile(r"^[0-9a-f]{40}$")
+          github = "https://api.github.com/repos/szl-holdings/szl-router/commits/main"
+          hub = "https://huggingface.co/api/spaces/SZLHOLDINGS/llm-router-live"
+          runtime = hub + "/runtime"
+          endpoint = "https://szlholdings-llm-router-live.hf.space"
+          token = os.environ.get("HF_TOKEN", "").strip()
+          if not token:
+              raise SystemExit("HF_TOKEN is required for exact provider readback")
+
+          def request_json(url: str, *, auth: bool = False) -> dict:
+              headers = {
+                  "Accept": "application/json",
+                  "Cache-Control": "no-cache",
+                  "User-Agent": "szl-router-flagship-alignment/1.0",
+              }
+              if auth:
+                  headers["Authorization"] = f"Bearer {token}"
+              request = urllib.request.Request(url, headers=headers)
+              with urllib.request.urlopen(request, timeout=20) as response:
+                  if response.status != 200:
+                      raise RuntimeError(f"HTTP {response.status}: {url}")
+                  payload = json.load(response)
+              if not isinstance(payload, dict):
+                  raise RuntimeError(f"non-object JSON: {url}")
+              return payload
+
+          source = request_json(github)
+          source_sha = str(source.get("sha", "")).lower()
+          if not SHA.fullmatch(source_sha):
+              raise SystemExit("unable to resolve exact szl-router main SHA")
+
+          deadline = time.monotonic() + 1_200
+          observed = {}
+          last_error = ""
+          while time.monotonic() < deadline:
+              try:
+                  info = request_json(hub + "?expand[]=sha&expand[]=private", auth=True)
+                  run = request_json(runtime, auth=True)
+                  nonce = urllib.parse.quote(str(time.time_ns()))
+                  attestation = request_json(
+                      endpoint + "/.well-known/szl-source.json?refresh=1&nonce=" + nonce
+                  )
+                  hub_sha = str(info.get("sha", "")).lower()
+                  runtime_sha = str(run.get("sha", "")).lower()
+                  stage = str(run.get("stage", "")).upper()
+                  source_block = attestation.get("source") or {}
+                  deployment = attestation.get("deployment") or {}
+                  attested_source = str(source_block.get("commit", "")).lower()
+                  attested_repo = source_block.get("repository")
+                  attested_hf = str(deployment.get("hf_revision", "")).lower()
+                  private = bool(info.get("private", True))
+                  observed = {
+                      "source_sha": source_sha,
+                      "hub_sha": hub_sha,
+                      "runtime_sha": runtime_sha,
+                      "attested_source_sha": attested_source,
+                      "attested_hf_sha": attested_hf,
+                      "attested_repository": attested_repo,
+                      "stage": stage,
+                      "private": private,
+                      "alignment_state": attestation.get("alignment_state"),
+                  }
+                  if (
+                      not private
+                      and stage == "RUNNING"
+                      and hub_sha == runtime_sha == attested_hf
+                      and attested_source == source_sha
+                      and attested_repo == "szl-holdings/szl-router"
+                      and attestation.get("alignment_state") == "SOURCE_BOUND_DEPLOYMENT"
+                  ):
+                      break
+                  last_error = json.dumps(observed, sort_keys=True)
+              except Exception as exc:
+                  last_error = f"{type(exc).__name__}: {exc}"
+              time.sleep(15)
+          else:
+              raise SystemExit("router flagship did not converge: " + last_error)
+
+          report = {
+              "schema": "szl.router-flagship-live-alignment/v1",
+              "observed_at": datetime.now(timezone.utc).isoformat(),
+              "status": "VERIFIED",
+              "source": "szl-holdings/szl-router",
+              "space": "SZLHOLDINGS/llm-router-live",
+              "product": "https://a-11-oy.com/code",
+              "proof": "https://a11oy.net",
+              "observation": observed,
+              "credential_value_recorded": False,
+          }
+          Path(os.environ["LIVE_REPORT"]).write_text(
+              json.dumps(report, indent=2, sort_keys=True) + "\n",
+              encoding="utf-8",
+          )
+          print(json.dumps(report, indent=2, sort_keys=True))
+          PY
+
+      - name: Upload live alignment evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: router-flagship-live-${{ github.sha }}
+          path: ${{ env.LIVE_REPORT }}
+          if-no-files-found: error
+          retention-days: 90
