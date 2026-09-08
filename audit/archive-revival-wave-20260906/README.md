@@ -1,7 +1,9 @@
 # Archive revival wave — 2026-09-06
 
-This directory records the corrected, source-bound archive disposition. The live
-authenticated inventory contained **34 public archived repositories**.
+This directory records the original September 6 inventory of **34 public
+archived repositories** and its current governed disposition. The September 8
+[executable recovery review](../../docs/ARCHIVE_RECOVERY_20260908.md) supersedes
+the original four-owner decision with the six-owner set below.
 
 The governed v2 contract is implemented by:
 
@@ -13,14 +15,16 @@ The governed v2 contract is implemented by:
 
 ## Decision
 
-Restore exactly four unique source owners:
+Restore exactly six unique source owners:
 
 - `szl-atelier`
+- `szl-build-env`
 - `szl-mesh`
 - `szl-router`
 - `uds-bundles`
+- `vsp-otel`
 
-Retain twenty-four consolidation tombstones and six immutable historical records.
+Retain twenty-two consolidation tombstones and six immutable historical records.
 The manifest contains the exact canonical target and Hugging Face showcase for
 every archived repository.
 
@@ -41,7 +45,7 @@ protections, secrets, or Hugging Face.
 ## Evidence boundary
 
 Merging this source contract is not an unarchive claim. The protected-main
-workflow must report provider readback with `archived=false` for all four exact
+workflow must report provider readback with `archived=false` for all six exact
 repositories. Source modernization, Hugging Face publication, runtime readiness,
 and exact live source binding remain separate evidence stages.
 

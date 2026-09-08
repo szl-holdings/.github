@@ -70,7 +70,7 @@ class ManifestContracts(unittest.TestCase):
         self.assertEqual(len(manifest["repositories"]), 34)
         self.assertEqual(
             manifest["restoration_wave"]["repositories"],
-            ["szl-atelier", "szl-mesh", "szl-router", "uds-bundles"],
+            ["szl-atelier", "szl-build-env", "szl-mesh", "szl-router", "uds-bundles", "vsp-otel"],
         )
 
     def test_duplicate_json_key_is_rejected(self) -> None:
@@ -89,7 +89,7 @@ class ManifestContracts(unittest.TestCase):
         candidate["restoration_wave"]["repositories"] = sorted(
             candidate["restoration_wave"]["repositories"] + ["cosmos"]
         )
-        candidate["restoration_wave"]["count"] = 5
+        candidate["restoration_wave"]["count"] = len(candidate["restoration_wave"]["repositories"])
         with self.assertRaises(MODULE.PortfolioError):
             MODULE.validate_manifest(candidate)
 
@@ -122,11 +122,23 @@ class ManifestContracts(unittest.TestCase):
 
 
 class PlanContracts(unittest.TestCase):
-    def test_initial_plan_restores_only_four(self) -> None:
+    def test_recovery_wave_only_restores_missing_executable_owners(self) -> None:
+        manifest = load_manifest()
+        recovered = {"szl-build-env", "vsp-otel"}
+        values = [
+            archived(value.name) if value.name in recovered else value
+            for value in inventory(manifest, restored=True)
+        ]
+        plan = MODULE.build_plan(manifest, values)
+        self.assertEqual(plan["restore"], sorted(recovered))
+        self.assertEqual(len(plan["already_restored"]), 4)
+        self.assertEqual(len(plan["retain_archived"]), 28)
+
+    def test_initial_plan_restores_only_six(self) -> None:
         manifest = load_manifest()
         plan = MODULE.build_plan(manifest, inventory(manifest))
         self.assertEqual(plan["restore"], manifest["restoration_wave"]["repositories"])
-        self.assertEqual(len(plan["retain_archived"]), 30)
+        self.assertEqual(len(plan["retain_archived"]), 28)
         self.assertEqual(plan["unclassified_archived"], [])
 
     def test_idempotent_plan_accepts_verified_restores(self) -> None:
@@ -137,7 +149,7 @@ class PlanContracts(unittest.TestCase):
             plan["already_restored"],
             manifest["restoration_wave"]["repositories"],
         )
-        self.assertEqual(len(plan["retain_archived"]), 30)
+        self.assertEqual(len(plan["retain_archived"]), 28)
 
     def test_unclassified_archive_fails_closed(self) -> None:
         manifest = load_manifest()
