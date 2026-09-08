@@ -13,6 +13,7 @@
 Source-bound governed AI.
 
 [**Product**](https://a-11-oy.com) ·
+[**Router**](https://huggingface.co/spaces/SZLHOLDINGS/llm-router-live) ·
 [**Proof**](https://a11oy.net) ·
 [**GitHub**](https://github.com/szl-holdings) ·
 [**Hugging Face**](https://huggingface.co/SZLHOLDINGS)
@@ -27,9 +28,30 @@ Source-bound governed AI.
 
 Authority and evidence are checked before action. Runtime stays inside its declared boundary. Λ uniqueness remains **Conjecture 1 OPEN**.
 
+## Inference flagship
+
+<p align="center">
+  <a href="https://huggingface.co/spaces/SZLHOLDINGS/llm-router-live">
+    <img src="./assets/hf-card-router.svg"
+         alt="SZL Router flagship: owned compute first, bounded hosted fallback, and a receipt verifier"
+         width="100%" />
+  </a>
+</p>
+
+**SZL Router** is the source-owned OpenAI-compatible gateway for the estate: owned compute first, explicitly configured fallback after, and provenance plus a receipt for every routed answer.
+
+[**Public flagship Space**](https://huggingface.co/spaces/SZLHOLDINGS/llm-router-live) ·
+[**Gateway source**](https://github.com/szl-holdings/szl-router) ·
+[**Integrated A11oy view**](https://a-11-oy.com/code) ·
+[**Proof origin**](https://a11oy.net)
+
+The router is infrastructure, not an autonomous authority. A routing score is an estimate; a receipt proves scoped integrity and provenance; a human and deployment policy bind consequential action.
+
 ## Estate map
 
 Three commercial flagships: **A11oy, Killinchu, Forge**.
+
+One inference flagship: **SZL Router**.
 
 Five public domain bodies: **Terra, Killinchu, PRISM Counsel, PURIQ Finance, LYTE**.
 
@@ -44,6 +66,7 @@ Hub inventory is registry-only—not availability, operational readiness, or pub
 ## Public paths
 
 - **A11oy** · [product](https://a-11-oy.com) · [source](https://github.com/szl-holdings/a11oy)
+- **SZL Router** · [flagship Space](https://huggingface.co/spaces/SZLHOLDINGS/llm-router-live) · [source](https://github.com/szl-holdings/szl-router) · [A11oy integration](https://a-11-oy.com/code)
 - **Proof registry** · [a11oy.net](https://a11oy.net) for diligence and atlas evidence
 - **Artifacts** · [Hugging Face](https://huggingface.co/SZLHOLDINGS)
 - **IMMUNE** · [product tab](https://a-11-oy.com/immune) · [Channel A](https://huggingface.co/spaces/SZLHOLDINGS/immune) · [Channel B](https://huggingface.co/spaces/SZLHOLDINGS/immune-lattice)
@@ -54,6 +77,8 @@ NEXUS is an internal IMMUNE capability plane, not a second product. Do not mint 
 ## Current state
 
 - A11oy publishes bounded kernel evidence; λ remains a conjecture.
+- SZL Router is the canonical gateway source; the Hugging Face Space is its generated public evidence surface, not the credential-bearing gateway deployment.
+- Provider-backed inference is available only when an operator explicitly configures and admits a provider route.
 - Killinchu public actuation is **SIMULATED** unless a separately authorized effector proves otherwise.
 - [`SZLHOLDINGS/SZLHOLDINGS`](https://huggingface.co/datasets/SZLHOLDINGS/SZLHOLDINGS) is a **HISTORICAL** dataset mirror.
 - A signature proves integrity and origin within scope—not accuracy, safety, performance, compliance, or deployment authorization.
@@ -65,8 +90,8 @@ This profile claims no regulatory approval, universal safety, customer adoption,
 
 <div align="center">
 
-**Govern · execute · prove**
+**Govern · route · execute · prove**
 
-[a-11-oy.com](https://a-11-oy.com) · [a11oy.net](https://a11oy.net)
+[a-11-oy.com](https://a-11-oy.com) · [SZL Router](https://huggingface.co/spaces/SZLHOLDINGS/llm-router-live) · [a11oy.net](https://a11oy.net)
 
 </div>
