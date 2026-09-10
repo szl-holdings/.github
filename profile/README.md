@@ -1,33 +1,33 @@
 # SZL Holdings
 
-**AI that proves what it did — and you can check the proof yourself.**
+**Governed AI. Evidence you can inspect.**
 
-Every model, agent, and pipeline in this org ships with signed receipts. No metric is invented to fill a panel: everything public is labeled MEASURED, REPORTED, MODELED, HEURISTIC, or UNKNOWN.
+Source, running software, and model evaluations are separate claims. Follow the evidence for the exact artifact and revision; unknowns remain visible rather than being filled in.
 
-## Start here (2 minutes)
+## Start here
 
-1. **See it work** — [a-11-oy.com](https://a-11-oy.com): governed AI actions across five verticals, each with a receipt you can verify offline in your own browser. No account, no trust required.
-2. **Check the proofs** — [a11oy.net](https://a11oy.net): the public proof registry. Every claim links to its evidence; empty panels stay empty.
-3. **Run the models** — [huggingface.co/SZLHOLDINGS](https://huggingface.co/SZLHOLDINGS): 30+ models and datasets with signed training/eval receipts baked in.
+1. **Explore the product** — [a-11-oy.com](https://a-11-oy.com): A11oy, current capability status, and governed workflows.
+2. **Inspect the evidence** — [a11oy.net](https://a11oy.net): proof, receipts, evaluations, and known bounds.
+3. **Browse the artifacts** — [huggingface.co/SZLHOLDINGS](https://huggingface.co/SZLHOLDINGS): models, software kernels, datasets, and Spaces. Check each artifact's evidence and limitations.
+
+## Public inventory — a dated observation
+
+**21 public Spaces, 46 models, 35 datasets**, observed **2026-09-10T03:20:41Z** under the anonymous `hf-public-author-membership/v1` predicate. These are public API repository counts, not the authenticated organization total, the governed keep-list, or a count of production-ready models. Software kernels count once as model repositories; private assets, collections, and buckets are outside these totals.
+
+[Source-pinned inventory](https://github.com/szl-holdings/a11oy/blob/4c6621b17ba452d5af7aa2460462fdfbe513509f/docs/huggingface-ecosystem-manifest.json) · [Generation and verification](https://github.com/szl-holdings/a11oy/actions/runs/34432937958) · [Machine-readable binding](https://github.com/szl-holdings/.github/blob/main/profile/public-inventory.json)
 
 ## The short tour
 
 | You want to… | Go here |
 |---|---|
-| Verify a signed AI receipt yourself | [a-11-oy.com](https://a-11-oy.com) — "receipts you can verify" |
-| Train a sovereign model on your own GPU | [szl-forge](https://github.com/szl-holdings/szl-forge) — QLoRA kit, datasets, runbook |
-| Add governance tools to any MCP client | [hatun-mcp](https://github.com/szl-holdings/hatun-mcp) — DSSE receipts, Lean theorems, doctrine probes |
-| See how models earn promotion (fail-closed) | [szl-hf-frontier](https://github.com/szl-holdings/szl-hf-frontier) + [szl-forge `frontier/`](https://github.com/szl-holdings/szl-forge/tree/main/frontier) — evaluation lanes with signed baselines |
-| Read the flagship control plane | [a11oy](https://github.com/szl-holdings/a11oy) — the Living Command Fabric |
-
-## What makes this different
-
-- **Honesty labels everywhere** — measured numbers are marked measured; unknowns stay visible instead of being filled in
-- **Fail-closed evaluation** — models promote only through signed receipts that beat a declared baseline on a hidden probe set; ties and self-authored evidence fail closed
-- **Offline verification** — receipts verify without phoning home; the proof travels with the artifact
+| Inspect receipt verification | [a11oy](https://github.com/szl-holdings/a11oy) — source and verification contracts |
+| Explore model training and evaluation | [szl-forge](https://github.com/szl-holdings/szl-forge) — kits, datasets, runbooks, and measured limits |
+| Inspect governance tools for MCP | [hatun-mcp](https://github.com/szl-holdings/hatun-mcp) |
+| Inspect model qualification | [szl-hf-frontier](https://github.com/szl-holdings/szl-hf-frontier) + [Forge evaluation source](https://github.com/szl-holdings/szl-forge/tree/main/frontier) |
+| Read the command fabric | [a11oy](https://github.com/szl-holdings/a11oy) |
 
 ## Status, honestly
 
-Pre-launch. The control plane, receipt format, and evaluation harnesses are built and self-applied; external pilots are next. Diligence paths (investor / developer / operator) live at [a11oy.net](https://a11oy.net).
+Pre-launch. A passing source check does not establish a live deployment, and a signed record does not establish independent model quality. Current runtime status, verification evidence, and remaining gaps are separate diligence inputs.
 
 *Doctrine: give away the format, sell the control plane, keep the proof.*
