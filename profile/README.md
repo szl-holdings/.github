@@ -25,6 +25,10 @@ Source, running software, and model evaluations are separate claims. Follow the 
 
 Portfolio roles distinguish **one inference flagship**, **three commercial flagships**, **five public domain bodies**, and **six internal engines**. Those labels describe topology, **not availability, operational readiness, or publication policy**.
 
+## Historical estate contract
+
+**HISTORICAL:** estate-alignment contract v1 recorded **16 portfolio Spaces**, **1 inventory-only Space**, **45 models**, and **34 datasets**. Those figures are retained only as the prior contract snapshot; they do not override the dated current public observation above. Its named topology includes **A11oy**, **Forge**, **Killinchu**, **Terra**, **PRISM Counsel**, **PURIQ Finance**, and **LYTE**.
+
 ## Diligence paths
 
 **Receipt verification:** [a11oy source](https://github.com/szl-holdings/a11oy) contains the source and verification contracts.
