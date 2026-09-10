@@ -54,11 +54,15 @@ Five public domain bodies: **Terra, Killinchu, PRISM Counsel, PURIQ Finance, LYT
 
 Six internal engines: **Sentra, Lyte, Killinchu, Finance, Terra, Counsel**.
 
-**17 public Spaces, 45 models, 34 datasets.** Portfolio authority is narrower: **16 portfolio Spaces** plus **1 inventory-only Space**.
+**HISTORICAL estate-alignment v1 snapshot:** **17 public Spaces, 45 models, 34 datasets.** Portfolio authority was narrower: **16 portfolio Spaces** plus **1 inventory-only Space**. These figures remain provenance for that contract and do not override the current dated public observation below.
 
 Hub inventory is registry-only—not availability, operational readiness, or publication policy.
 
 ## Current state
+
+**21 public Spaces, 46 models, 35 datasets.** Observed **2026-09-10T03:20:41Z** under the anonymous public-only `hf-public-author-membership/v1` predicate admitted by A11oy and bound in the GitHub organization profile. Kernels count once as model repositories; private assets, collections, and buckets are outside these totals. This is inventory evidence, not model quality, runtime readiness, or production authorization.
+
+[**Inventory binding**](https://github.com/szl-holdings/.github/blob/main/profile/public-inventory.json) · [**Admitted source manifest**](https://github.com/szl-holdings/a11oy/blob/4c6621b17ba452d5af7aa2460462fdfbe513509f/docs/huggingface-ecosystem-manifest.json)
 
 Killinchu public actuation is **SIMULATED**. `SZLHOLDINGS/SZLHOLDINGS` is **HISTORICAL**. Λ uniqueness remains **Conjecture 1**. HTTP 200 is not a production certificate.
 
