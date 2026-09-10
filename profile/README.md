@@ -1,66 +1,33 @@
-<!-- markdownlint-disable MD013 MD033 MD041 -->
-
-<div align="center">
-
-<img src="./assets/evidence-lattice-v2.webp"
-     alt="A bounded signal path entering a holographic verification lattice"
-     width="100%" />
-
 # SZL Holdings
 
-**Control before action. Evidence after.**
+**AI that proves what it did — and you can check the proof yourself.**
 
-[**Product**](https://a-11-oy.com) ·
-[**Router**](https://huggingface.co/spaces/SZLHOLDINGS/llm-router-live) ·
-[**Proof**](https://a11oy.net) ·
-[**GitHub**](https://github.com/szl-holdings) ·
-[**Hugging Face**](https://huggingface.co/SZLHOLDINGS)
+Every model, agent, and pipeline in this org ships with signed receipts. No metric is invented to fill a panel: everything public is labeled MEASURED, REPORTED, MODELED, HEURISTIC, or UNKNOWN.
 
-</div>
+## Start here (2 minutes)
 
-## Governed loop
+1. **See it work** — [a-11-oy.com](https://a-11-oy.com): governed AI actions across five verticals, each with a receipt you can verify offline in your own browser. No account, no trust required.
+2. **Check the proofs** — [a11oy.net](https://a11oy.net): the public proof registry. Every claim links to its evidence; empty panels stay empty.
+3. **Run the models** — [huggingface.co/SZLHOLDINGS](https://huggingface.co/SZLHOLDINGS): 30+ models and datasets with signed training/eval receipts baked in.
 
-**Signal** → **reason** → **policy** → **bounded action** → **receipt** → **verification**.
+## The short tour
 
-## Inference flagship
+| You want to… | Go here |
+|---|---|
+| Verify a signed AI receipt yourself | [a-11-oy.com](https://a-11-oy.com) — "receipts you can verify" |
+| Train a sovereign model on your own GPU | [szl-forge](https://github.com/szl-holdings/szl-forge) — QLoRA kit, datasets, runbook |
+| Add governance tools to any MCP client | [hatun-mcp](https://github.com/szl-holdings/hatun-mcp) — DSSE receipts, Lean theorems, doctrine probes |
+| See how models earn promotion (fail-closed) | [szl-hf-frontier](https://github.com/szl-holdings/szl-hf-frontier) + [szl-forge `frontier/`](https://github.com/szl-holdings/szl-forge/tree/main/frontier) — evaluation lanes with signed baselines |
+| Read the flagship control plane | [a11oy](https://github.com/szl-holdings/a11oy) — the Living Command Fabric |
 
-<p align="center">
-  <a href="https://huggingface.co/spaces/SZLHOLDINGS/llm-router-live">
-    <img src="./assets/hf-card-router.svg"
-         alt="SZL Router: owned compute, bounded fallback, and receipt verification"
-         width="100%" />
-  </a>
-</p>
+## What makes this different
 
-**SZL Router** is the source-owned OpenAI-compatible gateway: owned compute first, explicitly configured fallback second, with provenance and a receipt for every routed answer.
+- **Honesty labels everywhere** — measured numbers are marked measured; unknowns stay visible instead of being filled in
+- **Fail-closed evaluation** — models promote only through signed receipts that beat a declared baseline on a hidden probe set; ties and self-authored evidence fail closed
+- **Offline verification** — receipts verify without phoning home; the proof travels with the artifact
 
-[**Space**](https://huggingface.co/spaces/SZLHOLDINGS/llm-router-live) ·
-[**Source**](https://github.com/szl-holdings/szl-router) ·
-[**A11oy view**](https://a-11-oy.com/code) ·
-[**Proof**](https://a11oy.net)
+## Status, honestly
 
-A routing score is advisory. A receipt proves scoped integrity and provenance. Human and deployment policy bind consequential action.
+Pre-launch. The control plane, receipt format, and evaluation harnesses are built and self-applied; external pilots are next. Diligence paths (investor / developer / operator) live at [a11oy.net](https://a11oy.net).
 
-## Estate map
-
-Three commercial flagships: **A11oy, Killinchu, Forge**.
-
-One inference flagship: **SZL Router**.
-
-Five public domain bodies: **Terra, Killinchu, PRISM Counsel, PURIQ Finance, LYTE**.
-
-Six internal engines: **Sentra, Lyte, Killinchu, Finance, Terra, Counsel**.
-
-**17 public Spaces, 45 models, 34 datasets.** Portfolio authority is narrower: **16 portfolio Spaces** plus **1 inventory-only Space**, Yarqa, with `governedKeep=false` and disposition `FOLD`.
-
-Hub inventory is registry-only—not availability, operational readiness, or publication policy. KEEP authority: [`docs/CANONICAL_FLEET.md`](https://github.com/szl-holdings/.github/blob/main/docs/CANONICAL_FLEET.md).
-
-## Current state
-
-- Provider routes are available only when explicitly configured.
-- Killinchu public actuation is **SIMULATED** unless separately authorized.
-- [`SZLHOLDINGS/SZLHOLDINGS`](https://huggingface.co/datasets/SZLHOLDINGS/SZLHOLDINGS) is **HISTORICAL**.
-- Λ uniqueness remains **Conjecture 1 OPEN**.
-- Estate is **not READY**; HTTP 200 is not a production certificate.
-
-[Security](https://github.com/szl-holdings/.github/security/policy) · [Trust boundary](https://github.com/szl-holdings/.github/blob/main/TRUST.md)
+*Doctrine: give away the format, sell the control plane, keep the proof.*
