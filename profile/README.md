@@ -19,6 +19,12 @@ Source, running software, and model evaluations are separate claims. Follow the 
 
 [Source-pinned inventory](https://github.com/szl-holdings/a11oy/blob/4c6621b17ba452d5af7aa2460462fdfbe513509f/docs/huggingface-ecosystem-manifest.json) · [Generation and verification](https://github.com/szl-holdings/a11oy/actions/runs/34432937958) · [Machine-readable binding](https://github.com/szl-holdings/.github/blob/main/profile/public-inventory.json)
 
+## Inference flagship
+
+**One inference flagship:** [SZL Router](https://github.com/szl-holdings/szl-router) is source-owned at `szl-holdings/szl-router`; its public presentation target is [`SZLHOLDINGS/llm-router-live`](https://huggingface.co/spaces/SZLHOLDINGS/llm-router-live), product integration is [https://a-11-oy.com/code](https://a-11-oy.com/code), and proof originates at [a11oy.net](https://a11oy.net).
+
+Portfolio roles distinguish **one inference flagship**, **three commercial flagships**, **five public domain bodies**, and **six internal engines**. Those labels describe topology, **not availability, operational readiness, or publication policy**.
+
 ## Diligence paths
 
 **Receipt verification:** [a11oy source](https://github.com/szl-holdings/a11oy) contains the source and verification contracts.
