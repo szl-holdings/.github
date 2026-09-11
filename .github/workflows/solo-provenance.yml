@@ -1,0 +1,31 @@
+name: szl/provenance
+
+# Advisory solo-maintainer provenance gate.
+# Not a required check. Does not disable DCO rulesets. Does not push to main.
+on:
+  pull_request:
+    types: [opened, edited, synchronize, reopened]
+
+permissions:
+  contents: read
+  pull-requests: read
+
+concurrency:
+  group: szl-provenance-${{ github.repository }}-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  provenance:
+    name: szl/provenance
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - name: Unit tests
+        run: python3 provenance/test_check.py
+      - name: Evaluate pull request
+        env:
+          GITHUB_EVENT_PATH: ${{ github.event_path }}
+        run: python3 provenance/check.py provenance/solo-maintainer-policy.v1.json
