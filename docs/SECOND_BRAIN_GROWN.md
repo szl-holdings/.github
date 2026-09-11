@@ -1,20 +1,23 @@
 # Second brain grown — wired to the web, folded, public
 
-Captured: 2026-08-29T11:50:00-04:00
+Captured: 2026-09-11T19:05:00Z · public-fold URL corrected
 Actor: founder@szl-holdings
 Kind: estate.sign ALLOW · estate.align ALLOW · estate.admit DENY
 Terminal: GREEN_LIGHT
-Live surface: this Estate OS `/brain` (pulse)
-Public fold: https://holdings.a-11-oy.com/brain/
+Live surface: Estate OS `/brain` (pulse) and product `/command/brain` (retrieve)
+Public fold: https://a11oy.net/estate/thread-ops/
+Holdings fold: https://holdings.a-11-oy.com/brain/ — DEAD (root Pages 404; owner-gated DNS). Do not advertise.
+Product /brain: https://a-11-oy.com/brain (Hickok Dual-Stream; do not overwrite)
+Hub second-brain: ARCHIVE / family. Minting DENY.
 certified_production_ready: false
 
 ## What is now available
 
-The second brain is a **derived, handles-only** navigator. It is live on the Estate OS, recaptured onto existing GitHub docs, and folded onto the existing Pages domain. No new GitHub repository. No new Hugging Face Space minted by this OS.
+The second brain is a **derived, handles-only** navigator. It is live on the Estate OS, recaptured onto existing GitHub docs, and folded onto the existing proof origin. No new GitHub repository. No new Hugging Face Space minted by this OS.
 
 - Six organs. Twelve folds (command, kernels, khipu, forge, evidence, bodies, showcase, family, wedge, leaders, backdoors, held).
-- Local retrieve returns handles. A miss abstains.
-- **Pulse the web** is user-initiated. Grok 4.6 + live Hub/GitHub recapture. WILLAY vetoes exploit-shaped queries.
+- Local retrieve returns handles. A miss abstains. Product `/command/brain` binds same-origin `/api/a11oy/v1/brain/uncertainty` and `/api/a11oy/v1/brain/answer`.
+- Public Hub artifact for this thread: dataset `SZLHOLDINGS/szl-second-brain-inrepo` (DATA / BM25, not a model).
 - Existing maps stay existing: `SZLHOLDINGS/anatomy`, `SZLHOLDINGS/Khipu-Loom`, `SZLHOLDINGS/holographic`.
 
 ## Undreamed job
@@ -28,20 +31,18 @@ The second brain is a **derived, handles-only** navigator. It is live on the Est
 | GitHub authenticated search | 95 |
 | GitHub public search | 90 |
 | Packet registry | 76 |
-| Hub models / datasets / Spaces | 42 / 28 / 43 |
-| Open org PRs | 0 |
+| Hub models / datasets / Spaces | 44 / 33 / 16 public this pass |
+| Open org PRs | measured separately |
 
 ### Pull requests
 
-- `.github#496` CLOSED without merge 2026-08-29T14:44:34Z. Operator Spaces exist anyway. Classified family. Not front doors.
-- `a11oy-factory#1` MERGED as BIND_AS_A11OY_PACKAGE. Not a flagship.
-- `a11oy-net#41` MERGED catalog copy. Nexus stays family.
+- `a11oy-net#146` MERGED. Sitemap admits `/estate/thread-ops/` (27 locs).
+- `szl-forge#214` CLOSED completed. Evidence-only CI deadlock addressed on source.
+- `.github#496` CLOSED without merge. Operator Spaces exist anyway. Classified family.
 
 ### Classified, not admitted
 
-New public GitHub since green light includes factory, second-brain, puriq-live, sovereign-os, real-estate, khipu-pages, lyte-services, evidence-studio, immune-lattice, command-lab, drift, cosmos.
-
-Hub Spaces now include `SZLHOLDINGS/second-brain`, `a11oy-factory`, `lyte-services`, `szl-sovereign-os`, `szl-real-estate`. This OS did not mint them. Fold. Do not flagship. The live navigator remains `/brain` and the Pages fold.
+Hub Space `SZLHOLDINGS/second-brain` is HTTP 401 ARCHIVE / family. Do not republish. Product `/brain` is Hickok Dual-Stream — do not overwrite. Public fold is a11oy.net/estate/thread-ops/.
 
 ## Leaders (open web, REPORTED, not partners)
 
@@ -49,12 +50,13 @@ Kantata, Certinia, ConnectWise PSA, Autotask (Kaseya), HaloPSA, NetSuite OpenAir
 
 ## Back doors (unclassified surfaces / unowned gaps — not exploits)
 
-Pin drift. Hub Space sprawl 43 vs packet 27. Hub `second-brain` classified family. Operator Spaces despite #496 closed without merge. trusted-contract still red. Public MCP wrappers around incumbent PSAs — adjacent sprawl, do not mint a competing wrapper.
+Pin drift. Hub Space sprawl vs KEEP-6. Hub `second-brain` classified family. trusted-contract still red. Public MCP wrappers around incumbent PSAs — adjacent sprawl, do not mint a competing wrapper.
 
 ## What is not live
 
 - 9000-node graph: UNAVAILABLE (cytoscape `nodeRepulsion:9000`).
 - Private 9464-node graph: unpublished.
+- L2 metal operating point: owner-laptop only. This operator session is BLOCKED_NO_METAL.
 - Production ATO, paid pilot, ROI, live BFT.
 - New public GitHub repository or Hub Space from this OS.
 
