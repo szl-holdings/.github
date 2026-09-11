@@ -1,0 +1,96 @@
+{
+  "schema": "szl.public-inventory-scope-declaration/v1",
+  "observed_at": "2026-09-11T19:05:00Z",
+  "disposition": "HOLD",
+  "evidence_class": "LIVE_READBACK",
+  "production_authorization": false,
+  "automatic_promotion_authorized": false,
+  "issue": "https://github.com/szl-holdings/.github/issues/728",
+  "note": "A date-stamped declaration of incomparable predicates. Not a replacement for public-membership.json or public-inventory.json. Not an item-level membership sweep.",
+  "predicates": {
+    "membership_v1": {
+      "schema": "szl.public-profile-inventory/v1",
+      "observed_at": "2026-09-10T03:20:41Z",
+      "origin": "https://a11oy.net/public-membership.json",
+      "scope_id": "hf-public-author-membership/v1",
+      "counts": { "models": 46, "datasets": 35, "spaces": 21 },
+      "kernel_policy": "count-once-as-model-repository-not-a-fourth-kind",
+      "kinds": ["models", "datasets", "spaces"],
+      "comparable_to": []
+    },
+    "inventory_v3": {
+      "schema": "szl.public-hf-inventory/v3",
+      "observed_at": "2026-08-31T18:59:11Z",
+      "origin": "https://a11oy.net/public-inventory.json",
+      "counts": { "models": 44, "datasets": 30, "spaces": 48, "collections": 21, "buckets": 1 },
+      "kernel_note": "szl-kernels counted as a model repository in this historical snapshot",
+      "comparable_to": []
+    },
+    "estate_upgrade_report_2026_07_22": {
+      "schema": "szl.hf-estate-upgrade-report/v1",
+      "observed_at": "2026-07-22T06:34:06Z",
+      "origin": "https://github.com/szl-holdings/.github/blob/main/reports/hf-estate-upgrade-latest.json",
+      "counts": { "models": 15, "datasets": 32, "spaces": 26, "kernels": 10, "collections": 0, "buckets": 0 },
+      "note": "Historical dry-run report. Third predicate. Do not use as current totals.",
+      "comparable_to": []
+    }
+  },
+  "kernel_kind": {
+    "required_before": "2026-09-13T00:00:00Z",
+    "membership_v1_policy": "count-once-as-model-repository-not-a-fourth-kind",
+    "first_class_hub_type": "kernel",
+    "loader": {
+      "package": "huggingface/kernels",
+      "version": "v0.16.1",
+      "revision": "1dc5c9d05683e8a594bb6d7a1ab18318b89e2caa",
+      "loads_model_type_kernels": false
+    },
+    "scope": {
+      "id": "hf-public-author-kernels/v1",
+      "method": "GET",
+      "url": "https://huggingface.co/api/kernels?author=SZLHOLDINGS",
+      "authentication": "none",
+      "observed_at": "2026-09-11T19:05:00Z"
+    },
+    "listed": [
+      "SZLHOLDINGS/szl-govsign",
+      "SZLHOLDINGS/szl-kernels",
+      "SZLHOLDINGS/szl-lambda-gate",
+      "SZLHOLDINGS/szl-governed-norm",
+      "SZLHOLDINGS/governed-inference-meter",
+      "SZLHOLDINGS/szl-blocked",
+      "SZLHOLDINGS/szl-provctl",
+      "SZLHOLDINGS/szl-invariants",
+      "SZLHOLDINGS/szl-ouroboros",
+      "SZLHOLDINGS/szl-formulas",
+      "SZLHOLDINGS/szl-maskmod",
+      "SZLHOLDINGS/szl-block-kv",
+      "SZLHOLDINGS/szl-receipt-attn",
+      "SZLHOLDINGS/YARQA-ATTN"
+    ],
+    "listed_count": 14,
+    "listed_count_meaning": "cardinality of unauthenticated Hub kernels API for author SZLHOLDINGS at observed_at; not membership; not inventory v3; not projection closure",
+    "dual_listed_as_model_search_hits": [
+      "SZLHOLDINGS/szl-kernels",
+      "SZLHOLDINGS/szl-khipu-kernels"
+    ],
+    "model_search_only_not_in_kernels_api": [
+      "SZLHOLDINGS/szl-khipu-kernels"
+    ],
+    "count_for_membership_v1": null,
+    "count_reason": "KERNEL_KIND_DISTINCT_SCOPE",
+    "production_relevant_projections_verified": false,
+    "exact_main_and_v1_revisions_bound": false,
+    "legacy_model_type_fail_closed_verified": false,
+    "remote_code_trust_decided": false
+  },
+  "item_level_membership_enumeration": "UNAVAILABLE",
+  "forbidden": [
+    "mix membership 46/35/21 with inventory 44/30/48",
+    "treat kernels API 14 as the membership model count",
+    "treat July 22 report 15/32/26/10 as current",
+    "delete assets to force a number",
+    "claim first-class kernel kind is already in public-membership.json",
+    "treat Hub listing as runtime readiness or production admission"
+  ]
+}
