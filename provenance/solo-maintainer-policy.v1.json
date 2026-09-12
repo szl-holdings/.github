@@ -1,0 +1,34 @@
+{
+  "schema": "szl.solo-maintainer-provenance/v1",
+  "organization": "szl-holdings",
+  "internal_dco_required": false,
+  "external_dco_or_cla_required": true,
+  "required_check": "szl/provenance",
+  "enforcement": "advisory",
+  "allowed_human_actors": ["stephenlutar2-hash"],
+  "allowed_app_slugs": [
+    "web-flow",
+    "dependabot",
+    "chatgpt-codex-connector"
+  ],
+  "merge_modes": ["squash"],
+  "direct_default_branch_push": false,
+  "required_evidence": [
+    "exact_head_sha",
+    "tests",
+    "security_checks",
+    "rights_attestation",
+    "rollback",
+    "known_limits"
+  ],
+  "pr_body_headings": [
+    "Origin",
+    "Rights",
+    "Agents and tools",
+    "Tests",
+    "Security",
+    "Rollback",
+    "Known limits"
+  ],
+  "credential_value_recorded": false
+}
