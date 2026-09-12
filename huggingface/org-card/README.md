@@ -10,6 +10,42 @@ pinned: true
 license: apache-2.0
 ---
 
+
+<!-- SZL_LLM_ROUTER_FLAGSHIP:BEGIN -->
+## SZL LLM Router · Flagship Inference Control Plane
+
+<table>
+<tr>
+<td width="64%" valign="top">
+
+**One governed endpoint in front of many brains.** The router selects among sovereign, free-grid, and paid fallback tiers; records why a route was selected; and attaches an independently inspectable receipt to every completed response.
+
+`szl-auto` · `szl-fast` · `szl-large` · `szl-coder`
+
+- **Sovereign-first:** operator-owned GPU routes are attempted before external providers when they are actually reachable.
+- **OpenAI-compatible:** clients use the familiar `/v1/chat/completions` contract.
+- **Fail-closed provenance:** unavailable providers are skipped or surfaced; no response or signature is fabricated.
+- **Receipt-native routing:** model, provider tier, attempts, request digest, cost basis, and routing rationale remain reviewable.
+
+</td>
+<td width="36%" valign="top">
+
+**Authority chain**
+
+1. [GitHub source](https://github.com/szl-holdings/szl-router)
+2. [Hugging Face runtime](https://huggingface.co/spaces/SZLHOLDINGS/llm-router-live)
+3. [A11oy operator interface](https://a-11-oy.com/code)
+4. [Proof and known bounds](https://a11oy.net)
+
+**Runtime truth:** `LIVE`, `CONFIGURED_UNVERIFIED`, `OFFLINE_UNTIL_KEYED`, or `UNAVAILABLE`—never implied from a polished card.
+
+</td>
+</tr>
+</table>
+
+> Model output never creates execution authority. Independent policy constrains routing, and a human binds consequential action. Λ uniqueness remains **Conjecture 1 — open**.
+<!-- SZL_LLM_ROUTER_FLAGSHIP:END -->
+
 <!-- markdownlint-disable MD013 MD033 MD041 -->
 
 <p align="center">
@@ -43,6 +79,16 @@ A source-owned OpenAI-compatible gateway with owned compute first, explicit host
 [**Launch**](https://huggingface.co/spaces/SZLHOLDINGS/llm-router-live) · [**Gateway source**](https://github.com/szl-holdings/szl-router) · [**A11oy integration**](https://a-11-oy.com/code) · [**Proof**](https://a11oy.net)
 
 Provider credentials, private addresses, and topology are not published. A running Space does not prove every provider is configured or authorized.
+
+## Cyber-physical flagship
+
+### Killinchu
+
+Counter-UAS and maritime intelligence on the same receipt substrate. Detection, classification, and the governed-decision layer are live; every verdict carries a DSSE Khipu receipt. Public effectors stay **SIMULATED**; human authority binds engagement.
+
+[**Launch /elite**](https://szlholdings-killinchu.hf.space/elite) · [**Space**](https://huggingface.co/spaces/SZLHOLDINGS/killinchu) · [**Source**](https://github.com/szl-holdings/killinchu) · [**OSINT corpus**](https://huggingface.co/datasets/SZLHOLDINGS/killinchu-osint-corpus) · [**Proof**](https://a11oy.net)
+
+Runtime truth: the Space self-reports live posture at `/api/killinchu/v1/honest`. HTTP 200 is not a production certificate. Λ uniqueness remains **Conjecture 1**.
 
 ## Estate map
 
