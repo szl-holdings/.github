@@ -56,7 +56,7 @@ def test_classification_prioritizes_p0_before_provider_or_runtime() -> None:
 def clean_pull() -> tuple[operator.GitHub, dict[str, object]]:
     api = mock.create_autospec(operator.GitHub, instance=True)
     api.apply = False
-    api.repository.return_value = {"default_branch": "main"}
+    api.repository.return_value = {"default_branch": "main", "archived": False}
     api.pull.return_value = {
         "draft": False,
         "mergeable": True,
@@ -168,6 +168,7 @@ def test_apply_without_token_fails_closed_and_records_no_value() -> None:
 def test_duplicate_closure_is_exact_and_leaves_pointer() -> None:
     api = mock.create_autospec(operator.GitHub, instance=True)
     api.apply = True
+    api.repository.return_value = {"archived": False}
     api.search.return_value = [
         {
             "repository_url": "https://api.github.com/repos/szl-holdings/example",
@@ -202,6 +203,7 @@ def test_duplicate_closure_is_exact_and_leaves_pointer() -> None:
 def test_nonidentical_issue_bodies_are_only_classified() -> None:
     api = mock.create_autospec(operator.GitHub, instance=True)
     api.apply = True
+    api.repository.return_value = {"archived": False}
     api.search.return_value = [
         {
             "repository_url": "https://api.github.com/repos/szl-holdings/example",
@@ -255,6 +257,7 @@ def test_source_contains_no_protection_visibility_archive_or_secret_mutation() -
 def test_identical_issues_in_different_repositories_are_not_closed() -> None:
     api = mock.create_autospec(operator.GitHub, instance=True)
     api.apply = True
+    api.repository.return_value = {"archived": False}
     body = "This exact long issue text is valid independently for two repository components."
     api.search.return_value = [
         {
@@ -337,6 +340,7 @@ def test_approval_clears_prior_change_request() -> None:
 def test_stale_estate_label_does_not_drive_reclassification() -> None:
     api = mock.create_autospec(operator.GitHub, instance=True)
     api.apply = True
+    api.repository.return_value = {"archived": False}
     api.search.return_value = [
         {
             "repository_url": "https://api.github.com/repos/szl-holdings/example",

@@ -8,6 +8,7 @@ on:
       - ".github/workflows/frontier-issue-operator.yml"
       - ".github/workflows/frontier-issue-operator-contract.yml"
       - "tests/test_frontier_issue_operator.py"
+      - "tests/test_frontier_issue_operator_safety.py"
   schedule:
     - cron: "17 */2 * * *"
   workflow_dispatch:
@@ -37,10 +38,6 @@ jobs:
     name: Reconcile pull requests and issues without bypass
     runs-on: ubuntu-latest
     timeout-minutes: 30
-    env:
-      # Prefer an organization-capable credential. The repository token remains
-      # a fail-closed fallback and cannot silently acquire cross-repository scope.
-      SZL_ORG_TOKEN: ${{ secrets.SZL_ORG_ADMIN_TOKEN || secrets.ORG_ADMIN_TOKEN || secrets.SZL_GITHUB_TOKEN || secrets.GH_PAT || github.token }}
     steps:
       - name: Harden runner
         uses: step-security/harden-runner@bf7454d06d71f1098171f2acdf0cd4708d7b5920 # v2.20.0
@@ -60,10 +57,14 @@ jobs:
       - name: Run network-free operator contracts
         run: |
           python -m pip install --disable-pip-version-check pytest
-          python -m pytest -q tests/test_frontier_issue_operator.py
+          python -m pytest -q tests/test_frontier_issue_operator.py tests/test_frontier_issue_operator_safety.py
           python -m py_compile .github/scripts/frontier_issue_operator.py
 
       - name: Execute bounded organization reconciliation
+        # Never expose the organization credential to dependency installation,
+        # checkout, test imports, artifact upload, or receipt validation.
+        env:
+          SZL_ORG_TOKEN: ${{ secrets.SZL_ORG_ADMIN_TOKEN || secrets.ORG_ADMIN_TOKEN || secrets.SZL_GITHUB_TOKEN || secrets.GH_PAT || github.token }}
         shell: bash
         run: |
           set -euo pipefail

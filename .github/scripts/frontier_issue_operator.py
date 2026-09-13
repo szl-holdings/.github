@@ -13,7 +13,9 @@ The operator is intentionally conservative:
 * it classifies every remaining issue with one deterministic ``estate:*`` label;
 * it never changes branch protection, rulesets, visibility, secrets, provider
   resources, repository archival state, or issue content authored by humans;
-* it records no token value and redacts token-like strings from its report.
+* it records no token value and redacts token-like strings from its report;
+* incomplete check/review coverage fails closed, archived targets are read-only,
+  and per-item errors produce a partial-failure receipt and nonzero exit.
 
 Dry-run is the default. ``--apply`` enables the bounded mutations above.
 """
@@ -36,6 +38,7 @@ from typing import Any, Iterable
 
 API = "https://api.github.com"
 GRAPHQL = "https://api.github.com/graphql"
+MAX_API_BYTES = 10 * 1024 * 1024
 DEFAULT_ORG = "szl-holdings"
 REPORT_SCHEMA = "szl.frontier-issue-operator/v1"
 COMMAND_CENTER_TITLE = "[estate] Frontier issue command center"
@@ -64,6 +67,30 @@ LABELS = {
 
 class GitHubError(RuntimeError):
     """GitHub API failure with a secret-free message."""
+
+
+class NoRedirect(urllib.request.HTTPRedirectHandler):
+    """Never forward a credentialed API request to a redirect target."""
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        return None
+
+
+def api_url(path: str) -> str:
+    """Confine all credentialed requests to the canonical GitHub API origin."""
+    if not isinstance(path, str) or any(ord(c) < 33 or ord(c) == 127 for c in path):
+        raise GitHubError("invalid GitHub API target")
+    url = API + path if path.startswith("/") and not path.startswith("//") else path
+    try:
+        parsed = urllib.parse.urlsplit(url)
+        port = parsed.port
+    except ValueError:
+        raise GitHubError("invalid GitHub API target") from None
+    if (parsed.scheme != "https" or parsed.hostname != "api.github.com"
+            or parsed.username is not None or parsed.password is not None
+            or port not in (None, 443) or parsed.fragment
+            or "\\" in url or any(x in {".", ".."} for x in urllib.parse.unquote(parsed.path).split("/"))):
+        raise GitHubError("noncanonical GitHub API target refused")
+    return url
 
 
 @dataclass
@@ -144,7 +171,7 @@ class GitHub:
         *,
         expected: Iterable[int] = (200,),
     ) -> tuple[Any, dict[str, str], int]:
-        url = path if path.startswith("https://") else API + path
+        url = api_url(path)
         body = None
         headers = dict(self.headers)
         if payload is not None:
@@ -152,16 +179,20 @@ class GitHub:
             headers["Content-Type"] = "application/json"
         request = urllib.request.Request(url, data=body, method=method, headers=headers)
         try:
-            with urllib.request.urlopen(request, timeout=45) as response:
-                raw = response.read()
+            opener = urllib.request.build_opener(urllib.request.ProxyHandler({}), NoRedirect())
+            with opener.open(request, timeout=45) as response:
+                raw = response.read(MAX_API_BYTES + 1)
+                if len(raw) > MAX_API_BYTES:
+                    raise GitHubError("GitHub response exceeded its byte budget")
                 result = json.loads(raw) if raw else None
                 status = response.status
                 response_headers = dict(response.headers.items())
         except urllib.error.HTTPError as exc:
-            raw = exc.read().decode("utf-8", "replace")[:4000]
-            raise GitHubError(f"GitHub HTTP {exc.code}: {redact(raw)}") from exc
-        except (urllib.error.URLError, TimeoutError, json.JSONDecodeError) as exc:
-            raise GitHubError(f"GitHub request failed: {redact(str(exc))}") from exc
+            # Error pages, Location headers and transport messages can contain
+            # credentials or private text. Keep only a numeric status class.
+            raise GitHubError(f"GitHub HTTP {exc.code}") from None
+        except (urllib.error.URLError, OSError, ValueError):
+            raise GitHubError("GitHub transport or JSON decoding failed") from None
         if status not in set(expected):
             raise GitHubError(f"unexpected GitHub status {status} for {method} {path}")
         return result, response_headers, status
@@ -173,30 +204,79 @@ class GitHub:
         if not isinstance(result, dict):
             raise GitHubError("GitHub GraphQL returned a non-object")
         if result.get("errors"):
-            raise GitHubError("GitHub GraphQL rejected the bounded query: " + json.dumps(result["errors"])[:2000])
+            raise GitHubError("GitHub GraphQL rejected the bounded query")
         data = result.get("data")
         if not isinstance(data, dict):
             raise GitHubError("GitHub GraphQL response has no data object")
         return data
 
     def search(self, query: str, *, limit: int) -> list[dict[str, Any]]:
+        """Require a complete bounded census before using it for mutations.
+
+        GitHub pagination must keep a fixed page size. Shrinking it on the last
+        page repeats earlier rows and silently omits later ones.
+        """
+        if type(limit) is not int or not 1 <= limit <= 1000:
+            raise GitHubError("issue search limit must be between 1 and 1000")
         rows: list[dict[str, Any]] = []
-        page = 1
-        while len(rows) < limit and page <= 10:
-            per_page = min(100, limit - len(rows))
+        expected_total: int | None = None
+        seen: set[int] = set()
+        for page in range(1, 11):
             encoded = urllib.parse.quote(query)
             result, _headers, _status = self.request(
-                "GET",
-                f"/search/issues?q={encoded}&sort=updated&order=desc&per_page={per_page}&page={page}",
+                "GET", f"/search/issues?q={encoded}&sort=updated&order=desc&per_page=100&page={page}",
             )
-            batch = result.get("items", []) if isinstance(result, dict) else []
-            if not isinstance(batch, list):
-                raise GitHubError("GitHub issue search returned a non-array")
-            rows.extend(item for item in batch if isinstance(item, dict))
-            if len(batch) < per_page:
-                break
-            page += 1
-        return rows[:limit]
+            if not isinstance(result, dict) or result.get("incomplete_results") is not False:
+                raise GitHubError("issue search is incomplete or malformed")
+            total, batch = result.get("total_count"), result.get("items")
+            if type(total) is not int or not 0 <= total <= limit or not isinstance(batch, list):
+                raise GitHubError("issue search coverage exceeds its limit or is unavailable")
+            if expected_total is None:
+                expected_total = total
+            if total != expected_total or len(batch) != min(100, total - len(rows)):
+                raise GitHubError("issue search coverage moved or a page is incomplete")
+            for row in batch:
+                identity = row.get("id") if isinstance(row, dict) else None
+                if type(identity) is not int or identity <= 0 or identity in seen:
+                    raise GitHubError("issue search contains invalid or repeated identities")
+                seen.add(identity)
+                rows.append(row)
+            if len(rows) == expected_total:
+                return rows
+        raise GitHubError("issue search exceeded its page budget")
+
+    def counted_pages(self, path: str, key: str, *, sha: str | None = None) -> list[dict[str, Any]]:
+        """Collect every advertised check/status page, or refuse the observation.
+
+        Construct same-endpoint page URLs rather than trusting a provider Link
+        target. Counts and duplicate IDs detect common movement/truncation; this
+        is not an atomic GitHub snapshot and does not replace merge protections.
+        """
+        rows: list[dict[str, Any]] = []
+        seen: set[int] = set()
+        expected_total: int | None = None
+        for page in range(1, 101):
+            result, _headers, _status = self.request("GET", f"{path}?per_page=100&page={page}")
+            if not isinstance(result, dict):
+                raise GitHubError("check/status collection is not an object")
+            total, batch = result.get("total_count"), result.get(key)
+            if type(total) is not int or not 0 <= total <= 10000 or not isinstance(batch, list):
+                raise GitHubError("check/status coverage is malformed or outside its budget")
+            if sha is not None and result.get("sha") != sha:
+                raise GitHubError("combined status belongs to a different revision")
+            if expected_total is None:
+                expected_total = total
+            if total != expected_total or len(batch) != min(100, total - len(rows)):
+                raise GitHubError("check/status coverage moved or a page is incomplete")
+            for row in batch:
+                identity = row.get("id") if isinstance(row, dict) else None
+                if type(identity) is not int or identity <= 0 or identity in seen:
+                    raise GitHubError("check/status collection has invalid or repeated identities")
+                seen.add(identity)
+                rows.append(row)
+            if len(rows) == expected_total:
+                return rows
+        raise GitHubError("check/status collection exceeded its page budget")
 
     def repository(self, full_name: str) -> dict[str, Any]:
         result, _headers, _status = self.request("GET", f"/repos/{full_name}")
@@ -219,14 +299,12 @@ class GitHub:
         return result
 
     def checks(self, full_name: str, sha: str) -> CheckState:
-        result, _headers, _status = self.request(
-            "GET", f"/repos/{full_name}/commits/{sha}/check-runs?per_page=100"
+        check_runs = self.counted_pages(
+            f"/repos/{full_name}/commits/{sha}/check-runs", "check_runs"
         )
-        check_runs = result.get("check_runs", []) if isinstance(result, dict) else []
-        status_result, _headers, _status = self.request(
-            "GET", f"/repos/{full_name}/commits/{sha}/status"
+        statuses = self.counted_pages(
+            f"/repos/{full_name}/commits/{sha}/status", "statuses", sha=sha
         )
-        statuses = status_result.get("statuses", []) if isinstance(status_result, dict) else []
         passed: list[str] = []
         failed: list[str] = []
         active: list[str] = []
@@ -236,7 +314,7 @@ class GitHub:
             conclusion = str(row.get("conclusion") or "").lower()
             if status in ACTIVE_CHECK_STATES or not conclusion:
                 active.append(name)
-            elif conclusion in ALLOWED_CHECK_CONCLUSIONS:
+            elif status == "completed" and conclusion in ALLOWED_CHECK_CONCLUSIONS:
                 passed.append(name)
             elif conclusion in FAILED_CHECK_CONCLUSIONS:
                 failed.append(name)
@@ -261,23 +339,33 @@ class GitHub:
         )
 
     def reviews(self, full_name: str, number: int) -> list[str]:
-        result, _headers, _status = self.request(
-            "GET", f"/repos/{full_name}/pulls/{number}/reviews?per_page=100"
-        )
-        # COMMENTED and PENDING reviews do not revoke an earlier change
-        # request. Only a later APPROVED or DISMISSED decision clears it.
+        # COMMENTED/PENDING do not revoke a prior change request. Require all
+        # pages before accepting a later approval/dismissal as the final state.
         latest_decisive: dict[str, str] = {}
         decisive = {"CHANGES_REQUESTED", "APPROVED", "DISMISSED"}
-        for row in result if isinstance(result, list) else []:
-            login = str((row.get("user") or {}).get("login") or "")
-            state = str(row.get("state") or "").upper()
-            if login and state in decisive:
-                latest_decisive[login] = state
-        return sorted(
-            login
-            for login, state in latest_decisive.items()
-            if state == "CHANGES_REQUESTED"
-        )
+        seen_pages: set[str] = set()
+        for page in range(1, 101):
+            result, _headers, _status = self.request(
+                "GET", f"/repos/{full_name}/pulls/{number}/reviews?per_page=100&page={page}"
+            )
+            if not isinstance(result, list) or len(result) > 100:
+                raise GitHubError("review collection is malformed")
+            fingerprint = hashlib.sha256(json.dumps(result, sort_keys=True).encode()).hexdigest()
+            if result and fingerprint in seen_pages:
+                raise GitHubError("review pagination repeated a page")
+            seen_pages.add(fingerprint)
+            for row in result:
+                if not isinstance(row, dict) or not isinstance(row.get("user"), dict):
+                    raise GitHubError("review identity is unavailable")
+                login, state = row["user"].get("login"), row.get("state")
+                if not isinstance(login, str) or not login or state not in decisive | {"COMMENTED", "PENDING"}:
+                    raise GitHubError("review state or identity is unavailable")
+                if state in decisive:
+                    latest_decisive[login] = state
+            if len(result) < 100:
+                return sorted(login for login, state in latest_decisive.items()
+                              if state == "CHANGES_REQUESTED")
+        raise GitHubError("review collection exceeded its page budget")
 
     def unresolved_threads(self, full_name: str, number: int) -> int:
         owner, name = full_name.split("/", 1)
@@ -295,23 +383,31 @@ class GitHub:
         """
         unresolved = 0
         cursor: str | None = None
-        while True:
-            data = self.graphql(
-                query,
-                {"owner": owner, "name": name, "number": number, "cursor": cursor},
-            )
-            pull = ((data.get("repository") or {}).get("pullRequest") or {})
-            threads = pull.get("reviewThreads") or {}
-            unresolved += sum(
-                1 for row in threads.get("nodes") or [] if row.get("isResolved") is False
-            )
-            page = threads.get("pageInfo") or {}
-            if not page.get("hasNextPage"):
-                break
+        seen_cursors: set[str] = set()
+        for _ in range(100):
+            data = self.graphql(query, {"owner": owner, "name": name, "number": number, "cursor": cursor})
+            repo = data.get("repository") if isinstance(data, dict) else None
+            pull = repo.get("pullRequest") if isinstance(repo, dict) else None
+            threads = pull.get("reviewThreads") if isinstance(pull, dict) else None
+            if not isinstance(threads, dict):
+                raise GitHubError("review-thread evidence is unavailable")
+            nodes, page = threads.get("nodes"), threads.get("pageInfo")
+            if not isinstance(nodes, list) or len(nodes) > 100 or not isinstance(page, dict):
+                raise GitHubError("review-thread page is malformed")
+            if type(page.get("hasNextPage")) is not bool:
+                raise GitHubError("review-thread pagination state is unavailable")
+            for row in nodes:
+                if not isinstance(row, dict) or type(row.get("isResolved")) is not bool:
+                    raise GitHubError("review-thread resolution state is unavailable")
+                unresolved += not row["isResolved"]
+            if page["hasNextPage"] is False:
+                return unresolved
             cursor = page.get("endCursor")
-            if not cursor:
-                raise GitHubError("review-thread pagination has no end cursor")
-        return unresolved
+            if not isinstance(cursor, str) or not cursor or len(cursor) > 1024 or cursor in seen_cursors:
+                raise GitHubError("review-thread pagination has an invalid or repeated cursor")
+            seen_cursors.add(cursor)
+        raise GitHubError("review-thread collection exceeded its page budget")
+
 
     def merge(self, full_name: str, number: int, sha: str, title: str) -> str:
         if not self.apply:
@@ -477,6 +573,11 @@ def evaluate_pr(api: GitHub, item: dict[str, Any]) -> PullRequestState:
     )
     try:
         repo = api.repository(repository)
+        if type(repo.get("archived")) is not bool:
+            raise GitHubError("repository archival state is unavailable")
+        if repo["archived"]:
+            row.action = "READ_ONLY_ARCHIVED"
+            return row
         pull = api.pull(repository, number)
         row.default_branch = str(repo.get("default_branch") or "")
         row.base_ref = str((pull.get("base") or {}).get("ref") or "")
@@ -550,6 +651,9 @@ def reconcile_issues(api: GitHub, org: str, *, limit: int) -> list[IssueState]:
             )
 
     results: list[IssueState] = []
+    # Archived repositories remain part of the observation, never a write target.
+    # Cache metadata once per repository; an API failure remains a failure.
+    repository_cache: dict[str, dict[str, Any] | Exception] = {}
     for row in raw:
         repository = repository_from_api_url(str(row["repository_url"]))
         labels = [str(label.get("name") or "") for label in row.get("labels") or []]
@@ -568,6 +672,20 @@ def reconcile_issues(api: GitHub, org: str, *, limit: int) -> list[IssueState]:
             classification=classification,
         )
         try:
+            if repository not in repository_cache:
+                try:
+                    repository_cache[repository] = api.repository(repository)
+                except Exception as exc:
+                    repository_cache[repository] = exc
+            repo = repository_cache[repository]
+            if isinstance(repo, Exception):
+                raise GitHubError("repository metadata could not be observed")
+            if not isinstance(repo, dict) or type(repo.get("archived")) is not bool:
+                raise GitHubError("repository archival state is unavailable")
+            if repo["archived"]:
+                state.action = "READ_ONLY_ARCHIVED"
+                results.append(state)
+                continue
             fingerprint = issue_fingerprint(state.title, row.get("body"))
             canonical = canonical_for.get((repository, fingerprint or ""))
             if canonical and int(canonical["number"]) != state.number:
@@ -593,8 +711,8 @@ def command_center_body(
     pulls: list[PullRequestState],
     issues: list[IssueState],
 ) -> str:
-    issue_counts = Counter(row.classification for row in issues if row.action != "CLOSED_EXACT_DUPLICATE")
-    repository_counts = Counter(row.repository for row in issues if row.action != "CLOSED_EXACT_DUPLICATE")
+    issue_counts = Counter(row.classification for row in issues if row.action not in {"CLOSED_EXACT_DUPLICATE", "READ_ONLY_ARCHIVED"})
+    repository_counts = Counter(row.repository for row in issues if row.action not in {"CLOSED_EXACT_DUPLICATE", "READ_ONLY_ARCHIVED"})
     merged = [row for row in pulls if row.action == "MERGED"]
     blocked = [row for row in pulls if row.action == "BLOCKED"]
     errors = [row for row in pulls if row.action == "ERROR"] + [row for row in issues if row.action == "ERROR"]
@@ -612,7 +730,8 @@ def command_center_body(
         f"- Observed: **{len(pulls)}**",
         f"- Merged this pass: **{len(merged)}**",
         f"- Still blocked or active: **{len(blocked)}**",
-        f"- Operator errors: **{len([row for row in pulls if row.action == 'ERROR'])}**",
+        f"- Operator errors: **{len(errors)}**",
+        f"- Read-only archived issues: **{sum(row.action == 'READ_ONLY_ARCHIVED' for row in issues)}**",
     ]
     for row in blocked[:50]:
         lines.append(
@@ -704,9 +823,11 @@ def main(argv: list[str] | None = None) -> int:
 
     final_prs = api.search(f"org:{args.org} is:pr is:open", limit=args.max_prs)
     final_issues = issue_rows(api, args.org, limit=args.max_issues)
+    operation_errors = sum(row.action == "ERROR" for row in [*pulls, *issues])
+    incomplete = bool(operation_errors or command_center_error)
     payload = {
         "schema": REPORT_SCHEMA,
-        "status": "COMPLETE",
+        "status": "PARTIAL_FAILURE" if incomplete else "COMPLETE",
         "mode": "APPLY" if args.apply else "DRY_RUN",
         "organization": args.org,
         "started_at": started,
@@ -724,6 +845,8 @@ def main(argv: list[str] | None = None) -> int:
             "observed_issues": len(issues),
             "closed_exact_duplicates": sum(row.action == "CLOSED_EXACT_DUPLICATE" for row in issues),
             "classified_issues": sum(row.action == "CLASSIFIED" for row in issues),
+            "read_only_archived_issues": sum(row.action == "READ_ONLY_ARCHIVED" for row in issues),
+            "read_only_archived_pull_requests": sum(row.action == "READ_ONLY_ARCHIVED" for row in pulls),
             "issue_errors": sum(row.action == "ERROR" for row in issues),
             "final_open_pull_requests": len(final_prs),
             "final_open_issues": len(final_issues),
@@ -734,7 +857,7 @@ def main(argv: list[str] | None = None) -> int:
     }
     write_report(args.report, payload)
     print(json.dumps(payload["summary"], indent=2, sort_keys=True))
-    return 0 if not command_center_error else 1
+    return 1 if incomplete else 0
 
 
 if __name__ == "__main__":
