@@ -9,6 +9,9 @@ on:
       - ".github/workflows/frontier-issue-operator-contract.yml"
       - "tests/test_frontier_issue_operator*.py"
       - "config/estate-pr-authorizations.json"
+      - ".github/scripts/frontier_receipt_check.py"
+      - "tests/test_frontier_receipt_check.py"
+      - "requirements/frontier-observer-tests.lock"
   schedule:
     - cron: "17 */2 * * *"
   workflow_dispatch:
@@ -51,12 +54,24 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
-          python-version: "3.12"
+          python-version: "3.12.14"
       - name: Run network-free operator contracts
+        shell: bash
+        env:
+          PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
         run: |
-          python -m pip install --disable-pip-version-check pytest
-          python -m pytest -q tests/test_frontier_issue_operator.py tests/test_frontier_issue_operator_safety.py tests/test_frontier_issue_operator_authority.py
-          python -m py_compile .github/scripts/frontier_issue_operator.py
+          set -euo pipefail
+          venv="$RUNNER_TEMP/frontier-test-venv"
+          test ! -e "$venv"
+          python -I -m venv "$venv"
+          "$venv/bin/python" -I -m pip --isolated install --disable-pip-version-check \
+            --no-cache-dir --require-hashes --only-binary=:all: --index-url https://pypi.org/simple \
+            -r requirements/frontier-observer-tests.lock
+          "$venv/bin/python" -I -m pip check
+          "$venv/bin/python" -I -c 'from importlib.metadata import version; import sys; print(sys.version); print("pytest=" + version("pytest")); sys.exit(0 if version("pytest") == "9.0.3" else 1)'
+          "$venv/bin/python" -I -m pytest -q tests/test_frontier_issue_operator*.py tests/test_frontier_receipt_check.py
+          "$venv/bin/python" -I -O -m pytest -q tests/test_frontier_issue_operator*.py tests/test_frontier_receipt_check.py
+          "$venv/bin/python" -I -m py_compile .github/scripts/frontier_issue_operator.py .github/scripts/frontier_receipt_check.py
 
   operate:
     name: Observe public estate and request only authorized queue entries
@@ -83,7 +98,7 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
-          python-version: "3.12"
+          python-version: "3.12.14"
       - name: Execute bounded organization reconciliation
         env:
           # Existing governed reader/writer alias; no organization-admin default.
@@ -99,28 +114,17 @@ jobs:
             args+=(--apply --from-dispatch-event)
           fi
           python .github/scripts/frontier_issue_operator.py "${args[@]}"
-      - name: Verify public observation receipt
-        if: always()
-        shell: bash
-        run: |
-          python - <<'PYCODE'
-          import json
-          from pathlib import Path
-          payload = json.loads(Path("frontier-issue-operator.json").read_text(encoding="utf-8"))
-          if payload.get("schema") != "szl.frontier-issue-operator/v1":
-              raise SystemExit("unexpected receipt schema")
-          if payload.get("token_value_recorded") is not False:
-              raise SystemExit("receipt boundary is unavailable")
-          coverage = payload.get("coverage") or {}
-          if coverage.get("scope") != "public-search-visible-only" or coverage.get("complete_organization") is not False:
-              raise SystemExit("receipt overstates its inventory scope")
-          print(json.dumps(payload.get("summary"), indent=2, sort_keys=True))
-          PYCODE
+      - name: Verify and stage exact public receipt bytes
+        id: verify_receipt
+        if: ${{ always() && !cancelled() }}
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: python -I -B .github/scripts/frontier_receipt_check.py
       - name: Upload public observation receipt
-        if: always()
+        if: ${{ always() && !cancelled() && steps.verify_receipt.outcome == 'success' }}
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: frontier-issue-operator-${{ github.run_id }}-${{ github.run_attempt }}
-          path: ${{ env.REPORT_PATH }}
+          path: ${{ runner.temp }}/frontier-verified-receipt/frontier-issue-operator.json
           if-no-files-found: error
           retention-days: 90
