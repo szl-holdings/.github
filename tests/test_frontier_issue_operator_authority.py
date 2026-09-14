@@ -510,7 +510,7 @@ def test_queue_readback_binds_nested_pull_request_not_merge_group_commit(monkeyp
 
 def writer_fixture():
     api = m.GitHub("repository-scoped-fixture", apply=False)
-    api.repository = mock.Mock(side_effect=lambda repo: metadata(repo))
+    api.repository = mock.Mock(side_effect=metadata)
     issue = {"number": 585, "title": m.COMMAND_CENTER_TITLE, "state": "open",
         "user": {"login": "stephenlutar2-hash"}, "body": m.COMMAND_CENTER_MARKER + "\nold machine body"}
     calls = []
@@ -598,3 +598,33 @@ def test_invalid_dispatch_inputs_do_not_reflect_values(tmp_path, monkeypatch, ch
 def test_error_code_is_a_positive_allowlist_not_raw_exception():
     assert m.diagnostic_code(m.GitHubError("exact candidate signature is not verified")) == "SIGNATURE_UNVERIFIED"
     assert m.diagnostic_code(RuntimeError("opaque-secret-information")) == "OPERATOR_PRECONDITION_OR_OBSERVATION_FAILED"
+
+
+@pytest.mark.parametrize("send_error,expected_send", [(False, "ACKNOWLEDGED"), (True, "ERROR")])
+def test_readback_failure_preserves_send_disposition_without_retry(monkeypatch, send_error, expected_send):
+    context(monkeypatch)
+    api = FixtureAPI()
+    api.send_error = send_error
+    api.queue_readback_error = True
+    outcome, stages = execute(api)
+    assert outcome == {"state": "QUEUE_WRITE_OUTCOME_UNKNOWN", "send": expected_send}
+    assert stages == [{"state": "QUEUE_WRITE_ATTEMPTED_READBACK_REQUIRED"}]
+    assert len(api.mutations) == 1
+    assert api._queue_permit is None and api._queue_input is None
+    assert "synthetic readback failure" not in json.dumps(outcome)
+
+
+def test_public_scope_and_queue_boundaries_remain_single_complete_lines():
+    body = m.command_center_body(org=m.DEFAULT_ORG, apply=False, pulls=[], issues=[])
+    scope = (
+        "Scope: public search-visible items only, with repository visibility rechecked before publication. "
+        + "Private repositories and security alerts are NOT OBSERVED. This is not a complete organization audit, "
+        + "a security clearance, a model qualification, or a runtime-readiness certificate."
+    )
+    authority = (
+        "Queue requests require one unexpired exact-head authorization from protected source and explicit manual dispatch. "
+        + "Normal GitHub checks, signatures, review-thread resolution and the merge queue remain authoritative. "
+        + "A queue request is not a merge or deployment claim."
+    )
+    assert body.splitlines().count(scope) == 1
+    assert body.splitlines().count(authority) == 1

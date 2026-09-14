@@ -740,9 +740,9 @@ def command_center_body(*, org: str, apply: bool, pulls: list[PullRequestState],
     counts = Counter(row["classification"] for row in public_issues if row["action"] != "READ_ONLY_ARCHIVED")
     lines = [COMMAND_CENTER_MARKER, "# Frontier issue command center", "",
         f"Generated: `{utc_now()}`", "Mode: `PUBLIC_OBSERVATION`", "",
-        "Scope: public search-visible items only, with repository visibility rechecked before publication. "
-        "Private repositories and security alerts are NOT OBSERVED. This is not a complete organization audit, "
-        "a security clearance, a model qualification, or a runtime-readiness certificate.", "",
+        ("Scope: public search-visible items only, with repository visibility rechecked before publication. "
+         + "Private repositories and security alerts are NOT OBSERVED. This is not a complete organization audit, "
+         + "a security clearance, a model qualification, or a runtime-readiness certificate."), "",
         "## Public pull-request observations", "",
         f"- Observed public pull requests: **{len(public_pulls)}**",
         "- Immediate merges: **0**",
@@ -755,9 +755,9 @@ def command_center_body(*, org: str, apply: bool, pulls: list[PullRequestState],
     lines += ["", "Classification is a keyword-based triage suggestion, not a confirmed severity or resolution.",
         "Matching text is only a duplicate candidate. No issue is closed and no human labels are replaced.",
         "", "## Authority", "",
-        "Queue requests require one unexpired exact-head authorization from protected source and explicit manual dispatch. "
-        "Normal GitHub checks, signatures, review-thread resolution and the merge queue remain authoritative. "
-        "A queue request is not a merge or deployment claim.", "",
+        ("Queue requests require one unexpired exact-head authorization from protected source and explicit manual dispatch. "
+         + "Normal GitHub checks, signatures, review-thread resolution and the merge queue remain authoritative. "
+         + "A queue request is not a merge or deployment claim."), "",
         "Source repair and estate work remain tracked in #740 and #694. API observations are bounded and non-atomic."]
     return "\n".join(lines) + "\n"
 
@@ -1042,6 +1042,8 @@ def execute_authorized_queue(api: GitHub, authorization_id: str, acknowledgement
                 and (entry.get("pullRequest") or {}).get("headRefOid") == grant["head_sha"]):
             return {"state": "QUEUED_EXACT_HEAD_OBSERVED"}
     except Exception:
+        # Readback failure cannot establish the write outcome. Preserve UNKNOWN
+        # below, never echo provider details, and never resend the mutation.
         pass
     # Even an immediate provider merge needs a separate source/merge receipt;
     # neither absence from the queue nor an HTTP 200 qualifies that outcome here.
