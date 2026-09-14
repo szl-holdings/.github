@@ -72,8 +72,8 @@ jobs:
             -r requirements/frontier-observer-tests.lock
           "$venv/bin/python" -I -m pip check
           "$venv/bin/python" -I -c 'from importlib.metadata import version; import sys; print(sys.version); print("pytest=" + version("pytest")); sys.exit(0 if version("pytest") == "9.0.3" else 1)'
-          "$venv/bin/python" -I -m pytest -q tests/test_frontier_issue_operator*.py tests/test_frontier_receipt_check.py
-          "$venv/bin/python" -I -O -m pytest -q tests/test_frontier_issue_operator*.py tests/test_frontier_receipt_check.py
+          "$venv/bin/python" -I -m pytest -q tests/test_frontier_issue_operator.py tests/test_frontier_issue_operator_safety.py tests/test_frontier_issue_operator_authority.py tests/test_frontier_receipt_check.py
+          "$venv/bin/python" -I -O -m pytest -q tests/test_frontier_issue_operator.py tests/test_frontier_issue_operator_safety.py tests/test_frontier_issue_operator_authority.py tests/test_frontier_receipt_check.py
           "$venv/bin/python" -I -m py_compile .github/scripts/frontier_issue_operator.py .github/scripts/frontier_receipt_check.py
 
       - name: Reject secret and protection mutation primitives
