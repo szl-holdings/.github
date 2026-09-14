@@ -15,7 +15,7 @@ import os
 from pathlib import Path
 import tempfile
 import unittest
-from unittest import mock
+import unittest.mock
 import urllib.error
 
 HERE = Path(__file__).resolve().parent
@@ -48,15 +48,15 @@ class PublicSmokeTests(unittest.TestCase):
         self.requests: list[object] = []
         self.opener_handlers: list[tuple] = []
         self.responses: dict[str, tuple[int, bytes]] = {}
-        self.addCleanup(mock.patch.stopall)
-        mock.patch.dict(os.environ, {"HF_TOKEN": CONTROL_TOKEN}, clear=True).start()
-        mock.patch.object(publisher.time, "sleep").start()
-        mock.patch("socket.create_connection", side_effect=AssertionError("network forbidden")).start()
-        mock.patch.object(publisher.urllib.request, "build_opener", side_effect=self.build_opener).start()
+        self.addCleanup(unittest.mock.patch.stopall)
+        unittest.mock.patch.dict(os.environ, {"HF_TOKEN": CONTROL_TOKEN}, clear=True).start()
+        unittest.mock.patch.object(publisher.time, "sleep").start()
+        unittest.mock.patch("socket.create_connection", side_effect=AssertionError("network forbidden")).start()
+        unittest.mock.patch.object(publisher.urllib.request, "build_opener", side_effect=self.build_opener).start()
 
     def build_opener(self, *handlers):
         self.opener_handlers.append(handlers)
-        return mock.Mock(open=self.open_request)
+        return unittest.mock.Mock(open=self.open_request)
 
     def open_request(self, request, timeout):
         self.requests.append(request)
@@ -100,7 +100,7 @@ class PublicSmokeTests(unittest.TestCase):
             ])
 
     def test_public_routes_never_read_hub_credentials(self):
-        with mock.patch.object(publisher, "_auth_headers", side_effect=AssertionError("not application auth")):
+        with unittest.mock.patch.object(publisher, "_auth_headers", side_effect=AssertionError("not application auth")):
             self.assertEqual(publisher.probe_smoke_routes(REPO, list(ENTITY_PATHS), retries=1), [])
         self.assertEqual(len(self.app_requests()), len(ENTITY_PATHS))
 
@@ -117,7 +117,7 @@ class PublicSmokeTests(unittest.TestCase):
             self.assertIsInstance(handlers[0], publisher._NoRedirect)
 
     def test_public_routes_do_not_need_any_environment_token(self):
-        with mock.patch.dict(os.environ, {}, clear=True):
+        with unittest.mock.patch.dict(os.environ, {}, clear=True):
             self.assertEqual(publisher.probe_smoke_routes(REPO, ["/"], retries=1), [])
 
     def test_hub_state_and_immutable_file_keep_control_authentication(self):
