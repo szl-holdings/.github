@@ -1,0 +1,76 @@
+name: HF public application smoke contract
+
+"on":
+  pull_request:
+    branches: [main]
+    paths:
+      - .github/scripts/hf_deploy_from_dockerfile.py
+      - .github/scripts/test_hf_deploy_from_dockerfile.py
+      - .github/scripts/test_hf_public_smoke.py
+      - .github/workflows/hf-public-smoke-contract.yml
+  push:
+    branches: [main]
+  merge_group:
+    types: [checks_requested]
+
+permissions:
+  contents: read
+
+jobs:
+  contract:
+    name: Public smoke and retained publisher gates (${{ matrix.python }})
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        python: ["3.11", "3.12"]
+    steps:
+      - name: Checkout exact test revision
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+          fetch-depth: 1
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: ${{ matrix.python }}
+      - name: Record measured source and interpreter
+        env:
+          EVENT_HEAD: ${{ github.event.pull_request.head.sha }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p reports/public-smoke
+          python - <<'PY'
+          import hashlib, json, os, pathlib, platform, subprocess
+          files = [".github/scripts/hf_deploy_from_dockerfile.py",
+                   ".github/scripts/test_hf_deploy_from_dockerfile.py",
+                   ".github/scripts/test_hf_public_smoke.py"]
+          revision = subprocess.check_output(["git", "rev-parse", "HEAD"], text=True).strip()
+          payload = {"schema": "szl.public-smoke-test-source/v1", "checkout_revision": revision,
+                     "event_head": os.getenv("EVENT_HEAD") or None, "python": platform.python_version(),
+                     "run_id": os.environ["GITHUB_RUN_ID"], "run_attempt": os.environ["GITHUB_RUN_ATTEMPT"],
+                     "scope": "OFFLINE_TRANSPORT_CONTRACT_NOT_LIVE_DEPLOYMENT",
+                     "files": {name: hashlib.sha256(pathlib.Path(name).read_bytes()).hexdigest() for name in files}}
+          pathlib.Path("reports/public-smoke/source.json").write_text(json.dumps(payload, indent=2) + "\n")
+          print(json.dumps(payload, indent=2))
+          PY
+      - name: Exercise public transport and every retained publisher regression
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -I -P .github/scripts/test_hf_public_smoke.py 2>&1 | tee reports/public-smoke/public-normal.log
+          python -I -P -O .github/scripts/test_hf_public_smoke.py 2>&1 | tee reports/public-smoke/public-optimized.log
+          python -I -P .github/scripts/test_hf_deploy_from_dockerfile.py 2>&1 | tee reports/public-smoke/publisher-normal.log
+          python -I -P -O .github/scripts/test_hf_deploy_from_dockerfile.py 2>&1 | tee reports/public-smoke/publisher-optimized.log
+      - name: Retain bounded offline test evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: hf-public-smoke-${{ matrix.python }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: reports/public-smoke/
+          if-no-files-found: error
+          retention-days: 30
+          overwrite: false
