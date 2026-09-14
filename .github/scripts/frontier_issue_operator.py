@@ -1,23 +1,12 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: Apache-2.0
-"""Bounded organization-wide pull-request and issue convergence operator.
+"""Public-only estate observation and explicitly authorized merge-queue requests.
 
-The operator is intentionally conservative:
-
-* it merges only same-repository, non-draft pull requests into the repository's
-  default branch when GitHub reports a clean merge, every observed check and
-  status is terminal-success/neutral/skipped, no reviewer currently requests
-  changes, and no review thread is unresolved;
-* it closes only exact normalized duplicate issues, retaining the most recently
-  updated canonical issue and leaving a durable pointer on each duplicate;
-* it classifies every remaining issue with one deterministic ``estate:*`` label;
-* it never changes branch protection, rulesets, visibility, secrets, provider
-  resources, repository archival state, or issue content authored by humans;
-* it records no token value and redacts token-like strings from its report;
-* incomplete check/review coverage fails closed, archived targets are read-only,
-  and per-item errors produce a partial-failure receipt and nonzero exit.
-
-Dry-run is the default. ``--apply`` enables the bounded mutations above.
+Scheduled runs observe and suggest; they never merge pull requests, close issues,
+replace labels, or change repository/provider settings. Queue admission requires
+one unexpired authorization from exact protected source plus a manual dispatch.
+Public output contains only allowlisted metadata, not titles, bodies, reviewers,
+check names, provider errors, or private-repository identifiers.
 """
 from __future__ import annotations
 
@@ -25,14 +14,16 @@ import argparse
 import hashlib
 import json
 import os
+import base64
+import tempfile
 import re
 import time
 import urllib.error
 import urllib.parse
 import urllib.request
 from collections import Counter, defaultdict
-from dataclasses import asdict, dataclass, field
-from datetime import datetime, timezone
+from dataclasses import dataclass, field
+from datetime import datetime, timezone, timedelta
 from pathlib import Path
 from typing import Any, Iterable
 
@@ -43,7 +34,25 @@ DEFAULT_ORG = "szl-holdings"
 REPORT_SCHEMA = "szl.frontier-issue-operator/v1"
 COMMAND_CENTER_TITLE = "[estate] Frontier issue command center"
 COMMAND_CENTER_MARKER = "<!-- SZL-FRONTIER-ISSUE-COMMAND-CENTER-V1 -->"
-DUPLICATE_MARKER = "<!-- SZL-EXACT-DUPLICATE-CLOSURE-V1 -->"
+COMMAND_CENTER_NUMBER = 585
+CONTROLLER_REPO = "szl-holdings/.github"
+AUTHORIZATION_PATH = "config/estate-pr-authorizations.json"
+AUTHORIZATION_SCHEMA = "szl.estate-pr-authorizations/v1"
+QUEUE_ACKNOWLEDGEMENT = "ENQUEUE_EXACT_REVIEWED_HEAD"
+SHA40 = re.compile(r"[0-9a-f]{40}\Z")
+SHA256 = re.compile(r"[0-9a-f]{64}\Z")
+REPOSITORY = re.compile(r"szl-holdings/[A-Za-z0-9_.-]{1,100}\Z")
+QUEUE_MUTATION = """mutation($input:EnqueuePullRequestInput!) {
+  enqueuePullRequest(input:$input) { mergeQueueEntry { id pullRequest { id headRefOid } } }
+}"""
+QUEUE_QUERY = """query($owner:String!, $name:String!, $number:Int!) {
+  repository(owner:$owner, name:$name) {
+    pullRequest(number:$number) { id state isDraft headRefOid baseRefOid
+      reviewDecision mergeQueueEntry { id pullRequest { id headRefOid } }
+    }
+  }
+}"""
+THREAD_QUERY = '\n        query($owner:String!, $name:String!, $number:Int!, $cursor:String) {\n          repository(owner:$owner, name:$name) {\n            pullRequest(number:$number) {\n              reviewThreads(first:100, after:$cursor) {\n                nodes { isResolved }\n                pageInfo { hasNextPage endCursor }\n              }\n            }\n          }\n        }\n        '
 ALLOWED_CHECK_CONCLUSIONS = frozenset({"success", "neutral", "skipped"})
 FAILED_CHECK_CONCLUSIONS = frozenset(
     {"failure", "cancelled", "timed_out", "action_required", "startup_failure", "stale"}
@@ -51,8 +60,6 @@ FAILED_CHECK_CONCLUSIONS = frozenset(
 ACTIVE_CHECK_STATES = frozenset({"queued", "in_progress", "pending", "requested", "waiting"})
 SAFE_MERGE_STATES = frozenset({"clean", "has_hooks"})
 TOKEN_PATTERN = re.compile(r"(?:gh[pousr]_[A-Za-z0-9_]{20,}|github_pat_[A-Za-z0-9_]{20,}|hf_[A-Za-z0-9]{20,})")
-URL_PATTERN = re.compile(r"https?://\S+")
-WHITESPACE = re.compile(r"\s+")
 
 LABELS = {
     "estate:p0": ("b60205", "Immediate security, data-integrity, or production-boundary defect"),
@@ -121,6 +128,7 @@ class PullRequestState:
     action: str = "OBSERVED"
     merge_sha: str | None = None
     error: str | None = None
+    public_verified: bool = False
 
 
 @dataclass
@@ -134,6 +142,7 @@ class IssueState:
     duplicate_of: str | None = None
     action: str = "CLASSIFIED"
     error: str | None = None
+    public_verified: bool = False
 
 
 def utc_now() -> str:
@@ -155,6 +164,9 @@ class GitHub:
     def __init__(self, token: str, *, apply: bool) -> None:
         self.token = token.strip()
         self.apply = apply
+        self._queue_permit: tuple[str, str] | None = None
+        self._queue_input: dict[str, Any] | None = None
+        self._report_body: str | None = None
         self.headers = {
             "Accept": "application/vnd.github+json",
             "X-GitHub-Api-Version": "2022-11-28",
@@ -172,6 +184,23 @@ class GitHub:
         expected: Iterable[int] = (200,),
     ) -> tuple[Any, dict[str, str], int]:
         url = api_url(path)
+        # This is an allowlist of effects, not merely a dry-run convention.
+        if method != "GET":
+            allowed = False
+            if method == "POST" and url == GRAPHQL and isinstance(payload, dict):
+                if set(payload) == {"query", "variables"}:
+                    query, variables = payload["query"], payload["variables"]
+                    allowed = query in (THREAD_QUERY, QUEUE_QUERY) and isinstance(variables, dict)
+                    if query == QUEUE_MUTATION:
+                        allowed = (self.apply is True and self._queue_input is not None
+                                   and variables == {"input": self._queue_input})
+            if (method == "PATCH" and path == f"/repos/{CONTROLLER_REPO}/issues/{COMMAND_CENTER_NUMBER}"
+                    and self._report_body is not None):
+                allowed = payload == {"body": self._report_body}
+            if not allowed:
+                raise GitHubError("mutation is outside the operator capability")
+        elif payload is not None:
+            raise GitHubError("GET requests cannot contain a body")
         body = None
         headers = dict(self.headers)
         if payload is not None:
@@ -184,7 +213,7 @@ class GitHub:
                 raw = response.read(MAX_API_BYTES + 1)
                 if len(raw) > MAX_API_BYTES:
                     raise GitHubError("GitHub response exceeded its byte budget")
-                result = json.loads(raw) if raw else None
+                result = strict_json(raw) if raw else None
                 status = response.status
                 response_headers = dict(response.headers.items())
         except urllib.error.HTTPError as exc:
@@ -194,7 +223,7 @@ class GitHub:
         except (urllib.error.URLError, OSError, ValueError):
             raise GitHubError("GitHub transport or JSON decoding failed") from None
         if status not in set(expected):
-            raise GitHubError(f"unexpected GitHub status {status} for {method} {path}")
+            raise GitHubError(f"unexpected GitHub HTTP status {status}")
         return result, response_headers, status
 
     def graphql(self, query: str, variables: dict[str, Any]) -> dict[str, Any]:
@@ -369,18 +398,7 @@ class GitHub:
 
     def unresolved_threads(self, full_name: str, number: int) -> int:
         owner, name = full_name.split("/", 1)
-        query = """
-        query($owner:String!, $name:String!, $number:Int!, $cursor:String) {
-          repository(owner:$owner, name:$name) {
-            pullRequest(number:$number) {
-              reviewThreads(first:100, after:$cursor) {
-                nodes { isResolved }
-                pageInfo { hasNextPage endCursor }
-              }
-            }
-          }
-        }
-        """
+        query = THREAD_QUERY
         unresolved = 0
         cursor: str | None = None
         seen_cursors: set[str] = set()
@@ -409,140 +427,110 @@ class GitHub:
         raise GitHubError("review-thread collection exceeded its page budget")
 
 
-    def merge(self, full_name: str, number: int, sha: str, title: str) -> str:
-        if not self.apply:
-            return "DRY_RUN"
-        payload = {
-            "sha": sha,
-            "merge_method": "squash",
-            "commit_title": f"{title} (#{number})",
-            "commit_message": (
-                "Protected frontier merge after exact-head terminal checks, clean mergeability, "
-                "no outstanding change request, and zero unresolved review threads.\n\n"
-                "Signed-off-by: Stephen Lutar <stephenlutar2@gmail.com>"
-            ),
-        }
-        result, _headers, _status = self.request(
-            "PUT", f"/repos/{full_name}/pulls/{number}/merge", payload, expected=(200, 201)
-        )
-        if not isinstance(result, dict) or result.get("merged") is not True:
-            raise GitHubError(f"GitHub rejected merge for {full_name}#{number}: {redact(result)}")
-        value = result.get("sha")
-        return str(value or "UNKNOWN")
+    def merge(self, *args: Any, **kwargs: Any) -> str:
+        """Reject obsolete callers rather than silently restoring unsafe behavior."""
+        raise GitHubError("immediate merge is not an operator capability")
 
-    def ensure_label(self, full_name: str, name: str) -> None:
-        if not self.apply:
-            return
-        color, description = LABELS[name]
-        encoded = urllib.parse.quote(name, safe="")
+    def close_duplicate(self, *args: Any, **kwargs: Any) -> None:
+        raise GitHubError("issue closure requires a separate reviewed disposition")
+
+    def set_classification(self, *args: Any, **kwargs: Any) -> None:
+        raise GitHubError("classification is advisory; issue labels are not replaced")
+
+    def queue_snapshot(self, repository: str, number: int) -> dict[str, Any]:
+        owner, name = repository.split("/", 1)
+        data = self.graphql(QUEUE_QUERY, {"owner": owner, "name": name, "number": number})
+        repo = data.get("repository")
+        pull = repo.get("pullRequest") if isinstance(repo, dict) else None
+        if not isinstance(pull, dict):
+            raise GitHubError("queue observation unavailable")
+        return pull
+
+    def enqueue_exact(self, node_id: str, sha: str) -> Any:
+        if (self.apply is not True or self._queue_permit != (node_id, sha)
+                or not isinstance(node_id, str) or not node_id or not SHA40.fullmatch(sha)):
+            raise GitHubError("queue capability unavailable")
+        self._queue_input = {"pullRequestId": node_id, "expectedHeadOid": sha, "jump": False}
         try:
-            self.request("GET", f"/repos/{full_name}/labels/{encoded}")
-        except GitHubError as exc:
-            if "HTTP 404" not in str(exc):
-                raise
-            self.request(
-                "POST",
-                f"/repos/{full_name}/labels",
-                {"name": name, "color": color, "description": description},
-                expected=(201,),
-            )
+            # Exactly one send; ambiguous outcomes are handled only by readback.
+            return self.graphql(QUEUE_MUTATION, {"input": self._queue_input})
+        finally:
+            self._queue_input = None
 
-    def set_classification(
-        self,
-        full_name: str,
-        number: int,
-        label: str,
-        existing_labels: Iterable[str],
-    ) -> None:
-        """Preserve human labels while enforcing exactly one estate label."""
-        if not self.apply:
-            return
-        current = [name for name in existing_labels if name]
-        preserved = [name for name in current if not name.startswith("estate:")]
-        labels = sorted(set([*preserved, label]))
-        if sorted(set(current)) == labels:
-            return
-        self.ensure_label(full_name, label)
-        self.request(
-            "PATCH",
-            f"/repos/{full_name}/issues/{number}",
-            {"labels": labels},
-            expected=(200,),
-        )
+    def publish_command_center(self, pulls: list[PullRequestState], issues: list[IssueState]) -> str:
+        """Update only the already-owned machine body; never create/reopen an issue."""
+        source = protected_source(self)
+        if not is_public_repository(self.repository(CONTROLLER_REPO), CONTROLLER_REPO):
+            raise GitHubError("public report target unavailable")
+        path = f"/repos/{CONTROLLER_REPO}/issues/{COMMAND_CENTER_NUMBER}"
+        target, _, _ = self.request("GET", path)
+        if (not isinstance(target, dict) or target.get("number") != COMMAND_CENTER_NUMBER
+                or target.get("title") != COMMAND_CENTER_TITLE
+                or target.get("state") != "open" or "pull_request" in target
+                or (target.get("user") or {}).get("login") != "stephenlutar2-hash"
+                or not isinstance(target.get("body"), str)
+                or not target["body"].startswith(COMMAND_CENTER_MARKER)):
+            raise GitHubError("machine report ownership did not match")
+        # Both the report and the current visibility are checked again at the
+        # publication boundary. No private rows or free text enter the body.
+        for row in [*pulls, *issues]:
+            if row.public_verified:
+                row.public_verified = is_public_repository(self.repository(row.repository), row.repository)
+        body = command_center_body(org=DEFAULT_ORG, apply=False, pulls=pulls, issues=issues)
+        if protected_source(self) != source:
+            raise GitHubError("controller moved before public report publication")
+        if target["body"] != body:
+            self._report_body = body
+            try:
+                self.request("PATCH", path, {"body": body})
+            finally:
+                self._report_body = None
+        observed, _, _ = self.request("GET", path)
+        if not isinstance(observed, dict) or observed.get("body") != body:
+            raise GitHubError("machine report write requires readback")
+        return f"https://github.com/{CONTROLLER_REPO}/issues/{COMMAND_CENTER_NUMBER}"
 
-    def comment(self, full_name: str, number: int, body: str) -> None:
-        if not self.apply:
-            return
-        self.request(
-            "POST",
-            f"/repos/{full_name}/issues/{number}/comments",
-            {"body": body},
-            expected=(201,),
-        )
 
-    def close_duplicate(self, full_name: str, number: int, canonical_url: str) -> None:
-        if not self.apply:
-            return
-        body = (
-            f"{DUPLICATE_MARKER}\n"
-            "Closing this issue because its normalized title and body are byte-equivalent to "
-            f"the newer canonical issue: {canonical_url}. No underlying defect is being declared fixed."
-        )
-        self.comment(full_name, number, body)
-        self.request(
-            "PATCH",
-            f"/repos/{full_name}/issues/{number}",
-            {"state": "closed", "state_reason": "not_planned"},
-            expected=(200,),
-        )
-
-    def upsert_command_center(self, org: str, body: str) -> str:
-        query = f'org:{org} repo:{org}/.github is:issue in:title "{COMMAND_CENTER_TITLE}"'
-        rows = self.search(query, limit=20)
-        exact = [row for row in rows if row.get("title") == COMMAND_CENTER_TITLE]
-        if exact:
-            target = max(exact, key=lambda row: str(row.get("updated_at") or ""))
-            url = str(target.get("html_url"))
-            if self.apply:
-                self.request(
-                    "PATCH",
-                    f"/repos/{org}/.github/issues/{target['number']}",
-                    {"body": body, "state": "open"},
-                    expected=(200,),
-                )
-            return url
-        if not self.apply:
-            return "DRY_RUN"
-        self.ensure_label(f"{org}/.github", "estate:execution-ledger")
-        result, _headers, _status = self.request(
-            "POST",
-            f"/repos/{org}/.github/issues",
-            {"title": COMMAND_CENTER_TITLE, "body": body, "labels": ["estate:execution-ledger"]},
-            expected=(201,),
-        )
-        return str(result.get("html_url") or "UNKNOWN")
+def strict_json(raw: bytes | str) -> Any:
+    """Refuse duplicate keys and non-finite values rather than selecting a side."""
+    def pairs(items: list[tuple[str, Any]]) -> dict[str, Any]:
+        result: dict[str, Any] = {}
+        for key, value in items:
+            if key in result:
+                raise ValueError("duplicate JSON key")
+            result[key] = value
+        return result
+    def nonfinite(value: str) -> None:
+        raise ValueError("non-finite JSON value")
+    return json.loads(raw, object_pairs_hook=pairs, parse_constant=nonfinite)
 
 
 def repository_from_api_url(url: str) -> str:
-    parts = url.rstrip("/").split("/")
-    if len(parts) < 2:
-        raise ValueError(f"invalid repository URL: {url!r}")
-    return "/".join(parts[-2:])
+    parsed = urllib.parse.urlsplit(api_url(url))
+    name = parsed.path.removeprefix("/repos/")
+    if (not parsed.path.startswith("/repos/") or parsed.query or not REPOSITORY.fullmatch(name)
+            or name.split("/")[1] in {".", ".."}):
+        raise GitHubError("repository identity is outside the public estate")
+    return name
+
+
+def is_public_repository(value: Any, expected: str) -> bool:
+    return (isinstance(value, dict) and REPOSITORY.fullmatch(expected) is not None
+            and value.get("full_name") == expected and value.get("private") is False
+            and value.get("visibility") == "public")
 
 
 def normalized_issue_text(value: str | None) -> str:
-    text = (value or "").replace("\r\n", "\n")
-    text = WHITESPACE.sub(" ", text).strip().casefold()
-    return text
+    # Code, paths, whitespace and case can change meaning. No lossy normalization.
+    return value if isinstance(value, str) else ""
 
 
 def issue_fingerprint(title: str, body: str | None) -> str | None:
-    normalized_title = normalized_issue_text(title)
-    normalized_body = normalized_issue_text(body)
-    if not normalized_title or len(normalized_body) < 40:
+    if not isinstance(title, str) or not title or not isinstance(body, str) or len(body) < 40:
         return None
-    framed = f"{normalized_title}\n{normalized_body}".encode("utf-8")
-    return hashlib.sha256(framed).hexdigest()
+    # JSON framing prevents delimiter collisions. Hashes remain in memory only.
+    return hashlib.sha256(json.dumps([title, body], ensure_ascii=False,
+        separators=(",", ":")).encode("utf-8")).hexdigest()
 
 
 def classify_issue(title: str, body: str | None, labels: Iterable[str] = ()) -> str:
@@ -575,6 +563,9 @@ def evaluate_pr(api: GitHub, item: dict[str, Any]) -> PullRequestState:
         repo = api.repository(repository)
         if type(repo.get("archived")) is not bool:
             raise GitHubError("repository archival state is unavailable")
+        if not is_public_repository(repo, repository):
+            raise GitHubError("public repository identity could not be verified")
+        row.public_verified = True
         if repo["archived"]:
             row.action = "READ_ONLY_ARCHIVED"
             return row
@@ -616,18 +607,17 @@ def evaluate_pr(api: GitHub, item: dict[str, Any]) -> PullRequestState:
             row.blockers.append("unresolved-review-threads")
 
         if not row.blockers and row.head_sha:
-            row.merge_sha = api.merge(repository, number, row.head_sha, row.title)
-            row.action = "WOULD_MERGE" if not api.apply else "MERGED"
+            row.action = "REVIEW_CANDIDATE"
         else:
             row.action = "BLOCKED"
-    except Exception as exc:  # each PR remains independently observable
-        row.error = str(redact(str(exc)))
+    except Exception:  # each PR remains independently observable
+        row.error = "OBSERVATION_FAILED"
         row.action = "ERROR"
     return row
 
 
 def issue_rows(api: GitHub, org: str, *, limit: int) -> list[dict[str, Any]]:
-    rows = api.search(f"org:{org} is:issue is:open", limit=limit)
+    rows = api.search(f"org:{org} is:issue is:open is:public", limit=limit)
     return [row for row in rows if "pull_request" not in row]
 
 
@@ -645,10 +635,7 @@ def reconcile_issues(api: GitHub, org: str, *, limit: int) -> list[IssueState]:
     canonical_for: dict[tuple[str, str], dict[str, Any]] = {}
     for fingerprint, group in by_fingerprint.items():
         if len(group) > 1:
-            canonical_for[fingerprint] = max(
-                group,
-                key=lambda row: (str(row.get("updated_at") or ""), int(row.get("number") or 0)),
-            )
+            canonical_for[fingerprint] = min(group, key=lambda row: int(row["number"]))
 
     results: list[IssueState] = []
     # Archived repositories remain part of the observation, never a write target.
@@ -682,6 +669,9 @@ def reconcile_issues(api: GitHub, org: str, *, limit: int) -> list[IssueState]:
                 raise GitHubError("repository metadata could not be observed")
             if not isinstance(repo, dict) or type(repo.get("archived")) is not bool:
                 raise GitHubError("repository archival state is unavailable")
+            if not is_public_repository(repo, repository):
+                raise GitHubError("public repository identity could not be verified")
+            state.public_verified = True
             if repo["archived"]:
                 state.action = "READ_ONLY_ARCHIVED"
                 results.append(state)
@@ -690,174 +680,512 @@ def reconcile_issues(api: GitHub, org: str, *, limit: int) -> list[IssueState]:
             canonical = canonical_for.get((repository, fingerprint or ""))
             if canonical and int(canonical["number"]) != state.number:
                 state.duplicate_of = str(canonical.get("html_url") or "")
-                api.close_duplicate(repository, state.number, state.duplicate_of)
-                state.action = "WOULD_CLOSE_EXACT_DUPLICATE" if not api.apply else "CLOSED_EXACT_DUPLICATE"
+                state.action = "DUPLICATE_CANDIDATE"
             else:
-                api.set_classification(
-                    repository, state.number, classification, labels
-                )
-                state.action = "WOULD_CLASSIFY" if not api.apply else "CLASSIFIED"
-        except Exception as exc:
-            state.error = str(redact(str(exc)))
+                state.action = "CLASSIFICATION_PROPOSED"
+        except Exception:
+            state.error = "OBSERVATION_FAILED"
             state.action = "ERROR"
         results.append(state)
     return results
 
 
-def command_center_body(
-    *,
-    org: str,
-    apply: bool,
-    pulls: list[PullRequestState],
-    issues: list[IssueState],
-) -> str:
-    issue_counts = Counter(row.classification for row in issues if row.action not in {"CLOSED_EXACT_DUPLICATE", "READ_ONLY_ARCHIVED"})
-    repository_counts = Counter(row.repository for row in issues if row.action not in {"CLOSED_EXACT_DUPLICATE", "READ_ONLY_ARCHIVED"})
-    merged = [row for row in pulls if row.action == "MERGED"]
-    blocked = [row for row in pulls if row.action == "BLOCKED"]
-    errors = [row for row in pulls if row.action == "ERROR"] + [row for row in issues if row.action == "ERROR"]
-    lines = [
-        COMMAND_CENTER_MARKER,
-        "# Frontier issue command center",
-        "",
-        f"Generated: `{utc_now()}`",
-        f"Mode: `{'APPLY' if apply else 'DRY_RUN'}`",
-        "",
-        "This ledger is machine-generated. It does not treat reachability as readiness, does not close unresolved work, and does not bypass repository protections.",
-        "",
-        "## Pull-request convergence",
-        "",
-        f"- Observed: **{len(pulls)}**",
-        f"- Merged this pass: **{len(merged)}**",
-        f"- Still blocked or active: **{len(blocked)}**",
-        f"- Operator errors: **{len(errors)}**",
-        f"- Read-only archived issues: **{sum(row.action == 'READ_ONLY_ARCHIVED' for row in issues)}**",
-    ]
-    for row in blocked[:50]:
-        lines.append(
-            f"- `{row.repository}#{row.number}` — {row.title} — `{', '.join(row.blockers)}`"
-        )
-    lines += ["", "## Open-issue classification", ""]
+PUBLIC_ACTIONS = frozenset({"REVIEW_CANDIDATE", "BLOCKED", "ERROR", "READ_ONLY_ARCHIVED",
+    "DUPLICATE_CANDIDATE", "CLASSIFICATION_PROPOSED"})
+PUBLIC_BLOCKERS = frozenset({"draft", "external-fork", "non-default-base", "mergeability-not-clean",
+    "no-check-evidence", "failed-checks", "active-checks", "changes-requested", "unresolved-review-threads"})
+
+
+def public_row(row: PullRequestState | IssueState) -> dict[str, Any] | None:
+    """A projection, not a redaction regex: never serialize free-form content."""
+    if (row.public_verified is not True or not REPOSITORY.fullmatch(row.repository)
+            or type(row.number) is not int or row.number <= 0):
+        return None
+    result: dict[str, Any] = {"repository": row.repository, "number": row.number,
+        "action": row.action if row.action in PUBLIC_ACTIONS else "ERROR"}
+    if isinstance(row, PullRequestState):
+        result["head_sha"] = row.head_sha if isinstance(row.head_sha, str) and SHA40.fullmatch(row.head_sha) else None
+        result["blockers"] = sorted({item if item in PUBLIC_BLOCKERS else "OTHER_REVIEW_BLOCKER" for item in row.blockers})
+        result["checks"] = {"passed": len(row.checks.passed), "failed": len(row.checks.failed), "active": len(row.checks.active)}
+    else:
+        result["classification"] = row.classification if row.classification in LABELS else "estate:backlog"
+        # Reconstruct links from validated identities, never from issue text/API URLs.
+        match = re.fullmatch(r"https://github\.com/" + re.escape(row.repository) + r"/issues/([1-9][0-9]*)", row.duplicate_of or "")
+        result["possible_duplicate_of"] = int(match[1]) if match else None
+    result["url"] = f"https://github.com/{row.repository}/{'pull' if isinstance(row, PullRequestState) else 'issues'}/{row.number}"
+    return result
+
+
+def refresh_public_scope(api: GitHub, rows: list[Any]) -> None:
+    observed: dict[str, bool] = {}
+    for row in rows:
+        if row.public_verified:
+            if row.repository not in observed:
+                try:
+                    observed[row.repository] = is_public_repository(api.repository(row.repository), row.repository)
+                except Exception:
+                    observed[row.repository] = False
+            row.public_verified = observed[row.repository]
+            if not row.public_verified:
+                row.action, row.error = "ERROR", "PUBLIC_SCOPE_UNAVAILABLE"
+
+
+def command_center_body(*, org: str, apply: bool, pulls: list[PullRequestState], issues: list[IssueState]) -> str:
+    # Fixed publisher identity and generated prose prevent Markdown injection,
+    # private-repository aggregation and reflective provider-error disclosure.
+    if org != DEFAULT_ORG:
+        raise GitHubError("public report organization mismatch")
+    public_pulls = [item for row in pulls if (item := public_row(row)) is not None]
+    public_issues = [item for row in issues if (item := public_row(row)) is not None]
+    counts = Counter(row["classification"] for row in public_issues if row["action"] != "READ_ONLY_ARCHIVED")
+    lines = [COMMAND_CENTER_MARKER, "# Frontier issue command center", "",
+        f"Generated: `{utc_now()}`", "Mode: `PUBLIC_OBSERVATION`", "",
+        "Scope: public search-visible items only, with repository visibility rechecked before publication. "
+        "Private repositories and security alerts are NOT OBSERVED. This is not a complete organization audit, "
+        "a security clearance, a model qualification, or a runtime-readiness certificate.", "",
+        "## Public pull-request observations", "",
+        f"- Observed public pull requests: **{len(public_pulls)}**",
+        "- Immediate merges: **0**",
+        f"- Operator errors: **{sum(row.action == 'ERROR' for row in [*pulls, *issues])}**"]
+    for row in public_pulls[:100]:
+        lines.append(f"- [{row['repository']}#{row['number']}]({row['url']}) — `{row['action']}`")
+    lines += ["", "## Advisory public-issue classifications", ""]
     for label in LABELS:
-        lines.append(f"- `{label}`: **{issue_counts.get(label, 0)}**")
-    lines += ["", "## Repositories with the largest active queues", ""]
-    for repository, count in repository_counts.most_common(30):
-        lines.append(f"- `{repository}`: **{count}**")
-    lines += [
-        "",
-        "## Mutation boundaries",
-        "",
-        "- Pull requests merge only after clean exact-head checks and review state.",
-        "- Only exact normalized duplicate issues are closed automatically.",
-        "- Provider credentials, DNS, billing, quotas, branch protection, visibility, archive state, models, datasets, and runtime allocations are not changed.",
-        "- Token values are neither printed nor persisted.",
-    ]
-    if errors:
-        lines += ["", "## Operator errors", ""]
-        for row in errors[:50]:
-            lines.append(
-                f"- `{row.repository}#{row.number}` — `{redact(row.error or 'unknown')}`"
-            )
+        lines.append(f"- `{label}`: **{counts.get(label, 0)}**")
+    lines += ["", "Classification is a keyword-based triage suggestion, not a confirmed severity or resolution.",
+        "Matching text is only a duplicate candidate. No issue is closed and no human labels are replaced.",
+        "", "## Authority", "",
+        "Queue requests require one unexpired exact-head authorization from protected source and explicit manual dispatch. "
+        "Normal GitHub checks, signatures, review-thread resolution and the merge queue remain authoritative. "
+        "A queue request is not a merge or deployment claim.", "",
+        "Source repair and estate work remain tracked in #740 and #694. API observations are bounded and non-atomic."]
     return "\n".join(lines) + "\n"
 
 
 def write_report(path: Path, payload: dict[str, Any]) -> None:
+    """Atomically replace only a report assembled from public_row and fixed codes."""
     path.parent.mkdir(parents=True, exist_ok=True)
-    safe = redact(payload)
-    path.write_text(json.dumps(safe, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    # This defense supplements the positive projection; it does not prove that
+    # arbitrary input is safe to publish. Callers never pass raw API data here.
+    text = json.dumps(redact(payload), indent=2, sort_keys=True, allow_nan=False) + "\n"
+    fd, temporary = tempfile.mkstemp(prefix=".frontier-report-", dir=str(path.parent))
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as handle:
+            handle.write(text)
+            handle.flush()
+            os.fsync(handle.fileno())
+        os.replace(temporary, path)
+    finally:
+        if os.path.exists(temporary):
+            os.unlink(temporary)
+
+
+def read_json(api: GitHub, path: str) -> Any:
+    value, _, _ = api.request("GET", path)
+    return value
+
+
+def timestamp(value: Any) -> datetime:
+    if not isinstance(value, str) or not re.fullmatch(r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z", value):
+        raise GitHubError("authorization timestamp must be exact UTC")
+    try:
+        return datetime.strptime(value, "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=timezone.utc)
+    except ValueError:
+        raise GitHubError("authorization timestamp is invalid") from None
+
+
+def validate_authorizations(value: Any, authorization_id: str, now: datetime) -> dict[str, Any]:
+    if (not isinstance(value, dict) or set(value) != {"schema", "authorizations"}
+            or value["schema"] != AUTHORIZATION_SCHEMA or not isinstance(value["authorizations"], list)
+            or len(value["authorizations"]) > 25):
+        raise GitHubError("authorization collection is invalid")
+    required = {"id", "repository", "pr_number", "head_sha", "base_sha", "not_before", "expires_at", "rules_sha256"}
+    ids, targets = set(), set()
+    selected = None
+    for row in value["authorizations"]:
+        if not isinstance(row, dict) or set(row) != required:
+            raise GitHubError("authorization fields are invalid")
+        identity, repo, number = row["id"], row["repository"], row["pr_number"]
+        if (not isinstance(identity, str) or not re.fullmatch(r"[a-z0-9][a-z0-9-]{0,63}", identity)
+                or identity in ids or not isinstance(repo, str) or not REPOSITORY.fullmatch(repo)
+                or repo.split("/")[1] in {".", ".."} or type(number) is not int or number <= 0
+                or (repo, number) in targets):
+            raise GitHubError("authorization identity is invalid or duplicated")
+        ids.add(identity)
+        targets.add((repo, number))
+        for key in ("head_sha", "base_sha"):
+            if not isinstance(row[key], str) or not SHA40.fullmatch(row[key]):
+                raise GitHubError("authorization requires an exact commit")
+        if not isinstance(row["rules_sha256"], str) or not SHA256.fullmatch(row["rules_sha256"]):
+            raise GitHubError("authorization requires an effective-rules digest")
+        start, end = timestamp(row["not_before"]), timestamp(row["expires_at"])
+        if not timedelta(0) < end - start <= timedelta(hours=24):
+            raise GitHubError("authorization lifetime exceeds 24 hours")
+        if identity == authorization_id:
+            if not start <= now < end:
+                raise GitHubError("selected authorization is not currently valid")
+            selected = row
+    if selected is None:
+        raise GitHubError("no exact protected authorization was selected")
+    return dict(selected)
+
+
+def protected_source(api: GitHub) -> str:
+    source = os.environ.get("GITHUB_SHA", "")
+    if (not SHA40.fullmatch(source) or os.environ.get("GITHUB_REPOSITORY") != CONTROLLER_REPO
+            or os.environ.get("GITHUB_REF") != "refs/heads/main"
+            or os.environ.get("GITHUB_REF_PROTECTED") != "true"):
+        raise GitHubError("protected controller context is required")
+    branch = read_json(api, f"/repos/{CONTROLLER_REPO}/branches/main")
+    if (not isinstance(branch, dict) or branch.get("protected") is not True
+            or (branch.get("commit") or {}).get("sha") != source):
+        raise GitHubError("protected controller source moved or is unavailable")
+    return source
+
+
+def dispatch_authorization(api: GitHub, authorization_id: str, acknowledgement: str) -> tuple[str, dict[str, Any]]:
+    if acknowledgement != QUEUE_ACKNOWLEDGEMENT or not re.fullmatch(r"[a-z0-9][a-z0-9-]{0,63}", authorization_id):
+        raise GitHubError("manual exact-head acknowledgement is required")
+    if (os.environ.get("GITHUB_EVENT_NAME") != "workflow_dispatch"
+            or os.environ.get("GITHUB_RUN_ATTEMPT") != "1"
+            or os.environ.get("GITHUB_WORKFLOW_REF") != f"{CONTROLLER_REPO}/.github/workflows/frontier-issue-operator.yml@refs/heads/main"):
+        raise GitHubError("only a first-attempt protected manual dispatch may enqueue")
+    run_id = os.environ.get("GITHUB_RUN_ID", "")
+    if not re.fullmatch(r"[1-9][0-9]{0,19}", run_id):
+        raise GitHubError("workflow run identity is unavailable")
+    source = protected_source(api)
+    run = read_json(api, f"/repos/{CONTROLLER_REPO}/actions/runs/{run_id}")
+    if (not isinstance(run, dict) or run.get("id") != int(run_id)
+            or run.get("head_sha") != source or run.get("head_branch") != "main"
+            or run.get("event") != "workflow_dispatch" or run.get("run_attempt") != 1
+            or run.get("status") != "in_progress"
+            or run.get("path") != ".github/workflows/frontier-issue-operator.yml"):
+        raise GitHubError("workflow run is not the expected live protected dispatch")
+    content = read_json(api, f"/repos/{CONTROLLER_REPO}/contents/{AUTHORIZATION_PATH}?ref={source}")
+    if (not isinstance(content, dict) or content.get("type") != "file"
+            or content.get("path") != AUTHORIZATION_PATH or content.get("encoding") != "base64"
+            or type(content.get("size")) is not int or not 0 < content["size"] <= 32768
+            or not isinstance(content.get("content"), str) or len(content["content"]) > 50000):
+        raise GitHubError("protected authorization file is unavailable")
+    try:
+        raw = base64.b64decode(content["content"].replace("\n", ""), validate=True)
+        blob = hashlib.sha1(b"blob " + str(len(raw)).encode() + b"\0" + raw, usedforsecurity=False).hexdigest()
+        if len(raw) != content["size"] or content.get("sha") != blob:
+            raise ValueError("source blob mismatch")
+        policy = strict_json(raw)
+    except (ValueError, TypeError, UnicodeError):
+        raise GitHubError("protected authorization bytes are invalid") from None
+    return source, validate_authorizations(policy, authorization_id, datetime.now(timezone.utc))
+
+
+def effective_rules(api: GitHub, repo: str, branch: str) -> list[dict[str, Any]]:
+    # Read the provider's effective branch rules, including inherited rules.
+    # No ruleset or branch-protection mutation endpoint exists in this operator.
+    rows = read_json(api, f"/repos/{repo}/rules/branches/{urllib.parse.quote(branch, safe='')}?per_page=100&page=1")
+    if not isinstance(rows, list) or not 1 <= len(rows) < 100 or not all(isinstance(row, dict) and isinstance(row.get("type"), str) for row in rows):
+        raise GitHubError("effective branch-rule coverage is unavailable or truncated")
+    return rows
+
+
+def rules_digest(rows: list[dict[str, Any]]) -> str:
+    framed = sorted(json.dumps(row, sort_keys=True, separators=(",", ":"), allow_nan=False) for row in rows)
+    return hashlib.sha256(json.dumps(framed, separators=(",", ":")).encode()).hexdigest()
+
+
+def promotion_preflight(api: GitHub, grant: dict[str, Any]) -> dict[str, Any]:
+    repo, number, head = grant["repository"], grant["pr_number"], grant["head_sha"]
+    metadata = api.repository(repo)
+    if not is_public_repository(metadata, repo) or metadata.get("archived") is not False:
+        raise GitHubError("promotion target is not a verified active public repository")
+    branch = metadata.get("default_branch")
+    if not isinstance(branch, str) or not branch:
+        raise GitHubError("default branch unavailable")
+    branch_state = read_json(api, f"/repos/{repo}/branches/{urllib.parse.quote(branch, safe='')}")
+    if (not isinstance(branch_state, dict) or branch_state.get("protected") is not True
+            or (branch_state.get("commit") or {}).get("sha") != grant["base_sha"]):
+        raise GitHubError("protected target base moved or is unavailable")
+    rules = effective_rules(api, repo, branch)
+    if rules_digest(rules) != grant["rules_sha256"]:
+        raise GitHubError("effective target rules differ from the authorization")
+    types = {row.get("type") for row in rules}
+    if not {"pull_request", "required_status_checks", "required_signatures", "non_fast_forward", "deletion", "merge_queue"} <= types:
+        raise GitHubError("protected queue or required safety controls are absent")
+    requirements: list[dict[str, Any]] = []
+    needs_approval = False
+    for rule in rules:
+        parameters = rule.get("parameters") or {}
+        if not isinstance(parameters, dict):
+            raise GitHubError("rule parameters are malformed")
+        if rule.get("type") == "merge_queue" and parameters.get("merge_method") != "SQUASH":
+            raise GitHubError("only the protected squash queue is supported")
+        if not isinstance(parameters, dict):
+            raise GitHubError("rule parameters are malformed")
+        if rule.get("type") == "pull_request":
+            if parameters.get("required_review_thread_resolution") is not True:
+                raise GitHubError("review-thread protection is required")
+            approvals = parameters.get("required_approving_review_count")
+            if type(approvals) is not int or approvals < 0:
+                raise GitHubError("approval policy is unavailable")
+            needs_approval = needs_approval or approvals > 0 or any(
+                parameters.get(key) is not False for key in ("require_code_owner_review", "require_last_push_approval"))
+        if rule.get("type") == "required_status_checks":
+            if parameters.get("strict_required_status_checks_policy") is not True:
+                raise GitHubError("strict required checks are required")
+            contexts = parameters.get("required_status_checks")
+            if not isinstance(contexts, list) or not contexts:
+                raise GitHubError("required-check configuration is empty or malformed")
+            requirements.extend(contexts)
+    pull = api.pull(repo, number)
+    if (pull.get("number") != number or type(pull.get("number")) is not int
+            or not isinstance(pull.get("node_id"), str) or not pull["node_id"]
+            or pull.get("state") != "open" or pull.get("draft") is not False
+            or pull.get("merged") is not False or pull.get("mergeable") is not True
+            or pull.get("mergeable_state") not in SAFE_MERGE_STATES
+            or (pull.get("base") or {}).get("ref") != branch
+            or (pull.get("base") or {}).get("sha") != grant["base_sha"]
+            or ((pull.get("base") or {}).get("repo") or {}).get("full_name") != repo
+            or (pull.get("head") or {}).get("sha") != head
+            or ((pull.get("head") or {}).get("repo") or {}).get("full_name") != repo):
+        raise GitHubError("pull request is not the exact ready internal candidate")
+    labels = pull.get("labels")
+    if not isinstance(labels, list):
+        raise GitHubError("pull-request labels are unavailable")
+    for label in labels:
+        name = label.get("name") if isinstance(label, dict) else None
+        if not isinstance(name, str) or re.search(r"hold|blocked|do[ -]?not[ -]?merge|wip|awaiting[ -]?evidence", name, re.I):
+            raise GitHubError("pull-request label requires review or evidence")
+    # The provider queue retains its own signature rules. This additional
+    # exact-head observation never substitutes a locally manufactured signature.
+    commit = read_json(api, f"/repos/{repo}/commits/{head}")
+    if (not isinstance(commit, dict) or commit.get("sha") != head
+            or ((commit.get("commit") or {}).get("verification") or {}).get("verified") is not True):
+        raise GitHubError("exact candidate signature is not verified")
+    observed = api.checks(repo, head)
+    if observed.count == 0 or observed.failed or observed.active:
+        raise GitHubError("check evidence is absent, failed, or active")
+    check_rows = api.counted_pages(f"/repos/{repo}/commits/{head}/check-runs", "check_runs")
+    status_rows = api.counted_pages(f"/repos/{repo}/commits/{head}/status", "statuses", sha=head)
+    for requirement in requirements:
+        name = requirement.get("context") if isinstance(requirement, dict) else None
+        app = requirement.get("integration_id") if isinstance(requirement, dict) else None
+        if not isinstance(name, str) or not name or (app is not None and (type(app) is not int or app <= 0)):
+            raise GitHubError("required-check identity is malformed")
+        candidates = [row for row in check_rows if row.get("name") == name
+            and (app is None or (row.get("app") or {}).get("id") == app)]
+        if candidates:
+            if any(row.get("head_sha") != head or row.get("status") != "completed"
+                    or row.get("conclusion") != "success" for row in candidates):
+                raise GitHubError("required exact-head check did not succeed")
+        elif app is None:
+            statuses = [row for row in status_rows if row.get("context") == name]
+            if not statuses or any(row.get("state") != "success" for row in statuses):
+                raise GitHubError("required status was not successfully observed")
+        else:
+            # Legacy statuses do not independently identify an integration ID.
+            raise GitHubError("required check application could not be verified")
+    if api.reviews(repo, number) or api.unresolved_threads(repo, number) != 0:
+        raise GitHubError("review changes or threads remain outstanding")
+    snapshot = api.queue_snapshot(repo, number)
+    if needs_approval and snapshot.get("reviewDecision") != "APPROVED":
+        raise GitHubError("required approval decision is not verified")
+    if (snapshot.get("state") != "OPEN" or snapshot.get("isDraft") is not False
+            or snapshot.get("headRefOid") != head or snapshot.get("baseRefOid") != grant["base_sha"]
+            or snapshot.get("reviewDecision") not in {None, "APPROVED"}
+            or snapshot.get("id") != pull["node_id"]):
+        raise GitHubError("fresh queue identity or review decision does not match")
+    return snapshot
+
+
+def execute_authorized_queue(api: GitHub, authorization_id: str, acknowledgement: str,
+        save_stage: Any) -> dict[str, str]:
+    """One explicit grant, two full preflights, one send, independent readback.
+
+    save_stage persists public fixed-state evidence before the first possible
+    mutation. A transport exception never triggers a second mutation call.
+    """
+    source, grant = dispatch_authorization(api, authorization_id, acknowledgement)
+    first = promotion_preflight(api, grant)
+    source_again, current = dispatch_authorization(api, authorization_id, acknowledgement)
+    if source_again != source or current != grant:
+        raise GitHubError("controller source or grant changed during preflight")
+    final = promotion_preflight(api, grant)
+    if first.get("id") != final.get("id"):
+        raise GitHubError("pull request identity changed during preflight")
+    if protected_source(api) != source:
+        raise GitHubError("controller source changed at the write boundary")
+    if not timestamp(grant["not_before"]) <= datetime.now(timezone.utc) < timestamp(grant["expires_at"]):
+        raise GitHubError("authorization expired at the write boundary")
+    entry = final.get("mergeQueueEntry")
+    if (isinstance(entry, dict) and isinstance(entry.get("id"), str) and entry["id"]
+            and (entry.get("pullRequest") or {}).get("id") == final["id"]
+            and (entry.get("pullRequest") or {}).get("headRefOid") == grant["head_sha"]):
+        return {"state": "ALREADY_QUEUED_EXACT_HEAD"}
+    if entry is not None:
+        raise GitHubError("existing queue entry does not match the candidate")
+    save_stage({"state": "QUEUE_WRITE_ATTEMPTED_READBACK_REQUIRED"})
+    sent_error = False
+    try:
+        api._queue_permit = (final["id"], grant["head_sha"])
+        api.enqueue_exact(final["id"], grant["head_sha"])
+    except Exception:
+        sent_error = True
+    finally:
+        api._queue_permit = None
+    # Reconciliation reads never treat the send acknowledgement as proof.
+    try:
+        after = api.queue_snapshot(grant["repository"], grant["pr_number"])
+        entry = after.get("mergeQueueEntry")
+        if (after.get("id") == final["id"] and after.get("headRefOid") == grant["head_sha"]
+                and after.get("state") == "OPEN" and after.get("isDraft") is False
+                and isinstance(entry, dict) and isinstance(entry.get("id"), str) and entry["id"]
+                and (entry.get("pullRequest") or {}).get("id") == final["id"]
+                and (entry.get("pullRequest") or {}).get("headRefOid") == grant["head_sha"]):
+            return {"state": "QUEUED_EXACT_HEAD_OBSERVED"}
+    except Exception:
+        pass
+    # Even an immediate provider merge needs a separate source/merge receipt;
+    # neither absence from the queue nor an HTTP 200 qualifies that outcome here.
+    return {"state": "QUEUE_WRITE_OUTCOME_UNKNOWN", "send": "ERROR" if sent_error else "ACKNOWLEDGED"}
+
+
+DIAGNOSTIC_CODES = {
+    "exact candidate signature is not verified": "SIGNATURE_UNVERIFIED",
+    "no exact protected authorization was selected": "AUTHORIZATION_NOT_SELECTED",
+    "selected authorization is not currently valid": "AUTHORIZATION_EXPIRED_OR_FUTURE",
+    "authorization expired at the write boundary": "AUTHORIZATION_EXPIRED_AT_WRITE",
+    "effective target rules differ from the authorization": "PROTECTION_DRIFT",
+    "protected controller source moved or is unavailable": "CONTROLLER_SOURCE_UNAVAILABLE",
+    "protected target base moved or is unavailable": "TARGET_BASE_MOVED",
+    "required check application could not be verified": "REQUIRED_CHECK_APP_UNVERIFIED",
+    "review changes or threads remain outstanding": "REVIEW_HOLD",
+    "pull-request label requires review or evidence": "REVIEW_LABEL_HOLD",
+    "machine report ownership did not match": "REPORT_OWNERSHIP_MISMATCH",
+    "repository-scoped report credential is unavailable": "REPORT_CREDENTIAL_UNAVAILABLE",
+    "GitHub HTTP 401": "API_AUTHENTICATION_DENIED",
+    "GitHub HTTP 403": "API_ACCESS_DENIED",
+    "GitHub HTTP 404": "API_RESOURCE_UNAVAILABLE",
+    "GitHub HTTP 429": "API_RATE_LIMITED",
+    "GitHub transport or JSON decoding failed": "API_TRANSPORT_UNAVAILABLE",
+}
+
+
+def diagnostic_code(exc: Exception) -> str:
+    # The message selects a known code; it is never returned or reflected.
+    return DIAGNOSTIC_CODES.get(str(exc), "OPERATOR_PRECONDITION_OR_OBSERVATION_FAILED")
+
+
+def read_dispatch_inputs() -> tuple[str, str]:
+    """Read inputs from the runner event, not echoed env values or command args."""
+    path = Path(os.environ.get("GITHUB_EVENT_PATH", ""))
+    with path.open("rb") as handle:
+        raw = handle.read(65537)
+    if len(raw) > 65536:
+        raise GitHubError("dispatch event exceeds its byte budget")
+    value = strict_json(raw)
+    inputs = value.get("inputs") if isinstance(value, dict) else None
+    if not isinstance(inputs, dict) or set(inputs) != {"apply", "authorization_id", "acknowledgement"}:
+        raise GitHubError("dispatch input schema is invalid")
+    apply = inputs["apply"]
+    if apply is not True and not (isinstance(apply, str) and apply == "true"):
+        raise GitHubError("dispatch does not request apply")
+    identity, acknowledgement = inputs["authorization_id"], inputs["acknowledgement"]
+    if (not isinstance(identity, str) or not re.fullmatch(r"[a-z0-9][a-z0-9-]{0,63}", identity)
+            or acknowledgement != QUEUE_ACKNOWLEDGEMENT):
+        raise GitHubError("dispatch acknowledgement or identity is invalid")
+    return identity, acknowledgement
+
+
+def build_report(started: str, pulls: list[PullRequestState], issues: list[IssueState], *,
+        apply: bool, fatal: bool = False, promotion: dict[str, str] | None = None,
+        command_center: str = "NOT_REQUESTED", error_code: str | None = None) -> dict[str, Any]:
+    public_pulls = [item for row in pulls if (item := public_row(row)) is not None]
+    public_issues = [item for row in issues if (item := public_row(row)) is not None]
+    errors = sum(row.action == "ERROR" for row in [*pulls, *issues])
+    uncertain = (promotion or {}).get("state") in {"QUEUE_WRITE_ATTEMPTED_READBACK_REQUIRED", "QUEUE_WRITE_OUTCOME_UNKNOWN"}
+    source = os.environ.get("GITHUB_SHA", "")
+    return {"schema": REPORT_SCHEMA, "status": "PARTIAL_FAILURE" if fatal or errors or uncertain else "OBSERVATION_COMPLETE",
+        "mode": "EXACT_QUEUE" if apply else "PUBLIC_OBSERVATION", "organization": DEFAULT_ORG,
+        "started_at": started, "finished_at": utc_now(), "token_value_recorded": False,
+        "coverage": {"scope": "public-search-visible-only", "complete_organization": False,
+            "private_repositories": "NOT_OBSERVED", "security_alerts": "NOT_OBSERVED", "atomic_snapshot": False},
+        "source_revision": source if SHA40.fullmatch(source) else None,
+        "pull_requests": public_pulls, "issues": public_issues,
+        "promotion": promotion or {"state": "NOT_REQUESTED"}, "command_center": command_center,
+        "error_code": error_code if error_code in set(DIAGNOSTIC_CODES.values()) | {"OPERATOR_PRECONDITION_OR_OBSERVATION_FAILED"} else None,
+        "summary": {"observed_pull_requests": len(public_pulls), "observed_issues": len(public_issues),
+            "merged_pull_requests": 0, "closed_exact_duplicates": 0, "changed_issue_labels": 0,
+            "pull_request_errors": sum(row.action == "ERROR" for row in pulls),
+            "issue_errors": sum(row.action == "ERROR" for row in issues), "observation_failed": fatal,
+            "classification_counts": dict(Counter(row["classification"] for row in public_issues))}}
 
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--org", default=DEFAULT_ORG)
-    parser.add_argument("--apply", action="store_true")
+    parser.add_argument("--org", choices=[DEFAULT_ORG], default=DEFAULT_ORG)
+    parser.add_argument("--apply", action="store_true", help="Request one protected exact-head queue entry; never merge directly")
+    parser.add_argument("--authorization-id", default="")
+    parser.add_argument("--acknowledgement", default="")
+    parser.add_argument("--publish-command-center", action="store_true")
+    parser.add_argument("--from-dispatch-event", action="store_true")
     parser.add_argument("--report", type=Path, default=Path("frontier-issue-operator.json"))
     parser.add_argument("--max-prs", type=int, default=300)
     parser.add_argument("--max-issues", type=int, default=1000)
     args = parser.parse_args(argv)
-
-    token = (
-        os.environ.get("SZL_ORG_TOKEN")
-        or os.environ.get("GH_TOKEN")
-        or os.environ.get("GITHUB_TOKEN")
-        or ""
-    ).strip()
-    if args.apply and not token:
-        payload = {
-            "schema": REPORT_SCHEMA,
-            "status": "BLOCKED_MANAGED_PREREQUISITE",
-            "error": "Apply mode requires an organization-capable GitHub token.",
-            "token_value_recorded": False,
-            "generated_at": utc_now(),
-        }
-        write_report(args.report, payload)
-        print(json.dumps(payload, indent=2, sort_keys=True))
-        return 2
-
-    api = GitHub(token, apply=args.apply)
     started = utc_now()
+    token = (os.environ.get("SZL_ORG_TOKEN") or os.environ.get("GH_TOKEN") or os.environ.get("GITHUB_TOKEN") or "").strip()
+    if args.apply and not token:
+        payload = build_report(started, [], [], apply=True, fatal=True)
+        payload["status"] = "BLOCKED_MANAGED_PREREQUISITE"
+        write_report(args.report, payload)
+        return 2
+    api = GitHub(token, apply=args.apply)
     pulls: list[PullRequestState] = []
-    # Up to three passes allow merges that unblock stacked same-repository PRs.
-    observed_keys: set[tuple[str, int, str | None]] = set()
-    for _pass in range(3):
-        raw = api.search(f"org:{args.org} is:pr is:open", limit=args.max_prs)
-        current: list[PullRequestState] = []
-        for item in raw:
-            state = evaluate_pr(api, item)
-            current.append(state)
-            key = (state.repository, state.number, state.head_sha)
-            if key not in observed_keys:
-                pulls.append(state)
-                observed_keys.add(key)
-        if not args.apply or not any(row.action == "MERGED" for row in current):
-            break
-
-    issues = reconcile_issues(api, args.org, limit=args.max_issues)
-    body = command_center_body(org=args.org, apply=args.apply, pulls=pulls, issues=issues)
-    command_center_url = "UNAVAILABLE"
-    command_center_error = None
+    issues: list[IssueState] = []
+    promotion: dict[str, str] = {"state": "NOT_REQUESTED"}
+    center, fatal, error_code = "NOT_REQUESTED", False, None
+    def save_stage(stage: dict[str, str]) -> None:
+        nonlocal promotion
+        promotion = stage
+        write_report(args.report, build_report(started, pulls, issues, apply=args.apply, promotion=stage))
     try:
-        command_center_url = api.upsert_command_center(args.org, body)
+        # Ordinary schedules cannot acquire write authority through the old bool.
+        # Validate apply context before any estate-wide observation.
+        if args.from_dispatch_event:
+            if not args.apply:
+                raise GitHubError("event inputs cannot authorize an observation-only invocation")
+            args.authorization_id, args.acknowledgement = read_dispatch_inputs()
+        if args.apply:
+            dispatch_authorization(api, args.authorization_id, args.acknowledgement)
+        raw = api.search(f"org:{DEFAULT_ORG} is:pr is:open is:public", limit=args.max_prs)
+        for item in raw:
+            pulls.append(evaluate_pr(api, item))
+        issues = reconcile_issues(api, DEFAULT_ORG, limit=args.max_issues)
+        refresh_public_scope(api, [*pulls, *issues])
+        if args.apply:
+            if any(row.action == "ERROR" for row in [*pulls, *issues]):
+                raise GitHubError("incomplete observation cannot promote a candidate")
+            promotion = execute_authorized_queue(api, args.authorization_id, args.acknowledgement, save_stage)
+        if args.publish_command_center:
+            protected_source(api)
+            report_token = os.environ.get("SZL_REPORT_TOKEN", "").strip()
+            if not report_token:
+                raise GitHubError("repository-scoped report credential is unavailable")
+            # The public machine issue uses only the repository token, not the
+            # cross-repository reader/queue credential.
+            writer = GitHub(report_token, apply=False)
+            writer.publish_command_center(pulls, issues)
+            center = "PUBLIC_BODY_READBACK_VERIFIED"
     except Exception as exc:
-        command_center_error = str(redact(str(exc)))
-
-    final_prs = api.search(f"org:{args.org} is:pr is:open", limit=args.max_prs)
-    final_issues = issue_rows(api, args.org, limit=args.max_issues)
-    operation_errors = sum(row.action == "ERROR" for row in [*pulls, *issues])
-    incomplete = bool(operation_errors or command_center_error)
-    payload = {
-        "schema": REPORT_SCHEMA,
-        "status": "PARTIAL_FAILURE" if incomplete else "COMPLETE",
-        "mode": "APPLY" if args.apply else "DRY_RUN",
-        "organization": args.org,
-        "started_at": started,
-        "finished_at": utc_now(),
-        "token_value_recorded": False,
-        "pull_requests": [
-            {**asdict(row), "checks": asdict(row.checks)} for row in pulls
-        ],
-        "issues": [asdict(row) for row in issues],
-        "summary": {
-            "observed_pull_requests": len(pulls),
-            "merged_pull_requests": sum(row.action == "MERGED" for row in pulls),
-            "blocked_pull_requests": sum(row.action == "BLOCKED" for row in pulls),
-            "pull_request_errors": sum(row.action == "ERROR" for row in pulls),
-            "observed_issues": len(issues),
-            "closed_exact_duplicates": sum(row.action == "CLOSED_EXACT_DUPLICATE" for row in issues),
-            "classified_issues": sum(row.action == "CLASSIFIED" for row in issues),
-            "read_only_archived_issues": sum(row.action == "READ_ONLY_ARCHIVED" for row in issues),
-            "read_only_archived_pull_requests": sum(row.action == "READ_ONLY_ARCHIVED" for row in pulls),
-            "issue_errors": sum(row.action == "ERROR" for row in issues),
-            "final_open_pull_requests": len(final_prs),
-            "final_open_issues": len(final_issues),
-            "classification_counts": dict(Counter(row.classification for row in issues)),
-        },
-        "command_center_url": command_center_url,
-        "command_center_error": command_center_error,
-    }
+        fatal = True
+        error_code = diagnostic_code(exc)
+        if args.publish_command_center and center == "NOT_REQUESTED":
+            center = "NOT_VERIFIED"
+    refresh_public_scope(api, [*pulls, *issues])
+    payload = build_report(started, pulls, issues, apply=args.apply, fatal=fatal,
+        promotion=promotion, command_center=center, error_code=error_code)
     write_report(args.report, payload)
     print(json.dumps(payload["summary"], indent=2, sort_keys=True))
-    return 1 if incomplete else 0
+    return 1 if payload["status"] == "PARTIAL_FAILURE" else 0
 
 
 if __name__ == "__main__":

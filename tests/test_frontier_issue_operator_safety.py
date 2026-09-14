@@ -181,7 +181,7 @@ def test_archived_issues_are_read_only_and_metadata_is_cached():
     client = mock.create_autospec(m.GitHub, instance=True)
     client.apply = True
     client.search.return_value = [issue(1), issue(2)]
-    client.repository.return_value = {'archived': True}
+    client.repository.return_value = {'archived': True, 'full_name': REPO, 'visibility': 'public', 'private': False}
     observed = m.reconcile_issues(client, 'szl-holdings', limit=10)
     assert all(row.action == 'READ_ONLY_ARCHIVED' for row in observed)
     client.repository.assert_called_once_with(REPO)
@@ -201,7 +201,7 @@ def test_unknown_archival_state_prevents_issue_writes():
 
 
 def test_archive_and_unknown_archive_prevent_pr_merge():
-    for metadata, action in (({'archived': True}, 'READ_ONLY_ARCHIVED'), ({}, 'ERROR')):
+    for metadata, action in (({'archived': True, 'full_name': REPO, 'visibility': 'public', 'private': False}, 'READ_ONLY_ARCHIVED'), ({}, 'ERROR')):
         client = mock.create_autospec(m.GitHub, instance=True)
         client.apply = True
         client.repository.return_value = metadata
@@ -225,7 +225,6 @@ def test_item_error_is_nonzero_and_not_complete(tmp_path):
     client = mock.create_autospec(m.GitHub, instance=True)
     client.apply = False
     client.search.return_value = []
-    client.upsert_command_center.return_value = 'DRY_RUN'
     with mock.patch.object(m, 'GitHub', return_value=client), \
          mock.patch.object(m, 'reconcile_issues', return_value=[failed]):
         assert m.main(['--report', str(output)]) == 1
@@ -322,10 +321,9 @@ def test_empty_success_keeps_zero_exit_and_complete(tmp_path):
     client = mock.create_autospec(m.GitHub, instance=True)
     client.apply = False
     client.search.return_value = []
-    client.upsert_command_center.return_value = 'DRY_RUN'
     with mock.patch.object(m, 'GitHub', return_value=client), mock.patch.object(m, 'reconcile_issues', return_value=[]):
         assert m.main(['--report', str(output)]) == 0
-    assert json.loads(output.read_text())['status'] == 'COMPLETE'
+    assert json.loads(output.read_text())['status'] == 'OBSERVATION_COMPLETE'
 
 
 def test_canonical_transport_keeps_auth_only_on_admitted_request():
