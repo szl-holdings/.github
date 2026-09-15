@@ -1,6 +1,5 @@
-# One-time owner-authorized same-tree signature operation on isolated branches.
-# This is not a publisher, merge controller, provider operation or bypass.
-name: Produce verified bounded-read publisher candidate
+# Isolated operator only; not a production publisher or merge bypass.
+name: Apply exact publisher import-review correction
 "on":
   push:
     branches: [ops/queue-743-8331e2dc-20260915]
@@ -9,15 +8,14 @@ permissions:
   contents: write
   pull-requests: read
 concurrency:
-  group: verified-source-bounded-read-6781097c
+  group: publisher-import-review-7dfd00cc
   cancel-in-progress: false
 jobs:
   signed-source:
-    if: github.repository == 'szl-holdings/.github' && github.event_name == 'push'
     runs-on: ubuntu-24.04
     timeout-minutes: 8
     steps:
-      - name: Produce one GitHub-verified commit with the exact reviewed tree
+      - name: Apply the reviewed one-line import correction without unsigned history
         env:
           GITHUB_TOKEN: ${{ github.token }}
         shell: bash
@@ -25,117 +23,86 @@ jobs:
           set -euo pipefail
           mkdir -p signing-evidence
           python3 - <<'PY'
-          import base64, datetime, hashlib, json, os, pathlib, urllib.parse, urllib.request
-          REPO='szl-holdings/.github'
-          SOURCE='6781097c201a3ac755c2f5aee97e5e13c4758c77'
-          BASE='0af851c120b01e645977b21d9b3abe0630e64240'
-          TREE='12d0062bc88a98aa17ba868d96e4d66b4b34f124'
-          BRANCH='fix/hf/bounded-read-transport-verified'
-          FILES={
-              '.github/scripts/hf_deploy_from_dockerfile.py':'1b3820c2f2f5be85156268c987229489161fbe8b',
-              '.github/scripts/test_hf_public_smoke.py':'b099577976f44e13378e00c29a43fb1acebf16df',
-              '.github/scripts/test_hf_http_boundaries.py':'68018c1df4fdffa8e2cf87da23c21154e9208eb5',
-              '.github/workflows/hf-public-smoke-contract.yml':'f18dd41663abbceeca976b8e2f9f6ba51fc5d42f',
-              'docs/HF_HTTP_TRANSPORT_BOUNDARIES.md':'0df64997b74f26490481450924dc569a16c5991a',
-          }
-          report={'schema':'szl.verified-same-tree-candidate/v2','repository':REPO,
-                  'predecessor_pr':745,'source':SOURCE,'base':BASE,'candidate_branch':BRANCH,
-                  'expected_tree':TREE,'run_id':os.environ['GITHUB_RUN_ID'],
-                  'run_attempt':os.environ['GITHUB_RUN_ATTEMPT'],'operator_sha':os.environ['GITHUB_SHA'],
-                  'state':'NOT_ATTEMPTED','commit_attempts':0,'original_branch_modified':False,
-                  'force_update':False,'main_modified':False,'provider_operations':0,
-                  'secret_values_recorded':False}
-          out=pathlib.Path('signing-evidence/receipt.json')
+          import ast, base64, datetime, hashlib, json, os, pathlib, urllib.request
+          REPO='szl-holdings/.github'; BRANCH='fix/hf/bounded-read-transport-verified'
+          HEAD='7dfd00cc65983be9496f84fa4cfa133f8f4b9c6a'; MAIN='0af851c120b01e645977b21d9b3abe0630e64240'
+          PATH='.github/scripts/test_hf_http_boundaries.py'
+          BEFORE='68018c1df4fdffa8e2cf87da23c21154e9208eb5'; AFTER='800ab6416e28c03d45b29169fe961fe8a686c0c6'
+          report={'schema':'szl.exact-review-signature/v1','pr':746,'repository':REPO,'review_comment':4016419130,
+              'expected_head':HEAD,'path':PATH,'expected_blob':AFTER,'run_id':os.environ['GITHUB_RUN_ID'],
+              'run_attempt':os.environ['GITHUB_RUN_ATTEMPT'],'state':'NOT_ATTEMPTED','mutation_attempts':0,
+              'main_modified':False,'force_update':False,'provider_operations':0}
           def save():
               report['observed_at']=datetime.datetime.now(datetime.timezone.utc).isoformat()
-              out.write_text(json.dumps(report,indent=2,allow_nan=False)+'\n')
+              pathlib.Path('signing-evidence/receipt.json').write_text(json.dumps(report,indent=2)+'\n')
           class NoRedirect(urllib.request.HTTPRedirectHandler):
               def redirect_request(self,*args,**kwargs): raise RuntimeError('redirect prohibited')
           opener=urllib.request.build_opener(urllib.request.ProxyHandler({}),NoRedirect())
           def api(path,payload=None):
-              if not (path.startswith('/repos/'+REPO+'/') or path=='/graphql'):
-                  raise RuntimeError('unexpected API path')
-              req=urllib.request.Request('https://api.github.com'+path,
-                  data=None if payload is None else json.dumps(payload).encode(),
-                  method='GET' if payload is None else 'POST',headers={
-                      'Authorization':'Bearer '+os.environ['GITHUB_TOKEN'],
-                      'Accept':'application/vnd.github+json','Content-Type':'application/json',
-                      'User-Agent':'SZL-verified-same-tree-source/2.0'})
-              with opener.open(req,timeout=25) as response:
-                  raw=response.read(16*1024*1024+1)
-              if len(raw)>16*1024*1024: raise RuntimeError('response bound exceeded')
-              value=json.loads(raw)
-              if isinstance(value,dict) and value.get('errors'):
-                  report['graphql_error_types']=[str(e.get('type','UNKNOWN'))[:80] for e in value['errors'][:3]]
-                  raise RuntimeError('GraphQL operation rejected')
+              if not (path.startswith('/repos/'+REPO+'/') or path=='/graphql'): raise RuntimeError('origin boundary')
+              req=urllib.request.Request('https://api.github.com'+path,data=None if payload is None else json.dumps(payload).encode(),
+                  headers={'Authorization':'Bearer '+os.environ['GITHUB_TOKEN'],'Accept':'application/vnd.github+json',
+                  'Content-Type':'application/json','User-Agent':'SZL-exact-import-review/1.0'},method='GET' if payload is None else 'POST')
+              with opener.open(req,timeout=25) as r: b=r.read(16*1024*1024+1)
+              if len(b)>16*1024*1024: raise RuntimeError('response size bound')
+              value=json.loads(b)
+              if isinstance(value,dict) and value.get('errors'): raise RuntimeError('GraphQL rejected')
               return value
-          def ref(branch):
-              return api('/repos/'+REPO+'/git/ref/heads/'+urllib.parse.quote(branch,safe=''))['object']['sha']
-          def entries(revision):
-              data=api('/repos/'+REPO+'/git/trees/'+revision+'?recursive=1')
+          def ref(branch): return api('/repos/'+REPO+'/git/ref/heads/'+branch)['object']['sha']
+          def tree(sha):
+              data=api('/repos/'+REPO+'/git/trees/'+sha+'?recursive=1')
               if data.get('truncated'): raise RuntimeError('incomplete tree')
-              return {e['path']:e for e in data['tree'] if e['type']!='tree'}
+              return {e['path']:(e['type'],e['mode'],e['sha']) for e in data['tree'] if e['type']!='tree'}
+          def blob_id(data): return hashlib.sha1(b'blob '+str(len(data)).encode()+b'\0'+data).hexdigest()
           try:
-              if os.environ['GITHUB_RUN_ATTEMPT']!='1': raise RuntimeError('rerun prohibited')
-              if ref('main')!=BASE or ref(BRANCH)!=BASE: raise RuntimeError('base or target moved')
-              pr=api('/repos/'+REPO+'/pulls/745')
-              if pr.get('merged') is not True or pr.get('merge_commit_sha')!=BASE:
-                  raise RuntimeError('admitted predecessor changed')
-              original=api('/repos/'+REPO+'/git/commits/'+SOURCE)
-              if original['tree']['sha']!=TREE: raise RuntimeError('source tree mismatch')
-              base_tree=entries(BASE); source_tree=entries(SOURCE)
-              difference={p for p in set(base_tree)|set(source_tree)
-                  if tuple(base_tree.get(p,{}).get(k) for k in ('type','mode','sha')) !=
-                     tuple(source_tree.get(p,{}).get(k) for k in ('type','mode','sha'))}
-              if difference!=set(FILES): raise RuntimeError('unexpected changed-file set')
-              additions=[]; observed={}
-              for path,expected in sorted(FILES.items()):
-                  entry=source_tree[path]
-                  if entry['type']!='blob' or entry['mode']!='100644' or entry['sha']!=expected or entry.get('size',0)>1024*1024:
-                      raise RuntimeError('source identity or mode mismatch')
-                  blob=api('/repos/'+REPO+'/git/blobs/'+expected)
-                  if blob.get('encoding')!='base64': raise RuntimeError('unsupported encoding')
-                  data=base64.b64decode(blob['content']); data.decode('utf-8')
-                  digest=hashlib.sha1(b'blob '+str(len(data)).encode()+b'\0'+data).hexdigest()
-                  if digest!=expected: raise RuntimeError('source bytes mismatch')
-                  observed[path]={'git_blob':digest,'sha256':hashlib.sha256(data).hexdigest(),'bytes':len(data)}
-                  additions.append({'path':path,'contents':base64.b64encode(data).decode()})
-              report['files']=observed
-              if ref('main')!=BASE or ref(BRANCH)!=BASE: raise RuntimeError('source moved during preparation')
-              report['state']='UNKNOWN_AFTER_ATTEMPT'; report['commit_attempts']=1; save()
-              result=api('/graphql',{'query':'mutation($input:CreateCommitOnBranchInput!){createCommitOnBranch(input:$input){commit{oid url}}}',
-                  'variables':{'input':{'branch':{'repositoryNameWithOwner':REPO,'branchName':BRANCH},
-                      'expectedHeadOid':BASE,'message':{
-                          'headline':'fix(hf): bound publisher reads and isolate management credentials',
-                          'body':'Five-file transport successor to admitted PR745. Exact reviewed tree '+TREE+' from preserved source '+SOURCE+'. Actual authorship and signature are supplied by GitHub under the workflow identity. 150 unique local offline methods passed; fresh hosted qualification and ordinary queue admission remain required. No provider mutation, secret rotation, forced update, independent approval or deployment claim.\n\nSigned-off-by: Stephen P. Lutar <stephenlutar2@gmail.com>'},
-                      'fileChanges':{'additions':additions}}}})
+              if os.environ['GITHUB_RUN_ATTEMPT']!='1' or ref('main')!=MAIN or ref(BRANCH)!=HEAD:
+                  raise RuntimeError('attempt or source movement')
+              pr=api('/repos/'+REPO+'/pulls/746')
+              if pr['state']!='open' or pr['head']['sha']!=HEAD or pr['head']['ref']!=BRANCH:
+                  raise RuntimeError('PR identity changed')
+              before_tree=tree(HEAD)
+              if before_tree[PATH]!=('blob','100644',BEFORE): raise RuntimeError('preimage mismatch')
+              source=api('/repos/'+REPO+'/git/blobs/'+BEFORE)
+              old=base64.b64decode(source['content']); text=old.decode('utf-8')
+              if blob_id(old)!=BEFORE or text.count('from unittest import mock')!=1: raise RuntimeError('unexpected source')
+              new=text.replace('from unittest import mock','import unittest.mock as mock').encode()
+              if blob_id(new)!=AFTER: raise RuntimeError('postimage mismatch')
+              def semantics(raw):
+                  module=ast.parse(raw)
+                  module.body=[x for x in module.body if not isinstance(x,(ast.Import,ast.ImportFrom))]
+                  return ast.dump(module,include_attributes=False)
+              if semantics(old)!=semantics(new): raise RuntimeError('non-import semantics changed')
+              expected=dict(before_tree); expected[PATH]=('blob','100644',AFTER)
+              if ref('main')!=MAIN or ref(BRANCH)!=HEAD: raise RuntimeError('source moved')
+              report.update(state='UNKNOWN_AFTER_ATTEMPT',mutation_attempts=1); save()
+              result=api('/graphql',{'query':'mutation($input:CreateCommitOnBranchInput!){createCommitOnBranch(input:$input){commit{oid}}}',
+                  'variables':{'input':{'branch':{'repositoryNameWithOwner':REPO,'branchName':BRANCH},'expectedHeadOid':HEAD,
+                      'message':{'headline':'test(hf): use one explicit unittest import style',
+                          'body':'Address code-quality discussion4016419130. One import statement changes; 46 local boundary tests pass normally and optimized. Non-import AST is unchanged. Native requalification is required; no provider operation or independent approval.\n\nSigned-off-by: Stephen P. Lutar <stephenlutar2@gmail.com>'},
+                      'fileChanges':{'additions':[{'path':PATH,'contents':base64.b64encode(new).decode()}]}}}})
               sha=result['data']['createCommitOnBranch']['commit']['oid']; report['candidate_revision']=sha; save()
-              candidate=api('/repos/'+REPO+'/git/commits/'+sha)
-              report['candidate_tree']=candidate['tree']['sha']
-              report['verification']={k:candidate['verification'].get(k) for k in ('verified','reason','verified_at')}
-              report['actual_author']=candidate['author']; report['actual_committer']=candidate['committer']
-              report['parents']=[p['sha'] for p in candidate['parents']]
-              if report['candidate_tree']!=TREE or report['parents']!=[BASE]:
-                  raise RuntimeError('whole-tree or parent mismatch')
-              if candidate['verification'].get('verified') is not True:
-                  raise RuntimeError('signature not verified')
+              commit=api('/repos/'+REPO+'/git/commits/'+sha)
+              report['verification']={k:commit['verification'].get(k) for k in ('verified','reason','verified_at')}
+              report['actual_author']=commit['author']; report['actual_committer']=commit['committer']
+              report['tree']=commit['tree']['sha']; report['parents']=[p['sha'] for p in commit['parents']]
+              if tree(sha)!=expected or report['parents']!=[HEAD] or report['verification']['verified'] is not True:
+                  raise RuntimeError('complete tree or signature not verified')
               if ref(BRANCH)!=sha: raise RuntimeError('candidate moved after commit')
-              report['state']='VERIFIED_SAME_TREE_CANDIDATE'; save()
-          except Exception as exc:
-              report['error_type']=type(exc).__name__
-              if hasattr(exc,'code'): report['http_status']=exc.code
-              if report['commit_attempts']==0: report['state']='PRECHECK_FAILED'
-              try: report['target_readback']=ref(BRANCH)
-              except Exception as err: report['readback_error']=type(err).__name__
-              save(); print(json.dumps(report,indent=2)); raise SystemExit('Candidate unqualified; inspect receipt before any successor.')
+              report.update(state='VERIFIED_EXACT_REVIEW_CORRECTION',sha256=hashlib.sha256(new).hexdigest()); save()
+          except Exception as e:
+              report['error_type']=type(e).__name__
+              if report['mutation_attempts']==0: report['state']='PRECHECK_FAILED'
+              try: report['branch_readback']=ref(BRANCH)
+              except Exception as r: report['readback_error']=type(r).__name__
+              save(); raise SystemExit('Review operation incomplete; inspect receipt without blind retry.')
           finally: save()
           print(json.dumps(report,indent=2))
           PY
-      - name: Retain exact signature and whole-tree readback
+      - name: Preserve actual signature and exact-tree receipt
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: verified-bounded-read-${{ github.run_id }}-${{ github.run_attempt }}
+          name: publisher-import-review-${{ github.run_id }}-${{ github.run_attempt }}
           path: signing-evidence/receipt.json
           if-no-files-found: error
           retention-days: 30
