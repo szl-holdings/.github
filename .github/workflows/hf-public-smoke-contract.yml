@@ -7,6 +7,7 @@ name: HF public application smoke contract
       - .github/scripts/hf_deploy_from_dockerfile.py
       - .github/scripts/test_hf_deploy_from_dockerfile.py
       - .github/scripts/test_hf_public_smoke.py
+      - .github/scripts/test_hf_http_boundaries.py
       - .github/workflows/hf-public-smoke-contract.yml
   push:
     branches: [main]
@@ -47,7 +48,8 @@ jobs:
           import hashlib, json, os, pathlib, platform, subprocess
           files = [".github/scripts/hf_deploy_from_dockerfile.py",
                    ".github/scripts/test_hf_deploy_from_dockerfile.py",
-                   ".github/scripts/test_hf_public_smoke.py"]
+                   ".github/scripts/test_hf_public_smoke.py",
+                   ".github/scripts/test_hf_http_boundaries.py"]
           revision = subprocess.check_output(["git", "rev-parse", "HEAD"], text=True).strip()
           payload = {"schema": "szl.public-smoke-test-source/v1", "checkout_revision": revision,
                      "event_head": os.getenv("EVENT_HEAD") or None, "python": platform.python_version(),
@@ -65,6 +67,8 @@ jobs:
           python -I -P -O .github/scripts/test_hf_public_smoke.py 2>&1 | tee reports/public-smoke/public-optimized.log
           python -I -P .github/scripts/test_hf_deploy_from_dockerfile.py 2>&1 | tee reports/public-smoke/publisher-normal.log
           python -I -P -O .github/scripts/test_hf_deploy_from_dockerfile.py 2>&1 | tee reports/public-smoke/publisher-optimized.log
+          python -I -P .github/scripts/test_hf_http_boundaries.py 2>&1 | tee reports/public-smoke/http-normal.log
+          python -I -P -O .github/scripts/test_hf_http_boundaries.py 2>&1 | tee reports/public-smoke/http-optimized.log
       - name: Retain bounded offline test evidence
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
