@@ -1,0 +1,119 @@
+# One-time owner-authorized operation on an isolated branch; never merge this
+# operator file to main. No scheduler, publisher, protection edit or admin token.
+name: One-time native queue request for reviewed PR 743
+"on":
+  push:
+    branches: [ops/queue-743-8331e2dc-20260915]
+    paths: [.github/workflows/one-time-queue-743.yml]
+permissions:
+  contents: read
+  pull-requests: write
+concurrency:
+  group: one-time-reviewed-queue-743-8331e2dc
+  cancel-in-progress: false
+jobs:
+  queue:
+    if: github.repository == 'szl-holdings/.github' && github.event_name == 'push'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+    steps:
+      - name: Require exact reviewed source and ask the existing queue once
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p queue-evidence
+          python3 - <<'PY'
+          import datetime, json, os, pathlib, urllib.request
+          REPO = 'szl-holdings/.github'
+          HEAD = '8331e2dc7490fd057223057b900cc51f32d11a17'
+          BASE = '60c9ce7ba56c30b5f6529c916ca55e0bad8eff3b'
+          NODE = 'PR_kwDOR44CFM8AAAABDcg9ag'
+          REQUIRED = {'gate/ground-truth','gate/labels','gate/schema','gate/adversarial',
+                      'gate/verify-all','gate/provenance','gate/a11y-perf','gate/lean','deploy/staging'}
+          report = {'schema':'szl.one-time-native-queue-request/v1','repository':REPO,'pr':743,
+                    'reviewed_head':HEAD,'reviewed_base':BASE,'run_id':os.environ['GITHUB_RUN_ID'],
+                    'run_attempt':os.environ['GITHUB_RUN_ATTEMPT'],'operator_sha':os.environ['GITHUB_SHA'],
+                    'state':'NOT_ATTEMPTED','mutation_attempts':0,'admin_bypass':False,
+                    'protection_changes':0,'live_publication':False,'secret_values_recorded':False}
+          output = pathlib.Path('queue-evidence/receipt.json')
+          def save():
+              report['observed_at'] = datetime.datetime.now(datetime.timezone.utc).isoformat()
+              output.write_text(json.dumps(report,indent=2)+'\n',encoding='utf-8')
+          class NoRedirect(urllib.request.HTTPRedirectHandler):
+              def redirect_request(self,*args,**kwargs):
+                  raise RuntimeError('redirect prohibited')
+          opener = urllib.request.build_opener(urllib.request.ProxyHandler({}),NoRedirect())
+          def api(path, payload=None):
+              if not (path.startswith('/repos/'+REPO+'/') or path == '/graphql'):
+                  raise RuntimeError('unexpected API path')
+              data = None if payload is None else json.dumps(payload).encode()
+              req = urllib.request.Request('https://api.github.com'+path,data=data,
+                  method='GET' if payload is None else 'POST',headers={
+                      'Authorization':'Bearer '+os.environ['GITHUB_TOKEN'],
+                      'Accept':'application/vnd.github+json','Content-Type':'application/json',
+                      'User-Agent':'SZL-one-time-reviewed-queue/1.0'})
+              with opener.open(req,timeout=25) as response:
+                  raw=response.read(4*1024*1024+1)
+                  if len(raw)>4*1024*1024: raise RuntimeError('response too large')
+              result=json.loads(raw)
+              if isinstance(result,dict) and result.get('errors'):
+                  raise RuntimeError('GraphQL request rejected')
+              return result
+          def observe_pr():
+              return api('/graphql',{'query':'query { repository(owner:"szl-holdings",name:".github") { pullRequest(number:743) { id state isDraft headRefOid baseRefName mergeQueueEntry { id } } } }'})['data']['repository']['pullRequest']
+          def require_pr(pr):
+              if pr['id']!=NODE or pr['state']!='OPEN' or pr['isDraft'] or pr['headRefOid']!=HEAD or pr['baseRefName']!='main':
+                  raise RuntimeError('PR identity or disposition changed')
+          try:
+              if os.environ['GITHUB_RUN_ATTEMPT']!='1': raise RuntimeError('operator rerun prohibited')
+              if os.environ['GITHUB_REF']!='refs/heads/ops/queue-743-8331e2dc-20260915': raise RuntimeError('wrong operation branch')
+              rules=api('/repos/'+REPO+'/rulesets/19755620')
+              if rules.get('enforcement')!='active' or not any(r.get('type')=='merge_queue' for r in rules.get('rules',[])):
+                  raise RuntimeError('native queue must remain active')
+              observed_required={c['context'] for r in rules['rules'] if r['type']=='required_status_checks' for c in r['parameters']['required_status_checks']}
+              if observed_required!=REQUIRED: raise RuntimeError('required-check policy changed')
+              checks=[]
+              for page in range(1,11):
+                  batch=api('/repos/'+REPO+'/commits/'+HEAD+'/check-runs?filter=latest&per_page=100&page='+str(page))['check_runs']
+                  checks.extend(batch)
+                  if len(batch)<100: break
+              else: raise RuntimeError('check inventory incomplete')
+              verified={}
+              for name in sorted(REQUIRED):
+                  rows=[r for r in checks if r['name']==name and r.get('app',{}).get('id')==15368 and r['head_sha']==HEAD]
+                  if not rows: raise RuntimeError('required exact-head check missing')
+                  latest=max(rows,key=lambda r:r['id'])
+                  if latest['status']!='completed' or latest['conclusion']!='success': raise RuntimeError('required check not successful')
+                  verified[name]=latest['id']
+              report['required_checks']=verified
+              if api('/repos/'+REPO+'/git/ref/heads/main')['object']['sha']!=BASE: raise RuntimeError('main moved before request')
+              pr=observe_pr(); require_pr(pr); report['before']=pr
+              if pr['mergeQueueEntry']:
+                  report['state']='ALREADY_ENQUEUED'; save()
+              else:
+                  report['state']='UNKNOWN_AFTER_ATTEMPT'; report['mutation_attempts']=1; save()
+                  result=api('/graphql',{'query':'mutation($id:ID!,$sha:GitObjectID!){ enqueuePullRequest(input:{pullRequestId:$id,expectedHeadOid:$sha,jump:false}){ mergeQueueEntry { id position state } } }','variables':{'id':NODE,'sha':HEAD}})
+                  entry=result['data']['enqueuePullRequest']['mergeQueueEntry']
+                  if not entry or not entry.get('id'): raise RuntimeError('queue acceptance not confirmed')
+                  report['queue_entry']=entry; report['state']='QUEUE_REQUEST_ACCEPTED'; save()
+                  report['after']=observe_pr(); save()
+          except Exception as exc:
+              report['error_type']=type(exc).__name__
+              if hasattr(exc,'code'): report['http_status']=exc.code
+              if report['mutation_attempts']==0: report['state']='PRECHECK_FAILED'
+              save()
+              raise SystemExit('Queue operation did not complete; see bounded receipt, do not resend blindly.')
+          finally:
+              save()
+          print(json.dumps(report,indent=2))
+          PY
+      - name: Preserve the single-attempt operation receipt
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: queue-743-${{ github.run_id }}-${{ github.run_attempt }}
+          path: queue-evidence/receipt.json
+          if-no-files-found: error
+          retention-days: 30
