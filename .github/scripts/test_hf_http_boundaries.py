@@ -12,7 +12,7 @@ import io
 from email.message import Message
 from pathlib import Path
 import unittest
-from unittest import mock
+import unittest.mock as mock
 import urllib.error
 import urllib.request
 
