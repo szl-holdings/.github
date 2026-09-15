@@ -1,0 +1,73 @@
+# Read-only delivery compatibility check. Never merge this operator file to main.
+name: Exact publisher public read qualification
+"on":
+  push:
+    branches: [ops/queue-743-8331e2dc-20260915]
+    paths: [.github/workflows/one-time-hf-read-qualification.yml]
+permissions:
+  contents: read
+concurrency:
+  group: hf-read-qualification-7dfd00cc
+  cancel-in-progress: false
+jobs:
+  observe:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+    steps:
+      - name: Verify immutable source and public Hub byte delivery without credentials
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p read-evidence
+          python3 - <<'PY'
+          import datetime, hashlib, importlib.util, json, os, pathlib, re, urllib.request
+          REV='7dfd00cc65983be9496f84fa4cfa133f8f4b9c6a'
+          HASH='79edfbc099cf701129c1129ef696087d934a7c88d909be343d29856f2a9b6811'
+          out=pathlib.Path('read-evidence'); report={'schema':'szl.hf-read-compatibility/v1',
+              'source_revision':REV,'controller_sha256':HASH,'run_id':os.environ['GITHUB_RUN_ID'],
+              'run_attempt':os.environ['GITHUB_RUN_ATTEMPT'],'private_access_tested':False,
+              'credentials_used':False,'mutations':0,'live_deployment_claim':False,'observations':[]}
+          class NoRedirect(urllib.request.HTTPRedirectHandler):
+              def redirect_request(self,*args,**kwargs): raise RuntimeError('source redirect prohibited')
+          url='https://raw.githubusercontent.com/szl-holdings/.github/'+REV+'/.github/scripts/hf_deploy_from_dockerfile.py'
+          opener=urllib.request.build_opener(urllib.request.ProxyHandler({}),NoRedirect())
+          with opener.open(url,timeout=25) as r: raw=r.read(1024*1024+1)
+          if len(raw)>1024*1024 or hashlib.sha256(raw).hexdigest()!=HASH: raise SystemExit('Source identity failed')
+          source=out/'qualified_source.py'; source.write_bytes(raw)
+          for key in tuple(os.environ):
+              if key in {'HF_TOKEN','HUGGINGFACE_TOKEN','GH_TOKEN','GITHUB_TOKEN'}: os.environ.pop(key)
+          spec=importlib.util.spec_from_file_location('qualified_hf_read',source)
+          module=importlib.util.module_from_spec(spec); spec.loader.exec_module(module)
+          failures=0
+          for space in ('SZLHOLDINGS/finance','SZLHOLDINGS/lyte','SZLHOLDINGS/a11oy'):
+              record={'space':space,'state':'UNAVAILABLE','files':[]}
+              try:
+                  stage,sha=module.hf_space_state(space)
+                  if not isinstance(sha,str) or not re.fullmatch('[0-9a-f]{40}',sha): raise RuntimeError('bad identity')
+                  record.update(hf_revision=sha,runtime_stage=stage)
+                  for path in ('README.md','Dockerfile','app.py'):
+                      status,data=module.hf_resolve(space,path,sha)
+                      file={'path':path,'http_status':status,'bytes':len(data),'sha256':hashlib.sha256(data).hexdigest()}
+                      if status!=200 or not data: raise RuntimeError('immutable file unavailable')
+                      record['files'].append(file)
+                  second_stage,second_sha=module.hf_space_state(space)
+                  record.update(readback_sha=second_sha,readback_stage=second_stage,
+                      source_moved=second_sha!=sha,state='READ_COMPATIBILITY_OBSERVED')
+              except Exception as exc:
+                  failures+=1; record['error_type']=type(exc).__name__
+              report['observations'].append(record)
+              report['observed_at']=datetime.datetime.now(datetime.timezone.utc).isoformat()
+              (out/'receipt.json').write_text(json.dumps(report,indent=2)+'\n')
+          report['failed_sources']=failures; report['all_requested_reads_passed']=failures==0
+          (out/'receipt.json').write_text(json.dumps(report,indent=2)+'\n')
+          print(json.dumps(report,indent=2))
+          if failures: raise SystemExit('Public read compatibility remains incomplete; no admission inferred')
+          PY
+      - name: Retain read-only compatibility evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: hf-read-compatibility-${{ github.run_id }}-${{ github.run_attempt }}
+          path: read-evidence/receipt.json
+          if-no-files-found: error
+          retention-days: 30
