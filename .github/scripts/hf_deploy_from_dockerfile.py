@@ -704,7 +704,13 @@ def wait_for_expected_runtime(hf_repo, expected_sha, timeout, poll_interval=15):
 
 
 def probe_smoke_routes(hf_repo, smoke_paths, retries=6, delay=5):
-    """Probe only the derived Space host; redirects and empty bodies fail."""
+    """Probe the public application, not a Hub-authenticated tenant session.
+
+    HF_TOKEN belongs to Hub control/file APIs, not the application's bearer
+    namespace. A public route must pass without it; a private or authenticated
+    route remains a failure here and needs its own application-owned contract.
+    Redirect, non-200, empty-body, source, and immutable-byte gates are unchanged.
+    """
     paths = normalize_smoke_paths(smoke_paths)
     origin = hf_live_origin(hf_repo)
     failures = []
@@ -715,7 +721,7 @@ def probe_smoke_routes(hf_repo, smoke_paths, retries=6, delay=5):
         for attempt in range(max(1, int(retries))):
             try:
                 status, body = _http(
-                    url, headers=_auth_headers(), retries=1,
+                    url, headers={"Cache-Control": "no-cache"}, retries=1,
                     follow_redirects=False,
                 )
                 last_status = status
