@@ -1,4 +1,4 @@
-# Read-only delivery compatibility check. Never merge this operator file to main.
+# Read-only compatibility check; never merge this operator file to main.
 name: Exact publisher public read qualification
 "on":
   push:
@@ -7,26 +7,28 @@ name: Exact publisher public read qualification
 permissions:
   contents: read
 concurrency:
-  group: hf-read-qualification-7dfd00cc
+  group: hf-read-qualification-66645345
   cancel-in-progress: false
 jobs:
   observe:
     runs-on: ubuntu-24.04
     timeout-minutes: 8
     steps:
-      - name: Verify immutable source and public Hub byte delivery without credentials
+      - name: Verify immutable source and actual declared public runtime files
         shell: bash
         run: |
           set -euo pipefail
           mkdir -p read-evidence
           python3 - <<'PY'
           import datetime, hashlib, importlib.util, json, os, pathlib, re, urllib.request
-          REV='7dfd00cc65983be9496f84fa4cfa133f8f4b9c6a'
+          REV='6664534580b0b2ba72b1a25e887eb336fb0e9178'
           HASH='79edfbc099cf701129c1129ef696087d934a7c88d909be343d29856f2a9b6811'
-          out=pathlib.Path('read-evidence'); report={'schema':'szl.hf-read-compatibility/v1',
+          out=pathlib.Path('read-evidence'); report={'schema':'szl.hf-read-compatibility/v2',
               'source_revision':REV,'controller_sha256':HASH,'run_id':os.environ['GITHUB_RUN_ID'],
               'run_attempt':os.environ['GITHUB_RUN_ATTEMPT'],'private_access_tested':False,
-              'credentials_used':False,'mutations':0,'live_deployment_claim':False,'observations':[]}
+              'credentials_used':False,'mutations':0,'live_deployment_claim':False,
+              'predecessor_run':34978794342,'predecessor_failure':'A11oy app.py was incorrectly assumed; probe its actual Docker CMD target instead.',
+              'observations':[]}
           class NoRedirect(urllib.request.HTTPRedirectHandler):
               def redirect_request(self,*args,**kwargs): raise RuntimeError('source redirect prohibited')
           url='https://raw.githubusercontent.com/szl-holdings/.github/'+REV+'/.github/scripts/hf_deploy_from_dockerfile.py'
@@ -45,23 +47,33 @@ jobs:
                   stage,sha=module.hf_space_state(space)
                   if not isinstance(sha,str) or not re.fullmatch('[0-9a-f]{40}',sha): raise RuntimeError('bad identity')
                   record.update(hf_revision=sha,runtime_stage=stage)
-                  for path in ('README.md','Dockerfile','app.py'):
+                  def observe_file(path):
                       status,data=module.hf_resolve(space,path,sha)
-                      file={'path':path,'http_status':status,'bytes':len(data),'sha256':hashlib.sha256(data).hexdigest()}
+                      entry={'path':path,'http_status':status,'bytes':len(data),'sha256':hashlib.sha256(data).hexdigest()}
+                      record['files'].append(entry)
                       if status!=200 or not data: raise RuntimeError('immutable file unavailable')
-                      record['files'].append(file)
+                      return data
+                  observe_file('README.md'); docker=observe_file('Dockerfile')
+                  if space=='SZLHOLDINGS/a11oy':
+                      commands=re.findall(r'^CMD\s+(\[[^\n]+\])\s*$',docker.decode('utf-8'),re.MULTILINE)
+                      if not commands or json.loads(commands[-1])!=['python','gdw_runtime.py']:
+                          raise RuntimeError('unexpected declared A11oy entrypoint')
+                      record['observed_docker_cmd']=['python','gdw_runtime.py']
+                      observe_file('gdw_runtime.py')
+                  else: observe_file('app.py')
                   second_stage,second_sha=module.hf_space_state(space)
                   record.update(readback_sha=second_sha,readback_stage=second_stage,
                       source_moved=second_sha!=sha,state='READ_COMPATIBILITY_OBSERVED')
+                  if second_sha!=sha: raise RuntimeError('source moved during public observation')
               except Exception as exc:
-                  failures+=1; record['error_type']=type(exc).__name__
+                  failures+=1; record['state']='UNAVAILABLE'; record['error_type']=type(exc).__name__
               report['observations'].append(record)
               report['observed_at']=datetime.datetime.now(datetime.timezone.utc).isoformat()
               (out/'receipt.json').write_text(json.dumps(report,indent=2)+'\n')
           report['failed_sources']=failures; report['all_requested_reads_passed']=failures==0
           (out/'receipt.json').write_text(json.dumps(report,indent=2)+'\n')
           print(json.dumps(report,indent=2))
-          if failures: raise SystemExit('Public read compatibility remains incomplete; no admission inferred')
+          if failures: raise SystemExit('Public read compatibility incomplete; no admission inferred')
           PY
       - name: Retain read-only compatibility evidence
         if: always()
