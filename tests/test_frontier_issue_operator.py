@@ -20,7 +20,7 @@ sys.modules[SPEC.name] = operator
 SPEC.loader.exec_module(operator)
 
 
-def test_exact_duplicate_fingerprint_is_whitespace_and_case_stable() -> None:
+def test_duplicate_candidates_preserve_whitespace_and_case() -> None:
     first = operator.issue_fingerprint(
         "[Runtime] Space failed",
         "The exact runtime returned 404.  Preserve evidence and repair source parity.",
@@ -30,7 +30,7 @@ def test_exact_duplicate_fingerprint_is_whitespace_and_case_stable() -> None:
         "The exact runtime returned 404.\nPreserve evidence and repair source parity.",
     )
     assert first is not None
-    assert first == second
+    assert first != second
 
 
 def test_short_or_missing_body_is_never_auto_duplicate() -> None:
@@ -56,7 +56,7 @@ def test_classification_prioritizes_p0_before_provider_or_runtime() -> None:
 def clean_pull() -> tuple[operator.GitHub, dict[str, object]]:
     api = mock.create_autospec(operator.GitHub, instance=True)
     api.apply = False
-    api.repository.return_value = {"default_branch": "main"}
+    api.repository.return_value = {"default_branch": "main", "archived": False, "full_name": "szl-holdings/example", "visibility": "public", "private": False}
     api.pull.return_value = {
         "draft": False,
         "mergeable": True,
@@ -85,14 +85,12 @@ def clean_pull() -> tuple[operator.GitHub, dict[str, object]]:
     return api, item
 
 
-def test_clean_exact_head_would_merge() -> None:
+def test_clean_exact_head_is_only_a_review_candidate() -> None:
     api, item = clean_pull()
     result = operator.evaluate_pr(api, item)
-    assert result.action == "WOULD_MERGE"
+    assert result.action == "REVIEW_CANDIDATE"
     assert result.blockers == []
-    api.merge.assert_called_once_with(
-        "szl-holdings/example", 7, "a" * 40, "fix: exact defect"
-    )
+    api.merge.assert_not_called()
 
 
 def test_draft_failure_active_check_and_thread_each_block_merge() -> None:
@@ -165,9 +163,10 @@ def test_apply_without_token_fails_closed_and_records_no_value() -> None:
     assert report["token_value_recorded"] is False
 
 
-def test_duplicate_closure_is_exact_and_leaves_pointer() -> None:
+def test_duplicate_candidate_uses_oldest_number_without_closure() -> None:
     api = mock.create_autospec(operator.GitHub, instance=True)
     api.apply = True
+    api.repository.return_value = {"archived": False, "full_name": "szl-holdings/example", "visibility": "public", "private": False}
     api.search.return_value = [
         {
             "repository_url": "https://api.github.com/repos/szl-holdings/example",
@@ -189,19 +188,18 @@ def test_duplicate_closure_is_exact_and_leaves_pointer() -> None:
         },
     ]
     rows = operator.reconcile_issues(api, "szl-holdings", limit=10)
-    assert rows[0].action == "CLOSED_EXACT_DUPLICATE"
-    assert rows[0].duplicate_of.endswith("/issues/2")
-    api.close_duplicate.assert_called_once_with(
-        "szl-holdings/example",
-        1,
-        "https://github.com/szl-holdings/example/issues/2",
-    )
-    assert rows[1].action == "CLASSIFIED"
+    assert rows[0].action == "CLASSIFICATION_PROPOSED"
+    assert rows[1].action == "DUPLICATE_CANDIDATE"
+    assert rows[1].duplicate_of.endswith("/issues/1")
+    api.close_duplicate.assert_not_called()
+    api.set_classification.assert_not_called()
+
 
 
 def test_nonidentical_issue_bodies_are_only_classified() -> None:
     api = mock.create_autospec(operator.GitHub, instance=True)
     api.apply = True
+    api.repository.return_value = {"archived": False, "full_name": "szl-holdings/example", "visibility": "public", "private": False}
     api.search.return_value = [
         {
             "repository_url": "https://api.github.com/repos/szl-holdings/example",
@@ -223,9 +221,9 @@ def test_nonidentical_issue_bodies_are_only_classified() -> None:
         },
     ]
     rows = operator.reconcile_issues(api, "szl-holdings", limit=10)
-    assert all(row.action == "CLASSIFIED" for row in rows)
+    assert all(row.action == "CLASSIFICATION_PROPOSED" for row in rows)
     api.close_duplicate.assert_not_called()
-    assert api.set_classification.call_count == 2
+    api.set_classification.assert_not_called()
 
 
 def test_workflow_accepts_the_established_org_token_alias() -> None:
@@ -255,6 +253,8 @@ def test_source_contains_no_protection_visibility_archive_or_secret_mutation() -
 def test_identical_issues_in_different_repositories_are_not_closed() -> None:
     api = mock.create_autospec(operator.GitHub, instance=True)
     api.apply = True
+    api.repository.return_value = {"archived": False, "full_name": "szl-holdings/example", "visibility": "public", "private": False}
+    api.repository.side_effect = lambda repo: {"archived": False, "full_name": repo, "visibility": "public", "private": False}
     body = "This exact long issue text is valid independently for two repository components."
     api.search.return_value = [
         {
@@ -277,30 +277,23 @@ def test_identical_issues_in_different_repositories_are_not_closed() -> None:
         },
     ]
     rows = operator.reconcile_issues(api, "szl-holdings", limit=10)
-    assert all(row.action == "CLASSIFIED" for row in rows)
+    assert all(row.action == "CLASSIFICATION_PROPOSED" for row in rows)
     api.close_duplicate.assert_not_called()
-    assert api.set_classification.call_count == 2
+    api.set_classification.assert_not_called()
 
 
 def test_classification_replaces_stale_estate_labels_and_preserves_human_labels() -> None:
-    api = operator.GitHub("test-token", apply=True)
-    api.ensure_label = mock.Mock()
-    api.request = mock.Mock(return_value=({}, {}, 200))
-    api.set_classification(
-        "szl-holdings/example",
-        9,
-        "estate:runtime-drift",
-        ["bug", "estate:backlog", "estate:code-actionable"],
-    )
-    api.ensure_label.assert_called_once_with(
-        "szl-holdings/example", "estate:runtime-drift"
-    )
-    api.request.assert_called_once_with(
-        "PATCH",
-        "/repos/szl-holdings/example/issues/9",
-        {"labels": ["bug", "estate:runtime-drift"]},
-        expected=(200,),
-    )
+    # The successor cannot replace labels at all, even with apply=True.
+    api = operator.GitHub("fixture", apply=True)
+    api.request = mock.Mock()
+    try:
+        api.set_classification("szl-holdings/example", 9, "estate:runtime-drift", ["bug"])
+    except operator.GitHubError:
+        pass
+    else:
+        raise AssertionError("advisory classification acquired write authority")
+    api.request.assert_not_called()
+
 
 
 
@@ -337,6 +330,7 @@ def test_approval_clears_prior_change_request() -> None:
 def test_stale_estate_label_does_not_drive_reclassification() -> None:
     api = mock.create_autospec(operator.GitHub, instance=True)
     api.apply = True
+    api.repository.return_value = {"archived": False, "full_name": "szl-holdings/example", "visibility": "public", "private": False}
     api.search.return_value = [
         {
             "repository_url": "https://api.github.com/repos/szl-holdings/example",
@@ -350,20 +344,17 @@ def test_stale_estate_label_does_not_drive_reclassification() -> None:
     ]
     rows = operator.reconcile_issues(api, "szl-holdings", limit=10)
     assert rows[0].classification == "estate:code-actionable"
-    api.set_classification.assert_called_once_with(
-        "szl-holdings/example", 11, "estate:code-actionable", ["estate:p0"]
-    )
+    api.set_classification.assert_not_called()
 
 
 def test_exact_classification_is_a_noop() -> None:
-    api = operator.GitHub("test-token", apply=True)
-    api.ensure_label = mock.Mock()
+    # The successor cannot replace labels at all, even with apply=True.
+    api = operator.GitHub("fixture", apply=True)
     api.request = mock.Mock()
-    api.set_classification(
-        "szl-holdings/example",
-        9,
-        "estate:runtime-drift",
-        ["estate:runtime-drift", "bug"],
-    )
-    api.ensure_label.assert_not_called()
+    try:
+        api.set_classification("szl-holdings/example", 9, "estate:runtime-drift", ["bug"])
+    except operator.GitHubError:
+        pass
+    else:
+        raise AssertionError("advisory classification acquired write authority")
     api.request.assert_not_called()
