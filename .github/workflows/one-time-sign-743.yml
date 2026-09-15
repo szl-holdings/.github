@@ -1,0 +1,133 @@
+# One-time owner-authorized signature repair on isolated branches.
+# No force update, protected-main commit, queue bypass, provider or secret access.
+name: Produce verified same-tree candidate for PR 743
+"on":
+  push:
+    branches: [ops/queue-743-8331e2dc-20260915]
+    paths: [.github/workflows/one-time-sign-743.yml]
+permissions:
+  contents: write
+  pull-requests: read
+concurrency:
+  group: verified-source-candidate-743-8331e2dc
+  cancel-in-progress: false
+jobs:
+  signed-source:
+    if: github.repository == 'szl-holdings/.github' && github.event_name == 'push'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+    steps:
+      - name: Create one signed commit only if its entire tree equals reviewed source
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p signing-evidence
+          python3 - <<'PY'
+          import base64, datetime, hashlib, json, os, pathlib, urllib.request
+          REPO='szl-holdings/.github'
+          SOURCE='8331e2dc7490fd057223057b900cc51f32d11a17'
+          BASE='60c9ce7ba56c30b5f6529c916ca55e0bad8eff3b'
+          BRANCH='fix/hf/public-smoke-auth-boundary-verified'
+          FILES={'.github/scripts/hf_deploy_from_dockerfile.py', '.github/scripts/test_hf_public_smoke.py',
+                 '.github/workflows/hf-public-smoke-contract.yml', 'docs/HF_PUBLIC_SMOKE_CONTRACT.md',
+                 'huggingface/org-card/README.md'}
+          report={'schema':'szl.verified-same-tree-candidate/v1','repository':REPO,'original_pr':743,
+                  'source':SOURCE,'base':BASE,'candidate_branch':BRANCH,
+                  'run_id':os.environ['GITHUB_RUN_ID'],'run_attempt':os.environ['GITHUB_RUN_ATTEMPT'],
+                  'operator_sha':os.environ['GITHUB_SHA'],'state':'NOT_ATTEMPTED','commit_attempts':0,
+                  'original_branch_modified':False,'force_update':False,'main_modified':False,
+                  'provider_operations':0,'secret_values_recorded':False}
+          out=pathlib.Path('signing-evidence/receipt.json')
+          def save():
+              report['observed_at']=datetime.datetime.now(datetime.timezone.utc).isoformat()
+              out.write_text(json.dumps(report,indent=2)+'\n')
+          class NoRedirect(urllib.request.HTTPRedirectHandler):
+              def redirect_request(self,*args,**kwargs): raise RuntimeError('redirect prohibited')
+          opener=urllib.request.build_opener(urllib.request.ProxyHandler({}),NoRedirect())
+          def api(path,payload=None):
+              if not (path.startswith('/repos/'+REPO+'/') or path=='/graphql'): raise RuntimeError('unexpected API path')
+              req=urllib.request.Request('https://api.github.com'+path,
+                  data=None if payload is None else json.dumps(payload).encode(),
+                  method='GET' if payload is None else 'POST',headers={
+                      'Authorization':'Bearer '+os.environ['GITHUB_TOKEN'],
+                      'Accept':'application/vnd.github+json','Content-Type':'application/json',
+                      'User-Agent':'SZL-verified-same-tree-source/1.0'})
+              with opener.open(req,timeout=25) as response:
+                  raw=response.read(8*1024*1024+1)
+              if len(raw)>8*1024*1024: raise RuntimeError('response bound exceeded')
+              value=json.loads(raw)
+              if isinstance(value,dict) and value.get('errors'):
+                  report['graphql_errors']=[{'type':str(e.get('type',''))[:80],
+                      'message':str(e.get('message','')).replace(os.environ['GITHUB_TOKEN'],'[REDACTED]')[:500]}
+                      for e in value['errors'][:3]]
+                  raise RuntimeError('GraphQL operation rejected')
+              return value
+          def ref(branch): return api('/repos/'+REPO+'/git/ref/heads/'+branch)['object']['sha']
+          try:
+              if os.environ['GITHUB_RUN_ATTEMPT']!='1': raise RuntimeError('rerun prohibited')
+              if ref('main')!=BASE or ref(BRANCH)!=BASE: raise RuntimeError('base or target moved')
+              pr=api('/repos/'+REPO+'/pulls/743')
+              if pr['head']['sha']!=SOURCE or pr['state']!='open': raise RuntimeError('original PR changed')
+              original=api('/repos/'+REPO+'/git/commits/'+SOURCE)
+              report['expected_tree']=original['tree']['sha']
+              tree=api('/repos/'+REPO+'/git/trees/'+SOURCE+'?recursive=1')
+              if tree.get('truncated'): raise RuntimeError('source tree incomplete')
+              entries={e['path']:e for e in tree['tree'] if e['type']=='blob'}
+              comparison=api('/repos/'+REPO+'/compare/'+BASE+'...'+SOURCE)
+              if {f['filename'] for f in comparison.get('files',[])}!=FILES:
+                  raise RuntimeError('reviewed changed-file set no longer matches')
+              if any(f['status'] not in ('added','modified') for f in comparison['files']):
+                  raise RuntimeError('unexpected removal or rename')
+              additions=[]; observed={}
+              for path in sorted(FILES):
+                  entry=entries[path]
+                  if entry['mode']!='100644' or entry.get('size',0)>1024*1024:
+                      raise RuntimeError('GraphQL cannot preserve this source mode/size')
+                  blob=api('/repos/'+REPO+'/git/blobs/'+entry['sha'])
+                  if blob['encoding']!='base64': raise RuntimeError('unsupported blob encoding')
+                  data=base64.b64decode(blob['content']); data.decode('utf-8')
+                  digest=hashlib.sha1(b'blob '+str(len(data)).encode()+b'\0'+data).hexdigest()
+                  if digest!=entry['sha']: raise RuntimeError('source bytes mismatch')
+                  observed[path]={'git_blob':digest,'sha256':hashlib.sha256(data).hexdigest(),'bytes':len(data)}
+                  additions.append({'path':path,'contents':base64.b64encode(data).decode()})
+              report['files']=observed
+              if ref('main')!=BASE or ref(BRANCH)!=BASE or ref('fix/hf/public-smoke-auth-boundary')!=SOURCE:
+                  raise RuntimeError('source moved during preparation')
+              report['state']='UNKNOWN_AFTER_ATTEMPT'; report['commit_attempts']=1; save()
+              result=api('/graphql',{'query':'mutation($input:CreateCommitOnBranchInput!){ createCommitOnBranch(input:$input){ commit { oid url } } }',
+                  'variables':{'input':{'branch':{'repositoryNameWithOwner':REPO,'branchName':BRANCH},
+                      'expectedHeadOid':BASE,'message':{
+                          'headline':'fix(hf): preserve reviewed public smoke in a verified candidate',
+                          'body':'Exact source-tree successor to PR743 head '+SOURCE+'. Original branch and review history retained. This commit is authenticated and signed by GitHub under the actual workflow identity, not an independent human review. No source semantics, protection, credential or provider setting is changed. Native current-revision CI and ordinary merge-queue admission are still required.\n\nSigned-off-by: Stephen P. Lutar <stephenlutar2@gmail.com>'},
+                      'fileChanges':{'additions':additions}}}})
+              sha=result['data']['createCommitOnBranch']['commit']['oid']; report['candidate_revision']=sha; save()
+              candidate=api('/repos/'+REPO+'/git/commits/'+sha)
+              report['candidate_tree']=candidate['tree']['sha']
+              report['verification']={k:candidate['verification'].get(k) for k in ('verified','reason','verified_at')}
+              report['actual_author']=candidate['author']; report['actual_committer']=candidate['committer']
+              report['parents']=[p['sha'] for p in candidate['parents']]
+              if report['candidate_tree']!=report['expected_tree'] or report['parents']!=[BASE]:
+                  raise RuntimeError('whole-tree or parent identity mismatch')
+              if candidate['verification'].get('verified') is not True: raise RuntimeError('GitHub did not verify the new commit')
+              if ref(BRANCH)!=sha: raise RuntimeError('candidate branch moved after commit')
+              report['state']='VERIFIED_SAME_TREE_CANDIDATE'; save()
+          except Exception as exc:
+              report['error_type']=type(exc).__name__
+              if hasattr(exc,'code'): report['http_status']=exc.code
+              if report['commit_attempts']==0: report['state']='PRECHECK_FAILED'
+              try: report['target_readback']=ref(BRANCH)
+              except Exception as err: report['readback_error']=type(err).__name__
+              save(); print(json.dumps(report,indent=2)); raise SystemExit('Signed candidate not qualified; retain receipt and do not retry blindly.')
+          finally: save()
+          print(json.dumps(report,indent=2))
+          PY
+      - name: Retain exact signature and whole-tree readback
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: verified-source-743-${{ github.run_id }}-${{ github.run_attempt }}
+          path: signing-evidence/receipt.json
+          if-no-files-found: error
+          retention-days: 30
