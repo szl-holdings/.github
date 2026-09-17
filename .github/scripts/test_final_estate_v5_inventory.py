@@ -147,6 +147,7 @@ class PriorFalseGreenRegressionTests(OfflineTests):
             seen = sum(path == f"/orgs/{ORG}/repos" for _, path, _ in current.calls)
             if p == f"/orgs/{ORG}/repos" and seen >= 2:
                 return [repository(".github", 1), repository("a11oy", 999)]
+            return None
         t.hook = hook
         self.assertFalse(gate(t)[0].ok)
 
@@ -156,6 +157,7 @@ class PriorFalseGreenRegressionTests(OfflineTests):
             seen = sum(path == f"/repos/{ORG}/a11oy/pulls" for _, path, _ in current.calls)
             if p == f"/repos/{ORG}/a11oy/pulls" and seen >= 2:
                 return [pull(search=False)]
+            return None
         t.hook = hook
         self.assertFalse(gate(t)[0].ok)
 
@@ -252,6 +254,7 @@ class InventoryContractTests(OfflineTests):
             count = sum(path == f"/orgs/{ORG}" for _, path, _ in current.calls)
             if p == f"/orgs/{ORG}" and count >= 2:
                 return {"login": ORG, "public_repos": 3}
+            return None
         t.hook = hook
         self.assertFalse(gate(t)[0].ok)
 
@@ -261,6 +264,7 @@ class InventoryContractTests(OfflineTests):
             count = sum(path == f"/orgs/{ORG}" for _, path, _ in current.calls)
             if p == f"/orgs/{ORG}" and count >= 3:
                 return {"login": ORG, "public_repos": 3}
+            return None
         t.hook = hook
         self.assertFalse(gate(t)[0].ok)
 
