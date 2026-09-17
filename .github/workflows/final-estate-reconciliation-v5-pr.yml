@@ -6,6 +6,8 @@ on:
     paths:
       - .github/scripts/final_estate_reconciliation_v5.py
       - .github/scripts/final_estate_v5_core.py
+      - .github/scripts/final_estate_v5_inventory.py
+      - .github/scripts/test_final_estate_v5_inventory.py
       - .github/scripts/final_estate_v5_evidence.py
       - .github/scripts/final_estate_v5_probes.py
       - .github/scripts/test_final_estate_v5_evidence.py
@@ -53,6 +55,8 @@ jobs:
           python -m py_compile \
             .github/scripts/final_estate_reconciliation_v5.py \
             .github/scripts/final_estate_v5_core.py \
+            .github/scripts/final_estate_v5_inventory.py \
+            .github/scripts/test_final_estate_v5_inventory.py \
             .github/scripts/final_estate_v5_evidence.py \
             .github/scripts/final_estate_v5_probes.py \
             .github/scripts/test_final_estate_v5_evidence.py \
@@ -60,6 +64,7 @@ jobs:
             .github/scripts/test_final_estate_v5_upstream.py
           python .github/scripts/test_final_estate_v5_evidence.py
           python .github/scripts/test_final_estate_v5_probes.py
+          python .github/scripts/test_final_estate_v5_inventory.py
           python .github/scripts/test_final_estate_v5_upstream.py
           git diff --check
 

@@ -59,28 +59,30 @@ class FakeSession:
 
 
 class FinalEstateProbeV5Tests(unittest.TestCase):
-    def test_open_public_prs_discard_issue_shaped_search_items(self) -> None:
+    def test_open_public_prs_reject_issue_shaped_search_items(self) -> None:
         client = GitHubClient(None)
+        repository = "szl-holdings/a11oy"
+        def row(number: int) -> dict[str, Any]:
+            return {
+                "id": number + 1000, "number": number, "state": "open",
+                "draft": False, "title": "SYNTHETIC search fixture",
+                "repository_url": f"https://api.github.com/repos/{repository}",
+                "html_url": f"https://github.com/{repository}/pull/{number}",
+            }
+        real_pr = row(309)
+        real_pr["pull_request"] = {
+            "url": f"https://api.github.com/repos/{repository}/pulls/309"
+        }
         response = FakeResponse(
             status_code=200,
             url="https://api.github.com/search/issues",
             content_type="application/json",
-            payload={
-                "items": [
-                    {
-                        "number": 309,
-                        "title": "real pull request",
-                        "pull_request": {"url": "https://api.github.com/pulls/309"},
-                    },
-                    {"number": 310, "title": "ordinary issue"},
-                ]
-            },
+            payload={"total_count": 2, "incomplete_results": False,
+                     "items": [real_pr, row(310)]},
         )
         client.request = lambda *_args, **_kwargs: response  # type: ignore[method-assign]
-
-        values = client.open_public_pull_requests()
-
-        self.assertEqual([item["number"] for item in values], [309])
+        with self.assertRaisesRegex(RuntimeError, "PUBLIC_PR_DISCRIMINATOR"):
+            client.open_public_pull_requests()
 
     def test_get_only_api_accepts_observed_head_405(self) -> None:
         spec = PROBES["a11oy_livez"]
