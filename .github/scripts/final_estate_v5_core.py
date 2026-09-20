@@ -10,6 +10,8 @@ from urllib.parse import urlsplit
 
 import requests
 
+from final_estate_v5_inventory import PublicPullRequestObserver
+
 ORG = "szl-holdings"
 A11OY_REPOSITORY = "szl-holdings/a11oy"
 A11OY_BRANCH = "main"
@@ -95,6 +97,7 @@ PROBES = {
 
 class GitHubClient:
     def __init__(self, token: str | None) -> None:
+        self.public_pr_observation: dict[str, Any] | None = None
         self.base = "https://api.github.com"
         self.session = requests.Session()
         self.session.headers.update(
@@ -146,30 +149,11 @@ class GitHubClient:
         return revision
 
     def open_public_pull_requests(self) -> list[dict[str, Any]]:
-        query = f"org:{ORG} is:pr is:open is:public"
-        output: list[dict[str, Any]] = []
-        for page in range(1, 11):
-            payload = self.request(
-                "GET",
-                "/search/issues",
-                params={"q": query, "per_page": 100, "page": page},
-            ).json()
-            if not isinstance(payload, dict):
-                raise RuntimeError("GitHub pull-request search is not an object")
-            values = payload.get("items") or []
-            if not isinstance(values, list):
-                raise RuntimeError("GitHub pull-request search items are not a list")
-            # GitHub's search response uses the issues schema for both issues
-            # and pull requests.  Treat an item as a pull request only when the
-            # discriminator is present rather than trusting the query string.
-            output.extend(
-                item
-                for item in values
-                if isinstance(item, dict) and "pull_request" in item
-            )
-            if len(values) < 100:
-                return output
-        raise RuntimeError("public pull-request search exceeded 1,000 results")
+        # Clear any prior evidence before a new observation, including failure.
+        self.public_pr_observation = None
+        observation = PublicPullRequestObserver(self.request).observe()
+        self.public_pr_observation = observation.evidence
+        return observation.items
 
     def upsert_report_issue(self, body: str, operational: bool) -> dict[str, Any]:
         query = f'repo:{ORG}/.github is:issue in:title "{REPORT_TITLE}"'
