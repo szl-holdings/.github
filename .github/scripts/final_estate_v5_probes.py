@@ -189,6 +189,12 @@ def evaluate_a11oy_source(client: GitHubClient) -> tuple[Gate, str | None]:
 def evaluate_open_public_prs(client: GitHubClient) -> Gate:
     try:
         values = client.open_public_pull_requests()
+        observation = getattr(client, "public_pr_observation", None)
+        zero_verified = (
+            isinstance(observation, Mapping)
+            and observation.get("schema") == "szl.public-pr-observation/v1"
+            and observation.get("zero_closure_authorized") is True
+        )
         evidence = [
             {
                 "repository_url": item.get("repository_url"),
@@ -202,9 +208,11 @@ def evaluate_open_public_prs(client: GitHubClient) -> Gate:
         ]
         return Gate(
             "public_estate_open_prs",
-            len(values) == 0,
-            f"public_open_pull_requests={len(values)}",
-            {"visibility_scope": "public", "open_pull_requests": evidence},
+            len(values) == 0 and zero_verified,
+            (f"public_open_pull_requests={len(values)}" if values or zero_verified
+             else "public_open_pull_requests=UNVERIFIED; independent census required"),
+            {"visibility_scope": "public", "open_pull_requests": evidence,
+             "observation": observation},
         )
     except Exception as exc:  # noqa: BLE001
         return Gate(

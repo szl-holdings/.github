@@ -113,8 +113,10 @@ class PublicSmokeTests(unittest.TestCase):
             self.assertEqual(request.get_header("Cache-control"), "no-cache")
         self.assertTrue(self.opener_handlers)
         for handlers in self.opener_handlers:
-            self.assertEqual(len(handlers), 1)
-            self.assertIsInstance(handlers[0], publisher._NoRedirect)
+            self.assertEqual(len(handlers), 2)
+            self.assertIsInstance(handlers[0], publisher.urllib.request.ProxyHandler)
+            self.assertEqual(handlers[0].proxies, {})
+            self.assertIsInstance(handlers[1], publisher._NoRedirect)
 
     def test_public_routes_do_not_need_any_environment_token(self):
         with unittest.mock.patch.dict(os.environ, {}, clear=True):
