@@ -45,7 +45,10 @@ from __future__ import annotations
 import argparse
 import fnmatch
 import hashlib
+import http.client
+import io
 import json
+import math
 import os
 import posixpath
 import random
@@ -521,34 +524,179 @@ class _NoRedirect(urllib.request.HTTPRedirectHandler):
         return None
 
 
+# Transport limits are independent from source/byte/route admission. Oversize
+# responses remain failures; they are never truncated and reported as verified.
+HTTP_MAX_RESPONSE_BYTES = 64 * 1024 * 1024
+HTTP_MAX_ERROR_BYTES = 64 * 1024
+HTTP_MAX_RETRY_DELAY_S = 30.0
+HTTP_MAX_ATTEMPTS = 10
+
+
+class _ReadContractError(RuntimeError):
+    """A bounded read failed its transport contract; never retry as a write."""
+
+
+def _read_origin(url):
+    """Validate a fixed HF HTTPS read destination without reflecting its URL."""
+    try:
+        if (not isinstance(url, str) or not url or
+                any(ord(c) <= 32 or ord(c) == 127 for c in url) or
+                "\\" in url):
+            raise ValueError
+        parsed = urllib.parse.urlsplit(url)
+        host = parsed.hostname or ""
+        if (parsed.scheme != "https" or parsed.username is not None or
+                parsed.password is not None or parsed.fragment or
+                parsed.port not in (None, 443) or not host.isascii() or
+                not re.fullmatch(r"[a-z0-9]+(?:[a-z0-9.-]*[a-z0-9])?", host)):
+            raise ValueError
+        if not (host == "huggingface.co" or host.endswith(".huggingface.co") or
+                host == "hf.co" or host.endswith(".hf.co") or
+                host.endswith(".hf.space")):
+            raise ValueError
+        return ("https", host, 443)
+    except (ValueError, TypeError, AttributeError):
+        raise _ReadContractError("HF read destination is outside the HTTPS contract") from None
+
+
+class _HubReadRedirect(urllib.request.HTTPRedirectHandler):
+    """Allow HF delivery redirects without forwarding management credentials."""
+    def http_error_302(self, req, fp, code, msg, headers):
+        # urllib's default redirect implementation drains fp.read() without a
+        # byte bound. This dedicated GET opener uses no shared connection pool:
+        # close the redirect response instead and let the stdlib retain its
+        # redirect-count, method, relative-URL and loop-detection machinery.
+        fp.close()
+        if not (headers.get("Location") or headers.get("URI")):
+            raise _ReadContractError("Hub redirect has no destination")
+        with io.BytesIO(b"") as empty:
+            return super().http_error_302(req, empty, code, msg, headers)
+
+    http_error_301 = http_error_302
+    http_error_303 = http_error_302
+    http_error_307 = http_error_302
+    http_error_308 = http_error_302
+
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        before = _read_origin(req.full_url)
+        destination = urllib.parse.urljoin(req.full_url, newurl)
+        after = _read_origin(destination)
+        # Public application routes use _NoRedirect instead. File delivery may
+        # follow HF-owned HTTPS locations, never an arbitrary external origin.
+        if after[1].endswith(".hf.space"):
+            raise _ReadContractError("Hub file redirect cannot enter an application")
+        redirected = super().redirect_request(
+            req, fp, code, msg, headers, destination
+        )
+        if redirected is not None:
+            for key in tuple(dict(redirected.header_items())):
+                lower = key.lower()
+                if (lower in {"cookie", "proxy-authorization", "host"} or
+                        (lower == "authorization" and
+                         not (before == after == ("https", "huggingface.co", 443)))):
+                    redirected.remove_header(key)
+        return redirected
+
+
+def _bounded_http_body(response, limit):
+    """Read at most limit+1 bytes, reject malformed length and early EOF."""
+    headers = getattr(response, "headers", None) or {}
+    lengths = (headers.get_all("Content-Length", [])
+               if hasattr(headers, "get_all") else
+               [headers["Content-Length"]] if "Content-Length" in headers else [])
+    declared = None
+    if lengths:
+        if (len(lengths) != 1 or not isinstance(lengths[0], str) or
+                re.fullmatch(r"[0-9]{1,20}", lengths[0].strip()) is None):
+            raise _ReadContractError("invalid HTTP Content-Length")
+        declared = int(lengths[0].strip())
+        if declared > limit:
+            raise _ReadContractError("HTTP response exceeds byte limit")
+    body = bytearray()
+    while True:
+        chunk = response.read(min(65536, limit + 1 - len(body)))
+        if not isinstance(chunk, bytes):
+            raise _ReadContractError("HTTP response body is not bytes")
+        if not chunk:
+            break
+        body.extend(chunk)
+        if len(body) > limit:
+            raise _ReadContractError("HTTP response exceeds byte limit")
+    if declared is not None and len(body) != declared:
+        raise _ReadContractError("HTTP response length does not match declaration")
+    return bytes(body)
+
+
+def _http_retry_delay(headers, attempt):
+    fallback = min(HTTP_MAX_RETRY_DELAY_S, 2.0 * (2 ** attempt))
+    raw = (headers or {}).get("Retry-After")
+    if raw is None:
+        return fallback
+    try:
+        if not isinstance(raw, str) or len(raw) > 128:
+            return fallback
+        value = float(raw)
+        if not math.isfinite(value) or value < 0:
+            return fallback
+        return min(HTTP_MAX_RETRY_DELAY_S, value)
+    except (ValueError, OverflowError):
+        return fallback
+
+
 def _http(url, headers=None, retries=6, follow_redirects=True):
-    last = None
+    """GET with bounded bodies/retries and management-origin authentication.
+
+    Each socket operation has the existing 45-second timeout. This is not a
+    strict whole-call wall-clock deadline; the workflow deadline is separate.
+    Mutating SDK operations are deliberately outside this read-only helper.
+    """
+    if type(retries) is not int or not 1 <= retries <= HTTP_MAX_ATTEMPTS:
+        raise _ReadContractError("HTTP read attempts must be an integer from 1 to 10")
+    if type(follow_redirects) is not bool:
+        raise _ReadContractError("HTTP redirect policy must be boolean")
+    origin = _read_origin(url)
     hdrs = dict(UA)
-    if headers:
-        hdrs.update(headers)
-    opener = (urllib.request.build_opener() if follow_redirects else
-              urllib.request.build_opener(_NoRedirect()))
+    seen = set()
+    for key, value in (headers or {}).items():
+        if (not isinstance(key, str) or not isinstance(value, str) or
+                re.fullmatch(r"[!#$%&'*+.^_`|~0-9A-Za-z-]+", key) is None or
+                any(ord(c) < 32 or ord(c) == 127 for c in value)):
+            raise _ReadContractError("invalid HTTP request header")
+        lower = key.lower()
+        if lower in seen or lower in {"cookie", "proxy-authorization", "host"}:
+            raise _ReadContractError("HTTP credential/header boundary rejected request")
+        if lower == "authorization" and origin != ("https", "huggingface.co", 443):
+            raise _ReadContractError("Hub authentication cannot enter another origin")
+        seen.add(lower)
+        hdrs[key] = value
+    handler = _HubReadRedirect() if follow_redirects else _NoRedirect()
+    opener = urllib.request.build_opener(urllib.request.ProxyHandler({}), handler)
+    last = "unavailable"
     for attempt in range(retries):
+        retry_delay = min(HTTP_MAX_RETRY_DELAY_S, 1.5 * (attempt + 1))
         try:
-            req = urllib.request.Request(url, headers=hdrs)
+            req = urllib.request.Request(url, headers=hdrs, method="GET")
             with opener.open(req, timeout=45) as resp:
-                return resp.status, resp.read()
-        except urllib.error.HTTPError as e:
-            if 300 <= e.code < 500:
-                return e.code, e.read()
-            last = e
-            if e.code == 429 or 500 <= e.code < 600:
-                ra = (e.headers or {}).get("Retry-After")
-                try:
-                    delay = float(ra) if ra else min(60.0, 2.0 * (2 ** attempt))
-                except ValueError:
-                    delay = min(60.0, 2.0 * (2 ** attempt))
-                time.sleep(delay + random.uniform(0, 1.0))
-                continue
-        except (urllib.error.URLError, TimeoutError, ConnectionError) as e:
-            last = e
-        time.sleep(1.5 * (attempt + 1) + random.uniform(0, 0.5))
-    raise RuntimeError(f"GET failed after {retries} tries: {url}: {last}")
+                return resp.status, _bounded_http_body(resp, HTTP_MAX_RESPONSE_BYTES)
+        except urllib.error.HTTPError as exc:
+            try:
+                retryable = exc.code == 429 or 500 <= exc.code < 600
+                if not retryable:
+                    return exc.code, _bounded_http_body(exc, HTTP_MAX_ERROR_BYTES)
+                last = "HTTP_" + str(exc.code)
+                retry_delay = _http_retry_delay(exc.headers, attempt)
+            finally:
+                exc.close()
+        except (urllib.error.URLError, OSError, http.client.HTTPException):
+            # Provider exception text and signed URLs can carry credentials.
+            last = "transport_unavailable"
+        # There is no reason to sleep after the final attempt. In particular,
+        # public probes request one inner attempt and own their outer retry.
+        if attempt + 1 < retries:
+            time.sleep(retry_delay)
+    raise _ReadContractError(
+        f"HF GET unavailable after {retries} attempts ({last})"
+    ) from None
 
 
 def hf_resolve(hf_repo, path, ref="main"):
@@ -704,7 +852,13 @@ def wait_for_expected_runtime(hf_repo, expected_sha, timeout, poll_interval=15):
 
 
 def probe_smoke_routes(hf_repo, smoke_paths, retries=6, delay=5):
-    """Probe only the derived Space host; redirects and empty bodies fail."""
+    """Probe the public application, not a Hub-authenticated tenant session.
+
+    HF_TOKEN belongs to Hub control/file APIs, not the application's bearer
+    namespace. A public route must pass without it; a private or authenticated
+    route remains a failure here and needs its own application-owned contract.
+    Redirect, non-200, empty-body, source, and immutable-byte gates are unchanged.
+    """
     paths = normalize_smoke_paths(smoke_paths)
     origin = hf_live_origin(hf_repo)
     failures = []
@@ -715,7 +869,7 @@ def probe_smoke_routes(hf_repo, smoke_paths, retries=6, delay=5):
         for attempt in range(max(1, int(retries))):
             try:
                 status, body = _http(
-                    url, headers=_auth_headers(), retries=1,
+                    url, headers={"Cache-Control": "no-cache"}, retries=1,
                     follow_redirects=False,
                 )
                 last_status = status
