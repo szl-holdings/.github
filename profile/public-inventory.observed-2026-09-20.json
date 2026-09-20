@@ -1,0 +1,43 @@
+{
+  "schema": "szl.public-profile-inventory-observation/v1",
+  "replaces_prior_receipt": false,
+  "prior_receipt": {
+    "path": "profile/public-inventory.json",
+    "observed_at": "2026-09-10T03:20:41Z",
+    "counts": {"spaces": 21, "models": 46, "datasets": 35}
+  },
+  "observed_at": "2026-09-20T15:16:00Z",
+  "observer": "authenticated-whoami plus anonymous-author-list",
+  "scope_public": {
+    "id": "hf-public-author-membership/v1",
+    "authentication": "none",
+    "counts": {"spaces": 21, "models": 47, "datasets": 35},
+    "drift_vs_prior_receipt": {
+      "spaces": "MATCH",
+      "models": "DRIFT +1 SZLHOLDINGS/szl-receiptagent-qwen35-0.8b-v2-merged",
+      "datasets": "MATCH"
+    }
+  },
+  "scope_authenticated": {
+    "authentication": "write-token",
+    "counts": {"spaces": 27, "models": 47, "datasets": 43},
+    "note": "Authenticated totals include private repos. Do not print these as the public card."
+  },
+  "five_space": {
+    "id": "SZLHOLDINGS/five-space",
+    "status": 404,
+    "exists": false,
+    "mint": "REFUSED"
+  },
+  "historical_estate_alignment_v1": {
+    "label": "HISTORICAL",
+    "portfolio_spaces": 16,
+    "inventory_only_spaces": 1,
+    "models": 45,
+    "datasets": 34
+  },
+  "production_authorization": false,
+  "runtime_readiness_inferred": false,
+  "model_quality_inferred": false,
+  "claim_boundary": "Dated observation only. Not a LIVE stamp. Not a publisher receipt. Not a replacement for profile/public-inventory.json until the inventory generator emits new evidence hashes."
+}
