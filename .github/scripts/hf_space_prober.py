@@ -4,7 +4,7 @@
 Reads the live Hub API for one organization and records, per asset:
   - visibility (private/public)
   - Space runtime stage (RUNNING / BUILDING / RUNTIME_ERROR / PAUSED / SLEEPING / ...)
-  - declared license
+  - declared license, and where the declaration was found
   - presence of a governance stamp carrying a literal model-ID backlink
 
 Every row carries a doctrine label: MEASURED when the API answered, UNAVAILABLE
@@ -26,9 +26,10 @@ import urllib.request
 from datetime import datetime, timezone
 
 HUB = "https://huggingface.co"
-UA = "szl-hf-space-prober/1.0"
+UA = "szl-hf-space-prober/1.1"
 RUNNING = "RUNNING"
 STAMP_HINTS = ("governance", "governed", "measured truth", "provenance")
+FM_LICENSE = re.compile(r"^license:\s*['\"]?([^'\"\s#]+)", re.MULTILINE)
 BACKLINK = re.compile(r"(?:huggingface\.co/(?:spaces/|datasets/)?[\w.-]+/[\w.-]+)|(?:github\.com/szl-holdings/[\w.-]+)", re.I)
 
 
@@ -74,6 +75,21 @@ def card_text(kind: str, repo_id: str, token: str | None) -> tuple[str, str]:
     return "", "UNAVAILABLE" if status in (401, 403) else "UNKNOWN"
 
 
+def front_matter_license(text: str) -> str | None:
+    """Read `license:` from card YAML front matter.
+
+    The Hub search index does not always carry a `license:` tag even when the
+    card declares one, so an index-only check manufactures false MEASURED
+    failures. The card is authoritative; only the leading block is parsed.
+    """
+    if not text.startswith("---"):
+        return None
+    end = text.find("\n---", 3)
+    block = text[3:end] if end != -1 else text[3:4000]
+    m = FM_LICENSE.search(block)
+    return m.group(1) if m else None
+
+
 def probe(kind: str, org: str, token: str | None, check_cards: bool) -> tuple[list, dict]:
     repos, status = list_repos(kind, org, token)
     rows: list[dict] = []
@@ -94,6 +110,7 @@ def probe(kind: str, org: str, token: str | None, check_cards: bool) -> tuple[li
                                  if t.startswith("license:")), None)),
             "label": "MEASURED",
         }
+        row["license_source"] = "index" if row["license"] else "UNKNOWN"
         if kind == "spaces":
             runtime = r.get("runtime") or {}
             row["stage"] = runtime.get("stage") or "UNKNOWN"
@@ -108,6 +125,11 @@ def probe(kind: str, org: str, token: str | None, check_cards: bool) -> tuple[li
             row["card_bytes"] = len(text)
             row["has_stamp"] = bool(text) and any(h in low for h in STAMP_HINTS)
             row["has_backlink"] = bool(BACKLINK.search(text))
+            if not row["license"]:
+                fm = front_matter_license(text)
+                if fm:
+                    row["license"] = fm
+                    row["license_source"] = "card_front_matter"
         rows.append(row)
 
     spaces = [x for x in rows if x["kind"] == "spaces"]
@@ -129,6 +151,8 @@ def probe(kind: str, org: str, token: str | None, check_cards: bool) -> tuple[li
             1 for x in rows if x.get("card_label") == "MEASURED" and not x.get("has_backlink"))
         summary[f"{kind}_card_unreadable"] = sum(
             1 for x in rows if x.get("card_label") != "MEASURED")
+        summary[f"{kind}_license_from_card"] = sum(
+            1 for x in rows if x.get("license_source") == "card_front_matter")
     summary[f"{kind}_missing_license"] = sum(1 for x in rows if not x.get("license"))
     return rows, summary
 
@@ -157,6 +181,7 @@ def main() -> int:
 
     summary["missing_stamp"] = sum(v for k, v in summary.items() if k.endswith("_missing_stamp"))
     summary["missing_license"] = sum(v for k, v in summary.items() if k.endswith("_missing_license"))
+    summary["license_from_card"] = sum(v for k, v in summary.items() if k.endswith("_license_from_card"))
     summary["public_not_running"] = summary.get("public_not_running", 0)
     summary["token_present"] = bool(token)
 
@@ -175,14 +200,16 @@ def main() -> int:
         md.append(f"- {k}: {summary[k]}")
     offenders = [x for x in all_rows
                  if (x["kind"] == "spaces" and not x["private"] and not x.get("running"))
-                 or (x.get("card_label") == "MEASURED" and not x.get("has_stamp"))]
+                 or (x.get("card_label") == "MEASURED" and not x.get("has_stamp"))
+                 or not x.get("license")]
     if offenders:
         md += ["", "## Assets needing action", "",
-               "| repo | kind | private | stage | stamp | license |",
-               "| --- | --- | --- | --- | --- | --- |"]
+               "| repo | kind | private | stage | stamp | license | license source |",
+               "| --- | --- | --- | --- | --- | --- | --- |"]
         for x in offenders[:200]:
             md.append(f"| `{x['repo_id']}` | {x['kind']} | {x['private']} | "
-                      f"{x.get('stage', '-')} | {x.get('has_stamp', '-')} | {x.get('license') or '-'} |")
+                      f"{x.get('stage', '-')} | {x.get('has_stamp', '-')} | "
+                      f"{x.get('license') or '-'} | {x.get('license_source', '-')} |")
 
     for path, blob in ((args.out_json, json.dumps(payload, indent=2, sort_keys=True) + "\n"),
                        (args.out_md, "\n".join(md) + "\n")):
@@ -192,7 +219,9 @@ def main() -> int:
 
     print(f"hf probe: {summary.get('spaces_total', 0)} spaces, "
           f"{summary.get('public_not_running', 0)} public not running, "
-          f"{summary.get('missing_stamp', 0)} missing stamp")
+          f"{summary.get('missing_stamp', 0)} missing stamp, "
+          f"{summary.get('missing_license', 0)} missing license "
+          f"({summary.get('license_from_card', 0)} resolved from card)")
     if args.dry_run:
         return 0
     return 1 if (summary.get("public_not_running", 0) or summary.get("missing_stamp", 0)) else 0
