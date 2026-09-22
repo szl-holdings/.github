@@ -151,7 +151,7 @@ jobs:
           if-no-files-found: error
           retention-days: 90
 
-      - name: Enforce complete authenticated read and safe public projection
+      - name: Enforce complete authenticated coverage
         if: always()
         env:
           EXIT_CODE: ${{ steps.digest.outputs.exit_code }}
