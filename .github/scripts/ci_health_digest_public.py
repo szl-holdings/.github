@@ -174,7 +174,7 @@ def public_digest(
         f"Restricted detail withheld: **{restricted}** red workflows; those failures remain in all totals and issue-state decisions.",
         "",
         "Branch protection is **NOT VERIFIED** by this digest. Default-branch file existence and "
-        "branch-bound runs do not establish enforced branch policies or current-head CI success.",
+        + "branch-bound runs do not establish enforced branch policies or current-head CI success.",
         "",
     ]
     lines.extend(rows)
@@ -183,8 +183,8 @@ def public_digest(
     lines.extend([
         "", "---",
         "Repository visibility was re-read before publishing public workflow detail. This is a bounded "
-        "observation, not an atomic guarantee of future visibility. Private/internal identifiers, workflow "
-        "names and run links are excluded from this public issue, report, log and summary. "
-        "Classification policy and fail-closed collection are unchanged. No raw private details are persisted by this publisher.",
+        + "observation, not an atomic guarantee of future visibility. Private/internal identifiers, workflow "
+        + "names and run links are excluded from this public issue, report, log and summary. "
+        + "Classification policy and fail-closed collection are unchanged. No raw private details are persisted by this publisher.",
     ])
     return PublicDigest("\n".join(lines), published, counts, total, restricted)
