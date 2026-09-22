@@ -451,5 +451,13 @@ class WorkflowContractTests(unittest.TestCase):
         self.assertIn("persist-credentials: false", workflow)
 
 
+def load_tests(loader, standard_tests, pattern):
+    """Include disclosure regressions in the existing pre-credential self-test."""
+    import test_ci_health_digest_public
+
+    standard_tests.addTests(loader.loadTestsFromModule(test_ci_health_digest_public))
+    return standard_tests
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)
