@@ -46,7 +46,7 @@ class PublicProjectionTests(unittest.TestCase):
     def render(self, entries, reds, reader=None):
         return public_digest(reds, entries, coverage=coverage(len(entries)),
                              authentication_mode="fixture", classify=classify,
-                             visibility_reader=reader or (lambda name: repo(name)))
+                             visibility_reader=reader or repo)
 
     def test_private_names_workflows_and_urls_never_enter_view(self):
         private = repo("private-canary-91", True)
@@ -154,7 +154,7 @@ class PublicProjectionTests(unittest.TestCase):
     def test_inventory_coverage_cannot_be_silently_reduced(self):
         with self.assertRaises(PublicationError):
             public_digest({}, [repo()], coverage=coverage(2), authentication_mode="fixture",
-                          classify=classify, visibility_reader=lambda n: repo(n))
+                          classify=classify, visibility_reader=repo)
 
 
 class PublicPublisherIntegrationTests(unittest.TestCase):
