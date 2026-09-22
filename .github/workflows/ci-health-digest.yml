@@ -1,10 +1,19 @@
 name: CI Health Digest
 
-# Org-wide CI health sweep + one rolling issue. Authentication is App-first,
-# migration-safe, and fail-closed. Every configured reader is independently
-# validated against GitHub's authoritative public/private repository totals,
-# the complete paginated organization inventory, and Actions-read capability.
-# A stale or partial credential cannot mask a later complete reader.
+# Org-wide CI health sweep + one rolling public issue. Authentication is
+# App-first, migration-safe, and fail-closed. Every configured reader is
+# independently validated against GitHub's authoritative public/private
+# repository totals, the complete paginated organization inventory, and
+# Actions-read capability. A stale or partial credential cannot mask a later
+# complete reader.
+#
+# Publication is intentionally narrower than reader coverage. The complete
+# authenticated reader may inspect private/internal repositories, but the
+# public .github issue, artifact, step summary, and optional notification are
+# produced only through ci_health_digest_public.py. That adapter publishes
+# repository/workflow/run detail for public repositories and refuses to infer
+# branch protection from default-branch file existence. No private-detail sink
+# is invented by this public workflow.
 #
 # Qillqaq's governance-approved token profile includes
 # `permission-organization-administration: read`. The action runs only when the
@@ -14,8 +23,9 @@ name: CI Health Digest
 #
 # Default-branch evidence boundary: GitHub's Actions registry can retain workflow
 # entries from feature or closed-PR branches. The digest proves every inspected
-# workflow file exists at the repository's current default branch and never
-# falls back to a run from another branch.
+# source workflow file exists at the repository's current default branch and
+# never falls back to a run from another branch. This is source-lineage evidence,
+# not branch-protection/ruleset evidence.
 
 on:
   schedule:
@@ -25,9 +35,11 @@ on:
     branches: [main]
     paths:
       - .github/scripts/ci_health_digest.py
+      - .github/scripts/ci_health_digest_public.py
       - .github/scripts/ci_health_digest_http.py
       - .github/scripts/ci_health_digest_sweep.py
       - .github/scripts/test_ci_health_digest.py
+      - .github/scripts/test_ci_health_digest_public_boundary.py
       - .github/scripts/test_ci_health_digest_reader_inventory.py
       - .github/scripts/test_ci_health_digest_rate_budget.py
       - .github/scripts/test_ci_health_digest_default_branch.py
@@ -53,7 +65,7 @@ env:
 
 jobs:
   digest:
-    name: Authenticated organization sweep and rolling evidence issue
+    name: Authenticated full reader and public-safe rolling evidence issue
     runs-on: ubuntu-latest
     timeout-minutes: 100
     steps:
@@ -73,18 +85,21 @@ jobs:
         with:
           python-version: "3.12"
 
-      - name: Compile and self-test the complete-coverage contract
+      - name: Compile and self-test the complete-reader and publication contracts
         run: |
           set -euo pipefail
           python -m py_compile \
             .github/scripts/ci_health_digest.py \
+            .github/scripts/ci_health_digest_public.py \
             .github/scripts/ci_health_digest_http.py \
             .github/scripts/ci_health_digest_sweep.py \
             .github/scripts/test_ci_health_digest.py \
+            .github/scripts/test_ci_health_digest_public_boundary.py \
             .github/scripts/test_ci_health_digest_reader_inventory.py \
             .github/scripts/test_ci_health_digest_rate_budget.py \
             .github/scripts/test_ci_health_digest_default_branch.py
           python .github/scripts/test_ci_health_digest.py
+          python .github/scripts/test_ci_health_digest_public_boundary.py
           python .github/scripts/test_ci_health_digest_reader_inventory.py
           python .github/scripts/test_ci_health_digest_rate_budget.py
           python .github/scripts/test_ci_health_digest_default_branch.py
@@ -103,7 +118,7 @@ jobs:
           permission-contents: read
           permission-organization-administration: read
 
-      - name: Sweep the verified organization estate and publish issue evidence
+      - name: Sweep the full verified estate and publish only public-safe evidence
         id: digest
         env:
           DIGEST_APP_TOKEN: ${{ steps.app-token.outputs.token }}
@@ -122,12 +137,12 @@ jobs:
         shell: bash
         run: |
           set +e
-          python .github/scripts/ci_health_digest.py --report "$REPORT_PATH"
+          python .github/scripts/ci_health_digest_public.py --report "$REPORT_PATH"
           code=$?
           echo "exit_code=${code}" >> "$GITHUB_OUTPUT"
           exit 0
 
-      - name: Upload immutable digest evidence
+      - name: Upload immutable public-projection digest evidence
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
@@ -136,14 +151,14 @@ jobs:
           if-no-files-found: error
           retention-days: 90
 
-      - name: Enforce complete authenticated coverage
+      - name: Enforce complete authenticated read and safe public projection
         if: always()
         env:
           EXIT_CODE: ${{ steps.digest.outputs.exit_code }}
         run: |
           code="${EXIT_CODE:-2}"
           if [ "$code" -ne 0 ]; then
-            echo "::error::CI health digest is NOT VERIFIED. The rolling issue contains the fail-closed receipt."
+            echo "::error::CI health digest is NOT VERIFIED. The rolling issue contains only fail-closed public-safe evidence."
             exit "$code"
           fi
-          echo "Organization CI health digest is current, authenticated, default-branch-bound, and evidence-bound."
+          echo "Organization CI reader completed; public issue and artifact are visibility-redacted and default-branch-source-bound."
