@@ -5,9 +5,11 @@ on:
     branches: [main]
     paths:
       - .github/scripts/ci_health_digest.py
+      - .github/scripts/ci_health_digest_public.py
       - .github/scripts/ci_health_digest_http.py
       - .github/scripts/ci_health_digest_sweep.py
       - .github/scripts/test_ci_health_digest.py
+      - .github/scripts/test_ci_health_digest_public_boundary.py
       - .github/scripts/test_ci_health_digest_default_branch.py
       - .github/workflows/ci-health-digest.yml
       - .github/workflows/ci-health-digest-default-branch-pr.yml
@@ -21,7 +23,7 @@ concurrency:
 
 jobs:
   verify:
-    name: Default-branch files and GitHub-managed dynamic workflows
+    name: Default-branch source, dynamic, and public-projection contracts
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -41,11 +43,14 @@ jobs:
           set -euo pipefail
           python -m py_compile \
             .github/scripts/ci_health_digest.py \
+            .github/scripts/ci_health_digest_public.py \
             .github/scripts/ci_health_digest_http.py \
             .github/scripts/ci_health_digest_sweep.py \
             .github/scripts/test_ci_health_digest.py \
+            .github/scripts/test_ci_health_digest_public_boundary.py \
             .github/scripts/test_ci_health_digest_default_branch.py
           python .github/scripts/test_ci_health_digest.py
+          python .github/scripts/test_ci_health_digest_public_boundary.py
           python .github/scripts/test_ci_health_digest_default_branch.py
           git diff --check
 
@@ -75,6 +80,33 @@ jobs:
               "secrets.",
               "contents: write",
               "git push",
+          )
+          for marker in required:
+              assert marker in source, marker
+          for marker in forbidden:
+              assert marker not in source, marker
+
+      - name: Prove public publication never equates source lineage with protection
+        shell: python
+        run: |
+          from pathlib import Path
+
+          source = Path(
+              ".github/scripts/ci_health_digest_public.py"
+          ).read_text(encoding="utf-8")
+          required = (
+              "PUBLIC_REPOSITORY_DETAILS_ONLY",
+              "default_branch_source",
+              "private_repository_identities_persisted",
+              "private_workflow_details_persisted",
+              "branch_protection_inferred",
+              "UNAVAILABLE_IN_PUBLIC_WORKFLOW",
+              "does **not** prove branch protection",
+          )
+          forbidden = (
+              "contents: write",
+              "git push",
+              "permission-administration",
           )
           for marker in required:
               assert marker in source, marker
