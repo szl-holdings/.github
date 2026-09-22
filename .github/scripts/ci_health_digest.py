@@ -14,7 +14,6 @@ import json
 import os
 import urllib.error
 import urllib.request
-from dataclasses import asdict
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Mapping, Sequence
@@ -28,15 +27,17 @@ from ci_health_digest_http import (
     select_reader,
 )
 from ci_health_digest_sweep import (
-    build_body,
+    classify,
     build_failure_body,
     sweep,
 )
 
+from ci_health_digest_public import public_digest
+
 ISSUE_REPOSITORY = f"{ORG}/.github"
 ISSUE_TITLE = "🔴 CI Health Digest — org-wide"
 ISSUE_LABEL = "ci-health"
-REPORT_SCHEMA = "szl.ci-health-digest/v2"
+REPORT_SCHEMA = "szl.ci-health-digest/v3"
 
 
 def _issue_token() -> str:
@@ -280,7 +281,7 @@ def main(argv: Sequence[str] | None = None) -> int:
                 "An organization reader is accepted only after proving the "
                 "reviewed repository floor."
             ),
-            "Every protected-default-branch workflow API read is fail-closed.",
+            "Every default-branch workflow API read is fail-closed; protection is not verified.",
             (
                 "The ephemeral repository token writes only the one rolling "
                 "digest issue."
@@ -312,20 +313,38 @@ def main(argv: Sequence[str] | None = None) -> int:
         }
         reds, coverage = sweep(reader.token, reader.repositories)
         coverage = _normalize_coverage(coverage)
-        body, actionable, red_total, dispositions = build_body(
+        def visibility_reader(name: str) -> Mapping[str, Any]:
+            _, metadata = _request_json(
+                reader.token,
+                f"https://api.github.com/repos/{ORG}/{name}",
+                operation="revalidate public digest repository visibility",
+            )
+            return metadata
+
+        public = public_digest(
             reds,
+            reader.repositories,
             coverage=coverage,
             authentication_mode=reader.mode,
+            classify=classify,
+            visibility_reader=visibility_reader,
         )
+        body = public.body
+        actionable = public.dispositions["ACTIONABLE"]
+        red_total = public.red_total
+        dispositions = public.dispositions
         issue = upsert_issue(body, red_total=red_total)
         notification = maybe_notify(actionable, red_total)
         report.update(
             {
                 "status": "VERIFIED",
                 "coverage": coverage,
-                "red_runs": {
-                    repository: [asdict(item) for item in items]
-                    for repository, items in reds.items()
+                "red_runs": public.red_runs,
+                "publication": {
+                    "scope": "public-detail-restricted-aggregate/v1",
+                    "restricted_red_total": public.restricted_red_total,
+                    "private_details_recorded": False,
+                    "branch_protection_verified": False,
                 },
                 "summary": {
                     "actionable": actionable,
