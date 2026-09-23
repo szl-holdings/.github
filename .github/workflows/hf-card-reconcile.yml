@@ -1,0 +1,194 @@
+name: hf-card-reconcile
+
+# Push-triggered runs are plan-only. Hub writes require explicit dispatch:
+# apply=true, and body replacement requires allow_body_replace=true.
+# Receipts remain UNSIGNED_HONEST until the DSSE lane signs.
+
+on:
+  workflow_dispatch:
+    inputs:
+      only:
+        description: Comma-separated repo_id filter (blank = every declared asset)
+        type: string
+        default: ""
+      apply:
+        description: Write to the Hub. Unchecked runs are plan-only.
+        type: boolean
+        default: false
+      allow_body_replace:
+        description: Permit body replacement for assets declaring a body_file
+        type: boolean
+        default: false
+
+  push:
+    branches: [main]
+    paths:
+      - ".github/config/hf_card_expectations.json"
+      - ".github/config/hf_cards/**"
+      - ".github/scripts/hf_card_reconcile.py"
+      - ".github/workflows/hf-card-reconcile.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: hf-card-reconcile
+  cancel-in-progress: false
+
+jobs:
+  reconcile:
+    name: governance/hf-card-reconcile
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    permissions:
+      contents: read
+
+    env:
+      REPORT: reports/governance/hf-card-reconcile.json
+      APPLY: ${{ github.event_name == 'workflow_dispatch' && inputs.apply == true && '1' || '' }}
+      ALLOW_BODY: ${{ github.event_name == 'workflow_dispatch' && inputs.allow_body_replace == true && '1' || '' }}
+      ONLY: ${{ inputs.only || '' }}
+
+    steps:
+      - name: Harden runner
+        uses: step-security/harden-runner@05e31511f85b41b11d1cf0ef85d0992719546e2c # v2.21.0
+        with:
+          egress-policy: audit
+
+      - name: Checkout exact governance source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 1
+
+      - name: Set up exact Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12"
+
+      - name: Validate declarative expectation
+        run: |
+          set -euo pipefail
+
+          python -I -P - <<'PY'
+          import json
+          import os
+
+          cfg = json.load(
+              open(".github/config/hf_card_expectations.json", encoding="utf-8")
+          )
+
+          assert (
+              cfg.get("schema") == "szl.governance.hf_card_expectations/v1"
+          ), "unexpected schema"
+
+          assets = cfg.get("assets") or []
+
+          assert assets, "no assets declared"
+
+          seen = set()
+
+          for asset in assets:
+              repo_id = asset["repo_id"]
+
+              assert repo_id not in seen, f"duplicate asset: {repo_id}"
+
+              seen.add(repo_id)
+
+              assert asset.get("kind") in (
+                  "spaces",
+                  "models",
+                  "datasets",
+              ), f"bad kind: {repo_id}"
+
+              assert (
+                  repo_id.split("/")[0] == cfg["defaults"]["org"]
+              ), f"asset outside declared org: {repo_id}"
+
+              body_file = asset.get("body_file")
+
+              if body_file:
+                  body_path = os.path.join(
+                      ".github/config/hf_cards",
+                      body_file,
+                  )
+
+                  assert os.path.isfile(body_path), (
+                      f"missing body file: {body_path}"
+                  )
+
+          print(f"expectation valid: {len(assets)} assets")
+          PY
+
+      - name: Reconcile cards
+        id: reconcile
+        env:
+          HF_ORG_TOKEN: ${{ secrets.HF_ORG_TOKEN }}
+          HF_ORG_TOKEN1: ${{ secrets.HF_ORG_TOKEN1 }}
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+          HF_WRITE_TOKEN: ${{ secrets.HF_WRITE_TOKEN }}
+        run: |
+          set +e
+
+          python -I -P .github/scripts/hf_card_reconcile.py \
+            --out-json "$REPORT" \
+            ${ONLY:+--only "$ONLY"} \
+            ${APPLY:+--apply} \
+            ${ALLOW_BODY:+--allow-body-replace}
+
+          echo "exit_code=$?" >> "$GITHUB_OUTPUT"
+
+      - name: Publish reconcile report
+        if: always()
+        run: |
+          set -euo pipefail
+
+          if [ ! -f "$REPORT" ]; then
+            echo "no report produced" >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+
+          python -I -P - <<'PY' >> "$GITHUB_STEP_SUMMARY"
+          import json
+          import os
+
+          report = json.load(
+              open(os.environ["REPORT"], encoding="utf-8")
+          )
+
+          print(f"# Hub card reconcile — mode `{report['mode']}`\n")
+          print("| repo | label | changes | route | applied |")
+          print("| --- | --- | --- | --- | --- |")
+
+          for asset in report["assets"]:
+              changes = (
+                  "<br>".join(asset.get("changes") or [])
+                  or "none"
+              )
+
+              print(
+                  f"| `{asset['repo_id']}` | "
+                  f"{asset['label']} | "
+                  f"{changes} | "
+                  f"{asset.get('apply_route', '-')} | "
+                  f"{asset.get('applied', 'plan-only')} |"
+              )
+          PY
+
+      - name: Retain immutable reconcile receipt
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: hf-card-reconcile-${{ github.run_id }}-${{ github.run_attempt }}
+          path: reports/governance/
+          if-no-files-found: warn
+          retention-days: 90
+
+      - name: Fail closed
+        if: always()
+        env:
+          RC: ${{ steps.reconcile.outputs.exit_code }}
+        run: |
+          set -euo pipefail
+          exit "${RC:-1}"
