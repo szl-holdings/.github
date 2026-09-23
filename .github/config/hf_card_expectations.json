@@ -1,0 +1,30 @@
+{
+  "schema": "szl.governance.hf_card_expectations/v1",
+  "doc": "Declarative expected card state for SZLHOLDINGS Hub assets. The reconciler never invents facts: every value here is owner-authored. Absent keys are left untouched.",
+  "defaults": {
+    "license": "apache-2.0",
+    "require_stamp": true,
+    "stamp_heading": "## Governance",
+    "org": "SZLHOLDINGS",
+    "source_org": "szl-holdings"
+  },
+  "assets": [
+    {
+      "repo_id": "SZLHOLDINGS/yarqa",
+      "kind": "spaces",
+      "license": "apache-2.0",
+      "title": "Yarqa",
+      "short_description": "Plug-flow compartmentalization for compartmental models. Clean-room, Apache-2.0.",
+      "source_repo": "szl-holdings/yarqa",
+      "body_file": "yarqa.md",
+      "reason": "Card was the 191-byte Hugging Face placeholder while the Space carries real source (yarqa 0.5.0, FastAPI space app, digest-pinned base image, hash-locked requirements)."
+    },
+    {
+      "repo_id": "SZLHOLDINGS/szl-constellation",
+      "kind": "spaces",
+      "license": "apache-2.0",
+      "source_repo": "szl-holdings/szl-constellation",
+      "reason": "Card declared tags but no license; body is already accurate and must not be rewritten."
+    }
+  ]
+}

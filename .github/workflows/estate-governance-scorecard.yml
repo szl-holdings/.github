@@ -1,0 +1,167 @@
+name: estate-governance-scorecard
+
+# Consolidated, fail-closed governance scorecard for the SZL estate:
+#   szl-holdings (GitHub org)  +  SZLHOLDINGS (Hugging Face org)
+#
+# Doctrine: MEASURED / REPORTED / UNKNOWN / UNAVAILABLE. Only MEASURED failures
+# turn this workflow red; missing scope degrades to UNAVAILABLE and is reported,
+# never silently passed. Receipts stay UNSIGNED_HONEST until the DSSE lane signs.
+
+on:
+  schedule:
+    - cron: "17 11 * * *"     # 07:17 America/New_York (EDT), daily
+    - cron: "17 13 * * 1"     # Monday deep sweep
+  workflow_dispatch:
+    inputs:
+      deep_sample:
+        description: Repos to deep-probe for protection and action pins
+        type: string
+        default: "40"
+      strict_unknown:
+        description: Treat UNKNOWN/UNAVAILABLE controls as drift
+        type: boolean
+        default: false
+      dry_run:
+        description: Report only; never fail the run and never open an issue
+        type: boolean
+        default: false
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/estate-governance-scorecard.yml"
+      - ".github/scripts/governance_scorecard.py"
+      - ".github/scripts/hf_space_prober.py"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: estate-governance-scorecard
+  cancel-in-progress: false
+
+jobs:
+  scorecard:
+    name: governance/scorecard
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      issues: write
+    env:
+      GH_ORG: szl-holdings
+      HF_ORG: SZLHOLDINGS
+      DEEP_SAMPLE: ${{ inputs.deep_sample || '40' }}
+      DRY_RUN: ${{ inputs.dry_run == true && '1' || '' }}
+      STRICT_UNKNOWN: ${{ inputs.strict_unknown == true && '1' || '' }}
+      REPORT_DIR: reports/governance
+      ISSUE_TITLE: "[governance] estate security drift"
+    steps:
+      - name: Harden runner
+        uses: step-security/harden-runner@05e31511f85b41b11d1cf0ef85d0992719546e2c # v2.21.0
+        with:
+          egress-policy: audit
+
+      - name: Checkout exact governance source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 1
+
+      - name: Set up exact Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12"
+
+      - name: Probe Hugging Face estate
+        id: hf
+        env:
+          HF_ORG_TOKEN: ${{ secrets.HF_ORG_TOKEN }}
+          HF_ORG_TOKEN1: ${{ secrets.HF_ORG_TOKEN1 }}
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+          HF_WRITE_TOKEN: ${{ secrets.HF_WRITE_TOKEN }}
+          HF_HUB_DISABLE_PROGRESS_BARS: "1"
+        run: |
+          set +e
+          python -I -P .github/scripts/hf_space_prober.py \
+            --org "$HF_ORG" \
+            --out-json "$REPORT_DIR/hf-spaces.json" \
+            --out-md "$REPORT_DIR/hf-spaces.md" \
+            ${DRY_RUN:+--dry-run}
+          echo "exit_code=$?" >> "$GITHUB_OUTPUT"
+
+      - name: Audit GitHub organization controls
+        id: gh
+        env:
+          SCORECARD_TOKEN: ${{ secrets.SZL_ORG_ADMIN_TOKEN || secrets.ORG_ADMIN_TOKEN || secrets.SZL_GITHUB_TOKEN || secrets.GH_PAT || github.token }}
+        run: |
+          set +e
+          python -I -P .github/scripts/governance_scorecard.py \
+            --org "$GH_ORG" \
+            --deep-sample "$DEEP_SAMPLE" \
+            --hf-report "$REPORT_DIR/hf-spaces.json" \
+            --out-json "$REPORT_DIR/github-scorecard.json" \
+            --out-md "$REPORT_DIR/scorecard.md" \
+            ${STRICT_UNKNOWN:+--strict-unknown} \
+            ${DRY_RUN:+--dry-run}
+          echo "exit_code=$?" >> "$GITHUB_OUTPUT"
+
+      - name: Publish scorecard to the run summary
+        if: always()
+        run: |
+          set -euo pipefail
+          for f in "$REPORT_DIR/scorecard.md" "$REPORT_DIR/hf-spaces.md"; do
+            if [ -f "$f" ]; then
+              head -c 200000 "$f" >> "$GITHUB_STEP_SUMMARY"
+              printf '\n\n' >> "$GITHUB_STEP_SUMMARY"
+            fi
+          done
+
+      - name: Retain immutable scorecard evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: governance-scorecard-${{ github.run_id }}-${{ github.run_attempt }}
+          path: reports/governance/
+          if-no-files-found: warn
+          retention-days: 90
+
+      - name: Open or refresh the drift issue
+        if: always() && env.DRY_RUN == '' && github.event_name != 'push'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_EXIT: ${{ steps.gh.outputs.exit_code }}
+          HF_EXIT: ${{ steps.hf.outputs.exit_code }}
+        run: |
+          set -euo pipefail
+          if [ "${GH_EXIT:-0}" = "0" ] && [ "${HF_EXIT:-0}" = "0" ]; then
+            echo "no measured drift; leaving issue state untouched"
+            exit 0
+          fi
+          body_file="$(mktemp)"
+          {
+            printf '%s\n\n' "Automated drift detection. Run: ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
+            printf 'github auditor exit=%s | hf prober exit=%s\n\n' "${GH_EXIT:-?}" "${HF_EXIT:-?}"
+            [ -f "$REPORT_DIR/scorecard.md" ] && head -c 55000 "$REPORT_DIR/scorecard.md"
+            printf '\n\n'
+            [ -f "$REPORT_DIR/hf-spaces.md" ] && head -c 10000 "$REPORT_DIR/hf-spaces.md"
+          } > "$body_file"
+          existing="$(gh issue list --state open --search "$ISSUE_TITLE in:title" \
+            --json number,title --jq "map(select(.title == \"$ISSUE_TITLE\")) | .[0].number // empty")"
+          if [ -n "$existing" ]; then
+            gh issue comment "$existing" --body-file "$body_file"
+          else
+            gh issue create --title "$ISSUE_TITLE" --body-file "$body_file" --label governance || \
+              gh issue create --title "$ISSUE_TITLE" --body-file "$body_file"
+          fi
+
+      - name: Fail closed on measured drift
+        if: always() && env.DRY_RUN == ''
+        env:
+          GH_EXIT: ${{ steps.gh.outputs.exit_code }}
+          HF_EXIT: ${{ steps.hf.outputs.exit_code }}
+        run: |
+          set -euo pipefail
+          rc=0
+          [ "${GH_EXIT:-0}" = "0" ] || rc=1
+          [ "${HF_EXIT:-0}" = "0" ] || rc=1
+          exit "$rc"
