@@ -27,7 +27,7 @@ import urllib.request
 from datetime import datetime, timezone
 
 HUB = "https://huggingface.co"
-UA = "szl-hf-card-reconcile/1.0"
+UA = "szl-hf-card-reconcile/1.1"
 SCALAR = re.compile(r"^([A-Za-z_][A-Za-z0-9_-]*):\s*(.*)$")
 MEASURED, UNAVAILABLE = "MEASURED", "UNAVAILABLE"
 
@@ -184,20 +184,67 @@ def plan_asset(asset: dict, defaults: dict, token: str | None, bodies_dir: str,
     return row
 
 
-def apply_asset(row: dict, token: str, message: str) -> dict:
+def apply_asset(row: dict, token: str, message: str, prefer_pr: bool = False) -> dict:
+    """Commit the reconciled card, falling back to a Hub pull request on 403.
+
+    A credential that can contribute but cannot write directly receives a 403
+    with create_pr guidance. Retry exactly once through the Hub pull-request
+    route, record the route that was used, and fail closed if both are denied.
+    """
     kind = row["kind"]
     seg = {"spaces": "spaces", "datasets": "datasets", "models": "models"}[kind]
+
     header = {"key": "header", "value": {"summary": message}}
-    filerec = {"key": "file", "value": {"path": "README.md", "encoding": "utf-8",
-                                        "content": row["new_text"]}}
-    ndjson = (json.dumps(header) + "\n" + json.dumps(filerec) + "\n").encode("utf-8")
-    detail, status = hub_request(
-        "POST", f"/api/{seg}/{row['repo_id']}/commit/main", token, ndjson,
-        "application/x-ndjson")
-    row["apply_status"] = status
-    row["applied"] = status in (200, 201)
-    if not row["applied"]:
+
+    filerec = {
+        "key": "file",
+        "value": {
+            "path": "README.md",
+            "encoding": "utf-8",
+            "content": row["new_text"],
+        },
+    }
+
+    ndjson = (
+        json.dumps(header)
+        + "\n"
+        + json.dumps(filerec)
+        + "\n"
+    ).encode("utf-8")
+
+    base = f"/api/{seg}/{row['repo_id']}/commit/main"
+
+    attempts = (
+        [("pull_request", base + "?create_pr=1")]
+        if prefer_pr
+        else [
+            ("main", base),
+            ("pull_request", base + "?create_pr=1"),
+        ]
+    )
+
+    for route, path in attempts:
+        detail, status = hub_request(
+            "POST",
+            path,
+            token,
+            ndjson,
+            "application/x-ndjson",
+        )
+
+        row["apply_status"] = status
+        row["apply_route"] = route
+
+        if status in (200, 201):
+            row["applied"] = True
+            return row
+
         row["apply_detail"] = detail[:300]
+
+        if status != 403:
+            break
+
+    row["applied"] = False
     return row
 
 
@@ -209,6 +256,11 @@ def main() -> int:
     ap.add_argument("--only", default="", help="comma-separated repo_id filter")
     ap.add_argument("--apply", action="store_true")
     ap.add_argument("--allow-body-replace", action="store_true")
+    ap.add_argument(
+        "--prefer-pr",
+        action="store_true",
+        help="skip direct commit and create a Hub pull request",
+    )
     ap.add_argument("--message", default="chore(card): reconcile governed card metadata")
     args = ap.parse_args()
 
@@ -231,7 +283,7 @@ def main() -> int:
     for asset in assets:
         row = plan_asset(asset, defaults, token, args.bodies_dir, args.allow_body_replace)
         if args.apply and row["label"] == MEASURED and row["changes"]:
-            apply_asset(row, token, args.message)
+            apply_asset(row, token, args.message, args.prefer_pr)
         rows.append(row)
 
     payload = {
