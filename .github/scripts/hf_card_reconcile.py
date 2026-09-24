@@ -173,6 +173,10 @@ def load_config(config: str, bodies_dir: str, only: str) -> tuple[dict, list, di
         seen.add(repo_id)
         if asset.get("kind") not in ("spaces", "datasets", "models"):
             raise ValueError(f"invalid kind: {repo_id}")
+        if asset["kind"] == "spaces" and "short_description" in asset:
+            description = asset["short_description"]
+            if not isinstance(description, str) or not 1 <= len(description) <= 60:
+                raise ValueError(f"Space short_description must contain 1 to 60 characters: {repo_id}")
         if not re.fullmatch(r"szl-holdings/[A-Za-z0-9][A-Za-z0-9_.-]*", asset.get("source_repo", "")):
             raise ValueError(f"invalid source repository: {repo_id}")
         for key in ("license", "title", "short_description"):

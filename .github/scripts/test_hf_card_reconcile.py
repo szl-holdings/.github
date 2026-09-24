@@ -150,6 +150,22 @@ class CardReconcileTests(unittest.TestCase):
                 self.assertIn("error", receipt)
                 requests.assert_not_called()
 
+    def test_space_short_description_length_boundaries(self):
+        for description in ("a", "a" * 60):
+            with self.subTest(valid_length=len(description)):
+                self.asset["short_description"] = description
+                self.write_config()
+                _, selected, _ = RECONCILE.load_config(str(self.config), str(self.root), "")
+                self.assertEqual(selected[0]["short_description"], description)
+        for description in ("", "a" * 61, None, 60):
+            with self.subTest(invalid_description=description):
+                self.asset["short_description"] = description
+                self.write_config()
+                code, receipt, requests = self.run_main()
+                self.assertEqual(code, 1)
+                self.assertIn("1 to 60 characters", receipt["error"])
+                requests.assert_not_called()
+
     def test_plan_does_not_attest_credentials(self):
         code, receipt, requests = self.run_main(["--allow-body-replace"], [(json.dumps({"sha": HEAD}), 200), (self.card, 200)])
         self.assertEqual(code, 0)
