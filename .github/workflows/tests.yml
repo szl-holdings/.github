@@ -2,11 +2,17 @@ name: Tests
 
 on:
   push:
-    branches: [main]
+    branches:
+    - main
   pull_request:
-    branches: [main]
-  workflow_dispatch:
-
+    branches:
+    - main
+  workflow_dispatch: null
+  merge_group:
+    types:
+    - checks_requested
+    branches:
+    - main
 permissions:
   contents: read
 
