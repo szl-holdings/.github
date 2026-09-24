@@ -16,9 +16,17 @@ on:
         type: boolean
         default: false
       allow_body_replace:
-        description: Permit body replacement for assets declaring a body_file
+        description: Preview or apply body replacement for assets declaring a body_file
         type: boolean
         default: false
+      plan_run_id:
+        description: Successful plan run on this exact main revision (required for apply)
+        type: string
+        default: ""
+      plan_run_attempt:
+        description: Exact reviewed attempt of the plan run
+        type: string
+        default: "1"
 
   push:
     branches: [main]
@@ -26,6 +34,7 @@ on:
       - ".github/config/hf_card_expectations.json"
       - ".github/config/hf_cards/**"
       - ".github/scripts/hf_card_reconcile.py"
+      - ".github/scripts/test_hf_card_reconcile.py"
       - ".github/workflows/hf-card-reconcile.yml"
 
 permissions:
@@ -43,12 +52,15 @@ jobs:
 
     permissions:
       contents: read
+      actions: read
 
     env:
       REPORT: reports/governance/hf-card-reconcile.json
       APPLY: ${{ github.event_name == 'workflow_dispatch' && inputs.apply == true && '1' || '' }}
       ALLOW_BODY: ${{ github.event_name == 'workflow_dispatch' && inputs.allow_body_replace == true && '1' || '' }}
       ONLY: ${{ inputs.only || '' }}
+      PLAN_RUN_ID: ${{ inputs.plan_run_id || '' }}
+      PLAN_RUN_ATTEMPT: ${{ inputs.plan_run_attempt || '1' }}
 
     steps:
       - name: Harden runner
@@ -66,6 +78,12 @@ jobs:
         uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
           python-version: "3.12"
+
+      - name: Check trusted branch and regression contracts
+        run: |
+          set -euo pipefail
+          [ "$GITHUB_REF" = refs/heads/main ]
+          python -I -P .github/scripts/test_hf_card_reconcile.py
 
       - name: Validate declarative expectation
         run: |
@@ -121,22 +139,52 @@ jobs:
           print(f"expectation valid: {len(assets)} assets")
           PY
 
+      - name: Retrieve the reviewed plan from this exact workflow revision
+        if: env.APPLY == '1'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          [[ "$PLAN_RUN_ID" =~ ^[0-9]+$ ]]
+          [[ "$PLAN_RUN_ATTEMPT" =~ ^[1-9][0-9]*$ ]]
+          gh api "repos/$GITHUB_REPOSITORY/actions/runs/$PLAN_RUN_ID/attempts/$PLAN_RUN_ATTEMPT" > "$RUNNER_TEMP/plan-run.json"
+          python -I -P - <<'PY'
+          import json
+          import os
+          import subprocess
+
+          run = json.load(open(os.path.join(os.environ["RUNNER_TEMP"], "plan-run.json")))
+          assert run["path"] == ".github/workflows/hf-card-reconcile.yml", "wrong workflow"
+          assert run["event"] == "workflow_dispatch", "plan must be explicitly dispatched"
+          assert run["head_branch"] == "main", "plan must use main"
+          assert run["head_sha"] == os.environ["GITHUB_SHA"], "source changed: run a fresh plan"
+          assert run["status"] == "completed" and run["conclusion"] == "success", "plan did not succeed"
+          assert str(run["run_attempt"]) == os.environ["PLAN_RUN_ATTEMPT"], "wrong plan attempt"
+          assert str(run["id"]) != os.environ["GITHUB_RUN_ID"], "cannot consume own receipt"
+          name = f"hf-card-reconcile-{run['id']}-{run['run_attempt']}"
+          subprocess.run([
+              "gh", "run", "download", str(run["id"]), "--repo", os.environ["GITHUB_REPOSITORY"],
+              "--name", name, "--dir", os.path.join(os.environ["RUNNER_TEMP"], "reviewed-plan"),
+          ], check=True)
+          PY
+
       - name: Reconcile cards
         id: reconcile
         env:
-          HF_ORG_TOKEN: ${{ secrets.HF_ORG_TOKEN }}
-          HF_ORG_TOKEN1: ${{ secrets.HF_ORG_TOKEN1 }}
-          HF_TOKEN: ${{ secrets.HF_TOKEN }}
-          HF_WRITE_TOKEN: ${{ secrets.HF_WRITE_TOKEN }}
+          HF_CARD_WRITE_TOKEN: ${{ env.APPLY == '1' && secrets.HF_CARD_WRITE_TOKEN || '' }}
+          HF_ORG_TOKEN: ${{ env.APPLY == '1' && secrets.HF_ORG_TOKEN || '' }}
+          HF_ORG_TOKEN1: ${{ env.APPLY == '1' && secrets.HF_ORG_TOKEN1 || '' }}
+          HF_TOKEN: ${{ env.APPLY == '1' && secrets.HF_TOKEN || '' }}
+          HF_WRITE_TOKEN: ${{ env.APPLY == '1' && secrets.HF_WRITE_TOKEN || '' }}
         run: |
           set +e
-
-          python -I -P .github/scripts/hf_card_reconcile.py \
-            --out-json "$REPORT" \
-            ${ONLY:+--only "$ONLY"} \
-            ${APPLY:+--apply} \
-            ${ALLOW_BODY:+--allow-body-replace}
-
+          args=(--out-json "$REPORT")
+          if [ -n "$ONLY" ]; then args+=(--only "$ONLY"); fi
+          if [ -n "$ALLOW_BODY" ]; then args+=(--allow-body-replace); fi
+          if [ -n "$APPLY" ]; then
+            args+=(--apply --expected-plan "$RUNNER_TEMP/reviewed-plan/hf-card-reconcile.json")
+          fi
+          python -I -P .github/scripts/hf_card_reconcile.py "${args[@]}"
           echo "exit_code=$?" >> "$GITHUB_OUTPUT"
 
       - name: Publish reconcile report
@@ -146,7 +194,7 @@ jobs:
 
           if [ ! -f "$REPORT" ]; then
             echo "no report produced" >> "$GITHUB_STEP_SUMMARY"
-            exit 0
+            exit 1
           fi
 
           python -I -P - <<'PY' >> "$GITHUB_STEP_SUMMARY"
@@ -158,6 +206,9 @@ jobs:
           )
 
           print(f"# Hub card reconcile — mode `{report['mode']}`\n")
+          print(f"Source: `{report.get('source_revision', 'UNKNOWN')}`\n")
+          if report.get("error"):
+              print(f"Failure: {report['error']}\n")
           print("| repo | label | changes | route | applied |")
           print("| --- | --- | --- | --- | --- |")
 
@@ -182,7 +233,7 @@ jobs:
         with:
           name: hf-card-reconcile-${{ github.run_id }}-${{ github.run_attempt }}
           path: reports/governance/
-          if-no-files-found: warn
+          if-no-files-found: error
           retention-days: 90
 
       - name: Fail closed
@@ -191,4 +242,5 @@ jobs:
           RC: ${{ steps.reconcile.outputs.exit_code }}
         run: |
           set -euo pipefail
+          test -s "$REPORT"
           exit "${RC:-1}"

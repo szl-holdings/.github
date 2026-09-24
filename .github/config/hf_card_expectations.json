@@ -14,7 +14,7 @@
       "kind": "spaces",
       "license": "apache-2.0",
       "title": "Yarqa",
-      "short_description": "Plug-flow compartmentalization for compartmental models. Clean-room, Apache-2.0.",
+      "short_description": "Plug-flow compartmentalization for compartmental models.",
       "source_repo": "szl-holdings/yarqa",
       "body_file": "yarqa.md",
       "reason": "Card was the 191-byte Hugging Face placeholder while the Space carries real source (yarqa 0.5.0, FastAPI space app, digest-pinned base image, hash-locked requirements)."
