@@ -2,7 +2,7 @@
 """Reconcile declared Hub card fields with exact, unsigned plan/apply receipts.
 
 Default is plan-only. Body replacement requires --allow-body-replace in both
-plan and apply. --expected-plan binds apply to reviewed source and Hub bytes.
+plan and apply. Apply requires --expected-plan to bind reviewed source and Hub bytes.
 Only the standard library is used; credentials are never retained in receipts.
 """
 from __future__ import annotations
@@ -142,9 +142,10 @@ def stamp_block(asset: dict, defaults: dict, newline: str = "\n") -> str:
         "- Receipts remain UNSIGNED_HONEST until the DSSE lane signs", ""])
 
 
-def has_stamp(body: str, asset: dict) -> bool:
+def has_stamp(body: str, asset: dict, defaults: dict | None = None) -> bool:
+    heading = (defaults or {}).get("stamp_heading", "## Governance")
     return all(marker in body for marker in (
-        "## Governance", asset["repo_id"], "https://github.com/" + asset["source_repo"],
+        heading, asset["repo_id"], "https://github.com/" + asset["source_repo"],
         "MEASURED / REPORTED / UNKNOWN / UNAVAILABLE", "UNSIGNED_HONEST", "DSSE"))
 
 
@@ -228,7 +229,7 @@ def plan_asset(asset: dict, defaults: dict, token: str | None, bodies_dir: str,
             if body != desired:
                 body = desired
                 row["changes"].append(f"body<={body_file}")
-        if asset.get("require_stamp", defaults.get("require_stamp", True)) and not has_stamp(body, asset):
+        if asset.get("require_stamp", defaults.get("require_stamp", True)) and not has_stamp(body, asset, defaults):
             newline = "\r\n" if prefix.endswith("\r\n") else "\n"
             separator = "" if body.endswith(newline * 2) else newline if body.endswith(newline) else newline * 2
             body += separator + stamp_block(asset, defaults, newline)
@@ -370,6 +371,8 @@ def main() -> int:
     token = next((os.environ[key] for key in TOKEN_KEYS if os.environ.get(key)), None)
     code = 1
     try:
+        if args.apply and not args.expected_plan:
+            raise ValueError("--apply requires --expected-plan")
         cfg, assets, hashes = load_config(args.config, args.bodies_dir, args.only)
         payload.update(hashes)
         if args.expected_plan and not args.apply:

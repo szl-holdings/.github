@@ -62,6 +62,14 @@ class CardReconcileTests(unittest.TestCase):
     def identity(self, name="betterwithage", role="admin"):
         return json.dumps({"name": name, "orgs": [{"name": "SZLHOLDINGS", "roleInOrg": role}]}), 200
 
+    def expected_plan(self, allow=False):
+        extra = ["--allow-body-replace"] if allow else []
+        code, receipt, _ = self.run_main(extra, [(json.dumps({"sha": HEAD}), 200), (self.card, 200)])
+        self.assertEqual(code, 0)
+        path = self.root / "expected-plan.json"
+        path.write_text(json.dumps(receipt), encoding="utf-8")
+        return path, receipt
+
     def test_body_gate_previews_only_when_enabled_and_is_idempotent(self):
         without = self.plan(allow=False)
         self.assertNotIn("body<=yarqa.md", without["changes"])
@@ -100,6 +108,17 @@ class CardReconcileTests(unittest.TestCase):
     def test_stamp_requires_the_complete_contract(self):
         self.assertFalse(RECONCILE.has_stamp("Governance of SZLHOLDINGS/yarqa", self.asset))
         self.assertTrue(RECONCILE.has_stamp(self.desired, self.asset))
+
+    def test_configured_stamp_heading_is_idempotent(self):
+        self.defaults["stamp_heading"] = "## Provenance and governance"
+        asset = dict(self.asset)
+        asset.pop("body_file")
+        first = self.plan(asset=asset)
+        self.assertIn("body+=governance_stamp", first["changes"])
+        self.assertEqual(first["new_text"].count(self.defaults["stamp_heading"]), 1)
+        second = self.plan(first["new_text"], asset=asset)
+        self.assertEqual(second["changes"], [])
+        self.assertEqual(second["new_text"], first["new_text"])
 
     def test_invalid_selection_writes_failure_receipt_before_network(self):
         for only in (", ,", "SZLHOLDINGS/missing", "SZLHOLDINGS/yarqa,SZLHOLDINGS/missing"):
@@ -141,7 +160,8 @@ class CardReconcileTests(unittest.TestCase):
         self.assertTrue(all(call.args[0] == "GET" for call in requests.call_args_list))
 
     def test_401_preflight_retains_failure_without_credentials_or_writes(self):
-        code, receipt, requests = self.run_main(["--apply"], [(TOKEN, 401)], TOKEN)
+        expected, _ = self.expected_plan()
+        code, receipt, requests = self.run_main(["--apply", "--expected-plan", str(expected)], [(TOKEN, 401)], TOKEN)
         self.assertEqual(code, 1)
         self.assertEqual(receipt["identity"]["http_status"], 401)
         self.assertNotIn(TOKEN, json.dumps(receipt))
@@ -149,18 +169,43 @@ class CardReconcileTests(unittest.TestCase):
         self.assertEqual(requests.call_args.args[1], "/api/whoami-v2")
 
     def test_wrong_owner_and_read_member_fail_preflight(self):
+        expected, _ = self.expected_plan()
         for identity in (self.identity(name="someone_else"), self.identity(role="read")):
             with self.subTest(identity=identity):
-                code, receipt, requests = self.run_main(["--apply"], [identity], TOKEN)
+                code, receipt, requests = self.run_main(["--apply", "--expected-plan", str(expected)], [identity], TOKEN)
                 self.assertEqual(code, 1)
                 self.assertEqual(receipt["identity"]["label"], "UNAVAILABLE")
                 self.assertEqual(requests.call_count, 1)
 
     def test_missing_token_retains_failure_receipt(self):
-        code, receipt, requests = self.run_main(["--apply"])
+        expected, _ = self.expected_plan()
+        code, receipt, requests = self.run_main(["--apply", "--expected-plan", str(expected)])
         self.assertEqual(code, 1)
         self.assertIn("requires an HF token", receipt["error"])
         requests.assert_not_called()
+
+    def test_apply_without_expected_plan_fails_before_config_or_network(self):
+        with patch.object(RECONCILE, "load_config", side_effect=AssertionError("must not load config")) as load:
+            code, receipt, requests = self.run_main(["--apply"], token=TOKEN)
+        self.assertEqual(code, 1)
+        self.assertEqual(receipt["error"], "--apply requires --expected-plan")
+        self.assertFalse(receipt["success"])
+        self.assertEqual(receipt["assets"], [])
+        self.assertNotIn("identity", receipt)
+        load.assert_not_called()
+        requests.assert_not_called()
+
+    def test_main_applies_only_with_a_matching_generated_plan(self):
+        expected, plan = self.expected_plan(allow=True)
+        desired = plan["assets"][0]["new_text"]
+        code, receipt, requests = self.run_main(
+            ["--apply", "--allow-body-replace", "--expected-plan", str(expected)],
+            [self.identity(), (json.dumps({"sha": HEAD}), 200), (self.card, 200),
+             (json.dumps({"commitOid": COMMIT}), 200), (desired, 200), (json.dumps({"sha": COMMIT}), 200)], TOKEN)
+        self.assertEqual(code, 0)
+        self.assertTrue(receipt["success"])
+        self.assertTrue(receipt["assets"][0]["main_verified"])
+        self.assertEqual(sum(call.args[0] == "POST" for call in requests.call_args_list), 1)
 
     def test_exact_plan_rejects_source_config_body_and_hub_drift(self):
         code, original, _ = self.run_main(["--allow-body-replace"], [(json.dumps({"sha": HEAD}), 200), (self.card, 200)])
