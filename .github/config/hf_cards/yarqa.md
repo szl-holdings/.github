@@ -25,10 +25,11 @@ dependency `numpy>=1.23`.
 fails closed if any of those fields is absent, so a serving container is not
 reported healthy on a partial boot.
 
-When the image is built with `SZL_GIT_SHA`, the value is validated as a
-40-character lowercase hex revision and written read-only to
-`/usr/share/szl/source-revision`, binding the running container to an exact
-source commit.
+When the image is built with a nonempty `SZL_GIT_SHA`, the Dockerfile rejects
+characters outside lowercase hexadecimal and writes the supplied value read-only
+to `/usr/share/szl/source-revision`. Its length check does not currently stop the
+shell on failure. This file alone does not establish a valid commit or prove
+that the supplied revision matches the running source.
 
 ## Truth states
 

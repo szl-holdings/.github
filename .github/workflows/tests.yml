@@ -26,6 +26,8 @@ jobs:
         run: python3 .github/scripts/test_solo_builder_provenance.py
       - name: Reusable-workflow pinned-target validator self-test
         run: python3 .github/scripts/test_reusable_workflow_target_check.py
+      - name: HF card reconciliation contract self-test
+        run: python3 -I -P .github/scripts/test_hf_card_reconcile.py
 
       # Pins the org-wide DOCTRINE honesty gate — the single most load-bearing
       # check in the org, and (until now) the ONLY guard with no self-test.

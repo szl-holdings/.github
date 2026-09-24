@@ -1,24 +1,18 @@
 #!/usr/bin/env python3
-"""Reconcile SZLHOLDINGS Hub card metadata against a declarative JSON expectation.
+"""Reconcile declared Hub card fields with exact, unsigned plan/apply receipts.
 
-The JSON in .github/config/hf_card_expectations.json is the owner-authored
-statement of expected card state. This tool never invents a fact: it only
-applies values that are written in that file, and it only touches keys the file
-names. Absent keys are left byte-identical.
-
-Front matter is edited surgically. A card body is replaced only when the
-expectation names a body_file AND --allow-body-replace is passed, so a routine
-metadata reconcile can never silently rewrite prose.
-
-Default mode is plan-only. --apply performs Hub commits.
-
-stdlib only.
+Default is plan-only. Body replacement requires --allow-body-replace in both
+plan and apply. Apply requires --expected-plan to bind reviewed source and Hub bytes.
+Only the standard library is used; credentials are never retained in receipts.
 """
 from __future__ import annotations
 
 import argparse
+import base64
+import hashlib
 import json
 import os
+from pathlib import Path
 import re
 import sys
 import time
@@ -27,284 +21,390 @@ import urllib.request
 from datetime import datetime, timezone
 
 HUB = "https://huggingface.co"
-UA = "szl-hf-card-reconcile/1.1"
-SCALAR = re.compile(r"^([A-Za-z_][A-Za-z0-9_-]*):\s*(.*)$")
+SCHEMA = "szl.governance.hf_card_reconcile/v1"
+ORG = "SZLHOLDINGS"
 MEASURED, UNAVAILABLE = "MEASURED", "UNAVAILABLE"
+SHA = re.compile(r"[0-9a-f]{40}")
+SCALAR = re.compile(r"^([A-Za-z_][A-Za-z0-9_-]*):[ \t]*(.*)$")
+TOKEN_KEYS = ("HF_CARD_WRITE_TOKEN", "HF_ORG_TOKEN", "HF_ORG_TOKEN1", "HF_TOKEN", "HF_WRITE_TOKEN")
 
 
-def utc_now() -> str:
-    return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+def digest(text: str) -> str:
+    return hashlib.sha256(text.encode("utf-8")).hexdigest()
 
 
-def hub_request(method: str, path: str, token: str | None, body: bytes | None = None,
-                content_type: str | None = None):
-    url = path if path.startswith("http") else HUB + path
-    headers = {"User-Agent": UA}
+def hub_request(method: str, path: str, token: str | None,
+                body: bytes | None = None, content_type: str | None = None):
+    headers = {"User-Agent": "szl-hf-card-reconcile/2.0"}
     if token:
         headers["Authorization"] = f"Bearer {token}"
     if content_type:
         headers["Content-Type"] = content_type
-    req = urllib.request.Request(url, data=body, headers=headers, method=method)
-    for attempt in range(3):
+    req = urllib.request.Request(HUB + path, data=body, headers=headers, method=method)
+    # A timed-out POST may already have committed; never repeat ambiguous writes.
+    limit = 3 if method == "GET" else 1
+    for attempt in range(limit):
         try:
             with urllib.request.urlopen(req, timeout=45) as resp:
-                return resp.read().decode("utf-8", "replace"), resp.status
+                return resp.read().decode("utf-8"), resp.status
         except urllib.error.HTTPError as exc:
             detail = exc.read().decode("utf-8", "replace")[:400]
-            if exc.code in (429, 500, 502, 503) and attempt < 2:
+            if token:
+                detail = detail.replace(token, "[REDACTED]")
+            if exc.code in (429, 500, 502, 503) and attempt + 1 < limit:
                 time.sleep(4 * (attempt + 1))
                 continue
             return detail, exc.code
-        except urllib.error.URLError as exc:
-            if attempt < 2:
+        except (urllib.error.URLError, TimeoutError, OSError, UnicodeError):
+            if attempt + 1 < limit:
                 time.sleep(3)
                 continue
-            return str(exc), 0
-    return "", 0
+            return "request failed or response was not UTF-8", 0
+    return "request failed", 0
+
+
+def split_card(text: str) -> tuple[str, str, str, str]:
+    opening = re.match(r"\A---(?:\r\n|\n)", text)
+    if not opening:
+        raise ValueError("no YAML front matter found")
+    closing = re.search(r"(?m)^---[ \t]*(?:\r\n|\n|\Z)", text[opening.end():])
+    if not closing:
+        raise ValueError("unterminated YAML front matter")
+    start = opening.end() + closing.start()
+    end = opening.end() + closing.end()
+    return text[:opening.end()], text[opening.end():start], text[start:end], text[end:]
 
 
 def split_front_matter(text: str) -> tuple[str, str]:
-    """Return (front_matter_block, remainder). Block excludes the --- fences."""
-    if not text.startswith("---"):
-        return "", text
-    end = text.find("\n---", 3)
-    if end == -1:
-        return "", text
-    fm = text[4:end] if text[3] == "\n" else text[3:end]
-    rest = text[end + 4:]
-    return fm, rest.lstrip("\n")
+    _, fm, _, body = split_card(text)
+    return fm, body
 
 
-def fm_keys(fm: str) -> dict:
-    out = {}
-    for line in fm.splitlines():
-        if line.startswith((" ", "\t", "-")):
-            continue
-        m = SCALAR.match(line)
-        if m:
-            out[m.group(1)] = m.group(2).strip().strip("'\"")
-    return out
+def scalar_value(raw: str) -> str:
+    value = raw.strip()
+    if not value or value.startswith(("|", ">", "[", "{", "&", "*", "!")):
+        raise ValueError("target field is not a supported single-line scalar")
+    if value.startswith('"'):
+        try:
+            parsed, end = json.JSONDecoder().raw_decode(value)
+        except ValueError as exc:
+            raise ValueError("unsupported quoted scalar") from exc
+        tail = value[end:].strip()
+        if not isinstance(parsed, str) or (tail and not tail.startswith("#")):
+            raise ValueError("unsupported quoted scalar")
+        return parsed
+    if value.startswith("'"):
+        match = re.fullmatch(r"'((?:[^']|'')*)'[ \t]*(?:#.*)?", value)
+        if not match:
+            raise ValueError("unsupported quoted scalar")
+        return match.group(1).replace("''", "'")
+    return re.split(r"[ \t]+#", value, maxsplit=1)[0].rstrip()
 
 
 def set_scalar(fm: str, key: str, value: str) -> tuple[str, bool]:
-    """Insert or update one top-level scalar, preserving every other line."""
-    lines = fm.splitlines()
+    """Change one scalar or append after all existing YAML blocks."""
+    lines = fm.splitlines(keepends=True)
+    positions = []
     for i, line in enumerate(lines):
-        m = SCALAR.match(line)
-        if m and m.group(1) == key:
-            if m.group(2).strip().strip("'\"") == value:
-                return fm, False
-            lines[i] = f"{key}: {value}"
-            return "\n".join(lines), True
-    # Insert only after a top-level scalar that actually carries a value and is
-    # not the header of an indented block. Inserting after a bare "tags:" would
-    # split that key from its list items and corrupt the card.
-    insert_at = len(lines)
-    for i, line in enumerate(lines):
-        m = SCALAR.match(line)
-        if not m or line.startswith((" ", "\t", "-")):
-            continue
-        if not m.group(2).strip():
-            continue
-        nxt = lines[i + 1] if i + 1 < len(lines) else ""
-        if nxt.startswith((" ", "\t", "-")):
-            continue
-        insert_at = i + 1
-    lines.insert(insert_at, f"{key}: {value}")
-    return "\n".join(lines), True
+        raw = line.rstrip("\r\n")
+        if re.match(rf"^[\"']{re.escape(key)}[\"']\s*:", raw):
+            raise ValueError(f"quoted target key is unsupported: {key}")
+        match = SCALAR.match(raw)
+        if match and match.group(1) == key:
+            positions.append((i, match.group(2)))
+    if len(positions) > 1:
+        raise ValueError(f"duplicate target field: {key}")
+    encoded = value if re.fullmatch(r"[A-Za-z0-9_.-]+", value) else json.dumps(value, ensure_ascii=False)
+    newline = "\r\n" if "\r\n" in fm else "\n"
+    if positions:
+        i, raw = positions[0]
+        current = scalar_value(raw)
+        for following in lines[i + 1:]:
+            if not following.strip() or following.lstrip().startswith("#"):
+                continue
+            if following.startswith((" ", "\t", "-")):
+                raise ValueError(f"target field has block or continuation content: {key}")
+            break
+        if current == value:
+            return fm, False
+        ending = "\r\n" if lines[i].endswith("\r\n") else "\n" if lines[i].endswith("\n") else ""
+        lines[i] = f"{key}: {encoded}{ending}"
+        return "".join(lines), True
+    prefix = fm if not fm or fm.endswith("\n") else fm + newline
+    return prefix + f"{key}: {encoded}{newline}", True
 
 
-def stamp_block(asset: dict, defaults: dict) -> str:
-    repo_id = asset["repo_id"]
-    source = asset.get("source_repo")
-    heading = defaults.get("stamp_heading", "## Governance")
-    lines = [heading, "",
-             f"- Hub repository: `{repo_id}`"]
-    if source:
-        lines.append(f"- Source of truth: [github.com/{source}](https://github.com/{source})")
-    lines += ["- Doctrine labels in force: MEASURED / REPORTED / UNKNOWN / UNAVAILABLE",
-              "- Receipts remain UNSIGNED_HONEST until the DSSE lane signs", ""]
-    return "\n".join(lines)
+def stamp_block(asset: dict, defaults: dict, newline: str = "\n") -> str:
+    return newline.join([defaults.get("stamp_heading", "## Governance"), "",
+        f"- Hub repository: `{asset['repo_id']}`",
+        f"- Source of truth: [github.com/{asset['source_repo']}](https://github.com/{asset['source_repo']})",
+        "- Doctrine labels in force: MEASURED / REPORTED / UNKNOWN / UNAVAILABLE",
+        "- Receipts remain UNSIGNED_HONEST until the DSSE lane signs", ""])
 
 
-def has_stamp(body: str, asset: dict) -> bool:
-    low = body.lower()
-    if "governance" not in low and "governed" not in low:
-        return False
-    return asset["repo_id"].lower() in low or (
-        asset.get("source_repo", "\0").lower() in low)
+def has_stamp(body: str, asset: dict, defaults: dict | None = None) -> bool:
+    heading = (defaults or {}).get("stamp_heading", "## Governance")
+    return all(marker in body for marker in (
+        heading, asset["repo_id"], "https://github.com/" + asset["source_repo"],
+        "MEASURED / REPORTED / UNKNOWN / UNAVAILABLE", "UNSIGNED_HONEST", "DSSE"))
+
+
+def load_config(config: str, bodies_dir: str, only: str) -> tuple[dict, list, dict]:
+    raw = Path(config).read_bytes().decode("utf-8")
+    cfg = json.loads(raw)
+    if cfg.get("schema") != "szl.governance.hf_card_expectations/v1":
+        raise ValueError("unexpected expectation schema")
+    defaults = cfg.get("defaults", {})
+    if defaults.get("org") != ORG:
+        raise ValueError("expectation must declare SZLHOLDINGS")
+    assets = cfg.get("assets")
+    if not isinstance(assets, list) or not assets:
+        raise ValueError("no assets declared")
+    seen, bodies = set(), {}
+    root = Path(bodies_dir).resolve()
+    for asset in assets:
+        if not isinstance(asset, dict):
+            raise ValueError("asset must be an object")
+        repo_id = asset.get("repo_id", "")
+        if not isinstance(repo_id, str) or not re.fullmatch(r"SZLHOLDINGS/[A-Za-z0-9][A-Za-z0-9_.-]*", repo_id):
+            raise ValueError("invalid or out-of-namespace repository")
+        if repo_id in seen:
+            raise ValueError(f"duplicate asset: {repo_id}")
+        seen.add(repo_id)
+        if asset.get("kind") not in ("spaces", "datasets", "models"):
+            raise ValueError(f"invalid kind: {repo_id}")
+        if not re.fullmatch(r"szl-holdings/[A-Za-z0-9][A-Za-z0-9_.-]*", asset.get("source_repo", "")):
+            raise ValueError(f"invalid source repository: {repo_id}")
+        for key in ("license", "title", "short_description"):
+            value = asset.get(key, defaults.get(key) if key == "license" else None)
+            if value is not None and (not isinstance(value, str) or not value or "\n" in value or "\r" in value):
+                raise ValueError(f"invalid declared scalar: {repo_id}/{key}")
+        body_file = asset.get("body_file")
+        if body_file:
+            path = (root / body_file).resolve()
+            if not path.is_relative_to(root) or not path.is_file():
+                raise ValueError(f"missing or outside body file: {repo_id}")
+            bodies[body_file] = digest(path.read_bytes().decode("utf-8"))
+    wanted = {item.strip() for item in only.split(",") if item.strip()}
+    if only and not wanted:
+        raise ValueError("empty target selection")
+    if wanted - seen:
+        raise ValueError("unknown target selection: " + ", ".join(sorted(wanted - seen)))
+    selected = [a for a in assets if not wanted or a["repo_id"] in wanted]
+    if not selected:
+        raise ValueError("no selected assets")
+    return cfg, selected, {"config_sha256": digest(raw), "body_files_sha256": bodies}
 
 
 def plan_asset(asset: dict, defaults: dict, token: str | None, bodies_dir: str,
                allow_body: bool) -> dict:
-    repo_id = asset["repo_id"]
-    kind = asset.get("kind", "spaces")
-    seg = {"spaces": "spaces/", "datasets": "datasets/", "models": ""}[kind]
-    text, status = hub_request("GET", f"/{seg}{repo_id}/raw/main/README.md", token)
+    repo_id, kind = asset["repo_id"], asset["kind"]
     row = {"repo_id": repo_id, "kind": kind, "label": MEASURED, "changes": [],
            "reason": asset.get("reason", "")}
+    detail, status = hub_request("GET", f"/api/{kind}/{repo_id}", token)
+    row["read_status"] = status
+    try:
+        if status != 200:
+            raise ValueError(f"repository read HTTP {status}")
+        revision = json.loads(detail).get("sha", "")
+        if not isinstance(revision, str) or not SHA.fullmatch(revision):
+            raise ValueError("repository returned no exact revision")
+        row["hub_revision"] = revision
+        seg = "" if kind == "models" else kind + "/"
+        text, status = hub_request("GET", f"/{seg}{repo_id}/raw/{revision}/README.md", token)
+        row["read_status"] = status
+        if status != 200:
+            raise ValueError(f"card read HTTP {status}")
+        prefix, fm, closing, body = split_card(text)
+        for key in ("license", "title", "short_description"):
+            want = asset.get(key, defaults.get("license") if key == "license" else None)
+            if want is not None:
+                fm, changed = set_scalar(fm, key, want)
+                if changed:
+                    row["changes"].append(f"front_matter.{key}={want}")
+        body_file = asset.get("body_file")
+        if body_file and allow_body:
+            desired = (Path(bodies_dir) / body_file).read_bytes().decode("utf-8")
+            desired = ("\r\n" if prefix.endswith("\r\n") else "\n") + desired
+            if body != desired:
+                body = desired
+                row["changes"].append(f"body<={body_file}")
+        if asset.get("require_stamp", defaults.get("require_stamp", True)) and not has_stamp(body, asset, defaults):
+            newline = "\r\n" if prefix.endswith("\r\n") else "\n"
+            separator = "" if body.endswith(newline * 2) else newline if body.endswith(newline) else newline * 2
+            body += separator + stamp_block(asset, defaults, newline)
+            row["changes"].append("body+=governance_stamp")
+        new_text = prefix + fm + closing + body
+        if new_text == text:
+            row["changes"] = []
+        row.update(before_sha256=digest(text), after_sha256=digest(new_text),
+                   bytes_before=len(text.encode("utf-8")), bytes_after=len(new_text.encode("utf-8")),
+                   original_text=text, new_text=new_text)
+        return row
+    except (ValueError, OSError, TypeError, AttributeError) as exc:
+        row.update(label=UNAVAILABLE, detail=str(exc))
+        return row
+
+
+def identity_preflight(token: str, expected_owner: str) -> dict:
+    detail, status = hub_request("GET", "/api/whoami-v2", token)
+    result = {"label": UNAVAILABLE, "http_status": status}
     if status != 200:
-        row.update({"label": UNAVAILABLE, "detail": f"card read HTTP {status}"})
-        return row
-
-    fm, body = split_front_matter(text)
-    if not fm:
-        row.update({"label": UNAVAILABLE, "detail": "no YAML front matter found"})
-        return row
-
-    original_bytes = len(text)
-    existing = fm_keys(fm)
-
-    for key in ("license", "title", "short_description"):
-        want = asset.get(key) if key != "license" else asset.get("license", defaults.get("license"))
-        if not want:
-            continue
-        if key != "license" and existing.get(key):
-            continue
-        quoted = f'"{want}"' if key == "short_description" else want
-        fm, changed = set_scalar(fm, key, quoted)
-        if changed:
-            row["changes"].append(f"front_matter.{key}={want}")
-
-    body_file = asset.get("body_file")
-    if body_file and allow_body:
-        path = os.path.join(bodies_dir, body_file)
-        with open(path, encoding="utf-8") as fh:
-            body = fh.read()
-        row["changes"].append(f"body<={body_file}")
-
-    if asset.get("require_stamp", defaults.get("require_stamp", True)) and not has_stamp(body, asset):
-        body = body.rstrip("\n") + "\n\n" + stamp_block(asset, defaults)
-        row["changes"].append("body+=governance_stamp")
-
-    new_text = "---\n" + fm.strip("\n") + "\n---\n\n" + body.lstrip("\n")
-    row["new_text"] = new_text
-    row["bytes_before"] = original_bytes
-    row["bytes_after"] = len(new_text)
-    return row
+        result["detail"] = f"identity preflight HTTP {status}"
+        return result
+    try:
+        identity = json.loads(detail)
+        name = identity.get("name")
+        role = next((org.get("roleInOrg") for org in identity.get("orgs", []) if org.get("name") == ORG), None)
+        result.update(name=name, organization=ORG, role=role)
+        if name != expected_owner:
+            result["detail"] = "credential owner does not match expected owner"
+        elif role not in ("admin", "write", "contributor"):
+            result["detail"] = "credential owner lacks an eligible organization role"
+        elif identity.get("auth", {}).get("accessToken", {}).get("role") == "read":
+            result["detail"] = "credential is explicitly read-only"
+        else:
+            result["label"] = MEASURED
+    except (ValueError, TypeError, AttributeError):
+        result["detail"] = "identity response is malformed"
+    return result
 
 
 def apply_asset(row: dict, token: str, message: str, prefer_pr: bool = False) -> dict:
-    """Commit the reconciled card, falling back to a Hub pull request on 403.
-
-    A credential that can contribute but cannot write directly receives a 403
-    with create_pr guidance. Retry exactly once through the Hub pull-request
-    route, record the route that was used, and fail closed if both are denied.
-    """
-    kind = row["kind"]
-    seg = {"spaces": "spaces", "datasets": "datasets", "models": "models"}[kind]
-
-    header = {"key": "header", "value": {"summary": message}}
-
-    filerec = {
-        "key": "file",
-        "value": {
-            "path": "README.md",
-            "encoding": "utf-8",
-            "content": row["new_text"],
-        },
-    }
-
-    ndjson = (
-        json.dumps(header)
-        + "\n"
-        + json.dumps(filerec)
-        + "\n"
-    ).encode("utf-8")
-
-    base = f"/api/{seg}/{row['repo_id']}/commit/main"
-
-    attempts = (
-        [("pull_request", base + "?create_pr=1")]
-        if prefer_pr
-        else [
-            ("main", base),
-            ("pull_request", base + "?create_pr=1"),
-        ]
-    )
-
-    for route, path in attempts:
-        detail, status = hub_request(
-            "POST",
-            path,
-            token,
-            ndjson,
-            "application/x-ndjson",
-        )
-
-        row["apply_status"] = status
-        row["apply_route"] = route
-
+    if not row["changes"]:
+        row.update(applied=False, apply_route="none", outcome="already_current", verified=True)
+        return row
+    header = {"key": "header", "value": {"summary": message, "parentCommit": row["hub_revision"]}}
+    file_record = {"key": "file", "value": {"path": "README.md", "encoding": "base64",
+        "content": base64.b64encode(row["new_text"].encode("utf-8")).decode("ascii")}}
+    body = (json.dumps(header) + "\n" + json.dumps(file_record) + "\n").encode("utf-8")
+    base = f"/api/{row['kind']}/{row['repo_id']}/commit/main"
+    routes = [("pull_request", base + "?create_pr=1")] if prefer_pr else [("main", base), ("pull_request", base + "?create_pr=1")]
+    row["apply_attempts"] = []
+    for route, path in routes:
+        detail, status = hub_request("POST", path, token, body, "application/x-ndjson")
+        row["apply_attempts"].append({"route": route, "http_status": status})
+        row.update(apply_status=status, apply_route=route)
         if status in (200, 201):
-            row["applied"] = True
+            try:
+                response = json.loads(detail)
+                commit = response.get("commitOid", "")
+                if not isinstance(commit, str) or not SHA.fullmatch(commit):
+                    raise ValueError("missing commit revision")
+                if route == "pull_request" and not response.get("pullRequestUrl"):
+                    raise ValueError("missing pull request URL")
+            except (ValueError, TypeError, AttributeError):
+                row.update(applied=False, verified=False, outcome="unknown_write_result",
+                           detail="successful write response lacks commit or pull request identity; inspect Hub before retry")
+                return row
+            row.update(applied=True, commit_oid=commit, commit_url=response.get("commitUrl"),
+                       pull_request_url=response.get("pullRequestUrl"), main_verified=False,
+                       outcome="pull_request_created" if route == "pull_request" else "committed")
+            if route == "pull_request":
+                row["pending_main_readback"] = True
+            seg = "" if row["kind"] == "models" else row["kind"] + "/"
+            actual, read_status = hub_request("GET", f"/{seg}{row['repo_id']}/raw/{commit}/README.md", token)
+            row["verification_status"] = read_status
+            row["verified"] = read_status == 200 and digest(actual) == row["after_sha256"]
+            if not row["verified"]:
+                row["detail"] = "committed card could not be verified against planned bytes"
+            elif route == "main":
+                main, main_status = hub_request("GET", f"/api/{row['kind']}/{row['repo_id']}", token)
+                try:
+                    main_revision = json.loads(main).get("sha", "") if main_status == 200 else ""
+                except (ValueError, TypeError, AttributeError):
+                    main_revision = ""
+                row["main_revision"] = main_revision
+                row["main_read_status"] = main_status
+                row["main_verified"] = main_revision == commit
+                row["verified"] = row["main_verified"]
+                if not row["verified"]:
+                    row["detail"] = "main revision could not be verified as the committed card revision"
             return row
-
-        row["apply_detail"] = detail[:300]
-
         if status != 403:
             break
-
-    row["applied"] = False
+    row.update(applied=False, verified=False, detail=f"card write HTTP {row['apply_status']}",
+               outcome="unknown_write_result" if row["apply_status"] == 0 or row["apply_status"] >= 500 else "write_failed")
     return row
 
 
+def validate_expected_plan(payload: dict, path: str) -> None:
+    plan = json.loads(Path(path).read_bytes().decode("utf-8"))
+    if plan.get("schema") != SCHEMA or plan.get("mode") != "plan" or plan.get("success") is not True:
+        raise ValueError("expected plan is not a successful plan receipt")
+    for key in ("source_revision", "config_sha256", "body_files_sha256", "body_replace_allowed"):
+        if plan.get(key) != payload.get(key):
+            raise ValueError(f"expected plan differs: {key}")
+    if not SHA.fullmatch(payload.get("source_revision", "")):
+        raise ValueError("expected-plan apply requires an exact source revision")
+    planned, actual = plan.get("assets", []), payload["assets"]
+    if len(planned) != len(actual) or {r["repo_id"] for r in planned} != {r["repo_id"] for r in actual}:
+        raise ValueError("expected plan target set differs")
+    indexed = {r["repo_id"]: r for r in planned}
+    if len(indexed) != len(planned):
+        raise ValueError("expected plan has duplicate assets")
+    for row in actual:
+        expected = indexed[row["repo_id"]]
+        if expected.get("label") != MEASURED or row["label"] != MEASURED:
+            raise ValueError("expected plan contains an unavailable target")
+        for key in ("kind", "hub_revision", "before_sha256", "after_sha256", "changes", "new_text"):
+            if expected.get(key) != row.get(key):
+                raise ValueError(f"expected plan differs: {row['repo_id']}/{key}")
+
+
 def main() -> int:
-    ap = argparse.ArgumentParser()
-    ap.add_argument("--config", default=".github/config/hf_card_expectations.json")
-    ap.add_argument("--bodies-dir", default=".github/config/hf_cards")
-    ap.add_argument("--out-json", default="reports/governance/hf-card-reconcile.json")
-    ap.add_argument("--only", default="", help="comma-separated repo_id filter")
-    ap.add_argument("--apply", action="store_true")
-    ap.add_argument("--allow-body-replace", action="store_true")
-    ap.add_argument(
-        "--prefer-pr",
-        action="store_true",
-        help="skip direct commit and create a Hub pull request",
-    )
-    ap.add_argument("--message", default="chore(card): reconcile governed card metadata")
-    args = ap.parse_args()
-
-    with open(args.config, encoding="utf-8") as fh:
-        cfg = json.load(fh)
-    defaults = cfg.get("defaults", {})
-    assets = cfg.get("assets", [])
-    if args.only:
-        wanted = {s.strip() for s in args.only.split(",") if s.strip()}
-        assets = [a for a in assets if a["repo_id"] in wanted]
-
-    token = next((os.environ[k] for k in
-                  ("HF_ORG_TOKEN", "HF_ORG_TOKEN1", "HF_TOKEN", "HF_WRITE_TOKEN")
-                  if os.environ.get(k)), None)
-    if args.apply and not token:
-        print("FATAL: --apply requires an HF token", file=sys.stderr)
-        return 2
-
-    rows = []
-    for asset in assets:
-        row = plan_asset(asset, defaults, token, args.bodies_dir, args.allow_body_replace)
-        if args.apply and row["label"] == MEASURED and row["changes"]:
-            apply_asset(row, token, args.message, args.prefer_pr)
-        rows.append(row)
-
-    payload = {
-        "schema": "szl.governance.hf_card_reconcile/v1",
-        "generated_at": utc_now(),
-        "mode": "apply" if args.apply else "plan",
-        "body_replace_allowed": bool(args.allow_body_replace),
-        "assets": [{k: v for k, v in r.items() if k != "new_text"} for r in rows],
-        "receipt_state": "UNSIGNED_HONEST",
-    }
-    os.makedirs(os.path.dirname(args.out_json) or ".", exist_ok=True)
-    with open(args.out_json, "w", encoding="utf-8") as fh:
-        fh.write(json.dumps(payload, indent=2, sort_keys=True) + "\n")
-
-    for r in rows:
-        print(f"{r['repo_id']}: {r['label']} changes={r['changes']} "
-              f"applied={r.get('applied', 'plan-only')}")
-
-    unavailable = [r for r in rows if r["label"] == UNAVAILABLE]
-    failed = [r for r in rows if args.apply and r["changes"] and not r.get("applied")]
-    return 1 if (unavailable or failed) else 0
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--config", default=".github/config/hf_card_expectations.json")
+    parser.add_argument("--bodies-dir", default=".github/config/hf_cards")
+    parser.add_argument("--out-json", default="reports/governance/hf-card-reconcile.json")
+    parser.add_argument("--only", default="")
+    parser.add_argument("--apply", action="store_true")
+    parser.add_argument("--allow-body-replace", action="store_true")
+    parser.add_argument("--prefer-pr", action="store_true")
+    parser.add_argument("--expected-plan")
+    parser.add_argument("--expected-owner", default="betterwithage")
+    parser.add_argument("--message", default="chore(card): reconcile governed card metadata")
+    args = parser.parse_args()
+    payload = {"schema": SCHEMA, "generated_at": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+               "source_revision": os.environ.get("GITHUB_SHA", ""), "mode": "apply" if args.apply else "plan",
+               "body_replace_allowed": args.allow_body_replace, "assets": [], "receipt_state": "UNSIGNED_HONEST"}
+    token = next((os.environ[key] for key in TOKEN_KEYS if os.environ.get(key)), None)
+    code = 1
+    try:
+        if args.apply and not args.expected_plan:
+            raise ValueError("--apply requires --expected-plan")
+        cfg, assets, hashes = load_config(args.config, args.bodies_dir, args.only)
+        payload.update(hashes)
+        if args.expected_plan and not args.apply:
+            raise ValueError("--expected-plan is only valid with --apply")
+        if args.apply:
+            if not token:
+                raise ValueError("--apply requires an HF token")
+            payload["identity"] = identity_preflight(token, args.expected_owner)
+            if payload["identity"]["label"] != MEASURED:
+                raise ValueError(payload["identity"].get("detail", "identity preflight failed"))
+        payload["assets"] = [plan_asset(asset, cfg["defaults"], token, args.bodies_dir, args.allow_body_replace) for asset in assets]
+        if not payload["assets"] or any(row["label"] != MEASURED for row in payload["assets"]):
+            raise ValueError("one or more selected cards could not be planned")
+        if args.expected_plan:
+            validate_expected_plan(payload, args.expected_plan)
+        if args.apply:
+            for row in payload["assets"]:
+                apply_asset(row, token, args.message, args.prefer_pr)
+            code = 0 if all(row.get("verified") for row in payload["assets"]) else 1
+        else:
+            code = 0
+    except (ValueError, OSError, TypeError, KeyError, AttributeError) as exc:
+        payload["error"] = str(exc).replace(token, "[REDACTED]") if token else str(exc)
+    payload["success"] = code == 0
+    output = Path(args.out_json)
+    output.parent.mkdir(parents=True, exist_ok=True)
+    output.write_bytes((json.dumps(payload, indent=2, sort_keys=True, ensure_ascii=False) + "\n").encode("utf-8"))
+    for row in payload["assets"]:
+        print(f"{row['repo_id']}: {row['label']} changes={row['changes']} applied={row.get('applied', 'plan-only')}")
+    if payload.get("error"):
+        print("FATAL: " + payload["error"], file=sys.stderr)
+    return code
 
 
 if __name__ == "__main__":
