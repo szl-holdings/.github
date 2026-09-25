@@ -37,16 +37,8 @@
         "repository_ruleset_name": "series-a-default-branch"
       }
     },
-    "open_prs": [
-      {
-        "number": 24,
-        "production_disposition": "HOLD_UNTIL_DCO",
-        "reason": "Ready-for-review docs-only Wave 0 copy. self-test succeeded. Commit 34dfb55c has no Signed-off-by. Green light does not squash without DCO.",
-        "repository": "szl-holdings/szl-estate-os",
-        "title": "Wave 0: Approve is perfusion \u2014 case travels the body before the ledger writes",
-        "html_url": "https://github.com/szl-holdings/szl-estate-os/pull/24"
-      }
-    ],
+    "open_prs": [],
+    "open_prs_non_public_omitted": 1,
     "private": 5,
     "public": 71,
     "repositories": 76,

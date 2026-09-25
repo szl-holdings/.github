@@ -160,12 +160,6 @@
       "action": "managed-marker",
       "detail": "",
       "status": "dry-run",
-      "target": "SZLHOLDINGS/szl-org-infra"
-    },
-    {
-      "action": "managed-marker",
-      "detail": "",
-      "status": "dry-run",
       "target": "SZLHOLDINGS/SZLHOLDINGS"
     },
     {
@@ -185,18 +179,6 @@
       "detail": "",
       "status": "dry-run",
       "target": "SZLHOLDINGS/szl-artifacts"
-    },
-    {
-      "action": "managed-marker",
-      "detail": "",
-      "status": "dry-run",
-      "target": "SZLHOLDINGS/anatomy-alive-harness"
-    },
-    {
-      "action": "managed-marker",
-      "detail": "",
-      "status": "dry-run",
-      "target": "SZLHOLDINGS/thesis-formula-index"
     },
     {
       "action": "managed-marker",
@@ -244,12 +226,6 @@
       "action": "managed-marker",
       "detail": "",
       "status": "dry-run",
-      "target": "SZLHOLDINGS/yuyay-v3-axis-labels-v1"
-    },
-    {
-      "action": "managed-marker",
-      "detail": "",
-      "status": "dry-run",
       "target": "SZLHOLDINGS/uds-bundles-v1"
     },
     {
@@ -269,18 +245,6 @@
       "detail": "",
       "status": "dry-run",
       "target": "SZLHOLDINGS/a11oy-verifiable-corpus"
-    },
-    {
-      "action": "managed-marker",
-      "detail": "",
-      "status": "dry-run",
-      "target": "SZLHOLDINGS/legacy-archive"
-    },
-    {
-      "action": "managed-marker",
-      "detail": "",
-      "status": "dry-run",
-      "target": "SZLHOLDINGS/szl-evidence"
     },
     {
       "action": "managed-marker",
@@ -988,12 +952,6 @@
       "action": "collection-add:SZL Holdings \u2014 Datasets & Evidence",
       "detail": "",
       "status": "dry-run",
-      "target": "SZLHOLDINGS/szl-org-infra"
-    },
-    {
-      "action": "collection-add:SZL Holdings \u2014 Datasets & Evidence",
-      "detail": "",
-      "status": "dry-run",
       "target": "SZLHOLDINGS/SZLHOLDINGS"
     },
     {
@@ -1013,18 +971,6 @@
       "detail": "",
       "status": "dry-run",
       "target": "SZLHOLDINGS/szl-artifacts"
-    },
-    {
-      "action": "collection-add:SZL Holdings \u2014 Datasets & Evidence",
-      "detail": "",
-      "status": "dry-run",
-      "target": "SZLHOLDINGS/anatomy-alive-harness"
-    },
-    {
-      "action": "collection-add:SZL Holdings \u2014 Datasets & Evidence",
-      "detail": "",
-      "status": "dry-run",
-      "target": "SZLHOLDINGS/thesis-formula-index"
     },
     {
       "action": "collection-add:SZL Holdings \u2014 Datasets & Evidence",
@@ -1072,12 +1018,6 @@
       "action": "collection-add:SZL Holdings \u2014 Datasets & Evidence",
       "detail": "",
       "status": "dry-run",
-      "target": "SZLHOLDINGS/yuyay-v3-axis-labels-v1"
-    },
-    {
-      "action": "collection-add:SZL Holdings \u2014 Datasets & Evidence",
-      "detail": "",
-      "status": "dry-run",
       "target": "SZLHOLDINGS/uds-bundles-v1"
     },
     {
@@ -1097,18 +1037,6 @@
       "detail": "",
       "status": "dry-run",
       "target": "SZLHOLDINGS/a11oy-verifiable-corpus"
-    },
-    {
-      "action": "collection-add:SZL Holdings \u2014 Datasets & Evidence",
-      "detail": "",
-      "status": "dry-run",
-      "target": "SZLHOLDINGS/legacy-archive"
-    },
-    {
-      "action": "collection-add:SZL Holdings \u2014 Datasets & Evidence",
-      "detail": "",
-      "status": "dry-run",
-      "target": "SZLHOLDINGS/szl-evidence"
     },
     {
       "action": "collection-add:SZL Holdings \u2014 Datasets & Evidence",
@@ -1169,12 +1097,6 @@
       "detail": "",
       "status": "dry-run",
       "target": "SZLHOLDINGS/szl-lake"
-    },
-    {
-      "action": "collection-add:SZL Holdings \u2014 Canonical Estate",
-      "detail": "",
-      "status": "dry-run",
-      "target": "SZLHOLDINGS/szl-evidence"
     },
     {
       "action": "kernel-contract",
@@ -1276,6 +1198,11 @@
   "generated_at": "2026-07-22T06:34:06.003563+00:00",
   "generation": "1578aa3cecdee90ba0a03f31080b9eaa9d58ae23",
   "organization": "SZLHOLDINGS",
+  "public_redaction": {
+    "applied_on": "2026-09-25",
+    "note": "Action entries that targeted non-public repositories were removed from this committed copy. counts, summary and all other fields are unchanged from the original 2026-07-22 capture.",
+    "removed_action_entries": 13
+  },
   "publish": false,
   "retired_clone_ids": [
     "SZLHOLDINGS/a11oy-clone-1",

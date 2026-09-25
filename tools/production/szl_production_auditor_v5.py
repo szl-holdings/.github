@@ -281,6 +281,13 @@ def validate_profile(profile: dict[str, Any]) -> list[str]:
     repo_ids = [x.get("repository") for x in profile.get("repositories", [])]
     if len(repo_ids) != len(set(repo_ids)):
         errors.append("duplicate repository IDs")
+    # The profile and its tiers CSV are committed to a public repository, so
+    # they list public repositories only. The index (not the name) is reported
+    # so a rejected entry is not echoed into public CI logs.
+    for index, repo in enumerate(profile.get("repositories", [])):
+        if repo.get("visibility") != "public":
+            errors.append(f"repositories[{index}] is not public; the committed profile "
+                          "lists public repositories only")
     for target in profile.get("web_targets", []):
         if not str(target.get("base_url", "")).startswith("https://"):
             errors.append(f"non-HTTPS target: {target.get('base_url')}")
@@ -660,10 +667,13 @@ def audit_github(profile: dict[str, Any], report: Report, http: HTTP) -> None:
         if not isinstance(repos, list):
             raise ValueError("repo response is not a list")
         report.proof("G00", "GitHub repository inventory", org, "PASS", count=len(repos))
-        if len(repos) != len(profile["repositories"]):
+        # The profile is public-only (see validate_profile), so compare it with
+        # the public part of the live inventory.
+        public_count = sum(1 for r in repos if not r.get("private"))
+        if public_count != len(profile["repositories"]):
             report.finding("G00", "P0", "FAIL", org, "Repository inventory drift",
-                           f"profile={len(profile['repositories'])}; api={len(repos)}",
-                           "Recapture and classify every asset.")
+                           f"profile={len(profile['repositories'])}; api_public={public_count}",
+                           "Recapture and classify every public asset.")
     except Exception as exc:
         report.finding("G00", "P0", "UNKNOWN", org, "GitHub inventory unavailable",
                        str(exc), "Provide read-only metadata access and rerun.")

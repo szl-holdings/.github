@@ -66,9 +66,9 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ github.token }}
           # Org-scoped HF token so the sweep also covers PRIVATE HF repos
-          # (private datasets like szl-org-infra, szl-payloads, szl-evidence,
-          # szl-charts, test-results, etc. whose front-matter license: would
-          # otherwise never be verified). REQUIRED: with --include-private the
+          # (whose front-matter license: would otherwise never be verified).
+          # The committed report and this log list public repos only; private
+          # repos appear as aggregate counts. REQUIRED: with --include-private the
           # script fails loudly (job red) if this secret is missing/expired or
           # cannot list private repos, rather than silently checking public only.
           HF_ORG_TOKEN: ${{ secrets.HF_ORG_TOKEN }}

@@ -886,20 +886,6 @@
       "visibility": "public"
     },
     {
-      "action": "KEEP_PRIVATE_AND_CLASSIFY",
-      "archived": "False",
-      "current_portfolio": "internal control / diligence",
-      "priority": "P0",
-      "production_policy": "classification, security, integrity, migration/archive, and source-binding gate",
-      "production_tier": "T2",
-      "repository": "szl-holdings/pitch-collateral",
-      "size_kb": "103",
-      "source_url": "https://github.com/szl-holdings/pitch-collateral",
-      "target": "Private operations, diligence, defensive, or incubator plane",
-      "target_class": "PRIVATE_INTERNAL",
-      "visibility": "private"
-    },
-    {
       "action": "MIGRATE_MIRROR_ARCHIVE",
       "archived": "False",
       "current_portfolio": "model factory",
@@ -1194,20 +1180,6 @@
       "visibility": "public"
     },
     {
-      "action": "KEEP_PRIVATE_AND_CLASSIFY",
-      "archived": "False",
-      "current_portfolio": "internal control / diligence",
-      "priority": "P0",
-      "production_policy": "classification, security, integrity, migration/archive, and source-binding gate",
-      "production_tier": "T2",
-      "repository": "szl-holdings/szl-org-health",
-      "size_kb": "295",
-      "source_url": "https://github.com/szl-holdings/szl-org-health",
-      "target": "Private operations, diligence, defensive, or incubator plane",
-      "target_class": "PRIVATE_INTERNAL",
-      "visibility": "private"
-    },
-    {
       "action": "KEEP_NOT_PINNED",
       "archived": "False",
       "current_portfolio": "open receipt standard",
@@ -1460,34 +1432,6 @@
       "visibility": "public"
     },
     {
-      "action": "KEEP_PRIVATE_AND_CLASSIFY",
-      "archived": "False",
-      "current_portfolio": "internal control / diligence",
-      "priority": "P1",
-      "production_policy": "classification, security, integrity, migration/archive, and source-binding gate",
-      "production_tier": "T2",
-      "repository": "szl-holdings/gdw-frontier",
-      "size_kb": "407",
-      "source_url": "https://github.com/szl-holdings/gdw-frontier",
-      "target": "Private operations, diligence, defensive, or incubator plane",
-      "target_class": "PRIVATE_INTERNAL",
-      "visibility": "private"
-    },
-    {
-      "action": "KEEP_PRIVATE_AND_CLASSIFY",
-      "archived": "False",
-      "current_portfolio": "internal control / diligence",
-      "priority": "P0",
-      "production_policy": "classification, security, integrity, migration/archive, and source-binding gate",
-      "production_tier": "T2",
-      "repository": "szl-holdings/szl-estate-os",
-      "size_kb": "387",
-      "source_url": "https://github.com/szl-holdings/szl-estate-os",
-      "target": "Private operations, diligence, defensive, or incubator plane",
-      "target_class": "PRIVATE_INTERNAL",
-      "visibility": "private"
-    },
-    {
       "action": "MIGRATE_MIRROR_ARCHIVE",
       "archived": "False",
       "current_portfolio": "SDA / YARQA research",
@@ -1514,20 +1458,6 @@
       "target": "One kernel family, correctness, benchmark, energy, and release authority",
       "target_class": "MAINTAINED_TECHNICAL",
       "visibility": "public"
-    },
-    {
-      "action": "KEEP_PRIVATE_AND_CLASSIFY",
-      "archived": "False",
-      "current_portfolio": "internal control / diligence",
-      "priority": "P1",
-      "production_policy": "classification, security, integrity, migration/archive, and source-binding gate",
-      "production_tier": "T2",
-      "repository": "szl-holdings/szl-defensive-control-plane",
-      "size_kb": "80",
-      "source_url": "https://github.com/szl-holdings/szl-defensive-control-plane",
-      "target": "Private operations, diligence, defensive, or incubator plane",
-      "target_class": "PRIVATE_INTERNAL",
-      "visibility": "private"
     },
     {
       "action": "MIGRATE_MIRROR_ARCHIVE",

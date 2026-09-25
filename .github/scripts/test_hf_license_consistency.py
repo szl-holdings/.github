@@ -27,7 +27,9 @@ from __future__ import annotations
 import contextlib
 import importlib.util
 import io
+import json
 import os
+import tempfile
 import unittest
 
 _HERE = os.path.dirname(os.path.abspath(__file__))
@@ -39,7 +41,7 @@ hlc = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(hlc)
 
 
-def _run_main(argv, *, hf_token, whoami, repos):
+def _run_main(argv, *, hf_token, whoami, repos, check_repo=None, stdout=None):
     """Run ``hlc.main()`` with the HF API surface stubbed out (no network).
 
     ``hf_token``  -> what ``_hf_token()`` returns (None simulates a missing token).
@@ -47,7 +49,9 @@ def _run_main(argv, *, hf_token, whoami, repos):
     ``repos``     -> the repo list ``list_hf_repos()`` returns (its 2nd element,
                      the list-errors, is forced empty so we isolate the private
                      floor / preflight branches under test).
-    Returns the ``main()`` exit code. Stdout/stderr are swallowed.
+    ``check_repo`` -> optional replacement for the default all-OK stub.
+    ``stdout``    -> optional StringIO that receives stdout and stderr.
+    Returns the ``main()`` exit code. Stdout/stderr are swallowed by default.
     """
     saved = {
         "_hf_token": hlc._hf_token,
@@ -65,18 +69,18 @@ def _run_main(argv, *, hf_token, whoami, repos):
         # A clean, network-free per-repo result so the healthy path never tries
         # to read a README; the preflight branches under test short-circuit
         # before drift matters anyway.
-        hlc.check_repo = lambda repo, entry, gh_org, gh_token, use_github: {
+        hlc.check_repo = check_repo or (lambda repo, entry, gh_org, gh_token, use_github: {
             "repo": repo["id"], "kind": repo["kind"], "private": repo["private"],
             "hf_license": "Apache-2.0", "hf_license_norm": "Apache-2.0",
             "hf_license_name": None, "github_spdx": None, "allowlisted": False,
             "status": "OK", "errors": [], "warnings": [], "notes": [],
-        }
+        })
         import sys
         saved_argv = sys.argv
         sys.argv = ["hf_license_consistency.py"] + argv
+        sink = stdout if stdout is not None else io.StringIO()
         try:
-            with contextlib.redirect_stdout(io.StringIO()), \
-                    contextlib.redirect_stderr(io.StringIO()):
+            with contextlib.redirect_stdout(sink), contextlib.redirect_stderr(sink):
                 return hlc.main()
         finally:
             sys.argv = saved_argv
@@ -139,6 +143,124 @@ class TestPrivateCoverageSafetyNet(unittest.TestCase):
             hf_token="tok", whoami=_OK_WHOAMI,
             repos=_private_repos(5))
         self.assertEqual(rc, 0)
+
+
+_PUBLIC_REPO = {"id": "SZLHOLDINGS/pub-0", "name": "pub-0",
+                "kind": "dataset", "private": False}
+
+
+def _error_stub(repo, entry, gh_org, gh_token, use_github):
+    return {
+        "repo": repo["id"], "kind": repo["kind"], "private": repo["private"],
+        "hf_license": None, "hf_license_norm": None, "hf_license_name": None,
+        "github_spdx": None, "allowlisted": False, "status": "ERROR",
+        "errors": ["no 'license:' in README front-matter"], "warnings": [], "notes": [],
+    }
+
+
+class TestPublicOnlyOutput(unittest.TestCase):
+    """The report is committed to, and uploaded from, a public repository, and
+    stdout is a public CI log: private repos may appear only as counts."""
+
+    def _run(self, extra_argv=(), check_repo=None):
+        with tempfile.TemporaryDirectory() as tmp:
+            report_path = os.path.join(tmp, "report.json")
+            out = io.StringIO()
+            rc = _run_main(
+                ["--include-private", "--min-private", "5", "--no-github",
+                 "--report", report_path, *extra_argv],
+                hf_token="tok", whoami=_OK_WHOAMI,
+                repos=_private_repos(5) + [_PUBLIC_REPO],
+                check_repo=check_repo, stdout=out)
+            with open(report_path, encoding="utf-8") as fh:
+                text = fh.read()
+        return rc, json.loads(text), text, out.getvalue()
+
+    def test_report_lists_public_repos_only(self):
+        rc, report, text, log = self._run()
+        self.assertEqual(rc, 0)
+        self.assertEqual([x["repo"] for x in report["results"]], ["SZLHOLDINGS/pub-0"])
+        self.assertTrue(report["private_results_redacted"])
+        self.assertEqual(report["private_summary"],
+                         {"checked": 5, "ok": 5, "warn": 0, "error": 0})
+        self.assertEqual(report["summary"]["checked"], 6)
+        self.assertNotIn("priv-", text)
+        self.assertNotIn("priv-", log)
+        self.assertIn("SZLHOLDINGS/pub-0", log)
+
+    def test_show_private_prints_ids_but_report_stays_public_only(self):
+        rc, report, text, log = self._run(["--show-private"])
+        self.assertEqual(rc, 0)
+        self.assertIn("SZLHOLDINGS/priv-0", log)
+        self.assertNotIn("priv-", text)
+
+    def test_private_drift_still_fails_without_naming_the_repo(self):
+        rc, report, text, log = self._run(check_repo=_error_stub)
+        self.assertEqual(rc, 1)
+        self.assertEqual(report["private_summary"]["error"], 5)
+        self.assertNotIn("priv-", text)
+        self.assertNotIn("priv-", log)
+        self.assertIn("--show-private", log)
+
+    def test_committed_report_lists_no_private_repo(self):
+        path = os.path.join(_HERE, "..", "data", "hf_license_consistency_report.json")
+        with open(path, encoding="utf-8") as fh:
+            report = json.load(fh)
+        self.assertTrue(report.get("private_results_redacted"))
+        self.assertEqual([x["repo"] for x in report["results"] if x.get("private")], [])
+
+
+class TestPrivateRepoPolicy(unittest.TestCase):
+    """Private repos are license-optional through one top-level policy, so the
+    public allowlist never has to name a private repo."""
+
+    def test_policy_entry_is_synthesized_for_private_repos_only(self):
+        seen = {}
+
+        def capture(repo, entry, gh_org, gh_token, use_github):
+            seen[repo["id"]] = entry
+            return _error_stub(repo, entry, gh_org, gh_token, use_github) | {
+                "status": "OK", "errors": []}
+
+        with tempfile.TemporaryDirectory() as tmp:
+            allow = os.path.join(tmp, "allow.json")
+            with open(allow, "w", encoding="utf-8") as fh:
+                json.dump({"repos": {"SZLHOLDINGS/priv-1": {"expected_spdx": "MIT"}},
+                           "private_repos": {"license_optional": True}}, fh)
+            rc = _run_main(
+                ["--include-private", "--min-private", "1", "--no-github",
+                 "--allowlist", allow],
+                hf_token="tok", whoami=_OK_WHOAMI,
+                repos=_private_repos(2) + [_PUBLIC_REPO], check_repo=capture)
+        self.assertEqual(rc, 0)
+        self.assertIsNone(seen["SZLHOLDINGS/pub-0"])
+        self.assertEqual(seen["SZLHOLDINGS/priv-0"],
+                         {"license_optional": True, "private_policy": True})
+        # An explicit per-repo entry still wins over the policy.
+        self.assertEqual(seen["SZLHOLDINGS/priv-1"], {"expected_spdx": "MIT"})
+
+    def test_check_repo_warns_under_policy_and_errors_without_it(self):
+        saved = hlc.hf_readme, hlc._hf_token
+        try:
+            hlc.hf_readme = lambda repo, token: "# card without front-matter\n"
+            hlc._hf_token = lambda: None
+            repo = _private_repos(1)[0]
+            with_policy = hlc.check_repo(
+                repo, {"license_optional": True, "private_policy": True},
+                "szl-holdings", None, False)
+            without = hlc.check_repo(repo, None, "szl-holdings", None, False)
+        finally:
+            hlc.hf_readme, hlc._hf_token = saved
+        self.assertEqual(with_policy["status"], "WARN")
+        self.assertEqual(with_policy["errors"], [])
+        self.assertFalse(with_policy["allowlisted"])
+        self.assertEqual(without["status"], "ERROR")
+
+    def test_committed_allowlist_uses_the_policy(self):
+        path = os.path.join(_HERE, "..", "data", "hf_license_allowlist.json")
+        with open(path, encoding="utf-8") as fh:
+            allow = json.load(fh)
+        self.assertTrue(allow["private_repos"]["license_optional"])
 
 
 if __name__ == "__main__":

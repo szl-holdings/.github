@@ -2,6 +2,7 @@
 """Unit tests for SZL Production Auditor v5 — fail-closed profile and redaction."""
 from __future__ import annotations
 
+import csv
 import importlib.util
 import json
 import tempfile
@@ -11,6 +12,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent
 AUDITOR_PATH = ROOT / "szl_production_auditor_v5.py"
 PROFILE_PATH = ROOT / "szl_production_readiness_profile_v5.json"
+TIERS_CSV_PATH = ROOT / "SZL_PRODUCTION_REPOSITORY_TIERS_V5.csv"
 
 
 def load_auditor():
@@ -30,7 +32,7 @@ class ProfileTests(unittest.TestCase):
         profile = json.loads(PROFILE_PATH.read_text(encoding="utf-8"))
         self.assertEqual(AUD.validate_profile(profile), [])
         self.assertEqual(len(profile["gates"]), 17)
-        self.assertEqual(len(profile["repositories"]), 76)
+        self.assertEqual(len(profile["repositories"]), 71)
         self.assertEqual(len(profile["release_rings"]), 5)
 
     def test_missing_keys_fail_closed(self) -> None:
@@ -48,6 +50,51 @@ class ProfileTests(unittest.TestCase):
         profile["web_targets"] = [{"base_url": "http://example.com", "id": "x"}]
         errors = AUD.validate_profile(profile)
         self.assertTrue(any("non-HTTPS" in e for e in errors))
+
+    def test_non_public_repository_rejected_without_echoing_name(self) -> None:
+        profile = json.loads(PROFILE_PATH.read_text(encoding="utf-8"))
+        extra = dict(profile["repositories"][0], repository="szl-holdings/example-internal",
+                     visibility="private")
+        profile["repositories"] = profile["repositories"] + [extra]
+        errors = AUD.validate_profile(profile)
+        self.assertTrue(any("is not public" in e for e in errors))
+        self.assertFalse(any("example-internal" in e for e in errors))
+
+    def test_tiers_csv_is_public_only_and_matches_profile(self) -> None:
+        profile = json.loads(PROFILE_PATH.read_text(encoding="utf-8"))
+        with TIERS_CSV_PATH.open(encoding="utf-8", newline="") as fh:
+            rows = list(csv.DictReader(fh))
+        self.assertEqual({r["visibility"] for r in rows}, {"public"})
+        self.assertEqual([r["repository"] for r in rows],
+                         [r["repository"] for r in profile["repositories"]])
+
+
+class FakeHTTP:
+    def __init__(self, org_repos: list[dict]) -> None:
+        self.org_repos = org_repos
+
+    def json(self, url: str, token: str | None = None):
+        if "/orgs/szl-holdings/repos" in url:
+            return self.org_repos
+        if "/search/issues" in url:
+            return {"total_count": 0}
+        raise RuntimeError("offline test")
+
+
+class InventoryDriftTests(unittest.TestCase):
+    def _drift_findings(self, extra_public: int) -> list[dict]:
+        profile = json.loads(PROFILE_PATH.read_text(encoding="utf-8"))
+        live = [{"private": False} for _ in range(len(profile["repositories"]) + extra_public)]
+        live += [{"private": True} for _ in range(3)]
+        report = AUD.Report(profile)
+        AUD.audit_github(profile, report, FakeHTTP(live))
+        return [f for f in report.findings if f["title"] == "Repository inventory drift"]
+
+    def test_private_repositories_do_not_count_as_drift(self) -> None:
+        self.assertEqual(self._drift_findings(extra_public=0), [])
+
+    def test_unclassified_public_repository_is_drift(self) -> None:
+        self.assertEqual(len(self._drift_findings(extra_public=1)), 1)
 
 
 class RedactionTests(unittest.TestCase):
