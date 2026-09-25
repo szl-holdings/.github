@@ -1,0 +1,160 @@
+name: Control-Plane Effect Gate
+
+"on":
+  pull_request:
+  merge_group:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+concurrency:
+  group: control-plane-effect-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  control-plane-effect-gate:
+    name: Static control-plane effect boundary
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Harden runner
+        uses: step-security/harden-runner@e14015d583714f6e62063499dc959a02595150a1 # v2.21.1
+        with:
+          disable-sudo: true
+          egress-policy: audit
+
+      - name: Check out the exact event head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+          ref: ${{ github.event.pull_request.head.sha || github.event.merge_group.head_sha || github.sha }}
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12"
+
+      - name: Prepare run-scoped evidence directory
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p cp-ebom
+          printf '%s\n' 'CP-eBOM analysis has not completed.' > cp-ebom/status.txt
+
+      - name: Resolve exact event revisions
+        id: revisions
+        shell: bash
+        run: |
+          set -euo pipefail
+          python <<'PY'
+          import json
+          import os
+          import re
+          from pathlib import Path
+
+          exact_sha = re.compile(r"[0-9a-f]{40}")
+          event_name = os.environ["GITHUB_EVENT_NAME"]
+          payload = json.loads(Path(os.environ["GITHUB_EVENT_PATH"]).read_text("utf-8"))
+
+          if event_name == "pull_request":
+              base = payload["pull_request"]["base"]["sha"]
+              head = payload["pull_request"]["head"]["sha"]
+          elif event_name == "merge_group":
+              base = payload["merge_group"]["base_sha"]
+              head = payload["merge_group"]["head_sha"]
+          elif event_name == "push":
+              if os.environ["GITHUB_REF"] != "refs/heads/main":
+                  raise SystemExit("push analysis is restricted to refs/heads/main")
+              base = payload["before"]
+              head = payload["after"]
+          else:
+              raise SystemExit("unsupported event")
+
+          base = str(base).lower()
+          head = str(head).lower()
+          if not exact_sha.fullmatch(base) or set(base) == {"0"}:
+              raise SystemExit("event base is not an exact nonzero commit SHA")
+          if not exact_sha.fullmatch(head) or set(head) == {"0"}:
+              raise SystemExit("event head is not an exact nonzero commit SHA")
+          if event_name in {"merge_group", "push"} and head != os.environ["GITHUB_SHA"].lower():
+              raise SystemExit("event head does not match GITHUB_SHA")
+
+          with Path(os.environ["GITHUB_OUTPUT"]).open("a", encoding="utf-8") as output:
+              output.write(f"base={base}\n")
+              output.write(f"head={head}\n")
+          PY
+
+      - name: Verify checked-out revisions
+        shell: bash
+        env:
+          BASE_SHA: ${{ steps.revisions.outputs.base }}
+          HEAD_SHA: ${{ steps.revisions.outputs.head }}
+        run: |
+          set -euo pipefail
+          expected_before="${BASE_SHA}"
+          expected_after="${HEAD_SHA}"
+          readback_before="$(git rev-parse --verify "${BASE_SHA}^{commit}")"
+          readback_after="$(git rev-parse --verify "${HEAD_SHA}^{commit}")"
+          test "${readback_before}" = "${expected_before}"
+          test "${readback_after}" = "${expected_after}"
+          test "$(git rev-parse --verify 'HEAD^{commit}')" = "${expected_after}"
+
+      - name: Run checker self-tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          python .github/scripts/test_control_plane_effect_gate.py 2>&1 | tee cp-ebom/self-tests.log
+
+      - name: Emit and enforce the effect receipt
+        shell: bash
+        env:
+          BASE_SHA: ${{ steps.revisions.outputs.base }}
+          HEAD_SHA: ${{ steps.revisions.outputs.head }}
+        run: |
+          set +e
+          set -uo pipefail
+          python .github/scripts/control_plane_effect_gate.py \
+            --repository-root . \
+            --base "${BASE_SHA}" \
+            --head "${HEAD_SHA}" \
+            --policy .github/data/control_plane_effect_policy.json \
+            --report cp-ebom/report.json
+          gate_exit=$?
+          export GATE_EXIT="${gate_exit}"
+          set -e
+          python <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          receipt_path = Path("cp-ebom/report.json")
+          if not receipt_path.is_file():
+              raise SystemExit("the analyzer did not emit a receipt")
+          receipt = json.loads(receipt_path.read_text("utf-8"))
+          verdict = receipt.get("verdict")
+          exit_code = int(os.environ["GATE_EXIT"])
+          expected = {0: "ALLOW", 2: "DENY", 3: "REVIEW_REQUIRED"}.get(exit_code)
+          if expected is None or verdict != expected:
+              raise SystemExit("analyzer exit and receipt verdict do not agree")
+
+          Path("cp-ebom/status.txt").write_text(
+              f"verdict={verdict}\nclaim={receipt.get('claim', 'MISSING')}\n",
+              encoding="utf-8",
+          )
+          if verdict == "DENY":
+              raise SystemExit(exit_code)
+          PY
+
+      - name: Upload the run-scoped effect report
+        if: ${{ always() }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: control-plane-effect-${{ github.run_id }}
+          path: cp-ebom/
+          if-no-files-found: error
+          retention-days: 14
