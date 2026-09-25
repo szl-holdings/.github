@@ -1,0 +1,85 @@
+name: Frontier Compass (nightly, read-only)
+
+# Company-level zoom-out across a-11-oy.com, a11oy.net, the szl-holdings GitHub org and the
+# SZLHOLDINGS Hugging Face org (tools/compass/szl_frontier_compass.py, stdlib only):
+#   * every numeric public claim classified against the canonical sources
+#     (.github/data/lean_numbers.json + the measured public estate): only UNEXPLAINED /
+#     DISSENT / STALE values become findings;
+#   * re-counts the LOCKED lutar-lean commit with the canonical lean_numbers.py method and
+#     reports whether the published headline figures reproduce, plus main-HEAD drift;
+#   * freshness, dead internal pages with referrers, links to private/missing/archived repos,
+#     HF repo links probed individually, provenance of the served landing, web + DNS posture,
+#     narrative metrics, and a coverage section (no silent caps).
+#
+# READ-ONLY. No issues, PRs or comments are created from CI: humans approve write phases (F9).
+# The BOARD_MEMO lands in the job summary; the full report is an artifact.
+# The job fails only at or above --fail-on (default P0), so the known P1 backlog does not
+# turn the nightly red while it is being worked down.
+
+on:
+  schedule:
+    - cron: "17 6 * * *"
+  workflow_dispatch:
+    inputs:
+      fail_on:
+        description: "Fail at or above this severity"
+        type: choice
+        options: ["P0", "P1", "P2", "P3", "none"]
+        default: "P0"
+  pull_request:
+    paths:
+      - "tools/compass/**"
+      - ".github/workflows/frontier-compass.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: frontier-compass-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  compass:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout (.github)
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12"
+
+      - name: Unit tests (offline, hash-locked pytest)
+        run: |
+          python -m pip install --disable-pip-version-check --no-cache-dir \
+            --require-hashes --only-binary=:all: -r requirements/frontier-observer-tests.lock
+          python -m pytest -q -p no:cacheprovider tools/compass/test_szl_frontier_compass.py
+
+      - name: Compass (public view)
+        if: github.event_name != 'pull_request'
+        env:
+          # Built-in token: rate limit only. The compass computes everything from the PUBLIC view.
+          GITHUB_TOKEN: ${{ github.token }}
+          FAIL_ON: ${{ inputs.fail_on || 'P0' }}
+        run: |
+          python -X utf8 tools/compass/szl_frontier_compass.py \
+            --out compass-out --max-pages 150 --readme-cap 100 --card-cap 60 --ext-cap 300 \
+            --fail-on "$FAIL_ON" --receipts ""
+
+      - name: Board memo to job summary
+        if: always() && github.event_name != 'pull_request'
+        run: |
+          if [ -f compass-out/BOARD_MEMO.md ]; then cat compass-out/BOARD_MEMO.md >> "$GITHUB_STEP_SUMMARY"; fi
+
+      - name: Upload report
+        if: always() && github.event_name != 'pull_request'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: frontier-compass-${{ github.run_id }}
+          path: compass-out/
+          retention-days: 30
+          if-no-files-found: warn
