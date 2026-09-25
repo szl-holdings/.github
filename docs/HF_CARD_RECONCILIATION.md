@@ -2,8 +2,32 @@
 
 The `hf-card-reconcile` workflow updates only the fields and optional card bodies
 declared in `.github/config/hf_card_expectations.json`. The current targets are
-`SZLHOLDINGS/yarqa` and `SZLHOLDINGS/szl-constellation`. Constellation's existing
-body is preserved; its historical estate-count claim is outside this lane.
+`SZLHOLDINGS/yarqa` and `SZLHOLDINGS/szl-constellation`. Both cards were
+hand-edited on the Hub by the owner, who chose to keep those edits. No asset
+declares a `body_file`, so neither body can be replaced. Constellation's
+estate-count prose is owner content outside this lane.
+
+## Governance section
+
+Each card must carry the `stamp_heading` (`## Governance`) and the markers that
+`has_stamp()` checks: the Hub repository id, the GitHub source link, the doctrine
+labels `MEASURED / REPORTED / UNKNOWN / UNAVAILABLE`, `UNSIGNED_HONEST`, and
+`DSSE`. When a marker is missing:
+
+| Card state | Plan result |
+| --- | --- |
+| No `## Governance` heading | Appends the full stamp block (`body+=governance_stamp`) |
+| Exactly one heading | Inserts only the missing marker lines at the end of that section (`governance_stamp~=completed_missing_markers`) |
+| More than one heading | Fails closed; the row is `UNAVAILABLE` and nothing is written |
+| Section ends in an unclosed code fence or holds a possible setext heading | Fails closed |
+
+A section ends at the next heading of the same or higher level, or at the end of
+the file. Headings inside fenced code are ignored. The inserted lines join a
+trailing bullet list directly and otherwise follow one blank line. Every other
+byte is preserved, including CRLF or LF line endings and a missing final
+newline. The duplicate-heading check runs even when every marker is present, so
+a duplicated section is never reported as current. Each completion row lists
+the inserted lines in `governance_markers_added`.
 
 ## Credential
 
@@ -25,12 +49,14 @@ Dispatch from `main` using these inputs:
 ```text
 only=SZLHOLDINGS/yarqa,SZLHOLDINGS/szl-constellation
 apply=false
-allow_body_replace=true
+allow_body_replace=false
 ```
 
-Enabling body replacement during a plan previews the declared Yarqa body without
-writing anything. Using `false` produces a metadata-only plan and cannot later
-authorize a body replacement.
+No asset declares a `body_file`, so `allow_body_replace=true` would change
+nothing. Keep it `false`: the plan receipt then records
+`body_replace_allowed: false`, and an apply bound to that plan cannot replace a
+body. Front-matter reconciliation and governance marker completion do not depend
+on this setting.
 
 Download `hf-card-reconcile-RUN_ID-ATTEMPT`, and inspect
 `hf-card-reconcile.json`. Require both rows to be `MEASURED`. Review the retained
@@ -58,8 +84,9 @@ ambiguous or interrupted write to avoid duplicates.
 
 Retain the plan/apply artifacts, exact GitHub source SHA, run URLs, Hub commit or
 PR URLs, and anonymous live card readbacks. Compare the readback bytes with each
-plan's `after_sha256`; verify the constellation body remains unchanged apart from
-the appended governance stamp. An unchanged card produces a no-op without a new
+plan's `after_sha256`; verify each body remains unchanged apart from the
+inserted governance marker lines and that each card still has exactly one
+`## Governance` heading. An unchanged card produces a no-op without a new
 commit.
 
 `MEASURED_SUCCESS` requires live-main readback for both cards. Authentication or
