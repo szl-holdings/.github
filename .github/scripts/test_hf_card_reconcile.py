@@ -20,6 +20,9 @@ HEAD = "a" * 40
 COMMIT = "b" * 40
 SOURCE = "c" * 40
 TOKEN = "test-credential-never-retain"
+LABELS = "- Doctrine labels in force: MEASURED / REPORTED / UNKNOWN / UNAVAILABLE"
+RECEIPTS = "- Receipts remain UNSIGNED_HONEST until the DSSE lane signs"
+COMPLETED = "governance_stamp~=completed_missing_markers"
 
 
 class CardReconcileTests(unittest.TestCase):
@@ -323,6 +326,176 @@ class CardReconcileTests(unittest.TestCase):
                 self.assertIn(status, (0, 503))
                 self.assertEqual(request.call_count, 1)
                 sleep.assert_not_called()
+
+    def governed(self, repo="yarqa"):
+        return {"repo_id": f"SZLHOLDINGS/{repo}", "kind": "spaces", "license": "apache-2.0",
+                "source_repo": f"szl-holdings/{repo}"}
+
+    def assert_noop_on_rerun(self, result, asset):
+        again = self.plan(result["new_text"], asset=asset)
+        self.assertEqual(again["label"], "MEASURED")
+        self.assertEqual(again["changes"], [])
+        self.assertEqual(again["new_text"], result["new_text"])
+        self.assertEqual(again["before_sha256"], again["after_sha256"])
+        self.assertNotIn("governance_markers_added", again)
+        with patch.object(RECONCILE, "hub_request") as requests:
+            applied = RECONCILE.apply_asset(again, TOKEN, "reconcile")
+        requests.assert_not_called()
+        self.assertEqual(applied["outcome"], "already_current")
+
+    def test_partial_governance_section_is_completed_in_place_not_duplicated(self):
+        asset = self.governed()
+        source = "- Source of truth: [github.com/szl-holdings/yarqa](https://github.com/szl-holdings/yarqa)"
+        cases = (
+            ("Hub Space repository: SZLHOLDINGS/yarqa\n\n- Source authority: https://github.com/szl-holdings/yarqa\n",
+             [LABELS, RECEIPTS], ""),
+            ("Hub Space repository: SZLHOLDINGS/yarqa\n\n" + LABELS + "\n", [source, RECEIPTS], ""),
+            ("Owner prose without any marker.\n", ["- Hub repository: `SZLHOLDINGS/yarqa`", source, LABELS, RECEIPTS], "\n"),
+        )
+        for section, missing, separator in cases:
+            with self.subTest(section=section):
+                card = "---\ntitle: Yarqa\nlicense: apache-2.0\n---\n\n# Yarqa\n\n## Governance\n\n" + section
+                result = self.plan(card, asset=asset)
+                self.assertEqual(result["changes"], [COMPLETED])
+                self.assertEqual(result["governance_markers_added"], missing)
+                self.assertEqual(result["new_text"], card + separator + "".join(line + "\n" for line in missing))
+                self.assertEqual(result["new_text"].count("## Governance"), 1)
+                self.assertTrue(RECONCILE.has_stamp(result["new_text"], asset, self.defaults))
+                self.assert_noop_on_rerun(result, asset)
+
+    def test_duplicate_governance_headings_fail_closed_before_any_write(self):
+        asset = self.governed()
+        complete = RECONCILE.stamp_block(asset, self.defaults)
+        for body in ("## Governance\n\nfirst\n\n## Governance\n\nsecond\n",
+                     complete + "\n## Governance ##\n\nAll markers present still fails closed.\n"):
+            with self.subTest(body=body):
+                card = "---\ntitle: Yarqa\n---\n\n" + body
+                row = self.plan(card, asset=asset)
+                self.assertEqual(row["label"], "UNAVAILABLE")
+                self.assertIn("'## Governance' appears 2 times", row["detail"])
+                self.assertNotIn("new_text", row)
+                self.cfg["assets"] = [asset]
+                self.write_config()
+                code, receipt, requests = self.run_main([], [(json.dumps({"sha": HEAD}), 200), (card, 200)])
+                self.assertEqual(code, 1)
+                self.assertFalse(receipt["success"])
+                self.assertIn("SZLHOLDINGS/yarqa: stamp heading '## Governance' appears 2 times", receipt["error"])
+                self.assertTrue(all(call.args[0] == "GET" for call in requests.call_args_list))
+
+    def test_fenced_heading_text_is_neither_a_section_nor_a_duplicate(self):
+        asset = self.governed()
+        card = ("---\ntitle: Yarqa\nlicense: apache-2.0\n---\n\n```markdown\n## Governance\n```\n\n"
+                "## Governance\n\nHub Space repository: SZLHOLDINGS/yarqa\n"
+                "- Source authority: https://github.com/szl-holdings/yarqa\n")
+        result = self.plan(card, asset=asset)
+        self.assertEqual(result["changes"], [COMPLETED])
+        self.assertEqual(result["new_text"], card + LABELS + "\n" + RECEIPTS + "\n")
+        self.assert_noop_on_rerun(result, asset)
+
+    def test_mid_document_section_keeps_following_content_byte_identical(self):
+        asset = self.governed()
+        fm = "---\ntitle: Yarqa\nlicense: apache-2.0\nshort_description: Auditable plug-flow compartmentalization. Apache-2.0\n---\n"
+        following = ("\n## For investors\n\nYarqa carries the SZL pattern beyond language models.\n\n"
+                     "Doctrine v11 - nothing glows that did not earn it.")
+        governance = ("## Governance\n\nHub Space repository: SZLHOLDINGS/yarqa\n\n"
+                      "- Source authority: https://github.com/szl-holdings/yarqa\n"
+                      "- Runtime boundary: a responding Space is not a production certificate.\n")
+        nested = governance + ("\n### Boundary detail\n\n~~~text\n# a fenced comment, not a heading\n~~~\n\n"
+                               "Subsection prose stays inside the section.\n")
+        for section, insert in ((governance, LABELS + "\n" + RECEIPTS + "\n"),
+                                (nested, "\n" + LABELS + "\n" + RECEIPTS + "\n")):
+            with self.subTest(nested=section is nested):
+                card = fm + "\n# Yarqa\n\n~~~text\ngit clone https://github.com/szl-holdings/yarqa.git\n~~~\n\n" + section + following
+                result = self.plan(card, asset=asset)
+                self.assertEqual(result["changes"], [COMPLETED])
+                self.assertEqual(result["new_text"], card.replace(section + following, section + insert + following))
+                self.assertTrue(result["new_text"].endswith(section + insert + following))
+                self.assertEqual(RECONCILE.split_card(result["new_text"])[1], RECONCILE.split_card(card)[1])
+                self.assertEqual(result["new_text"].count("## Governance"), 1)
+                self.assert_noop_on_rerun(result, asset)
+
+    def test_crlf_card_completion_keeps_crlf_bytes(self):
+        asset = self.governed()
+        card = "\r\n".join(["---", "title: Yarqa", "license: apache-2.0", "---", "", "# Yarqa", "",
+                            "## Governance", "", "- Hub repository: `SZLHOLDINGS/yarqa`",
+                            "- Source: https://github.com/szl-holdings/yarqa", "", "## Next", "", "tail", ""])
+        result = self.plan(card, asset=asset)
+        text = result["new_text"]
+        self.assertEqual(result["changes"], [COMPLETED])
+        self.assertEqual(text, card.replace("yarqa\r\n\r\n## Next", "yarqa\r\n" + LABELS + "\r\n" + RECEIPTS + "\r\n\r\n## Next"))
+        self.assertEqual(text.count("\n"), text.count("\r\n"))
+        self.assertTrue(text.endswith("tail\r\n"))
+        self.assert_noop_on_rerun(result, asset)
+
+    def test_constellation_like_card_keeps_prose_and_estate_claims_byte_identical(self):
+        asset = self.governed("szl-constellation")
+        for newline in ("\n", "\r\n"):
+            with self.subTest(newline=newline):
+                card = newline.join([
+                    "---", "title: SZL Constellation", "license: apache-2.0", "tags:", "  - szl", "---", "",
+                    "# SZL Constellation - the living archive", "", "49 estates, unarchived as light.", "",
+                    "[Canonical GitHub source](https://github.com/szl-holdings/szl-constellation) |", "",
+                    "## Shader Fabric", "", "Measured in headless Edge: 49 estates, 0 dropped.", "",
+                    "| State | Meaning |", "|---|---|", "| MEASURED | Measured evidence exists |", "",
+                    "## Developer start", "", "~~~text", "python -m http.server 8000",
+                    "# open http://localhost:8000/holo/demo.html", "~~~", "",
+                    "## Governance", "", "Hub repository: SZLHOLDINGS/szl-constellation", "",
+                    "- Source authority: https://github.com/szl-holdings/szl-constellation",
+                    "- Evidence boundary: verification proves integrity and declared origin, not availability.", "",
+                    "Doctrine v11 - nothing glows that did not earn it."])
+                result = self.plan(card, asset=asset)
+                text = result["new_text"]
+                self.assertEqual(result["changes"], [COMPLETED])
+                self.assertEqual(result["governance_markers_added"], [LABELS, RECEIPTS])
+                self.assertEqual(text, card + newline + newline + LABELS + newline + RECEIPTS)
+                self.assertTrue(text.startswith(card))
+                self.assertFalse(text.endswith(newline))
+                self.assertEqual(text.count("49 estates"), 2)
+                self.assertEqual(text.count("## Governance"), 1)
+                self.assertEqual(RECONCILE.split_card(text)[1], RECONCILE.split_card(card)[1])
+                self.assert_noop_on_rerun(result, asset)
+
+    def test_ambiguous_section_boundaries_fail_closed(self):
+        asset = self.governed()
+        for body, reason in (("## Governance\n\nSZLHOLDINGS/yarqa\n\n~~~text\nunterminated\n", "unclosed fenced code"),
+                             ("## Governance\n\nSZLHOLDINGS/yarqa\n\nFooter\n---\n\nmore\n", "setext heading")):
+            with self.subTest(reason=reason):
+                row = self.plan("---\ntitle: Yarqa\n---\n\n" + body, asset=asset)
+                self.assertEqual(row["label"], "UNAVAILABLE")
+                self.assertIn(reason, row["detail"])
+        complete = ("---\ntitle: Yarqa\nlicense: apache-2.0\n---\n\n" + RECONCILE.stamp_block(asset, self.defaults)
+                    + "\nFooter\n---\n\n~~~text\nunterminated\n")
+        row = self.plan(complete, asset=asset)
+        self.assertEqual((row["label"], row["changes"], row["new_text"]), ("MEASURED", [], complete))
+
+    def test_repository_expectation_keeps_owner_hub_bodies(self):
+        config = Path(__file__).resolve().parents[1] / "config" / "hf_card_expectations.json"
+        cfg, selected, hashes = RECONCILE.load_config(str(config), str(config.parent / "hf_cards"), "")
+        self.assertEqual({a["repo_id"] for a in selected}, {"SZLHOLDINGS/yarqa", "SZLHOLDINGS/szl-constellation"})
+        self.assertEqual(cfg["defaults"]["stamp_heading"], "## Governance")
+        self.assertFalse([a["repo_id"] for a in selected if "body_file" in a])
+        self.assertEqual(hashes["body_files_sha256"], {})
+
+    def test_completion_plan_binds_apply_to_the_exact_completed_bytes(self):
+        asset = self.governed()
+        self.cfg["assets"] = [asset]
+        self.write_config()
+        self.card = ("---\ntitle: Yarqa\nlicense: apache-2.0\n---\n\n## Governance\n\nHub Space repository: SZLHOLDINGS/yarqa\n"
+                     "- Source authority: https://github.com/szl-holdings/yarqa\n\n## Next\n")
+        expected, plan = self.expected_plan()
+        self.assertFalse(plan["body_replace_allowed"])
+        self.assertEqual(plan["assets"][0]["changes"], [COMPLETED])
+        desired = plan["assets"][0]["new_text"]
+        code, receipt, requests = self.run_main(["--apply", "--expected-plan", str(expected)],
+            [self.identity(), (json.dumps({"sha": HEAD}), 200), (self.card, 200),
+             (json.dumps({"commitOid": COMMIT}), 200), (desired, 200), (json.dumps({"sha": COMMIT}), 200)], TOKEN)
+        self.assertEqual(code, 0)
+        self.assertTrue(receipt["assets"][0]["main_verified"])
+        posts = [call for call in requests.call_args_list if call.args[0] == "POST"]
+        self.assertEqual(len(posts), 1)
+        records = [json.loads(line) for line in posts[0].args[3].decode("utf-8").splitlines()]
+        self.assertEqual(records[0]["value"]["parentCommit"], HEAD)
+        self.assertEqual(base64.b64decode(records[1]["value"]["content"]).decode("utf-8"), desired)
 
 
 if __name__ == "__main__":

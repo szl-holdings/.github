@@ -3,6 +3,8 @@
 
 Default is plan-only. Body replacement requires --allow-body-replace in both
 plan and apply. Apply requires --expected-plan to bind reviewed source and Hub bytes.
+An existing governance section is completed in place with only its missing marker
+lines; a second section is never added, and duplicate sections fail closed.
 Only the standard library is used; credentials are never retained in receipts.
 """
 from __future__ import annotations
@@ -134,19 +136,114 @@ def set_scalar(fm: str, key: str, value: str) -> tuple[str, bool]:
     return prefix + f"{key}: {encoded}{newline}", True
 
 
+def stamp_lines(asset: dict) -> list[tuple[tuple[str, ...], str]]:
+    """Governance marker lines, each with the markers it carries."""
+    source = asset["source_repo"]
+    return [
+        ((asset["repo_id"],), f"- Hub repository: `{asset['repo_id']}`"),
+        (("https://github.com/" + source,), f"- Source of truth: [github.com/{source}](https://github.com/{source})"),
+        (("MEASURED / REPORTED / UNKNOWN / UNAVAILABLE",),
+         "- Doctrine labels in force: MEASURED / REPORTED / UNKNOWN / UNAVAILABLE"),
+        (("UNSIGNED_HONEST", "DSSE"), "- Receipts remain UNSIGNED_HONEST until the DSSE lane signs"),
+    ]
+
+
 def stamp_block(asset: dict, defaults: dict, newline: str = "\n") -> str:
     return newline.join([defaults.get("stamp_heading", "## Governance"), "",
-        f"- Hub repository: `{asset['repo_id']}`",
-        f"- Source of truth: [github.com/{asset['source_repo']}](https://github.com/{asset['source_repo']})",
-        "- Doctrine labels in force: MEASURED / REPORTED / UNKNOWN / UNAVAILABLE",
-        "- Receipts remain UNSIGNED_HONEST until the DSSE lane signs", ""])
+                         *(line for _, line in stamp_lines(asset)), ""])
 
 
 def has_stamp(body: str, asset: dict, defaults: dict | None = None) -> bool:
     heading = (defaults or {}).get("stamp_heading", "## Governance")
-    return all(marker in body for marker in (
-        heading, asset["repo_id"], "https://github.com/" + asset["source_repo"],
-        "MEASURED / REPORTED / UNKNOWN / UNAVAILABLE", "UNSIGNED_HONEST", "DSSE"))
+    return heading in body and all(marker in body for markers, _ in stamp_lines(asset) for marker in markers)
+
+
+ATX = re.compile(r"^ {0,3}(#{1,6})(?:[ \t]+(.*?))?[ \t]*$")
+FENCE_OPEN = re.compile(r"^ {0,3}(`{3,}|~{3,})(.*)$")
+FENCE_CLOSE = re.compile(r"^ {0,3}(`{3,}|~{3,})[ \t]*$")
+SETEXT_UNDERLINE = re.compile(r"^ {0,3}(?:=+|-+)[ \t]*$")
+LIST_ITEM = re.compile(r"^ {0,3}[-*+][ \t]")
+
+
+def atx_heading(line: str) -> tuple[int, str] | None:
+    match = ATX.match(line.rstrip("\r\n"))
+    if not match:
+        return None
+    return len(match.group(1)), re.sub(r"(?:^|[ \t]+)#+$", "", match.group(2) or "").strip()
+
+
+def markdown_lines(body: str) -> tuple[list[str], list[str]]:
+    """Split on LF only (so lines rejoin to the exact bytes) and classify each line.
+
+    Kinds: "text", "code" (fence opener or fenced content), "close" (fence closer).
+    """
+    lines = [m.group(0) for m in re.finditer(r"[^\n]*\n|[^\n]+\Z", body)]
+    kinds, fence = [], None
+    for line in lines:
+        raw = line.rstrip("\r\n")
+        if fence:
+            closing = FENCE_CLOSE.match(raw)
+            if closing and closing.group(1)[0] == fence[0] and len(closing.group(1)) >= len(fence):
+                fence = None
+                kinds.append("close")
+            else:
+                kinds.append("code")
+            continue
+        opening = FENCE_OPEN.match(raw)
+        if opening and not (opening.group(1)[0] == "`" and "`" in opening.group(2)):
+            fence = opening.group(1)
+            kinds.append("code")
+            continue
+        kinds.append("text")
+    return lines, kinds
+
+
+def stamp_section(lines: list[str], kinds: list[str], defaults: dict) -> tuple[int, int] | None:
+    """Locate the single existing stamp section as [heading, end) line indexes.
+
+    A section ends at the next heading of the same or higher level, or at EOF.
+    More than one stamp heading always fails closed.
+    """
+    heading = defaults.get("stamp_heading", "## Governance")
+    wanted = atx_heading(heading)
+    if wanted is None or "\n" in heading or "\r" in heading:
+        raise ValueError("stamp_heading must be a single ATX heading line")
+    headings = [(i, *atx_heading(line)) for i, line in enumerate(lines)
+                if kinds[i] == "text" and atx_heading(line)]
+    matches = [i for i, level, text in headings if (level, text) == wanted]
+    if len(matches) > 1:
+        raise ValueError(f"stamp heading {heading!r} appears {len(matches)} times; "
+                         "refusing to choose or add a governance section (fail closed)")
+    if not matches:
+        return None
+    start = matches[0]
+    return start, next((i for i, level, _ in headings if i > start and level <= wanted[0]), len(lines))
+
+
+def complete_stamp(lines: list[str], kinds: list[str], section: tuple[int, int], asset: dict,
+                   fallback_newline: str) -> tuple[str, list[str]]:
+    """Add only the missing marker lines at the end of the one existing stamp section.
+
+    Every original byte is kept in order; the only change is one contiguous insertion
+    after the section's last nonblank line. Ambiguous boundaries fail closed.
+    """
+    start, end = section
+    text = "".join(lines[start:end])
+    missing = [line for markers, line in stamp_lines(asset) if not all(m in text for m in markers)]
+    if not missing:
+        return "".join(lines), []
+    for i in range(start + 1, end):
+        if (kinds[i] == "text" and kinds[i - 1] == "text" and lines[i - 1].strip()
+                and SETEXT_UNDERLINE.match(lines[i].rstrip("\r\n")) and not atx_heading(lines[i - 1])):
+            raise ValueError(f"stamp section boundary is ambiguous (possible setext heading at body line {i + 1}); fail closed")
+    last = max(i for i in range(start, end) if lines[i].strip())
+    if kinds[last] == "code":
+        raise ValueError("stamp section ends inside an unclosed fenced code block; fail closed")
+    ending = re.search(r"\r?\n\Z", lines[last])
+    newline = ending.group(0) if ending else fallback_newline
+    block = missing if last != start and LIST_ITEM.match(lines[last]) else ["", *missing]
+    insert = "".join(item + newline for item in block) if ending else "".join(newline + item for item in block)
+    return "".join(lines[:last + 1]) + insert + "".join(lines[last + 1:]), missing
 
 
 def load_config(config: str, bodies_dir: str, only: str) -> tuple[dict, list, dict]:
@@ -233,11 +330,21 @@ def plan_asset(asset: dict, defaults: dict, token: str | None, bodies_dir: str,
             if body != desired:
                 body = desired
                 row["changes"].append(f"body<={body_file}")
-        if asset.get("require_stamp", defaults.get("require_stamp", True)) and not has_stamp(body, asset, defaults):
+        if asset.get("require_stamp", defaults.get("require_stamp", True)):
             newline = "\r\n" if prefix.endswith("\r\n") else "\n"
-            separator = "" if body.endswith(newline * 2) else newline if body.endswith(newline) else newline * 2
-            body += separator + stamp_block(asset, defaults, newline)
-            row["changes"].append("body+=governance_stamp")
+            lines, kinds = markdown_lines(body)
+            # Duplicate stamp headings fail closed even when every marker is present.
+            section = stamp_section(lines, kinds, defaults)
+            if not has_stamp(body, asset, defaults):
+                if section is None:
+                    separator = "" if body.endswith(newline * 2) else newline if body.endswith(newline) else newline * 2
+                    body += separator + stamp_block(asset, defaults, newline)
+                    row["changes"].append("body+=governance_stamp")
+                else:
+                    body, added = complete_stamp(lines, kinds, section, asset, newline)
+                    if added:
+                        row["changes"].append("governance_stamp~=completed_missing_markers")
+                        row["governance_markers_added"] = added
         new_text = prefix + fm + closing + body
         if new_text == text:
             row["changes"] = []
@@ -389,7 +496,8 @@ def main() -> int:
                 raise ValueError(payload["identity"].get("detail", "identity preflight failed"))
         payload["assets"] = [plan_asset(asset, cfg["defaults"], token, args.bodies_dir, args.allow_body_replace) for asset in assets]
         if not payload["assets"] or any(row["label"] != MEASURED for row in payload["assets"]):
-            raise ValueError("one or more selected cards could not be planned")
+            raise ValueError("one or more selected cards could not be planned: " + "; ".join(
+                f"{row['repo_id']}: {row.get('detail', 'unknown')}" for row in payload["assets"] if row["label"] != MEASURED))
         if args.expected_plan:
             validate_expected_plan(payload, args.expected_plan)
         if args.apply:

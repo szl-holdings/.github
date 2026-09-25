@@ -14,17 +14,16 @@
       "kind": "spaces",
       "license": "apache-2.0",
       "title": "Yarqa",
-      "short_description": "Plug-flow compartmentalization for compartmental models.",
+      "short_description": "Auditable plug-flow compartmentalization. Apache-2.0",
       "source_repo": "szl-holdings/yarqa",
-      "body_file": "yarqa.md",
-      "reason": "Card was the 191-byte Hugging Face placeholder while the Space carries real source (yarqa 0.5.0, FastAPI space app, digest-pinned base image, hash-locked requirements)."
+      "reason": "Owner hand-edited the Hub card (Hub main 8a6a273b3081a9783e50ecfacdd2e4cca05ea024, 'docs: governed Yarqa card 2026-09-24', README 1738 bytes) and chose to keep those edits. Declared scalars mirror the live front matter. No body_file is declared, so the body is never replaced; the reconciler only completes missing governance marker lines inside the existing Governance section."
     },
     {
       "repo_id": "SZLHOLDINGS/szl-constellation",
       "kind": "spaces",
       "license": "apache-2.0",
       "source_repo": "szl-holdings/szl-constellation",
-      "reason": "Card declared tags but no license; body is already accurate and must not be rewritten."
+      "reason": "Owner-authored Hub card kept by owner decision (Hub main de68f6e0aa84e8d62534ce5259d16c395eceeb6a, README 2399 bytes); license apache-2.0 is now declared on the Hub. The body is owner-authored and never rewritten; the reconciler only completes missing governance marker lines inside the existing Governance section. Its estate-count prose is outside this lane."
     }
   ]
 }
