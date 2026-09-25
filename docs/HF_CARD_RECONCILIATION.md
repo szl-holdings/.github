@@ -44,8 +44,12 @@ the anonymous plan. `governance/hf-card-reconcile-apply` runs only when
 
 The apply step runs `hf auth token` once for each selected target, with
 `HF_OIDC_RESOURCE` set to that target's resource. The `hf` CLI comes from the
-hash-locked `requirements/hf-publisher.lock` (`huggingface-hub==1.19.0`). Each
-returned token must be exactly one `hf_…` line. The step masks it and keeps it
+hash-locked `requirements/hf-publisher.lock` (`huggingface-hub==1.19.0`). The
+CLI runs with `HF_TOKEN`, `HUGGING_FACE_HUB_TOKEN`, `HF_OIDC_ID_TOKEN`,
+`HF_ENDPOINT`, `HUGGINGFACE_CO_STAGING` and `HF_DEBUG` unset, so no inherited
+value can supply the subject token, move the exchange endpoint or audience, or
+add debug output. `HF_HUB_DISABLE_UPDATE_CHECK=1` skips its PyPI version check.
+Each returned token must be exactly one `hf_…` line. The step masks it and keeps it
 in its own process environment as `HF_OIDC_TOKEN_<RESOURCE>`. Minting and
 applying happen in the same step, so no token passes through `GITHUB_ENV`, a
 step output, a file, or an artifact.
@@ -93,9 +97,11 @@ organization-role check used in token mode does not apply. Before any read or
 write, apply calls `GET /api/<kind>/<ns>/<name>/auth-check/write` with each
 target's token (`/api/spaces/…` for these two Spaces). This is the endpoint behind `huggingface_hub`'s documented
 `auth_check(..., write=True)`. Any result other than HTTP 200 fails the whole
-apply before any card is read or written. The `/api/whoami-v2` response for
-the same token is recorded as `REPORTED` context: HTTP status, `name`, `type`,
-and token role. It never gates a write. How the Hub answers whoami-v2 for an
+apply before any card is read or written. After a target's write check returns
+HTTP 200, the `/api/whoami-v2` response for the same token is recorded as
+`REPORTED` context: HTTP status, `name`, `type`, and token role. It never gates
+a write. A target whose write check failed is not asked, and its whoami entry
+is `UNAVAILABLE`. How the Hub answers whoami-v2 for an
 OIDC token is `UNKNOWN` until the first apply receipt records it.
 
 The receipt's `auth` block holds `mode: "oidc"` and each target's `repo_id` and

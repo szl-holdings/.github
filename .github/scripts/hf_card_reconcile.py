@@ -436,6 +436,10 @@ def oidc_preflight(targets: list, tokens: dict) -> dict:
                "http_status": status, "label": MEASURED if status == 200 else UNAVAILABLE}
         if status != 200:
             row["detail"] = f"write auth check HTTP {status}"
+            # The apply is already blocked; identity context would not change that.
+            row["whoami"] = {"label": UNAVAILABLE, "detail": "not requested: write auth check failed"}
+            rows.append(row)
+            continue
         detail, whoami_status = hub_request("GET", "/api/whoami-v2", token)
         whoami = {"label": REPORTED, "http_status": whoami_status}
         if whoami_status == 200:

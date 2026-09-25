@@ -7,9 +7,14 @@ import hashlib
 import importlib.util
 import io
 import json
+import os
 from pathlib import Path
 import re
+import shutil
+import subprocess
+import sys
 import tempfile
+import textwrap
 import unittest
 from unittest.mock import patch
 import urllib.error
@@ -18,6 +23,10 @@ import urllib.error
 SPEC = importlib.util.spec_from_file_location("hf_card_reconcile", Path(__file__).with_name("hf_card_reconcile.py"))
 RECONCILE = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(RECONCILE)
+REPO_ROOT = Path(__file__).resolve().parents[2]
+WORKFLOW = REPO_ROOT / ".github" / "workflows" / "hf-card-reconcile.yml"
+# The apply step is exercised with the runner's own bash; CI runs on ubuntu-latest.
+BASH = shutil.which("bash") if os.name == "posix" else None
 HEAD = "a" * 40
 COMMIT = "b" * 40
 SOURCE = "c" * 40
@@ -619,8 +628,10 @@ class CardReconcileTests(unittest.TestCase):
                          [("SZLHOLDINGS/yarqa", "MEASURED", 200), ("SZLHOLDINGS/szl-constellation", "UNAVAILABLE", 403)])
         self.assertEqual(receipt["error"], "Trusted Publisher write check failed: SZLHOLDINGS/szl-constellation HTTP 403")
         self.assertEqual(receipt["assets"], [])
-        self.assertTrue(all(method == "GET" and (path.endswith("/auth-check/write") or path == "/api/whoami-v2")
-                            for method, path, _ in hub.calls))
+        self.assertEqual([(method, path) for method, path, _ in hub.calls], [
+            ("GET", "/api/spaces/SZLHOLDINGS/yarqa/auth-check/write"), ("GET", "/api/whoami-v2"),
+            ("GET", "/api/spaces/SZLHOLDINGS/szl-constellation/auth-check/write")])
+        self.assertEqual([t["whoami"]["label"] for t in receipt["identity"]["targets"]], ["REPORTED", "UNAVAILABLE"])
         self.assert_no_credentials(receipt)
 
     def test_oidc_preflight_gates_on_write_check_not_owner_or_role(self):
@@ -634,10 +645,12 @@ class CardReconcileTests(unittest.TestCase):
                 self.assertEqual(result["targets"][0]["whoami"]["http_status"], whoami[1])
                 self.assertEqual(requests.call_args_list[0].args[:3],
                                  ("GET", "/api/spaces/SZLHOLDINGS/yarqa/auth-check/write", OIDC["SZLHOLDINGS/yarqa"]))
-        with patch.object(RECONCILE, "hub_request", side_effect=[("denied", 401), self.identity()]):
+        with patch.object(RECONCILE, "hub_request", side_effect=[("denied", 401), self.identity()]) as requests:
             result = RECONCILE.oidc_preflight(target, tokens)
         self.assertEqual(result["label"], "UNAVAILABLE")
-        self.assertEqual(result["targets"][0]["whoami"]["name"], "betterwithage")
+        self.assertEqual(result["targets"][0]["whoami"],
+                         {"label": "UNAVAILABLE", "detail": "not requested: write auth check failed"})
+        self.assertEqual(requests.call_count, 1)
 
     def test_auth_oidc_is_apply_only(self):
         code, receipt, requests = self.run_main(["--auth", "oidc"], env_extra=OIDC_ENV)
@@ -707,7 +720,7 @@ class CardReconcileTests(unittest.TestCase):
         return blocks
 
     def test_workflow_grants_oidc_only_to_apply_and_keeps_secrets_out_of_plans(self):
-        text = (Path(__file__).resolve().parents[1] / "workflows" / "hf-card-reconcile.yml").read_text(encoding="utf-8")
+        text = WORKFLOW.read_text(encoding="utf-8")
         jobs = self.workflow_jobs(text)
         self.assertEqual(list(jobs), ["contract", "reconcile", "apply"])
         code = "\n".join(line for line in text.splitlines() if not line.lstrip().startswith("#"))
@@ -728,8 +741,13 @@ class CardReconcileTests(unittest.TestCase):
             self.assertRegex(line, r"^[A-Z0-9_]+: \$\{\{ inputs\.auth == 'token' && secrets\.[A-Z0-9_]+ \|\| '' \}\}$")
         uses = re.findall(r"(?m)^\s*(?:-\s*)?uses:\s*(\S+)", text)
         self.assertTrue(uses)
+        pins = {}
         for ref in uses:
             self.assertRegex(ref, r"^[^@\s]+@[0-9a-f]{40}$")
+            action, sha = ref.split("@")
+            pins.setdefault(action, set()).add(sha)
+        # Every job runs the same revision of each action, so a merge cannot leave mixed pins.
+        self.assertEqual({action: shas for action, shas in pins.items() if len(shas) > 1}, {})
         blocks = self.run_blocks(text)
         self.assertGreaterEqual(len(blocks), 10)
         for block in blocks:
@@ -737,12 +755,131 @@ class CardReconcileTests(unittest.TestCase):
         apply_step = next(block for block in blocks if "--list-oidc-targets" in block)
         for required in ('HF_OIDC_RESOURCE="$resource"', 'auth token 2>"$err" </dev/null',
                          '[[ "$value" =~ ^hf_[A-Za-z0-9._-]+$ ]]', 'echo "::add-mask::$value"',
-                         'printf -v "$name"', 's/hf_[A-Za-z0-9._-]+/[REDACTED]/g'):
+                         'printf -v "$name"', 's/hf_[A-Za-z0-9._-]+/[REDACTED]/g',
+                         "env -u HF_TOKEN -u HUGGING_FACE_HUB_TOKEN -u HF_OIDC_ID_TOKEN",
+                         "-u HF_ENDPOINT -u HUGGINGFACE_CO_STAGING -u HF_DEBUG",
+                         "HF_HUB_DISABLE_UPDATE_CHECK=1", '"${only_args[@]}" || rc=$?'):
             self.assertIn(required, apply_step)
         for forbidden in ("GITHUB_ENV", "GITHUB_OUTPUT\" <<", "tee "):
             self.assertNotIn(forbidden, apply_step)
+        self.assertNotRegex(apply_step, r"(?m)^\s*rc=\$\?\s*$")
+
+    def run_apply_step(self, shell, scenario, only, reconcile_rc=0):
+        """Run the real apply step with a fake hf CLI and a stub reconciler; no network."""
+        block = next(b for b in self.run_blocks(WORKFLOW.read_text(encoding="utf-8")) if "--list-oidc-targets" in b)
+        work = Path(tempfile.mkdtemp(dir=self.root))
+        runner_temp, stubs = work / "runner", work / "bin"
+        (runner_temp / "hf-cli-venv" / "bin").mkdir(parents=True)
+        stubs.mkdir()
+        for path, text in ((work / "step.sh", textwrap.dedent(block) + "\n"),
+                           (runner_temp / "hf-cli-venv" / "bin" / "hf", FAKE_HF),
+                           (stubs / "python", STUB_PYTHON)):
+            path.write_bytes(text.encode("utf-8"))
+            path.chmod(0o755)
+        output = work / "github_output"
+        output.write_bytes(b"")
+        env = {key: value for key, value in os.environ.items() if not key.startswith(("HF_", "HUGGING"))}
+        env.update(PATH=str(stubs) + os.pathsep + env.get("PATH", ""), RUNNER_TEMP=runner_temp.as_posix(),
+                   GITHUB_OUTPUT=output.as_posix(), REPORT=(work / "report.json").as_posix(), ONLY=only,
+                   ALLOW_BODY="", AUTH_MODE="oidc", REAL_PYTHON=sys.executable, STUB_LOG=(work / "log").as_posix(),
+                   SCENARIO=scenario, RECONCILE_RC=str(reconcile_rc),
+                   # Present in the step environment; none of them may reach the exchange.
+                   HF_TOKEN="", HF_CARD_WRITE_TOKEN="", HF_OIDC_ID_TOKEN="eyJinherited.subject.token",
+                   HF_ENDPOINT="https://hub.invalid", HUGGINGFACE_CO_STAGING="1", HF_DEBUG="1")
+        proc = subprocess.run([*shell, (work / "step.sh").as_posix()], cwd=REPO_ROOT, env=env,
+                              stdin=subprocess.DEVNULL, capture_output=True, encoding="utf-8",
+                              errors="replace", timeout=120)
+
+        def read(name):
+            path = work / name
+            return path.read_bytes().decode("utf-8") if path.exists() else ""
+        leftovers = sorted(p.name for p in runner_temp.iterdir() if p.name != "hf-cli-venv")
+        return proc, read("github_output"), read("log.hf"), read("log.reconcile"), leftovers
+
+    def test_apply_step_records_exit_code_and_scopes_each_exchange_under_the_runner_shell(self):
+        if not BASH:
+            self.skipTest("needs POSIX bash; runs in the contract job on ubuntu-latest")
+        both = "SZLHOLDINGS/yarqa,SZLHOLDINGS/szl-constellation"
+        yarqa, constellation = FAKE_TOKENS["yarqa"], FAKE_TOKENS["szl-constellation"]
+        cases = (
+            # scenario, only, reconciler rc, exit_code, tokens the reconciler receives, exchanges
+            ("ok", both, 0, "0", {YARQA_ENV: yarqa, CONSTELLATION_ENV: constellation}, 2),
+            ("ok", both, 1, "1", {YARQA_ENV: yarqa, CONSTELLATION_ENV: constellation}, 2),
+            ("fail_constellation", both, 0, "1", {YARQA_ENV: yarqa, CONSTELLATION_ENV: "<unset>"}, 2),
+            ("fail_constellation", both, 1, "1", {YARQA_ENV: yarqa, CONSTELLATION_ENV: "<unset>"}, 2),
+            ("two_lines_yarqa", both, 1, "1", {YARQA_ENV: "<unset>", CONSTELLATION_ENV: constellation}, 2),
+            ("ok", "SZLHOLDINGS/yarqa", 0, "0", {YARQA_ENV: yarqa, CONSTELLATION_ENV: "<unset>"}, 1),
+        )
+        # `bash -e {0}` is the runner default when a step sets no shell; the second is `shell: bash`.
+        for shell in ((BASH, "-e"), (BASH, "--noprofile", "--norc", "-eo", "pipefail")):
+            for scenario, only, reconcile_rc, exit_code, received, exchanges in cases:
+                with self.subTest(shell=shell[1:], scenario=scenario, only=only, reconcile_rc=reconcile_rc):
+                    proc, output, hf_log, reconcile_log, leftovers = self.run_apply_step(
+                        shell, scenario, only, reconcile_rc)
+                    self.assertEqual(proc.returncode, 0, proc.stderr)
+                    self.assertEqual(output, f"exit_code={exit_code}\n")
+                    self.assertEqual(leftovers, [])
+                    calls = hf_log.splitlines()
+                    self.assertEqual(len(calls), exchanges, hf_log)
+                    for call in calls:
+                        self.assertRegex(call, r"^resource=spaces/SZLHOLDINGS/[a-z-]+ update_check=1 "
+                                               r"args=auth token leaked=$")
+                    self.assertEqual(dict(line.split("=", 1) for line in reconcile_log.splitlines()
+                                          if line.startswith("HF_OIDC_TOKEN_")), received)
+                    self.assertIn("--apply --auth oidc", reconcile_log)
+                    masked = [line for line in proc.stdout.splitlines() if line.startswith("::add-mask::")]
+                    self.assertEqual(masked, ["::add-mask::" + v for v in received.values() if v != "<unset>"])
+                    logs = "\n".join(line for line in (proc.stdout + proc.stderr).splitlines()
+                                     if not line.startswith("::add-mask::"))
+                    for secret in (*FAKE_TOKENS.values(), "hf_jwt_leaked", "eyJ", "Set HF_DEBUG"):
+                        self.assertNotIn(secret, logs)
+                    if scenario == "fail_constellation":
+                        self.assertIn("::error::UNAVAILABLE - trusted-publisher exchange failed for "
+                                      "SZLHOLDINGS/szl-constellation (spaces/SZLHOLDINGS/szl-constellation)",
+                                      proc.stdout)
+                        self.assertEqual(proc.stderr.count("[REDACTED]"), 2)
 
 
+FAKE_TOKENS = {"yarqa": "hf_jwt_fakeyarqa.claims.signature",
+               "szl-constellation": "hf_jwt_fakeconstellation.claims.signature"}
+# Stands in for `hf auth token`: records what the exchange would see and never calls the Hub.
+FAKE_HF = r"""#!/usr/bin/env bash
+set -u
+leaked=""
+for v in HF_TOKEN HUGGING_FACE_HUB_TOKEN HF_OIDC_ID_TOKEN HF_ENDPOINT HUGGINGFACE_CO_STAGING HF_DEBUG; do
+  if [ "${!v+set}" = set ]; then leaked="$leaked$v,"; fi
+done
+name="${HF_OIDC_RESOURCE##*/}"
+echo "resource=$HF_OIDC_RESOURCE update_check=${HF_HUB_DISABLE_UPDATE_CHECK-} args=$* leaked=$leaked" >> "$STUB_LOG.hf"
+if [ "$SCENARIO" = fail_constellation ] && [ "$name" = szl-constellation ]; then
+  echo "Error: invalid_grant for hf_jwt_leaked.a.b (subject eyJleaked.c.d)" >&2
+  echo "Set HF_DEBUG=1 as environment variable for full traceback."
+  exit 1
+fi
+if [ "$SCENARIO" = two_lines_yarqa ] && [ "$name" = yarqa ]; then
+  printf 'hf_jwt_fakeyarqa.claims.signature\nhf_jwt_fakeyarqa.claims.signature\n'
+  exit 0
+fi
+case "$name" in
+  yarqa) echo "hf_jwt_fakeyarqa.claims.signature" ;;
+  szl-constellation) echo "hf_jwt_fakeconstellation.claims.signature" ;;
+  *) exit 1 ;;
+esac
+echo "hint: the token was printed to stdout" >&2
+"""
+# Stands in for `python`: target listing runs the real reconciler; the apply call only records its inputs.
+STUB_PYTHON = r"""#!/usr/bin/env bash
+case " $* " in
+  *" --list-oidc-targets "*) exec "$REAL_PYTHON" "$@" ;;
+esac
+{
+  for name in HF_OIDC_TOKEN_SPACES_SZLHOLDINGS_YARQA HF_OIDC_TOKEN_SPACES_SZLHOLDINGS_SZL_CONSTELLATION; do
+    printf '%s=%s\n' "$name" "${!name-<unset>}"
+  done
+  printf 'argv=%s\n' "$*"
+} > "$STUB_LOG.reconcile"
+exit "$RECONCILE_RC"
+"""
 YARQA_ENV = "HF_OIDC_TOKEN_SPACES_SZLHOLDINGS_YARQA"
 CONSTELLATION_ENV = "HF_OIDC_TOKEN_SPACES_SZLHOLDINGS_SZL_CONSTELLATION"
 OIDC = {"SZLHOLDINGS/yarqa": "hf_jwt_eyJyarqa.claims.signature",

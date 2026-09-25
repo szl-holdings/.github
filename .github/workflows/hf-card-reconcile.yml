@@ -159,7 +159,7 @@ jobs:
 
     steps:
       - name: Harden runner
-        uses: step-security/harden-runner@05e31511f85b41b11d1cf0ef85d0992719546e2c # v2.21.0
+        uses: step-security/harden-runner@e14015d583714f6e62063499dc959a02595150a1 # v2.21.1
         with:
           egress-policy: audit
 
@@ -271,7 +271,7 @@ jobs:
 
     steps:
       - name: Harden runner
-        uses: step-security/harden-runner@05e31511f85b41b11d1cf0ef85d0992719546e2c # v2.21.0
+        uses: step-security/harden-runner@e14015d583714f6e62063499dc959a02595150a1 # v2.21.1
         with:
           egress-policy: audit
 
@@ -354,6 +354,9 @@ jobs:
           HF_TOKEN: ${{ inputs.auth == 'token' && secrets.HF_TOKEN || '' }}
           HF_WRITE_TOKEN: ${{ inputs.auth == 'token' && secrets.HF_WRITE_TOKEN || '' }}
         run: |
+          # The runner starts this script with `bash -e`. Every expected failure
+          # below is caught by `if` or `|| rc=$?`, so exit_code is always written;
+          # anything unexpected stops the step, and "Fail closed" then exits 1.
           set -uo pipefail
           only_args=()
           if [ -n "$ONLY" ]; then only_args=(--only "$ONLY"); fi
@@ -376,7 +379,16 @@ jobs:
                 echo "Trusted Publisher exchange: target=$repo_id resource=$resource"
                 err="$(mktemp "$RUNNER_TEMP/hf-oidc-error.XXXXXX")"
                 value=""
-                if value="$(env -u HF_TOKEN -u HUGGING_FACE_HUB_TOKEN HF_OIDC_RESOURCE="$resource" \
+                # Unset every variable that could supply the subject token
+                # (HF_OIDC_ID_TOKEN), move the exchange endpoint and audience
+                # (HF_ENDPOINT, HUGGINGFACE_CO_STAGING) or add debug output
+                # (HF_DEBUG), and skip the CLI's PyPI update check.
+                # On a known error, hf 1.19.0 prints its "Set HF_DEBUG=1" hint to
+                # stdout, so it lands in $value. The one-hf_-line check rejects
+                # it, and $value is cleared without ever being printed.
+                if value="$(env -u HF_TOKEN -u HUGGING_FACE_HUB_TOKEN -u HF_OIDC_ID_TOKEN \
+                      -u HF_ENDPOINT -u HUGGINGFACE_CO_STAGING -u HF_DEBUG \
+                      HF_HUB_DISABLE_UPDATE_CHECK=1 HF_OIDC_RESOURCE="$resource" \
                       "$hf_cli" auth token 2>"$err" </dev/null)" \
                     && [[ "$value" =~ ^hf_[A-Za-z0-9._-]+$ ]]; then
                   echo "::add-mask::$value"
@@ -399,8 +411,8 @@ jobs:
           fi
           # A missing target token makes the reconciler fail closed before any
           # Hub request and still retain a receipt naming the missing target.
-          python -I -P .github/scripts/hf_card_reconcile.py "${args[@]}" "${only_args[@]}"
-          rc=$?
+          rc=0
+          python -I -P .github/scripts/hf_card_reconcile.py "${args[@]}" "${only_args[@]}" || rc=$?
           if [ "$mint_failed" -ne 0 ]; then rc=1; fi
           echo "exit_code=$rc" >> "$GITHUB_OUTPUT"
 
