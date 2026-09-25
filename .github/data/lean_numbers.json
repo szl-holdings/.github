@@ -26,7 +26,7 @@
       "sha256_collision_resistant"
     ],
     "sorries_raw": 163,
-    "sorries_noncomment": 146,
+    "sorries_noncomment": 149,
     "sorries_putnam": 51,
     "sorries_baseline": 112,
     "locked_formula_count": 8,
