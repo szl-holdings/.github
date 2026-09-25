@@ -3,19 +3,21 @@ name: FORGE-9 bootstrap invariants
 on:
   pull_request:
     paths:
-      - ".governance/**"
-      - ".github/workflows/**"
-      - ".github/scripts/**"
-      - ".github/pull_request_template.md"
+    - .governance/**
+    - .github/workflows/**
+    - .github/scripts/**
+    - .github/pull_request_template.md
   push:
     branches:
-      - main
+    - main
     paths:
-      - ".governance/**"
-      - ".github/workflows/**"
-      - ".github/scripts/**"
-      - ".github/pull_request_template.md"
-
+    - .governance/**
+    - .github/workflows/**
+    - .github/scripts/**
+    - .github/pull_request_template.md
+  merge_group:
+    types:
+    - checks_requested
 permissions:
   contents: read
 

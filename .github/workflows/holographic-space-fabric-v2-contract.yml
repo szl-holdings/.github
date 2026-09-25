@@ -3,23 +3,26 @@ name: Holographic Space Fabric v2 Contract
 on:
   pull_request:
     paths:
-      - "design/holographic-v2/**"
-      - ".github/scripts/rollout_holographic_spaces_v2.py"
-      - ".github/scripts/run_holographic_spaces_v2.py"
-      - ".github/tests/test_holographic_spaces_v2.py"
-      - ".github/workflows/holographic-space-fabric-v2-contract.yml"
-      - ".github/workflows/rollout-holographic-space-fabric-v2.yml"
+    - design/holographic-v2/**
+    - .github/scripts/rollout_holographic_spaces_v2.py
+    - .github/scripts/run_holographic_spaces_v2.py
+    - .github/tests/test_holographic_spaces_v2.py
+    - .github/workflows/holographic-space-fabric-v2-contract.yml
+    - .github/workflows/rollout-holographic-space-fabric-v2.yml
   push:
-    branches: [main]
+    branches:
+    - main
     paths:
-      - "design/holographic-v2/**"
-      - ".github/scripts/rollout_holographic_spaces_v2.py"
-      - ".github/scripts/run_holographic_spaces_v2.py"
-      - ".github/tests/test_holographic_spaces_v2.py"
-      - ".github/workflows/holographic-space-fabric-v2-contract.yml"
-      - ".github/workflows/rollout-holographic-space-fabric-v2.yml"
-  workflow_dispatch:
-
+    - design/holographic-v2/**
+    - .github/scripts/rollout_holographic_spaces_v2.py
+    - .github/scripts/run_holographic_spaces_v2.py
+    - .github/tests/test_holographic_spaces_v2.py
+    - .github/workflows/holographic-space-fabric-v2-contract.yml
+    - .github/workflows/rollout-holographic-space-fabric-v2.yml
+  workflow_dispatch: null
+  merge_group:
+    types:
+    - checks_requested
 permissions:
   contents: read
 
