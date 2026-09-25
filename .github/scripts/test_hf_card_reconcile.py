@@ -3,10 +3,12 @@
 import base64
 from contextlib import redirect_stderr, redirect_stdout
 import copy
+import hashlib
 import importlib.util
 import io
 import json
 from pathlib import Path
+import re
 import tempfile
 import unittest
 from unittest.mock import patch
@@ -50,10 +52,10 @@ class CardReconcileTests(unittest.TestCase):
         self.assertIn("/raw/" + HEAD + "/README.md", requests.call_args_list[1].args[1])
         return result
 
-    def run_main(self, extra=(), responses=(), token=None, source=SOURCE):
+    def run_main(self, extra=(), responses=(), token=None, source=SOURCE, env_extra=None):
         output = self.root / "receipt.json"
         args = ["hf_card_reconcile.py", "--config", str(self.config), "--bodies-dir", str(self.root), "--out-json", str(output), *extra]
-        env = {"GITHUB_SHA": source}
+        env = {"GITHUB_SHA": source, **(env_extra or {})}
         if token:
             env["HF_CARD_WRITE_TOKEN"] = token
         with patch.object(RECONCILE.sys, "argv", args), patch.dict(RECONCILE.os.environ, env, clear=True), \
@@ -496,6 +498,298 @@ class CardReconcileTests(unittest.TestCase):
         records = [json.loads(line) for line in posts[0].args[3].decode("utf-8").splitlines()]
         self.assertEqual(records[0]["value"]["parentCommit"], HEAD)
         self.assertEqual(base64.b64decode(records[1]["value"]["content"]).decode("utf-8"), desired)
+
+    # --- Trusted Publisher (OIDC) apply credentials -------------------------------------------
+
+    def two_spaces(self):
+        self.cfg["assets"] = [self.governed("yarqa"), self.governed("szl-constellation")]
+        self.write_config()
+        card = "---\ntitle: Card\nlicense: apache-2.0\n---\n\n# Card\n"
+        return {"SZLHOLDINGS/yarqa": card, "SZLHOLDINGS/szl-constellation": card}
+
+    def oidc_plan(self):
+        cards = self.two_spaces()
+        hub = FakeHub(cards)
+        code, receipt, _ = self.run_main([], hub, env_extra=OIDC_ENV)
+        self.assertEqual(code, 0, receipt.get("error"))
+        self.assertTrue(all(used is None for _, _, used in hub.calls), "plans must read anonymously")
+        self.assertNotIn("auth", receipt)
+        self.assertNotIn("identity", receipt)
+        path = self.root / "oidc-plan.json"
+        path.write_text(json.dumps(receipt), encoding="utf-8")
+        return cards, path
+
+    def assert_no_credentials(self, receipt, *extra):
+        text = json.dumps(receipt)
+        for secret in (TOKEN, *OIDC.values(), *extra):
+            self.assertNotIn(secret, text)
+
+    def test_oidc_resource_and_variable_follow_the_declared_kind(self):
+        for kind, resource in (("spaces", "spaces/SZLHOLDINGS/szl-constellation"),
+                               ("datasets", "datasets/SZLHOLDINGS/szl-constellation"),
+                               ("models", "SZLHOLDINGS/szl-constellation")):
+            with self.subTest(kind=kind):
+                asset = {"repo_id": "SZLHOLDINGS/szl-constellation", "kind": kind}
+                self.assertEqual(RECONCILE.oidc_resource(asset), resource)
+                [target] = RECONCILE.oidc_targets([asset])
+                self.assertEqual(target["resource"], resource)
+                self.assertEqual(target["env"], "HF_OIDC_TOKEN_" + re.sub(r"[/-]", "_", resource.upper()))
+        colliding = [{"repo_id": "SZLHOLDINGS/szl-constellation", "kind": "spaces"},
+                     {"repo_id": "SZLHOLDINGS/szl.constellation", "kind": "spaces"}]
+        with self.assertRaisesRegex(ValueError, "ambiguous"):
+            RECONCILE.oidc_targets(colliding)
+
+    def test_list_oidc_targets_is_network_free_and_writes_no_receipt(self):
+        self.two_spaces()
+        output = self.root / "receipt.json"
+        for only, expected in (("", [YARQA_ENV + "\tspaces/SZLHOLDINGS/yarqa\tSZLHOLDINGS/yarqa",
+                                     CONSTELLATION_ENV + "\tspaces/SZLHOLDINGS/szl-constellation\tSZLHOLDINGS/szl-constellation"]),
+                               ("SZLHOLDINGS/szl-constellation",
+                                [CONSTELLATION_ENV + "\tspaces/SZLHOLDINGS/szl-constellation\tSZLHOLDINGS/szl-constellation"])):
+            with self.subTest(only=only):
+                args = ["hf_card_reconcile.py", "--config", str(self.config), "--bodies-dir", str(self.root),
+                        "--out-json", str(output), "--list-oidc-targets", "--only", only]
+                stdout = io.StringIO()
+                with patch.object(RECONCILE.sys, "argv", args), patch.dict(RECONCILE.os.environ, {}, clear=True), \
+                     patch.object(RECONCILE, "hub_request") as requests, redirect_stdout(stdout):
+                    code = RECONCILE.main()
+                self.assertEqual(code, 0)
+                self.assertEqual(stdout.getvalue().splitlines(), expected)
+                requests.assert_not_called()
+                self.assertFalse(output.exists())
+
+    def test_oidc_apply_binds_each_target_to_its_own_token_and_never_records_it(self):
+        cards, expected = self.oidc_plan()
+        hub = FakeHub(cards)
+        code, receipt, _ = self.run_main(["--apply", "--auth", "oidc", "--expected-plan", str(expected)],
+                                         hub, TOKEN, env_extra=OIDC_ENV)
+        self.assertEqual(code, 0, receipt.get("error"))
+        self.assertTrue(receipt["success"])
+        self.assertEqual(receipt["auth"], {"mode": "oidc", "token_recorded": False, "targets": [
+            {"repo_id": "SZLHOLDINGS/yarqa", "resource": "spaces/SZLHOLDINGS/yarqa"},
+            {"repo_id": "SZLHOLDINGS/szl-constellation", "resource": "spaces/SZLHOLDINGS/szl-constellation"}]})
+        identity = receipt["identity"]
+        self.assertEqual((identity["mode"], identity["label"]), ("oidc", "MEASURED"))
+        self.assertEqual([(t["resource"], t["check"], t["http_status"], t["whoami"]["label"]) for t in identity["targets"]],
+                         [("spaces/SZLHOLDINGS/yarqa", "auth-check/write", 200, "REPORTED"),
+                          ("spaces/SZLHOLDINGS/szl-constellation", "auth-check/write", 200, "REPORTED")])
+        self.assertEqual([path for _, path, _ in hub.calls[:4]], [
+            "/api/spaces/SZLHOLDINGS/yarqa/auth-check/write", "/api/whoami-v2",
+            "/api/spaces/SZLHOLDINGS/szl-constellation/auth-check/write", "/api/whoami-v2"])
+        for index, (method, path, used) in enumerate(hub.calls):
+            with self.subTest(call=(method, path)):
+                repo = FakeHub.repo_in(path) or FakeHub.repo_in(hub.calls[index - 1][1])
+                self.assertEqual(used, OIDC[repo])
+        self.assertEqual(sorted(path for method, path, _ in hub.calls if method == "POST"),
+                         ["/api/spaces/SZLHOLDINGS/szl-constellation/commit/main", "/api/spaces/SZLHOLDINGS/yarqa/commit/main"])
+        self.assertTrue(all(row["main_verified"] for row in receipt["assets"]))
+        self.assert_no_credentials(receipt)
+
+    def test_oidc_missing_or_malformed_target_token_fails_closed_before_network(self):
+        _, expected = self.oidc_plan()
+        yarqa = {YARQA_ENV: OIDC["SZLHOLDINGS/yarqa"]}
+        for env, reason in (
+                (yarqa, "missing: SZLHOLDINGS/szl-constellation (spaces/SZLHOLDINGS/szl-constellation via "
+                        + CONSTELLATION_ENV + ")"),
+                ({}, "missing: SZLHOLDINGS/yarqa (spaces/SZLHOLDINGS/yarqa via " + YARQA_ENV + "), SZLHOLDINGS/szl-constellation"),
+                ({**yarqa, CONSTELLATION_ENV: "hf_jwt_one.a.b\nhf_jwt_two.c.d"}, "not a single Hub token: SZLHOLDINGS/szl-constellation"),
+                ({**yarqa, CONSTELLATION_ENV: "not-a-hub-token"}, "not a single Hub token: SZLHOLDINGS/szl-constellation")):
+            with self.subTest(reason=reason):
+                code, receipt, requests = self.run_main(["--apply", "--auth", "oidc", "--expected-plan", str(expected)],
+                                                        token=TOKEN, env_extra=env)
+                self.assertEqual(code, 1)
+                self.assertFalse(receipt["success"])
+                self.assertIn(reason, receipt["error"])
+                requests.assert_not_called()
+                self.assertNotIn("identity", receipt)
+                self.assertEqual(receipt["assets"], [])
+                self.assertEqual(receipt["auth"]["mode"], "oidc")
+                self.assertEqual([t["resource"] for t in receipt["auth"]["targets"]],
+                                 ["spaces/SZLHOLDINGS/yarqa", "spaces/SZLHOLDINGS/szl-constellation"])
+                self.assert_no_credentials(receipt, *env.values())
+
+    def test_oidc_failed_write_check_blocks_every_target_before_reads_or_writes(self):
+        cards, expected = self.oidc_plan()
+        hub = FakeHub(cards, auth_status={"SZLHOLDINGS/szl-constellation": 403})
+        code, receipt, _ = self.run_main(["--apply", "--auth", "oidc", "--expected-plan", str(expected)],
+                                         hub, env_extra=OIDC_ENV)
+        self.assertEqual(code, 1)
+        self.assertEqual(receipt["identity"]["label"], "UNAVAILABLE")
+        self.assertEqual([(t["repo_id"], t["label"], t["http_status"]) for t in receipt["identity"]["targets"]],
+                         [("SZLHOLDINGS/yarqa", "MEASURED", 200), ("SZLHOLDINGS/szl-constellation", "UNAVAILABLE", 403)])
+        self.assertEqual(receipt["error"], "Trusted Publisher write check failed: SZLHOLDINGS/szl-constellation HTTP 403")
+        self.assertEqual(receipt["assets"], [])
+        self.assertTrue(all(method == "GET" and (path.endswith("/auth-check/write") or path == "/api/whoami-v2")
+                            for method, path, _ in hub.calls))
+        self.assert_no_credentials(receipt)
+
+    def test_oidc_preflight_gates_on_write_check_not_owner_or_role(self):
+        target = RECONCILE.oidc_targets([self.governed()])
+        tokens = {"SZLHOLDINGS/yarqa": OIDC["SZLHOLDINGS/yarqa"]}
+        for whoami in ((json.dumps({"type": "user", "name": "[OIDC]"}), 200), ("unauthorized", 401), ("[]", 200)):
+            with self.subTest(whoami=whoami), patch.object(RECONCILE, "hub_request", side_effect=[("", 200), whoami]) as requests:
+                result = RECONCILE.oidc_preflight(target, tokens)
+                self.assertEqual(result["label"], "MEASURED")
+                self.assertEqual(result["targets"][0]["whoami"]["label"], "REPORTED")
+                self.assertEqual(result["targets"][0]["whoami"]["http_status"], whoami[1])
+                self.assertEqual(requests.call_args_list[0].args[:3],
+                                 ("GET", "/api/spaces/SZLHOLDINGS/yarqa/auth-check/write", OIDC["SZLHOLDINGS/yarqa"]))
+        with patch.object(RECONCILE, "hub_request", side_effect=[("denied", 401), self.identity()]):
+            result = RECONCILE.oidc_preflight(target, tokens)
+        self.assertEqual(result["label"], "UNAVAILABLE")
+        self.assertEqual(result["targets"][0]["whoami"]["name"], "betterwithage")
+
+    def test_auth_oidc_is_apply_only(self):
+        code, receipt, requests = self.run_main(["--auth", "oidc"], env_extra=OIDC_ENV)
+        self.assertEqual(code, 1)
+        self.assertIn("--auth oidc is only valid with --apply", receipt["error"])
+        self.assertNotIn("auth", receipt)
+        requests.assert_not_called()
+
+    def test_token_mode_keeps_precedence_without_fallthrough_and_records_only_the_source_name(self):
+        expected, _ = self.expected_plan()
+        env = {"HF_ORG_TOKEN": "first-invalid-credential", "HF_TOKEN": "second-credential", **OIDC_ENV}
+        for extra in ([], ["--auth", "token"]):
+            with self.subTest(extra=extra):
+                code, receipt, requests = self.run_main(["--apply", *extra, "--expected-plan", str(expected)],
+                                                        [("unauthorized", 401)], env_extra=env)
+                self.assertEqual(code, 1)
+                self.assertEqual(requests.call_count, 1)
+                self.assertEqual(requests.call_args.args[1:3], ("/api/whoami-v2", "first-invalid-credential"))
+                self.assertEqual(receipt["auth"], {"mode": "token", "source": "HF_ORG_TOKEN", "token_recorded": False})
+                self.assert_no_credentials(receipt, *env.values())
+
+    def test_token_mode_success_uses_one_secret_for_every_target(self):
+        cards, expected = self.oidc_plan()
+        hub = FakeHub(cards, whoami=self.identity())
+        code, receipt, _ = self.run_main(["--apply", "--auth", "token", "--expected-plan", str(expected)],
+                                         hub, TOKEN, env_extra=OIDC_ENV)
+        self.assertEqual(code, 0, receipt.get("error"))
+        self.assertEqual(receipt["auth"], {"mode": "token", "source": "HF_CARD_WRITE_TOKEN", "token_recorded": False})
+        self.assertEqual(receipt["identity"]["name"], "betterwithage")
+        self.assertEqual({used for _, _, used in hub.calls}, {TOKEN})
+        self.assertEqual(sum(method == "POST" for method, _, _ in hub.calls), 2)
+        self.assert_no_credentials(receipt)
+
+    def test_error_text_never_retains_any_present_credential(self):
+        failure = ValueError(f"boom {OIDC['SZLHOLDINGS/yarqa']} {TOKEN}")
+        for extra in (["--auth", "oidc"], ["--auth", "token"]):
+            with self.subTest(extra=extra), patch.object(RECONCILE, "load_config", side_effect=failure):
+                code, receipt, _ = self.run_main(["--apply", *extra, "--expected-plan", "unused.json"],
+                                                 token=TOKEN, env_extra=OIDC_ENV)
+                self.assertEqual(code, 1)
+                self.assertEqual(receipt["error"], "boom [REDACTED] [REDACTED]")
+
+    # --- Workflow contract (text-level; the suite stays standard-library only) ------------------
+
+    @staticmethod
+    def workflow_jobs(text):
+        parts = re.split(r"(?m)^  ([A-Za-z0-9_-]+):\n", text.split("\njobs:\n", 1)[1])
+        return dict(zip(parts[1::2], parts[2::2]))
+
+    @staticmethod
+    def run_blocks(text):
+        lines, blocks = text.splitlines(), []
+        for i, line in enumerate(lines):
+            match = re.match(r"^(\s*)(?:-\s+)?run:\s*(.*)$", line)
+            if not match:
+                continue
+            indent, rest = len(match.group(1)), match.group(2)
+            if rest and rest[0] not in "|>":
+                blocks.append(rest)
+                continue
+            body = []
+            for following in lines[i + 1:]:
+                if following.strip() and len(following) - len(following.lstrip()) <= indent:
+                    break
+                body.append(following)
+            blocks.append("\n".join(body))
+        return blocks
+
+    def test_workflow_grants_oidc_only_to_apply_and_keeps_secrets_out_of_plans(self):
+        text = (Path(__file__).resolve().parents[1] / "workflows" / "hf-card-reconcile.yml").read_text(encoding="utf-8")
+        jobs = self.workflow_jobs(text)
+        self.assertEqual(list(jobs), ["contract", "reconcile", "apply"])
+        code = "\n".join(line for line in text.splitlines() if not line.lstrip().startswith("#"))
+        self.assertEqual(code.count("id-token"), 1)
+        self.assertIn("    permissions:\n      contents: read\n      actions: read\n      id-token: write\n", jobs["apply"])
+        self.assertIn("if: github.event_name == 'workflow_dispatch' && inputs.apply == true", jobs["apply"])
+        self.assertIn("if: github.event_name != 'workflow_dispatch' || inputs.apply != true", jobs["reconcile"])
+        for name in ("contract", "reconcile"):
+            self.assertNotIn("id-token", jobs[name])
+            self.assertNotIn("secrets.", jobs[name])
+        for name in ("reconcile", "apply"):
+            self.assertIn("    needs: contract\n", jobs[name])
+        self.assertRegex(text, r"\n      auth:\n        description: [^\n]+\n        type: choice\n"
+                               r"        options:\n          - oidc\n          - token\n        default: oidc\n")
+        secret_lines = [line.strip() for line in text.splitlines() if "secrets." in line]
+        self.assertEqual(len(secret_lines), len(RECONCILE.TOKEN_KEYS))
+        for line in secret_lines:
+            self.assertRegex(line, r"^[A-Z0-9_]+: \$\{\{ inputs\.auth == 'token' && secrets\.[A-Z0-9_]+ \|\| '' \}\}$")
+        uses = re.findall(r"(?m)^\s*(?:-\s*)?uses:\s*(\S+)", text)
+        self.assertTrue(uses)
+        for ref in uses:
+            self.assertRegex(ref, r"^[^@\s]+@[0-9a-f]{40}$")
+        blocks = self.run_blocks(text)
+        self.assertGreaterEqual(len(blocks), 10)
+        for block in blocks:
+            self.assertNotIn("${{", block)
+        apply_step = next(block for block in blocks if "--list-oidc-targets" in block)
+        for required in ('HF_OIDC_RESOURCE="$resource"', 'auth token 2>"$err" </dev/null',
+                         '[[ "$value" =~ ^hf_[A-Za-z0-9._-]+$ ]]', 'echo "::add-mask::$value"',
+                         'printf -v "$name"', 's/hf_[A-Za-z0-9._-]+/[REDACTED]/g'):
+            self.assertIn(required, apply_step)
+        for forbidden in ("GITHUB_ENV", "GITHUB_OUTPUT\" <<", "tee "):
+            self.assertNotIn(forbidden, apply_step)
+
+
+YARQA_ENV = "HF_OIDC_TOKEN_SPACES_SZLHOLDINGS_YARQA"
+CONSTELLATION_ENV = "HF_OIDC_TOKEN_SPACES_SZLHOLDINGS_SZL_CONSTELLATION"
+OIDC = {"SZLHOLDINGS/yarqa": "hf_jwt_eyJyarqa.claims.signature",
+        "SZLHOLDINGS/szl-constellation": "hf_jwt_eyJconstellation.claims.signature"}
+OIDC_ENV = {YARQA_ENV: OIDC["SZLHOLDINGS/yarqa"], CONSTELLATION_ENV: OIDC["SZLHOLDINGS/szl-constellation"]}
+
+
+class FakeHub:
+    """Stateful Hub double: per-repo heads, parent-checked commits, and write auth checks."""
+    API = re.compile(r"/api/(?:spaces|models|datasets)/(SZLHOLDINGS/[^/?]+)(/auth-check/write|/commit/main(?:\?create_pr=1)?)?")
+    RAW = re.compile(r"/(?:spaces/|datasets/)?(SZLHOLDINGS/[^/]+)/raw/([0-9a-f]{40})/README\.md")
+
+    def __init__(self, cards, auth_status=None, whoami=(json.dumps({"type": "user", "name": "[OIDC]"}), 200)):
+        self.revisions = {repo: {HEAD: text} for repo, text in cards.items()}
+        self.heads = {repo: HEAD for repo in cards}
+        self.auth_status = auth_status or {}
+        self.whoami = whoami
+        self.calls = []
+
+    @staticmethod
+    def repo_in(path):
+        match = re.search(r"SZLHOLDINGS/[A-Za-z0-9_.-]+", path)
+        return match.group(0) if match else None
+
+    def __call__(self, method, path, token, body=None, content_type=None):
+        self.calls.append((method, path, token))
+        if path == "/api/whoami-v2":
+            return self.whoami
+        raw = self.RAW.fullmatch(path)
+        if raw:
+            text = self.revisions[raw.group(1)].get(raw.group(2))
+            return (text, 200) if text is not None else ("missing", 404)
+        api = self.API.fullmatch(path)
+        if not api:
+            raise AssertionError(f"unexpected Hub path {path}")
+        repo, suffix = api.group(1), api.group(2) or ""
+        if suffix == "/auth-check/write":
+            return "", self.auth_status.get(repo, 200)
+        if suffix.startswith("/commit/main"):
+            records = [json.loads(line) for line in body.decode("utf-8").splitlines()]
+            if records[0]["value"]["parentCommit"] != self.heads[repo]:
+                return "parent moved", 409
+            commit = hashlib.sha1(repo.encode("utf-8")).hexdigest()
+            self.revisions[repo][commit] = base64.b64decode(records[1]["value"]["content"]).decode("utf-8")
+            self.heads[repo] = commit
+            return json.dumps({"commitOid": commit}), 200
+        return json.dumps({"sha": self.heads[repo]}), 200
 
 
 if __name__ == "__main__":

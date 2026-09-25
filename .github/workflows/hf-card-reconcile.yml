@@ -2,6 +2,11 @@ name: hf-card-reconcile
 
 # Push-triggered runs are plan-only. Hub writes require explicit dispatch:
 # apply=true, and body replacement requires allow_body_replace=true.
+# Plans read anonymously. Apply authenticates with auth=oidc (default): one
+# Hugging Face Trusted Publisher token per selected target, minted and masked
+# inside the apply step and never written to a file, output, or artifact.
+# auth=token keeps the long-lived secret precedence unchanged.
+# Only the apply job may request a GitHub OIDC token (id-token: write).
 # Receipts remain UNSIGNED_HONEST until the DSSE lane signs.
 
 on:
@@ -27,6 +32,13 @@ on:
         description: Exact reviewed attempt of the plan run
         type: string
         default: "1"
+      auth:
+        description: Apply credential (oidc = per-target Trusted Publisher token; token = long-lived secret)
+        type: choice
+        options:
+          - oidc
+          - token
+        default: oidc
 
   push:
     branches: [main]
@@ -45,22 +57,13 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  reconcile:
-    name: governance/hf-card-reconcile
+  contract:
+    name: governance/hf-card-contract
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 10
 
     permissions:
       contents: read
-      actions: read
-
-    env:
-      REPORT: reports/governance/hf-card-reconcile.json
-      APPLY: ${{ github.event_name == 'workflow_dispatch' && inputs.apply == true && '1' || '' }}
-      ALLOW_BODY: ${{ github.event_name == 'workflow_dispatch' && inputs.allow_body_replace == true && '1' || '' }}
-      ONLY: ${{ inputs.only || '' }}
-      PLAN_RUN_ID: ${{ inputs.plan_run_id || '' }}
-      PLAN_RUN_ATTEMPT: ${{ inputs.plan_run_attempt || '1' }}
 
     steps:
       - name: Harden runner
@@ -139,8 +142,160 @@ jobs:
           print(f"expectation valid: {len(assets)} assets")
           PY
 
+  reconcile:
+    name: governance/hf-card-reconcile
+    needs: contract
+    if: github.event_name != 'workflow_dispatch' || inputs.apply != true
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    permissions:
+      contents: read
+
+    env:
+      REPORT: reports/governance/hf-card-reconcile.json
+      ALLOW_BODY: ${{ github.event_name == 'workflow_dispatch' && inputs.allow_body_replace == true && '1' || '' }}
+      ONLY: ${{ inputs.only || '' }}
+
+    steps:
+      - name: Harden runner
+        uses: step-security/harden-runner@05e31511f85b41b11d1cf0ef85d0992719546e2c # v2.21.0
+        with:
+          egress-policy: audit
+
+      - name: Checkout exact governance source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 1
+
+      - name: Set up exact Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12"
+
+      - name: Plan cards anonymously
+        id: reconcile
+        run: |
+          set +e
+          args=(--out-json "$REPORT")
+          if [ -n "$ONLY" ]; then args+=(--only "$ONLY"); fi
+          if [ -n "$ALLOW_BODY" ]; then args+=(--allow-body-replace); fi
+          python -I -P .github/scripts/hf_card_reconcile.py "${args[@]}"
+          echo "exit_code=$?" >> "$GITHUB_OUTPUT"
+
+      - name: Publish reconcile report
+        if: always()
+        run: |
+          set -euo pipefail
+
+          if [ ! -f "$REPORT" ]; then
+            echo "no report produced" >> "$GITHUB_STEP_SUMMARY"
+            exit 1
+          fi
+
+          python -I -P - <<'PY' >> "$GITHUB_STEP_SUMMARY"
+          import json
+          import os
+
+          report = json.load(
+              open(os.environ["REPORT"], encoding="utf-8")
+          )
+
+          print(f"# Hub card reconcile — mode `{report['mode']}`\n")
+          print(f"Source: `{report.get('source_revision', 'UNKNOWN')}`\n")
+          auth = report.get("auth")
+          if auth:
+              resources = ", ".join(f"`{t['resource']}`" for t in auth.get("targets", []))
+              print(f"Auth: `{auth['mode']}`" + (f" ({resources})" if resources else "") + "\n")
+          if report.get("error"):
+              print(f"Failure: {report['error']}\n")
+          print("| repo | label | changes | route | applied |")
+          print("| --- | --- | --- | --- | --- |")
+
+          for asset in report["assets"]:
+              changes = (
+                  "<br>".join(asset.get("changes") or [])
+                  or "none"
+              )
+
+              print(
+                  f"| `{asset['repo_id']}` | "
+                  f"{asset['label']} | "
+                  f"{changes} | "
+                  f"{asset.get('apply_route', '-')} | "
+                  f"{asset.get('applied', 'plan-only')} |"
+              )
+          PY
+
+      - name: Retain immutable reconcile receipt
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: hf-card-reconcile-${{ github.run_id }}-${{ github.run_attempt }}
+          path: reports/governance/
+          if-no-files-found: error
+          retention-days: 90
+
+      - name: Fail closed
+        if: always()
+        env:
+          RC: ${{ steps.reconcile.outputs.exit_code }}
+        run: |
+          set -euo pipefail
+          test -s "$REPORT"
+          exit "${RC:-1}"
+
+  apply:
+    name: governance/hf-card-reconcile-apply
+    needs: contract
+    if: github.event_name == 'workflow_dispatch' && inputs.apply == true
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    # id-token: write is granted to this job only. Each Hugging Face Trusted
+    # Publisher must match repository=szl-holdings/.github, branch=main and
+    # workflow=hf-card-reconcile.yml exactly.
+    permissions:
+      contents: read
+      actions: read
+      id-token: write
+
+    env:
+      REPORT: reports/governance/hf-card-reconcile.json
+      ALLOW_BODY: ${{ inputs.allow_body_replace == true && '1' || '' }}
+      ONLY: ${{ inputs.only || '' }}
+      PLAN_RUN_ID: ${{ inputs.plan_run_id || '' }}
+      PLAN_RUN_ATTEMPT: ${{ inputs.plan_run_attempt || '1' }}
+      AUTH_MODE: ${{ inputs.auth || 'oidc' }}
+
+    steps:
+      - name: Harden runner
+        uses: step-security/harden-runner@05e31511f85b41b11d1cf0ef85d0992719546e2c # v2.21.0
+        with:
+          egress-policy: audit
+
+      - name: Checkout exact governance source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 1
+
+      - name: Set up exact Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12"
+
+      - name: Check trusted branch and credential mode
+        run: |
+          set -euo pipefail
+          [ "$GITHUB_REF" = refs/heads/main ]
+          case "$AUTH_MODE" in
+            oidc|token) echo "auth=$AUTH_MODE" ;;
+            *) echo "::error::UNAVAILABLE - unsupported auth mode"; exit 1 ;;
+          esac
+
       - name: Retrieve the reviewed plan from this exact workflow revision
-        if: env.APPLY == '1'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
@@ -168,24 +323,86 @@ jobs:
           ], check=True)
           PY
 
-      - name: Reconcile cards
+      - name: Create hash-locked Hub CLI for the OIDC exchange
+        if: env.AUTH_MODE == 'oidc'
+        run: |
+          set -euo pipefail
+          VENV="$RUNNER_TEMP/hf-cli-venv"
+          if [ -e "$VENV" ]; then
+            echo "::error::Refusing preexisting Hub CLI virtual environment."
+            exit 2
+          fi
+          python -m venv "$VENV"
+          "$VENV/bin/python" -I -P -m pip install \
+            --disable-pip-version-check --require-hashes --only-binary=:all: \
+            --ignore-installed -r requirements/hf-publisher.lock
+          "$VENV/bin/python" -I -P -c \
+            'from importlib.metadata import version; assert version("huggingface-hub") == "1.19.0"'
+          test -x "$VENV/bin/hf"
+
+      # OIDC: one exchange per selected target, scoped by HF_OIDC_RESOURCE.
+      # Each token is validated as one Hub token line, masked, and kept only in
+      # this step's process environment as HF_OIDC_TOKEN_<RESOURCE>. Minting and
+      # applying share one step so no token crosses a step boundary, GITHUB_ENV,
+      # an output, or an artifact. Any failed exchange fails the whole apply.
+      - name: Reconcile cards (apply)
         id: reconcile
         env:
-          HF_CARD_WRITE_TOKEN: ${{ env.APPLY == '1' && secrets.HF_CARD_WRITE_TOKEN || '' }}
-          HF_ORG_TOKEN: ${{ env.APPLY == '1' && secrets.HF_ORG_TOKEN || '' }}
-          HF_ORG_TOKEN1: ${{ env.APPLY == '1' && secrets.HF_ORG_TOKEN1 || '' }}
-          HF_TOKEN: ${{ env.APPLY == '1' && secrets.HF_TOKEN || '' }}
-          HF_WRITE_TOKEN: ${{ env.APPLY == '1' && secrets.HF_WRITE_TOKEN || '' }}
+          HF_CARD_WRITE_TOKEN: ${{ inputs.auth == 'token' && secrets.HF_CARD_WRITE_TOKEN || '' }}
+          HF_ORG_TOKEN: ${{ inputs.auth == 'token' && secrets.HF_ORG_TOKEN || '' }}
+          HF_ORG_TOKEN1: ${{ inputs.auth == 'token' && secrets.HF_ORG_TOKEN1 || '' }}
+          HF_TOKEN: ${{ inputs.auth == 'token' && secrets.HF_TOKEN || '' }}
+          HF_WRITE_TOKEN: ${{ inputs.auth == 'token' && secrets.HF_WRITE_TOKEN || '' }}
         run: |
-          set +e
-          args=(--out-json "$REPORT")
-          if [ -n "$ONLY" ]; then args+=(--only "$ONLY"); fi
+          set -uo pipefail
+          only_args=()
+          if [ -n "$ONLY" ]; then only_args=(--only "$ONLY"); fi
+          args=(--out-json "$REPORT" --apply --auth "$AUTH_MODE"
+            --expected-plan "$RUNNER_TEMP/reviewed-plan/hf-card-reconcile.json")
           if [ -n "$ALLOW_BODY" ]; then args+=(--allow-body-replace); fi
-          if [ -n "$APPLY" ]; then
-            args+=(--apply --expected-plan "$RUNNER_TEMP/reviewed-plan/hf-card-reconcile.json")
+          mint_failed=0
+          if [ "$AUTH_MODE" = oidc ]; then
+            hf_cli="$RUNNER_TEMP/hf-cli-venv/bin/hf"
+            minted=()
+            if targets="$(python -I -P .github/scripts/hf_card_reconcile.py --list-oidc-targets "${only_args[@]}")" \
+                && [ -n "$targets" ]; then
+              while IFS=$'\t' read -r name resource repo_id; do
+                if ! [[ "$name" =~ ^HF_OIDC_TOKEN_[A-Z0-9_]+$ \
+                    && "$resource" =~ ^((spaces|datasets)/)?SZLHOLDINGS/[A-Za-z0-9][A-Za-z0-9_.-]*$ ]]; then
+                  echo "::error::UNAVAILABLE - unexpected OIDC target entry"
+                  mint_failed=1
+                  continue
+                fi
+                echo "Trusted Publisher exchange: target=$repo_id resource=$resource"
+                err="$(mktemp "$RUNNER_TEMP/hf-oidc-error.XXXXXX")"
+                value=""
+                if value="$(env -u HF_TOKEN -u HUGGING_FACE_HUB_TOKEN HF_OIDC_RESOURCE="$resource" \
+                      "$hf_cli" auth token 2>"$err" </dev/null)" \
+                    && [[ "$value" =~ ^hf_[A-Za-z0-9._-]+$ ]]; then
+                  echo "::add-mask::$value"
+                  printf -v "$name" '%s' "$value"
+                  minted+=("$name")
+                  echo "minted and masked a repo-scoped token for $resource"
+                else
+                  mint_failed=1
+                  echo "::error::UNAVAILABLE - trusted-publisher exchange failed for $repo_id ($resource)"
+                  sed -E 's/hf_[A-Za-z0-9._-]+/[REDACTED]/g; s/eyJ[A-Za-z0-9._-]+/[REDACTED]/g' "$err" >&2 || true
+                fi
+                value=""
+                rm -f "$err"
+              done <<< "$targets"
+              if [ "${#minted[@]}" -gt 0 ]; then export "${minted[@]}"; fi
+            else
+              mint_failed=1
+              echo "::error::UNAVAILABLE - could not resolve the selected OIDC targets"
+            fi
           fi
-          python -I -P .github/scripts/hf_card_reconcile.py "${args[@]}"
-          echo "exit_code=$?" >> "$GITHUB_OUTPUT"
+          # A missing target token makes the reconciler fail closed before any
+          # Hub request and still retain a receipt naming the missing target.
+          python -I -P .github/scripts/hf_card_reconcile.py "${args[@]}" "${only_args[@]}"
+          rc=$?
+          if [ "$mint_failed" -ne 0 ]; then rc=1; fi
+          echo "exit_code=$rc" >> "$GITHUB_OUTPUT"
 
       - name: Publish reconcile report
         if: always()
@@ -207,6 +424,10 @@ jobs:
 
           print(f"# Hub card reconcile — mode `{report['mode']}`\n")
           print(f"Source: `{report.get('source_revision', 'UNKNOWN')}`\n")
+          auth = report.get("auth")
+          if auth:
+              resources = ", ".join(f"`{t['resource']}`" for t in auth.get("targets", []))
+              print(f"Auth: `{auth['mode']}`" + (f" ({resources})" if resources else "") + "\n")
           if report.get("error"):
               print(f"Failure: {report['error']}\n")
           print("| repo | label | changes | route | applied |")
