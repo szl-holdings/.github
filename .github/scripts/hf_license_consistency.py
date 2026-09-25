@@ -29,7 +29,8 @@ Output privacy: the ``--report`` file is committed to, and uploaded as an
 artifact from, a public repository. With ``--include-private`` it therefore
 lists PUBLIC repos only; private repos are checked but appear only as the
 aggregate ``private_summary`` counts. Stdout (a public CI log) does the same
-unless ``--show-private`` is passed for a local run.
+unless ``--show-private`` is passed for a local run; that flag is refused when
+``GITHUB_ACTIONS=true``.
 
 Auth:
   - HF token from $HF_ORG_TOKEN / $HF_TOKEN / $HF_WRITE_TOKEN (optional for
@@ -44,7 +45,8 @@ Usage:
       [--github-org szl-holdings] [--include-private] [--no-github] [--json] \
       [--show-private]
 
-Exit code 0 = all consistent (warnings allowed); 1 = at least one ERROR.
+Exit code 0 = all consistent (warnings allowed); 1 = at least one ERROR;
+2 = --show-private refused under GitHub Actions.
 """
 from __future__ import annotations
 
@@ -306,9 +308,6 @@ def check_repo(repo, allow_entry, gh_org, gh_token, use_github):
     errors, warnings, notes = [], [], []
 
     license_optional = bool((allow_entry or {}).get("license_optional"))
-    # Set only on entries main() synthesizes from the top-level private_repos
-    # policy: a missing license on a private repo is a WARN, not a silent note.
-    by_private_policy = bool((allow_entry or {}).get("private_policy"))
     expected = (allow_entry or {}).get("expected_spdx")
     allowed = set()
     if expected:
@@ -321,16 +320,11 @@ def check_repo(repo, allow_entry, gh_org, gh_token, use_github):
     if readme is None:
         if not license_optional:
             errors.append("README.md not found on main (cannot read license front-matter)")
-        elif by_private_policy:
-            warnings.append("no README on a private repo (license required before it is made public)")
         else:
             notes.append("no README (allowlisted as license-optional)")
     elif not fm_license:
         if not license_optional:
             errors.append("no 'license:' in README front-matter")
-        elif by_private_policy:
-            warnings.append("no 'license:' front-matter on a private repo "
-                            "(required before it is made public)")
         else:
             notes.append("no license front-matter (allowlisted as license-optional)")
     else:
@@ -381,7 +375,7 @@ def check_repo(repo, allow_entry, gh_org, gh_token, use_github):
         "hf_license_norm": claimed_norm or None,
         "hf_license_name": fm_name,
         "github_spdx": gh_spdx if gh_found else None,
-        "allowlisted": bool(allow_entry) and not by_private_policy,
+        "allowlisted": bool(allow_entry),
         "status": status,
         "errors": errors,
         "warnings": warnings,
@@ -411,9 +405,14 @@ def main() -> int:
     ap.add_argument("--json", action="store_true", help="Print the JSON report to stdout.")
     ap.add_argument("--show-private", action="store_true",
                     help="Also print private repo ids and results to stdout (local "
-                         "debugging only; never pass this in CI). The --report file "
-                         "never lists private repos.")
+                         "debugging only; refused when GITHUB_ACTIONS=true). The "
+                         "--report file never lists private repos.")
     args = ap.parse_args()
+    if args.show_private and os.environ.get("GITHUB_ACTIONS") == "true":
+        # CI logs of this public repository are public: private ids stay local.
+        print("--show-private is for local runs only and is refused in GitHub "
+              "Actions (the job log is public).", file=sys.stderr)
+        return 2
 
     allow = {}
     if args.allowlist and os.path.exists(args.allowlist):
@@ -421,7 +420,6 @@ def main() -> int:
             allow = json.load(fh)
     allow_repos = allow.get("repos", {})
     ignore_repos = set(allow.get("ignore_repos", []))
-    private_license_optional = bool((allow.get("private_repos") or {}).get("license_optional"))
 
     hf_token = _hf_token()
     gh_token = _gh_token()
@@ -486,8 +484,6 @@ def main() -> int:
             continue
         # allowlist key may be full id ("SZLHOLDINGS/foo") or bare name ("foo").
         entry = allow_repos.get(r["id"], allow_repos.get(r["name"]))
-        if entry is None and r.get("private") and private_license_optional:
-            entry = {"license_optional": True, "private_policy": True}
         results.append(check_repo(r, entry, args.github_org, gh_token, use_github))
 
     errs = [x for x in results if x["status"] == "ERROR"]

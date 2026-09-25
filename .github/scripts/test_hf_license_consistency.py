@@ -31,6 +31,7 @@ import json
 import os
 import tempfile
 import unittest
+from unittest import mock
 
 _HERE = os.path.dirname(os.path.abspath(__file__))
 _MODULE_PATH = os.path.join(_HERE, "hf_license_consistency.py")
@@ -39,6 +40,7 @@ _spec = importlib.util.spec_from_file_location("hf_license_consistency", _MODULE
 assert _spec and _spec.loader
 hlc = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(hlc)
+_REAL_CHECK_REPO = hlc.check_repo
 
 
 def _run_main(argv, *, hf_token, whoami, repos, check_repo=None, stdout=None):
@@ -163,7 +165,11 @@ class TestPublicOnlyOutput(unittest.TestCase):
     stdout is a public CI log: private repos may appear only as counts."""
 
     def _run(self, extra_argv=(), check_repo=None):
-        with tempfile.TemporaryDirectory() as tmp:
+        # These cases model a local run; the CI refusal of --show-private is
+        # covered by TestShowPrivateIsLocalOnly.
+        env = {k: v for k, v in os.environ.items() if k != "GITHUB_ACTIONS"}
+        with tempfile.TemporaryDirectory() as tmp, \
+                mock.patch.dict(os.environ, env, clear=True):
             report_path = os.path.join(tmp, "report.json")
             out = io.StringIO()
             rc = _run_main(
@@ -210,57 +216,70 @@ class TestPublicOnlyOutput(unittest.TestCase):
         self.assertEqual([x["repo"] for x in report["results"] if x.get("private")], [])
 
 
-class TestPrivateRepoPolicy(unittest.TestCase):
-    """Private repos are license-optional through one top-level policy, so the
-    public allowlist never has to name a private repo."""
+class TestPrivateReposKeepErrorSemantics(unittest.TestCase):
+    """Keeping private ids out of the public outputs must not relax the check:
+    a private repo with no allowlist entry of its own and no license
+    front-matter is still an ERROR that fails the run."""
 
-    def test_policy_entry_is_synthesized_for_private_repos_only(self):
-        seen = {}
+    @staticmethod
+    def _readme(repo, token):
+        if repo["private"]:
+            return "# card without front-matter\n"
+        return "---\nlicense: apache-2.0\n---\n# card\n"
 
-        def capture(repo, entry, gh_org, gh_token, use_github):
-            seen[repo["id"]] = entry
-            return _error_stub(repo, entry, gh_org, gh_token, use_github) | {
-                "status": "OK", "errors": []}
-
-        with tempfile.TemporaryDirectory() as tmp:
-            allow = os.path.join(tmp, "allow.json")
-            with open(allow, "w", encoding="utf-8") as fh:
-                json.dump({"repos": {"SZLHOLDINGS/priv-1": {"expected_spdx": "MIT"}},
-                           "private_repos": {"license_optional": True}}, fh)
-            rc = _run_main(
-                ["--include-private", "--min-private", "1", "--no-github",
-                 "--allowlist", allow],
-                hf_token="tok", whoami=_OK_WHOAMI,
-                repos=_private_repos(2) + [_PUBLIC_REPO], check_repo=capture)
-        self.assertEqual(rc, 0)
-        self.assertIsNone(seen["SZLHOLDINGS/pub-0"])
-        self.assertEqual(seen["SZLHOLDINGS/priv-0"],
-                         {"license_optional": True, "private_policy": True})
-        # An explicit per-repo entry still wins over the policy.
-        self.assertEqual(seen["SZLHOLDINGS/priv-1"], {"expected_spdx": "MIT"})
-
-    def test_check_repo_warns_under_policy_and_errors_without_it(self):
-        saved = hlc.hf_readme, hlc._hf_token
+    def _run_real_check(self, allowlist_doc=None):
+        saved = hlc.hf_readme
+        hlc.hf_readme = self._readme
         try:
-            hlc.hf_readme = lambda repo, token: "# card without front-matter\n"
-            hlc._hf_token = lambda: None
-            repo = _private_repos(1)[0]
-            with_policy = hlc.check_repo(
-                repo, {"license_optional": True, "private_policy": True},
-                "szl-holdings", None, False)
-            without = hlc.check_repo(repo, None, "szl-holdings", None, False)
+            with tempfile.TemporaryDirectory() as tmp:
+                report_path = os.path.join(tmp, "report.json")
+                argv = ["--include-private", "--min-private", "5", "--no-github",
+                        "--report", report_path]
+                if allowlist_doc is not None:
+                    allow = os.path.join(tmp, "allow.json")
+                    with open(allow, "w", encoding="utf-8") as fh:
+                        json.dump(allowlist_doc, fh)
+                    argv += ["--allowlist", allow]
+                out = io.StringIO()
+                rc = _run_main(argv, hf_token="tok", whoami=_OK_WHOAMI,
+                               repos=_private_repos(5) + [_PUBLIC_REPO],
+                               check_repo=_REAL_CHECK_REPO, stdout=out)
+                with open(report_path, encoding="utf-8") as fh:
+                    text = fh.read()
         finally:
-            hlc.hf_readme, hlc._hf_token = saved
-        self.assertEqual(with_policy["status"], "WARN")
-        self.assertEqual(with_policy["errors"], [])
-        self.assertFalse(with_policy["allowlisted"])
-        self.assertEqual(without["status"], "ERROR")
+            hlc.hf_readme = saved
+        return rc, json.loads(text), text, out.getvalue()
 
-    def test_committed_allowlist_uses_the_policy(self):
-        path = os.path.join(_HERE, "..", "data", "hf_license_allowlist.json")
-        with open(path, encoding="utf-8") as fh:
-            allow = json.load(fh)
-        self.assertTrue(allow["private_repos"]["license_optional"])
+    def test_committed_allowlist_keeps_private_missing_license_an_error(self):
+        rc, report, text, log = self._run_real_check()
+        self.assertEqual(rc, 1)
+        self.assertEqual(report["private_summary"],
+                         {"checked": 5, "ok": 0, "warn": 0, "error": 5})
+        self.assertEqual([(x["repo"], x["status"]) for x in report["results"]],
+                         [("SZLHOLDINGS/pub-0", "OK")])
+        self.assertNotIn("priv-", text)
+        self.assertNotIn("priv-", log)
+
+    def test_top_level_private_key_grants_no_exemption(self):
+        rc, report, text, log = self._run_real_check(
+            {"repos": {}, "private_repos": {"license_optional": True},
+             "ignore_repos": []})
+        self.assertEqual(rc, 1)
+        self.assertEqual(report["private_summary"]["error"], 5)
+        self.assertEqual(report["private_summary"]["warn"], 0)
+
+
+class TestShowPrivateIsLocalOnly(unittest.TestCase):
+    def test_show_private_is_refused_in_github_actions(self):
+        out = io.StringIO()
+        with mock.patch.dict(os.environ, {"GITHUB_ACTIONS": "true"}):
+            rc = _run_main(
+                ["--include-private", "--min-private", "5", "--no-github",
+                 "--show-private"],
+                hf_token="tok", whoami=_OK_WHOAMI,
+                repos=_private_repos(5) + [_PUBLIC_REPO], stdout=out)
+        self.assertEqual(rc, 2)
+        self.assertNotIn("priv-", out.getvalue())
 
 
 if __name__ == "__main__":

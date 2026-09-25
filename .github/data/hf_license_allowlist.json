@@ -1,5 +1,5 @@
 {
-  "_comment": "Intentional, reasoned exceptions for the HF license-consistency checker (see ../scripts/hf_license_consistency.py). The companion to GitHub's license_allowlist.json. Every entry must explain WHY the HF front-matter license is absent, or differs from the matching GitHub repo's SPDX. Nothing is silently 'passed' — un-listed drift fails the scheduled run. Keys may be a full HF id ('SZLHOLDINGS/foo') or a bare repo name ('foo'). Supported fields: license_optional (bool — repo legitimately has no license front-matter), expected_spdx + allowed_claims (pin/extend the accepted HF license values), github_repo (override or, when false/null, disable the GitHub cross-reference). Top-level private_repos.license_optional applies to every private repo that has no entry of its own.",
+  "_comment": "Intentional, reasoned exceptions for the HF license-consistency checker (see ../scripts/hf_license_consistency.py). The companion to GitHub's license_allowlist.json. Every entry must explain WHY the HF front-matter license is absent, or differs from the matching GitHub repo's SPDX. Nothing is silently 'passed' — un-listed drift fails the scheduled run. Keys may be a full HF id ('SZLHOLDINGS/foo') or a bare repo name ('foo'). Supported fields: license_optional (bool — repo legitimately has no license front-matter), expected_spdx + allowed_claims (pin/extend the accepted HF license values), github_repo (override or, when false/null, disable the GitHub cross-reference).",
   "repos": {
     "SZLHOLDINGS/README": {
       "license_optional": true,
@@ -12,10 +12,6 @@
       "github_repo": "szl-lake",
       "reason": "Dual-licensed lake mirrored from szl-holdings/szl-lake: datasets under CC-BY-4.0 (the SPDX GitHub detects), code/tooling under Apache-2.0. The HF dataset card declares CC-BY-4.0; either is acceptable."
     }
-  },
-  "private_repos": {
-    "license_optional": true,
-    "reason": "This file is public, so it names no private repo. A private HF repo is not a published artifact: a missing license: front-matter on it is a WARN (counted in the report's private_summary), not an ERROR. The check blocks as soon as the repo is public. A license claim that is present but disagrees with the GitHub SPDX stays an ERROR."
   },
   "ignore_repos": []
 }

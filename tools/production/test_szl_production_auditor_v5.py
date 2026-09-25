@@ -5,14 +5,17 @@ from __future__ import annotations
 import csv
 import importlib.util
 import json
+import re
 import tempfile
 import unittest
+import urllib.parse
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent
 AUDITOR_PATH = ROOT / "szl_production_auditor_v5.py"
 PROFILE_PATH = ROOT / "szl_production_readiness_profile_v5.json"
 TIERS_CSV_PATH = ROOT / "SZL_PRODUCTION_REPOSITORY_TIERS_V5.csv"
+SNAPSHOT_PATH = ROOT / "SZL_CURRENT_PRODUCTION_SNAPSHOT_V5.json"
 
 
 def load_auditor():
@@ -69,13 +72,50 @@ class ProfileTests(unittest.TestCase):
                          [r["repository"] for r in profile["repositories"]])
 
 
+    def test_snapshot_references_public_repositories_only(self) -> None:
+        profile = json.loads(PROFILE_PATH.read_text(encoding="utf-8"))
+        public = {r["repository"] for r in profile["repositories"]
+                  if r.get("visibility") == "public"}
+        snapshot = json.loads(SNAPSHOT_PATH.read_text(encoding="utf-8"))
+        refs: set[str] = set()
+
+        def walk(node) -> None:
+            if isinstance(node, dict):
+                for key, value in node.items():
+                    if key == "repository" and isinstance(value, str):
+                        refs.add(value)
+                    walk(value)
+            elif isinstance(node, list):
+                for value in node:
+                    walk(value)
+            elif isinstance(node, str):
+                for name in re.findall(r"szl-holdings/([A-Za-z0-9._-]+)", node):
+                    refs.add("szl-holdings/" + name.rstrip("."))
+
+        walk(snapshot)
+        self.assertTrue(refs)
+        # Count only: a failure message must not echo a repository name into
+        # a public CI log.
+        outside = len(refs - public)
+        self.assertEqual(outside, 0,
+                         f"{outside} snapshot repository reference(s) are not in the "
+                         "public profile")
+
+
 class FakeHTTP:
+    """Serves the org repo list in GitHub-style pages (per_page / page)."""
+
     def __init__(self, org_repos: list[dict]) -> None:
         self.org_repos = org_repos
+        self.repo_pages: list[int] = []
 
     def json(self, url: str, token: str | None = None):
         if "/orgs/szl-holdings/repos" in url:
-            return self.org_repos
+            query = urllib.parse.parse_qs(urllib.parse.urlsplit(url).query)
+            per_page = int(query.get("per_page", ["30"])[0])
+            page = int(query.get("page", ["1"])[0])
+            self.repo_pages.append(page)
+            return self.org_repos[(page - 1) * per_page:page * per_page]
         if "/search/issues" in url:
             return {"total_count": 0}
         raise RuntimeError("offline test")
@@ -95,6 +135,24 @@ class InventoryDriftTests(unittest.TestCase):
 
     def test_unclassified_public_repository_is_drift(self) -> None:
         self.assertEqual(len(self._drift_findings(extra_public=1)), 1)
+
+    def test_inventory_reads_every_page(self) -> None:
+        # 126 repos over two pages; only 60 of the 71 public ones are on page 1,
+        # so a single-page read would report drift that is not there.
+        profile = json.loads(PROFILE_PATH.read_text(encoding="utf-8"))
+        public_total = len(profile["repositories"])
+        live = ([{"private": False}] * 60 + [{"private": True}] * 40
+                + [{"private": False}] * (public_total - 60) + [{"private": True}] * 15)
+        http = FakeHTTP(live)
+        report = AUD.Report(profile)
+        AUD.audit_github(profile, report, http)
+        self.assertEqual(http.repo_pages, [1, 2])
+        self.assertEqual([f for f in report.findings
+                          if f["title"] == "Repository inventory drift"], [])
+        inventory = [e for e in report.evidence
+                     if e["control"] == "GitHub repository inventory"]
+        self.assertEqual(len(inventory), 1)
+        self.assertEqual(inventory[0]["data"].get("count"), len(live))
 
 
 class RedactionTests(unittest.TestCase):

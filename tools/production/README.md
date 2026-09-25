@@ -22,8 +22,10 @@ python tools/production/szl_production_auditor_v5.py \
 
 Public-only inventory: this repository is public, so the profile, the tiers CSV
 and the snapshot list public repositories only. `validate_profile` rejects any
-`repositories` entry whose `visibility` is not `public`, and the live inventory
-drift check compares the profile with public repositories only.
+`repositories` entry whose `visibility` is not `public`, and the unit tests check
+the tiers CSV and the snapshot against the public profile. The live inventory
+drift check reads every page of the org listing and compares the profile with
+public repositories only.
 
 Truth boundary: this packet performs no merge, deployment, Hub mutation, ruleset
 edit, DNS change, model training, or production certification. Missing evidence

@@ -659,13 +659,28 @@ def gh_json(http: HTTP, path: str, token: str | None) -> Any:
     return http.json(url, token=token)
 
 
+def gh_list(http: HTTP, path: str, token: str | None, per_page: int = 100,
+            max_pages: int = 20) -> list[Any]:
+    """Fetch every page of a GitHub list endpoint (fail closed past max_pages)."""
+    items: list[Any] = []
+    sep = "&" if "?" in path else "?"
+    for page in range(1, max_pages + 1):
+        batch = gh_json(http, f"{path}{sep}per_page={per_page}&page={page}", token)
+        if not isinstance(batch, list):
+            raise ValueError("list response is not a list")
+        items.extend(batch)
+        if len(batch) < per_page:
+            return items
+    raise ValueError(f"list response exceeded {max_pages} pages")
+
+
 def audit_github(profile: dict[str, Any], report: Report, http: HTTP) -> None:
     token = os.environ.get("GH_TOKEN") or os.environ.get("GITHUB_TOKEN")
     org = "szl-holdings"
     try:
-        repos = gh_json(http, f"/orgs/{org}/repos?per_page=100&type=all", token)
-        if not isinstance(repos, list):
-            raise ValueError("repo response is not a list")
+        # All pages: a single page would undercount an org with more than 100
+        # repositories and skew the public inventory comparison below.
+        repos = gh_list(http, f"/orgs/{org}/repos?type=all", token)
         report.proof("G00", "GitHub repository inventory", org, "PASS", count=len(repos))
         # The profile is public-only (see validate_profile), so compare it with
         # the public part of the live inventory.
