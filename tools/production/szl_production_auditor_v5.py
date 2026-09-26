@@ -272,9 +272,16 @@ class HTTP:
 
 def validate_profile(profile: dict[str, Any]) -> list[str]:
     errors = []
-    required = {"schema", "name", "repositories", "web_targets", "gates", "release_rings"}
+    required = {"schema", "name", "repositories", "non_public_repositories_omitted",
+                "web_targets", "gates", "release_rings"}
     if missing := sorted(required - profile.keys()):
         errors.append(f"missing keys: {missing}")
+    # How many non-public repositories the capture classified and left out of
+    # this public-only profile. The live drift check compares it with the
+    # non-public count, so an unclassified private repository is still drift.
+    omitted = profile.get("non_public_repositories_omitted", 0)
+    if isinstance(omitted, bool) or not isinstance(omitted, int) or omitted < 0:
+        errors.append("non_public_repositories_omitted must be a non-negative integer")
     gate_ids = [x.get("id") for x in profile.get("gates", [])]
     if len(gate_ids) != len(set(gate_ids)):
         errors.append("duplicate gate IDs")
@@ -682,13 +689,19 @@ def audit_github(profile: dict[str, Any], report: Report, http: HTTP) -> None:
         # repositories and skew the public inventory comparison below.
         repos = gh_list(http, f"/orgs/{org}/repos?type=all", token)
         report.proof("G00", "GitHub repository inventory", org, "PASS", count=len(repos))
-        # The profile is public-only (see validate_profile), so compare it with
-        # the public part of the live inventory.
+        # The profile lists public repositories only (see validate_profile) and
+        # records how many non-public ones the capture left out. Both parts are
+        # compared with the live inventory by count, so a new unclassified
+        # repository of either visibility is drift, and no name is reported.
         public_count = sum(1 for r in repos if not r.get("private"))
-        if public_count != len(profile["repositories"]):
+        non_public_count = len(repos) - public_count
+        omitted = profile["non_public_repositories_omitted"]
+        if public_count != len(profile["repositories"]) or non_public_count != omitted:
             report.finding("G00", "P0", "FAIL", org, "Repository inventory drift",
-                           f"profile={len(profile['repositories'])}; api_public={public_count}",
-                           "Recapture and classify every public asset.")
+                           f"profile_public={len(profile['repositories'])}; "
+                           f"api_public={public_count}; profile_non_public={omitted}; "
+                           f"api_non_public={non_public_count}",
+                           "Recapture and classify every asset.")
     except Exception as exc:
         report.finding("G00", "P0", "UNKNOWN", org, "GitHub inventory unavailable",
                        str(exc), "Provide read-only metadata access and rerun.")

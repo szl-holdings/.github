@@ -472,6 +472,7 @@
   ],
   "mission": "Unify existing frontend, backend, security, truth, AI, debugging and release controls into one fail-closed PRR.",
   "name": "SZL Production Readiness System",
+  "non_public_repositories_omitted": 5,
   "primary_vertical": "Build and sell Lyte Services now.",
   "product_hierarchy": {
     "adjacent_vertical": {

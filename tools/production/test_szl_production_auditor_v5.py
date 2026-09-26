@@ -30,17 +30,65 @@ def load_auditor():
 AUD = load_auditor()
 
 
+def snapshot_repository_refs(node) -> set[str]:
+    """Collect the snapshot's structured repository references.
+
+    Covered: every ``repository`` value, every ``szl-holdings/<name>`` string
+    (for example ``target`` values), and the bare repository names used as keys
+    of ``captured_ruleset_evidence``. Not covered: a bare repository name in
+    free text, or a Hugging Face id. This is a partial guard, not a full scan.
+    """
+    refs: set[str] = set()
+    if isinstance(node, dict):
+        for key, value in node.items():
+            if key == "repository" and isinstance(value, str):
+                refs.add(value)
+            if key == "captured_ruleset_evidence" and isinstance(value, dict):
+                refs.update(f"szl-holdings/{name}" for name in value)
+            refs |= snapshot_repository_refs(value)
+    elif isinstance(node, list):
+        for value in node:
+            refs |= snapshot_repository_refs(value)
+    elif isinstance(node, str):
+        for name in re.findall(r"szl-holdings/([A-Za-z0-9._-]+)", node):
+            refs.add("szl-holdings/" + name.rstrip("."))
+    return refs
+
+
 class ProfileTests(unittest.TestCase):
     def test_canonical_profile_validates(self) -> None:
         profile = json.loads(PROFILE_PATH.read_text(encoding="utf-8"))
         self.assertEqual(AUD.validate_profile(profile), [])
         self.assertEqual(len(profile["gates"]), 17)
         self.assertEqual(len(profile["repositories"]), 71)
+        self.assertEqual(profile["non_public_repositories_omitted"], 5)
         self.assertEqual(len(profile["release_rings"]), 5)
+
+    def test_profile_counts_match_snapshot(self) -> None:
+        # Profile and snapshot come from the same capture: 71 public rows plus
+        # 5 non-public repositories recorded as a count only.
+        profile = json.loads(PROFILE_PATH.read_text(encoding="utf-8"))
+        github = json.loads(SNAPSHOT_PATH.read_text(encoding="utf-8"))["github"]
+        self.assertEqual(len(profile["repositories"]), github["public"])
+        self.assertEqual(profile["non_public_repositories_omitted"], github["private"])
+        self.assertEqual(len(profile["repositories"]) + profile["non_public_repositories_omitted"],
+                         github["repositories"])
 
     def test_missing_keys_fail_closed(self) -> None:
         errors = AUD.validate_profile({"schema": "x"})
         self.assertTrue(any("missing keys" in e for e in errors))
+
+    def test_non_public_count_required_and_well_formed(self) -> None:
+        profile = json.loads(PROFILE_PATH.read_text(encoding="utf-8"))
+        missing = dict(profile)
+        del missing["non_public_repositories_omitted"]
+        self.assertTrue(any("non_public_repositories_omitted" in e
+                            for e in AUD.validate_profile(missing)))
+        for bad in (-1, "5", True, None, 2.5):
+            with self.subTest(value=bad):
+                errors = AUD.validate_profile(dict(profile, non_public_repositories_omitted=bad))
+                self.assertIn("non_public_repositories_omitted must be a non-negative integer",
+                              errors)
 
     def test_duplicate_gate_ids_fail(self) -> None:
         profile = json.loads(PROFILE_PATH.read_text(encoding="utf-8"))
@@ -71,28 +119,13 @@ class ProfileTests(unittest.TestCase):
         self.assertEqual([r["repository"] for r in rows],
                          [r["repository"] for r in profile["repositories"]])
 
-
     def test_snapshot_references_public_repositories_only(self) -> None:
+        # Partial guard: see snapshot_repository_refs for what it covers.
         profile = json.loads(PROFILE_PATH.read_text(encoding="utf-8"))
         public = {r["repository"] for r in profile["repositories"]
                   if r.get("visibility") == "public"}
         snapshot = json.loads(SNAPSHOT_PATH.read_text(encoding="utf-8"))
-        refs: set[str] = set()
-
-        def walk(node) -> None:
-            if isinstance(node, dict):
-                for key, value in node.items():
-                    if key == "repository" and isinstance(value, str):
-                        refs.add(value)
-                    walk(value)
-            elif isinstance(node, list):
-                for value in node:
-                    walk(value)
-            elif isinstance(node, str):
-                for name in re.findall(r"szl-holdings/([A-Za-z0-9._-]+)", node):
-                    refs.add("szl-holdings/" + name.rstrip("."))
-
-        walk(snapshot)
+        refs = snapshot_repository_refs(snapshot)
         self.assertTrue(refs)
         # Count only: a failure message must not echo a repository name into
         # a public CI log.
@@ -100,6 +133,18 @@ class ProfileTests(unittest.TestCase):
         self.assertEqual(outside, 0,
                          f"{outside} snapshot repository reference(s) are not in the "
                          "public profile")
+
+    def test_snapshot_reference_collector_covers_each_structured_form(self) -> None:
+        cases = {
+            "repository field": {"open_prs": [{"repository": "szl-holdings/example-internal"}]},
+            "org-qualified string": {"ruleset_findings": [
+                {"target": "szl-holdings/example-internal"}]},
+            "ruleset evidence key": {"github": {"captured_ruleset_evidence": {
+                "example-internal": {"captured_approvals": 0}}}},
+        }
+        for label, snapshot in cases.items():
+            with self.subTest(form=label):
+                self.assertIn("szl-holdings/example-internal", snapshot_repository_refs(snapshot))
 
 
 class FakeHTTP:
@@ -122,19 +167,31 @@ class FakeHTTP:
 
 
 class InventoryDriftTests(unittest.TestCase):
-    def _drift_findings(self, extra_public: int) -> list[dict]:
+    def _drift_findings(self, extra_public: int = 0, extra_non_public: int = 0) -> list[dict]:
         profile = json.loads(PROFILE_PATH.read_text(encoding="utf-8"))
-        live = [{"private": False} for _ in range(len(profile["repositories"]) + extra_public)]
-        live += [{"private": True} for _ in range(3)]
+        public = len(profile["repositories"]) + extra_public
+        non_public = profile["non_public_repositories_omitted"] + extra_non_public
+        live = [{"private": False, "name": f"public-{i}"} for i in range(public)]
+        live += [{"private": True, "name": f"example-internal-{i}"} for i in range(non_public)]
         report = AUD.Report(profile)
         AUD.audit_github(profile, report, FakeHTTP(live))
         return [f for f in report.findings if f["title"] == "Repository inventory drift"]
 
-    def test_private_repositories_do_not_count_as_drift(self) -> None:
-        self.assertEqual(self._drift_findings(extra_public=0), [])
+    def test_recorded_non_public_repositories_are_not_drift(self) -> None:
+        self.assertEqual(self._drift_findings(), [])
 
     def test_unclassified_public_repository_is_drift(self) -> None:
         self.assertEqual(len(self._drift_findings(extra_public=1)), 1)
+
+    def test_unclassified_non_public_repository_is_drift_without_names(self) -> None:
+        # The profile lists public repositories only, so a new or removed
+        # non-public repository is found through the recorded count. The
+        # finding reports counts, never a repository name.
+        for delta in (1, -1):
+            with self.subTest(extra_non_public=delta):
+                findings = self._drift_findings(extra_non_public=delta)
+                self.assertEqual(len(findings), 1)
+                self.assertNotIn("example-internal", json.dumps(findings))
 
     def test_inventory_reads_every_page(self) -> None:
         # 126 repos over two pages; only 60 of the 71 public ones are on page 1,
@@ -143,6 +200,7 @@ class InventoryDriftTests(unittest.TestCase):
         public_total = len(profile["repositories"])
         live = ([{"private": False}] * 60 + [{"private": True}] * 40
                 + [{"private": False}] * (public_total - 60) + [{"private": True}] * 15)
+        profile["non_public_repositories_omitted"] = 55
         http = FakeHTTP(live)
         report = AUD.Report(profile)
         AUD.audit_github(profile, report, http)
