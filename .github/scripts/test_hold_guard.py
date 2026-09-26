@@ -185,6 +185,31 @@ class MarkerTests(unittest.TestCase):
             with self.subTest(title=title):
                 self.assertEqual(hold_guard.hold_reasons(title, []), [])
 
+    def test_dnm_inside_an_identifier_is_not_a_marker(self) -> None:
+        # Once the check is required, a false positive silently blocks a
+        # pull request nobody put on HOLD, e.g. a Dependabot bump of a
+        # package whose name contains "dnm".
+        for title in (
+            "chore(deps): bump dnm-lib from 1.0 to 1.1",
+            "chore(deps): bump @scope/dnm from 2 to 3",
+            "chore(deps): bump lib-dnm from 2 to 3",
+            "fix: dnm_utils import order",
+            "docs: pkg.dnm notes",
+        ):
+            with self.subTest(title=title):
+                self.assertEqual(hold_guard.hold_reasons(title, []), [])
+
+    def test_standalone_dnm_is_still_a_marker(self) -> None:
+        for title in (
+            "DNM",
+            "DNM - wip rewrite",
+            "wip, DNM",
+            "feat: x DNM!",
+            "feat: x {dnm}",
+        ):
+            with self.subTest(title=title):
+                self.assertTrue(hold_guard.hold_reasons(title, []))
+
     def test_annotation_cannot_start_a_new_workflow_command(self) -> None:
         escaped = hold_guard.annotation("a\n::add-mask::x\r%")
         self.assertNotIn("\n", escaped)
@@ -470,6 +495,42 @@ class WorkflowContractTests(unittest.TestCase):
         self.assertIn("\n  merge_group:\n    types: [checks_requested]\n", self.caller)
         self.assertNotRegex(self.caller, r"(?m)^\s+branches:")
         self.assertNotRegex(self.caller, r"(?m)^\s+paths:")
+
+    def test_newer_hold_event_cancels_an_older_run(self) -> None:
+        # Without this, an older run that saw a HOLD label in its payload can
+        # finish after the newer clear run and leave a stale verdict.
+        self.assertIn(
+            "\nconcurrency:\n"
+            "  group: hold-guard-${{ github.event.pull_request.number || github.ref }}\n"
+            "  cancel-in-progress: true\n",
+            self.caller,
+        )
+
+    def test_documented_caller_stub_matches_this_repositorys_caller(self) -> None:
+        # Other repositories copy the stub from the reusable's header. It must
+        # stay identical to the caller this repository actually runs and tests,
+        # apart from the pinned remote `uses:` target.
+        stub: list[str] = []
+        for line in self.reusable.splitlines():
+            if line == "#   name: HOLD guard" or stub:
+                if not line.startswith("#   "):
+                    break
+                stub.append(line[4:])
+        caller = [
+            line
+            for line in self.caller.splitlines()
+            if line.strip() and not line.lstrip().startswith("#")
+        ]
+        local_uses = "    uses: ./.github/workflows/reusable-hold-guard.yml"
+        remote_uses = (
+            "    uses: szl-holdings/.github/.github/workflows/"
+            "reusable-hold-guard.yml@<40-char commit SHA>"
+        )
+        self.assertIn(local_uses, caller)
+        self.assertIn(remote_uses, stub)
+        self.assertEqual(
+            [remote_uses if line == local_uses else line for line in caller], stub
+        )
 
     def test_caller_job_name_and_least_privilege(self) -> None:
         self.assertIn(

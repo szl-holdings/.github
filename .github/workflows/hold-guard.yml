@@ -8,6 +8,11 @@ name: HOLD guard
 # labeled / unlabeled / edited re-run the check whenever a HOLD label or the
 # title changes; synchronize re-runs it on every new head. There is no branch
 # or path filter: HOLD applies to every pull request.
+#
+# One run per pull request at a time: a newer HOLD event cancels the older
+# run, so a slow run that saw an older label state can never finish last and
+# leave a stale verdict on the head commit. Merge-queue refs are unique per
+# group, so queue runs never cancel each other.
 
 on:
   pull_request:
@@ -17,6 +22,10 @@ on:
 
 permissions:
   contents: read
+
+concurrency:
+  group: hold-guard-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
 
 jobs:
   hold-guard:

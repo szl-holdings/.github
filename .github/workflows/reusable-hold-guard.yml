@@ -18,6 +18,8 @@ name: Reusable — HOLD guard
 # in every repository, which is the exact context a ruleset should require.
 # The caller must trigger on merge_group when the branch uses a merge queue,
 # and on labeled/unlabeled/edited so a HOLD change re-evaluates the check.
+# Keep the concurrency block: a newer HOLD event must cancel an older run so
+# a stale verdict can never finish last on the head commit.
 #
 #   name: HOLD guard
 #   on:
@@ -27,6 +29,9 @@ name: Reusable — HOLD guard
 #       types: [checks_requested]
 #   permissions:
 #     contents: read
+#   concurrency:
+#     group: hold-guard-${{ github.event.pull_request.number || github.ref }}
+#     cancel-in-progress: true
 #   jobs:
 #     hold-guard:
 #       name: hold-guard

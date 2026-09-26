@@ -14,7 +14,9 @@ A pull request is HELD when either of these is true:
   optional inner spaces) or the standalone word ``DNM``.
 
 Prose such as "under HOLD" in a title is deliberately NOT a marker: HOLD must
-be declared explicitly with a label or the bracketed title marker.
+be declared explicitly with a label or the bracketed title marker. Nor is
+``dnm`` inside an identifier such as a package name (``dnm-lib``,
+``@scope/dnm``, ``dnm_utils``), so a dependency bump cannot be held by accident.
 
 The guard evaluates the event payload AND a live read of the pull request, and
 fails if either shows a marker. The live read covers the merge-queue event,
@@ -52,7 +54,10 @@ TITLE_MARKERS: tuple[tuple[re.Pattern[str], str], ...] = (
         ),
         "[DNM] / [do not merge]",
     ),
-    (re.compile(r"(?<![A-Za-z0-9])dnm(?![A-Za-z0-9])", re.IGNORECASE), "DNM"),
+    # The bare word DNM counts only when it stands alone. A letter, digit,
+    # underscore, hyphen, dot, slash or @ next to it makes it part of an
+    # identifier (a Dependabot "bump dnm-lib" or "@scope/dnm"), not a marker.
+    (re.compile(r"(?<![\w./@-])dnm(?![\w./@-])", re.IGNORECASE), "DNM"),
 )
 
 PULL_REQUEST_EVENTS = frozenset({"pull_request", "pull_request_target"})

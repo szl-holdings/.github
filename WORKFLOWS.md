@@ -83,9 +83,11 @@ the pull request carries either marker:
   (any case; spaces, underscores and hyphens are interchangeable); or
 - a title containing `[HOLD]`, `[DNM]`, `[do not merge]` or the word `DNM`.
 
-Prose such as "under HOLD" in a title is not a marker. Declare HOLD with the
-label (preferred, because removing it is an auditable event) or the bracketed
-title marker.
+Prose such as "under HOLD" in a title is not a marker, and neither is `dnm`
+inside an identifier such as a package name (`bump dnm-lib`, `@scope/dnm`), so
+a dependency bump is never held by accident. Declare HOLD with the label
+(preferred, because removing it is an auditable event) or the bracketed title
+marker.
 
 The job reads the event payload and makes one read-only REST request for the
 live pull request, because a `merge_group` payload has no labels or title and a
@@ -98,8 +100,12 @@ network-free self-test are `.github/scripts/hold_guard.py` and
 
 `hold-guard.yml` is this repository's caller. Other repositories copy the
 caller stub from the header of `reusable-hold-guard.yml`, pinned to a
-40-character commit SHA of this repository. With the caller job id and name
-kept as `hold-guard`, every repository reports the same check context:
+40-character commit SHA of this repository; the self-test keeps that stub
+identical to the caller tested here. The caller's concurrency group lets a
+newer HOLD event cancel an older run for the same pull request, so a slow run
+that saw an older label state can never finish last. With the caller job id
+and name kept as `hold-guard`, every repository reports the same check
+context:
 
 ```text
 hold-guard / hold-guard
