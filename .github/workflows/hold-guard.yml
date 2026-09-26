@@ -1,0 +1,27 @@
+name: HOLD guard
+
+# Enforces HOLD on this repository's own pull requests and merge-queue groups
+# through the org reusable workflow. The check context is
+# `hold-guard / hold-guard`; it becomes a merge block only once a ruleset
+# requires that context (owner action, see WORKFLOWS.md "HOLD guard").
+#
+# labeled / unlabeled / edited re-run the check whenever a HOLD label or the
+# title changes; synchronize re-runs it on every new head. There is no branch
+# or path filter: HOLD applies to every pull request.
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, edited, labeled, unlabeled, ready_for_review]
+  merge_group:
+    types: [checks_requested]
+
+permissions:
+  contents: read
+
+jobs:
+  hold-guard:
+    name: hold-guard
+    permissions:
+      contents: read
+      pull-requests: read
+    uses: ./.github/workflows/reusable-hold-guard.yml

@@ -22,6 +22,7 @@ of redefining the same logic locally.
 | `reusable-trivy.yml` | Trivy filesystem vulnerability scan | `push`, weekly cron |
 | `reusable-hf-candidate-plan.yml` | Build a provider-free exact base-to-head Dockerfile payload plan and revalidate the live PR pair | base-controlled `pull_request_target` |
 | `reusable-hf-module-drift-check.yml` | Detect drift between a repo's source-of-truth and its live Hugging Face Space | caller-chosen |
+| `reusable-hold-guard.yml` | Fail a PR or merge-queue group that carries a HOLD label or title marker | `pull_request` (incl. `labeled`, `unlabeled`, `edited`), `merge_group` |
 
 ### Repository-native provenance compatibility
 
@@ -68,6 +69,48 @@ jobs:
 For maximum supply-chain hygiene, replace `@main` with a 40-character SHA from
 this repository. Organization refs are exempt from the automated pin check, but
 immutable pins remain preferred for non-experimental consumers.
+
+## HOLD guard
+
+HOLD is a merge block only when GitHub can see it. Before this guard, HOLD
+lived in prose and hand-copied local lists, no check or ruleset read it, and
+every HOLD pull request of 2026-09-25 merged with green required checks.
+
+`reusable-hold-guard.yml` fails a pull request, or its merge-queue group, while
+the pull request carries either marker:
+
+- a label whose name is `hold`, `hold-for-owner`, `do-not-merge` or `dnm`
+  (any case; spaces, underscores and hyphens are interchangeable); or
+- a title containing `[HOLD]`, `[DNM]`, `[do not merge]` or the word `DNM`.
+
+Prose such as "under HOLD" in a title is not a marker. Declare HOLD with the
+label (preferred, because removing it is an auditable event) or the bracketed
+title marker.
+
+The job reads the event payload and makes one read-only REST request for the
+live pull request, because a `merge_group` payload has no labels or title and a
+label can change after the triggering event. It never checks out caller
+content, uses no stored credentials, and needs only `contents: read` and
+`pull-requests: read`. An unsupported event, malformed payload, missing token,
+or failed live read is a failure (exit 2), never a pass. The logic and its
+network-free self-test are `.github/scripts/hold_guard.py` and
+`.github/scripts/test_hold_guard.py`.
+
+`hold-guard.yml` is this repository's caller. Other repositories copy the
+caller stub from the header of `reusable-hold-guard.yml`, pinned to a
+40-character commit SHA of this repository. With the caller job id and name
+kept as `hold-guard`, every repository reports the same check context:
+
+```text
+hold-guard / hold-guard
+```
+
+The check blocks a merge only after a ruleset requires that context. Adding it
+to a ruleset is an owner action. Scope an organization-level requirement to
+repositories that already have the caller, because a required context that
+never reports leaves every pull request waiting. A HOLD applied after a pull
+request's merge-group check has already run is not re-evaluated inside that
+group; remove the pull request from the queue when you apply a late HOLD.
 
 ## HF Space module drift
 

@@ -1,0 +1,72 @@
+name: Reusable — HOLD guard
+
+# Fails the calling pull request, or its merge-queue group, while it carries a
+# HOLD marker, so HOLD becomes a merge block instead of prose:
+#   - a label named hold, hold-for-owner, do-not-merge or dnm (any case;
+#     spaces, underscores and hyphens are interchangeable), or
+#   - a title containing [HOLD], [DNM], [do not merge] or the word DNM.
+# The logic, its exit-code contract and its self-test live in
+# .github/scripts/hold_guard.py and .github/scripts/test_hold_guard.py.
+#
+# The job reads the event payload plus ONE live read-only REST request for the
+# pull request (the merge_group payload carries no labels or title). It never
+# checks out or executes caller content, uses no stored credentials, and needs
+# only contents: read + pull-requests: read. An unevaluable run fails closed.
+#
+# Caller stub for a consuming repository. Keep the caller job id and name
+# `hold-guard`: the resulting check context is then `hold-guard / hold-guard`
+# in every repository, which is the exact context a ruleset should require.
+# The caller must trigger on merge_group when the branch uses a merge queue,
+# and on labeled/unlabeled/edited so a HOLD change re-evaluates the check.
+#
+#   name: HOLD guard
+#   on:
+#     pull_request:
+#       types: [opened, synchronize, reopened, edited, labeled, unlabeled, ready_for_review]
+#     merge_group:
+#       types: [checks_requested]
+#   permissions:
+#     contents: read
+#   jobs:
+#     hold-guard:
+#       name: hold-guard
+#       permissions:
+#         contents: read
+#         pull-requests: read
+#       uses: szl-holdings/.github/.github/workflows/reusable-hold-guard.yml@<40-char commit SHA>
+
+on:
+  workflow_call: {}
+
+permissions:
+  contents: read
+
+jobs:
+  hold-guard:
+    name: hold-guard
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      pull-requests: read
+    steps:
+      - name: Harden runner
+        uses: step-security/harden-runner@e14015d583714f6e62063499dc959a02595150a1 # v2.21.1
+        with:
+          egress-policy: audit
+
+      - name: Checkout exact reusable-workflow revision (guard source only)
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: ${{ job.workflow_repository }}
+          ref: ${{ job.workflow_sha }}
+          path: hold-guard-tools
+          fetch-depth: 1
+          persist-credentials: false
+          sparse-checkout: .github/scripts/hold_guard.py
+          sparse-checkout-cone-mode: false
+
+      - name: Fail while the pull request carries a HOLD marker
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: python3 -I hold-guard-tools/.github/scripts/hold_guard.py
