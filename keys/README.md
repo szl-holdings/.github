@@ -6,7 +6,10 @@
 This directory publishes a **public** SZL Holdings organization cosign key.
 It is **not** the key the a11oy Space reported for signing when checked on
 2026-09-26, and it is **not** the repository-root key. Read
-[Key status](#key-status) before you verify anything against it.
+[Key status](#key-status) before you verify anything against it. The a11oy
+runtime receipt key (`9926bf69`) is published separately as
+[`a11oy-runtime-receipts.pub`](./a11oy-runtime-receipts.pub); choosing a single
+canonical org key is still an owner key ceremony.
 
 > **PUBLIC KEY ONLY.** This directory holds public keys only. A public-git scan
 > recorded at 2026-08-29T18:00Z found no committed private key
@@ -35,6 +38,7 @@ It is **not** the key the a11oy Space reported for signing when checked on
 | File | Contents |
 |---|---|
 | [`cosign.pub`](./cosign.pub) | Org cosign **public** key `421a1422` (ECDSA P-256, SubjectPublicKeyInfo PEM). Last changed 2026-06-09 (`320d55f`). |
+| [`a11oy-runtime-receipts.pub`](./a11oy-runtime-receipts.pub) | a11oy runtime receipt **public** key `9926bf69` (ECDSA P-256, SPKI DER SHA-256 `8e2d106c…`). Byte-identical to `https://a-11-oy.com/cosign.pub` and `https://szlholdings-a11oy.hf.space/cosign.pub` when added on 2026-09-27. Use it to verify a11oy decision receipts; it is not a release-signing key. |
 
 This file does **not** mirror the repository-root [`/cosign.pub`](../cosign.pub).
 The root key was rotated on 2026-06-14 (`e942dc4`) and again on 2026-06-27
@@ -73,7 +77,7 @@ git log. Live GETs were run on 2026-09-26 at 02:37:38Z.
 | `421a1422` | `fc7e0c26b91ca8cae14bf773c3dd8da7cdfe2aa99432abd6604abd67a7b53567` | root `cosign.pub` from 2026-06-09 (`6da2a72`); `keys/cosign.pub` from 2026-06-09 (`320d55f`). | Still the file in this directory. |
 | `76199818` | `a1f6d3233442cdad0801c702e0ff77aa45fd1ba45f532e3919c80d520b2826ab` | root `cosign.pub` from 2026-06-14 (`e942dc4`). | Replaced on 2026-06-27. |
 | `d3028f8a` | `580ed9a9bd9f7c9f4f49ec9564b81ba8b3d80f3f21d0e5200c38514be94ad3a8` | root `cosign.pub` from 2026-06-27 (`30cad24`). Also embedded as `COSIGN_PUBLIC_PEM` in `szl_dsse.py` at `szl-holdings/a11oy@28acdc52` and served at the a11oy Space `/khipu/pubkey.pem` (02:37Z). | Current root key. |
-| `9926bf69` | `8e2d106c6995e11dbf7cbedfa9e5800bb50c82a635756e40dcd330364f6ea8ba` | Not published in this repository. Served at `https://a-11-oy.com/cosign.pub` and `https://szlholdings-a11oy.hf.space/cosign.pub` (02:37Z), which is the signing product origin itself. Also committed in `szl-holdings/a11oy` at `ayllu/keys/council-runtime-2026-07-21.pub` since `0d3a2d4c` (2026-07-21), with the same SPKI DER; that copy is wrapped at 76 columns, so its keyid-style hash is `75dc678a…`. a11oy's `ayllu/keys/README.md` says that copy was recovered from two live a11oy signatures by ECDSA public-key recovery, and that verifying against it does not prove custody of the published org key. Full keyid `9926bf69b799ea663fc5cf5a8c5d8f594d99d7b323700d6a20b803bd4c9f4e15`. | Key the a11oy Space reported for signing (see below). |
+| `9926bf69` | `8e2d106c6995e11dbf7cbedfa9e5800bb50c82a635756e40dcd330364f6ea8ba` | Published here as [`keys/a11oy-runtime-receipts.pub`](./a11oy-runtime-receipts.pub) since 2026-09-27 (before that, not published in this repository). Served at `https://a-11-oy.com/cosign.pub` and `https://szlholdings-a11oy.hf.space/cosign.pub` (02:37Z), which is the signing product origin itself. Also committed in `szl-holdings/a11oy` at `ayllu/keys/council-runtime-2026-07-21.pub` since `0d3a2d4c` (2026-07-21), with the same SPKI DER; that copy is wrapped at 76 columns, so its keyid-style hash is `75dc678a…`. a11oy's `ayllu/keys/README.md` says that copy was recovered from two live a11oy signatures by ECDSA public-key recovery, and that verifying against it does not prove custody of the published org key. Full keyid `9926bf69b799ea663fc5cf5a8c5d8f594d99d7b323700d6a20b803bd4c9f4e15`. | Key the a11oy Space reported for signing (see below). |
 
 What was observed on 2026-09-26:
 
@@ -224,3 +228,26 @@ secret to the published org key. Old receipts remain verifiable with the prior
 public key (keep an archive of retired public keys). Add each new and retired
 key to [Key status](#key-status), and update `SZLHOLDINGS/szl-lake`
 `keys/org-cosign.pub` in the same change.
+
+## Verify an a11oy receipt against the runtime key
+
+```python
+# pip install cryptography
+import base64, json, sys
+from cryptography.hazmat.primitives import hashes
+from cryptography.hazmat.primitives.asymmetric import ec
+from cryptography.hazmat.primitives.serialization import load_pem_public_key
+
+key = load_pem_public_key(open("keys/a11oy-runtime-receipts.pub", "rb").read())
+env = json.load(open(sys.argv[1]))          # a DSSE envelope: payloadType, payload, signatures
+payload, ptype = base64.b64decode(env["payload"]), env["payloadType"].encode()
+pae = b"DSSEv1 %d %s %d %s" % (len(ptype), ptype, len(payload), payload)
+for s in env["signatures"]:
+    key.verify(base64.b64decode(s["sig"]), pae, ec.ECDSA(hashes.SHA256()))   # raises if invalid
+print("OK")
+```
+
+Checked on 2026-09-27: the top-level envelopes of `szl-holdings/a11oy`
+`ayllu/decisions/2026-07-21-inaugural-charter.json` and
+`2026-07-21-post-rebuild-continuity.json` verify under this key; their inner
+envelopes do not (they carry a different signer).
