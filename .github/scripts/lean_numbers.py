@@ -17,7 +17,9 @@ Counting methods (documented, stable):
   - declarations: lines in Lutar/ and Main.lean whose initial token is one of
     {theorem, lemma, def, abbrev, instance, structure, inductive, class},
     optionally preceded by the `noncomputable` and/or `private` modifier.
-  - axioms_raw: lines whose initial token is `axiom` (after optional modifiers).
+  - axioms_raw: lines whose first token is `axiom` (after optional indentation, one
+    attribute and private/protected/noncomputable/unsafe modifiers), excluding lines
+    that start inside a /- -/ block comment or docstring.
   - axioms_unique: distinct axiom names among those.
   - sorries_raw: total `\\bsorry\\b` token occurrences across all .lean files.
   - sorries_noncomment: occurrences excluding lines that are pure line-comments
@@ -41,12 +43,30 @@ DECL_RE = re.compile(
     r"^(?:private\s+)?(?:noncomputable\s+)?(?:private\s+)?"
     r"(theorem|lemma|def|abbrev|instance|structure|inductive|class)\b"
 )
-AXIOM_RE = re.compile(r"^(?:private\s+)?axiom\s+([A-Za-z_][A-Za-z0-9_']*)")
+AXIOM_RE = re.compile(
+    r"^\s*(?:@\[[^\]]*\]\s*)?(?:(?:private|protected|noncomputable|unsafe)\s+)*axiom\s+([A-Za-z_][A-Za-z0-9_'.]*)"
+)
+_AX_STATE = {"depth": 0}
+
+
+def _axiom_match(line: str, st: dict):
+    # Comment-aware axiom match: skip lines that start inside a /- -/ block comment or docstring.
+    start_depth = st["depth"]
+    i, n = 0, len(line)
+    while i < n:
+        if line.startswith("/-", i):
+            st["depth"] += 1; i += 2; continue
+        if st["depth"] and line.startswith("-/", i):
+            st["depth"] -= 1; i += 2; continue
+        if not st["depth"] and line.startswith("--", i):
+            break
+        i += 1
+    return None if start_depth else AXIOM_RE.match(line)
 SORRY_RE = re.compile(r"\bsorry\b")
 COMMENT_LINE_RE = re.compile(r"^\s*--")
 
 
-def iter_lean_files(root: str):
+def _iter_lean_files_raw(root: str):
     base = os.path.join(root, "Lutar")
     for dirpath, _dirs, files in os.walk(base):
         for fn in files:
@@ -55,6 +75,12 @@ def iter_lean_files(root: str):
     main = os.path.join(root, "Main.lean")
     if os.path.exists(main):
         yield main
+
+
+def iter_lean_files(root: str):
+    for item in _iter_lean_files_raw(root):
+        _AX_STATE["depth"] = 0
+        yield item
 
 
 def count(root: str) -> dict:
@@ -72,7 +98,7 @@ def count(root: str) -> dict:
             for line in fh:
                 if DECL_RE.match(line):
                     declarations += 1
-                m = AXIOM_RE.match(line)
+                m = _axiom_match(line, _AX_STATE)
                 if m:
                     axioms_raw += 1
                     axiom_names.add(m.group(1))
