@@ -74,6 +74,32 @@
         ".github/scripts/control_plane_effect_gate.py": "sha256:047a2537c126cc5124f5a6be91893287743e34cf43aabc02b27262ee2381e70e",
         ".github/scripts/test_control_plane_effect_gate.py": "sha256:2572b909e25fd9c3927a7ed19205fc3db9ade60fb56bcbf01ceff316bd2315f2"
       }
+    },
+    ".github/workflows/lean-numbers.yml": {
+      "intent_id": "cp-ebom-static-boundary-v1",
+      "valid_until": "2026-11-30",
+      "source_sha256": "sha256:13eca4a27e663008bc02c0537d10f01daea0b1e3f4e14728b67cd30849cd34a1",
+      "credentials": [],
+      "resources": [],
+      "effects": [],
+      "max_external_writes": 1,
+      "required_controls": {
+        "triggers": [
+          "merge_group",
+          "pull_request",
+          "push"
+        ],
+        "contents_read": true,
+        "no_explicit_secrets": true,
+        "concurrency": true,
+        "protected_ref": true,
+        "exact_sha": true,
+        "expected_before": true,
+        "readback": true
+      },
+      "trusted_transitives": {
+        ".github/scripts/lean_numbers.py": "sha256:999598ac0da319b5a261d9fdbd7419662df883034a6ac17202b6a75cf2a77ede"
+      }
     }
   }
 }
