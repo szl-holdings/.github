@@ -76,7 +76,7 @@
       }
     },
     ".github/workflows/lean-numbers.yml": {
-      "intent_id": "cp-ebom-static-boundary-v1",
+      "intent_id": "lean-numbers-recount-v1",
       "valid_until": "2026-11-30",
       "source_sha256": "sha256:13eca4a27e663008bc02c0537d10f01daea0b1e3f4e14728b67cd30849cd34a1",
       "credentials": [],
