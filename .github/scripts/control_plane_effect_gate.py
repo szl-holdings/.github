@@ -1451,12 +1451,24 @@ def analyze_repository(
     )
     if unbound_executable_changes:
         reason_codes.add("UNBOUND_EXECUTABLE_CHANGE")
+    # A PR that touches a trust root must not launder DENY verdicts of other workflows
+    # into REVIEW_REQUIRED. Denials of non-trust-root workflows stay hard.
+    untrusted_denials = sorted(
+        str(item.get("workflow"))
+        for item in analyses
+        if isinstance(item, dict)
+        and item.get("verdict") == "DENY"
+        and str(item.get("workflow")) not in TRUST_ROOT_PATHS
+    )
+    if trust_root_changes and untrusted_denials:
+        reason_codes.add("TRUST_ROOT_BUNDLED_WITH_DENIED_WORKFLOW")
     hard_reasons = {
         "WORKFLOW_DELETION_DENIED",
         "WORKFLOW_DECLARATION_MISSING",
         "WORKFLOW_DIGEST_MISMATCH",
         "TRUSTED_TRANSITIVE_DIGEST_MISMATCH",
         "TRUSTED_TRANSITIVE_SET_MISMATCH",
+        "TRUST_ROOT_BUNDLED_WITH_DENIED_WORKFLOW",
     }
     if reason_codes & hard_reasons:
         verdict = "DENY"
