@@ -74,6 +74,144 @@
         ".github/scripts/control_plane_effect_gate.py": "sha256:047a2537c126cc5124f5a6be91893287743e34cf43aabc02b27262ee2381e70e",
         ".github/scripts/test_control_plane_effect_gate.py": "sha256:2572b909e25fd9c3927a7ed19205fc3db9ade60fb56bcbf01ceff316bd2315f2"
       }
+    },
+    ".github/workflows/lean-numbers.yml": {
+      "intent_id": "cp-ebom-static-boundary-v1",
+      "valid_until": "2026-11-30",
+      "source_sha256": "sha256:13eca4a27e663008bc02c0537d10f01daea0b1e3f4e14728b67cd30849cd34a1",
+      "credentials": [],
+      "resources": [
+        {
+          "key": "github:actions:artifact:control-plane-effect",
+          "access": "external-write"
+        },
+        {
+          "key": "github:repository:szl-holdings/.github:contents",
+          "access": "read"
+        },
+        {
+          "key": "runner:guard:egress",
+          "access": "local-write"
+        },
+        {
+          "key": "runner:toolchain:python",
+          "access": "local-write"
+        }
+      ],
+      "effects": [
+        {
+          "sink": "github.artifact.upload",
+          "resource": "github:actions:artifact:control-plane-effect",
+          "access": "external-write",
+          "max_calls": 1
+        },
+        {
+          "sink": "github.contents.checkout",
+          "resource": "github:repository:szl-holdings/.github:contents",
+          "access": "read",
+          "max_calls": 1
+        },
+        {
+          "sink": "runner.guard.configure",
+          "resource": "runner:guard:egress",
+          "access": "local-write",
+          "max_calls": 1
+        },
+        {
+          "sink": "runner.toolchain.install",
+          "resource": "runner:toolchain:python",
+          "access": "local-write",
+          "max_calls": 1
+        }
+      ],
+      "max_external_writes": 1,
+      "required_controls": {
+        "triggers": [
+          "merge_group",
+          "pull_request",
+          "push"
+        ],
+        "contents_read": true,
+        "no_explicit_secrets": true,
+        "concurrency": true,
+        "protected_ref": true,
+        "exact_sha": true,
+        "expected_before": true,
+        "readback": true
+      },
+      "trusted_transitives": {
+        ".github/scripts/control_plane_effect_gate.py": "sha256:047a2537c126cc5124f5a6be91893287743e34cf43aabc02b27262ee2381e70e",
+        ".github/scripts/test_control_plane_effect_gate.py": "sha256:2572b909e25fd9c3927a7ed19205fc3db9ade60fb56bcbf01ceff316bd2315f2"
+      }
+    },
+    ".github/workflows/frontier-compass.yml": {
+      "intent_id": "cp-ebom-static-boundary-v1",
+      "valid_until": "2026-11-30",
+      "source_sha256": "sha256:be364b5937239be40e058c50ce6d06a2abe348292dc0b9228ca8dcebe11c85b7",
+      "credentials": [],
+      "resources": [
+        {
+          "key": "github:actions:artifact:control-plane-effect",
+          "access": "external-write"
+        },
+        {
+          "key": "github:repository:szl-holdings/.github:contents",
+          "access": "read"
+        },
+        {
+          "key": "runner:guard:egress",
+          "access": "local-write"
+        },
+        {
+          "key": "runner:toolchain:python",
+          "access": "local-write"
+        }
+      ],
+      "effects": [
+        {
+          "sink": "github.artifact.upload",
+          "resource": "github:actions:artifact:control-plane-effect",
+          "access": "external-write",
+          "max_calls": 1
+        },
+        {
+          "sink": "github.contents.checkout",
+          "resource": "github:repository:szl-holdings/.github:contents",
+          "access": "read",
+          "max_calls": 1
+        },
+        {
+          "sink": "runner.guard.configure",
+          "resource": "runner:guard:egress",
+          "access": "local-write",
+          "max_calls": 1
+        },
+        {
+          "sink": "runner.toolchain.install",
+          "resource": "runner:toolchain:python",
+          "access": "local-write",
+          "max_calls": 1
+        }
+      ],
+      "max_external_writes": 1,
+      "required_controls": {
+        "triggers": [
+          "merge_group",
+          "pull_request",
+          "push"
+        ],
+        "contents_read": true,
+        "no_explicit_secrets": true,
+        "concurrency": true,
+        "protected_ref": true,
+        "exact_sha": true,
+        "expected_before": true,
+        "readback": true
+      },
+      "trusted_transitives": {
+        ".github/scripts/control_plane_effect_gate.py": "sha256:047a2537c126cc5124f5a6be91893287743e34cf43aabc02b27262ee2381e70e",
+        ".github/scripts/test_control_plane_effect_gate.py": "sha256:2572b909e25fd9c3927a7ed19205fc3db9ade60fb56bcbf01ceff316bd2315f2"
+      }
     }
   }
 }
