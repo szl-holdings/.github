@@ -35,6 +35,7 @@ SAFE_IDENTIFIER = re.compile(r"[A-Za-z0-9][A-Za-z0-9._:/-]*")
 SECRET_REFERENCE = re.compile(r"\$\{\{\s*secrets\.([A-Za-z_][A-Za-z0-9_]*)\s*\}\}")
 MUTATING_HTTP_VERBS = frozenset({"POST", "PUT", "PATCH", "DELETE"})
 ACCESS_MODES = frozenset({"read", "local-write", "external-write"})
+REVIEWED_UNKNOWN_ENTRY = re.compile(r"([A-Z][A-Z0-9_]*)@([^:@\s]+):([1-9][0-9]*)")
 TRUSTED_TOOL_PATHS = frozenset(
     {
         ".github/scripts/control_plane_effect_gate.py",
@@ -270,7 +271,7 @@ def load_policy_bytes(raw: bytes, *, as_of: date) -> dict[str, Any]:
         if not isinstance(declaration, dict):
             raise GateError("POLICY_SCHEMA_INVALID", "workflow declaration must be an object")
         strict_keys(
-            declaration,
+            {key: value for key, value in declaration.items() if key != "reviewed_unknowns"},
             {
                 "intent_id",
                 "valid_until",
@@ -432,6 +433,37 @@ def load_policy_bytes(raw: bytes, *, as_of: date) -> dict[str, Any]:
                 digest, f"{workflow}.trusted_transitives.{trusted_path}"
             )
 
+        reviewed = declaration.get("reviewed_unknowns", {})
+        if not isinstance(reviewed, dict) or (reviewed and set(reviewed) != {"files", "unknowns"}):
+            raise GateError("POLICY_SCHEMA_INVALID", "reviewed_unknowns must be an object with files and unknowns")
+        normalized_reviewed: dict[str, Any] = {}
+        if reviewed:
+            pinned_source = reviewed["files"]
+            pinned_entries = reviewed["unknowns"]
+            if (
+                not isinstance(pinned_source, dict)
+                or not pinned_source
+                or not isinstance(pinned_entries, list)
+                or not pinned_entries
+            ):
+                raise GateError("POLICY_SCHEMA_INVALID", "reviewed_unknowns needs non-empty files and unknowns")
+            pinned_files: dict[str, str] = {}
+            for item_path, digest in pinned_source.items():
+                pinned_path = safe_repo_path(item_path)
+                if pinned_path in TRUSTED_TOOL_PATHS:
+                    raise GateError("TRUST_EXPANSION_DENIED", "gate tools cannot be reviewed-unknown pins")
+                pinned_files[pinned_path] = validate_digest(digest, f"{workflow}.reviewed_unknowns.{pinned_path}")
+            pinned_items: list[str] = []
+            for entry in pinned_entries:
+                text = str(entry)
+                match = REVIEWED_UNKNOWN_ENTRY.fullmatch(text)
+                if not match or match.group(2) not in pinned_files or text in pinned_items:
+                    raise GateError(
+                        "POLICY_SCHEMA_INVALID",
+                        "reviewed unknowns must be unique CODE@path:line entries on pinned files",
+                    )
+                pinned_items.append(text)
+            normalized_reviewed = {"files": dict(sorted(pinned_files.items())), "unknowns": sorted(pinned_items)}
         normalized[workflow] = {
             "intent_id": intent_id,
             "valid_until": declaration_until.isoformat(),
@@ -447,6 +479,7 @@ def load_policy_bytes(raw: bytes, *, as_of: date) -> dict[str, Any]:
                 "triggers": sorted(str(item) for item in triggers),
             },
             "trusted_transitives": dict(sorted(normalized_trusted.items())),
+            "reviewed_unknowns": normalized_reviewed,
         }
     policy["workflow_declarations"] = dict(sorted(normalized.items()))
     policy["_sha256"] = sha256_bytes(raw)
@@ -1210,7 +1243,27 @@ def bind_declaration(
         all_unknowns.extend(dep_unknowns)
     all_effects = sorted(set(all_effects))
     all_unknowns = sorted(set(all_unknowns))
-    if all_unknowns:
+    # Owner-reviewed exact bytes: unknowns are accepted only when every pinned file
+    # matches its digest and the observed unknown set equals the reviewed set.
+    reviewed = declaration.get("reviewed_unknowns") or {}
+    unknowns_reviewed = False
+    if reviewed and all_unknowns:
+        pins_ok = True
+        for pinned_path, pinned_digest in reviewed["files"].items():
+            blob = source if pinned_path == workflow_path else dependency_blobs.get(pinned_path)
+            if blob is None or sha256_bytes(blob) != pinned_digest:
+                pins_ok = False
+        observed = set()
+        for item in all_unknowns:
+            public = item.public()
+            observed.add(f"{public['code']}@{public['path']}:{public['line']}")
+        if not pins_ok:
+            reasons.add("REVIEWED_UNKNOWN_PIN_MISMATCH")
+        elif observed == set(reviewed["unknowns"]):
+            unknowns_reviewed = True
+        else:
+            reasons.add("REVIEWED_UNKNOWN_SET_MISMATCH")
+    if all_unknowns and not unknowns_reviewed:
         reasons.add("UNKNOWN_EFFECT")
 
     declarations = {
@@ -1468,6 +1521,8 @@ def analyze_repository(
         "WORKFLOW_DIGEST_MISMATCH",
         "TRUSTED_TRANSITIVE_DIGEST_MISMATCH",
         "TRUSTED_TRANSITIVE_SET_MISMATCH",
+        "REVIEWED_UNKNOWN_PIN_MISMATCH",
+        "REVIEWED_UNKNOWN_SET_MISMATCH",
         "TRUST_ROOT_BUNDLED_WITH_DENIED_WORKFLOW",
     }
     if reason_codes & hard_reasons:
