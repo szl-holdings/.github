@@ -159,6 +159,6 @@ Org page: [github.com/szl-holdings](https://github.com/szl-holdings) · Doctrine
 
 ## SZL Holdings
 
-![SZL Holdings](./branding/szl-avatar-animated.gif)
+<img src="./profile/assets/szl/logos/szl_logo_primary.svg" alt="SZL Holdings" width="240">
 
-*The SZL Holdings animated mark (400×400, 16fps loop). Signed Yachay.*
+*The SZL Holdings orbit mark (szl-brand `kanchay/` 1.1.0, CC BY 4.0).*
