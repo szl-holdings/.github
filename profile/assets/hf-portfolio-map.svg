@@ -1,24 +1,32 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1280" height="720" viewBox="0 0 1280 720" role="img" aria-labelledby="title desc">
   <title id="title">SZL Holdings portfolio map</title>
   <desc id="desc">Four connected product lanes for command, intelligence, models and data, and evidence, centered on a governed decision loop.</desc>
+  <!-- SZL KANCHAY v1.1.0, founder direction (szl-design-system.css sha256 9e5e6e3ae2a5).
+       Literal token hex (SVG cannot read CSS variables):
+       #030F29 bg token (color-space-900), #061536 color-space-800, #0A1E47 color-space-700, #10151C color-gray-900
+       #02091C bg-deep token, #1B222C surface token (color-gray-800), #F5F7FA text token (color-gray-50)
+       #C9D2DF text-sub token (color-gray-200), #A4B1C4 color-gray-300, #76859B text-ghost token (color-gray-400)
+       #E9EEF6 color-silver-100, #9AA7BD color-silver-300, #5C6B86 color-silver-500
+       #DF735F accent token (color-coral-400), #F0917E color-coral-300, #C4543F color-coral-500 (orbit-mark node only)
+       #FFFFFF color-white (orbit mark monogram). -->
   <defs>
     <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
       <stop offset="0" stop-color="#030F29"/>
-      <stop offset=".55" stop-color="#07152F"/>
+      <stop offset=".55" stop-color="#061536"/>
       <stop offset="1" stop-color="#10151C"/>
     </linearGradient>
     <radialGradient id="wash" cx="50%" cy="43%" r="60%">
-      <stop offset="0" stop-color="#DF735F" stop-opacity=".17"/>
-      <stop offset=".55" stop-color="#0F726E" stop-opacity=".07"/>
+      <stop offset="0" stop-color="#9AA7BD" stop-opacity=".1"/>
+      <stop offset=".55" stop-color="#0A1E47" stop-opacity=".35"/>
       <stop offset="1" stop-color="#030F29" stop-opacity="0"/>
     </radialGradient>
-    <linearGradient id="signal" x1="0" y1="0" x2="1" y2="0">
-      <stop offset="0" stop-color="#5CC4BF"/>
+    <linearGradient id="signal" gradientUnits="userSpaceOnUse" x1="411" y1="0" x2="869" y2="0">
+      <stop offset="0" stop-color="#5C6B86"/>
       <stop offset=".5" stop-color="#E9EEF6"/>
-      <stop offset="1" stop-color="#DF735F"/>
+      <stop offset="1" stop-color="#9AA7BD"/>
     </linearGradient>
     <filter id="shadow" x="-20%" y="-20%" width="140%" height="160%">
-      <feDropShadow dx="0" dy="18" stdDeviation="22" flood-color="#000814" flood-opacity=".44"/>
+      <feDropShadow dx="0" dy="18" stdDeviation="22" flood-color="#02091C" flood-opacity=".44"/>
     </filter>
     <pattern id="grid" width="48" height="48" patternUnits="userSpaceOnUse">
       <path d="M48 0H0V48" fill="none" stroke="#9AA7BD" stroke-opacity=".045"/>
@@ -31,53 +39,70 @@
 
   <g font-family="system-ui,-apple-system,Segoe UI,Arial,sans-serif">
     <g transform="translate(64 54)">
-      <path d="M0 10h18M9 1v18" stroke="#DF735F" stroke-width="2"/>
-      <circle cx="9" cy="10" r="3.5" fill="#DF735F"/>
-      <text x="34" y="15" fill="#C9D2DF" font-size="14" font-weight="700" letter-spacing="3.2">SZL HOLDINGS / PORTFOLIO SYSTEM</text>
+      <svg x="0" y="-5" width="48.0" height="28" viewBox="96 252 1008 588" aria-hidden="true"><!-- SZL orbit mark: szl-brand kanchay/logos/szl_favicon.svg, paths verbatim (ids namespaced); its node is this image's one coral node -->
+    <defs>
+    <linearGradient id="map-mark-orbit" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#E9EEF6"/>
+      <stop offset="0.5" stop-color="#9AA7BD"/>
+      <stop offset="1" stop-color="#5C6B86"/>
+    </linearGradient>
+    <radialGradient id="map-mark-node" cx="0.38" cy="0.34" r="0.75">
+      <stop offset="0" stop-color="#F0917E"/>
+      <stop offset="0.55" stop-color="#DF735F"/>
+      <stop offset="1" stop-color="#C4543F"/>
+    </radialGradient>
+    </defs>
+    <g transform="rotate(-22 657.0 502.0)"><ellipse cx="657.0" cy="502.0" rx="432" ry="196" fill="none" stroke="url(#map-mark-orbit)" stroke-width="7" stroke-linecap="round" opacity="0.95"/></g>
+  <path d="M 500 402 C 476 374 344 374 334 416 C 324 458 396 480.0 409.0 502.0 C 476 526.0 512 540 476 582 C 464 620 358 626 310 606 " fill="none" stroke="#FFFFFF" stroke-width="70" stroke-linecap="butt" stroke-linejoin="round"/>
+  <g fill="#FFFFFF"><path d="M 534 372 L 732 372 L 732 444 L 636 568 L 732 568 L 732 632 L 534 632 L 534 560 L 630 436 L 534 436 Z"/><path d="M 762 372 L 830 372 L 830 568 L 1014 568 L 954 632 L 762 632 Z"/></g>
+  <circle cx="937.9" cy="264.3" r="33" fill="url(#map-mark-node)"/>
+  <path d="M 657.0 678 L 694.0 766 L 675.0 766 L 657.0 710.3 L 639.0 766 L 620.0 766 Z" fill="url(#map-mark-orbit)" opacity="0.96"/>
+  </svg>
+      <text x="60" y="15" fill="#C9D2DF" font-size="14" font-weight="700" letter-spacing="3.2">SZL HOLDINGS / PORTFOLIO SYSTEM</text>
     </g>
     <text x="64" y="142" fill="#F5F7FA" font-size="54" font-weight="760" letter-spacing="-2">One substrate. Four clear paths.</text>
     <text x="64" y="180" fill="#A4B1C4" font-size="19">Choose the mission. Follow the evidence.</text>
 
     <path d="M640 258V574M320 376H960" fill="none" stroke="#5C6B86" stroke-opacity=".5" stroke-width="1.5"/>
     <path d="M411 376H869" fill="none" stroke="url(#signal)" stroke-width="3" stroke-linecap="round"/>
-    <circle cx="640" cy="376" r="70" fill="#07152F" stroke="#E9EEF6" stroke-opacity=".28"/>
-    <circle cx="640" cy="376" r="49" fill="none" stroke="#DF735F" stroke-width="2" stroke-dasharray="3 8"/>
+    <circle cx="640" cy="376" r="70" fill="#061536" stroke="#E9EEF6" stroke-opacity=".28"/>
+    <circle cx="640" cy="376" r="49" fill="none" stroke="#9AA7BD" stroke-width="2" stroke-dasharray="3 8"/>
     <path d="M614 376c0-22 17-38 38-38 18 0 32 11 37 26M666 376c0 22-17 38-38 38-18 0-32-11-37-26" fill="none" stroke="url(#signal)" stroke-width="4" stroke-linecap="round"/>
-    <circle cx="640" cy="376" r="6" fill="#F5F7FA"/>
+    <circle cx="640" cy="376" r="6" fill="#E9EEF6"/>
     <text x="640" y="470" text-anchor="middle" fill="#C9D2DF" font-size="11" font-weight="700" letter-spacing="2.2">GOVERNED DECISION LOOP</text>
 
     <g filter="url(#shadow)">
       <g transform="translate(64 242)">
-        <rect width="347" height="156" rx="20" fill="#101925" stroke="#5C6B86" stroke-opacity=".58"/>
-        <rect width="5" height="156" rx="2.5" fill="#DF735F"/>
-        <text x="30" y="39" fill="#F0917E" font-size="11" font-weight="800" letter-spacing="2.2">COMMAND</text>
+        <rect width="347" height="156" rx="20" fill="#1B222C" stroke="#5C6B86" stroke-opacity=".58"/>
+        <rect width="5" height="156" rx="2.5" fill="#9AA7BD"/>
+        <text x="30" y="39" fill="#C9D2DF" font-size="11" font-weight="800" letter-spacing="2.2">COMMAND</text>
         <text x="30" y="78" fill="#F5F7FA" font-size="27" font-weight="720">a11oy</text>
         <text x="30" y="108" fill="#A4B1C4" font-size="15">Policy-bound action with receipts.</text>
-        <text x="30" y="135" fill="#76859B" font-size="11" font-weight="700" letter-spacing="1.2">PRODUCT + DEVELOPER ENTRY</text>
+        <text x="30" y="135" fill="#A4B1C4" font-size="11" font-weight="700" letter-spacing="1.2">PRODUCT + DEVELOPER ENTRY</text>
       </g>
       <g transform="translate(869 242)">
-        <rect width="347" height="156" rx="20" fill="#101925" stroke="#5C6B86" stroke-opacity=".58"/>
-        <rect x="342" width="5" height="156" rx="2.5" fill="#5CC4BF"/>
-        <text x="30" y="39" fill="#8FD9D5" font-size="11" font-weight="800" letter-spacing="2.2">INTELLIGENCE</text>
+        <rect width="347" height="156" rx="20" fill="#1B222C" stroke="#5C6B86" stroke-opacity=".58"/>
+        <rect x="342" width="5" height="156" rx="2.5" fill="#9AA7BD"/>
+        <text x="30" y="39" fill="#C9D2DF" font-size="11" font-weight="800" letter-spacing="2.2">INTELLIGENCE</text>
         <text x="30" y="78" fill="#F5F7FA" font-size="27" font-weight="720">Killinchu</text>
         <text x="30" y="108" fill="#A4B1C4" font-size="15">Operator-first mission awareness.</text>
-        <text x="30" y="135" fill="#76859B" font-size="11" font-weight="700" letter-spacing="1.2">DEMONSTRATION + CORPUS</text>
+        <text x="30" y="135" fill="#A4B1C4" font-size="11" font-weight="700" letter-spacing="1.2">DEMONSTRATION + CORPUS</text>
       </g>
       <g transform="translate(64 510)">
-        <rect width="347" height="146" rx="20" fill="#101925" stroke="#5C6B86" stroke-opacity=".58"/>
-        <rect width="5" height="146" rx="2.5" fill="#D7B96B"/>
-        <text x="30" y="38" fill="#E4CF99" font-size="11" font-weight="800" letter-spacing="2.2">MODELS + DATA</text>
+        <rect width="347" height="146" rx="20" fill="#1B222C" stroke="#5C6B86" stroke-opacity=".58"/>
+        <rect width="5" height="146" rx="2.5" fill="#9AA7BD"/>
+        <text x="30" y="38" fill="#C9D2DF" font-size="11" font-weight="800" letter-spacing="2.2">MODELS + DATA</text>
         <text x="30" y="76" fill="#F5F7FA" font-size="25" font-weight="720">Khipu / Forge</text>
         <text x="30" y="106" fill="#A4B1C4" font-size="15">Weights, evaluations, and lineage.</text>
-        <text x="30" y="131" fill="#76859B" font-size="11" font-weight="700" letter-spacing="1.2">ARTIFACT FAMILIES</text>
+        <text x="30" y="131" fill="#A4B1C4" font-size="11" font-weight="700" letter-spacing="1.2">ARTIFACT FAMILIES</text>
       </g>
       <g transform="translate(869 510)">
-        <rect width="347" height="146" rx="20" fill="#101925" stroke="#5C6B86" stroke-opacity=".58"/>
-        <rect x="342" width="5" height="146" rx="2.5" fill="#E9EEF6"/>
+        <rect width="347" height="146" rx="20" fill="#1B222C" stroke="#5C6B86" stroke-opacity=".58"/>
+        <rect x="342" width="5" height="146" rx="2.5" fill="#9AA7BD"/>
         <text x="30" y="38" fill="#C9D2DF" font-size="11" font-weight="800" letter-spacing="2.2">EVIDENCE</text>
         <text x="30" y="76" fill="#F5F7FA" font-size="25" font-weight="720">Receipts / Lake</text>
         <text x="30" y="106" fill="#A4B1C4" font-size="15">Portable records for independent review.</text>
-        <text x="30" y="131" fill="#76859B" font-size="11" font-weight="700" letter-spacing="1.2">VERIFY OUTSIDE THE UI</text>
+        <text x="30" y="131" fill="#A4B1C4" font-size="11" font-weight="700" letter-spacing="1.2">VERIFY OUTSIDE THE UI</text>
       </g>
     </g>
   </g>

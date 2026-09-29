@@ -9,7 +9,7 @@
     <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
       <stop offset="0" stop-color="#030F29"/><stop offset="1" stop-color="#10151c"/>
     </linearGradient>
-    <linearGradient id="ln" x1="0" y1="0" x2="1" y2="0">
+    <linearGradient id="ln" gradientUnits="userSpaceOnUse" x1="24" y1="0" x2="736" y2="0">
       <stop offset="0" stop-color="#E9EEF6"/><stop offset=".5" stop-color="#9AA7BD"/><stop offset="1" stop-color="#5C6B86"/>
     </linearGradient>
     <style>
@@ -20,34 +20,38 @@
              font-family:ui-monospace, 'SF Mono', 'Cascadia Code', 'JetBrains Mono', 'IBM Plex Mono', 'Liberation Mono', Menlo, Consolas, monospace; opacity:1; }
       .lab{ font-size:11.5px; fill:#a4b1c4; letter-spacing:.06em; text-transform:uppercase; }
       .foot{ font-size:11px; fill:#a4b1c4; font-family:ui-monospace, 'SF Mono', 'Cascadia Code', 'JetBrains Mono', 'IBM Plex Mono', 'Liberation Mono', Menlo, Consolas, monospace; }
-      .flow{ stroke-dasharray:14 10; }
+      .flow{ stroke-dasharray:14 10; animation:szl-flow 1.6s linear infinite; }
+      .live{ animation:szl-live 2s ease-in-out infinite; }
+      @keyframes szl-flow{ to{ stroke-dashoffset:-48; } }
+      @keyframes szl-live{ 50%{ opacity:.35; } }
+      @media (prefers-reduced-motion: reduce){ .flow, .live{ animation:none; } }
     </style>
   </defs>
   <rect width="760" height="240" rx="16" fill="url(#bg)" stroke="#3c4757"/>
-  <line class="flow" x1="24" y1="76" x2="736" y2="76" stroke="url(#ln)" stroke-width="2.5" stroke-linecap="round"><animate attributeName="stroke-dashoffset" values="0;-48" dur="1.6s" repeatCount="indefinite"/></line>
+  <line class="flow" x1="24" y1="76" x2="736" y2="76" stroke="url(#ln)" stroke-width="2.5" stroke-linecap="round"/>
   <text class="title" x="30" y="44">SZL Holdings · governance substrate</text>
   <text class="sub" x="30" y="64">formally-verified gate for agentic AI · doctrine v11 LOCKED</text>
   
   <g transform="translate(100,132)" text-anchor="middle">
-    <text class="val" y="0">20<animate attributeName="opacity" values="0.55;1;0.55" dur="2.4s" begin="0.0s" repeatCount="indefinite"/></text>
+    <text class="val" y="0">20</text>
     <text class="lab" y="30">public repos</text>
   </g>
   <g transform="translate(240,132)" text-anchor="middle">
-    <text class="val" y="0">749<animate attributeName="opacity" values="0.55;1;0.55" dur="2.4s" begin="0.18s" repeatCount="indefinite"/></text>
+    <text class="val" y="0">749</text>
     <text class="lab" y="30">Lean decl</text>
   </g><line x1="170" y1="104" x2="170" y2="150" stroke="#3c4757"/>
   <g transform="translate(380,132)" text-anchor="middle">
-    <text class="val" y="0">14<animate attributeName="opacity" values="0.55;1;0.55" dur="2.4s" begin="0.36s" repeatCount="indefinite"/></text>
+    <text class="val" y="0">14</text>
     <text class="lab" y="30">axioms</text>
   </g><line x1="310" y1="104" x2="310" y2="150" stroke="#3c4757"/>
   <g transform="translate(520,132)" text-anchor="middle">
-    <text class="val" y="0">163<animate attributeName="opacity" values="0.55;1;0.55" dur="2.4s" begin="0.54s" repeatCount="indefinite"/></text>
+    <text class="val" y="0">163</text>
     <text class="lab" y="30">sorries</text>
   </g><line x1="450" y1="104" x2="450" y2="150" stroke="#3c4757"/>
   <g transform="translate(660,132)" text-anchor="middle">
-    <text class="val" y="0">13<animate attributeName="opacity" values="0.55;1;0.55" dur="2.4s" begin="0.72s" repeatCount="indefinite"/></text>
+    <text class="val" y="0">13</text>
     <text class="lab" y="30">yuyay axes</text>
   </g><line x1="590" y1="104" x2="590" y2="150" stroke="#3c4757"/>
   <text class="foot" x="30" y="222">every gate decision emits a DSSE receipt onto the Khipu Merkle DAG · SLSA L1 · Λ-uniqueness Conjecture</text>
-  <circle cx="726" cy="34" r="6" fill="#DF735F"><animate attributeName="opacity" values="1;0.3;1" dur="2s" repeatCount="indefinite"/></circle>
+  <circle class="live" cx="726" cy="34" r="6" fill="#DF735F"/>
 </svg>

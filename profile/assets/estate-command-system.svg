@@ -8,7 +8,7 @@
        #f5f7fa text token (color-gray-50), #c9d2df text-sub token (color-gray-200)
        #a4b1c4 color-gray-300, #E9EEF6 color-silver-100, #9AA7BD color-silver-300
        #5C6B86 color-silver-500, #DF735F accent token (color-coral-400), #F0917E color-coral-300
-       #C4543F color-coral-500, #5cc4bf color-yuyay-300 (link-like)
+       #C4543F color-coral-500 (orbit-mark node only)
        #FFFFFF color-white (orbit mark monogram). -->
   <defs>
     <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
@@ -16,12 +16,7 @@
       <stop offset="0.58" stop-color="#0a0f1e"/>
       <stop offset="1" stop-color="#10151c"/>
     </linearGradient>
-    <linearGradient id="cream" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0" stop-color="#f5f7fa"/>
-      <stop offset="0.55" stop-color="#f5f7fa"/>
-      <stop offset="1" stop-color="#c9d2df"/>
-    </linearGradient>
-    <linearGradient id="signal" x1="0" y1="0" x2="1" y2="0">
+    <linearGradient id="signal" gradientUnits="userSpaceOnUse" x1="30" y1="0" x2="1250" y2="0">
       <stop offset="0" stop-color="#E9EEF6"/>
       <stop offset="0.48" stop-color="#9AA7BD"/>
       <stop offset="0.78" stop-color="#9AA7BD"/>
@@ -31,14 +26,6 @@
       <stop offset="0" stop-color="#1b222c" stop-opacity="0.82"/>
       <stop offset="1" stop-color="#10151c" stop-opacity="0.7"/>
     </linearGradient>
-    <radialGradient id="blueGlow" cx="50%" cy="50%" r="50%">
-      <stop offset="0" stop-color="#9AA7BD" stop-opacity="0.2"/>
-      <stop offset="1" stop-color="#9AA7BD" stop-opacity="0"/>
-    </radialGradient>
-    <filter id="softGlow" x="-80%" y="-80%" width="260%" height="260%">
-      <feGaussianBlur stdDeviation="8" result="blur"/>
-      <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
-    </filter>
     <pattern id="microgrid" width="32" height="32" patternUnits="userSpaceOnUse">
       <path d="M32 0H0V32" fill="none" stroke="#E9EEF6" stroke-opacity="0.038"/>
     </pattern>
@@ -53,25 +40,11 @@
     <rect width="452" height="548" rx="26" fill="#10151c" stroke="#5C6B86" stroke-opacity="0.6"/>
     <rect x="14" y="14" width="424" height="520" rx="20" fill="url(#glass)" stroke="#9AA7BD" stroke-opacity="0.24"/>
     <path d="M34 82H418M34 466H418M72 34V514M380 34V514" stroke="#9AA7BD" stroke-opacity="0.08"/>
-    <ellipse cx="226" cy="286" rx="170" ry="214" fill="none" stroke="#9AA7BD" stroke-opacity="0.22"/>
-    <ellipse cx="226" cy="286" rx="138" ry="174" fill="none" stroke="#5C6B86" stroke-opacity="0.5" stroke-dasharray="4 10"/>
-    <ellipse cx="226" cy="474" rx="150" ry="28" fill="none" stroke="url(#signal)" stroke-opacity="0.52"/>
-    <ellipse cx="226" cy="474" rx="95" ry="16" fill="none" stroke="#9AA7BD" stroke-opacity="0.35"/>
-    <circle cx="226" cy="474" r="76" fill="url(#blueGlow)"/>
-    <path d="M226 455V498" stroke="#E9EEF6" stroke-width="2" filter="url(#softGlow)"/>
+    <!-- one silver orbit at the canonical -22 degree tilt around the mark -->
+    <ellipse cx="226" cy="280" rx="196" ry="88" fill="none" stroke="#9AA7BD" stroke-opacity="0.34" transform="rotate(-22 226 280)"/>
+    <ellipse cx="226" cy="280" rx="160" ry="70" fill="none" stroke="#5C6B86" stroke-opacity="0.5" stroke-dasharray="4 10" transform="rotate(-22 226 280)"/>
 
-    <g fill="url(#signal)" opacity="0.95">
-      <rect x="93" y="194" width="12" height="36"/><rect x="105" y="170" width="12" height="24"/><rect x="117" y="158" width="24" height="12"/>
-      <rect x="141" y="146" width="36" height="12"/><rect x="177" y="134" width="36" height="12"/>
-      <rect x="239" y="134" width="36" height="12"/><rect x="275" y="146" width="36" height="12"/>
-      <rect x="311" y="158" width="24" height="12"/><rect x="335" y="170" width="12" height="24"/><rect x="347" y="194" width="12" height="36"/>
-      <rect x="93" y="342" width="12" height="36"/><rect x="105" y="378" width="12" height="24"/><rect x="117" y="402" width="24" height="12"/>
-      <rect x="141" y="414" width="36" height="12"/><rect x="177" y="426" width="36" height="12"/>
-      <rect x="239" y="426" width="36" height="12"/><rect x="275" y="414" width="36" height="12"/>
-      <rect x="311" y="402" width="24" height="12"/><rect x="335" y="378" width="12" height="24"/><rect x="347" y="342" width="12" height="36"/>
-    </g>
-
-    <svg x="156" y="245" width="140" height="81.67" viewBox="96 252 1008 588" aria-hidden="true"><!-- SZL orbit mark: _founder/logos/szl_favicon.svg, paths verbatim -->
+    <svg x="136" y="227.5" width="180" height="105" viewBox="96 252 1008 588" aria-hidden="true"><!-- SZL orbit mark: _founder/logos/szl_favicon.svg, paths verbatim -->
     <defs>
     <linearGradient id="szl-mark-orbit" x1="0" y1="0" x2="1" y2="1">
       <stop offset="0" stop-color="#E9EEF6"/>
@@ -91,17 +64,11 @@
   <path d="M 657.0 678 L 694.0 766 L 675.0 766 L 657.0 710.3 L 639.0 766 L 620.0 766 Z" fill="url(#szl-mark-orbit)" opacity="0.96"/>
   </svg>
 
-    <g filter="url(#softGlow)">
-      <rect x="213" y="97" width="26" height="26" fill="#9AA7BD"/><rect x="219" y="91" width="14" height="38" fill="#E9EEF6"/>
-      <rect x="213" y="441" width="26" height="26" fill="#5C6B86"/><rect x="219" y="435" width="14" height="38" fill="#9AA7BD"/>
-    </g>
-    <circle cx="354" cy="177" r="7" fill="#E9EEF6" filter="url(#softGlow)"/>
-    <path d="M226 110C332 120 387 200 375 288C363 376 309 428 226 453" fill="none" stroke="url(#signal)" stroke-width="1.5" stroke-opacity="0.58"/>
     <text x="34" y="510" fill="#a4b1c4" font-family="ui-monospace, 'SF Mono', 'Cascadia Code', 'JetBrains Mono', 'IBM Plex Mono', 'Liberation Mono', Menlo, Consolas, monospace" font-size="11" letter-spacing="2.2">BOUNDED ACTION / PORTABLE EVIDENCE</text>
   </g>
 
   <g transform="translate(542 72)" font-family="system-ui, -apple-system, 'Segoe UI', 'Helvetica Neue', 'Liberation Sans', Arial, sans-serif">
-    <text x="0" y="78" fill="url(#cream)" font-size="96" font-weight="690" letter-spacing="-5">SZL</text>
+    <text x="0" y="78" fill="#f5f7fa" font-size="96" font-weight="690" letter-spacing="-5">SZL</text>
     <text x="2" y="118" fill="#a4b1c4" font-size="14" font-weight="650" letter-spacing="4.4">GOVERNED AI  ·  INFERENCE  ·  COMMAND SYSTEMS</text>
     <path d="M2 142H668" stroke="#9AA7BD" stroke-opacity="0.35"/>
     <text x="2" y="190" fill="#c9d2df" font-size="22" font-weight="410">Frontier infrastructure for decisions that must</text>
@@ -155,7 +122,7 @@
 
   <g transform="translate(38 632)" font-family="ui-monospace, 'SF Mono', 'Cascadia Code', 'JetBrains Mono', 'IBM Plex Mono', 'Liberation Mono', Menlo, Consolas, monospace">
     <rect width="1204" height="54" rx="18" fill="#10151c" stroke="#3c4757"/>
-    <text x="30" y="34" fill="#5cc4bf" font-size="13" letter-spacing="1.8">a-11-oy.com</text>
+    <text x="30" y="34" fill="#c9d2df" font-size="13" letter-spacing="1.8">a-11-oy.com</text>
     <path d="M205 12V42M466 12V42" stroke="#5C6B86" stroke-opacity="0.6"/>
     <text x="238" y="34" fill="#c9d2df" font-size="13" letter-spacing="1.8">github.com/szl-holdings</text>
     <text x="490" y="34" fill="#c9d2df" font-size="13" letter-spacing="1.8">huggingface.co/SZLHOLDINGS</text>

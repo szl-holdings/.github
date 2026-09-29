@@ -53,14 +53,14 @@
   </g>
 
   <g stroke="url(#route)" stroke-width="3" fill="none" filter="url(#glow)">
-    <path d="M925 440C782 352 728 255 610 209"/>
+    <path d="M925 440C812 420 736 452 646 470"/>
     <path d="M925 440C1080 352 1158 258 1295 220"/>
     <path d="M925 440C778 540 714 645 580 700"/>
     <path d="M925 440C1077 536 1160 640 1302 688"/>
   </g>
 
   <g font-family="system-ui, -apple-system, 'Segoe UI', 'Helvetica Neue', 'Liberation Sans', Arial, sans-serif">
-    <g transform="translate(515 153)">
+    <g transform="translate(430 416)">
       <rect width="216" height="108" rx="18" fill="#1b222c" fill-opacity="0.94" stroke="#3c4757"/>
       <text x="22" y="34" fill="#a4b1c4" font-size="14" font-weight="700" letter-spacing="2">ROUTE 01</text>
       <text x="22" y="67" fill="#f5f7fa" font-size="24" font-weight="600">Owned compute</text>
@@ -96,9 +96,9 @@
 
   <g transform="translate(86 86)" font-family="system-ui, -apple-system, 'Segoe UI', 'Helvetica Neue', 'Liberation Sans', Arial, sans-serif">
     <text x="0" y="0" dominant-baseline="hanging" fill="#a4b1c4" font-size="15" font-weight="800" letter-spacing="4">INFERENCE FLAGSHIP</text>
-    <text x="0" y="58" dominant-baseline="hanging" fill="#f5f7fa" font-size="72" font-weight="560" letter-spacing="-3">One gateway.</text>
-    <text x="0" y="140" dominant-baseline="hanging" fill="#c9d2df" font-size="72" font-weight="560" letter-spacing="-3">Every route accounted for.</text>
-    <text x="2" y="246" dominant-baseline="hanging" fill="#a4b1c4" font-size="24">OpenAI-compatible routing · owned compute first · per-answer receipts</text>
+    <text x="0" y="58" dominant-baseline="hanging" fill="#f5f7fa" font-size="60" font-weight="560" letter-spacing="-2.4">One gateway.</text>
+    <text x="0" y="126" dominant-baseline="hanging" fill="#c9d2df" font-size="60" font-weight="560" letter-spacing="-2.4">Every route accounted for.</text>
+    <text x="2" y="222" dominant-baseline="hanging" fill="#a4b1c4" font-size="22">OpenAI-compatible routing · owned compute first · per-answer receipts</text>
   </g>
 
   <g transform="translate(88 786)" font-family="ui-monospace, 'SF Mono', 'Cascadia Code', 'JetBrains Mono', 'IBM Plex Mono', 'Liberation Mono', Menlo, Consolas, monospace">

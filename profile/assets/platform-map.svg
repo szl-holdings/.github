@@ -4,17 +4,12 @@
        #030F29 bg token (color-space-900), #1b222c surface token (color-gray-800)
        #3c4757 border token (color-gray-600), #f5f7fa text token (color-gray-50)
        #a4b1c4 color-gray-300, #76859b text-ghost token (color-gray-400), #E9EEF6 color-silver-100
-       #9AA7BD color-silver-300, #5C6B86 color-silver-500. -->
+       #9AA7BD color-silver-300, #5C6B86 color-silver-500, #DF735F accent token (color-coral-400). -->
   <defs>
     <linearGradient id="goldLine2" x1="0" y1="0" x2="1" y2="0">
       <stop offset="0%" stop-color="#9AA7BD" stop-opacity="0"/>
       <stop offset="50%" stop-color="#9AA7BD" stop-opacity="0.3"/>
       <stop offset="100%" stop-color="#9AA7BD" stop-opacity="0"/>
-    </linearGradient>
-    <linearGradient id="goldFill" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0%" stop-color="#E9EEF6"/>
-      <stop offset="50%" stop-color="#9AA7BD"/>
-      <stop offset="100%" stop-color="#5C6B86"/>
     </linearGradient>
   </defs>
 
@@ -34,6 +29,7 @@
   <text x="450" y="76" text-anchor="middle" fill="#f5f7fa" font-family="system-ui, -apple-system, 'Segoe UI', 'Helvetica Neue', 'Liberation Sans', Arial, sans-serif" font-size="14" font-weight="700">SZL Holdings</text>
 
   <line x1="450" y1="92" x2="450" y2="115" stroke="#9AA7BD" stroke-width="1" opacity="0.4"/>
+  <circle cx="450" cy="103.5" r="3.5" fill="#DF735F"/><!-- the frame's one coral node -->
 
   <rect x="290" y="115" width="320" height="40" rx="6" fill="#1b222c" stroke="#5C6B86" stroke-width="1"/>
   <text x="370" y="140" text-anchor="middle" fill="#f5f7fa" font-family="system-ui, -apple-system, 'Segoe UI', 'Helvetica Neue', 'Liberation Sans', Arial, sans-serif" font-size="12" font-weight="600">Lyte</text>
@@ -65,7 +61,7 @@
   <text x="750" y="238" text-anchor="middle" fill="#a4b1c4" font-family="system-ui, -apple-system, 'Segoe UI', 'Helvetica Neue', 'Liberation Sans', Arial, sans-serif" font-size="9">Legal &amp; Advisory</text>
 
   <rect x="40" y="280" width="820" height="36" rx="4" fill="#1b222c" stroke="#5C6B86" stroke-width="1"/>
-  <text x="450" y="303" text-anchor="middle" fill="#76859b" font-family="system-ui, -apple-system, 'Segoe UI', 'Helvetica Neue', 'Liberation Sans', Arial, sans-serif" font-size="10" letter-spacing="0.5">PostgreSQL  ·  Drizzle ORM  ·  Express 5  ·  React  ·  Expo  ·  AI Engine  ·  RBAC  ·  Audit Trail  ·  Signal Pipeline</text>
+  <text x="450" y="303" text-anchor="middle" fill="#a4b1c4" font-family="system-ui, -apple-system, 'Segoe UI', 'Helvetica Neue', 'Liberation Sans', Arial, sans-serif" font-size="10" letter-spacing="0.5">PostgreSQL  ·  Drizzle ORM  ·  Express 5  ·  React  ·  Expo  ·  AI Engine  ·  RBAC  ·  Audit Trail  ·  Signal Pipeline</text>
 
   <text x="450" y="348" text-anchor="middle" fill="#76859b" font-family="system-ui, -apple-system, 'Segoe UI', 'Helvetica Neue', 'Liberation Sans', Arial, sans-serif" font-size="9" letter-spacing="1">OBSERVE  ·  UNDERSTAND  ·  DECIDE  ·  EXECUTE</text>
 

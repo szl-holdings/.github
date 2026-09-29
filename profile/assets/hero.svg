@@ -4,7 +4,7 @@
          #030F29 bg token (color-space-900), #10151c color-gray-900
          #f5f7fa text token (color-gray-50), #c9d2df text-sub token (color-gray-200)
          #a4b1c4 color-gray-300, #76859b text-ghost token (color-gray-400), #E9EEF6 color-silver-100
-         #9AA7BD color-silver-300. -->
+         #9AA7BD color-silver-300, #DF735F accent token (color-coral-400). -->
     <defs>
       <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
         <stop offset="0%" style="stop-color:#030F29"/>
@@ -16,7 +16,9 @@
       </linearGradient>
     </defs>
     <rect width="800" height="280" fill="url(#bg)" rx="12"/>
+    <!-- orbit rule: a silver hairline ending in the frame's one coral node -->
     <rect x="60" y="168" width="80" height="3" fill="url(#accent)" rx="1.5"/>
+    <circle cx="150" cy="169.5" r="4.5" fill="#DF735F"/>
     <text x="60" y="100" font-family="system-ui, -apple-system, 'Segoe UI', 'Helvetica Neue', 'Liberation Sans', Arial, sans-serif" font-size="42" font-weight="700" fill="#f5f7fa" letter-spacing="-1">SZL Holdings</text>
     <text x="60" y="145" font-family="system-ui, -apple-system, 'Segoe UI', 'Helvetica Neue', 'Liberation Sans', Arial, sans-serif" font-size="18" fill="#c9d2df" letter-spacing="0.5">Governed AI decision infrastructure</text>
     <text x="60" y="210" font-family="system-ui, -apple-system, 'Segoe UI', 'Helvetica Neue', 'Liberation Sans', Arial, sans-serif" font-size="13" fill="#a4b1c4">Signal detection</text>

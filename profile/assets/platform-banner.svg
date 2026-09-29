@@ -5,7 +5,7 @@
          #1b222c surface token (color-gray-800), #3c4757 border token (color-gray-600)
          #f5f7fa text token (color-gray-50), #c9d2df text-sub token (color-gray-200)
          #a4b1c4 color-gray-300, #76859b text-ghost token (color-gray-400), #E9EEF6 color-silver-100
-         #9AA7BD color-silver-300. -->
+         #9AA7BD color-silver-300, #DF735F accent token (color-coral-400). -->
     <defs>
       <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
         <stop offset="0%" stop-color="#030F29"/>
@@ -15,6 +15,11 @@
         <stop offset="0%" stop-color="#E9EEF6"/>
         <stop offset="100%" stop-color="#9AA7BD" stop-opacity=".53"/>
       </linearGradient>
+      <linearGradient id="rule" gradientUnits="userSpaceOnUse" x1="80" y1="0" x2="400" y2="0">
+        <stop offset="0" stop-color="#9AA7BD" stop-opacity="0"/>
+        <stop offset="0.5" stop-color="#9AA7BD" stop-opacity="0.6"/>
+        <stop offset="1" stop-color="#9AA7BD" stop-opacity="0"/>
+      </linearGradient>
     </defs>
     <rect width="1280" height="640" fill="url(#bg)"/>
     <rect x="0" y="0" width="6" height="640" fill="url(#accent)"/>
@@ -22,7 +27,9 @@
     <text x="80" y="120" font-family="system-ui, -apple-system, 'Segoe UI', 'Helvetica Neue', 'Liberation Sans', Arial, sans-serif" font-size="22" font-weight="400" fill="#76859b" letter-spacing="4">SZL HOLDINGS</text>
     <text x="80" y="220" font-family="system-ui, -apple-system, 'Segoe UI', 'Helvetica Neue', 'Liberation Sans', Arial, sans-serif" font-size="72" font-weight="700" fill="#f5f7fa">Platform</text>
     <text x="80" y="290" font-family="system-ui, -apple-system, 'Segoe UI', 'Helvetica Neue', 'Liberation Sans', Arial, sans-serif" font-size="28" font-weight="400" fill="#c9d2df">TypeScript monorepo with 7 domain verticals</text>
-    <line x1="80" y1="330" x2="400" y2="330" stroke="#9AA7BD" stroke-width="2" opacity="0.5"/>
+    <!-- orbit rule: a silver hairline around the frame's one coral node -->
+    <line x1="80" y1="330" x2="400" y2="330" stroke="url(#rule)" stroke-width="2"/>
+    <circle cx="240" cy="330" r="5" fill="#DF735F"/>
     
     <rect x="80" y="370" width="240" height="100" rx="8" fill="#1b222c" stroke="#3c4757" stroke-width="1"/>
     <text x="200" y="410" font-family="ui-monospace, 'SF Mono', 'Cascadia Code', 'JetBrains Mono', 'IBM Plex Mono', 'Liberation Mono', Menlo, Consolas, monospace" font-size="36" font-weight="700" fill="#f5f7fa" text-anchor="middle">34</text>
