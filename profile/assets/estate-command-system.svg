@@ -1,63 +1,64 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1280" height="720" viewBox="0 0 1280 720" role="img" aria-labelledby="title desc">
   <title id="title">SZL governed AI command fabric</title>
-  <desc id="desc">A restrained dark command surface with a pixel-built SZL mark, a holographic evidence chamber, and clear paths for decision makers, builders, and reviewers.</desc>
-  <!-- SZL Kanchay v1.0.0 (tokens.json); literal hex because SVG cannot read CSS variables:
-       #0a0f1e color-a11oy-bg, #10151c color-a11oy-deep, #1b222c color-a11oy-surface,
-       #f5f7fa color-a11oy-text, #e6eaf1 color-gray-100, #c9d2df color-a11oy-text-sub,
-       #a4b1c4 color-gray-300, #76859b color-a11oy-text-ghost, #d7b96b color-a11oy-gold (hatun-300),
-       #e4cf99 gold-bright (hatun-200), #5cc4bf color-ink-signal (yuyay-300), #8fd9d5 yuyay-200. -->
+  <desc id="desc">A restrained dark command surface with the SZL orbit mark in a holographic evidence chamber, and clear paths for decision makers, builders, and reviewers.</desc>
+  <!-- SZL KANCHAY v1.1.0, founder direction (szl-design-system.css sha256 9e5e6e3ae2a5).
+       Literal token hex (SVG cannot read CSS variables):
+       #030F29 bg token (color-space-900), #0a0f1e color-gray-950, #10151c color-gray-900
+       #1b222c surface token (color-gray-800), #3c4757 border token (color-gray-600)
+       #f5f7fa text token (color-gray-50), #c9d2df text-sub token (color-gray-200)
+       #a4b1c4 color-gray-300, #E9EEF6 color-silver-100, #9AA7BD color-silver-300
+       #5C6B86 color-silver-500, #DF735F accent token (color-coral-400), #F0917E color-coral-300
+       #C4543F color-coral-500, #5cc4bf color-yuyay-300 (link-like)
+       #FFFFFF color-white (orbit mark monogram). -->
   <defs>
     <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0" stop-color="#0a0f1e"/>
+      <stop offset="0" stop-color="#030F29"/>
       <stop offset="0.58" stop-color="#0a0f1e"/>
       <stop offset="1" stop-color="#10151c"/>
     </linearGradient>
     <linearGradient id="cream" x1="0" y1="0" x2="1" y2="1">
       <stop offset="0" stop-color="#f5f7fa"/>
-      <stop offset="0.55" stop-color="#e6eaf1"/>
+      <stop offset="0.55" stop-color="#f5f7fa"/>
       <stop offset="1" stop-color="#c9d2df"/>
     </linearGradient>
     <linearGradient id="signal" x1="0" y1="0" x2="1" y2="0">
-      <stop offset="0" stop-color="#5cc4bf"/>
-      <stop offset="0.48" stop-color="#8fd9d5"/>
-      <stop offset="0.78" stop-color="#e4cf99"/>
-      <stop offset="1" stop-color="#d7b96b"/>
+      <stop offset="0" stop-color="#E9EEF6"/>
+      <stop offset="0.48" stop-color="#9AA7BD"/>
+      <stop offset="0.78" stop-color="#9AA7BD"/>
+      <stop offset="1" stop-color="#5C6B86"/>
     </linearGradient>
     <linearGradient id="glass" x1="0" y1="0" x2="1" y2="1">
       <stop offset="0" stop-color="#1b222c" stop-opacity="0.82"/>
       <stop offset="1" stop-color="#10151c" stop-opacity="0.7"/>
     </linearGradient>
     <radialGradient id="blueGlow" cx="50%" cy="50%" r="50%">
-      <stop offset="0" stop-color="#8fd9d5" stop-opacity="0.34"/>
-      <stop offset="1" stop-color="#8fd9d5" stop-opacity="0"/>
+      <stop offset="0" stop-color="#9AA7BD" stop-opacity="0.2"/>
+      <stop offset="1" stop-color="#9AA7BD" stop-opacity="0"/>
     </radialGradient>
     <filter id="softGlow" x="-80%" y="-80%" width="260%" height="260%">
       <feGaussianBlur stdDeviation="8" result="blur"/>
       <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
     </filter>
     <pattern id="microgrid" width="32" height="32" patternUnits="userSpaceOnUse">
-      <path d="M32 0H0V32" fill="none" stroke="#c9d2df" stroke-opacity="0.038"/>
-    </pattern>
-    <pattern id="pixels" width="10" height="10" patternUnits="userSpaceOnUse">
-      <path d="M10 0H0V10" fill="none" stroke="#0a0f1e" stroke-opacity="0.34"/>
+      <path d="M32 0H0V32" fill="none" stroke="#E9EEF6" stroke-opacity="0.038"/>
     </pattern>
   </defs>
 
   <rect width="1280" height="720" rx="30" fill="url(#bg)"/>
   <rect width="1280" height="720" rx="30" fill="url(#microgrid)"/>
-  <rect x="1" y="1" width="1278" height="718" rx="29" fill="none" stroke="#c9d2df" stroke-opacity="0.16"/>
+  <rect x="1" y="1" width="1278" height="718" rx="29" fill="none" stroke="#9AA7BD" stroke-opacity="0.3"/>
   <path d="M30 30H1250" stroke="url(#signal)" stroke-width="2" stroke-opacity="0.82"/>
 
   <g transform="translate(38 55)">
-    <rect width="452" height="548" rx="26" fill="#10151c" stroke="#a4b1c4" stroke-opacity="0.25"/>
-    <rect x="14" y="14" width="424" height="520" rx="20" fill="url(#glass)" stroke="#5cc4bf" stroke-opacity="0.24"/>
-    <path d="M34 82H418M34 466H418M72 34V514M380 34V514" stroke="#a4b1c4" stroke-opacity="0.08"/>
-    <ellipse cx="226" cy="286" rx="170" ry="214" fill="none" stroke="#8fd9d5" stroke-opacity="0.22"/>
-    <ellipse cx="226" cy="286" rx="138" ry="174" fill="none" stroke="#e4cf99" stroke-opacity="0.18" stroke-dasharray="4 10"/>
+    <rect width="452" height="548" rx="26" fill="#10151c" stroke="#5C6B86" stroke-opacity="0.6"/>
+    <rect x="14" y="14" width="424" height="520" rx="20" fill="url(#glass)" stroke="#9AA7BD" stroke-opacity="0.24"/>
+    <path d="M34 82H418M34 466H418M72 34V514M380 34V514" stroke="#9AA7BD" stroke-opacity="0.08"/>
+    <ellipse cx="226" cy="286" rx="170" ry="214" fill="none" stroke="#9AA7BD" stroke-opacity="0.22"/>
+    <ellipse cx="226" cy="286" rx="138" ry="174" fill="none" stroke="#5C6B86" stroke-opacity="0.5" stroke-dasharray="4 10"/>
     <ellipse cx="226" cy="474" rx="150" ry="28" fill="none" stroke="url(#signal)" stroke-opacity="0.52"/>
-    <ellipse cx="226" cy="474" rx="95" ry="16" fill="none" stroke="#8fd9d5" stroke-opacity="0.35"/>
+    <ellipse cx="226" cy="474" rx="95" ry="16" fill="none" stroke="#9AA7BD" stroke-opacity="0.35"/>
     <circle cx="226" cy="474" r="76" fill="url(#blueGlow)"/>
-    <path d="M226 455V498" stroke="#e6eaf1" stroke-width="2" filter="url(#softGlow)"/>
+    <path d="M226 455V498" stroke="#E9EEF6" stroke-width="2" filter="url(#softGlow)"/>
 
     <g fill="url(#signal)" opacity="0.95">
       <rect x="93" y="194" width="12" height="36"/><rect x="105" y="170" width="12" height="24"/><rect x="117" y="158" width="24" height="12"/>
@@ -70,81 +71,94 @@
       <rect x="311" y="402" width="24" height="12"/><rect x="335" y="378" width="12" height="24"/><rect x="347" y="342" width="12" height="36"/>
     </g>
 
-    <g fill="url(#cream)">
-      <path d="M126 221h82v22h-60v24h48v22h-48v24h60v22h-82v-22h-18v-24h18v-22h-18v-24h18z"/>
-      <path d="M284 221h22v92h58v22h-80z"/>
-    </g>
-    <path d="M218 221h64v22h-20v22h-22v24h-22v24h64v22h-86v-22h22v-24h22v-24h20v-22h-42z" fill="#5cc4bf"/>
-    <rect x="108" y="221" width="256" height="114" fill="url(#pixels)" opacity="0.48"/>
+    <svg x="156" y="245" width="140" height="81.67" viewBox="96 252 1008 588" aria-hidden="true"><!-- SZL orbit mark: _founder/logos/szl_favicon.svg, paths verbatim -->
+    <defs>
+    <linearGradient id="szl-mark-orbit" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#E9EEF6"/>
+      <stop offset="0.5" stop-color="#9AA7BD"/>
+      <stop offset="1" stop-color="#5C6B86"/>
+    </linearGradient>
+    <radialGradient id="szl-mark-node" cx="0.38" cy="0.34" r="0.75">
+      <stop offset="0" stop-color="#F0917E"/>
+      <stop offset="0.55" stop-color="#DF735F"/>
+      <stop offset="1" stop-color="#C4543F"/>
+    </radialGradient>
+  </defs>
+  <g transform="rotate(-22 657.0 502.0)"><ellipse cx="657.0" cy="502.0" rx="432" ry="196" fill="none" stroke="url(#szl-mark-orbit)" stroke-width="7" stroke-linecap="round" opacity="0.95"/></g>
+  <path d="M 500 402 C 476 374 344 374 334 416 C 324 458 396 480.0 409.0 502.0 C 476 526.0 512 540 476 582 C 464 620 358 626 310 606 " fill="none" stroke="#FFFFFF" stroke-width="70" stroke-linecap="butt" stroke-linejoin="round"/>
+  <g fill="#FFFFFF"><path d="M 534 372 L 732 372 L 732 444 L 636 568 L 732 568 L 732 632 L 534 632 L 534 560 L 630 436 L 534 436 Z"/><path d="M 762 372 L 830 372 L 830 568 L 1014 568 L 954 632 L 762 632 Z"/></g>
+  <circle cx="937.9" cy="264.3" r="33" fill="url(#szl-mark-node)"/>
+  <path d="M 657.0 678 L 694.0 766 L 675.0 766 L 657.0 710.3 L 639.0 766 L 620.0 766 Z" fill="url(#szl-mark-orbit)" opacity="0.96"/>
+  </svg>
 
     <g filter="url(#softGlow)">
-      <rect x="213" y="97" width="26" height="26" fill="#8fd9d5"/><rect x="219" y="91" width="14" height="38" fill="#5cc4bf"/>
-      <rect x="213" y="441" width="26" height="26" fill="#e4cf99"/><rect x="219" y="435" width="14" height="38" fill="#d7b96b"/>
+      <rect x="213" y="97" width="26" height="26" fill="#9AA7BD"/><rect x="219" y="91" width="14" height="38" fill="#E9EEF6"/>
+      <rect x="213" y="441" width="26" height="26" fill="#5C6B86"/><rect x="219" y="435" width="14" height="38" fill="#9AA7BD"/>
     </g>
-    <circle cx="354" cy="177" r="7" fill="#d7b96b" filter="url(#softGlow)"/>
+    <circle cx="354" cy="177" r="7" fill="#E9EEF6" filter="url(#softGlow)"/>
     <path d="M226 110C332 120 387 200 375 288C363 376 309 428 226 453" fill="none" stroke="url(#signal)" stroke-width="1.5" stroke-opacity="0.58"/>
-    <text x="34" y="510" fill="#a4b1c4" font-family="'JetBrains Mono', ui-monospace, SFMono-Regular, monospace" font-size="11" letter-spacing="2.2">BOUNDED ACTION / PORTABLE EVIDENCE</text>
+    <text x="34" y="510" fill="#a4b1c4" font-family="ui-monospace, 'SF Mono', 'Cascadia Code', 'JetBrains Mono', 'IBM Plex Mono', 'Liberation Mono', Menlo, Consolas, monospace" font-size="11" letter-spacing="2.2">BOUNDED ACTION / PORTABLE EVIDENCE</text>
   </g>
 
-  <g transform="translate(542 72)" font-family="Inter, system-ui, sans-serif">
-    <text x="0" y="78" font-family="'Space Grotesk', system-ui, sans-serif" fill="url(#cream)" font-size="96" font-weight="690" letter-spacing="-5">SZL</text>
-    <text x="2" y="118" fill="#c9d2df" font-size="14" font-weight="650" letter-spacing="4.4">GOVERNED AI  ·  INFERENCE  ·  COMMAND SYSTEMS</text>
-    <path d="M2 142H668" stroke="#c9d2df" stroke-opacity="0.18"/>
+  <g transform="translate(542 72)" font-family="system-ui, -apple-system, 'Segoe UI', 'Helvetica Neue', 'Liberation Sans', Arial, sans-serif">
+    <text x="0" y="78" fill="url(#cream)" font-size="96" font-weight="690" letter-spacing="-5">SZL</text>
+    <text x="2" y="118" fill="#a4b1c4" font-size="14" font-weight="650" letter-spacing="4.4">GOVERNED AI  ·  INFERENCE  ·  COMMAND SYSTEMS</text>
+    <path d="M2 142H668" stroke="#9AA7BD" stroke-opacity="0.35"/>
     <text x="2" y="190" fill="#c9d2df" font-size="22" font-weight="410">Frontier infrastructure for decisions that must</text>
     <text x="2" y="222" fill="#c9d2df" font-size="22" font-weight="410">remain bounded, inspectable, and reproducible.</text>
 
     <g transform="translate(0 260)">
       <g>
-        <rect width="205" height="98" rx="15" fill="#1b222c" stroke="#5cc4bf" stroke-opacity="0.31"/>
-        <text x="18" y="30" fill="#5cc4bf" font-size="12" font-weight="760" letter-spacing="2">UNDERSTAND</text>
-        <text x="18" y="57" fill="#a4b1c4" font-size="14">Products, boundaries,</text><text x="18" y="78" fill="#a4b1c4" font-size="14">and operating outcomes.</text>
+        <rect width="205" height="98" rx="15" fill="#1b222c" stroke="#3c4757"/>
+        <text x="18" y="30" fill="#a4b1c4" font-size="12" font-weight="760" letter-spacing="2">UNDERSTAND</text>
+        <text x="18" y="57" fill="#c9d2df" font-size="14">Products, boundaries,</text><text x="18" y="78" fill="#c9d2df" font-size="14">and operating outcomes.</text>
       </g>
       <g transform="translate(219)">
-        <rect width="205" height="98" rx="15" fill="#1b222c" stroke="#8fd9d5" stroke-opacity="0.31"/>
-        <text x="18" y="30" fill="#8fd9d5" font-size="12" font-weight="760" letter-spacing="2">BUILD</text>
-        <text x="18" y="57" fill="#a4b1c4" font-size="14">Source, contracts,</text><text x="18" y="78" fill="#a4b1c4" font-size="14">tests, and quick starts.</text>
+        <rect width="205" height="98" rx="15" fill="#1b222c" stroke="#3c4757"/>
+        <text x="18" y="30" fill="#a4b1c4" font-size="12" font-weight="760" letter-spacing="2">BUILD</text>
+        <text x="18" y="57" fill="#c9d2df" font-size="14">Source, contracts,</text><text x="18" y="78" fill="#c9d2df" font-size="14">tests, and quick starts.</text>
       </g>
       <g transform="translate(438)">
-        <rect width="205" height="98" rx="15" fill="#1b222c" stroke="#e4cf99" stroke-opacity="0.34"/>
-        <text x="18" y="30" fill="#e4cf99" font-size="12" font-weight="760" letter-spacing="2">VERIFY</text>
-        <text x="18" y="57" fill="#a4b1c4" font-size="14">Evidence, limits,</text><text x="18" y="78" fill="#a4b1c4" font-size="14">and exact revisions.</text>
+        <rect width="205" height="98" rx="15" fill="#1b222c" stroke="#3c4757"/>
+        <text x="18" y="30" fill="#a4b1c4" font-size="12" font-weight="760" letter-spacing="2">VERIFY</text>
+        <text x="18" y="57" fill="#c9d2df" font-size="14">Evidence, limits,</text><text x="18" y="78" fill="#c9d2df" font-size="14">and exact revisions.</text>
       </g>
     </g>
 
     <g transform="translate(0 384)">
       <g>
-        <rect width="154" height="122" rx="16" fill="url(#glass)" stroke="#5cc4bf" stroke-opacity="0.27"/>
-        <path d="M24 28l14-8 14 8v16l-14 8-14-8z" fill="none" stroke="#5cc4bf" stroke-width="2"/>
-        <text x="18" y="76" fill="#e6eaf1" font-size="14" font-weight="720" letter-spacing="1.4">PLATFORMS</text>
+        <rect width="154" height="122" rx="16" fill="url(#glass)" stroke="#3c4757"/>
+        <path d="M24 28l14-8 14 8v16l-14 8-14-8z" fill="none" stroke="#9AA7BD" stroke-width="2"/>
+        <text x="18" y="76" fill="#f5f7fa" font-size="14" font-weight="720" letter-spacing="1.4">PLATFORMS</text>
         <text x="18" y="99" fill="#a4b1c4" font-size="12">Operate systems.</text>
       </g>
       <g transform="translate(166)">
-        <rect width="154" height="122" rx="16" fill="url(#glass)" stroke="#8fd9d5" stroke-opacity="0.27"/>
-        <g fill="#8fd9d5"><circle cx="28" cy="29" r="4"/><circle cx="48" cy="21" r="4"/><circle cx="50" cy="43" r="4"/><path d="M31 28l13-6M31 31l15 10M48 25l2 14" stroke="#8fd9d5" stroke-width="2"/></g>
-        <text x="18" y="76" fill="#e6eaf1" font-size="14" font-weight="720" letter-spacing="1.4">MODELS</text>
+        <rect width="154" height="122" rx="16" fill="url(#glass)" stroke="#3c4757"/>
+        <g fill="#9AA7BD"><circle cx="28" cy="29" r="4"/><circle cx="48" cy="21" r="4"/><circle cx="50" cy="43" r="4"/><path d="M31 28l13-6M31 31l15 10M48 25l2 14" stroke="#9AA7BD" stroke-width="2"/></g>
+        <text x="18" y="76" fill="#f5f7fa" font-size="14" font-weight="720" letter-spacing="1.4">MODELS</text>
         <text x="18" y="99" fill="#a4b1c4" font-size="12">Reason with context.</text>
       </g>
       <g transform="translate(332)">
-        <rect width="154" height="122" rx="16" fill="url(#glass)" stroke="#d7b96b" stroke-opacity="0.29"/>
-        <g fill="none" stroke="#d7b96b" stroke-width="2"><path d="M22 22h32v32H22z"/><path d="M30 14v8M46 14v8M30 54v8M46 54v8M14 30h8M14 46h8M54 30h8M54 46h8"/></g>
-        <text x="18" y="76" fill="#e6eaf1" font-size="14" font-weight="720" letter-spacing="1.4">KERNELS</text>
+        <rect width="154" height="122" rx="16" fill="url(#glass)" stroke="#3c4757"/>
+        <g fill="none" stroke="#9AA7BD" stroke-width="2"><path d="M22 22h32v32H22z"/><path d="M30 14v8M46 14v8M30 54v8M46 54v8M14 30h8M14 46h8M54 30h8M54 46h8"/></g>
+        <text x="18" y="76" fill="#f5f7fa" font-size="14" font-weight="720" letter-spacing="1.4">KERNELS</text>
         <text x="18" y="99" fill="#a4b1c4" font-size="12">Execute efficiently.</text>
       </g>
       <g transform="translate(498)">
-        <rect width="154" height="122" rx="16" fill="url(#glass)" stroke="#e4cf99" stroke-opacity="0.31"/>
-        <path d="M22 23h32v30H22zM28 29h20M28 36h20M28 43h13" fill="none" stroke="#e4cf99" stroke-width="2"/>
-        <text x="18" y="76" fill="#e6eaf1" font-size="14" font-weight="720" letter-spacing="1.4">EVIDENCE</text>
+        <rect width="154" height="122" rx="16" fill="url(#glass)" stroke="#3c4757"/>
+        <path d="M22 23h32v30H22zM28 29h20M28 36h20M28 43h13" fill="none" stroke="#9AA7BD" stroke-width="2"/>
+        <text x="18" y="76" fill="#f5f7fa" font-size="14" font-weight="720" letter-spacing="1.4">EVIDENCE</text>
         <text x="18" y="99" fill="#a4b1c4" font-size="12">Prove what happened.</text>
       </g>
     </g>
   </g>
 
-  <g transform="translate(38 632)" font-family="'JetBrains Mono', ui-monospace, SFMono-Regular, monospace">
-    <rect width="1204" height="54" rx="18" fill="#10151c" stroke="#a4b1c4" stroke-opacity="0.18"/>
+  <g transform="translate(38 632)" font-family="ui-monospace, 'SF Mono', 'Cascadia Code', 'JetBrains Mono', 'IBM Plex Mono', 'Liberation Mono', Menlo, Consolas, monospace">
+    <rect width="1204" height="54" rx="18" fill="#10151c" stroke="#3c4757"/>
     <text x="30" y="34" fill="#5cc4bf" font-size="13" letter-spacing="1.8">a-11-oy.com</text>
-    <path d="M205 12V42M411 12V42" stroke="#76859b" stroke-opacity="0.22"/>
+    <path d="M205 12V42M466 12V42" stroke="#5C6B86" stroke-opacity="0.6"/>
     <text x="238" y="34" fill="#c9d2df" font-size="13" letter-spacing="1.8">github.com/szl-holdings</text>
-    <text x="445" y="34" fill="#c9d2df" font-size="13" letter-spacing="1.8">huggingface.co/SZLHOLDINGS</text>
-    <text x="1170" y="34" fill="#d7b96b" font-size="11" letter-spacing="2.4" text-anchor="end">CONTROL · EVIDENCE · OUTCOMES</text>
+    <text x="490" y="34" fill="#c9d2df" font-size="13" letter-spacing="1.8">huggingface.co/SZLHOLDINGS</text>
+    <text x="1170" y="34" fill="#a4b1c4" font-size="11" letter-spacing="2.4" text-anchor="end">CONTROL · EVIDENCE · OUTCOMES</text>
   </g>
 </svg>
