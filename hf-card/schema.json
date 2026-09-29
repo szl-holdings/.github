@@ -1,0 +1,161 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/szl-holdings/.github/blob/main/hf-card/schema.json",
+  "title": "SZL Hugging Face card front matter",
+  "$comment": "Validated by hf-card/lint.py, which implements exactly the keywords used here (type, required, properties, additionalProperties, items, minItems, maxItems, uniqueItems, enum, const, pattern, minLength, maxLength, minimum, maximum, allOf, anyOf, not, if/then, $ref to #/$defs). An unsupported keyword fails closed instead of being ignored. Pick the per-type schema with #/$defs/<type>: model, dataset, space or kernel.",
+  "$defs": {
+    "repo_id": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*/[A-Za-z0-9][A-Za-z0-9._-]*$"
+    },
+    "license_id": {
+      "$comment": "A Hub license identifier. lint.py never supplies a default: a card without a license fails.",
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9.+-]*$"
+    },
+    "tags": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {"type": "string", "minLength": 1, "pattern": "^[^\\s]+$"}
+    },
+    "szl": {
+      "$comment": "Live cards already keep free-form evidence keys under szl (artifact_class, weights, doctrine, ...). This contract adds two required keys and leaves the others alone.",
+      "type": "object",
+      "required": ["source_repo", "proof_url"],
+      "properties": {
+        "source_repo": {
+          "$comment": "The one GitHub repository whose committed workflow writes this asset (decision D1).",
+          "type": "string",
+          "pattern": "^szl-holdings/[A-Za-z0-9._-]+$"
+        },
+        "proof_url": {
+          "$comment": "Where a reader can check the card's claims: a proof page or the source repository.",
+          "type": "string",
+          "pattern": "^https://[^\\s]+$"
+        },
+        "lifecycle": {
+          "$comment": "Lifecycle enum from docs/CLAIM_LANGUAGE.md.",
+          "enum": [
+            "HISTORICAL_STUB",
+            "INFORMATIONAL_METADATA_ONLY",
+            "SOURCE_ONLY",
+            "RESEARCH",
+            "EVALUATION",
+            "CANDIDATE",
+            "PROMOTED",
+            "BLOCKED"
+          ]
+        },
+        "source_sha": {
+          "$comment": "Written by render.py --source-sha. The commit the card was rendered from.",
+          "type": "string",
+          "pattern": "^[0-9a-f]{40}$"
+        }
+      }
+    },
+    "common": {
+      "type": "object",
+      "required": ["license", "tags", "szl"],
+      "properties": {
+        "license": {"$ref": "#/$defs/license_id"},
+        "license_name": {"type": "string", "minLength": 1},
+        "license_link": {"type": "string", "minLength": 1},
+        "tags": {"$ref": "#/$defs/tags"},
+        "szl": {"$ref": "#/$defs/szl"},
+        "datasets": {"type": "array", "items": {"$ref": "#/$defs/repo_id"}},
+        "models": {"type": "array", "items": {"$ref": "#/$defs/repo_id"}}
+      },
+      "allOf": [
+        {
+          "$comment": "Hub rule: license 'other' must name and link the license. No license is ever invented.",
+          "if": {"required": ["license"], "properties": {"license": {"const": "other"}}},
+          "then": {"required": ["license_name", "license_link"]}
+        }
+      ]
+    },
+    "model": {
+      "allOf": [
+        {"$ref": "#/$defs/common"},
+        {
+          "type": "object",
+          "required": ["library_name"],
+          "properties": {
+            "library_name": {"type": "string", "minLength": 1},
+            "pipeline_tag": {"type": "string", "minLength": 1},
+            "base_model": {
+              "anyOf": [
+                {"$ref": "#/$defs/repo_id"},
+                {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/repo_id"}}
+              ]
+            },
+            "base_model_relation": {"enum": ["adapter", "merge", "quantized", "finetune"]},
+            "model-index": {"type": "array"}
+          }
+        },
+        {
+          "$comment": "Hub convention: a declared base_model_relation (adapter, merge, quantized, finetune) names its base_model.",
+          "if": {"required": ["base_model_relation"]},
+          "then": {"required": ["base_model"]}
+        }
+      ]
+    },
+    "dataset": {
+      "allOf": [
+        {"$ref": "#/$defs/common"},
+        {
+          "type": "object",
+          "properties": {
+            "pretty_name": {"type": "string", "minLength": 1},
+            "task_categories": {"type": "array", "items": {"type": "string"}},
+            "size_categories": {"type": "array", "items": {"type": "string"}},
+            "configs": {"type": "array"}
+          }
+        }
+      ]
+    },
+    "space": {
+      "allOf": [
+        {"$ref": "#/$defs/common"},
+        {
+          "type": "object",
+          "required": ["title", "sdk"],
+          "properties": {
+            "title": {"type": "string", "minLength": 1},
+            "emoji": {"type": "string", "minLength": 1},
+            "colorFrom": {"enum": ["red", "yellow", "green", "blue", "indigo", "purple", "pink", "gray"]},
+            "colorTo": {"enum": ["red", "yellow", "green", "blue", "indigo", "purple", "pink", "gray"]},
+            "sdk": {"enum": ["docker", "gradio", "static", "streamlit"]},
+            "sdk_version": {"type": "string", "minLength": 1},
+            "app_port": {"type": "integer", "minimum": 1, "maximum": 65535},
+            "app_file": {"type": "string", "minLength": 1},
+            "pinned": {"type": "boolean"},
+            "short_description": {"type": "string", "minLength": 1, "maxLength": 60}
+          }
+        },
+        {
+          "$comment": "SZL explicitness rule: a Docker Space names its port instead of relying on the Hub default.",
+          "if": {"required": ["sdk"], "properties": {"sdk": {"const": "docker"}}},
+          "then": {"required": ["app_port"]}
+        },
+        {
+          "$comment": "SZL pinning rule, not a Hub rule: a Python-SDK Space names its SDK version.",
+          "if": {"required": ["sdk"], "properties": {"sdk": {"enum": ["gradio", "streamlit"]}}},
+          "then": {"required": ["sdk_version"]}
+        }
+      ]
+    },
+    "kernel": {
+      "allOf": [
+        {"$ref": "#/$defs/common"},
+        {
+          "type": "object",
+          "required": ["library_name"],
+          "properties": {
+            "library_name": {"const": "kernels"}
+          }
+        }
+      ]
+    }
+  }
+}
