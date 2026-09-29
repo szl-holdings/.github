@@ -1,0 +1,134 @@
+{#- SZL Hugging Face card: one template for model, dataset, space and kernel.
+    Rendered by hf-card/render.py from a vars file committed in the source
+    repository. The template prints only what the vars file declares; it never
+    supplies a license, a number or an evidence label of its own. -#}
+---
+{{ front_matter_yaml }}---
+<!-- hf-card: type={{ type }} source={{ fm.szl.source_repo }} vars={{ vars_path }}{% if source_sha %} sha={{ source_sha }}{% endif %} -->
+<!-- Rendered by szl-holdings/.github hf-card/render.py. Edit {{ vars_path }} in {{ fm.szl.source_repo }}; do not edit this card on the Hub. -->
+
+# {{ title }}
+
+{{ summary }}
+
+{% if type == "model" %}
+## Model
+
+| Field | Value |
+| --- | --- |
+| Hub id | `{{ repo_id }}` |
+| Library | `{{ fm.library_name }}` |
+{% if fm.pipeline_tag is defined %}
+| Pipeline | `{{ fm.pipeline_tag }}` |
+{% endif %}
+{% if fm.base_model is defined %}
+| Base model | {% for b in ([fm.base_model] if fm.base_model is string else fm.base_model) %}[{{ b }}](https://huggingface.co/{{ b }}){% if not loop.last %}, {% endif %}{% endfor %} |
+{% endif %}
+{% if fm.base_model_relation is defined %}
+| Relation to base | `{{ fm.base_model_relation }}` |
+{% endif %}
+{% if fm.datasets is defined %}
+| Datasets | {% for d in fm.datasets %}[{{ d }}](https://huggingface.co/datasets/{{ d }}){% if not loop.last %}, {% endif %}{% endfor %} |
+{% endif %}
+{% elif type == "dataset" %}
+## Dataset
+
+| Field | Value |
+| --- | --- |
+| Hub id | `{{ repo_id }}` |
+{% if fm.pretty_name is defined %}
+| Name | {{ fm.pretty_name | cell }} |
+{% endif %}
+{% if fm.task_categories is defined %}
+| Task categories | {{ fm.task_categories | join(", ") | cell }} |
+{% endif %}
+{% if fm.size_categories is defined %}
+| Size category | {{ fm.size_categories | join(", ") | cell }} |
+{% endif %}
+{% if dataset.structure is defined %}
+
+{{ dataset.structure }}
+{% endif %}
+{% elif type == "space" %}
+## Space
+
+| Field | Value |
+| --- | --- |
+| Hub id | `{{ repo_id }}` |
+| SDK | `{{ fm.sdk }}`{% if fm.sdk_version is defined %} `{{ fm.sdk_version }}`{% endif %} |
+{% if fm.app_port is defined %}
+| App port | `{{ fm.app_port }}` |
+{% endif %}
+{% if space.health_path is defined %}
+| Health route | `{{ space.health_path }}` |
+{% endif %}
+{% if space.url is defined %}
+| Live URL | <{{ space.url }}> |
+{% endif %}
+{% elif type == "kernel" %}
+## Kernel
+
+| Field | Value |
+| --- | --- |
+| Hub id | `{{ repo_id }}` |
+| Library | `{{ fm.library_name }}` |
+{% if kernel.backends is defined %}
+| Backends | {{ kernel.backends | join(", ") | cell }} |
+{% endif %}
+{% if kernel.load is defined %}
+
+```python
+{{ kernel.load | trim }}
+```
+{% endif %}
+{% endif %}
+{% for section in sections %}
+
+## {{ section.heading }}
+
+{{ section.body | trim }}
+{% endfor %}
+{% if claims %}
+
+## Claims
+
+| Label | Claim | Evidence |
+| --- | --- | --- |
+{% for c in claims %}
+| {{ c.label }} | {{ c.claim | cell }} | {% if c.receipt is defined %}[receipt]({{ c.receipt }}){% else %}none linked{% endif %} |
+{% endfor %}
+
+Labels follow the [SZL claim language](https://github.com/szl-holdings/.github/blob/main/docs/CLAIM_LANGUAGE.md). A claim is only as strong as the receipt it links.
+{% endif %}
+{% if limits %}
+
+## Limits
+
+{% for item in limits %}
+- {{ item | trim }}
+{% endfor %}
+{% endif %}
+{% if release is defined %}
+
+<!-- SZL-HF-MIRROR:START -->
+## Release
+
+Mirrored from [{{ fm.szl.source_repo }}@{{ release.tag }}](https://github.com/{{ fm.szl.source_repo }}/releases/tag/{{ release.tag }}), source commit [`{{ release.source_sha }}`](https://github.com/{{ fm.szl.source_repo }}/commit/{{ release.source_sha }}).
+<!-- SZL-HF-MIRROR:END -->
+{% endif %}
+
+## Source and provenance
+
+| Field | Value |
+| --- | --- |
+| Source repository | [{{ fm.szl.source_repo }}](https://github.com/{{ fm.szl.source_repo }}) |
+{% if source_sha %}
+| Rendered from | [`{{ source_sha }}`](https://github.com/{{ fm.szl.source_repo }}/commit/{{ source_sha }}) |
+{% endif %}
+| Proof | <{{ fm.szl.proof_url }}> |
+| License | `{{ fm.license }}`{% if fm.license_name is defined %} ({{ fm.license_name | cell }}){% endif %} |
+{% if fm.szl.lifecycle is defined %}
+| Lifecycle | `{{ fm.szl.lifecycle }}` |
+{% endif %}
+
+This card is written to the Hub only by the committed mirror workflow of {{ fm.szl.source_repo }}.
