@@ -1,0 +1,27 @@
+# Example vars file for a kernel card. Test fixture only.
+type: kernel
+repo_id: SZLHOLDINGS/example-kernel
+title: Example kernel
+summary: A fixture that exercises the kernel block.
+front_matter:
+  license: apache-2.0
+  library_name: kernels
+  tags:
+    - kernel
+  szl:
+    source_repo: szl-holdings/example-kernel
+    proof_url: https://github.com/szl-holdings/example-kernel
+kernel:
+  backends: [cpu]
+  load: |
+    from kernels import get_kernel
+    kernel = get_kernel("SZLHOLDINGS/example-kernel")
+claims:
+  - label: MEASURED
+    claim: "Latency p50 of 1.8 ms on the fixture host."
+    receipt: https://github.com/szl-holdings/example-kernel/blob/0123456789abcdef0123456789abcdef01234567/BENCH.json
+  - label: REPORTED
+    claim: Hub-only bench file, not committed in the source repository.
+release:
+  tag: v0.1.0
+  source_sha: 0123456789abcdef0123456789abcdef01234567

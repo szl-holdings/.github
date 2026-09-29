@@ -19,7 +19,7 @@ name: Reusable — Energy-Provenance Honesty Guard
 # Wire it up from a consuming repo:
 #   jobs:
 #     energy-provenance:
-#       uses: szl-holdings/.github/.github/workflows/reusable-energy-provenance-guard.yml@main
+#       uses: szl-holdings/.github/.github/workflows/reusable-energy-provenance-guard.yml@<full-commit-sha>  # SHA-pin per pin-check.yml
 
 on:
   workflow_call:
