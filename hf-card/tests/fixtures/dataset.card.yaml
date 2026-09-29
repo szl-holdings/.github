@@ -1,0 +1,22 @@
+# Example vars file for a dataset card. Test fixture only.
+type: dataset
+repo_id: SZLHOLDINGS/example-dataset
+title: Example dataset
+summary: A fixture that exercises the dataset block.
+front_matter:
+  license: cc-by-4.0
+  pretty_name: Example dataset
+  task_categories:
+    - other
+  size_categories:
+    - n<1K
+  tags:
+    - receipts
+  szl:
+    source_repo: szl-holdings/example-dataset
+    proof_url: https://github.com/szl-holdings/example-dataset
+dataset:
+  structure: One JSON Lines file, `data/receipts.jsonl`, one receipt per line.
+claims:
+  - label: REPORTED
+    claim: Row count as reported by the generator log.
