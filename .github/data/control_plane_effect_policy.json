@@ -9,7 +9,7 @@
     ".github/workflows/control-plane-effect-gate.yml": {
       "intent_id": "cp-ebom-static-boundary-v1",
       "valid_until": "2026-11-30",
-      "source_sha256": "sha256:e2c689c637aeb420e2cf43db1d139a03f5b1594bcba3c9f3d8d57fb3dcd1817d",
+      "source_sha256": "sha256:61a841b326844734c27bda85e73378189f3907fb6753b983aca91bb1e2425b88",
       "credentials": [],
       "resources": [
         {
@@ -71,8 +71,8 @@
         "readback": true
       },
       "trusted_transitives": {
-        ".github/scripts/control_plane_effect_gate.py": "sha256:beff9752879fe10e967aef52dafccc392f1cefa5c70cf3703a04babafd500108",
-        ".github/scripts/test_control_plane_effect_gate.py": "sha256:2572b909e25fd9c3927a7ed19205fc3db9ade60fb56bcbf01ceff316bd2315f2"
+        ".github/scripts/control_plane_effect_gate.py": "sha256:8c79f5d969594bb0572db757212b2140c0ad0e618dc8a7e7f1d08f7e194bf0bc",
+        ".github/scripts/test_control_plane_effect_gate.py": "sha256:8fef3297392608f4e2cb6341c2eb1d4f1831a710c92d816bc83c91597e8166e8"
       }
     },
     ".github/workflows/lean-numbers.yml": {
@@ -125,6 +125,7 @@
           ".github/workflows/lean-numbers.yml": "sha256:80446fb8637b0d94abed2d7a3d3dc847f725aeda1eaab40fc8aa414856e13689"
         },
         "unknowns": [
+          "ACTION_INPUTS_REVIEW_REQUIRED@.github/workflows/lean-numbers.yml:41",
           "PYTHON_DYNAMIC_SUBPROCESS@.github/scripts/lean_numbers.py:132",
           "PYTHON_DYNAMIC_SUBPROCESS@.github/scripts/lean_numbers.py:152",
           "PYTHON_IMPORT_UNRESOLVED@.github/scripts/lean_numbers.py:29",
