@@ -78,7 +78,7 @@
     ".github/workflows/lean-numbers.yml": {
       "intent_id": "lean-numbers-recount-v1",
       "valid_until": "2026-11-30",
-      "source_sha256": "sha256:13eca4a27e663008bc02c0537d10f01daea0b1e3f4e14728b67cd30849cd34a1",
+      "source_sha256": "sha256:80446fb8637b0d94abed2d7a3d3dc847f725aeda1eaab40fc8aa414856e13689",
       "credentials": [],
       "resources": [
         {
@@ -107,20 +107,56 @@
       "max_external_writes": 0,
       "required_controls": {
         "triggers": [
-          "merge_group",
-          "pull_request",
-          "push"
+          "push",
+          "workflow_dispatch"
         ],
         "contents_read": true,
         "no_explicit_secrets": true,
         "concurrency": true,
-        "protected_ref": true,
-        "exact_sha": true,
-        "expected_before": true,
-        "readback": true
+        "protected_ref": false,
+        "exact_sha": false,
+        "expected_before": false,
+        "readback": false
       },
-      "trusted_transitives": {
-        ".github/scripts/lean_numbers.py": "sha256:999598ac0da319b5a261d9fdbd7419662df883034a6ac17202b6a75cf2a77ede"
+      "trusted_transitives": {},
+      "reviewed_unknowns": {
+        "files": {
+          ".github/scripts/lean_numbers.py": "sha256:0e8b6cccbf9c422803984bda3657abbed78da6cf7e7ccfa1cf44078adc4630df",
+          ".github/workflows/lean-numbers.yml": "sha256:80446fb8637b0d94abed2d7a3d3dc847f725aeda1eaab40fc8aa414856e13689"
+        },
+        "unknowns": [
+          "PYTHON_DYNAMIC_SUBPROCESS@.github/scripts/lean_numbers.py:103",
+          "PYTHON_DYNAMIC_SUBPROCESS@.github/scripts/lean_numbers.py:123",
+          "PYTHON_IMPORT_UNRESOLVED@.github/scripts/lean_numbers.py:27",
+          "PYTHON_IMPORT_UNRESOLVED@.github/scripts/lean_numbers.py:29",
+          "PYTHON_SOURCE_REVIEW_REQUIRED@.github/scripts/lean_numbers.py:1",
+          "PYTHON_SOURCE_REVIEW_REQUIRED@.github/workflows/lean-numbers.yml:59",
+          "SCRIPT_SOURCE_REVIEW_REQUIRED@.github/workflows/lean-numbers.yml:1",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/lean-numbers.yml:48",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/lean-numbers.yml:49",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/lean-numbers.yml:50",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/lean-numbers.yml:51",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/lean-numbers.yml:52",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/lean-numbers.yml:53",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/lean-numbers.yml:54",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/lean-numbers.yml:55",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/lean-numbers.yml:56",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/lean-numbers.yml:58",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/lean-numbers.yml:59",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/lean-numbers.yml:60",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/lean-numbers.yml:61",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/lean-numbers.yml:62",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/lean-numbers.yml:63",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/lean-numbers.yml:64",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/lean-numbers.yml:65",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/lean-numbers.yml:66",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/lean-numbers.yml:67",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/lean-numbers.yml:68",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/lean-numbers.yml:69",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/lean-numbers.yml:49",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/lean-numbers.yml:50",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/lean-numbers.yml:52"
+        ]
       }
     }
   }
