@@ -8,5 +8,5 @@ def test_org_card_navigation_has_full_size_hit_regions() -> None:
     assert "height: 48px" in rule
     assert "min-height: var(--tap)" in rule
     assert "justify-content: center" in rule
-    assert "border-radius: 10px" in rule
+    assert "border-radius: var(--radius-md)" in rule
     assert "border-radius: 999px" not in rule
