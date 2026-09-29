@@ -80,9 +80,31 @@
       "valid_until": "2026-11-30",
       "source_sha256": "sha256:13eca4a27e663008bc02c0537d10f01daea0b1e3f4e14728b67cd30849cd34a1",
       "credentials": [],
-      "resources": [],
-      "effects": [],
-      "max_external_writes": 1,
+      "resources": [
+        {
+          "key": "github:repository:szl-holdings/.github:contents",
+          "access": "read"
+        },
+        {
+          "key": "runner:toolchain:python",
+          "access": "local-write"
+        }
+      ],
+      "effects": [
+        {
+          "sink": "github.contents.checkout",
+          "resource": "github:repository:szl-holdings/.github:contents",
+          "access": "read",
+          "max_calls": 1
+        },
+        {
+          "sink": "runner.toolchain.install",
+          "resource": "runner:toolchain:python",
+          "access": "local-write",
+          "max_calls": 1
+        }
+      ],
+      "max_external_writes": 0,
       "required_controls": {
         "triggers": [
           "merge_group",
