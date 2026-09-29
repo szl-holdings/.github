@@ -12,7 +12,7 @@ name: Reusable — Doctrine Overclaim Guard
 # Wire it up from a consuming repo, e.g.:
 #   jobs:
 #     overclaim:
-#       uses: szl-holdings/.github/.github/workflows/reusable-overclaim-guard.yml@main
+#       uses: szl-holdings/.github/.github/workflows/reusable-overclaim-guard.yml@<full-commit-sha>  # SHA-pin per pin-check.yml
 #
 # Repos whose governed docs differ from the default set can pass `files:`
 # (space-separated). The check is a self-contained grep so it works even where

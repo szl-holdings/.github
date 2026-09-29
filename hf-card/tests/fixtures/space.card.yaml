@@ -1,0 +1,25 @@
+# Example vars file for a Space card. Test fixture only.
+type: space
+repo_id: SZLHOLDINGS/example-space
+title: Example Space
+summary: A fixture that exercises the Space block.
+front_matter:
+  title: Example Space
+  emoji: "🧾"
+  colorFrom: indigo
+  colorTo: gray
+  sdk: docker
+  app_port: 7860
+  pinned: false
+  license: apache-2.0
+  short_description: Fixture Space for the shared card template
+  tags:
+    - governance
+  szl:
+    source_repo: szl-holdings/example-space
+    proof_url: https://github.com/szl-holdings/example-space
+space:
+  health_path: /healthz
+  url: https://szlholdings-example-space.hf.space/
+limits:
+  - Runs on cpu-basic; no GPU claim.
