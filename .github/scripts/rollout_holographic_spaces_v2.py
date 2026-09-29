@@ -80,6 +80,16 @@ PYTHON_ENTRIES = (
 )
 EXCLUDED_REPOS = {".github", "a11oy", "a11oy-net"}
 ALLOWED_CHECK_CONCLUSIONS = {"success", "neutral", "skipped"}
+# The fabric palette is SZL KANCHAY founder tokens (var(--bg), var(--focus), ...) with no
+# literal fallback. A Space must vendor szl/szl-design-system.css beside the layer and link
+# it first; without it the grounds are transparent and the focus outline computes to none.
+FOUNDER_BASE = "szl/szl-design-system.css"
+FOUNDER_LAYER_SUFFIXES = (
+    "szl-space-hologram.css",
+    "szl-space-hologram.js",
+    "szl_hologram_assets.py",
+    "szl_hologram_streamlit.py",
+)
 
 
 class RolloutError(RuntimeError):
@@ -702,7 +712,7 @@ def adapt_streamlit(content: str, slug: str) -> str:
 
 
 def streamlit_helper() -> str:
-    return '''"""CSS-only Streamlit adapter for SZL Holographic Space Fabric v2."""\nfrom __future__ import annotations\n\nimport hashlib\nimport html\nfrom pathlib import Path\nimport streamlit as st\n\n_ROOT = Path(__file__).resolve().parent\n_CSS = (_ROOT / "szl-space-hologram.css").read_text(encoding="utf-8")\n_PALETTES = [\n    ("#07131a", "#102633", "#f2fbff", "#9ab4c2", "#64dcff", "#a88bff"),\n    ("#130a10", "#291522", "#fff6fb", "#c2a2b3", "#ff7bc3", "#ffb56b"),\n    ("#07140d", "#12281a", "#f5fff7", "#9db8a4", "#72efa0", "#5ad6ff"),\n    ("#130e06", "#2a1d0e", "#fffaf0", "#c2b297", "#ffc66d", "#ff7d73"),\n    ("#090a18", "#171932", "#f6f6ff", "#a6a8c4", "#878cff", "#54e4d7"),\n]\n_MOTIFS = ("command-grid", "signal-aurora", "bathymetric-radar", "parcel-topography", "threat-lattice", "case-lines", "editorial-orbit", "graph-mesh", "build-circuit", "recursive-weave", "agent-swarm", "cell-membrane", "checksum-ledger")\n\ndef render_szl_hologram(slug: str) -> None:\n    seed = int.from_bytes(hashlib.sha256(slug.encode("utf-8")).digest()[:4], "big")\n    background, surface, foreground, muted, accent, accent2 = _PALETTES[seed % len(_PALETTES)]\n    motif = _MOTIFS[(seed >> 8) % len(_MOTIFS)]\n    label = " ".join(part.capitalize() for part in slug.replace("_", "-").split("-") if part)\n    variables = f":root{{--szl-space-bg:{background};--szl-space-surface:{surface};--szl-space-fg:{foreground};--szl-space-muted:{muted};--szl-space-accent:{accent};--szl-space-accent-2:{accent2};}}"\n    markup = f"""<style>{_CSS}{variables}</style><div id="szl-space-holo-v2-ambient" aria-hidden="true"><span class="szl-space-field"></span><span class="szl-space-orbit"></span><span class="szl-space-beam"></span><span class="szl-space-scan"></span><span class="szl-space-nodes"></span></div><nav style="position:relative;z-index:2147483000;display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 14px;margin:0 0 12px;border:1px solid var(--szl-space-line);border-radius:14px;background:color-mix(in srgb,var(--szl-space-bg) 88%,transparent);backdrop-filter:blur(16px)" aria-label="SZL ecosystem"><strong>{html.escape(label)}</strong><span style="display:flex;gap:10px;flex-wrap:wrap"><a href="https://a-11-oy.com">Command</a><a href="https://a11oy.net">Proof</a><a href="https://huggingface.co/SZLHOLDINGS">Spaces</a><a href="https://github.com/szl-holdings">Source</a></span></nav><script>document.documentElement.dataset.szlSpaceHoloV2='true';document.documentElement.dataset.szlSpaceMotif={motif!r};document.documentElement.dataset.szlSpaceSlug={slug!r};</script>"""\n    st.markdown(markup, unsafe_allow_html=True)\n'''
+    return '''"""CSS-only Streamlit adapter for SZL Holographic Space Fabric v2."""\nfrom __future__ import annotations\n\nimport hashlib\nimport html\nfrom pathlib import Path\nimport streamlit as st\n\n_ROOT = Path(__file__).resolve().parent\n_CSS = (_ROOT / "szl-space-hologram.css").read_text(encoding="utf-8")\n# SZL KANCHAY founder tokens (szl/szl-design-system.css loads first); linework silver, one teal accent.\n_PALETTES = [\n    ("var(--bg)", "var(--surface)", "var(--text)", "var(--text-sub)", "var(--link)", "var(--color-silver-300)"),\n    ("var(--bg)", "var(--surface)", "var(--text)", "var(--text-sub)", "var(--link)", "var(--color-silver-100)"),\n    ("var(--bg)", "var(--surface)", "var(--text)", "var(--text-sub)", "var(--link)", "var(--color-silver-300)"),\n    ("var(--bg)", "var(--surface)", "var(--text)", "var(--text-sub)", "var(--link)", "var(--color-silver-100)"),\n    ("var(--bg)", "var(--surface)", "var(--text)", "var(--text-sub)", "var(--link)", "var(--color-silver-300)"),\n]\n_MOTIFS = ("command-grid", "signal-aurora", "bathymetric-radar", "parcel-topography", "threat-lattice", "case-lines", "editorial-orbit", "graph-mesh", "build-circuit", "recursive-weave", "agent-swarm", "cell-membrane", "checksum-ledger")\n\ndef render_szl_hologram(slug: str) -> None:\n    seed = int.from_bytes(hashlib.sha256(slug.encode("utf-8")).digest()[:4], "big")\n    background, surface, foreground, muted, accent, accent2 = _PALETTES[seed % len(_PALETTES)]\n    motif = _MOTIFS[(seed >> 8) % len(_MOTIFS)]\n    label = " ".join(part.capitalize() for part in slug.replace("_", "-").split("-") if part)\n    variables = f":root{{--szl-space-bg:{background};--szl-space-surface:{surface};--szl-space-fg:{foreground};--szl-space-muted:{muted};--szl-space-accent:{accent};--szl-space-accent-2:{accent2};}}"\n    markup = f"""<style>{_CSS}{variables}</style><div id="szl-space-holo-v2-ambient" aria-hidden="true"><span class="szl-space-field"></span><span class="szl-space-orbit"></span><span class="szl-space-beam"></span><span class="szl-space-scan"></span><span class="szl-space-nodes"></span></div><nav style="position:relative;z-index:2147483000;display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 14px;margin:0 0 12px;border:1px solid var(--szl-space-line);border-radius:14px;background:color-mix(in srgb,var(--szl-space-bg) 88%,transparent);backdrop-filter:blur(16px)" aria-label="SZL ecosystem"><strong>{html.escape(label)}</strong><span style="display:flex;gap:10px;flex-wrap:wrap"><a href="https://a-11-oy.com">Command</a><a href="https://a11oy.net">Proof</a><a href="https://huggingface.co/SZLHOLDINGS">Spaces</a><a href="https://github.com/szl-holdings">Source</a></span></nav><script>document.documentElement.dataset.szlSpaceHoloV2='true';document.documentElement.dataset.szlSpaceMotif={motif!r};document.documentElement.dataset.szlSpaceSlug={slug!r};</script>"""\n    st.markdown(markup, unsafe_allow_html=True)\n'''
 
 
 def read_assets(root: Path) -> tuple[str, str, str]:
@@ -910,9 +920,31 @@ Generated by `{SCHEMA}`.
 """
 
 
+def founder_base_gaps(paths: Iterable[str], changes: Iterable[Change]) -> list[str]:
+    """Return fabric writes whose directory has no vendored SZL KANCHAY base."""
+    present = set(paths)
+    gaps: list[str] = []
+    for change in changes:
+        if not change.path.endswith(FOUNDER_LAYER_SUFFIXES):
+            continue
+        parent = change.path.rpartition("/")[0]
+        base = f"{parent}/{FOUNDER_BASE}" if parent else FOUNDER_BASE
+        if base not in present:
+            gaps.append(change.path)
+    return gaps
+
+
 def apply_plan(github: GitHub, org: str, plan: Plan, digest: str) -> None:
     if plan.status != "planned":
         return
+    tree_paths = (str(item.get("path")) for item in github.tree(plan.repository, plan.default_branch))
+    gaps = founder_base_gaps(tree_paths, plan.changes)
+    if gaps:
+        raise RolloutError(
+            "FOUNDER_BASE_MISSING",
+            f"{plan.repository} must vendor and link {FOUNDER_BASE} before the fabric layer",
+            details={"layer_writes": gaps},
+        )
     open_pull = github.open_pull(plan.repository, org, BRANCH)
     exists = github.ref_exists(plan.repository, BRANCH)
     if exists and not open_pull:

@@ -10,46 +10,46 @@
   window.__SZL_SPACE_HOLO_V2__ = true;
 
   var VERSION = "2.0.0";
-  // SZL KANCHAY v1.1.0, founder direction (szl-design-system.css). Every Space shares the
-  // dark-operator neutrals: --bg #030F29 (color-space-900), --surface #1b222c, --text #f5f7fa,
-  // --text-sub #c9d2df. Each family adds one functional accent, teal (color-yuyay-300 #5cc4bf,
-  // -200 #8fd9d5, -400 #34aaa4) or, for premium flagship families only, gold (--premium
-  // #d7b96b), plus a silver for linework (color-silver-300 #9AA7BD or -100 #E9EEF6). No coral
-  // (the fabric has no single node), no violet or blue-violet. Motifs carry identity.
+  // SZL KANCHAY v1.1.0, founder direction (szl-brand kanchay/ @aa876fa). Palette values are token
+  // references resolved against szl-design-system.css, which each Space links before this layer
+  // (the same roles as _layers/szl-space-hologram): ground --bg, surface --surface, text --text /
+  // --text-sub, one functional teal accent --link (kicker, skip link, native controls), and silver
+  // linework (color-silver-300 or -100). No coral (the fabric draws no single node), no gold, no
+  // violet or cyan. Keys, labels, motifs and the FNV-1a palette index are unchanged.
   var CURATED = {
-    "a11oy": ["A11oy", "command-grid", "#030F29", "#1b222c", "#f5f7fa", "#c9d2df", "#d7b96b", "#9AA7BD"],
-    "a11oy-enterprise": ["A11oy Enterprise", "command-grid", "#030F29", "#1b222c", "#f5f7fa", "#c9d2df", "#d7b96b", "#E9EEF6"],
-    "lyte": ["Lyte", "signal-aurora", "#030F29", "#1b222c", "#f5f7fa", "#c9d2df", "#5cc4bf", "#9AA7BD"],
-    "lyte-lattice": ["Lyte Lattice", "signal-aurora", "#030F29", "#1b222c", "#f5f7fa", "#c9d2df", "#5cc4bf", "#9AA7BD"],
-    "vessels": ["Vessels", "bathymetric-radar", "#030F29", "#1b222c", "#f5f7fa", "#c9d2df", "#8fd9d5", "#9AA7BD"],
-    "terra": ["Terra", "parcel-topography", "#030F29", "#1b222c", "#f5f7fa", "#c9d2df", "#5cc4bf", "#E9EEF6"],
-    "szl-real-estate": ["Terra Real Estate", "parcel-topography", "#030F29", "#1b222c", "#f5f7fa", "#c9d2df", "#5cc4bf", "#E9EEF6"],
-    "aegis": ["Aegis", "threat-lattice", "#030F29", "#1b222c", "#f5f7fa", "#c9d2df", "#34aaa4", "#9AA7BD"],
-    "prism-counsel": ["PRISM Counsel", "case-lines", "#030F29", "#1b222c", "#f5f7fa", "#c9d2df", "#8fd9d5", "#E9EEF6"],
-    "counsel": ["PRISM Counsel", "case-lines", "#030F29", "#1b222c", "#f5f7fa", "#c9d2df", "#8fd9d5", "#E9EEF6"],
-    "carlota-jo": ["Carlota Jo", "editorial-orbit", "#030F29", "#1b222c", "#f5f7fa", "#c9d2df", "#8fd9d5", "#9AA7BD"],
-    "nexus": ["Nexus", "graph-mesh", "#030F29", "#1b222c", "#f5f7fa", "#c9d2df", "#5cc4bf", "#E9EEF6"],
-    "a11oy-factory": ["A11oy Factory", "build-circuit", "#030F29", "#1b222c", "#f5f7fa", "#c9d2df", "#d7b96b", "#9AA7BD"],
-    "szl-command-lab": ["SZL Command Lab", "build-circuit", "#030F29", "#1b222c", "#f5f7fa", "#c9d2df", "#d7b96b", "#9AA7BD"],
-    "ouroboros": ["Ouroboros", "recursive-weave", "#030F29", "#1b222c", "#f5f7fa", "#c9d2df", "#34aaa4", "#E9EEF6"],
-    "szl-khipu": ["SZL KHIPU", "recursive-weave", "#030F29", "#1b222c", "#f5f7fa", "#c9d2df", "#34aaa4", "#E9EEF6"],
-    "killinchu": ["Killinchu", "agent-swarm", "#030F29", "#1b222c", "#f5f7fa", "#c9d2df", "#d7b96b", "#E9EEF6"],
-    "immune": ["IMMUNE", "cell-membrane", "#030F29", "#1b222c", "#f5f7fa", "#c9d2df", "#5cc4bf", "#9AA7BD"],
-    "governed-receipt-verifier": ["Governed Receipt Verifier", "checksum-ledger", "#030F29", "#1b222c", "#f5f7fa", "#c9d2df", "#8fd9d5", "#E9EEF6"]
+    "a11oy": ["A11oy", "command-grid", "var(--bg)", "var(--surface)", "var(--text)", "var(--text-sub)", "var(--link)", "var(--color-silver-300)"],
+    "a11oy-enterprise": ["A11oy Enterprise", "command-grid", "var(--bg)", "var(--surface)", "var(--text)", "var(--text-sub)", "var(--link)", "var(--color-silver-100)"],
+    "lyte": ["Lyte", "signal-aurora", "var(--bg)", "var(--surface)", "var(--text)", "var(--text-sub)", "var(--link)", "var(--color-silver-300)"],
+    "lyte-lattice": ["Lyte Lattice", "signal-aurora", "var(--bg)", "var(--surface)", "var(--text)", "var(--text-sub)", "var(--link)", "var(--color-silver-300)"],
+    "vessels": ["Vessels", "bathymetric-radar", "var(--bg)", "var(--surface)", "var(--text)", "var(--text-sub)", "var(--link)", "var(--color-silver-300)"],
+    "terra": ["Terra", "parcel-topography", "var(--bg)", "var(--surface)", "var(--text)", "var(--text-sub)", "var(--link)", "var(--color-silver-100)"],
+    "szl-real-estate": ["Terra Real Estate", "parcel-topography", "var(--bg)", "var(--surface)", "var(--text)", "var(--text-sub)", "var(--link)", "var(--color-silver-100)"],
+    "aegis": ["Aegis", "threat-lattice", "var(--bg)", "var(--surface)", "var(--text)", "var(--text-sub)", "var(--link)", "var(--color-silver-300)"],
+    "prism-counsel": ["PRISM Counsel", "case-lines", "var(--bg)", "var(--surface)", "var(--text)", "var(--text-sub)", "var(--link)", "var(--color-silver-100)"],
+    "counsel": ["PRISM Counsel", "case-lines", "var(--bg)", "var(--surface)", "var(--text)", "var(--text-sub)", "var(--link)", "var(--color-silver-100)"],
+    "carlota-jo": ["Carlota Jo", "editorial-orbit", "var(--bg)", "var(--surface)", "var(--text)", "var(--text-sub)", "var(--link)", "var(--color-silver-300)"],
+    "nexus": ["Nexus", "graph-mesh", "var(--bg)", "var(--surface)", "var(--text)", "var(--text-sub)", "var(--link)", "var(--color-silver-100)"],
+    "a11oy-factory": ["A11oy Factory", "build-circuit", "var(--bg)", "var(--surface)", "var(--text)", "var(--text-sub)", "var(--link)", "var(--color-silver-300)"],
+    "szl-command-lab": ["SZL Command Lab", "build-circuit", "var(--bg)", "var(--surface)", "var(--text)", "var(--text-sub)", "var(--link)", "var(--color-silver-300)"],
+    "ouroboros": ["Ouroboros", "recursive-weave", "var(--bg)", "var(--surface)", "var(--text)", "var(--text-sub)", "var(--link)", "var(--color-silver-100)"],
+    "szl-khipu": ["SZL KHIPU", "recursive-weave", "var(--bg)", "var(--surface)", "var(--text)", "var(--text-sub)", "var(--link)", "var(--color-silver-100)"],
+    "killinchu": ["Killinchu", "agent-swarm", "var(--bg)", "var(--surface)", "var(--text)", "var(--text-sub)", "var(--link)", "var(--color-silver-100)"],
+    "immune": ["IMMUNE", "cell-membrane", "var(--bg)", "var(--surface)", "var(--text)", "var(--text-sub)", "var(--link)", "var(--color-silver-300)"],
+    "governed-receipt-verifier": ["Governed Receipt Verifier", "checksum-ledger", "var(--bg)", "var(--surface)", "var(--text)", "var(--text-sub)", "var(--link)", "var(--color-silver-100)"]
   };
   var PALETTES = [
-    ["#030F29", "#1b222c", "#f5f7fa", "#c9d2df", "#5cc4bf", "#9AA7BD"],
-    ["#030F29", "#1b222c", "#f5f7fa", "#c9d2df", "#8fd9d5", "#9AA7BD"],
-    ["#030F29", "#1b222c", "#f5f7fa", "#c9d2df", "#34aaa4", "#9AA7BD"],
-    ["#030F29", "#1b222c", "#f5f7fa", "#c9d2df", "#5cc4bf", "#E9EEF6"],
-    ["#030F29", "#1b222c", "#f5f7fa", "#c9d2df", "#8fd9d5", "#E9EEF6"],
-    ["#030F29", "#1b222c", "#f5f7fa", "#c9d2df", "#34aaa4", "#E9EEF6"],
-    ["#030F29", "#1b222c", "#f5f7fa", "#c9d2df", "#8fd9d5", "#9AA7BD"],
-    ["#030F29", "#1b222c", "#f5f7fa", "#c9d2df", "#5cc4bf", "#E9EEF6"],
-    ["#030F29", "#1b222c", "#f5f7fa", "#c9d2df", "#34aaa4", "#E9EEF6"],
-    ["#030F29", "#1b222c", "#f5f7fa", "#c9d2df", "#8fd9d5", "#E9EEF6"],
-    ["#030F29", "#1b222c", "#f5f7fa", "#c9d2df", "#5cc4bf", "#9AA7BD"],
-    ["#030F29", "#1b222c", "#f5f7fa", "#c9d2df", "#34aaa4", "#9AA7BD"]
+    ["var(--bg)", "var(--surface)", "var(--text)", "var(--text-sub)", "var(--link)", "var(--color-silver-300)"],
+    ["var(--bg)", "var(--surface)", "var(--text)", "var(--text-sub)", "var(--link)", "var(--color-silver-300)"],
+    ["var(--bg)", "var(--surface)", "var(--text)", "var(--text-sub)", "var(--link)", "var(--color-silver-300)"],
+    ["var(--bg)", "var(--surface)", "var(--text)", "var(--text-sub)", "var(--link)", "var(--color-silver-100)"],
+    ["var(--bg)", "var(--surface)", "var(--text)", "var(--text-sub)", "var(--link)", "var(--color-silver-100)"],
+    ["var(--bg)", "var(--surface)", "var(--text)", "var(--text-sub)", "var(--link)", "var(--color-silver-100)"],
+    ["var(--bg)", "var(--surface)", "var(--text)", "var(--text-sub)", "var(--link)", "var(--color-silver-300)"],
+    ["var(--bg)", "var(--surface)", "var(--text)", "var(--text-sub)", "var(--link)", "var(--color-silver-100)"],
+    ["var(--bg)", "var(--surface)", "var(--text)", "var(--text-sub)", "var(--link)", "var(--color-silver-100)"],
+    ["var(--bg)", "var(--surface)", "var(--text)", "var(--text-sub)", "var(--link)", "var(--color-silver-100)"],
+    ["var(--bg)", "var(--surface)", "var(--text)", "var(--text-sub)", "var(--link)", "var(--color-silver-300)"],
+    ["var(--bg)", "var(--surface)", "var(--text)", "var(--text-sub)", "var(--link)", "var(--color-silver-300)"]
   ];
   var MOTIFS = ["command-grid", "signal-aurora", "bathymetric-radar", "parcel-topography", "threat-lattice", "case-lines", "editorial-orbit", "graph-mesh", "build-circuit", "recursive-weave", "agent-swarm", "cell-membrane", "checksum-ledger"];
   var LINKS = [
@@ -135,7 +135,7 @@
     SpaceBar.prototype.connectedCallback = function () {
       if (this.shadowRoot) return;
       var shadow = this.attachShadow({ mode: "open" });
-      shadow.innerHTML = '<style>:host{all:initial;display:block;position:relative;z-index:2147483000;color-scheme:dark;font-family:system-ui,-apple-system,"Segoe UI","Helvetica Neue","Liberation Sans",Arial,sans-serif}*{box-sizing:border-box}.bar{min-height:50px;display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:14px;padding:8px clamp(12px,2.3vw,30px);color:var(--szl-space-fg,#f5f7fa);background:color-mix(in srgb,var(--szl-space-bg,#030F29) 88%,transparent);border-bottom:1px solid color-mix(in srgb,var(--szl-space-accent-2,#9AA7BD) 25%,transparent);box-shadow:0 14px 40px color-mix(in srgb,var(--szl-space-bg,#030F29) 27%,transparent);backdrop-filter:blur(18px) saturate(130%)}.identity{min-width:0;display:flex;align-items:center;gap:10px;color:inherit;text-decoration:none}.mark{width:24px;height:24px;flex:none;border:1px solid color-mix(in srgb,var(--szl-space-accent-2) 70%,var(--szl-space-fg) 12%);border-radius:8px;background:radial-gradient(circle at 28% 25%,var(--szl-space-accent),transparent 35%),linear-gradient(145deg,color-mix(in srgb,var(--szl-space-accent-2) 70%,transparent),transparent 72%);box-shadow:0 0 25px color-mix(in srgb,var(--szl-space-accent-2) 28%,transparent);transform:rotate(8deg)}.copy{min-width:0;display:grid;gap:1px}.eyebrow{color:var(--szl-space-muted);font-size:9px;letter-spacing:.19em;text-transform:uppercase}.label{overflow:hidden;font-size:13px;font-weight:740;text-overflow:ellipsis;white-space:nowrap}nav{display:flex;gap:4px}nav a{min-height:34px;display:inline-flex;align-items:center;padding:6px 10px;border:1px solid transparent;border-radius:999px;color:var(--szl-space-muted);font-size:11px;font-weight:660;letter-spacing:.04em;text-decoration:none}nav a:hover,nav a:focus-visible,nav a[aria-current=page]{color:var(--szl-space-fg);border-color:color-mix(in srgb,var(--szl-space-accent-2) 38%,transparent);background:color-mix(in srgb,var(--szl-space-fg) 7%,transparent);outline:none}nav a:focus-visible,button:focus-visible,.identity:focus-visible{outline:3px solid var(--szl-space-focus,#34aaa4);outline-offset:2px}button{display:none;width:40px;height:36px;align-items:center;justify-content:center;border:1px solid color-mix(in srgb,var(--szl-space-accent-2) 32%,transparent);border-radius:10px;color:var(--szl-space-fg);background:transparent;cursor:pointer}@media(max-width:700px){button{display:inline-flex}nav{position:absolute;top:calc(100% + 7px);right:10px;min-width:190px;display:none;flex-direction:column;padding:8px;border:1px solid color-mix(in srgb,var(--szl-space-accent-2) 28%,transparent);border-radius:14px;background:color-mix(in srgb,var(--szl-space-bg) 96%,var(--szl-space-fg) 2%);box-shadow:0 20px 52px color-mix(in srgb,var(--szl-space-bg) 53%,transparent)}nav[data-open=true]{display:flex}nav a{min-height:42px}}@media(prefers-reduced-motion:reduce){.mark{transform:none}}@media(forced-colors:active){.bar,nav a,button,.mark{border:1px solid CanvasText}.mark{background:CanvasText}}</style><div class="bar" role="banner"><a class="identity" href="https://a-11-oy.com" aria-label="Open A11oy Command"><span class="mark" aria-hidden="true"></span><span class="copy"><span class="eyebrow">SZL holographic fabric</span><span class="label"></span></span></a><button type="button" aria-label="Open ecosystem navigation" aria-expanded="false">Menu</button><nav aria-label="SZL ecosystem" data-open="false"></nav></div>';
+      shadow.innerHTML = '<style>:host{all:initial;display:block;position:relative;z-index:2147483000;color-scheme:dark;font-family:var(--font-body)}*{box-sizing:border-box}.bar{min-height:50px;display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:14px;padding:8px clamp(12px,2.3vw,30px);color:var(--szl-space-fg,var(--text));background:color-mix(in srgb,var(--szl-space-bg,var(--bg)) 88%,transparent);border-bottom:1px solid color-mix(in srgb,var(--szl-space-accent-2,var(--color-silver-300)) 25%,transparent);box-shadow:0 14px 40px color-mix(in srgb,var(--szl-space-bg,var(--bg)) 27%,transparent);backdrop-filter:blur(18px) saturate(130%)}.identity{min-width:0;display:flex;align-items:center;gap:10px;color:inherit;text-decoration:none}.mark{width:24px;height:24px;flex:none;border:1px solid color-mix(in srgb,var(--szl-space-accent-2) 70%,var(--szl-space-fg) 12%);border-radius:8px;background:radial-gradient(circle at 28% 25%,var(--szl-space-accent),transparent 35%),linear-gradient(145deg,color-mix(in srgb,var(--szl-space-accent-2) 70%,transparent),transparent 72%);box-shadow:0 0 25px color-mix(in srgb,var(--szl-space-accent-2) 28%,transparent);transform:rotate(8deg)}.copy{min-width:0;display:grid;gap:1px}.eyebrow{color:var(--szl-space-muted);font-size:9px;letter-spacing:.19em;text-transform:uppercase}.label{overflow:hidden;font-size:13px;font-weight:740;text-overflow:ellipsis;white-space:nowrap}nav{display:flex;gap:4px}nav a{min-height:34px;display:inline-flex;align-items:center;padding:6px 10px;border:1px solid transparent;border-radius:999px;color:var(--szl-space-muted);font-size:11px;font-weight:660;letter-spacing:.04em;text-decoration:none}nav a:hover,nav a:focus-visible,nav a[aria-current=page]{color:var(--szl-space-fg);border-color:color-mix(in srgb,var(--szl-space-accent-2) 38%,transparent);background:color-mix(in srgb,var(--szl-space-fg) 7%,transparent);outline:none}nav a:focus-visible,button:focus-visible,.identity:focus-visible{outline:3px solid var(--szl-space-focus,var(--focus));outline-offset:2px}button{display:none;width:40px;height:36px;align-items:center;justify-content:center;border:1px solid color-mix(in srgb,var(--szl-space-accent-2) 32%,transparent);border-radius:10px;color:var(--szl-space-fg);background:transparent;cursor:pointer}@media(max-width:700px){button{display:inline-flex}nav{position:absolute;top:calc(100% + 7px);right:10px;min-width:190px;display:none;flex-direction:column;padding:8px;border:1px solid color-mix(in srgb,var(--szl-space-accent-2) 28%,transparent);border-radius:14px;background:color-mix(in srgb,var(--szl-space-bg) 96%,var(--szl-space-fg) 2%);box-shadow:0 20px 52px color-mix(in srgb,var(--szl-space-bg) 53%,transparent)}nav[data-open=true]{display:flex}nav a{min-height:42px}}@media(prefers-reduced-motion:reduce){.mark{transform:none}}@media(forced-colors:active){.bar,nav a,button,.mark{border:1px solid CanvasText}.mark{background:CanvasText}}</style><div class="bar" role="banner"><a class="identity" href="https://a-11-oy.com" aria-label="Open A11oy Command"><span class="mark" aria-hidden="true"></span><span class="copy"><span class="eyebrow">SZL holographic fabric</span><span class="label"></span></span></a><button type="button" aria-label="Open ecosystem navigation" aria-expanded="false">Menu</button><nav aria-label="SZL ecosystem" data-open="false"></nav></div>';
       shadow.querySelector(".label").textContent = identity.label;
       var nav = shadow.querySelector("nav");
       LINKS.forEach(function (row) {
