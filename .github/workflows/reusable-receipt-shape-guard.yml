@@ -23,7 +23,7 @@ name: Reusable — Receipt-Shape Honesty Guard
 # Wire it up from a consuming repo:
 #   jobs:
 #     receipt-shape:
-#       uses: szl-holdings/.github/.github/workflows/reusable-receipt-shape-guard.yml@main
+#       uses: szl-holdings/.github/.github/workflows/reusable-receipt-shape-guard.yml@<full-commit-sha>  # SHA-pin per pin-check.yml
 
 on:
   workflow_call:

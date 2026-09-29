@@ -16,7 +16,7 @@ name: Reusable — Bundle Reference Check
 # Wire it up from a consuming repo, e.g.:
 #   jobs:
 #     bundle-refs:
-#       uses: szl-holdings/.github/.github/workflows/reusable-bundle-ref-check.yml@main
+#       uses: szl-holdings/.github/.github/workflows/reusable-bundle-ref-check.yml@<full-commit-sha>  # SHA-pin per pin-check.yml
 #       secrets: inherit   # optional: lets the GHCR probe authenticate for
 #                          # PRIVATE szl-holdings packages (public probe anon)
 #
