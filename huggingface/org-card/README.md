@@ -25,6 +25,8 @@ license: apache-2.0
 
 **Understand:** A11oy. **Route:** SZL Router. **Explore:** SZL Atlas. **Build:** GitHub. **Verify:** the [trust boundary](https://github.com/szl-holdings/.github/blob/main/TRUST.md) and served [`deployment.json`](https://szlholdings-readme.static.hf.space/deployment.json).
 
+## Inference flagship
+
 <!-- SZL_LLM_ROUTER_FLAGSHIP:BEGIN -->
 ## SZL LLM Router · Flagship Inference Control Plane
 
