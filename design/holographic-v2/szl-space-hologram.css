@@ -4,12 +4,18 @@
  * per Space. Original local-only implementation. SPDX-License-Identifier: Apache-2.0
  */
 :root {
-  --szl-space-bg: #05090f;
-  --szl-space-surface: #0d1722;
-  --szl-space-fg: #f3f8ff;
-  --szl-space-muted: #9eb0c2;
-  --szl-space-accent: #55ebd1;
-  --szl-space-accent-2: #6f8cff;
+  /* Default palette = SZL Kanchay v1.0.0 (tokens.json). Literal token values, because the fabric is
+     vendored into Spaces that may not load kanchay.css: ground color-a11oy-bg, surface
+     color-a11oy-surface, text color-a11oy-text / color-a11oy-text-sub, accent color-a11oy-gold
+     (hatun-300), accent-2 color-ink-signal (yuyay-300), focus color-focus (yuyay-400).
+     Per-Space accents come only from the yuyay / hatun / yawar scales; motifs carry identity. */
+  --szl-space-bg: #0a0f1e;
+  --szl-space-surface: #1b222c;
+  --szl-space-fg: #f5f7fa;
+  --szl-space-muted: #c9d2df;
+  --szl-space-accent: #d7b96b;
+  --szl-space-accent-2: #5cc4bf;
+  --szl-space-focus: #34aaa4;
   --szl-space-x: 52vw;
   --szl-space-y: 30vh;
   --szl-space-nx: 0;
@@ -118,14 +124,14 @@ html[data-szl-space-motif="checksum-ledger"] .szl-space-field { background: repe
   border: 1px solid var(--szl-space-line);
   border-radius: 18px;
   background: color-mix(in srgb, var(--szl-space-surface) 86%, transparent);
-  box-shadow: 0 22px 74px rgb(0 0 0 / .34), inset 0 1px 0 color-mix(in srgb, var(--szl-space-fg) 6%, transparent);
+  box-shadow: 0 22px 74px color-mix(in srgb, var(--szl-space-bg) 34%, transparent), inset 0 1px 0 color-mix(in srgb, var(--szl-space-fg) 6%, transparent);
   backdrop-filter: blur(16px) saturate(125%);
 }
 .szl-space-kicker { color: var(--szl-space-accent); font-size: .72rem; font-weight: 760; letter-spacing: .18em; text-transform: uppercase; }
 .szl-space-gradient-text { color: var(--szl-space-fg); background: linear-gradient(110deg, var(--szl-space-fg), var(--szl-space-accent) 58%, var(--szl-space-accent-2)); background-clip: text; -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
-.szl-space-skip-link { position: fixed; top: 8px; left: 8px; z-index: 2147483647; padding: 10px 14px; border: 2px solid var(--szl-space-accent); border-radius: 9px; color: var(--szl-space-bg); background: var(--szl-space-accent); font: 700 14px/1.2 system-ui, sans-serif; text-decoration: none; transform: translateY(-160%); transition: transform .15s ease; }
+.szl-space-skip-link { position: fixed; top: 8px; left: 8px; z-index: 2147483647; padding: 10px 14px; border: 2px solid var(--szl-space-accent); border-radius: 9px; color: var(--szl-space-bg); background: var(--szl-space-accent); font: 700 14px/1.2 Inter, system-ui, sans-serif; text-decoration: none; transform: translateY(-160%); transition: transform .15s ease; }
 .szl-space-skip-link:focus { transform: translateY(0); }
-html[data-szl-space-holo-v2="true"] :where(a, button, input, textarea, select, summary, [tabindex]):focus-visible { outline: 3px solid var(--szl-space-accent) !important; outline-offset: 4px !important; }
+html[data-szl-space-holo-v2="true"] :where(a, button, input, textarea, select, summary, [tabindex]):focus-visible { outline: 3px solid var(--szl-space-focus) !important; outline-offset: 4px !important; }
 html[data-szl-space-power="low"] .szl-space-scan, html[data-szl-space-power="low"] .szl-space-beam { display: none; }
 html[data-szl-space-power="low"] .szl-space-orbit { animation: none; opacity: .28; }
 html[data-szl-space-state="paused"] #szl-space-holo-v2-ambient > span { animation-play-state: paused !important; }
