@@ -15,7 +15,9 @@ Source, running software, and model evaluations are separate claims. Follow the 
 
 ## Current state
 
-**21 public Spaces, 46 models, 35 datasets.** Observed **2026-09-10T03:20:41Z** under the anonymous `hf-public-author-membership/v1` predicate. These are public API repository counts, not the authenticated organization total, the governed keep-list, or a count of production-ready models. Software kernels count once as model repositories; private assets, collections, and buckets are outside these totals.
+**Current inventory** (observed **2026-09-29T02:04:17Z**, authenticated Hub API): public **23 Spaces, 49 models, 34 datasets**; including private: 29 Spaces, 49 models, 43 datasets. Repository counts only; not a keep-list or a production-candidate count.
+
+**Historical public snapshot:** 21 public Spaces, 46 models, 35 datasets, observed **2026-09-10T03:20:41Z** under the anonymous `hf-public-author-membership/v1` predicate. These are public API repository counts, not the authenticated organization total, the governed keep-list, or a count of production-candidate models. Software kernels count once as model repositories; private assets, collections, and buckets are outside these totals.
 
 [Source-pinned inventory](https://github.com/szl-holdings/a11oy/blob/4c6621b17ba452d5af7aa2460462fdfbe513509f/docs/huggingface-ecosystem-manifest.json) · [Generation and verification](https://github.com/szl-holdings/a11oy/actions/runs/34432937958) · [Machine-readable binding](https://github.com/szl-holdings/.github/blob/main/profile/public-inventory.json)
 

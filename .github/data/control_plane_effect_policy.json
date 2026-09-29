@@ -71,7 +71,7 @@
         "readback": true
       },
       "trusted_transitives": {
-        ".github/scripts/control_plane_effect_gate.py": "sha256:047a2537c126cc5124f5a6be91893287743e34cf43aabc02b27262ee2381e70e",
+        ".github/scripts/control_plane_effect_gate.py": "sha256:beff9752879fe10e967aef52dafccc392f1cefa5c70cf3703a04babafd500108",
         ".github/scripts/test_control_plane_effect_gate.py": "sha256:2572b909e25fd9c3927a7ed19205fc3db9ade60fb56bcbf01ceff316bd2315f2"
       }
     }
