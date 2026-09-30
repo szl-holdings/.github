@@ -644,6 +644,31 @@ def _http_retry_delay(headers, attempt):
         return fallback
 
 
+def _immutable_hub_file_read(origin, parsed):
+    """Admit only canonical, immutable Space file paths for 499 retries."""
+    if (origin != ("https", "huggingface.co", 443) or parsed.query or
+            re.fullmatch(
+                r"/spaces/[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+/resolve/[0-9a-f]{40}/[^?#]+",
+                parsed.path,
+            ) is None):
+        return False
+    # Check each segment before and after decoding, including nested escapes.
+    # A path normalizer must not turn an admitted URL into a mutable/API path.
+    # Ordinary encoded file names (spaces, Unicode, percent signs) remain valid.
+    for segment in parsed.path.split("/")[1:]:
+        while True:
+            if segment in {"", ".", ".."} or "/" in segment or "\\" in segment:
+                return False
+            try:
+                decoded = urllib.parse.unquote(segment, errors="strict")
+            except UnicodeDecodeError:
+                return False
+            if decoded == segment:
+                break
+            segment = decoded
+    return True
+
+
 def _http(url, headers=None, retries=6, follow_redirects=True):
     """GET with bounded bodies/retries and management-origin authentication.
 
@@ -656,6 +681,11 @@ def _http(url, headers=None, retries=6, follow_redirects=True):
     if type(follow_redirects) is not bool:
         raise _ReadContractError("HTTP redirect policy must be boolean")
     origin = _read_origin(url)
+    parsed = urllib.parse.urlsplit(url)
+    # A cancelled immutable Hub file read may be retried without changing the
+    # artifact being verified. Do not extend 499 retries to APIs, mutable refs,
+    # public application routes, or signed/query-bearing delivery URLs.
+    immutable_file_read = _immutable_hub_file_read(origin, parsed)
     hdrs = dict(UA)
     seen = set()
     for key, value in (headers or {}).items():
@@ -681,7 +711,8 @@ def _http(url, headers=None, retries=6, follow_redirects=True):
                 return resp.status, _bounded_http_body(resp, HTTP_MAX_RESPONSE_BYTES)
         except urllib.error.HTTPError as exc:
             try:
-                retryable = exc.code == 429 or 500 <= exc.code < 600
+                retryable = (exc.code == 429 or 500 <= exc.code < 600 or
+                             (exc.code == 499 and immutable_file_read))
                 if not retryable:
                     return exc.code, _bounded_http_body(exc, HTTP_MAX_ERROR_BYTES)
                 last = "HTTP_" + str(exc.code)
