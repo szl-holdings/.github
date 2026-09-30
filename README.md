@@ -161,4 +161,4 @@ Org page: [github.com/szl-holdings](https://github.com/szl-holdings) · Doctrine
 
 <img src="./profile/assets/szl/logos/szl_logo_primary.svg" alt="SZL Holdings" width="240">
 
-*The SZL Holdings orbit mark (szl-brand `kanchay/` 1.1.0, CC BY 4.0).*
+*The SZL Holdings orbit mark (szl-brand `kanchay/` 1.1.1, CC BY 4.0).*

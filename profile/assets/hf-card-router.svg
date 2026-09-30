@@ -1,7 +1,7 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1600" height="900" viewBox="0 0 1600 900" role="img" aria-labelledby="title desc">
   <title id="title">SZL Router flagship</title>
   <desc id="desc">A dark holographic model-routing field connecting owned compute, hosted fallback, and verifiable receipts around an SZL Router core.</desc>
-  <!-- SZL KANCHAY v1.1.0, founder direction (szl-design-system.css sha256 9e5e6e3ae2a5).
+  <!-- SZL KANCHAY v1.1.1, founder direction (szl-design-system.css sha256 e05d19baa021).
        Literal token hex (SVG cannot read CSS variables):
        #030F29 bg token (color-space-900), #0a0f1e color-gray-950, #10151c color-gray-900
        #0a1e47 color-space-700, #1b222c surface token (color-gray-800)
