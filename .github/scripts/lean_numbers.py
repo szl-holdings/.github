@@ -46,27 +46,34 @@ DECL_RE = re.compile(
 AXIOM_RE = re.compile(
     r"^\s*(?:@\[[^\]]*\]\s*)?(?:(?:private|protected|noncomputable|unsafe)\s+)*axiom\s+([A-Za-z_][A-Za-z0-9_'.]*)"
 )
-_AX_STATE = {"depth": 0}
 
 
-def _axiom_match(line: str, st: dict):
-    # Comment-aware axiom match: skip lines that start inside a /- -/ block comment or docstring.
-    start_depth = st["depth"]
+def block_comment_depth_after(line: str, depth: int) -> int:
+    """Return the Lean `/- -/` nesting depth after scanning ``line``.
+
+    Lean block comments and docstrings (``/-``, ``/--``, ``/-!``) nest. A ``--``
+    outside any block comment ends the scan (rest of the line is a line comment).
+    """
     i, n = 0, len(line)
     while i < n:
         if line.startswith("/-", i):
-            st["depth"] += 1; i += 2; continue
-        if st["depth"] and line.startswith("-/", i):
-            st["depth"] -= 1; i += 2; continue
-        if not st["depth"] and line.startswith("--", i):
+            depth += 1
+            i += 2
+        elif depth and line.startswith("-/", i):
+            depth -= 1
+            i += 2
+        elif not depth and line.startswith("--", i):
             break
-        i += 1
-    return None if start_depth else AXIOM_RE.match(line)
+        else:
+            i += 1
+    return depth
+
+
 SORRY_RE = re.compile(r"\bsorry\b")
 COMMENT_LINE_RE = re.compile(r"^\s*--")
 
 
-def _iter_lean_files_raw(root: str):
+def iter_lean_files(root: str):
     base = os.path.join(root, "Lutar")
     for dirpath, _dirs, files in os.walk(base):
         for fn in files:
@@ -75,12 +82,6 @@ def _iter_lean_files_raw(root: str):
     main = os.path.join(root, "Main.lean")
     if os.path.exists(main):
         yield main
-
-
-def iter_lean_files(root: str):
-    for item in _iter_lean_files_raw(root):
-        _AX_STATE["depth"] = 0
-        yield item
 
 
 def count(root: str) -> dict:
@@ -94,11 +95,13 @@ def count(root: str) -> dict:
 
     for path in iter_lean_files(root):
         is_putnam = f"{os.sep}Putnam{os.sep}" in path
+        comment_depth = 0  # `/- -/` nesting at the start of the current line
         with open(path, "r", encoding="utf-8", errors="replace") as fh:
             for line in fh:
                 if DECL_RE.match(line):
                     declarations += 1
-                m = _axiom_match(line, _AX_STATE)
+                m = None if comment_depth else AXIOM_RE.match(line)
+                comment_depth = block_comment_depth_after(line, comment_depth)
                 if m:
                     axioms_raw += 1
                     axiom_names.add(m.group(1))
