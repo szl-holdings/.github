@@ -71,8 +71,8 @@
         "readback": true
       },
       "trusted_transitives": {
-        ".github/scripts/control_plane_effect_gate.py": "sha256:8c79f5d969594bb0572db757212b2140c0ad0e618dc8a7e7f1d08f7e194bf0bc",
-        ".github/scripts/test_control_plane_effect_gate.py": "sha256:8fef3297392608f4e2cb6341c2eb1d4f1831a710c92d816bc83c91597e8166e8"
+        ".github/scripts/control_plane_effect_gate.py": "sha256:c6dab1dd86092280168a6312417c03fde611fdbe197cd4c436aadf25ae18fb67",
+        ".github/scripts/test_control_plane_effect_gate.py": "sha256:abf96660b74f49eaaffe4f6165a0614f0e8922605ddc8a47d4aa11ef71791981"
       }
     },
     ".github/workflows/lean-numbers.yml": {

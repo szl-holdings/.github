@@ -535,6 +535,92 @@ class YamlBoundaryRegressionTests(unittest.TestCase):
         self.assertIn(reason, bound["reason_codes"])
         return parsed, bound
 
+    def test_same_line_flow_checkouts_preserve_distinct_call_occurrences(self) -> None:
+        prefix = workflow().decode().split("jobs:\n", 1)[0]
+        checkout = f"{{uses: {CHECKOUT_ACTION}}}"
+        for jobs in (
+            f"jobs: {{fixture: {{runs-on: ubuntu-latest, steps: [{checkout}, {checkout}]}}}}\n",
+            "jobs: {"
+            + ", ".join(
+                f"{name}: {{runs-on: ubuntu-latest, steps: [{checkout}]}}"
+                for name in ("first", "second")
+            ) + "}\n",
+        ):
+            with self.subTest(jobs=jobs):
+                source = (prefix + jobs).encode()
+                candidate = policy_for(source)
+                parsed, bound = self.assert_source_denied(
+                    source, reason="MUTATION_BUDGET_EXCEEDED", candidate=candidate
+                )
+                self.assertEqual(parsed["unknowns"], [])
+                self.assertEqual(len(parsed["effects"]), 2)
+                self.assertEqual(parsed["effects"][0], parsed["effects"][1])
+                self.assertEqual(len(bound["effects"]), 2)
+                # A sufficient fixture budget verifies that flow YAML remains supported.
+                candidate["workflow_declarations"][WORKFLOW_PATH]["effects"][0]["max_calls"] = 2
+                _parsed, allowed = bind_source(source, candidate=candidate)
+                self.assertEqual(allowed["verdict"], "ALLOW")
+
+    def test_same_line_flow_run_mutations_preserve_external_write_occurrences(self) -> None:
+        prefix = workflow().decode().split("    steps:\n", 1)[0]
+        command = "curl -X POST https://example.invalid/api"
+        source = (
+            prefix + f"    steps: [{{uses: {CHECKOUT_ACTION}}}, "
+            + f"{{run: {json.dumps(command)}}}, {{run: {json.dumps(command)}}}]\n"
+        ).encode()
+        candidate = reviewed_policy_for(source)
+        declaration = candidate["workflow_declarations"][WORKFLOW_PATH]
+        resource = "https:example.invalid/api"
+        declaration["resources"].append({"key": resource, "access": "external-write"})
+        declaration["effects"].append({
+            "sink": "http.post", "resource": resource,
+            "access": "external-write", "max_calls": 1,
+        })
+        declaration["max_external_writes"] = 1
+        parsed, bound = self.assert_source_denied(
+            source, reason="MUTATION_BUDGET_EXCEEDED", candidate=candidate
+        )
+        posts = [effect for effect in parsed["effects"] if effect.sink == "http.post"]
+        self.assertEqual(len(posts), 2)
+        self.assertEqual(posts[0], posts[1])
+        self.assertTrue(bound["reviewed_unknowns_applied"])
+        self.assertIn("EXTERNAL_WRITE_BUDGET_EXCEEDED", bound["reason_codes"])
+        self.assertEqual(bound["external_write_sites"], 2)
+        declaration["effects"][-1]["max_calls"] = 2
+        declaration["max_external_writes"] = 2
+        _parsed, allowed = bind_source(source, candidate=candidate)
+        self.assertEqual(allowed["verdict"], "ALLOW")
+
+    def test_binding_preserves_same_line_dependency_call_occurrences(self) -> None:
+        source = workflow(extra_step="      - run: python scripts/fixture.py\n")
+        dependencies = {
+            "scripts/fixture.py": (
+                b"import requests\n"
+                b"requests.post('https://example.invalid/api'); "
+                b"requests.post('https://example.invalid/api')\n"
+            )
+        }
+        candidate = reviewed_policy_for(source, dependencies=dependencies)
+        declaration = candidate["workflow_declarations"][WORKFLOW_PATH]
+        resource = "https:example.invalid/api"
+        declaration["resources"].append({"key": resource, "access": "external-write"})
+        declaration["effects"].append({
+            "sink": "http.post", "resource": resource,
+            "access": "external-write", "max_calls": 1,
+        })
+        declaration["max_external_writes"] = 1
+        _parsed, bound = self.assert_source_denied(
+            source, reason="MUTATION_BUDGET_EXCEEDED", candidate=candidate,
+            dependencies=dependencies,
+        )
+        self.assertTrue(bound["reviewed_unknowns_applied"])
+        self.assertEqual(bound["external_write_sites"], 2)
+        self.assertIn("EXTERNAL_WRITE_BUDGET_EXCEEDED", bound["reason_codes"])
+        declaration["effects"][-1]["max_calls"] = 2
+        declaration["max_external_writes"] = 2
+        _parsed, allowed = bind_source(source, candidate=candidate, dependencies=dependencies)
+        self.assertEqual(allowed["verdict"], "ALLOW")
+
     def test_run_spellings_and_decoded_commands_cannot_hide_git_push(self) -> None:
         for step in (
             "      - run : git push origin main\n",

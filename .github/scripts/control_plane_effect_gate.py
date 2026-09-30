@@ -1237,7 +1237,9 @@ def analyze_workflow_source(source: str, *, path: str) -> dict[str, Any]:
         "credentials": sorted(credentials),
         "dependencies": dependencies,
         "controls": controls,
-        "effects": sorted(set(effects)),
+        # Effects are occurrences, not a set: separate flow-YAML steps may
+        # share every recorded field, including their physical source line.
+        "effects": sorted(effects),
         "unknowns": sorted(set(unknowns)),
     }
 
@@ -1507,7 +1509,10 @@ def bind_declaration(
         dep_effects, dep_unknowns = analyze_dependency(dependency, content)
         all_effects.extend(dep_effects)
         all_unknowns.extend(dep_unknowns)
-    all_effects = sorted(set(all_effects))
+    # Preserve multiplicity through binding too, including separate Python
+    # calls on one line. Conservative duplicate observations must not erase
+    # real call sites and silently reduce an admitted mutation budget.
+    all_effects = sorted(all_effects)
     all_unknowns = sorted(set(all_unknowns))
     unreviewable = any(item.code in NON_REVIEWABLE_UNKNOWN_CODES for item in all_unknowns)
     if unreviewable:
