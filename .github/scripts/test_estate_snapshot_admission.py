@@ -7,15 +7,14 @@ import io
 import json
 from pathlib import Path
 import tempfile
-import unittest
-from unittest import mock
+from unittest import TestCase, main, mock
 
 SCRIPT = Path(__file__).resolve().parents[2] / "scripts" / "estate_snapshot_admission.py"
 SPEC = importlib.util.spec_from_file_location("estate_admission", SCRIPT)
 admission = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(admission)
 
-class AdmissionTests(unittest.TestCase):
+class AdmissionTests(TestCase):
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory()
         self.addCleanup(self.temp.cleanup)
@@ -147,4 +146,4 @@ class AdmissionTests(unittest.TestCase):
                     self.proposed()
 
 if __name__ == "__main__":
-    unittest.main()
+    main()
