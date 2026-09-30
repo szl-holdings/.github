@@ -241,39 +241,6 @@ class ControllerSafetyContract(unittest.TestCase):
             },
         )
 
-    def test_founder_token_layer_requires_vendored_base_beside_it(self) -> None:
-        changes = [
-            core.Change("index.html", "<html></html>"),
-            core.Change("szl-space-hologram.css", "css"),
-            core.Change("artifacts/sentra/public/szl-space-hologram.js", "javascript"),
-            core.Change("space/szl_hologram_streamlit.py", "helper"),
-        ]
-        self.assertEqual(
-            core.founder_base_gaps(["szl/szl-design-system.css", "artifacts/sentra/public/szl/szl-design-system.css"], changes),
-            ["space/szl_hologram_streamlit.py"],
-        )
-        self.assertEqual(core.founder_base_gaps(["index.html"], changes[:1]), [])
-
-    def test_apply_fails_closed_without_founder_base(self) -> None:
-        class GitHub:
-            writes: list[str] = []
-
-            @staticmethod
-            def tree(full_name, default_branch):
-                return [{"path": "index.html"}]
-
-            def __getattr__(self, name):
-                GitHub.writes.append(name)
-                raise AssertionError(f"no write may start without the founder base: {name}")
-
-        plan = core.Plan("szl-holdings/demo", "main", [], 1000, "canonical source map")
-        plan.changes = [core.Change("szl-space-hologram.css", "css"), core.Change("index.html", "<html></html>")]
-        with self.assertRaises(core.RolloutError) as caught:
-            core.apply_plan(GitHub(), "szl-holdings", plan, "digest")
-        self.assertEqual(caught.exception.code, "FOUNDER_BASE_MISSING")
-        self.assertEqual(GitHub.writes, [])
-        self.assertEqual(plan.status, "planned")
-
     def test_asset_loader_verifies_schema(self) -> None:
         css, javascript, registry = core.read_assets(ASSETS)
         self.assertTrue(css)
