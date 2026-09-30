@@ -47,12 +47,54 @@ mutation sink. Those sink recognizers enrich the inventory; they do not prove
 the absence of other effects. Exact SHA-pinned reviewed Actions have explicit
 effect classifications.
 
+Workflow structure is decoded with the admitted PyYAML 6.0.3 parser, not
+matched as text. String-preserving scalar decoding keeps the GitHub `on` key
+intact and recognizes quoted, spaced, escaped, and flow-style keys and values.
+Duplicate keys, aliases, anchors, explicit tags, directives, multiple
+documents, and inputs exceeding the size, event-count, or nesting limits are
+denied. A missing or different parser version also fails closed. The enforcing
+workflow installs one exact Python 3.12 Linux wheel URL with its SHA-256;
+local execution requires the same parser version.
+The enforcing workflow uses Python's isolated mode for installation,
+self-tests, analysis, and receipt handling so repository-local modules or
+Python environment overrides cannot shadow the admitted parser or libraries.
+
+Permissions are read from workflow and job mappings, including `write-all`.
+Unresolved inherited token authority is denied. Containers, services, matrix
+fan-out, unsupported runners or shells, and dynamic checkout targets are not
+modeled execution boundaries and cannot be waived with an exact-byte review.
+A literal checkout repository override binds the actual repository resource.
+Credential expressions are inspected after YAML decoding; receipts record
+only referenced credential names, including fallback and bracket forms.
+
+Known action input keys must be ASCII identifiers and are normalized with
+the runner's case-insensitive semantics; normalization collisions are denied.
+Explicit authentication inputs must resolve wholly to named secret or
+`GITHUB_TOKEN` references; literal, dynamic, or unbound fallback authority
+is denied without recording its value. Artifact names bind the
+actual literal destination. Only the enforcing workflow's exact
+`control-plane-effect-${{ github.run_id }}` template maps to its declared
+run-scoped artifact namespace. Other dynamic names, non-archived uploads,
+overwriting/deleting artifacts, Python cache writes, and checkout options
+that fetch unmodeled resources are denied. A checkout cannot substitute
+foreign repository or revision bytes for pinned local dependencies. Unknown
+external actions, unresolved local actions or dependencies, and reusable
+workflows cannot be accepted by reviewing only the caller's bytes.
+Executable control hints come from run blocks, not workflow names or labels.
+
+Owner-reviewed unknowns remain available only for eligible bounded source
+constructs. Acceptance requires exact file digests and the complete observed
+unknown set; the receipt records whether that review was applied. This cannot
+waive invalid YAML, unresolved authority or execution boundaries, or fan-out.
+
 ## Trust-root bootstrap boundary
 
 The policy, checker, checker tests, and enforcing workflow form a trust root.
 A candidate change to any of them cannot honestly certify itself. Such a
-change is a bootstrap or trust-root transition and must produce
-`REVIEW_REQUIRED`, not `ALLOW`.
+change is a bootstrap or trust-root transition and cannot produce `ALLOW`.
+An eligible transition produces `REVIEW_REQUIRED`; a hard violation remains
+`DENY`. Bundling a denied ordinary workflow with a trust-root edit does not
+downgrade that denial.
 
 `REVIEW_REQUIRED` is a truthful stop for independent human review. The reviewer
 must inspect the complete trust-root diff, exact digests, workflow permissions,

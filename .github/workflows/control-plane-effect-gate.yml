@@ -46,12 +46,19 @@ jobs:
           mkdir -p cp-ebom
           printf '%s\n' 'CP-eBOM analysis has not completed.' > cp-ebom/status.txt
 
+      - name: Install the admitted YAML parser wheel
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -I -m pip --isolated install --no-deps --no-cache-dir --disable-pip-version-check \
+            'https://files.pythonhosted.org/packages/8b/9d/b3589d3877982d4f2329302ef98a8026e7f4443c765c46cfecc8858c6b4b/pyyaml-6.0.3-cp312-cp312-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl#sha256=ba1cc08a7ccde2d2ec775841541641e4548226580ab850948cbfda66a1befcdc'
+
       - name: Resolve exact event revisions
         id: revisions
         shell: bash
         run: |
           set -euo pipefail
-          python <<'PY'
+          python -I <<'PY'
           import json
           import os
           import re
@@ -108,7 +115,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          python .github/scripts/test_control_plane_effect_gate.py 2>&1 | tee cp-ebom/self-tests.log
+          python -I .github/scripts/test_control_plane_effect_gate.py 2>&1 | tee cp-ebom/self-tests.log
 
       - name: Emit and enforce the effect receipt
         shell: bash
@@ -118,7 +125,7 @@ jobs:
         run: |
           set +e
           set -uo pipefail
-          python .github/scripts/control_plane_effect_gate.py \
+          python -I .github/scripts/control_plane_effect_gate.py \
             --repository-root . \
             --base "${BASE_SHA}" \
             --head "${HEAD_SHA}" \
@@ -127,7 +134,7 @@ jobs:
           gate_exit=$?
           export GATE_EXIT="${gate_exit}"
           set -e
-          python <<'PY'
+          python -I <<'PY'
           import json
           import os
           from pathlib import Path
