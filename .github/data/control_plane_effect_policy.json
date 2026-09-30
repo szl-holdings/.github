@@ -121,14 +121,14 @@
       "trusted_transitives": {},
       "reviewed_unknowns": {
         "files": {
-          ".github/scripts/lean_numbers.py": "sha256:0e8b6cccbf9c422803984bda3657abbed78da6cf7e7ccfa1cf44078adc4630df",
+          ".github/scripts/lean_numbers.py": "sha256:9cbfe8acc1292ba23f1cbc0dc1ce60c56a1d164ba4caf823f60ad86f2795efa3",
           ".github/workflows/lean-numbers.yml": "sha256:80446fb8637b0d94abed2d7a3d3dc847f725aeda1eaab40fc8aa414856e13689"
         },
         "unknowns": [
-          "PYTHON_DYNAMIC_SUBPROCESS@.github/scripts/lean_numbers.py:103",
-          "PYTHON_DYNAMIC_SUBPROCESS@.github/scripts/lean_numbers.py:123",
-          "PYTHON_IMPORT_UNRESOLVED@.github/scripts/lean_numbers.py:27",
+          "PYTHON_DYNAMIC_SUBPROCESS@.github/scripts/lean_numbers.py:132",
+          "PYTHON_DYNAMIC_SUBPROCESS@.github/scripts/lean_numbers.py:152",
           "PYTHON_IMPORT_UNRESOLVED@.github/scripts/lean_numbers.py:29",
+          "PYTHON_IMPORT_UNRESOLVED@.github/scripts/lean_numbers.py:31",
           "PYTHON_SOURCE_REVIEW_REQUIRED@.github/scripts/lean_numbers.py:1",
           "PYTHON_SOURCE_REVIEW_REQUIRED@.github/workflows/lean-numbers.yml:59",
           "SCRIPT_SOURCE_REVIEW_REQUIRED@.github/workflows/lean-numbers.yml:1",
