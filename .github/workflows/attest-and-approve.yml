@@ -6,6 +6,10 @@ on:
       - FORGE-9 gates
     types:
       - completed
+    branches:
+      - 'pr-*'
+      - 'gh-readonly-queue/**'
+
 
 permissions:
   contents: read
@@ -16,7 +20,10 @@ concurrency:
 
 jobs:
   attest:
-    if: github.event.workflow_run.conclusion == 'success'
+    if: >-
+      github.event.workflow_run.conclusion == 'success'
+      && (github.event.workflow_run.event == 'pull_request'
+          || github.event.workflow_run.event == 'merge_group')
     permissions:
       actions: read
       contents: write
