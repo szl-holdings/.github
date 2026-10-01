@@ -53,6 +53,7 @@ import os
 import posixpath
 import random
 import re
+import tempfile
 import sys
 import time
 import urllib.error
@@ -643,6 +644,31 @@ def _http_retry_delay(headers, attempt):
         return fallback
 
 
+def _immutable_hub_file_read(origin, parsed):
+    """Admit only canonical, immutable Space file paths for 499 retries."""
+    if (origin != ("https", "huggingface.co", 443) or parsed.query or
+            re.fullmatch(
+                r"/spaces/[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+/resolve/[0-9a-f]{40}/[^?#]+",
+                parsed.path,
+            ) is None):
+        return False
+    # Check each segment before and after decoding, including nested escapes.
+    # A path normalizer must not turn an admitted URL into a mutable/API path.
+    # Ordinary encoded file names (spaces, Unicode, percent signs) remain valid.
+    for segment in parsed.path.split("/")[1:]:
+        while True:
+            if segment in {"", ".", ".."} or "/" in segment or "\\" in segment:
+                return False
+            try:
+                decoded = urllib.parse.unquote(segment, errors="strict")
+            except UnicodeDecodeError:
+                return False
+            if decoded == segment:
+                break
+            segment = decoded
+    return True
+
+
 def _http(url, headers=None, retries=6, follow_redirects=True):
     """GET with bounded bodies/retries and management-origin authentication.
 
@@ -655,6 +681,11 @@ def _http(url, headers=None, retries=6, follow_redirects=True):
     if type(follow_redirects) is not bool:
         raise _ReadContractError("HTTP redirect policy must be boolean")
     origin = _read_origin(url)
+    parsed = urllib.parse.urlsplit(url)
+    # A cancelled immutable Hub file read may be retried without changing the
+    # artifact being verified. Do not extend 499 retries to APIs, mutable refs,
+    # public application routes, or signed/query-bearing delivery URLs.
+    immutable_file_read = _immutable_hub_file_read(origin, parsed)
     hdrs = dict(UA)
     seen = set()
     for key, value in (headers or {}).items():
@@ -680,7 +711,8 @@ def _http(url, headers=None, retries=6, follow_redirects=True):
                 return resp.status, _bounded_http_body(resp, HTTP_MAX_RESPONSE_BYTES)
         except urllib.error.HTTPError as exc:
             try:
-                retryable = exc.code == 429 or 500 <= exc.code < 600
+                retryable = (exc.code == 429 or 500 <= exc.code < 600 or
+                             (exc.code == 499 and immutable_file_read))
                 if not retryable:
                     return exc.code, _bounded_http_body(exc, HTTP_MAX_ERROR_BYTES)
                 last = "HTTP_" + str(exc.code)
@@ -890,6 +922,7 @@ def probe_smoke_routes(hf_repo, smoke_paths, retries=6, delay=5):
 # derive: Dockerfile -> deploy manifest (no network, no push)
 # --------------------------------------------------------------------------- #
 def derive(args):
+    source_sha = str(getattr(args, "source_sha", "") or "")
     readme_path = validate_readme_target(args.readme_path, args.include_readme)
     requested_revision = getattr(args, "source_revision_file", "")
     if requested_revision:
@@ -1068,6 +1101,7 @@ def derive(args):
         "github_repo": args.github_repo,
         "hf_repo": args.hf_repo,
         "ref": args.ref,
+        "source_sha": source_sha,
         "dockerfile": dockerfile_rel,
         "dockerfile_target": "Dockerfile",
         "copy_sources": len(sources),
@@ -1169,7 +1203,15 @@ def list_repo_files_with_rate_limit_retry(
 
 
 def fetch_github_json(url, token):
-    """Fetch one authenticated GitHub API object."""
+    """Fetch bounded JSON from the configured GitHub management origin."""
+    parsed = urllib.parse.urlsplit(url)
+    origin = urllib.parse.urlsplit(
+        os.environ.get("GITHUB_API_URL", "https://api.github.com")
+    )
+    if (parsed.scheme != "https" or parsed.username or parsed.password or
+            parsed.fragment or parsed.netloc != origin.netloc or
+            origin.scheme != "https"):
+        raise DeployContractError("GitHub management origin rejected")
     request = urllib.request.Request(
         url,
         headers={
@@ -1178,8 +1220,243 @@ def fetch_github_json(url, token):
             "X-GitHub-Api-Version": "2022-11-28",
         },
     )
-    with urllib.request.urlopen(request, timeout=20) as response:
-        return json.load(response)
+    opener = urllib.request.build_opener(
+        urllib.request.ProxyHandler({}), _NoRedirect()
+    )
+    try:
+        with opener.open(request, timeout=20) as response:
+            if response.status != 200:
+                raise DeployContractError("GitHub management response unavailable")
+            body = _bounded_http_body(response, 2 * 1024 * 1024)
+        return strict_json(body)
+    except (urllib.error.URLError, OSError, http.client.HTTPException,
+            _ReadContractError) as exc:
+        raise DeployContractError(
+            "GitHub management read unavailable: " + type(exc).__name__
+        ) from None
+
+
+def strict_json(body):
+    """Reject ambiguous keys and non-finite JSON in operation evidence."""
+    def pairs(items):
+        value = {}
+        for key, item in items:
+            if key in value:
+                raise DeployContractError("JSON contains duplicate keys")
+            value[key] = item
+        return value
+
+    def constant(_value):
+        raise DeployContractError("JSON contains a non-finite number")
+
+    try:
+        return json.loads(body, object_pairs_hook=pairs, parse_constant=constant)
+    except (UnicodeDecodeError, ValueError) as exc:
+        raise DeployContractError("operation evidence is not strict JSON") from exc
+
+
+def manifest_identity(manifest):
+    """Hash the complete derived plan, excluding only result/time fields."""
+    transient = {"generated_utc", "manifest_sha256", "hf_commit_oid", "pruned",
+                 "transaction"}
+    stable = {key: value for key, value in manifest.items() if key not in transient}
+    return sha256(json.dumps(stable, sort_keys=True, separators=(",", ":"),
+                             ensure_ascii=False, allow_nan=False).encode("utf-8"))
+
+
+def transaction_options(args, manifest):
+    names = ("expected_hf_parent", "operation_id", "expected_manifest_sha256",
+             "transaction_journal")
+    values = {name: str(getattr(args, name, "") or "") for name in names}
+    if not any(values.values()):
+        return None
+    if not all(values.values()):
+        raise DeployContractError("all four transaction options are required")
+    for name, length in (("expected_hf_parent", 40), ("operation_id", 64),
+                         ("expected_manifest_sha256", 64)):
+        if not re.fullmatch(r"[0-9a-f]{" + str(length) + "}", values[name]):
+            raise DeployContractError("invalid transaction option: " + name)
+    if values["expected_manifest_sha256"] != manifest_identity(manifest):
+        raise DeployContractError("derived manifest differs from the approved plan")
+    source = str(getattr(args, "source_sha", "") or "")
+    if (not re.fullmatch(r"[0-9a-f]{40}", source) or args.ref != source or
+            not getattr(args, "require_default_branch_tip", False)):
+        raise DeployContractError("transaction requires exact source/ref and default-tip guard")
+    requested = os.path.abspath(values["transaction_journal"])
+    resolved = os.path.realpath(requested)
+    if os.path.normcase(requested) != os.path.normcase(resolved):
+        raise DeployContractError("transaction journal must not traverse symlinks")
+    root = os.path.realpath(args.repo_root)
+    try:
+        in_payload = os.path.commonpath((root, resolved)) == root
+    except ValueError:
+        in_payload = False
+    if in_payload:
+        raise DeployContractError("transaction journal must be outside the payload")
+    if (os.path.lexists(resolved) or
+            (args.manifest_out and resolved == os.path.realpath(args.manifest_out))):
+        raise DeployContractError("journal exists or collides; reconcile before retry")
+    if not os.path.isdir(os.path.dirname(resolved)):
+        raise DeployContractError("transaction journal parent is unavailable")
+    values["transaction_journal"] = resolved
+    return values
+
+
+def write_journal(path, value, *, exclusive=False):
+    """Persist intent before mutation and replace completed evidence atomically."""
+    data = (json.dumps(value, sort_keys=True, indent=2, ensure_ascii=False,
+                       allow_nan=False) + "\n").encode("utf-8")
+    if exclusive:
+        descriptor = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+        with os.fdopen(descriptor, "wb") as handle:
+            handle.write(data)
+            handle.flush()
+            os.fsync(handle.fileno())
+    else:
+        descriptor, temporary = tempfile.mkstemp(
+            prefix=".szl-operation-", dir=os.path.dirname(path)
+        )
+        try:
+            with os.fdopen(descriptor, "wb") as handle:
+                handle.write(data)
+                handle.flush()
+                os.fsync(handle.fileno())
+            os.replace(temporary, path)
+        finally:
+            if os.path.exists(temporary):
+                os.unlink(temporary)
+    # POSIX directory fsync makes the new directory entry durable too.
+    if os.name != "nt":
+        descriptor = os.open(os.path.dirname(path), os.O_RDONLY)
+        try:
+            os.fsync(descriptor)
+        finally:
+            os.close(descriptor)
+
+
+def intent_identity(journal):
+    """Bind the request, including deletions, independently of its outcome."""
+    fields = ("schema", "operation_id", "expected_parent", "manifest_sha256", "pruned")
+    return sha256(json.dumps({key: journal[key] for key in fields}, sort_keys=True,
+                             separators=(",", ":"), allow_nan=False).encode("utf-8"))
+
+
+def commit_with_transaction(api, args, manifest, ops, deleted, options):
+    """Submit once with provider CAS; preserve uncertainty across process loss."""
+    description = (
+        f"Reusable Dockerfile-COPY-derived deploy from {args.github_repo} {args.ref}.\n"
+        f"Files: {len(manifest['files'])}  Pruned: {len(deleted)}\n"
+        "Derived from Dockerfile COPY sources."
+    )
+    kwargs = {}
+    journal = None
+    if options:
+        description += (
+            "\nSZL-Operation-ID: " + options["operation_id"] +
+            "\nSZL-Manifest-SHA256: " + options["expected_manifest_sha256"] +
+            "\nSZL-Expected-Parent: " + options["expected_hf_parent"]
+        )
+        kwargs["parent_commit"] = options["expected_hf_parent"]
+        journal = {
+            "schema": "szl.hf-deploy-operation/v1",
+            "state": "OUTCOME_UNCERTAIN",
+            "operation_id": options["operation_id"],
+            "expected_parent": options["expected_hf_parent"],
+            "manifest_sha256": options["expected_manifest_sha256"],
+            "manifest": manifest,
+            "pruned": list(deleted),
+        }
+        journal["intent_sha256"] = intent_identity(journal)
+        write_journal(options["transaction_journal"], journal, exclusive=True)
+    try:
+        commit = api.create_commit(
+            repo_id=args.hf_repo, repo_type="space", operations=ops,
+            commit_message=(
+                f"deploy(hf): sync {args.github_repo}@{args.ref} derived COPY set"
+            ),
+            commit_description=description, **kwargs,
+        )
+    except Exception as exc:  # SDK messages may contain signed URLs or secrets.
+        raise DeployContractError(
+            "HF commit outcome uncertain; reconcile before retry (" +
+            type(exc).__name__ + ")"
+        ) from None
+    if not re.fullmatch(r"[0-9a-f]{40}", str(getattr(commit, "oid", ""))):
+        raise DeployContractError("HF commit outcome uncertain: invalid commit identity")
+    if journal:
+        journal["state"] = "COMMIT_ACKNOWLEDGED"
+        journal["hf_commit_oid"] = commit.oid
+        write_journal(options["transaction_journal"], journal)
+    return commit
+
+
+def reconcile_transaction(path, requested_hf_repo=""):
+    """Read remote history and immutable bytes without retrying a mutation."""
+    with open(path, "rb") as handle:
+        body = handle.read(16 * 1024 * 1024 + 1)
+    if len(body) > 16 * 1024 * 1024:
+        raise DeployContractError("transaction journal exceeds byte limit")
+    journal = strict_json(body)
+    if not isinstance(journal, dict) or journal.get("schema") != "szl.hf-deploy-operation/v1":
+        raise DeployContractError("invalid transaction journal schema")
+    manifest = journal.get("manifest")
+    if not isinstance(manifest, dict) or manifest_identity(manifest) != journal.get("manifest_sha256"):
+        raise DeployContractError("transaction manifest binding is invalid")
+    if (not all(key in journal for key in (
+            "schema", "operation_id", "expected_parent", "manifest_sha256", "pruned")) or
+            not isinstance(journal.get("pruned"), list) or
+            journal.get("intent_sha256") != intent_identity(journal)):
+        raise DeployContractError("transaction intent binding is invalid")
+    operation = journal.get("operation_id")
+    parent = journal.get("expected_parent")
+    if (not isinstance(operation, str) or not re.fullmatch(r"[0-9a-f]{64}", operation) or
+            not isinstance(parent, str) or not re.fullmatch(r"[0-9a-f]{40}", parent)):
+        raise DeployContractError("invalid operation or parent identity")
+    repo = manifest.get("hf_repo")
+    if (not isinstance(repo, str) or not re.fullmatch(r"[A-Za-z0-9_-]+/[A-Za-z0-9_.-]+", repo)
+            or requested_hf_repo and requested_hf_repo != repo):
+        raise DeployContractError("transaction target is invalid or differs")
+    status, raw = _http(f"{HF_HOST}/api/spaces/{repo}/commits/main",
+                        headers=_auth_headers(), retries=2, follow_redirects=False)
+    history = strict_json(raw) if status == 200 else None
+    if (not isinstance(history, list) or not history or len(history) > 100 or
+            any(not isinstance(item, dict) for item in history)):
+        raise DeployContractError("bounded remote commit history unavailable")
+    marker = "SZL-Operation-ID: " + operation
+    candidates = [index for index, item in enumerate(history)
+                  if isinstance(item, dict) and marker in str(item.get("message", "")).splitlines()]
+    if len(candidates) != 1:
+        return {"state": "OUTCOME_UNCERTAIN", "operation_id": operation}
+    index = candidates[0]
+    candidate = history[index]
+    oid = candidate.get("id")
+    lines = str(candidate.get("message", "")).splitlines()
+    if (not isinstance(oid, str) or not re.fullmatch(r"[0-9a-f]{40}", oid) or
+            "SZL-Manifest-SHA256: " + journal["manifest_sha256"] not in lines or
+            "SZL-Expected-Parent: " + parent not in lines or
+            index + 1 >= len(history) or history[index + 1].get("id") != parent):
+        return {"state": "OUTCOME_UNCERTAIN", "operation_id": operation}
+    files = manifest.get("files")
+    if not isinstance(files, dict) or not files:
+        raise DeployContractError("transaction has no complete file closure")
+    for target, meta in sorted(files.items()):
+        if normalize_repo_path(target) != target:
+            raise DeployContractError("transaction has invalid target path")
+        if (not isinstance(meta, dict) or type(meta.get("size")) is not int or
+                meta["size"] < 0 or not isinstance(meta.get("sha256"), str) or
+                not re.fullmatch(r"[0-9a-f]{64}", meta["sha256"])):
+            raise DeployContractError("transaction has invalid file identity")
+        status, raw = hf_resolve(repo, target, oid)
+        if status != 200 or sha256(raw) != meta.get("sha256") or len(raw) != meta.get("size"):
+            return {"state": "HOLD_BYTE_MISMATCH", "operation_id": operation}
+    for target in journal.get("pruned", []):
+        normalize_repo_path(target)
+        status, _raw = hf_resolve(repo, target, oid)
+        if status != 404:
+            return {"state": "HOLD_PRUNE_MISMATCH", "operation_id": operation}
+    return {"state": "CONFIRMED" if index == 0 else "SUPERSEDED",
+            "operation_id": operation, "hf_commit_oid": oid,
+            "manifest_sha256": journal["manifest_sha256"]}
 
 
 def require_current_default_branch_tip(args):
@@ -1231,6 +1508,8 @@ def require_current_default_branch_tip(args):
 
 def deploy(args):
     manifest, files = derive(args)
+    manifest["manifest_sha256"] = manifest_identity(manifest)
+    options = transaction_options(args, manifest)
     print(f"== HF deploy: {args.github_repo} -> {args.hf_repo} ({args.ref}) ==")
     print(f"   COPY sources: {manifest['copy_sources']}   files resolved: "
           f"{manifest['files_resolved']}   readme: {manifest['readme']}")
@@ -1266,7 +1545,7 @@ def deploy(args):
         try:
             return _orig(self, content, *a, **k)
         except Exception as e:  # noqa: BLE001
-            print("::warning::HF _validate_yaml skipped (non-fatal):", repr(e)[:160])
+            print("::warning::HF _validate_yaml unavailable:", type(e).__name__)
             return None
     HfApi._validate_yaml = _safe_validate
 
@@ -1301,18 +1580,16 @@ def deploy(args):
     # particular, do not move it into a separately scheduled preflight job:
     # a caller's default branch can advance between jobs.
     require_current_default_branch_tip(args)
-    commit = api.create_commit(
-        repo_id=args.hf_repo, repo_type="space", operations=ops,
-        commit_message=f"deploy(hf): sync {args.github_repo}@{args.ref} derived COPY set",
-        commit_description=(
-            f"Reusable Dockerfile-COPY-derived deploy from {args.github_repo} {args.ref}.\n"
-            f"Files: {len(files)}  Pruned: {len(deleted)}\n"
-            "Derived from Dockerfile COPY sources (NO hand-maintained allowlist).\n\n"
-            "Co-Authored-By: Claude Opus 4.7 <noreply@anthropic.com>"),
-    )
+    commit = commit_with_transaction(api, args, manifest, ops, deleted, options)
     print(f"\nHF commit: {commit.oid} -> {args.hf_repo}  added:{len(files)} pruned:{len(deleted)}")
     manifest["hf_commit_oid"] = commit.oid
     manifest["pruned"] = deleted
+    if options:
+        manifest["transaction"] = {
+            "operation_id": options["operation_id"],
+            "expected_parent": options["expected_hf_parent"],
+            "state": "COMMIT_ACKNOWLEDGED",
+        }
     if args.manifest_out:
         with open(args.manifest_out, "w") as fh:
             json.dump(manifest, fh, indent=2, sort_keys=True)
@@ -1417,6 +1694,16 @@ def main(argv=None):
         help="JSON array of same-host live app paths to require after deploy",
     )
     ap.add_argument("--manifest-out", default="")
+    ap.add_argument("--expected-hf-parent", default="",
+                    help="transaction: exact remote parent enforced by provider CAS")
+    ap.add_argument("--operation-id", default="",
+                    help="transaction: unique 64-character lowercase hex operation ID")
+    ap.add_argument("--expected-manifest-sha256", default="",
+                    help="transaction: manifest_sha256 from the approved dry-run")
+    ap.add_argument("--transaction-journal", default="",
+                    help="transaction: new durable intent path outside the payload")
+    ap.add_argument("--reconcile-transaction", default="",
+                    help="read-only reconciliation of one retained operation journal")
     ap.add_argument("--prune", action="store_true",
                     help="delete Space files under directory COPY sources that are "
                          "gone from git main (never touches file/glob sources)")
@@ -1444,12 +1731,20 @@ def main(argv=None):
     args.include_readme = str(args.include_readme).lower() not in ("false", "0", "no")
 
     # Derive HF repo by convention if not given: szl-holdings/<x> -> SZLHOLDINGS/<x>.
-    if not args.hf_repo and not args.restart_space:
+    if not args.hf_repo and not args.restart_space and not args.reconcile_transaction:
         name = (args.github_repo.split("/")[-1] if args.github_repo else
                 os.path.basename(os.path.abspath(args.repo_root)))
         args.hf_repo = f"SZLHOLDINGS/{name}"
 
     try:
+        if args.reconcile_transaction:
+            flag_names = {item.split("=", 1)[0] for item in cli_args
+                          if item.startswith("--")}
+            if flag_names - {"--reconcile-transaction", "--hf-repo"}:
+                raise DeployContractError("reconciliation accepts only its journal and optional target")
+            result = reconcile_transaction(args.reconcile_transaction, args.hf_repo)
+            print(json.dumps(result, sort_keys=True))
+            return 0 if result["state"] == "CONFIRMED" else 2
         if args.restart_space:
             flag_names = {
                 item.split("=", 1)[0]

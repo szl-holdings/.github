@@ -17,7 +17,7 @@ EXPECTED_PERMISSIONS = {
 SCALAR = re.compile(r"^  ([a-z][a-z0-9-]*): (read|write|none)$")
 CHECKOUT_ACTION = "actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1"
 EXPECTED_WORKFLOW_SHA256 = (
-    "f3c14a6730617569892f56a76660babb05ab7a52c43349f6d9355d3c84d3607e"
+    "1f518a525b257440a8b018d2a86453123e8e21c81273e03cb0c838358e3188dd"
 )
 EXPECTED_STEP_NAMES = (
     "Harden runner",
@@ -32,7 +32,7 @@ EXPECTED_STEP_NAMES = (
     "Require a confirmed healthy control plane",
 )
 EXPECTED_ACTIONS = (
-    "step-security/harden-runner@05e31511f85b41b11d1cf0ef85d0992719546e2c",
+    "step-security/harden-runner@e14015d583714f6e62063499dc959a02595150a1",
     CHECKOUT_ACTION,
     "actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97",
     "actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1",
