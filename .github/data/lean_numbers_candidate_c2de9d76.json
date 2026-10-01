@@ -1,0 +1,110 @@
+{
+  "schema": "szl.lean_numbers_candidate/v1",
+  "status": "CANDIDATE - NOT A LOCK ADVANCE",
+  "reason": "official axiom regex matches prose inside comments/docstrings",
+  "official_output": {
+    "schema": "szl.lean_numbers/v1",
+    "repo": "szl-holdings/lutar-lean",
+    "ref": "main",
+    "sha": "c2de9d7644d191602ff26a007ccdf02e73622376",
+    "measured_at_utc": "2026-09-27T20:51:44Z",
+    "method": "see .github/scripts/lean_numbers.py docstring (fixed grep-equivalent regexes)",
+    "numbers": {
+      "declarations": 2119,
+      "axioms_raw": 34,
+      "axioms_unique": 33,
+      "axiom_names": [
+        "A6'_block_consistent",
+        "A6_bisymmetric",
+        "CrystalIsometryClass",
+        "KS_theorem_1_1",
+        "MomentSubGaussian",
+        "PDDFingerprint",
+        "audit_reidemeister_invariance",
+        "canonicalReceipt",
+        "chromotopology_code_bijection",
+        "codeHash_collision_resistant",
+        "compression_collision_resistant",
+        "domain_separation",
+        "ecdsa_unforgeable",
+        "gleason_length_mod_8",
+        "h2_collision_resistant",
+        "hashFn_collision_resistant",
+        "hash_collision_resistant",
+        "is",
+        "klDivergence_nonneg",
+        "lambda_schur_concave_n_axis",
+        "lambda_stationary_unique",
+        "leaf_collision_resistant",
+        "liu_hui_pi_converges",
+        "node_collision_resistant",
+        "pdd",
+        "pinsker",
+        "r1_invariance",
+        "r2_invariance",
+        "setAlpha_cauchy",
+        "setDelta_stage2",
+        "sha256",
+        "sha256_collision_resistant",
+        "token"
+      ],
+      "sorries_raw": 430,
+      "sorries_noncomment": 378,
+      "sorries_putnam": 71,
+      "sorries_baseline": 359
+    }
+  },
+  "axiom_audit": {
+    "independent_method": "comment/docstring-stripped, line-start axiom declarations only",
+    "real_axioms_unique": 32,
+    "real_axiom_names": [
+      "A6'_block_consistent",
+      "A6_bisymmetric",
+      "CrystalIsometryClass",
+      "KS_theorem_1_1",
+      "MomentSubGaussian",
+      "PDDFingerprint",
+      "audit_reidemeister_invariance",
+      "canonicalReceipt",
+      "chromotopology_code_bijection",
+      "codeHash_collision_resistant",
+      "compression_collision_resistant",
+      "domain_separation",
+      "ecdsa_unforgeable",
+      "gleason_length_mod_8",
+      "h2_collision_resistant",
+      "hashFn_collision_resistant",
+      "hash_collision_resistant",
+      "klDivergence_nonneg",
+      "lambda_schur_concave_n_axis",
+      "lambda_stationary_unique",
+      "leaf_collision_resistant",
+      "liu_hui_pi_converges",
+      "node_collision_resistant",
+      "pdd",
+      "pinsker",
+      "r1_invariance",
+      "r2_invariance",
+      "setAlpha_cauchy",
+      "setDelta_stage2",
+      "sha256",
+      "sha256_collision_resistant",
+      "sha256_inj"
+    ],
+    "official_false_positives": {
+      "is": [
+        "Lutar\\Axioms.lean:117",
+        "Lutar\\SBOMProvenance.lean:158",
+        "Lutar\\Coder\\CoderProofs.lean:49"
+      ],
+      "token": [
+        "Lutar\\Wave15\\KLDivergenceSimplex.lean:36",
+        "Lutar\\Wave15\\PinskerRoadmap.lean:24",
+        "Lutar\\Wave18\\AczelRepresentation.lean:31"
+      ]
+    },
+    "official_missed": [
+      "sha256_inj"
+    ]
+  }
+}

@@ -4,18 +4,25 @@
  * per Space. Original local-only implementation. SPDX-License-Identifier: Apache-2.0
  */
 :root {
-  --szl-space-bg: #05090f;
-  --szl-space-surface: #0d1722;
-  --szl-space-fg: #f3f8ff;
-  --szl-space-muted: #9eb0c2;
-  --szl-space-accent: #55ebd1;
-  --szl-space-accent-2: #6f8cff;
+  /* Default palette = SZL KANCHAY v1.1.0, founder direction (szl-brand kanchay/ @aa876fa;
+     szl-design-system.css, loaded before this layer). Same mapping as the .github fabric:
+     ground --bg, surface --surface, text --text / --text-sub, functional accent --link
+     (teal: kicker, skip link, native controls), linework color-silver-300, focus --focus.
+     Lines, fields, glows and dot fields are silver. No coral: the fabric has no single node
+     element. Motifs (geometry) carry each Space's identity. */
+  --szl-space-bg: var(--bg);
+  --szl-space-surface: var(--surface);
+  --szl-space-fg: var(--text);
+  --szl-space-muted: var(--text-sub);
+  --szl-space-accent: var(--link);
+  --szl-space-accent-2: var(--color-silver-300);
+  --szl-space-focus: var(--focus);
   --szl-space-x: 52vw;
   --szl-space-y: 30vh;
   --szl-space-nx: 0;
   --szl-space-ny: 0;
-  --szl-space-line: color-mix(in srgb, var(--szl-space-accent) 17%, transparent);
-  --szl-space-glow: color-mix(in srgb, var(--szl-space-accent) 16%, transparent);
+  --szl-space-line: color-mix(in srgb, var(--szl-space-accent-2) 17%, transparent);
+  --szl-space-glow: color-mix(in srgb, var(--szl-space-accent-2) 16%, transparent);
   --szl-space-glow-2: color-mix(in srgb, var(--szl-space-accent-2) 14%, transparent);
   color-scheme: dark;
 }
@@ -50,7 +57,7 @@ html[data-szl-space-holo-v2="true"] body { min-height: 100%; isolation: isolate;
     linear-gradient(var(--szl-space-line) 1px, transparent 1px),
     linear-gradient(90deg, var(--szl-space-line) 1px, transparent 1px);
   background-size: 60px 60px;
-  mask-image: radial-gradient(ellipse at var(--szl-space-x) var(--szl-space-y), #000 0 13%, transparent 64%);
+  mask-image: radial-gradient(ellipse at var(--szl-space-x) var(--szl-space-y), currentColor 0 13%, transparent 64%);
   transform: perspective(760px) rotateX(63deg) translate3d(calc(var(--szl-space-nx) * -12px), calc(34% + var(--szl-space-ny) * -8px), -90px);
   opacity: .68;
 }
@@ -82,15 +89,15 @@ html[data-szl-space-holo-v2="true"] body { min-height: 100%; isolation: isolate;
 .szl-space-scan {
   inset: 0;
   background: repeating-linear-gradient(180deg, transparent 0 6px, color-mix(in srgb, var(--szl-space-fg) 2%, transparent) 7px 8px);
-  mask-image: linear-gradient(transparent 0 8%, #000 22% 82%, transparent 96%);
+  mask-image: linear-gradient(transparent 0 8%, currentColor 22% 82%, transparent 96%);
   opacity: .22;
   animation: szl-space-scan 15s linear infinite;
 }
 .szl-space-nodes {
   inset: 0;
-  background-image: radial-gradient(circle, var(--szl-space-accent) 0 1.5px, transparent 2.5px);
+  background-image: radial-gradient(circle, var(--szl-space-accent-2) 0 1.5px, transparent 2.5px);
   background-size: 118px 78px;
-  mask-image: radial-gradient(ellipse at 66% 38%, #000, transparent 65%);
+  mask-image: radial-gradient(ellipse at 66% 38%, currentColor, transparent 65%);
   opacity: .18;
 }
 
@@ -106,10 +113,10 @@ html[data-szl-space-motif="threat-lattice"] .szl-space-orbit { border-radius: 0;
 html[data-szl-space-motif="case-lines"] .szl-space-field { background: repeating-linear-gradient(0deg, transparent 0 51px, var(--szl-space-line) 52px 53px), repeating-linear-gradient(90deg, transparent 0 219px, var(--szl-space-glow-2) 220px 221px); transform: rotate(-2deg); }
 html[data-szl-space-motif="editorial-orbit"] .szl-space-orbit { transform: rotate(12deg) scaleY(.54); width: min(76vw, 760px); }
 html[data-szl-space-motif="editorial-orbit"] .szl-space-field { background: linear-gradient(115deg, transparent 37%, var(--szl-space-line) 38% 40%, transparent 41% 61%, var(--szl-space-glow-2) 62% 64%, transparent 65%); transform: none; }
-html[data-szl-space-motif="graph-mesh"] .szl-space-field { background: radial-gradient(circle, var(--szl-space-accent) 0 2px, transparent 3px), linear-gradient(30deg, transparent 49%, var(--szl-space-line) 50%, transparent 51%), linear-gradient(150deg, transparent 49%, var(--szl-space-line) 50%, transparent 51%); background-size: 94px 94px; transform: none; }
-html[data-szl-space-motif="build-circuit"] .szl-space-field { background: radial-gradient(circle, var(--szl-space-accent) 0 2px, transparent 3px), linear-gradient(90deg, var(--szl-space-line) 1px, transparent 1px), linear-gradient(var(--szl-space-line) 1px, transparent 1px); background-size: 70px 70px; clip-path: polygon(0 8%, 76% 8%, 76% 28%, 100% 28%, 100% 92%, 22% 92%, 22% 69%, 0 69%); transform: none; }
-html[data-szl-space-motif="recursive-weave"] .szl-space-field { background: repeating-conic-gradient(from 0deg, var(--szl-space-line) 0 1deg, transparent 1deg 13deg); mask-image: repeating-radial-gradient(circle, #000 0 1px, transparent 2px 54px); transform: scale(1.18); animation: szl-space-ring 46s linear infinite; }
-html[data-szl-space-motif="agent-swarm"] .szl-space-field { background-image: radial-gradient(circle, var(--szl-space-accent) 0 2px, transparent 3px), radial-gradient(circle, var(--szl-space-accent-2) 0 1px, transparent 2px); background-position: 0 0, 31px 27px; background-size: 72px 68px, 89px 83px; transform: none; animation: szl-space-swarm 26s ease-in-out infinite alternate; }
+html[data-szl-space-motif="graph-mesh"] .szl-space-field { background: radial-gradient(circle, var(--szl-space-accent-2) 0 2px, transparent 3px), linear-gradient(30deg, transparent 49%, var(--szl-space-line) 50%, transparent 51%), linear-gradient(150deg, transparent 49%, var(--szl-space-line) 50%, transparent 51%); background-size: 94px 94px; transform: none; }
+html[data-szl-space-motif="build-circuit"] .szl-space-field { background: radial-gradient(circle, var(--szl-space-accent-2) 0 2px, transparent 3px), linear-gradient(90deg, var(--szl-space-line) 1px, transparent 1px), linear-gradient(var(--szl-space-line) 1px, transparent 1px); background-size: 70px 70px; clip-path: polygon(0 8%, 76% 8%, 76% 28%, 100% 28%, 100% 92%, 22% 92%, 22% 69%, 0 69%); transform: none; }
+html[data-szl-space-motif="recursive-weave"] .szl-space-field { background: repeating-conic-gradient(from 0deg, var(--szl-space-line) 0 1deg, transparent 1deg 13deg); mask-image: repeating-radial-gradient(circle, currentColor 0 1px, transparent 2px 54px); transform: scale(1.18); animation: szl-space-ring 46s linear infinite; }
+html[data-szl-space-motif="agent-swarm"] .szl-space-field { background-image: radial-gradient(circle, var(--szl-space-accent-2) 0 2px, transparent 3px), radial-gradient(circle, var(--szl-space-muted) 0 1px, transparent 2px); background-position: 0 0, 31px 27px; background-size: 72px 68px, 89px 83px; transform: none; animation: szl-space-swarm 26s ease-in-out infinite alternate; }
 html[data-szl-space-motif="cell-membrane"] .szl-space-field { background: repeating-radial-gradient(ellipse at 48% 46%, transparent 0 42px, var(--szl-space-line) 43px 44px); transform: rotate(16deg) scale(1.24); }
 html[data-szl-space-motif="checksum-ledger"] .szl-space-field { background: repeating-linear-gradient(0deg, transparent 0 31px, var(--szl-space-line) 32px 33px), repeating-linear-gradient(90deg, transparent 0 167px, var(--szl-space-glow-2) 168px 169px); transform: none; }
 
@@ -118,14 +125,14 @@ html[data-szl-space-motif="checksum-ledger"] .szl-space-field { background: repe
   border: 1px solid var(--szl-space-line);
   border-radius: 18px;
   background: color-mix(in srgb, var(--szl-space-surface) 86%, transparent);
-  box-shadow: 0 22px 74px rgb(0 0 0 / .34), inset 0 1px 0 color-mix(in srgb, var(--szl-space-fg) 6%, transparent);
+  box-shadow: 0 22px 74px color-mix(in srgb, var(--szl-space-bg) 34%, transparent), inset 0 1px 0 color-mix(in srgb, var(--szl-space-fg) 6%, transparent);
   backdrop-filter: blur(16px) saturate(125%);
 }
 .szl-space-kicker { color: var(--szl-space-accent); font-size: .72rem; font-weight: 760; letter-spacing: .18em; text-transform: uppercase; }
-.szl-space-gradient-text { color: var(--szl-space-fg); background: linear-gradient(110deg, var(--szl-space-fg), var(--szl-space-accent) 58%, var(--szl-space-accent-2)); background-clip: text; -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
-.szl-space-skip-link { position: fixed; top: 8px; left: 8px; z-index: 2147483647; padding: 10px 14px; border: 2px solid var(--szl-space-accent); border-radius: 9px; color: var(--szl-space-bg); background: var(--szl-space-accent); font: 700 14px/1.2 system-ui, sans-serif; text-decoration: none; transform: translateY(-160%); transition: transform .15s ease; }
+.szl-space-gradient-text { color: var(--szl-space-fg); background: linear-gradient(110deg, var(--szl-space-fg), var(--szl-space-fg) 58%, var(--szl-space-muted)); background-clip: text; -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+.szl-space-skip-link { position: fixed; top: 8px; left: 8px; z-index: 2147483647; padding: 10px 14px; border: 2px solid var(--szl-space-accent); border-radius: 9px; color: var(--szl-space-bg); background: var(--szl-space-accent); font: 700 14px/1.2 var(--font-body); text-decoration: none; transform: translateY(-160%); transition: transform .15s ease; }
 .szl-space-skip-link:focus { transform: translateY(0); }
-html[data-szl-space-holo-v2="true"] :where(a, button, input, textarea, select, summary, [tabindex]):focus-visible { outline: 3px solid var(--szl-space-accent) !important; outline-offset: 4px !important; }
+html[data-szl-space-holo-v2="true"] :where(a, button, input, textarea, select, summary, [tabindex]):focus-visible { outline: 3px solid var(--szl-space-focus) !important; outline-offset: 4px !important; }
 html[data-szl-space-power="low"] .szl-space-scan, html[data-szl-space-power="low"] .szl-space-beam { display: none; }
 html[data-szl-space-power="low"] .szl-space-orbit { animation: none; opacity: .28; }
 html[data-szl-space-state="paused"] #szl-space-holo-v2-ambient > span { animation-play-state: paused !important; }
@@ -160,5 +167,5 @@ html[data-szl-space-state="paused"] #szl-space-holo-v2-ambient > span { animatio
 }
 @media print {
   szl-space-ecosystem-bar, #szl-space-holo-v2-ambient, .szl-space-skip-link { display: none !important; }
-  html[data-szl-space-holo-v2="true"], html[data-szl-space-holo-v2="true"] body { color: #000 !important; background: #fff !important; }
+  html[data-szl-space-holo-v2="true"], html[data-szl-space-holo-v2="true"] body { color: var(--color-gray-900) !important; background: var(--color-white) !important; }
 }
