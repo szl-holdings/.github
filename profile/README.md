@@ -34,6 +34,6 @@ Source, running software, and model evaluations are **separate claims**, and we 
 
 Public Hugging Face estate observed **2026-09-30**: **50 models, 35 datasets, 33 Spaces** (repository counts). Twenty PyPI packages published. These are dated observations, refreshed from the live Hub API — not marketing numbers.
 
-**Receipt verification:** the [a11oy source](https://github.com/szl-holdings/a11oy) carries the verification contracts. **Model training and evaluation:** [szl-forge](https://github.com/szl-holdings/szl-forge) holds the kits, datasets, runbooks, and measured limits. **Trust boundary:** [TRUST.md](https://github.com/szl-holdings/.github/blob/main/TRUST.md).
+**Receipt verification:** the [a11oy source](https://github.com/szl-holdings/a11oy) carries the verification contracts. **Model training and evaluation:** [szl-forge](https://github.com/szl-holdings/szl-forge) holds the kits, datasets, runbooks, and measured limits. **Trust boundary:** [TRUST.md](https://github.com/szl-holdings/.github/blob/main/TRUST.md). Killinchu effectors stay **SIMULATED**; `SZLHOLDINGS/SZLHOLDINGS` is **HISTORICAL**.
 
 *Governed AI. Evidence you can inspect. Work you can verify.*
