@@ -2,7 +2,7 @@
 title: SZL — Governed AI Command Fabric
 emoji: 🛡️
 colorFrom: gray
-colorTo: indigo
+colorTo: gray
 sdk: static
 short_description: Governed AI routing, kernels, and verifiable outcomes.
 thumbnail: https://huggingface.co/spaces/SZLHOLDINGS/README/resolve/main/assets/evidence-lattice-v2.webp

@@ -1,19 +1,44 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1280" height="300" viewBox="0 0 1280 300" role="img" aria-labelledby="title desc">
   <title id="title">SZL Holdings — control before action, evidence after</title>
   <desc id="desc">A compact dark portfolio banner with a governed-loop trace connecting control and evidence.</desc>
+  <!-- SZL KANCHAY v1.1.1, founder direction (szl-design-system.css sha256 e05d19baa021).
+       Literal token hex (SVG cannot read CSS variables):
+       #030F29 bg token (color-space-900), #10151C color-gray-900, #C9D2DF text-sub token (color-gray-200)
+       #F5F7FA text token (color-gray-50), #A4B1C4 color-gray-300, #76859B text-ghost token (color-gray-400)
+       #E9EEF6 color-silver-100, #9AA7BD color-silver-300, #5C6B86 color-silver-500
+       #DF735F accent token (color-coral-400), #F0917E color-coral-300, #C4543F color-coral-500 (orbit-mark node only)
+       #FFFFFF color-white (orbit mark monogram). -->
   <defs>
     <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#030F29"/><stop offset="1" stop-color="#10151C"/></linearGradient>
-    <linearGradient id="trace" x1="0" y1="0" x2="1" y2="0"><stop stop-color="#5CC4BF"/><stop offset=".55" stop-color="#E9EEF6"/><stop offset="1" stop-color="#DF735F"/></linearGradient>
+    <linearGradient id="trace" gradientUnits="userSpaceOnUse" x1="790" y1="0" x2="1172" y2="0"><stop stop-color="#5C6B86"/><stop offset=".55" stop-color="#E9EEF6"/><stop offset="1" stop-color="#9AA7BD"/></linearGradient>
   </defs>
   <rect width="1280" height="300" rx="24" fill="url(#bg)"/>
   <rect x="1" y="1" width="1278" height="298" rx="23" fill="none" stroke="#5C6B86" stroke-opacity=".45"/>
   <g font-family="system-ui,-apple-system,Segoe UI,Arial,sans-serif">
-    <g transform="translate(54 44)"><path d="M0 9h18M9 0v18" stroke="#DF735F" stroke-width="2"/><circle cx="9" cy="9" r="3.5" fill="#DF735F"/><text x="32" y="14" fill="#C9D2DF" font-size="13" font-weight="750" letter-spacing="3">SZL HOLDINGS</text></g>
+    <g transform="translate(54 44)"><svg x="0" y="-6" width="44.57" height="26" viewBox="96 252 1008 588" aria-hidden="true"><!-- SZL orbit mark: szl-brand kanchay/logos/szl_favicon.svg, paths verbatim (ids namespaced); its node is this image's one coral node -->
+    <defs>
+    <linearGradient id="banner-mark-orbit" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#E9EEF6"/>
+      <stop offset="0.5" stop-color="#9AA7BD"/>
+      <stop offset="1" stop-color="#5C6B86"/>
+    </linearGradient>
+    <radialGradient id="banner-mark-node" cx="0.38" cy="0.34" r="0.75">
+      <stop offset="0" stop-color="#F0917E"/>
+      <stop offset="0.55" stop-color="#DF735F"/>
+      <stop offset="1" stop-color="#C4543F"/>
+    </radialGradient>
+    </defs>
+    <g transform="rotate(-22 657.0 502.0)"><ellipse cx="657.0" cy="502.0" rx="432" ry="196" fill="none" stroke="url(#banner-mark-orbit)" stroke-width="7" stroke-linecap="round" opacity="0.95"/></g>
+  <path d="M 500 402 C 476 374 344 374 334 416 C 324 458 396 480.0 409.0 502.0 C 476 526.0 512 540 476 582 C 464 620 358 626 310 606 " fill="none" stroke="#FFFFFF" stroke-width="70" stroke-linecap="butt" stroke-linejoin="round"/>
+  <g fill="#FFFFFF"><path d="M 534 372 L 732 372 L 732 444 L 636 568 L 732 568 L 732 632 L 534 632 L 534 560 L 630 436 L 534 436 Z"/><path d="M 762 372 L 830 372 L 830 568 L 1014 568 L 954 632 L 762 632 Z"/></g>
+  <circle cx="937.9" cy="264.3" r="33" fill="url(#banner-mark-node)"/>
+  <path d="M 657.0 678 L 694.0 766 L 675.0 766 L 657.0 710.3 L 639.0 766 L 620.0 766 Z" fill="url(#banner-mark-orbit)" opacity="0.96"/>
+  </svg><text x="58" y="14" fill="#C9D2DF" font-size="13" font-weight="750" letter-spacing="3">SZL HOLDINGS</text></g>
     <text x="54" y="145" fill="#F5F7FA" font-size="48" font-weight="760" letter-spacing="-1.8">Control before action.</text>
     <text x="54" y="197" fill="#C9D2DF" font-size="34" font-weight="580" letter-spacing="-1">Evidence after.</text>
     <text x="54" y="250" fill="#76859B" font-size="12" font-weight="700" letter-spacing="1.8">GOVERN · EXECUTE · PROVE</text>
     <path d="M790 152h382" stroke="url(#trace)" stroke-width="3" stroke-linecap="round"/>
-    <g fill="#030F29" stroke-width="3"><circle cx="790" cy="152" r="11" stroke="#5CC4BF"/><circle cx="918" cy="152" r="11" stroke="#C9D2DF"/><circle cx="1045" cy="152" r="11" stroke="#E9EEF6"/><circle cx="1172" cy="152" r="11" stroke="#DF735F"/></g>
-    <g fill="#8C99AD" font-size="10" font-weight="750" letter-spacing="1.2" text-anchor="middle"><text x="790" y="187">SIGNAL</text><text x="918" y="187">POLICY</text><text x="1045" y="187">RECEIPT</text><text x="1172" y="187">VERIFY</text></g>
+    <g fill="#030F29" stroke-width="3"><circle cx="790" cy="152" r="11" stroke="#5C6B86"/><circle cx="918" cy="152" r="11" stroke="#9AA7BD"/><circle cx="1045" cy="152" r="11" stroke="#E9EEF6"/><circle cx="1172" cy="152" r="11" stroke="#9AA7BD"/></g>
+    <g fill="#A4B1C4" font-size="10" font-weight="750" letter-spacing="1.2" text-anchor="middle"><text x="790" y="187">SIGNAL</text><text x="918" y="187">POLICY</text><text x="1045" y="187">RECEIPT</text><text x="1172" y="187">VERIFY</text></g>
   </g>
 </svg>
