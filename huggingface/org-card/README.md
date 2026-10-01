@@ -49,6 +49,10 @@ Counter-UAS and maritime intelligence with governed decisions and DSSE Khipu rec
 
 Inspect the Space's self-reported `/api/killinchu/v1/honest`; self-reporting is not independent qualification.
 
+## Install
+
+`pip install szl-receipts` · [manifest](https://github.com/szl-holdings/szl-org-health/blob/main/governance/pypi/pypi-packages.v1.json) · [listing](https://pypi.org/user/betterwithage/)
+
 ## Estate map
 
 Three commercial flagships: **A11oy, Killinchu, Forge**. One inference flagship: **SZL Router**.
@@ -65,7 +69,7 @@ Six internal engines: **CHAPAQ (folded into Killinchu), Lyte, Killinchu, Finance
 
 [**Inventory binding**](https://github.com/szl-holdings/.github/blob/main/profile/public-inventory.json) · [**Admitted source manifest**](https://github.com/szl-holdings/a11oy/blob/4c6621b17ba452d5af7aa2460462fdfbe513509f/docs/huggingface-ecosystem-manifest.json)
 
-Listing **2026-09-25**: 23 Spaces, 49 models, 35 datasets; binding refresh pending.
+Listing **2026-10-01**: 33/50/35 Spaces/models/datasets (09-25: 23/49/35).
 
 `SZLHOLDINGS/SZLHOLDINGS` is **HISTORICAL**. Λ uniqueness remains **Conjecture 1 — open**. HTTP 200 is not a production certificate.
 
