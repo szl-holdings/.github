@@ -306,7 +306,7 @@ html[data-szl-space-holo-v2="true"][data-szl-zoom-tier="extreme"] :where(
 
 @media (prefers-contrast: more) {
   html[data-szl-space-holo-v2="true"] {
-    --szl-space-line: color-mix(in srgb, var(--szl-space-fg) 56%, transparent);
+    --szl-space-line: color-mix(in srgb, var(--color-silver-100) 56%, transparent);
   }
 }
 

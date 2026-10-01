@@ -10,40 +10,46 @@
   window.__SZL_SPACE_HOLO_V2__ = true;
 
   var VERSION = "2.0.0";
+  // SZL KANCHAY v1.1.0, founder direction (szl-brand kanchay/ @aa876fa). Palette values are token
+  // references resolved against szl-design-system.css, which each Space links before this layer
+  // (the same roles as _layers/szl-space-hologram): ground --bg, surface --surface, text --text /
+  // --text-sub, one functional teal accent --link (kicker, skip link, native controls), and silver
+  // linework (color-silver-300 or -100). No coral (the fabric draws no single node), no gold, no
+  // violet or cyan. Keys, labels, motifs and the FNV-1a palette index are unchanged.
   var CURATED = {
-    "a11oy": ["A11oy", "command-grid", "#05090f", "#0d1722", "#f3f8ff", "#9eb0c2", "#55ebd1", "#6f8cff"],
-    "a11oy-enterprise": ["A11oy Enterprise", "command-grid", "#05090f", "#101723", "#f5f8ff", "#a1b0c2", "#5ee7d3", "#7d8fff"],
-    "lyte": ["Lyte", "signal-aurora", "#04110f", "#0c211d", "#effffb", "#98b9b0", "#52ffd0", "#78a8ff"],
-    "lyte-lattice": ["Lyte Lattice", "signal-aurora", "#04110f", "#0c211d", "#effffb", "#98b9b0", "#52ffd0", "#78a8ff"],
-    "vessels": ["Vessels", "bathymetric-radar", "#03101b", "#0b2133", "#f0fbff", "#9ab5c5", "#5ce1ff", "#2a78ff"],
-    "terra": ["Terra", "parcel-topography", "#07110c", "#122118", "#f6fff7", "#a8b8a9", "#80e89a", "#dda85e"],
-    "szl-real-estate": ["Terra Real Estate", "parcel-topography", "#07110c", "#122118", "#f6fff7", "#a8b8a9", "#80e89a", "#dda85e"],
-    "aegis": ["Aegis", "threat-lattice", "#120707", "#251111", "#fff5f3", "#c3a5a1", "#ff655e", "#ffb34d"],
-    "prism-counsel": ["PRISM Counsel", "case-lines", "#090c17", "#151a2b", "#f8f9ff", "#aaafc3", "#7aa7ff", "#d7c4ff"],
-    "counsel": ["PRISM Counsel", "case-lines", "#090c17", "#151a2b", "#f8f9ff", "#aaafc3", "#7aa7ff", "#d7c4ff"],
-    "carlota-jo": ["Carlota Jo", "editorial-orbit", "#140b18", "#28142f", "#fff7ff", "#c3a9c5", "#e2a8ff", "#ef9b67"],
-    "nexus": ["Nexus", "graph-mesh", "#080a19", "#15172d", "#f7f7ff", "#a9abc6", "#9a8cff", "#53e9ff"],
-    "a11oy-factory": ["A11oy Factory", "build-circuit", "#090d08", "#171e13", "#fafff5", "#abb6a4", "#c9ff5c", "#7e9cff"],
-    "szl-command-lab": ["SZL Command Lab", "build-circuit", "#090d08", "#171e13", "#fafff5", "#abb6a4", "#c9ff5c", "#7e9cff"],
-    "ouroboros": ["Ouroboros", "recursive-weave", "#100c07", "#21180e", "#fffaf0", "#c1b49d", "#ffd36e", "#c094ff"],
-    "szl-khipu": ["SZL KHIPU", "recursive-weave", "#100c07", "#21180e", "#fffaf0", "#c1b49d", "#ffd36e", "#c094ff"],
-    "killinchu": ["Killinchu", "agent-swarm", "#110716", "#25102d", "#fff6ff", "#c4a5c8", "#ff74d4", "#68e8ff"],
-    "immune": ["IMMUNE", "cell-membrane", "#061217", "#10272b", "#f1feff", "#9bb9bb", "#50e3d4", "#ff7f78"],
-    "governed-receipt-verifier": ["Governed Receipt Verifier", "checksum-ledger", "#0b1013", "#172126", "#f5fbf8", "#a5b5ae", "#77d6a3", "#d7b96b"]
+    "a11oy": ["A11oy", "command-grid", "var(--bg)", "var(--surface)", "var(--text)", "var(--text-sub)", "var(--link)", "var(--color-silver-300)"],
+    "a11oy-enterprise": ["A11oy Enterprise", "command-grid", "var(--bg)", "var(--surface)", "var(--text)", "var(--text-sub)", "var(--link)", "var(--color-silver-100)"],
+    "lyte": ["Lyte", "signal-aurora", "var(--bg)", "var(--surface)", "var(--text)", "var(--text-sub)", "var(--link)", "var(--color-silver-300)"],
+    "lyte-lattice": ["Lyte Lattice", "signal-aurora", "var(--bg)", "var(--surface)", "var(--text)", "var(--text-sub)", "var(--link)", "var(--color-silver-300)"],
+    "vessels": ["Vessels", "bathymetric-radar", "var(--bg)", "var(--surface)", "var(--text)", "var(--text-sub)", "var(--link)", "var(--color-silver-300)"],
+    "terra": ["Terra", "parcel-topography", "var(--bg)", "var(--surface)", "var(--text)", "var(--text-sub)", "var(--link)", "var(--color-silver-100)"],
+    "szl-real-estate": ["Terra Real Estate", "parcel-topography", "var(--bg)", "var(--surface)", "var(--text)", "var(--text-sub)", "var(--link)", "var(--color-silver-100)"],
+    "aegis": ["Aegis", "threat-lattice", "var(--bg)", "var(--surface)", "var(--text)", "var(--text-sub)", "var(--link)", "var(--color-silver-300)"],
+    "prism-counsel": ["PRISM Counsel", "case-lines", "var(--bg)", "var(--surface)", "var(--text)", "var(--text-sub)", "var(--link)", "var(--color-silver-100)"],
+    "counsel": ["PRISM Counsel", "case-lines", "var(--bg)", "var(--surface)", "var(--text)", "var(--text-sub)", "var(--link)", "var(--color-silver-100)"],
+    "carlota-jo": ["Carlota Jo", "editorial-orbit", "var(--bg)", "var(--surface)", "var(--text)", "var(--text-sub)", "var(--link)", "var(--color-silver-300)"],
+    "nexus": ["Nexus", "graph-mesh", "var(--bg)", "var(--surface)", "var(--text)", "var(--text-sub)", "var(--link)", "var(--color-silver-100)"],
+    "a11oy-factory": ["A11oy Factory", "build-circuit", "var(--bg)", "var(--surface)", "var(--text)", "var(--text-sub)", "var(--link)", "var(--color-silver-300)"],
+    "szl-command-lab": ["SZL Command Lab", "build-circuit", "var(--bg)", "var(--surface)", "var(--text)", "var(--text-sub)", "var(--link)", "var(--color-silver-300)"],
+    "ouroboros": ["Ouroboros", "recursive-weave", "var(--bg)", "var(--surface)", "var(--text)", "var(--text-sub)", "var(--link)", "var(--color-silver-100)"],
+    "szl-khipu": ["SZL KHIPU", "recursive-weave", "var(--bg)", "var(--surface)", "var(--text)", "var(--text-sub)", "var(--link)", "var(--color-silver-100)"],
+    "killinchu": ["Killinchu", "agent-swarm", "var(--bg)", "var(--surface)", "var(--text)", "var(--text-sub)", "var(--link)", "var(--color-silver-100)"],
+    "immune": ["IMMUNE", "cell-membrane", "var(--bg)", "var(--surface)", "var(--text)", "var(--text-sub)", "var(--link)", "var(--color-silver-300)"],
+    "governed-receipt-verifier": ["Governed Receipt Verifier", "checksum-ledger", "var(--bg)", "var(--surface)", "var(--text)", "var(--text-sub)", "var(--link)", "var(--color-silver-100)"]
   };
   var PALETTES = [
-    ["#07131a", "#102633", "#f2fbff", "#9ab4c2", "#64dcff", "#a88bff"],
-    ["#130a10", "#291522", "#fff6fb", "#c2a2b3", "#ff7bc3", "#ffb56b"],
-    ["#07140d", "#12281a", "#f5fff7", "#9db8a4", "#72efa0", "#5ad6ff"],
-    ["#130e06", "#2a1d0e", "#fffaf0", "#c2b297", "#ffc66d", "#ff7d73"],
-    ["#090a18", "#171932", "#f6f6ff", "#a6a8c4", "#878cff", "#54e4d7"],
-    ["#0f0715", "#24102f", "#fff6ff", "#bca6c5", "#d88cff", "#74c6ff"],
-    ["#061315", "#10272b", "#f1feff", "#9bb9bb", "#50e3d4", "#b4ed70"],
-    ["#140808", "#2d1414", "#fff6f4", "#c2a3a0", "#ff6c63", "#e9cf6f"],
-    ["#0a1115", "#16242c", "#f5fbff", "#a3b2bb", "#83c7ff", "#8df0bd"],
-    ["#111006", "#282512", "#fffef0", "#beb99b", "#e5f36b", "#e8a85f"],
-    ["#0b0714", "#1c122c", "#faf6ff", "#aea2c0", "#b697ff", "#ff82ad"],
-    ["#07120f", "#12251f", "#f2fff9", "#9db6aa", "#75e8b4", "#c1a0ff"]
+    ["var(--bg)", "var(--surface)", "var(--text)", "var(--text-sub)", "var(--link)", "var(--color-silver-300)"],
+    ["var(--bg)", "var(--surface)", "var(--text)", "var(--text-sub)", "var(--link)", "var(--color-silver-300)"],
+    ["var(--bg)", "var(--surface)", "var(--text)", "var(--text-sub)", "var(--link)", "var(--color-silver-300)"],
+    ["var(--bg)", "var(--surface)", "var(--text)", "var(--text-sub)", "var(--link)", "var(--color-silver-100)"],
+    ["var(--bg)", "var(--surface)", "var(--text)", "var(--text-sub)", "var(--link)", "var(--color-silver-100)"],
+    ["var(--bg)", "var(--surface)", "var(--text)", "var(--text-sub)", "var(--link)", "var(--color-silver-100)"],
+    ["var(--bg)", "var(--surface)", "var(--text)", "var(--text-sub)", "var(--link)", "var(--color-silver-300)"],
+    ["var(--bg)", "var(--surface)", "var(--text)", "var(--text-sub)", "var(--link)", "var(--color-silver-100)"],
+    ["var(--bg)", "var(--surface)", "var(--text)", "var(--text-sub)", "var(--link)", "var(--color-silver-100)"],
+    ["var(--bg)", "var(--surface)", "var(--text)", "var(--text-sub)", "var(--link)", "var(--color-silver-100)"],
+    ["var(--bg)", "var(--surface)", "var(--text)", "var(--text-sub)", "var(--link)", "var(--color-silver-300)"],
+    ["var(--bg)", "var(--surface)", "var(--text)", "var(--text-sub)", "var(--link)", "var(--color-silver-300)"]
   ];
   var MOTIFS = ["command-grid", "signal-aurora", "bathymetric-radar", "parcel-topography", "threat-lattice", "case-lines", "editorial-orbit", "graph-mesh", "build-circuit", "recursive-weave", "agent-swarm", "cell-membrane", "checksum-ledger"];
   var LINKS = [
@@ -129,7 +135,7 @@
     SpaceBar.prototype.connectedCallback = function () {
       if (this.shadowRoot) return;
       var shadow = this.attachShadow({ mode: "open" });
-      shadow.innerHTML = '<style>:host{all:initial;display:block;position:relative;z-index:2147483000;color-scheme:dark;font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}*{box-sizing:border-box}.bar{min-height:50px;display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:14px;padding:8px clamp(12px,2.3vw,30px);color:var(--szl-space-fg,#fff);background:color-mix(in srgb,var(--szl-space-bg,#05090f) 88%,transparent);border-bottom:1px solid color-mix(in srgb,var(--szl-space-accent,#55ebd1) 25%,transparent);box-shadow:0 14px 40px #0004;backdrop-filter:blur(18px) saturate(130%)}.identity{min-width:0;display:flex;align-items:center;gap:10px;color:inherit;text-decoration:none}.mark{width:24px;height:24px;flex:none;border:1px solid color-mix(in srgb,var(--szl-space-accent) 70%,white 12%);border-radius:8px;background:radial-gradient(circle at 28% 25%,var(--szl-space-accent),transparent 35%),linear-gradient(145deg,color-mix(in srgb,var(--szl-space-accent-2) 70%,transparent),transparent 72%);box-shadow:0 0 25px color-mix(in srgb,var(--szl-space-accent) 28%,transparent);transform:rotate(8deg)}.copy{min-width:0;display:grid;gap:1px}.eyebrow{color:var(--szl-space-muted);font-size:9px;letter-spacing:.19em;text-transform:uppercase}.label{overflow:hidden;font-size:13px;font-weight:740;text-overflow:ellipsis;white-space:nowrap}nav{display:flex;gap:4px}nav a{min-height:34px;display:inline-flex;align-items:center;padding:6px 10px;border:1px solid transparent;border-radius:999px;color:var(--szl-space-muted);font-size:11px;font-weight:660;letter-spacing:.04em;text-decoration:none}nav a:hover,nav a:focus-visible,nav a[aria-current=page]{color:var(--szl-space-fg);border-color:color-mix(in srgb,var(--szl-space-accent) 38%,transparent);background:color-mix(in srgb,var(--szl-space-accent) 10%,transparent);outline:none}button{display:none;width:40px;height:36px;align-items:center;justify-content:center;border:1px solid color-mix(in srgb,var(--szl-space-accent) 32%,transparent);border-radius:10px;color:var(--szl-space-fg);background:transparent;cursor:pointer}@media(max-width:700px){button{display:inline-flex}nav{position:absolute;top:calc(100% + 7px);right:10px;min-width:190px;display:none;flex-direction:column;padding:8px;border:1px solid color-mix(in srgb,var(--szl-space-accent) 28%,transparent);border-radius:14px;background:color-mix(in srgb,var(--szl-space-bg) 96%,white 2%);box-shadow:0 20px 52px #0008}nav[data-open=true]{display:flex}nav a{min-height:42px}}@media(prefers-reduced-motion:reduce){.mark{transform:none}}@media(forced-colors:active){.bar,nav a,button,.mark{border:1px solid CanvasText}.mark{background:CanvasText}}</style><div class="bar" role="banner"><a class="identity" href="https://a-11-oy.com" aria-label="Open A11oy Command"><span class="mark" aria-hidden="true"></span><span class="copy"><span class="eyebrow">SZL holographic fabric</span><span class="label"></span></span></a><button type="button" aria-label="Open ecosystem navigation" aria-expanded="false">Menu</button><nav aria-label="SZL ecosystem" data-open="false"></nav></div>';
+      shadow.innerHTML = '<style>:host{all:initial;display:block;position:relative;z-index:2147483000;color-scheme:dark;font-family:var(--font-body)}*{box-sizing:border-box}.bar{min-height:50px;display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:14px;padding:8px clamp(12px,2.3vw,30px);color:var(--szl-space-fg,var(--text));background:color-mix(in srgb,var(--szl-space-bg,var(--bg)) 88%,transparent);border-bottom:1px solid color-mix(in srgb,var(--szl-space-accent-2,var(--color-silver-300)) 25%,transparent);box-shadow:0 14px 40px color-mix(in srgb,var(--szl-space-bg,var(--bg)) 27%,transparent);backdrop-filter:blur(18px) saturate(130%)}.identity{min-width:0;display:flex;align-items:center;gap:10px;color:inherit;text-decoration:none}.mark{width:24px;height:24px;flex:none;border:1px solid color-mix(in srgb,var(--szl-space-accent-2) 70%,var(--szl-space-fg) 12%);border-radius:8px;background:radial-gradient(circle at 28% 25%,var(--szl-space-accent),transparent 35%),linear-gradient(145deg,color-mix(in srgb,var(--szl-space-accent-2) 70%,transparent),transparent 72%);box-shadow:0 0 25px color-mix(in srgb,var(--szl-space-accent-2) 28%,transparent);transform:rotate(8deg)}.copy{min-width:0;display:grid;gap:1px}.eyebrow{color:var(--szl-space-muted);font-size:9px;letter-spacing:.19em;text-transform:uppercase}.label{overflow:hidden;font-size:13px;font-weight:740;text-overflow:ellipsis;white-space:nowrap}nav{display:flex;gap:4px}nav a{min-height:34px;display:inline-flex;align-items:center;padding:6px 10px;border:1px solid transparent;border-radius:999px;color:var(--szl-space-muted);font-size:11px;font-weight:660;letter-spacing:.04em;text-decoration:none}nav a:hover,nav a:focus-visible,nav a[aria-current=page]{color:var(--szl-space-fg);border-color:color-mix(in srgb,var(--szl-space-accent-2) 38%,transparent);background:color-mix(in srgb,var(--szl-space-fg) 7%,transparent);outline:none}nav a:focus-visible,button:focus-visible,.identity:focus-visible{outline:3px solid var(--szl-space-focus,var(--focus));outline-offset:2px}button{display:none;width:40px;height:36px;align-items:center;justify-content:center;border:1px solid color-mix(in srgb,var(--szl-space-accent-2) 32%,transparent);border-radius:10px;color:var(--szl-space-fg);background:transparent;cursor:pointer}@media(max-width:700px){button{display:inline-flex}nav{position:absolute;top:calc(100% + 7px);right:10px;min-width:190px;display:none;flex-direction:column;padding:8px;border:1px solid color-mix(in srgb,var(--szl-space-accent-2) 28%,transparent);border-radius:14px;background:color-mix(in srgb,var(--szl-space-bg) 96%,var(--szl-space-fg) 2%);box-shadow:0 20px 52px color-mix(in srgb,var(--szl-space-bg) 53%,transparent)}nav[data-open=true]{display:flex}nav a{min-height:42px}}@media(prefers-reduced-motion:reduce){.mark{transform:none}}@media(forced-colors:active){.bar,nav a,button,.mark{border:1px solid CanvasText}.mark{background:CanvasText}}</style><div class="bar" role="banner"><a class="identity" href="https://a-11-oy.com" aria-label="Open A11oy Command"><span class="mark" aria-hidden="true"></span><span class="copy"><span class="eyebrow">SZL holographic fabric</span><span class="label"></span></span></a><button type="button" aria-label="Open ecosystem navigation" aria-expanded="false">Menu</button><nav aria-label="SZL ecosystem" data-open="false"></nav></div>';
       shadow.querySelector(".label").textContent = identity.label;
       var nav = shadow.querySelector("nav");
       LINKS.forEach(function (row) {
