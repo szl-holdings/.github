@@ -71,8 +71,8 @@
         "readback": true
       },
       "trusted_transitives": {
-        ".github/scripts/control_plane_effect_gate.py": "sha256:8c79f5d969594bb0572db757212b2140c0ad0e618dc8a7e7f1d08f7e194bf0bc",
-        ".github/scripts/test_control_plane_effect_gate.py": "sha256:8fef3297392608f4e2cb6341c2eb1d4f1831a710c92d816bc83c91597e8166e8"
+        ".github/scripts/control_plane_effect_gate.py": "sha256:c6dab1dd86092280168a6312417c03fde611fdbe197cd4c436aadf25ae18fb67",
+        ".github/scripts/test_control_plane_effect_gate.py": "sha256:abf96660b74f49eaaffe4f6165a0614f0e8922605ddc8a47d4aa11ef71791981"
       }
     },
     ".github/workflows/lean-numbers.yml": {
@@ -159,6 +159,18 @@
           "SHELL_COMPOSITION_UNKNOWN@.github/workflows/lean-numbers.yml:52"
         ]
       }
+    },
+    ".github/workflows/estate-snapshot-admission.yml": {
+      "intent_id": "estate-snapshot-admission-contract-v1",
+      "valid_until": "2026-11-30",
+      "source_sha256": "sha256:70d8cb695974248d71ef478d4fef3771709f236c90d757d086b241b6298e3a0f",
+      "credentials": [],
+      "resources": [{"key": "github:repository:szl-holdings/.github:contents", "access": "read"}, {"key": "runner:toolchain:python", "access": "local-write"}],
+      "effects": [{"sink": "github.contents.checkout", "resource": "github:repository:szl-holdings/.github:contents", "access": "read", "max_calls": 1}, {"sink": "runner.toolchain.install", "resource": "runner:toolchain:python", "access": "local-write", "max_calls": 1}],
+      "max_external_writes": 0,
+      "required_controls": {"triggers": ["pull_request", "merge_group", "push"], "contents_read": true, "no_explicit_secrets": true, "concurrency": true, "protected_ref": false, "exact_sha": false, "expected_before": false, "readback": false},
+      "trusted_transitives": {},
+      "reviewed_unknowns": {"files": {".github/scripts/test_estate_snapshot_admission.py": "sha256:7e594ea3e6c0cdd0819a068c7f92a2cc404909d60013c66d51fb3609967b19ab", ".github/workflows/estate-snapshot-admission.yml": "sha256:70d8cb695974248d71ef478d4fef3771709f236c90d757d086b241b6298e3a0f", "scripts/estate_snapshot_admission.py": "sha256:f255a7aacb904bf81c5c8004e0c43f0da4e243fc549971d148a5a1d9fadd8562"}, "unknowns": ["ACTION_INPUTS_REVIEW_REQUIRED@.github/workflows/estate-snapshot-admission.yml:19", "ACTION_INPUTS_REVIEW_REQUIRED@.github/workflows/estate-snapshot-admission.yml:23", "PYTHON_IMPORT_UNRESOLVED@.github/scripts/test_estate_snapshot_admission.py:2", "PYTHON_IMPORT_UNRESOLVED@.github/scripts/test_estate_snapshot_admission.py:3", "PYTHON_IMPORT_UNRESOLVED@.github/scripts/test_estate_snapshot_admission.py:5", "PYTHON_IMPORT_UNRESOLVED@.github/scripts/test_estate_snapshot_admission.py:6", "PYTHON_IMPORT_UNRESOLVED@scripts/estate_snapshot_admission.py:3", "PYTHON_IMPORT_UNRESOLVED@scripts/estate_snapshot_admission.py:5", "PYTHON_IMPORT_UNRESOLVED@scripts/estate_snapshot_admission.py:6", "PYTHON_IMPORT_UNRESOLVED@scripts/estate_snapshot_admission.py:8", "PYTHON_SOURCE_REVIEW_REQUIRED@.github/scripts/test_estate_snapshot_admission.py:1", "PYTHON_SOURCE_REVIEW_REQUIRED@scripts/estate_snapshot_admission.py:1", "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/estate-snapshot-admission.yml:26", "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/estate-snapshot-admission.yml:27"]}
     }
   }
 }

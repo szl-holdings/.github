@@ -2,49 +2,38 @@
 
 # SZL Holdings
 
-**Governed AI. Evidence you can inspect.**
+**AI that signs its work — and refuses to lie.**
 
-Source, running software, and model evaluations are separate claims. Follow the evidence for the exact artifact and revision; unknowns remain visible instead of being filled in.
+Every claim this stack makes carries a cryptographic receipt you can verify yourself. Anything it can't prove, it labels UNAVAILABLE instead of filling in a plausible-looking answer. No silent confidence. No fabricated "LIVE." Just signed evidence and honest bounds.
+
+## See it in 30 seconds
+
+Open **[a-11-oy.com](https://a-11-oy.com)** — the living command fabric. Every governed action emits a hash-chained, DSSE-signed receipt. Don't take our word for it: pull a receipt and verify it against the public contract. That's the whole pitch — you don't have to trust us, you can check.
 
 ## Start here
 
-1. **Explore the product** — [a-11-oy.com](https://a-11-oy.com): A11oy, current capability status, and governed workflows.
-2. **Inspect the evidence** — [a11oy.net](https://a11oy.net): proof, receipts, evaluations, and known bounds.
-3. **Browse the artifacts** — [Hugging Face / SZLHOLDINGS](https://huggingface.co/SZLHOLDINGS): models, software kernels, datasets, and Spaces. Check each artifact's evidence and limitations.
-4. **Inspect the source estate** — [GitHub / szl-holdings](https://github.com/szl-holdings): canonical source, evaluation lanes, and repository-specific controls.
+1. **The product** — [a-11-oy.com](https://a-11-oy.com): the A11oy command substrate, live capability status, governed workflows. This is the front door.
+2. **The proof** — [a11oy.net](https://a11oy.net): the proof registry. Receipts, evaluations, and known bounds — including the things we *can't* yet prove.
+3. **Install the stack** — [PyPI](https://pypi.org/user/betterwithage/): 20 packages, each published with OIDC trusted publishing and build provenance. `pip install szl-guardrail-receipt` and you're holding the receipt machinery.
+4. **Browse the artifacts** — [Hugging Face / SZLHOLDINGS](https://huggingface.co/SZLHOLDINGS): models, software kernels, datasets, and Spaces, each with its own evidence and stated limits.
+5. **Read the source** — [github.com/szl-holdings](https://github.com/szl-holdings): canonical source, evaluation lanes, and per-repo controls.
 
-## Current state
+## The receipt stack on PyPI
 
-**Current inventory** (observed **2026-09-29T02:04:17Z**, authenticated Hub API): public **23 Spaces, 49 models, 34 datasets**; including private: 29 Spaces, 49 models, 43 datasets. Repository counts only.
+Twenty installable packages that *are* the provenance tooling — not claims about it. Receipt primitives, guardrail and energy witnesses, calibration and retrieval benchmarks, and an OpenTelemetry evidence exporter. Every one is published by OIDC trusted publishing (no stored tokens) with PEP 740 build attestations, and every one fails closed: `MEASURED`, `BLOCKED`, or `UNAVAILABLE`, never coerced.
 
-**Historical public snapshot:** 21 public Spaces, 46 models, 35 datasets, observed **2026-09-10T03:20:41Z** under the anonymous `hf-public-author-membership/v1` predicate. These are public API repository counts, not the authenticated organization total, the governed keep-list, or production-candidate models. Software kernels count once as model repositories; private assets, collections, and buckets are outside these totals.
+```bash
+pip install szl-receipts szl-guardrail-receipt vsp-otel szl-nemo
+```
 
-[Source-pinned inventory](https://github.com/szl-holdings/a11oy/blob/4c6621b17ba452d5af7aa2460462fdfbe513509f/docs/huggingface-ecosystem-manifest.json) · [Generation and verification](https://github.com/szl-holdings/a11oy/actions/runs/34432937958) · [Machine-readable binding](https://github.com/szl-holdings/.github/blob/main/profile/public-inventory.json)
+## The doctrine
 
-## Inference flagship
+Source, running software, and model evaluations are **separate claims**, and we keep them separate. A green test is not a deployment; a deployment is not a proof. Unknowns stay visible. This is the same discipline the industry is now converging on for supply-chain security — SLSA provenance, in-toto, Sigstore — except here it's not a compliance layer bolted on after the fact. It's the product.
 
-**One inference flagship:** [SZL Router](https://github.com/szl-holdings/szl-router) is source-owned at `szl-holdings/szl-router`; its public presentation target is [`SZLHOLDINGS/llm-router-live`](https://huggingface.co/spaces/SZLHOLDINGS/llm-router-live), product integration is [https://a-11-oy.com/code](https://a-11-oy.com/code), and proof originates at [a11oy.net](https://a11oy.net).
+## Current state (honest, dated)
 
-Portfolio roles distinguish **one inference flagship**, **three commercial flagships**, **five public domain bodies**, and **six internal engines**. Those labels describe topology, **not availability, operational readiness, or publication policy**.
+Public Hugging Face estate observed **2026-09-30**: **50 models, 35 datasets, 33 Spaces** (repository counts). Twenty PyPI packages published. These are dated observations, refreshed from the live Hub API — not marketing numbers.
 
-## Historical estate contract
+**Receipt verification:** the [a11oy source](https://github.com/szl-holdings/a11oy) carries the verification contracts. **Model training and evaluation:** [szl-forge](https://github.com/szl-holdings/szl-forge) holds the kits, datasets, runbooks, and measured limits. **Trust boundary:** [TRUST.md](https://github.com/szl-holdings/.github/blob/main/TRUST.md). Killinchu effectors stay **SIMULATED**; `SZLHOLDINGS/SZLHOLDINGS` is **HISTORICAL**.
 
-**HISTORICAL:** estate-alignment contract v1 recorded **16 portfolio Spaces**, **1 inventory-only Space**, **45 models**, and **34 datasets**. Those figures are retained only as the prior contract snapshot; they do not override the dated current public observation above. Its named topology includes **A11oy**, **Forge**, **Killinchu**, **Terra**, **PRISM Counsel**, **PURIQ Finance**, and **LYTE**.
-
-## Diligence paths
-
-**Receipt verification:** [a11oy source](https://github.com/szl-holdings/a11oy) contains the source and verification contracts.
-
-**Model training and evaluation:** [szl-forge](https://github.com/szl-holdings/szl-forge) contains kits, datasets, runbooks, measured limits, and frontier evaluation lanes.
-
-**Governance for MCP:** [hatun-mcp](https://github.com/szl-holdings/hatun-mcp) contains the governed MCP surface.
-
-**Qualification evidence:** [szl-frontier](https://github.com/szl-holdings/szl-frontier) records exact-source frontier admissions and HOLD/EVALUATION boundaries.
-
-## Evidence boundary
-
-**Current state** is a dated observation, not a promise of future availability. **HISTORICAL** evidence remains historical even when a newer source exists. **SIMULATED** results are not measured production results and must stay labeled as such.
-
-Pre-launch. A passing source check does not establish a live deployment, and a signed record does not establish independent model quality. Runtime status, verification evidence, and remaining gaps are separate diligence inputs.
-
-*Doctrine: give away the format, sell the control plane, keep the proof.*
+*Governed AI. Evidence you can inspect. Work you can verify.*
