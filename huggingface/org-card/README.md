@@ -51,7 +51,7 @@ Inspect the Space's self-reported `/api/killinchu/v1/honest`; self-reporting is 
 
 ## Install
 
-`pip install szl-receipts` · [manifest](https://github.com/szl-holdings/szl-org-health/blob/main/governance/pypi/pypi-packages.v1.json) · [listing](https://pypi.org/user/betterwithage/)
+`pip install szl-receipts` · [manifest](https://github.com/szl-holdings/szlholdings.com/blob/main/pypi/pypi-packages.v1.json) · [listing](https://pypi.org/user/betterwithage/)
 
 ## Estate map
 
