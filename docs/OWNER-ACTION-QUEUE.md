@@ -44,7 +44,15 @@ Issues szl-gpu-bridge#93 and #20 remain open and `EXPIRED_AWAITING_ENGINE_SIGNAT
 - Optional: an org-level fine-grained token with `runners`/`secrets` read so estate audits can see org secrets and runner groups without an owner session.
 - Done since the last queue: repository descriptions (`#617` closed; 0 active repos without a description).
 
+## 7. szl-brand Spaces publisher token (3 minutes)
+
+The marketing engine merged ([szl-brand #131](https://github.com/szl-holdings/szl-brand/pull/131)), but its exact-projection workflow `hf-marketing-spaces.yml` failed closed: the repository secret `HF_TOKEN` on szl-brand is rejected by Hugging Face at `/whoami-v2` (400 Bad request — invalid or revoked). Nothing was written; `SZLHOLDINGS/szl-marketing-1.1` still runs the stale duplicate linter and `SZLHOLDINGS/szl-brand-campaign` still serves the default static template.
+
+- Fix: run `payloads/runbooks/SZL-BRAND-SPACES-TOKEN.ps1` from szl-hf-frontier in administrator PowerShell 5.1. It opens the fine-grained token page, takes the token hidden, checks `repo.write` on exactly the two Spaces against the token's own scope list, runs `gh secret set HF_TOKEN --repo szl-holdings/szl-brand`, and dispatches the workflow with the confirmation phrase.
+- Verify: job `hf-marketing-spaces/publish-exact` green and both `reports/spaces/*-publish.json` in the run artifact read `PUBLISHED_CONVERGED`; the campaign Space shows live labeled numbers instead of template text.
+
 ## Closed by the 2026-09-30 wave (for the record)
 
 - WO1 card reconciliation: all eight repos reconciled (three Hub PRs merged under owner authorization; WILLAY's reviewed curated card published by byte-exact PR, revision `432646a2`); a daily drift gate in szl-forge keeps it closed.
 - david-leads `/v0` wired and live; a-11-oy.com apex proxied and green; a daily public-surface watch notifies only on failure.
+- Marketing payload built as code: `szl_brand.marketing` engine, compliance linter, channel drafts, operating plan, exact Space projections and a copy guard on every szl-brand PR (szl-brand #131; receipt session 10).
