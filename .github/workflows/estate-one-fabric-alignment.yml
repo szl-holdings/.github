@@ -52,10 +52,39 @@ jobs:
         with:
           egress-policy: audit
 
+      - name: Resolve exact source (same-repository heads only)
+        id: source
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          THIS_REPOSITORY: ${{ github.repository }}
+          FALLBACK_SHA: ${{ github.sha }}
+          RUN_HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
+          RUN_HEAD_REPOSITORY: ${{ github.event.workflow_run.head_repository.full_name }}
+          RUN_HEAD_BRANCH: ${{ github.event.workflow_run.head_branch }}
+          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          PR_HEAD_REPOSITORY: ${{ github.event.pull_request.head.repo.full_name }}
+        run: |
+          set -euo pipefail
+          sha="$FALLBACK_SHA"
+          if [ "$EVENT_NAME" = "workflow_run" ]; then
+            if [ "$RUN_HEAD_REPOSITORY" != "$THIS_REPOSITORY" ] || [ "$RUN_HEAD_BRANCH" != "main" ]; then
+              echo "::error::refusing to check out a workflow_run head from ${RUN_HEAD_REPOSITORY}@${RUN_HEAD_BRANCH}; only ${THIS_REPOSITORY}@main is trusted"
+              exit 1
+            fi
+            sha="$RUN_HEAD_SHA"
+          elif [ "$EVENT_NAME" = "pull_request" ] && [ "$PR_HEAD_REPOSITORY" = "$THIS_REPOSITORY" ]; then
+            sha="$PR_HEAD_SHA"
+          fi
+          if ! [[ "$sha" =~ ^[0-9a-f]{40}$ ]]; then
+            echo "::error::resolved source is not a 40-hex commit: ${sha}"
+            exit 1
+          fi
+          echo "sha=${sha}" >> "$GITHUB_OUTPUT"
+
       - name: Checkout exact source
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: ${{ github.event.workflow_run.head_sha || github.event.pull_request.head.sha || github.sha }}
+          ref: ${{ steps.source.outputs.sha }}
           persist-credentials: false
           fetch-depth: 1
 
@@ -80,7 +109,7 @@ jobs:
 
       - name: Emit secret-free source receipt
         env:
-          GITHUB_SHA: ${{ github.event.workflow_run.head_sha || github.event.pull_request.head.sha || github.sha }}
+          GITHUB_SHA: ${{ steps.source.outputs.sha }}
         run: >-
           python .github/scripts/estate_alignment_contract.py
           --repo-root .
@@ -92,7 +121,7 @@ jobs:
           python .github/scripts/hf_static_space_deploy.py \
             --repo-root . \
             --manifest huggingface/org-card.manifest.json \
-            --source-sha "${{ github.event.workflow_run.head_sha || github.event.pull_request.head.sha || github.sha }}" \
+            --source-sha "${{ steps.source.outputs.sha }}" \
             --materialize "$(mktemp -d)" \
             --report hf-org-card-alignment-materialization.json
 
@@ -127,10 +156,39 @@ jobs:
         with:
           egress-policy: audit
 
+      - name: Resolve exact source (same-repository heads only)
+        id: source
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          THIS_REPOSITORY: ${{ github.repository }}
+          FALLBACK_SHA: ${{ github.sha }}
+          RUN_HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
+          RUN_HEAD_REPOSITORY: ${{ github.event.workflow_run.head_repository.full_name }}
+          RUN_HEAD_BRANCH: ${{ github.event.workflow_run.head_branch }}
+          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          PR_HEAD_REPOSITORY: ${{ github.event.pull_request.head.repo.full_name }}
+        run: |
+          set -euo pipefail
+          sha="$FALLBACK_SHA"
+          if [ "$EVENT_NAME" = "workflow_run" ]; then
+            if [ "$RUN_HEAD_REPOSITORY" != "$THIS_REPOSITORY" ] || [ "$RUN_HEAD_BRANCH" != "main" ]; then
+              echo "::error::refusing to check out a workflow_run head from ${RUN_HEAD_REPOSITORY}@${RUN_HEAD_BRANCH}; only ${THIS_REPOSITORY}@main is trusted"
+              exit 1
+            fi
+            sha="$RUN_HEAD_SHA"
+          elif [ "$EVENT_NAME" = "pull_request" ] && [ "$PR_HEAD_REPOSITORY" = "$THIS_REPOSITORY" ]; then
+            sha="$PR_HEAD_SHA"
+          fi
+          if ! [[ "$sha" =~ ^[0-9a-f]{40}$ ]]; then
+            echo "::error::resolved source is not a 40-hex commit: ${sha}"
+            exit 1
+          fi
+          echo "sha=${sha}" >> "$GITHUB_OUTPUT"
+
       - name: Checkout exact validator source
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: ${{ github.event.workflow_run.head_sha || github.event.pull_request.head.sha || github.sha }}
+          ref: ${{ steps.source.outputs.sha }}
           persist-credentials: false
           fetch-depth: 1
 
@@ -142,7 +200,7 @@ jobs:
       - name: Compare live product, source, and artifact authorities
         env:
           GITHUB_TOKEN: ${{ github.token }}
-          GITHUB_SHA: ${{ github.event.workflow_run.head_sha || github.event.pull_request.head.sha || github.sha }}
+          GITHUB_SHA: ${{ steps.source.outputs.sha }}
         run: >-
           python .github/scripts/estate_alignment_contract.py
           --repo-root .

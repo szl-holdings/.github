@@ -97,8 +97,15 @@ class EstateAlignmentContractTests(unittest.TestCase):
         self.assertIn("github.event_name == 'workflow_dispatch'", live_job)
         self.assertIn("needs.local-contract.result == 'success'", live_job)
         self.assertNotIn("github.event_name == 'push'", live_job)
-        exact_head = "${{ github.event.workflow_run.head_sha || github.event.pull_request.head.sha || github.sha }}"
+        # Scorecard DangerousWorkflow: checkout refs never carry workflow_run/pull_request
+        # head contexts directly; a guarded resolve step admits same-repository heads only.
+        exact_head = "${{ steps.source.outputs.sha }}"
         self.assertGreaterEqual(workflow.count(exact_head), 4)
+        self.assertEqual(workflow.count("ref: ${{ steps.source.outputs.sha }}"), 2)
+        self.assertNotIn("ref: ${{ github.event.workflow_run.head_sha", workflow)
+        self.assertNotIn("ref: ${{ github.event.pull_request.head.sha", workflow)
+        self.assertIn('[ "$RUN_HEAD_REPOSITORY" != "$THIS_REPOSITORY" ] || [ "$RUN_HEAD_BRANCH" != "main" ]', workflow)
+        self.assertIn('[[ "$sha" =~ ^[0-9a-f]{40}$ ]]', workflow)
 
     def test_strict_loader_rejects_duplicate_keys_and_nonfinite_numbers(self) -> None:
         with self.assertRaisesRegex(alignment.AlignmentError, "duplicate JSON key"):
