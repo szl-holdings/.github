@@ -7,15 +7,15 @@ on:
     paths:
       - ".github/workflows/repair-holographic-target-gates-on-branch.yml"
 
-permissions:
-  contents: write
-
+permissions: read-all
 concurrency:
   group: repair-holographic-target-gates
   cancel-in-progress: false
 
 jobs:
   repair:
+    permissions:
+      contents: write
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:

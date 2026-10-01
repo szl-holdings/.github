@@ -20,10 +20,7 @@ on:
     - cron: "23 * * * *"
   workflow_dispatch: {}
 
-permissions:
-  contents: read
-  security-events: write
-
+permissions: read-all
 concurrency:
   group: publish-nexus-space-${{ github.event_name }}
   cancel-in-progress: true
@@ -98,6 +95,9 @@ jobs:
           git diff --check
 
   publish:
+    permissions:
+      contents: read
+      security-events: write
     name: Publish exact Nexus main and attest live state
     if: github.event_name != 'pull_request'
     runs-on: ubuntu-24.04

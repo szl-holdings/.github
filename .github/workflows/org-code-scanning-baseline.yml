@@ -18,11 +18,7 @@ on:
         type: boolean
         default: true
 
-permissions:
-  contents: read
-  issues: write
-  security-events: write
-
+permissions: read-all
 concurrency:
   group: organization-codeql-baseline
   cancel-in-progress: false
@@ -32,6 +28,10 @@ env:
 
 jobs:
   converge:
+    permissions:
+      contents: read
+      issues: write
+      security-events: write
     name: Preserve existing analysis; configure uncovered public repos
     runs-on: ubuntu-latest
     timeout-minutes: 50
