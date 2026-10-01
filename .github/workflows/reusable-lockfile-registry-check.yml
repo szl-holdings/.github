@@ -15,7 +15,7 @@ name: Reusable — Lockfile Registry Check
 # Wire it up from a consuming repo, e.g.:
 #   jobs:
 #     lockfiles:
-#       uses: szl-holdings/.github/.github/workflows/reusable-lockfile-registry-check.yml@main
+#       uses: szl-holdings/.github/.github/workflows/reusable-lockfile-registry-check.yml@<full-commit-sha>  # SHA-pin per pin-check.yml
 #
 # The check is a self-contained grep so it works even in a repo that does not
 # vendor the python script. The accompanying script

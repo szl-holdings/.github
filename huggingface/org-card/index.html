@@ -28,8 +28,10 @@
       --teal-hi: #8af1e4;
       --gold: #d7b55e;
       --gold-hi: #efd694;
+      --rose: #f0a3a3;
       --radius: 18px;
       --tap: 44px;
+      --szl-touch-target: 44px;
       --mono: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
       --display: "Aptos Display", "Bahnschrift", "Trebuchet MS", sans-serif;
       --sans: "Aptos", "Segoe UI Variable Text", "Trebuchet MS", sans-serif;
@@ -55,7 +57,7 @@
     }
 
     #szl-hf-org-card a { color: inherit; }
-    #szl-hf-org-card h1, #szl-hf-org-card h2, #szl-hf-org-card h3, #szl-hf-org-card p, #szl-hf-org-card a, #szl-hf-org-card code { overflow-wrap: anywhere; }
+    #szl-hf-org-card h1, #szl-hf-org-card h2, #szl-hf-org-card h3, #szl-hf-org-card p, #szl-hf-org-card a, #szl-hf-org-card code, #szl-hf-org-card dt, #szl-hf-org-card dd, #szl-hf-org-card li { overflow-wrap: anywhere; }
     #szl-hf-org-card a:focus-visible { outline: 3px solid var(--teal); outline-offset: 4px; }
     #szl-hf-org-card .szl-hf-skip { position: absolute; left: -9999px; top: 0; }
     #szl-hf-org-card .szl-hf-skip:focus { left: max(16px, env(safe-area-inset-left)); top: max(16px, env(safe-area-inset-top)); z-index: 30; border-radius: 8px; padding: 10px 14px; background: var(--ink); color: var(--void); }
@@ -104,6 +106,11 @@
     #szl-hf-org-card .szl-hf-button.szl-hf-secondary { background: rgba(10, 17, 28, .8); border-color: rgba(169, 197, 255, .34); color: #dce6f4; }
     #szl-hf-org-card .szl-hf-button.szl-hf-secondary:hover { border-color: var(--teal); color: var(--teal-hi); }
 
+    #szl-hf-org-card .szl-hf-hero-facts { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; margin: 30px 0 0; padding: 0; list-style: none; max-width: 620px; }
+    #szl-hf-org-card .szl-hf-hero-facts li { min-width: 0; border: 1px solid rgba(132, 149, 171, .3); border-radius: 14px; padding: 12px 13px; background: rgba(7, 12, 20, .82); }
+    #szl-hf-org-card .szl-hf-hero-facts strong { display: block; color: var(--ink); font-family: var(--display); font-size: 22px; letter-spacing: -.02em; line-height: 1.1; }
+    #szl-hf-org-card .szl-hf-hero-facts span { display: block; margin-top: 4px; color: var(--quiet); font-family: var(--mono); font-size: 10px; letter-spacing: .08em; text-transform: uppercase; }
+
     #szl-hf-org-card section { padding: 52px 0; border-top: 1px solid rgba(132, 149, 171, .15); scroll-margin-top: 20px; }
     #szl-hf-org-card .szl-hf-section-head { display: grid; grid-template-columns: minmax(0, .85fr) minmax(0, 1.15fr); gap: 32px; align-items: start; margin-bottom: 28px; }
     #szl-hf-org-card h2 { margin: 8px 0 0; font-size: clamp(30px, 3.6vw, 46px); line-height: 1.07; letter-spacing: -.035em; text-wrap: balance; }
@@ -117,6 +124,23 @@
     #szl-hf-org-card .szl-hf-journey p { margin: 0; color: var(--muted); }
     #szl-hf-org-card .szl-hf-go { display: inline-flex; min-height: var(--tap); align-items: flex-end; margin-top: auto; padding-top: 16px; color: var(--gold-hi); font-family: var(--mono); font-size: 12px; }
 
+    #szl-hf-org-card .szl-hf-flagships { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+    #szl-hf-org-card .szl-hf-flagship { position: relative; min-width: 0; display: flex; flex-direction: column; border: 1px solid var(--line); border-radius: var(--radius); padding: 24px; background: linear-gradient(160deg, rgba(16, 24, 36, .98), rgba(9, 14, 22, .98)); }
+    #szl-hf-org-card .szl-hf-flagship::before { content: ""; position: absolute; left: 24px; right: 24px; top: 0; height: 2px; border-radius: 0 0 2px 2px; background: linear-gradient(90deg, var(--teal), transparent); }
+    #szl-hf-org-card .szl-hf-flagship.szl-hf-flagship-gold::before { background: linear-gradient(90deg, var(--gold), transparent); }
+    #szl-hf-org-card .szl-hf-flagship-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 14px; }
+    #szl-hf-org-card .szl-hf-flagship h3 { margin: 7px 0 0; font-size: 28px; letter-spacing: -.025em; }
+    #szl-hf-org-card .szl-hf-flagship > p { margin: 12px 0 16px; color: var(--muted); }
+    #szl-hf-org-card .szl-hf-badge { flex: 0 0 auto; border: 1px solid rgba(71, 215, 196, .35); border-radius: 999px; padding: 6px 9px; color: var(--teal-hi); font-family: var(--mono); font-size: 10px; letter-spacing: .1em; text-transform: uppercase; white-space: nowrap; }
+    #szl-hf-org-card .szl-hf-badge.szl-hf-badge-sim { border-color: rgba(240, 163, 163, .5); color: var(--rose); }
+    #szl-hf-org-card .szl-hf-badge.szl-hf-badge-gold { border-color: rgba(215, 181, 94, .5); color: var(--gold-hi); }
+    #szl-hf-org-card .szl-hf-chain { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; margin: 0; padding: 0; list-style: none; }
+    #szl-hf-org-card .szl-hf-chain a { display: flex; min-width: 0; min-height: var(--tap); flex-direction: column; justify-content: center; border: 1px solid rgba(132, 149, 171, .22); border-radius: 11px; padding: 9px 10px; color: var(--muted); text-decoration: none; transition: border-color .2s ease, color .2s ease; }
+    #szl-hf-org-card .szl-hf-chain a:hover { border-color: rgba(71, 215, 196, .52); color: var(--ink); }
+    #szl-hf-org-card .szl-hf-chain small { display: block; color: var(--gold-hi); font-family: var(--mono); font-size: 10px; letter-spacing: .1em; text-transform: uppercase; }
+    #szl-hf-org-card .szl-hf-chain span { display: block; margin-top: 3px; font-size: 13px; }
+    #szl-hf-org-card .szl-hf-flagship-note { margin: 14px 0 0; color: var(--quiet); font-family: var(--mono); font-size: 11px; }
+
     #szl-hf-org-card .szl-hf-portfolio { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; }
     #szl-hf-org-card .szl-hf-portfolio-card { min-width: 0; border: 1px solid var(--line); border-radius: var(--radius); padding: 22px; background: var(--ground); }
     #szl-hf-org-card .szl-hf-portfolio-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 14px; }
@@ -126,19 +150,28 @@
     #szl-hf-org-card .szl-hf-link-list { display: grid; gap: 8px; margin: 0; padding: 0; list-style: none; }
     #szl-hf-org-card .szl-hf-link-list a { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 12px; min-height: var(--tap); align-items: center; border-top: 1px solid rgba(132, 149, 171, .18); color: var(--muted); text-decoration: none; }
     #szl-hf-org-card .szl-hf-link-list a:hover { color: var(--ink); }
-    #szl-hf-org-card .szl-hf-link-list span:last-child { color: var(--gold-hi); font-family: var(--mono); font-size: 11px; }
+    #szl-hf-org-card .szl-hf-link-list span:last-child { color: var(--gold-hi); font-family: var(--mono); font-size: 11px; text-align: right; }
     #szl-hf-org-card .szl-hf-browse { display: inline-flex; min-height: var(--tap); align-items: center; margin-top: 15px; color: var(--teal-hi); font-family: var(--mono); font-size: 12px; text-decoration: none; }
     #szl-hf-org-card .szl-hf-kernel-note { display: grid; grid-template-columns: minmax(0, .7fr) minmax(0, 1.3fr); gap: 28px; align-items: center; margin-top: 14px; border: 1px solid rgba(215, 181, 94, .3); border-radius: var(--radius); padding: 22px; background: linear-gradient(120deg, rgba(31, 28, 19, .74), rgba(13, 20, 29, .96)); }
     #szl-hf-org-card .szl-hf-kernel-note h3 { margin: 0; font-size: 24px; }
     #szl-hf-org-card .szl-hf-kernel-note p { margin: 0; color: var(--muted); }
 
     #szl-hf-org-card .szl-hf-loop { border: 1px solid var(--line); border-radius: 22px; padding: clamp(22px, 4vw, 38px); background: #090f17; }
-    #szl-hf-org-card .szl-hf-steps { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin: 0; padding: 0; list-style: none; }
-    #szl-hf-org-card .szl-hf-step { min-width: 0; min-height: 108px; border-top: 2px solid var(--line); padding: 14px 8px 0 0; }
+    #szl-hf-org-card .szl-hf-steps { position: relative; display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 12px; margin: 0; padding: 0; list-style: none; counter-reset: szl-step; }
+    #szl-hf-org-card .szl-hf-step { position: relative; min-width: 0; min-height: 118px; border-top: 2px solid var(--line); padding: 16px 8px 0 0; counter-increment: szl-step; }
+    #szl-hf-org-card .szl-hf-step::before { content: counter(szl-step, decimal-leading-zero); display: inline-block; margin-bottom: 8px; color: var(--quiet); font-family: var(--mono); font-size: 10px; letter-spacing: .12em; }
+    #szl-hf-org-card .szl-hf-step::after { content: ""; position: absolute; top: -6px; left: 0; width: 10px; height: 10px; border-radius: 50%; background: var(--void); border: 2px solid var(--line); }
     #szl-hf-org-card .szl-hf-step strong { display: block; color: var(--ink); font-family: var(--mono); font-size: 11px; letter-spacing: .08em; text-transform: uppercase; }
     #szl-hf-org-card .szl-hf-step span { display: block; margin-top: 8px; color: var(--quiet); font-size: 13px; }
     #szl-hf-org-card .szl-hf-step.szl-hf-control { border-color: var(--teal); }
+    #szl-hf-org-card .szl-hf-step.szl-hf-control::after { border-color: var(--teal); box-shadow: 0 0 12px rgba(71, 215, 196, .5); }
     #szl-hf-org-card .szl-hf-step.szl-hf-evidence { border-color: var(--gold); }
+    #szl-hf-org-card .szl-hf-step.szl-hf-evidence::after { border-color: var(--gold); box-shadow: 0 0 12px rgba(215, 181, 94, .45); }
+    #szl-hf-org-card .szl-hf-loop-legend { display: flex; flex-wrap: wrap; gap: 18px; margin: 18px 0 0; padding: 0; list-style: none; color: var(--quiet); font-family: var(--mono); font-size: 11px; }
+    #szl-hf-org-card .szl-hf-loop-legend li { display: inline-flex; align-items: center; gap: 8px; min-height: 24px; }
+    #szl-hf-org-card .szl-hf-loop-legend li::before { content: ""; width: 18px; height: 2px; background: var(--line); }
+    #szl-hf-org-card .szl-hf-loop-legend li.szl-hf-legend-control::before { background: var(--teal); }
+    #szl-hf-org-card .szl-hf-loop-legend li.szl-hf-legend-evidence::before { background: var(--gold); }
 
     #szl-hf-org-card .szl-hf-truth { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
     #szl-hf-org-card .szl-hf-truth-panel { min-width: 0; border: 1px solid var(--line); border-radius: var(--radius); padding: 24px; background: var(--panel); }
@@ -147,11 +180,25 @@
     #szl-hf-org-card .szl-hf-labels { display: flex; flex-wrap: wrap; gap: 7px; margin: 0; padding: 0; list-style: none; }
     #szl-hf-org-card .szl-hf-label { border: 1px solid var(--line); border-radius: 999px; padding: 6px 9px; color: var(--muted); font-family: var(--mono); font-size: 10px; }
     #szl-hf-org-card .szl-hf-label.szl-hf-measured { border-color: rgba(71, 215, 196, .52); color: var(--teal-hi); }
+    #szl-hf-org-card .szl-hf-label.szl-hf-sim { border-color: rgba(240, 163, 163, .5); color: var(--rose); }
     #szl-hf-org-card .szl-hf-status-list { display: grid; gap: 7px; margin: 0; padding: 0; list-style: none; }
     #szl-hf-org-card .szl-hf-status-list a { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 12px; min-height: 48px; align-items: center; border: 1px solid var(--line); border-radius: 11px; padding: 8px 12px; color: var(--muted); text-decoration: none; }
     #szl-hf-org-card .szl-hf-status-list a:hover { border-color: rgba(71, 215, 196, .52); color: var(--ink); }
     #szl-hf-org-card .szl-hf-status-list span:last-child { color: var(--gold-hi); font-family: var(--mono); font-size: 11px; }
     #szl-hf-org-card code { color: var(--gold-hi); font-family: var(--mono); }
+
+    #szl-hf-org-card .szl-hf-estate { display: grid; grid-template-columns: minmax(0, 1.05fr) minmax(0, .95fr); gap: 14px; }
+    #szl-hf-org-card .szl-hf-estate-panel { min-width: 0; border: 1px solid var(--line); border-radius: var(--radius); padding: 24px; background: var(--ground); }
+    #szl-hf-org-card .szl-hf-estate-panel h3 { margin: 0 0 14px; font-size: 24px; }
+    #szl-hf-org-card .szl-hf-estate-list { display: grid; gap: 0; margin: 0; }
+    #szl-hf-org-card .szl-hf-estate-list dt { padding: 12px 0 2px; color: var(--teal-hi); font-family: var(--mono); font-size: 11px; letter-spacing: .12em; text-transform: uppercase; border-top: 1px solid rgba(132, 149, 171, .18); }
+    #szl-hf-org-card .szl-hf-estate-list dd { margin: 0 0 10px; color: var(--muted); }
+    #szl-hf-org-card .szl-hf-counts { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; margin: 0 0 14px; padding: 0; list-style: none; }
+    #szl-hf-org-card .szl-hf-counts li { min-width: 0; border: 1px solid rgba(132, 149, 171, .22); border-radius: 14px; padding: 14px 12px; background: var(--panel); }
+    #szl-hf-org-card .szl-hf-counts strong { display: block; color: var(--ink); font-family: var(--display); font-size: 34px; letter-spacing: -.03em; line-height: 1; }
+    #szl-hf-org-card .szl-hf-counts span { display: block; margin-top: 6px; color: var(--quiet); font-family: var(--mono); font-size: 10px; letter-spacing: .08em; text-transform: uppercase; }
+    #szl-hf-org-card .szl-hf-estate-panel > p { margin: 0 0 12px; color: var(--muted); }
+    #szl-hf-org-card .szl-hf-estate-panel > p.szl-hf-microcopy { margin: 0; }
 
     #szl-hf-org-card .szl-hf-closing { padding-bottom: 72px; }
     #szl-hf-org-card .szl-hf-closing-panel { display: grid; grid-template-columns: minmax(0, 1.3fr) minmax(220px, .7fr); gap: 30px; align-items: center; border: 1px solid rgba(215, 181, 94, .34); border-radius: 22px; padding: clamp(28px, 5vw, 48px); background: linear-gradient(130deg, #132636, #111721 58%, #211c12); }
@@ -165,14 +212,18 @@
     #szl-hf-org-card .szl-hf-footer-links a { min-height: var(--tap); display: inline-flex; align-items: center; text-decoration: none; }
     #szl-hf-org-card .szl-hf-footer-links a:hover { color: var(--ink); }
 
+    @media (max-width: 1024px) {
+      #szl-hf-org-card .szl-hf-steps { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    }
     @media (max-width: 900px) {
-      #szl-hf-org-card .szl-hf-section-head, #szl-hf-org-card .szl-hf-kernel-note, #szl-hf-org-card .szl-hf-closing-panel { grid-template-columns: 1fr; }
+      #szl-hf-org-card .szl-hf-section-head, #szl-hf-org-card .szl-hf-kernel-note, #szl-hf-org-card .szl-hf-closing-panel, #szl-hf-org-card .szl-hf-estate, #szl-hf-org-card .szl-hf-flagships { grid-template-columns: 1fr; }
       #szl-hf-org-card .szl-hf-hero { min-height: 500px; }
       #szl-hf-org-card .szl-hf-hero::before { background: linear-gradient(90deg, rgba(5, 9, 16, .99), rgba(5, 9, 16, .7) 78%, rgba(5, 9, 16, .3)); }
       #szl-hf-org-card .szl-hf-hero-art { object-position: 62% center; }
       #szl-hf-org-card .szl-hf-journeys, #szl-hf-org-card .szl-hf-portfolio { grid-template-columns: 1fr; }
       #szl-hf-org-card .szl-hf-journey { min-height: 150px; }
       #szl-hf-org-card .szl-hf-portfolio-card { padding: 20px; }
+      #szl-hf-org-card .szl-hf-chain { grid-template-columns: repeat(2, minmax(0, 1fr)); }
     }
     @media (max-width: 760px) {
       #szl-hf-org-card .szl-hf-nav { min-height: 0; padding: 10px 0; display: grid; grid-template-columns: 1fr; }
@@ -180,6 +231,7 @@
       #szl-hf-org-card nav a { justify-content: center; min-width: 44px; min-height: var(--tap); padding: 12px 10px; text-align: center; white-space: normal; }
       #szl-hf-org-card nav a.szl-hf-primary-link { grid-column: 1 / -1; }
       #szl-hf-org-card .szl-hf-truth { grid-template-columns: 1fr; }
+      #szl-hf-org-card .szl-hf-steps { grid-template-columns: repeat(2, minmax(0, 1fr)); }
     }
     @media (max-width: 640px) {
       #szl-hf-org-card .szl-hf-shell { width: calc(100% - 24px); }
@@ -192,18 +244,25 @@
       #szl-hf-org-card .szl-hf-lede { font-size: 16px; }
       #szl-hf-org-card .szl-hf-actions { display: grid; grid-template-columns: 1fr; }
       #szl-hf-org-card .szl-hf-actions .szl-hf-button { width: 100% !important; }
+      #szl-hf-org-card .szl-hf-hero-facts { grid-template-columns: 1fr; }
       #szl-hf-org-card nav a.szl-hf-primary-link { grid-column: auto; }
       #szl-hf-org-card section { padding: 42px 0; scroll-margin-top: 0; }
       #szl-hf-org-card .szl-hf-section-head { gap: 14px; margin-bottom: 22px; }
       #szl-hf-org-card .szl-hf-steps { grid-template-columns: 1fr; }
       #szl-hf-org-card .szl-hf-step { min-height: 0; padding: 11px 0 13px; }
+      #szl-hf-org-card .szl-hf-chain { grid-template-columns: 1fr; }
+      #szl-hf-org-card .szl-hf-counts { grid-template-columns: 1fr; }
       #szl-hf-org-card .szl-hf-link-list a, #szl-hf-org-card .szl-hf-status-list a { grid-template-columns: minmax(0, 1fr) auto; }
       #szl-hf-org-card .szl-hf-closing { padding-bottom: 52px; }
     }
+    @media (max-width: 560px) {
+      #szl-hf-org-card .szl-hf-flagship { padding: 20px; }
+      #szl-hf-org-card .szl-hf-flagship h3 { font-size: 24px; }
+    }
     @media (max-width: 390px) {
       #szl-hf-org-card .szl-hf-shell { width: calc(100% - 18px); }
-      #szl-hf-org-card .szl-hf-portfolio-head { display: grid; }
-      #szl-hf-org-card .szl-hf-type { width: max-content; }
+      #szl-hf-org-card .szl-hf-portfolio-head, #szl-hf-org-card .szl-hf-flagship-head { display: grid; }
+      #szl-hf-org-card .szl-hf-type, #szl-hf-org-card .szl-hf-badge { width: max-content; }
     }
     @media (max-height: 520px) and (orientation: landscape) {
       #szl-hf-org-card .szl-hf-hero { min-height: 0; margin-block: 14px 38px; padding-block: 28px; }
@@ -211,14 +270,14 @@
     }
     @media (prefers-reduced-motion: reduce) {
       #szl-hf-org-card { scroll-behavior: auto; }
-      #szl-hf-org-card .szl-hf-button, #szl-hf-org-card .szl-hf-journey { transition: none; }
+      #szl-hf-org-card .szl-hf-button, #szl-hf-org-card .szl-hf-journey, #szl-hf-org-card .szl-hf-chain a { transition: none; }
       #szl-hf-org-card .szl-hf-button:hover, #szl-hf-org-card .szl-hf-journey:hover { transform: none; }
     }
     @media (prefers-contrast: more) {
       #szl-hf-org-card { --line: #718197; --muted: #d2d9e2; --quiet: #b7c1ce; }
     }
     @media (forced-colors: active) {
-      #szl-hf-org-card .szl-hf-brand-mark, #szl-hf-org-card .szl-hf-button, #szl-hf-org-card .szl-hf-journey, #szl-hf-org-card .szl-hf-portfolio-card, #szl-hf-org-card .szl-hf-truth-panel, #szl-hf-org-card .szl-hf-status-list a { forced-color-adjust: auto; }
+      #szl-hf-org-card .szl-hf-brand-mark, #szl-hf-org-card .szl-hf-button, #szl-hf-org-card .szl-hf-journey, #szl-hf-org-card .szl-hf-portfolio-card, #szl-hf-org-card .szl-hf-truth-panel, #szl-hf-org-card .szl-hf-status-list a, #szl-hf-org-card .szl-hf-flagship, #szl-hf-org-card .szl-hf-chain a, #szl-hf-org-card .szl-hf-estate-panel { forced-color-adjust: auto; }
     }
   </style>
 
@@ -234,6 +293,7 @@
         </a>
         <nav aria-label="Primary navigation">
           <a href="#szl-hf-paths">Start</a>
+          <a href="#szl-hf-flagships">Flagships</a>
           <a href="#szl-hf-artifacts">Portfolio</a>
           <a href="#szl-hf-status">Truth</a>
           <a class="szl-hf-primary-link" href="https://a-11-oy.com">Open a11oy</a>
@@ -251,9 +311,14 @@
             <p class="szl-hf-lede">Models, data, kernels, and demonstrations for decisions that must stay inside declared authority and survive independent scrutiny.</p>
             <div class="szl-hf-actions" aria-label="Primary actions">
               <a class="szl-hf-button szl-hf-primary" href="https://a-11-oy.com">Enter the command center</a>
-              <a class="szl-hf-button szl-hf-secondary" href="#szl-hf-artifacts">Browse the portfolio</a>
+              <a class="szl-hf-button szl-hf-secondary" href="#szl-hf-flagships">Meet the flagships</a>
               <a class="szl-hf-button szl-hf-secondary" href="https://a11oy.net">Verify evidence</a>
             </div>
+            <ul class="szl-hf-hero-facts" aria-label="Doctrine facts">
+              <li><strong>8</strong><span>formulas locked-proven</span></li>
+              <li><strong>&lt; 1.0</strong><span>trust, always</span></li>
+              <li><strong>Conjecture 1</strong><span>Λ uniqueness, open</span></li>
+            </ul>
             <p class="szl-hf-microcopy">Artifact type, evidence class, and runtime state remain separate.</p>
           </div>
         </section>
@@ -294,6 +359,77 @@
           </div>
         </section>
 
+        <section id="szl-hf-flagships" aria-labelledby="szl-hf-flagships-title">
+          <div class="szl-hf-section-head">
+            <div>
+              <div class="szl-hf-eyebrow">Flagships</div>
+              <h2 id="szl-hf-flagships-title">Four systems. One authority chain each.</h2>
+            </div>
+            <p class="szl-hf-section-copy">Every flagship publishes the same chain: GitHub source, Hugging Face runtime, product surface, proof and known bounds. Runtime truth is read from the running system, never implied from this card.</p>
+          </div>
+          <div class="szl-hf-flagships">
+            <article class="szl-hf-flagship">
+              <div class="szl-hf-flagship-head">
+                <div><span class="szl-hf-index">Commercial flagship</span><h3>A11oy</h3></div>
+                <span class="szl-hf-badge">Command</span>
+              </div>
+              <p>Governed-AI command center: deny-by-default policy, a signed receipt for every governed action, and a human binding every consequential step.</p>
+              <ul class="szl-hf-chain" aria-label="a11oy authority chain">
+                <li><a href="https://github.com/szl-holdings/a11oy"><small>Source</small><span>szl-holdings/a11oy</span></a></li>
+                <li><a href="https://huggingface.co/spaces/SZLHOLDINGS/a11oy"><small>Runtime</small><span>a11oy Space</span></a></li>
+                <li><a href="https://a-11-oy.com"><small>Product</small><span>a-11-oy.com</span></a></li>
+                <li><a href="https://a-11-oy.com/api/a11oy/v1/honest"><small>Truth</small><span>/v1/honest</span></a></li>
+              </ul>
+              <p class="szl-hf-flagship-note">Signing status and persistent storage are reported live by the runtime; the README lists the current PARTIAL states.</p>
+            </article>
+
+            <article class="szl-hf-flagship">
+              <div class="szl-hf-flagship-head">
+                <div><span class="szl-hf-index">Cyber-physical flagship</span><h3>Killinchu</h3></div>
+                <span class="szl-hf-badge szl-hf-badge-sim">Effectors SIMULATED</span>
+              </div>
+              <p>Counter-UAS and maritime intelligence with governed decisions and DSSE Khipu receipt evidence. Sensing feeds may be live; public effectors remain SIMULATED with a human on the loop.</p>
+              <ul class="szl-hf-chain" aria-label="Killinchu authority chain">
+                <li><a href="https://github.com/szl-holdings/killinchu"><small>Source</small><span>szl-holdings/killinchu</span></a></li>
+                <li><a href="https://huggingface.co/spaces/SZLHOLDINGS/killinchu"><small>Runtime</small><span>killinchu Space</span></a></li>
+                <li><a href="https://huggingface.co/datasets/SZLHOLDINGS/killinchu-osint-corpus"><small>Corpus</small><span>OSINT corpus</span></a></li>
+                <li><a href="https://szlholdings-killinchu.hf.space/api/killinchu/v1/honest"><small>Truth</small><span>/v1/honest</span></a></li>
+              </ul>
+              <p class="szl-hf-flagship-note">Self-reporting is not independent qualification. The OSINT corpus is never trained on.</p>
+            </article>
+
+            <article class="szl-hf-flagship szl-hf-flagship-gold">
+              <div class="szl-hf-flagship-head">
+                <div><span class="szl-hf-index">Model flagship</span><h3>Forge</h3></div>
+                <span class="szl-hf-badge szl-hf-badge-gold">Weights</span>
+              </div>
+              <p>The governed training and release line behind Khipu and ReceiptAgent: receipted fine-tunes on disclosed base models, held-out gates before publication, GGUF forms for CPU serving.</p>
+              <ul class="szl-hf-chain" aria-label="Forge authority chain">
+                <li><a href="https://github.com/szl-holdings/szl-forge"><small>Source</small><span>szl-holdings/szl-forge</span></a></li>
+                <li><a href="https://huggingface.co/SZLHOLDINGS/SZL-Khipu-1.5B"><small>Weights</small><span>SZL-Khipu-1.5B</span></a></li>
+                <li><a href="https://huggingface.co/SZLHOLDINGS/SZL-Forge-1.5B-ReceiptAgent"><small>Weights</small><span>ReceiptAgent 1.5B</span></a></li>
+                <li><a href="https://huggingface.co/datasets/SZLHOLDINGS/model-bom"><small>BOM</small><span>Model registry</span></a></li>
+              </ul>
+              <p class="szl-hf-flagship-note">Every weight card states base model, lineage, and what its evaluation does not prove.</p>
+            </article>
+
+            <article class="szl-hf-flagship szl-hf-flagship-gold">
+              <div class="szl-hf-flagship-head">
+                <div><span class="szl-hf-index">Inference flagship</span><h3>SZL Router</h3></div>
+                <span class="szl-hf-badge szl-hf-badge-gold">Control plane</span>
+              </div>
+              <p>One OpenAI-compatible endpoint in front of sovereign, free-grid, and paid fallback tiers. Every completed response carries an inspectable receipt of model, tier, attempts, and routing rationale.</p>
+              <ul class="szl-hf-chain" aria-label="SZL Router authority chain">
+                <li><a href="https://github.com/szl-holdings/szl-router"><small>Source</small><span>szl-holdings/szl-router</span></a></li>
+                <li><a href="https://huggingface.co/spaces/SZLHOLDINGS/llm-router-live"><small>Runtime</small><span>llm-router-live</span></a></li>
+                <li><a href="https://a-11-oy.com/code"><small>Operator</small><span>a11oy /code</span></a></li>
+                <li><a href="https://a11oy.net"><small>Proof</small><span>a11oy.net</span></a></li>
+              </ul>
+              <p class="szl-hf-flagship-note">Runtime truth reads LIVE, CONFIGURED_UNVERIFIED, OFFLINE_UNTIL_KEYED, or UNAVAILABLE. Unavailable providers are surfaced, never faked.</p>
+            </article>
+          </div>
+        </section>
+
         <section id="szl-hf-artifacts" aria-labelledby="szl-hf-artifacts-title">
           <div class="szl-hf-section-head">
             <div>
@@ -312,6 +448,7 @@
               <ul class="szl-hf-link-list">
                 <li><a class="szl-hf-card" href="https://huggingface.co/SZLHOLDINGS/SZL-Khipu-1.5B"><span>Khipu 1.5B</span><span>weights</span></a></li>
                 <li><a class="szl-hf-card" href="https://huggingface.co/SZLHOLDINGS/SZL-Forge-1.5B-ReceiptAgent"><span>ReceiptAgent</span><span>weights</span></a></li>
+                <li><a class="szl-hf-card" href="https://huggingface.co/SZLHOLDINGS/SZL-Khipu-1.5B-GGUF"><span>Khipu 1.5B GGUF</span><span>CPU serving</span></a></li>
                 <li><a class="szl-hf-card" href="https://huggingface.co/SZLHOLDINGS/szl-kernels"><span>SZL Kernels</span><span>software</span></a></li>
               </ul>
               <a class="szl-hf-browse" href="https://huggingface.co/SZLHOLDINGS/models">View every model -&gt;</a>
@@ -324,9 +461,10 @@
               </div>
               <p>Corpora, admitted evidence, evaluations, receipts, and proofs expose source and privacy boundaries.</p>
               <ul class="szl-hf-link-list">
-                <li><a class="szl-hf-card" href="https://huggingface.co/datasets/SZLHOLDINGS/szl-lake"><span>szl-lake</span><span>admitted</span></a></li>
+                <li><a class="szl-hf-card" href="https://huggingface.co/datasets/SZLHOLDINGS/szl-lake"><span>szl-lake</span><span>receipt store</span></a></li>
                 <li><a class="szl-hf-card" href="https://huggingface.co/datasets/SZLHOLDINGS/a11oy-verifiable-corpus"><span>a11oy corpus</span><span>verifiable</span></a></li>
-                <li><a class="szl-hf-card" href="https://huggingface.co/datasets/SZLHOLDINGS/governed-receipts-bench"><span>Agent bench</span><span>evaluation</span></a></li>
+                <li><a class="szl-hf-card" href="https://huggingface.co/datasets/SZLHOLDINGS/governed-receipts-bench"><span>Receipts bench</span><span>evaluation</span></a></li>
+                <li><a class="szl-hf-card" href="https://huggingface.co/datasets/SZLHOLDINGS/model-bom"><span>Model BOM</span><span>registry</span></a></li>
               </ul>
               <a class="szl-hf-browse" href="https://huggingface.co/SZLHOLDINGS/datasets">View every dataset -&gt;</a>
             </article>
@@ -340,7 +478,8 @@
               <ul class="szl-hf-link-list">
                 <li><a class="szl-hf-card" href="https://huggingface.co/spaces/SZLHOLDINGS/a11oy"><span>a11oy</span><span>command</span></a></li>
                 <li><a class="szl-hf-card" href="https://huggingface.co/spaces/SZLHOLDINGS/killinchu"><span>Killinchu</span><span>intelligence / SIMULATED</span></a></li>
-                <li><a class="szl-hf-card" href="https://huggingface.co/spaces/SZLHOLDINGS/szl-kernels-live"><span>Kernels live</span><span>evidence</span></a></li>
+                <li><a class="szl-hf-card" href="https://huggingface.co/spaces/SZLHOLDINGS/llm-router-live"><span>SZL Router</span><span>inference</span></a></li>
+                <li><a class="szl-hf-card" href="https://huggingface.co/spaces/SZLHOLDINGS/szl-command-lab"><span>SZL Atlas</span><span>estate map</span></a></li>
               </ul>
               <a class="szl-hf-browse" href="https://huggingface.co/SZLHOLDINGS/spaces">View every Space -&gt;</a>
             </article>
@@ -357,7 +496,7 @@
               <div class="szl-hf-eyebrow">Operating loop</div>
               <h2 id="szl-hf-loop-title">Decision and evidence travel together.</h2>
             </div>
-            <p class="szl-hf-section-copy">A six-stage contract makes the control boundary legible on a phone without a horizontal carousel or clipped final steps.</p>
+            <p class="szl-hf-section-copy">Six stages, one contract. The first three stages control; the last three prove. A receipt that enters a governed action is the same receipt that leaves it.</p>
           </div>
           <div class="szl-hf-loop">
             <ol class="szl-hf-steps">
@@ -368,6 +507,11 @@
               <li class="szl-hf-step szl-hf-evidence"><strong>Verify</strong><span>Replay evidence outside the product UI.</span></li>
               <li class="szl-hf-step szl-hf-evidence"><strong>Respond</strong><span>Rollback, investigate, or improve policy.</span></li>
             </ol>
+            <ul class="szl-hf-loop-legend" aria-label="Loop legend">
+              <li class="szl-hf-legend-control">Control</li>
+              <li class="szl-hf-legend-evidence">Evidence</li>
+              <li><code>receipts.in ≡ receipts.out</code></li>
+            </ul>
           </div>
         </section>
 
@@ -377,7 +521,7 @@
               <div class="szl-hf-eyebrow">Truth contract</div>
               <h2 id="szl-hf-status-title">Read the label before the claim.</h2>
             </div>
-            <p class="szl-hf-section-copy">Evidence class says how a claim was established. Runtime state says what is available now. Neither grants authorization.</p>
+            <p class="szl-hf-section-copy">Evidence class says how a claim was established. Runtime state says what is available now. Neither grants authorization. HTTP 200 is reachability, not a production certificate.</p>
           </div>
           <div class="szl-hf-truth">
             <article class="szl-hf-truth-panel">
@@ -390,6 +534,8 @@
                 <li class="szl-hf-label">MODELED</li>
                 <li class="szl-hf-label">CONJECTURE</li>
                 <li class="szl-hf-label">ROADMAP</li>
+                <li class="szl-hf-label">UNAVAILABLE</li>
+                <li class="szl-hf-label szl-hf-sim">SIMULATED</li>
               </ul>
               <p class="szl-hf-microcopy">A signature establishes scoped integrity and origin, not accuracy, safety, or fitness.</p>
             </article>
@@ -403,24 +549,52 @@
                 <li><a href="https://szlholdings-killinchu.hf.space/api/build-info"><span>Killinchu build</span><span>revision</span></a></li>
                 <li><a href="https://szlholdings-killinchu.hf.space/api/public-risk-status"><span>Killinchu public-risk gate</span><span>risk</span></a></li>
                 <li><a href="https://szlholdings-killinchu.hf.space/api/killinchu/readyz"><span>Killinchu service readiness</span><span>runtime</span></a></li>
+                <li><a href="https://github.com/szl-holdings/.github/blob/main/profile/public-inventory.json"><span>Public inventory binding</span><span>registry</span></a></li>
                 <li><a href="https://github.com/szl-holdings"><span>Protected GitHub source</span><span>code</span></a></li>
               </ul>
             </article>
           </div>
         </section>
 
-        <section class="szl-hf-section" aria-labelledby="szl-hf-estate-map-title">
-          <div class="szl-hf-shell">
-            <div class="szl-hf-section-heading">
+        <section id="szl-hf-estate" aria-labelledby="szl-hf-estate-map-title">
+          <div class="szl-hf-section-head">
+            <div>
               <div class="szl-hf-eyebrow">One governed estate map</div>
               <h2 id="szl-hf-estate-map-title">Product, source, runtime, and proof move together.</h2>
             </div>
-            <p>Three commercial flagships: A11oy, Killinchu, Forge.</p>
-            <p>Five public domain bodies: Terra, Killinchu, PRISM Counsel, PURIQ Finance, LYTE.</p>
-            <p>Six internal engines: Sentra, Lyte, Killinchu, Finance, Terra, Counsel.</p>
-            <p data-szl-inventory="historical"><strong>HISTORICAL estate-alignment v1:</strong> 16 portfolio Spaces · 45 models · 34 datasets; 1 inventory-only Space: Yarqa · governedKeep=false · disposition=FOLD. These figures describe the prior contract snapshot, not current Hub membership or visibility.</p>
-            <p data-szl-inventory="current"><strong>Current state snapshot:</strong> 21 public Spaces, 46 models, 35 datasets. Observed <time datetime="2026-09-10T03:20:41Z">2026-09-10T03:20:41Z</time> under the anonymous public-only <code>hf-public-author-membership/v1</code> predicate. Kernels count once as model repositories; private assets, collections and buckets are excluded. This dated observation is not a live count.</p>
-            <p><a href="https://github.com/szl-holdings/.github/blob/main/profile/public-inventory.json">Inventory binding</a> · <a href="https://github.com/szl-holdings/a11oy/blob/4c6621b17ba452d5af7aa2460462fdfbe513509f/docs/huggingface-ecosystem-manifest.json">Source-pinned inventory</a>. Hub inventory is registry evidence only—not availability, operational readiness, or publication policy. The governed KEEP list remains <a href="https://github.com/szl-holdings/.github/blob/main/docs/CANONICAL_FLEET.md">docs/CANONICAL_FLEET.md</a>.</p>
+            <p class="szl-hf-section-copy">The map below is a dated, receipted snapshot of the public Hub inventory. It is registry evidence only &#8212; not availability, operational readiness, or publication policy.</p>
+          </div>
+          <div class="szl-hf-estate">
+            <article class="szl-hf-estate-panel">
+              <h3>Shape of the estate</h3>
+              <dl class="szl-hf-estate-list">
+                <dt>Three commercial flagships</dt>
+                <dd>A11oy, Killinchu, Forge.</dd>
+                <dt>One inference flagship</dt>
+                <dd>SZL Router.</dd>
+                <dt>Five public domain bodies</dt>
+                <dd>Terra, Killinchu, PRISM Counsel, PURIQ Finance, LYTE.</dd>
+                <dt>Six internal engines</dt>
+                <dd>CHAPAQ (folded into Killinchu), Lyte, Killinchu, Finance, Terra, Counsel.</dd>
+                <dt>Governed kernel suite</dt>
+                <dd>Source-bound executable kernels published as software under the Models surface and indexed by <a href="https://huggingface.co/SZLHOLDINGS/szl-kernels">SZL Kernels</a>.</dd>
+                <dt>Doctrine</dt>
+                <dd>v11 LOCKED. Λ uniqueness is Conjecture 1 (open); Khipu is tamper-evident (Conjectures 2 and 3); supply chain is L1 honest, L2 attested, L3 roadmap.</dd>
+              </dl>
+            </article>
+            <article class="szl-hf-estate-panel">
+              <h3>Current state</h3>
+              <ul class="szl-hf-counts" aria-label="Public Hub inventory binding, observed 2026-09-10">
+                <li><strong>21</strong><span>public Spaces</span></li>
+                <li><strong>46</strong><span>model repos</span></li>
+                <li><strong>35</strong><span>public datasets</span></li>
+              </ul>
+              <p data-szl-inventory="current"><strong>Current state snapshot:</strong> 21 public Spaces, 46 models, 35 datasets. Observed <time datetime="2026-09-10T03:20:41Z">2026-09-10T03:20:41Z</time> under the anonymous public-only <code>hf-public-author-membership/v1</code> predicate. Kernels count once as model repositories; private assets, collections and buckets are excluded. This dated observation is not a live count.</p>
+              <p data-szl-inventory="historical"><strong>HISTORICAL estate-alignment v1:</strong> 16 portfolio Spaces · 45 models · 34 datasets; 1 inventory-only Space: Yarqa · governedKeep=false · disposition=FOLD. These figures describe the prior contract snapshot, not current Hub membership or visibility.</p>
+              <p>A later anonymous listing on <code>2026-09-25</code> showed 23 public Spaces, 49 model repositories, and 35 public datasets; the receipted binding refresh is pending, so the bound figures above remain the figures of record until it lands.</p>
+              <p><a href="https://github.com/szl-holdings/.github/blob/main/profile/public-inventory.json">Inventory binding</a> · <a href="https://github.com/szl-holdings/a11oy/blob/4c6621b17ba452d5af7aa2460462fdfbe513509f/docs/huggingface-ecosystem-manifest.json">Source-pinned inventory</a>. Hub inventory is registry evidence only, not availability, operational readiness, or publication policy. The governed KEEP list remains <a href="https://github.com/szl-holdings/.github/blob/main/docs/CANONICAL_FLEET.md">docs/CANONICAL_FLEET.md</a>.</p>
+              <p class="szl-hf-microcopy">A cached card, screenshot, badge, or copied count is not current state.</p>
+            </article>
           </div>
         </section>
 
@@ -432,7 +606,7 @@
               <p>Use exact revisions, keep runtime and evidence state separate, and report security issues through the protected channel.</p>
             </div>
             <div class="szl-hf-closing-actions">
-              <a class="szl-hf-button szl-hf-primary" href="https://holdings.a-11-oy.com/docs-site/">Developer documentation</a>
+              <a class="szl-hf-button szl-hf-primary" href="https://github.com/szl-holdings/.github/blob/main/TRUST.md">Trust posture</a>
               <a class="szl-hf-button szl-hf-secondary" href="https://github.com/szl-holdings/.github/security/policy">Security policy</a>
               <a class="szl-hf-button szl-hf-secondary" href="https://github.com/szl-holdings/.github/blob/main/SUPPORT.md">Support</a>
             </div>
@@ -447,6 +621,7 @@
         <div class="szl-hf-footer-links">
           <a href="https://huggingface.co/SZLHOLDINGS/collections">Collections</a>
           <a href="https://github.com/szl-holdings/.github/blob/main/TRUST.md">Trust</a>
+          <a href="https://github.com/szl-holdings/.github/blob/main/doctrine/DOCTRINE_V11.md">Doctrine</a>
           <a href="https://github.com/szl-holdings/.github">Source</a>
         </div>
       </div>

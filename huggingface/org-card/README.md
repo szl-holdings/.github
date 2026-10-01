@@ -25,6 +25,8 @@ license: apache-2.0
 
 **Understand:** A11oy. **Route:** SZL Router. **Explore:** SZL Atlas. **Build:** GitHub. **Verify:** the [trust boundary](https://github.com/szl-holdings/.github/blob/main/TRUST.md) and served [`deployment.json`](https://szlholdings-readme.static.hf.space/deployment.json).
 
+## Inference flagship
+
 <!-- SZL_LLM_ROUTER_FLAGSHIP:BEGIN -->
 ## SZL LLM Router · Flagship Inference Control Plane
 
@@ -53,7 +55,7 @@ Three commercial flagships: **A11oy, Killinchu, Forge**. One inference flagship:
 
 Five public domain bodies: **Terra, Killinchu, PRISM Counsel, PURIQ Finance, LYTE**.
 
-Six internal engines: **Sentra, Lyte, Killinchu, Finance, Terra, Counsel**.
+Six internal engines: **CHAPAQ (folded into Killinchu), Lyte, Killinchu, Finance, Terra, Counsel**.
 
 **HISTORICAL estate-alignment v1:** 17 public Spaces, 45 models, 34 datasets; 16 portfolio Spaces plus 1 inventory-only Space.
 
@@ -62,6 +64,8 @@ Six internal engines: **Sentra, Lyte, Killinchu, Finance, Terra, Counsel**.
 **21 public Spaces, 46 models, 35 datasets**, observed **2026-09-10T03:20:41Z** under anonymous public-only `hf-public-author-membership/v1`. Kernels count once as model repositories. Private assets, collections and buckets are excluded. Hub inventory is registry evidence, not availability, operational readiness, or publication policy.
 
 [**Inventory binding**](https://github.com/szl-holdings/.github/blob/main/profile/public-inventory.json) · [**Admitted source manifest**](https://github.com/szl-holdings/a11oy/blob/4c6621b17ba452d5af7aa2460462fdfbe513509f/docs/huggingface-ecosystem-manifest.json)
+
+Listing **2026-09-25**: 23 Spaces, 49 models, 35 datasets; binding refresh pending.
 
 `SZLHOLDINGS/SZLHOLDINGS` is **HISTORICAL**. Λ uniqueness remains **Conjecture 1 — open**. HTTP 200 is not a production certificate.
 

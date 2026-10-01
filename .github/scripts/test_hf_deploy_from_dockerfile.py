@@ -1301,5 +1301,130 @@ class TestRemoteAddContextSemantics(unittest.TestCase):
             ["local.tar"],
         )
 
+class TestDurableTransaction(unittest.TestCase):
+    def setUp(self):
+        self.temp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.temp.cleanup)
+        self.root = os.path.join(self.temp.name, "payload")
+        os.mkdir(self.root)
+        self.path = os.path.join(self.temp.name, "operation.json")
+        self.manifest = {
+            "schema": 2, "hf_repo": "SZLHOLDINGS/lyte",
+            "github_repo": "szl-holdings/lyte-services", "ref": "a" * 40,
+            "source_sha": "a" * 40, "generated_utc": "first",
+            "files": {"serve.py": {"sha256": dep.sha256(b"print(1)"), "size": 8}},
+        }
+        self.args = types.SimpleNamespace(
+            github_repo=self.manifest["github_repo"], ref="a" * 40,
+            hf_repo=self.manifest["hf_repo"], repo_root=self.root, manifest_out="",
+            expected_hf_parent="b" * 40, operation_id="c" * 64,
+            expected_manifest_sha256=dep.manifest_identity(self.manifest),
+            transaction_journal=self.path,
+            source_sha="a" * 40, require_default_branch_tip=True,
+        )
+
+    def options(self):
+        return dep.transaction_options(self.args, self.manifest)
+
+    def test_manifest_identity_excludes_time_but_binds_every_source_field(self):
+        before = dep.manifest_identity(self.manifest)
+        self.manifest["generated_utc"] = "later"
+        self.manifest["hf_commit_oid"] = "d" * 40
+        self.assertEqual(dep.manifest_identity(self.manifest), before)
+        self.manifest["source_sha"] = "e" * 40
+        self.assertNotEqual(dep.manifest_identity(self.manifest), before)
+
+    def test_partial_options_and_plan_drift_refuse_before_mutation(self):
+        self.args.operation_id = ""
+        with self.assertRaises(dep.DeployContractError):
+            self.options()
+        self.args.operation_id = "c" * 64
+        self.manifest["files"]["serve.py"]["size"] = 9
+        with self.assertRaises(dep.DeployContractError):
+            self.options()
+        self.assertFalse(os.path.exists(self.path))
+
+    def test_journal_cannot_be_payload_or_replace_previous_intent(self):
+        self.args.transaction_journal = os.path.join(self.root, "operation.json")
+        with self.assertRaises(dep.DeployContractError):
+            self.options()
+        self.args.transaction_journal = self.path
+        with open(self.path, "wb") as handle:
+            handle.write(b"previous intent")
+        with self.assertRaises(dep.DeployContractError):
+            self.options()
+        with open(self.path, "rb") as handle:
+            self.assertEqual(handle.read(), b"previous intent")
+
+    def test_intent_is_durable_before_provider_cas_and_ack_is_separate(self):
+        api = mock.Mock()
+        def create(**kwargs):
+            with open(self.path, "rb") as handle:
+                journal = dep.strict_json(handle.read())
+            self.assertEqual(journal["state"], "OUTCOME_UNCERTAIN")
+            self.assertEqual(kwargs["parent_commit"], "b" * 40)
+            self.assertIn("SZL-Operation-ID: " + "c" * 64, kwargs["commit_description"])
+            return types.SimpleNamespace(oid="d" * 40)
+        api.create_commit.side_effect = create
+        dep.commit_with_transaction(api, self.args, self.manifest, [], [], self.options())
+        with open(self.path, "rb") as handle:
+            self.assertEqual(dep.strict_json(handle.read())["state"], "COMMIT_ACKNOWLEDGED")
+        self.assertEqual(api.create_commit.call_count, 1)
+
+    def interrupted(self):
+        api = mock.Mock()
+        api.create_commit.side_effect = TimeoutError("signed-url-secret")
+        with self.assertRaises(dep.DeployContractError) as error:
+            dep.commit_with_transaction(api, self.args, self.manifest, [], [], self.options())
+        self.assertNotIn("signed-url-secret", str(error.exception))
+        self.assertEqual(api.create_commit.call_count, 1)
+        with open(self.path, "rb") as handle:
+            self.assertEqual(dep.strict_json(handle.read())["state"], "OUTCOME_UNCERTAIN")
+        return api
+
+    def history(self):
+        return [
+            {"id": "d" * 40, "message": "\n".join([
+                "SZL-Operation-ID: " + "c" * 64,
+                "SZL-Manifest-SHA256: " + self.args.expected_manifest_sha256,
+                "SZL-Expected-Parent: " + "b" * 40])},
+            {"id": "b" * 40, "message": "old"},
+        ]
+
+    def reconcile(self, history, body=b"print(1)"):
+        with mock.patch.object(dep, "_http", return_value=(200, json.dumps(history).encode())), \
+                mock.patch.object(dep, "hf_resolve", return_value=(200, body)):
+            return dep.reconcile_transaction(self.path)
+
+    def test_timeout_after_success_is_reconciled_without_second_write(self):
+        api = self.interrupted()
+        self.assertEqual(self.reconcile(self.history())["state"], "CONFIRMED")
+        self.assertEqual(api.create_commit.call_count, 1)
+        with self.assertRaises(dep.DeployContractError):
+            self.options()
+
+    def test_absent_duplicate_or_wrong_parent_marker_remains_uncertain(self):
+        self.interrupted()
+        for history in ([{"id": "b" * 40, "message": "old"}],
+                        self.history() + self.history(),
+                        [self.history()[0], {"id": "e" * 40, "message": "other"}]):
+            with self.subTest(history=history):
+                self.assertEqual(self.reconcile(history)["state"], "OUTCOME_UNCERTAIN")
+
+    def test_byte_mismatch_and_superseded_commit_cannot_be_admitted(self):
+        self.interrupted()
+        self.assertEqual(self.reconcile(self.history(), b"print(2)")["state"], "HOLD_BYTE_MISMATCH")
+        later = [{"id": "e" * 40, "message": "later"}] + self.history()
+        self.assertEqual(self.reconcile(later)["state"], "SUPERSEDED")
+
+    def test_strict_journal_and_target_refuse_ambiguity(self):
+        for body in (b'{"state":1,"state":2}', b'{"value":NaN}'):
+            with self.assertRaises(dep.DeployContractError):
+                dep.strict_json(body)
+        self.interrupted()
+        with self.assertRaises(dep.DeployContractError):
+            dep.reconcile_transaction(self.path, "SZLHOLDINGS/a11oy")
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)
