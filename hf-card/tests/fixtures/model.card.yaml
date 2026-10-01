@@ -1,0 +1,37 @@
+# Example vars file for a model card. Test fixture: the ids, sha and paths are
+# placeholders, not real assets or receipts.
+type: model
+repo_id: SZLHOLDINGS/example-model
+title: Example model
+summary: >-
+  A fixture that exercises the model block of the shared card template.
+front_matter:
+  license: apache-2.0
+  library_name: transformers
+  pipeline_tag: text-generation
+  base_model: Qwen/Qwen2.5-1.5B-Instruct
+  base_model_relation: finetune
+  datasets:
+    - SZLHOLDINGS/example-dataset
+  tags:
+    - governed-ai
+    - szl-holdings
+  szl:
+    source_repo: szl-holdings/example-model
+    proof_url: https://github.com/szl-holdings/example-model
+    lifecycle: EVALUATION
+sections:
+  - heading: Usage
+    body: |
+      ```python
+      from transformers import AutoModelForCausalLM
+      model = AutoModelForCausalLM.from_pretrained("SZLHOLDINGS/example-model")
+      ```
+claims:
+  - label: MEASURED
+    claim: Unit tests pass on the release commit (12 passed).
+    receipt: https://github.com/szl-holdings/example-model/blob/0123456789abcdef0123456789abcdef01234567/receipts/tests.json
+  - label: NOT_CLAIMED
+    claim: Any leaderboard ranking.
+limits:
+  - Not evaluated outside the fixture.
