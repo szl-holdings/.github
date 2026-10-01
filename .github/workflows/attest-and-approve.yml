@@ -174,7 +174,6 @@ jobs:
               || { echo "::error::required check is not green: $CHECK"; exit 1; }
           done
 
-          HAS_QUEUE=0
           gh api "repos/$REPOSITORY/rulesets?per_page=100" --paginate \
             --jq '.[].id' > "$RUNNER_TEMP/ruleset-ids.txt"
           [ -s "$RUNNER_TEMP/ruleset-ids.txt" ] \
@@ -184,13 +183,19 @@ jobs:
             BYPASS=$(jq '.bypass_actors | length' "$RUNNER_TEMP/ruleset-$ID.json")
             [ "$BYPASS" -eq 0 ] \
               || { echo "::error::P6 ruleset $ID has $BYPASS bypass actors"; exit 1; }
-            if jq -e '.rules[] | select(.type == "merge_queue")' \
-                "$RUNNER_TEMP/ruleset-$ID.json" >/dev/null; then
-              HAS_QUEUE=1
-            fi
           done < "$RUNNER_TEMP/ruleset-ids.txt"
-          [ "$HAS_QUEUE" -eq 1 ] \
-            || { echo "::error::merge queue rule is not active"; exit 1; }
+
+          # GitHub resolves active enforcement, branch conditions and inherited
+          # policy here; listed disabled/evaluate/nonmatching rules do not count.
+          # Main owns the queue. Release branches use the separate protected
+          # nonqueued path and must not be required to gain a queue rule.
+          gh api -H "Accept: application/vnd.github+json" \
+            "repos/$REPOSITORY/rules/branches/main?per_page=100" \
+            --paginate --slurp > "$RUNNER_TEMP/effective-main-rules.json"
+          jq -e 'type == "array" and all(.[]; type == "array")
+            and any(.[][]; .type == "merge_queue")' \
+            "$RUNNER_TEMP/effective-main-rules.json" >/dev/null \
+            || { echo "::error::P6 no active merge queue rule applies to main"; exit 1; }
 
           CAN_APPROVE=$(gh api "repos/$REPOSITORY/actions/permissions/workflow" \
             --jq '.can_approve_pull_request_reviews')
