@@ -49,6 +49,18 @@ Counter-UAS and maritime intelligence with governed decisions and DSSE Khipu rec
 
 Inspect the Space's self-reported `/api/killinchu/v1/honest`; self-reporting is not independent qualification.
 
+## Install the governed stack
+
+Twenty Python packages on PyPI are the provenance tooling itself: receipt primitives (`szl-receipts`, `szl-receipt-dsse`, `szl-guardrail-receipt`), witnesses (`szl-energy-attest`, `szl-ci-witness`, `szl-openshell-receipts`), evaluation lanes (`szl-retrieval-bench`, `szl-engine-bench`, `szl-quant-bench`), the doctrine kernel (`szl-nemo`), and the OpenTelemetry evidence exporter (`vsp-otel`). Every release is published from its GitHub repository through PyPI Trusted Publishing (GitHub OIDC, no stored tokens) with PEP 740 build attestations; the PyPI project page verifies the `github.com/szl-holdings` source link against that publisher.
+
+```bash
+pip install szl-receipts szl-guardrail-receipt vsp-otel szl-nemo
+```
+
+[**PyPI listing**](https://pypi.org/user/betterwithage/) · [**Package manifest and release-path contract**](https://github.com/szl-holdings/szl-org-health/blob/main/governance/pypi/pypi-packages.v1.json) · [**Release path**](https://github.com/szl-holdings/szl-org-health/blob/main/docs/PYPI_RELEASE_PATH.md)
+
+Twenty published packages observed **2026-10-01**; an installable package is source evidence, not a deployment or an evaluation.
+
 ## Estate map
 
 Three commercial flagships: **A11oy, Killinchu, Forge**. One inference flagship: **SZL Router**.
@@ -65,7 +77,7 @@ Six internal engines: **CHAPAQ (folded into Killinchu), Lyte, Killinchu, Finance
 
 [**Inventory binding**](https://github.com/szl-holdings/.github/blob/main/profile/public-inventory.json) · [**Admitted source manifest**](https://github.com/szl-holdings/a11oy/blob/4c6621b17ba452d5af7aa2460462fdfbe513509f/docs/huggingface-ecosystem-manifest.json)
 
-Listing **2026-09-25**: 23 Spaces, 49 models, 35 datasets; binding refresh pending.
+Listing **2026-09-25**: 23 Spaces, 49 models, 35 datasets; listing **2026-10-01**: 33 Spaces, 50 models, 35 datasets; binding refresh pending.
 
 `SZLHOLDINGS/SZLHOLDINGS` is **HISTORICAL**. Λ uniqueness remains **Conjecture 1 — open**. HTTP 200 is not a production certificate.
 
