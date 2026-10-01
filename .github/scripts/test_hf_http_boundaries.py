@@ -9,8 +9,11 @@ from __future__ import annotations
 
 import importlib.util
 import io
+import json
 from email.message import Message
 from pathlib import Path
+import tempfile
+from types import SimpleNamespace
 import unittest
 import unittest.mock as mock
 import urllib.error
@@ -27,6 +30,10 @@ SPEC.loader.exec_module(subject)
 HUB = "https://huggingface.co/api/spaces/SZLHOLDINGS/fixture"
 TOKEN = "fixture-control-token-not-a-credential"
 CDN = "https://cas-bridge.xethub.hf.co/fixture?signature=inert"
+IMMUTABLE_FILE = (
+    "https://huggingface.co/spaces/SZLHOLDINGS/fixture/resolve/"
+    + "a" * 40 + "/app.py"
+)
 
 
 class Reply(io.BytesIO):
@@ -308,6 +315,182 @@ class HttpBoundaryTests(unittest.TestCase):
         self.assertEqual(subject._http(HUB, retries=2), (200, b"ok"))
         self.assertEqual(len(self.requests), 2)
         self.sleep.assert_called_once_with(1.0)
+
+    def test_immutable_file_499_retries_the_same_get_and_returns_exact_bytes(self):
+        error = self.error(499)
+        stream = error.fp
+        self.responses = [error, Reply(b"exact-source-bytes")]
+        with mock.patch.object(subject, "_auth_headers", return_value={}):
+            self.assertEqual(subject.hf_resolve(
+                "SZLHOLDINGS/fixture", "app.py", "a" * 40
+            ), (200, b"exact-source-bytes"))
+        self.assertEqual([r.full_url for r in self.requests], [IMMUTABLE_FILE] * 2)
+        self.assertEqual([r.get_method() for r in self.requests], ["GET"] * 2)
+        self.sleep.assert_called_once_with(2.0)
+        self.assertTrue(stream.closed)
+
+    def test_immutable_file_499_exhausts_the_existing_default_attempt_budget(self):
+        errors = [self.error(499) for _ in range(6)]
+        streams = [error.fp for error in errors]
+        self.responses = errors
+        with (
+            mock.patch.object(subject, "_auth_headers", return_value={}),
+            self.assertRaisesRegex(RuntimeError, "after 6 attempts.*HTTP_499"),
+        ):
+            subject.hf_resolve("SZLHOLDINGS/fixture", "app.py", "a" * 40)
+        self.assertEqual(len(self.requests), 6)
+        self.assertEqual(self.sleep.call_args_list, [
+            mock.call(delay) for delay in (2.0, 4.0, 8.0, 16.0, 30.0)
+        ])
+        self.assertTrue(all(stream.closed for stream in streams))
+
+    def test_immutable_file_499_retry_after_remains_capped(self):
+        self.responses = [self.error(499, "3600"), Reply()]
+        self.assertEqual(subject._http(IMMUTABLE_FILE, retries=2), (200, b"ok"))
+        self.sleep.assert_called_once_with(30.0)
+
+    def test_one_attempt_immutable_file_499_does_not_sleep(self):
+        self.responses = [self.error(499)]
+        with self.assertRaisesRegex(RuntimeError, "after 1 attempts.*HTTP_499"):
+            subject._http(IMMUTABLE_FILE, retries=1)
+        self.assertEqual(len(self.requests), 1)
+        self.sleep.assert_not_called()
+
+    def test_499_retry_does_not_expand_to_mutable_or_nonfile_reads(self):
+        urls = (
+            HUB,
+            "https://szlholdings-fixture.hf.space/readyz",
+            IMMUTABLE_FILE.replace("a" * 40, "main"),
+            IMMUTABLE_FILE.replace("a" * 40, "a" * 7),
+            IMMUTABLE_FILE.replace("huggingface.co", "hf.co"),
+            IMMUTABLE_FILE + "?download=true",
+        )
+        for url in urls:
+            with self.subTest(url=url):
+                self.requests.clear()
+                self.responses = [self.error(499)]
+                self.assertEqual(subject._http(url), (499, b"unavailable"))
+                self.assertEqual(len(self.requests), 1)
+                self.sleep.assert_not_called()
+
+    def test_immutable_file_auth_and_not_found_errors_remain_terminal(self):
+        for code in (401, 403, 404):
+            with self.subTest(code=code):
+                self.requests.clear()
+                error = self.error(code)
+                stream = error.fp
+                self.responses = [error, Reply()]
+                self.assertEqual(subject._http(IMMUTABLE_FILE), (code, b"unavailable"))
+                self.assertEqual(len(self.requests), 1)
+                self.assertEqual(len(self.responses), 1)
+                self.sleep.assert_not_called()
+                self.assertTrue(stream.closed)
+
+    def test_499_retry_rejects_raw_and_encoded_dot_segments(self):
+        tails = (
+            ".", "..", "./app.py", "../main/app.py", "dir/../app.py",
+            "%2e/app.py", "%2E%2e/app.py", ".%2e/app.py", "%2e./app.py",
+            "dir/%2e%2e/app.py", "%252e%252e/app.py", "%25252e/app.py",
+        )
+        urls = [IMMUTABLE_FILE.rsplit("/", 1)[0] + "/" + tail for tail in tails]
+        urls.extend((
+            IMMUTABLE_FILE.replace("/SZLHOLDINGS/", "/../"),
+            IMMUTABLE_FILE.replace("/fixture/", "/./"),
+        ))
+        for url in urls:
+            with self.subTest(url=url):
+                self.requests.clear()
+                self.responses = [self.error(499), Reply()]
+                self.assertEqual(subject._http(url), (499, b"unavailable"))
+                self.assertEqual(len(self.requests), 1)
+                self.assertEqual(len(self.responses), 1)
+                self.sleep.assert_not_called()
+
+    def test_499_retry_rejects_encoded_separators_and_empty_tail_segments(self):
+        tails = (
+            "dir%2Fapp.py", "dir%2fapp.py", "dir%5Capp.py", "dir%5capp.py",
+            "%2f..%2fmain%2fapp.py", "%252fmain/app.py", "dir%255capp.py",
+            "dir//app.py", "/app.py", "dir/", "%ff/app.py",
+        )
+        for tail in tails:
+            with self.subTest(tail=tail):
+                self.requests.clear()
+                self.responses = [self.error(499), Reply()]
+                url = IMMUTABLE_FILE.rsplit("/", 1)[0] + "/" + tail
+                self.assertEqual(subject._http(url), (499, b"unavailable"))
+                self.assertEqual(len(self.requests), 1)
+                self.assertEqual(len(self.responses), 1)
+                self.sleep.assert_not_called()
+
+    def test_immutable_file_raw_backslash_remains_rejected_before_open(self):
+        url = IMMUTABLE_FILE.rsplit("/", 1)[0] + "/dir\\app.py"
+        with self.assertRaises(RuntimeError):
+            subject._http(url)
+        self.builder.assert_not_called()
+        self.sleep.assert_not_called()
+
+    def test_immutable_file_499_preserves_ordinary_encoded_filenames(self):
+        tails = (
+            "docs/report%20one.json", "docs/caf%C3%A9.json", "docs/100%25.json",
+            "docs/part%23one.json", ".config/file.json", "docs/version..json",
+        )
+        for tail in tails:
+            with self.subTest(tail=tail):
+                self.requests.clear()
+                self.sleep.reset_mock()
+                self.responses = [self.error(499), Reply(b"exact-file")]
+                url = IMMUTABLE_FILE.rsplit("/", 1)[0] + "/" + tail
+                self.assertEqual(subject._http(url), (200, b"exact-file"))
+                self.assertEqual([r.full_url for r in self.requests], [url, url])
+                self.sleep.assert_called_once_with(2.0)
+
+    def test_immutable_file_404_after_499_stops_without_a_third_request(self):
+        self.responses = [self.error(499), self.error(404), Reply()]
+        self.assertEqual(subject._http(IMMUTABLE_FILE), (404, b"unavailable"))
+        self.assertEqual(len(self.requests), 2)
+        self.assertEqual(len(self.responses), 1)
+        self.sleep.assert_called_once_with(2.0)
+
+    def test_immutable_file_oversize_success_after_499_still_fails_closed(self):
+        reply = Reply(b"x" * 65, headers={"Content-Length": "65"})
+        self.responses = [self.error(499), reply]
+        with self.assertRaisesRegex(RuntimeError, "exceeds byte limit"):
+            subject._http(IMMUTABLE_FILE)
+        self.assertEqual(len(self.requests), 2)
+        self.assertEqual(reply.read_sizes, [])
+        self.assertTrue(reply.closed)
+
+    def assert_immutable_attestation_rejects(self):
+        with tempfile.TemporaryDirectory() as directory:
+            manifest = Path(directory) / "manifest.json"
+            manifest.write_text(json.dumps({
+                "hf_repo": "SZLHOLDINGS/fixture",
+                "hf_commit_oid": "a" * 40,
+                "smoke_paths": ["/"],
+                "files": {"app.py": {"sha256": subject.sha256(b"expected")}},
+            }), encoding="utf-8")
+            args = SimpleNamespace(
+                manifest=str(manifest), hf_repo="", wait_running=0, smoke_retries=2,
+            )
+            with (
+                mock.patch.object(subject, "_auth_headers", return_value={}),
+                mock.patch.object(subject, "wait_for_expected_runtime", return_value=True),
+                mock.patch.object(subject, "probe_smoke_routes") as probe,
+                mock.patch("builtins.print"),
+            ):
+                self.assertEqual(subject.attest(args), 1)
+            probe.assert_not_called()
+
+    def test_byte_mismatch_after_retried_499_does_not_pass_attestation(self):
+        self.responses = [self.error(499), Reply(b"different")]
+        self.assert_immutable_attestation_rejects()
+        self.assertEqual(len(self.requests), 2)
+
+    def test_exhausted_499_does_not_pass_attestation_or_run_live_smoke(self):
+        self.responses = [self.error(499) for _ in range(6)]
+        self.assert_immutable_attestation_rejects()
+        self.assertEqual(len(self.requests), 6)
+        self.assertEqual(self.sleep.call_count, 5)
 
     def test_one_attempt_503_does_not_sleep(self):
         self.responses = [self.error(503, "3600")]

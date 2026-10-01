@@ -32,7 +32,33 @@ DEFAULT_POLICY_PATH = ".github/data/control_plane_effect_policy.json"
 EXACT_SHA = re.compile(r"[0-9a-f]{40}")
 EXACT_DIGEST = re.compile(r"sha256:[0-9a-f]{64}")
 SAFE_IDENTIFIER = re.compile(r"[A-Za-z0-9][A-Za-z0-9._:/-]*")
-SECRET_REFERENCE = re.compile(r"\$\{\{\s*secrets\.([A-Za-z_][A-Za-z0-9_]*)\s*\}\}")
+SECRET_REFERENCE = re.compile(r"\bsecrets\s*\.\s*([A-Za-z_][A-Za-z0-9_]*)", re.I)
+SECRET_INDEX_REFERENCE = re.compile(r"\bsecrets\s*\[\s*['\"]([A-Za-z_][A-Za-z0-9_]*)['\"]\s*\]", re.I)
+GITHUB_EXPRESSION = re.compile(r"\$\{\{(.*?)\}\}", re.S)
+AUTH_INPUT_REFERENCE = (
+    r"(?:secrets\s*(?:\.\s*[A-Za-z_][A-Za-z0-9_]*|\[\s*['\"][A-Za-z_][A-Za-z0-9_]*['\"]\s*\])"
+    r"|github\s*(?:\.\s*token|\[\s*['\"]token['\"]\s*\]))"
+)
+AUTH_INPUT_EXPRESSION = re.compile(
+    r"\A\$\{\{\s*" + AUTH_INPUT_REFERENCE
+    + r"(?:\s*\|\|\s*" + AUTH_INPUT_REFERENCE + r")*\s*\}\}\Z", re.I
+)
+YAML_PARSER_VERSION = "6.0.3"
+NON_REVIEWABLE_UNKNOWN_CODES = frozenset({
+    "YAML_PARSER_UNAVAILABLE", "YAML_INVALID", "YAML_DUPLICATE_KEY",
+    "YAML_INDIRECTION_UNSUPPORTED", "YAML_MAPPING_KEY_UNSUPPORTED",
+    "YAML_LIMIT_EXCEEDED", "YAML_DIRECTIVE_UNSUPPORTED", "WORKFLOW_SHAPE_INVALID",
+    "CONTAINER_EXECUTION_UNSUPPORTED", "WORKFLOW_FANOUT_UNSUPPORTED",
+    "ACTION_RESOURCE_OVERRIDE_UNSUPPORTED", "GITHUB_PERMISSION_DEFAULT_UNRESOLVED",
+    "GITHUB_PERMISSION_FORM_UNSUPPORTED", "RUNNER_SELECTION_UNSUPPORTED",
+    "SHELL_SELECTION_UNSUPPORTED", "WORKFLOW_DEFAULTS_UNSUPPORTED",
+    "SECRET_NAME_UNRESOLVED", "WORKFLOW_EXPRESSION_EXECUTION_UNSUPPORTED",
+    "WORKING_DIRECTORY_UNSUPPORTED",
+    "REUSABLE_WORKFLOW_UNSUPPORTED", "LOCAL_ACTION_UNSUPPORTED",
+    "UNCLASSIFIED_EXTERNAL_ACTION", "ACTION_DESTRUCTIVE_INPUT_UNSUPPORTED",
+    "LOCAL_DEPENDENCY_MISSING", "ACTION_EXTRA_EFFECT_UNSUPPORTED",
+    "CHECKOUT_SOURCE_BOUNDARY_UNSUPPORTED",
+})
 MUTATING_HTTP_VERBS = frozenset({"POST", "PUT", "PATCH", "DELETE"})
 ACCESS_MODES = frozenset({"read", "local-write", "external-write"})
 REVIEWED_UNKNOWN_ENTRY = re.compile(r"([A-Z][A-Z0-9_]*)@([^:@\s]+):([1-9][0-9]*)")
@@ -500,96 +526,159 @@ def uncommented_yaml(source: str) -> str:
     )
 
 
-def workflow_triggers(source: str) -> list[str]:
-    lines = source.splitlines()
-    for index, line in enumerate(lines):
-        match = re.match(r'^(?:"on"|on):\s*(.*)$', line)
-        if not match:
-            continue
-        inline = match.group(1).strip()
-        if inline:
-            if inline.startswith("[") and inline.endswith("]"):
-                return sorted(
-                    item.strip(" '\"")
-                    for item in inline[1:-1].split(",")
-                    if item.strip(" '\"")
-                )
-            if inline == "{}":
-                return []
-            return [inline.strip(" '\"")]
-        found: list[str] = []
-        for child in lines[index + 1 :]:
-            if child and not child.startswith((" ", "\t")):
-                break
-            key = re.match(r"^\s{2}([A-Za-z_][A-Za-z0-9_-]*):", child)
-            if key:
-                found.append(key.group(1))
-        return sorted(set(found))
+def parse_workflow_yaml(source: str) -> tuple[dict[str, Any], dict[tuple[Any, ...], int]]:
+    """Parse actual YAML structure with strings preserved, bounded and unambiguous."""
+    try:
+        import yaml
+    except ImportError as exc:
+        raise GateError("YAML_PARSER_UNAVAILABLE", "the pinned YAML parser is required") from exc
+    if yaml.__version__ != YAML_PARSER_VERSION:
+        raise GateError("YAML_PARSER_UNAVAILABLE", "the YAML parser version is not admitted")
+    if len(source.encode("utf-8")) > 1_048_576:
+        raise GateError("YAML_LIMIT_EXCEEDED", "workflow source exceeds the parser limit")
+    lines: dict[tuple[Any, ...], int] = {}
+    try:
+        depth = documents = count = 0
+        for event in yaml.parse(source, Loader=yaml.BaseLoader):
+            count += 1
+            if count > 20_000:
+                raise GateError("YAML_LIMIT_EXCEEDED", "workflow has too many YAML nodes")
+            if isinstance(event, yaml.events.DocumentStartEvent):
+                documents += 1
+                if documents > 1:
+                    raise GateError("YAML_INVALID", "one YAML document is required")
+                if event.version is not None or event.tags:
+                    raise GateError("YAML_DIRECTIVE_UNSUPPORTED", "YAML directives require review")
+            if isinstance(event, yaml.events.AliasEvent) or getattr(event, "anchor", None):
+                raise GateError("YAML_INDIRECTION_UNSUPPORTED", "YAML aliases and anchors are unsupported")
+            if getattr(event, "tag", None):
+                raise GateError("YAML_INDIRECTION_UNSUPPORTED", "explicit YAML tags are unsupported")
+            if isinstance(event, (yaml.events.MappingStartEvent, yaml.events.SequenceStartEvent)):
+                depth += 1
+                if depth > 64:
+                    raise GateError("YAML_LIMIT_EXCEEDED", "workflow YAML nesting is too deep")
+            elif isinstance(event, (yaml.events.MappingEndEvent, yaml.events.SequenceEndEvent)):
+                depth -= 1
+        root = yaml.compose(source, Loader=yaml.BaseLoader)
+
+        def build(node: Any, location: tuple[Any, ...]) -> Any:
+            if node is None:
+                raise GateError("WORKFLOW_SHAPE_INVALID", "workflow root is missing")
+            lines[location] = node.start_mark.line + 1
+            if isinstance(node, yaml.nodes.ScalarNode):
+                if node.style in {"|", ">"}:
+                    lines[location] += 1
+                return node.value
+            if isinstance(node, yaml.nodes.SequenceNode):
+                return [build(child, (*location, index)) for index, child in enumerate(node.value)]
+            if not isinstance(node, yaml.nodes.MappingNode):
+                raise GateError("WORKFLOW_SHAPE_INVALID", "unsupported YAML node")
+            result: dict[str, Any] = {}
+            for key_node, child in node.value:
+                if not isinstance(key_node, yaml.nodes.ScalarNode):
+                    raise GateError("YAML_MAPPING_KEY_UNSUPPORTED", "workflow keys must be strings")
+                key = key_node.value
+                if key == "<<":
+                    raise GateError("YAML_INDIRECTION_UNSUPPORTED", "YAML merge keys are unsupported")
+                if key in result:
+                    raise GateError("YAML_DUPLICATE_KEY", "workflow repeats a mapping key")
+                result[key] = build(child, (*location, key))
+            return result
+
+        document = build(root, ())
+        if not isinstance(document, dict):
+            raise GateError("WORKFLOW_SHAPE_INVALID", "workflow root must be a mapping")
+        return document, lines
+    except yaml.YAMLError as exc:
+        raise GateError("YAML_INVALID", "workflow YAML could not be parsed") from exc
+
+
+def workflow_scalar_values(value: Any) -> list[str]:
+    if isinstance(value, str):
+        return [value]
+    if isinstance(value, dict):
+        return [item for child in value.values() for item in workflow_scalar_values(child)]
+    if isinstance(value, list):
+        return [item for child in value for item in workflow_scalar_values(child)]
     return []
 
 
-def workflow_permissions(source: str) -> list[str]:
-    lines = source.splitlines()
-    found: list[str] = []
-    for index, line in enumerate(lines):
-        match = re.match(r"^(\s*)permissions:\s*(.*)$", line)
-        if not match:
+def workflow_triggers(source: str) -> list[str]:
+    document, _lines = parse_workflow_yaml(source)
+    triggers = document.get("on", [])
+    if isinstance(triggers, dict):
+        values = list(triggers)
+    elif isinstance(triggers, list):
+        values = triggers
+    elif isinstance(triggers, str):
+        values = [triggers] if triggers else []
+    else:
+        raise GateError("WORKFLOW_SHAPE_INVALID", "workflow triggers have an invalid shape")
+    if any(not isinstance(item, str) or not re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*", item) for item in values):
+        raise GateError("WORKFLOW_SHAPE_INVALID", "workflow trigger names must be literal")
+    return sorted(set(values))
+
+
+def parsed_workflow_permissions(
+    document: Mapping[str, Any], *, path: str
+) -> tuple[list[str], list[UnknownEffect]]:
+    found: set[str] = set()
+    unknowns: list[UnknownEffect] = []
+    jobs = document.get("jobs", {})
+    scopes = [document]
+    if isinstance(jobs, dict):
+        scopes.extend(job for job in jobs.values() if isinstance(job, dict))
+    for scope in scopes:
+        if "permissions" not in scope:
             continue
-        indent = len(match.group(1))
-        inline = match.group(2).strip()
-        if inline:
-            found.append(inline)
-            continue
-        for child in lines[index + 1 :]:
-            if not child.strip():
-                continue
-            child_indent = len(child) - len(child.lstrip())
-            if child_indent <= indent:
-                break
-            item = re.match(
-                r"^\s*([A-Za-z_][A-Za-z0-9_-]*):\s*(read|write|none)\s*(?:#.*)?$",
-                child,
-            )
-            if item:
-                found.append(f"{item.group(1)}:{item.group(2)}")
-    return sorted(set(found))
+        permission = scope["permissions"]
+        if isinstance(permission, dict):
+            for key, access in permission.items():
+                if (
+                    not re.fullmatch(r"[A-Za-z_][A-Za-z0-9_-]*", key)
+                    or not isinstance(access, str)
+                    or access not in {"read", "write", "none"}
+                ):
+                    unknowns.append(UnknownEffect("GITHUB_PERMISSION_FORM_UNSUPPORTED", path, 1))
+                else:
+                    found.add(f"{key}:{access}")
+        elif permission in ("read-all", "write-all"):
+            found.add("*:" + permission.split("-")[0])
+        else:
+            unknowns.append(UnknownEffect("GITHUB_PERMISSION_FORM_UNSUPPORTED", path, 1))
+    if not isinstance(jobs, dict) or (
+        "permissions" not in document and any(
+            isinstance(job, dict) and "permissions" not in job for job in jobs.values()
+        )
+    ):
+        unknowns.append(UnknownEffect("GITHUB_PERMISSION_DEFAULT_UNRESOLVED", path, 1))
+    return sorted(found), unknowns
 
 
 def run_blocks(source: str) -> list[tuple[int, str]]:
-    lines = source.splitlines()
+    document, lines = parse_workflow_yaml(source)
     blocks: list[tuple[int, str]] = []
-    index = 0
-    while index < len(lines):
-        line = lines[index]
-        match = re.match(r"^(\s*)(?:-\s*)?run:\s*(.*)$", line)
-        if not match:
-            index += 1
+    jobs = document.get("jobs", {})
+    if not isinstance(jobs, dict):
+        raise GateError("WORKFLOW_SHAPE_INVALID", "workflow jobs must be a mapping")
+    for job_name, job in jobs.items():
+        if not isinstance(job, dict) or not isinstance(job.get("steps"), list):
             continue
-        indent = len(match.group(1))
-        value = match.group(2).strip()
-        if value in {"|", ">", "|-", ">-", "|+", ">+"}:
-            body: list[str] = []
-            start = index + 2
-            index += 1
-            while index < len(lines):
-                child = lines[index]
-                if child.strip():
-                    child_indent = len(child) - len(child.lstrip())
-                    if child_indent <= indent:
-                        break
-                    body.append(child[indent + 2 :])
-                else:
-                    body.append("")
-                index += 1
-            blocks.append((start, "\n".join(body)))
-            continue
-        blocks.append((index + 1, value))
-        index += 1
+        for index, step in enumerate(job["steps"]):
+            if isinstance(step, dict) and isinstance(step.get("run"), str):
+                location = ("jobs", job_name, "steps", index, "run")
+                blocks.append((lines[location], step["run"]))
     return blocks
 
 
 def workflow_dependencies(source: str) -> list[str]:
     clean = uncommented_yaml(source)
+    try:
+        document, _lines = parse_workflow_yaml(source)
+        clean += "\n" + "\n".join(workflow_scalar_values(document))
+    except GateError:
+        # A malformed workflow still fails analysis; retain discoverable raw paths.
+        pass
     dependencies: set[str] = set()
     for match in LOCAL_PATH.finditer(clean):
         spelling = match.group(1)
@@ -878,7 +967,7 @@ def inline_python_blocks(
     index = 0
     while index < len(lines):
         match = re.search(
-            r"\bpython3?\s+(?:-\s+)?<<-?['\"]?([A-Za-z_][A-Za-z0-9_]*)['\"]?",
+            r"\bpython3?\s+(?:-I\s+)?(?:-\s+)?<<-?['\"]?([A-Za-z_][A-Za-z0-9_]*)['\"]?",
             lines[index],
         )
         if not match:
@@ -910,33 +999,207 @@ def inline_python_blocks(
 
 
 def analyze_workflow_source(source: str, *, path: str) -> dict[str, Any]:
-    clean = uncommented_yaml(source)
     effects: list[RawEffect] = []
     unknowns: list[UnknownEffect] = []
-    if re.search(
-        r"(?m)^\s*(?:---|\.\.\.|<<:)|"
-        r"^\s*(?:-\s*)?[A-Za-z_][A-Za-z0-9_-]*:\s*[&*][A-Za-z_]",
-        clean,
-    ):
-        unknowns.append(UnknownEffect("YAML_INDIRECTION_UNSUPPORTED", path, 1))
-    blocks = run_blocks(clean)
-    run_keys = re.findall(r"(?m)^\s*(?:-\s*)?run:\s*", clean)
-    if len(run_keys) != len(blocks):
-        unknowns.append(UnknownEffect("YAML_RUN_FORM_UNSUPPORTED", path, 1))
-    for line_no, line in enumerate(clean.splitlines(), start=1):
-        match = re.match(r"^\s*(?:-\s*)?uses:\s*([^\s#]+)", line)
-        if not match:
-            continue
-        action = match.group(1)
-        if action.startswith("./"):
-            unknowns.append(UnknownEffect("LOCAL_ACTION_UNSUPPORTED", path, line_no))
-        elif action in KNOWN_ACTION_EFFECTS:
-            sink, resource, access = KNOWN_ACTION_EFFECTS[action]
-            effects.append(RawEffect(sink, access, path, line_no, resource))
-        else:
-            unknowns.append(
-                UnknownEffect("UNCLASSIFIED_EXTERNAL_ACTION", path, line_no)
+    try:
+        document, lines = parse_workflow_yaml(source)
+        triggers = workflow_triggers(source)
+    except GateError as exc:
+        return {
+            "triggers": [], "permissions": [], "credentials": [],
+            "dependencies": workflow_dependencies(source),
+            "controls": {key: False for key in (
+                "contents_read", "no_explicit_secrets", "concurrency",
+                "protected_ref", "exact_sha", "expected_before", "readback",
+            )},
+            "effects": [], "unknowns": [UnknownEffect(exc.code, path, 1)],
+        }
+    permissions, permission_unknowns = parsed_workflow_permissions(document, path=path)
+    unknowns.extend(permission_unknowns)
+    scalar_values = workflow_scalar_values(document)
+    credentials: set[str] = set()
+    explicit_credentials = False
+    for scalar in scalar_values:
+        expressions = list(GITHUB_EXPRESSION.finditer(scalar))
+        if scalar.count("$" + "{{") != len(expressions):
+            unknowns.append(UnknownEffect("WORKFLOW_SHAPE_INVALID", path, 1))
+        for expression in expressions:
+            value = expression.group(1)
+            if re.search(r"\bsecrets\b", value, re.I):
+                explicit_credentials = True
+                names = SECRET_REFERENCE.findall(value) + SECRET_INDEX_REFERENCE.findall(value)
+                credentials.update(names)
+                unknowns.append(UnknownEffect("SECRET_EXPRESSION_REVIEW_REQUIRED", path, 1))
+                if len(re.findall(r"\bsecrets\b", value, re.I)) != len(names):
+                    unknowns.append(UnknownEffect("SECRET_NAME_UNRESOLVED", path, 1))
+            token_reference = re.search(
+                r"\bgithub\s*(?:\.\s*token\b|\[\s*['\"]token['\"]\s*\])", value, re.I
             )
+            github_aggregate = re.search(r"\btoJSON\s*\(\s*github\s*\)", value, re.I)
+            if token_reference or github_aggregate:
+                explicit_credentials = True
+                credentials.add("GITHUB_TOKEN")
+                unknowns.append(UnknownEffect("SECRET_EXPRESSION_REVIEW_REQUIRED", path, 1))
+            github_indexes = re.findall(r"\bgithub\s*\[", value, re.I)
+            literal_github_indexes = re.findall(
+                r"\bgithub\s*\[\s*['\"][A-Za-z_][A-Za-z0-9_]*['\"]\s*\]", value, re.I
+            )
+            if len(github_indexes) != len(literal_github_indexes):
+                explicit_credentials = True
+                unknowns.append(UnknownEffect("SECRET_NAME_UNRESOLVED", path, 1))
+
+    def unknown(code: str, location: tuple[Any, ...]) -> None:
+        unknowns.append(UnknownEffect(code, path, lines.get(location, 1)))
+
+    if set(document) - {
+        "name", "run-name", "on", "permissions", "env", "defaults",
+        "concurrency", "jobs",
+    }:
+        unknown("WORKFLOW_SHAPE_INVALID", ())
+    if "defaults" in document:
+        unknown("WORKFLOW_DEFAULTS_UNSUPPORTED", ("defaults",))
+    if "env" in document:
+        unknown("WORKFLOW_ENVIRONMENT_REVIEW_REQUIRED", ("env",))
+    dependencies = workflow_dependencies(source)
+    jobs = document.get("jobs")
+    if not isinstance(jobs, dict) or not jobs:
+        unknown("WORKFLOW_SHAPE_INVALID", ("jobs",))
+        jobs = {}
+    blocks: list[tuple[int, str]] = []
+    for job_name, job in jobs.items():
+        location = ("jobs", job_name)
+        if not isinstance(job, dict):
+            unknown("WORKFLOW_SHAPE_INVALID", location)
+            continue
+        if set(job) - {
+            "name", "runs-on", "permissions", "needs", "if", "env", "defaults",
+            "strategy", "timeout-minutes", "continue-on-error", "container",
+            "services", "outputs", "environment", "concurrency", "steps",
+            "uses", "with", "secrets",
+        }:
+            unknown("WORKFLOW_SHAPE_INVALID", location)
+        for key in ("container", "services"):
+            if key in job:
+                unknown("CONTAINER_EXECUTION_UNSUPPORTED", (*location, key))
+        if "strategy" in job:
+            unknown("WORKFLOW_FANOUT_UNSUPPORTED", (*location, "strategy"))
+        if "defaults" in job:
+            unknown("WORKFLOW_DEFAULTS_UNSUPPORTED", (*location, "defaults"))
+        if "env" in job:
+            unknown("WORKFLOW_ENVIRONMENT_REVIEW_REQUIRED", (*location, "env"))
+        if "uses" in job:
+            unknown("REUSABLE_WORKFLOW_UNSUPPORTED", (*location, "uses"))
+            if "secrets" in job:
+                explicit_credentials = True
+                unknown("SECRET_NAME_UNRESOLVED", (*location, "secrets"))
+            continue
+        if job.get("runs-on") not in ("ubuntu-latest", "ubuntu-24.04", "ubuntu-22.04"):
+            unknown("RUNNER_SELECTION_UNSUPPORTED", (*location, "runs-on"))
+        steps = job.get("steps")
+        if not isinstance(steps, list) or not steps:
+            unknown("WORKFLOW_SHAPE_INVALID", (*location, "steps"))
+            continue
+        for index, step in enumerate(steps):
+            step_location = (*location, "steps", index)
+            if not isinstance(step, dict) or bool("uses" in step) == bool("run" in step):
+                unknown("WORKFLOW_SHAPE_INVALID", step_location)
+                continue
+            if set(step) - {
+                "id", "if", "name", "uses", "run", "working-directory", "shell",
+                "with", "env", "continue-on-error", "timeout-minutes",
+            }:
+                unknown("WORKFLOW_SHAPE_INVALID", step_location)
+            if "env" in step:
+                unknown("WORKFLOW_ENVIRONMENT_REVIEW_REQUIRED", (*step_location, "env"))
+            if "working-directory" in step:
+                unknown("WORKING_DIRECTORY_UNSUPPORTED", (*step_location, "working-directory"))
+            if "shell" in step and step["shell"] != "bash":
+                unknown("SHELL_SELECTION_UNSUPPORTED", (*step_location, "shell"))
+            if "uses" in step:
+                action = step["uses"]
+                if not isinstance(action, str):
+                    unknown("WORKFLOW_SHAPE_INVALID", (*step_location, "uses"))
+                    continue
+                inputs = step.get("with", {})
+                if not isinstance(inputs, dict) or any(not isinstance(v, str) for v in inputs.values()):
+                    unknown("WORKFLOW_SHAPE_INVALID", (*step_location, "with"))
+                    continue
+                if any(not re.fullmatch(r"[A-Za-z][A-Za-z0-9_-]*", key) for key in inputs):
+                    unknown("WORKFLOW_SHAPE_INVALID", (*step_location, "with"))
+                    continue
+                # Runner input environment names and toolkit getInput lookups
+                # are case-insensitive; retain the same semantic authority.
+                normalized_inputs = {key.lower(): value for key, value in inputs.items()}
+                if len(normalized_inputs) != len(inputs):
+                    unknown("WORKFLOW_SHAPE_INVALID", (*step_location, "with"))
+                    continue
+                inputs = normalized_inputs
+                if inputs:
+                    unknown("ACTION_INPUTS_REVIEW_REQUIRED", (*step_location, "with"))
+                if action.startswith("./"):
+                    unknown("LOCAL_ACTION_UNSUPPORTED", (*step_location, "uses"))
+                elif action in KNOWN_ACTION_EFFECTS:
+                    sink, resource, access = KNOWN_ACTION_EFFECTS[action]
+                    if sink in {"github.contents.checkout", "runner.toolchain.install"}:
+                        for auth_input in ("token", "ssh-key"):
+                            auth_value = inputs.get(auth_input, "")
+                            if auth_value:
+                                explicit_credentials = True
+                                if not AUTH_INPUT_EXPRESSION.fullmatch(auth_value):
+                                    unknown("SECRET_NAME_UNRESOLVED", (*step_location, "with"))
+                    if sink == "github.contents.checkout":
+                        if (
+                            inputs.get("github-server-url", "https://github.com") != "https://github.com"
+                            or inputs.get("submodules", "false").lower() != "false"
+                            or inputs.get("lfs", "false").lower() != "false"
+                            or inputs.get("allow-unsafe-pr-checkout", "false").lower() != "false"
+                            or bool(inputs.get("path"))
+                        ):
+                            unknown("ACTION_EXTRA_EFFECT_UNSUPPORTED", (*step_location, "with"))
+                        exact_event_head = "${{ github.event.pull_request.head.sha || github.event.merge_group.head_sha || github.sha }}"
+                        if dependencies and (
+                            inputs.get("repository", "szl-holdings/.github") != "szl-holdings/.github"
+                            or ("ref" in inputs and inputs["ref"] != exact_event_head)
+                        ):
+                            unknown("CHECKOUT_SOURCE_BOUNDARY_UNSUPPORTED", (*step_location, "with"))
+                    if sink == "github.contents.checkout" and "repository" in inputs:
+                        repository = inputs["repository"]
+                        if not re.fullmatch(r"[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+", repository):
+                            unknown("ACTION_RESOURCE_OVERRIDE_UNSUPPORTED", (*step_location, "with"))
+                            continue
+                        resource = f"github:repository:{repository}:contents"
+                    if sink == "github.artifact.upload":
+                        if inputs.get("archive", "true").lower() != "true":
+                            unknown("ACTION_RESOURCE_OVERRIDE_UNSUPPORTED", (*step_location, "with"))
+                        artifact = inputs.get("name", "artifact")
+                        if artifact == "control-plane-effect-${{ github.run_id }}":
+                            # This exact run-scoped namespace is the enforcing
+                            # workflow contract, not an arbitrary dynamic name.
+                            resource = "github:actions:artifact:control-plane-effect"
+                        elif re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._-]*", artifact):
+                            resource = f"github:actions:artifact:{artifact}"
+                        else:
+                            unknown("ACTION_RESOURCE_OVERRIDE_UNSUPPORTED", (*step_location, "with"))
+                            continue
+                        if inputs.get("overwrite", "false").lower() != "false":
+                            unknown("ACTION_DESTRUCTIVE_INPUT_UNSUPPORTED", (*step_location, "with"))
+                    if sink == "runner.toolchain.install" and (
+                        inputs.get("cache") or inputs.get("cache-dependency-path")
+                    ):
+                        unknown("ACTION_EXTRA_EFFECT_UNSUPPORTED", (*step_location, "with"))
+                    effects.append(RawEffect(
+                        sink, access, path, lines[(*step_location, "uses")], resource
+                    ))
+                else:
+                    unknown("UNCLASSIFIED_EXTERNAL_ACTION", (*step_location, "uses"))
+            else:
+                block = step["run"]
+                if not isinstance(block, str):
+                    unknown("WORKFLOW_SHAPE_INVALID", (*step_location, "run"))
+                    continue
+                if GITHUB_EXPRESSION.search(block):
+                    unknown("WORKFLOW_EXPRESSION_EXECUTION_UNSUPPORTED", (*step_location, "run"))
+                blocks.append((lines[(*step_location, "run")], block))
 
     for start_line, block in blocks:
         block_effects, block_unknowns = shell_effects(
@@ -950,12 +1213,15 @@ def analyze_workflow_source(source: str, *, path: str) -> dict[str, Any]:
         effects.extend(inline_effects)
         unknowns.extend(inline_unknowns)
 
-    permissions = workflow_permissions(clean)
+    concurrency = document.get("concurrency")
+    # Only executable blocks supply control hints; workflow names, labels,
+    # action inputs, and other metadata cannot spoof those indicators.
+    clean = "\n".join(block for _line, block in blocks)
     controls = {
-        "contents_read": "contents:read" in permissions,
-        "no_explicit_secrets": not bool(SECRET_REFERENCE.search(clean)),
-        "concurrency": bool(re.search(r"(?m)^concurrency:\s*(?:$|\{)", clean))
-        and bool(re.search(r"(?m)^\s+group:\s*\S", clean)),
+        "contents_read": "contents:read" in permissions or "*:read" in permissions,
+        "no_explicit_secrets": not explicit_credentials,
+        "concurrency": isinstance(concurrency, dict)
+        and isinstance(concurrency.get("group"), str) and bool(concurrency["group"]),
         "protected_ref": bool(re.search(r"refs/heads/main", clean))
         and bool(re.search(r"(?:GITHUB_REF|github\.ref)", clean)),
         "exact_sha": bool(re.search(r"git\s+rev-parse", clean))
@@ -966,12 +1232,14 @@ def analyze_workflow_source(source: str, *, path: str) -> dict[str, Any]:
         "readback": bool(re.search(r"read[-_ ]?back|verify.*after", clean, re.I)),
     }
     return {
-        "triggers": workflow_triggers(clean),
+        "triggers": triggers,
         "permissions": permissions,
-        "credentials": sorted(set(SECRET_REFERENCE.findall(clean))),
-        "dependencies": workflow_dependencies(clean),
+        "credentials": sorted(credentials),
+        "dependencies": dependencies,
         "controls": controls,
-        "effects": sorted(set(effects)),
+        # Effects are occurrences, not a set: separate flow-YAML steps may
+        # share every recorded field, including their physical source line.
+        "effects": sorted(effects),
         "unknowns": sorted(set(unknowns)),
     }
 
@@ -1241,13 +1509,19 @@ def bind_declaration(
         dep_effects, dep_unknowns = analyze_dependency(dependency, content)
         all_effects.extend(dep_effects)
         all_unknowns.extend(dep_unknowns)
-    all_effects = sorted(set(all_effects))
+    # Preserve multiplicity through binding too, including separate Python
+    # calls on one line. Conservative duplicate observations must not erase
+    # real call sites and silently reduce an admitted mutation budget.
+    all_effects = sorted(all_effects)
     all_unknowns = sorted(set(all_unknowns))
+    unreviewable = any(item.code in NON_REVIEWABLE_UNKNOWN_CODES for item in all_unknowns)
+    if unreviewable:
+        reasons.add("UNREVIEWABLE_EFFECT_BOUNDARY")
     # Owner-reviewed exact bytes: unknowns are accepted only when every pinned file
     # matches its digest and the observed unknown set equals the reviewed set.
     reviewed = declaration.get("reviewed_unknowns") or {}
     unknowns_reviewed = False
-    if reviewed and all_unknowns:
+    if reviewed and all_unknowns and not unreviewable:
         pins_ok = True
         for pinned_path, pinned_digest in reviewed["files"].items():
             blob = source if pinned_path == workflow_path else dependency_blobs.get(pinned_path)
@@ -1324,6 +1598,7 @@ def bind_declaration(
             ),
         ),
         "unknowns": [item.public() for item in all_unknowns],
+        "reviewed_unknowns_applied": unknowns_reviewed,
         "external_write_sites": external_writes,
         "reason_codes": sorted(reasons),
         "verdict": "DENY" if reasons else "ALLOW",
@@ -1524,6 +1799,7 @@ def analyze_repository(
         "REVIEWED_UNKNOWN_PIN_MISMATCH",
         "REVIEWED_UNKNOWN_SET_MISMATCH",
         "TRUST_ROOT_BUNDLED_WITH_DENIED_WORKFLOW",
+        "UNREVIEWABLE_EFFECT_BOUNDARY",
     }
     if reason_codes & hard_reasons:
         verdict = "DENY"
