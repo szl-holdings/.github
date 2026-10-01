@@ -12,9 +12,7 @@ on:
 # Least privilege: the workflow-level default is read-only. `actions: write`
 # (needed only to dispatch the protected controller) is granted on the single
 # job that performs the dispatch, so no other job or future step inherits it.
-permissions:
-  contents: read
-
+permissions: read-all
 concurrency:
   group: github-personal-notification-scheduler
   cancel-in-progress: false

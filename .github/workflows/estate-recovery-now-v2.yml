@@ -9,19 +9,19 @@ on:
         required: false
         default: "manual stalled-build convergence"
 
-permissions:
-  contents: read
-  actions: write
-  checks: read
-  issues: write
-  pull-requests: write
-
+permissions: read-all
 concurrency:
   group: szl-estate-recovery-v2
   cancel-in-progress: false
 
 jobs:
   recover:
+    permissions:
+      contents: read
+      actions: write
+      checks: read
+      issues: write
+      pull-requests: write
     runs-on: ubuntu-24.04
     timeout-minutes: 90
     env:

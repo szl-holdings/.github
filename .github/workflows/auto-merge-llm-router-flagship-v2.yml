@@ -8,12 +8,12 @@ name: Auto-merge LLM Router flagship v2
       - .github/workflows/auto-merge-llm-router-flagship-v2.yml
       - scripts/restore_llm_router_flagship_v2.py
 
-permissions:
-  contents: write
-  pull-requests: write
-
+permissions: read-all
 jobs:
   enable:
+    permissions:
+      contents: write
+      pull-requests: write
     name: Enable protected squash auto-merge
     if: github.event.pull_request.head.ref == 'fix/llm-router-exact-runtime-attestation-v2-20260908'
     runs-on: ubuntu-latest

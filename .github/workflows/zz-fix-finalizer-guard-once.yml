@@ -7,11 +7,11 @@ on:
     paths:
       - ".github/workflows/zz-fix-finalizer-guard-once.yml"
 
-permissions:
-  contents: write
-
+permissions: read-all
 jobs:
   fix:
+    permissions:
+      contents: write
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:

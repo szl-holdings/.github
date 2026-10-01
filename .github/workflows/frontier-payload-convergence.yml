@@ -38,11 +38,7 @@ on:
         type: boolean
         default: true
 
-permissions:
-  actions: write
-  contents: read
-  issues: write
-
+permissions: read-all
 concurrency:
   group: frontier-payload-convergence-${{ github.event_name }}
   cancel-in-progress: false
@@ -53,6 +49,10 @@ env:
 
 jobs:
   contract:
+    permissions:
+      actions: write
+      contents: read
+      issues: write
     name: Prove mutation and evidence boundaries
     runs-on: ubuntu-24.04
     timeout-minutes: 10
@@ -125,6 +125,10 @@ jobs:
           PY
 
   converge:
+    permissions:
+      actions: write
+      contents: read
+      issues: write
     name: Apply exact payload controls and record readback
     if: github.event_name != 'pull_request'
     needs: contract

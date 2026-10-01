@@ -8,12 +8,12 @@ name: Auto-merge LLM Router card enforcement
       - .github/workflows/auto-merge-llm-router-card-enforcement.yml
       - scripts/enforce_llm_router_flagship_card.py
 
-permissions:
-  contents: write
-  pull-requests: write
-
+permissions: read-all
 jobs:
   enable:
+    permissions:
+      contents: write
+      pull-requests: write
     name: Enable protected squash auto-merge
     if: github.event.pull_request.head.ref == 'fix/enforce-llm-router-flagship-card-20260908'
     runs-on: ubuntu-latest

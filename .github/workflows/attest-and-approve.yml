@@ -7,9 +7,7 @@ on:
     types:
       - completed
 
-permissions:
-  contents: read
-
+permissions: read-all
 concurrency:
   group: forge9-attest-${{ github.event.workflow_run.head_sha }}
   cancel-in-progress: false
