@@ -12,6 +12,7 @@ import tempfile
 import unittest
 from datetime import date
 from pathlib import Path
+from unittest import mock
 
 
 CHECKER_PATH = Path(__file__).with_name("control_plane_effect_gate.py")
@@ -29,6 +30,9 @@ CHECKOUT_ACTION = (
     "actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1"
 )
 CHECKOUT_RESOURCE = "github:repository:szl-holdings/.github:contents"
+UPLOAD_ACTION = (
+    "actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a"
+)
 
 
 def workflow(*, name: str = "fixture", extra_step: str = "") -> bytes:
@@ -160,6 +164,45 @@ def analyze(root: Path, base: str, head: str) -> dict[str, object]:
         policy_path=POLICY_PATH,
         as_of=AS_OF,
     )
+
+
+def bind_source(
+    source: bytes,
+    *,
+    candidate: dict[str, object] | None = None,
+    dependencies: dict[str, bytes] | None = None,
+) -> tuple[dict[str, object], dict[str, object]]:
+    """Exercise analysis with a policy bound to the actual adversarial source."""
+    declaration = gate.load_policy_bytes(
+        policy_bytes(candidate or policy_for(source)), as_of=AS_OF
+    )["workflow_declarations"][WORKFLOW_PATH]
+    parsed = gate.analyze_workflow_source(source.decode("utf-8"), path=WORKFLOW_PATH)
+    bound = gate.bind_declaration(
+        WORKFLOW_PATH, source, parsed, declaration, dependencies or {}
+    )
+    return parsed, bound
+
+
+def reviewed_policy_for(
+    source: bytes,
+    *,
+    dependencies: dict[str, bytes] | None = None,
+    credentials: list[str] | None = None,
+) -> dict[str, object]:
+    """Pin the observed unknown set so denials cannot depend on missing review."""
+    candidate = policy_for(source, credentials=credentials)
+    parsed = gate.analyze_workflow_source(source.decode("utf-8"), path=WORKFLOW_PATH)
+    unknowns = list(parsed["unknowns"])
+    for path, content in (dependencies or {}).items():
+        _effects, dependency_unknowns = gate.analyze_dependency(path, content)
+        unknowns.extend(dependency_unknowns)
+    files = {WORKFLOW_PATH: gate.sha256_bytes(source)}
+    files.update({path: gate.sha256_bytes(content) for path, content in (dependencies or {}).items()})
+    candidate["workflow_declarations"][WORKFLOW_PATH]["reviewed_unknowns"] = {
+        "files": files,
+        "unknowns": sorted({f"{item.code}@{item.path}:{item.line}" for item in unknowns}),
+    }
+    return candidate
 
 
 class PolicyAndPathTests(unittest.TestCase):
@@ -377,6 +420,18 @@ class SinkRecognitionTests(unittest.TestCase):
             "inline Python must be classified as a write or fail closed as unknown",
         )
 
+    def test_isolated_inline_python_keeps_effect_inventory(self) -> None:
+        legacy = (
+            "python <<'PY'\nimport requests\n"
+            "requests.post('https://example.invalid/api')\nPY\n"
+        )
+        isolated = legacy.replace("python ", "python -I ", 1)
+        legacy_effects, legacy_unknowns = gate.inline_python_blocks(legacy, path=WORKFLOW_PATH, start_line=1)
+        effects, unknowns = gate.inline_python_blocks(isolated, path=WORKFLOW_PATH, start_line=1)
+        self.assertIn(("http.post", "external-write"), {(item.sink, item.access) for item in effects})
+        self.assertEqual(effects, legacy_effects)
+        self.assertEqual(unknowns, legacy_unknowns)
+
 
 class DeclarationTests(unittest.TestCase):
     def test_generic_http_endpoint_cannot_be_bound_to_arbitrary_resource(self) -> None:
@@ -464,6 +519,525 @@ class DeclarationTests(unittest.TestCase):
         self.assertEqual(found[0]["code"], "CROSS_WORKFLOW_RESOURCE_CONFLICT")
 
 
+class YamlBoundaryRegressionTests(unittest.TestCase):
+    def assert_source_denied(
+        self,
+        source: bytes,
+        *,
+        reason: str,
+        candidate: dict[str, object] | None = None,
+        dependencies: dict[str, bytes] | None = None,
+    ) -> tuple[dict[str, object], dict[str, object]]:
+        parsed, bound = bind_source(source, candidate=candidate, dependencies=dependencies)
+        self.assertEqual(bound["source_sha256"], gate.sha256_bytes(source))
+        self.assertNotIn("WORKFLOW_DIGEST_MISMATCH", bound["reason_codes"])
+        self.assertEqual(bound["verdict"], "DENY")
+        self.assertIn(reason, bound["reason_codes"])
+        return parsed, bound
+
+    def test_same_line_flow_checkouts_preserve_distinct_call_occurrences(self) -> None:
+        prefix = workflow().decode().split("jobs:\n", 1)[0]
+        checkout = f"{{uses: {CHECKOUT_ACTION}}}"
+        for jobs in (
+            f"jobs: {{fixture: {{runs-on: ubuntu-latest, steps: [{checkout}, {checkout}]}}}}\n",
+            "jobs: {"
+            + ", ".join(
+                f"{name}: {{runs-on: ubuntu-latest, steps: [{checkout}]}}"
+                for name in ("first", "second")
+            ) + "}\n",
+        ):
+            with self.subTest(jobs=jobs):
+                source = (prefix + jobs).encode()
+                candidate = policy_for(source)
+                parsed, bound = self.assert_source_denied(
+                    source, reason="MUTATION_BUDGET_EXCEEDED", candidate=candidate
+                )
+                self.assertEqual(parsed["unknowns"], [])
+                self.assertEqual(len(parsed["effects"]), 2)
+                self.assertEqual(parsed["effects"][0], parsed["effects"][1])
+                self.assertEqual(len(bound["effects"]), 2)
+                # A sufficient fixture budget verifies that flow YAML remains supported.
+                candidate["workflow_declarations"][WORKFLOW_PATH]["effects"][0]["max_calls"] = 2
+                _parsed, allowed = bind_source(source, candidate=candidate)
+                self.assertEqual(allowed["verdict"], "ALLOW")
+
+    def test_same_line_flow_run_mutations_preserve_external_write_occurrences(self) -> None:
+        prefix = workflow().decode().split("    steps:\n", 1)[0]
+        command = "curl -X POST https://example.invalid/api"
+        source = (
+            prefix + f"    steps: [{{uses: {CHECKOUT_ACTION}}}, "
+            + f"{{run: {json.dumps(command)}}}, {{run: {json.dumps(command)}}}]\n"
+        ).encode()
+        candidate = reviewed_policy_for(source)
+        declaration = candidate["workflow_declarations"][WORKFLOW_PATH]
+        resource = "https:example.invalid/api"
+        declaration["resources"].append({"key": resource, "access": "external-write"})
+        declaration["effects"].append({
+            "sink": "http.post", "resource": resource,
+            "access": "external-write", "max_calls": 1,
+        })
+        declaration["max_external_writes"] = 1
+        parsed, bound = self.assert_source_denied(
+            source, reason="MUTATION_BUDGET_EXCEEDED", candidate=candidate
+        )
+        posts = [effect for effect in parsed["effects"] if effect.sink == "http.post"]
+        self.assertEqual(len(posts), 2)
+        self.assertEqual(posts[0], posts[1])
+        self.assertTrue(bound["reviewed_unknowns_applied"])
+        self.assertIn("EXTERNAL_WRITE_BUDGET_EXCEEDED", bound["reason_codes"])
+        self.assertEqual(bound["external_write_sites"], 2)
+        declaration["effects"][-1]["max_calls"] = 2
+        declaration["max_external_writes"] = 2
+        _parsed, allowed = bind_source(source, candidate=candidate)
+        self.assertEqual(allowed["verdict"], "ALLOW")
+
+    def test_binding_preserves_same_line_dependency_call_occurrences(self) -> None:
+        source = workflow(extra_step="      - run: python scripts/fixture.py\n")
+        dependencies = {
+            "scripts/fixture.py": (
+                b"import requests\n"
+                b"requests.post('https://example.invalid/api'); "
+                b"requests.post('https://example.invalid/api')\n"
+            )
+        }
+        candidate = reviewed_policy_for(source, dependencies=dependencies)
+        declaration = candidate["workflow_declarations"][WORKFLOW_PATH]
+        resource = "https:example.invalid/api"
+        declaration["resources"].append({"key": resource, "access": "external-write"})
+        declaration["effects"].append({
+            "sink": "http.post", "resource": resource,
+            "access": "external-write", "max_calls": 1,
+        })
+        declaration["max_external_writes"] = 1
+        _parsed, bound = self.assert_source_denied(
+            source, reason="MUTATION_BUDGET_EXCEEDED", candidate=candidate,
+            dependencies=dependencies,
+        )
+        self.assertTrue(bound["reviewed_unknowns_applied"])
+        self.assertEqual(bound["external_write_sites"], 2)
+        self.assertIn("EXTERNAL_WRITE_BUDGET_EXCEEDED", bound["reason_codes"])
+        declaration["effects"][-1]["max_calls"] = 2
+        declaration["max_external_writes"] = 2
+        _parsed, allowed = bind_source(source, candidate=candidate, dependencies=dependencies)
+        self.assertEqual(allowed["verdict"], "ALLOW")
+
+    def test_run_spellings_and_decoded_commands_cannot_hide_git_push(self) -> None:
+        for step in (
+            "      - run : git push origin main\n",
+            "      - 'run': git push origin main\n",
+            '      - "run": git push origin main\n',
+            '      - "r\\u0075n": git push origin main\n',
+            "      - {run: git push origin main}\n",
+            '      - {"r\\u0075n": "git \\u0070ush origin main"}\n',
+        ):
+            with self.subTest(step=step):
+                source = workflow(extra_step=step)
+                parsed, _bound = self.assert_source_denied(source, reason="UNDECLARED_EFFECT")
+                self.assertIn(
+                    ("git.remote.push", "external-write"),
+                    {(item.sink, item.access) for item in parsed["effects"]},
+                )
+                self.assertEqual(gate.run_blocks(source.decode("utf-8"))[0][1], "git push origin main")
+
+    def test_uses_spellings_cannot_hide_known_external_action(self) -> None:
+        for key in ("uses ", "'uses'", '"uses"', '"u\\u0073es"'):
+            for flow in (False, True):
+                with self.subTest(key=key, flow=flow):
+                    entry = f"{key}: {UPLOAD_ACTION}"
+                    source = workflow(extra_step="      - " + ("{" + entry + "}" if flow else entry) + "\n")
+                    parsed, _bound = self.assert_source_denied(source, reason="UNDECLARED_EFFECT")
+                    self.assertIn(
+                        ("github.artifact.upload", "external-write"),
+                        {(item.sink, item.access) for item in parsed["effects"]},
+                    )
+
+    def test_supported_yaml_spellings_keep_known_checkout_boundary(self) -> None:
+        for checkout in (
+            f"      - uses : {CHECKOUT_ACTION}\n",
+            f"      - 'uses': '{CHECKOUT_ACTION}'\n",
+            f'      - "u\\u0073es": "{CHECKOUT_ACTION}"\n',
+            f"      - {{uses: {CHECKOUT_ACTION}}}\n",
+        ):
+            with self.subTest(checkout=checkout):
+                source = workflow().replace(f"      - uses: {CHECKOUT_ACTION}\n".encode(), checkout.encode())
+                source = source.replace(b'"on":', b"on:")
+                parsed, bound = bind_source(source)
+                self.assertEqual(parsed["triggers"], ["merge_group", "pull_request", "push"])
+                self.assertEqual(parsed["unknowns"], [])
+                self.assertEqual(bound["verdict"], "ALLOW")
+                self.assertEqual(bound["effects"][0]["resource"], CHECKOUT_RESOURCE)
+
+    def test_inline_and_write_all_permissions_cannot_hide_write_authority(self) -> None:
+        for root_permission, job_permission, expected in (
+            ("permissions: {contents: read, actions: write}\n", "", "actions:write"),
+            ('"permi\\u0073sions": {contents: read, issues: write}\n', "", "issues:write"),
+            ("permissions: write-all\n", "", "*:write"),
+            ("permissions:\n  contents: read\n", "    permissions: {contents: read, id-token: write}\n", "id-token:write"),
+            ("permissions:\n  contents: read\n", "    'permissions': write-all\n", "*:write"),
+        ):
+            with self.subTest(root=root_permission, job=job_permission):
+                source = workflow().replace(b"permissions:\n  contents: read\n", root_permission.encode())
+                source = source.replace(b"    steps:\n", job_permission.encode() + b"    steps:\n")
+                parsed, _bound = self.assert_source_denied(source, reason="GITHUB_WRITE_PERMISSION_PRESENT")
+                self.assertIn(expected, parsed["permissions"])
+
+    def test_read_all_permissions_are_recognized_as_read(self) -> None:
+        source = workflow().replace(b"permissions:\n  contents: read\n", b"permissions: read-all\n")
+        parsed, bound = bind_source(source)
+        self.assertEqual(parsed["permissions"], ["*:read"])
+        self.assertEqual(bound["verdict"], "ALLOW")
+
+    def test_secret_fallback_bracket_and_aggregate_expressions_are_detected(self) -> None:
+        expressions = (
+            ("secrets.HF_TOKEN || 'placeholder'", ["HF_TOKEN"], False),
+            ("secrets['HF_TOKEN']", ["HF_TOKEN"], False),
+            ("SeCrEtS['HF_TOKEN']", ["HF_TOKEN"], False),
+            ("secrets[format('HF_{0}', 'TOKEN')]", [], True),
+            ("toJSON(secrets)", [], True),
+            ("github.token", ["GITHUB_TOKEN"], False),
+            ("github['token']", ["GITHUB_TOKEN"], False),
+            ('GITHUB["TOKEN"]', ["GITHUB_TOKEN"], False),
+        )
+        for expression, names, unresolved in expressions:
+            with self.subTest(expression=expression):
+                value = "$" + "{{ " + expression + " }}"
+                source = workflow(extra_step="      - run: true\n        env:\n          FIXTURE_AUTH: " + json.dumps(value) + "\n")
+                candidate = policy_for(source, credentials=names)
+                parsed, _bound = self.assert_source_denied(source, reason="UNKNOWN_EFFECT", candidate=candidate)
+                self.assertEqual(parsed["credentials"], names)
+                self.assertFalse(parsed["controls"]["no_explicit_secrets"])
+                self.assertIn("SECRET_EXPRESSION_REVIEW_REQUIRED", {item.code for item in parsed["unknowns"]})
+                if unresolved:
+                    reviewed = reviewed_policy_for(source, credentials=names)
+                    self.assert_source_denied(source, reason="UNREVIEWABLE_EFFECT_BOUNDARY", candidate=reviewed)
+
+    def test_mixed_literal_and_dynamic_github_indexes_cannot_hide_possible_token(self) -> None:
+        expression = "$" + "{{ github['ref'] && github[inputs.key] }}"
+        source = workflow(extra_step="      - run: true\n        env:\n          FIXTURE_AUTH: " + json.dumps(expression) + "\n")
+        candidate = reviewed_policy_for(source, credentials=[])
+        parsed, bound = self.assert_source_denied(source, reason="UNREVIEWABLE_EFFECT_BOUNDARY", candidate=candidate)
+        self.assertEqual(parsed["credentials"], [])
+        self.assertFalse(parsed["controls"]["no_explicit_secrets"])
+        self.assertIn("SECRET_NAME_UNRESOLVED", {item.code for item in parsed["unknowns"]})
+        self.assertFalse(bound["reviewed_unknowns_applied"])
+
+    def test_execution_contexts_cannot_be_waived_with_exact_unknown_pins(self) -> None:
+        for addition, expected in (
+            ("    services: {fixture: {image: 'example.invalid/fixture:latest'}}\n", "CONTAINER_EXECUTION_UNSUPPORTED"),
+            ("    'services':\n      fixture:\n        image: example.invalid/fixture:latest\n", "CONTAINER_EXECUTION_UNSUPPORTED"),
+            ("    container: example.invalid/fixture:latest\n", "CONTAINER_EXECUTION_UNSUPPORTED"),
+            ('    "conta\\u0069ner": {image: "example.invalid/fixture:latest"}\n', "CONTAINER_EXECUTION_UNSUPPORTED"),
+            ("    strategy: {matrix: {lane: [one, two]}}\n", "WORKFLOW_FANOUT_UNSUPPORTED"),
+            ('    "stra\\u0074egy":\n      matrix:\n        lane: [one, two]\n', "WORKFLOW_FANOUT_UNSUPPORTED"),
+        ):
+            with self.subTest(addition=addition):
+                source = workflow().replace(b"    steps:\n", addition.encode() + b"    steps:\n")
+                candidate = reviewed_policy_for(source)
+                parsed, bound = self.assert_source_denied(source, reason="UNREVIEWABLE_EFFECT_BOUNDARY", candidate=candidate)
+                self.assertIn(expected, {item.code for item in parsed["unknowns"]})
+                self.assertIn("UNKNOWN_EFFECT", bound["reason_codes"])
+                self.assertFalse(bound["reviewed_unknowns_applied"])
+
+    def test_reusable_workflow_cannot_be_waived_with_exact_unknown_pins(self) -> None:
+        source = (
+            "name: fixture\non: [pull_request, merge_group, push]\n"
+            "permissions: {contents: read}\nconcurrency: {group: fixture}\n"
+            "jobs:\n  fixture:\n    uses: elsewhere/automation/.github/workflows/fixture.yml@"
+            + "a" * 40 + "\n"
+        ).encode()
+        candidate = reviewed_policy_for(source)
+        parsed, bound = self.assert_source_denied(source, reason="UNREVIEWABLE_EFFECT_BOUNDARY", candidate=candidate)
+        self.assertIn("REUSABLE_WORKFLOW_UNSUPPORTED", {item.code for item in parsed["unknowns"]})
+        self.assertFalse(bound["reviewed_unknowns_applied"])
+
+    def test_unclassified_and_local_actions_cannot_be_waived_with_exact_pins(self) -> None:
+        for action, expected in (
+            ("unreviewed/action@" + "a" * 40, "UNCLASSIFIED_EXTERNAL_ACTION"),
+            ("./.github/actions/local", "LOCAL_ACTION_UNSUPPORTED"),
+        ):
+            with self.subTest(action=action):
+                source = workflow(extra_step=f"      - uses: {action}\n")
+                parsed, bound = self.assert_source_denied(source, reason="UNREVIEWABLE_EFFECT_BOUNDARY", candidate=reviewed_policy_for(source))
+                self.assertIn(expected, {item.code for item in parsed["unknowns"]})
+                self.assertFalse(bound["reviewed_unknowns_applied"])
+
+    def test_checkout_repository_override_binds_actual_repository(self) -> None:
+        actual_resource = "github:repository:elsewhere/fixture:contents"
+        source = workflow().replace(
+            f"      - uses: {CHECKOUT_ACTION}\n".encode(),
+            (f"      - uses: {CHECKOUT_ACTION}\n" + '        with: {"repos\\u0069tory": elsewhere/fixture}\n').encode(),
+        )
+        old_policy = reviewed_policy_for(source)
+        parsed, _bound = self.assert_source_denied(source, reason="UNDECLARED_EFFECT", candidate=old_policy)
+        self.assertEqual({item.resource for item in parsed["effects"]}, {actual_resource})
+        corrected = copy.deepcopy(old_policy)
+        declaration = corrected["workflow_declarations"][WORKFLOW_PATH]
+        declaration["resources"][0]["key"] = actual_resource
+        declaration["effects"][0]["resource"] = actual_resource
+        _parsed, bound = bind_source(source, candidate=corrected)
+        self.assertEqual(bound["verdict"], "ALLOW")
+        self.assertEqual(bound["effects"][0]["resource"], actual_resource)
+        self.assertTrue(bound["reviewed_unknowns_applied"])
+
+    def test_upload_artifact_binds_literal_and_default_resource_names(self) -> None:
+        old_resource = "github:actions:artifact:control-plane-effect"
+        for inputs, actual_name in (
+            ("", "artifact"),
+            ("        with: {name: other-artifact}\n", "other-artifact"),
+            ("        with: {NAME: other-artifact}\n", "other-artifact"),
+        ):
+            with self.subTest(inputs=inputs):
+                source = workflow(extra_step=f"      - uses: {UPLOAD_ACTION}\n" + inputs)
+                candidate = reviewed_policy_for(source) if inputs else policy_for(source)
+                declaration = candidate["workflow_declarations"][WORKFLOW_PATH]
+                declaration["resources"].append({"key": old_resource, "access": "external-write"})
+                declaration["effects"].append({"sink": "github.artifact.upload", "resource": old_resource, "access": "external-write", "max_calls": 1})
+                declaration["max_external_writes"] = 1
+                parsed, _bound = self.assert_source_denied(source, reason="UNDECLARED_EFFECT", candidate=candidate)
+                actual_resource = "github:actions:artifact:" + actual_name
+                self.assertIn(actual_resource, {item.resource for item in parsed["effects"]})
+                declaration["resources"][-1]["key"] = actual_resource
+                declaration["effects"][-1]["resource"] = actual_resource
+                _parsed, corrected = bind_source(source, candidate=candidate)
+                self.assertEqual(corrected["verdict"], "ALLOW")
+
+    def test_upload_overwrite_and_dynamic_names_remain_nonwaivable(self) -> None:
+        for inputs in (
+            "        with: {name: other-artifact, overwrite: true}\n",
+            "        with: {NAME: other-artifact, OVERWRITE: true}\n",
+            '        with: {name: "${{ github.repository }}"}\n',
+            "        with: {name: other-artifact, archive: false}\n",
+            "        with: {NAME: other-artifact, ARCHIVE: false}\n",
+        ):
+            with self.subTest(inputs=inputs):
+                source = workflow(extra_step=f"      - uses: {UPLOAD_ACTION}\n" + inputs)
+                candidate = reviewed_policy_for(source)
+                _parsed, bound = self.assert_source_denied(source, reason="UNREVIEWABLE_EFFECT_BOUNDARY", candidate=candidate)
+                self.assertFalse(bound["reviewed_unknowns_applied"])
+
+    def test_action_inputs_with_additional_effects_remain_nonwaivable(self) -> None:
+        setup_python = "actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97"
+        for action, inputs in (
+            (CHECKOUT_ACTION, "{submodules: recursive}"),
+            (CHECKOUT_ACTION, "{lfs: true}"),
+            (CHECKOUT_ACTION, "{allow-unsafe-pr-checkout: true}"),
+            (CHECKOUT_ACTION, "{github-server-url: 'https://elsewhere.invalid'}"),
+            (CHECKOUT_ACTION, "{path: nested}"),
+            (setup_python, "{cache: pip}"),
+            (setup_python, "{CACHE: pip}"),
+            (setup_python, "{cache-dependency-path: requirements.txt}"),
+        ):
+            with self.subTest(action=action, inputs=inputs):
+                source = workflow(extra_step=f"      - uses: {action}\n        with: {inputs}\n")
+                candidate = reviewed_policy_for(source)
+                parsed, bound = self.assert_source_denied(source, reason="UNREVIEWABLE_EFFECT_BOUNDARY", candidate=candidate)
+                self.assertIn("ACTION_EXTRA_EFFECT_UNSUPPORTED", {item.code for item in parsed["unknowns"]})
+                self.assertFalse(bound["reviewed_unknowns_applied"])
+
+    def test_checkout_foreign_source_cannot_bind_local_dependency_bytes(self) -> None:
+        dependencies = {"scripts/fixture.py": b"pass\n"}
+        for inputs in ("{repository: elsewhere/fixture}", "{REPOSITORY: elsewhere/fixture}", "{ref: main}"):
+            with self.subTest(inputs=inputs):
+                source = workflow(extra_step="      - run: python scripts/fixture.py\n").replace(
+                    f"      - uses: {CHECKOUT_ACTION}\n".encode(),
+                    f"      - uses: {CHECKOUT_ACTION}\n        with: {inputs}\n".encode(),
+                )
+                candidate = reviewed_policy_for(source, dependencies=dependencies)
+                parsed, bound = self.assert_source_denied(source, reason="UNREVIEWABLE_EFFECT_BOUNDARY", candidate=candidate, dependencies=dependencies)
+                self.assertIn("CHECKOUT_SOURCE_BOUNDARY_UNSUPPORTED", {item.code for item in parsed["unknowns"]})
+                self.assertFalse(bound["reviewed_unknowns_applied"])
+
+    def test_action_input_case_collisions_are_nonwaivable(self) -> None:
+        source = workflow(extra_step=f"      - uses: {UPLOAD_ACTION}\n        with: {{name: fixture, NAME: other-artifact}}\n")
+        candidate = reviewed_policy_for(source)
+        parsed, bound = self.assert_source_denied(source, reason="UNREVIEWABLE_EFFECT_BOUNDARY", candidate=candidate)
+        self.assertIn("WORKFLOW_SHAPE_INVALID", {item.code for item in parsed["unknowns"]})
+        self.assertFalse(bound["reviewed_unknowns_applied"])
+
+    def test_unicode_action_input_names_cannot_alias_ascii_runtime_inputs(self) -> None:
+        for spelling in ("\u017fubmodules", '"\\u017fubmodules"'):
+            with self.subTest(spelling=spelling):
+                source = workflow().replace(
+                    f"      - uses: {CHECKOUT_ACTION}\n".encode(),
+                    f"      - uses: {CHECKOUT_ACTION}\n        with: {{{spelling}: true}}\n".encode(),
+                )
+                candidate = reviewed_policy_for(source)
+                parsed, bound = self.assert_source_denied(source, reason="UNREVIEWABLE_EFFECT_BOUNDARY", candidate=candidate)
+                self.assertIn("WORKFLOW_SHAPE_INVALID", {item.code for item in parsed["unknowns"]})
+                self.assertFalse(bound["reviewed_unknowns_applied"])
+
+    def test_action_auth_inputs_with_unresolved_sources_are_nonwaivable(self) -> None:
+        setup_python = "actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97"
+        for action in (CHECKOUT_ACTION, setup_python):
+            for input_name in ("token", "ssh-key"):
+                for value, names in (
+                    ("${{ vars.FIXTURE_AUTH }}", []),
+                    ("${{ inputs.fixture_auth }}", []),
+                    ("${{ env.FIXTURE_AUTH }}", []),
+                    ("fixture-value", []),
+                    ("${{ secrets.FIXTURE_AUTH || inputs.fallback }}", ["FIXTURE_AUTH"]),
+                ):
+                    with self.subTest(action=action, input_name=input_name, value=value):
+                        step = f"      - uses: {action}\n        with: {{{input_name}: {json.dumps(value)}}}\n"
+                        source = workflow().replace(f"      - uses: {CHECKOUT_ACTION}\n".encode(), step.encode()) if action == CHECKOUT_ACTION else workflow(extra_step=step)
+                        candidate = reviewed_policy_for(source, credentials=names)
+                        parsed, bound = self.assert_source_denied(source, reason="UNREVIEWABLE_EFFECT_BOUNDARY", candidate=candidate)
+                        self.assertEqual(parsed["credentials"], names)
+                        self.assertFalse(parsed["controls"]["no_explicit_secrets"])
+                        self.assertIn("SECRET_NAME_UNRESOLVED", {item.code for item in parsed["unknowns"]})
+                        self.assertFalse(bound["reviewed_unknowns_applied"])
+
+    def test_action_auth_inputs_with_declared_names_keep_exact_review_path(self) -> None:
+        setup_python = "actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97"
+        for action in (CHECKOUT_ACTION, setup_python):
+            for input_name in ("TOKEN", "SSH-KEY"):
+                for value, names in (
+                    ("${{ secrets.FIXTURE_AUTH }}", ["FIXTURE_AUTH"]),
+                    ("${{ secrets['FIXTURE_AUTH'] }}", ["FIXTURE_AUTH"]),
+                    ("${{ github.token }}", ["GITHUB_TOKEN"]),
+                    ("${{ github['token'] || secrets.FIXTURE_AUTH }}", ["FIXTURE_AUTH", "GITHUB_TOKEN"]),
+                ):
+                    with self.subTest(action=action, input_name=input_name, value=value):
+                        step = f"      - uses: {action}\n        with: {{{input_name}: {json.dumps(value)}}}\n"
+                        source = workflow().replace(f"      - uses: {CHECKOUT_ACTION}\n".encode(), step.encode()) if action == CHECKOUT_ACTION else workflow(extra_step=step)
+                        candidate = reviewed_policy_for(source, credentials=names)
+                        if action == setup_python:
+                            declaration = candidate["workflow_declarations"][WORKFLOW_PATH]
+                            declaration["resources"].append({"key": "runner:toolchain:python", "access": "local-write"})
+                            declaration["effects"].append({"sink": "runner.toolchain.install", "resource": "runner:toolchain:python", "access": "local-write", "max_calls": 1})
+                        parsed, bound = bind_source(source, candidate=candidate)
+                        self.assertEqual(parsed["credentials"], names)
+                        self.assertFalse(parsed["controls"]["no_explicit_secrets"])
+                        self.assertNotIn("SECRET_NAME_UNRESOLVED", {item.code for item in parsed["unknowns"]})
+                        self.assertEqual(bound["verdict"], "ALLOW")
+                        self.assertTrue(bound["reviewed_unknowns_applied"])
+
+    def test_dynamic_checkout_repository_cannot_be_reviewed_into_authority(self) -> None:
+        expression = "$" + "{{ github.repository }}"
+        source = workflow().replace(
+            f"      - uses: {CHECKOUT_ACTION}\n".encode(),
+            (f"      - uses: {CHECKOUT_ACTION}\n" + f'        with: {{repository: "{expression}"}}\n').encode(),
+        )
+        candidate = reviewed_policy_for(source)
+        parsed, _bound = self.assert_source_denied(source, reason="UNREVIEWABLE_EFFECT_BOUNDARY", candidate=candidate)
+        self.assertIn("ACTION_RESOURCE_OVERRIDE_UNSUPPORTED", {item.code for item in parsed["unknowns"]})
+        self.assertEqual(parsed["effects"], [])
+
+    def test_ambiguous_yaml_is_nonwaivable_even_with_matching_source_and_pins(self) -> None:
+        baseline = workflow().decode("utf-8")
+        candidates = (
+            (baseline.replace("permissions:\n", "permissions: {contents: read}\npermissions:\n"), "YAML_DUPLICATE_KEY"),
+            (baseline + "      - run: true\n        run: true\n", "YAML_DUPLICATE_KEY"),
+            (baseline + '      - {run: true, "r\\u0075n": true}\n', "YAML_DUPLICATE_KEY"),
+            (baseline + "---\nname: second\n", "YAML_INVALID"),
+            (baseline.replace("name: fixture", "name: !!str fixture"), "YAML_INDIRECTION_UNSUPPORTED"),
+            (baseline.replace("name: fixture", "name: &display fixture"), "YAML_INDIRECTION_UNSUPPORTED"),
+            (baseline.replace("name: fixture", "name: *display"), "YAML_INDIRECTION_UNSUPPORTED"),
+            (baseline.replace("concurrency:\n", "concurrency:\n  <<: {group: fixture}\n"), "YAML_INDIRECTION_UNSUPPORTED"),
+            ("%YAML 1.2\n---\n" + baseline, "YAML_DIRECTIVE_UNSUPPORTED"),
+        )
+        for spelling, expected in candidates:
+            with self.subTest(expected=expected, spelling=spelling):
+                source = spelling.encode()
+                candidate = reviewed_policy_for(source)
+                parsed, _bound = self.assert_source_denied(source, reason="UNREVIEWABLE_EFFECT_BOUNDARY", candidate=candidate)
+                self.assertIn(expected, {item.code for item in parsed["unknowns"]})
+
+    def test_unknown_root_and_job_keys_cannot_extend_execution_model(self) -> None:
+        for source in (
+            workflow() + b"unsupported-execution: true\n",
+            workflow().replace(b"    steps:\n", b"    Container: example.invalid/fixture:latest\n    steps:\n"),
+            workflow().replace(b"    steps:\n", b"    unsupported-execution: true\n    steps:\n"),
+        ):
+            with self.subTest(source=source):
+                candidate = reviewed_policy_for(source)
+                parsed, bound = self.assert_source_denied(source, reason="UNREVIEWABLE_EFFECT_BOUNDARY", candidate=candidate)
+                self.assertIn("WORKFLOW_SHAPE_INVALID", {item.code for item in parsed["unknowns"]})
+                self.assertFalse(bound["reviewed_unknowns_applied"])
+
+    def test_workflow_parser_size_depth_and_event_limits_are_nonwaivable(self) -> None:
+        for boundary, spelling in (
+            ("size", "name: " + "x" * 1_048_577 + "\n"),
+            ("depth", "name: " + "[" * 65 + "x" + "]" * 65 + "\n"),
+            ("events", "name: [" + ",".join("x" for _index in range(20_000)) + "]\n"),
+        ):
+            with self.subTest(boundary=boundary):
+                source = spelling.encode()
+                candidate = reviewed_policy_for(source)
+                parsed, bound = self.assert_source_denied(source, reason="UNREVIEWABLE_EFFECT_BOUNDARY", candidate=candidate)
+                self.assertEqual({item.code for item in parsed["unknowns"]}, {"YAML_LIMIT_EXCEEDED"})
+                self.assertFalse(bound["reviewed_unknowns_applied"])
+
+    def test_parser_unavailability_and_wrong_version_are_nonwaivable(self) -> None:
+        source = workflow()
+        yaml_module = importlib.import_module("yaml")
+        for context in (
+            mock.patch.dict(sys.modules, {"yaml": None}),
+            mock.patch.object(yaml_module, "__version__", "6.0.2"),
+        ):
+            with self.subTest(context=type(context).__name__), context:
+                candidate = reviewed_policy_for(source)
+                parsed, _bound = self.assert_source_denied(source, reason="UNREVIEWABLE_EFFECT_BOUNDARY", candidate=candidate)
+                self.assertEqual({item.code for item in parsed["unknowns"]}, {"YAML_PARSER_UNAVAILABLE"})
+
+    def test_decoded_local_dependency_paths_are_included_in_binding(self) -> None:
+        source = workflow(extra_step='      - "r\\u0075n": "python scripts/fi\\u0078ture.py"\n')
+        parsed, _bound = self.assert_source_denied(source, reason="UNKNOWN_EFFECT")
+        self.assertEqual(parsed["dependencies"], ["scripts/fixture.py"])
+        dependencies = {"scripts/fixture.py": b"pass\n"}
+        candidate = reviewed_policy_for(source, dependencies=dependencies)
+        _parsed, bound = bind_source(source, candidate=candidate, dependencies=dependencies)
+        self.assertEqual(bound["verdict"], "ALLOW")
+        self.assertEqual(bound["dependencies"], [{"path": "scripts/fixture.py", "sha256": gate.sha256_bytes(b"pass\n")}])
+        local_uses = workflow(extra_step='      - "u\\u0073es": "./.github/workflows/fi\\u0078ture.yml"\n')
+        self.assertEqual(gate.workflow_dependencies(local_uses.decode()), [".github/workflows/fixture.yml"])
+
+    def test_missing_dependency_cannot_be_waived_by_unknown_entry(self) -> None:
+        source = workflow(extra_step="      - run: python scripts/fixture.py\n")
+        candidate = reviewed_policy_for(source)
+        candidate["workflow_declarations"][WORKFLOW_PATH]["reviewed_unknowns"]["unknowns"].append(
+            f"LOCAL_DEPENDENCY_MISSING@{WORKFLOW_PATH}:1"
+        )
+        _parsed, bound = self.assert_source_denied(source, reason="UNREVIEWABLE_EFFECT_BOUNDARY", candidate=candidate)
+        self.assertIn("LOCAL_DEPENDENCY_MISSING", {item["code"] for item in bound["unknowns"]})
+        self.assertFalse(bound["reviewed_unknowns_applied"])
+
+    def test_metadata_cannot_supply_required_execution_control_hints(self) -> None:
+        source = workflow(name="refs/heads/main GITHUB_REF git rev-parse HEAD_SHA expected-before readback")
+        candidate = policy_for(source)
+        controls = candidate["workflow_declarations"][WORKFLOW_PATH]["required_controls"]
+        for name in ("protected_ref", "exact_sha", "expected_before", "readback"):
+            controls[name] = True
+        parsed, bound = self.assert_source_denied(source, reason="CONTROL_EXACT_SHA_MISSING", candidate=candidate)
+        for name in ("protected_ref", "exact_sha", "expected_before", "readback"):
+            self.assertFalse(parsed["controls"][name])
+            self.assertIn(f"CONTROL_{name.upper()}_MISSING", bound["reason_codes"])
+
+    def test_exact_reviewed_shell_unknowns_still_allow(self) -> None:
+        source = workflow(extra_step="      - run: opaque-tool fixture\n")
+        candidate = reviewed_policy_for(source)
+        parsed, bound = bind_source(source, candidate=candidate)
+        self.assertEqual({item.code for item in parsed["unknowns"]}, {"SHELL_COMMAND_UNCLASSIFIED"})
+        self.assertEqual(bound["verdict"], "ALLOW")
+        self.assertEqual(bound["reason_codes"], [])
+        self.assertTrue(bound["reviewed_unknowns_applied"])
+
+    def test_reviewed_unknown_pin_and_set_drift_still_deny(self) -> None:
+        source = workflow(extra_step="      - run: opaque-tool fixture\n")
+        for mismatch in ("pin", "set"):
+            with self.subTest(mismatch=mismatch):
+                candidate = reviewed_policy_for(source)
+                reviewed = candidate["workflow_declarations"][WORKFLOW_PATH]["reviewed_unknowns"]
+                if mismatch == "pin":
+                    reviewed["files"][WORKFLOW_PATH] = gate.sha256_bytes(workflow())
+                    expected = "REVIEWED_UNKNOWN_PIN_MISMATCH"
+                else:
+                    reviewed["unknowns"].append(f"DYNAMIC_EXECUTION@{WORKFLOW_PATH}:1")
+                    expected = "REVIEWED_UNKNOWN_SET_MISMATCH"
+                _parsed, bound = self.assert_source_denied(source, reason=expected, candidate=candidate)
+                self.assertFalse(bound["reviewed_unknowns_applied"])
+
+
 class GitReceiptTests(unittest.TestCase):
     def test_no_effect_change_is_deterministic_and_has_object_provenance(self) -> None:
         with TemporaryRepository() as fixture:
@@ -500,6 +1074,39 @@ class GitReceiptTests(unittest.TestCase):
             self.assertNotEqual(
                 receipt["claim"], "VERIFIED_STATIC_EFFECT_BOUNDARY"
             )
+
+    def test_trust_root_bundled_with_matching_digest_denied_workflow_stays_deny(self) -> None:
+        source = workflow(extra_step='      - {"r\\u0075n": "git push origin main"}\n')
+        with TemporaryRepository() as fixture:
+            base = fixture.install_baseline()
+            fixture.write(CHECKER_REPO_PATH, b"# fixture checker change\n")
+            fixture.write(WORKFLOW_PATH, source)
+            fixture.write(POLICY_PATH, policy_bytes(policy_for(source)))
+            head = fixture.commit("bundle analyzer change with undeclared workflow write")
+            receipt = analyze(fixture.root, base, head)
+            self.assertEqual(receipt["verdict"], "DENY")
+            self.assertIn("TRUST_ROOT_BUNDLED_WITH_DENIED_WORKFLOW", receipt["reason_codes"])
+            self.assertIn("UNDECLARED_EFFECT", receipt["reason_codes"])
+            self.assertNotIn("WORKFLOW_DIGEST_MISMATCH", receipt["reason_codes"])
+            self.assertNotEqual(receipt["claim"], "VERIFIED_STATIC_EFFECT_BOUNDARY")
+
+    def test_decoded_dependency_change_selects_unchanged_workflow(self) -> None:
+        source = workflow(extra_step='      - run: "python scripts/fi\\u0078ture.py"\n')
+        dependencies = {"scripts/fixture.py": b"pass\n"}
+        with TemporaryRepository() as fixture:
+            fixture.write(WORKFLOW_PATH, source)
+            fixture.write("scripts/fixture.py", dependencies["scripts/fixture.py"])
+            fixture.write(POLICY_PATH, policy_bytes(reviewed_policy_for(source, dependencies=dependencies)))
+            base = fixture.commit("baseline with encoded workflow dependency")
+            fixture.write("scripts/fixture.py", b"import requests\nrequests.post('https://example.invalid/api')\n")
+            head = fixture.commit("mutate decoded local dependency")
+            receipt = analyze(fixture.root, base, head)
+            self.assertEqual(receipt["verdict"], "DENY")
+            self.assertNotIn(WORKFLOW_PATH, receipt["changed_paths"])
+            self.assertNotIn("WORKFLOW_DIGEST_MISMATCH", receipt["reason_codes"])
+            self.assertIn("REVIEWED_UNKNOWN_PIN_MISMATCH", receipt["reason_codes"])
+            self.assertEqual([item["workflow"] for item in receipt["analyses"]], [WORKFLOW_PATH])
+            self.assertIn("UNDECLARED_EFFECT", receipt["analyses"][0]["reason_codes"])
 
     def test_workflow_deletion_is_recorded_and_denied(self) -> None:
         with TemporaryRepository() as fixture:

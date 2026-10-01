@@ -1,0 +1,27 @@
+name: Estate snapshot admission contract
+"on":
+  pull_request:
+  merge_group:
+  push:
+    branches: [main]
+permissions:
+  contents: read
+concurrency:
+  group: estate-snapshot-admission-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+jobs:
+  admission:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+          ref: ${{ github.event.pull_request.head.sha || github.event.merge_group.head_sha || github.sha }}
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: "3.12"
+      - name: Exercise the admitted CLI and synthetic boundary tests
+        run: |
+          python -I scripts/estate_snapshot_admission.py --help
+          python -I .github/scripts/test_estate_snapshot_admission.py
