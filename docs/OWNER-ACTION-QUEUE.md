@@ -2,6 +2,10 @@
 
 Each item lists the exact path and the command that proves it worked. Nothing here is delegable: each touches a credential, a key, an org-level setting, or owner hardware by design. State verified 2026-09-30 (receipt: szl-hf-frontier `payloads/SZL-HF-FRONTIER-1-EXECUTION-RECEIPT-2026-09-30.md`).
 
+## 0. One paste for all of it (recommended entry point)
+
+`payloads/runbooks/SZL-OWNER-MASTER-RUNBOOK.ps1` in szl-hf-frontier runs items 1, 2, 3, 4 and 7 below plus the khipu-abstain DPO lane and a local marketing-engine run as independent, fail-closed lanes, then writes one secret-free receipt under `%USERPROFILE%\szl\receipts\`. Tokens are read from the clipboard after you click Copy in the browser (nothing typed), and any lane can be skipped by typing `SKIP`. Fetch it byte-verified with the block in the thread receipt (session 10) or from Actions-authenticated `gh api`. Items 5 and 6 stay manual.
+
 ## 1. Cloudflare — one API token, two effects (5 minutes)
 
 A names-only audit of all 103 active repositories found **no Cloudflare credential anywhere** (no `CLOUDFLARE*`, `CF_*`, or `WRANGLER*` secret at repo, environment, or visible-org scope). The Pipedream connector still fails (`9106`): an API Token was saved into the API-**Key** connector, which expects the Global API Key plus account email.
