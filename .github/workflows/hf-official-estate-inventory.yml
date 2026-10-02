@@ -54,12 +54,14 @@ jobs:
 
       - name: Determine execution mode
         id: mode
+        env:
+          HF_INVENTORY_PUBLISH_INPUT: ${{ inputs.publish }}
         shell: bash
         run: |
           set -euo pipefail
           publish=true
           if [ "${GITHUB_EVENT_NAME}" = "pull_request" ]; then publish=false; fi
-          if [ "${GITHUB_EVENT_NAME}" = "workflow_dispatch" ] && [ "${{ inputs.publish }}" != "true" ]; then publish=false; fi
+          if [ "${GITHUB_EVENT_NAME}" = "workflow_dispatch" ] && [ "${HF_INVENTORY_PUBLISH_INPUT}" != "true" ]; then publish=false; fi
           echo "publish=${publish}" >> "$GITHUB_OUTPUT"
 
       - name: Set up Python
@@ -118,7 +120,7 @@ jobs:
         if: always() && steps.mode.outputs.publish == 'true'
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: hf-official-estate-inventory-${{ github.run_id }}
+          name: hf-official-estate-inventory-public-v1
           path: reports/hf-official-estate-inventory-public.json
           if-no-files-found: error
           retention-days: 90
@@ -198,8 +200,9 @@ jobs:
 
       - name: Publish inventory summary
         if: always() && steps.mode.outputs.publish == 'true'
-        shell: python
+        shell: bash
         run: |
+          python - <<'PY'
           import json
           import os
           from pathlib import Path
@@ -214,11 +217,14 @@ jobs:
                       out.write(f'- {key}: `{value}`\n')
                   canonical = report.get('canonical_a11oy') or {}
                   out.write(f"- canonical A11oy: `{canonical.get('sha', 'UNKNOWN')}` ({canonical.get('stage', 'UNKNOWN')})\n")
+          PY
 
       - name: Enforce fail-closed inventory result
         if: always() && steps.mode.outputs.publish == 'true'
+        env:
+          HF_INVENTORY_EXIT_CODE: ${{ steps.estate.outputs.exit_code }}
         run: |
-          code="${{ steps.estate.outputs.exit_code }}"
+          code="${HF_INVENTORY_EXIT_CODE:-}"
           if [ -z "$code" ]; then code=2; fi
           if [ "$code" -ne 0 ]; then
             echo "::error::Official estate inventory failed with exit ${code}."
