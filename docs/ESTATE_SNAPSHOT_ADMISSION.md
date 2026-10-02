@@ -29,5 +29,7 @@ Current/private inventory, secrets, CI, publication and runtime need separate
 evidence. Tiers do not replace `estate/alignment.v1.json` authority.
 
 The contract workflow runs synthetic tests with read-only repository access,
-SHA-pinned Actions and exact event checkout. Its new effect-policy binding is
-a trust-root proposal: `REVIEW_REQUIRED` until human review accepts that root.
+SHA-pinned Actions and exact event checkout. Its effect-policy binding is a
+trust-root transition: `REVIEW_REQUIRED` until an exact-head sole-owner
+attestation and normal protected-branch checks accept that root, as described
+in [Control-Plane Effect Bill of Materials](CONTROL_PLANE_EFFECTS.md).
