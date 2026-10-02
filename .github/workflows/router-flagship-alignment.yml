@@ -43,6 +43,8 @@ jobs:
     name: router-flagship/validate
     runs-on: ubuntu-24.04
     timeout-minutes: 12
+    env:
+      SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.event.merge_group.head_sha || github.sha }}
     steps:
       - name: Harden runner
         uses: step-security/harden-runner@e14015d583714f6e62063499dc959a02595150a1 # v2.21.1
@@ -52,7 +54,7 @@ jobs:
       - name: Checkout exact candidate
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: ${{ github.sha }}
+          ref: ${{ github.event.pull_request.head.sha || github.event.merge_group.head_sha || github.sha }}
           persist-credentials: false
           fetch-depth: 1
 
@@ -65,7 +67,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          test "$(git rev-parse HEAD)" = "$SOURCE_SHA"
           python -I -P -m py_compile .github/scripts/router_flagship_contract.py
           python -I -P .github/scripts/router_flagship_contract.py \
             --report "$VALIDATION_REPORT"
@@ -80,7 +82,7 @@ jobs:
           python .github/scripts/hf_static_space_deploy.py \
             --repo-root . \
             --manifest huggingface/org-card.manifest.json \
-            --source-sha "$GITHUB_SHA" \
+            --source-sha "$SOURCE_SHA" \
             --materialize "$preview_dir"
           test -f "profile/assets/hf-card-router.svg"
           grep -F "See it on real data" "$preview_dir/README.md"

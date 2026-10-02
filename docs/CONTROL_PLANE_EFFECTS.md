@@ -11,8 +11,8 @@ canonical JSON receipt. The analyzer does not contact GitHub, Hugging Face, a
 cloud provider, or any product runtime. It does not request or record secret
 values.
 
-The first policy declares only the CP-eBOM workflow. Existing estate workflows
-have not been migrated into this policy. A change to an undeclared workflow or
+The policy admits only its explicitly declared workflows, including the
+reviewed front-door scope described below. A change to an undeclared workflow or
 an unbound executable/configuration path is denied by this gate until its
 effect contract is reviewed and added. The workflow is not a required branch
 protection context merely because this file is present.
@@ -26,6 +26,8 @@ declaration:
 - referenced credential names, never credential values;
 - exact SHA-pinned actions with reviewed effect classifications;
 - local executable dependencies covered by exact content digests;
+- literal local Hugging Face JSON `--manifest` arguments, including their
+  publication target;
 - known external mutation sinks and exact resource keys;
 - per-effect call budgets and a total external-write budget;
 - concurrency, protected-ref, exact-revision, expected-before, and readback
@@ -61,7 +63,7 @@ Python environment overrides cannot shadow the admitted parser or libraries.
 
 Permissions are read from workflow and job mappings, including `write-all`.
 Unresolved inherited token authority is denied. Containers, services, matrix
-fan-out, unsupported runners or shells, and dynamic checkout targets are not
+fan-out, unsupported runners or shells, and unbounded checkout targets are not
 modeled execution boundaries and cannot be waived with an exact-byte review.
 A literal checkout repository override binds the actual repository resource.
 Credential expressions are inspected after YAML decoding; receipts record
@@ -72,12 +74,37 @@ the runner's case-insensitive semantics; normalization collisions are denied.
 Explicit authentication inputs must resolve wholly to named secret or
 `GITHUB_TOKEN` references; literal, dynamic, or unbound fallback authority
 is denied without recording its value. Artifact names bind the
-actual literal destination. Only the enforcing workflow's exact
-`control-plane-effect-${{ github.run_id }}` template maps to its declared
-run-scoped artifact namespace. Other dynamic names, non-archived uploads,
+actual literal destination. A fixed literal prefix followed by exactly
+`-${{ github.run_id }}`, `-${{ github.run_id }}-${{ github.run_attempt }}`, or
+`-${{ github.sha }}` binds a distinct exact `artifact-template` resource key
+containing both the prefix and the suffix type. This models the provider-owned
+numeric/hex suffix; it does not admit arbitrary dynamic names or wildcard
+matching. The original `control-plane-effect-${{ github.run_id }}` contract
+retains its existing run-scoped resource key. Other dynamic names, non-archived uploads,
 overwriting/deleting artifacts, Python cache writes, and checkout options
 that fetch unmodeled resources are denied. A checkout cannot substitute
-foreign repository or revision bytes for pinned local dependencies. Unknown
+foreign repository or unbounded revision bytes for pinned local dependencies.
+Explicit `github.sha` is accepted only when events or an exact event condition
+exclude pull requests: a PR's `github.sha` names a synthetic merge commit rather
+than the head whose dependencies the gate binds. The existing exact
+PR/merge-group/event SHA fallback remains supported.
+A direct PR head SHA requires the exact PR-event condition on its job or step.
+The one admitted step-output resolver is matched against its complete canonical
+shell body and environment bindings: it accepts same-repository PR heads,
+requires same-repository `main` for workflow-run heads, and validates a 40-hex
+result before writing its output. It must precede its consumer, have a unique
+step ID, run unconditionally without ignored failures, be consumed only under
+default or explicit `success()` gating, and have no inherited
+environment or preceding arbitrary executable code. Modified or other output
+resolvers remain denied. These source selectors describe event revisions; they
+do not independently prove a live provider's event payload or release state.
+
+Run blocks may interpolate only provider-owned `github.sha`, `github.run_id`,
+`github.run_attempt`, or that validated hex resolver output. All remaining
+shell/Python analysis, exact-byte review, effect declarations, and mutation
+budgets still apply; allowing an inert value does not prove the surrounding
+program safe. User-controlled strings, fallback expressions, missing resolvers,
+and malformed expressions remain denied. Unknown
 external actions, unresolved local actions or dependencies, and reusable
 workflows cannot be accepted by reviewing only the caller's bytes.
 Executable control hints come from run blocks, not workflow names or labels.
@@ -86,6 +113,36 @@ Owner-reviewed unknowns remain available only for eligible bounded source
 constructs. Acceptance requires exact file digests and the complete observed
 unknown set; the receipt records whether that review was applied. This cannot
 waive invalid YAML, unresolved authority or execution boundaries, or fan-out.
+
+## Front-door workflow admission
+
+The front-door declarations bind organization-card content writes to
+`huggingface:space:SZLHOLDINGS/README:contents` and visibility changes to
+`huggingface:space:SZLHOLDINGS/README:settings`. The central wrapper enforces
+this target directly; the production publisher's literal manifest is also
+included in the reviewed file digests. Changing its target invalidates that
+review. Both real publishers use the same `hf-org-card-main` concurrency group
+for publication with cancellation disabled. The receipt preserves the shared
+resource conflict for review; it does not infer authorization or provider
+compare-and-set behavior from the concurrency group.
+
+The estate and router validators invoke the same deployment helper only in
+materialization mode. Static dependency analysis still inventories the helper's
+SDK write site, so their declarations conservatively name that same manifest
+target and retain the conflict. This is an inventory of potential source
+effects, not a claim that validation published anything.
+
+The `tests.yml` declaration binds its seven observed SDK sites to the exact
+`runner:test-double:huggingface-client` fixture resource. This key describes
+local fake/mock API instances, not a Hugging Face repository or deployment.
+The reviewed test source supplies `FakeApi` for source-variable writes,
+replaces `huggingface_hub.HfApi` for restart tests, and passes `mock.Mock`
+instances to commit tests. Production CLI entries in that workflow are compile
+and help checks; it supplies no Hugging Face secret or publication command.
+The declaration pins the workflow, test modules, and referenced production
+modules and retains all seven conservative `external-write` site counts.
+This fixture binding must not be generalized to another workflow or changed
+test harness without a fresh source and policy review.
 
 ## Trust-root bootstrap boundary
 

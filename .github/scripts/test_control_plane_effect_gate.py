@@ -847,6 +847,150 @@ class YamlBoundaryRegressionTests(unittest.TestCase):
                 self.assertIn("CHECKOUT_SOURCE_BOUNDARY_UNSUPPORTED", {item.code for item in parsed["unknowns"]})
                 self.assertFalse(bound["reviewed_unknowns_applied"])
 
+    def test_bounded_artifact_templates_have_distinct_exact_resources(self) -> None:
+        for name, expected in (
+            ("report-${{ github.run_id }}", "report:run-id"),
+            ("report-${{ github.run_id }}-${{ github.run_attempt }}", "report:run-id-run-attempt"),
+            ("report-${{ github.sha }}", "report:sha"),
+        ):
+            with self.subTest(name=name):
+                source = workflow(extra_step=f"      - uses: {UPLOAD_ACTION}\n        with:\n          name: {name}\n")
+                candidate = reviewed_policy_for(source)
+                declaration = candidate["workflow_declarations"][WORKFLOW_PATH]
+                resource = "github:actions:artifact-template:" + expected
+                declaration["resources"].append({"key": resource, "access": "external-write"})
+                declaration["effects"].append({"sink": "github.artifact.upload", "resource": resource, "access": "external-write", "max_calls": 1})
+                declaration["max_external_writes"] = 1
+                parsed, bound = bind_source(source, candidate=candidate)
+                self.assertIn(resource, {effect.resource for effect in parsed["effects"]})
+                self.assertEqual(bound["verdict"], "ALLOW")
+                # A literal-name contract cannot stand in for the template.
+                declaration["resources"][-1]["key"] = "github:actions:artifact:report"
+                declaration["effects"][-1]["resource"] = "github:actions:artifact:report"
+                self.assert_source_denied(source, reason="UNDECLARED_EFFECT", candidate=candidate)
+
+    def test_hub_manifest_target_is_pinned_as_a_local_dependency(self) -> None:
+        manifest = "huggingface/org-card.manifest.json"
+        source = workflow(extra_step=f"      - run: echo --manifest {manifest}\n")
+        dependencies = {manifest: b'{"target":{"repo_id":"SZLHOLDINGS/README"}}\n'}
+        candidate = reviewed_policy_for(source, dependencies=dependencies)
+        parsed, bound = bind_source(source, candidate=candidate, dependencies=dependencies)
+        self.assertEqual(parsed["dependencies"], [manifest])
+        self.assertEqual(bound["verdict"], "ALLOW")
+        changed = {manifest: b'{"target":{"repo_id":"elsewhere/other"}}\n'}
+        _parsed, bound = self.assert_source_denied(source, reason="REVIEWED_UNKNOWN_PIN_MISMATCH", candidate=candidate, dependencies=changed)
+        self.assertFalse(bound["reviewed_unknowns_applied"])
+        self.assert_source_denied(source, reason="UNREVIEWABLE_EFFECT_BOUNDARY", candidate=candidate, dependencies={})
+        for value in (f"'{manifest}'", f'"{manifest}"', manifest):
+            quoted = workflow(extra_step=f"      - run: echo --manifest {value}\n")
+            self.assertEqual(gate.workflow_dependencies(quoted.decode()), [manifest])
+        for value in (f'"{manifest} suffix"', f"{manifest}.other", f'"{manifest}', f"'{manifest}\""):
+            malformed = workflow(extra_step=f"      - run: echo --manifest {value}\n")
+            self.assertNotIn(manifest, gate.workflow_dependencies(malformed.decode()))
+
+    def test_artifact_templates_reject_unbounded_or_destructive_variants(self) -> None:
+        for name, extra in (
+            ("${{ github.run_id }}", ""),
+            ("report-${{ github.event.issue.title }}", ""),
+            ("report-${{ github.run_id || inputs.name }}", ""),
+            ("report-${{ github.run_id }}-extra", ""),
+            ("report-${{ github.run_attempt }}", ""),
+            ("../report-${{ github.sha }}", ""),
+            ("report-${{ github.run_id }", ""),
+            ("report-${{ github.run_id }}", "          overwrite: true\n"),
+            ("report-${{ github.sha }}", "          archive: false\n"),
+        ):
+            with self.subTest(name=name, extra=extra):
+                source = workflow(extra_step=f"      - uses: {UPLOAD_ACTION}\n        with:\n          name: {json.dumps(name)}\n{extra}")
+                candidate = reviewed_policy_for(source)
+                self.assert_source_denied(source, reason="UNREVIEWABLE_EFFECT_BOUNDARY", candidate=candidate)
+
+    def test_event_checkout_refs_require_exact_supported_expression_and_pr_guard(self) -> None:
+        dependencies = {"scripts/fixture.py": b"pass\n"}
+        for ref, condition, accepted in (
+            ("${{ github.sha }}", "github.event_name == 'push'", True),
+            ("${{ github.sha }}", None, False),
+            ("${{ github.sha }}", "github.event_name != 'workflow_run'", False),
+            ("${{ github.event.pull_request.head.sha }}", "github.event_name == 'pull_request'", True),
+            ("${{ github.event.pull_request.head.sha }}", None, False),
+            ("${{ github.event.pull_request.head.sha }}", "github.event_name != 'push'", False),
+            ("${{ github.sha || 'main' }}", None, False),
+            ("${{ inputs.sha }}", None, False),
+            ("${{ github.event.workflow_run.head_sha }}", None, False),
+            ("${{ steps.source.outputs.sha }}", None, False),
+        ):
+            with self.subTest(ref=ref, condition=condition):
+                source = workflow(extra_step="      - run: python scripts/fixture.py\n").replace(
+                    f"      - uses: {CHECKOUT_ACTION}\n".encode(),
+                    f"      - uses: {CHECKOUT_ACTION}\n        with:\n          ref: {json.dumps(ref)}\n".encode(),
+                )
+                if condition:
+                    source = source.replace(b"    runs-on:", f"    if: {condition}\n    runs-on:".encode())
+                candidate = reviewed_policy_for(source, dependencies=dependencies)
+                parsed, bound = bind_source(source, candidate=candidate, dependencies=dependencies)
+                self.assertEqual("CHECKOUT_SOURCE_BOUNDARY_UNSUPPORTED" not in {u.code for u in parsed["unknowns"]}, accepted)
+                self.assertEqual(bound["verdict"], "ALLOW" if accepted else "DENY")
+
+    def guarded_source_fixture(self) -> dict[str, object]:
+        # Exercise the independently maintained production resolver, including
+        # its env bindings and ordering, rather than importing the analyzer's
+        # accepted-script constant as the positive fixture.
+        path = CHECKER_PATH.parents[1] / "workflows" / "estate-one-fabric-alignment.yml"
+        document, _lines = gate.parse_workflow_yaml(path.read_text(encoding="utf-8"))
+        job = document["jobs"]["local-contract"]
+        job["steps"] = job["steps"][:3] + [{"run": 'python scripts/fixture.py --sha "${{ steps.source.outputs.sha }}"'}]
+        document["jobs"] = {"fixture": job}
+        document["on"] = ["pull_request", "push", "workflow_run"]
+        return document
+
+    def test_canonical_guarded_checkout_and_hex_run_expression_are_eligible(self) -> None:
+        source = json.dumps(self.guarded_source_fixture()).encode()
+        parsed = gate.analyze_workflow_source(source.decode(), path=WORKFLOW_PATH)
+        self.assertFalse({u.code for u in parsed["unknowns"]} & gate.NON_REVIEWABLE_UNKNOWN_CODES)
+        # The eligible boundary still needs exact-source review; it is not an
+        # automatically proven shell program.
+        self.assertIn("SHELL_COMMAND_UNCLASSIFIED", {u.code for u in parsed["unknowns"]})
+
+    def test_mutated_guarded_checkout_cannot_be_waived(self) -> None:
+        mutations = (
+            lambda d, s: s[1].update({"if": "always()"}),
+            lambda d, s: s[1].update({"continue-on-error": "true"}),
+            lambda d, s: s[1].update({"shell": "sh"}),
+            lambda d, s: s[1]["env"].update({"FALLBACK_SHA": "${{ inputs.sha }}"}),
+            lambda d, s: s[1]["env"].update({"BASH_ENV": "evil.sh"}),
+            lambda d, s: d.update({"env": {"BASH_ENV": "evil.sh"}}),
+            lambda d, s: s[1].update({"run": s[1]["run"].replace("exit 1", "true")}),
+            lambda d, s: s[1].update({"run": s[1]["run"].replace('"$RUN_HEAD_BRANCH" != "main"', '"$RUN_HEAD_BRANCH" = "main"')}),
+            lambda d, s: s[1].update({"run": s[1]["run"] + '\necho "sha=main" >> "$GITHUB_OUTPUT"\n'}),
+            lambda d, s: s.insert(0, {"run": "echo bad >> $GITHUB_ENV"}),
+            lambda d, s: s.append({"id": "source", "run": "true"}),
+            lambda d, s: s.insert(1, s.pop(2)),  # output consumed before resolver
+            lambda d, s: s[2]["with"].update({"repository": "elsewhere/fixture"}),
+            lambda d, s: s[2].update({"if": "always()"}),
+            lambda d, s: s[-1].update({"if": "always()"}),
+        )
+        for index, mutate in enumerate(mutations):
+            with self.subTest(mutation=index):
+                document = self.guarded_source_fixture()
+                mutate(document, document["jobs"]["fixture"]["steps"])
+                source = json.dumps(document).encode()
+                dependencies = {"scripts/fixture.py": b"pass\n"}
+                candidate = reviewed_policy_for(source, dependencies=dependencies)
+                parsed, _bound = self.assert_source_denied(source, reason="UNREVIEWABLE_EFFECT_BOUNDARY", candidate=candidate, dependencies=dependencies)
+                self.assertTrue({"CHECKOUT_SOURCE_BOUNDARY_UNSUPPORTED", "WORKFLOW_EXPRESSION_EXECUTION_UNSUPPORTED"} & {u.code for u in parsed["unknowns"]})
+
+    def test_shell_interpolation_only_accepts_provider_hex_or_numeric_values(self) -> None:
+        for value, accepted in (
+            ("github.sha", True), ("github.run_id", True), ("github.run_attempt", True),
+            ("github.event.issue.title", False), ("github.ref", False),
+            ("steps.source.outputs.sha", False), ("github.sha || inputs.fallback", False),
+            ("format('{0}', github.sha)", False),
+        ):
+            with self.subTest(value=value):
+                source = workflow(extra_step='      - run: echo "${{ ' + value + ' }}"\n')
+                parsed = gate.analyze_workflow_source(source.decode(), path=WORKFLOW_PATH)
+                self.assertEqual("WORKFLOW_EXPRESSION_EXECUTION_UNSUPPORTED" not in {u.code for u in parsed["unknowns"]}, accepted)
+
     def test_action_input_case_collisions_are_nonwaivable(self) -> None:
         source = workflow(extra_step=f"      - uses: {UPLOAD_ACTION}\n        with: {{name: fixture, NAME: other-artifact}}\n")
         candidate = reviewed_policy_for(source)

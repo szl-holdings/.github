@@ -128,6 +128,11 @@ LOCAL_PATH = re.compile(
     r"[A-Za-z0-9_.\-/]+\.(?:py|sh|bash|ps1|js|mjs|cjs|ts|json|yml|yaml))"
     r"(?![A-Za-z0-9_.-])"
 )
+LOCAL_MANIFEST_PATH = re.compile(
+    r"--manifest(?:\s+|=)(?P<quote>['\"]?)"
+    r"(?P<manifest>(?:\./)?huggingface/[A-Za-z0-9_.\-/]+\.json)"
+    r"(?P=quote)(?=\s|$)"
+)
 
 
 class GateError(RuntimeError):
@@ -680,8 +685,8 @@ def workflow_dependencies(source: str) -> list[str]:
         # A malformed workflow still fails analysis; retain discoverable raw paths.
         pass
     dependencies: set[str] = set()
-    for match in LOCAL_PATH.finditer(clean):
-        spelling = match.group(1)
+    spellings = LOCAL_PATH.findall(clean) + [match.group("manifest") for match in LOCAL_MANIFEST_PATH.finditer(clean)]
+    for spelling in spellings:
         # A leading ./ is GitHub's explicit repository-local uses syntax.
         # The policy and receipt still use one canonical Git-tree path.
         dependency = spelling[2:] if spelling.startswith("./") else spelling
@@ -998,6 +1003,116 @@ def inline_python_blocks(
     return effects, unknowns
 
 
+GUARDED_SOURCE_ENV = {
+    "EVENT_NAME": "${{ github.event_name }}",
+    "THIS_REPOSITORY": "${{ github.repository }}",
+    "FALLBACK_SHA": "${{ github.sha }}",
+    "RUN_HEAD_SHA": "${{ github.event.workflow_run.head_sha }}",
+    "RUN_HEAD_REPOSITORY": "${{ github.event.workflow_run.head_repository.full_name }}",
+    "RUN_HEAD_BRANCH": "${{ github.event.workflow_run.head_branch }}",
+    "PR_HEAD_SHA": "${{ github.event.pull_request.head.sha }}",
+    "PR_HEAD_REPOSITORY": "${{ github.event.pull_request.head.repo.full_name }}",
+}
+# This is an intentionally exact, reviewed resolver grammar, not a shell
+# theorem prover. Any changed command, guard, environment binding, or output
+# requires a new analyzer review; finding a SHA regex somewhere is insufficient.
+GUARDED_SOURCE_RUN = '''set -euo pipefail
+sha="$FALLBACK_SHA"
+if [ "$EVENT_NAME" = "workflow_run" ]; then
+  if [ "$RUN_HEAD_REPOSITORY" != "$THIS_REPOSITORY" ] || [ "$RUN_HEAD_BRANCH" != "main" ]; then
+    echo "::error::refusing to check out a workflow_run head from ${RUN_HEAD_REPOSITORY}@${RUN_HEAD_BRANCH}; only ${THIS_REPOSITORY}@main is trusted"
+    exit 1
+  fi
+  sha="$RUN_HEAD_SHA"
+elif [ "$EVENT_NAME" = "pull_request" ] && [ "$PR_HEAD_REPOSITORY" = "$THIS_REPOSITORY" ]; then
+  sha="$PR_HEAD_SHA"
+fi
+if ! [[ "$sha" =~ ^[0-9a-f]{40}$ ]]; then
+  echo "::error::resolved source is not a 40-hex commit: ${sha}"
+  exit 1
+fi
+echo "sha=${sha}" >> "$GITHUB_OUTPUT"'''
+
+
+def guarded_source_references(
+    document: Mapping[str, Any], job: Mapping[str, Any], steps: list[Any], index: int,
+) -> set[str]:
+    """Outputs proven hex by an earlier, unconditional canonical resolver."""
+    consumer = steps[index]
+    if (
+        document.get("env") or job.get("env")
+        or not isinstance(consumer, dict)
+        or consumer.get("if", "success()") not in {"success()", "${{ success() }}"}
+    ):
+        return set()  # In particular, do not admit inherited BASH_ENV overrides.
+    result: set[str] = set()
+    for before, step in enumerate(steps[:index]):
+        if not isinstance(step, dict):
+            continue
+        identifier = step.get("id", "")
+        if not isinstance(identifier, str) or not re.fullmatch(r"[A-Za-z_][A-Za-z0-9_-]*", identifier):
+            continue
+        if sum(isinstance(item, dict) and item.get("id") == identifier for item in steps) != 1:
+            continue
+        if (
+            set(step) - {"id", "name", "env", "run", "shell"}
+            or step.get("shell", "bash") != "bash"
+            or step.get("env") != GUARDED_SOURCE_ENV
+            or not isinstance(step.get("run"), str)
+            or step["run"].rstrip("\n") != GUARDED_SOURCE_RUN
+        ):
+            continue
+        # Only the reviewed runner guard can precede this resolver. Earlier
+        # arbitrary code could replace its shell or poison GITHUB_ENV/PATH.
+        if any(
+            not isinstance(prior, dict)
+            or prior.get("uses") != "step-security/harden-runner@e14015d583714f6e62063499dc959a02595150a1"
+            or set(prior) - {"name", "uses", "with"}
+            for prior in steps[:before]
+        ):
+            continue
+        result.add(f"steps.{identifier}.outputs.sha")
+    return result
+
+
+def bounded_artifact_resource(name: str) -> str | None:
+    """Bind one literal destination or one exact provider-owned suffix template."""
+    if re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._-]*", name):
+        return f"github:actions:artifact:{name}"
+    templates = {
+        "-${{ github.run_id }}": "run-id",
+        "-${{ github.run_id }}-${{ github.run_attempt }}": "run-id-run-attempt",
+        "-${{ github.sha }}": "sha",
+    }
+    for suffix, scope in templates.items():
+        if not name.endswith(suffix):
+            continue
+        prefix = name[:-len(suffix)]
+        if re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._-]*", prefix):
+            if name == "control-plane-effect-${{ github.run_id }}":
+                return "github:actions:artifact:control-plane-effect"
+            # Separate from literal artifact resources so a fixed name cannot
+            # silently claim the contract for a dynamic destination, or vice versa.
+            return f"github:actions:artifact-template:{prefix}:{scope}"
+    return None
+
+
+def checkout_ref_is_bounded(
+    ref: str, job: Mapping[str, Any], step: Mapping[str, Any], guarded: set[str], triggers: Sequence[str],
+) -> bool:
+    if ref == "${{ github.event.pull_request.head.sha || github.event.merge_group.head_sha || github.sha }}":
+        return True
+    if ref == "${{ github.sha }}":
+        # PR github.sha is a synthetic merge commit, not the PR head whose
+        # dependency bytes this gate binds. An explicit event SHA is admitted
+        # only when the workflow or exact event condition excludes PR execution.
+        non_pr_conditions = {f"github.event_name == '{event}'" for event in ("push", "workflow_dispatch", "schedule", "merge_group", "workflow_run")}
+        return not ({"pull_request", "pull_request_target"} & set(triggers)) or job.get("if") in non_pr_conditions or step.get("if") in non_pr_conditions
+    if ref == "${{ github.event.pull_request.head.sha }}":
+        return job.get("if") == "github.event_name == 'pull_request'" or step.get("if") == "github.event_name == 'pull_request'"
+    return any(ref == "${{ " + expression + " }}" for expression in guarded)
+
+
 def analyze_workflow_source(source: str, *, path: str) -> dict[str, Any]:
     effects: list[RawEffect] = []
     unknowns: list[UnknownEffect] = []
@@ -1104,6 +1219,7 @@ def analyze_workflow_source(source: str, *, path: str) -> dict[str, Any]:
             if not isinstance(step, dict) or bool("uses" in step) == bool("run" in step):
                 unknown("WORKFLOW_SHAPE_INVALID", step_location)
                 continue
+            guarded = guarded_source_references(document, job, steps, index)
             if set(step) - {
                 "id", "if", "name", "uses", "run", "working-directory", "shell",
                 "with", "env", "continue-on-error", "timeout-minutes",
@@ -1156,10 +1272,9 @@ def analyze_workflow_source(source: str, *, path: str) -> dict[str, Any]:
                             or bool(inputs.get("path"))
                         ):
                             unknown("ACTION_EXTRA_EFFECT_UNSUPPORTED", (*step_location, "with"))
-                        exact_event_head = "${{ github.event.pull_request.head.sha || github.event.merge_group.head_sha || github.sha }}"
                         if dependencies and (
                             inputs.get("repository", "szl-holdings/.github") != "szl-holdings/.github"
-                            or ("ref" in inputs and inputs["ref"] != exact_event_head)
+                            or ("ref" in inputs and not checkout_ref_is_bounded(inputs["ref"], job, step, guarded, triggers))
                         ):
                             unknown("CHECKOUT_SOURCE_BOUNDARY_UNSUPPORTED", (*step_location, "with"))
                     if sink == "github.contents.checkout" and "repository" in inputs:
@@ -1172,15 +1287,11 @@ def analyze_workflow_source(source: str, *, path: str) -> dict[str, Any]:
                         if inputs.get("archive", "true").lower() != "true":
                             unknown("ACTION_RESOURCE_OVERRIDE_UNSUPPORTED", (*step_location, "with"))
                         artifact = inputs.get("name", "artifact")
-                        if artifact == "control-plane-effect-${{ github.run_id }}":
-                            # This exact run-scoped namespace is the enforcing
-                            # workflow contract, not an arbitrary dynamic name.
-                            resource = "github:actions:artifact:control-plane-effect"
-                        elif re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._-]*", artifact):
-                            resource = f"github:actions:artifact:{artifact}"
-                        else:
+                        artifact_resource = bounded_artifact_resource(artifact)
+                        if artifact_resource is None:
                             unknown("ACTION_RESOURCE_OVERRIDE_UNSUPPORTED", (*step_location, "with"))
                             continue
+                        resource = artifact_resource
                         if inputs.get("overwrite", "false").lower() != "false":
                             unknown("ACTION_DESTRUCTIVE_INPUT_UNSUPPORTED", (*step_location, "with"))
                     if sink == "runner.toolchain.install" and (
@@ -1197,7 +1308,11 @@ def analyze_workflow_source(source: str, *, path: str) -> dict[str, Any]:
                 if not isinstance(block, str):
                     unknown("WORKFLOW_SHAPE_INVALID", (*step_location, "run"))
                     continue
-                if GITHUB_EXPRESSION.search(block):
+                # Only provider-owned hex/numeric values or a proven hex output
+                # can be interpolated into shell. Remaining shell/Python source
+                # still requires complete exact-byte review and effect binding.
+                safe_values = {"github.sha", "github.run_id", "github.run_attempt"} | guarded
+                if any(expression.group(1).strip() not in safe_values for expression in GITHUB_EXPRESSION.finditer(block)):
                     unknown("WORKFLOW_EXPRESSION_EXECUTION_UNSUPPORTED", (*step_location, "run"))
                 blocks.append((lines[(*step_location, "run")], block))
 
@@ -1225,7 +1340,7 @@ def analyze_workflow_source(source: str, *, path: str) -> dict[str, Any]:
         "protected_ref": bool(re.search(r"refs/heads/main", clean))
         and bool(re.search(r"(?:GITHUB_REF|github\.ref)", clean)),
         "exact_sha": bool(re.search(r"git\s+rev-parse", clean))
-        and bool(re.search(r"(?:GITHUB_SHA|github\.sha|HEAD_SHA)", clean)),
+        and bool(re.search(r"(?:GITHUB_SHA|github\.sha|HEAD_SHA|SOURCE_SHA)", clean)),
         "expected_before": bool(
             re.search(r"expected[-_ ]before|compare[-_ ]and[-_ ]set", clean, re.I)
         ),
