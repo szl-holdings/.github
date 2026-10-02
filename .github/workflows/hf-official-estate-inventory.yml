@@ -28,7 +28,6 @@ on:
 
 permissions:
   contents: read
-  issues: write
 
 concurrency:
   group: hf-official-estate-inventory-${{ github.event_name }}-${{ github.ref }}
@@ -43,8 +42,6 @@ jobs:
       HF_ORG_TOKEN: ${{ secrets.HF_ORG_TOKEN || secrets.HF_ORG_TOKEN1 }}
       HF_TOKEN: ${{ secrets.HF_TOKEN }}
       HF_HUB_DISABLE_PROGRESS_BARS: "1"
-      GH_TOKEN: ${{ github.token }}
-      REPORT_ISSUE_TITLE: '[hf-estate-inventory] official collections and buckets'
     steps:
       - name: Checkout inventory verifier
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -54,12 +51,14 @@ jobs:
 
       - name: Determine execution mode
         id: mode
+        env:
+          HF_INVENTORY_PUBLISH_INPUT: ${{ inputs.publish }}
         shell: bash
         run: |
           set -euo pipefail
           publish=true
           if [ "${GITHUB_EVENT_NAME}" = "pull_request" ]; then publish=false; fi
-          if [ "${GITHUB_EVENT_NAME}" = "workflow_dispatch" ] && [ "${{ inputs.publish }}" != "true" ]; then publish=false; fi
+          if [ "${GITHUB_EVENT_NAME}" = "workflow_dispatch" ] && [ "${HF_INVENTORY_PUBLISH_INPUT}" != "true" ]; then publish=false; fi
           echo "publish=${publish}" >> "$GITHUB_OUTPUT"
 
       - name: Set up Python
@@ -107,96 +106,31 @@ jobs:
           echo "exit_code=${code}" >> "$GITHUB_OUTPUT"
           exit 0
 
-      - name: Upload immutable inventory report
+      - name: Project public metadata without private identifiers
+        if: always() && steps.mode.outputs.publish == 'true'
+        run: |
+          python .github/scripts/hf_official_estate_inventory_compat.py \
+            --public-projection reports/hf-official-estate-inventory-latest.json \
+            --output reports/hf-official-estate-inventory-public.json
+
+      - name: Upload public inventory projection
         if: always() && steps.mode.outputs.publish == 'true'
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: hf-official-estate-inventory-${{ github.run_id }}
-          path: reports/hf-official-estate-inventory-latest.json
+          name: hf-official-estate-inventory-public-v1
+          path: reports/hf-official-estate-inventory-public.json
           if-no-files-found: error
           retention-days: 90
 
-      - name: Persist deterministic inventory issue
+      - name: Publish inventory summary
         if: always() && steps.mode.outputs.publish == 'true'
         shell: bash
         run: |
-          set -euo pipefail
-          test -f reports/hf-official-estate-inventory-latest.json
-          {
-            echo '<!-- szl-hf-official-estate-inventory -->'
-            echo '# Hugging Face official estate inventory'
-            echo
-            echo "- Run: ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
-            echo "- Source revision: \`${GITHUB_SHA}\`"
-            echo
-            echo '```json'
-            cat reports/hf-official-estate-inventory-latest.json
-            echo '```'
-          } > /tmp/hf-official-inventory.md
-
-          issue_number="$(gh issue list \
-            --repo "$GITHUB_REPOSITORY" \
-            --state all \
-            --search "${REPORT_ISSUE_TITLE} in:title" \
-            --json number,title \
-            --jq ".[] | select(.title == env.REPORT_ISSUE_TITLE) | .number" \
-            | head -n1)"
-          if [ -n "$issue_number" ]; then
-            gh issue edit "$issue_number" \
-              --repo "$GITHUB_REPOSITORY" \
-              --body-file /tmp/hf-official-inventory.md
-          else
-            gh issue create \
-              --repo "$GITHUB_REPOSITORY" \
-              --title "$REPORT_ISSUE_TITLE" \
-              --body-file /tmp/hf-official-inventory.md >/dev/null
-            issue_number="$(gh issue list \
-              --repo "$GITHUB_REPOSITORY" \
-              --state all \
-              --search "${REPORT_ISSUE_TITLE} in:title" \
-              --json number,title \
-              --jq ".[] | select(.title == env.REPORT_ISSUE_TITLE) | .number" \
-              | head -n1)"
-          fi
-
-          if python - <<'PY'
-          import json
-          from pathlib import Path
-          report = json.loads(Path('reports/hf-official-estate-inventory-latest.json').read_text())
-          counts = report.get('counts', {})
-          canonical = report.get('canonical_a11oy', {})
-          clones = report.get('clone_absence', {})
-          ok = (
-              report.get('summary', {}).get('error') == 0
-              and canonical.get('stage') == 'RUNNING'
-              and canonical.get('private') is False
-              and canonical.get('sdk') == 'docker'
-              and all(clones.values())
-              and len(clones) == 4
-              and counts.get('kernels') is not None
-              and counts.get('collections') is not None
-              and counts.get('collection_references') is not None
-              and counts.get('buckets') is not None
-          )
-          raise SystemExit(0 if ok else 1)
-          PY
-          then
-            gh issue close "$issue_number" \
-              --repo "$GITHUB_REPOSITORY" \
-              --reason completed \
-              --comment 'Supported HfApi inventory, official Kernel Hub discovery with HfApi readback, collection reference resolution, bucket readback, canonical runtime, and permanent clone absence all passed.' || true
-          else
-            gh issue reopen "$issue_number" --repo "$GITHUB_REPOSITORY" || true
-          fi
-
-      - name: Publish inventory summary
-        if: always() && steps.mode.outputs.publish == 'true'
-        shell: python
-        run: |
+          python - <<'PY'
           import json
           import os
           from pathlib import Path
-          path = Path('reports/hf-official-estate-inventory-latest.json')
+          path = Path('reports/hf-official-estate-inventory-public.json')
           with open(os.environ['GITHUB_STEP_SUMMARY'], 'a', encoding='utf-8') as out:
               out.write('## Official Hugging Face estate inventory\n\n')
               if not path.exists():
@@ -205,13 +139,16 @@ jobs:
                   report = json.loads(path.read_text())
                   for key, value in report.get('counts', {}).items():
                       out.write(f'- {key}: `{value}`\n')
-                  canonical = report.get('canonical_a11oy', {})
+                  canonical = report.get('canonical_a11oy') or {}
                   out.write(f"- canonical A11oy: `{canonical.get('sha', 'UNKNOWN')}` ({canonical.get('stage', 'UNKNOWN')})\n")
+          PY
 
       - name: Enforce fail-closed inventory result
         if: always() && steps.mode.outputs.publish == 'true'
+        env:
+          HF_INVENTORY_EXIT_CODE: ${{ steps.estate.outputs.exit_code }}
         run: |
-          code="${{ steps.estate.outputs.exit_code }}"
+          code="${HF_INVENTORY_EXIT_CODE:-}"
           if [ -z "$code" ]; then code=2; fi
           if [ "$code" -ne 0 ]; then
             echo "::error::Official estate inventory failed with exit ${code}."

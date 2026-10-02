@@ -3,9 +3,11 @@ from __future__ import annotations
 
 import importlib
 import inspect
+import json
 import pathlib
 import sys
 import unittest
+from unittest.mock import patch
 
 HERE = pathlib.Path(__file__).resolve().parent
 if str(HERE) not in sys.path:
@@ -15,15 +17,24 @@ compat = importlib.import_module("hf_official_estate_inventory_compat")
 
 
 class Response:
-    def __init__(self, payload, link=""):
+    def __init__(self, payload, link="", status=200, raw=None):
         self._payload = payload
         self.headers = {"Link": link} if link else {}
+        self.status_code = status
+        self.raw = json.dumps(payload).encode() if raw is None else raw
+        self.closed = False
 
     def raise_for_status(self):
         return None
 
     def json(self):
         return self._payload
+
+    def iter_content(self, chunk_size=None):
+        yield self.raw
+
+    def close(self):
+        self.closed = True
 
 
 class Session:
@@ -32,8 +43,8 @@ class Session:
         self.calls = []
         self.headers = {}
 
-    def get(self, url, timeout=None):
-        self.calls.append((url, timeout))
+    def get(self, url, **kwargs):
+        self.calls.append((url, kwargs))
         return self.responses.pop(0)
 
 
@@ -51,7 +62,7 @@ class Api:
         self.info_calls = []
         self.file_calls = []
 
-    def kernel_info(self, repo_id):
+    def kernel_info(self, repo_id, timeout=None):
         self.info_calls.append(repo_id)
         return KernelInfo(repo_id, "a" * 40)
 
@@ -68,6 +79,7 @@ class KernelInventoryCompatibilityTests(unittest.TestCase):
             "https://huggingface.co/api/kernels?cursor=next",
         )
         self.assertEqual(compat._next_link(""), "")
+        self.assertEqual(compat._next_link('<https://huggingface.co/api/kernels?cursor=next>; rel = "NEXT"'), "https://huggingface.co/api/kernels?cursor=next")
 
     def test_official_endpoint_pagination(self) -> None:
         verifier = object.__new__(compat.CurrentHubEstateInventory)
@@ -86,7 +98,7 @@ class KernelInventoryCompatibilityTests(unittest.TestCase):
             "SZLHOLDINGS/kernel-b",
         ])
         self.assertEqual(len(verifier.http.calls), 2)
-        self.assertTrue(all(timeout == 45 for _, timeout in verifier.http.calls))
+        self.assertTrue(all(kwargs == {"timeout": (10, 15), "allow_redirects": False, "stream": True} for _, kwargs in verifier.http.calls))
 
     def test_kernel_discovery_requires_hfapi_readback(self) -> None:
         verifier = object.__new__(compat.CurrentHubEstateInventory)
@@ -96,7 +108,6 @@ class KernelInventoryCompatibilityTests(unittest.TestCase):
         verifier.http = Session(
             [Response([
                 {"id": "SZLHOLDINGS/kernel-a", "sha": "stale"},
-                {"id": "other/kernel", "sha": "b" * 40},
             ])]
         )
         verifier.inventory_kernels()
@@ -110,6 +121,101 @@ class KernelInventoryCompatibilityTests(unittest.TestCase):
             verifier.api.file_calls,
             [("SZLHOLDINGS/kernel-a", "kernel", "a" * 40)],
         )
+
+    def verifier(self, responses):
+        verifier = object.__new__(compat.CurrentHubEstateInventory)
+        verifier.http = Session(responses)
+        verifier.api = Api()
+        verifier.inventory = {}
+        verifier.actions = []
+        return verifier
+
+    def test_foreign_pagination_link_never_sends_bearer_header(self):
+        verifier = self.verifier([Response([], '<https://attacker.example/api/kernels?cursor=x>; rel="next"')])
+        verifier.http.headers["Authorization"] = "Bearer test-never-leak"
+        with self.assertRaisesRegex(ValueError, "KERNEL_URL_REJECTED"):
+            verifier._list_kernel_summaries()
+        self.assertEqual(len(verifier.http.calls), 1)
+        self.assertTrue(all(url.startswith("https://huggingface.co/api/kernels?") for url, _ in verifier.http.calls))
+
+    def test_redirect_is_rejected_and_response_closed(self):
+        response = Response([], status=302)
+        verifier = self.verifier([response])
+        with self.assertRaisesRegex(RuntimeError, "KERNEL_HTTP_STATUS_REJECTED"):
+            verifier._list_kernel_summaries()
+        self.assertIs(verifier.http.calls[0][1]["allow_redirects"], False)
+        self.assertTrue(response.closed)
+
+    def test_unsafe_urls_are_rejected_before_request(self):
+        urls = ["http://huggingface.co/api/kernels", "https://huggingface.co.attacker/api/kernels",
+                "https://user@huggingface.co/api/kernels", "https://huggingface.co:443/api/kernels",
+                "https://huggingface.co/api/models", "https://huggingface.co/api/kernels#x",
+                "https://huggingface.co/api/kernels?author=other", "https://huggingface.co/api/kernels?limit=1000",
+                "https://huggingface.co/api/kernels?cursor=a&cursor=b", "https://huggingface.co/api/kernels\n"]
+        for url in urls:
+            with self.subTest(url=url), patch.object(compat, "KERNEL_LIST_URL", url):
+                verifier = self.verifier([])
+                with self.assertRaises(ValueError): verifier._list_kernel_summaries()
+                self.assertEqual(verifier.http.calls, [])
+
+    def test_json_boundaries_and_record_shape_fail_closed(self):
+        payloads = [b'[{"id":"SZLHOLDINGS/a","id":"SZLHOLDINGS/b"}]',
+                    b'[{"id":"SZLHOLDINGS/a","likes":NaN}]', b'[{"id":"SZLHOLDINGS/a","likes":1e999}]', b'[null]', b'[{"id":"other/kernel"}]',
+                    b'[{"id":"SZLHOLDINGS/a"},{"id":"SZLHOLDINGS/a"}]', b'{"error":"not-a-list"}']
+        for raw in payloads:
+            with self.subTest(raw=raw):
+                verifier = self.verifier([Response([], raw=raw)])
+                with self.assertRaises((ValueError, TypeError)): verifier.inventory_kernels()
+                self.assertNotIn("kernels", verifier.inventory)
+
+    def test_byte_page_item_and_cycle_bounds(self):
+        verifier = self.verifier([Response([], raw=b' ' * 65)])
+        with patch.object(compat, "MAX_KERNEL_PAGE_BYTES", 64), self.assertRaisesRegex(RuntimeError, "BYTE_BOUND"):
+            verifier._list_kernel_summaries()
+        verifier = self.verifier([Response([{ "id": "SZLHOLDINGS/a" }, { "id": "SZLHOLDINGS/b" }])])
+        with patch.object(compat, "MAX_KERNEL_ITEMS", 1), self.assertRaisesRegex(RuntimeError, "ITEM_BOUND"):
+            verifier._list_kernel_summaries()
+        verifier = self.verifier([Response([], '<https://huggingface.co/api/kernels?cursor=x>; rel="next"')])
+        with patch.object(compat, "MAX_KERNEL_PAGES", 1), self.assertRaisesRegex(RuntimeError, "PAGE_BOUND"):
+            verifier._list_kernel_summaries()
+        verifier = self.verifier([Response([], f'<{compat.KERNEL_LIST_URL}>; rel="next"')])
+        with self.assertRaisesRegex(RuntimeError, "PAGINATION_CYCLE"): verifier._list_kernel_summaries()
+        self.assertEqual(len(verifier.http.calls), 1)
+
+    def test_duplicate_and_malformed_next_links_are_not_end_of_census(self):
+        url = "https://huggingface.co/api/kernels?cursor=x"
+        for header in (f'<{url}>; rel="next", <{url}>; rel="next"', 'bad; rel="next"'):
+            with self.subTest(header=header), self.assertRaises(ValueError): compat._next_link(header)
+
+    def test_readback_identity_and_sha_are_not_taken_from_listing(self):
+        verifier = self.verifier([Response([{"id": "SZLHOLDINGS/a", "sha": "a" * 40}])])
+        verifier.api.kernel_info = lambda *args, **kwargs: KernelInfo("SZLHOLDINGS/other", "b" * 40)
+        with self.assertRaisesRegex(RuntimeError, "ID_MISMATCH"): verifier.inventory_kernels()
+        verifier = self.verifier([Response([{"id": "SZLHOLDINGS/a", "sha": "a" * 40}])])
+        verifier.api.kernel_info = lambda *args, **kwargs: KernelInfo("SZLHOLDINGS/a", None)
+        with self.assertRaisesRegex(RuntimeError, "IMMUTABLE_REVISION_MISSING"): verifier.inventory_kernels()
+
+    def test_public_projection_excludes_private_ids_notes_actions_errors_and_digests(self):
+        secret = "PRIVATE-SENTINEL"
+        raw = {"assets": {"kernels": [{"id":"SZLHOLDINGS/public", "private":False},
+                                      {"id":secret,"private":True}, {"id":secret,"private":None}]},
+               "collections":[{"title":secret}],"buckets":[{"id":secret}],
+               "actions":[{"detail":secret}],"fatal":secret,"sha256":secret,"summary":{"error":1}}
+        projected = compat.public_report(raw)
+        self.assertNotIn(secret, json.dumps(projected))
+        self.assertEqual(projected["counts"]["kernels"], 1)
+        self.assertIsNone(projected["counts"]["models"])
+        self.assertEqual(projected["coverage"]["models"], "UNKNOWN")
+        projected = compat.public_report({"assets":{"models":[]}, "counts":{"models":None}})
+        self.assertIsNone(projected["counts"]["models"])
+        self.assertEqual(projected["coverage"]["models"], "UNKNOWN")
+
+    def test_private_evidence_dataset_is_required_before_any_publish(self):
+        verifier = self.verifier([]); verifier.publish = True
+        verifier.api.dataset_info = lambda _: type("Info", (), {"private":False})()
+        with patch.object(compat.base.OfficialEstateInventory, "persist") as persist:
+            with self.assertRaisesRegex(RuntimeError, "PRIVATE_EVIDENCE_DATASET_REQUIRED"): verifier.persist({})
+            persist.assert_not_called()
 
     def test_active_compatibility_source_uses_no_nonexistent_list_method(self) -> None:
         executable = "\n".join(

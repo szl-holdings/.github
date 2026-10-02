@@ -75,6 +75,284 @@
         ".github/scripts/test_control_plane_effect_gate.py": "sha256:abf96660b74f49eaaffe4f6165a0614f0e8922605ddc8a47d4aa11ef71791981"
       }
     },
+    ".github/workflows/estate-snapshot-admission.yml": {
+      "intent_id": "estate-snapshot-admission-contract-v1",
+      "valid_until": "2026-11-30",
+      "source_sha256": "sha256:70d8cb695974248d71ef478d4fef3771709f236c90d757d086b241b6298e3a0f",
+      "credentials": [],
+      "resources": [
+        {
+          "key": "github:repository:szl-holdings/.github:contents",
+          "access": "read"
+        },
+        {
+          "key": "runner:toolchain:python",
+          "access": "local-write"
+        }
+      ],
+      "effects": [
+        {
+          "sink": "github.contents.checkout",
+          "resource": "github:repository:szl-holdings/.github:contents",
+          "access": "read",
+          "max_calls": 1
+        },
+        {
+          "sink": "runner.toolchain.install",
+          "resource": "runner:toolchain:python",
+          "access": "local-write",
+          "max_calls": 1
+        }
+      ],
+      "max_external_writes": 0,
+      "required_controls": {
+        "triggers": [
+          "pull_request",
+          "merge_group",
+          "push"
+        ],
+        "contents_read": true,
+        "no_explicit_secrets": true,
+        "concurrency": true,
+        "protected_ref": false,
+        "exact_sha": false,
+        "expected_before": false,
+        "readback": false
+      },
+      "trusted_transitives": {},
+      "reviewed_unknowns": {
+        "files": {
+          ".github/scripts/test_estate_snapshot_admission.py": "sha256:7e594ea3e6c0cdd0819a068c7f92a2cc404909d60013c66d51fb3609967b19ab",
+          ".github/workflows/estate-snapshot-admission.yml": "sha256:70d8cb695974248d71ef478d4fef3771709f236c90d757d086b241b6298e3a0f",
+          "scripts/estate_snapshot_admission.py": "sha256:f255a7aacb904bf81c5c8004e0c43f0da4e243fc549971d148a5a1d9fadd8562"
+        },
+        "unknowns": [
+          "ACTION_INPUTS_REVIEW_REQUIRED@.github/workflows/estate-snapshot-admission.yml:19",
+          "ACTION_INPUTS_REVIEW_REQUIRED@.github/workflows/estate-snapshot-admission.yml:23",
+          "PYTHON_IMPORT_UNRESOLVED@.github/scripts/test_estate_snapshot_admission.py:2",
+          "PYTHON_IMPORT_UNRESOLVED@.github/scripts/test_estate_snapshot_admission.py:3",
+          "PYTHON_IMPORT_UNRESOLVED@.github/scripts/test_estate_snapshot_admission.py:5",
+          "PYTHON_IMPORT_UNRESOLVED@.github/scripts/test_estate_snapshot_admission.py:6",
+          "PYTHON_IMPORT_UNRESOLVED@scripts/estate_snapshot_admission.py:3",
+          "PYTHON_IMPORT_UNRESOLVED@scripts/estate_snapshot_admission.py:5",
+          "PYTHON_IMPORT_UNRESOLVED@scripts/estate_snapshot_admission.py:6",
+          "PYTHON_IMPORT_UNRESOLVED@scripts/estate_snapshot_admission.py:8",
+          "PYTHON_SOURCE_REVIEW_REQUIRED@.github/scripts/test_estate_snapshot_admission.py:1",
+          "PYTHON_SOURCE_REVIEW_REQUIRED@scripts/estate_snapshot_admission.py:1",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/estate-snapshot-admission.yml:26",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/estate-snapshot-admission.yml:27"
+        ]
+      }
+    },
+    ".github/workflows/hf-official-estate-inventory.yml": {
+      "intent_id": "hf-official-estate-inventory-public-boundary-v1",
+      "valid_until": "2026-11-30",
+      "source_sha256": "sha256:5f1a46698dba6b5fd8ceca43d92bcd485fee53a7d70f04cc00df2a844273e42f",
+      "credentials": [
+        "HF_ORG_TOKEN",
+        "HF_ORG_TOKEN1",
+        "HF_TOKEN"
+      ],
+      "resources": [
+        {
+          "key": "github:actions:artifact:hf-official-estate-inventory-public-v1",
+          "access": "external-write"
+        },
+        {
+          "key": "github:repository:szl-holdings/.github:contents",
+          "access": "read"
+        },
+        {
+          "key": "runner:toolchain:python",
+          "access": "local-write"
+        },
+        {
+          "key": "sink:sdk:repository:upload_file",
+          "access": "external-write"
+        }
+      ],
+      "effects": [
+        {
+          "sink": "github.artifact.upload",
+          "resource": "github:actions:artifact:hf-official-estate-inventory-public-v1",
+          "access": "external-write",
+          "max_calls": 1
+        },
+        {
+          "sink": "github.contents.checkout",
+          "resource": "github:repository:szl-holdings/.github:contents",
+          "access": "read",
+          "max_calls": 1
+        },
+        {
+          "sink": "runner.toolchain.install",
+          "resource": "runner:toolchain:python",
+          "access": "local-write",
+          "max_calls": 1
+        },
+        {
+          "sink": "sdk.repository.upload_file",
+          "resource": "sink:sdk:repository:upload_file",
+          "access": "external-write",
+          "max_calls": 1
+        }
+      ],
+      "max_external_writes": 2,
+      "required_controls": {
+        "triggers": [
+          "pull_request",
+          "push",
+          "schedule",
+          "workflow_dispatch"
+        ],
+        "contents_read": true,
+        "no_explicit_secrets": false,
+        "concurrency": true,
+        "protected_ref": false,
+        "exact_sha": false,
+        "expected_before": false,
+        "readback": false
+      },
+      "trusted_transitives": {},
+      "reviewed_unknowns": {
+        "files": {
+          ".github/workflows/hf-official-estate-inventory.yml": "sha256:5f1a46698dba6b5fd8ceca43d92bcd485fee53a7d70f04cc00df2a844273e42f",
+          ".github/scripts/hf_official_estate_inventory.py": "sha256:de23a6629ec991033f8bd0fd3aae1874cae5e1c51e8f6d1d80669b267d627e20",
+          ".github/scripts/hf_official_estate_inventory_compat.py": "sha256:86febafb0a52456fe377a224d15c93e76fe61fedc8ce86978437a9fb6d8b9c2c",
+          ".github/scripts/test_hf_official_estate_inventory.py": "sha256:a6591380ecace60b69314aec04ae3aa23836eb2e72d9a6436f466f6cd2c6274c",
+          ".github/scripts/test_hf_official_estate_inventory_compat.py": "sha256:c0d80a7f39952d57d1e14ad0869393f6df957c66ec58686eac9bad86339abafa"
+        },
+        "unknowns": [
+          "ACTION_INPUTS_REVIEW_REQUIRED@.github/workflows/hf-official-estate-inventory.yml:120",
+          "ACTION_INPUTS_REVIEW_REQUIRED@.github/workflows/hf-official-estate-inventory.yml:49",
+          "ACTION_INPUTS_REVIEW_REQUIRED@.github/workflows/hf-official-estate-inventory.yml:67",
+          "PYTHON_DYNAMIC_EXECUTION@.github/scripts/hf_official_estate_inventory.py:102",
+          "PYTHON_DYNAMIC_EXECUTION@.github/scripts/hf_official_estate_inventory.py:145",
+          "PYTHON_DYNAMIC_EXECUTION@.github/scripts/hf_official_estate_inventory.py:158",
+          "PYTHON_DYNAMIC_EXECUTION@.github/scripts/hf_official_estate_inventory.py:159",
+          "PYTHON_DYNAMIC_EXECUTION@.github/scripts/hf_official_estate_inventory.py:160",
+          "PYTHON_DYNAMIC_EXECUTION@.github/scripts/hf_official_estate_inventory.py:217",
+          "PYTHON_DYNAMIC_EXECUTION@.github/scripts/hf_official_estate_inventory.py:218",
+          "PYTHON_DYNAMIC_EXECUTION@.github/scripts/hf_official_estate_inventory.py:219",
+          "PYTHON_DYNAMIC_EXECUTION@.github/scripts/hf_official_estate_inventory.py:305",
+          "PYTHON_DYNAMIC_EXECUTION@.github/scripts/hf_official_estate_inventory.py:311",
+          "PYTHON_DYNAMIC_EXECUTION@.github/scripts/hf_official_estate_inventory.py:312",
+          "PYTHON_DYNAMIC_EXECUTION@.github/scripts/hf_official_estate_inventory.py:339",
+          "PYTHON_DYNAMIC_EXECUTION@.github/scripts/hf_official_estate_inventory.py:71",
+          "PYTHON_DYNAMIC_EXECUTION@.github/scripts/test_hf_official_estate_inventory.py:15",
+          "PYTHON_DYNAMIC_EXECUTION@.github/scripts/test_hf_official_estate_inventory_compat.py:16",
+          "PYTHON_IMPORT_UNRESOLVED@.github/scripts/hf_official_estate_inventory.py:11",
+          "PYTHON_IMPORT_UNRESOLVED@.github/scripts/hf_official_estate_inventory.py:12",
+          "PYTHON_IMPORT_UNRESOLVED@.github/scripts/hf_official_estate_inventory.py:13",
+          "PYTHON_IMPORT_UNRESOLVED@.github/scripts/hf_official_estate_inventory.py:14",
+          "PYTHON_IMPORT_UNRESOLVED@.github/scripts/hf_official_estate_inventory.py:19",
+          "PYTHON_IMPORT_UNRESOLVED@.github/scripts/hf_official_estate_inventory.py:20",
+          "PYTHON_IMPORT_UNRESOLVED@.github/scripts/hf_official_estate_inventory.py:22",
+          "PYTHON_IMPORT_UNRESOLVED@.github/scripts/hf_official_estate_inventory.py:26",
+          "PYTHON_IMPORT_UNRESOLVED@.github/scripts/hf_official_estate_inventory.py:9",
+          "PYTHON_IMPORT_UNRESOLVED@.github/scripts/hf_official_estate_inventory_compat.py:11",
+          "PYTHON_IMPORT_UNRESOLVED@.github/scripts/hf_official_estate_inventory_compat.py:13",
+          "PYTHON_IMPORT_UNRESOLVED@.github/scripts/hf_official_estate_inventory_compat.py:15",
+          "PYTHON_IMPORT_UNRESOLVED@.github/scripts/hf_official_estate_inventory_compat.py:19",
+          "PYTHON_IMPORT_UNRESOLVED@.github/scripts/hf_official_estate_inventory_compat.py:23",
+          "PYTHON_IMPORT_UNRESOLVED@.github/scripts/hf_official_estate_inventory_compat.py:25",
+          "PYTHON_IMPORT_UNRESOLVED@.github/scripts/hf_official_estate_inventory_compat.py:27",
+          "PYTHON_IMPORT_UNRESOLVED@.github/scripts/test_hf_official_estate_inventory.py:2",
+          "PYTHON_IMPORT_UNRESOLVED@.github/scripts/test_hf_official_estate_inventory.py:4",
+          "PYTHON_IMPORT_UNRESOLVED@.github/scripts/test_hf_official_estate_inventory.py:5",
+          "PYTHON_IMPORT_UNRESOLVED@.github/scripts/test_hf_official_estate_inventory.py:9",
+          "PYTHON_IMPORT_UNRESOLVED@.github/scripts/test_hf_official_estate_inventory_compat.py:2",
+          "PYTHON_IMPORT_UNRESOLVED@.github/scripts/test_hf_official_estate_inventory_compat.py:4",
+          "PYTHON_IMPORT_UNRESOLVED@.github/scripts/test_hf_official_estate_inventory_compat.py:5",
+          "PYTHON_SOURCE_REVIEW_REQUIRED@.github/scripts/hf_official_estate_inventory.py:1",
+          "PYTHON_SOURCE_REVIEW_REQUIRED@.github/scripts/hf_official_estate_inventory_compat.py:1",
+          "PYTHON_SOURCE_REVIEW_REQUIRED@.github/scripts/test_hf_official_estate_inventory.py:1",
+          "PYTHON_SOURCE_REVIEW_REQUIRED@.github/scripts/test_hf_official_estate_inventory_compat.py:1",
+          "PYTHON_SOURCE_REVIEW_REQUIRED@.github/workflows/hf-official-estate-inventory.yml:130",
+          "SCRIPT_SOURCE_REVIEW_REQUIRED@.github/workflows/hf-official-estate-inventory.yml:1",
+          "SDK_TARGET_UNRESOLVED@.github/scripts/hf_official_estate_inventory.py:451",
+          "SECRET_EXPRESSION_REVIEW_REQUIRED@.github/workflows/hf-official-estate-inventory.yml:1",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-official-estate-inventory.yml:101",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-official-estate-inventory.yml:102",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-official-estate-inventory.yml:103",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-official-estate-inventory.yml:104",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-official-estate-inventory.yml:105",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-official-estate-inventory.yml:106",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-official-estate-inventory.yml:107",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-official-estate-inventory.yml:112",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-official-estate-inventory.yml:113",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-official-estate-inventory.yml:114",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-official-estate-inventory.yml:129",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-official-estate-inventory.yml:130",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-official-estate-inventory.yml:131",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-official-estate-inventory.yml:132",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-official-estate-inventory.yml:133",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-official-estate-inventory.yml:134",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-official-estate-inventory.yml:135",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-official-estate-inventory.yml:136",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-official-estate-inventory.yml:137",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-official-estate-inventory.yml:138",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-official-estate-inventory.yml:139",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-official-estate-inventory.yml:140",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-official-estate-inventory.yml:141",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-official-estate-inventory.yml:142",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-official-estate-inventory.yml:143",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-official-estate-inventory.yml:144",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-official-estate-inventory.yml:151",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-official-estate-inventory.yml:152",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-official-estate-inventory.yml:153",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-official-estate-inventory.yml:154",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-official-estate-inventory.yml:155",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-official-estate-inventory.yml:156",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-official-estate-inventory.yml:157",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-official-estate-inventory.yml:59",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-official-estate-inventory.yml:60",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-official-estate-inventory.yml:61",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-official-estate-inventory.yml:62",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-official-estate-inventory.yml:71",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-official-estate-inventory.yml:72",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-official-estate-inventory.yml:73",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-official-estate-inventory.yml:78",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-official-estate-inventory.yml:79",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-official-estate-inventory.yml:80",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-official-estate-inventory.yml:81",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-official-estate-inventory.yml:82",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-official-estate-inventory.yml:83",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-official-estate-inventory.yml:84",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-official-estate-inventory.yml:85",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-official-estate-inventory.yml:91",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-official-estate-inventory.yml:92",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-official-estate-inventory.yml:93",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-official-estate-inventory.yml:94",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/hf-official-estate-inventory.yml:102",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/hf-official-estate-inventory.yml:103",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/hf-official-estate-inventory.yml:104",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/hf-official-estate-inventory.yml:106",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/hf-official-estate-inventory.yml:112",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/hf-official-estate-inventory.yml:113",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/hf-official-estate-inventory.yml:141",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/hf-official-estate-inventory.yml:143",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/hf-official-estate-inventory.yml:151",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/hf-official-estate-inventory.yml:152",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/hf-official-estate-inventory.yml:153",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/hf-official-estate-inventory.yml:154",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/hf-official-estate-inventory.yml:155",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/hf-official-estate-inventory.yml:60",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/hf-official-estate-inventory.yml:61",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/hf-official-estate-inventory.yml:62",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/hf-official-estate-inventory.yml:71",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/hf-official-estate-inventory.yml:72",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/hf-official-estate-inventory.yml:78",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/hf-official-estate-inventory.yml:79",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/hf-official-estate-inventory.yml:80",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/hf-official-estate-inventory.yml:81",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/hf-official-estate-inventory.yml:91",
+          "WORKFLOW_ENVIRONMENT_REVIEW_REQUIRED@.github/workflows/hf-official-estate-inventory.yml:149",
+          "WORKFLOW_ENVIRONMENT_REVIEW_REQUIRED@.github/workflows/hf-official-estate-inventory.yml:42",
+          "WORKFLOW_ENVIRONMENT_REVIEW_REQUIRED@.github/workflows/hf-official-estate-inventory.yml:55"
+        ]
+      }
+    },
     ".github/workflows/lean-numbers.yml": {
       "intent_id": "lean-numbers-recount-v1",
       "valid_until": "2026-11-30",
@@ -159,18 +437,6 @@
           "SHELL_COMPOSITION_UNKNOWN@.github/workflows/lean-numbers.yml:52"
         ]
       }
-    },
-    ".github/workflows/estate-snapshot-admission.yml": {
-      "intent_id": "estate-snapshot-admission-contract-v1",
-      "valid_until": "2026-11-30",
-      "source_sha256": "sha256:70d8cb695974248d71ef478d4fef3771709f236c90d757d086b241b6298e3a0f",
-      "credentials": [],
-      "resources": [{"key": "github:repository:szl-holdings/.github:contents", "access": "read"}, {"key": "runner:toolchain:python", "access": "local-write"}],
-      "effects": [{"sink": "github.contents.checkout", "resource": "github:repository:szl-holdings/.github:contents", "access": "read", "max_calls": 1}, {"sink": "runner.toolchain.install", "resource": "runner:toolchain:python", "access": "local-write", "max_calls": 1}],
-      "max_external_writes": 0,
-      "required_controls": {"triggers": ["pull_request", "merge_group", "push"], "contents_read": true, "no_explicit_secrets": true, "concurrency": true, "protected_ref": false, "exact_sha": false, "expected_before": false, "readback": false},
-      "trusted_transitives": {},
-      "reviewed_unknowns": {"files": {".github/scripts/test_estate_snapshot_admission.py": "sha256:7e594ea3e6c0cdd0819a068c7f92a2cc404909d60013c66d51fb3609967b19ab", ".github/workflows/estate-snapshot-admission.yml": "sha256:70d8cb695974248d71ef478d4fef3771709f236c90d757d086b241b6298e3a0f", "scripts/estate_snapshot_admission.py": "sha256:f255a7aacb904bf81c5c8004e0c43f0da4e243fc549971d148a5a1d9fadd8562"}, "unknowns": ["ACTION_INPUTS_REVIEW_REQUIRED@.github/workflows/estate-snapshot-admission.yml:19", "ACTION_INPUTS_REVIEW_REQUIRED@.github/workflows/estate-snapshot-admission.yml:23", "PYTHON_IMPORT_UNRESOLVED@.github/scripts/test_estate_snapshot_admission.py:2", "PYTHON_IMPORT_UNRESOLVED@.github/scripts/test_estate_snapshot_admission.py:3", "PYTHON_IMPORT_UNRESOLVED@.github/scripts/test_estate_snapshot_admission.py:5", "PYTHON_IMPORT_UNRESOLVED@.github/scripts/test_estate_snapshot_admission.py:6", "PYTHON_IMPORT_UNRESOLVED@scripts/estate_snapshot_admission.py:3", "PYTHON_IMPORT_UNRESOLVED@scripts/estate_snapshot_admission.py:5", "PYTHON_IMPORT_UNRESOLVED@scripts/estate_snapshot_admission.py:6", "PYTHON_IMPORT_UNRESOLVED@scripts/estate_snapshot_admission.py:8", "PYTHON_SOURCE_REVIEW_REQUIRED@.github/scripts/test_estate_snapshot_admission.py:1", "PYTHON_SOURCE_REVIEW_REQUIRED@scripts/estate_snapshot_admission.py:1", "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/estate-snapshot-admission.yml:26", "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/estate-snapshot-admission.yml:27"]}
     }
   }
 }
