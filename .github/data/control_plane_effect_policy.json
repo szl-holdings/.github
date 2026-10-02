@@ -265,7 +265,7 @@
     ".github/workflows/hf-dataset-register-consistency.yml": {
       "intent_id": "hf-dataset-register-offline-consistency-v1",
       "valid_until": "2026-11-30",
-      "source_sha256": "sha256:b30dd701cef73451bda6110d9bcff49edf6b384dc4eb8657253ce3b270de10e3",
+      "source_sha256": "sha256:443c439d3a770dc8f982aaf3d73654ceafbd021a0cb67cd14dd85674903c1aae",
       "credentials": [],
       "resources": [
         {"key": "github:repository:szl-holdings/.github:contents", "access": "read"},
@@ -280,12 +280,13 @@
       "trusted_transitives": {},
       "reviewed_unknowns": {
         "files": {
-          ".github/workflows/hf-dataset-register-consistency.yml": "sha256:b30dd701cef73451bda6110d9bcff49edf6b384dc4eb8657253ce3b270de10e3",
+          ".github/workflows/hf-dataset-register-consistency.yml": "sha256:443c439d3a770dc8f982aaf3d73654ceafbd021a0cb67cd14dd85674903c1aae",
           ".github/scripts/hf_dataset_register_consistency.py": "sha256:cfa59278dbd11ae3f5bd204773c1e970dc5b32dbe82c2cf505befc7cfba15a1d",
           ".github/scripts/test_hf_dataset_register_consistency.py": "sha256:f12bfc133b8d54463a191b0e0e4825f11ae0fda115a9c8ba5f52aae08e7dfe47"
         },
         "unknowns": [
-          "ACTION_INPUTS_REVIEW_REQUIRED@.github/workflows/hf-dataset-register-consistency.yml:28",
+          "ACTION_INPUTS_REVIEW_REQUIRED@.github/workflows/hf-dataset-register-consistency.yml:26",
+          "ACTION_INPUTS_REVIEW_REQUIRED@.github/workflows/hf-dataset-register-consistency.yml:30",
           "PYTHON_CLIENT_UNRESOLVED@.github/scripts/test_hf_dataset_register_consistency.py:194",
           "PYTHON_IMPORT_UNRESOLVED@.github/scripts/hf_dataset_register_consistency.py:9",
           "PYTHON_IMPORT_UNRESOLVED@.github/scripts/hf_dataset_register_consistency.py:11",
@@ -301,8 +302,8 @@
           "PYTHON_IMPORT_UNRESOLVED@.github/scripts/test_hf_dataset_register_consistency.py:26",
           "PYTHON_SOURCE_REVIEW_REQUIRED@.github/scripts/hf_dataset_register_consistency.py:1",
           "PYTHON_SOURCE_REVIEW_REQUIRED@.github/scripts/test_hf_dataset_register_consistency.py:1",
-          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-dataset-register-consistency.yml:30",
-          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-dataset-register-consistency.yml:32"
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-dataset-register-consistency.yml:32",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-dataset-register-consistency.yml:34"
         ]
       }
     }
