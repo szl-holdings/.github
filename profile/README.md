@@ -18,6 +18,10 @@
 
 Source, build, publication, runtime, and independent evidence are separate states. Labels such as `MEASURED`, `REPORTED`, `UNKNOWN`, and `UNAVAILABLE` describe the scope of a claim. An artifact's card or receipt should identify the evidence behind it. The [trust boundary](https://github.com/szl-holdings/.github/blob/main/TRUST.md) explains who may authorize an action.
 
+## Portfolio roles
+
+**One inference flagship:** [SZL Router](https://github.com/szl-holdings/szl-router), source-owned at `szl-holdings/szl-router`, presented at [`SZLHOLDINGS/llm-router-live`](https://huggingface.co/spaces/SZLHOLDINGS/llm-router-live), integrated at [a-11-oy.com/code](https://a-11-oy.com/code), proof at [a11oy.net](https://a11oy.net). **Three commercial flagships:** A11oy, Killinchu, Forge. **Five public domain bodies:** Terra, Killinchu, PRISM Counsel, PURIQ Finance, LYTE. **Six internal engines:** Sentra, Lyte, Killinchu, Finance, Terra, Counsel. These labels describe topology, **not availability, operational readiness, or publication policy**; Hub inventory is registry evidence under the same boundary.
+
 ## Current state
 
 The last source-bound public inventory snapshot recorded **21 public Spaces, 46 models, 35 datasets** at **2026-09-10T03:20:41Z** under `hf-public-author-membership/v1`. This is a dated observation, not a live count. [Read `profile/public-inventory.json`](https://github.com/szl-holdings/.github/blob/main/profile/public-inventory.json), bound to A11oy source `4c6621b17ba452d5af7aa2460462fdfbe513509f`, and check the [current Hub listing](https://huggingface.co/SZLHOLDINGS) for newer membership.

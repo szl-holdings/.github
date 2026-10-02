@@ -28,18 +28,18 @@ license: apache-2.0
 ## Inference flagship
 
 <!-- SZL_LLM_ROUTER_FLAGSHIP:BEGIN -->
-**SZL Router** exposes an OpenAI-compatible gateway with route state and provenance. [Open the Space](https://huggingface.co/spaces/SZLHOLDINGS/llm-router-live), [inspect source](https://github.com/szl-holdings/szl-router), or [view the route map](https://raw.githubusercontent.com/szl-holdings/.github/main/profile/assets/hf-card-router.svg). Its providers require separate qualification.
+**SZL Router** exposes an OpenAI-compatible gateway with route state and provenance. [Open the Space](https://huggingface.co/spaces/SZLHOLDINGS/llm-router-live), [inspect source](https://github.com/szl-holdings/szl-router), [A11oy integration](https://a-11-oy.com/code), or [view the route map](https://raw.githubusercontent.com/szl-holdings/.github/main/profile/assets/hf-card-router.svg). Its providers require separate qualification.
 <!-- SZL_LLM_ROUTER_FLAGSHIP:END -->
 
 ## Portfolio at a glance
 
 **Three commercial flagships:** A11oy, Killinchu, Forge. **One inference flagship:** SZL Router. **Five public domain bodies:** Terra, Killinchu, PRISM Counsel, PURIQ Finance, LYTE. **Six internal engines:** Sentra, Lyte, Killinchu, Finance, Terra, Counsel. These are product roles, not availability claims.
 
-[Killinchu](https://huggingface.co/spaces/SZLHOLDINGS/killinchu) presents public observation and operator decisions; its effectors are **SIMULATED**. [Read its source](https://github.com/szl-holdings/killinchu) and current readiness before using its outputs. [Explore the architecture image](https://huggingface.co/spaces/SZLHOLDINGS/README/resolve/main/assets/estate-command-system.svg).
+[Killinchu](https://huggingface.co/spaces/SZLHOLDINGS/killinchu) presents public observation and operator decisions; its effectors are **SIMULATED**. [Read its source](https://github.com/szl-holdings/killinchu) and readiness before using its outputs. [Explore the architecture image](https://huggingface.co/spaces/SZLHOLDINGS/README/resolve/main/assets/estate-command-system.svg).
 
 ## Current state
 
-The last source-bound public inventory snapshot recorded **21 public Spaces, 46 models, 35 datasets** at **2026-09-10T03:20:41Z** under `hf-public-author-membership/v1`. It is a dated snapshot, not a live count. [Read `profile/public-inventory.json`](https://github.com/szl-holdings/.github/blob/main/profile/public-inventory.json), bound to A11oy source `4c6621b17ba452d5af7aa2460462fdfbe513509f`, then browse the [live Hub listing](https://huggingface.co/SZLHOLDINGS).
+The last source-bound public inventory snapshot recorded **21 public Spaces, 46 models, 35 datasets** at **2026-09-10T03:20:41Z** under `hf-public-author-membership/v1`. Dated snapshot, not a live count; Hub inventory is registry evidence, not availability, operational readiness, or publication policy. [Read `profile/public-inventory.json`](https://github.com/szl-holdings/.github/blob/main/profile/public-inventory.json), bound to A11oy source `4c6621b17ba452d5af7aa2460462fdfbe513509f`, then browse the [live Hub listing](https://huggingface.co/SZLHOLDINGS).
 
 **HISTORICAL** estate-alignment v1 described 16 portfolio Spaces and 1 inventory-only Space, with 45 models and 34 datasets. The [`SZLHOLDINGS/SZLHOLDINGS` dataset](https://huggingface.co/datasets/SZLHOLDINGS/SZLHOLDINGS) is also historical. Neither supplies current readiness.
 
