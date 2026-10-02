@@ -65,11 +65,9 @@ Six internal engines: **CHAPAQ (folded into Killinchu), Lyte, Killinchu, Finance
 
 ## Current state
 
-**21 public Spaces, 46 models, 35 datasets**, observed **2026-09-10T03:20:41Z** under anonymous public-only `hf-public-author-membership/v1`. Kernels count once as model repositories. Private assets, collections and buckets are excluded. Hub inventory is registry evidence, not availability, operational readiness, or publication policy.
+**34 public Spaces, 46 models, 35 datasets**, observed **2026-10-02T21:07:54Z** under anonymous public-only `hf-public-author-membership/v1`. Kernels count once as model repositories. Private assets, collections and buckets are excluded. Hub inventory is registry evidence, not availability, operational readiness, or publication policy.
 
-[**Inventory binding**](https://github.com/szl-holdings/.github/blob/main/profile/public-inventory.json) · [**Admitted source manifest**](https://github.com/szl-holdings/a11oy/blob/4c6621b17ba452d5af7aa2460462fdfbe513509f/docs/huggingface-ecosystem-manifest.json)
-
-Listing **2026-10-01**: 33/50/35 Spaces/models/datasets (09-25: 23/49/35).
+[**Inventory binding**](https://github.com/szl-holdings/.github/blob/main/profile/public-inventory.json) · [**Admitted source manifest**](https://github.com/szl-holdings/a11oy/blob/7ae3e7e5b4ec3c9b0d36464ee8b796045a1c37a3/docs/huggingface-ecosystem-manifest.json)
 
 `SZLHOLDINGS/SZLHOLDINGS` is **HISTORICAL**. Λ uniqueness remains **Conjecture 1 — open**. HTTP 200 is not a production certificate.
 

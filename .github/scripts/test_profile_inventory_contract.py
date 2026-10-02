@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 from html import unescape
+from html.parser import HTMLParser
 from pathlib import Path
 import re
 import unittest
@@ -15,6 +16,36 @@ COUNT_LINE = re.compile(
     r"(?P<models>[0-9]+) models, "
     r"(?P<datasets>[0-9]+) datasets\b"
 )
+
+
+class InventoryCountParser(HTMLParser):
+    def __init__(self) -> None:
+        super().__init__()
+        self.in_counts = False
+        self.in_item = False
+        self.item_text: list[str] = []
+        self.items: list[str] = []
+        self.observed_label = ""
+
+    def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
+        attributes = dict(attrs)
+        if tag == "ul" and "szl-hf-counts" in (attributes.get("class") or "").split():
+            self.in_counts = True
+            self.observed_label = attributes.get("aria-label") or ""
+        elif tag == "li" and self.in_counts:
+            self.in_item = True
+            self.item_text = []
+
+    def handle_data(self, data: str) -> None:
+        if self.in_item:
+            self.item_text.append(data)
+
+    def handle_endtag(self, tag: str) -> None:
+        if tag == "li" and self.in_item:
+            self.items.append("".join(self.item_text).strip())
+            self.in_item = False
+        elif tag == "ul" and self.in_counts:
+            self.in_counts = False
 
 
 class PublicInventoryContractTests(unittest.TestCase):
@@ -61,6 +92,17 @@ class PublicInventoryContractTests(unittest.TestCase):
 
     def test_static_front_door_uses_the_same_dated_public_snapshot(self) -> None:
         source = (ROOT / "huggingface/org-card/index.html").read_text(encoding="utf-8")
+        count_list = InventoryCountParser()
+        count_list.feed(source)
+        self.assertEqual(
+            count_list.items,
+            [
+                f'{self.expected["spaces"]}public Spaces',
+                f'{self.expected["models"]}model repos',
+                f'{self.expected["datasets"]}public datasets',
+            ],
+        )
+        self.assertIn(self.inventory["observed_at"][:10], count_list.observed_label)
         current = re.search(
             r'<p data-szl-inventory="current">(.*?)</p>', source, re.DOTALL
         )
