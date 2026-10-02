@@ -86,10 +86,11 @@ Forge's local model-BOM v2 builder is a different tool and is unchanged. This
 checker neither generates nor publishes a replacement register and preserves
 historical source-of-record and byte-parity limitations.
 
-No workflow, security policy, allowlist, rights, dataset or collection changes
-are part of this tool. Existing Tests uses explicit filenames and does not
-automatically run the new test. CI wiring needs separate coordination with
-that workflow's owner; until then run the standalone test command above.
+The required `Tests` workflow runs this checker’s synthetic offline self-test.
+It does not fetch current Hub state, publish a replacement register, establish
+dataset rights, or replace review of the underlying captured audit. The source
+checker makes no security policy, allowlist, rights, dataset or collection
+changes.
 
 The dated audit covered 34 public dataset IDs and a 30-row register. Three
 eligible rows had explicit blocked training claims; four current IDs were
