@@ -88,7 +88,7 @@
     "github_profile": "profile/README.md",
     "hugging_face_org_card": "huggingface/org-card/README.md",
     "visual_asset": "profile/assets/hf-card-router.svg",
-    "required_label": "One inference flagship: SZL Router"
+    "required_label": "SZL Router"
   },
   "supersedes": {
     "scope": "router presentation and source ownership only",

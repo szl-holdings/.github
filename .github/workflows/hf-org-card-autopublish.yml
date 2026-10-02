@@ -36,8 +36,9 @@ permissions:
   contents: read
 
 concurrency:
-  group: hf-org-card-central-${{ github.event_name }}
-  cancel-in-progress: true
+  # Both publication workflows share the same Space and parent-commit guard.
+  group: ${{ github.event_name == 'push' && 'hf-org-card-main' || format('hf-org-card-pr-{0}', github.event.number) }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   validate:
@@ -86,7 +87,7 @@ jobs:
             --materialize "$OUTPUT" \
             --report hf-org-card-materialization.json
           test -s "$OUTPUT/assets/estate-command-system.svg"
-          grep -Fq 'Choose a path' "$OUTPUT/README.md"
+          grep -Fq 'See it on real data' "$OUTPUT/README.md"
           grep -Fq 'SZL' "$OUTPUT/assets/estate-command-system.svg"
 
       - name: Upload validation evidence

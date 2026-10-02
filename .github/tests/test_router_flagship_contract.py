@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import importlib.util
+import json
 import tempfile
 import unittest
 from pathlib import Path
@@ -50,24 +51,59 @@ class RouterFlagshipContractTests(unittest.TestCase):
         self.assertNotIn("<script", svg.casefold())
         self.assertNotIn("javascript:", svg.casefold())
 
-    def test_hub_card_renders_source_owned_router_asset_without_bundle_drift(self) -> None:
+    def test_portfolio_links_source_owned_router_asset_without_bundle_drift(self) -> None:
         manifest = MODULE.load_json(ROOT / "huggingface/org-card.manifest.json")
         sources = {row["source"] for row in manifest["files"]}
         self.assertNotIn("profile/assets/hf-card-router.svg", sources)
 
-        markers = manifest["runtime_transforms"]["README.md"]["required_markers"]
-        for marker in (
-            "Inference flagship",
-            "SZL Router",
-            "One inference flagship",
-            MODULE.HUB_ASSET_URL,
-        ):
-            self.assertIn(marker, markers)
-
-        card = (ROOT / "huggingface/org-card/README.md").read_text(
+        card = (ROOT / "profile/README.md").read_text(
             encoding="utf-8"
         )
         self.assertIn(MODULE.HUB_ASSET_URL, card)
+
+    def validate_with_profile_change(self, transform, relative_path="profile/README.md"):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            for relative in (
+                "governance/router-flagship-v1.json", "profile/README.md",
+                "huggingface/org-card/README.md", "docs/CANONICAL_FLEET.md",
+                "huggingface/org-card/GOVERNANCE.md", MODULE.ASSET,
+                "huggingface/org-card.manifest.json",
+            ):
+                target = root / relative
+                target.parent.mkdir(parents=True, exist_ok=True)
+                target.write_bytes((ROOT / relative).read_bytes())
+            target = root / relative_path
+            target.write_text(transform(target.read_text(encoding="utf-8")), encoding="utf-8")
+            return MODULE.validate(root)
+
+    def test_plain_profile_label_does_not_relax_machine_program_classification(self) -> None:
+        def remove_classification(text):
+            policy = json.loads(text)
+            policy["program"]["class"] = "UNCLASSIFIED"
+            return json.dumps(policy)
+        result = self.validate_with_profile_change(remove_classification, "governance/router-flagship-v1.json")
+        self.assertEqual(result["status"], "FAIL")
+        self.assertIn("program class mismatch", result["failures"])
+
+    def test_profile_contract_requires_the_plain_public_label(self) -> None:
+        def restore_internal_label(text):
+            policy = json.loads(text)
+            policy["profile_contract"]["required_label"] = "One inference flagship: SZL Router"
+            return json.dumps(policy)
+        result = self.validate_with_profile_change(restore_internal_label, "governance/router-flagship-v1.json")
+        self.assertEqual(result["status"], "FAIL")
+        self.assertIn("plain router profile label mismatch", result["failures"])
+
+    def test_portfolio_cannot_drop_router_product_authority(self) -> None:
+        result = self.validate_with_profile_change(lambda text: text.replace(MODULE.PRODUCT, "https://example.com"))
+        self.assertEqual(result["status"], "FAIL")
+        self.assertIn(f"GitHub profile missing {MODULE.PRODUCT}", result["failures"])
+
+    def test_portfolio_cannot_drop_source_owned_router_art(self) -> None:
+        result = self.validate_with_profile_change(lambda text: text.replace(MODULE.HUB_ASSET_URL, "https://example.com/route.svg"))
+        self.assertEqual(result["status"], "FAIL")
+        self.assertIn("GitHub profile does not link source-owned router art", result["failures"])
 
 
 if __name__ == "__main__":

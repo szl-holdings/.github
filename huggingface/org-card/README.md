@@ -1,88 +1,59 @@
 ---
-title: SZL — Governed AI Command Fabric
+title: SZL Holdings
 emoji: 🛡️
 colorFrom: gray
 colorTo: gray
 sdk: static
-short_description: Governed AI routing, kernels, and verifiable outcomes.
+short_description: Checkable computations, public data, reproducible examples.
 thumbnail: https://huggingface.co/spaces/SZLHOLDINGS/README/resolve/main/assets/evidence-lattice-v2.webp
 pinned: true
 license: apache-2.0
 ---
 
 <!-- markdownlint-disable MD013 MD033 MD041 -->
+<!-- markdownlint-configure-file {"MD025": {"front_matter_title": ""}} -->
 
-<p align="center">
-  <img src="https://huggingface.co/spaces/SZLHOLDINGS/README/resolve/main/assets/estate-command-system.svg"
-       alt="SZL governed AI command fabric" width="100%" />
-</p>
+# SZL Holdings
 
-# Governed AI. Inference. Command systems.
+We build tools that make computational results checkable.
 
-[**Product**](https://a-11-oy.com) · [**Proof**](https://a11oy.net) · [**Source**](https://github.com/szl-holdings) · [**Artifacts**](https://huggingface.co/SZLHOLDINGS)
+A computation receipt records the exact input file, the code that ran, and
+the output hash. Someone else can repeat the calculation and compare its
+bytes with the retained result. If a check cannot run, it reports
+**not verified**. It never counts a missing check as passed.
 
-## Choose a path
+## See it on real data
 
-**Understand:** A11oy. **Route:** SZL Router. **Explore:** SZL Atlas. **Build:** GitHub. **Verify:** the [trust boundary](https://github.com/szl-holdings/.github/blob/main/TRUST.md) and served [`deployment.json`](https://szlholdings-readme.static.hf.space/deployment.json).
+Our [worked single-cell example](https://github.com/szl-holdings/governed-receipt-spec/tree/320983d22e76fc9b26af0b2cd20799c5000543fc/examples/public-single-cell)
+downloads the public GEO GSE85241 file and summarizes all **3,072 submitted
+cell columns**, retaining **4 source donor labels**. It records **19,059
+endogenous features** and **81 ERCC spike-in rows** separately. The original
+researchers produced the data; the example does not redistribute the matrix.
 
-## Inference flagship
+The [recorded run](https://github.com/szl-holdings/governed-receipt-spec/blob/320983d22e76fc9b26af0b2cd20799c5000543fc/examples/public-single-cell/observed-run.json)
+produced byte-identical summary output twice. Changed summary bytes and
+changed receipt payloads were rejected against the unchanged retained reference.
+The example links its exact executed source, public CPU run, and reproduction commands.
 
-<!-- SZL_LLM_ROUTER_FLAGSHIP:BEGIN -->
-## SZL LLM Router · Flagship Inference Control Plane
+## What the checks mean
 
-<img src="https://raw.githubusercontent.com/szl-holdings/.github/main/profile/assets/hf-card-router.svg" alt="SZL Router flagship" width="100%" />
+This is a demonstration of **integrity and reproducibility**. The receipt
+is **unsigned**: it does not verify authorship or prevent replacement of
+all files and hashes together.
 
-OpenAI-compatible `/v1/chat/completions`: owned-compute preference, explicit hosted fallback, route provenance and inspectable receipts.
+It runs **no gene-signature scoring**, reports **no biological findings**,
+and claims no superiority over AUCell, UCell, or Seurat. Donor summaries
+are descriptive; cells are not treated as independent biological replicates
+in a hypothesis test. It makes **no clinical-use claim**.
 
-`szl-auto` · `szl-fast` · `szl-large` · `szl-coder`
+## Language-model evaluation records
 
-[**Launch**](https://huggingface.co/spaces/SZLHOLDINGS/llm-router-live) · [**Gateway source**](https://github.com/szl-holdings/szl-router) · [**A11oy integration**](https://a-11-oy.com/code)
+Our [evaluation receipts dataset](https://huggingface.co/datasets/SZLHOLDINGS/szl-frontier-evaluation-receipts)
+contains separate language-model evaluation records. Read each record's
+inputs, execution details, and limitations; it does not validate the
+single-cell example or establish general model superiority.
 
-Runtime states: `LIVE`, `CONFIGURED_UNVERIFIED`, `OFFLINE_UNTIL_KEYED`, `UNAVAILABLE`. A running Space proves neither provider configuration nor authorization. Credentials, private addresses and topology stay private. Model output never creates execution authority.
-<!-- SZL_LLM_ROUTER_FLAGSHIP:END -->
+For other Python tools, browse the [published packages](https://pypi.org/user/betterwithage/) and their [package manifest](https://github.com/szl-holdings/szlholdings.com/blob/main/pypi/pypi-packages.v1.json). Reproduce this example with its recorded setup.
 
-## Cyber-physical flagship: Killinchu
-
-Counter-UAS and maritime intelligence with governed decisions and DSSE Khipu receipt evidence. Public effectors remain **SIMULATED**; human authority binds engagement.
-
-[**Launch /elite**](https://szlholdings-killinchu.hf.space/elite) · [**Space**](https://huggingface.co/spaces/SZLHOLDINGS/killinchu) · [**Source**](https://github.com/szl-holdings/killinchu) · [**OSINT corpus**](https://huggingface.co/datasets/SZLHOLDINGS/killinchu-osint-corpus)
-
-Inspect the Space's self-reported `/api/killinchu/v1/honest`; self-reporting is not independent qualification.
-
-## Install
-
-`pip install szl-receipts` · [manifest](https://github.com/szl-holdings/szlholdings.com/blob/main/pypi/pypi-packages.v1.json) · [listing](https://pypi.org/user/betterwithage/)
-
-## Estate map
-
-Three commercial flagships: **A11oy, Killinchu, Forge**. One inference flagship: **SZL Router**.
-
-Five public domain bodies: **Terra, Killinchu, PRISM Counsel, PURIQ Finance, LYTE**.
-
-Six internal engines: **CHAPAQ (folded into Killinchu), Lyte, Killinchu, Finance, Terra, Counsel**.
-
-**HISTORICAL estate-alignment v1:** 17 public Spaces, 45 models, 34 datasets; 16 portfolio Spaces plus 1 inventory-only Space.
-
-## Current state
-
-**21 public Spaces, 46 models, 35 datasets**, observed **2026-09-10T03:20:41Z** under anonymous public-only `hf-public-author-membership/v1`. Kernels count once as model repositories. Private assets, collections and buckets are excluded. Hub inventory is registry evidence, not availability, operational readiness, or publication policy.
-
-[**Inventory binding**](https://github.com/szl-holdings/.github/blob/main/profile/public-inventory.json) · [**Admitted source manifest**](https://github.com/szl-holdings/a11oy/blob/4c6621b17ba452d5af7aa2460462fdfbe513509f/docs/huggingface-ecosystem-manifest.json)
-
-Listing **2026-10-01**: 33/50/35 Spaces/models/datasets (09-25: 23/49/35).
-
-`SZLHOLDINGS/SZLHOLDINGS` is **HISTORICAL**. Λ uniqueness remains **Conjecture 1 — open**. HTTP 200 is not a production certificate.
-
-<img src="https://huggingface.co/spaces/SZLHOLDINGS/README/resolve/main/assets/evidence-lattice-v2.webp" alt="A bounded signal path entering a verification lattice" width="100%" />
-
-## Reproduce and verify
-
-```bash
-preview_dir="$(mktemp -d)"
-python .github/scripts/hf_static_space_deploy.py \
-  --repo-root . \
-  --manifest huggingface/org-card.manifest.json \
-  --source-sha "$(git rev-parse HEAD)" \
-  --materialize "$preview_dir"
-python -m http.server 8000 --directory "$preview_dir"
-```
+[Product](https://a-11-oy.com) ·
+[Source of this page](https://szlholdings-readme.static.hf.space/deployment.json)

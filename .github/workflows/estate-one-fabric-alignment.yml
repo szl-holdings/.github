@@ -9,6 +9,8 @@ on:
       - huggingface/org-card/**
       - huggingface/org-card.manifest.json
       - .github/scripts/estate_alignment_contract.py
+      - .github/scripts/public_front_door_check.py
+      - .github/scripts/test_public_front_door_check.py
       - .github/scripts/test_estate_alignment_contract.py
       - .github/scripts/test_estate_alignment_org_card.py
       - .github/scripts/test_estate_alignment_identity.py
@@ -21,6 +23,8 @@ on:
       - huggingface/org-card/**
       - huggingface/org-card.manifest.json
       - .github/scripts/estate_alignment_contract.py
+      - .github/scripts/public_front_door_check.py
+      - .github/scripts/test_public_front_door_check.py
       - .github/scripts/test_estate_alignment_contract.py
       - .github/scripts/test_estate_alignment_org_card.py
       - .github/scripts/test_estate_alignment_identity.py
@@ -72,7 +76,11 @@ jobs:
               exit 1
             fi
             sha="$RUN_HEAD_SHA"
-          elif [ "$EVENT_NAME" = "pull_request" ] && [ "$PR_HEAD_REPOSITORY" = "$THIS_REPOSITORY" ]; then
+          elif [ "$EVENT_NAME" = "pull_request" ]; then
+            if [ "$PR_HEAD_REPOSITORY" != "$THIS_REPOSITORY" ]; then
+              echo "::error::refusing to check out a pull_request head from ${PR_HEAD_REPOSITORY}; only ${THIS_REPOSITORY} is trusted"
+              exit 1
+            fi
             sha="$PR_HEAD_SHA"
           fi
           if ! [[ "$sha" =~ ^[0-9a-f]{40}$ ]]; then
@@ -176,7 +184,11 @@ jobs:
               exit 1
             fi
             sha="$RUN_HEAD_SHA"
-          elif [ "$EVENT_NAME" = "pull_request" ] && [ "$PR_HEAD_REPOSITORY" = "$THIS_REPOSITORY" ]; then
+          elif [ "$EVENT_NAME" = "pull_request" ]; then
+            if [ "$PR_HEAD_REPOSITORY" != "$THIS_REPOSITORY" ]; then
+              echo "::error::refusing to check out a pull_request head from ${PR_HEAD_REPOSITORY}; only ${THIS_REPOSITORY} is trusted"
+              exit 1
+            fi
             sha="$PR_HEAD_SHA"
           fi
           if ! [[ "$sha" =~ ^[0-9a-f]{40}$ ]]; then

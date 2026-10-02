@@ -1,45 +1,29 @@
+<!-- markdownlint-disable MD013 MD041 -->
+
 ![SZL Holdings evidence lattice](./assets/evidence-lattice-v2.webp)
 
 # SZL Holdings
 
-**AI that signs its work — and refuses to lie.**
-
-Every claim carries a cryptographic receipt you can verify yourself. Anything it can't prove is labeled UNAVAILABLE instead of a plausible-looking answer. No silent confidence. No fabricated "LIVE." Signed evidence, honest bounds.
-
-## See it in 30 seconds
-
-Open **[a-11-oy.com](https://a-11-oy.com)** — the living command fabric. Every governed action emits a hash-chained, DSSE-signed receipt. Pull one and verify it against the public contract.
+**Make the computation checkable.** We build software for inspecting computational results and repeating calculations. A computation receipt records the input, code, and output hash; it does not establish scientific correctness or make a model suitable for a particular use.
 
 ## Start here
 
-1. **The product** — [a-11-oy.com](https://a-11-oy.com): the A11oy command substrate, live capability status, governed workflows.
-2. **The proof** — [a11oy.net](https://a11oy.net): the proof registry: receipts, evaluations, and known bounds, including what we *can't* yet prove.
-3. **Install the stack** — [PyPI](https://pypi.org/user/betterwithage/): 20 packages with OIDC trusted publishing and build provenance.
-4. **Browse the artifacts** — [Hugging Face / SZLHOLDINGS](https://huggingface.co/SZLHOLDINGS): models, kernels, datasets, and Spaces, each with evidence and stated limits.
-5. **Read the source** — [github.com/szl-holdings](https://github.com/szl-holdings): canonical source, evaluation lanes, and per-repo controls.
+- **Use the product:** [a-11-oy.com](https://a-11-oy.com) shows A11oy's tools and their reported availability.
+- **Inspect records:** [a11oy.net](https://a11oy.net) publishes computation records; read each record's checks and limits.
+- **Repeat a public example:** [The worked single-cell example](https://github.com/szl-holdings/governed-receipt-spec/tree/320983d22e76fc9b26af0b2cd20799c5000543fc/examples/public-single-cell) gives the input, calculation, retained result, and explicit verification limits.
+- **Read source:** [github.com/szl-holdings](https://github.com/szl-holdings) contains the software source.
+- **Install published packages:** [PyPI](https://pypi.org/user/betterwithage/) lists the available Python packages; verify each package's own release evidence.
 
-## The receipt stack on PyPI
+## How the pieces fit
 
-Twenty packages that *are* the provenance tooling: receipt primitives, guardrail and energy witnesses, calibration and retrieval benchmarks, an OpenTelemetry evidence exporter. Each ships by OIDC trusted publishing (no stored tokens) with PEP 740 attestations and fails closed: `MEASURED`, `BLOCKED`, or `UNAVAILABLE`, never coerced.
+**A11oy** provides an interface for using tools and inspecting results. **[SZL Router](https://github.com/szl-holdings/szl-router)** routes requests to language models, with a [public status page](https://huggingface.co/spaces/SZLHOLDINGS/llm-router-live), [operator interface](https://a-11-oy.com/code), and [route map](https://raw.githubusercontent.com/szl-holdings/.github/main/profile/assets/hf-card-router.svg). **Killinchu** demonstrates observations and operator decisions; its public action outputs remain **SIMULATED**. **Forge** houses model and software research. [The example introduction](https://huggingface.co/spaces/SZLHOLDINGS/README) explains a reproducible calculation and its limits.
 
-```bash
-pip install szl-receipts szl-guardrail-receipt vsp-otel szl-nemo
-```
+Published source, a successful build, running software, and independently checked results establish different things. Labels such as `MEASURED`, `REPORTED`, `UNKNOWN`, and `UNAVAILABLE` state what was observed. Read the supporting record and its limits. The [authorization rules](https://github.com/szl-holdings/.github/blob/main/TRUST.md) explain who may authorize an action.
 
-## The doctrine
+## Current state
 
-Source, running software, and model evaluations are **separate claims**, kept separate. A green test is not a deployment; a deployment is not a proof. Unknowns stay visible. Supply-chain security is converging on the same discipline — SLSA, in-toto, Sigstore — except here it isn't bolted on. It's the product.
+The last source-bound public inventory snapshot recorded **21 public Spaces, 46 models, 35 datasets** at **2026-09-10T03:20:41Z** under `hf-public-author-membership/v1`. This is a dated observation, not a live count. [Read `profile/public-inventory.json`](https://github.com/szl-holdings/.github/blob/main/profile/public-inventory.json), bound to A11oy source `4c6621b17ba452d5af7aa2460462fdfbe513509f`. For a specific published artifact, inspect the [language-model evaluation records](https://huggingface.co/datasets/SZLHOLDINGS/szl-frontier-evaluation-receipts) and their stated limits.
 
-## Portfolio topology
+**HISTORICAL:** an earlier inventory described 16 portfolio Spaces, 1 inventory-only Space, 45 models, and 34 datasets. The [`SZLHOLDINGS/SZLHOLDINGS` dataset](https://huggingface.co/datasets/SZLHOLDINGS/SZLHOLDINGS) is a historical profile mirror. It does not establish today's inventory, readiness, or model quality.
 
-**One inference flagship:** [SZL Router](https://github.com/szl-holdings/szl-router) is source-owned at `szl-holdings/szl-router`; its presentation target is [`SZLHOLDINGS/llm-router-live`](https://huggingface.co/spaces/SZLHOLDINGS/llm-router-live), product integration is [https://a-11-oy.com/code](https://a-11-oy.com/code), and proof originates at [a11oy.net](https://a11oy.net). Portfolio roles distinguish **one inference flagship**, **three commercial flagships**, **five public domain bodies**, and **six internal engines**. Those labels describe topology, **not availability, operational readiness, or publication policy**.
-
-## Current state (honest, dated)
-
-Public Hugging Face estate observed **2026-09-30**: **50 models, 35 datasets, 33 Spaces** (repository counts). Twenty PyPI packages published. Dated observations from the live Hub API, not marketing numbers.
-
-**HISTORICAL:** estate-alignment contract v1 recorded **16 portfolio Spaces**, **1 inventory-only Space**, **45 models**, and **34 datasets** — prior snapshot, superseded above. Its named topology: **A11oy**, **Forge**, **Killinchu**, **Terra**, **PRISM Counsel**, **PURIQ Finance**, **LYTE**.
-
-**Verification contracts:** [a11oy](https://github.com/szl-holdings/a11oy). **Training and evaluation:** [szl-forge](https://github.com/szl-holdings/szl-forge) (kits, datasets, runbooks, measured limits). **Trust boundary:** [TRUST.md](https://github.com/szl-holdings/.github/blob/main/TRUST.md). Killinchu effectors stay **SIMULATED**; `SZLHOLDINGS/SZLHOLDINGS` is **HISTORICAL**.
-
-*Governed AI. Evidence you can inspect. Work you can verify.*
+*Trace the source. Check the state. Read the limit.*
