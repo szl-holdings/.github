@@ -6,11 +6,23 @@ source_repository: https://github.com/szl-holdings/.github
 manifest: https://github.com/szl-holdings/.github/blob/main/huggingface/org-card.manifest.json
 live_receipt: deployment.json
 governance: https://github.com/szl-holdings/governance-as-code
-verifier: https://huggingface.co/spaces/SZLHOLDINGS/governed-receipt-verifier
+verifier: https://github.com/szl-holdings/governed-receipt-spec/blob/main/verify.py
 
 ## Claim boundary
 
 This file declares the publication authority and verification path. It does not, by itself, prove that the Space is current, that a model is accurate, or that any runtime is production-ready. Current deployment status is established only when `deployment.json` is served from the public Space and its source revision matches protected `szl-holdings/.github` main.
+
+## Receipt verification
+
+The verifier of record is the [offline Python verifier](https://github.com/szl-holdings/governed-receipt-spec/blob/main/README.md#verify-in-one-command) in `szl-holdings/governed-receipt-spec`. From that repository, install its pinned requirements and run:
+
+```bash
+pip install -r requirements.txt
+python verify.py examples/a11oy-khipu-chain.json
+python verify.py --verify-key tests/fixtures/cosign.pub examples/a11oy-khipu-chain.json
+```
+
+Without `--verify-key`, signatures are `SKIP`; a `PASS` means integrity-only, not authenticated signatures. With a supplied key, a successful check verifies envelope signatures against that key, but does not establish signer trust or authorization, re-derive the runtime's internal digest, or qualify a deployed browser consumer. The public `SZLHOLDINGS/governed-receipt-verifier` Space is not a verified receipt-verification path.
 
 ## Inference flagship binding
 
