@@ -1,7 +1,19 @@
 # Hugging Face Space lifecycle authority
 
-**Status:** protected source policy. A source merge is not a provider mutation,
-and a provider `RUNNING` stage is not end-to-end product proof.
+**Status (2026-10-02):** the legacy
+[lifecycle workflow](https://github.com/szl-holdings/.github/actions/workflows/hf-space-lifecycle-reconcile.yml)
+was disabled in GitHub and read back as `disabled_manually`. Do not dispatch or
+re-enable it. The source policy below is the historical August 31 decision,
+not the current keep/retire authority. A source merge is not a provider
+mutation, and a provider `RUNNING` stage is not end-to-end product proof.
+
+The newer [A11oy keep list at `059dc5b`](https://github.com/szl-holdings/a11oy/blob/059dc5bdd9358e8c51af442d7f052ea2d2d9b74b/docs/series-a/hf-space-keep-list.yaml)
+retains eight organization Spaces and one creator-profile Space. Its counts
+describe the September 4 census, not a live inventory. `SZLHOLDINGS/terra`
+is retained; `SZLHOLDINGS/terra-assurance` is a private duplicate tracked for
+gated retirement in [IMMUNE #124](https://github.com/szl-holdings/immune/issues/124).
+The old controller still exists in Git history and source, so the provider's
+disabled-workflow state must be checked separately before relying on it.
 
 ## Historical authenticated policy authority
 
@@ -28,11 +40,13 @@ and enabled. A later bounded runtime census observed 27 `RUNNING` and 19
 `<subdomain>.static.hf.space/index.html` origin. That is reachability evidence,
 not proof of every user flow.
 
-## Policy decision
+## Historical policy decision
 
-`.github/data/hf-space-lifecycle-policy.json` fixes the exact 46-Space
-inventory as public. New repositories do not match a wildcard and require a new
-protected policy revision with content, privacy, license, and source review.
+`.github/data/hf-space-lifecycle-policy.json` fixed the exact 46-Space
+inventory as public in August. It is retained as historical evidence and must
+not be used to authorize publication. New repositories do not match a wildcard
+and require a new protected policy revision with content, privacy, license,
+and source review.
 
 The desired runtime stage is `RUNNING` for every admitted Space. This first
 controller reports runtime drift but cannot repair it. At the August 31 census,
@@ -62,12 +76,13 @@ Restarting those Spaces requires a separate, reviewed runtime controller with
 hardware/cost limits, one-target locking, build-log evidence, health probes,
 and source/runtime identity checks. A blanket restart is not encoded here.
 
-## What this controller can do
+## Historical controller behavior (disabled)
 
-`HF Space Lifecycle Reconcile` is manual, protected-main-only, serialized on
-`hf-provider-mutation-szlholdings`, and gated by the GitHub `production`
-environment. GitHub concurrency only serializes participating workflows in
-this repository; it is not an organization-wide or provider-side lock.
+When enabled, `HF Space Lifecycle Reconcile` was manual, bound to protected
+main, serialized on `hf-provider-mutation-szlholdings`, and gated by the
+GitHub `production` environment. GitHub concurrency only serializes
+participating workflows in this repository; it is not an organization-wide or
+provider-side lock.
 Only the controller step receives the fixed `HF_ORG_TOKEN`
 secret. Without logging identity or token material, it verifies user identity
 and an unambiguous SZLHOLDINGS admin role, then performs a separate,
@@ -159,17 +174,25 @@ compatibility, and secret/PII absence. In particular:
 not permission to expose operational databases, payloads, identities, or
 third-party material.
 
-## Operator sequence
+## Current operating boundary
 
-1. Merge this source through signed, protected CI and the merge queue.
-2. Confirm no other Hub mutation workflow is active.
-3. Approve one `production` environment plan for one exact target.
-4. Read its artifact and copy the policy hash and three exact provider fields.
-5. If a publication transition is actually planned, launch one apply with those
-   exact values.
-6. Treat only `VERIFIED` as a completed visibility transition. Preserve
-   `UNKNOWN_AFTER_ATTEMPT`, `BLOCKED_PRECONDITION`, and `CONCURRENT_DRIFT` as
-   failures requiring investigation.
+Do not approve the obsolete
+[run `33975602488`](https://github.com/szl-holdings/.github/actions/runs/33975602488).
+It still reads as waiting at old source
+`e25adbe3d39b988ced35740a6b58cbfc5ffa920b`, while GitHub's cancel
+endpoint says it is completed, force-cancel returns 409, and environment
+rejection returns 422. This inconsistent API state is not a terminal receipt.
+Disabling the workflow does not prove that an already-created run is cancelled.
+
+Before any new lifecycle writer is introduced, reconcile its exact targets to
+the current A11oy keep list and admit its effects through the protected static
+control-plane gate. The gate rejects workflow deletion and unbound executable
+changes in this repository; it must not be bypassed by weakening checks. The
+three private duplicates in IMMUNE #124 require captured source, product, and
+evidence, removal of active publishers, a verified replacement, no unique
+secret dependency, and a secret-free target-specific retirement receipt before
+any deletion. The legacy IMMUNE finalizer has 49 potential victims and is not
+a safe way to execute that three-target issue.
 
 ## Origins and proof boundaries
 
