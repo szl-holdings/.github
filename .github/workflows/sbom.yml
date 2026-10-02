@@ -38,4 +38,5 @@ jobs:
         with:
           name: sbom
           path: sbom.cyclonedx.json
+          if-no-files-found: error
           retention-days: 30
