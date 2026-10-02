@@ -88,10 +88,12 @@ class PublicInventoryContractTests(unittest.TestCase):
             "https://a-11-oy.com",
             "https://a11oy.net",
             "https://github.com/szl-holdings",
-            "https://huggingface.co/SZLHOLDINGS",
+            "https://github.com/szl-holdings/governed-receipt-spec/tree/320983d22e76fc9b26af0b2cd20799c5000543fc/examples/public-single-cell",
+            "https://huggingface.co/datasets/SZLHOLDINGS/szl-frontier-evaluation-receipts",
         )
         for destination in required_destinations:
             self.assertRegex(source, r"\[[^\]\n]+\]\(" + re.escape(destination) + r"\)")
+        self.assertNotRegex(source, r"\]\(https://huggingface\.co/SZLHOLDINGS/?\)")
         # The canonical fleet, not retired Channel A/B copy, owns navigation.
         self.assertIn("https://github.com/szl-holdings/szl-router", source)
         self.assertIn("https://huggingface.co/spaces/SZLHOLDINGS/llm-router-live", source)

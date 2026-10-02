@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import importlib.util
+import json
 import tempfile
 import unittest
 from pathlib import Path
@@ -60,7 +61,7 @@ class RouterFlagshipContractTests(unittest.TestCase):
         )
         self.assertIn(MODULE.HUB_ASSET_URL, card)
 
-    def validate_with_profile_change(self, transform):
+    def validate_with_profile_change(self, transform, relative_path="profile/README.md"):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
             for relative in (
@@ -72,9 +73,27 @@ class RouterFlagshipContractTests(unittest.TestCase):
                 target = root / relative
                 target.parent.mkdir(parents=True, exist_ok=True)
                 target.write_bytes((ROOT / relative).read_bytes())
-            profile = root / "profile/README.md"
-            profile.write_text(transform(profile.read_text(encoding="utf-8")), encoding="utf-8")
+            target = root / relative_path
+            target.write_text(transform(target.read_text(encoding="utf-8")), encoding="utf-8")
             return MODULE.validate(root)
+
+    def test_plain_profile_label_does_not_relax_machine_program_classification(self) -> None:
+        def remove_classification(text):
+            policy = json.loads(text)
+            policy["program"]["class"] = "UNCLASSIFIED"
+            return json.dumps(policy)
+        result = self.validate_with_profile_change(remove_classification, "governance/router-flagship-v1.json")
+        self.assertEqual(result["status"], "FAIL")
+        self.assertIn("program class mismatch", result["failures"])
+
+    def test_profile_contract_requires_the_plain_public_label(self) -> None:
+        def restore_internal_label(text):
+            policy = json.loads(text)
+            policy["profile_contract"]["required_label"] = "One inference flagship: SZL Router"
+            return json.dumps(policy)
+        result = self.validate_with_profile_change(restore_internal_label, "governance/router-flagship-v1.json")
+        self.assertEqual(result["status"], "FAIL")
+        self.assertIn("plain router profile label mismatch", result["failures"])
 
     def test_portfolio_cannot_drop_router_product_authority(self) -> None:
         result = self.validate_with_profile_change(lambda text: text.replace(MODULE.PRODUCT, "https://example.com"))

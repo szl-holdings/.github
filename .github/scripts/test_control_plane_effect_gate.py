@@ -6,6 +6,8 @@ from __future__ import annotations
 import copy
 import importlib.util
 import json
+import os
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -943,6 +945,22 @@ class YamlBoundaryRegressionTests(unittest.TestCase):
         document["on"] = ["pull_request", "push", "workflow_run"]
         return document
 
+    def test_event_sha_checkout_rejects_pr_review_and_unknown_events(self) -> None:
+        dependencies = {"scripts/fixture.py": b"pass\n"}
+        for event, accepted in (("pull_request_review", False), ("pull_request_review_comment", False), ("issue_comment", False), ("push", True), ("workflow_dispatch", True)):
+            with self.subTest(event=event):
+                source = workflow(extra_step="      - run: python scripts/fixture.py\n").replace(
+                    b'"on": [pull_request, merge_group, push]', f'"on": [{event}]'.encode(),
+                ).replace(
+                    f"      - uses: {CHECKOUT_ACTION}\n".encode(),
+                    f"      - uses: {CHECKOUT_ACTION}\n        with:\n          ref: ${{{{ github.sha }}}}\n".encode(),
+                )
+                candidate = reviewed_policy_for(source, dependencies=dependencies)
+                candidate["workflow_declarations"][WORKFLOW_PATH]["required_controls"]["triggers"] = [event]
+                parsed, bound = bind_source(source, candidate=candidate, dependencies=dependencies)
+                self.assertEqual(bound["verdict"], "ALLOW" if accepted else "DENY")
+                self.assertEqual("CHECKOUT_SOURCE_BOUNDARY_UNSUPPORTED" not in {u.code for u in parsed["unknowns"]}, accepted)
+
     def test_canonical_guarded_checkout_and_hex_run_expression_are_eligible(self) -> None:
         source = json.dumps(self.guarded_source_fixture()).encode()
         parsed = gate.analyze_workflow_source(source.decode(), path=WORKFLOW_PATH)
@@ -951,8 +969,47 @@ class YamlBoundaryRegressionTests(unittest.TestCase):
         # automatically proven shell program.
         self.assertIn("SHELL_COMMAND_UNCLASSIFIED", {u.code for u in parsed["unknowns"]})
 
+    def test_canonical_resolver_rejects_fork_pr_instead_of_using_merge_sha(self) -> None:
+        git_bash = Path(r"C:\Program Files\Git\bin\bash.exe")
+        bash = str(git_bash) if git_bash.is_file() else shutil.which("bash")
+        if not bash:
+            self.skipTest("bash is required to exercise the workflow's actual shell guard")
+        document = self.guarded_source_fixture()
+        script = document["jobs"]["fixture"]["steps"][1]["run"]
+        for event, pr_repository, run_repository, expected in (
+            ("pull_request", "szl-holdings/.github", "szl-holdings/.github", "b" * 40),
+            ("pull_request", "foreign/fork", "szl-holdings/.github", None),
+            ("workflow_run", "szl-holdings/.github", "foreign/fork", None),
+            ("push", "", "", "a" * 40),
+        ):
+            with self.subTest(event=event, pr_repository=pr_repository, run_repository=run_repository), tempfile.TemporaryDirectory() as directory:
+                output = Path(directory) / "output"
+                environment = {**os.environ, "EVENT_NAME": event, "THIS_REPOSITORY": "szl-holdings/.github", "FALLBACK_SHA": "a" * 40, "PR_HEAD_SHA": "b" * 40, "PR_HEAD_REPOSITORY": pr_repository, "RUN_HEAD_SHA": "c" * 40, "RUN_HEAD_REPOSITORY": run_repository, "RUN_HEAD_BRANCH": "main", "GITHUB_OUTPUT": output.as_posix()}
+                environment.pop("BASH_ENV", None)
+                result = subprocess.run([bash, "-c", script], env=environment, capture_output=True, timeout=15)
+                if expected is None:
+                    self.assertNotEqual(result.returncode, 0)
+                    self.assertFalse(output.exists(), "a rejected foreign head must emit no fallback revision")
+                else:
+                    self.assertEqual(result.returncode, 0, result.stderr.decode())
+                    self.assertEqual(output.read_text().strip(), "sha=" + expected)
+
+    def test_old_fork_pr_fallback_resolver_is_nonwaivable(self) -> None:
+        document = self.guarded_source_fixture()
+        resolver = document["jobs"]["fixture"]["steps"][1]
+        resolver["run"] = resolver["run"].replace(
+            'elif [ "$EVENT_NAME" = "pull_request" ]; then\n  if [ "$PR_HEAD_REPOSITORY" != "$THIS_REPOSITORY" ]; then\n    echo "::error::refusing to check out a pull_request head from ${PR_HEAD_REPOSITORY}; only ${THIS_REPOSITORY} is trusted"\n    exit 1\n  fi',
+            'elif [ "$EVENT_NAME" = "pull_request" ] && [ "$PR_HEAD_REPOSITORY" = "$THIS_REPOSITORY" ]; then',
+        )
+        source = json.dumps(document).encode()
+        dependencies = {"scripts/fixture.py": b"pass\n"}
+        candidate = reviewed_policy_for(source, dependencies=dependencies)
+        parsed, _bound = self.assert_source_denied(source, reason="UNREVIEWABLE_EFFECT_BOUNDARY", candidate=candidate, dependencies=dependencies)
+        self.assertIn("CHECKOUT_SOURCE_BOUNDARY_UNSUPPORTED", {u.code for u in parsed["unknowns"]})
+
     def test_mutated_guarded_checkout_cannot_be_waived(self) -> None:
         mutations = (
+            lambda d, s: d.update({"on": ["pull_request_target"]}),
             lambda d, s: s[1].update({"if": "always()"}),
             lambda d, s: s[1].update({"continue-on-error": "true"}),
             lambda d, s: s[1].update({"shell": "sh"}),
@@ -964,6 +1021,7 @@ class YamlBoundaryRegressionTests(unittest.TestCase):
             lambda d, s: s[1].update({"run": s[1]["run"] + '\necho "sha=main" >> "$GITHUB_OUTPUT"\n'}),
             lambda d, s: s.insert(0, {"run": "echo bad >> $GITHUB_ENV"}),
             lambda d, s: s.append({"id": "source", "run": "true"}),
+            lambda d, s: s.append({"id": "Source", "run": "true"}),
             lambda d, s: s.insert(1, s.pop(2)),  # output consumed before resolver
             lambda d, s: s[2]["with"].update({"repository": "elsewhere/fixture"}),
             lambda d, s: s[2].update({"if": "always()"}),

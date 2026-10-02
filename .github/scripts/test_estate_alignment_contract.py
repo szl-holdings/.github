@@ -53,12 +53,19 @@ class EstateAlignmentContractTests(unittest.TestCase):
                 failures = self.document_failures_after(relative, lambda text: text.replace("unsigned", "signed").replace("Unsigned", "Signed"))
                 self.assertIn(f"{label}: missing scientific scope or limitation: unsigned", failures)
 
-    def test_github_portfolio_still_requires_its_taxonomy(self) -> None:
+    def test_github_profile_rejects_internal_vocabulary(self) -> None:
         failures = self.document_failures_after(
             "profile/README.md",
-            lambda text: text.replace("Three commercial flagships", "Products"),
+            lambda text: text + "\nPURIQ Finance and internal engines.\n",
         )
-        self.assertIn("GitHub profile missing 'Three commercial flagships'", failures)
+        self.assertIn("GitHub profile: internal vocabulary remains in scientist-facing copy", failures)
+
+    def test_github_profile_preserves_dated_inventory_limits(self) -> None:
+        failures = self.document_failures_after(
+            "profile/README.md",
+            lambda text: text.replace("not a live count", "a live count"),
+        )
+        self.assertIn("GitHub profile missing Hub inventory claim boundary", failures)
 
     def test_manifest_must_preserve_the_scientific_readback_gate(self) -> None:
         def remove_unsigned_marker(text):

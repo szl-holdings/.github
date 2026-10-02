@@ -1024,7 +1024,11 @@ if [ "$EVENT_NAME" = "workflow_run" ]; then
     exit 1
   fi
   sha="$RUN_HEAD_SHA"
-elif [ "$EVENT_NAME" = "pull_request" ] && [ "$PR_HEAD_REPOSITORY" = "$THIS_REPOSITORY" ]; then
+elif [ "$EVENT_NAME" = "pull_request" ]; then
+  if [ "$PR_HEAD_REPOSITORY" != "$THIS_REPOSITORY" ]; then
+    echo "::error::refusing to check out a pull_request head from ${PR_HEAD_REPOSITORY}; only ${THIS_REPOSITORY} is trusted"
+    exit 1
+  fi
   sha="$PR_HEAD_SHA"
 fi
 if ! [[ "$sha" =~ ^[0-9a-f]{40}$ ]]; then
@@ -1035,12 +1039,13 @@ echo "sha=${sha}" >> "$GITHUB_OUTPUT"'''
 
 
 def guarded_source_references(
-    document: Mapping[str, Any], job: Mapping[str, Any], steps: list[Any], index: int,
+    document: Mapping[str, Any], job: Mapping[str, Any], steps: list[Any], index: int, triggers: Sequence[str],
 ) -> set[str]:
     """Outputs proven hex by an earlier, unconditional canonical resolver."""
     consumer = steps[index]
     if (
         document.get("env") or job.get("env")
+        or not set(triggers).issubset({"pull_request", "push", "schedule", "workflow_dispatch", "workflow_run", "merge_group"})
         or not isinstance(consumer, dict)
         or consumer.get("if", "success()") not in {"success()", "${{ success() }}"}
     ):
@@ -1052,7 +1057,7 @@ def guarded_source_references(
         identifier = step.get("id", "")
         if not isinstance(identifier, str) or not re.fullmatch(r"[A-Za-z_][A-Za-z0-9_-]*", identifier):
             continue
-        if sum(isinstance(item, dict) and item.get("id") == identifier for item in steps) != 1:
+        if sum(isinstance(item, dict) and isinstance(item.get("id"), str) and item["id"].casefold() == identifier.casefold() for item in steps) != 1:
             continue
         if (
             set(step) - {"id", "name", "env", "run", "shell"}
@@ -1106,8 +1111,9 @@ def checkout_ref_is_bounded(
         # PR github.sha is a synthetic merge commit, not the PR head whose
         # dependency bytes this gate binds. An explicit event SHA is admitted
         # only when the workflow or exact event condition excludes PR execution.
-        non_pr_conditions = {f"github.event_name == '{event}'" for event in ("push", "workflow_dispatch", "schedule", "merge_group", "workflow_run")}
-        return not ({"pull_request", "pull_request_target"} & set(triggers)) or job.get("if") in non_pr_conditions or step.get("if") in non_pr_conditions
+        non_pr_events = {"push", "workflow_dispatch", "schedule", "merge_group", "workflow_run"}
+        non_pr_conditions = {f"github.event_name == '{event}'" for event in non_pr_events}
+        return bool(triggers) and set(triggers).issubset(non_pr_events) or job.get("if") in non_pr_conditions or step.get("if") in non_pr_conditions
     if ref == "${{ github.event.pull_request.head.sha }}":
         return job.get("if") == "github.event_name == 'pull_request'" or step.get("if") == "github.event_name == 'pull_request'"
     return any(ref == "${{ " + expression + " }}" for expression in guarded)
@@ -1219,7 +1225,7 @@ def analyze_workflow_source(source: str, *, path: str) -> dict[str, Any]:
             if not isinstance(step, dict) or bool("uses" in step) == bool("run" in step):
                 unknown("WORKFLOW_SHAPE_INVALID", step_location)
                 continue
-            guarded = guarded_source_references(document, job, steps, index)
+            guarded = guarded_source_references(document, job, steps, index, triggers)
             if set(step) - {
                 "id", "if", "name", "uses", "run", "working-directory", "shell",
                 "with", "env", "continue-on-error", "timeout-minutes",

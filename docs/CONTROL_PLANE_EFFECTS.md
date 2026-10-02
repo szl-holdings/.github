@@ -91,6 +91,7 @@ PR/merge-group/event SHA fallback remains supported.
 A direct PR head SHA requires the exact PR-event condition on its job or step.
 The one admitted step-output resolver is matched against its complete canonical
 shell body and environment bindings: it accepts same-repository PR heads,
+rejects fork PRs instead of falling back to their synthetic merge revision,
 requires same-repository `main` for workflow-run heads, and validates a 40-hex
 result before writing its output. It must precede its consumer, have a unique
 step ID, run unconditionally without ignored failures, be consumed only under

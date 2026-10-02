@@ -9,6 +9,7 @@ import sys
 from collections import Counter
 from html.parser import HTMLParser
 from pathlib import Path
+from urllib.parse import urlsplit
 
 import hf_static_space_deploy as deploy
 
@@ -17,7 +18,8 @@ REQUIRED_LINKS = {
     "https://a-11-oy.com",
     "https://a11oy.net",
     "https://github.com/szl-holdings",
-    "https://huggingface.co/SZLHOLDINGS",
+    "https://github.com/szl-holdings/governed-receipt-spec/tree/320983d22e76fc9b26af0b2cd20799c5000543fc/examples/public-single-cell",
+    "https://huggingface.co/datasets/SZLHOLDINGS/szl-frontier-evaluation-receipts",
 }
 BANNED_COPY = {
     "every model ships with signed receipts",
@@ -49,8 +51,47 @@ SCIENTIST_MARKERS = {
 }
 SCIENTIST_BANNED_WORDS = re.compile(
     r"\b(?:Lambda(?:-Spine)?|Doctrine|Khipu|PURIQ|IMMUNE|Yachay|Kitaev-surface|"
-    r"estate|wave|lane|wheel)\b|Λ", re.IGNORECASE
+    r"governed|estate|wave|lane|wheel)\b|Λ", re.IGNORECASE
 )
+
+
+def links_to_hub_organization_root(url: str) -> bool:
+    try:
+        parsed = urlsplit(url)
+        return (
+            parsed.scheme.casefold() in {"http", "https"}
+            and (parsed.hostname or "").casefold() == "huggingface.co"
+            and parsed.path.rstrip("/").casefold() == "/szlholdings"
+        )
+    except ValueError:
+        return False
+
+
+def profile_link_failures(document: str) -> list[str]:
+    """Require usable profile navigation to specific public artifacts."""
+    links = re.findall(r"\]\((https?://[^)]+)\)", document)
+    failures = [
+        f"GitHub profile missing canonical link: {url}"
+        for url in sorted(REQUIRED_LINKS) if url not in links
+    ]
+    if any(links_to_hub_organization_root(url) for url in links):
+        failures.append("GitHub profile links must point to a specific Hub artifact")
+    return failures
+
+
+def public_prose(document: str) -> str:
+    # Keep existing repository identifiers in URLs while checking their labels.
+    prose = re.sub(r"^---\n.*?\n---\n", "", document, count=1, flags=re.S)
+    prose = re.sub(r"<(?:style|script)\b[^>]*>.*?</(?:style|script)>", "", prose, flags=re.S | re.I)
+    prose = re.sub(r"\[([^]]+)\]\([^)]+\)", r"\1", prose)
+    prose = re.sub(r"<[^>]+>", " ", prose)
+    return " ".join(prose.replace("**", "").split())
+
+
+def public_copy_failures(document: str) -> list[str]:
+    if SCIENTIST_BANNED_WORDS.search(public_prose(document)):
+        return ["internal vocabulary remains in scientist-facing copy"]
+    return []
 
 
 def scientist_copy_failures(document: str) -> list[str]:
@@ -61,19 +102,13 @@ def scientist_copy_failures(document: str) -> list[str]:
         f"missing direct artifact link: {url}"
         for url in sorted(SCIENTIST_LINKS) if url not in links
     ]
-    if any(url.rstrip("/") == "https://huggingface.co/SZLHOLDINGS" for url in links):
+    if any(links_to_hub_organization_root(url) for url in links):
         failures.append("scientist-facing links must point to a specific artifact")
-    # Keep existing repository identifiers in URLs while checking their labels.
-    prose = re.sub(r"^---\n.*?\n---\n", "", document, count=1, flags=re.S)
-    prose = re.sub(r"<(?:style|script)\b[^>]*>.*?</(?:style|script)>", "", prose, flags=re.S | re.I)
-    prose = re.sub(r"\[([^]]+)\]\([^)]+\)", r"\1", prose)
-    prose = re.sub(r"<[^>]+>", " ", prose)
-    prose = " ".join(prose.replace("**", "").split())
+    prose = public_prose(document)
     for marker in sorted(SCIENTIST_MARKERS):
         if marker.casefold() not in prose.casefold():
             failures.append(f"missing scientific scope or limitation: {marker}")
-    if SCIENTIST_BANNED_WORDS.search(prose):
-        failures.append("internal vocabulary remains in scientist-facing copy")
+    failures.extend(public_copy_failures(document))
     return failures
 
 
@@ -748,10 +783,10 @@ def main() -> int:
     )
     failures = FailureList()
 
-    for url in REQUIRED_LINKS:
-        require(
-            url in profile, f"GitHub profile missing canonical link: {url}", failures
-        )
+    for failure in profile_link_failures(profile):
+        require(False, failure, failures)
+    for failure in public_copy_failures(profile):
+        require(False, f"GitHub profile: {failure}", failures)
     for name, document in (("Hub card", hub_card), ("Static front door", html)):
         for failure in scientist_copy_failures(document):
             require(False, f"{name}: {failure}", failures)

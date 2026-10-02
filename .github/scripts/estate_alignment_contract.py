@@ -247,24 +247,18 @@ def validate_documents(root: Path, contract: Mapping[str, Any]) -> list[str]:
     hf_readme = (root / "huggingface/org-card/README.md").read_text(encoding="utf-8")
     hf_index = (root / "huggingface/org-card/index.html").read_text(encoding="utf-8")
     manifest = load_json(root / "huggingface/org-card.manifest.json")
-    # The portfolio taxonomy remains machine-readable and on the GitHub
-    # portfolio profile. Scientists enter through a specific reproducible
-    # example whose direct links and scientific limits have their own checks.
-    documents = {"GitHub profile": profile}
-    for label, text in documents.items():
-        for marker in ("Three commercial flagships", "Five public domain bodies", "Six internal engines"):
-            require(marker.casefold() in text.casefold(), f"{label} missing {marker!r}", failures)
-        for name in ("A11oy", "Killinchu", "Forge", "Terra", "PRISM Counsel", "PURIQ Finance", "LYTE"):
-            require(name.casefold() in text.casefold(), f"{label} missing {name}", failures)
+    # validate_contract keeps the exact machine taxonomy. Public profiles use
+    # plain language and direct artifact links, with dated inventory context.
+    failures.extend(f"GitHub profile: {failure}" for failure in front_door.profile_link_failures(profile))
+    failures.extend(f"GitHub profile: {failure}" for failure in front_door.public_copy_failures(profile))
     for marker in ("16 portfolio Spaces", "1 inventory-only Space", "45 models", "34 datasets"):
         require(marker.casefold() in profile.casefold(), f"GitHub profile missing {marker}", failures)
-    for label, text in documents.items():
-        require(
-            "not availability, operational readiness, or publication policy"
-            in " ".join(text.casefold().split()),
-            f"{label} missing Hub inventory claim boundary",
-            failures,
-        )
+    require(
+        "not a live count" in profile.casefold()
+        and "does not establish today's inventory, readiness, or model quality" in profile.casefold(),
+        "GitHub profile missing Hub inventory claim boundary",
+        failures,
+    )
     for label, text in (("Hugging Face README", hf_readme), ("Hugging Face index", hf_index)):
         failures.extend(f"{label}: {failure}" for failure in front_door.scientist_copy_failures(text))
     require('data-szl-surface="company-front-door"' in hf_index, "Hugging Face homepage smoke marker missing", failures)

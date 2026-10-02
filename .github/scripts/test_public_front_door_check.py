@@ -5,6 +5,44 @@ from types import SimpleNamespace
 import public_front_door_check as check
 
 
+ORG_ROOT_VARIANTS = (
+    "https://huggingface.co/SZLHOLDINGS",
+    "https://huggingface.co/SZLHOLDINGS/",
+    "https://HUGGINGFACE.CO/szlholdings",
+    "https://huggingface.co/szlholdings?tab=datasets",
+    "https://huggingface.co/SZLHOLDINGS/#models",
+)
+
+
+class ProfileNavigationTests(unittest.TestCase):
+    def setUp(self):
+        root = Path(__file__).resolve().parents[2]
+        self.profile = (root / "profile/README.md").read_text(encoding="utf-8")
+
+    def test_profile_links_directly_to_the_worked_example_and_evaluation_records(self):
+        self.assertEqual(check.profile_link_failures(self.profile), [])
+        self.assertEqual(check.public_copy_failures(self.profile), [])
+
+    def test_profile_cannot_reintroduce_internal_terms_in_visible_copy(self):
+        for phrase in ("governed AI", "code estate", "PURIQ Finance", "Doctrine"):
+            with self.subTest(phrase=phrase):
+                self.assertEqual(check.public_copy_failures(self.profile + "\n" + phrase), ["internal vocabulary remains in scientist-facing copy"])
+
+    def test_repository_names_in_links_are_not_visible_jargon(self):
+        self.assertEqual(check.public_copy_failures("[Example](https://github.com/szl-holdings/governed-receipt-spec)"), [])
+
+    def test_org_root_is_rejected_even_when_required_artifact_links_are_present(self):
+        for root in ORG_ROOT_VARIANTS:
+            with self.subTest(root=root):
+                failures = check.profile_link_failures(self.profile + f"\n[Browse]({root})")
+                self.assertIn("GitHub profile links must point to a specific Hub artifact", failures)
+
+    def test_artifact_url_in_prose_cannot_replace_a_working_link(self):
+        dataset = "https://huggingface.co/datasets/SZLHOLDINGS/szl-frontier-evaluation-receipts"
+        document = self.profile.replace(f"]({dataset})", "](https://example.com)") + "\n" + dataset
+        self.assertIn(f"GitHub profile missing canonical link: {dataset}", check.profile_link_failures(document))
+
+
 class ScientistCopyTests(unittest.TestCase):
     def setUp(self):
         root = Path(__file__).resolve().parents[2]
@@ -25,9 +63,11 @@ class ScientistCopyTests(unittest.TestCase):
 
     def test_organization_root_cannot_replace_the_specific_dataset(self):
         dataset = "https://huggingface.co/datasets/SZLHOLDINGS/szl-frontier-evaluation-receipts"
-        failures = check.scientist_copy_failures(self.card.replace(dataset, "https://huggingface.co/SZLHOLDINGS"))
-        self.assertIn("scientist-facing links must point to a specific artifact", failures)
-        self.assertIn(f"missing direct artifact link: {dataset}", failures)
+        for root in ORG_ROOT_VARIANTS:
+            with self.subTest(root=root):
+                failures = check.scientist_copy_failures(self.card.replace(dataset, root))
+                self.assertIn("scientist-facing links must point to a specific artifact", failures)
+                self.assertIn(f"missing direct artifact link: {dataset}", failures)
 
     def test_example_url_in_prose_does_not_satisfy_navigation(self):
         example = next(url for url in check.SCIENTIST_LINKS if "governed-receipt-spec" in url)
