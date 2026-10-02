@@ -179,7 +179,7 @@ The workflow recognizes these verdict and process-exit pairs:
 | Verdict | Exit | Workflow meaning |
 | --- | ---: | --- |
 | `ALLOW` | `0` | No unresolved effect in the declared scope. |
-| `DENY` | `2` | A policy violation, unknown effect, or analysis failure blocks the change. |
+| `DENY` | `2` | Policy violations or analysis failures block the change. |
 | `REVIEW_REQUIRED` | `3` | A trust-root transition needs independent review. |
 
 Any missing receipt, malformed receipt, unknown exit code, or disagreement
