@@ -36,11 +36,9 @@ Source, running software, and model evaluations are **separate claims**, kept se
 
 ## Current state
 
-**34 public Spaces, 46 models, 35 datasets**, observed **2026-10-02T21:07:54Z** under anonymous public-only `hf-public-author-membership/v1`. Kernels count once as model repositories. Private assets, collections and buckets are excluded. This dated registry snapshot is not a live count or a readiness claim.
+**34 public Spaces, 46 models, 35 datasets**, observed **2026-10-02T21:07:54Z** under anonymous `hf-public-author-membership/v1`. These public-only repository counts are not a live count or readiness claim.
 
 [**Inventory binding**](https://github.com/szl-holdings/.github/blob/main/profile/public-inventory.json) · [**Admitted source manifest**](https://github.com/szl-holdings/a11oy/blob/7ae3e7e5b4ec3c9b0d36464ee8b796045a1c37a3/docs/huggingface-ecosystem-manifest.json)
-
-Twenty PyPI packages were listed separately; Hub repository counts do not qualify those packages or model behavior.
 
 **HISTORICAL:** estate-alignment contract v1 recorded **16 portfolio Spaces**, **1 inventory-only Space**, **45 models**, and **34 datasets** — prior snapshot, superseded above. Its named topology: **A11oy**, **Forge**, **Killinchu**, **Terra**, **PRISM Counsel**, **PURIQ Finance**, **LYTE**.
 
