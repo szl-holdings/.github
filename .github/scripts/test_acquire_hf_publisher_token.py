@@ -80,6 +80,210 @@ class PublisherCredentialSelectionTests(unittest.TestCase):
 
         self.assertEqual([False], seen)
 
+    def test_explicit_recovery_creates_only_exact_public_docker_space(self) -> None:
+        class Api:
+            def __init__(self, *, token):
+                self.calls = []
+                self.checks = 0
+
+            def whoami(self):
+                return {"name": "founder", "orgs": [{"name": "SZLHOLDINGS", "roleInOrg": "admin"}]}
+
+            def auth_check(self, **kwargs):
+                self.checks += 1
+                self.calls.append(("auth_check", kwargs))
+                if self.checks == 1:
+                    raise self._error(404)
+
+            def create_repo(self, **kwargs):
+                self.calls.append(("create_repo", kwargs))
+
+            def repo_info(self, **kwargs):
+                self.calls.append(("repo_info", kwargs))
+                return types.SimpleNamespace(id="SZLHOLDINGS/nexus", private=False)
+
+            @staticmethod
+            def _error(code):
+                error = RuntimeError("secret must not enter evidence")
+                error.response = types.SimpleNamespace(status_code=code)
+                return error
+
+        holder = {}
+
+        def factory(**kwargs):
+            holder["api"] = Api(**kwargs)
+            return holder["api"]
+
+        result = auth.recover_public_nexus(
+            {"HF_ORG_TOKEN_CANDIDATE": "hf_secret_material"}, api_factory=factory
+        )
+        self.assertEqual("CREATED_PUBLIC_WRITE_CONFIRMED", result["state"])
+        self.assertEqual(
+            (
+                "create_repo",
+                {
+                    "repo_id": "SZLHOLDINGS/nexus",
+                    "repo_type": "space",
+                    "space_sdk": "docker",
+                    "private": False,
+                    "exist_ok": False,
+                },
+            ),
+            holder["api"].calls[1],
+        )
+        self.assertEqual(2, holder["api"].checks)
+        self.assertNotIn("hf_secret_material", json.dumps(result))
+
+    def test_inaccessible_existing_target_cannot_be_recreated_or_unprivated(self) -> None:
+        class Api:
+            def __init__(self, *, token):
+                self.creates = 0
+
+            def whoami(self):
+                return {"name": "founder", "orgs": [{"name": "SZLHOLDINGS", "roleInOrg": "admin"}]}
+
+            def auth_check(self, **kwargs):
+                error = RuntimeError("inaccessible")
+                error.response = types.SimpleNamespace(status_code=404)
+                raise error
+
+            def create_repo(self, **kwargs):
+                self.creates += 1
+                self.args = kwargs
+                error = RuntimeError("already occupied")
+                error.response = types.SimpleNamespace(status_code=409)
+                raise error
+
+        holder = {}
+
+        def factory(**kwargs):
+            holder["api"] = Api(**kwargs)
+            return holder["api"]
+
+        result = auth.recover_public_nexus(
+            {"HF_ORG_TOKEN_CANDIDATE": "hf_secret_material"}, api_factory=factory
+        )
+        self.assertEqual("BLOCKED_NO_TARGET_WRITER", result["state"])
+        self.assertEqual(1, holder["api"].creates)
+        self.assertEqual(False, holder["api"].args["exist_ok"])
+        self.assertEqual(409, result["attempts"][0]["status_code"])
+        self.assertNotIn("hf_secret_material", json.dumps(result))
+
+    def test_recovery_requires_verified_org_admin(self) -> None:
+        class Api:
+            def __init__(self, *, token):
+                pass
+
+            def whoami(self):
+                return {"name": "writer", "orgs": [{"name": "SZLHOLDINGS", "roleInOrg": "write"}]}
+
+            def auth_check(self, **kwargs):
+                error = RuntimeError("not found")
+                error.response = types.SimpleNamespace(status_code=404)
+                raise error
+
+            def create_repo(self, **kwargs):
+                raise AssertionError("create_repo must not be reached")
+
+        result = auth.recover_public_nexus(
+            {"HF_ORG_TOKEN_CANDIDATE": "hf_write_only"}, api_factory=Api
+        )
+        self.assertEqual("BLOCKED_NO_TARGET_WRITER", result["state"])
+        self.assertEqual("OrgAdminUnverified", result["attempts"][0]["error_type"])
+
+    def test_create_readback_failure_is_unknown_after_attempt(self) -> None:
+        class Api:
+            def __init__(self, *, token):
+                self.checks = 0
+
+            def whoami(self):
+                return {"name": "founder", "orgs": [{"name": "SZLHOLDINGS", "roleInOrg": "admin"}]}
+
+            def auth_check(self, **kwargs):
+                self.checks += 1
+                if self.checks == 1:
+                    error = RuntimeError("not found")
+                    error.response = types.SimpleNamespace(status_code=404)
+                    raise error
+
+            def create_repo(self, **kwargs):
+                return "https://huggingface.co/spaces/SZLHOLDINGS/nexus"
+
+            def repo_info(self, **kwargs):
+                return types.SimpleNamespace(id="SZLHOLDINGS/nexus", private=True)
+
+        result = auth.recover_public_nexus(
+            {"HF_ORG_TOKEN_CANDIDATE": "hf_secret_material"}, api_factory=Api
+        )
+        self.assertEqual("UNKNOWN_AFTER_ATTEMPT", result["state"])
+        self.assertEqual("post_create_readback", result["attempts"][0]["phase"])
+
+    def test_writable_private_target_is_reported_without_visibility_change(self) -> None:
+        class Api:
+            def __init__(self, *, token):
+                pass
+
+            def whoami(self):
+                return {"name": "founder"}
+
+            def auth_check(self, **kwargs):
+                return None
+
+            def repo_info(self, **kwargs):
+                return types.SimpleNamespace(id="SZLHOLDINGS/nexus", private=True)
+
+            def create_repo(self, **kwargs):
+                raise AssertionError("existing target must never be recreated")
+
+        result = auth.recover_public_nexus(
+            {"HF_ORG_TOKEN_CANDIDATE": "hf_secret_material"}, api_factory=Api
+        )
+        self.assertEqual("BLOCKED_EXISTING_TARGET_MISMATCH", result["state"])
+
+    def test_recovery_boundary_refuses_non_main_dispatch_before_provider_access(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            report = root / "report.json"
+            token_file = root / "token"
+            policy = _HERE.parent / "data" / "hf-space-lifecycle-policy.json"
+            with (
+                patch.dict(os.environ, {
+                    "GITHUB_EVENT_NAME": "workflow_dispatch",
+                    "GITHUB_REF": "refs/heads/unprotected",
+                    "GITHUB_REPOSITORY": "szl-holdings/.github",
+                    "HF_ORG_TOKEN_CANDIDATE": "hf_secret_material",
+                }),
+                patch.object(
+                    auth,
+                    "recover_public_nexus",
+                    side_effect=AssertionError("provider must not be touched"),
+                ),
+            ):
+                code = auth.main([
+                    "--target-repo", "SZLHOLDINGS/nexus",
+                    "--target-type", "space",
+                    "--recover-exact-public-nexus",
+                    "--recovery-policy", str(policy),
+                    "--token-file", str(token_file),
+                    "--report", str(report),
+                ])
+            self.assertEqual(1, code)
+            self.assertFalse(token_file.exists())
+            self.assertNotIn("hf_secret_material", report.read_text(encoding="utf-8"))
+
+    def test_protected_policy_must_declare_exact_public_nexus(self) -> None:
+        policy_path = _HERE.parent / "data" / "hf-space-lifecycle-policy.json"
+        auth._assert_public_nexus_policy(policy_path)
+        with tempfile.TemporaryDirectory() as directory:
+            wrong = Path(directory) / "policy.json"
+            data = json.loads(policy_path.read_text(encoding="utf-8"))
+            for target in data["targets"]:
+                if target["repo_id"] == "SZLHOLDINGS/nexus":
+                    target["desired_visibility"] = "private"
+            wrong.write_text(json.dumps(data), encoding="utf-8")
+            with self.assertRaises(auth.CredentialSelectionError):
+                auth._assert_public_nexus_policy(wrong)
+
     def test_repository_404_never_proves_creation_authority(self) -> None:
         class FakeRepositoryNotFoundError(RuntimeError):
             pass
@@ -285,6 +489,21 @@ class NexusWorkflowCredentialContractTests(unittest.TestCase):
             "python -I -B .github/scripts/test_acquire_hf_publisher_token.py",
             workflow,
         )
+
+    def test_recovery_is_owner_dispatch_only_and_serializes_publication(self) -> None:
+        workflow = (_HERE.parent / "workflows" / "publish-nexus-space.yml").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn("recover_missing_target:", workflow)
+        self.assertIn("default: false", workflow)
+        self.assertIn("github.ref == 'refs/heads/main'", workflow)
+        self.assertIn("--recover-exact-public-nexus", workflow)
+        self.assertIn(
+            "--recovery-policy tools/.github/data/hf-space-lifecycle-policy.json",
+            workflow,
+        )
+        self.assertIn("'publish' }}", workflow)
+        self.assertIn("cancel-in-progress: ${{ github.event_name == 'pull_request' }}", workflow)
 
     def test_selected_token_is_never_printed_or_redeclared(self) -> None:
         workflow = (_HERE.parent / "workflows" / "publish-nexus-space.yml").read_text(
