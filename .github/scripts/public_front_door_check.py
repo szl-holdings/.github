@@ -976,6 +976,11 @@ def main() -> int:
         failures,
     )
     require(
+        "--publish" not in deploy_workflow and "secrets." not in deploy_workflow,
+        "retired org-card workflow must not contain a provider write path or credential",
+        failures,
+    )
+    require(
         "-p test_hf_static_space_deploy.py" in deploy_workflow,
         "deployment workflow does not run publisher tests",
         failures,

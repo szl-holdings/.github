@@ -1,5 +1,5 @@
 # Retired writer: hf-org-card-autopublish.yml is the sole active publisher.
-# Preserve this workflow for historical run links, but never enter its provider job.
+# Preserve this workflow for historical run links, but remove its provider path.
 name: Hugging Face organization front door (retired writer)
 
 on:
@@ -37,7 +37,6 @@ jobs:
     if: ${{ false }}
     name: Retired publisher is disabled
     runs-on: ubuntu-latest
-    environment: production
     timeout-minutes: 20
     steps:
       - name: Harden runner
@@ -90,51 +89,3 @@ jobs:
 
       - name: Verify public front-door contract
         run: python .github/scripts/public_front_door_check.py
-
-      - name: Install exact Hub client
-        run: python -m pip install --disable-pip-version-check "huggingface_hub==1.19.0"
-
-      - name: Restore public organization-card visibility
-        env:
-          HF_TOKEN: ${{ secrets.HF_TOKEN }}
-        run: >-
-          python .github/scripts/hf_space_visibility.py
-          --repo-id SZLHOLDINGS/README
-          --wait-seconds 120
-          --report hf-org-card-visibility-pre.json
-
-      - name: Publish and verify exact source
-        env:
-          HF_TOKEN: ${{ secrets.HF_TOKEN }}
-          GITHUB_TOKEN: ${{ github.token }}
-          SZL_PUBLICATION_ENVIRONMENT: production
-        run: >-
-          python .github/scripts/hf_static_space_deploy.py
-          --repo-root .
-          --manifest huggingface/org-card.manifest.json
-          --source-sha "${GITHUB_SHA}"
-          --publish
-          --wait-seconds 600
-          --report hf-org-card-deploy-report.json
-
-      - name: Confirm public visibility after publication
-        env:
-          HF_TOKEN: ${{ secrets.HF_TOKEN }}
-        run: >-
-          python .github/scripts/hf_space_visibility.py
-          --repo-id SZLHOLDINGS/README
-          --check-only
-          --wait-seconds 120
-          --report hf-org-card-visibility-post.json
-
-      - name: Upload deployment evidence
-        if: always()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
-        with:
-          name: hf-org-card-deploy-evidence
-          path: |
-            hf-org-card-deploy-report.json
-            hf-org-card-visibility-pre.json
-            hf-org-card-visibility-post.json
-          if-no-files-found: warn
-          retention-days: 90

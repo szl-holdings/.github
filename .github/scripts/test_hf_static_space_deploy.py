@@ -225,14 +225,12 @@ class StaticSpaceDeployTests(unittest.TestCase):
         workflow = (
             repo_root / ".github" / "workflows" / "hf-org-card-deploy.yml"
         ).read_text(encoding="utf-8")
-        for required in (
-            "publish-and-verify:\n    if: ${{ false }}",
-            "environment: production",
-            "GITHUB_TOKEN: ${{ github.token }}",
-            "SZL_PUBLICATION_ENVIRONMENT: production",
-        ):
+        for required in ("publish-and-verify:\n    if: ${{ false }}",):
             with self.subTest(required=required):
                 self.assertIn(required, workflow)
+        self.assertNotIn("--publish", workflow)
+        self.assertNotIn("secrets.", workflow)
+        self.assertNotIn("SZL_PUBLICATION_ENVIRONMENT:", workflow)
 
     def test_publish_authority_rejects_branch_dispatch_and_rerun(self):
         contract, _ = deploy.load_contract(self.root, self.manifest)
