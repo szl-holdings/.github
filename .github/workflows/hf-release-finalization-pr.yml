@@ -108,6 +108,8 @@ jobs:
         run: |
           set -euo pipefail
           python lake/scripts/test_hf_dataset_contract.py
+          PYTHONPATH=lake/scripts python lake/scripts/test_publish_hf_dataset.py
+          python lake/scripts/publish_hf_dataset.py --check-index
           PYTHONPATH=energy python -m pytest -q energy/tests/test_hf_kernel_contract.py
           PYTHONPATH=lambda-gate/torch-ext:lambda-gate python -m pytest -q lambda-gate/tests/test_hf_governed_norm_contract.py
 

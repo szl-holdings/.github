@@ -811,6 +811,75 @@
           "WORKFLOW_ENVIRONMENT_REVIEW_REQUIRED@.github/workflows/hf-living-constellation-operator.yml:37"
         ]
       }
+    },
+    ".github/workflows/hf-dataset-card-admission.yml": {
+      "intent_id": "hf-dataset-card-offline-admission-v1",
+      "valid_until": "2026-11-30",
+      "source_sha256": "sha256:7f8fb1523abe6f7469caab7be008c42c13ab858e77f4f90fb4e9b661fb647cf8",
+      "credentials": [],
+      "resources": [
+        {
+          "key": "github:repository:szl-holdings/.github:contents",
+          "access": "read"
+        },
+        {
+          "key": "runner:toolchain:python",
+          "access": "local-write"
+        }
+      ],
+      "effects": [
+        {
+          "sink": "github.contents.checkout",
+          "resource": "github:repository:szl-holdings/.github:contents",
+          "access": "read",
+          "max_calls": 1
+        },
+        {
+          "sink": "runner.toolchain.install",
+          "resource": "runner:toolchain:python",
+          "access": "local-write",
+          "max_calls": 1
+        }
+      ],
+      "max_external_writes": 0,
+      "required_controls": {
+        "triggers": [
+          "pull_request"
+        ],
+        "contents_read": true,
+        "no_explicit_secrets": true,
+        "concurrency": false,
+        "protected_ref": false,
+        "exact_sha": false,
+        "expected_before": false,
+        "readback": false
+      },
+      "trusted_transitives": {},
+      "reviewed_unknowns": {
+        "files": {
+          ".github/scripts/hf_dataset_card_admission.py": "sha256:132136b859ce0b09f0f79c742e8fa4db58084e5d735dd0ab04396d42d8e7c187",
+          ".github/scripts/test_hf_dataset_card_admission.py": "sha256:da6b6d1f9dbda043fbc35b36ade5a6a8fc42404a9e155d1a646ecca76ac42eaf",
+          ".github/workflows/hf-dataset-card-admission.yml": "sha256:7f8fb1523abe6f7469caab7be008c42c13ab858e77f4f90fb4e9b661fb647cf8"
+        },
+        "unknowns": [
+          "ACTION_INPUTS_REVIEW_REQUIRED@.github/workflows/hf-dataset-card-admission.yml:20",
+          "ACTION_INPUTS_REVIEW_REQUIRED@.github/workflows/hf-dataset-card-admission.yml:24",
+          "PYTHON_DYNAMIC_EXECUTION@.github/scripts/hf_dataset_card_admission.py:19",
+          "PYTHON_DYNAMIC_EXECUTION@.github/scripts/hf_dataset_card_admission.py:89",
+          "PYTHON_IMPORT_UNRESOLVED@.github/scripts/hf_dataset_card_admission.py:3",
+          "PYTHON_IMPORT_UNRESOLVED@.github/scripts/hf_dataset_card_admission.py:8",
+          "PYTHON_IMPORT_UNRESOLVED@.github/scripts/test_hf_dataset_card_admission.py:10",
+          "PYTHON_IMPORT_UNRESOLVED@.github/scripts/test_hf_dataset_card_admission.py:4",
+          "PYTHON_IMPORT_UNRESOLVED@.github/scripts/test_hf_dataset_card_admission.py:5",
+          "PYTHON_IMPORT_UNRESOLVED@.github/scripts/test_hf_dataset_card_admission.py:6",
+          "PYTHON_IMPORT_UNRESOLVED@.github/scripts/test_hf_dataset_card_admission.py:7",
+          "PYTHON_SOURCE_REVIEW_REQUIRED@.github/scripts/hf_dataset_card_admission.py:1",
+          "PYTHON_SOURCE_REVIEW_REQUIRED@.github/scripts/test_hf_dataset_card_admission.py:1",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-dataset-card-admission.yml:26",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-dataset-card-admission.yml:28",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-dataset-card-admission.yml:30"
+        ]
+      }
     }
   }
 }

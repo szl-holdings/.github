@@ -60,10 +60,24 @@ Exit 0 means those local source checks passed. Exit 2 is `BLOCKED` with
 `DATASET_CARD_ADMISSION_INVALID`. It makes no network request, reads no
 credentials, executes no dataset code, and creates no output files.
 
-These are local unit tests. The existing hosted Tests workflow lists suites
-explicitly and does not automatically execute this new suite. No workflow,
-effect policy, live card expectation, credential binding, or uploader is
-changed by this proposal. The existing card reconciler supports three scalar
+The dedicated `hf-dataset-card-admission.yml` workflow runs this suite normally
+and with Python assertions disabled, then validates the actual two-card source
+proposal. It uses the existing SHA-pinned checkout and Python setup actions,
+read-only repository permission, no persisted checkout credentials, no explicit
+secrets and a five-minute job limit. It does not upload artifacts or contact
+Hugging Face. Hosted execution must be read back at the final proposal head;
+local test success alone does not establish it.
+
+The proposed new declaration in `control_plane_effect_policy.json` binds the
+exact workflow and two helper byte hashes, the actual analyzer unknown set,
+one repository checkout and one Python setup, with zero external writes.
+Existing declarations and deny-by-default controls are preserved. This changes
+a policy trust root: the full gate returns `REVIEW_REQUIRED` and still requires
+protected owner review. A matching per-workflow static analysis is not owner
+approval, provider authority, or a proof of arbitrary program behavior.
+
+No live card expectation, credential binding or uploader is changed. The
+existing card reconciler supports three scalar
 fields and optional body/stamp changes; it does not implement either proposed
 viewer operation. Adding these targets to it is outside this source admission.
 
