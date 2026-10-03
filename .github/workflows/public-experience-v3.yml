@@ -124,6 +124,8 @@ jobs:
       - name: Audit both origins and every public Space
         id: audit
         shell: bash
+        env:
+          TARGET_REGEX: ${{ github.event_name == 'workflow_dispatch' && inputs.target_regex || '' }}
         run: |
           set +e
           mkdir -p "$SCREENSHOTS"
@@ -135,7 +137,7 @@ jobs:
             --concurrency 6
             --timeout-ms 30000
           )
-          target_filter="${{ github.event_name == 'workflow_dispatch' && inputs.target_regex || '' }}"
+          target_filter="$TARGET_REGEX"
           if [ -n "$target_filter" ]; then args+=(--target-regex "$target_filter"); fi
           python .github/scripts/audit_public_experience_v3.py "${args[@]}"
           code=$?
