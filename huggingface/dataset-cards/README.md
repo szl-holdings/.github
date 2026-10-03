@@ -41,7 +41,7 @@ For a fresh clone, set the option at creation rather than rewriting an active
 checkout:
 
 ```sh
-git -c core.autocrlf=false clone https://github.com/szl-holdings/.github.git
+git clone --config core.autocrlf=false https://github.com/szl-holdings/.github.git
 ```
 
 Select the reviewed proposal revision, then run:
