@@ -2,7 +2,7 @@
   "schema": "szl.codex.whole-thread-workgraph/v2",
   "generated_at": "2026-08-11T00:00:00Z",
   "marker": "SZL-CODEX-WHOLE-THREAD-FINISH-V1",
-  "authority": "This file is the canonical machine-readable graph. The compact JSON block in WORKCELL.md is a human-readable summary only.",
+  "authority": "This file is the sole canonical machine-readable graph. WORKCELL.md references this file and intentionally embeds no second graph or schema snapshot.",
   "owner_authorization": "PRESENT",
   "coordination_repository": "szl-holdings/.github",
   "source_contract": "coordination/codex/whole-thread-finish-2026-08-11/WORKCELL.md",
