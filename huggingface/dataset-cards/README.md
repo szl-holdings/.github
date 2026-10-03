@@ -33,7 +33,18 @@ record; it does not copy or transform those retained provider artifacts.
 
 ## Local checks
 
-From a clean checkout of this proposal:
+From a clean checkout of this proposal with Git line-ending translation
+disabled (`core.autocrlf=false`). These byte checks use the canonical LF Git
+blobs. A Windows checkout that translates them to CRLF must report drift;
+that is a failed check, not a reason to rehash the immutable card anchors.
+For a fresh clone, set the option at creation rather than rewriting an active
+checkout:
+
+```sh
+git -c core.autocrlf=false clone https://github.com/szl-holdings/.github.git
+```
+
+Select the reviewed proposal revision, then run:
 
 ```sh
 python -I -B .github/scripts/hf_dataset_card_admission.py
