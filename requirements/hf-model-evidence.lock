@@ -1,4 +1,0 @@
-# Linux CPython 3.12 wheel; same PyYAML artifact as hf-publisher.lock.
---only-binary=:all:
-pyyaml==6.0.3 \
-    --hash=sha256:ba1cc08a7ccde2d2ec775841541641e4548226580ab850948cbfda66a1befcdc

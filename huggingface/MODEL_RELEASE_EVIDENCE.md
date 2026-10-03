@@ -49,7 +49,9 @@ leadership, training completeness or runtime readiness.
 
 ## Run and interpret
 
-Install the Linux CPython 3.12 dependency with the hash-locked requirement, then:
+The workflow installs the admitted Linux CPython 3.12 PyYAML 6.0.3 wheel by its
+exact URL and SHA-256, matching the control-plane gate's parser. Locally, use
+that parser version, then:
 
 ```sh
 python -I -B .github/scripts/test_hf_model_evidence_audit.py
