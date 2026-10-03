@@ -65,8 +65,8 @@
       "trusted_transitives": {},
       "reviewed_unknowns": {
         "files": {
-          ".github/scripts/hf_model_evidence_audit.py": "sha256:1740d222b3a069813e6701baff8740c3439829e78d261e3afc057b264a4da842",
-          ".github/scripts/test_hf_model_evidence_audit.py": "sha256:6d52761e4e9921f514980d07d3b760e8956975202e91752dd491c7cf45075dc6",
+          ".github/scripts/hf_model_evidence_audit.py": "sha256:7026bc0dfddb746ff928deb665c157c8ca82357059bc8c9b8cb4af7d3626e495",
+          ".github/scripts/test_hf_model_evidence_audit.py": "sha256:d059055fb311922db211826da3373802b29ba9683c76557ae73d9a58a6512e23",
           ".github/workflows/hf-model-evidence-audit.yml": "sha256:c5bc20712427d88e95cf51b863a1f388cfd4f58fc37fa91956464433e4211666"
         },
         "unknowns": [
