@@ -11,10 +11,10 @@ canonical JSON receipt. The analyzer does not contact GitHub, Hugging Face, a
 cloud provider, or any product runtime. It does not request or record secret
 values.
 
-The first policy declares only the CP-eBOM workflow. Existing estate workflows
-have not been migrated into this policy. A change to an undeclared workflow or
-an unbound executable/configuration path is denied by this gate until its
-effect contract is reviewed and added. The workflow is not a required branch
+The policy covers only its explicitly declared workflows; other estate
+workflows have not all been migrated. A change to an undeclared workflow or an
+unbound executable/configuration path is denied by this gate until its effect
+contract is examined and added. The workflow is not a required branch
 protection context merely because this file is present.
 
 ## What the gate evaluates
@@ -96,16 +96,29 @@ An eligible transition produces `REVIEW_REQUIRED`; a hard violation remains
 `DENY`. Bundling a denied ordinary workflow with a trust-root edit does not
 downgrade that denial.
 
-`REVIEW_REQUIRED` is a truthful stop for independent human review. The reviewer
-must inspect the complete trust-root diff, exact digests, workflow permissions,
-action pins, test evidence, and protected-branch result before accepting the
-new root. The check result is supporting evidence; it is not an independent
-approval of code that executed from the candidate revision.
+`REVIEW_REQUIRED` is a truthful stop for a trust-root decision, not an `ALLOW`
+or an approval. SZL operates as a sole-owner build; do not invent an
+independent human reviewer. For a trust-root transition, the owner or an
+explicitly delegated operator must record a solo-owner attestation on the
+exact PR head before requesting a normal protected merge. The record must name
+the acting operator and state whether any independent human review occurred.
+It must identify the base and head commits, the retained CP-eBOM decision
+digest, the complete trust-root diff and exact source digests, workflow
+permissions and action pins, terminal exact-head required checks, observed
+unknowns and limits, and a rollback path. The acting operator must inspect
+the evidence and state why the change is acceptable despite the non-`ALLOW`
+receipt. A missing or `DENY` receipt is not eligible. This attestation is
+accountable owner acceptance, not a GitHub self-approval or a claim of
+independent review. Verify the commit signature when required by effective
+branch rules, and read back the protected merge and receipt afterward. Any
+approval requirement in effective branch rules still applies; do not bypass
+it. A trust-root edit cannot downgrade an ordinary workflow's hard `DENY`.
 
-After a reviewed trust root is present on the protected base, ordinary workflow
-changes are evaluated against the policy blob from that base. Changing a
-workflow's source digest requires changing the policy and therefore another
-trust-root review. Later trust-root changes repeat the same bootstrap process.
+After an owner-attested trust root is present on the protected base, ordinary
+workflow changes are evaluated against the policy blob from that base.
+Changing a workflow's source digest requires changing the policy and
+therefore another trust-root decision. Later trust-root changes repeat the
+same bootstrap process.
 
 ## Receipt and result semantics
 
@@ -122,13 +135,13 @@ The workflow recognizes these verdict and process-exit pairs:
 | --- | ---: | --- |
 | `ALLOW` | `0` | No unresolved effect in the declared scope. |
 | `DENY` | `2` | A policy violation, unknown effect, or analysis failure blocks the change. |
-| `REVIEW_REQUIRED` | `3` | A trust-root transition needs independent review. |
+| `REVIEW_REQUIRED` | `3` | A trust-root transition needs an explicit owner decision and protected checks; it is not `ALLOW`. |
 
 Any missing receipt, malformed receipt, unknown exit code, or disagreement
 between the receipt and process exit fails the workflow. `REVIEW_REQUIRED`
 completes the reporting step so reviewers can inspect its artifact; the
-receipt's decision remains `REVIEW_REQUIRED`. Acceptance depends on normal
-protected-branch review and merge rules.
+receipt's decision remains `REVIEW_REQUIRED`. Acceptance depends on the
+recorded owner decision and normal protected-branch review and merge rules.
 
 The uploaded Actions artifact is run-scoped evidence with limited retention.
 It is not an immutable attestation. Durable release evidence must bind the
@@ -145,7 +158,8 @@ reviewed grammar and the exact Git objects named in the receipt. It is not:
 - evidence that any provider call ran or succeeded;
 - evidence that a deployment or runtime is healthy;
 - authorization to use a secret or mutate a provider; or
-- a substitute for branch protection, independent review, or runtime witness.
+- a substitute for branch protection, any review required by effective rules,
+  or runtime witness.
 
 The receipt explicitly states that no provider calls were performed and no
 secret values were requested or recorded.
@@ -162,7 +176,8 @@ Before policy expiry:
 2. Review all analyzer and action-classification changes as trust-root changes.
 3. Run adversarial self-tests and the gate at the exact candidate head.
 4. Preserve least-privilege permissions and immutable action pins.
-5. Renew validity only through a protected, independently reviewed change.
+5. Renew validity only through a protected, owner-attested transition with
+   terminal required checks and any review demanded by effective branch rules.
 
 Expired intent, a weakened default, broader resource matching, or an unreviewed
 trust expansion must remain denied.

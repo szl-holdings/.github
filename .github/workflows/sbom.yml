@@ -21,17 +21,33 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - name: Install Syft
+      - name: Generate CycloneDX SBOM with digest-verified Syft
+        shell: bash
         run: |
-          curl -sSfL https://raw.githubusercontent.com/anchore/syft/main/install.sh | sh -s -- -b /usr/local/bin
-      - name: Generate CycloneDX SBOM
+          set -euo pipefail
+          tool_dir="$(mktemp -d "${RUNNER_TEMP}/syft.XXXXXX")"
+          archive="${tool_dir}/syft.tar.gz"
+          curl --fail --silent --show-error --location \
+            --proto '=https' --proto-redir '=https' \
+            --max-time 180 --max-filesize 40000000 \
+            --output "$archive" \
+            'https://github.com/anchore/syft/releases/download/v1.51.1/syft_1.51.1_linux_amd64.tar.gz'
+          printf '%s  %s\n' \
+            '8fcb33017a0dc1058298c923c436d19dfa68ae93968e0b423248542e3afb9fc3' \
+            "$archive" | sha256sum --check --status
+          tar -xzf "$archive" -C "$tool_dir" syft
+          test -x "${tool_dir}/syft"
+          SYFT_CHECK_FOR_APP_UPDATE=false "${tool_dir}/syft" dir:. \
+            -o cyclonedx-json=sbom.cyclonedx.json
+      - name: Verify CycloneDX SBOM
         run: |
-          syft . --output cyclonedx-json=sbom.cyclonedx.json
-          echo "SBOM generated:"
-          wc -l sbom.cyclonedx.json
+          test -s sbom.cyclonedx.json
+          jq -e '.bomFormat == "CycloneDX" and (.components | type == "array")' \
+            sbom.cyclonedx.json > /dev/null
       - name: Upload SBOM artifact
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: sbom
           path: sbom.cyclonedx.json
+          if-no-files-found: error
           retention-days: 30
