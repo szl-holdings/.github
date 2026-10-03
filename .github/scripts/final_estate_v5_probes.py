@@ -40,7 +40,15 @@ def _json_contract_ok(
     )
     ok = required_ok and schema_ok and statuses_ok
     if name == "a11oy_livez":
-        return ok and payload.get("receipt_minted") is False
+        return (
+            ok
+            and payload.get("status") == "PROCESS_ALIVE"
+            and payload.get("scope") == (
+                "process liveness only; no dependency readiness asserted"
+            )
+            and payload.get("production_ready") is False
+            and payload.get("receipt_minted") is False
+        )
     if name == "a11oy_build_info":
         build = payload.get("build")
         revision = build.get("revision") if isinstance(build, Mapping) else None

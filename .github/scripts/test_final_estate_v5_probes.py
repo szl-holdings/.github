@@ -98,9 +98,10 @@ class FinalEstateProbeV5Tests(unittest.TestCase):
                 url=spec.url,
                 content_type="application/json",
                 payload={
-                    "status": "LIVE",
+                    "status": "PROCESS_ALIVE",
                     "process": {"pid": 1},
-                    "scope": "process liveness only",
+                    "scope": "process liveness only; no dependency readiness asserted",
+                    "production_ready": False,
                     "receipt_minted": False,
                 },
             ),
@@ -108,6 +109,53 @@ class FinalEstateProbeV5Tests(unittest.TestCase):
         gate = safe_probe("a11oy_livez", spec, None, session=session)
         self.assertTrue(gate.ok)
         self.assertFalse(gate.evidence["head_required"])
+
+    def test_livez_rejects_missing_or_mismatched_process_contract(self) -> None:
+        spec = PROBES["a11oy_livez"]
+        baseline = {
+            "status": "PROCESS_ALIVE",
+            "process": {"pid": 1},
+            "scope": "process liveness only; no dependency readiness asserted",
+            "production_ready": False,
+            "receipt_minted": False,
+        }
+
+        def probe(payload: dict[str, Any]) -> bool:
+            session = FakeSession(
+                head=FakeResponse(
+                    status_code=405,
+                    url=spec.url,
+                    content_type="application/json",
+                    payload={"detail": "Method Not Allowed"},
+                ),
+                get=FakeResponse(
+                    status_code=200,
+                    url=spec.url,
+                    content_type="application/json",
+                    payload=payload,
+                ),
+            )
+            return safe_probe("a11oy_livez", spec, None, session=session).ok
+
+        self.assertTrue(probe(baseline))
+        for field in baseline:
+            with self.subTest(missing=field):
+                payload = dict(baseline)
+                del payload[field]
+                self.assertFalse(probe(payload))
+
+        mismatches = {
+            "legacy-live": {"status": "LIVE"},
+            "readiness-status": {"status": "READY"},
+            "readiness-scope": {"scope": "dependency readiness asserted"},
+            "ready": {"production_ready": True},
+            "ready-null": {"production_ready": None},
+            "receipt": {"receipt_minted": True},
+            "receipt-zero": {"receipt_minted": 0},
+        }
+        for label, changes in mismatches.items():
+            with self.subTest(mismatch=label):
+                self.assertFalse(probe({**baseline, **changes}))
 
     def test_document_probe_requires_head_support(self) -> None:
         spec = PROBES["a11oy_product"]

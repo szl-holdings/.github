@@ -65,8 +65,8 @@ PROBES = {
         "https://szlholdings-a11oy.hf.space/api/livez",
         False,
         "json",
-        expected_statuses=("LIVE",),
-        required_keys=("process", "scope", "receipt_minted"),
+        expected_statuses=("PROCESS_ALIVE",),
+        required_keys=("process", "scope", "production_ready", "receipt_minted"),
     ),
     "a11oy_build_info": ProbeSpec(
         "https://szlholdings-a11oy.hf.space/api/build-info",
