@@ -1,0 +1,117 @@
+# Copyright 2026 SZL Holdings — SPDX-License-Identifier: Apache-2.0
+name: Recover exact Nexus provider target
+
+# This central, owner-dispatched bootstrap only creates the declared Hub target.
+# The separate publish-nexus-space.yml remains the sole content/runtime writer.
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - .github/workflows/recover-nexus-target.yml
+      - .github/scripts/recover_nexus_target.py
+      - .github/scripts/test_recover_nexus_target.py
+      - .github/data/hf-space-lifecycle-policy.json
+      - .github/data/nexus-target-bootstrap-authorization.json
+      - requirements/hf-publisher.lock
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+concurrency:
+  group: recover-exact-nexus-target
+  cancel-in-progress: false
+
+jobs:
+  validate:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Harden runner
+        uses: step-security/harden-runner@e14015d583714f6e62063499dc959a02595150a1 # v2.21.1
+        with:
+          egress-policy: audit
+
+      - name: Checkout exact candidate
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up exact Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12.10"
+
+      - name: Prove exact target recovery contracts without network
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -I -B .github/scripts/test_recover_nexus_target.py
+          git diff --check
+
+  recover:
+    if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Harden runner
+        uses: step-security/harden-runner@e14015d583714f6e62063499dc959a02595150a1 # v2.21.1
+        with:
+          egress-policy: audit
+
+      - name: Checkout exact protected policy
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up exact Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12.10"
+
+      - name: Deny absent grant before any provider credential is loaded
+        shell: bash
+        run: |
+          set -euo pipefail
+          umask 077
+          python -I -B .github/scripts/recover_nexus_target.py \
+            --policy .github/data/hf-space-lifecycle-policy.json \
+            --grant .github/data/nexus-target-bootstrap-authorization.json \
+            --report evidence/nexus/target-recovery.json \
+            --preflight
+
+      - name: Install hash-locked Hub client in fresh environment
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m venv "$RUNNER_TEMP/nexus-recovery-venv"
+          "$RUNNER_TEMP/nexus-recovery-venv/bin/python" -I -P -m pip install \
+            --disable-pip-version-check --require-hashes --only-binary=:all: \
+            -r requirements/hf-publisher.lock
+
+      - name: Recover one exact public Docker Space and read back authority
+        shell: bash
+        env:
+          HF_ORG_TOKEN_CANDIDATE: ${{ secrets.HF_ORG_TOKEN }}
+          HF_ORG_TOKEN1_CANDIDATE: ${{ secrets.HF_ORG_TOKEN1 }}
+          HF_WRITE_TOKEN_CANDIDATE: ${{ secrets.HF_WRITE_TOKEN }}
+          HF_TOKEN_CANDIDATE: ${{ secrets.HF_TOKEN }}
+        run: |
+          set -euo pipefail
+          set +x
+          umask 077
+          "$RUNNER_TEMP/nexus-recovery-venv/bin/python" -I -P \
+            .github/scripts/recover_nexus_target.py \
+            --policy .github/data/hf-space-lifecycle-policy.json \
+            --grant .github/data/nexus-target-bootstrap-authorization.json \
+            --report evidence/nexus/target-recovery.json
+
+      - name: Upload sanitized recovery receipt
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: nexus-target-recovery
+          path: evidence/nexus/target-recovery.json
+          if-no-files-found: warn
+          retention-days: 90
