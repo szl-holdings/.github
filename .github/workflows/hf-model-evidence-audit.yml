@@ -59,12 +59,9 @@ jobs:
     timeout-minutes: 20
     permissions:
       contents: read
-      issues: write
     env:
       REPORT_JSON: reports/hf-model-evidence-latest.json
       REPORT_MD: reports/hf-model-evidence-latest.md
-      REPORT_ISSUE_TITLE: "[hf-model-evidence] public artifact evidence gaps"
-      GH_TOKEN: ${{ github.token }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -91,43 +88,12 @@ jobs:
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: hf-model-evidence-${{ github.run_id }}
+          name: hf-model-evidence
           path: |
             ${{ env.REPORT_JSON }}
             ${{ env.REPORT_MD }}
           if-no-files-found: error
           retention-days: 90
-      - name: Record evidence gaps in one issue
-        if: always()
-        shell: bash
-        env:
-          EXIT_CODE: ${{ steps.audit.outputs.exit_code }}
-        run: |
-          set -euo pipefail
-          test -f "$REPORT_MD"
-          {
-            echo '<!-- szl-hf-model-evidence-audit -->'
-            echo "Run: ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
-            echo "Source revision: ${GITHUB_SHA}"
-            echo
-            cat "$REPORT_MD"
-          } > /tmp/hf-model-evidence-issue.md
-          issue_number="$(gh issue list --repo "$GITHUB_REPOSITORY" --state all \
-            --search "${REPORT_ISSUE_TITLE} in:title" --json number,title \
-            --jq '.[] | select(.title == env.REPORT_ISSUE_TITLE) | .number' | head -n1)"
-          if [ -z "$issue_number" ]; then
-            issue_url="$(gh issue create --repo "$GITHUB_REPOSITORY" \
-              --title "$REPORT_ISSUE_TITLE" --body-file /tmp/hf-model-evidence-issue.md)"
-            issue_number="${issue_url##*/}"
-          else
-            gh issue edit "$issue_number" --repo "$GITHUB_REPOSITORY" --body-file /tmp/hf-model-evidence-issue.md
-          fi
-          state="$(gh issue view "$issue_number" --repo "$GITHUB_REPOSITORY" --json state --jq .state)"
-          if [ "${EXIT_CODE:-2}" = "0" ] && [ "$state" = "OPEN" ]; then
-            gh issue close "$issue_number" --repo "$GITHUB_REPOSITORY" --reason completed
-          elif [ "${EXIT_CODE:-2}" != "0" ] && [ "$state" = "CLOSED" ]; then
-            gh issue reopen "$issue_number" --repo "$GITHUB_REPOSITORY"
-          fi
       - name: Enforce collection result
         if: always()
         env:

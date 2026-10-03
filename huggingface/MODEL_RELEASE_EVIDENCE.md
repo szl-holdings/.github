@@ -3,8 +3,8 @@
 The scheduled `HF Model Evidence Audit` collects public SZLHOLDINGS model-type
 repositories at immutable Hub revisions. Its reports identify artifact types,
 structured scores, unsafe serialized metadata, unqualified claims and collection
-gaps. It makes no Hub writes. The workflow stores a report and updates one GitHub
-issue; its enforced result stays red while findings remain.
+gaps. It makes no Hub writes. The workflow retains a report in its run artifact;
+its enforced result stays red while findings remain.
 
 This replaces the unmerged implementation in PR #516. Conventional sharded
 PyTorch files are weight artifacts. A result filename, an empty YAML marker or a
