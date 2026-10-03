@@ -6,6 +6,125 @@
   "unknown_effect": "deny",
   "wildcard_resources": "deny",
   "workflow_declarations": {
+    ".github/workflows/hf-model-evidence-audit.yml": {
+      "intent_id": "hf-model-evidence-public-census-v2",
+      "valid_until": "2026-11-30",
+      "source_sha256": "sha256:c5bc20712427d88e95cf51b863a1f388cfd4f58fc37fa91956464433e4211666",
+      "credentials": [],
+      "resources": [
+        {
+          "key": "github:actions:artifact:hf-model-evidence",
+          "access": "external-write"
+        },
+        {
+          "key": "github:repository:szl-holdings/.github:contents",
+          "access": "read"
+        },
+        {
+          "key": "runner:toolchain:python",
+          "access": "local-write"
+        }
+      ],
+      "effects": [
+        {
+          "sink": "github.artifact.upload",
+          "resource": "github:actions:artifact:hf-model-evidence",
+          "access": "external-write",
+          "max_calls": 1
+        },
+        {
+          "sink": "github.contents.checkout",
+          "resource": "github:repository:szl-holdings/.github:contents",
+          "access": "read",
+          "max_calls": 2
+        },
+        {
+          "sink": "runner.toolchain.install",
+          "resource": "runner:toolchain:python",
+          "access": "local-write",
+          "max_calls": 2
+        }
+      ],
+      "max_external_writes": 1,
+      "required_controls": {
+        "triggers": [
+          "merge_group",
+          "pull_request",
+          "push",
+          "schedule",
+          "workflow_dispatch"
+        ],
+        "contents_read": true,
+        "no_explicit_secrets": true,
+        "concurrency": true,
+        "protected_ref": false,
+        "exact_sha": false,
+        "expected_before": false,
+        "readback": false
+      },
+      "trusted_transitives": {},
+      "reviewed_unknowns": {
+        "files": {
+          ".github/scripts/hf_model_evidence_audit.py": "sha256:ff310eed2168b07805b764c75db4a9c32f83004964126688c85444dd895a98ad",
+          ".github/scripts/test_hf_model_evidence_audit.py": "sha256:212d303179a1c9541538fa400de8b975dfba6eaf16edee4e123b6b6dcfb910e0",
+          ".github/workflows/hf-model-evidence-audit.yml": "sha256:c5bc20712427d88e95cf51b863a1f388cfd4f58fc37fa91956464433e4211666"
+        },
+        "unknowns": [
+          "ACTION_INPUTS_REVIEW_REQUIRED@.github/workflows/hf-model-evidence-audit.yml:39",
+          "ACTION_INPUTS_REVIEW_REQUIRED@.github/workflows/hf-model-evidence-audit.yml:42",
+          "ACTION_INPUTS_REVIEW_REQUIRED@.github/workflows/hf-model-evidence-audit.yml:67",
+          "ACTION_INPUTS_REVIEW_REQUIRED@.github/workflows/hf-model-evidence-audit.yml:70",
+          "ACTION_INPUTS_REVIEW_REQUIRED@.github/workflows/hf-model-evidence-audit.yml:91",
+          "DYNAMIC_EXECUTION@.github/workflows/hf-model-evidence-audit.yml:82",
+          "HTTP_TARGET_UNRESOLVED@.github/scripts/hf_model_evidence_audit.py:55",
+          "PYTHON_IMPORT_UNRESOLVED@.github/scripts/hf_model_evidence_audit.py:8",
+          "PYTHON_IMPORT_UNRESOLVED@.github/scripts/hf_model_evidence_audit.py:10",
+          "PYTHON_IMPORT_UNRESOLVED@.github/scripts/hf_model_evidence_audit.py:14",
+          "PYTHON_IMPORT_UNRESOLVED@.github/scripts/hf_model_evidence_audit.py:19",
+          "PYTHON_IMPORT_UNRESOLVED@.github/scripts/hf_model_evidence_audit.py:20",
+          "PYTHON_IMPORT_UNRESOLVED@.github/scripts/hf_model_evidence_audit.py:21",
+          "PYTHON_IMPORT_UNRESOLVED@.github/scripts/hf_model_evidence_audit.py:23",
+          "PYTHON_IMPORT_UNRESOLVED@.github/scripts/test_hf_model_evidence_audit.py:3",
+          "PYTHON_IMPORT_UNRESOLVED@.github/scripts/test_hf_model_evidence_audit.py:5",
+          "PYTHON_IMPORT_UNRESOLVED@.github/scripts/test_hf_model_evidence_audit.py:6",
+          "PYTHON_SOURCE_REVIEW_REQUIRED@.github/scripts/hf_model_evidence_audit.py:1",
+          "PYTHON_SOURCE_REVIEW_REQUIRED@.github/scripts/test_hf_model_evidence_audit.py:1",
+          "SCRIPT_SOURCE_REVIEW_REQUIRED@.github/workflows/hf-model-evidence-audit.yml:1",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-model-evidence-audit.yml:45",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-model-evidence-audit.yml:46",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-model-evidence-audit.yml:50",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-model-evidence-audit.yml:51",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-model-evidence-audit.yml:73",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-model-evidence-audit.yml:74",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-model-evidence-audit.yml:79",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-model-evidence-audit.yml:80",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-model-evidence-audit.yml:81",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-model-evidence-audit.yml:82",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-model-evidence-audit.yml:83",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-model-evidence-audit.yml:84",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-model-evidence-audit.yml:85",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-model-evidence-audit.yml:86",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-model-evidence-audit.yml:102",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-model-evidence-audit.yml:103",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-model-evidence-audit.yml:104",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-model-evidence-audit.yml:105",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-model-evidence-audit.yml:106",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-model-evidence-audit.yml:107",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/hf-model-evidence-audit.yml:45",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/hf-model-evidence-audit.yml:73",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/hf-model-evidence-audit.yml:80",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/hf-model-evidence-audit.yml:81",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/hf-model-evidence-audit.yml:82",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/hf-model-evidence-audit.yml:83",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/hf-model-evidence-audit.yml:85",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/hf-model-evidence-audit.yml:102",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/hf-model-evidence-audit.yml:103",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/hf-model-evidence-audit.yml:105",
+          "WORKFLOW_ENVIRONMENT_REVIEW_REQUIRED@.github/workflows/hf-model-evidence-audit.yml:62",
+          "WORKFLOW_ENVIRONMENT_REVIEW_REQUIRED@.github/workflows/hf-model-evidence-audit.yml:100"
+        ]
+      }
+    },
     ".github/workflows/sbom.yml": {
       "intent_id": "sbom-verified-syft-cyclonedx-v1",
       "valid_until": "2026-11-30",
