@@ -20,7 +20,7 @@ Source, build, publication, runtime, and independent evidence are separate state
 
 ## Portfolio roles
 
-**One inference flagship:** [SZL Router](https://github.com/szl-holdings/szl-router), source-owned at `szl-holdings/szl-router`, presented at [`SZLHOLDINGS/llm-router-live`](https://huggingface.co/spaces/SZLHOLDINGS/llm-router-live), integrated at [a-11-oy.com/code](https://a-11-oy.com/code), proof at [a11oy.net](https://a11oy.net). **Three commercial flagships:** A11oy, Killinchu, Forge. **Five public domain bodies:** Terra, Killinchu, PRISM Counsel, PURIQ Finance, LYTE. **Six internal engines:** Sentra, Lyte, Killinchu, Finance, Terra, Counsel. These labels describe topology, **not availability, operational readiness, or publication policy**; Hub inventory is registry evidence under the same boundary.
+**One inference flagship:** [SZL Router](https://github.com/szl-holdings/szl-router), source-owned at `szl-holdings/szl-router`, presented at [`SZLHOLDINGS/llm-router-live`](https://huggingface.co/spaces/SZLHOLDINGS/llm-router-live), integrated at [a-11-oy.com/code](https://a-11-oy.com/code), proof at [a11oy.net](https://a11oy.net). **Three commercial flagships:** A11oy, Killinchu, Forge. **Five public domain bodies:** Terra, Killinchu, PRISM Counsel, PURIQ Finance, LYTE. **Six internal engines:** CHAPAQ, Lyte, Killinchu, Finance, Terra, Counsel. These labels describe topology, **not availability, operational readiness, or publication policy**; Hub inventory is registry evidence under the same boundary.
 
 ## Current state
 

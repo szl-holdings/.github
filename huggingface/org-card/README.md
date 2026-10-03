@@ -33,7 +33,7 @@ license: apache-2.0
 
 ## Portfolio at a glance
 
-**Three commercial flagships:** A11oy, Killinchu, Forge. **One inference flagship:** SZL Router. **Five public domain bodies:** Terra, Killinchu, PRISM Counsel, PURIQ Finance, LYTE. **Six internal engines:** Sentra, Lyte, Killinchu, Finance, Terra, Counsel. These are product roles, not availability claims.
+**Three commercial flagships:** A11oy, Killinchu, Forge. **One inference flagship:** SZL Router. **Five public domain bodies:** Terra, Killinchu, PRISM Counsel, PURIQ Finance, LYTE. **Six internal engines:** CHAPAQ, Lyte, Killinchu, Finance, Terra, Counsel. These are product roles, not availability claims.
 
 [Killinchu](https://huggingface.co/spaces/SZLHOLDINGS/killinchu) presents public observation and operator decisions; its effectors are **SIMULATED**. [Read its source](https://github.com/szl-holdings/killinchu) and readiness before using its outputs. [Explore the architecture image](https://huggingface.co/spaces/SZLHOLDINGS/README/resolve/main/assets/estate-command-system.svg).
 
