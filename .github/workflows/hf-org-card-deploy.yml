@@ -1,4 +1,6 @@
-name: Hugging Face organization front door
+# Retired writer: hf-org-card-autopublish.yml is the sole active publisher.
+# Preserve this workflow for historical run links, but never enter its provider job.
+name: Hugging Face organization front door (retired writer)
 
 on:
   workflow_dispatch:
@@ -32,7 +34,8 @@ concurrency:
 
 jobs:
   publish-and-verify:
-    name: Publish exact source and verify served revision
+    if: ${{ false }}
+    name: Retired publisher is disabled
     runs-on: ubuntu-latest
     environment: production
     timeout-minutes: 20

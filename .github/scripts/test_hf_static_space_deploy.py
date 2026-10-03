@@ -220,12 +220,13 @@ class StaticSpaceDeployTests(unittest.TestCase):
             contract, "a" * 40, self.authority_env()
         )
 
-    def test_publish_workflow_exports_exact_authority_environment(self):
+    def test_legacy_publish_workflow_is_disabled(self):
         repo_root = Path(__file__).resolve().parents[2]
         workflow = (
             repo_root / ".github" / "workflows" / "hf-org-card-deploy.yml"
         ).read_text(encoding="utf-8")
         for required in (
+            "publish-and-verify:\n    if: ${{ false }}",
             "environment: production",
             "GITHUB_TOKEN: ${{ github.token }}",
             "SZL_PUBLICATION_ENVIRONMENT: production",

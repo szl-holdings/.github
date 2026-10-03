@@ -971,6 +971,11 @@ def main() -> int:
         failures,
     )
     require(
+        "publish-and-verify:\n    if: ${{ false }}" in deploy_workflow,
+        "legacy org-card publisher must remain disabled; central autopublish is the sole writer",
+        failures,
+    )
+    require(
         "-p test_hf_static_space_deploy.py" in deploy_workflow,
         "deployment workflow does not run publisher tests",
         failures,

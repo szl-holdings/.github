@@ -16,6 +16,7 @@ on:
       - ".github/scripts/test_hf_space_visibility.py"
       - ".github/scripts/test_hf_static_space_deploy.py"
       - ".github/workflows/hf-org-card-autopublish.yml"
+      - ".github/workflows/hf-org-card-deploy.yml"
   push:
     branches: [main]
     paths:
@@ -31,6 +32,7 @@ on:
       - ".github/scripts/test_hf_space_visibility.py"
       - ".github/scripts/test_hf_static_space_deploy.py"
       - ".github/workflows/hf-org-card-autopublish.yml"
+      - ".github/workflows/hf-org-card-deploy.yml"
 
 permissions:
   contents: read
