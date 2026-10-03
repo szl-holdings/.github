@@ -223,6 +223,70 @@ def test_running_app_starting_waits_instead_of_restarting() -> None:
     assert result.operational is True
 
 
+def test_gdw_readiness_requires_a_valid_ready_response() -> None:
+    host = "https://szlholdings-gdw-frontier.hf.space/"
+    ready_url = host + "readyz"
+    cases = (
+        (200, b'{"status":"ready","service":"gdw"}', "application/json", True),
+        (200, b'{"status":"not_ready","service":"gdw"}', "application/json", False),
+        (200, b'{"status":"ready","service":"other"}', "application/json", False),
+        (200, b"<html>login</html>", "text/html", False),
+        (200, b"not JSON", "application/json", False),
+        (401, b'{"detail":"authentication required"}', "application/json", False),
+    )
+    for status, body, content_type, expected in cases:
+        with mock.patch.object(
+            operator,
+            "_request",
+            return_value=(status, body, {"Content-Type": content_type}),
+        ) as request:
+            url, observed_status, blockers = operator.probe_runtime(
+                (host,), repo_id="SZLHOLDINGS/gdw-frontier"
+            )
+        request.assert_called_once_with("GET", ready_url, timeout=25.0)
+        assert (url is not None and observed_status == 200) is expected
+        assert bool(blockers) is (not expected)
+
+
+def test_gdw_probe_is_selected_by_canonical_space_identity() -> None:
+    host = "https://szlholdings-gdw-frontier.hf.space/"
+    space = operator.Space(
+        repo_id="SZLHOLDINGS/gdw-frontier",
+        slug="gdw-frontier",
+        sdk="docker",
+        stage="RUNNING",
+        private=False,
+        host_candidates=(host,),
+    )
+    with mock.patch.object(
+        operator,
+        "_request",
+        return_value=(
+            200,
+            b'{"status":"ready","service":"gdw"}',
+            {"Content-Type": "application/json"},
+        ),
+    ) as request:
+        result = operator.operate_one(space, token=None, repair=False, wait_seconds=30)
+    request.assert_called_once_with("GET", host + "readyz", timeout=25.0)
+    assert result.operational is True
+    assert result.runtime_url == host + "readyz"
+
+    with mock.patch.object(
+        operator,
+        "_request",
+        return_value=(
+            200,
+            b'{"status":"ready","service":"gdw"}',
+            {"Content-Type": "application/json"},
+        ),
+    ) as request:
+        url, _, blockers = operator.probe_runtime((host,), repo_id="SZLHOLDINGS/other")
+    request.assert_called_once_with("GET", host, timeout=25.0)
+    assert url is None
+    assert blockers
+
+
 if __name__ == "__main__":
     import pytest
 
