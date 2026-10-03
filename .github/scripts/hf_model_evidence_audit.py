@@ -78,13 +78,17 @@ def _repo_id(item: dict[str, Any]) -> str:
 
 
 def _paths(info: dict[str, Any]) -> list[str]:
+    siblings = info.get("siblings")
+    if not isinstance(siblings, list):
+        raise AuditIncomplete("missing or malformed pinned Hub file inventory")
     paths = []
-    for sibling in info.get("siblings") or []:
-        if isinstance(sibling, dict) and sibling.get("rfilename"):
-            path = str(sibling["rfilename"])
-            if "\\" in path or path.startswith("/") or ".." in PurePosixPath(path).parts:
-                raise AuditIncomplete("unsafe Hub metadata path")
-            paths.append(path)
+    for sibling in siblings:
+        if not isinstance(sibling, dict) or not isinstance(sibling.get("rfilename"), str) or not sibling["rfilename"].strip():
+            raise AuditIncomplete("malformed pinned Hub file entry")
+        path = sibling["rfilename"]
+        if "\\" in path or path.startswith("/") or ".." in PurePosixPath(path).parts:
+            raise AuditIncomplete("unsafe Hub metadata path")
+        paths.append(path)
     return sorted(set(paths))
 
 

@@ -159,6 +159,20 @@ class ModelEvidenceAuditTests(unittest.TestCase):
         with self.assertRaises(audit.AuditIncomplete):
             evaluate(model_info(["../results.json"]))
 
+    def test_missing_or_malformed_pinned_file_inventory_is_incomplete(self):
+        for siblings in (None, {}, "model.safetensors", [None], [{}], [{"rfilename": 42}], [{"rfilename": ""}]):
+            with self.subTest(siblings=siblings):
+                info = model_info()
+                if siblings is None:
+                    del info["siblings"]
+                else:
+                    info["siblings"] = siblings
+                with self.assertRaises(audit.AuditIncomplete):
+                    evaluate(info)
+        empty = model_info()
+        empty["siblings"] = []
+        self.assertEqual(evaluate(empty)["weight_files"], [])
+
     def test_network_failure_writes_incomplete_report_and_exits_two(self):
         with tempfile.TemporaryDirectory() as directory:
             report = Path(directory) / "report.json"
