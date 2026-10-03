@@ -126,7 +126,7 @@ jobs:
 
   operate:
     name: Repair and prove public Space runtimes
-    if: github.event_name != 'pull_request'
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
     needs: contract
     runs-on: ubuntu-latest
     timeout-minutes: 35
@@ -139,10 +139,10 @@ jobs:
         with:
           egress-policy: audit
 
-      - name: Checkout protected operator policy
+      - name: Checkout exact protected operator policy
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: main
+          ref: ${{ github.event.pull_request.head.sha || github.event.merge_group.head_sha || github.sha }}
           persist-credentials: false
           fetch-depth: 1
 
@@ -206,7 +206,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: hf-living-constellation-v2-${{ github.run_id }}-${{ github.run_attempt }}
+          name: hf-living-constellation-v2
           path: ${{ env.REPORT_PATH }}
           if-no-files-found: error
           retention-days: 90
@@ -257,8 +257,10 @@ jobs:
       - name: Enforce operational fleet
         if: always()
         shell: bash
+        env:
+          OPERATE_EXIT_CODE: ${{ steps.operate.outputs.exit_code }}
         run: |
-          code="${{ steps.operate.outputs.exit_code }}"
+          code="$OPERATE_EXIT_CODE"
           test -n "$code"
           if [ "$code" -ne 0 ]; then
             echo "::error::One or more public Spaces were not proven operational; inspect the uploaded exact fleet receipt."
