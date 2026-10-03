@@ -37,14 +37,11 @@ env:
 
 jobs:
   finalize:
-    name: Supported Dataset API and authenticated Kernel Hub Git
+    name: Read-only Dataset closure and authenticated Kernel Hub Git
     runs-on: ubuntu-latest
     timeout-minutes: 120
     env:
-      HF_ORG_TOKEN: ${{ secrets.HF_ORG_TOKEN || secrets.HF_ORG_TOKEN1 }}
-      HF_TOKEN: ${{ secrets.HF_TOKEN }}
       HF_HUB_DISABLE_PROGRESS_BARS: "1"
-      GH_TOKEN: ${{ github.token }}
     steps:
       - name: Checkout release controller
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -144,23 +141,19 @@ jobs:
         run: |
           set -euo pipefail
           python lake/scripts/test_hf_dataset_contract.py
+          PYTHONPATH=lake/scripts python lake/scripts/test_publish_hf_dataset.py
+          python lake/scripts/publish_hf_dataset.py --check-index
           PYTHONPATH=energy python -m pytest -q energy/tests/test_hf_kernel_contract.py
           PYTHONPATH=lambda-gate/torch-ext:lambda-gate \
             python -m pytest -q lambda-gate/tests/test_hf_governed_norm_contract.py
-
-      - name: Require governed organization publisher
-        run: |
-          set -euo pipefail
-          if [ -z "${HF_ORG_TOKEN:-}" ] && [ -z "${HF_TOKEN:-}" ]; then
-            echo "::error::No supported Hugging Face organization write token is configured."
-            exit 2
-          fi
 
       - name: Finalize and independently verify exact revisions
         id: release
         working-directory: controller
         shell: bash
         env:
+          HF_ORG_TOKEN: ${{ secrets.HF_ORG_TOKEN || secrets.HF_ORG_TOKEN1 }}
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
           SZL_LAKE_SHA: ${{ steps.sources.outputs.lake_sha }}
           SZL_ENERGY_ATTEST_SHA: ${{ steps.sources.outputs.energy_sha }}
           SZL_LAMBDA_GATE_SHA: ${{ steps.sources.outputs.lambda_sha }}
@@ -194,6 +187,7 @@ jobs:
         shell: bash
         env:
           EXIT_CODE: ${{ steps.release.outputs.exit_code }}
+          GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
           test -f "$REPORT_PATH"
@@ -230,7 +224,7 @@ jobs:
             gh issue close "$issue" \
               --repo "$GITHUB_REPOSITORY" \
               --reason completed \
-              --comment 'The reviewed Lake payload and both first-class Kernel card contracts passed supported transport, immutable revision, build preservation, byte-parity, and selfcheck verification.' || true
+              --comment 'The Lake source projection, bound lineage, immutable closed tree, direct predecessor, receipt counts, and stable mutable-head Viewer probe passed. Both first-class Kernel card contracts passed supported transport, immutable revision, build preservation, byte-parity, and selfcheck verification.' || true
           else
             gh issue reopen "$issue" --repo "$GITHUB_REPOSITORY" || true
           fi
@@ -251,4 +245,4 @@ jobs:
             echo "::error::HF release finalization failed with exit ${code}."
             exit "$code"
           fi
-          echo "Lake and both first-class Kernel contracts are operational through supported transports."
+          echo "Lake closure is verified read-only; both first-class Kernel contracts passed supported transports."
