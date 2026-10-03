@@ -610,6 +610,86 @@
       "trusted_transitives": {},
       "reviewed_unknowns": {"files": {".github/scripts/test_estate_snapshot_admission.py": "sha256:7e594ea3e6c0cdd0819a068c7f92a2cc404909d60013c66d51fb3609967b19ab", ".github/workflows/estate-snapshot-admission.yml": "sha256:70d8cb695974248d71ef478d4fef3771709f236c90d757d086b241b6298e3a0f", "scripts/estate_snapshot_admission.py": "sha256:f255a7aacb904bf81c5c8004e0c43f0da4e243fc549971d148a5a1d9fadd8562"}, "unknowns": ["ACTION_INPUTS_REVIEW_REQUIRED@.github/workflows/estate-snapshot-admission.yml:19", "ACTION_INPUTS_REVIEW_REQUIRED@.github/workflows/estate-snapshot-admission.yml:23", "PYTHON_IMPORT_UNRESOLVED@.github/scripts/test_estate_snapshot_admission.py:2", "PYTHON_IMPORT_UNRESOLVED@.github/scripts/test_estate_snapshot_admission.py:3", "PYTHON_IMPORT_UNRESOLVED@.github/scripts/test_estate_snapshot_admission.py:5", "PYTHON_IMPORT_UNRESOLVED@.github/scripts/test_estate_snapshot_admission.py:6", "PYTHON_IMPORT_UNRESOLVED@scripts/estate_snapshot_admission.py:3", "PYTHON_IMPORT_UNRESOLVED@scripts/estate_snapshot_admission.py:5", "PYTHON_IMPORT_UNRESOLVED@scripts/estate_snapshot_admission.py:6", "PYTHON_IMPORT_UNRESOLVED@scripts/estate_snapshot_admission.py:8", "PYTHON_SOURCE_REVIEW_REQUIRED@.github/scripts/test_estate_snapshot_admission.py:1", "PYTHON_SOURCE_REVIEW_REQUIRED@scripts/estate_snapshot_admission.py:1", "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/estate-snapshot-admission.yml:26", "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/estate-snapshot-admission.yml:27"]}
     },
+    ".github/workflows/hf-dataset-badge-refresh.yml": {
+      "intent_id": "hf-dataset-badge-source-ownership-v1",
+      "valid_until": "2026-11-30",
+      "source_sha256": "sha256:34bbe106d943bbaba67c9aff1d45bdd8c52095435fcb521efc82b6ca5d61423c",
+      "credentials": [
+        "HF_ORG_TOKEN"
+      ],
+      "resources": [
+        {
+          "key": "github:repository:szl-holdings/.github:contents",
+          "access": "read"
+        },
+        {
+          "key": "huggingface:organization:SZLHOLDINGS:dataset-cards-excluding-szl-lake",
+          "access": "external-write"
+        },
+        {
+          "key": "runner:guard:egress",
+          "access": "local-write"
+        }
+      ],
+      "effects": [
+        {
+          "sink": "github.contents.checkout",
+          "resource": "github:repository:szl-holdings/.github:contents",
+          "access": "read",
+          "max_calls": 1
+        },
+        {
+          "sink": "http.post",
+          "resource": "huggingface:organization:SZLHOLDINGS:dataset-cards-excluding-szl-lake",
+          "access": "external-write",
+          "max_calls": 1
+        },
+        {
+          "sink": "runner.guard.configure",
+          "resource": "runner:guard:egress",
+          "access": "local-write",
+          "max_calls": 1
+        }
+      ],
+      "max_external_writes": 1,
+      "required_controls": {
+        "triggers": [
+          "push",
+          "schedule",
+          "workflow_dispatch"
+        ],
+        "contents_read": true,
+        "no_explicit_secrets": false,
+        "concurrency": true,
+        "protected_ref": false,
+        "exact_sha": false,
+        "expected_before": false,
+        "readback": false
+      },
+      "trusted_transitives": {},
+      "reviewed_unknowns": {
+        "files": {
+          ".github/scripts/hf_dataset_badge_refresh.mjs": "sha256:447e48aae0540ba578ed569342899b2be84d96b0700cfce9472f2445ad2a8ade",
+          ".github/scripts/test_hf_dataset_badge_refresh.mjs": "sha256:933592d674105d72a7d4ea1ed305eec5dcb597f6bc320fae0520a311b564af48",
+          ".github/workflows/hf-dataset-badge-refresh.yml": "sha256:34bbe106d943bbaba67c9aff1d45bdd8c52095435fcb521efc82b6ca5d61423c"
+        },
+        "unknowns": [
+          "ACTION_INPUTS_REVIEW_REQUIRED@.github/workflows/hf-dataset-badge-refresh.yml:57",
+          "SCRIPT_SOURCE_REVIEW_REQUIRED@.github/scripts/hf_dataset_badge_refresh.mjs:1",
+          "SCRIPT_SOURCE_REVIEW_REQUIRED@.github/scripts/test_hf_dataset_badge_refresh.mjs:1",
+          "SCRIPT_SOURCE_REVIEW_REQUIRED@.github/workflows/hf-dataset-badge-refresh.yml:1",
+          "SECRET_EXPRESSION_REVIEW_REQUIRED@.github/workflows/hf-dataset-badge-refresh.yml:1",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-dataset-badge-refresh.yml:63",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-dataset-badge-refresh.yml:73",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-dataset-badge-refresh.yml:74",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-dataset-badge-refresh.yml:75",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-dataset-badge-refresh.yml:76",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-dataset-badge-refresh.yml:77",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/hf-dataset-badge-refresh.yml:73",
+          "WORKFLOW_ENVIRONMENT_REVIEW_REQUIRED@.github/workflows/hf-dataset-badge-refresh.yml:67"
+        ]
+      }
+    },
     ".github/workflows/hf-dataset-register-consistency.yml": {
       "intent_id": "hf-dataset-register-offline-consistency-v1",
       "valid_until": "2026-11-30",
