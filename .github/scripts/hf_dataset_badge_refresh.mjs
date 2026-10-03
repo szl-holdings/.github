@@ -14,14 +14,34 @@
 // Usage: HF_TOKEN=... node hf_dataset_badge_refresh.mjs [--publish]
 //   default = dry run (report drift, commit nothing)
 
+import { pathToFileURL } from "node:url";
+
 const TOKEN = process.env.HF_TOKEN || process.env.HUGGINGFACE_API_TOKEN;
-if (!TOKEN) {
-  console.error("FATAL: HF_TOKEN is not set — cannot audit private datasets or commit. Refusing to run public-only.");
-  process.exit(1);
-}
-const HF = { Authorization: "Bearer " + TOKEN };
+const HF = TOKEN ? { Authorization: "Bearer " + TOKEN } : {};
 const PUBLISH = process.argv.includes("--publish");
 const sleep = ms => new Promise(r => setTimeout(r, ms));
+
+// Lake README.md is part of one atomic, source-owned closed publication.
+// A cross-estate badge commit would create a second writer and invalidate the
+// index/predecessor closure. Other datasets remain in the existing refresher
+// while their publication ownership is inventoried separately.
+export const SOURCE_OWNED_DATASETS = new Set([
+  "SZLHOLDINGS/szl-lake",
+]);
+
+const SOURCE_OWNED_DATASET_KEYS = new Set(
+  [...SOURCE_OWNED_DATASETS].map(id => id.toLowerCase()),
+);
+
+export function isSourceOwnedDataset(id) {
+  return typeof id === "string" && SOURCE_OWNED_DATASET_KEYS.has(id.toLowerCase());
+}
+
+export function assertBadgeWriteAllowed(id) {
+  if (isSourceOwnedDataset(id)) {
+    throw new Error(`${id}: badge write refused; dataset is source-owned`);
+  }
+}
 
 // Same value-escaping as the upgrade builder (shields.io path segment)
 const esc = s => s.replace(/-/g, "--").replace(/ /g, "%20").replace(/·/g, "%C2%B7");
@@ -66,43 +86,71 @@ async function countFiles(id) {
   return files;
 }
 
-let drifted = 0, checked = 0, skipped = 0, failed = 0;
-const ids = await listDatasets();
-console.log(`datasets: ${ids.length}`);
-for (const id of ids) {
-  const d = id.split("/")[1];
-  try {
-    const rr = await jfetch(`https://huggingface.co/datasets/${id}/raw/main/README.md`);
-    if (!rr.ok) { console.log(`SKIP ${d}: README HTTP ${rr.status}`); skipped++; continue; }
-    const txt = await rr.text();
-    if (!FILES_RE.test(txt)) { console.log(`SKIP ${d}: no house files badge`); skipped++; continue; }
-    checked++;
-    const nfiles = await countFiles(id);
-    const lic = (txt.match(/^license:\s*(\S+)/m) || [])[1] || "other";
-    let out = txt.replace(FILES_RE, (_, a, cur, z) => a + esc(String(nfiles)) + z);
-    out = out.replace(LICENSE_RE, (_, a, cur, z) => a + esc(lic) + z);
-    if (out === txt) { console.log(`ok   ${d}: files=${nfiles}, license=${lic}`); continue; }
-    drifted++;
-    const oldFiles = (txt.match(FILES_RE) || [])[2];
-    const oldLic = (txt.match(LICENSE_RE) || [])[2];
-    console.log(`DRIFT ${d}: files ${oldFiles} -> ${esc(String(nfiles))}, license ${oldLic} -> ${esc(lic)}${PUBLISH ? "" : " (dry run)"}`);
-    if (PUBLISH) {
-      const body = [
-        JSON.stringify({ key: "header", value: { summary: `docs: refresh badge stats (files=${nfiles}, license=${lic})`, description: "Automated badge-row refresh from the live tree; body preserved verbatim." } }),
-        JSON.stringify({ key: "file", value: { path: "README.md", content: Buffer.from(out).toString("base64"), encoding: "base64" } }),
-      ].join("\n");
-      const r = await fetch(`https://huggingface.co/api/datasets/${id}/commit/main`, {
-        method: "POST", headers: { ...HF, "Content-Type": "application/x-ndjson" }, body,
-      });
-      console.log(`  publish ${d}: ${r.status}${r.ok ? "" : " " + (await r.text()).slice(0, 200)}`);
-      if (!r.ok) failed++;
-      await sleep(400);
-    }
-  } catch (e) {
-    console.error(`ERROR ${d}: ${e.message}`);
-    failed++;
-  }
-  await sleep(200);
+export async function publishReadmeCommit({
+  id,
+  content,
+  nfiles,
+  license,
+  fetch = globalThis.fetch,
+  headers = HF,
+}) {
+  assertBadgeWriteAllowed(id);
+  const body = [
+    JSON.stringify({ key: "header", value: { summary: `docs: refresh badge stats (files=${nfiles}, license=${license})`, description: "Automated badge-row refresh from the live tree; body preserved verbatim." } }),
+    JSON.stringify({ key: "file", value: { path: "README.md", content: Buffer.from(content).toString("base64"), encoding: "base64" } }),
+  ].join("\n");
+  return fetch(`https://huggingface.co/api/datasets/${id}/commit/main`, { method: "POST", headers: { ...headers, "Content-Type": "application/x-ndjson" }, body });
 }
-console.log(`summary: checked=${checked} drifted=${drifted} skipped=${skipped} failed=${failed}`);
-if (failed > 0) process.exit(1);
+
+async function main() {
+  if (!TOKEN) {
+    console.error("FATAL: HF_TOKEN is not set — cannot audit private datasets or commit. Refusing to run public-only.");
+    process.exitCode = 1;
+    return;
+  }
+
+  let drifted = 0, checked = 0, skipped = 0, failed = 0;
+  const ids = await listDatasets();
+  console.log(`datasets: ${ids.length}`);
+  for (const id of ids) {
+    const d = id.split("/")[1];
+    if (isSourceOwnedDataset(id)) {
+      console.log(`SKIP ${d}: source-owned atomic publisher`);
+      skipped++;
+      continue;
+    }
+    try {
+      const rr = await jfetch(`https://huggingface.co/datasets/${id}/raw/main/README.md`);
+      if (!rr.ok) { console.log(`SKIP ${d}: README HTTP ${rr.status}`); skipped++; continue; }
+      const txt = await rr.text();
+      if (!FILES_RE.test(txt)) { console.log(`SKIP ${d}: no house files badge`); skipped++; continue; }
+      checked++;
+      const nfiles = await countFiles(id);
+      const lic = (txt.match(/^license:\s*(\S+)/m) || [])[1] || "other";
+      let out = txt.replace(FILES_RE, (_, a, cur, z) => a + esc(String(nfiles)) + z);
+      out = out.replace(LICENSE_RE, (_, a, cur, z) => a + esc(lic) + z);
+      if (out === txt) { console.log(`ok   ${d}: files=${nfiles}, license=${lic}`); continue; }
+      drifted++;
+      const oldFiles = (txt.match(FILES_RE) || [])[2];
+      const oldLic = (txt.match(LICENSE_RE) || [])[2];
+      console.log(`DRIFT ${d}: files ${oldFiles} -> ${esc(String(nfiles))}, license ${oldLic} -> ${esc(lic)}${PUBLISH ? "" : " (dry run)"}`);
+      if (PUBLISH) {
+        const r = await publishReadmeCommit({
+          id, content: out, nfiles, license: lic,
+        });
+        console.log(`  publish ${d}: ${r.status}${r.ok ? "" : " " + (await r.text()).slice(0, 200)}`);
+        if (!r.ok) failed++;
+        await sleep(400);
+      }
+    } catch (e) {
+      console.error(`ERROR ${d}: ${e.message}`);
+      failed++;
+    }
+    await sleep(200);
+  }
+  console.log(`summary: checked=${checked} drifted=${drifted} skipped=${skipped} failed=${failed}`);
+  if (failed > 0) process.exitCode = 1;
+}
+
+const invokedPath = process.argv[1] ? pathToFileURL(process.argv[1]).href : "";
+if (import.meta.url === invokedPath) await main();

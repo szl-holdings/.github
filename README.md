@@ -38,7 +38,7 @@
 |---|---|
 | [`profile/README.md`](./profile/README.md) | Org profile shown at <https://github.com/szl-holdings> |
 | [`.github/ISSUE_TEMPLATE/`](./.github/ISSUE_TEMPLATE/) | Default issue templates cascaded to every repo without its own |
-| [`.github/PULL_REQUEST_TEMPLATE.md`](./.github/PULL_REQUEST_TEMPLATE.md) | Default PR template |
+| [`.github/pull_request_template.md`](./.github/pull_request_template.md) | Default PR template |
 | [`.github/workflows/`](./.github/workflows/) | **22 reusable workflows** — see [`WORKFLOWS.md`](./WORKFLOWS.md) |
 | [`.github/dependabot.yml`](./.github/dependabot.yml) | Weekly dependency updates for this repo |
 | [`.github/CODEOWNERS`](./.github/CODEOWNERS) | Org-default ownership |

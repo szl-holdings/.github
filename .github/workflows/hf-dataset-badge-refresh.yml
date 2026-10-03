@@ -10,6 +10,8 @@ name: HF Dataset Badge Refresh
 # license from the LIVE tree and rewrites ONLY the badge values inside the
 # existing badge row (targeted regex on the shields.io URL). Body text is
 # never touched; a README is re-committed only when a badge value changed.
+# Source-owned atomic publications such as SZLHOLDINGS/szl-lake are excluded:
+# their source workflow owns README.md and the closed index as one revision.
 # Badge palette/format matches the estate house style (files 5b8dee,
 # license 7e8aa3, flat-square).
 #
@@ -33,6 +35,7 @@ on:
     branches: [main]
     paths:
       - ".github/scripts/hf_dataset_badge_refresh.mjs"
+      - ".github/scripts/test_hf_dataset_badge_refresh.mjs"
       - ".github/workflows/hf-dataset-badge-refresh.yml"
 
 permissions:
@@ -56,13 +59,18 @@ jobs:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
+      - name: Verify source-owned dataset exclusions offline
+        run: node --test .github/scripts/test_hf_dataset_badge_refresh.mjs
+
       - name: Refresh dataset badges from the live tree
         env:
           HF_TOKEN: ${{ secrets.HF_ORG_TOKEN }}
+          EVENT_NAME: ${{ github.event_name }}
+          DRY_RUN: ${{ github.event.inputs.dry_run || 'false' }}
         run: |
           # Push-triggered runs validate in dry-run; schedule/dispatch publish
           # (unless dispatch asked for dry_run).
-          if [ "${{ github.event_name }}" = "push" ] || [ "${{ github.event.inputs.dry_run }}" = "true" ]; then
+          if [ "$EVENT_NAME" = "push" ] || [ "$DRY_RUN" = "true" ]; then
             node .github/scripts/hf_dataset_badge_refresh.mjs
           else
             node .github/scripts/hf_dataset_badge_refresh.mjs --publish
