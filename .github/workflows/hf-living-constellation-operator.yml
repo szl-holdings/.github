@@ -28,7 +28,6 @@ on:
 
 permissions:
   contents: read
-  issues: write
 
 concurrency:
   group: hf-living-constellation-operator-${{ github.event_name }}
@@ -131,7 +130,6 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 35
     env:
-      GH_TOKEN: ${{ github.token }}
       HF_ORG_TOKEN: ${{ secrets.HF_ORG_TOKEN || secrets.HF_ORG_TOKEN1 || secrets.HF_TOKEN || secrets.HF_WRITE_TOKEN }}
     steps:
       - name: Harden runner
@@ -210,49 +208,6 @@ jobs:
           path: ${{ env.REPORT_PATH }}
           if-no-files-found: error
           retention-days: 90
-
-      - name: Reconcile the runtime-drift issue
-        if: always()
-        shell: bash
-        run: |
-          set +e
-          python -I -P <<'PY' > /tmp/hf-runtime-drift.md
-          import json
-          import os
-          from pathlib import Path
-
-          report = json.loads(Path(os.environ["REPORT_PATH"]).read_text(encoding="utf-8"))
-          summary = report.get("summary") or {}
-          print("## Living Constellation runtime receipt")
-          print()
-          print(f"- Run: {os.environ['GITHUB_SERVER_URL']}/{os.environ['GITHUB_REPOSITORY']}/actions/runs/{os.environ['GITHUB_RUN_ID']}")
-          print(f"- Public Spaces: `{summary.get('total_public_spaces', 0)}`")
-          print(f"- Operational: `{summary.get('operational', 0)}`")
-          print(f"- Not operational: `{summary.get('not_operational', 0)}`")
-          print(f"- Restarts attempted: `{summary.get('restart_attempted', 0)}`")
-          print(f"- Complete: `{summary.get('complete', False)}`")
-          print("- Hardware/source/visibility mutations: `false`")
-          print()
-          for row in report.get("spaces", []):
-              if row.get("operational"):
-                  continue
-              blockers = "; ".join(row.get("blockers") or [])[:700]
-              print(f"- `{row.get('repo_id')}` — `{row.get('state')}` / `{row.get('final_stage')}` — {blockers}")
-          PY
-          title='[runtime] Living Constellation public Space drift'
-          issue="$(gh issue list --state all --limit 100 --json number,title --jq '.[] | select(.title == "[runtime] Living Constellation public Space drift") | .number' | head -n1)"
-          complete="$(python -I -P -c 'import json,os; print(str(bool(json.load(open(os.environ["REPORT_PATH"]))["summary"].get("complete"))).lower())')"
-          if [ "$complete" = "true" ]; then
-            if [ -n "$issue" ]; then
-              gh issue comment "$issue" --body-file /tmp/hf-runtime-drift.md
-              gh issue close "$issue" --reason completed
-            fi
-          elif [ -n "$issue" ]; then
-            gh issue comment "$issue" --body-file /tmp/hf-runtime-drift.md
-          else
-            gh issue create --title "$title" --body-file /tmp/hf-runtime-drift.md
-          fi
-          exit 0
 
       - name: Enforce operational fleet
         if: always()
