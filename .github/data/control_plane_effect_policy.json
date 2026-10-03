@@ -6,6 +6,280 @@
   "unknown_effect": "deny",
   "wildcard_resources": "deny",
   "workflow_declarations": {
+    ".github/workflows/hf-model-evidence-audit.yml": {
+      "intent_id": "hf-model-evidence-public-census-v2",
+      "valid_until": "2026-11-30",
+      "source_sha256": "sha256:c5bc20712427d88e95cf51b863a1f388cfd4f58fc37fa91956464433e4211666",
+      "credentials": [],
+      "resources": [
+        {
+          "key": "github:actions:artifact:hf-model-evidence",
+          "access": "external-write"
+        },
+        {
+          "key": "github:repository:szl-holdings/.github:contents",
+          "access": "read"
+        },
+        {
+          "key": "runner:toolchain:python",
+          "access": "local-write"
+        }
+      ],
+      "effects": [
+        {
+          "sink": "github.artifact.upload",
+          "resource": "github:actions:artifact:hf-model-evidence",
+          "access": "external-write",
+          "max_calls": 1
+        },
+        {
+          "sink": "github.contents.checkout",
+          "resource": "github:repository:szl-holdings/.github:contents",
+          "access": "read",
+          "max_calls": 2
+        },
+        {
+          "sink": "runner.toolchain.install",
+          "resource": "runner:toolchain:python",
+          "access": "local-write",
+          "max_calls": 2
+        }
+      ],
+      "max_external_writes": 1,
+      "required_controls": {
+        "triggers": [
+          "merge_group",
+          "pull_request",
+          "push",
+          "schedule",
+          "workflow_dispatch"
+        ],
+        "contents_read": true,
+        "no_explicit_secrets": true,
+        "concurrency": true,
+        "protected_ref": false,
+        "exact_sha": false,
+        "expected_before": false,
+        "readback": false
+      },
+      "trusted_transitives": {},
+      "reviewed_unknowns": {
+        "files": {
+          ".github/scripts/hf_model_evidence_audit.py": "sha256:7026bc0dfddb746ff928deb665c157c8ca82357059bc8c9b8cb4af7d3626e495",
+          ".github/scripts/test_hf_model_evidence_audit.py": "sha256:d059055fb311922db211826da3373802b29ba9683c76557ae73d9a58a6512e23",
+          ".github/workflows/hf-model-evidence-audit.yml": "sha256:c5bc20712427d88e95cf51b863a1f388cfd4f58fc37fa91956464433e4211666"
+        },
+        "unknowns": [
+          "ACTION_INPUTS_REVIEW_REQUIRED@.github/workflows/hf-model-evidence-audit.yml:39",
+          "ACTION_INPUTS_REVIEW_REQUIRED@.github/workflows/hf-model-evidence-audit.yml:42",
+          "ACTION_INPUTS_REVIEW_REQUIRED@.github/workflows/hf-model-evidence-audit.yml:67",
+          "ACTION_INPUTS_REVIEW_REQUIRED@.github/workflows/hf-model-evidence-audit.yml:70",
+          "ACTION_INPUTS_REVIEW_REQUIRED@.github/workflows/hf-model-evidence-audit.yml:91",
+          "DYNAMIC_EXECUTION@.github/workflows/hf-model-evidence-audit.yml:82",
+          "HTTP_TARGET_UNRESOLVED@.github/scripts/hf_model_evidence_audit.py:55",
+          "PYTHON_IMPORT_UNRESOLVED@.github/scripts/hf_model_evidence_audit.py:8",
+          "PYTHON_IMPORT_UNRESOLVED@.github/scripts/hf_model_evidence_audit.py:10",
+          "PYTHON_IMPORT_UNRESOLVED@.github/scripts/hf_model_evidence_audit.py:14",
+          "PYTHON_IMPORT_UNRESOLVED@.github/scripts/hf_model_evidence_audit.py:19",
+          "PYTHON_IMPORT_UNRESOLVED@.github/scripts/hf_model_evidence_audit.py:20",
+          "PYTHON_IMPORT_UNRESOLVED@.github/scripts/hf_model_evidence_audit.py:21",
+          "PYTHON_IMPORT_UNRESOLVED@.github/scripts/hf_model_evidence_audit.py:23",
+          "PYTHON_IMPORT_UNRESOLVED@.github/scripts/test_hf_model_evidence_audit.py:3",
+          "PYTHON_IMPORT_UNRESOLVED@.github/scripts/test_hf_model_evidence_audit.py:5",
+          "PYTHON_IMPORT_UNRESOLVED@.github/scripts/test_hf_model_evidence_audit.py:6",
+          "PYTHON_SOURCE_REVIEW_REQUIRED@.github/scripts/hf_model_evidence_audit.py:1",
+          "PYTHON_SOURCE_REVIEW_REQUIRED@.github/scripts/test_hf_model_evidence_audit.py:1",
+          "SCRIPT_SOURCE_REVIEW_REQUIRED@.github/workflows/hf-model-evidence-audit.yml:1",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-model-evidence-audit.yml:45",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-model-evidence-audit.yml:46",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-model-evidence-audit.yml:50",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-model-evidence-audit.yml:51",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-model-evidence-audit.yml:73",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-model-evidence-audit.yml:74",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-model-evidence-audit.yml:79",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-model-evidence-audit.yml:80",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-model-evidence-audit.yml:81",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-model-evidence-audit.yml:82",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-model-evidence-audit.yml:83",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-model-evidence-audit.yml:84",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-model-evidence-audit.yml:85",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-model-evidence-audit.yml:86",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-model-evidence-audit.yml:102",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-model-evidence-audit.yml:103",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-model-evidence-audit.yml:104",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-model-evidence-audit.yml:105",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-model-evidence-audit.yml:106",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-model-evidence-audit.yml:107",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/hf-model-evidence-audit.yml:45",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/hf-model-evidence-audit.yml:73",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/hf-model-evidence-audit.yml:80",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/hf-model-evidence-audit.yml:81",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/hf-model-evidence-audit.yml:82",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/hf-model-evidence-audit.yml:83",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/hf-model-evidence-audit.yml:85",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/hf-model-evidence-audit.yml:102",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/hf-model-evidence-audit.yml:103",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/hf-model-evidence-audit.yml:105",
+          "WORKFLOW_ENVIRONMENT_REVIEW_REQUIRED@.github/workflows/hf-model-evidence-audit.yml:62",
+          "WORKFLOW_ENVIRONMENT_REVIEW_REQUIRED@.github/workflows/hf-model-evidence-audit.yml:100"
+        ]
+      }
+    },
+    ".github/workflows/sbom.yml": {
+      "intent_id": "sbom-verified-syft-cyclonedx-v1",
+      "valid_until": "2026-11-30",
+      "source_sha256": "sha256:d978c80d9573c40919a3e3401b0dc62e0baa5b9d35be1f6980c598346025326e",
+      "credentials": [],
+      "resources": [
+        {"key": "github:actions:artifact:sbom", "access": "external-write"},
+        {"key": "github:repository:szl-holdings/.github:contents", "access": "read"}
+      ],
+      "effects": [
+        {"sink": "github.artifact.upload", "resource": "github:actions:artifact:sbom", "access": "external-write", "max_calls": 1},
+        {"sink": "github.contents.checkout", "resource": "github:repository:szl-holdings/.github:contents", "access": "read", "max_calls": 1}
+      ],
+      "max_external_writes": 1,
+      "required_controls": {
+        "triggers": ["push", "release", "workflow_dispatch"],
+        "contents_read": true,
+        "no_explicit_secrets": true,
+        "concurrency": false,
+        "protected_ref": false,
+        "exact_sha": false,
+        "expected_before": false,
+        "readback": false
+      },
+      "trusted_transitives": {},
+      "reviewed_unknowns": {
+        "files": {
+          ".github/workflows/sbom.yml": "sha256:d978c80d9573c40919a3e3401b0dc62e0baa5b9d35be1f6980c598346025326e"
+        },
+        "unknowns": [
+          "ACTION_INPUTS_REVIEW_REQUIRED@.github/workflows/sbom.yml:50",
+          "HTTP_TARGET_UNRESOLVED@.github/workflows/sbom.yml:30",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/sbom.yml:28",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/sbom.yml:29",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/sbom.yml:30",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/sbom.yml:31",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/sbom.yml:32",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/sbom.yml:33",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/sbom.yml:34",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/sbom.yml:35",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/sbom.yml:36",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/sbom.yml:37",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/sbom.yml:38",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/sbom.yml:39",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/sbom.yml:40",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/sbom.yml:41",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/sbom.yml:44",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/sbom.yml:45",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/sbom.yml:46",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/sbom.yml:28",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/sbom.yml:29",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/sbom.yml:30",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/sbom.yml:31",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/sbom.yml:32",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/sbom.yml:33",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/sbom.yml:35",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/sbom.yml:36",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/sbom.yml:37",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/sbom.yml:38",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/sbom.yml:39",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/sbom.yml:40",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/sbom.yml:45"
+        ]
+      }
+    },
+    ".github/workflows/estate-operational-inventory.yml": {
+      "intent_id": "estate-operational-inventory-contracts-v1",
+      "valid_until": "2026-11-30",
+      "source_sha256": "sha256:6a051e5f58918d140a72caadac6938c4167c872c67bc58fd56291b1e369b4402",
+      "credentials": [],
+      "resources": [
+        {
+          "key": "github:repository:szl-holdings/.github:contents",
+          "access": "read"
+        },
+        {
+          "key": "runner:toolchain:python",
+          "access": "local-write"
+        }
+      ],
+      "effects": [
+        {
+          "sink": "github.contents.checkout",
+          "resource": "github:repository:szl-holdings/.github:contents",
+          "access": "read",
+          "max_calls": 1
+        },
+        {
+          "sink": "runner.toolchain.install",
+          "resource": "runner:toolchain:python",
+          "access": "local-write",
+          "max_calls": 1
+        }
+      ],
+      "max_external_writes": 0,
+      "required_controls": {
+        "triggers": [
+          "pull_request"
+        ],
+        "contents_read": true,
+        "no_explicit_secrets": true,
+        "concurrency": false,
+        "protected_ref": false,
+        "exact_sha": false,
+        "expected_before": false,
+        "readback": false
+      },
+      "trusted_transitives": {},
+      "reviewed_unknowns": {
+        "files": {
+          ".github/scripts/estate_alignment_contract.py": "sha256:b23da4f50a93508080d23443cc50f6f14cd0910fe8f4eb1306fee341cf9e1145",
+          ".github/scripts/estate_operational_inventory.py": "sha256:e0a7870da14e2ebe1cf71a3edabd10ff01c3e93b6d22c1cd39596e5830de2874",
+          ".github/scripts/router_flagship_contract.py": "sha256:b191e2fcad51426867d4272ba7064cadc15489073047aeb2a682443e774c9265",
+          ".github/scripts/test_estate_operational_inventory.py": "sha256:548bc88fecab7e98d751ae4a281b1f583c41cb5d7c379d4feba0cbddb338f8f2",
+          ".github/workflows/estate-operational-inventory.yml": "sha256:6a051e5f58918d140a72caadac6938c4167c872c67bc58fd56291b1e369b4402"
+        },
+        "unknowns": [
+          "ACTION_INPUTS_REVIEW_REQUIRED@.github/workflows/estate-operational-inventory.yml:28",
+          "ACTION_INPUTS_REVIEW_REQUIRED@.github/workflows/estate-operational-inventory.yml:33",
+          "GITHUB_TARGET_UNRESOLVED@.github/scripts/estate_operational_inventory.py:62",
+          "HTTP_TARGET_UNRESOLVED@.github/scripts/estate_alignment_contract.py:338",
+          "PYTHON_CLIENT_UNRESOLVED@.github/scripts/estate_operational_inventory.py:183",
+          "PYTHON_CLIENT_UNRESOLVED@.github/scripts/estate_operational_inventory.py:83",
+          "PYTHON_DYNAMIC_EXECUTION@.github/scripts/estate_operational_inventory.py:307",
+          "PYTHON_DYNAMIC_SUBPROCESS@.github/scripts/estate_alignment_contract.py:820",
+          "PYTHON_IMPORT_UNRESOLVED@.github/scripts/estate_alignment_contract.py:14",
+          "PYTHON_IMPORT_UNRESOLVED@.github/scripts/estate_alignment_contract.py:15",
+          "PYTHON_IMPORT_UNRESOLVED@.github/scripts/estate_alignment_contract.py:16",
+          "PYTHON_IMPORT_UNRESOLVED@.github/scripts/estate_alignment_contract.py:17",
+          "PYTHON_IMPORT_UNRESOLVED@.github/scripts/estate_alignment_contract.py:4",
+          "PYTHON_IMPORT_UNRESOLVED@.github/scripts/estate_alignment_contract.py:6",
+          "PYTHON_IMPORT_UNRESOLVED@.github/scripts/estate_alignment_contract.py:7",
+          "PYTHON_IMPORT_UNRESOLVED@.github/scripts/estate_operational_inventory.py:10",
+          "PYTHON_IMPORT_UNRESOLVED@.github/scripts/estate_operational_inventory.py:15",
+          "PYTHON_IMPORT_UNRESOLVED@.github/scripts/estate_operational_inventory.py:17",
+          "PYTHON_IMPORT_UNRESOLVED@.github/scripts/estate_operational_inventory.py:18",
+          "PYTHON_IMPORT_UNRESOLVED@.github/scripts/estate_operational_inventory.py:4",
+          "PYTHON_IMPORT_UNRESOLVED@.github/scripts/estate_operational_inventory.py:6",
+          "PYTHON_IMPORT_UNRESOLVED@.github/scripts/estate_operational_inventory.py:7",
+          "PYTHON_IMPORT_UNRESOLVED@.github/scripts/router_flagship_contract.py:3",
+          "PYTHON_IMPORT_UNRESOLVED@.github/scripts/router_flagship_contract.py:5",
+          "PYTHON_IMPORT_UNRESOLVED@.github/scripts/test_estate_operational_inventory.py:13",
+          "PYTHON_IMPORT_UNRESOLVED@.github/scripts/test_estate_operational_inventory.py:4",
+          "PYTHON_IMPORT_UNRESOLVED@.github/scripts/test_estate_operational_inventory.py:6",
+          "PYTHON_SOURCE_REVIEW_REQUIRED@.github/scripts/estate_alignment_contract.py:1",
+          "PYTHON_SOURCE_REVIEW_REQUIRED@.github/scripts/estate_operational_inventory.py:1",
+          "PYTHON_SOURCE_REVIEW_REQUIRED@.github/scripts/router_flagship_contract.py:1",
+          "PYTHON_SOURCE_REVIEW_REQUIRED@.github/scripts/test_estate_operational_inventory.py:1",
+          "SCRIPT_SOURCE_REVIEW_REQUIRED@.github/workflows/estate-operational-inventory.yml:1",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/scripts/estate_operational_inventory.py:62",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/estate-operational-inventory.yml:37",
+          "WORKFLOW_ENVIRONMENT_REVIEW_REQUIRED@.github/workflows/estate-operational-inventory.yml:36"
+        ]
+      }
+    },
     ".github/workflows/control-plane-effect-gate.yml": {
       "intent_id": "cp-ebom-static-boundary-v1",
       "valid_until": "2026-11-30",
@@ -73,6 +347,111 @@
       "trusted_transitives": {
         ".github/scripts/control_plane_effect_gate.py": "sha256:c6dab1dd86092280168a6312417c03fde611fdbe197cd4c436aadf25ae18fb67",
         ".github/scripts/test_control_plane_effect_gate.py": "sha256:abf96660b74f49eaaffe4f6165a0614f0e8922605ddc8a47d4aa11ef71791981"
+      },
+      "reviewed_unknowns": {
+        "files": {
+          ".github/workflows/control-plane-effect-gate.yml": "sha256:61a841b326844734c27bda85e73378189f3907fb6753b983aca91bb1e2425b88"
+        },
+        "unknowns": [
+          "ACTION_INPUTS_REVIEW_REQUIRED@.github/workflows/control-plane-effect-gate.yml:164",
+          "ACTION_INPUTS_REVIEW_REQUIRED@.github/workflows/control-plane-effect-gate.yml:27",
+          "ACTION_INPUTS_REVIEW_REQUIRED@.github/workflows/control-plane-effect-gate.yml:33",
+          "ACTION_INPUTS_REVIEW_REQUIRED@.github/workflows/control-plane-effect-gate.yml:40",
+          "PYTHON_SOURCE_REVIEW_REQUIRED@.github/workflows/control-plane-effect-gate.yml:138",
+          "PYTHON_SOURCE_REVIEW_REQUIRED@.github/workflows/control-plane-effect-gate.yml:62",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/control-plane-effect-gate.yml:106",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/control-plane-effect-gate.yml:107",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/control-plane-effect-gate.yml:108",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/control-plane-effect-gate.yml:109",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/control-plane-effect-gate.yml:110",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/control-plane-effect-gate.yml:111",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/control-plane-effect-gate.yml:112",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/control-plane-effect-gate.yml:118",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/control-plane-effect-gate.yml:126",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/control-plane-effect-gate.yml:127",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/control-plane-effect-gate.yml:128",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/control-plane-effect-gate.yml:129",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/control-plane-effect-gate.yml:130",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/control-plane-effect-gate.yml:131",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/control-plane-effect-gate.yml:132",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/control-plane-effect-gate.yml:133",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/control-plane-effect-gate.yml:134",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/control-plane-effect-gate.yml:135",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/control-plane-effect-gate.yml:136",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/control-plane-effect-gate.yml:137",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/control-plane-effect-gate.yml:138",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/control-plane-effect-gate.yml:139",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/control-plane-effect-gate.yml:140",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/control-plane-effect-gate.yml:142",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/control-plane-effect-gate.yml:143",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/control-plane-effect-gate.yml:144",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/control-plane-effect-gate.yml:145",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/control-plane-effect-gate.yml:146",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/control-plane-effect-gate.yml:147",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/control-plane-effect-gate.yml:148",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/control-plane-effect-gate.yml:149",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/control-plane-effect-gate.yml:150",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/control-plane-effect-gate.yml:152",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/control-plane-effect-gate.yml:153",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/control-plane-effect-gate.yml:154",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/control-plane-effect-gate.yml:155",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/control-plane-effect-gate.yml:156",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/control-plane-effect-gate.yml:157",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/control-plane-effect-gate.yml:158",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/control-plane-effect-gate.yml:46",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/control-plane-effect-gate.yml:47",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/control-plane-effect-gate.yml:53",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/control-plane-effect-gate.yml:54",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/control-plane-effect-gate.yml:61",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/control-plane-effect-gate.yml:62",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/control-plane-effect-gate.yml:63",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/control-plane-effect-gate.yml:64",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/control-plane-effect-gate.yml:65",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/control-plane-effect-gate.yml:67",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/control-plane-effect-gate.yml:68",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/control-plane-effect-gate.yml:69",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/control-plane-effect-gate.yml:71",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/control-plane-effect-gate.yml:72",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/control-plane-effect-gate.yml:73",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/control-plane-effect-gate.yml:74",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/control-plane-effect-gate.yml:75",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/control-plane-effect-gate.yml:76",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/control-plane-effect-gate.yml:77",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/control-plane-effect-gate.yml:78",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/control-plane-effect-gate.yml:79",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/control-plane-effect-gate.yml:80",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/control-plane-effect-gate.yml:81",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/control-plane-effect-gate.yml:82",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/control-plane-effect-gate.yml:83",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/control-plane-effect-gate.yml:85",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/control-plane-effect-gate.yml:86",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/control-plane-effect-gate.yml:87",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/control-plane-effect-gate.yml:88",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/control-plane-effect-gate.yml:89",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/control-plane-effect-gate.yml:90",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/control-plane-effect-gate.yml:91",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/control-plane-effect-gate.yml:92",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/control-plane-effect-gate.yml:94",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/control-plane-effect-gate.yml:95",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/control-plane-effect-gate.yml:96",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/control-plane-effect-gate.yml:97",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/control-plane-effect-gate.yml:106",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/control-plane-effect-gate.yml:107",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/control-plane-effect-gate.yml:108",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/control-plane-effect-gate.yml:109",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/control-plane-effect-gate.yml:110",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/control-plane-effect-gate.yml:111",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/control-plane-effect-gate.yml:112",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/control-plane-effect-gate.yml:128",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/control-plane-effect-gate.yml:129",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/control-plane-effect-gate.yml:130",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/control-plane-effect-gate.yml:131",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/control-plane-effect-gate.yml:132",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/control-plane-effect-gate.yml:135",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/control-plane-effect-gate.yml:53",
+          "WORKFLOW_ENVIRONMENT_REVIEW_REQUIRED@.github/workflows/control-plane-effect-gate.yml:102",
+          "WORKFLOW_ENVIRONMENT_REVIEW_REQUIRED@.github/workflows/control-plane-effect-gate.yml:123"
+        ]
       }
     },
     ".github/workflows/lean-numbers.yml": {
@@ -171,6 +550,267 @@
       "required_controls": {"triggers": ["pull_request", "merge_group", "push"], "contents_read": true, "no_explicit_secrets": true, "concurrency": true, "protected_ref": false, "exact_sha": false, "expected_before": false, "readback": false},
       "trusted_transitives": {},
       "reviewed_unknowns": {"files": {".github/scripts/test_estate_snapshot_admission.py": "sha256:7e594ea3e6c0cdd0819a068c7f92a2cc404909d60013c66d51fb3609967b19ab", ".github/workflows/estate-snapshot-admission.yml": "sha256:70d8cb695974248d71ef478d4fef3771709f236c90d757d086b241b6298e3a0f", "scripts/estate_snapshot_admission.py": "sha256:f255a7aacb904bf81c5c8004e0c43f0da4e243fc549971d148a5a1d9fadd8562"}, "unknowns": ["ACTION_INPUTS_REVIEW_REQUIRED@.github/workflows/estate-snapshot-admission.yml:19", "ACTION_INPUTS_REVIEW_REQUIRED@.github/workflows/estate-snapshot-admission.yml:23", "PYTHON_IMPORT_UNRESOLVED@.github/scripts/test_estate_snapshot_admission.py:2", "PYTHON_IMPORT_UNRESOLVED@.github/scripts/test_estate_snapshot_admission.py:3", "PYTHON_IMPORT_UNRESOLVED@.github/scripts/test_estate_snapshot_admission.py:5", "PYTHON_IMPORT_UNRESOLVED@.github/scripts/test_estate_snapshot_admission.py:6", "PYTHON_IMPORT_UNRESOLVED@scripts/estate_snapshot_admission.py:3", "PYTHON_IMPORT_UNRESOLVED@scripts/estate_snapshot_admission.py:5", "PYTHON_IMPORT_UNRESOLVED@scripts/estate_snapshot_admission.py:6", "PYTHON_IMPORT_UNRESOLVED@scripts/estate_snapshot_admission.py:8", "PYTHON_SOURCE_REVIEW_REQUIRED@.github/scripts/test_estate_snapshot_admission.py:1", "PYTHON_SOURCE_REVIEW_REQUIRED@scripts/estate_snapshot_admission.py:1", "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/estate-snapshot-admission.yml:26", "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/estate-snapshot-admission.yml:27"]}
+    },
+    ".github/workflows/hf-dataset-register-consistency.yml": {
+      "intent_id": "hf-dataset-register-offline-consistency-v1",
+      "valid_until": "2026-11-30",
+      "source_sha256": "sha256:443c439d3a770dc8f982aaf3d73654ceafbd021a0cb67cd14dd85674903c1aae",
+      "credentials": [],
+      "resources": [
+        {"key": "github:repository:szl-holdings/.github:contents", "access": "read"},
+        {"key": "runner:toolchain:python", "access": "local-write"}
+      ],
+      "effects": [
+        {"sink": "github.contents.checkout", "resource": "github:repository:szl-holdings/.github:contents", "access": "read", "max_calls": 1},
+        {"sink": "runner.toolchain.install", "resource": "runner:toolchain:python", "access": "local-write", "max_calls": 1}
+      ],
+      "max_external_writes": 0,
+      "required_controls": {"triggers": ["pull_request", "merge_group", "push"], "contents_read": true, "no_explicit_secrets": true, "concurrency": false, "protected_ref": false, "exact_sha": false, "expected_before": false, "readback": false},
+      "trusted_transitives": {},
+      "reviewed_unknowns": {
+        "files": {
+          ".github/workflows/hf-dataset-register-consistency.yml": "sha256:443c439d3a770dc8f982aaf3d73654ceafbd021a0cb67cd14dd85674903c1aae",
+          ".github/scripts/hf_dataset_register_consistency.py": "sha256:cfa59278dbd11ae3f5bd204773c1e970dc5b32dbe82c2cf505befc7cfba15a1d",
+          ".github/scripts/test_hf_dataset_register_consistency.py": "sha256:f12bfc133b8d54463a191b0e0e4825f11ae0fda115a9c8ba5f52aae08e7dfe47"
+        },
+        "unknowns": [
+          "ACTION_INPUTS_REVIEW_REQUIRED@.github/workflows/hf-dataset-register-consistency.yml:26",
+          "ACTION_INPUTS_REVIEW_REQUIRED@.github/workflows/hf-dataset-register-consistency.yml:30",
+          "PYTHON_CLIENT_UNRESOLVED@.github/scripts/test_hf_dataset_register_consistency.py:194",
+          "PYTHON_IMPORT_UNRESOLVED@.github/scripts/hf_dataset_register_consistency.py:9",
+          "PYTHON_IMPORT_UNRESOLVED@.github/scripts/hf_dataset_register_consistency.py:11",
+          "PYTHON_IMPORT_UNRESOLVED@.github/scripts/hf_dataset_register_consistency.py:12",
+          "PYTHON_IMPORT_UNRESOLVED@.github/scripts/hf_dataset_register_consistency.py:14",
+          "PYTHON_IMPORT_UNRESOLVED@.github/scripts/test_hf_dataset_register_consistency.py:9",
+          "PYTHON_IMPORT_UNRESOLVED@.github/scripts/test_hf_dataset_register_consistency.py:11",
+          "PYTHON_IMPORT_UNRESOLVED@.github/scripts/test_hf_dataset_register_consistency.py:12",
+          "PYTHON_IMPORT_UNRESOLVED@.github/scripts/test_hf_dataset_register_consistency.py:13",
+          "PYTHON_IMPORT_UNRESOLVED@.github/scripts/test_hf_dataset_register_consistency.py:15",
+          "PYTHON_IMPORT_UNRESOLVED@.github/scripts/test_hf_dataset_register_consistency.py:16",
+          "PYTHON_IMPORT_UNRESOLVED@.github/scripts/test_hf_dataset_register_consistency.py:20",
+          "PYTHON_IMPORT_UNRESOLVED@.github/scripts/test_hf_dataset_register_consistency.py:26",
+          "PYTHON_SOURCE_REVIEW_REQUIRED@.github/scripts/hf_dataset_register_consistency.py:1",
+          "PYTHON_SOURCE_REVIEW_REQUIRED@.github/scripts/test_hf_dataset_register_consistency.py:1",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-dataset-register-consistency.yml:32",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-dataset-register-consistency.yml:34"
+        ]
+      }
+    },
+    ".github/workflows/hf-living-constellation-operator.yml": {
+      "intent_id": "hf-living-constellation-runtime-probe-v2",
+      "valid_until": "2026-11-30",
+      "source_sha256": "sha256:8385251f5ae9a88462cd3c2f7a085446b31ed1175448c7cc6f11aeae594ce3e9",
+      "credentials": [
+        "HF_ORG_TOKEN",
+        "HF_ORG_TOKEN1",
+        "HF_TOKEN",
+        "HF_WRITE_TOKEN"
+      ],
+      "resources": [
+        {
+          "key": "github:actions:artifact:hf-living-constellation-v2",
+          "access": "external-write"
+        },
+        {
+          "key": "github:repository:szl-holdings/.github:contents",
+          "access": "read"
+        },
+        {
+          "key": "huggingface:organization:SZLHOLDINGS:public-space-restart",
+          "access": "external-write"
+        },
+        {
+          "key": "runner:guard:egress",
+          "access": "local-write"
+        },
+        {
+          "key": "runner:toolchain:python",
+          "access": "local-write"
+        }
+      ],
+      "effects": [
+        {
+          "sink": "github.artifact.upload",
+          "resource": "github:actions:artifact:hf-living-constellation-v2",
+          "access": "external-write",
+          "max_calls": 1
+        },
+        {
+          "sink": "github.contents.checkout",
+          "resource": "github:repository:szl-holdings/.github:contents",
+          "access": "read",
+          "max_calls": 2
+        },
+        {
+          "sink": "runner.guard.configure",
+          "resource": "runner:guard:egress",
+          "access": "local-write",
+          "max_calls": 2
+        },
+        {
+          "sink": "runner.toolchain.install",
+          "resource": "runner:toolchain:python",
+          "access": "local-write",
+          "max_calls": 2
+        },
+        {
+          "sink": "sdk.huggingface.restart_space",
+          "resource": "huggingface:organization:SZLHOLDINGS:public-space-restart",
+          "access": "external-write",
+          "max_calls": 1
+        }
+      ],
+      "max_external_writes": 2,
+      "required_controls": {
+        "triggers": [
+          "pull_request",
+          "push",
+          "schedule",
+          "workflow_dispatch"
+        ],
+        "contents_read": true,
+        "no_explicit_secrets": false,
+        "concurrency": true,
+        "protected_ref": false,
+        "exact_sha": false,
+        "expected_before": false,
+        "readback": false
+      },
+      "trusted_transitives": {},
+      "reviewed_unknowns": {
+        "files": {
+          ".github/scripts/hf_living_constellation_operator.py": "sha256:f4baf8a3f15c3a299cefac4a676b8248ec31f56ed09c4b06f3808d5744e8fa88",
+          ".github/workflows/hf-living-constellation-operator.yml": "sha256:8385251f5ae9a88462cd3c2f7a085446b31ed1175448c7cc6f11aeae594ce3e9"
+        },
+        "unknowns": [
+          "ACTION_INPUTS_REVIEW_REQUIRED@.github/workflows/hf-living-constellation-operator.yml:138",
+          "ACTION_INPUTS_REVIEW_REQUIRED@.github/workflows/hf-living-constellation-operator.yml:143",
+          "ACTION_INPUTS_REVIEW_REQUIRED@.github/workflows/hf-living-constellation-operator.yml:150",
+          "ACTION_INPUTS_REVIEW_REQUIRED@.github/workflows/hf-living-constellation-operator.yml:207",
+          "ACTION_INPUTS_REVIEW_REQUIRED@.github/workflows/hf-living-constellation-operator.yml:48",
+          "ACTION_INPUTS_REVIEW_REQUIRED@.github/workflows/hf-living-constellation-operator.yml:53",
+          "ACTION_INPUTS_REVIEW_REQUIRED@.github/workflows/hf-living-constellation-operator.yml:59",
+          "HTTP_TARGET_UNRESOLVED@.github/scripts/hf_living_constellation_operator.py:160",
+          "PYTHON_DYNAMIC_HTTP_METHOD@.github/scripts/hf_living_constellation_operator.py:160",
+          "PYTHON_IMPORT_UNRESOLVED@.github/scripts/hf_living_constellation_operator.py:19",
+          "PYTHON_IMPORT_UNRESOLVED@.github/scripts/hf_living_constellation_operator.py:21",
+          "PYTHON_IMPORT_UNRESOLVED@.github/scripts/hf_living_constellation_operator.py:22",
+          "PYTHON_IMPORT_UNRESOLVED@.github/scripts/hf_living_constellation_operator.py:23",
+          "PYTHON_IMPORT_UNRESOLVED@.github/scripts/hf_living_constellation_operator.py:28",
+          "PYTHON_IMPORT_UNRESOLVED@.github/scripts/hf_living_constellation_operator.py:29",
+          "PYTHON_IMPORT_UNRESOLVED@.github/scripts/hf_living_constellation_operator.py:30",
+          "PYTHON_IMPORT_UNRESOLVED@.github/scripts/hf_living_constellation_operator.py:31",
+          "PYTHON_SOURCE_REVIEW_REQUIRED@.github/scripts/hf_living_constellation_operator.py:1",
+          "SCRIPT_SOURCE_REVIEW_REQUIRED@.github/workflows/hf-living-constellation-operator.yml:1",
+          "SDK_TARGET_UNRESOLVED@.github/scripts/hf_living_constellation_operator.py:383",
+          "SECRET_EXPRESSION_REVIEW_REQUIRED@.github/workflows/hf-living-constellation-operator.yml:1",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-living-constellation-operator.yml:101",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-living-constellation-operator.yml:102",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-living-constellation-operator.yml:103",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-living-constellation-operator.yml:105",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-living-constellation-operator.yml:106",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-living-constellation-operator.yml:107",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-living-constellation-operator.yml:108",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-living-constellation-operator.yml:109",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-living-constellation-operator.yml:110",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-living-constellation-operator.yml:111",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-living-constellation-operator.yml:112",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-living-constellation-operator.yml:113",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-living-constellation-operator.yml:114",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-living-constellation-operator.yml:115",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-living-constellation-operator.yml:116",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-living-constellation-operator.yml:117",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-living-constellation-operator.yml:118",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-living-constellation-operator.yml:119",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-living-constellation-operator.yml:120",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-living-constellation-operator.yml:121",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-living-constellation-operator.yml:122",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-living-constellation-operator.yml:123",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-living-constellation-operator.yml:124",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-living-constellation-operator.yml:158",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-living-constellation-operator.yml:159",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-living-constellation-operator.yml:160",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-living-constellation-operator.yml:161",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-living-constellation-operator.yml:162",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-living-constellation-operator.yml:163",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-living-constellation-operator.yml:164",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-living-constellation-operator.yml:165",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-living-constellation-operator.yml:166",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-living-constellation-operator.yml:173",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-living-constellation-operator.yml:174",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-living-constellation-operator.yml:175",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-living-constellation-operator.yml:176",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-living-constellation-operator.yml:178",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-living-constellation-operator.yml:179",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-living-constellation-operator.yml:180",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-living-constellation-operator.yml:181",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-living-constellation-operator.yml:182",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-living-constellation-operator.yml:183",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-living-constellation-operator.yml:184",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-living-constellation-operator.yml:185",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-living-constellation-operator.yml:186",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-living-constellation-operator.yml:187",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-living-constellation-operator.yml:188",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-living-constellation-operator.yml:189",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-living-constellation-operator.yml:190",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-living-constellation-operator.yml:191",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-living-constellation-operator.yml:192",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-living-constellation-operator.yml:193",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-living-constellation-operator.yml:194",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-living-constellation-operator.yml:195",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-living-constellation-operator.yml:196",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-living-constellation-operator.yml:197",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-living-constellation-operator.yml:198",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-living-constellation-operator.yml:199",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-living-constellation-operator.yml:200",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-living-constellation-operator.yml:201",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-living-constellation-operator.yml:218",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-living-constellation-operator.yml:219",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-living-constellation-operator.yml:220",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-living-constellation-operator.yml:221",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-living-constellation-operator.yml:222",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-living-constellation-operator.yml:223",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-living-constellation-operator.yml:63",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-living-constellation-operator.yml:71",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-living-constellation-operator.yml:72",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-living-constellation-operator.yml:74",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-living-constellation-operator.yml:75",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-living-constellation-operator.yml:76",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-living-constellation-operator.yml:78",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-living-constellation-operator.yml:79",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-living-constellation-operator.yml:80",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-living-constellation-operator.yml:81",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-living-constellation-operator.yml:82",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-living-constellation-operator.yml:83",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-living-constellation-operator.yml:84",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-living-constellation-operator.yml:85",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-living-constellation-operator.yml:86",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-living-constellation-operator.yml:87",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-living-constellation-operator.yml:88",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-living-constellation-operator.yml:89",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-living-constellation-operator.yml:90",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-living-constellation-operator.yml:91",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-living-constellation-operator.yml:92",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-living-constellation-operator.yml:93",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-living-constellation-operator.yml:94",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-living-constellation-operator.yml:95",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/hf-living-constellation-operator.yml:159",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/hf-living-constellation-operator.yml:160",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/hf-living-constellation-operator.yml:163",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/hf-living-constellation-operator.yml:165",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/hf-living-constellation-operator.yml:173",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/hf-living-constellation-operator.yml:198",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/hf-living-constellation-operator.yml:199",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/hf-living-constellation-operator.yml:218",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/hf-living-constellation-operator.yml:219",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/hf-living-constellation-operator.yml:220",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/hf-living-constellation-operator.yml:222",
+          "WORKFLOW_ENVIRONMENT_REVIEW_REQUIRED@.github/workflows/hf-living-constellation-operator.yml:133",
+          "WORKFLOW_ENVIRONMENT_REVIEW_REQUIRED@.github/workflows/hf-living-constellation-operator.yml:156",
+          "WORKFLOW_ENVIRONMENT_REVIEW_REQUIRED@.github/workflows/hf-living-constellation-operator.yml:216",
+          "WORKFLOW_ENVIRONMENT_REVIEW_REQUIRED@.github/workflows/hf-living-constellation-operator.yml:37"
+        ]
+      }
     }
   }
 }

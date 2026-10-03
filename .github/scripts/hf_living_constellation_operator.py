@@ -69,6 +69,7 @@ TOKEN_NAMES = (
     "HUGGINGFACE_TOKEN",
 )
 SECRET_PATTERN = re.compile(r"hf_[A-Za-z0-9]{12,}")
+GDW_SPACE_ID = "SZLHOLDINGS/gdw-frontier"
 
 
 class OperatorError(RuntimeError):
@@ -277,15 +278,35 @@ def restart_space(repo_id: str, token: str) -> int:
     return status
 
 
-def probe_runtime(candidates: Iterable[str]) -> tuple[str | None, int | None, list[str]]:
+def probe_runtime(
+    candidates: Iterable[str], *, repo_id: str | None = None
+) -> tuple[str | None, int | None, list[str]]:
     blockers: list[str] = []
-    for url in candidates:
+    # GDW protects its homepage; its public readiness route audits the ledger
+    # and exemplar store before reporting "ready".
+    gdw_readiness = repo_id is not None and repo_id.casefold() == GDW_SPACE_ID.casefold()
+    for host in candidates:
+        url = host.rstrip("/") + "/readyz" if gdw_readiness else host
         try:
             status, raw, headers = _request("GET", url, timeout=25.0)
         except OperatorError as exc:
             blockers.append(str(exc))
             continue
         content_type = str(headers.get("Content-Type") or headers.get("content-type") or "")
+        if gdw_readiness:
+            if status == 200 and content_type.lower().startswith("application/json"):
+                try:
+                    payload = json.loads(raw.decode("utf-8"))
+                except (UnicodeDecodeError, json.JSONDecodeError):
+                    payload = None
+                if (
+                    isinstance(payload, Mapping)
+                    and payload.get("status") == "ready"
+                    and payload.get("service") == "gdw"
+                ):
+                    return url, status, blockers
+            blockers.append(f"{url} did not provide a ready gdw response (HTTP {status})")
+            continue
         if status == 200 and raw and ("text/html" in content_type or b"<html" in raw[:8192].lower()):
             return url, status, blockers
         blockers.append(f"{url} returned HTTP {status} with {len(raw)} bytes")
@@ -346,7 +367,7 @@ def operate_one(
     # Static Spaces have no restartable container. Their operational contract is
     # the public static origin itself, so probe it directly and never POST.
     if space.sdk == "static":
-        url, status, blockers = probe_runtime(hosts)
+        url, status, blockers = probe_runtime(hosts, repo_id=space.repo_id)
         result.runtime_url = url
         result.runtime_http_status = status
         result.blockers.extend(blockers[-2:] if url else blockers)
@@ -378,7 +399,7 @@ def operate_one(
                 result.blockers.append(str(exc))
 
         if result.final_stage in HEALTHY_STAGES:
-            url, status, blockers = probe_runtime(hosts)
+            url, status, blockers = probe_runtime(hosts, repo_id=space.repo_id)
             result.runtime_url = url
             result.runtime_http_status = status
             result.blockers.extend(blockers[-2:] if url else blockers)
@@ -386,7 +407,7 @@ def operate_one(
         elif not should_wait and result.final_stage in {"UNKNOWN", "UNAVAILABLE"}:
             # Read-only reachability can still prove an application is serving
             # when provider stage metadata is temporarily absent.
-            url, status, blockers = probe_runtime(hosts)
+            url, status, blockers = probe_runtime(hosts, repo_id=space.repo_id)
             result.runtime_url = url
             result.runtime_http_status = status
             result.blockers.extend(blockers[-2:] if url else blockers)
