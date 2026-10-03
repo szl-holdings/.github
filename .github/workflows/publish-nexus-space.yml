@@ -10,29 +10,20 @@ on:
     branches: [main]
     paths:
       - .github/workflows/publish-nexus-space.yml
-      - .github/scripts/acquire_hf_publisher_token.py
-      - .github/scripts/test_acquire_hf_publisher_token.py
       - .github/scripts/hf_deploy_from_dockerfile.py
       - requirements/hf-publisher.lock
-      - .github/data/hf-space-lifecycle-policy.json
   push:
     branches: [main]
     paths:
       - .github/workflows/publish-nexus-space.yml
   schedule:
     - cron: "23 * * * *"
-  workflow_dispatch:
-    inputs:
-      recover_missing_target:
-        description: "Explicit recovery: create public SZLHOLDINGS/nexus only when absent"
-        type: boolean
-        required: true
-        default: false
+  workflow_dispatch: {}
 
 permissions: read-all
 concurrency:
-  group: publish-nexus-space-${{ github.event_name == 'pull_request' && github.ref || 'publish' }}
-  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+  group: publish-nexus-space-${{ github.event_name }}
+  cancel-in-progress: true
 
 jobs:
   validate:
@@ -73,8 +64,6 @@ jobs:
               'repository: szl-holdings/nexus',
               'HF_REPO: SZLHOLDINGS/nexus',
               'acquire_hf_publisher_token.py',
-              '--recover-exact-public-nexus',
-              '--recovery-policy tools/.github/data/hf-space-lifecycle-policy.json',
               'HF_ORG_TOKEN_CANDIDATE',
               'HF_ORG_TOKEN1_CANDIDATE',
               'HF_WRITE_TOKEN_CANDIDATE',
@@ -110,7 +99,7 @@ jobs:
       contents: read
       security-events: write
     name: Publish exact Nexus main and attest live state
-    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+    if: github.event_name != 'pull_request'
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
@@ -215,16 +204,10 @@ jobs:
           HF_REPO: SZLHOLDINGS/nexus
         run: |
           set -euo pipefail
-          RECOVERY_ARGS=()
-          if [ "${{ github.event_name }}" = workflow_dispatch ] && [ "${{ inputs.recover_missing_target }}" = true ]; then
-            RECOVERY_ARGS+=(--recover-exact-public-nexus)
-            RECOVERY_ARGS+=(--recovery-policy tools/.github/data/hf-space-lifecycle-policy.json)
-          fi
           "$RUNNER_TEMP/hf-publisher-venv/bin/python" -I -P \
             tools/.github/scripts/acquire_hf_publisher_token.py \
             --target-repo "$HF_REPO" \
             --target-type space \
-            "${RECOVERY_ARGS[@]}" \
             --token-file "$RUNNER_TEMP/nexus-hf-token" \
             --report evidence/nexus/hf-publisher-credential.json
 

@@ -32,7 +32,6 @@ TOKEN_ENV_ORDER: tuple[tuple[str, str], ...] = (
 )
 REQUEST_ID = re.compile(r"Request ID:\s*([^\n)]+)", re.IGNORECASE)
 TOKEN_LINE = re.compile(r"^hf_[A-Za-z0-9._-]+$")
-NEXUS_TARGET = "SZLHOLDINGS/nexus"
 
 
 class CredentialSelectionError(RuntimeError):
@@ -237,141 +236,6 @@ def select_credential(
     )
 
 
-def _require_public_exact_nexus(info: object) -> None:
-    if (
-        getattr(info, "id", None) != NEXUS_TARGET
-        or getattr(info, "private", None) is not False
-    ):
-        raise CredentialSelectionError("exact public Nexus target was not confirmed")
-
-
-def _assert_public_nexus_policy(path: Path) -> None:
-    policy = json.loads(path.read_text(encoding="utf-8"))
-    matching = [
-        target for target in policy.get("targets", [])
-        if target.get("repo_id") == NEXUS_TARGET
-    ]
-    if (
-        policy.get("schema") != "szl.hf.space-lifecycle-policy.v2"
-        or policy.get("organization") != "SZLHOLDINGS"
-        or policy.get("token_authority", {}).get("required_org_role") != "admin"
-        or len(matching) != 1
-        or matching[0].get("desired_visibility") != "public"
-        or matching[0].get("role") != "bound-service"
-    ):
-        raise CredentialSelectionError("protected Nexus lifecycle policy does not authorize public recovery")
-
-
-def _has_org_admin(identity: Mapping[str, object]) -> bool:
-    return any(
-        isinstance(org, dict)
-        and str(org.get("name") or "").casefold() == "szlholdings"
-        and org.get("roleInOrg") == "admin"
-        for org in (identity.get("orgs") or [])
-    )
-
-
-def _recovery_attempt(source: str, phase: str, error: BaseException) -> dict:
-    """Persist error class and HTTP status only, never provider error text."""
-
-    return {
-        "source": source,
-        "phase": phase,
-        "status_code": getattr(getattr(error, "response", None), "status_code", None),
-        "error_type": type(error).__name__,
-    }
-
-
-def recover_public_nexus(
-    environment: Mapping[str, str],
-    *,
-    api_factory: Callable[..., object] | None = None,
-) -> dict:
-    """On explicit dispatch, create only the policy-declared public Nexus Space.
-
-    A Hub 404 can mean absence or an inaccessible private Space. The exact
-    namespace/name and ``exist_ok=False`` form the atomic occupied-name guard.
-    A successful create is not accepted until authenticated write access and
-    exact public target readback both pass.
-    """
-
-    if api_factory is None:
-        from huggingface_hub import HfApi
-
-        api_factory = HfApi
-    attempts: list[dict] = []
-    for source, variable in TOKEN_ENV_ORDER:
-        raw = str(environment.get(variable) or "").strip()
-        if not raw:
-            continue
-        try:
-            api = api_factory(token=_normalize_token(raw))
-            identity = api.whoami()
-            if not str((identity or {}).get("name") or "").strip():
-                raise CredentialSelectionError("Hub identity is unavailable")
-        except Exception as error:
-            attempts.append(_recovery_attempt(source, "identity", error))
-            status = attempts[-1]["status_code"]
-            if status in (401, 403) or isinstance(error, CredentialSelectionError):
-                continue
-            return {"state": "BLOCKED_AUTHORITY_UNCERTAIN", "attempts": attempts}
-
-        try:
-            api.auth_check(repo_id=NEXUS_TARGET, repo_type="space", write=True)
-        except Exception as error:
-            status = getattr(getattr(error, "response", None), "status_code", None)
-            if status != 404:
-                attempts.append(_recovery_attempt(source, "write_check", error))
-                if status in (401, 403):
-                    continue
-                return {"state": "BLOCKED_AUTHORITY_UNCERTAIN", "attempts": attempts}
-            if not _has_org_admin(identity):
-                attempts.append({
-                    "source": source,
-                    "phase": "org_admin_check",
-                    "status_code": None,
-                    "error_type": "OrgAdminUnverified",
-                })
-                continue
-            try:
-                api.create_repo(
-                    repo_id=NEXUS_TARGET,
-                    repo_type="space",
-                    space_sdk="docker",
-                    private=False,
-                    exist_ok=False,
-                )
-            except Exception as create_error:
-                attempts.append(_recovery_attempt(source, "create", create_error))
-                create_status = attempts[-1]["status_code"]
-                if create_status in (401, 403, 409):
-                    continue
-                return {"state": "UNKNOWN_AFTER_ATTEMPT", "attempts": attempts}
-            try:
-                api.auth_check(repo_id=NEXUS_TARGET, repo_type="space", write=True)
-                _require_public_exact_nexus(
-                    api.repo_info(repo_id=NEXUS_TARGET, repo_type="space")
-                )
-            except Exception as verify_error:
-                attempts.append(
-                    _recovery_attempt(source, "post_create_readback", verify_error)
-                )
-                return {"state": "UNKNOWN_AFTER_ATTEMPT", "attempts": attempts}
-            attempts.append({"source": source, "phase": "create_readback", "status_code": 200})
-            return {"state": "CREATED_PUBLIC_WRITE_CONFIRMED", "attempts": attempts}
-
-        try:
-            _require_public_exact_nexus(
-                api.repo_info(repo_id=NEXUS_TARGET, repo_type="space")
-            )
-        except Exception as error:
-            attempts.append(_recovery_attempt(source, "existing_readback", error))
-            return {"state": "BLOCKED_EXISTING_TARGET_MISMATCH", "attempts": attempts}
-        attempts.append({"source": source, "phase": "existing_readback", "status_code": 200})
-        return {"state": "EXISTING_PUBLIC_WRITE_CONFIRMED", "attempts": attempts}
-    return {"state": "BLOCKED_NO_TARGET_WRITER", "attempts": attempts}
-
-
 def _write_report(
     path: Path,
     *,
@@ -380,7 +244,6 @@ def _write_report(
     resource: str | None,
     selected: ValidationResult | None,
     attempts: Sequence[Attempt],
-    recovery: dict | None = None,
 ) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     payload = {
@@ -395,7 +258,6 @@ def _write_report(
         },
         "selected": asdict(selected) if selected is not None else None,
         "attempts": [asdict(attempt) for attempt in attempts],
-        "recovery": recovery,
         "token_persisted": False,
         "token_logged": False,
         "token_job_environment_exported": False,
@@ -450,37 +312,13 @@ def main(argv: list[str] | None = None) -> int:
             "because they do not prove target absence or namespace creation authority."
         ),
     )
-    parser.add_argument(
-        "--recover-exact-public-nexus",
-        action="store_true",
-        help="Explicit owner dispatch: atomically create the exact public Nexus Docker Space if absent.",
-    )
-    parser.add_argument("--recovery-policy", type=Path)
     parser.add_argument("--token-file", required=True, type=Path)
     parser.add_argument("--report", required=True, type=Path)
     args = parser.parse_args(argv)
 
     attempts: list[Attempt] = []
     selected: ValidationResult | None = None
-    recovery: dict | None = None
     try:
-        if args.recover_exact_public_nexus:
-            if (
-                args.target_repo != NEXUS_TARGET
-                or args.target_type != "space"
-                or args.recovery_policy is None
-                or os.environ.get("GITHUB_EVENT_NAME") != "workflow_dispatch"
-                or os.environ.get("GITHUB_REF") != "refs/heads/main"
-                or os.environ.get("GITHUB_REPOSITORY") != "szl-holdings/.github"
-            ):
-                raise CredentialSelectionError("exact owner dispatch boundary failed")
-            _assert_public_nexus_policy(args.recovery_policy)
-            recovery = recover_public_nexus(os.environ)
-            if recovery["state"] not in (
-                "CREATED_PUBLIC_WRITE_CONFIRMED",
-                "EXISTING_PUBLIC_WRITE_CONFIRMED",
-            ):
-                raise CredentialSelectionError("Nexus target recovery failed closed")
         token, selected, attempts = select_credential(
             resource=args.oidc_resource,
             target_repo=args.target_repo,
@@ -496,7 +334,6 @@ def main(argv: list[str] | None = None) -> int:
             resource=args.oidc_resource,
             selected=selected,
             attempts=attempts,
-            recovery=recovery,
         )
         _write_token_file(args.token_file, token)
         print(
@@ -514,7 +351,6 @@ def main(argv: list[str] | None = None) -> int:
             resource=args.oidc_resource,
             selected=selected,
             attempts=attempts,
-            recovery=recovery,
         )
         print(
             "::error::Hugging Face publisher credential validation failed: "
