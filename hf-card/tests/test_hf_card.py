@@ -66,6 +66,14 @@ class RenderTests(unittest.TestCase):
         data = render.load_vars(FIXTURES / "model.card.yaml")
         self.assertEqual(render.render(copy.deepcopy(data)), render.render(copy.deepcopy(data)))
 
+    def test_render_without_release_does_not_claim_hub_publication(self) -> None:
+        data = render.load_vars(FIXTURES / "kernel.card.yaml")
+        data.pop("release", None)
+        self.assertNotIn("release", data)
+        text = render.render(data)
+        self.assertIn("Rendering this card does not establish Hub publication.", text)
+        self.assertNotIn("committed mirror workflow", text)
+
     def test_source_sha_is_stamped_in_front_matter_and_marker(self) -> None:
         data = render.load_vars(FIXTURES / "space.card.yaml")
         text = render.render(data, source_sha=SHA)
