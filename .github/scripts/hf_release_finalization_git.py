@@ -6,6 +6,7 @@ This adapter permanently replaces the unsupported ``repo_type='kernel'`` path in
 in the reviewed controller; first-class Kernel card/contract publication is
 performed only by :class:`kernel_hub_git.KernelHubGitTransport`.
 """
+
 from __future__ import annotations
 
 import io
@@ -31,7 +32,9 @@ class KernelGitFinalizer(retry.RetryingFinalizer):
         **kwargs: Any,
     ) -> None:
         super().__init__(*args, **kwargs)
-        self.kernel_transport = kernel_transport or KernelHubGitTransport(token=self.token)
+        self.kernel_transport = kernel_transport or KernelHubGitTransport(
+            token=self.token
+        )
 
     def _runtime(self) -> dict[str, str]:
         import numpy
@@ -55,7 +58,9 @@ class KernelGitFinalizer(retry.RetryingFinalizer):
             revision = self.kernel_transport.snapshot(repo_id).revision
             source = "authenticated-kernel-hub-git-fallback"
         if len(revision) != 40:
-            raise RuntimeError(f"Kernel metadata lacks an immutable revision: {repo_id}")
+            raise RuntimeError(
+                f"Kernel metadata lacks an immutable revision: {repo_id}"
+            )
         return revision, source
 
     @staticmethod
@@ -95,7 +100,9 @@ class KernelGitFinalizer(retry.RetryingFinalizer):
         source_dir = self.roots[spec["source_root"]] / spec["source_dir"]
         for filename in ("README.md", "contract.json"):
             if not (source_dir / filename).is_file():
-                raise RuntimeError(f"Kernel source contract is incomplete: {source_dir}")
+                raise RuntimeError(
+                    f"Kernel source contract is incomplete: {source_dir}"
+                )
 
         metadata_before, metadata_source = self._kernel_metadata_revision(repo_id)
 
@@ -104,7 +111,9 @@ class KernelGitFinalizer(retry.RetryingFinalizer):
                 repo_id=repo_id,
                 source_dir=source_dir,
                 metadata_revision=metadata_before,
-                metadata_revision_after=lambda: self._kernel_metadata_revision(repo_id)[0],
+                metadata_revision_after=lambda: self._kernel_metadata_revision(repo_id)[
+                    0
+                ],
                 generation=self.generation,
             )
             action_status = "updated" if publication.changed else "validated"
@@ -180,18 +189,24 @@ class KernelGitFinalizer(retry.RetryingFinalizer):
         for item in report.get("results", {}).get("kernels", {}).values():
             if isinstance(item, dict):
                 item["revision"] = item.get("after_sha") or item.get("revision")
-        report["boundaries"] = [
-            "Datasets use supported huggingface_hub dataset APIs only.",
+        boundaries = list(report.get("boundaries") or [])
+        for boundary in [
+            legacy.PROVIDER_SCOPE_BOUNDARY,
             "First-class Kernels use credential-safe authenticated Git.",
             "Generic repository helpers are never called with repo_type=kernel.",
             "Only README.md and contract.json may change in Kernel repositories.",
             "The complete Kernel build tree and immutable revision binding are verified.",
             "No model, Space, visibility, hardware, training, weight, qualification, or promotion state is mutated.",
-        ]
+        ]:
+            if boundary not in boundaries:
+                boundaries.append(boundary)
+        report["boundaries"] = boundaries
         return report
 
     def publish_evidence(self, report: dict[str, Any]) -> None:
-        rendered = (json.dumps(report, indent=2, sort_keys=True, default=str) + "\n").encode()
+        rendered = (
+            json.dumps(report, indent=2, sort_keys=True, default=str) + "\n"
+        ).encode()
         output = Path("reports/hf-release-finalization-latest.json")
         output.parent.mkdir(parents=True, exist_ok=True)
         output.write_bytes(rendered)
@@ -199,7 +214,9 @@ class KernelGitFinalizer(retry.RetryingFinalizer):
         if not self.publish:
             return
         if not self.api.repo_exists(legacy.EVIDENCE_DATASET, repo_type="dataset"):
-            raise RuntimeError(f"evidence dataset is missing: {legacy.EVIDENCE_DATASET}")
+            raise RuntimeError(
+                f"evidence dataset is missing: {legacy.EVIDENCE_DATASET}"
+            )
         timestamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
         for destination in (
             "release-finalization-v2/latest.json",
