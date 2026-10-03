@@ -37,6 +37,11 @@ jobs:
       - name: HF card reconciliation contract self-test
         run: python3 -I -P .github/scripts/test_hf_card_reconcile.py
 
+      - name: HF model evidence policy regressions
+        run: |
+          python3 -m pip install --disable-pip-version-check --require-hashes --only-binary=:all: -r requirements/hf-model-evidence.lock
+          python3 -I -B .github/scripts/test_hf_model_evidence_audit.py
+
       # Pins the org-wide DOCTRINE honesty gate — the single most load-bearing
       # check in the org, and (until now) the ONLY guard with no self-test.
       # Its logic used to be inline LINE-BASED bash grep: a cosmetic 2-line

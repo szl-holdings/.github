@@ -1,0 +1,141 @@
+name: HF Model Evidence Audit
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - .github/scripts/hf_model_evidence_audit.py
+      - .github/scripts/test_hf_model_evidence_audit.py
+      - .github/workflows/hf-model-evidence-audit.yml
+      - requirements/hf-model-evidence.lock
+      - huggingface/MODEL_RELEASE_EVIDENCE.md
+  push:
+    branches: [main]
+    paths:
+      - .github/scripts/hf_model_evidence_audit.py
+      - .github/scripts/test_hf_model_evidence_audit.py
+      - .github/workflows/hf-model-evidence-audit.yml
+      - requirements/hf-model-evidence.lock
+      - huggingface/MODEL_RELEASE_EVIDENCE.md
+  schedule:
+    - cron: "17 9 * * *"
+  workflow_dispatch: {}
+  merge_group:
+    types: [checks_requested]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: hf-model-evidence-${{ github.event_name == 'pull_request' && github.event.pull_request.number || 'live' }}
+  cancel-in-progress: false
+
+jobs:
+  verify:
+    name: Model evidence policy regressions
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12.10"
+      - name: Install hash-locked YAML parser
+        run: |
+          python -m pip install --disable-pip-version-check --require-hashes --only-binary=:all: -r requirements/hf-model-evidence.lock
+      - name: Verify policy behavior without network calls
+        run: |
+          set -euo pipefail
+          python -I -B .github/scripts/test_hf_model_evidence_audit.py
+          git diff --check
+
+  audit:
+    name: Public immutable Hub evidence
+    if: github.event_name != 'pull_request' && github.event_name != 'merge_group'
+    needs: verify
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      issues: write
+    env:
+      REPORT_JSON: reports/hf-model-evidence-latest.json
+      REPORT_MD: reports/hf-model-evidence-latest.md
+      REPORT_ISSUE_TITLE: "[hf-model-evidence] public artifact evidence gaps"
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12.10"
+      - name: Install hash-locked YAML parser
+        run: |
+          python -m pip install --disable-pip-version-check --require-hashes --only-binary=:all: -r requirements/hf-model-evidence.lock
+      - name: Collect public Hub revisions without credentials
+        id: audit
+        shell: bash
+        run: |
+          set +e
+          python -I -B .github/scripts/hf_model_evidence_audit.py \
+            --org SZLHOLDINGS --min-models 40 \
+            --require-structured-eval-for-weights --enforce \
+            --report "$REPORT_JSON" --markdown "$REPORT_MD"
+          code=$?
+          echo "exit_code=${code}" >> "$GITHUB_OUTPUT"
+          exit 0
+      - name: Upload audit evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: hf-model-evidence-${{ github.run_id }}
+          path: |
+            ${{ env.REPORT_JSON }}
+            ${{ env.REPORT_MD }}
+          if-no-files-found: error
+          retention-days: 90
+      - name: Record evidence gaps in one issue
+        if: always()
+        shell: bash
+        env:
+          EXIT_CODE: ${{ steps.audit.outputs.exit_code }}
+        run: |
+          set -euo pipefail
+          test -f "$REPORT_MD"
+          {
+            echo '<!-- szl-hf-model-evidence-audit -->'
+            echo "Run: ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
+            echo "Source revision: ${GITHUB_SHA}"
+            echo
+            cat "$REPORT_MD"
+          } > /tmp/hf-model-evidence-issue.md
+          issue_number="$(gh issue list --repo "$GITHUB_REPOSITORY" --state all \
+            --search "${REPORT_ISSUE_TITLE} in:title" --json number,title \
+            --jq '.[] | select(.title == env.REPORT_ISSUE_TITLE) | .number' | head -n1)"
+          if [ -z "$issue_number" ]; then
+            issue_url="$(gh issue create --repo "$GITHUB_REPOSITORY" \
+              --title "$REPORT_ISSUE_TITLE" --body-file /tmp/hf-model-evidence-issue.md)"
+            issue_number="${issue_url##*/}"
+          else
+            gh issue edit "$issue_number" --repo "$GITHUB_REPOSITORY" --body-file /tmp/hf-model-evidence-issue.md
+          fi
+          state="$(gh issue view "$issue_number" --repo "$GITHUB_REPOSITORY" --json state --jq .state)"
+          if [ "${EXIT_CODE:-2}" = "0" ] && [ "$state" = "OPEN" ]; then
+            gh issue close "$issue_number" --repo "$GITHUB_REPOSITORY" --reason completed
+          elif [ "${EXIT_CODE:-2}" != "0" ] && [ "$state" = "CLOSED" ]; then
+            gh issue reopen "$issue_number" --repo "$GITHUB_REPOSITORY"
+          fi
+      - name: Enforce collection result
+        if: always()
+        env:
+          EXIT_CODE: ${{ steps.audit.outputs.exit_code }}
+        run: |
+          code="${EXIT_CODE:-2}"
+          if [ "$code" -ne 0 ]; then
+            echo '::error::Public Hub evidence has gaps or collection was incomplete.'
+            exit "$code"
+          fi
+          echo 'Public evidence shape audit completed with no enforced findings.'
