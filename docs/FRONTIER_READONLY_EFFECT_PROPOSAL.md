@@ -16,7 +16,7 @@ read access; executable behavior is unchanged.
 | --- | --- |
 | `.github/scripts/frontier_payload/config.py` | `d9d2605f8bf324ca6f4e3f9c103f2710dc3c38ef02f317661ad96f5ac98d80ff` |
 | `.github/scripts/frontier_payload_readonly.py` | `71cdcd83a487c9ab8612edae6fae9747a5065c8551b5c89d6308bf7e519c92f9` |
-| `.github/scripts/test_frontier_payload_readonly.py` | `de4021b4730594340634c46521414f048ef22dbb9c3e7feb2dfcfc16f7e814f9` |
+| `.github/scripts/test_frontier_payload_readonly.py` | `13964208811ba20b25f84c4347c11739da16b4701bdb211d0736d44b46e6eb82` |
 | `.github/workflows/frontier-payload-convergence.yml` | `ee3b068f18ef04451c8839427cdacda79947891f3459cce2f2ea28894ed82308` |
 
 The workflow executes only these fixed entrypoints:
