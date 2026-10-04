@@ -14,30 +14,52 @@ import process from "node:process";
 import {
   classifyMeasurement,
   surfaceDisposition,
+  VIEWPORTS,
+  CORE_VIEWPORTS,
+  MIN_LINK_TARGET_PX,
+  MIN_PRIMARY_TARGET_PX,
 } from "./responsive_audit_policy_v31.mjs";
 
 const DECORATIVE_CLASS = /(?:^|[\s_-])(spectral|hologram|holo|aurora|glow|backdrop|background|noise|particle|beam|scanline|motif|decoration|ornament|ambient|orb)(?:$|[\s_-])/i;
 const ASSISTIVE_CLASS = /(?:^|[\s_-])(sr-only|screen-reader|visually-hidden|a11y-hidden)(?:$|[\s_-])/i;
 const PRIMARY_TAGS = new Set(["button", "input", "select", "textarea", "summary"]);
 const ACTIONABLE_TAGS = new Set([...PRIMARY_TAGS, "a"]);
+const PRESENTATIONAL_ROLES = new Set(["", "none", "presentation"]);
 
 function arg(name, fallback = null) {
   const index = process.argv.indexOf(name);
   return index >= 0 && process.argv[index + 1] ? process.argv[index + 1] : fallback;
 }
 
+function hasControlSemantics(item) {
+  return ACTIONABLE_TAGS.has(String(item.tag ?? "").toLowerCase())
+    || item.interactive === true || item.focusable === true
+    || item.hasInteractiveDescendant === true || item.contentEditable === true
+    || (Number.isInteger(item.tabIndex) && item.tabIndex >= 0)
+    || !PRESENTATIONAL_ROLES.has(String(item.role ?? "").trim().toLowerCase());
+}
+
+function observedNonInteractive(item) {
+  return !hasControlSemantics(item) && item.interactive === false
+    && item.focusable === false && item.hasInteractiveDescendant === false
+    && item.contentEditable === false && Number.isInteger(item.tabIndex) && item.tabIndex < 0
+    && Number.isFinite(item.width) && item.width > 0 && Number.isFinite(item.height) && item.height > 0;
+}
+
 function isAssistive(item) {
-  return ASSISTIVE_CLASS.test(String(item.className ?? ""));
+  return observedNonInteractive(item) && item.intentionallyClipped === true
+    && ASSISTIVE_CLASS.test(String(item.className ?? ""))
+    && String(item.text ?? "").trim().length > 0;
 }
 
 function isDecorative(item) {
-  return DECORATIVE_CLASS.test(`${item.id ?? ""} ${item.className ?? ""}`)
-    && !ACTIONABLE_TAGS.has(String(item.tag ?? "").toLowerCase());
+  return observedNonInteractive(item) && item.ariaHidden === true
+    && String(item.text ?? "").trim().length === 0
+    && DECORATIVE_CLASS.test(`${item.id ?? ""} ${item.className ?? ""}`);
 }
 
 function isActionable(item) {
-  const tag = String(item.tag ?? "").toLowerCase();
-  return ACTIONABLE_TAGS.has(tag) || String(item.text ?? "").trim().length > 0;
+  return hasControlSemantics(item) || String(item.text ?? "").trim().length > 0;
 }
 
 function splitOffscreen(items = []) {
@@ -62,14 +84,15 @@ function splitOffscreen(items = []) {
 function splitFixed(items = []) {
   const actionableFixedOversize = [];
   const decorativeFixedOversize = [];
+  const assistiveClipping = [];
+  const unclassifiedFixedOversize = [];
   for (const item of items) {
-    if (isAssistive(item) || isDecorative(item) || !isActionable(item)) {
-      decorativeFixedOversize.push(item);
-    } else {
-      actionableFixedOversize.push(item);
-    }
+    if (isAssistive(item)) assistiveClipping.push(item);
+    else if (isDecorative(item)) decorativeFixedOversize.push(item);
+    else if (isActionable(item)) actionableFixedOversize.push(item);
+    else unclassifiedFixedOversize.push(item);
   }
-  return { actionableFixedOversize, decorativeFixedOversize };
+  return { actionableFixedOversize, decorativeFixedOversize, assistiveClipping, unclassifiedFixedOversize };
 }
 
 function splitTargets(items = []) {
@@ -78,12 +101,16 @@ function splitTargets(items = []) {
   const advisorySmallLinks = [];
   for (const item of items) {
     const tag = String(item.tag ?? "").toLowerCase();
-    const width = Number(item.width ?? 0);
-    const height = Number(item.height ?? 0);
-    if (tag === "a") {
-      if (width < 23.5 || height < 23.5) undersizedLinkTargets.push(item);
-      else advisorySmallLinks.push(item);
-    } else if (PRIMARY_TAGS.has(tag) || tag) {
+    const { width, height } = item;
+    // An anchor exposed as a button or tab retains the primary-control floor.
+    const link = tag === "a" && item.primaryControl === false
+      && ["", "link"].includes(String(item.role ?? "").toLowerCase());
+    if (!Number.isFinite(width) || !Number.isFinite(height) || width <= 0 || height <= 0) {
+      undersizedPrimaryTargets.push(item);
+    } else if (link) {
+      if (width < MIN_LINK_TARGET_PX || height < MIN_LINK_TARGET_PX) undersizedLinkTargets.push(item);
+      else if (width < MIN_PRIMARY_TARGET_PX || height < MIN_PRIMARY_TARGET_PX) advisorySmallLinks.push(item);
+    } else if (width < MIN_PRIMARY_TARGET_PX || height < MIN_PRIMARY_TARGET_PX) {
       undersizedPrimaryTargets.push(item);
     }
   }
@@ -91,14 +118,30 @@ function splitTargets(items = []) {
 }
 
 function normalizeViewport(row, pageErrorCount) {
-  const offscreen = splitOffscreen(row.offscreen ?? []);
-  const fixed = splitFixed(row.fixedOversize ?? []);
-  const targets = splitTargets(row.undersizedTargets ?? []);
+  if (!row || typeof row !== "object" || Array.isArray(row)) throw new TypeError("viewport measurement must be an object");
+  const measurementErrors = [];
+  if (!Number.isInteger(row.viewportWidth) || row.viewportWidth !== row.width) {
+    measurementErrors.push({ code: "OBSERVED_VIEWPORT_WIDTH_MISMATCH" });
+  }
+  function observations(field) {
+    if (!Array.isArray(row[field]) || row[field].some((item) => !item || typeof item !== "object" || Array.isArray(item))) {
+      measurementErrors.push({ code: "RAW_MEASUREMENT_ARRAY_UNAVAILABLE", field });
+      return [];
+    }
+    return row[field];
+  }
+  const offscreen = splitOffscreen(observations("offscreen"));
+  const fixed = splitFixed(observations("fixedOversize"));
+  const targets = splitTargets(observations("undersizedTargets"));
+  const clippedText = observations("clippedText");
   const measurement = {
     ...row,
     ...offscreen,
     ...fixed,
     ...targets,
+    assistiveClipping: [...offscreen.assistiveClipping, ...fixed.assistiveClipping],
+    clippedText,
+    measurementErrors,
     pageErrorCount,
   };
   const policy = classifyMeasurement(measurement);
@@ -111,18 +154,33 @@ function normalizeViewport(row, pageErrorCount) {
 }
 
 function normalizeSurface(surface) {
-  const pageErrorsByViewport = new Map();
-  for (const item of surface.pageErrors ?? []) {
-    const name = String(item.viewport ?? "unknown");
-    pageErrorsByViewport.set(name, (pageErrorsByViewport.get(name) ?? 0) + 1);
+  if (!surface || typeof surface !== "object" || !["core", "space"].includes(surface.kind)) {
+    throw new TypeError("surface must declare its core or space viewport assignment");
   }
-  const viewports = (surface.viewports ?? []).map((row) =>
+  const expectedViewports = surface.kind === "core" ? CORE_VIEWPORTS : VIEWPORTS;
+  const expectedNames = new Set(expectedViewports.map((row) => row.name));
+  const failures = [];
+  const pageErrorsByViewport = new Map();
+  if (!Array.isArray(surface.pageErrors)) {
+    failures.push({ code: "PAGE_ERRORS_UNAVAILABLE" });
+  } else {
+    for (const item of surface.pageErrors) {
+      const name = String(item?.viewport ?? "unknown");
+      if (!expectedNames.has(name)) failures.push({ code: "UNASSIGNED_PAGE_RUNTIME_ERROR", viewport: name });
+      pageErrorsByViewport.set(name, (pageErrorsByViewport.get(name) ?? 0) + 1);
+    }
+  }
+  if (!Array.isArray(surface.errors)) failures.push({ code: "BROWSER_ERRORS_UNAVAILABLE" });
+  else if (surface.errors.length) failures.push({ code: "SURFACE_BROWSER_PROBE_ERROR", count: surface.errors.length });
+  if (!Array.isArray(surface.viewports)) failures.push({ code: "VIEWPORT_MEASUREMENTS_UNAVAILABLE" });
+  const viewports = (Array.isArray(surface.viewports) ? surface.viewports : []).map((row) =>
     normalizeViewport(row, pageErrorsByViewport.get(String(row.name)) ?? 0),
   );
   const disposition = surfaceDisposition(viewports, {
     runtimeStage: surface.stage ?? "UNKNOWN",
     availability: "RAW_PUBLIC_PROBE",
-  });
+    failures,
+  }, expectedViewports);
   return {
     ...surface,
     ...disposition,
@@ -146,10 +204,10 @@ function escapeHtml(value) {
 
 function htmlReport(report) {
   const rows = report.surfaces.map((surface) => {
-    const failures = [];
+    const failures = surface.failures.map((item) => escapeHtml(`${item.code}${item.viewport ? `: ${item.viewport}` : ""}`));
     for (const viewport of surface.viewports) {
       const codes = (viewport.failures ?? []).map((item) => item.code);
-      if (codes.length) failures.push(`${viewport.name}: ${codes.join(", ")}`);
+      if (codes.length) failures.push(escapeHtml(`${viewport.name}: ${codes.join(", ")}`));
     }
     return `<tr><td>${escapeHtml(surface.id)}</td><td>${escapeHtml(surface.sdk || surface.role || "")}</td><td class="${surface.pass ? "pass" : "fail"}">${surface.pass ? "PASS" : "FAIL"}</td><td>${escapeHtml(surface.stage || "")}</td><td>${failures.join("<br>") || "No actionable failures"}</td><td>${surface.warningCount}</td></tr>`;
   }).join("\n");
@@ -157,21 +215,44 @@ function htmlReport(report) {
 }
 
 export function normalizeReport(raw) {
-  if (!raw || typeof raw !== "object" || !Array.isArray(raw.surfaces)) {
-    throw new TypeError("raw responsive report must contain a surfaces array");
+  if (!raw || typeof raw !== "object" || raw.schema !== "szl.responsive-browser-audit/v3"
+      || !Array.isArray(raw.surfaces) || raw.surfaces.length === 0) {
+    throw new TypeError("raw v3 responsive report must contain a non-empty surfaces array");
+  }
+  const stamp = raw.observedAt;
+  if (typeof stamp !== "string" || !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,3})?Z$/.test(stamp)
+      || !Number.isFinite(Date.parse(stamp)) || new Date(stamp).toISOString().slice(0, 19) !== stamp.slice(0, 19)) {
+    throw new TypeError("raw report must preserve a valid observedAt UTC timestamp");
+  }
+  for (const [field, expected] of [["viewportContract", VIEWPORTS], ["coreViewportContract", CORE_VIEWPORTS]]) {
+    const supplied = raw[field];
+    if (!Array.isArray(supplied) || supplied.length !== expected.length
+        || supplied.some((row, index) => !row || ["name", "width", "height"].some((key) => row[key] !== expected[index][key]))) {
+      throw new TypeError(`raw ${field} does not match the assigned viewport contract`);
+    }
+  }
+  const ids = new Set();
+  for (const surface of raw.surfaces) {
+    if (typeof surface?.id !== "string" || !surface.id.trim() || ids.has(surface.id)) {
+      throw new TypeError("surface identities must be present and unique");
+    }
+    ids.add(surface.id);
+  }
+  if (raw.surfaceCount !== raw.surfaces.length) {
+    throw new TypeError("raw surfaceCount must match the measured surfaces");
   }
   const surfaces = raw.surfaces.map(normalizeSurface);
   return {
     schema: "szl.responsive-browser-audit/v3.1",
     sourceSchema: raw.schema ?? null,
-    observedAt: raw.observedAt ?? new Date().toISOString(),
+    observedAt: raw.observedAt,
     normalizedAt: new Date().toISOString(),
-    viewportContract: raw.viewportContract ?? [],
-    coreViewportContract: raw.coreViewportContract ?? [],
+    viewportContract: raw.viewportContract,
+    coreViewportContract: raw.coreViewportContract,
     policy: {
       decorativeOverflow: "WARNING",
       assistiveClipping: "WARNING",
-      nonActionableGeometryOverflow: "WARNING",
+      unclassifiedGeometryOverflow: "BLOCKING",
       actionableOffscreen: "BLOCKING",
       actionableFixedOversize: "BLOCKING",
       documentOverflowAboveTwoPixels: "BLOCKING",
