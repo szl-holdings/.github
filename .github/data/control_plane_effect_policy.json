@@ -2343,6 +2343,257 @@
           "WORKFLOW_ENVIRONMENT_REVIEW_REQUIRED@.github/workflows/frontier-payload-convergence.yml:163"
         ]
       }
+    },
+    ".github/workflows/hf-dataset-card-admission.yml": {
+      "intent_id": "hf-dataset-card-offline-admission-v1",
+      "valid_until": "2026-11-30",
+      "source_sha256": "sha256:7f8fb1523abe6f7469caab7be008c42c13ab858e77f4f90fb4e9b661fb647cf8",
+      "credentials": [],
+      "resources": [
+        {
+          "key": "github:repository:szl-holdings/.github:contents",
+          "access": "read"
+        },
+        {
+          "key": "runner:toolchain:python",
+          "access": "local-write"
+        }
+      ],
+      "effects": [
+        {
+          "sink": "github.contents.checkout",
+          "resource": "github:repository:szl-holdings/.github:contents",
+          "access": "read",
+          "max_calls": 1
+        },
+        {
+          "sink": "runner.toolchain.install",
+          "resource": "runner:toolchain:python",
+          "access": "local-write",
+          "max_calls": 1
+        }
+      ],
+      "max_external_writes": 0,
+      "required_controls": {
+        "triggers": [
+          "pull_request"
+        ],
+        "contents_read": true,
+        "no_explicit_secrets": true,
+        "concurrency": false,
+        "protected_ref": false,
+        "exact_sha": false,
+        "expected_before": false,
+        "readback": false
+      },
+      "trusted_transitives": {},
+      "reviewed_unknowns": {
+        "files": {
+          ".github/scripts/hf_dataset_card_admission.py": "sha256:132136b859ce0b09f0f79c742e8fa4db58084e5d735dd0ab04396d42d8e7c187",
+          ".github/scripts/test_hf_dataset_card_admission.py": "sha256:da6b6d1f9dbda043fbc35b36ade5a6a8fc42404a9e155d1a646ecca76ac42eaf",
+          ".github/workflows/hf-dataset-card-admission.yml": "sha256:7f8fb1523abe6f7469caab7be008c42c13ab858e77f4f90fb4e9b661fb647cf8"
+        },
+        "unknowns": [
+          "ACTION_INPUTS_REVIEW_REQUIRED@.github/workflows/hf-dataset-card-admission.yml:20",
+          "ACTION_INPUTS_REVIEW_REQUIRED@.github/workflows/hf-dataset-card-admission.yml:24",
+          "PYTHON_DYNAMIC_EXECUTION@.github/scripts/hf_dataset_card_admission.py:19",
+          "PYTHON_DYNAMIC_EXECUTION@.github/scripts/hf_dataset_card_admission.py:89",
+          "PYTHON_IMPORT_UNRESOLVED@.github/scripts/hf_dataset_card_admission.py:3",
+          "PYTHON_IMPORT_UNRESOLVED@.github/scripts/hf_dataset_card_admission.py:8",
+          "PYTHON_IMPORT_UNRESOLVED@.github/scripts/test_hf_dataset_card_admission.py:10",
+          "PYTHON_IMPORT_UNRESOLVED@.github/scripts/test_hf_dataset_card_admission.py:4",
+          "PYTHON_IMPORT_UNRESOLVED@.github/scripts/test_hf_dataset_card_admission.py:5",
+          "PYTHON_IMPORT_UNRESOLVED@.github/scripts/test_hf_dataset_card_admission.py:6",
+          "PYTHON_IMPORT_UNRESOLVED@.github/scripts/test_hf_dataset_card_admission.py:7",
+          "PYTHON_SOURCE_REVIEW_REQUIRED@.github/scripts/hf_dataset_card_admission.py:1",
+          "PYTHON_SOURCE_REVIEW_REQUIRED@.github/scripts/test_hf_dataset_card_admission.py:1",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-dataset-card-admission.yml:26",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-dataset-card-admission.yml:28",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-dataset-card-admission.yml:30"
+        ]
+      }
+    },
+    ".github/workflows/recover-nexus-target.yml": {
+      "intent_id": "nexus-exact-public-target-owner-recovery-v1",
+      "valid_until": "2026-11-30",
+      "source_sha256": "sha256:660fd09591e83f5697d7f7879a971dc179a68920d8ea866daec8e05dda6319cc",
+      "credentials": [
+        "HF_ORG_TOKEN",
+        "HF_ORG_TOKEN1",
+        "HF_WRITE_TOKEN",
+        "HF_TOKEN"
+      ],
+      "resources": [
+        {
+          "key": "github:actions:artifact:nexus-target-recovery",
+          "access": "external-write"
+        },
+        {
+          "key": "github:repository:szl-holdings/.github:contents",
+          "access": "read"
+        },
+        {
+          "key": "huggingface:space:SZLHOLDINGS/nexus",
+          "access": "external-write"
+        },
+        {
+          "key": "runner:guard:egress",
+          "access": "local-write"
+        },
+        {
+          "key": "runner:toolchain:python",
+          "access": "local-write"
+        },
+        {
+          "key": "stepsecurity:monitor:szl-holdings/.github",
+          "access": "external-write"
+        }
+      ],
+      "effects": [
+        {
+          "sink": "github.artifact.upload",
+          "resource": "github:actions:artifact:nexus-target-recovery",
+          "access": "external-write",
+          "max_calls": 1
+        },
+        {
+          "sink": "github.contents.checkout",
+          "resource": "github:repository:szl-holdings/.github:contents",
+          "access": "read",
+          "max_calls": 2
+        },
+        {
+          "sink": "runner.guard.configure",
+          "resource": "runner:guard:egress",
+          "access": "local-write",
+          "max_calls": 2
+        },
+        {
+          "sink": "runner.toolchain.install",
+          "resource": "runner:toolchain:python",
+          "access": "local-write",
+          "max_calls": 2
+        },
+        {
+          "sink": "sdk.repository.create",
+          "resource": "huggingface:space:SZLHOLDINGS/nexus",
+          "access": "external-write",
+          "max_calls": 1
+        },
+        {
+          "sink": "runner.guard.telemetry",
+          "resource": "stepsecurity:monitor:szl-holdings/.github",
+          "access": "external-write",
+          "max_calls": 2
+        }
+      ],
+      "max_external_writes": 4,
+      "required_controls": {
+        "triggers": [
+          "pull_request",
+          "workflow_dispatch"
+        ],
+        "contents_read": true,
+        "no_explicit_secrets": false,
+        "concurrency": true,
+        "protected_ref": true,
+        "exact_sha": true,
+        "expected_before": false,
+        "readback": false
+      },
+      "trusted_transitives": {},
+      "reviewed_unknowns": {
+        "files": {
+          ".github/data/hf-space-lifecycle-policy.json": "sha256:f4e6d68427fd240d682b9f01a41adace5859abebe12ec5b27eabc11abb46f4fd",
+          ".github/data/nexus-target-bootstrap-authorization.json": "sha256:a63fd8209dc961d3987ce80a8eb09440ffaf328fd1cc3b02993daa6a59a573c4",
+          ".github/scripts/recover_nexus_target.py": "sha256:d3de4b8de0fbe64fc2c2f8a123f62fb071ea2ce30a7d233288506618e523b35b",
+          ".github/scripts/test_recover_nexus_target.py": "sha256:c625577f08a65e390c1d2f4e16fbd2a10d19340ea239998c6896b6272617b22e",
+          ".github/workflows/recover-nexus-target.yml": "sha256:660fd09591e83f5697d7f7879a971dc179a68920d8ea866daec8e05dda6319cc"
+        },
+        "unknowns": [
+          "ACTION_INPUTS_REVIEW_REQUIRED@.github/workflows/recover-nexus-target.yml:128",
+          "ACTION_INPUTS_REVIEW_REQUIRED@.github/workflows/recover-nexus-target.yml:34",
+          "ACTION_INPUTS_REVIEW_REQUIRED@.github/workflows/recover-nexus-target.yml:39",
+          "ACTION_INPUTS_REVIEW_REQUIRED@.github/workflows/recover-nexus-target.yml:44",
+          "ACTION_INPUTS_REVIEW_REQUIRED@.github/workflows/recover-nexus-target.yml:61",
+          "ACTION_INPUTS_REVIEW_REQUIRED@.github/workflows/recover-nexus-target.yml:66",
+          "ACTION_INPUTS_REVIEW_REQUIRED@.github/workflows/recover-nexus-target.yml:72",
+          "PYTHON_DYNAMIC_EXECUTION@.github/scripts/recover_nexus_target.py:143",
+          "PYTHON_DYNAMIC_EXECUTION@.github/scripts/recover_nexus_target.py:144",
+          "PYTHON_DYNAMIC_EXECUTION@.github/scripts/recover_nexus_target.py:145",
+          "PYTHON_DYNAMIC_EXECUTION@.github/scripts/recover_nexus_target.py:150",
+          "PYTHON_DYNAMIC_EXECUTION@.github/scripts/recover_nexus_target.py:189",
+          "PYTHON_IMPORT_UNRESOLVED@.github/scripts/recover_nexus_target.py:10",
+          "PYTHON_IMPORT_UNRESOLVED@.github/scripts/recover_nexus_target.py:12",
+          "PYTHON_IMPORT_UNRESOLVED@.github/scripts/recover_nexus_target.py:15",
+          "PYTHON_IMPORT_UNRESOLVED@.github/scripts/recover_nexus_target.py:165",
+          "PYTHON_IMPORT_UNRESOLVED@.github/scripts/recover_nexus_target.py:18",
+          "PYTHON_IMPORT_UNRESOLVED@.github/scripts/test_recover_nexus_target.py:10",
+          "PYTHON_IMPORT_UNRESOLVED@.github/scripts/test_recover_nexus_target.py:3",
+          "PYTHON_IMPORT_UNRESOLVED@.github/scripts/test_recover_nexus_target.py:5",
+          "PYTHON_SOURCE_REVIEW_REQUIRED@.github/scripts/recover_nexus_target.py:1",
+          "PYTHON_SOURCE_REVIEW_REQUIRED@.github/scripts/test_recover_nexus_target.py:1",
+          "SCRIPT_SOURCE_REVIEW_REQUIRED@.github/workflows/recover-nexus-target.yml:1",
+          "SDK_TARGET_UNRESOLVED@.github/scripts/recover_nexus_target.py:204",
+          "SECRET_EXPRESSION_REVIEW_REQUIRED@.github/workflows/recover-nexus-target.yml:1",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/recover-nexus-target.yml:100",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/recover-nexus-target.yml:101",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/recover-nexus-target.yml:112",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/recover-nexus-target.yml:113",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/recover-nexus-target.yml:114",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/recover-nexus-target.yml:115",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/recover-nexus-target.yml:116",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/recover-nexus-target.yml:117",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/recover-nexus-target.yml:118",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/recover-nexus-target.yml:119",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/recover-nexus-target.yml:120",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/recover-nexus-target.yml:121",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/recover-nexus-target.yml:122",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/recover-nexus-target.yml:50",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/recover-nexus-target.yml:51",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/recover-nexus-target.yml:78",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/recover-nexus-target.yml:79",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/recover-nexus-target.yml:80",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/recover-nexus-target.yml:81",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/recover-nexus-target.yml:82",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/recover-nexus-target.yml:83",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/recover-nexus-target.yml:84",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/recover-nexus-target.yml:85",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/recover-nexus-target.yml:86",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/recover-nexus-target.yml:87",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/recover-nexus-target.yml:93",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/recover-nexus-target.yml:94",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/recover-nexus-target.yml:95",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/recover-nexus-target.yml:96",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/recover-nexus-target.yml:97",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/recover-nexus-target.yml:98",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/recover-nexus-target.yml:99",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/recover-nexus-target.yml:100",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/recover-nexus-target.yml:114",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/recover-nexus-target.yml:115",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/recover-nexus-target.yml:116",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/recover-nexus-target.yml:117",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/recover-nexus-target.yml:118",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/recover-nexus-target.yml:119",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/recover-nexus-target.yml:120",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/recover-nexus-target.yml:121",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/recover-nexus-target.yml:79",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/recover-nexus-target.yml:80",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/recover-nexus-target.yml:81",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/recover-nexus-target.yml:82",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/recover-nexus-target.yml:83",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/recover-nexus-target.yml:84",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/recover-nexus-target.yml:85",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/recover-nexus-target.yml:86",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/recover-nexus-target.yml:93",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/recover-nexus-target.yml:94",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/recover-nexus-target.yml:95",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/recover-nexus-target.yml:96",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/recover-nexus-target.yml:98",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/recover-nexus-target.yml:99",
+          "WORKFLOW_ENVIRONMENT_REVIEW_REQUIRED@.github/workflows/recover-nexus-target.yml:106"
+        ]
+      }
     }
   }
 }

@@ -1,0 +1,10 @@
+{
+  "schema": "szl.hf.nexus-target-bootstrap-authorization.v1",
+  "target": "SZLHOLDINGS/nexus",
+  "repo_type": "space",
+  "space_sdk": "docker",
+  "visibility": "public",
+  "scope": "one-time-create-if-absent",
+  "lifecycle_create_boundary": "preserved-false",
+  "enabled": false
+}
