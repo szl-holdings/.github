@@ -1525,7 +1525,7 @@
           ".github/scripts/hf_org_card_embed_check.py": "sha256:3e413b8bd2261a4af771672c9e159bb5db5a87ee13685332f06eb21f71efd2cb",
           ".github/scripts/prepare_org_card_preview.py": "sha256:4d00ce1860ad4ce1d8e369a11765643836585593bbde89fd0fa86029b15b0018",
           ".github/scripts/public_front_door_check.py": "sha256:ecbcd45818e6b5ed291d512ee98ec0eef2deebf24a9270fd479d0626a0d3302d",
-          ".github/scripts/render_profile_inventory.py": "sha256:c505347b05e00332011f1ee180a77c8ab5d988dc9a59666e2c6a08a1a064c885",
+          ".github/scripts/render_profile_inventory.py": "sha256:bf665cb5fbb208a5b6f943abb938865ead901c068197f59b1012b6b9259f4451",
           ".github/scripts/test_hf_org_card_embed_check.py": "sha256:4aef83f6c4f0065cef17f0bad8a171e402ce49191f42611ef590c125c577d572",
           ".github/scripts/test_org_card_browser.py": "sha256:6fdbe4175fc5e636f5b512d29c8efb7897d7a6fd471c2a9adc941937a9313700",
           ".github/scripts/test_profile_inventory_contract.py": "sha256:3c9c79e14cce631e2d422bd7668420a50af9f1aefb459a4a54b582940097fb25",

@@ -146,7 +146,8 @@ def markdown(record: dict) -> str:
             'figures do not count unique projects or trained language models. '
             f'[Inventory binding]({BINDING_URL}) · [Exact source]({source_url(record)}) · '
             '[Current Hub listing](https://huggingface.co/SZLHOLDINGS). '
-            'Membership alone does not establish runtime readiness, model quality, or publication permission.')
+            'Hub inventory is registry evidence, not availability, operational readiness, or publication policy. '
+            'It does not establish model quality.')
 
 
 def static(record: dict) -> str:
