@@ -2140,6 +2140,209 @@
           "WORKFLOW_ENVIRONMENT_REVIEW_REQUIRED@.github/workflows/responsive-estate-v3.yml:35"
         ]
       }
+    },
+    ".github/workflows/frontier-payload-convergence.yml": {
+      "intent_id": "frontier-bounded-anonymous-readonly-v1",
+      "valid_until": "2026-11-30",
+      "source_sha256": "sha256:ee3b068f18ef04451c8839427cdacda79947891f3459cce2f2ea28894ed82308",
+      "credentials": [],
+      "resources": [
+        {
+          "key": "github:actions:artifact:frontier-payload-readonly-verification",
+          "access": "external-write"
+        },
+        {
+          "key": "github:repository:szl-holdings/.github:contents",
+          "access": "read"
+        },
+        {
+          "key": "public-get:https://a-11-oy.com/controller",
+          "access": "read"
+        },
+        {
+          "key": "public-get:https://a-11-oy.com/eu-ai-act",
+          "access": "read"
+        },
+        {
+          "key": "public-get:https://a-11-oy.com/spectral",
+          "access": "read"
+        },
+        {
+          "key": "public-get:https://a11oy.net/",
+          "access": "read"
+        },
+        {
+          "key": "public-get:https://api.github.com/repos/szl-holdings/a11oy/commits/main",
+          "access": "read"
+        },
+        {
+          "key": "public-get:https://api.github.com/repos/szl-holdings/david-leads",
+          "access": "read"
+        },
+        {
+          "key": "public-get:https://api.github.com/repos/szl-holdings/szl-atelier",
+          "access": "read"
+        },
+        {
+          "key": "public-get:https://gdw.a-11-oy.com/healthz",
+          "access": "read"
+        },
+        {
+          "key": "public-get:https://huggingface.co/spaces/SZLHOLDINGS/vessels/raw/main/README.md",
+          "access": "read"
+        },
+        {
+          "key": "public-get:https://raw.githubusercontent.com/szl-holdings/killinchu/main/docs/hf-cards/SZLHOLDINGS-vessels.README.md",
+          "access": "read"
+        },
+        {
+          "key": "public-get:https://szlholdings-a11oy.hf.space/api/build-info",
+          "access": "read"
+        },
+        {
+          "key": "public-get:https://szlholdings-a11oy.hf.space/api/livez",
+          "access": "read"
+        },
+        {
+          "key": "public-get:https://szlholdings-a11oy.hf.space/eu-ai-act",
+          "access": "read"
+        },
+        {
+          "key": "public-get:https://szlholdings-killinchu.hf.space/",
+          "access": "read"
+        },
+        {
+          "key": "runner:guard:egress",
+          "access": "local-write"
+        },
+        {
+          "key": "runner:toolchain:python",
+          "access": "local-write"
+        }
+      ],
+      "effects": [
+        {
+          "sink": "github.artifact.upload",
+          "resource": "github:actions:artifact:frontier-payload-readonly-verification",
+          "access": "external-write",
+          "max_calls": 1
+        },
+        {
+          "sink": "github.contents.checkout",
+          "resource": "github:repository:szl-holdings/.github:contents",
+          "access": "read",
+          "max_calls": 2
+        },
+        {
+          "sink": "runner.guard.configure",
+          "resource": "runner:guard:egress",
+          "access": "local-write",
+          "max_calls": 2
+        },
+        {
+          "sink": "runner.toolchain.install",
+          "resource": "runner:toolchain:python",
+          "access": "local-write",
+          "max_calls": 2
+        }
+      ],
+      "max_external_writes": 1,
+      "required_controls": {
+        "triggers": [
+          "merge_group",
+          "pull_request",
+          "push",
+          "schedule",
+          "workflow_dispatch"
+        ],
+        "contents_read": true,
+        "no_explicit_secrets": true,
+        "concurrency": true,
+        "protected_ref": true,
+        "exact_sha": true,
+        "expected_before": false,
+        "readback": false
+      },
+      "trusted_transitives": {},
+      "reviewed_unknowns": {
+        "files": {
+          ".github/scripts/frontier_payload/config.py": "sha256:d9d2605f8bf324ca6f4e3f9c103f2710dc3c38ef02f317661ad96f5ac98d80ff",
+          ".github/scripts/frontier_payload_readonly.py": "sha256:71cdcd83a487c9ab8612edae6fae9747a5065c8551b5c89d6308bf7e519c92f9",
+          ".github/scripts/test_frontier_payload_readonly.py": "sha256:de4021b4730594340634c46521414f048ef22dbb9c3e7feb2dfcfc16f7e814f9",
+          ".github/workflows/frontier-payload-convergence.yml": "sha256:ee3b068f18ef04451c8839427cdacda79947891f3459cce2f2ea28894ed82308"
+        },
+        "unknowns": [
+          "ACTION_INPUTS_REVIEW_REQUIRED@.github/workflows/frontier-payload-convergence.yml:58",
+          "ACTION_INPUTS_REVIEW_REQUIRED@.github/workflows/frontier-payload-convergence.yml:63",
+          "ACTION_INPUTS_REVIEW_REQUIRED@.github/workflows/frontier-payload-convergence.yml:70",
+          "ACTION_INPUTS_REVIEW_REQUIRED@.github/workflows/frontier-payload-convergence.yml:99",
+          "ACTION_INPUTS_REVIEW_REQUIRED@.github/workflows/frontier-payload-convergence.yml:116",
+          "ACTION_INPUTS_REVIEW_REQUIRED@.github/workflows/frontier-payload-convergence.yml:123",
+          "ACTION_INPUTS_REVIEW_REQUIRED@.github/workflows/frontier-payload-convergence.yml:152",
+          "HTTP_TARGET_UNRESOLVED@.github/scripts/frontier_payload_readonly.py:104",
+          "PYTHON_DYNAMIC_SUBPROCESS@.github/scripts/test_frontier_payload_readonly.py:63",
+          "PYTHON_IMPORT_UNRESOLVED@.github/scripts/frontier_payload/config.py:2",
+          "PYTHON_IMPORT_UNRESOLVED@.github/scripts/frontier_payload/config.py:4",
+          "PYTHON_IMPORT_UNRESOLVED@.github/scripts/frontier_payload_readonly.py:9",
+          "PYTHON_IMPORT_UNRESOLVED@.github/scripts/frontier_payload_readonly.py:11",
+          "PYTHON_IMPORT_UNRESOLVED@.github/scripts/frontier_payload_readonly.py:12",
+          "PYTHON_IMPORT_UNRESOLVED@.github/scripts/frontier_payload_readonly.py:15",
+          "PYTHON_IMPORT_UNRESOLVED@.github/scripts/frontier_payload_readonly.py:17",
+          "PYTHON_IMPORT_UNRESOLVED@.github/scripts/frontier_payload_readonly.py:19",
+          "PYTHON_IMPORT_UNRESOLVED@.github/scripts/frontier_payload_readonly.py:20",
+          "PYTHON_IMPORT_UNRESOLVED@.github/scripts/frontier_payload_readonly.py:21",
+          "PYTHON_IMPORT_UNRESOLVED@.github/scripts/test_frontier_payload_readonly.py:5",
+          "PYTHON_IMPORT_UNRESOLVED@.github/scripts/test_frontier_payload_readonly.py:12",
+          "PYTHON_SOURCE_REVIEW_REQUIRED@.github/scripts/frontier_payload/config.py:1",
+          "PYTHON_SOURCE_REVIEW_REQUIRED@.github/scripts/frontier_payload_readonly.py:1",
+          "PYTHON_SOURCE_REVIEW_REQUIRED@.github/scripts/test_frontier_payload_readonly.py:1",
+          "SCRIPT_SOURCE_REVIEW_REQUIRED@.github/workflows/frontier-payload-convergence.yml:1",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/frontier-payload-convergence.yml:76",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/frontier-payload-convergence.yml:77",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/frontier-payload-convergence.yml:78",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/frontier-payload-convergence.yml:79",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/frontier-payload-convergence.yml:80",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/frontier-payload-convergence.yml:81",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/frontier-payload-convergence.yml:108",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/frontier-payload-convergence.yml:109",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/frontier-payload-convergence.yml:110",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/frontier-payload-convergence.yml:111",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/frontier-payload-convergence.yml:129",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/frontier-payload-convergence.yml:130",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/frontier-payload-convergence.yml:136",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/frontier-payload-convergence.yml:137",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/frontier-payload-convergence.yml:138",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/frontier-payload-convergence.yml:139",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/frontier-payload-convergence.yml:140",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/frontier-payload-convergence.yml:141",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/frontier-payload-convergence.yml:146",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/frontier-payload-convergence.yml:165",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/frontier-payload-convergence.yml:166",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/frontier-payload-convergence.yml:167",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/frontier-payload-convergence.yml:168",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/frontier-payload-convergence.yml:169",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/frontier-payload-convergence.yml:170",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/frontier-payload-convergence.yml:76",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/frontier-payload-convergence.yml:77",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/frontier-payload-convergence.yml:78",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/frontier-payload-convergence.yml:108",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/frontier-payload-convergence.yml:129",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/frontier-payload-convergence.yml:130",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/frontier-payload-convergence.yml:137",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/frontier-payload-convergence.yml:138",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/frontier-payload-convergence.yml:140",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/frontier-payload-convergence.yml:141",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/frontier-payload-convergence.yml:146",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/frontier-payload-convergence.yml:165",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/frontier-payload-convergence.yml:166",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/frontier-payload-convergence.yml:167",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/frontier-payload-convergence.yml:169",
+          "WORKFLOW_ENVIRONMENT_REVIEW_REQUIRED@.github/workflows/frontier-payload-convergence.yml:44",
+          "WORKFLOW_ENVIRONMENT_REVIEW_REQUIRED@.github/workflows/frontier-payload-convergence.yml:94",
+          "WORKFLOW_ENVIRONMENT_REVIEW_REQUIRED@.github/workflows/frontier-payload-convergence.yml:104",
+          "WORKFLOW_ENVIRONMENT_REVIEW_REQUIRED@.github/workflows/frontier-payload-convergence.yml:163"
+        ]
+      }
     }
   }
 }

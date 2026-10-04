@@ -202,7 +202,12 @@ def test_entrypoint_imports_under_isolated_safe_path() -> None:
 
 def test_workflow_contract_is_pinned_and_visibility_safe() -> None:
     workflow = (ROOT / ".github" / "workflows" / "frontier-payload-convergence.yml").read_text()
-    assert "huggingface_hub==1.19.0" in workflow
+    assert "python -I -P .github/scripts/frontier_payload_readonly.py" in workflow
+    assert "huggingface_hub" not in workflow
+    assert "secrets." not in workflow
+    assert "--apply" not in workflow and "--dispatch-controls" not in workflow
+    assert "OPERATIONAL_EFFECTS_HELD" in workflow
+    assert workflow.count("default: false") == 2
     assert "update_repo_visibility" not in workflow
     assert "private=False" not in workflow
     assert "retention-days: 90" in workflow
