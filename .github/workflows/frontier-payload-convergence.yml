@@ -1,44 +1,41 @@
 # Copyright 2026 SZL Holdings — SPDX-License-Identifier: Apache-2.0
-name: Frontier payload convergence
+name: Frontier payload read-only verification
 
 on:
   pull_request:
     branches: [main]
     paths:
-      - ".github/scripts/frontier_payload/**"
-      - ".github/scripts/frontier_payload_convergence.py"
+      - ".github/scripts/frontier_payload/config.py"
       - ".github/workflows/frontier-payload-convergence.yml"
-      - "tests/test_frontier_payload_convergence.py"
+      - ".github/scripts/test_frontier_payload_readonly.py"
+      - ".github/scripts/frontier_payload_readonly.py"
       - "docs/frontier/SZL_FRONTIER_PAYLOAD_2026-09-03.md"
   push:
     branches: [main]
     paths:
-      - ".github/scripts/frontier_payload/**"
-      - ".github/scripts/frontier_payload_convergence.py"
+      - ".github/scripts/frontier_payload/config.py"
       - ".github/workflows/frontier-payload-convergence.yml"
-      - "tests/test_frontier_payload_convergence.py"
+      - ".github/scripts/test_frontier_payload_readonly.py"
+      - ".github/scripts/frontier_payload_readonly.py"
       - "docs/frontier/SZL_FRONTIER_PAYLOAD_2026-09-03.md"
+  merge_group:
   schedule:
     - cron: "47 * * * *"
   workflow_dispatch:
     inputs:
       apply:
-        description: "Apply exact HF card, metadata, and native-workflow controls"
+        description: "HELD: mutation requires a separately admitted effect contract"
         required: false
         type: boolean
-        default: true
+        default: false
       dispatch_controls:
-        description: "Dispatch existing A11oy, CodeQL, and Nemo status workflows"
+        description: "HELD: dispatch requires a separately admitted effect contract"
         required: false
         type: boolean
-        default: true
-      enforce_ready:
-        description: "Fail unless all critical public probes and source parity pass"
-        required: false
-        type: boolean
-        default: true
+        default: false
 
-permissions: read-all
+permissions:
+  contents: read
 concurrency:
   group: frontier-payload-convergence-${{ github.event_name }}
   cancel-in-progress: false
@@ -51,8 +48,123 @@ jobs:
   contract:
     permissions:
       contents: read
+    name: Prove mutation and evidence boundaries
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Harden runner
+        uses: step-security/harden-runner@e14015d583714f6e62063499dc959a02595150a1 # v2.21.1
+        with:
+          egress-policy: audit
+
+      - name: Check out exact candidate
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.event.merge_group.head_sha || github.sha }}
+          persist-credentials: false
+          fetch-depth: 1
+
+      - name: Set up exact Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12.10"
+
+      - name: Compile and run public read-only contracts
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -I -P -m py_compile \
+            .github/scripts/frontier_payload_readonly.py \
+            .github/scripts/frontier_payload/config.py \
+            .github/scripts/test_frontier_payload_readonly.py
+          python -I -P .github/scripts/test_frontier_payload_readonly.py
+          git diff --check
+
   converge:
     permissions:
-      actions: write
       contents: read
-      issues: write
+    name: Verify public payload state with operational effects held
+    if: github.event_name != 'pull_request' && github.event_name != 'merge_group' && github.ref == 'refs/heads/main'
+    needs: contract
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    # The verifier receives no provider/GitHub credential. Checkout retains only
+    # its declared read access and does not persist credentials.
+    env:
+      HF_HUB_DISABLE_IMPLICIT_TOKEN: "1"
+    steps:
+      - name: Harden runner
+        uses: step-security/harden-runner@e14015d583714f6e62063499dc959a02595150a1 # v2.21.1
+        with:
+          egress-policy: audit
+
+      - name: Reject unqualified operational requests
+        shell: bash
+        env:
+          INPUT_APPLY: ${{ inputs.apply }}
+          INPUT_DISPATCH: ${{ inputs.dispatch_controls }}
+        run: |
+          set -euo pipefail
+          if [ "${INPUT_APPLY:-false}" = 'true' ] || [ "${INPUT_DISPATCH:-false}" = 'true' ]; then
+            echo '::error::OPERATIONAL_EFFECTS_HELD: a separately reviewed native effect contract is required.'
+            exit 2
+          fi
+
+      - name: Check out protected control plane
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.event.merge_group.head_sha || github.sha }}
+          persist-credentials: false
+          fetch-depth: 1
+
+      - name: Set up exact Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12.10"
+
+      - name: Verify protected source checkout
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$GITHUB_REF" = 'refs/heads/main'
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+
+      - name: Execute bounded read-only verification
+        id: converge
+        shell: bash
+        run: |
+          set +e
+          python -I -P .github/scripts/frontier_payload_readonly.py \
+            --report "$REPORT_PATH" --summary "$SUMMARY_PATH"
+          code=$?
+          echo "exit_code=$code" >> "$GITHUB_OUTPUT"
+          exit "$code"
+
+      - name: Publish exact summary
+        if: always()
+        shell: bash
+        run: cat "$SUMMARY_PATH" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload immutable convergence evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: frontier-payload-readonly-verification
+          path: |
+            ${{ env.REPORT_PATH }}
+            ${{ env.SUMMARY_PATH }}
+          if-no-files-found: error
+          retention-days: 90
+
+      - name: Enforce public verification result
+        if: always()
+        shell: bash
+        env:
+          VERIFICATION_EXIT_CODE: ${{ steps.converge.outputs.exit_code }}
+        run: |
+          code="${VERIFICATION_EXIT_CODE}"
+          test -n "$code"
+          if [ "$code" -ne 0 ]; then
+            echo "::error::Frontier payload has an actionable block or readiness proof has not converged."
+            exit "$code"
+          fi
