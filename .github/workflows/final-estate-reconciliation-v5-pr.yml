@@ -6,6 +6,8 @@ on:
     paths:
       - .github/scripts/final_estate_reconciliation_v5.py
       - .github/scripts/final_estate_v5_core.py
+      - .github/scripts/final_estate_v5_artifacts.py
+      - .github/scripts/test_final_estate_v5_artifacts.py
       - .github/scripts/final_estate_v5_inventory.py
       - .github/scripts/test_final_estate_v5_inventory.py
       - .github/scripts/final_estate_v5_evidence.py
@@ -15,9 +17,6 @@ on:
       - .github/scripts/test_final_estate_v5_upstream.py
       - .github/workflows/final-estate-reconciliation-v5.yml
       - .github/workflows/final-estate-reconciliation-v5-pr.yml
-      - .github/scripts/final_estate_reconciliation_v4.py
-      - .github/scripts/test_final_estate_reconciliation_v4.py
-      - .github/workflows/final-estate-reconciliation-v4.yml
 
 permissions:
   contents: read
@@ -55,6 +54,8 @@ jobs:
           python -m py_compile \
             .github/scripts/final_estate_reconciliation_v5.py \
             .github/scripts/final_estate_v5_core.py \
+            .github/scripts/final_estate_v5_artifacts.py \
+            .github/scripts/test_final_estate_v5_artifacts.py \
             .github/scripts/final_estate_v5_inventory.py \
             .github/scripts/test_final_estate_v5_inventory.py \
             .github/scripts/final_estate_v5_evidence.py \
@@ -66,6 +67,7 @@ jobs:
           python .github/scripts/test_final_estate_v5_probes.py
           python .github/scripts/test_final_estate_v5_inventory.py
           python .github/scripts/test_final_estate_v5_upstream.py
+          python .github/scripts/test_final_estate_v5_artifacts.py
           git diff --check
 
       - name: Write immutable pull-request boundary evidence
@@ -100,7 +102,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: final-estate-reconciliation-v5-pr-${{ github.run_id }}
+          name: final-estate-reconciliation-v5-pr
           path: ${{ env.REPORT_PATH }}
           if-no-files-found: error
           retention-days: 30

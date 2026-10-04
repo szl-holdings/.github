@@ -29,14 +29,15 @@ class ReleaseFinalizationContractTests(unittest.TestCase):
             },
         )
 
-    def test_kernel_publication_is_card_and_contract_only(self) -> None:
-        source = inspect.getsource(finalizer.Finalizer.finalize_kernel)
-        self.assertIn('repo_type="kernel"', source)
-        self.assertIn('((card, "README.md"), (contract, "contract.json"))', source)
-        self.assertNotIn("upload_folder", source)
-        self.assertNotIn("delete_repo", source)
-        self.assertNotIn("update_repo_settings", source)
-        self.assertNotIn("build-and-upload", source)
+    def test_legacy_base_mutation_paths_are_unavailable(self) -> None:
+        instance = object.__new__(finalizer.Finalizer)
+        with self.assertRaisesRegex(RuntimeError, "UNSUPPORTED_BASE_KERNEL_PUBLISHER"):
+            instance.finalize_kernel("SZLHOLDINGS/governed-inference-meter", {})
+        with self.assertRaisesRegex(RuntimeError, "UNSUPPORTED_BASE_EVIDENCE_PUBLISHER"):
+            instance.publish_evidence({})
+        source = inspect.getsource(finalizer.Finalizer)
+        self.assertNotIn("create_repo(", source)
+        self.assertNotIn("upload_file(", source)
 
     def test_dataset_finalization_is_read_only_and_requires_closed_index(self) -> None:
         source = inspect.getsource(finalizer.Finalizer.finalize_dataset)

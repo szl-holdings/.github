@@ -11,12 +11,14 @@ from __future__ import annotations
 
 import io
 import json
+import os
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Mapping
 
 import hf_release_finalization as legacy
 import hf_release_finalization_entrypoint as retry
+import hf_release_sources
 from kernel_hub_git import KernelHubGitTransport, KernelPublication
 
 REPORT_SCHEMA = "szl.hf-release-finalization/v2"
@@ -107,6 +109,7 @@ class KernelGitFinalizer(retry.RetryingFinalizer):
         metadata_before, metadata_source = self._kernel_metadata_revision(repo_id)
 
         if self.publish:
+            hf_release_sources.verify(operational=True)
             publication = self.kernel_transport.publish(
                 repo_id=repo_id,
                 source_dir=source_dir,
@@ -116,6 +119,7 @@ class KernelGitFinalizer(retry.RetryingFinalizer):
                 ],
                 generation=self.generation,
             )
+            hf_release_sources.verify(operational=True)
             action_status = "updated" if publication.changed else "validated"
         else:
             snapshot = self.kernel_transport.snapshot(repo_id)
@@ -181,6 +185,12 @@ class KernelGitFinalizer(retry.RetryingFinalizer):
     def report(self) -> dict[str, Any]:
         report = super().report()
         report["schema"] = REPORT_SCHEMA
+        report["workflow_artifact_binding"] = {
+            "repository": os.environ.get("GITHUB_REPOSITORY"),
+            "run_id": os.environ.get("GITHUB_RUN_ID"),
+            "run_attempt": os.environ.get("GITHUB_RUN_ATTEMPT"),
+            "source_sha": os.environ.get("GITHUB_SHA"),
+        }
         report["runtime"] = self._runtime()
         report["kernel_transport"] = "authenticated-kernel-hub-git"
         dataset = report.get("results", {}).get("dataset")
@@ -222,6 +232,7 @@ class KernelGitFinalizer(retry.RetryingFinalizer):
             "release-finalization-v2/latest.json",
             f"release-finalization-v2/history/{timestamp}.json",
         ):
+            hf_release_sources.verify(operational=True)
             self.api.upload_file(
                 repo_id=legacy.EVIDENCE_DATASET,
                 repo_type="dataset",
@@ -229,6 +240,7 @@ class KernelGitFinalizer(retry.RetryingFinalizer):
                 path_in_repo=destination,
                 commit_message=f"release(evidence): record finalization v2 {timestamp}",
             )
+            hf_release_sources.verify(operational=True)
         self.record(legacy.EVIDENCE_DATASET, "evidence-publish", "updated")
 
 

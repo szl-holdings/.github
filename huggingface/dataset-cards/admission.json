@@ -1,0 +1,147 @@
+{
+  "schema": "szl.hf-dataset-card-admission/v1",
+  "scope": "source-only",
+  "proposed_source_repository": "szl-holdings/.github",
+  "proposal_governance_base": "9887bc1716f5ee1dc0642a7310c1d8779acee59e",
+  "authority_status": "PENDING_PROTECTED_OWNER_MERGE",
+  "effects_allowed": false,
+  "provider_publication": "NOT_ATTEMPTED",
+  "targets": [
+    {
+      "repo_id": "SZLHOLDINGS/test-results",
+      "repo_type": "dataset",
+      "observed_hub_revision": "4d5de7b588460f56fc67437b11617c339a69d8c8",
+      "observed_readme": {
+        "path": "README.md",
+        "git_blob_oid": "73fcefbd39f336beea48544c42bc690fc4743c5f",
+        "sha256": "f881406b4521d8402d294e237018e8a7abaf8579d838ca61ffa4999c636ec4c3",
+        "size_bytes": 3480
+      },
+      "change": "select-harness-runs",
+      "candidate_path": "huggingface/dataset-cards/SZLHOLDINGS/test-results/README.md",
+      "candidate_sha256": "cb834e8b791cc94d1d0955fd8818d32577a5493d37e623a9929880a6928835fb",
+      "candidate_size_bytes": 3572,
+      "retained_files": [
+        {
+          "path": ".gitattributes",
+          "git_blob_oid": "bed0738c7eeb449bca98b5d2f33c89a1ee56349a",
+          "size_bytes": 2504
+        },
+        {
+          "path": "LICENSE",
+          "git_blob_oid": "261eeb9e9f8b2b4b0d119366dda99c6fd7d35c64",
+          "size_bytes": 11357
+        },
+        {
+          "path": "PROMOTION_READINESS_AUDIT.json",
+          "git_blob_oid": "22af9a0438e964db6d477c29ee9cbf5081b1baf9",
+          "size_bytes": 18559
+        },
+        {
+          "path": "PUBKEY_szlholdings-ec-p256.pem",
+          "git_blob_oid": "cf3385dc35cbb645b6d6c8eb2b4d0269841ac667",
+          "size_bytes": 178
+        },
+        {
+          "path": "SZL_ESTATE_MANAGED.json",
+          "git_blob_oid": "cd0279b49f3831f2d608eecb42142607fb72719b",
+          "size_bytes": 680
+        },
+        {
+          "path": "anatomy_alive_v6.py",
+          "git_blob_oid": "c8c89d225f22a66117daf531700a62707a8dc87e",
+          "size_bytes": 15332
+        },
+        {
+          "path": "harness_runs.jsonl",
+          "git_blob_oid": "60e2b903584ca0eac85ad491e089b2a149433ff2",
+          "size_bytes": 2374
+        },
+        {
+          "path": "provenance.json",
+          "git_blob_oid": "6b0cd0dc155e85a9d37770443ad150934e09dcc1",
+          "size_bytes": 1749
+        },
+        {
+          "path": "publish_harness_run.py",
+          "git_blob_oid": "60eedf8324e5c767268a136fb2f1095533a1dcd3",
+          "size_bytes": 7031
+        },
+        {
+          "path": "runs/20260721T033121.651579Z.dsse.json",
+          "git_blob_oid": "29937fa7a34241b8438d14605d476912f0574ad1",
+          "size_bytes": 794
+        },
+        {
+          "path": "runs/20260721T033121.651579Z.evidence.json",
+          "git_blob_oid": "b5568ad355819b3053ecb1201db68f274e1a56e8",
+          "size_bytes": 10051
+        },
+        {
+          "path": "runs/20260721T034029.453969Z.dsse.json",
+          "git_blob_oid": "7c407362e6ddbda3edd31808a15a9c7aa42effed",
+          "size_bytes": 794
+        },
+        {
+          "path": "runs/20260721T034029.453969Z.evidence.json",
+          "git_blob_oid": "542bfc5da3f9fb0c56fa2989a4b6354509cac32a",
+          "size_bytes": 10051
+        },
+        {
+          "path": "status.json",
+          "git_blob_oid": "4a8e25d4913236b53cad491af1f3fe4171d7a0a0",
+          "size_bytes": 1388
+        }
+      ],
+      "retained_files_sha256": "42ff883d40f3bd6d14ffe1e45a31edc37c3a2f0af9bf4586ec4067f0db019dba"
+    },
+    {
+      "repo_id": "SZLHOLDINGS/SZLHOLDINGS",
+      "repo_type": "dataset",
+      "observed_hub_revision": "7a6cce17710bf47b9e5a64e0b1be43d1276733ef",
+      "observed_readme": {
+        "path": "README.md",
+        "git_blob_oid": "97c0fb57d3bcd5689e6d941a6b463261e8499107",
+        "sha256": "d649056402f1fbe4e9764cfaaa8161c60b4847bb226dfb5e61af9fde85fbbed1",
+        "size_bytes": 4349
+      },
+      "change": "disable-metadata-viewer",
+      "candidate_path": "huggingface/dataset-cards/SZLHOLDINGS/SZLHOLDINGS/README.md",
+      "candidate_sha256": "9d0750c08b6eec1a147ee14544ffde333585355f22ec649ca521225d42642910",
+      "candidate_size_bytes": 4363,
+      "retained_files": [
+        {
+          "path": ".gitattributes",
+          "git_blob_oid": "bed0738c7eeb449bca98b5d2f33c89a1ee56349a",
+          "size_bytes": 2504
+        },
+        {
+          "path": "LICENSE",
+          "git_blob_oid": "261eeb9e9f8b2b4b0d119366dda99c6fd7d35c64",
+          "size_bytes": 11357
+        },
+        {
+          "path": "PROMOTION_READINESS_AUDIT.json",
+          "git_blob_oid": "7071b736ea7aadc0a409841c964f4ce987ee989d",
+          "size_bytes": 29653
+        },
+        {
+          "path": "SZL_ESTATE_MANAGED.json",
+          "git_blob_oid": "159665ce08860174833318f387717f4917f30f5b",
+          "size_bytes": 679
+        },
+        {
+          "path": "provenance.json",
+          "git_blob_oid": "ad41edc1725bc83ecf5721df5041e812e76a1b57",
+          "size_bytes": 3542
+        },
+        {
+          "path": "status.json",
+          "git_blob_oid": "18964519132bd728b3eb35d5f432be1abf51dcda",
+          "size_bytes": 2125
+        }
+      ],
+      "retained_files_sha256": "b63025760ea921be2f7a9b9027029063ac5797c8c3f8eb1dc9456b77259006fd"
+    }
+  ]
+}

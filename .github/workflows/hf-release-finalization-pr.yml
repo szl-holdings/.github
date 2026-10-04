@@ -5,6 +5,8 @@ on:
     branches: [main]
     paths:
       - .github/scripts/kernel_hub_git.py
+      - .github/scripts/hf_release_sources.py
+      - .github/scripts/test_hf_release_sources.py
       - .github/scripts/hf_release_finalization.py
       - .github/scripts/hf_release_finalization_entrypoint.py
       - .github/scripts/hf_release_finalization_git.py
@@ -23,6 +25,8 @@ concurrency:
   cancel-in-progress: true
 
 env:
+  PYTHONDONTWRITEBYTECODE: "1"
+  REVIEWED_SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.event.merge_group.head_sha || github.sha }}
   REPORT_PATH: reports/hf-release-finalization-prerelease.json
   HF_HUB_DISABLE_PROGRESS_BARS: "1"
 
@@ -37,41 +41,7 @@ jobs:
         with:
           persist-credentials: false
           fetch-depth: 1
-          path: controller
-
-      - name: Checkout merged Lake source read-only
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          repository: szl-holdings/szl-lake
-          ref: main
-          persist-credentials: false
-          fetch-depth: 0
-          path: lake
-
-      - name: Checkout merged energy-kernel source read-only
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          repository: szl-holdings/szl-energy-attest
-          ref: main
-          persist-credentials: false
-          fetch-depth: 0
-          path: energy
-
-      - name: Checkout merged governed-norm source read-only
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          repository: szl-holdings/szl-lambda-gate
-          ref: main
-          persist-credentials: false
-          fetch-depth: 0
-          path: lambda-gate
-
-      - name: Bind reviewed source lineage
-        run: |
-          set -euo pipefail
-          git -C lake merge-base --is-ancestor 9c3819e3eb65af862aa0234db7e595c4e423932a HEAD
-          git -C energy merge-base --is-ancestor 14c1d8fdbb19dbd69f4dfc365d7f74d515bc4bdb HEAD
-          git -C lambda-gate merge-base --is-ancestor 8b95ca47571fda65a52b0b6189677ec089a6e503 HEAD
+          ref: ${{ github.event.pull_request.head.sha || github.event.merge_group.head_sha || github.sha }}
 
       - name: Set up Python
         uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
@@ -84,11 +54,14 @@ jobs:
           python -m pip install --disable-pip-version-check --index-url https://download.pytorch.org/whl/cpu 'torch==2.7.1'
           python -m pip install --disable-pip-version-check 'numpy==2.2.6' 'huggingface_hub==1.19.0' 'kernels==0.16.0' 'requests==2.32.5' 'pytest>=8,<9' 'pyarrow>=18,<24' 'PyYAML>=6,<7'
 
+      - name: Acquire exact protected source owners
+        id: sources
+        run: python .github/scripts/hf_release_sources.py prepare
+
       - name: Verify controller and transport contracts without credentials
-        working-directory: controller
         run: |
           set -euo pipefail
-          python -m py_compile .github/scripts/kernel_hub_git.py .github/scripts/hf_release_finalization.py .github/scripts/hf_release_finalization_entrypoint.py .github/scripts/hf_release_finalization_git.py .github/scripts/test_kernel_hub_git.py .github/scripts/test_hf_release_finalization.py .github/scripts/test_hf_release_finalization_entrypoint.py .github/scripts/test_hf_release_finalization_git.py
+          python -m py_compile .github/scripts/hf_release_sources.py .github/scripts/test_hf_release_sources.py .github/scripts/kernel_hub_git.py .github/scripts/hf_release_finalization.py .github/scripts/hf_release_finalization_entrypoint.py .github/scripts/hf_release_finalization_git.py .github/scripts/test_kernel_hub_git.py .github/scripts/test_hf_release_finalization.py .github/scripts/test_hf_release_finalization_entrypoint.py .github/scripts/test_hf_release_finalization_git.py
           PYTHONPATH=.github/scripts python .github/scripts/test_kernel_hub_git.py
           PYTHONPATH=.github/scripts python .github/scripts/test_hf_release_finalization.py
           PYTHONPATH=.github/scripts python .github/scripts/test_hf_release_finalization_entrypoint.py
@@ -102,19 +75,13 @@ jobs:
           print('numpy runtime:', numpy.__version__)
           print('torch runtime:', torch.__version__)
           PY
+          python .github/scripts/test_hf_release_sources.py
           git diff --check
 
       - name: Verify merged source contracts read-only
-        run: |
-          set -euo pipefail
-          python lake/scripts/test_hf_dataset_contract.py
-          PYTHONPATH=lake/scripts python lake/scripts/test_publish_hf_dataset.py
-          python lake/scripts/publish_hf_dataset.py --check-index
-          PYTHONPATH=energy python -m pytest -q energy/tests/test_hf_kernel_contract.py
-          PYTHONPATH=lambda-gate/torch-ext:lambda-gate python -m pytest -q lambda-gate/tests/test_hf_governed_norm_contract.py
+        run: python .github/scripts/hf_release_sources.py contracts
 
       - name: Write immutable pull-request boundary evidence
-        working-directory: controller
         run: |
           mkdir -p reports
           python - <<'PY'
@@ -146,7 +113,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: hf-release-finalization-pr-${{ github.run_id }}
-          path: controller/${{ env.REPORT_PATH }}
+          name: hf-release-finalization-pr
+          path: ${{ env.REPORT_PATH }}
           if-no-files-found: error
           retention-days: 30

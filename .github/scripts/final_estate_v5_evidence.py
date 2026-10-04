@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Immutable issue-evidence validators for active-estate reconciliation v5."""
+"""Existing issue and immutable native-artifact evidence for reconciliation v5."""
 from __future__ import annotations
 
 from typing import Any, Callable, Mapping
@@ -168,6 +168,10 @@ def evaluate_issue_gate(
     client: GitHubClient, name: str, repo: str, number: int
 ) -> Gate:
     try:
+        if name == "hf_release_publication":
+            report, evidence = client.publication_evidence()
+            valid, detail = validate_release_publication(report)
+            return Gate(name, valid, "verified native run artifact; " + detail, evidence)
         issue = client.issue(repo, number)
         report = latest_report(issue)
         valid, detail = VALIDATORS[name](report)
@@ -191,9 +195,8 @@ def evaluate_issue_gate(
 def evaluate_release_revision_consistency(client: GitHubClient) -> Gate:
     try:
         readiness_issue = client.issue(*EVIDENCE_ISSUES["hf_release_readiness"])
-        publication_issue = client.issue(*EVIDENCE_ISSUES["hf_release_publication"])
         readiness = latest_report(readiness_issue)
-        publication = latest_report(publication_issue)
+        publication, publication_evidence = client.publication_evidence()
         readiness_results = readiness.get("results") or {}
         publication_results = publication.get("results") or {}
         readiness_dataset = readiness_results.get("dataset")
@@ -234,20 +237,18 @@ def evaluate_release_revision_consistency(client: GitHubClient) -> Gate:
             readiness.get("schema") == READINESS_SCHEMA
             and publication.get("schema") == PUBLICATION_SCHEMA
         )
-        issues_closed = (
-            readiness_issue.get("state") == "closed"
-            and publication_issue.get("state") == "closed"
-        )
+        issues_closed = readiness_issue.get("state") == "closed"
+        publication_valid = validate_release_publication(publication)[0]
         return Gate(
             "evidence:hf_release_revision_consistency",
-            dataset_match and kernels_match and schemas_current and issues_closed,
+            dataset_match and kernels_match and schemas_current and issues_closed and publication_valid,
             (
                 f"issues_closed={issues_closed}; schemas_current={schemas_current}; "
                 f"dataset_match={dataset_match}; kernels_match={kernels_match}"
             ),
             {
                 "readiness_issue_url": readiness_issue.get("html_url") or readiness_issue.get("url"),
-                "publication_issue_url": publication_issue.get("html_url") or publication_issue.get("url"),
+                "publication_artifact": publication_evidence,
                 "readiness_schema": readiness.get("schema"),
                 "publication_schema": publication.get("schema"),
                 "dataset_revision": readiness_dataset_revision,
