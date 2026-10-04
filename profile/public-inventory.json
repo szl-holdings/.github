@@ -1,41 +1,42 @@
 {
   "counts": {
-    "datasets": 35,
-    "models": 46,
-    "spaces": 21
-  },
-  "evidence": {
-    "archive_sha256": "b9d88f328029fbf49437a5154abdaaae7de8b7823138e0eae69a27ace601b488",
-    "artifact": 10135145952,
-    "record_sha256": "3ed462ea005ccf273dd25813d239a892d5c49138246b5a32ba014612d6e1a0fb",
-    "workflow_run": 34432937958
+    "datasets": 37,
+    "kernels": 14,
+    "models": 47,
+    "spaces": 34
   },
   "historical_portfolio_contract_replaced": false,
   "model_quality_inferred": false,
-  "observed_at": "2026-09-10T03:20:41Z",
+  "observed_at": "2026-10-04T15:36:53Z",
   "production_authorization": false,
   "runtime_readiness_inferred": false,
   "schema": "szl.public-profile-inventory/v1",
   "scope": {
     "authentication": "none",
     "collections_and_buckets": "outside-repository-membership-scope",
-    "id": "hf-public-author-membership/v1",
+    "cross_namespace_ids": "may-overlap-not-a-unique-project-or-trained-model-total",
+    "id": "hf-public-author-membership/v2",
+    "identity_key": [
+      "kind",
+      "id"
+    ],
     "include_disabled_metadata": true,
     "include_gated_metadata": true,
     "include_reserved_readme_if_public": true,
-    "kernel_policy": "count-once-as-model-repository-not-a-fourth-kind",
+    "kernel_policy": "native-kernel-namespace-separate-from-model-namespace",
     "kinds": [
       "models",
       "datasets",
-      "spaces"
+      "spaces",
+      "kernels"
     ],
     "portfolio_and_operational_policy": false,
     "visibility": "public-only"
   },
-  "scope_sha256": "9060fa8d7edcd5c246b86bcfcf1916df44b18038253325336f2f46208f8001ae",
-  "source_git_blob": "08d7c8097c4b6b00d774c379e6e68f6bfb720fa4",
+  "scope_sha256": "26f86974de30ba163e4efdb53d022cf1d8b46dc741d0cca860fa2a17198ae835",
+  "source_git_blob": "89722847d52334761c26039a46f7a0dd772a809a",
   "source_path": "docs/huggingface-ecosystem-manifest.json",
   "source_repository": "szl-holdings/a11oy",
-  "source_revision": "4c6621b17ba452d5af7aa2460462fdfbe513509f",
-  "source_sha256": "04dc30206d499f004fe8151cfdf63700c380db29c2afc3d97d2a213303421ca2"
+  "source_revision": "4346b821d0f971646b59fa90940af764ce59224f",
+  "source_sha256": "2a35e16fd6c7e4df9f8c051439c7f90dd873360b9fea881047c0870e23adb8c4"
 }

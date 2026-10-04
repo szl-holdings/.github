@@ -3,18 +3,25 @@
 from __future__ import annotations
 
 import json
+import hashlib
+import importlib.util
 from html import unescape
 from pathlib import Path
 import re
 import unittest
+import tempfile
 
 
 ROOT = Path(__file__).resolve().parents[2]
 COUNT_LINE = re.compile(
     r"(?P<spaces>[0-9]+) public Spaces, "
-    r"(?P<models>[0-9]+) models, "
+    r"(?P<models>[0-9]+) model repositories, "
+    r"(?P<kernels>[0-9]+) native kernels, "
     r"(?P<datasets>[0-9]+) datasets\b"
 )
+SPEC = importlib.util.spec_from_file_location("profile_inventory", ROOT / ".github/scripts/render_profile_inventory.py")
+render_inventory = importlib.util.module_from_spec(SPEC)
+SPEC.loader.exec_module(render_inventory)
 
 
 class PublicInventoryContractTests(unittest.TestCase):
@@ -98,6 +105,33 @@ class PublicInventoryContractTests(unittest.TestCase):
             self.assertIn(marker, historical.group(1))
         self.assertNotIn("This measured Hub inventory", source)
 
+    def test_visible_static_counters_match_all_four_namespaces(self) -> None:
+        source = (ROOT / "huggingface/org-card/index.html").read_text(encoding="utf-8")
+        pairs = re.findall(r'<li data-szl-inventory-kind="([a-z]+)"><strong>([0-9]+)</strong>', source)
+        self.assertEqual(len(pairs), 4)
+        self.assertEqual({kind: int(count) for kind, count in pairs}, self.expected)
+
+    def test_generated_sections_have_no_drift(self) -> None:
+        self.assertEqual(render_inventory.refresh(ROOT, self.inventory, check=True), [])
+
+    def test_stale_visible_counter_is_detected_even_when_paragraph_is_current(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            for relative in ("profile/README.md", "huggingface/org-card/README.md", "huggingface/org-card/index.html"):
+                target = root / relative
+                target.parent.mkdir(parents=True, exist_ok=True)
+                content = (ROOT / relative).read_text()
+                if target.suffix == ".html":
+                    content = re.sub(r'(data-szl-inventory-kind="kernels"><strong>)[0-9]+', r'\g<1>999', content)
+                target.write_text(content)
+            self.assertEqual(render_inventory.refresh(root, self.inventory, check=True), ["huggingface/org-card/index.html"])
+
+    def test_binding_does_not_infer_provider_or_readiness_from_membership(self) -> None:
+        for key in ("production_authorization", "runtime_readiness_inferred", "model_quality_inferred"):
+            self.assertIs(self.inventory[key], False)
+        self.assertEqual(self.inventory["scope"]["identity_key"], ["kind", "id"])
+        self.assertIn("Native kernel IDs may also appear", render_inventory.markdown(self.inventory))
+
     def test_public_markdown_has_no_hidden_control_characters(self) -> None:
         for name, path in self.documents.items():
             with self.subTest(document=name):
@@ -127,6 +161,67 @@ class PublicInventoryContractTests(unittest.TestCase):
         self.assertIn("https://github.com/szl-holdings/szl-router", source)
         self.assertIn("https://huggingface.co/spaces/SZLHOLDINGS/llm-router-live", source)
         self.assertNotIn("·`[Channel B]", source)
+
+
+class BindingRefreshTests(unittest.TestCase):
+    def manifest(self) -> dict:
+        return {
+            "org": "SZLHOLDINGS", "observedAt": "2026-10-04T15:36:53Z",
+            "inventoryScope": {"visibility": "public-only", "authenticated": False,
+                               "privateAssetsIncluded": False},
+            "counts": {"models": 1, "kernels": 1, "datasets": 0, "spaces": 0},
+            "inventory": {
+                "models": [{"id": "SZLHOLDINGS/same-id", "repoType": "model", "private": False}],
+                "kernels": [{"id": "SZLHOLDINGS/same-id", "repoType": "kernel", "private": False}],
+                "datasets": [], "spaces": [],
+            },
+        }
+
+    def bind(self, manifest: dict, *, blob: str | None = None) -> dict:
+        raw = json.dumps(manifest).encode()
+        expected = hashlib.sha1(b"blob " + str(len(raw)).encode() + b"\0" + raw).hexdigest()
+        return render_inventory.make_binding(raw, "1" * 40, blob or expected)
+
+    def test_model_and_native_kernel_same_id_remain_separate(self) -> None:
+        record = self.bind(self.manifest())
+        self.assertEqual(record["counts"], {"models": 1, "kernels": 1, "datasets": 0, "spaces": 0})
+        render_inventory.validate_binding(record)
+
+    def test_wrong_blob_cannot_rebind_counters(self) -> None:
+        with self.assertRaisesRegex(render_inventory.InventoryError, "blob"):
+            self.bind(self.manifest(), blob="0" * 40)
+
+    def test_incomplete_foreign_duplicate_and_private_membership_fail_closed(self) -> None:
+        mutations = (
+            lambda m: m["inventory"].pop("kernels"),
+            lambda m: m["inventory"]["models"][0].update(id="other-org/same-id"),
+            lambda m: m["inventory"]["models"][0].update(private=True),
+            lambda m: m["inventory"]["kernels"][0].update(repoType="model"),
+            lambda m: m["counts"].update(kernels=99),
+            lambda m: m["inventoryScope"].update(authenticated=True),
+            lambda m: m.update(observedAt="2026-02-31T00:00:00Z"),
+        )
+        for mutation in mutations:
+            with self.subTest(mutation=mutation):
+                manifest = self.manifest()
+                mutation(manifest)
+                with self.assertRaises(render_inventory.InventoryError):
+                    self.bind(manifest)
+        manifest = self.manifest()
+        manifest["inventory"]["models"] *= 2
+        manifest["counts"]["models"] = 2
+        with self.assertRaisesRegex(render_inventory.InventoryError, "duplicate"):
+            self.bind(manifest)
+
+    def test_wrong_predicate_and_inferred_readiness_are_rejected(self) -> None:
+        record = self.bind(self.manifest())
+        record["runtime_readiness_inferred"] = True
+        with self.assertRaises(render_inventory.InventoryError):
+            render_inventory.validate_binding(record)
+        record = self.bind(self.manifest())
+        record["scope"] = {**record["scope"], "id": "hf-public-author-membership/v1"}
+        with self.assertRaises(render_inventory.InventoryError):
+            render_inventory.validate_binding(record)
 
 
 if __name__ == "__main__":

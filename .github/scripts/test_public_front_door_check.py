@@ -366,8 +366,9 @@ class PublicationBindingTests(unittest.TestCase):
             with self.subTest(section=section, key=key):
                 self.assertIn(section, check.publication_contract_issues(contract))
 
-    def test_requires_exact_eighteen_source_destination_pairs(self):
-        self.assertEqual(len(check.REQUIRED_PUBLICATION_BINDINGS), 18)
+    def test_requires_exact_source_destination_pairs_including_shared_mark(self):
+        self.assertEqual(len(check.REQUIRED_PUBLICATION_BINDINGS), 19)
+        self.assertEqual(check.REQUIRED_PUBLICATION_BINDINGS[check.MARK_DESTINATION], check.CANONICAL_MARK)
         issues = check.publication_binding_issues(
             self.root,
             self.files_for_expected_bindings(),

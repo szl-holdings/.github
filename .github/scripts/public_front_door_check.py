@@ -14,6 +14,7 @@ import hf_static_space_deploy as deploy
 
 
 REQUIRED_LINKS = {
+    "https://huggingface.co/spaces/SZLHOLDINGS/szl-command-lab",
     "https://a-11-oy.com",
     "https://a11oy.net",
     "https://github.com/szl-holdings",
@@ -39,6 +40,8 @@ SAFE_PLAIN_METADATA_VALUE = re.compile(r"^[A-Za-z][A-Za-z0-9 ./_+,&'()-]*$")
 TRUTH_MARKERS = {"Current state", "HISTORICAL", "SIMULATED"}
 HUB_CARD_PATH_CLASS = "szl-hf-path"
 HUB_CARD_CARD_CLASS = "szl-hf-card"
+CANONICAL_MARK = "profile/assets/szl/logos/szl_mark_holographic.svg"
+MARK_DESTINATION = "assets/szl-mark-holographic.svg"
 CANONICAL_WEBP = "profile/assets/evidence-lattice-v2.webp"
 WEBP_DESTINATION = "assets/evidence-lattice-v2.webp"
 HUB_CARD_THUMBNAIL = (
@@ -63,6 +66,7 @@ REQUIRED_PUBLICATION_BINDINGS = {
     "assets/hf-card-models.svg": "profile/assets/hf-card-models.svg",
     "assets/hf-card-evidence.svg": "profile/assets/hf-card-evidence.svg",
     WEBP_DESTINATION: CANONICAL_WEBP,
+    MARK_DESTINATION: CANONICAL_MARK,
     "GOVERNANCE.md": "huggingface/org-card/GOVERNANCE.md",
     "MODELS.txt": "huggingface/org-card/MODELS.txt",
     "SEVEN_SPACES.md": "huggingface/org-card/SEVEN_SPACES.md",
@@ -722,18 +726,18 @@ def main() -> int:
         )
 
     require(
-        "./assets/evidence-lattice-v2.webp" in profile,
-        "profile does not use the canonical WebP hero",
+        CANONICAL_MARK in profile,
+        "profile does not use the canonical SZL mark",
         failures,
     )
     require(
-        "assets/evidence-lattice-v2.webp" in hub_card,
-        "Hub card does not use the canonical WebP hero",
+        MARK_DESTINATION in hub_card,
+        "Hub card does not use the canonical SZL mark",
         failures,
     )
     require(
-        "https://szlholdings-readme.static.hf.space/assets/evidence-lattice-v2.webp" in html,
-        "static front door does not use the canonical absolute WebP hero",
+        "https://szlholdings-readme.static.hf.space/" + MARK_DESTINATION in html,
+        "static front door does not use the canonical absolute SZL mark",
         failures,
     )
     require(
@@ -844,16 +848,9 @@ def main() -> int:
         failures,
     )
     require(
-        (
-            "https://szlholdings-readme.static.hf.space/assets/evidence-lattice-v2.webp",
-            "",
-            "1800",
-            "776",
-            "high",
-            "async",
-        )
-        in parser.images,
-        "decorative HTML hero must retain an empty alt attribute",
+        ("https://szlholdings-readme.static.hf.space/" + MARK_DESTINATION,
+         "", "256", "160", "", "async") in parser.images,
+        "decorative hero must use the reviewed responsive SZL mark",
         failures,
     )
     require(
@@ -938,7 +935,7 @@ def main() -> int:
         for source in REQUIRED_PUBLICATION_BINDINGS.values()
         if source.endswith(".svg")
     )
-    require(len(svg_sources) == 7, "compatibility SVG family is incomplete", failures)
+    require(len(svg_sources) == 8, "compatibility SVG family is incomplete", failures)
     for source in svg_sources:
         svg = (root / source).read_text(encoding="utf-8")
         require(
