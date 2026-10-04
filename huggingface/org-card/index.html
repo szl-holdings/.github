@@ -5,10 +5,10 @@
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
   <meta name="color-scheme" content="dark">
   <!-- theme-color = --bg (color-space-900); meta tags cannot read CSS variables -->
-  <meta name="theme-color" content="#030F29">
+  <meta name="theme-color" content="#090b10">
   <meta name="description" content="SZL Holdings publishes governed AI models, evidence, software, and demonstrations with explicit operational boundaries.">
-  <title>SZL Holdings - Control before action. Evidence after.</title>
-  <meta property="og:title" content="SZL Holdings - Control before action. Evidence after.">
+  <title>SZL Holdings - Governed intelligence. Checkable results.</title>
+  <meta property="og:title" content="SZL Holdings - Governed intelligence. Checkable results.">
   <meta property="og:description" content="Governed decision infrastructure for actions that must survive scrutiny.">
   <meta property="og:type" content="website">
   <meta property="og:url" content="https://szlholdings-readme.static.hf.space/">
@@ -17,22 +17,18 @@
   <meta name="twitter:card" content="summary_large_image">
   <style>
     #szl-hf-org-card {
-      /* SZL KANCHAY v1.1.1, founder direction (szl-brand kanchay/ @83f852c; szl-design-system.css
-         sha256 e05d19baa02185187491504673b00a3e3c4696af9ec9406dec9b6471987ccbc2), declared on the
-         isolated root with the design system's own token names. The host-isolation contract forbids
-         link elements, CSS imports and URL references, so the stylesheet itself cannot load here.
-         Palette tokens carry the design system's exact values; every semantic token and every rule
-         below reads them through var(). No other color or font literal appears in this card. */
-      --color-space-900: #030F29;
-      --color-gray-50: #f5f7fa;
+      /* Source-owned 2026 SZL public identity. Tokens remain inside the isolated
+         root; the host receives no imports, fonts, or executable dependencies. */
+      --color-space-900: #090b10;
+      --color-gray-50: #f2f0e9;
       --color-gray-100: #e6eaf1;
-      --color-gray-200: #c9d2df;
-      --color-gray-400: #76859b;
-      --color-gray-600: #3c4757;
-      --color-gray-800: #1b222c;
-      --color-coral-300: #F0917E;
-      --color-coral-400: #DF735F;
-      --color-coral-500: #C4543F;
+      --color-gray-200: #a7aebc;
+      --color-gray-400: #a7aebc;
+      --color-gray-600: #343c49;
+      --color-gray-800: #11151d;
+      --color-coral-300: #ffffff;
+      --color-coral-400: #e4e8ee;
+      --color-coral-500: #bcc7d5;
       --color-silver-100: #E9EEF6;
       --color-silver-300: #9AA7BD;
       --color-silver-500: #5C6B86;
@@ -43,7 +39,7 @@
       --color-warning-light: #e4cf99;
       --bg: var(--color-space-900);
       --surface: var(--color-gray-800);
-      --surface-alt: #18202b;
+      --surface-alt: #11151d;
       --border: var(--color-gray-600);
       --hairline: color-mix(in srgb, var(--color-silver-500) 38%, transparent);
       --text: var(--color-gray-50);
@@ -330,6 +326,27 @@
     @media (forced-colors: active) {
       #szl-hf-org-card .szl-hf-brand-mark, #szl-hf-org-card .szl-hf-button, #szl-hf-org-card .szl-hf-journey, #szl-hf-org-card .szl-hf-portfolio-card, #szl-hf-org-card .szl-hf-truth-panel, #szl-hf-org-card .szl-hf-status-list a, #szl-hf-org-card .szl-hf-flagship, #szl-hf-org-card .szl-hf-chain a, #szl-hf-org-card .szl-hf-estate-panel { forced-color-adjust: auto; }
     }
+
+    /* 2026 public identity: restrained ground, shared orbital mark, readable text. */
+    #szl-hf-org-card .szl-hf-brand-mark { width: 96px; height: auto; flex: 0 0 auto; }
+    #szl-hf-org-card .szl-hf-hero { display: grid; grid-template-columns: minmax(0, 1fr) minmax(160px, .45fr); min-height: 440px; padding: clamp(28px, 5vw, 64px); border-radius: 0; border-width: 0 0 1px; gap: 28px; }
+    #szl-hf-org-card .szl-hf-hero::before, #szl-hf-org-card .szl-hf-hero::after { display: none; }
+    #szl-hf-org-card .szl-hf-hero-copy { grid-column: 1; grid-row: 1; }
+    #szl-hf-org-card .szl-hf-hero-mark { grid-column: 2; grid-row: 1; width: 100%; max-width: 320px; height: auto; justify-self: center; }
+    #szl-hf-org-card .szl-hf-hero .szl-hf-eyebrow { border: 0; padding: 0; background: transparent; }
+    #szl-hf-org-card .szl-hf-hero .szl-hf-eyebrow::before { display: none; }
+    #szl-hf-org-card h1 { font-size: clamp(36px, 5.1vw, 64px); font-weight: 540; line-height: 1.08; letter-spacing: -.04em; }
+    #szl-hf-org-card .szl-hf-button { border-radius: 4px; }
+    #szl-hf-org-card .szl-hf-journey, #szl-hf-org-card .szl-hf-flagship, #szl-hf-org-card .szl-hf-portfolio-card { border-radius: 4px; box-shadow: none; }
+    #szl-hf-org-card .szl-hf-counts { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    #szl-hf-org-card .szl-hf-archive { margin-bottom: 30px; }
+    #szl-hf-org-card summary { min-height: 44px; padding-block: 12px; cursor: pointer; color: var(--text-sub); }
+    @media (max-width: 640px) {
+      #szl-hf-org-card .szl-hf-hero { grid-template-columns: minmax(0, 1fr); min-height: 0; gap: 20px; padding: 32px 8px; }
+      #szl-hf-org-card .szl-hf-hero-mark { grid-column: 1; grid-row: 1; width: 144px; justify-self: start; }
+      #szl-hf-org-card .szl-hf-hero-copy { grid-column: 1; grid-row: 2; }
+      #szl-hf-org-card .szl-hf-brand-mark { width: 72px; }
+    }
   </style>
 
 </head>
@@ -339,26 +356,7 @@
     <header>
       <div class="szl-hf-shell szl-hf-nav">
         <a class="szl-hf-brand" href="https://huggingface.co/SZLHOLDINGS" aria-label="SZL Holdings organization on Hugging Face">
-          <svg class="szl-hf-brand-mark" viewBox="96 252 1008 588" aria-hidden="true" focusable="false">
-            <!-- SZL orbit mark: szl-brand kanchay/logos/szl_favicon.svg, paths verbatim (gradient ids namespaced, paint from palette tokens) -->
-            <defs>
-            <linearGradient id="szl-hf-orbit" x1="0" y1="0" x2="1" y2="1">
-            <stop class="szl-hf-stop-silver-100" offset="0"/>
-            <stop class="szl-hf-stop-silver-300" offset="0.5"/>
-            <stop class="szl-hf-stop-silver-500" offset="1"/>
-            </linearGradient>
-            <radialGradient id="szl-hf-node" cx="0.38" cy="0.34" r="0.75">
-            <stop class="szl-hf-stop-coral-300" offset="0"/>
-            <stop class="szl-hf-stop-coral-400" offset="0.55"/>
-            <stop class="szl-hf-stop-coral-500" offset="1"/>
-            </radialGradient>
-            </defs>
-            <g transform="rotate(-22 657.0 502.0)"><ellipse cx="657.0" cy="502.0" rx="432" ry="196" fill="none" stroke="url(#szl-hf-orbit)" stroke-width="7" stroke-linecap="round" opacity="0.95"/></g>
-            <path class="szl-hf-mark-stroke" d="M 500 402 C 476 374 344 374 334 416 C 324 458 396 480.0 409.0 502.0 C 476 526.0 512 540 476 582 C 464 620 358 626 310 606 " stroke-width="70" stroke-linecap="butt" stroke-linejoin="round"/>
-            <g class="szl-hf-mark-fill"><path d="M 534 372 L 732 372 L 732 444 L 636 568 L 732 568 L 732 632 L 534 632 L 534 560 L 630 436 L 534 436 Z"/><path d="M 762 372 L 830 372 L 830 568 L 1014 568 L 954 632 L 762 632 Z"/></g>
-            <circle cx="937.9" cy="264.3" r="33" fill="url(#szl-hf-node)"/>
-            <path d="M 657.0 678 L 694.0 766 L 675.0 766 L 657.0 710.3 L 639.0 766 L 620.0 766 Z" fill="url(#szl-hf-orbit)" opacity="0.96"/>
-          </svg>
+          <img class="szl-hf-brand-mark" src="https://szlholdings-readme.static.hf.space/assets/szl-mark-holographic.svg" alt="SZL Holdings" width="96" height="60" decoding="async">
           SZL HOLDINGS
         </a>
         <nav aria-label="Primary navigation">
@@ -366,7 +364,7 @@
           <a href="#szl-hf-flagships">Flagships</a>
           <a href="#szl-hf-artifacts">Portfolio</a>
           <a href="#szl-hf-status">Truth</a>
-          <a class="szl-hf-primary-link" href="https://a-11-oy.com">Open a11oy</a>
+          <a class="szl-hf-primary-link" href="https://huggingface.co/spaces/SZLHOLDINGS/szl-command-lab">Open Command Lab</a>
         </nav>
       </div>
     </header>
@@ -374,21 +372,16 @@
     <main id="szl-hf-main" tabindex="-1">
       <div class="szl-hf-shell">
         <section class="szl-hf-hero" aria-labelledby="szl-hf-hero-title">
-          <img class="szl-hf-hero-art" src="https://szlholdings-readme.static.hf.space/assets/evidence-lattice-v2.webp" alt="" width="1800" height="776" fetchpriority="high" decoding="async">
+          <img class="szl-hf-hero-mark" src="https://szlholdings-readme.static.hf.space/assets/szl-mark-holographic.svg" alt="" width="256" height="160" decoding="async">
           <div class="szl-hf-hero-copy">
-            <div class="szl-hf-eyebrow">Governed decision infrastructure</div>
-            <h1 id="szl-hf-hero-title">Control before action. <span>Evidence after.</span></h1>
-            <p class="szl-hf-lede">Models, data, kernels, and demonstrations for decisions that must stay inside declared authority and survive independent scrutiny.</p>
+            <div class="szl-hf-eyebrow">SZL Holdings / software &amp; research</div>
+            <h1 id="szl-hf-hero-title">Governed intelligence.<br><span>Checkable results.</span></h1>
+            <p class="szl-hf-lede">Explore AI systems, models and research tools. Follow an output to its source, understand its limits, and build on work you can inspect.</p>
             <div class="szl-hf-actions" aria-label="Primary actions">
-              <a class="szl-hf-button szl-hf-primary" href="https://a-11-oy.com">Enter the command center</a>
-              <a class="szl-hf-button szl-hf-secondary" href="#szl-hf-flagships">Meet the flagships</a>
-              <a class="szl-hf-button szl-hf-secondary" href="https://a11oy.net">Verify evidence</a>
+              <a class="szl-hf-button szl-hf-primary" href="https://huggingface.co/spaces/SZLHOLDINGS/szl-command-lab">Explore Command Lab →</a>
+              <a class="szl-hf-button szl-hf-secondary" href="https://github.com/szl-holdings">Build with the source →</a>
             </div>
-            <ul class="szl-hf-hero-facts" aria-label="Doctrine facts">
-              <li><strong>8</strong><span>formulas locked-proven</span></li>
-              <li><strong>&lt; 1.0</strong><span>trust, always</span></li>
-              <li><strong>Conjecture 1</strong><span>Λ uniqueness, open</span></li>
-            </ul>
+            <p class="szl-hf-microcopy">Models · Kernels · Datasets · Spaces</p>
             <p class="szl-hf-microcopy">Artifact type, evidence class, and runtime state remain separate.</p>
           </div>
         </section>
@@ -397,9 +390,9 @@
           <div class="szl-hf-section-head">
             <div>
               <div class="szl-hf-eyebrow">Choose a path</div>
-              <h2 id="szl-hf-paths-title">One estate. Four clear journeys.</h2>
+              <h2 id="szl-hf-paths-title">Find your starting point.</h2>
             </div>
-            <p class="szl-hf-section-copy">Start with the outcome you need. Operator, builder, researcher, and verifier routes converge on the same source, release, and evidence boundaries.</p>
+            <p class="szl-hf-section-copy">Explore the portfolio, use a demonstration, inspect source code or reproduce a result. Each path shows the evidence it can support.</p>
           </div>
           <div class="szl-hf-journeys">
             <a class="szl-hf-journey szl-hf-path" href="https://huggingface.co/spaces/SZLHOLDINGS/a11oy">
@@ -633,7 +626,7 @@
               <div class="szl-hf-eyebrow">One governed estate map</div>
               <h2 id="szl-hf-estate-map-title">Product, source, runtime, and proof move together.</h2>
             </div>
-            <p class="szl-hf-section-copy">The map below is a dated, receipted snapshot of the public Hub inventory. It is registry evidence only &#8212; not availability, operational readiness, or publication policy.</p>
+            <p class="szl-hf-section-copy">The map below is a dated, source-bound snapshot of the public Hub inventory. It is registry evidence only &#8212; not availability, operational readiness, or publication policy.</p>
           </div>
           <div class="szl-hf-estate">
             <article class="szl-hf-estate-panel">
@@ -648,22 +641,24 @@
                 <dt>Six internal engines</dt>
                 <dd>CHAPAQ (folded into Killinchu), Lyte, Killinchu, Finance, Terra, Counsel.</dd>
                 <dt>Governed kernel suite</dt>
-                <dd>Source-bound executable kernels published as software under the Models surface and indexed by <a href="https://huggingface.co/SZLHOLDINGS/szl-kernels">SZL Kernels</a>.</dd>
+                <dd>Source-bound kernel software has a native Kernels namespace and legacy model mirrors, indexed by <a href="https://huggingface.co/SZLHOLDINGS/szl-kernels">SZL Kernels</a>.</dd>
                 <dt>Doctrine</dt>
                 <dd>v11 LOCKED. Λ uniqueness is Conjecture 1 (open); Khipu is tamper-evident (Conjectures 2 and 3); supply chain is L1 honest, L2 attested, L3 roadmap.</dd>
               </dl>
             </article>
             <article class="szl-hf-estate-panel">
               <h3>Current state</h3>
-              <ul class="szl-hf-counts" aria-label="Public Hub inventory binding, observed 2026-09-10">
-                <li><strong>21</strong><span>public Spaces</span></li>
-                <li><strong>46</strong><span>model repos</span></li>
-                <li><strong>35</strong><span>public datasets</span></li>
-              </ul>
-              <p data-szl-inventory="current"><strong>Current state snapshot:</strong> 21 public Spaces, 46 models, 35 datasets. Observed <time datetime="2026-09-10T03:20:41Z">2026-09-10T03:20:41Z</time> under the anonymous public-only <code>hf-public-author-membership/v1</code> predicate. Kernels count once as model repositories; private assets, collections and buckets are excluded. This dated observation is not a live count.</p>
+              <!-- szl:public-inventory:start -->
+<ul class="szl-hf-counts" aria-label="Public Hub inventory, observed 2026-10-04T15:36:53Z">
+<li data-szl-inventory-kind="spaces"><strong>34</strong><span>public Spaces</span></li>
+<li data-szl-inventory-kind="models"><strong>47</strong><span>model repositories</span></li>
+<li data-szl-inventory-kind="kernels"><strong>14</strong><span>native kernels</span></li>
+<li data-szl-inventory-kind="datasets"><strong>37</strong><span>public datasets</span></li>
+</ul>
+<p data-szl-inventory="current"><strong>Source-bound snapshot:</strong> 34 public Spaces, 47 model repositories, 14 native kernels, 37 datasets. Observed <time datetime="2026-10-04T15:36:53Z">2026-10-04T15:36:53Z</time> under <code>hf-public-author-membership/v2</code>. Native kernel IDs may also appear in the model namespace; these figures do not count unique projects or trained language models. Private assets, collections and buckets are outside this scope. This dated observation is not a live count.</p>
+<p><a href="https://github.com/szl-holdings/.github/blob/main/profile/public-inventory.json">Inventory binding</a> · <a href="https://github.com/szl-holdings/a11oy/blob/4346b821d0f971646b59fa90940af764ce59224f/docs/huggingface-ecosystem-manifest.json">Exact source inventory</a>. Membership alone does not establish runtime readiness, model quality, or publication permission. The governed KEEP list remains <a href="https://github.com/szl-holdings/.github/blob/main/docs/CANONICAL_FLEET.md">docs/CANONICAL_FLEET.md</a>.</p>
+<!-- szl:public-inventory:end -->
               <p data-szl-inventory="historical"><strong>HISTORICAL estate-alignment v1:</strong> 16 portfolio Spaces · 45 models · 34 datasets; 1 inventory-only Space: Yarqa · governedKeep=false · disposition=FOLD. These figures describe the prior contract snapshot, not current Hub membership or visibility.</p>
-              <p>Later anonymous listings on <code>2026-09-25</code> (23 public Spaces, 49 model repositories, 35 public datasets) and <code>2026-10-01</code> (33 public Spaces, 50 model repositories, 35 public datasets) have been observed; the receipted binding refresh is pending, so the bound figures above remain the figures of record until it lands.</p>
-              <p><a href="https://github.com/szl-holdings/.github/blob/main/profile/public-inventory.json">Inventory binding</a> · <a href="https://github.com/szl-holdings/a11oy/blob/4c6621b17ba452d5af7aa2460462fdfbe513509f/docs/huggingface-ecosystem-manifest.json">Source-pinned inventory</a>. Hub inventory is registry evidence only, not availability, operational readiness, or publication policy. The governed KEEP list remains <a href="https://github.com/szl-holdings/.github/blob/main/docs/CANONICAL_FLEET.md">docs/CANONICAL_FLEET.md</a>.</p>
               <p class="szl-hf-microcopy">A cached card, screenshot, badge, or copied count is not current state.</p>
             </article>
           </div>
@@ -673,7 +668,7 @@
           <div class="szl-hf-closing-panel">
             <div>
               <div class="szl-hf-eyebrow">Build or verify</div>
-              <h2 id="szl-hf-closing-title">Start with the product. Finish with the evidence.</h2>
+              <h2 id="szl-hf-closing-title">Explore the work. Inspect the evidence.</h2>
               <p>Use exact revisions, keep runtime and evidence state separate, and report security issues through the protected channel.</p>
             </div>
             <div class="szl-hf-closing-actions">
@@ -697,6 +692,7 @@
         </div>
       </div>
     </footer>
+    <details class="szl-hf-shell szl-hf-archive"><summary>Architecture image</summary><img src="https://szlholdings-readme.static.hf.space/assets/evidence-lattice-v2.webp" alt="SZL evidence lattice architecture artwork" width="1800" height="776" loading="lazy" decoding="async"></details>
     <!-- canonical deployment source: https://szlholdings-readme.static.hf.space/deployment.json -->
   </div>
 </body>

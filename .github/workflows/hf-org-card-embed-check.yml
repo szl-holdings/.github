@@ -8,6 +8,13 @@ on:
       - "huggingface/org-card.manifest.json"
       - "profile/assets/**"
       - "profile/assets/evidence-lattice-v2.webp"
+      - "profile/README.md"
+      - "profile/public-inventory.json"
+      - "hf-card/**"
+      - ".github/scripts/render_profile_inventory.py"
+      - ".github/scripts/test_profile_inventory_contract.py"
+      - ".github/scripts/test_org_card_browser.py"
+      - ".github/scripts/prepare_org_card_preview.py"
       - ".github/scripts/hf_org_card_embed_check.py"
       - ".github/scripts/public_front_door_check.py"
       - ".github/scripts/test_hf_org_card_embed_check.py"
@@ -20,6 +27,13 @@ on:
       - "huggingface/org-card.manifest.json"
       - "profile/assets/**"
       - "profile/assets/evidence-lattice-v2.webp"
+      - "profile/README.md"
+      - "profile/public-inventory.json"
+      - "hf-card/**"
+      - ".github/scripts/render_profile_inventory.py"
+      - ".github/scripts/test_profile_inventory_contract.py"
+      - ".github/scripts/test_org_card_browser.py"
+      - ".github/scripts/prepare_org_card_preview.py"
       - ".github/scripts/hf_org_card_embed_check.py"
       - ".github/scripts/public_front_door_check.py"
       - ".github/scripts/test_hf_org_card_embed_check.py"
@@ -69,3 +83,43 @@ jobs:
 
       - name: Verify org-card embed hardening
         run: python .github/scripts/hf_org_card_embed_check.py
+
+      - name: Verify source-bound public counters
+        run: |
+          python -m unittest discover -s .github/scripts -p test_profile_inventory_contract.py
+          python .github/scripts/render_profile_inventory.py --check
+
+      - name: Install shared card test requirements
+        run: python -m pip install --disable-pip-version-check --require-hashes -r hf-card/requirements.txt
+
+      - name: Verify shared card presentation and claim boundaries
+        run: python -m unittest discover -s hf-card/tests -p test_hf_card.py
+
+      - name: Copy declared source files into the local preview
+        run: >-
+          python .github/scripts/prepare_org_card_preview.py
+          --site "$RUNNER_TEMP/org-card-preview"
+          --report "$RUNNER_TEMP/org-card-materialization.json"
+
+      - name: Install isolated browser verifier
+        run: |
+          python -m venv "$RUNNER_TEMP/org-card-browser"
+          "$RUNNER_TEMP/org-card-browser/bin/python" -m pip install --disable-pip-version-check "playwright==1.63.0"
+          "$RUNNER_TEMP/org-card-browser/bin/python" -m playwright install --with-deps chromium
+
+      - name: Measure desktop and mobile source layouts
+        run: >-
+          "$RUNNER_TEMP/org-card-browser/bin/python" .github/scripts/test_org_card_browser.py
+          --site "$RUNNER_TEMP/org-card-preview"
+          --output "$RUNNER_TEMP/org-card-browser-evidence"
+
+      - name: Retain source presentation evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: hf-org-card-browser
+          path: |
+            ${{ runner.temp }}/org-card-browser-evidence/
+            ${{ runner.temp }}/org-card-materialization.json
+          if-no-files-found: error
+          retention-days: 30

@@ -1,7 +1,10 @@
 # hf-card: one card template, one schema, one linter
 
 `hf-card/` is the shared Hugging Face card toolkit for `SZLHOLDINGS` assets.
-Each asset's source repository commits a small vars file. `render.py` turns it
+Each asset's source repository commits a small vars file.
+Cards open with the shared SZL mark, a short summary, artifact and stage labels,
+a path into Command Lab or an explicitly declared Try link, and source/evidence
+links. Important limits stay visible; full technical details remain expandable. `render.py` turns it
 into the Hub `README.md` with a single template, and `lint.py` checks any card,
 rendered or hand-written, against the same contract.
 
@@ -111,11 +114,40 @@ that contains it.
 | `sections` | no | List of `{heading, body}` markdown sections |
 | `claims` | no | List of `{label, claim, receipt}`; `MEASURED` needs `receipt` |
 | `limits` | no | List of strings |
+| `overview` | no | `{artifact_type, stage}` plain-text labels; missing stage is visibly undeclared, never inferred from Hub RUNNING |
+| `links` | no | Explicit HTTPS `{try, build, evidence}`; absent Try uses the Command Lab explorer |
+| `inference` | no | Model-only dated observation: `{state, providers, observed_at, hub_revision, source_url}`; exact Hub API mapping URL and immutable revision required |
+| `support_request` | no | Model-only verified request evidence: `{model_id, model_revision, url, requested_at, verified_readback, request_state}`; official discussion URL and submitted research-review state required |
 | `release` | no | `{tag, source_sha}`; renders the `SZL-HF-MIRROR` release block |
 | `dataset`, `space`, `kernel` | no | Type block extras: `structure`; `health_path`, `url`; `backends`, `load` |
 
 Claim labels accepted by `render.py`: `MEASURED`, `REPORTED`, `UNVERIFIED`,
 `UNRATIFIED`, `DEGRADED`, `BLOCKED`, `UNAVAILABLE`, `NOT_CLAIMED`.
+
+Provider observation states are `NO_PROVIDER_MAPPING`, `PROVIDER_MAPPING_REPORTED`,
+and `UNAVAILABLE`. A reported mapping names its provider IDs; an empty mapping
+does not imply a model cannot run locally. Support requests, provider adoption,
+and research or deployment qualification are independent. Do not infer any of
+them from a card's `pipeline_tag`, a running Space, or a provider-request link.
+
+## Public inventory and estate coverage
+
+The organization profile is generated from `profile/public-inventory.json` by
+`.github/scripts/render_profile_inventory.py`. It counts native models, kernels,
+datasets and Spaces by `(kind, id)`. A kernel mirror in the model namespace is
+not another language model. Refresh from the canonical immutable A11oy manifest
+with its exact Git blob, then commit all three rendered front doors:
+
+```bash
+python .github/scripts/render_profile_inventory.py \
+  --manifest /path/to/a11oy/docs/huggingface-ecosystem-manifest.json \
+  --source-revision <reviewed-a11oy-commit> --source-git-blob <manifest-git-blob>
+python .github/scripts/render_profile_inventory.py --check
+```
+
+The source binding is a dated public observation. The independent estate release
+verifier checks the pinned GitHub bytes and current public membership; generated
+paragraphs alone cannot establish current availability or publication permission.
 
 ## Exit codes
 

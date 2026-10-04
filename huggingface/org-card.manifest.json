@@ -78,6 +78,10 @@
     {
       "source": "huggingface/org-card/seven-spaces.yaml",
       "destination": "seven-spaces.yaml"
+    },
+    {
+      "source": "profile/assets/szl/logos/szl_mark_holographic.svg",
+      "destination": "assets/szl-mark-holographic.svg"
     }
   ],
   "runtime_transforms": {

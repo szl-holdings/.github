@@ -1,31 +1,37 @@
-![SZL Holdings evidence lattice](./assets/evidence-lattice-v2.webp)
+<p><a href="https://huggingface.co/spaces/SZLHOLDINGS/szl-command-lab"><img src="https://raw.githubusercontent.com/szl-holdings/.github/main/profile/assets/szl/logos/szl_mark_holographic.svg" alt="SZL Holdings" width="144" /></a></p>
 
-# SZL Holdings
+# Governed intelligence. Checkable results.
 
-**Control before action. Evidence after.** We build governed AI software, public research artifacts, and interfaces that expose their source and limits. A receipt can establish a specific record's integrity; each model, dataset, and running service still needs its own qualification.
+SZL Holdings builds AI software, models and research tools that connect an output to its source and evidence. Explore the systems, inspect what is available, and reproduce the work behind each claim.
 
-## Start here
+[**Explore Command Lab →**](https://huggingface.co/spaces/SZLHOLDINGS/szl-command-lab) · [**Build with the source →**](https://github.com/szl-holdings)
 
-- **Use the product:** [a-11-oy.com](https://a-11-oy.com) shows A11oy's live capability state and bounded workflows.
-- **Inspect proof:** [a11oy.net](https://a11oy.net) is the public proof registry; check the scope and state of each receipt.
-- **Explore artifacts:** [Hugging Face / SZLHOLDINGS](https://huggingface.co/SZLHOLDINGS) lists models, datasets, kernels, and Spaces.
-- **Read source:** [github.com/szl-holdings](https://github.com/szl-holdings) is the canonical code estate.
-- **Install published packages:** [PyPI](https://pypi.org/user/betterwithage/) lists the available Python packages; verify each package's own release evidence.
+## Choose a path
 
-## How the pieces fit
+- **Explore:** [Command Lab](https://huggingface.co/spaces/SZLHOLDINGS/szl-command-lab) brings the public portfolio into one searchable interface.
+- **Use:** [A11oy](https://a-11-oy.com) exposes tools and their current capability state.
+- **Build:** browse [models, kernels, datasets and Spaces](https://huggingface.co/SZLHOLDINGS), or [published Python packages](https://pypi.org/user/betterwithage/).
+- **Verify:** [a11oy.net](https://a11oy.net) links computation records and their limits.
 
-**A11oy** is the command surface. **[SZL Router](https://github.com/szl-holdings/szl-router)** is the inference gateway, presented at [SZLHOLDINGS/llm-router-live](https://huggingface.co/spaces/SZLHOLDINGS/llm-router-live). **Killinchu** is a public observation and operator-decision demonstration; its effectors remain **SIMULATED**. **Forge** houses model and software research. [The Hub front door](https://huggingface.co/spaces/SZLHOLDINGS/README) maps those artifacts without making one Space's uptime a verdict on the rest.
+## What we build
 
-Source, build, publication, runtime, and independent evidence are separate states. Labels such as `MEASURED`, `REPORTED`, `UNKNOWN`, and `UNAVAILABLE` describe the scope of a claim. An artifact's card or receipt should identify the evidence behind it. The [trust boundary](https://github.com/szl-holdings/.github/blob/main/TRUST.md) explains who may authorize an action.
+**A11oy** connects governed workflows. **[SZL Router](https://github.com/szl-holdings/szl-router)** routes model requests and publishes a [status surface](https://huggingface.co/spaces/SZLHOLDINGS/llm-router-live). **Killinchu** demonstrates public observation and operator decisions; public effectors remain **SIMULATED**. **Forge** houses model and software research.
 
-## Portfolio roles
-
-**One inference flagship:** [SZL Router](https://github.com/szl-holdings/szl-router), source-owned at `szl-holdings/szl-router`, presented at [`SZLHOLDINGS/llm-router-live`](https://huggingface.co/spaces/SZLHOLDINGS/llm-router-live), integrated at [a-11-oy.com/code](https://a-11-oy.com/code), proof at [a11oy.net](https://a11oy.net). **Three commercial flagships:** A11oy, Killinchu, Forge. **Five public domain bodies:** Terra, Killinchu, PRISM Counsel, PURIQ Finance, LYTE. **Six internal engines:** CHAPAQ, Lyte, Killinchu, Finance, Terra, Counsel. These labels describe topology, **not availability, operational readiness, or publication policy**; Hub inventory is registry evidence under the same boundary.
+A published file, running application and independently checked result establish different things. Each artifact needs its own evidence and use limits.
 
 ## Current state
 
-The last source-bound public inventory snapshot recorded **21 public Spaces, 46 models, 35 datasets** at **2026-09-10T03:20:41Z** under `hf-public-author-membership/v1`. This is a dated observation, not a live count. [Read `profile/public-inventory.json`](https://github.com/szl-holdings/.github/blob/main/profile/public-inventory.json), bound to A11oy source `4c6621b17ba452d5af7aa2460462fdfbe513509f`, and check the [current Hub listing](https://huggingface.co/SZLHOLDINGS) for newer membership.
+<!-- szl:public-inventory:start -->
+The source-bound public inventory records **34 public Spaces, 47 model repositories, 14 native kernels, 37 datasets** at **2026-10-04T15:36:53Z** under `hf-public-author-membership/v2`. This is a dated observation, not a live count. Native kernel IDs may also appear in the model namespace; these figures do not count unique projects or trained language models. [Inventory binding](https://github.com/szl-holdings/.github/blob/main/profile/public-inventory.json) · [Exact source](https://github.com/szl-holdings/a11oy/blob/4346b821d0f971646b59fa90940af764ce59224f/docs/huggingface-ecosystem-manifest.json) · [Current Hub listing](https://huggingface.co/SZLHOLDINGS). Membership alone does not establish runtime readiness, model quality, or publication permission.
+<!-- szl:public-inventory:end -->
 
 **HISTORICAL:** estate-alignment v1 described 16 portfolio Spaces, 1 inventory-only Space, 45 models, and 34 datasets. The [`SZLHOLDINGS/SZLHOLDINGS` dataset](https://huggingface.co/datasets/SZLHOLDINGS/SZLHOLDINGS) is a historical profile mirror. It does not establish today's inventory, readiness, or model quality.
 
-*Trace the source. Check the state. Read the limit.*
+<details>
+<summary>Reproduce an example and inspect the architecture</summary>
+
+The [single-cell worked example](https://github.com/szl-holdings/governed-receipt-spec/tree/320983d22e76fc9b26af0b2cd20799c5000543fc/examples/public-single-cell) records a calculation on public GEO data. Its unsigned receipt demonstrates scoped integrity and reproducibility; it makes no biological or clinical claim.
+
+[Architecture image](./assets/evidence-lattice-v2.webp) · [Authorization rules](https://github.com/szl-holdings/.github/blob/main/TRUST.md)
+
+</details>
