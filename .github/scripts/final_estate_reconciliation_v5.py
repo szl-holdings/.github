@@ -11,6 +11,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import subprocess
 from dataclasses import asdict
 from datetime import datetime, timezone
 from pathlib import Path
@@ -23,9 +24,11 @@ from final_estate_v5_core import (
     REPLIT_DECOMMISSION_ISSUE,
     REPORT_MARKER,
     REPORT_SCHEMA,
+    SHA40,
     Gate,
     GitHubClient,
 )
+
 from final_estate_v5_evidence import (
     evaluate_issue_gate,
     evaluate_release_revision_consistency,
@@ -36,6 +39,36 @@ from final_estate_v5_probes import (
     evaluate_open_public_prs,
     safe_probe,
 )
+
+MAX_REPORT_BYTES = 2 * 1024 * 1024
+
+
+def evaluate_controller_source(client: GitHubClient) -> Gate:
+    """Observe the checked-out event source and protected main; never a lease."""
+    try:
+        expected = os.environ.get("GITHUB_SHA", "")
+        event = os.environ.get("GITHUB_EVENT_NAME", "")
+        if (SHA40.fullmatch(expected) is None or expected == "0" * 40
+                or os.environ.get("EVIDENCE_GENERATION") != expected
+                or os.environ.get("GITHUB_REPOSITORY") != "szl-holdings/.github"
+                or os.environ.get("GITHUB_REF") != "refs/heads/main"
+                or event not in {"push", "workflow_run", "workflow_dispatch"}
+                or (event == "workflow_run" and os.environ.get("UPSTREAM_WORKFLOW")
+                    != "HF Release Readiness Terminal")):
+            raise RuntimeError("CONTROLLER_EVENT_SOURCE_REJECTED")
+        actual = subprocess.run(
+            ["git", "rev-parse", "HEAD"], check=True, capture_output=True,
+            text=True, timeout=10,
+        ).stdout.strip()
+        if actual != expected or client.controller_head() != expected:
+            raise RuntimeError("CONTROLLER_SOURCE_MOVED_OR_MISMATCHED")
+        return Gate("source:controller_protected_main", True,
+                    "checked-out event source equals observed protected main",
+                    {"repository": "szl-holdings/.github", "revision": expected,
+                     "event": event, "atomic_lease": False})
+    except Exception:
+        return Gate("source:controller_protected_main", False,
+                    "CONTROLLER_SOURCE_UNVERIFIED", {})
 
 
 def evaluate_upstream_readiness() -> Gate:
@@ -67,17 +100,19 @@ def evaluate_upstream_readiness() -> Gate:
 
 
 def evaluate(client: GitHubClient) -> dict[str, Any]:
-    gates = [evaluate_upstream_readiness()]
-    gates.extend(
-        evaluate_issue_gate(client, name, repo, number)
-        for name, (repo, number) in EVIDENCE_ISSUES.items()
-    )
-    gates.append(evaluate_release_revision_consistency(client))
-    gates.append(evaluate_replit_decommission(client))
-    source_gate, source_sha = evaluate_a11oy_source(client)
-    gates.append(source_gate)
-    gates.extend(safe_probe(name, spec, source_sha) for name, spec in PROBES.items())
-    gates.append(evaluate_open_public_prs(client))
+    gates = [evaluate_controller_source(client), evaluate_upstream_readiness()]
+    if gates[0].ok:
+        gates.extend(
+            evaluate_issue_gate(client, name, repo, number)
+            for name, (repo, number) in EVIDENCE_ISSUES.items()
+        )
+        gates.append(evaluate_release_revision_consistency(client))
+        gates.append(evaluate_replit_decommission(client))
+        source_gate, source_sha = evaluate_a11oy_source(client)
+        gates.append(source_gate)
+        gates.extend(safe_probe(name, spec, source_sha) for name, spec in PROBES.items())
+        gates.append(evaluate_open_public_prs(client))
+        gates.append(evaluate_controller_source(client))
     operational = all(gate.ok for gate in gates)
     return {
         "schema": REPORT_SCHEMA,
@@ -109,7 +144,8 @@ def evaluate(client: GitHubClient) -> dict[str, Any]:
             "total": len(gates),
         },
         "boundaries": [
-            "This controller performs GitHub evidence reads, contract-aware public probes, and one deterministic issue update only.",
+            "This verifier performs bounded GitHub evidence reads and public probes, then writes its local report and per-run artifact; it never updates issues.",
+            "The checked-out event source must equal observed protected main before and after observations; these readbacks are not an atomic lease.",
             "A failed upstream HF Release Readiness Terminal workflow is an explicit fail-closed gate; stale evidence cannot substitute for a completed run.",
             "API routes may be GET-only; HEAD is required only for document/static surfaces whose contract declares it.",
             "It does not mutate any Hugging Face asset, deployment, visibility, hardware, model, dataset, kernel, collection, bucket, branch rule, training state, weight, qualification, or promotion state.",
@@ -149,33 +185,18 @@ def main() -> int:
         "--output",
         default="reports/final-estate-reconciliation-v5.json",
     )
-    parser.add_argument("--publish-issue", action="store_true")
     parser.add_argument("--enforce", action="store_true")
     args = parser.parse_args()
-    token = os.environ.get("GITHUB_TOKEN") or os.environ.get("GH_TOKEN")
+    token = os.environ.get("GITHUB_TOKEN")
     client = GitHubClient(token)
     report = evaluate(client)
     output = Path(args.output)
     output.parent.mkdir(parents=True, exist_ok=True)
-    output.write_text(
-        json.dumps(report, indent=2, sort_keys=True) + "\n",
-        encoding="utf-8",
-    )
-    print(json.dumps(report, indent=2, sort_keys=True))
-    if args.publish_issue:
-        run_url = None
-        if all(
-            os.environ.get(key)
-            for key in ("GITHUB_SERVER_URL", "GITHUB_REPOSITORY", "GITHUB_RUN_ID")
-        ):
-            run_url = (
-                f"{os.environ['GITHUB_SERVER_URL']}/{os.environ['GITHUB_REPOSITORY']}"
-                f"/actions/runs/{os.environ['GITHUB_RUN_ID']}"
-            )
-        client.upsert_report_issue(
-            issue_body(report, run_url),
-            report["operational_verified"],
-        )
+    encoded = (json.dumps(report, indent=2, sort_keys=True, allow_nan=False) + "\n").encode("utf-8")
+    if len(encoded) > MAX_REPORT_BYTES:
+        raise RuntimeError("REPORT_BUDGET_EXCEEDED")
+    output.write_bytes(encoded)
+    print(encoded.decode("utf-8"), end="")
     return 1 if args.enforce and not report["operational_verified"] else 0
 
 

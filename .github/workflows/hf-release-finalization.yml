@@ -5,6 +5,8 @@ on:
     branches: [main]
     paths:
       - .github/scripts/kernel_hub_git.py
+      - .github/scripts/hf_release_sources.py
+      - .github/scripts/test_hf_release_sources.py
       - .github/scripts/hf_release_finalization.py
       - .github/scripts/hf_release_finalization_entrypoint.py
       - .github/scripts/hf_release_finalization_git.py
@@ -25,15 +27,15 @@ on:
 
 permissions:
   contents: read
-  issues: write
 
 concurrency:
   group: hf-release-finalization-publication
   cancel-in-progress: false
 
 env:
+  PYTHONDONTWRITEBYTECODE: "1"
+  REVIEWED_SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.event.merge_group.head_sha || github.sha }}
   REPORT_PATH: reports/hf-release-finalization-latest.json
-  REPORT_ISSUE_TITLE: "[hf-release-publication] Lake and first-class Kernel Git transport"
 
 jobs:
   finalize:
@@ -48,46 +50,7 @@ jobs:
         with:
           persist-credentials: false
           fetch-depth: 1
-          path: controller
-
-      - name: Checkout merged Lake source
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          repository: szl-holdings/szl-lake
-          ref: main
-          persist-credentials: false
-          fetch-depth: 0
-          path: lake
-
-      - name: Checkout merged energy-kernel source
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          repository: szl-holdings/szl-energy-attest
-          ref: main
-          persist-credentials: false
-          fetch-depth: 0
-          path: energy
-
-      - name: Checkout merged governed-norm source
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          repository: szl-holdings/szl-lambda-gate
-          ref: main
-          persist-credentials: false
-          fetch-depth: 0
-          path: lambda-gate
-
-      - name: Bind exact reviewed source lineage
-        id: sources
-        shell: bash
-        run: |
-          set -euo pipefail
-          git -C lake merge-base --is-ancestor 9c3819e3eb65af862aa0234db7e595c4e423932a HEAD
-          git -C energy merge-base --is-ancestor 14c1d8fdbb19dbd69f4dfc365d7f74d515bc4bdb HEAD
-          git -C lambda-gate merge-base --is-ancestor 8b95ca47571fda65a52b0b6189677ec089a6e503 HEAD
-          echo "lake_sha=$(git -C lake rev-parse HEAD)" >> "$GITHUB_OUTPUT"
-          echo "energy_sha=$(git -C energy rev-parse HEAD)" >> "$GITHUB_OUTPUT"
-          echo "lambda_sha=$(git -C lambda-gate rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+          ref: ${{ github.event.pull_request.head.sha || github.event.merge_group.head_sha || github.sha }}
 
       - name: Set up Python
         uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
@@ -109,11 +72,18 @@ jobs:
             "pyarrow>=18,<24" \
             "PyYAML>=6,<7"
 
+      - name: Acquire exact protected source owners
+        id: sources
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: python .github/scripts/hf_release_sources.py prepare --operational
+
       - name: Verify transport, finalizer, and source contracts
-        working-directory: controller
         run: |
           set -euo pipefail
           python -m py_compile \
+            .github/scripts/hf_release_sources.py \
+            .github/scripts/test_hf_release_sources.py \
             .github/scripts/kernel_hub_git.py \
             .github/scripts/hf_release_finalization.py \
             .github/scripts/hf_release_finalization_entrypoint.py \
@@ -135,40 +105,38 @@ jobs:
           print("numpy runtime:", numpy.__version__)
           print("torch runtime:", torch.__version__)
           PY
+          python .github/scripts/test_hf_release_sources.py
           git diff --check
 
-      - name: Verify merged source contracts before external writes
-        run: |
-          set -euo pipefail
-          python lake/scripts/test_hf_dataset_contract.py
-          PYTHONPATH=lake/scripts python lake/scripts/test_publish_hf_dataset.py
-          python lake/scripts/publish_hf_dataset.py --check-index
-          PYTHONPATH=energy python -m pytest -q energy/tests/test_hf_kernel_contract.py
-          PYTHONPATH=lambda-gate/torch-ext:lambda-gate \
-            python -m pytest -q lambda-gate/tests/test_hf_governed_norm_contract.py
+      - name: Verify merged source contracts read-only
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: python .github/scripts/hf_release_sources.py contracts --operational
 
       - name: Finalize and independently verify exact revisions
         id: release
-        working-directory: controller
         shell: bash
         env:
+          GITHUB_TOKEN: ${{ github.token }}
           HF_ORG_TOKEN: ${{ secrets.HF_ORG_TOKEN || secrets.HF_ORG_TOKEN1 }}
           HF_TOKEN: ${{ secrets.HF_TOKEN }}
           SZL_LAKE_SHA: ${{ steps.sources.outputs.lake_sha }}
           SZL_ENERGY_ATTEST_SHA: ${{ steps.sources.outputs.energy_sha }}
           SZL_LAMBDA_GATE_SHA: ${{ steps.sources.outputs.lambda_sha }}
         run: |
+          python .github/scripts/hf_release_sources.py verify --operational
           set +e
           args=(
             --publish
             --generation "$GITHUB_SHA"
-            --lake-root ../lake
-            --energy-root ../energy
-            --lambda-root ../lambda-gate
+            --lake-root release-sources/lake
+            --energy-root release-sources/energy
+            --lambda-root release-sources/lambda-gate
           )
           PYTHONPATH=.github/scripts \
             python .github/scripts/hf_release_finalization_git.py "${args[@]}"
           code=$?
+          python .github/scripts/hf_release_sources.py verify --operational || code=2
           echo "exit_code=${code}" >> "$GITHUB_OUTPUT"
           exit 0
 
@@ -176,58 +144,10 @@ jobs:
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: hf-release-finalization-supported-${{ github.run_id }}
-          path: controller/${{ env.REPORT_PATH }}
+          name: hf-release-finalization-supported
+          path: ${{ env.REPORT_PATH }}
           if-no-files-found: error
           retention-days: 90
-
-      - name: Persist deterministic publication issue
-        if: always()
-        working-directory: controller
-        shell: bash
-        env:
-          EXIT_CODE: ${{ steps.release.outputs.exit_code }}
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          set -euo pipefail
-          test -f "$REPORT_PATH"
-          {
-            echo '<!-- szl-hf-release-publication-v2 -->'
-            echo '# Lake and first-class Kernel publication'
-            echo
-            echo "- Run: ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
-            echo "- Source revision: \`${GITHUB_SHA}\`"
-            echo
-            echo '```json'
-            cat "$REPORT_PATH"
-            echo '```'
-          } > /tmp/hf-release-publication.md
-          issue="$(gh issue list \
-            --repo "$GITHUB_REPOSITORY" \
-            --state all \
-            --search "${REPORT_ISSUE_TITLE} in:title" \
-            --json number,title \
-            --jq ".[] | select(.title == env.REPORT_ISSUE_TITLE) | .number" \
-            | head -n1)"
-          if [ -n "$issue" ]; then
-            gh issue edit "$issue" \
-              --repo "$GITHUB_REPOSITORY" \
-              --body-file /tmp/hf-release-publication.md
-          else
-            issue_url="$(gh issue create \
-              --repo "$GITHUB_REPOSITORY" \
-              --title "$REPORT_ISSUE_TITLE" \
-              --body-file /tmp/hf-release-publication.md)"
-            issue="${issue_url##*/}"
-          fi
-          if [ "${EXIT_CODE:-2}" = "0" ]; then
-            gh issue close "$issue" \
-              --repo "$GITHUB_REPOSITORY" \
-              --reason completed \
-              --comment 'The Lake source projection, bound lineage, immutable closed tree, direct predecessor, receipt counts, and stable mutable-head Viewer probe passed. Both first-class Kernel card contracts passed supported transport, immutable revision, build preservation, byte-parity, and selfcheck verification.' || true
-          else
-            gh issue reopen "$issue" --repo "$GITHUB_REPOSITORY" || true
-          fi
 
       - name: Record deterministic downstream handoff
         if: always()

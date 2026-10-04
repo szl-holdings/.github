@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import re
+import time
 from dataclasses import dataclass
 from typing import Any, Iterable, Mapping
 from urllib.parse import urlsplit
@@ -15,7 +16,6 @@ from final_estate_v5_inventory import PublicPullRequestObserver
 ORG = "szl-holdings"
 A11OY_REPOSITORY = "szl-holdings/a11oy"
 A11OY_BRANCH = "main"
-REPORT_TITLE = "[final-estate-reconciliation] SZL Holdings operational estate"
 REPORT_MARKER = "szl-final-estate-reconciliation-v5"
 REPORT_SCHEMA = "szl.final-estate-reconciliation/v5"
 REPLIT_DECOMMISSION_MARKER = "szl-replit-unified-control-hub-decommissioned"
@@ -36,6 +36,25 @@ EVIDENCE_ISSUES = {
     "hf_release_publication": ("szl-holdings/.github", 301),
 }
 REPLIT_DECOMMISSION_ISSUE = ("szl-holdings/.github", 273)
+MAX_RESPONSE_BYTES = 2 * 1024 * 1024
+MAX_GITHUB_REQUESTS = 532  # Existing census plus fixed source/evidence/artifact reads.
+
+
+def bounded_content(response: requests.Response, *, deadline: float) -> bytes:
+    """Bound decoded body bytes; transport timeouts bound individual blocking reads."""
+    chunks: list[bytes] = []
+    size = 0
+    try:
+        for chunk in response.iter_content(chunk_size=65536):
+            size += len(chunk)
+            if size > MAX_RESPONSE_BYTES or time.monotonic() > deadline:
+                raise RuntimeError("RESPONSE_BUDGET_EXCEEDED")
+            chunks.append(chunk)
+        if time.monotonic() > deadline:
+            raise RuntimeError("RESPONSE_BUDGET_EXCEEDED")
+        return b"".join(chunks)
+    finally:
+        response.close()
 
 
 @dataclass(frozen=True)
@@ -65,8 +84,8 @@ PROBES = {
         "https://szlholdings-a11oy.hf.space/api/livez",
         False,
         "json",
-        expected_statuses=("LIVE",),
-        required_keys=("process", "scope", "receipt_minted"),
+        expected_statuses=("PROCESS_ALIVE",),
+        required_keys=("process", "scope", "production_ready", "receipt_minted"),
     ),
     "a11oy_build_info": ProbeSpec(
         "https://szlholdings-a11oy.hf.space/api/build-info",
@@ -98,8 +117,10 @@ PROBES = {
 class GitHubClient:
     def __init__(self, token: str | None) -> None:
         self.public_pr_observation: dict[str, Any] | None = None
+        self.calls = 0
         self.base = "https://api.github.com"
         self.session = requests.Session()
+        self.session.trust_env = False
         self.session.headers.update(
             {
                 "Accept": "application/vnd.github+json",
@@ -119,19 +140,54 @@ class GitHubClient:
         payload: Mapping[str, Any] | None = None,
         expected: Iterable[int] = (200,),
     ) -> requests.Response:
+        allowed_path = (
+            path in {"/search/issues", "/orgs/szl-holdings", "/orgs/szl-holdings/repos",
+                     "/repos/szl-holdings/.github/branches/main",
+                     "/repos/szl-holdings/a11oy/commits/main"}
+            or re.fullmatch(r"/repos/szl-holdings/\.github/issues/(263|257|301|273)", path)
+            or re.fullmatch(r"/repos/szl-holdings/(?!\.{1,2}/)[A-Za-z0-9_.-]+/pulls", path)
+            or path == "/repos/szl-holdings/.github/actions/workflows/hf-release-finalization.yml/runs"
+            or re.fullmatch(r"/repos/szl-holdings/\.github/actions/runs/[1-9][0-9]*(/artifacts)?", path)
+            or re.fullmatch(r"/repos/szl-holdings/\.github/actions/artifacts/[1-9][0-9]*/zip", path)
+        )
+        if method != "GET" or payload is not None or not allowed_path:
+            raise RuntimeError("GITHUB_READ_SCOPE_REJECTED")
+        if self.calls >= MAX_GITHUB_REQUESTS:
+            raise RuntimeError("GITHUB_READ_BUDGET_EXCEEDED")
+        self.calls += 1
+        deadline = time.monotonic() + 60
         response = self.session.request(
             method,
             f"{self.base}{path}",
             params=params,
-            json=payload,
-            timeout=60,
+            allow_redirects=False,
+            stream=True,
+            timeout=(10, 20),
         )
         if response.status_code not in set(expected):
+            response.close()
             raise RuntimeError(
-                f"GitHub {method} {path} returned HTTP {response.status_code}: "
-                f"{response.text[:500]}"
+                f"GitHub GET returned HTTP {response.status_code}"
             )
+        # Preserve Response.json() for the existing validators, after bounded read.
+        response._content = bounded_content(response, deadline=deadline)
+        response._content_consumed = True
         return response
+
+    def controller_head(self) -> str:
+        value = self.request("GET", "/repos/szl-holdings/.github/branches/main").json()
+        commit = value.get("commit") if isinstance(value, dict) else None
+        revision = commit.get("sha") if isinstance(commit, dict) else None
+        if (not isinstance(value, dict) or value.get("name") != "main"
+                or value.get("protected") is not True
+                or not isinstance(revision, str) or SHA40.fullmatch(revision) is None
+                or revision == "0" * 40):
+            raise RuntimeError("CONTROLLER_PROTECTED_MAIN_UNAVAILABLE")
+        return revision
+
+    def publication_evidence(self):
+        from final_estate_v5_artifacts import publication_evidence
+        return publication_evidence(self)
 
     def issue(self, repo: str, number: int) -> dict[str, Any]:
         value = self.request("GET", f"/repos/{repo}/issues/{number}").json()
@@ -154,44 +210,6 @@ class GitHubClient:
         observation = PublicPullRequestObserver(self.request).observe()
         self.public_pr_observation = observation.evidence
         return observation.items
-
-    def upsert_report_issue(self, body: str, operational: bool) -> dict[str, Any]:
-        query = f'repo:{ORG}/.github is:issue in:title "{REPORT_TITLE}"'
-        payload = self.request(
-            "GET", "/search/issues", params={"q": query, "per_page": 10}
-        ).json()
-        values = payload.get("items", []) if isinstance(payload, dict) else []
-        exact = next(
-            (
-                item
-                for item in values
-                if isinstance(item, dict) and item.get("title") == REPORT_TITLE
-            ),
-            None,
-        )
-        desired_state = "closed" if operational else "open"
-        if exact:
-            return self.request(
-                "PATCH",
-                f"/repos/{ORG}/.github/issues/{int(exact['number'])}",
-                payload={"body": body, "state": desired_state},
-            ).json()
-        created = self.request(
-            "POST",
-            f"/repos/{ORG}/.github/issues",
-            payload={"title": REPORT_TITLE, "body": body},
-            expected=(201,),
-        ).json()
-        if not isinstance(created, dict):
-            raise RuntimeError("created reconciliation issue is not an object")
-        if operational:
-            created = self.request(
-                "PATCH",
-                f"/repos/{ORG}/.github/issues/{int(created['number'])}",
-                payload={"state": "closed"},
-            ).json()
-        return created
-
 
 def json_fences(body: str) -> list[dict[str, Any]]:
     output: list[dict[str, Any]] = []

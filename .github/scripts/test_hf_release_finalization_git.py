@@ -52,6 +52,12 @@ class FakeApi:
 
 
 class KernelGitFinalizerTests(unittest.TestCase):
+    def setUp(self):
+        # Provider fixtures must explicitly supply the separately tested source gate.
+        patcher = unittest.mock.patch("hf_release_sources.verify", return_value={"fixture": "SYNTHETIC"})
+        self.source_guard = patcher.start()
+        self.addCleanup(patcher.stop)
+
     def make_instance(self, *, publish=True, stub_selfcheck=True):
         tmp = tempfile.TemporaryDirectory()
         root = pathlib.Path(tmp.name)
@@ -82,6 +88,23 @@ class KernelGitFinalizerTests(unittest.TestCase):
         if stub_selfcheck:
             instance._kernel_selfcheck = lambda repo_id, revision: {"ok": True}
         return tmp, instance
+
+    def test_failed_source_guard_prevents_existing_kernel_publish(self):
+        temporary, instance = self.make_instance()
+        self.addCleanup(temporary.cleanup)
+        self.source_guard.side_effect = RuntimeError("SYNTHETIC source moved")
+        with self.assertRaisesRegex(RuntimeError, "source moved"):
+            instance.finalize_kernel("SZLHOLDINGS/example", {"source_root": "energy", "source_dir": "hf-kernels/example"})
+        self.assertEqual(instance.kernel_transport.publish_calls, [])
+
+    def test_source_movement_after_publish_prevents_success_evidence(self):
+        temporary, instance = self.make_instance()
+        self.addCleanup(temporary.cleanup)
+        self.source_guard.side_effect = [{}, RuntimeError("SYNTHETIC source moved after effect")]
+        with self.assertRaisesRegex(RuntimeError, "after effect"):
+            instance.finalize_kernel("SZLHOLDINGS/example", {"source_root": "energy", "source_dir": "hf-kernels/example"})
+        self.assertEqual(len(instance.kernel_transport.publish_calls), 1)
+        self.assertNotIn("kernels", instance.results)
 
     def test_kernel_publication_delegates_to_git_transport(self):
         tmp, instance = self.make_instance()
@@ -302,7 +325,7 @@ class KernelGitFinalizerTests(unittest.TestCase):
         self.assertNotIn("pull_request:", publication)
         self.assertIn("workflow_dispatch:", publication)
         self.assertIn("group: hf-release-finalization-publication", publication)
-        self.assertIn("issues: write", publication)
+        self.assertNotIn("issues: write", publication)
         self.assertNotIn("actions: write", publication)
         self.assertNotIn("gh workflow run hf-release-readiness", publication)
         self.assertIn(
@@ -317,14 +340,11 @@ class KernelGitFinalizerTests(unittest.TestCase):
         )[1].split("      - name:", 1)[0]
         self.assertIn("secrets.HF_ORG_TOKEN", finalize_step)
         self.assertIn("secrets.HF_TOKEN", finalize_step)
-        issue_step = publication.split(
-            "      - name: Persist deterministic publication issue", 1
-        )[1].split("      - name:", 1)[0]
-        self.assertIn("GH_TOKEN: ${{ github.token }}", issue_step)
-        self.assertNotIn("secrets.HF", issue_step)
+        self.assertNotIn("Persist deterministic publication issue", publication)
+        self.assertNotIn("gh issue", publication)
         self.assertEqual(publication.count("HF_ORG_TOKEN: ${{"), 1)
         self.assertEqual(publication.count("HF_TOKEN: ${{"), 1)
-        self.assertEqual(publication.count("GH_TOKEN: ${{"), 1)
+        self.assertEqual(publication.count("GH_TOKEN: ${{"), 0)
 
         self.assertIn("pull_request:", pull_request)
         self.assertNotIn("secrets.", pull_request)
