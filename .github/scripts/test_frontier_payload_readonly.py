@@ -11,7 +11,7 @@ import sys
 import tempfile
 import time
 import unittest
-from unittest import mock
+import unittest.mock
 
 ROOT = Path(__file__).resolve().parents[2]
 SOURCE = ROOT / '.github/scripts/frontier_payload_readonly.py'
@@ -74,7 +74,7 @@ class WorkflowBoundaryTests(unittest.TestCase):
 class TransportBoundaryTests(unittest.TestCase):
     def test_out_of_scope_url_is_rejected_before_transport(self):
         urls = ['http://127.0.0.1/', 'https://huggingface.co/api/spaces/private', 'https://api.github.com/repos/szl-holdings/a11oy/actions/workflows/hf-sync.yml/dispatches']
-        with mock.patch.object(verify.OPENER, 'open', side_effect=AssertionError('transport invoked')):
+        with unittest.mock.patch.object(verify.OPENER, 'open', side_effect=AssertionError('transport invoked')):
             for url in urls:
                 with self.subTest(url=url):
                     result = verify.request_public(url, deadline=time.monotonic()+1)
@@ -89,7 +89,7 @@ class TransportBoundaryTests(unittest.TestCase):
             time.sleep(1)
             raise AssertionError('timer did not interrupt')
         started = time.monotonic()
-        with mock.patch.object(verify, 'REQUEST_SECONDS', 0.025), mock.patch.object(verify.OPENER, 'open', side_effect=stall):
+        with unittest.mock.patch.object(verify, 'REQUEST_SECONDS', 0.025), unittest.mock.patch.object(verify.OPENER, 'open', side_effect=stall):
             result = verify.request_public(next(iter(verify.PUBLIC_URLS)), deadline=started+0.25)
         self.assertLess(time.monotonic()-started, 0.5)
         self.assertIsNone(result['status'])
@@ -114,7 +114,7 @@ class ReadbackContractTests(unittest.TestCase):
         return {"status": 200, "body": body, "error": None, "elapsed_ms": 1}
 
     def test_complete_actual_report_uses_fixed_public_reads_only(self):
-        with mock.patch.object(verify, 'request_public', side_effect=self.fixture_read) as reads:
+        with unittest.mock.patch.object(verify, 'request_public', side_effect=self.fixture_read) as reads:
             report = verify.collect_report(deadline=time.monotonic()+10)
         self.assertEqual(reads.call_count, 14)
         self.assertEqual(report['schema'], 'szl.frontier-payload-readonly/v1')
@@ -144,7 +144,7 @@ class ReadbackContractTests(unittest.TestCase):
                     elif any(item.url == url and item.name == defect for item in verify.CONFIG.PROBES):
                         value.update(status=503, body=b'private-provider-body-canary', error='HTTP_STATUS')
                     return value
-                with tempfile.TemporaryDirectory() as tmp, mock.patch.object(verify, 'request_public', side_effect=read):
+                with tempfile.TemporaryDirectory() as tmp, unittest.mock.patch.object(verify, 'request_public', side_effect=read):
                     output = Path(tmp)/'report.json'
                     self.assertEqual(verify.main(['--report',str(output),'--summary',str(Path(tmp)/'summary.md')]), 1)
                     report = json.loads(output.read_text())
@@ -152,7 +152,7 @@ class ReadbackContractTests(unittest.TestCase):
                 self.assertNotIn('private-provider-body-canary', json.dumps(report))
 
     def test_mutation_flags_are_rejected_before_any_read(self):
-        with mock.patch.object(verify, 'request_public', side_effect=AssertionError('read before argument rejection')):
+        with unittest.mock.patch.object(verify, 'request_public', side_effect=AssertionError('read before argument rejection')):
             for flag in ('--apply','--dispatch-controls'):
                 with self.subTest(flag=flag), self.assertRaises(SystemExit) as result:
                     verify.main(['--report','unused.json','--summary','unused.md',flag])
@@ -172,7 +172,7 @@ class ReadbackContractTests(unittest.TestCase):
         cases = [(b'ok', url, None), (b'x'*(verify.MAX_BYTES+1), url, 'RESPONSE_TOO_LARGE'), (b'ok', 'https://other.invalid/', 'HTTP_REDIRECT_HELD')]
         for body, result_url, error in cases:
             response = Response(body, result_url)
-            with self.subTest(error=error), mock.patch.object(verify.OPENER,'open',return_value=response) as opened:
+            with self.subTest(error=error), unittest.mock.patch.object(verify.OPENER,'open',return_value=response) as opened:
                 result = verify.request_public(url, deadline=time.monotonic()+1)
                 req = opened.call_args.args[0]
                 self.assertEqual(req.get_method(), 'GET')
@@ -182,7 +182,7 @@ class ReadbackContractTests(unittest.TestCase):
                 else: self.assertEqual(response.last_count, verify.MAX_BYTES+1)
 
     def test_exception_text_is_not_reported_or_retried(self):
-        with mock.patch.object(verify.OPENER, 'open', side_effect=RuntimeError('private-canary')) as opened:
+        with unittest.mock.patch.object(verify.OPENER, 'open', side_effect=RuntimeError('private-canary')) as opened:
             result = verify.request_public(verify.MAIN_URL, deadline=time.monotonic()+1)
         self.assertEqual(opened.call_count, 1)
         self.assertEqual(result['error'], 'PUBLIC_READ_FAILED')
