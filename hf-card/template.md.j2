@@ -7,9 +7,39 @@
 <!-- hf-card: type={{ type }} source={{ fm.szl.source_repo }} vars={{ vars_path }}{% if source_sha %} sha={{ source_sha }}{% endif %} -->
 <!-- Rendered by szl-holdings/.github hf-card/render.py. Edit {{ vars_path }} in {{ fm.szl.source_repo }}; do not edit this card on the Hub. -->
 
+<p><a href="https://huggingface.co/spaces/SZLHOLDINGS/szl-command-lab"><img src="https://raw.githubusercontent.com/szl-holdings/.github/main/profile/assets/szl/logos/szl_mark_holographic.svg" alt="SZL Holdings" width="112" /></a></p>
+
 # {{ title }}
 
 {{ summary }}
+
+**Artifact:** {{ overview.artifact_type | default(fm.szl.artifact_class | default(type | title)) }} · **Stage:** {{ overview.stage | default(fm.szl.lifecycle | default("Not declared")) }}
+
+{% if links.try is defined %}
+[Try]({{ links.try }}) · {% else %}
+[Explore in Command Lab](https://huggingface.co/spaces/SZLHOLDINGS/szl-command-lab) · {% endif %}
+[Build]({{ links.build | default("https://github.com/" + fm.szl.source_repo) }}) · [Evidence]({{ links.evidence | default(fm.szl.proof_url) }})
+
+{% if inference %}
+**Inference Providers:** {% if inference.state == "NO_PROVIDER_MAPPING" %}no provider listed{% elif inference.state == "PROVIDER_MAPPING_REPORTED" %}{{ inference.providers | join(", ") }} listed by the Hub{% else %}observation unavailable{% endif %} ([Hub observation]({{ inference.source_url }}), {{ inference.observed_at }}). A provider listing does not change this artifact's use limits.
+
+{% endif %}
+{% if support_request %}
+[Provider compatibility support requested]({{ support_request.url }}) on {{ support_request.requested_at }} for model revision `{{ support_request.model_revision }}`. Provider adoption and this artifact's use qualification remain independent.
+
+{% endif %}
+{% if limits %}
+## Before you use it
+
+{% for item in limits %}
+- {{ item | trim }}
+{% endfor %}
+{% else %}
+**Use boundary:** this card has no declared use limits. Review the source and evidence before choosing a use.
+{% endif %}
+
+<details>
+<summary>Technical details and evidence</summary>
 
 {% if type == "model" %}
 ## Model
@@ -90,24 +120,15 @@
 {% endfor %}
 {% if claims %}
 
-## Claims
+## Evidence record
 
-| Label | Claim | Evidence |
-| --- | --- | --- |
 {% for c in claims %}
-| {{ c.label }} | {{ c.claim | cell }} | {% if c.receipt is defined %}[receipt]({{ c.receipt }}){% else %}none linked{% endif %} |
-{% endfor %}
+**{{ c.label }}** — {{ c.claim }}{% if c.receipt is defined %} [Receipt]({{ c.receipt }}){% else %} (no receipt linked){% endif %}.
 
+{% endfor %}
 Labels follow the [SZL claim language](https://github.com/szl-holdings/.github/blob/main/docs/CLAIM_LANGUAGE.md). A claim is only as strong as the receipt it links.
 {% endif %}
-{% if limits %}
 
-## Limits
-
-{% for item in limits %}
-- {{ item | trim }}
-{% endfor %}
-{% endif %}
 {% if release is defined %}
 
 <!-- SZL-HF-MIRROR:START -->
@@ -119,6 +140,10 @@ Mirrored from [{{ fm.szl.source_repo }}@{{ release.tag }}](https://github.com/{{
 
 ## Source and provenance
 
+{% if inference %}
+Provider observation bound to Hub revision `{{ inference.hub_revision }}`; it is separate from runtime reachability and model qualification.
+
+{% endif %}
 | Field | Value |
 | --- | --- |
 | Source repository | [{{ fm.szl.source_repo }}](https://github.com/{{ fm.szl.source_repo }}) |
@@ -132,3 +157,5 @@ Mirrored from [{{ fm.szl.source_repo }}@{{ release.tag }}](https://github.com/{{
 {% endif %}
 
 Rendering this card does not establish Hub publication. Verify any Hub copy against its source revision, publication evidence, and exact Hub revision.
+
+</details>

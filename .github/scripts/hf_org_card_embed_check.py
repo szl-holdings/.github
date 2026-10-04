@@ -369,18 +369,21 @@ def validate_document(document: str) -> list[str]:
     if missing_fragments:
         failures.append(f"fragment targets are missing: {missing_fragments}")
 
-    if len(parser.images) != 1:
-        failures.append(f"expected one reviewed image, observed {len(parser.images)}")
-    elif parser.images[0] != {
-        "class": "szl-hf-hero-art",
-        "src": CANONICAL_ASSET_URL,
-        "alt": "",
-        "width": "1800",
-        "height": "776",
-        "fetchpriority": "high",
-        "decoding": "async",
-    }:
-        failures.append("hero image contract drifted from the canonical asset")
+    mark_url = "https://szlholdings-readme.static.hf.space/assets/szl-mark-holographic.svg"
+    approved_images = [
+        {"class": "szl-hf-hero-art", "src": CANONICAL_ASSET_URL, "alt": "",
+         "width": "1800", "height": "776", "fetchpriority": "high", "decoding": "async"},
+        {"src": CANONICAL_ASSET_URL, "alt": "SZL evidence lattice architecture artwork",
+         "width": "1800", "height": "776", "loading": "lazy", "decoding": "async"},
+        {"class": "szl-hf-brand-mark", "src": mark_url, "alt": "SZL Holdings",
+         "width": "96", "height": "60", "decoding": "async"},
+        {"class": "szl-hf-hero-mark", "src": mark_url, "alt": "",
+         "width": "256", "height": "160", "decoding": "async"},
+    ]
+    if (not parser.images or len(parser.images) > len(approved_images)
+            or any(image not in approved_images for image in parser.images)
+            or len({tuple(sorted(image.items())) for image in parser.images}) != len(parser.images)):
+        failures.append("hero image contract drifted from the canonical asset family")
 
     css = "\n".join(parser.styles)
     if CSS_EXTERNAL.search(css):
