@@ -923,6 +923,78 @@ class YamlBoundaryRegressionTests(unittest.TestCase):
         self.assertIn("ACTION_RESOURCE_OVERRIDE_UNSUPPORTED", {item.code for item in parsed["unknowns"]})
         self.assertEqual(parsed["effects"], [])
 
+    def test_reviewed_current_exact_action_pins_keep_narrow_effects(self) -> None:
+        actions = (
+            ("step-security/harden-runner@05e31511f85b41b11d1cf0ef85d0992719546e2c",
+             {"egress-policy": "audit"}, "runner.guard.configure", "runner:guard:egress"),
+            ("actions/setup-node@820762786026740c76f36085b0efc47a31fe5020",
+             {"node-version": "22", "package-manager-cache": "false"},
+             "runner.toolchain.install", "runner:toolchain:node"),
+        )
+        for action, inputs, sink, resource in actions:
+            with self.subTest(action=action):
+                source = workflow(extra_step=f"      - uses: {action}\n        with: {json.dumps(inputs)}\n")
+                candidate = reviewed_policy_for(source)
+                declaration = candidate["workflow_declarations"][WORKFLOW_PATH]
+                declaration["resources"].append({"key": resource, "access": "local-write"})
+                declaration["effects"].append({"sink": sink, "resource": resource, "access": "local-write", "max_calls": 1})
+                telemetry = 1 if action.startswith("step-security/") else 0
+                if telemetry:
+                    declaration["resources"].append({"key": "stepsecurity:monitor:szl-holdings/.github", "access": "external-write"})
+                    declaration["effects"].append({"sink": "runner.guard.telemetry", "resource": "stepsecurity:monitor:szl-holdings/.github", "access": "external-write", "max_calls": 1})
+                    declaration["max_external_writes"] = 1
+                parsed, bound = bind_source(source, candidate=candidate)
+                self.assertEqual(bound["verdict"], "ALLOW")
+                self.assertEqual(bound["external_write_sites"], telemetry)
+                self.assertNotIn("UNCLASSIFIED_EXTERNAL_ACTION", {item.code for item in parsed["unknowns"]})
+
+    def test_current_guard_cache_and_telemetry_are_not_hidden_as_local_effects(self) -> None:
+        action = "step-security/harden-runner@05e31511f85b41b11d1cf0ef85d0992719546e2c"
+        for mode, expected in (("audit", {"runner.guard.telemetry"}), ("block", {"runner.guard.telemetry", "github.cache.write"})):
+            source = workflow(extra_step=f"      - uses: {action}\n        with: {{egress-policy: {mode}}}\n")
+            parsed = gate.analyze_workflow_source(source.decode(), path=WORKFLOW_PATH)
+            observed = {item.sink for item in parsed["effects"] if item.access == "external-write"}
+            self.assertEqual(observed, expected)
+            candidate = reviewed_policy_for(source)
+            declaration = candidate["workflow_declarations"][WORKFLOW_PATH]
+            declaration["resources"].append({"key": "runner:guard:egress", "access": "local-write"})
+            declaration["effects"].append({"sink": "runner.guard.configure", "resource": "runner:guard:egress", "access": "local-write", "max_calls": 1})
+            _parsed, bound = bind_source(source, candidate=candidate)
+            self.assertEqual(bound["verdict"], "DENY")
+            self.assertIn("UNDECLARED_EFFECT", bound["reason_codes"])
+
+    def test_current_action_pin_does_not_admit_cache_auth_or_policy_effects(self) -> None:
+        node = "actions/setup-node@820762786026740c76f36085b0efc47a31fe5020"
+        harden = "step-security/harden-runner@05e31511f85b41b11d1cf0ef85d0992719546e2c"
+        cases = [(node, inputs) for inputs in (
+            {"node-version": "22"},
+            {"node-version": "22", "package-manager-cache": "true"},
+            *({"package-manager-cache": "false", key: value} for key, value in (
+                ("cache", "npm"), ("cache-dependency-path", "package-lock.json"),
+                ("registry-url", "https://registry.example.invalid"),
+                ("mirror", "https://mirror.example.invalid"),
+                ("mirror-token", "literal-credential"),
+            )),
+        )]
+        cases.extend((harden, {"egress-policy": "audit", key: value}) for key, value in (
+            ("policy", "production"), ("use-policy-store", "true"),
+            ("api-key", "literal-credential"), ("deploy-on-self-hosted-vm", "true"),
+            ("disable-file-monitoring", "true"),
+        ))
+        for action, inputs in cases:
+            with self.subTest(action=action, inputs=inputs):
+                source = workflow(extra_step=f"      - uses: {action}\n        with: {json.dumps(inputs)}\n")
+                candidate = reviewed_policy_for(source)
+                parsed, bound = self.assert_source_denied(source, reason="UNREVIEWABLE_EFFECT_BOUNDARY", candidate=candidate)
+                self.assertIn("ACTION_EXTRA_EFFECT_UNSUPPORTED", {item.code for item in parsed["unknowns"]})
+                self.assertFalse(bound["reviewed_unknowns_applied"])
+
+    def test_other_action_revisions_remain_nonreviewable(self) -> None:
+        for repository in ("actions/setup-node", "step-security/harden-runner"):
+            source = workflow(extra_step=f"      - uses: {repository}@{'f' * 40}\n")
+            parsed, _bound = self.assert_source_denied(source, reason="UNREVIEWABLE_EFFECT_BOUNDARY", candidate=reviewed_policy_for(source))
+            self.assertIn("UNCLASSIFIED_EXTERNAL_ACTION", {item.code for item in parsed["unknowns"]})
+
     def test_ambiguous_yaml_is_nonwaivable_even_with_matching_source_and_pins(self) -> None:
         baseline = workflow().decode("utf-8")
         candidates = (
