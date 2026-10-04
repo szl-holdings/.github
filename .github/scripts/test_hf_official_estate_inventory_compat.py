@@ -191,9 +191,20 @@ class KernelInventoryCompatibilityTests(unittest.TestCase):
         verifier = self.verifier([Response([{"id": "SZLHOLDINGS/a", "sha": "a" * 40}])])
         verifier.api.kernel_info = lambda *args, **kwargs: KernelInfo("SZLHOLDINGS/other", "b" * 40)
         with self.assertRaisesRegex(RuntimeError, "ID_MISMATCH"): verifier.inventory_kernels()
-        verifier = self.verifier([Response([{"id": "SZLHOLDINGS/a", "sha": "a" * 40}])])
-        verifier.api.kernel_info = lambda *args, **kwargs: KernelInfo("SZLHOLDINGS/a", None)
-        with self.assertRaisesRegex(RuntimeError, "IMMUTABLE_REVISION_MISSING"): verifier.inventory_kernels()
+        for revision in (None, "0" * 40):
+            verifier = self.verifier([Response([{"id": "SZLHOLDINGS/a", "sha": "a" * 40}])])
+            verifier.api.kernel_info = lambda *args, **kwargs: KernelInfo("SZLHOLDINGS/a", revision)
+            with self.subTest(revision=revision), self.assertRaisesRegex(RuntimeError, "IMMUTABLE_REVISION_MISSING"):
+                verifier.inventory_kernels()
+
+    def test_kernel_visibility_cannot_fall_back_to_stale_public_listing(self):
+        for value in (None, "false", 0):
+            verifier = self.verifier([Response([{"id": "SZLHOLDINGS/a", "private": False}])])
+            info = KernelInfo("SZLHOLDINGS/a", "a" * 40); info.private = value
+            verifier.api.kernel_info = lambda *args, **kwargs: info
+            with self.subTest(value=value), self.assertRaisesRegex(RuntimeError, "VISIBILITY_READBACK_MISSING"):
+                verifier.inventory_kernels()
+            self.assertNotIn("kernels", verifier.inventory)
 
     def test_public_projection_excludes_private_ids_notes_actions_errors_and_digests(self):
         secret = "PRIVATE-SENTINEL"
@@ -210,12 +221,10 @@ class KernelInventoryCompatibilityTests(unittest.TestCase):
         self.assertIsNone(projected["counts"]["models"])
         self.assertEqual(projected["coverage"]["models"], "UNKNOWN")
 
-    def test_private_evidence_dataset_is_required_before_any_publish(self):
-        verifier = self.verifier([]); verifier.publish = True
-        verifier.api.dataset_info = lambda _: type("Info", (), {"private":False})()
-        with patch.object(compat.base.OfficialEstateInventory, "persist") as persist:
-            with self.assertRaisesRegex(RuntimeError, "PRIVATE_EVIDENCE_DATASET_REQUIRED"): verifier.persist({})
-            persist.assert_not_called()
+    def test_compat_uses_the_same_private_expected_parent_publisher(self):
+        self.assertIs(compat.CurrentHubEstateInventory.persist, compat.base.OfficialEstateInventory.persist)
+        import hf_inventory_evidence as evidence
+        self.assertIs(compat.base.publish_report, evidence.publish_report)
 
     def test_active_compatibility_source_uses_no_nonexistent_list_method(self) -> None:
         executable = "\n".join(

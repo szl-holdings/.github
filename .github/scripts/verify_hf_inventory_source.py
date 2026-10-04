@@ -46,6 +46,19 @@ class _NoRedirect(urllib.request.HTTPRedirectHandler):
         raise SourceBoundaryError("GITHUB_REDIRECT_REJECTED")
 
 
+def _unique_object(pairs):
+    result = {}
+    for key, value in pairs:
+        if key in result:
+            raise SourceBoundaryError("GITHUB_DUPLICATE_JSON_KEY")
+        result[key] = value
+    return result
+
+
+def _reject_constant(_value):
+    raise SourceBoundaryError("GITHUB_NONFINITE_JSON")
+
+
 def read_main(token: str) -> dict[str, Any]:
     if not token or any(c in token for c in "\r\n"):
         raise SourceBoundaryError("GITHUB_READ_CREDENTIAL_REQUIRED")
@@ -63,7 +76,7 @@ def read_main(token: str) -> dict[str, Any]:
             body = response.read(65537)
         if len(body) > 65536:
             raise SourceBoundaryError("GITHUB_RESPONSE_BOUND_EXCEEDED")
-        result = json.loads(body)
+        result = json.loads(body, object_pairs_hook=_unique_object, parse_constant=_reject_constant)
         if not isinstance(result, dict):
             raise SourceBoundaryError("GITHUB_RESPONSE_SHAPE_REJECTED")
         return result
@@ -71,11 +84,19 @@ def read_main(token: str) -> dict[str, Any]:
         raise SourceBoundaryError("GITHUB_READBACK_FAILED") from None
 
 
+def require_protected_source(expected_source: str | None = None) -> str:
+    """Refresh the exact protected source immediately before a publication."""
+    checkout = subprocess.check_output(["git", "rev-parse", "--verify", "HEAD^{commit}"], text=True, timeout=10).strip()
+    verify_context(os.environ, checkout)
+    source = verify_context(os.environ, checkout, read_main(os.environ.get("GITHUB_TOKEN", "")))
+    if expected_source is not None and source != expected_source:
+        raise SourceBoundaryError("REPORT_SOURCE_MISMATCH")
+    return source
+
+
 def main() -> int:
     try:
-        checkout = subprocess.check_output(["git", "rev-parse", "--verify", "HEAD^{commit}"], text=True, timeout=10).strip()
-        verify_context(os.environ, checkout)
-        source = verify_context(os.environ, checkout, read_main(os.environ.get("GITHUB_TOKEN", "")))
+        source = require_protected_source()
     except (SourceBoundaryError, subprocess.SubprocessError, OSError) as error:
         code = str(error) if isinstance(error, SourceBoundaryError) else "SOURCE_PREFLIGHT_FAILED"
         print(json.dumps({"state": "BLOCKED", "error_code": code}))

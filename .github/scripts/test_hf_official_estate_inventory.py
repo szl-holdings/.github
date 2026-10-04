@@ -111,7 +111,10 @@ class OfficialEstateInventoryContractTests(unittest.TestCase):
             "clone-refresh",
         ):
             self.assertNotIn(forbidden, source)
-        self.assertIn("estate/official-inventory/latest.json", source)
+        self.assertIn("publish_report(self.api, rendered, generation=self.generation)", source)
+        import hf_inventory_evidence as evidence
+        self.assertEqual(inventory.EVIDENCE_DATASET, evidence.EVIDENCE_DATASET)
+        self.assertEqual(evidence.LATEST_PATH, "estate/official-inventory/latest.json")
 
     def test_report_exposes_downloads_and_likes_for_showcase(self) -> None:
         view = inventory.OfficialEstateInventory._public_asset_view(

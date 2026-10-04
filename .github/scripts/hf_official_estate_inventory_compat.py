@@ -187,8 +187,11 @@ class CurrentHubEstateInventory(base.OfficialEstateInventory):
             merged = dict(summary)
             merged.update({key: value for key, value in detail.items() if value is not None})
             merged["id"] = repo_id
+            if type(detail.get("private")) is not bool:
+                raise RuntimeError("KERNEL_VISIBILITY_READBACK_MISSING")
+            merged["private"] = detail["private"]
             revision = str(detail.get("sha") or "")
-            if not base.SHA40.fullmatch(revision):
+            if not base.SHA40.fullmatch(revision) or revision == "0" * 40:
                 raise RuntimeError("KERNEL_IMMUTABLE_REVISION_MISSING")
             files: set[str] = set()
             for path in self.api.list_repo_files(
@@ -242,15 +245,11 @@ class CurrentHubEstateInventory(base.OfficialEstateInventory):
         report["inventory_scope"] = "Authenticated visible namespace; not proof of ORG_COMPLETE or executable kernel compatibility."
         return report
 
-    def persist(self, report: dict[str, Any]) -> None:
-        if self.publish and self.api.dataset_info(base.EVIDENCE_DATASET).private is not True:
-            raise RuntimeError("PRIVATE_EVIDENCE_DATASET_REQUIRED")
-        super().persist(report)
-
-
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--publish", action="store_true")
+    parser.add_argument("--expected-before", action="store_true", help="Require the protected-source private dataset parent check for publication.")
+    parser.add_argument("--readback", action="store_true", help="Require exact committed-byte readback before publication succeeds.")
     parser.add_argument("--public-projection", type=Path, help="Project an existing operator report without network access.")
     parser.add_argument("--output", type=Path, default=Path("reports/hf-official-estate-inventory-public.json"))
     parser.add_argument(
@@ -258,12 +257,24 @@ def main() -> int:
         default=os.environ.get("GITHUB_SHA") or "manual",
     )
     args = parser.parse_args()
+    if args.publish and not (args.expected_before and args.readback):
+        parser.error("publication requires --expected-before and --readback")
     if args.public_projection:
-        if args.public_projection.stat().st_size > 8 * 1024 * 1024:
-            raise ValueError("OPERATOR_REPORT_BOUND_EXCEEDED")
-        raw = json.loads(args.public_projection.read_bytes(), object_pairs_hook=_unique_object, parse_constant=_reject_constant, parse_float=_finite_float)
-        args.output.parent.mkdir(parents=True, exist_ok=True)
-        args.output.write_text(json.dumps(public_report(raw), indent=2, sort_keys=True, allow_nan=False) + "\n", encoding="utf-8")
+        try:
+            if args.public_projection.resolve() == args.output.resolve():
+                raise ValueError("PROJECTION_MUST_NOT_REPLACE_OPERATOR_REPORT")
+            args.output.unlink(missing_ok=True)
+            with args.public_projection.open("rb") as source:
+                payload = source.read(8 * 1024 * 1024 + 1)
+            if len(payload) > 8 * 1024 * 1024:
+                raise ValueError("OPERATOR_REPORT_BOUND_EXCEEDED")
+            raw = json.loads(payload, object_pairs_hook=_unique_object, parse_constant=_reject_constant, parse_float=_finite_float)
+            rendered = json.dumps(public_report(raw), indent=2, sort_keys=True, allow_nan=False) + "\n"
+            args.output.parent.mkdir(parents=True, exist_ok=True)
+            args.output.write_text(rendered, encoding="utf-8")
+        except Exception:  # noqa: BLE001 - never echo operator data or decoding errors
+            print("FATAL: public inventory projection failed; private details withheld", file=sys.stderr)
+            return 2
         return 0
     token = (
         os.environ.get("HF_ORG_TOKEN")

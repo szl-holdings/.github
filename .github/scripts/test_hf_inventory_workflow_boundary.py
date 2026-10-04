@@ -85,17 +85,23 @@ class WorkflowBoundaryTests(unittest.TestCase):
         self.assertNotIn("GITHUB_ENV", json.dumps(workflow))
         self.assertNotIn("pull_request_target", workflow["on"])
 
-    def test_candidate_validation_is_a_separate_secret_free_reusable_workflow(self):
+    def test_candidate_validation_is_separate_and_secret_free(self):
         workflow = self.workflow()
         self.assertNotIn("pull_request", workflow["on"])
-        self.assertEqual(workflow["jobs"]["verify"], {"uses": "./.github/workflows/hf-inventory-contract.yml"})
+        self.assertNotIn("uses", workflow["jobs"]["verify"])
         contract = yaml.load((ROOT / ".github/workflows/hf-inventory-contract.yml").read_text(), Loader=yaml.BaseLoader)
-        self.assertEqual(set(contract["on"]), {"pull_request", "workflow_call"})
+        self.assertEqual(set(contract["on"]), {"pull_request", "merge_group"})
         self.assertEqual(contract["permissions"], {"contents": "read"})
         self.assertNotIn("secrets.", json.dumps(contract))
         self.assertNotIn("continue-on-error", json.dumps(contract))
         self.assertNotIn("--publish", json.dumps(contract))
         self.assertIn("test_hf_inventory_workflow_boundary.py", json.dumps(contract))
+        for job in (contract["jobs"]["verify"], workflow["jobs"]["verify"]):
+            self.assertIn("python .github/scripts/run_hf_inventory_contracts.py", json.dumps(job))
+        for name in ("test_hf_official_estate_inventory.py", "test_hf_official_estate_inventory_compat.py", "test_hf_inventory_public_boundary.py", "test_hf_inventory_workflow_boundary.py", "test_hf_inventory_evidence.py"):
+            self.assertIn(".github/scripts/" + name, json.dumps(contract))
+            self.assertIn(".github/scripts/" + name, json.dumps(workflow["jobs"]["verify"]))
+        self.assertEqual(contract["concurrency"]["cancel-in-progress"], "false")
 
     def test_privileged_job_is_separate_and_protected(self):
         job = self.workflow()["jobs"]["inventory"]
@@ -114,12 +120,14 @@ class WorkflowBoundaryTests(unittest.TestCase):
         text = privileged[0]["run"]
         self.assertIn("verify_hf_inventory_source.py", text)
         self.assertIn('--publish', text)
+        self.assertIn('--expected-before', text)
+        self.assertIn('--readback', text)
         self.assertIn('> "$private_log" 2>&1', text)
         self.assertNotIn("pip install", text)
         self.assertNotIn("pytest", text)
         for step in steps:
             if step.get("uses", "").startswith("actions/checkout@"):
-                self.assertEqual(step["with"]["ref"], "${{ github.sha }}")
+                self.assertEqual(step["with"]["ref"], "${{ github.event.pull_request.head.sha || github.event.merge_group.head_sha || github.sha }}")
                 self.assertEqual(step["with"]["persist-credentials"], "false")
 
     def test_only_public_projection_is_uploaded_by_inventory(self):
@@ -196,6 +204,47 @@ class CollectorOutputBoundaryTests(unittest.TestCase):
                 self.assertNotIn("PRIVATE-SENTINEL", output.getvalue() + report)
             finally:
                 os.chdir(previous)
+
+    def test_publish_requires_both_explicit_transaction_controls(self):
+        import hf_official_estate_inventory_compat as compat
+        for flags in ([], ["--expected-before"], ["--readback"]):
+            with self.subTest(flags=flags), patch.object(compat, "CurrentHubEstateInventory") as factory, patch.object(sys, "argv", ["inventory", "--publish", *flags]), contextlib.redirect_stderr(io.StringIO()):
+                with self.assertRaises(SystemExit) as raised:
+                    compat.main()
+                self.assertEqual(raised.exception.code, 2)
+                factory.assert_not_called()
+
+    def test_projection_failure_removes_stale_public_output_and_withholds_decode_errors(self):
+        import hf_official_estate_inventory_compat as compat
+        with tempfile.TemporaryDirectory() as directory:
+            source = Path(directory) / "operator.json"
+            destination = Path(directory) / "public.json"
+            source.write_bytes(b'\xffPRIVATE-SENTINEL')
+            destination.write_text('stale')
+            output = io.StringIO()
+            with patch.object(sys, "argv", ["inventory", "--public-projection", str(source), "--output", str(destination)]), contextlib.redirect_stderr(output), patch.object(compat, "CurrentHubEstateInventory") as factory:
+                self.assertEqual(compat.main(), 2)
+                factory.assert_not_called()
+            self.assertFalse(destination.exists())
+            self.assertNotIn("PRIVATE-SENTINEL", output.getvalue())
+            self.assertNotIn("UnicodeDecodeError", output.getvalue())
+
+    def test_projection_cannot_overwrite_its_operator_input(self):
+        import hf_official_estate_inventory_compat as compat
+        with tempfile.TemporaryDirectory() as directory:
+            source = Path(directory) / "operator.json"
+            raw = '{"private":"PRIVATE-SENTINEL"}'
+            source.write_text(raw)
+            with patch.object(sys, "argv", ["inventory", "--public-projection", str(source), "--output", str(source)]), contextlib.redirect_stderr(io.StringIO()):
+                self.assertEqual(compat.main(), 2)
+            self.assertEqual(source.read_text(), raw)
+
+    def test_offline_runner_rejects_hf_credentials_before_importing_suites(self):
+        import run_hf_inventory_contracts as runner
+        for name in runner.HF_CREDENTIALS:
+            with self.subTest(name=name), patch.dict(os.environ, {name: "test-only-sentinel"}, clear=True), patch.object(runner.unittest.defaultTestLoader, "loadTestsFromNames") as loader, contextlib.redirect_stderr(io.StringIO()):
+                self.assertEqual(runner.main(), 2)
+                loader.assert_not_called()
 
 
 if __name__ == "__main__":

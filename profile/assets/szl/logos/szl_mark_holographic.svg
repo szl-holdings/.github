@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 160" role="img" aria-labelledby="szl-title szl-desc">
+  <title id="szl-title">SZL Holdings</title>
+  <desc id="szl-desc">The SZL orbital monogram. Silver letterforms cross a precise cyan, lilac and mint orbit.</desc>
+  <defs>
+    <linearGradient id="szl-orbit" x1="18" y1="125" x2="234" y2="31" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#99e7ef"/>
+      <stop offset=".46" stop-color="#c2b9ef"/>
+      <stop offset=".76" stop-color="#ecebf0"/>
+      <stop offset="1" stop-color="#a3e4ca"/>
+    </linearGradient>
+    <linearGradient id="szl-silver" x1="64" y1="50" x2="165" y2="108" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#faf9f4"/>
+      <stop offset=".55" stop-color="#d7dce4"/>
+      <stop offset="1" stop-color="#a7b2c4"/>
+    </linearGradient>
+  </defs>
+  <ellipse cx="128" cy="80" rx="116" ry="43" transform="rotate(-20 128 80)" fill="none" stroke="url(#szl-orbit)" stroke-width="1.4"/>
+  <g fill="none" stroke="url(#szl-silver)" stroke-width="13" stroke-linejoin="miter">
+    <path d="M81 53H51L43 61V70L78 86V97L70 105H39"/>
+    <path d="M94 53H135V58L96 100V105H137"/>
+    <path d="M155 47V105H201"/>
+  </g>
+  <circle cx="222.5" cy="28.6" r="3.4" fill="#a3e4ca"/>
+  <path d="M125 125L128 119L131 125" fill="none" stroke="url(#szl-orbit)" stroke-width="1.2"/>
+</svg>

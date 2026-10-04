@@ -51,6 +51,66 @@ def rules(text: str, card_type: str = "kernel") -> list[str]:
 
 
 class RenderTests(unittest.TestCase):
+    def test_limits_and_user_paths_precede_expandable_technical_evidence(self) -> None:
+        data = render.load_vars(FIXTURES / "model.card.yaml")
+        data["overview"] = {"artifact_type": "LoRA adapter", "stage": "Research — HOLD"}
+        data["limits"] = ["Research use; promotion remains blocked."]
+        data["sections"] = [{"heading": "Full evaluation", "body": "Original source evidence remains here."}]
+        text = render.render(data)
+        self.assertIn("**Artifact:** LoRA adapter · **Stage:** Research — HOLD", text)
+        self.assertIn("[Explore in Command Lab]", text)
+        self.assertIn("[Build]", text)
+        self.assertLess(text.index("Research use; promotion remains blocked."), text.index("<details>"))
+        self.assertGreater(text.index("Original source evidence remains here."), text.index("<details>"))
+        self.assertIn("</details>", text)
+
+    def test_absent_stage_and_provider_are_not_promoted_from_metadata(self) -> None:
+        data = render.load_vars(FIXTURES / "space.card.yaml")
+        text = render.render(data)
+        self.assertIn("**Stage:** Not declared", text)
+        self.assertNotIn("Inference Providers:", text)
+        self.assertNotIn("production ready", text.lower())
+
+    def test_explicit_try_link_is_https_and_not_active_content(self) -> None:
+        data = render.load_vars(FIXTURES / "model.card.yaml")
+        for url in ("javascript:alert(1)", "https://u:p@example.com", "https://example.com/)\n[other](x)"):
+            with self.subTest(url=url), self.assertRaises(render.VarsError):
+                render.render({**data, "links": {"try": url}})
+        text = render.render({**data, "links": {"try": "https://huggingface.co/spaces/SZLHOLDINGS/example"}})
+        self.assertIn("[Try](https://huggingface.co/spaces/SZLHOLDINGS/example)", text)
+
+    def test_provider_mapping_is_dated_and_does_not_grant_deployment(self) -> None:
+        data = render.load_vars(FIXTURES / "model.card.yaml")
+        observation = {"state": "NO_PROVIDER_MAPPING", "providers": [],
+            "observed_at": "2026-10-04T15:00:00Z", "hub_revision": SHA,
+            "source_url": "https://huggingface.co/api/models/" + data["repo_id"] + "?expand=inferenceProviderMapping"}
+        text = render.render({**data, "inference": observation})
+        self.assertIn("**Inference Providers:** no provider listed", text)
+        self.assertIn("2026-10-04T15:00:00Z", text)
+        self.assertIn("separate from runtime reachability and model qualification", text)
+        for changed in ({"state": "PROVIDER_MAPPING_REPORTED"},
+                        {"providers": ["example-provider"]},
+                        {"providers": [{}]}, {"observed_at": "2026-02-31T00:00:00Z"},
+                        {"hub_revision": "main"}, {"source_url": "https://example.com"}):
+            with self.subTest(changed=changed), self.assertRaises(render.VarsError):
+                render.render({**data, "inference": {**observation, **changed}})
+
+    def test_verified_support_request_stays_separate_from_provider_adoption(self) -> None:
+        data = render.load_vars(FIXTURES / "model.card.yaml")
+        request = {"model_id": data["repo_id"], "model_revision": SHA,
+                   "url": "https://huggingface.co/spaces/huggingface/InferenceSupport/discussions/12781",
+                   "requested_at": "2026-10-04T15:51:03Z", "verified_readback": True,
+                   "request_state": "SUBMITTED_RESEARCH_COMPATIBILITY_REVIEW"}
+        text = render.render({**data, "support_request": request})
+        self.assertIn("Provider compatibility support requested", text)
+        self.assertIn("Provider adoption and this artifact's use qualification remain independent", text)
+        self.assertNotIn("**Inference Providers:**", text)
+        for changed in ({"model_id": "SZLHOLDINGS/other"}, {"verified_readback": False},
+                        {"request_state": "DRAFT"}, {"url": "https://example.com/12781"},
+                        {"model_revision": "main"}, {"requested_at": "2026-02-31T00:00:00Z"}):
+            with self.subTest(changed=changed), self.assertRaises(render.VarsError):
+                render.render({**data, "support_request": {**request, **changed}})
+
     def test_every_fixture_renders_and_lints_clean(self) -> None:
         for path in sorted(FIXTURES.glob("*.card.yaml")):
             with self.subTest(fixture=path.name):

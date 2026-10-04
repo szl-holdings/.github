@@ -22,8 +22,10 @@ Exit codes: 0 written or up to date, 1 validation, lint or drift failure,
 from __future__ import annotations
 
 import argparse
+import datetime as dt
 import re
 import sys
+from urllib.parse import urlsplit
 from pathlib import Path
 from typing import Any
 
@@ -48,7 +50,7 @@ CLAIM_LABELS = (
 )
 VARS_KEYS = {
     "type", "repo_id", "title", "summary", "front_matter", "sections", "claims", "limits",
-    "release", "dataset", "space", "kernel",
+    "release", "dataset", "space", "kernel", "overview", "links", "inference", "support_request",
 }
 SHA = re.compile(r"^[0-9a-f]{40}$")
 
@@ -87,7 +89,88 @@ def load_vars(path: Path) -> dict[str, Any]:
         _require(isinstance(item, str) and item.strip(), "each limit must be a non-empty string")
     for block in ("dataset", "space", "kernel"):
         _require(isinstance(data.get(block, {}), dict), f"{block} must be a mapping")
+    check_presentation(data)
     return data
+
+
+def check_presentation(data: dict[str, Any]) -> None:
+    overview = data.get("overview", {})
+    _require(isinstance(overview, dict) and set(overview) <= {"artifact_type", "stage"},
+             "overview supports only artifact_type and stage")
+    for key, value in overview.items():
+        _require(isinstance(value, str) and value.strip() and len(value) <= 100
+                 and not any(c in value for c in "\n\r<>|"),
+                 f"overview.{key} must be a short plain-text label")
+    links = data.get("links", {})
+    _require(isinstance(links, dict) and set(links) <= {"try", "build", "evidence"},
+             "links supports only try, build and evidence")
+    for key, value in links.items():
+        _require(isinstance(value, str), f"links.{key} must be an HTTPS URL")
+        parsed = urlsplit(value)
+        _require(parsed.scheme == "https" and bool(parsed.hostname)
+                 and not parsed.username and not parsed.password
+                 and not any(c.isspace() or c in "<>()\\" for c in value),
+                 f"links.{key} must be an unambiguous HTTPS URL")
+    inference = data.get("inference")
+    if inference is not None:
+        _require(data.get("type") == "model", "inference observations belong to model cards")
+        _require(isinstance(inference, dict) and set(inference) == {
+            "state", "providers", "observed_at", "hub_revision", "source_url"},
+            "inference needs exact state, providers, observed_at, hub_revision and source_url")
+        _require(inference["state"] in {
+            "NO_PROVIDER_MAPPING", "PROVIDER_MAPPING_REPORTED", "UNAVAILABLE"},
+            "inference.state is not a supported provider observation")
+        providers = inference["providers"]
+        _require(isinstance(providers, list) and all(isinstance(provider, str)
+                         and re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_-]{0,79}", provider)
+                         for provider in providers)
+                 and len(providers) == len(set(providers)), "inference.providers must be unique provider IDs")
+        _require(bool(providers) == (inference["state"] == "PROVIDER_MAPPING_REPORTED"),
+                 "provider state and provider names disagree")
+        _require(isinstance(inference["hub_revision"], str)
+                 and SHA.fullmatch(inference["hub_revision"]) is not None,
+                 "inference.hub_revision must be an immutable Hub revision")
+        _require(isinstance(inference["observed_at"], str)
+                 and re.fullmatch(r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|\+00:00)",
+                                  inference["observed_at"]) is not None,
+                 "inference.observed_at must be a UTC observation timestamp")
+        try:
+            dt.datetime.fromisoformat(inference["observed_at"].replace("Z", "+00:00"))
+        except ValueError:
+            raise VarsError("inference.observed_at is not a valid calendar date") from None
+        prefix = "https://huggingface.co/api/models/" + str(data["repo_id"])
+        _require(isinstance(inference["source_url"], str)
+                 and inference["source_url"] in {
+                     prefix + "?expand=inferenceProviderMapping",
+                     prefix + "?expand[]=inferenceProviderMapping",
+                     prefix + "?expand%5B%5D=inferenceProviderMapping",
+                     prefix + "?expand[]=inferenceProviderMapping&expand[]=sha",
+                     prefix + "?expand%5B%5D=inferenceProviderMapping&expand%5B%5D=sha"},
+                 "inference.source_url must observe this exact model's provider mapping")
+    request = data.get("support_request")
+    if request is not None:
+        _require(data.get("type") == "model", "provider support requests belong to model cards")
+        _require(isinstance(request, dict) and set(request) == {
+            "model_id", "model_revision", "url", "requested_at", "verified_readback", "request_state"},
+            "support_request needs exact model identity, URL, date, readback and request state")
+        _require(request["model_id"] == data["repo_id"], "support request belongs to another model")
+        _require(isinstance(request["model_revision"], str)
+                 and SHA.fullmatch(request["model_revision"]) is not None,
+                 "support request must bind the submitted model revision")
+        _require(request["verified_readback"] is True and
+                 request["request_state"] == "SUBMITTED_RESEARCH_COMPATIBILITY_REVIEW",
+                 "support requested requires verified submission evidence")
+        _require(isinstance(request["url"], str) and re.fullmatch(
+            r"https://huggingface\.co/spaces/huggingface/InferenceSupport/discussions/[1-9][0-9]*",
+            request["url"]) is not None, "support request must link the official submitted discussion")
+        _require(isinstance(request["requested_at"], str) and re.fullmatch(
+            r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|\+00:00)",
+            request["requested_at"]) is not None, "support request needs a UTC submission date")
+        try:
+            dt.datetime.fromisoformat(request["requested_at"].replace("Z", "+00:00"))
+        except ValueError:
+            raise VarsError("support request has an invalid submission date") from None
+
 
 
 def check_claims(claims: list[Any], source_repo: str | None) -> None:
@@ -121,6 +204,7 @@ def _cell(value: Any) -> str:
 
 
 def render(data: dict[str, Any], *, source_sha: str | None = None, vars_path: str = "hf/card.yaml") -> str:
+    check_presentation(data)
     front_matter = dict(data["front_matter"])
     szl = front_matter.get("szl")
     if source_sha is not None:
@@ -163,6 +247,10 @@ def render(data: dict[str, Any], *, source_sha: str | None = None, vars_path: st
         "kernel": data.get("kernel") or {},
         "source_sha": source_sha,
         "vars_path": vars_path,
+        "overview": data.get("overview") or {},
+        "links": data.get("links") or {},
+        "inference": data.get("inference") or {},
+        "support_request": data.get("support_request") or {},
     }
     if release is not None:
         context["release"] = release

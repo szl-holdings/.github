@@ -131,16 +131,36 @@
       "source_sha256": "sha256:28862bcc13dfbc662556c761ebe3fefbf9d4c4c70b28d30e67d5844ecff0a817",
       "credentials": [],
       "resources": [
-        {"key": "github:actions:artifact:sbom", "access": "external-write"},
-        {"key": "github:repository:szl-holdings/.github:contents", "access": "read"}
+        {
+          "key": "github:actions:artifact:sbom",
+          "access": "external-write"
+        },
+        {
+          "key": "github:repository:szl-holdings/.github:contents",
+          "access": "read"
+        }
       ],
       "effects": [
-        {"sink": "github.artifact.upload", "resource": "github:actions:artifact:sbom", "access": "external-write", "max_calls": 1},
-        {"sink": "github.contents.checkout", "resource": "github:repository:szl-holdings/.github:contents", "access": "read", "max_calls": 1}
+        {
+          "sink": "github.artifact.upload",
+          "resource": "github:actions:artifact:sbom",
+          "access": "external-write",
+          "max_calls": 1
+        },
+        {
+          "sink": "github.contents.checkout",
+          "resource": "github:repository:szl-holdings/.github:contents",
+          "access": "read",
+          "max_calls": 1
+        }
       ],
       "max_external_writes": 1,
       "required_controls": {
-        "triggers": ["push", "release", "workflow_dispatch"],
+        "triggers": [
+          "push",
+          "release",
+          "workflow_dispatch"
+        ],
         "contents_read": true,
         "no_explicit_secrets": true,
         "concurrency": false,
@@ -598,19 +618,76 @@
         ]
       }
     },
-    ".github/workflows/hf-inventory-contract.yml": {"intent_id":"hf-inventory-credentialless-candidate-contract-v1","valid_until":"2026-11-30","source_sha256":"sha256:82f6b7899fcc278bf6e46a525db392138d5bc42dd21bdd34fc7a84c3026e6de7","credentials":[],"resources":[{"key":"github:actions:artifact:hf-inventory-verification-source","access":"external-write"},{"key":"github:repository:szl-holdings/.github:contents","access":"read"},{"key":"runner:toolchain:python","access":"local-write"},{"key":"test-harness:hf-inventory:credentialless-sdk-site","access":"external-write"}],"effects":[{"sink":"github.artifact.upload","resource":"github:actions:artifact:hf-inventory-verification-source","access":"external-write","max_calls":1},{"sink":"github.contents.checkout","resource":"github:repository:szl-holdings/.github:contents","access":"read","max_calls":1},{"sink":"runner.toolchain.install","resource":"runner:toolchain:python","access":"local-write","max_calls":1},{"sink":"sdk.repository.upload_file","resource":"test-harness:hf-inventory:credentialless-sdk-site","access":"external-write","max_calls":1}],"max_external_writes":2,"required_controls":{"triggers":["pull_request"],"contents_read":true,"no_explicit_secrets":true,"concurrency":true,"protected_ref":false,"exact_sha":true,"expected_before":true,"readback":true},"trusted_transitives":{".github/scripts/control_plane_effect_gate.py":"sha256:c6dab1dd86092280168a6312417c03fde611fdbe197cd4c436aadf25ae18fb67",".github/scripts/test_control_plane_effect_gate.py":"sha256:abf96660b74f49eaaffe4f6165a0614f0e8922605ddc8a47d4aa11ef71791981"},"reviewed_unknowns":{"files":{".github/scripts/hf_inventory_public_boundary.py":"sha256:9ac5e5e09f58ef5f34fea648af01216248cdc15286e0d8ce79f66b0c47eac8d5",".github/scripts/hf_official_estate_inventory.py":"sha256:de23a6629ec991033f8bd0fd3aae1874cae5e1c51e8f6d1d80669b267d627e20",".github/scripts/hf_official_estate_inventory_compat.py":"sha256:db572e4f2245fe609105dc85c3fa9b3cb5393e0053cfa10f7d53905022e066c9",".github/scripts/test_hf_inventory_public_boundary.py":"sha256:ed338dcc8733c4483277c676053a5b94eaeefde5856e708aef2b283a48e56bbf",".github/scripts/test_hf_inventory_workflow_boundary.py":"sha256:5181d2178c5f9cd97d340949b582c8501726c2a0afaa38c5886d55cc860b9ab0",".github/scripts/test_hf_official_estate_inventory.py":"sha256:a6591380ecace60b69314aec04ae3aa23836eb2e72d9a6436f466f6cd2c6274c",".github/scripts/test_hf_official_estate_inventory_compat.py":"sha256:c0d80a7f39952d57d1e14ad0869393f6df957c66ec58686eac9bad86339abafa",".github/scripts/verify_hf_inventory_source.py":"sha256:7069866afe9be974fccb8639fdc300d2bb5d81e81edf6c77c53a910090268cae",".github/workflows/hf-inventory-contract.yml":"sha256:82f6b7899fcc278bf6e46a525db392138d5bc42dd21bdd34fc7a84c3026e6de7",".github/workflows/hf-official-estate-inventory.yml":"sha256:46485f5250ffb53bc8c0c17e973c2b72a80829c4eb886325862c71aaa567bf2b"},"unknowns":["ACTION_INPUTS_REVIEW_REQUIRED@.github/workflows/hf-inventory-contract.yml:28","ACTION_INPUTS_REVIEW_REQUIRED@.github/workflows/hf-inventory-contract.yml:34","ACTION_INPUTS_REVIEW_REQUIRED@.github/workflows/hf-inventory-contract.yml:90","DYNAMIC_EXECUTION@.github/workflows/hf-inventory-contract.yml:72","DYNAMIC_EXECUTION@.github/workflows/hf-inventory-contract.yml:74","DYNAMIC_EXECUTION@.github/workflows/hf-inventory-contract.yml:76","HTTP_TARGET_UNRESOLVED@.github/scripts/verify_hf_inventory_source.py:52","PYTHON_CLIENT_UNRESOLVED@.github/scripts/test_hf_inventory_workflow_boundary.py:71","PYTHON_DYNAMIC_EXECUTION@.github/scripts/hf_official_estate_inventory.py:71","PYTHON_DYNAMIC_EXECUTION@.github/scripts/hf_official_estate_inventory.py:102","PYTHON_DYNAMIC_EXECUTION@.github/scripts/hf_official_estate_inventory.py:145","PYTHON_DYNAMIC_EXECUTION@.github/scripts/hf_official_estate_inventory.py:158","PYTHON_DYNAMIC_EXECUTION@.github/scripts/hf_official_estate_inventory.py:159","PYTHON_DYNAMIC_EXECUTION@.github/scripts/hf_official_estate_inventory.py:160","PYTHON_DYNAMIC_EXECUTION@.github/scripts/hf_official_estate_inventory.py:217","PYTHON_DYNAMIC_EXECUTION@.github/scripts/hf_official_estate_inventory.py:218","PYTHON_DYNAMIC_EXECUTION@.github/scripts/hf_official_estate_inventory.py:219","PYTHON_DYNAMIC_EXECUTION@.github/scripts/hf_official_estate_inventory.py:305","PYTHON_DYNAMIC_EXECUTION@.github/scripts/hf_official_estate_inventory.py:311","PYTHON_DYNAMIC_EXECUTION@.github/scripts/hf_official_estate_inventory.py:312","PYTHON_DYNAMIC_EXECUTION@.github/scripts/hf_official_estate_inventory.py:339","PYTHON_DYNAMIC_EXECUTION@.github/scripts/test_hf_official_estate_inventory.py:15","PYTHON_DYNAMIC_EXECUTION@.github/scripts/test_hf_official_estate_inventory_compat.py:16","PYTHON_DYNAMIC_SUBPROCESS@.github/workflows/hf-inventory-contract.yml:82","PYTHON_IMPORT_UNRESOLVED@.github/scripts/hf_inventory_public_boundary.py:4","PYTHON_IMPORT_UNRESOLVED@.github/scripts/hf_official_estate_inventory.py:9","PYTHON_IMPORT_UNRESOLVED@.github/scripts/hf_official_estate_inventory.py:11","PYTHON_IMPORT_UNRESOLVED@.github/scripts/hf_official_estate_inventory.py:12","PYTHON_IMPORT_UNRESOLVED@.github/scripts/hf_official_estate_inventory.py:13","PYTHON_IMPORT_UNRESOLVED@.github/scripts/hf_official_estate_inventory.py:14","PYTHON_IMPORT_UNRESOLVED@.github/scripts/hf_official_estate_inventory.py:19","PYTHON_IMPORT_UNRESOLVED@.github/scripts/hf_official_estate_inventory.py:20","PYTHON_IMPORT_UNRESOLVED@.github/scripts/hf_official_estate_inventory.py:22","PYTHON_IMPORT_UNRESOLVED@.github/scripts/hf_official_estate_inventory.py:26","PYTHON_IMPORT_UNRESOLVED@.github/scripts/hf_official_estate_inventory_compat.py:11","PYTHON_IMPORT_UNRESOLVED@.github/scripts/hf_official_estate_inventory_compat.py:13","PYTHON_IMPORT_UNRESOLVED@.github/scripts/hf_official_estate_inventory_compat.py:15","PYTHON_IMPORT_UNRESOLVED@.github/scripts/hf_official_estate_inventory_compat.py:19","PYTHON_IMPORT_UNRESOLVED@.github/scripts/hf_official_estate_inventory_compat.py:23","PYTHON_IMPORT_UNRESOLVED@.github/scripts/hf_official_estate_inventory_compat.py:25","PYTHON_IMPORT_UNRESOLVED@.github/scripts/hf_official_estate_inventory_compat.py:27","PYTHON_IMPORT_UNRESOLVED@.github/scripts/hf_official_estate_inventory_compat.py:28","PYTHON_IMPORT_UNRESOLVED@.github/scripts/test_hf_inventory_public_boundary.py:4","PYTHON_IMPORT_UNRESOLVED@.github/scripts/test_hf_inventory_public_boundary.py:8","PYTHON_IMPORT_UNRESOLVED@.github/scripts/test_hf_inventory_workflow_boundary.py:4","PYTHON_IMPORT_UNRESOLVED@.github/scripts/test_hf_inventory_workflow_boundary.py:5","PYTHON_IMPORT_UNRESOLVED@.github/scripts/test_hf_inventory_workflow_boundary.py:14","PYTHON_IMPORT_UNRESOLVED@.github/scripts/test_hf_inventory_workflow_boundary.py:15","PYTHON_IMPORT_UNRESOLVED@.github/scripts/test_hf_inventory_workflow_boundary.py:147","PYTHON_IMPORT_UNRESOLVED@.github/scripts/test_hf_inventory_workflow_boundary.py:148","PYTHON_IMPORT_UNRESOLVED@.github/scripts/test_hf_inventory_workflow_boundary.py:152","PYTHON_IMPORT_UNRESOLVED@.github/scripts/test_hf_inventory_workflow_boundary.py:163","PYTHON_IMPORT_UNRESOLVED@.github/scripts/test_hf_inventory_workflow_boundary.py:173","PYTHON_IMPORT_UNRESOLVED@.github/scripts/test_hf_inventory_workflow_boundary.py:186","PYTHON_IMPORT_UNRESOLVED@.github/scripts/test_hf_official_estate_inventory.py:2","PYTHON_IMPORT_UNRESOLVED@.github/scripts/test_hf_official_estate_inventory.py:4","PYTHON_IMPORT_UNRESOLVED@.github/scripts/test_hf_official_estate_inventory.py:5","PYTHON_IMPORT_UNRESOLVED@.github/scripts/test_hf_official_estate_inventory.py:9","PYTHON_IMPORT_UNRESOLVED@.github/scripts/test_hf_official_estate_inventory_compat.py:2","PYTHON_IMPORT_UNRESOLVED@.github/scripts/test_hf_official_estate_inventory_compat.py:4","PYTHON_IMPORT_UNRESOLVED@.github/scripts/test_hf_official_estate_inventory_compat.py:5","PYTHON_IMPORT_UNRESOLVED@.github/scripts/verify_hf_inventory_source.py:4","PYTHON_IMPORT_UNRESOLVED@.github/scripts/verify_hf_inventory_source.py:11","PYTHON_IMPORT_UNRESOLVED@.github/scripts/verify_hf_inventory_source.py:12","PYTHON_IMPORT_UNRESOLVED@.github/workflows/hf-inventory-contract.yml:56","PYTHON_SOURCE_REVIEW_REQUIRED@.github/scripts/hf_inventory_public_boundary.py:1","PYTHON_SOURCE_REVIEW_REQUIRED@.github/scripts/hf_official_estate_inventory.py:1","PYTHON_SOURCE_REVIEW_REQUIRED@.github/scripts/hf_official_estate_inventory_compat.py:1","PYTHON_SOURCE_REVIEW_REQUIRED@.github/scripts/test_hf_inventory_public_boundary.py:1","PYTHON_SOURCE_REVIEW_REQUIRED@.github/scripts/test_hf_inventory_workflow_boundary.py:1","PYTHON_SOURCE_REVIEW_REQUIRED@.github/scripts/test_hf_official_estate_inventory.py:1","PYTHON_SOURCE_REVIEW_REQUIRED@.github/scripts/test_hf_official_estate_inventory_compat.py:1","PYTHON_SOURCE_REVIEW_REQUIRED@.github/scripts/verify_hf_inventory_source.py:1","PYTHON_SOURCE_REVIEW_REQUIRED@.github/workflows/hf-inventory-contract.yml:56","SCRIPT_SOURCE_REVIEW_REQUIRED@.github/workflows/hf-inventory-contract.yml:1","SCRIPT_SOURCE_REVIEW_REQUIRED@.github/workflows/hf-official-estate-inventory.yml:1","SDK_TARGET_UNRESOLVED@.github/scripts/hf_official_estate_inventory.py:451","SHELL_COMMAND_UNCLASSIFIED@.github/scripts/verify_hf_inventory_source.py:76","SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-inventory-contract.yml:37","SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-inventory-contract.yml:43","SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-inventory-contract.yml:44","SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-inventory-contract.yml:45","SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-inventory-contract.yml:46","SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-inventory-contract.yml:47","SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-inventory-contract.yml:48","SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-inventory-contract.yml:49","SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-inventory-contract.yml:50","SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-inventory-contract.yml:51","SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-inventory-contract.yml:55","SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-inventory-contract.yml:56","SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-inventory-contract.yml:57","SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-inventory-contract.yml:58","SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-inventory-contract.yml:59","SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-inventory-contract.yml:60","SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-inventory-contract.yml:61","SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-inventory-contract.yml:62","SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-inventory-contract.yml:63","SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-inventory-contract.yml:64","SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-inventory-contract.yml:65","SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-inventory-contract.yml:66","SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-inventory-contract.yml:67","SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-inventory-contract.yml:68","SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-inventory-contract.yml:69","SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-inventory-contract.yml:70","SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-inventory-contract.yml:71","SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-inventory-contract.yml:72","SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-inventory-contract.yml:73","SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-inventory-contract.yml:74","SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-inventory-contract.yml:75","SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-inventory-contract.yml:76","SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-inventory-contract.yml:77","SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-inventory-contract.yml:78","SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-inventory-contract.yml:79","SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-inventory-contract.yml:80","SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-inventory-contract.yml:81","SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-inventory-contract.yml:82","SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-inventory-contract.yml:83","SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-inventory-contract.yml:84","SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-inventory-contract.yml:85","SHELL_COMPOSITION_UNKNOWN@.github/workflows/hf-inventory-contract.yml:43","SHELL_COMPOSITION_UNKNOWN@.github/workflows/hf-inventory-contract.yml:44","SHELL_COMPOSITION_UNKNOWN@.github/workflows/hf-inventory-contract.yml:45","WORKFLOW_ENVIRONMENT_REVIEW_REQUIRED@.github/workflows/hf-inventory-contract.yml:21","WORKFLOW_ENVIRONMENT_REVIEW_REQUIRED@.github/workflows/hf-inventory-contract.yml:40"]}},
-    ".github/workflows/hf-official-estate-inventory.yml": {"intent_id":"hf-inventory-protected-public-boundary-v2","valid_until":"2026-11-30","source_sha256":"sha256:46485f5250ffb53bc8c0c17e973c2b72a80829c4eb886325862c71aaa567bf2b","credentials":["GITHUB_TOKEN","HF_ORG_TOKEN","HF_ORG_TOKEN1","HF_TOKEN"],"resources":[{"key":"github:actions:artifact:hf-official-estate-inventory-public-v1","access":"external-write"},{"key":"github:repository:szl-holdings/.github:contents","access":"read"},{"key":"huggingface:dataset:SZLHOLDINGS/szl-evidence:estate-official-inventory","access":"external-write"},{"key":"runner:toolchain:python","access":"local-write"}],"effects":[{"sink":"github.artifact.upload","resource":"github:actions:artifact:hf-official-estate-inventory-public-v1","access":"external-write","max_calls":1},{"sink":"github.contents.checkout","resource":"github:repository:szl-holdings/.github:contents","access":"read","max_calls":2},{"sink":"runner.toolchain.install","resource":"runner:toolchain:python","access":"local-write","max_calls":2},{"sink":"sdk.repository.upload_file","resource":"huggingface:dataset:SZLHOLDINGS/szl-evidence:estate-official-inventory","access":"external-write","max_calls":2}],"max_external_writes":3,"required_controls":{"triggers":["push","schedule","workflow_dispatch"],"contents_read":true,"no_explicit_secrets":false,"concurrency":true,"protected_ref":true,"exact_sha":true,"expected_before":true,"readback":true},"trusted_transitives":{},"reviewed_unknowns":{"files":{".github/scripts/hf_inventory_public_boundary.py":"sha256:9ac5e5e09f58ef5f34fea648af01216248cdc15286e0d8ce79f66b0c47eac8d5",".github/scripts/hf_official_estate_inventory.py":"sha256:de23a6629ec991033f8bd0fd3aae1874cae5e1c51e8f6d1d80669b267d627e20",".github/scripts/hf_official_estate_inventory_compat.py":"sha256:db572e4f2245fe609105dc85c3fa9b3cb5393e0053cfa10f7d53905022e066c9",".github/scripts/test_hf_inventory_public_boundary.py":"sha256:ed338dcc8733c4483277c676053a5b94eaeefde5856e708aef2b283a48e56bbf",".github/scripts/test_hf_inventory_workflow_boundary.py":"sha256:5181d2178c5f9cd97d340949b582c8501726c2a0afaa38c5886d55cc860b9ab0",".github/scripts/test_hf_official_estate_inventory.py":"sha256:a6591380ecace60b69314aec04ae3aa23836eb2e72d9a6436f466f6cd2c6274c",".github/scripts/test_hf_official_estate_inventory_compat.py":"sha256:c0d80a7f39952d57d1e14ad0869393f6df957c66ec58686eac9bad86339abafa",".github/scripts/verify_hf_inventory_source.py":"sha256:7069866afe9be974fccb8639fdc300d2bb5d81e81edf6c77c53a910090268cae",".github/workflows/hf-inventory-contract.yml":"sha256:82f6b7899fcc278bf6e46a525db392138d5bc42dd21bdd34fc7a84c3026e6de7",".github/workflows/hf-official-estate-inventory.yml":"sha256:46485f5250ffb53bc8c0c17e973c2b72a80829c4eb886325862c71aaa567bf2b"},"unknowns":["ACTION_INPUTS_REVIEW_REQUIRED@.github/workflows/hf-official-estate-inventory.yml:44","ACTION_INPUTS_REVIEW_REQUIRED@.github/workflows/hf-official-estate-inventory.yml:50","ACTION_INPUTS_REVIEW_REQUIRED@.github/workflows/hf-official-estate-inventory.yml:92","ACTION_INPUTS_REVIEW_REQUIRED@.github/workflows/hf-official-estate-inventory.yml:97","ACTION_INPUTS_REVIEW_REQUIRED@.github/workflows/hf-official-estate-inventory.yml:139","HTTP_TARGET_UNRESOLVED@.github/scripts/verify_hf_inventory_source.py:52","PYTHON_CLIENT_UNRESOLVED@.github/scripts/test_hf_inventory_workflow_boundary.py:71","PYTHON_DYNAMIC_EXECUTION@.github/scripts/hf_official_estate_inventory.py:71","PYTHON_DYNAMIC_EXECUTION@.github/scripts/hf_official_estate_inventory.py:102","PYTHON_DYNAMIC_EXECUTION@.github/scripts/hf_official_estate_inventory.py:145","PYTHON_DYNAMIC_EXECUTION@.github/scripts/hf_official_estate_inventory.py:158","PYTHON_DYNAMIC_EXECUTION@.github/scripts/hf_official_estate_inventory.py:159","PYTHON_DYNAMIC_EXECUTION@.github/scripts/hf_official_estate_inventory.py:160","PYTHON_DYNAMIC_EXECUTION@.github/scripts/hf_official_estate_inventory.py:217","PYTHON_DYNAMIC_EXECUTION@.github/scripts/hf_official_estate_inventory.py:218","PYTHON_DYNAMIC_EXECUTION@.github/scripts/hf_official_estate_inventory.py:219","PYTHON_DYNAMIC_EXECUTION@.github/scripts/hf_official_estate_inventory.py:305","PYTHON_DYNAMIC_EXECUTION@.github/scripts/hf_official_estate_inventory.py:311","PYTHON_DYNAMIC_EXECUTION@.github/scripts/hf_official_estate_inventory.py:312","PYTHON_DYNAMIC_EXECUTION@.github/scripts/hf_official_estate_inventory.py:339","PYTHON_DYNAMIC_EXECUTION@.github/scripts/test_hf_official_estate_inventory.py:15","PYTHON_DYNAMIC_EXECUTION@.github/scripts/test_hf_official_estate_inventory_compat.py:16","PYTHON_IMPORT_UNRESOLVED@.github/scripts/hf_inventory_public_boundary.py:4","PYTHON_IMPORT_UNRESOLVED@.github/scripts/hf_official_estate_inventory.py:9","PYTHON_IMPORT_UNRESOLVED@.github/scripts/hf_official_estate_inventory.py:11","PYTHON_IMPORT_UNRESOLVED@.github/scripts/hf_official_estate_inventory.py:12","PYTHON_IMPORT_UNRESOLVED@.github/scripts/hf_official_estate_inventory.py:13","PYTHON_IMPORT_UNRESOLVED@.github/scripts/hf_official_estate_inventory.py:14","PYTHON_IMPORT_UNRESOLVED@.github/scripts/hf_official_estate_inventory.py:19","PYTHON_IMPORT_UNRESOLVED@.github/scripts/hf_official_estate_inventory.py:20","PYTHON_IMPORT_UNRESOLVED@.github/scripts/hf_official_estate_inventory.py:22","PYTHON_IMPORT_UNRESOLVED@.github/scripts/hf_official_estate_inventory.py:26","PYTHON_IMPORT_UNRESOLVED@.github/scripts/hf_official_estate_inventory_compat.py:11","PYTHON_IMPORT_UNRESOLVED@.github/scripts/hf_official_estate_inventory_compat.py:13","PYTHON_IMPORT_UNRESOLVED@.github/scripts/hf_official_estate_inventory_compat.py:15","PYTHON_IMPORT_UNRESOLVED@.github/scripts/hf_official_estate_inventory_compat.py:19","PYTHON_IMPORT_UNRESOLVED@.github/scripts/hf_official_estate_inventory_compat.py:23","PYTHON_IMPORT_UNRESOLVED@.github/scripts/hf_official_estate_inventory_compat.py:25","PYTHON_IMPORT_UNRESOLVED@.github/scripts/hf_official_estate_inventory_compat.py:27","PYTHON_IMPORT_UNRESOLVED@.github/scripts/hf_official_estate_inventory_compat.py:28","PYTHON_IMPORT_UNRESOLVED@.github/scripts/test_hf_inventory_public_boundary.py:4","PYTHON_IMPORT_UNRESOLVED@.github/scripts/test_hf_inventory_public_boundary.py:8","PYTHON_IMPORT_UNRESOLVED@.github/scripts/test_hf_inventory_workflow_boundary.py:4","PYTHON_IMPORT_UNRESOLVED@.github/scripts/test_hf_inventory_workflow_boundary.py:5","PYTHON_IMPORT_UNRESOLVED@.github/scripts/test_hf_inventory_workflow_boundary.py:14","PYTHON_IMPORT_UNRESOLVED@.github/scripts/test_hf_inventory_workflow_boundary.py:15","PYTHON_IMPORT_UNRESOLVED@.github/scripts/test_hf_inventory_workflow_boundary.py:147","PYTHON_IMPORT_UNRESOLVED@.github/scripts/test_hf_inventory_workflow_boundary.py:148","PYTHON_IMPORT_UNRESOLVED@.github/scripts/test_hf_inventory_workflow_boundary.py:152","PYTHON_IMPORT_UNRESOLVED@.github/scripts/test_hf_inventory_workflow_boundary.py:163","PYTHON_IMPORT_UNRESOLVED@.github/scripts/test_hf_inventory_workflow_boundary.py:173","PYTHON_IMPORT_UNRESOLVED@.github/scripts/test_hf_inventory_workflow_boundary.py:186","PYTHON_IMPORT_UNRESOLVED@.github/scripts/test_hf_official_estate_inventory.py:2","PYTHON_IMPORT_UNRESOLVED@.github/scripts/test_hf_official_estate_inventory.py:4","PYTHON_IMPORT_UNRESOLVED@.github/scripts/test_hf_official_estate_inventory.py:5","PYTHON_IMPORT_UNRESOLVED@.github/scripts/test_hf_official_estate_inventory.py:9","PYTHON_IMPORT_UNRESOLVED@.github/scripts/test_hf_official_estate_inventory_compat.py:2","PYTHON_IMPORT_UNRESOLVED@.github/scripts/test_hf_official_estate_inventory_compat.py:4","PYTHON_IMPORT_UNRESOLVED@.github/scripts/test_hf_official_estate_inventory_compat.py:5","PYTHON_IMPORT_UNRESOLVED@.github/scripts/verify_hf_inventory_source.py:4","PYTHON_IMPORT_UNRESOLVED@.github/scripts/verify_hf_inventory_source.py:11","PYTHON_IMPORT_UNRESOLVED@.github/scripts/verify_hf_inventory_source.py:12","PYTHON_SOURCE_REVIEW_REQUIRED@.github/scripts/hf_inventory_public_boundary.py:1","PYTHON_SOURCE_REVIEW_REQUIRED@.github/scripts/hf_official_estate_inventory.py:1","PYTHON_SOURCE_REVIEW_REQUIRED@.github/scripts/hf_official_estate_inventory_compat.py:1","PYTHON_SOURCE_REVIEW_REQUIRED@.github/scripts/test_hf_inventory_public_boundary.py:1","PYTHON_SOURCE_REVIEW_REQUIRED@.github/scripts/test_hf_inventory_workflow_boundary.py:1","PYTHON_SOURCE_REVIEW_REQUIRED@.github/scripts/test_hf_official_estate_inventory.py:1","PYTHON_SOURCE_REVIEW_REQUIRED@.github/scripts/test_hf_official_estate_inventory_compat.py:1","PYTHON_SOURCE_REVIEW_REQUIRED@.github/scripts/verify_hf_inventory_source.py:1","PYTHON_SOURCE_REVIEW_REQUIRED@.github/workflows/hf-official-estate-inventory.yml:147","SCRIPT_SOURCE_REVIEW_REQUIRED@.github/workflows/hf-inventory-contract.yml:1","SCRIPT_SOURCE_REVIEW_REQUIRED@.github/workflows/hf-official-estate-inventory.yml:1","SDK_TARGET_UNRESOLVED@.github/scripts/hf_official_estate_inventory.py:451","SECRET_EXPRESSION_REVIEW_REQUIRED@.github/workflows/hf-official-estate-inventory.yml:1","SHELL_COMMAND_UNCLASSIFIED@.github/scripts/verify_hf_inventory_source.py:76","SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-official-estate-inventory.yml:53","SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-official-estate-inventory.yml:59","SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-official-estate-inventory.yml:60","SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-official-estate-inventory.yml:61","SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-official-estate-inventory.yml:62","SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-official-estate-inventory.yml:63","SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-official-estate-inventory.yml:64","SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-official-estate-inventory.yml:65","SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-official-estate-inventory.yml:66","SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-official-estate-inventory.yml:67","SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-official-estate-inventory.yml:68","SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-official-estate-inventory.yml:99","SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-official-estate-inventory.yml:105","SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-official-estate-inventory.yml:106","SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-official-estate-inventory.yml:107","SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-official-estate-inventory.yml:108","SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-official-estate-inventory.yml:109","SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-official-estate-inventory.yml:110","SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-official-estate-inventory.yml:119","SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-official-estate-inventory.yml:120","SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-official-estate-inventory.yml:121","SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-official-estate-inventory.yml:122","SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-official-estate-inventory.yml:123","SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-official-estate-inventory.yml:124","SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-official-estate-inventory.yml:125","SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-official-estate-inventory.yml:126","SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-official-estate-inventory.yml:127","SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-official-estate-inventory.yml:128","SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-official-estate-inventory.yml:129","SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-official-estate-inventory.yml:134","SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-official-estate-inventory.yml:146","SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-official-estate-inventory.yml:147","SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-official-estate-inventory.yml:148","SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-official-estate-inventory.yml:149","SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-official-estate-inventory.yml:150","SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-official-estate-inventory.yml:151","SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-official-estate-inventory.yml:152","SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-official-estate-inventory.yml:153","SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-official-estate-inventory.yml:154","SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-official-estate-inventory.yml:155","SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-official-estate-inventory.yml:159","SHELL_COMPOSITION_UNKNOWN@.github/workflows/hf-official-estate-inventory.yml:59","SHELL_COMPOSITION_UNKNOWN@.github/workflows/hf-official-estate-inventory.yml:60","SHELL_COMPOSITION_UNKNOWN@.github/workflows/hf-official-estate-inventory.yml:61","SHELL_COMPOSITION_UNKNOWN@.github/workflows/hf-official-estate-inventory.yml:105","SHELL_COMPOSITION_UNKNOWN@.github/workflows/hf-official-estate-inventory.yml:106","SHELL_COMPOSITION_UNKNOWN@.github/workflows/hf-official-estate-inventory.yml:107","SHELL_COMPOSITION_UNKNOWN@.github/workflows/hf-official-estate-inventory.yml:108","SHELL_COMPOSITION_UNKNOWN@.github/workflows/hf-official-estate-inventory.yml:109","SHELL_COMPOSITION_UNKNOWN@.github/workflows/hf-official-estate-inventory.yml:120","SHELL_COMPOSITION_UNKNOWN@.github/workflows/hf-official-estate-inventory.yml:121","SHELL_COMPOSITION_UNKNOWN@.github/workflows/hf-official-estate-inventory.yml:124","SHELL_COMPOSITION_UNKNOWN@.github/workflows/hf-official-estate-inventory.yml:127","SHELL_COMPOSITION_UNKNOWN@.github/workflows/hf-official-estate-inventory.yml:128","SHELL_COMPOSITION_UNKNOWN@.github/workflows/hf-official-estate-inventory.yml:129","SHELL_COMPOSITION_UNKNOWN@.github/workflows/hf-official-estate-inventory.yml:159","WORKFLOW_ENVIRONMENT_REVIEW_REQUIRED@.github/workflows/hf-official-estate-inventory.yml:37","WORKFLOW_ENVIRONMENT_REVIEW_REQUIRED@.github/workflows/hf-official-estate-inventory.yml:56","WORKFLOW_ENVIRONMENT_REVIEW_REQUIRED@.github/workflows/hf-official-estate-inventory.yml:84","WORKFLOW_ENVIRONMENT_REVIEW_REQUIRED@.github/workflows/hf-official-estate-inventory.yml:102","WORKFLOW_ENVIRONMENT_REVIEW_REQUIRED@.github/workflows/hf-official-estate-inventory.yml:114"]}},
+    ".github/workflows/hf-inventory-contract.yml": {"intent_id":"hf-inventory-offline-candidate-contract-v2","valid_until":"2026-11-30","source_sha256":"sha256:d5d9614d5a562fe8592cff97348a4a69a98b9ee248cc17d289df4e3ea3d69882","credentials":[],"resources":[{"key":"github:actions:artifact:hf-inventory-verification-source","access":"external-write"},{"key":"github:repository:szl-holdings/.github:contents","access":"read"},{"key":"runner:toolchain:python","access":"local-write"},{"key":"test-harness:hf-inventory:credentialless-sdk-site","access":"external-write"}],"effects":[{"sink":"github.artifact.upload","resource":"github:actions:artifact:hf-inventory-verification-source","access":"external-write","max_calls":1},{"sink":"github.contents.checkout","resource":"github:repository:szl-holdings/.github:contents","access":"read","max_calls":1},{"sink":"runner.toolchain.install","resource":"runner:toolchain:python","access":"local-write","max_calls":1},{"sink":"sdk.repository.create_commit","resource":"test-harness:hf-inventory:credentialless-sdk-site","access":"external-write","max_calls":1}],"max_external_writes":2,"required_controls":{"triggers":["pull_request","merge_group"],"contents_read":true,"no_explicit_secrets":true,"concurrency":true,"protected_ref":false,"exact_sha":true,"expected_before":false,"readback":false},"trusted_transitives":{".github/scripts/control_plane_effect_gate.py":"sha256:c6dab1dd86092280168a6312417c03fde611fdbe197cd4c436aadf25ae18fb67",".github/scripts/test_control_plane_effect_gate.py":"sha256:abf96660b74f49eaaffe4f6165a0614f0e8922605ddc8a47d4aa11ef71791981"},"reviewed_unknowns":{"files":{".github/scripts/hf_inventory_evidence.py":"sha256:930716555acc19c728c07a337b83c0b8eee7b06bb5de2852198c2a68a2aa244f",".github/scripts/hf_inventory_public_boundary.py":"sha256:9ac5e5e09f58ef5f34fea648af01216248cdc15286e0d8ce79f66b0c47eac8d5",".github/scripts/hf_official_estate_inventory.py":"sha256:80b77eea651d3b30908fbde5e1056d13c737bf3600a1a051e32ce770e659861a",".github/scripts/hf_official_estate_inventory_compat.py":"sha256:51f7dd5ea3c106403c84028486c23dcb048ecdd2302198de699249f5b65920dc",".github/scripts/run_hf_inventory_contracts.py":"sha256:7003c271c928e6e39104e44f459a0310a7557d546744c9b1ce4ef9686f63eb76",".github/scripts/test_hf_inventory_evidence.py":"sha256:43c15f99b42cb0e66408990a5fe74bee1cabb3a6dd1d2f2a24a12c8a340df549",".github/scripts/test_hf_inventory_public_boundary.py":"sha256:ed338dcc8733c4483277c676053a5b94eaeefde5856e708aef2b283a48e56bbf",".github/scripts/test_hf_inventory_workflow_boundary.py":"sha256:66748ae1b2f9029015ad5c2bfabdfbbb17dbf8e710193259c45d59e04c9135bb",".github/scripts/test_hf_official_estate_inventory.py":"sha256:e81c50831a773155242a8d19d299fa721bfe825f6f572f4c5665ea296be3e9a3",".github/scripts/test_hf_official_estate_inventory_compat.py":"sha256:bf4776f81fb07179824edb4331e0163fe82661f7083fdc078c6251a65ed97011",".github/scripts/verify_hf_inventory_source.py":"sha256:f1bc484929be3b5a549bbdb7a5dee0524b40af428277280e12a7ffadfbfa4650",".github/workflows/hf-inventory-contract.yml":"sha256:d5d9614d5a562fe8592cff97348a4a69a98b9ee248cc17d289df4e3ea3d69882",".github/workflows/hf-official-estate-inventory.yml":"sha256:196fc9ab0d448e65a7f84462297a06cdfa3be04db4792e5740673852fc44a6b8"},"unknowns":["ACTION_INPUTS_REVIEW_REQUIRED@.github/workflows/hf-inventory-contract.yml:30","ACTION_INPUTS_REVIEW_REQUIRED@.github/workflows/hf-inventory-contract.yml:36","ACTION_INPUTS_REVIEW_REQUIRED@.github/workflows/hf-inventory-contract.yml:94","DYNAMIC_EXECUTION@.github/workflows/hf-inventory-contract.yml:76","DYNAMIC_EXECUTION@.github/workflows/hf-inventory-contract.yml:78","DYNAMIC_EXECUTION@.github/workflows/hf-inventory-contract.yml:80","HTTP_TARGET_UNRESOLVED@.github/scripts/test_hf_inventory_evidence.py:158","HTTP_TARGET_UNRESOLVED@.github/scripts/verify_hf_inventory_source.py:65","PYTHON_CLIENT_UNRESOLVED@.github/scripts/run_hf_inventory_contracts.py:37","PYTHON_CLIENT_UNRESOLVED@.github/scripts/test_hf_inventory_workflow_boundary.py:71","PYTHON_DYNAMIC_EXECUTION@.github/scripts/hf_inventory_evidence.py:100","PYTHON_DYNAMIC_EXECUTION@.github/scripts/hf_inventory_evidence.py:102","PYTHON_DYNAMIC_EXECUTION@.github/scripts/hf_inventory_evidence.py:32","PYTHON_DYNAMIC_EXECUTION@.github/scripts/hf_inventory_evidence.py:34","PYTHON_DYNAMIC_EXECUTION@.github/scripts/hf_inventory_evidence.py:76","PYTHON_DYNAMIC_EXECUTION@.github/scripts/hf_official_estate_inventory.py:102","PYTHON_DYNAMIC_EXECUTION@.github/scripts/hf_official_estate_inventory.py:145","PYTHON_DYNAMIC_EXECUTION@.github/scripts/hf_official_estate_inventory.py:158","PYTHON_DYNAMIC_EXECUTION@.github/scripts/hf_official_estate_inventory.py:159","PYTHON_DYNAMIC_EXECUTION@.github/scripts/hf_official_estate_inventory.py:160","PYTHON_DYNAMIC_EXECUTION@.github/scripts/hf_official_estate_inventory.py:217","PYTHON_DYNAMIC_EXECUTION@.github/scripts/hf_official_estate_inventory.py:218","PYTHON_DYNAMIC_EXECUTION@.github/scripts/hf_official_estate_inventory.py:219","PYTHON_DYNAMIC_EXECUTION@.github/scripts/hf_official_estate_inventory.py:305","PYTHON_DYNAMIC_EXECUTION@.github/scripts/hf_official_estate_inventory.py:311","PYTHON_DYNAMIC_EXECUTION@.github/scripts/hf_official_estate_inventory.py:312","PYTHON_DYNAMIC_EXECUTION@.github/scripts/hf_official_estate_inventory.py:339","PYTHON_DYNAMIC_EXECUTION@.github/scripts/hf_official_estate_inventory.py:71","PYTHON_DYNAMIC_EXECUTION@.github/scripts/test_hf_official_estate_inventory.py:15","PYTHON_DYNAMIC_EXECUTION@.github/scripts/test_hf_official_estate_inventory_compat.py:16","PYTHON_DYNAMIC_SUBPROCESS@.github/workflows/hf-inventory-contract.yml:86","PYTHON_IMPORT_UNRESOLVED@.github/scripts/hf_inventory_evidence.py:13","PYTHON_IMPORT_UNRESOLVED@.github/scripts/hf_inventory_evidence.py:15","PYTHON_IMPORT_UNRESOLVED@.github/scripts/hf_inventory_evidence.py:4","PYTHON_IMPORT_UNRESOLVED@.github/scripts/hf_inventory_evidence.py:8","PYTHON_IMPORT_UNRESOLVED@.github/scripts/hf_inventory_public_boundary.py:4","PYTHON_IMPORT_UNRESOLVED@.github/scripts/hf_official_estate_inventory.py:11","PYTHON_IMPORT_UNRESOLVED@.github/scripts/hf_official_estate_inventory.py:12","PYTHON_IMPORT_UNRESOLVED@.github/scripts/hf_official_estate_inventory.py:13","PYTHON_IMPORT_UNRESOLVED@.github/scripts/hf_official_estate_inventory.py:18","PYTHON_IMPORT_UNRESOLVED@.github/scripts/hf_official_estate_inventory.py:19","PYTHON_IMPORT_UNRESOLVED@.github/scripts/hf_official_estate_inventory.py:21","PYTHON_IMPORT_UNRESOLVED@.github/scripts/hf_official_estate_inventory.py:25","PYTHON_IMPORT_UNRESOLVED@.github/scripts/hf_official_estate_inventory.py:26","PYTHON_IMPORT_UNRESOLVED@.github/scripts/hf_official_estate_inventory.py:9","PYTHON_IMPORT_UNRESOLVED@.github/scripts/hf_official_estate_inventory_compat.py:11","PYTHON_IMPORT_UNRESOLVED@.github/scripts/hf_official_estate_inventory_compat.py:13","PYTHON_IMPORT_UNRESOLVED@.github/scripts/hf_official_estate_inventory_compat.py:15","PYTHON_IMPORT_UNRESOLVED@.github/scripts/hf_official_estate_inventory_compat.py:19","PYTHON_IMPORT_UNRESOLVED@.github/scripts/hf_official_estate_inventory_compat.py:23","PYTHON_IMPORT_UNRESOLVED@.github/scripts/hf_official_estate_inventory_compat.py:25","PYTHON_IMPORT_UNRESOLVED@.github/scripts/hf_official_estate_inventory_compat.py:27","PYTHON_IMPORT_UNRESOLVED@.github/scripts/hf_official_estate_inventory_compat.py:28","PYTHON_IMPORT_UNRESOLVED@.github/scripts/run_hf_inventory_contracts.py:4","PYTHON_IMPORT_UNRESOLVED@.github/scripts/run_hf_inventory_contracts.py:7","PYTHON_IMPORT_UNRESOLVED@.github/scripts/test_hf_inventory_evidence.py:12","PYTHON_IMPORT_UNRESOLVED@.github/scripts/test_hf_inventory_evidence.py:13","PYTHON_IMPORT_UNRESOLVED@.github/scripts/test_hf_inventory_evidence.py:14","PYTHON_IMPORT_UNRESOLVED@.github/scripts/test_hf_inventory_evidence.py:16","PYTHON_IMPORT_UNRESOLVED@.github/scripts/test_hf_inventory_evidence.py:4","PYTHON_IMPORT_UNRESOLVED@.github/scripts/test_hf_inventory_evidence.py:8","PYTHON_IMPORT_UNRESOLVED@.github/scripts/test_hf_inventory_public_boundary.py:4","PYTHON_IMPORT_UNRESOLVED@.github/scripts/test_hf_inventory_public_boundary.py:8","PYTHON_IMPORT_UNRESOLVED@.github/scripts/test_hf_inventory_workflow_boundary.py:14","PYTHON_IMPORT_UNRESOLVED@.github/scripts/test_hf_inventory_workflow_boundary.py:15","PYTHON_IMPORT_UNRESOLVED@.github/scripts/test_hf_inventory_workflow_boundary.py:155","PYTHON_IMPORT_UNRESOLVED@.github/scripts/test_hf_inventory_workflow_boundary.py:156","PYTHON_IMPORT_UNRESOLVED@.github/scripts/test_hf_inventory_workflow_boundary.py:160","PYTHON_IMPORT_UNRESOLVED@.github/scripts/test_hf_inventory_workflow_boundary.py:171","PYTHON_IMPORT_UNRESOLVED@.github/scripts/test_hf_inventory_workflow_boundary.py:181","PYTHON_IMPORT_UNRESOLVED@.github/scripts/test_hf_inventory_workflow_boundary.py:194","PYTHON_IMPORT_UNRESOLVED@.github/scripts/test_hf_inventory_workflow_boundary.py:209","PYTHON_IMPORT_UNRESOLVED@.github/scripts/test_hf_inventory_workflow_boundary.py:218","PYTHON_IMPORT_UNRESOLVED@.github/scripts/test_hf_inventory_workflow_boundary.py:233","PYTHON_IMPORT_UNRESOLVED@.github/scripts/test_hf_inventory_workflow_boundary.py:243","PYTHON_IMPORT_UNRESOLVED@.github/scripts/test_hf_inventory_workflow_boundary.py:4","PYTHON_IMPORT_UNRESOLVED@.github/scripts/test_hf_inventory_workflow_boundary.py:5","PYTHON_IMPORT_UNRESOLVED@.github/scripts/test_hf_official_estate_inventory.py:115","PYTHON_IMPORT_UNRESOLVED@.github/scripts/test_hf_official_estate_inventory.py:2","PYTHON_IMPORT_UNRESOLVED@.github/scripts/test_hf_official_estate_inventory.py:4","PYTHON_IMPORT_UNRESOLVED@.github/scripts/test_hf_official_estate_inventory.py:5","PYTHON_IMPORT_UNRESOLVED@.github/scripts/test_hf_official_estate_inventory.py:9","PYTHON_IMPORT_UNRESOLVED@.github/scripts/test_hf_official_estate_inventory_compat.py:2","PYTHON_IMPORT_UNRESOLVED@.github/scripts/test_hf_official_estate_inventory_compat.py:226","PYTHON_IMPORT_UNRESOLVED@.github/scripts/test_hf_official_estate_inventory_compat.py:4","PYTHON_IMPORT_UNRESOLVED@.github/scripts/test_hf_official_estate_inventory_compat.py:5","PYTHON_IMPORT_UNRESOLVED@.github/scripts/verify_hf_inventory_source.py:11","PYTHON_IMPORT_UNRESOLVED@.github/scripts/verify_hf_inventory_source.py:12","PYTHON_IMPORT_UNRESOLVED@.github/scripts/verify_hf_inventory_source.py:4","PYTHON_IMPORT_UNRESOLVED@.github/workflows/hf-inventory-contract.yml:57","PYTHON_SOURCE_REVIEW_REQUIRED@.github/scripts/hf_inventory_evidence.py:1","PYTHON_SOURCE_REVIEW_REQUIRED@.github/scripts/hf_inventory_public_boundary.py:1","PYTHON_SOURCE_REVIEW_REQUIRED@.github/scripts/hf_official_estate_inventory.py:1","PYTHON_SOURCE_REVIEW_REQUIRED@.github/scripts/hf_official_estate_inventory_compat.py:1","PYTHON_SOURCE_REVIEW_REQUIRED@.github/scripts/run_hf_inventory_contracts.py:1","PYTHON_SOURCE_REVIEW_REQUIRED@.github/scripts/test_hf_inventory_evidence.py:1","PYTHON_SOURCE_REVIEW_REQUIRED@.github/scripts/test_hf_inventory_public_boundary.py:1","PYTHON_SOURCE_REVIEW_REQUIRED@.github/scripts/test_hf_inventory_workflow_boundary.py:1","PYTHON_SOURCE_REVIEW_REQUIRED@.github/scripts/test_hf_official_estate_inventory.py:1","PYTHON_SOURCE_REVIEW_REQUIRED@.github/scripts/test_hf_official_estate_inventory_compat.py:1","PYTHON_SOURCE_REVIEW_REQUIRED@.github/scripts/verify_hf_inventory_source.py:1","PYTHON_SOURCE_REVIEW_REQUIRED@.github/workflows/hf-inventory-contract.yml:57","SCRIPT_SOURCE_REVIEW_REQUIRED@.github/workflows/hf-inventory-contract.yml:1","SCRIPT_SOURCE_REVIEW_REQUIRED@.github/workflows/hf-official-estate-inventory.yml:1","SDK_TARGET_UNRESOLVED@.github/scripts/hf_inventory_evidence.py:89","SHELL_COMMAND_UNCLASSIFIED@.github/scripts/verify_hf_inventory_source.py:89","SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-inventory-contract.yml:39","SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-inventory-contract.yml:45","SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-inventory-contract.yml:49","SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-inventory-contract.yml:50","SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-inventory-contract.yml:51","SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-inventory-contract.yml:52","SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-inventory-contract.yml:56","SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-inventory-contract.yml:57","SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-inventory-contract.yml:58","SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-inventory-contract.yml:59","SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-inventory-contract.yml:60","SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-inventory-contract.yml:61","SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-inventory-contract.yml:62","SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-inventory-contract.yml:63","SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-inventory-contract.yml:64","SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-inventory-contract.yml:65","SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-inventory-contract.yml:66","SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-inventory-contract.yml:67","SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-inventory-contract.yml:68","SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-inventory-contract.yml:69","SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-inventory-contract.yml:70","SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-inventory-contract.yml:71","SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-inventory-contract.yml:72","SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-inventory-contract.yml:73","SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-inventory-contract.yml:74","SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-inventory-contract.yml:75","SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-inventory-contract.yml:76","SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-inventory-contract.yml:77","SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-inventory-contract.yml:78","SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-inventory-contract.yml:79","SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-inventory-contract.yml:80","SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-inventory-contract.yml:81","SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-inventory-contract.yml:82","SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-inventory-contract.yml:83","SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-inventory-contract.yml:84","SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-inventory-contract.yml:85","SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-inventory-contract.yml:86","SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-inventory-contract.yml:87","SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-inventory-contract.yml:88","SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-inventory-contract.yml:89","SHELL_COMPOSITION_UNKNOWN@.github/workflows/hf-inventory-contract.yml:45","WORKFLOW_ENVIRONMENT_REVIEW_REQUIRED@.github/workflows/hf-inventory-contract.yml:23","WORKFLOW_ENVIRONMENT_REVIEW_REQUIRED@.github/workflows/hf-inventory-contract.yml:42"]}},
+    ".github/workflows/hf-official-estate-inventory.yml": {"intent_id":"hf-inventory-protected-private-cas-readback-v3","valid_until":"2026-11-30","source_sha256":"sha256:196fc9ab0d448e65a7f84462297a06cdfa3be04db4792e5740673852fc44a6b8","credentials":["GITHUB_TOKEN","HF_ORG_TOKEN","HF_ORG_TOKEN1","HF_TOKEN"],"resources":[{"key":"github:actions:artifact:hf-official-estate-inventory-public-v1","access":"external-write"},{"key":"github:repository:szl-holdings/.github:contents","access":"read"},{"key":"huggingface:dataset:SZLHOLDINGS/szl-evidence:estate-official-inventory","access":"external-write"},{"key":"runner:toolchain:python","access":"local-write"}],"effects":[{"sink":"github.artifact.upload","resource":"github:actions:artifact:hf-official-estate-inventory-public-v1","access":"external-write","max_calls":1},{"sink":"github.contents.checkout","resource":"github:repository:szl-holdings/.github:contents","access":"read","max_calls":2},{"sink":"runner.toolchain.install","resource":"runner:toolchain:python","access":"local-write","max_calls":2},{"sink":"sdk.repository.create_commit","resource":"huggingface:dataset:SZLHOLDINGS/szl-evidence:estate-official-inventory","access":"external-write","max_calls":1}],"max_external_writes":2,"required_controls":{"triggers":["push","schedule","workflow_dispatch"],"contents_read":true,"no_explicit_secrets":false,"concurrency":true,"protected_ref":true,"exact_sha":true,"expected_before":true,"readback":true},"trusted_transitives":{},"reviewed_unknowns":{"files":{".github/scripts/hf_inventory_evidence.py":"sha256:930716555acc19c728c07a337b83c0b8eee7b06bb5de2852198c2a68a2aa244f",".github/scripts/hf_inventory_public_boundary.py":"sha256:9ac5e5e09f58ef5f34fea648af01216248cdc15286e0d8ce79f66b0c47eac8d5",".github/scripts/hf_official_estate_inventory.py":"sha256:80b77eea651d3b30908fbde5e1056d13c737bf3600a1a051e32ce770e659861a",".github/scripts/hf_official_estate_inventory_compat.py":"sha256:51f7dd5ea3c106403c84028486c23dcb048ecdd2302198de699249f5b65920dc",".github/scripts/run_hf_inventory_contracts.py":"sha256:7003c271c928e6e39104e44f459a0310a7557d546744c9b1ce4ef9686f63eb76",".github/scripts/test_hf_inventory_evidence.py":"sha256:43c15f99b42cb0e66408990a5fe74bee1cabb3a6dd1d2f2a24a12c8a340df549",".github/scripts/test_hf_inventory_public_boundary.py":"sha256:ed338dcc8733c4483277c676053a5b94eaeefde5856e708aef2b283a48e56bbf",".github/scripts/test_hf_inventory_workflow_boundary.py":"sha256:66748ae1b2f9029015ad5c2bfabdfbbb17dbf8e710193259c45d59e04c9135bb",".github/scripts/test_hf_official_estate_inventory.py":"sha256:e81c50831a773155242a8d19d299fa721bfe825f6f572f4c5665ea296be3e9a3",".github/scripts/test_hf_official_estate_inventory_compat.py":"sha256:bf4776f81fb07179824edb4331e0163fe82661f7083fdc078c6251a65ed97011",".github/scripts/verify_hf_inventory_source.py":"sha256:f1bc484929be3b5a549bbdb7a5dee0524b40af428277280e12a7ffadfbfa4650",".github/workflows/hf-inventory-contract.yml":"sha256:d5d9614d5a562fe8592cff97348a4a69a98b9ee248cc17d289df4e3ea3d69882",".github/workflows/hf-official-estate-inventory.yml":"sha256:196fc9ab0d448e65a7f84462297a06cdfa3be04db4792e5740673852fc44a6b8"},"unknowns":["ACTION_INPUTS_REVIEW_REQUIRED@.github/workflows/hf-official-estate-inventory.yml:130","ACTION_INPUTS_REVIEW_REQUIRED@.github/workflows/hf-official-estate-inventory.yml:46","ACTION_INPUTS_REVIEW_REQUIRED@.github/workflows/hf-official-estate-inventory.yml:51","ACTION_INPUTS_REVIEW_REQUIRED@.github/workflows/hf-official-estate-inventory.yml:84","ACTION_INPUTS_REVIEW_REQUIRED@.github/workflows/hf-official-estate-inventory.yml:89","HTTP_TARGET_UNRESOLVED@.github/scripts/test_hf_inventory_evidence.py:158","HTTP_TARGET_UNRESOLVED@.github/scripts/verify_hf_inventory_source.py:65","PYTHON_CLIENT_UNRESOLVED@.github/scripts/run_hf_inventory_contracts.py:37","PYTHON_CLIENT_UNRESOLVED@.github/scripts/test_hf_inventory_workflow_boundary.py:71","PYTHON_DYNAMIC_EXECUTION@.github/scripts/hf_inventory_evidence.py:100","PYTHON_DYNAMIC_EXECUTION@.github/scripts/hf_inventory_evidence.py:102","PYTHON_DYNAMIC_EXECUTION@.github/scripts/hf_inventory_evidence.py:32","PYTHON_DYNAMIC_EXECUTION@.github/scripts/hf_inventory_evidence.py:34","PYTHON_DYNAMIC_EXECUTION@.github/scripts/hf_inventory_evidence.py:76","PYTHON_DYNAMIC_EXECUTION@.github/scripts/hf_official_estate_inventory.py:102","PYTHON_DYNAMIC_EXECUTION@.github/scripts/hf_official_estate_inventory.py:145","PYTHON_DYNAMIC_EXECUTION@.github/scripts/hf_official_estate_inventory.py:158","PYTHON_DYNAMIC_EXECUTION@.github/scripts/hf_official_estate_inventory.py:159","PYTHON_DYNAMIC_EXECUTION@.github/scripts/hf_official_estate_inventory.py:160","PYTHON_DYNAMIC_EXECUTION@.github/scripts/hf_official_estate_inventory.py:217","PYTHON_DYNAMIC_EXECUTION@.github/scripts/hf_official_estate_inventory.py:218","PYTHON_DYNAMIC_EXECUTION@.github/scripts/hf_official_estate_inventory.py:219","PYTHON_DYNAMIC_EXECUTION@.github/scripts/hf_official_estate_inventory.py:305","PYTHON_DYNAMIC_EXECUTION@.github/scripts/hf_official_estate_inventory.py:311","PYTHON_DYNAMIC_EXECUTION@.github/scripts/hf_official_estate_inventory.py:312","PYTHON_DYNAMIC_EXECUTION@.github/scripts/hf_official_estate_inventory.py:339","PYTHON_DYNAMIC_EXECUTION@.github/scripts/hf_official_estate_inventory.py:71","PYTHON_DYNAMIC_EXECUTION@.github/scripts/test_hf_official_estate_inventory.py:15","PYTHON_DYNAMIC_EXECUTION@.github/scripts/test_hf_official_estate_inventory_compat.py:16","PYTHON_IMPORT_UNRESOLVED@.github/scripts/hf_inventory_evidence.py:13","PYTHON_IMPORT_UNRESOLVED@.github/scripts/hf_inventory_evidence.py:15","PYTHON_IMPORT_UNRESOLVED@.github/scripts/hf_inventory_evidence.py:4","PYTHON_IMPORT_UNRESOLVED@.github/scripts/hf_inventory_evidence.py:8","PYTHON_IMPORT_UNRESOLVED@.github/scripts/hf_inventory_public_boundary.py:4","PYTHON_IMPORT_UNRESOLVED@.github/scripts/hf_official_estate_inventory.py:11","PYTHON_IMPORT_UNRESOLVED@.github/scripts/hf_official_estate_inventory.py:12","PYTHON_IMPORT_UNRESOLVED@.github/scripts/hf_official_estate_inventory.py:13","PYTHON_IMPORT_UNRESOLVED@.github/scripts/hf_official_estate_inventory.py:18","PYTHON_IMPORT_UNRESOLVED@.github/scripts/hf_official_estate_inventory.py:19","PYTHON_IMPORT_UNRESOLVED@.github/scripts/hf_official_estate_inventory.py:21","PYTHON_IMPORT_UNRESOLVED@.github/scripts/hf_official_estate_inventory.py:25","PYTHON_IMPORT_UNRESOLVED@.github/scripts/hf_official_estate_inventory.py:26","PYTHON_IMPORT_UNRESOLVED@.github/scripts/hf_official_estate_inventory.py:9","PYTHON_IMPORT_UNRESOLVED@.github/scripts/hf_official_estate_inventory_compat.py:11","PYTHON_IMPORT_UNRESOLVED@.github/scripts/hf_official_estate_inventory_compat.py:13","PYTHON_IMPORT_UNRESOLVED@.github/scripts/hf_official_estate_inventory_compat.py:15","PYTHON_IMPORT_UNRESOLVED@.github/scripts/hf_official_estate_inventory_compat.py:19","PYTHON_IMPORT_UNRESOLVED@.github/scripts/hf_official_estate_inventory_compat.py:23","PYTHON_IMPORT_UNRESOLVED@.github/scripts/hf_official_estate_inventory_compat.py:25","PYTHON_IMPORT_UNRESOLVED@.github/scripts/hf_official_estate_inventory_compat.py:27","PYTHON_IMPORT_UNRESOLVED@.github/scripts/hf_official_estate_inventory_compat.py:28","PYTHON_IMPORT_UNRESOLVED@.github/scripts/run_hf_inventory_contracts.py:4","PYTHON_IMPORT_UNRESOLVED@.github/scripts/run_hf_inventory_contracts.py:7","PYTHON_IMPORT_UNRESOLVED@.github/scripts/test_hf_inventory_evidence.py:12","PYTHON_IMPORT_UNRESOLVED@.github/scripts/test_hf_inventory_evidence.py:13","PYTHON_IMPORT_UNRESOLVED@.github/scripts/test_hf_inventory_evidence.py:14","PYTHON_IMPORT_UNRESOLVED@.github/scripts/test_hf_inventory_evidence.py:16","PYTHON_IMPORT_UNRESOLVED@.github/scripts/test_hf_inventory_evidence.py:4","PYTHON_IMPORT_UNRESOLVED@.github/scripts/test_hf_inventory_evidence.py:8","PYTHON_IMPORT_UNRESOLVED@.github/scripts/test_hf_inventory_public_boundary.py:4","PYTHON_IMPORT_UNRESOLVED@.github/scripts/test_hf_inventory_public_boundary.py:8","PYTHON_IMPORT_UNRESOLVED@.github/scripts/test_hf_inventory_workflow_boundary.py:14","PYTHON_IMPORT_UNRESOLVED@.github/scripts/test_hf_inventory_workflow_boundary.py:15","PYTHON_IMPORT_UNRESOLVED@.github/scripts/test_hf_inventory_workflow_boundary.py:155","PYTHON_IMPORT_UNRESOLVED@.github/scripts/test_hf_inventory_workflow_boundary.py:156","PYTHON_IMPORT_UNRESOLVED@.github/scripts/test_hf_inventory_workflow_boundary.py:160","PYTHON_IMPORT_UNRESOLVED@.github/scripts/test_hf_inventory_workflow_boundary.py:171","PYTHON_IMPORT_UNRESOLVED@.github/scripts/test_hf_inventory_workflow_boundary.py:181","PYTHON_IMPORT_UNRESOLVED@.github/scripts/test_hf_inventory_workflow_boundary.py:194","PYTHON_IMPORT_UNRESOLVED@.github/scripts/test_hf_inventory_workflow_boundary.py:209","PYTHON_IMPORT_UNRESOLVED@.github/scripts/test_hf_inventory_workflow_boundary.py:218","PYTHON_IMPORT_UNRESOLVED@.github/scripts/test_hf_inventory_workflow_boundary.py:233","PYTHON_IMPORT_UNRESOLVED@.github/scripts/test_hf_inventory_workflow_boundary.py:243","PYTHON_IMPORT_UNRESOLVED@.github/scripts/test_hf_inventory_workflow_boundary.py:4","PYTHON_IMPORT_UNRESOLVED@.github/scripts/test_hf_inventory_workflow_boundary.py:5","PYTHON_IMPORT_UNRESOLVED@.github/scripts/test_hf_official_estate_inventory.py:115","PYTHON_IMPORT_UNRESOLVED@.github/scripts/test_hf_official_estate_inventory.py:2","PYTHON_IMPORT_UNRESOLVED@.github/scripts/test_hf_official_estate_inventory.py:4","PYTHON_IMPORT_UNRESOLVED@.github/scripts/test_hf_official_estate_inventory.py:5","PYTHON_IMPORT_UNRESOLVED@.github/scripts/test_hf_official_estate_inventory.py:9","PYTHON_IMPORT_UNRESOLVED@.github/scripts/test_hf_official_estate_inventory_compat.py:2","PYTHON_IMPORT_UNRESOLVED@.github/scripts/test_hf_official_estate_inventory_compat.py:226","PYTHON_IMPORT_UNRESOLVED@.github/scripts/test_hf_official_estate_inventory_compat.py:4","PYTHON_IMPORT_UNRESOLVED@.github/scripts/test_hf_official_estate_inventory_compat.py:5","PYTHON_IMPORT_UNRESOLVED@.github/scripts/verify_hf_inventory_source.py:11","PYTHON_IMPORT_UNRESOLVED@.github/scripts/verify_hf_inventory_source.py:12","PYTHON_IMPORT_UNRESOLVED@.github/scripts/verify_hf_inventory_source.py:4","PYTHON_SOURCE_REVIEW_REQUIRED@.github/scripts/hf_inventory_evidence.py:1","PYTHON_SOURCE_REVIEW_REQUIRED@.github/scripts/hf_inventory_public_boundary.py:1","PYTHON_SOURCE_REVIEW_REQUIRED@.github/scripts/hf_official_estate_inventory.py:1","PYTHON_SOURCE_REVIEW_REQUIRED@.github/scripts/hf_official_estate_inventory_compat.py:1","PYTHON_SOURCE_REVIEW_REQUIRED@.github/scripts/run_hf_inventory_contracts.py:1","PYTHON_SOURCE_REVIEW_REQUIRED@.github/scripts/test_hf_inventory_evidence.py:1","PYTHON_SOURCE_REVIEW_REQUIRED@.github/scripts/test_hf_inventory_public_boundary.py:1","PYTHON_SOURCE_REVIEW_REQUIRED@.github/scripts/test_hf_inventory_workflow_boundary.py:1","PYTHON_SOURCE_REVIEW_REQUIRED@.github/scripts/test_hf_official_estate_inventory.py:1","PYTHON_SOURCE_REVIEW_REQUIRED@.github/scripts/test_hf_official_estate_inventory_compat.py:1","PYTHON_SOURCE_REVIEW_REQUIRED@.github/scripts/verify_hf_inventory_source.py:1","PYTHON_SOURCE_REVIEW_REQUIRED@.github/workflows/hf-official-estate-inventory.yml:138","SCRIPT_SOURCE_REVIEW_REQUIRED@.github/workflows/hf-inventory-contract.yml:1","SCRIPT_SOURCE_REVIEW_REQUIRED@.github/workflows/hf-official-estate-inventory.yml:1","SDK_TARGET_UNRESOLVED@.github/scripts/hf_inventory_evidence.py:89","SECRET_EXPRESSION_REVIEW_REQUIRED@.github/workflows/hf-official-estate-inventory.yml:1","SHELL_COMMAND_UNCLASSIFIED@.github/scripts/verify_hf_inventory_source.py:89","SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-official-estate-inventory.yml:100","SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-official-estate-inventory.yml:109","SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-official-estate-inventory.yml:110","SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-official-estate-inventory.yml:111","SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-official-estate-inventory.yml:112","SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-official-estate-inventory.yml:113","SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-official-estate-inventory.yml:114","SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-official-estate-inventory.yml:115","SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-official-estate-inventory.yml:116","SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-official-estate-inventory.yml:117","SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-official-estate-inventory.yml:118","SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-official-estate-inventory.yml:119","SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-official-estate-inventory.yml:120","SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-official-estate-inventory.yml:125","SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-official-estate-inventory.yml:137","SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-official-estate-inventory.yml:138","SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-official-estate-inventory.yml:139","SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-official-estate-inventory.yml:140","SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-official-estate-inventory.yml:141","SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-official-estate-inventory.yml:142","SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-official-estate-inventory.yml:143","SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-official-estate-inventory.yml:144","SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-official-estate-inventory.yml:145","SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-official-estate-inventory.yml:146","SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-official-estate-inventory.yml:150","SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-official-estate-inventory.yml:53","SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-official-estate-inventory.yml:57","SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-official-estate-inventory.yml:58","SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-official-estate-inventory.yml:59","SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-official-estate-inventory.yml:60","SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-official-estate-inventory.yml:91","SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-official-estate-inventory.yml:97","SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-official-estate-inventory.yml:98","SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-official-estate-inventory.yml:99","SHELL_COMPOSITION_UNKNOWN@.github/workflows/hf-official-estate-inventory.yml:111","SHELL_COMPOSITION_UNKNOWN@.github/workflows/hf-official-estate-inventory.yml:112","SHELL_COMPOSITION_UNKNOWN@.github/workflows/hf-official-estate-inventory.yml:115","SHELL_COMPOSITION_UNKNOWN@.github/workflows/hf-official-estate-inventory.yml:118","SHELL_COMPOSITION_UNKNOWN@.github/workflows/hf-official-estate-inventory.yml:119","SHELL_COMPOSITION_UNKNOWN@.github/workflows/hf-official-estate-inventory.yml:120","SHELL_COMPOSITION_UNKNOWN@.github/workflows/hf-official-estate-inventory.yml:150","SHELL_COMPOSITION_UNKNOWN@.github/workflows/hf-official-estate-inventory.yml:97","SHELL_COMPOSITION_UNKNOWN@.github/workflows/hf-official-estate-inventory.yml:98","SHELL_COMPOSITION_UNKNOWN@.github/workflows/hf-official-estate-inventory.yml:99","WORKFLOW_ENVIRONMENT_REVIEW_REQUIRED@.github/workflows/hf-official-estate-inventory.yml:104","WORKFLOW_ENVIRONMENT_REVIEW_REQUIRED@.github/workflows/hf-official-estate-inventory.yml:39","WORKFLOW_ENVIRONMENT_REVIEW_REQUIRED@.github/workflows/hf-official-estate-inventory.yml:76","WORKFLOW_ENVIRONMENT_REVIEW_REQUIRED@.github/workflows/hf-official-estate-inventory.yml:94"]}},
     ".github/workflows/estate-snapshot-admission.yml": {
       "intent_id": "estate-snapshot-admission-contract-v1",
       "valid_until": "2026-11-30",
       "source_sha256": "sha256:70d8cb695974248d71ef478d4fef3771709f236c90d757d086b241b6298e3a0f",
       "credentials": [],
-      "resources": [{"key": "github:repository:szl-holdings/.github:contents", "access": "read"}, {"key": "runner:toolchain:python", "access": "local-write"}],
-      "effects": [{"sink": "github.contents.checkout", "resource": "github:repository:szl-holdings/.github:contents", "access": "read", "max_calls": 1}, {"sink": "runner.toolchain.install", "resource": "runner:toolchain:python", "access": "local-write", "max_calls": 1}],
+      "resources": [
+        {
+          "key": "github:repository:szl-holdings/.github:contents",
+          "access": "read"
+        },
+        {
+          "key": "runner:toolchain:python",
+          "access": "local-write"
+        }
+      ],
+      "effects": [
+        {
+          "sink": "github.contents.checkout",
+          "resource": "github:repository:szl-holdings/.github:contents",
+          "access": "read",
+          "max_calls": 1
+        },
+        {
+          "sink": "runner.toolchain.install",
+          "resource": "runner:toolchain:python",
+          "access": "local-write",
+          "max_calls": 1
+        }
+      ],
       "max_external_writes": 0,
-      "required_controls": {"triggers": ["pull_request", "merge_group", "push"], "contents_read": true, "no_explicit_secrets": true, "concurrency": true, "protected_ref": false, "exact_sha": false, "expected_before": false, "readback": false},
+      "required_controls": {
+        "triggers": [
+          "pull_request",
+          "merge_group",
+          "push"
+        ],
+        "contents_read": true,
+        "no_explicit_secrets": true,
+        "concurrency": true,
+        "protected_ref": false,
+        "exact_sha": false,
+        "expected_before": false,
+        "readback": false
+      },
       "trusted_transitives": {},
-      "reviewed_unknowns": {"files": {".github/scripts/test_estate_snapshot_admission.py": "sha256:7e594ea3e6c0cdd0819a068c7f92a2cc404909d60013c66d51fb3609967b19ab", ".github/workflows/estate-snapshot-admission.yml": "sha256:70d8cb695974248d71ef478d4fef3771709f236c90d757d086b241b6298e3a0f", "scripts/estate_snapshot_admission.py": "sha256:f255a7aacb904bf81c5c8004e0c43f0da4e243fc549971d148a5a1d9fadd8562"}, "unknowns": ["ACTION_INPUTS_REVIEW_REQUIRED@.github/workflows/estate-snapshot-admission.yml:19", "ACTION_INPUTS_REVIEW_REQUIRED@.github/workflows/estate-snapshot-admission.yml:23", "PYTHON_IMPORT_UNRESOLVED@.github/scripts/test_estate_snapshot_admission.py:2", "PYTHON_IMPORT_UNRESOLVED@.github/scripts/test_estate_snapshot_admission.py:3", "PYTHON_IMPORT_UNRESOLVED@.github/scripts/test_estate_snapshot_admission.py:5", "PYTHON_IMPORT_UNRESOLVED@.github/scripts/test_estate_snapshot_admission.py:6", "PYTHON_IMPORT_UNRESOLVED@scripts/estate_snapshot_admission.py:3", "PYTHON_IMPORT_UNRESOLVED@scripts/estate_snapshot_admission.py:5", "PYTHON_IMPORT_UNRESOLVED@scripts/estate_snapshot_admission.py:6", "PYTHON_IMPORT_UNRESOLVED@scripts/estate_snapshot_admission.py:8", "PYTHON_SOURCE_REVIEW_REQUIRED@.github/scripts/test_estate_snapshot_admission.py:1", "PYTHON_SOURCE_REVIEW_REQUIRED@scripts/estate_snapshot_admission.py:1", "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/estate-snapshot-admission.yml:26", "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/estate-snapshot-admission.yml:27"]}
+      "reviewed_unknowns": {
+        "files": {
+          ".github/scripts/test_estate_snapshot_admission.py": "sha256:7e594ea3e6c0cdd0819a068c7f92a2cc404909d60013c66d51fb3609967b19ab",
+          ".github/workflows/estate-snapshot-admission.yml": "sha256:70d8cb695974248d71ef478d4fef3771709f236c90d757d086b241b6298e3a0f",
+          "scripts/estate_snapshot_admission.py": "sha256:f255a7aacb904bf81c5c8004e0c43f0da4e243fc549971d148a5a1d9fadd8562"
+        },
+        "unknowns": [
+          "ACTION_INPUTS_REVIEW_REQUIRED@.github/workflows/estate-snapshot-admission.yml:19",
+          "ACTION_INPUTS_REVIEW_REQUIRED@.github/workflows/estate-snapshot-admission.yml:23",
+          "PYTHON_IMPORT_UNRESOLVED@.github/scripts/test_estate_snapshot_admission.py:2",
+          "PYTHON_IMPORT_UNRESOLVED@.github/scripts/test_estate_snapshot_admission.py:3",
+          "PYTHON_IMPORT_UNRESOLVED@.github/scripts/test_estate_snapshot_admission.py:5",
+          "PYTHON_IMPORT_UNRESOLVED@.github/scripts/test_estate_snapshot_admission.py:6",
+          "PYTHON_IMPORT_UNRESOLVED@scripts/estate_snapshot_admission.py:3",
+          "PYTHON_IMPORT_UNRESOLVED@scripts/estate_snapshot_admission.py:5",
+          "PYTHON_IMPORT_UNRESOLVED@scripts/estate_snapshot_admission.py:6",
+          "PYTHON_IMPORT_UNRESOLVED@scripts/estate_snapshot_admission.py:8",
+          "PYTHON_SOURCE_REVIEW_REQUIRED@.github/scripts/test_estate_snapshot_admission.py:1",
+          "PYTHON_SOURCE_REVIEW_REQUIRED@scripts/estate_snapshot_admission.py:1",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/estate-snapshot-admission.yml:26",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/estate-snapshot-admission.yml:27"
+        ]
+      }
     },
     ".github/workflows/hf-dataset-badge-refresh.yml": {
       "intent_id": "hf-dataset-badge-source-ownership-v1",
@@ -698,15 +775,44 @@
       "source_sha256": "sha256:443c439d3a770dc8f982aaf3d73654ceafbd021a0cb67cd14dd85674903c1aae",
       "credentials": [],
       "resources": [
-        {"key": "github:repository:szl-holdings/.github:contents", "access": "read"},
-        {"key": "runner:toolchain:python", "access": "local-write"}
+        {
+          "key": "github:repository:szl-holdings/.github:contents",
+          "access": "read"
+        },
+        {
+          "key": "runner:toolchain:python",
+          "access": "local-write"
+        }
       ],
       "effects": [
-        {"sink": "github.contents.checkout", "resource": "github:repository:szl-holdings/.github:contents", "access": "read", "max_calls": 1},
-        {"sink": "runner.toolchain.install", "resource": "runner:toolchain:python", "access": "local-write", "max_calls": 1}
+        {
+          "sink": "github.contents.checkout",
+          "resource": "github:repository:szl-holdings/.github:contents",
+          "access": "read",
+          "max_calls": 1
+        },
+        {
+          "sink": "runner.toolchain.install",
+          "resource": "runner:toolchain:python",
+          "access": "local-write",
+          "max_calls": 1
+        }
       ],
       "max_external_writes": 0,
-      "required_controls": {"triggers": ["pull_request", "merge_group", "push"], "contents_read": true, "no_explicit_secrets": true, "concurrency": false, "protected_ref": false, "exact_sha": false, "expected_before": false, "readback": false},
+      "required_controls": {
+        "triggers": [
+          "pull_request",
+          "merge_group",
+          "push"
+        ],
+        "contents_read": true,
+        "no_explicit_secrets": true,
+        "concurrency": false,
+        "protected_ref": false,
+        "exact_sha": false,
+        "expected_before": false,
+        "readback": false
+      },
       "trusted_transitives": {},
       "reviewed_unknowns": {
         "files": {
@@ -956,7 +1062,7 @@
     ".github/workflows/hf-org-card-autopublish.yml": {
       "intent_id": "hf-org-card-central-single-writer-v1",
       "valid_until": "2026-11-30",
-      "source_sha256": "sha256:e3c3575efafd948b45a0624f53016c5212b0ca6873c8f18f6973caeca6ed4a2b",
+      "source_sha256": "sha256:e92b29e945df636ca75a9158c6e2fd22c394d31528a42ea7a3a8a74f6f0c467f",
       "credentials": [
         "GITHUB_TOKEN",
         "HF_ORG_TOKEN",
@@ -1055,7 +1161,7 @@
       "trusted_transitives": {},
       "reviewed_unknowns": {
         "files": {
-          ".github/workflows/hf-org-card-autopublish.yml": "sha256:e3c3575efafd948b45a0624f53016c5212b0ca6873c8f18f6973caeca6ed4a2b",
+          ".github/workflows/hf-org-card-autopublish.yml": "sha256:e92b29e945df636ca75a9158c6e2fd22c394d31528a42ea7a3a8a74f6f0c467f",
           ".github/scripts/hf_org_card_autopublish.py": "sha256:9639607089280ccf8a112882b57bffcd88fb0893cae5ee9a1c4273ae3371f015",
           ".github/scripts/hf_org_card_publish_cleanup.py": "sha256:ddf1cf8b8597384c071a7f920806b9c5ea5b71aad40106943612627738af86e8",
           ".github/scripts/hf_space_visibility.py": "sha256:6f9d05d30323230bc8569147e24d95a2a08107fef27112c4ef994086a0834394",
@@ -1067,17 +1173,17 @@
           ".github/workflows/hf-org-card-deploy.yml": "sha256:a595ee5426de69599d57d4381d0d7a111dda0e6e9d7a58e84bab58dfa598d154"
         },
         "unknowns": [
-          "ACTION_INPUTS_REVIEW_REQUIRED@.github/workflows/hf-org-card-autopublish.yml:112",
-          "ACTION_INPUTS_REVIEW_REQUIRED@.github/workflows/hf-org-card-autopublish.yml:117",
-          "ACTION_INPUTS_REVIEW_REQUIRED@.github/workflows/hf-org-card-autopublish.yml:124",
-          "ACTION_INPUTS_REVIEW_REQUIRED@.github/workflows/hf-org-card-autopublish.yml:172",
-          "ACTION_INPUTS_REVIEW_REQUIRED@.github/workflows/hf-org-card-autopublish.yml:54",
-          "ACTION_INPUTS_REVIEW_REQUIRED@.github/workflows/hf-org-card-autopublish.yml:59",
-          "ACTION_INPUTS_REVIEW_REQUIRED@.github/workflows/hf-org-card-autopublish.yml:66",
-          "ACTION_INPUTS_REVIEW_REQUIRED@.github/workflows/hf-org-card-autopublish.yml:98",
-          "DYNAMIC_EXECUTION@.github/workflows/hf-org-card-autopublish.yml:151",
-          "DYNAMIC_EXECUTION@.github/workflows/hf-org-card-autopublish.yml:161",
-          "DYNAMIC_EXECUTION@.github/workflows/hf-org-card-autopublish.yml:87",
+          "ACTION_INPUTS_REVIEW_REQUIRED@.github/workflows/hf-org-card-autopublish.yml:100",
+          "ACTION_INPUTS_REVIEW_REQUIRED@.github/workflows/hf-org-card-autopublish.yml:114",
+          "ACTION_INPUTS_REVIEW_REQUIRED@.github/workflows/hf-org-card-autopublish.yml:119",
+          "ACTION_INPUTS_REVIEW_REQUIRED@.github/workflows/hf-org-card-autopublish.yml:126",
+          "ACTION_INPUTS_REVIEW_REQUIRED@.github/workflows/hf-org-card-autopublish.yml:174",
+          "ACTION_INPUTS_REVIEW_REQUIRED@.github/workflows/hf-org-card-autopublish.yml:56",
+          "ACTION_INPUTS_REVIEW_REQUIRED@.github/workflows/hf-org-card-autopublish.yml:61",
+          "ACTION_INPUTS_REVIEW_REQUIRED@.github/workflows/hf-org-card-autopublish.yml:68",
+          "DYNAMIC_EXECUTION@.github/workflows/hf-org-card-autopublish.yml:153",
+          "DYNAMIC_EXECUTION@.github/workflows/hf-org-card-autopublish.yml:163",
+          "DYNAMIC_EXECUTION@.github/workflows/hf-org-card-autopublish.yml:89",
           "HTTP_TARGET_UNRESOLVED@.github/scripts/hf_space_visibility.py:87",
           "HTTP_TARGET_UNRESOLVED@.github/scripts/hf_static_space_deploy.py:378",
           "HTTP_TARGET_UNRESOLVED@.github/scripts/hf_static_space_deploy.py:527",
@@ -1151,18 +1257,16 @@
           "SDK_TARGET_UNRESOLVED@.github/scripts/hf_static_space_deploy.py:807",
           "SECRET_EXPRESSION_REVIEW_REQUIRED@.github/workflows/hf-org-card-autopublish.yml:1",
           "SHELL_COMMAND_UNCLASSIFIED@.github/scripts/hf_static_space_deploy.py:504",
-          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-org-card-autopublish.yml:128",
-          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-org-card-autopublish.yml:134",
-          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-org-card-autopublish.yml:142",
-          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-org-card-autopublish.yml:143",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-org-card-autopublish.yml:130",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-org-card-autopublish.yml:136",
           "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-org-card-autopublish.yml:144",
           "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-org-card-autopublish.yml:145",
-          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-org-card-autopublish.yml:151",
-          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-org-card-autopublish.yml:161",
-          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-org-card-autopublish.yml:70",
-          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-org-card-autopublish.yml:76",
-          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-org-card-autopublish.yml:83",
-          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-org-card-autopublish.yml:84",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-org-card-autopublish.yml:146",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-org-card-autopublish.yml:147",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-org-card-autopublish.yml:153",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-org-card-autopublish.yml:163",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-org-card-autopublish.yml:72",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-org-card-autopublish.yml:78",
           "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-org-card-autopublish.yml:85",
           "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-org-card-autopublish.yml:86",
           "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-org-card-autopublish.yml:87",
@@ -1171,21 +1275,23 @@
           "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-org-card-autopublish.yml:90",
           "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-org-card-autopublish.yml:91",
           "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-org-card-autopublish.yml:92",
-          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/hf-org-card-autopublish.yml:142",
-          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/hf-org-card-autopublish.yml:151",
-          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/hf-org-card-autopublish.yml:161",
-          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/hf-org-card-autopublish.yml:83",
-          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/hf-org-card-autopublish.yml:84",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-org-card-autopublish.yml:93",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-org-card-autopublish.yml:94",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/hf-org-card-autopublish.yml:144",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/hf-org-card-autopublish.yml:153",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/hf-org-card-autopublish.yml:163",
           "SHELL_COMPOSITION_UNKNOWN@.github/workflows/hf-org-card-autopublish.yml:85",
           "SHELL_COMPOSITION_UNKNOWN@.github/workflows/hf-org-card-autopublish.yml:86",
           "SHELL_COMPOSITION_UNKNOWN@.github/workflows/hf-org-card-autopublish.yml:87",
           "SHELL_COMPOSITION_UNKNOWN@.github/workflows/hf-org-card-autopublish.yml:88",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/hf-org-card-autopublish.yml:89",
           "SHELL_COMPOSITION_UNKNOWN@.github/workflows/hf-org-card-autopublish.yml:90",
-          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/hf-org-card-autopublish.yml:91",
           "SHELL_COMPOSITION_UNKNOWN@.github/workflows/hf-org-card-autopublish.yml:92",
-          "WORKFLOW_ENVIRONMENT_REVIEW_REQUIRED@.github/workflows/hf-org-card-autopublish.yml:139",
-          "WORKFLOW_ENVIRONMENT_REVIEW_REQUIRED@.github/workflows/hf-org-card-autopublish.yml:149",
-          "WORKFLOW_ENVIRONMENT_REVIEW_REQUIRED@.github/workflows/hf-org-card-autopublish.yml:158"
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/hf-org-card-autopublish.yml:93",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/hf-org-card-autopublish.yml:94",
+          "WORKFLOW_ENVIRONMENT_REVIEW_REQUIRED@.github/workflows/hf-org-card-autopublish.yml:141",
+          "WORKFLOW_ENVIRONMENT_REVIEW_REQUIRED@.github/workflows/hf-org-card-autopublish.yml:151",
+          "WORKFLOW_ENVIRONMENT_REVIEW_REQUIRED@.github/workflows/hf-org-card-autopublish.yml:160"
         ]
       }
     },
@@ -1262,16 +1368,16 @@
       "reviewed_unknowns": {
         "files": {
           ".github/workflows/hf-org-card-deploy.yml": "sha256:a595ee5426de69599d57d4381d0d7a111dda0e6e9d7a58e84bab58dfa598d154",
-          ".github/scripts/hf_org_card_embed_check.py": "sha256:45076df2221c4fac6d3b7db317986c92a4a487484247db0af7765b223433b34b",
+          ".github/scripts/hf_org_card_embed_check.py": "sha256:3e413b8bd2261a4af771672c9e159bb5db5a87ee13685332f06eb21f71efd2cb",
           ".github/scripts/hf_space_visibility.py": "sha256:6f9d05d30323230bc8569147e24d95a2a08107fef27112c4ef994086a0834394",
           ".github/scripts/hf_static_space_deploy.py": "sha256:2b3a5f7313c7b52b0b16e8caa7da7da22a999045c99a382c1ca4bbd2965b081f",
-          ".github/scripts/public_front_door_check.py": "sha256:1786febd59e644b5d92f035f4cc15d17c358d7320abf9287d4debdbde7f1435c",
+          ".github/scripts/public_front_door_check.py": "sha256:ecbcd45818e6b5ed291d512ee98ec0eef2deebf24a9270fd479d0626a0d3302d",
           ".github/scripts/test_hf_org_card_embed_check.py": "sha256:4aef83f6c4f0065cef17f0bad8a171e402ce49191f42611ef590c125c577d572",
           ".github/scripts/test_hf_space_visibility.py": "sha256:08eb3de2ae3f53f07b85209a675d47d3b07f1fa8e901dfec69d6414203ab36d3",
           ".github/scripts/test_hf_static_space_deploy.py": "sha256:990e1814c6970447d8cf1f8ea554e25249fadceb881eedcaf1c702951262e6a0",
-          ".github/scripts/test_profile_inventory_contract.py": "sha256:02b199dee92996e758bf6f736e8e2554203c9297c93bf9bf552c09e5484161ac",
-          ".github/scripts/test_public_front_door_check.py": "sha256:320ae374866f13ec9cc4d66b2b3be6a66792e1022bdb2c1a7371a91c7a786141",
-          ".github/workflows/hf-org-card-embed-check.yml": "sha256:0bb893ec8261e74113ae41ba375d9f091646cf60e1e1161354be02f90303cf50"
+          ".github/scripts/test_profile_inventory_contract.py": "sha256:3c9c79e14cce631e2d422bd7668420a50af9f1aefb459a4a54b582940097fb25",
+          ".github/scripts/test_public_front_door_check.py": "sha256:900eb0c14a84966008a5d5602995697a8d93a55997224dd314e252bb7d7448bf",
+          ".github/workflows/hf-org-card-embed-check.yml": "sha256:2381b0ff495622b66b69ea7abcfe9c2ecd9ff26110ed1c995a2760f0944daefd"
         },
         "unknowns": [
           "ACTION_INPUTS_REVIEW_REQUIRED@.github/workflows/hf-org-card-deploy.yml:45",
@@ -1322,7 +1428,8 @@
           "PYTHON_IMPORT_UNRESOLVED@.github/scripts/test_hf_static_space_deploy.py:4",
           "PYTHON_IMPORT_UNRESOLVED@.github/scripts/test_hf_static_space_deploy.py:6",
           "PYTHON_IMPORT_UNRESOLVED@.github/scripts/test_profile_inventory_contract.py:3",
-          "PYTHON_IMPORT_UNRESOLVED@.github/scripts/test_profile_inventory_contract.py:6",
+          "PYTHON_IMPORT_UNRESOLVED@.github/scripts/test_profile_inventory_contract.py:7",
+          "PYTHON_IMPORT_UNRESOLVED@.github/scripts/test_profile_inventory_contract.py:8",
           "PYTHON_IMPORT_UNRESOLVED@.github/scripts/test_public_front_door_check.py:3",
           "PYTHON_IMPORT_UNRESOLVED@.github/scripts/test_public_front_door_check.py:5",
           "PYTHON_SOURCE_REVIEW_REQUIRED@.github/scripts/hf_org_card_embed_check.py:1",
@@ -1352,7 +1459,7 @@
     ".github/workflows/hf-org-card-embed-check.yml": {
       "intent_id": "hf-org-card-embed-validation-v1",
       "valid_until": "2026-11-30",
-      "source_sha256": "sha256:0bb893ec8261e74113ae41ba375d9f091646cf60e1e1161354be02f90303cf50",
+      "source_sha256": "sha256:2381b0ff495622b66b69ea7abcfe9c2ecd9ff26110ed1c995a2760f0944daefd",
       "credentials": [],
       "resources": [
         {
@@ -1366,6 +1473,10 @@
         {
           "key": "runner:toolchain:python",
           "access": "local-write"
+        },
+        {
+          "key": "github:actions:artifact:hf-org-card-browser",
+          "access": "external-write"
         }
       ],
       "effects": [
@@ -1386,9 +1497,15 @@
           "resource": "runner:toolchain:python",
           "access": "local-write",
           "max_calls": 1
+        },
+        {
+          "sink": "github.artifact.upload",
+          "resource": "github:actions:artifact:hf-org-card-browser",
+          "access": "external-write",
+          "max_calls": 1
         }
       ],
-      "max_external_writes": 0,
+      "max_external_writes": 1,
       "required_controls": {
         "triggers": [
           "pull_request",
@@ -1406,33 +1523,69 @@
       "trusted_transitives": {},
       "reviewed_unknowns": {
         "files": {
-          ".github/workflows/hf-org-card-embed-check.yml": "sha256:0bb893ec8261e74113ae41ba375d9f091646cf60e1e1161354be02f90303cf50",
-          ".github/scripts/hf_org_card_embed_check.py": "sha256:45076df2221c4fac6d3b7db317986c92a4a487484247db0af7765b223433b34b",
-          ".github/scripts/public_front_door_check.py": "sha256:1786febd59e644b5d92f035f4cc15d17c358d7320abf9287d4debdbde7f1435c",
+          ".github/workflows/hf-org-card-embed-check.yml": "sha256:2381b0ff495622b66b69ea7abcfe9c2ecd9ff26110ed1c995a2760f0944daefd",
+          ".github/scripts/hf_org_card_embed_check.py": "sha256:3e413b8bd2261a4af771672c9e159bb5db5a87ee13685332f06eb21f71efd2cb",
+          ".github/scripts/prepare_org_card_preview.py": "sha256:4d00ce1860ad4ce1d8e369a11765643836585593bbde89fd0fa86029b15b0018",
+          ".github/scripts/public_front_door_check.py": "sha256:ecbcd45818e6b5ed291d512ee98ec0eef2deebf24a9270fd479d0626a0d3302d",
+          ".github/scripts/render_profile_inventory.py": "sha256:bf665cb5fbb208a5b6f943abb938865ead901c068197f59b1012b6b9259f4451",
           ".github/scripts/test_hf_org_card_embed_check.py": "sha256:4aef83f6c4f0065cef17f0bad8a171e402ce49191f42611ef590c125c577d572",
-          ".github/scripts/test_public_front_door_check.py": "sha256:320ae374866f13ec9cc4d66b2b3be6a66792e1022bdb2c1a7371a91c7a786141"
+          ".github/scripts/test_org_card_browser.py": "sha256:6fdbe4175fc5e636f5b512d29c8efb7897d7a6fd471c2a9adc941937a9313700",
+          ".github/scripts/test_profile_inventory_contract.py": "sha256:3c9c79e14cce631e2d422bd7668420a50af9f1aefb459a4a54b582940097fb25",
+          ".github/scripts/test_public_front_door_check.py": "sha256:900eb0c14a84966008a5d5602995697a8d93a55997224dd314e252bb7d7448bf"
         },
         "unknowns": [
-          "ACTION_INPUTS_REVIEW_REQUIRED@.github/workflows/hf-org-card-embed-check.yml:46",
-          "ACTION_INPUTS_REVIEW_REQUIRED@.github/workflows/hf-org-card-embed-check.yml:51",
-          "ACTION_INPUTS_REVIEW_REQUIRED@.github/workflows/hf-org-card-embed-check.yml:56",
+          "ACTION_INPUTS_REVIEW_REQUIRED@.github/workflows/hf-org-card-embed-check.yml:120",
+          "ACTION_INPUTS_REVIEW_REQUIRED@.github/workflows/hf-org-card-embed-check.yml:60",
+          "ACTION_INPUTS_REVIEW_REQUIRED@.github/workflows/hf-org-card-embed-check.yml:65",
+          "ACTION_INPUTS_REVIEW_REQUIRED@.github/workflows/hf-org-card-embed-check.yml:70",
           "PYTHON_IMPORT_UNRESOLVED@.github/scripts/hf_org_card_embed_check.py:11",
           "PYTHON_IMPORT_UNRESOLVED@.github/scripts/hf_org_card_embed_check.py:4",
           "PYTHON_IMPORT_UNRESOLVED@.github/scripts/hf_org_card_embed_check.py:9",
+          "PYTHON_IMPORT_UNRESOLVED@.github/scripts/prepare_org_card_preview.py:10",
+          "PYTHON_IMPORT_UNRESOLVED@.github/scripts/prepare_org_card_preview.py:8",
           "PYTHON_IMPORT_UNRESOLVED@.github/scripts/public_front_door_check.py:10",
           "PYTHON_IMPORT_UNRESOLVED@.github/scripts/public_front_door_check.py:13",
           "PYTHON_IMPORT_UNRESOLVED@.github/scripts/public_front_door_check.py:4",
+          "PYTHON_IMPORT_UNRESOLVED@.github/scripts/render_profile_inventory.py:10",
+          "PYTHON_IMPORT_UNRESOLVED@.github/scripts/render_profile_inventory.py:12",
+          "PYTHON_IMPORT_UNRESOLVED@.github/scripts/render_profile_inventory.py:15",
           "PYTHON_IMPORT_UNRESOLVED@.github/scripts/test_hf_org_card_embed_check.py:4",
+          "PYTHON_IMPORT_UNRESOLVED@.github/scripts/test_org_card_browser.py:10",
+          "PYTHON_IMPORT_UNRESOLVED@.github/scripts/test_org_card_browser.py:13",
+          "PYTHON_IMPORT_UNRESOLVED@.github/scripts/test_org_card_browser.py:15",
+          "PYTHON_IMPORT_UNRESOLVED@.github/scripts/test_org_card_browser.py:18",
+          "PYTHON_IMPORT_UNRESOLVED@.github/scripts/test_org_card_browser.py:8",
+          "PYTHON_IMPORT_UNRESOLVED@.github/scripts/test_profile_inventory_contract.py:3",
+          "PYTHON_IMPORT_UNRESOLVED@.github/scripts/test_profile_inventory_contract.py:7",
+          "PYTHON_IMPORT_UNRESOLVED@.github/scripts/test_profile_inventory_contract.py:8",
           "PYTHON_IMPORT_UNRESOLVED@.github/scripts/test_public_front_door_check.py:3",
           "PYTHON_IMPORT_UNRESOLVED@.github/scripts/test_public_front_door_check.py:5",
           "PYTHON_SOURCE_REVIEW_REQUIRED@.github/scripts/hf_org_card_embed_check.py:1",
+          "PYTHON_SOURCE_REVIEW_REQUIRED@.github/scripts/prepare_org_card_preview.py:1",
           "PYTHON_SOURCE_REVIEW_REQUIRED@.github/scripts/public_front_door_check.py:1",
+          "PYTHON_SOURCE_REVIEW_REQUIRED@.github/scripts/render_profile_inventory.py:1",
           "PYTHON_SOURCE_REVIEW_REQUIRED@.github/scripts/test_hf_org_card_embed_check.py:1",
+          "PYTHON_SOURCE_REVIEW_REQUIRED@.github/scripts/test_org_card_browser.py:1",
+          "PYTHON_SOURCE_REVIEW_REQUIRED@.github/scripts/test_profile_inventory_contract.py:1",
           "PYTHON_SOURCE_REVIEW_REQUIRED@.github/scripts/test_public_front_door_check.py:1",
           "SCRIPT_SOURCE_REVIEW_REQUIRED@.github/workflows/hf-org-card-embed-check.yml:1",
-          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-org-card-embed-check.yml:60",
-          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-org-card-embed-check.yml:66",
-          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-org-card-embed-check.yml:71"
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-org-card-embed-check.yml:100",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-org-card-embed-check.yml:106",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-org-card-embed-check.yml:107",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-org-card-embed-check.yml:108",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-org-card-embed-check.yml:112",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-org-card-embed-check.yml:74",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-org-card-embed-check.yml:80",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-org-card-embed-check.yml:85",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-org-card-embed-check.yml:89",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-org-card-embed-check.yml:90",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-org-card-embed-check.yml:93",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-org-card-embed-check.yml:96",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/hf-org-card-embed-check.yml:100",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/hf-org-card-embed-check.yml:106",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/hf-org-card-embed-check.yml:107",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/hf-org-card-embed-check.yml:108",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/hf-org-card-embed-check.yml:112"
         ]
       }
     },
@@ -1509,7 +1662,7 @@
           ".github/workflows/tests.yml": "sha256:1136cd844578365121aa2b2a5c32634e45a92ed6330e742f1ad2859c25927725",
           ".github/scripts/hf_deploy_from_dockerfile.py": "sha256:f2f7a6c1296493d034eebed596f4176c2928470a4ed7e23620da6cacf19b16e7",
           ".github/scripts/hf_space_source_binding.py": "sha256:9888d4c126ead29d0960de3198a99f1d686956c8104f0cf6c5c0d4c113b2a37b",
-          ".github/scripts/public_front_door_check.py": "sha256:1786febd59e644b5d92f035f4cc15d17c358d7320abf9287d4debdbde7f1435c",
+          ".github/scripts/public_front_door_check.py": "sha256:ecbcd45818e6b5ed291d512ee98ec0eef2deebf24a9270fd479d0626a0d3302d",
           ".github/scripts/test_anatomy_map_drift.py": "sha256:69fe73b840912e549344a88069a67379ec769ca84ab7cd3021d33cd56db6a0b7",
           ".github/scripts/test_attestation_queue_precondition.py": "sha256:69d385bb7e74822f267cb277e80ba86c06ab294cc58800d8d6cd8abb2ed71068",
           ".github/scripts/test_build_drift_alert.py": "sha256:c2185652af353d2e1efafb1e2d02291a6a39a513a9ddc9d42e65ba95f547272c",
