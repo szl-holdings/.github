@@ -424,8 +424,8 @@
         "readback": true
       },
       "trusted_transitives": {
-        ".github/scripts/control_plane_effect_gate.py": "sha256:c6dab1dd86092280168a6312417c03fde611fdbe197cd4c436aadf25ae18fb67",
-        ".github/scripts/test_control_plane_effect_gate.py": "sha256:abf96660b74f49eaaffe4f6165a0614f0e8922605ddc8a47d4aa11ef71791981"
+        ".github/scripts/control_plane_effect_gate.py": "sha256:ff8765e852c974abea1d0348b1f8569e6ab27cf9bb1b9921d6ee0d8119df4c7d",
+        ".github/scripts/test_control_plane_effect_gate.py": "sha256:076626dfea9b67f0e23e78e8d43c294f3ef5fe36043714f9cf94ff732187f0a1"
       },
       "reviewed_unknowns": {
         "files": {
@@ -1986,6 +1986,156 @@
           "SHELL_COMPOSITION_UNKNOWN@.github/workflows/tests.yml:281",
           "SHELL_COMPOSITION_UNKNOWN@.github/workflows/tests.yml:282",
           "SHELL_COMPOSITION_UNKNOWN@.github/workflows/tests.yml:283"
+        ]
+      }
+    },
+    ".github/workflows/responsive-estate-v3.yml": {
+      "intent_id": "responsive-estate-observed-report-v31",
+      "valid_until": "2026-11-30",
+      "source_sha256": "sha256:09843f899d6b23b9c6acfaa0a45fd93126321602f909a91fb5467d1db99aabb4",
+      "credentials": [],
+      "resources": [
+        {
+          "key": "github:actions:artifact:responsive-estate-v3-live",
+          "access": "external-write"
+        },
+        {
+          "key": "github:repository:szl-holdings/.github:contents",
+          "access": "read"
+        },
+        {
+          "key": "runner:guard:egress",
+          "access": "local-write"
+        },
+        {
+          "key": "runner:toolchain:node",
+          "access": "local-write"
+        },
+        {
+          "key": "stepsecurity:monitor:szl-holdings/.github",
+          "access": "external-write"
+        }
+      ],
+      "effects": [
+        {
+          "sink": "github.artifact.upload",
+          "resource": "github:actions:artifact:responsive-estate-v3-live",
+          "access": "external-write",
+          "max_calls": 1
+        },
+        {
+          "sink": "github.contents.checkout",
+          "resource": "github:repository:szl-holdings/.github:contents",
+          "access": "read",
+          "max_calls": 2
+        },
+        {
+          "sink": "runner.guard.configure",
+          "resource": "runner:guard:egress",
+          "access": "local-write",
+          "max_calls": 2
+        },
+        {
+          "sink": "runner.guard.telemetry",
+          "resource": "stepsecurity:monitor:szl-holdings/.github",
+          "access": "external-write",
+          "max_calls": 2
+        },
+        {
+          "sink": "runner.toolchain.install",
+          "resource": "runner:toolchain:node",
+          "access": "local-write",
+          "max_calls": 2
+        }
+      ],
+      "max_external_writes": 3,
+      "required_controls": {
+        "triggers": [
+          "merge_group",
+          "pull_request",
+          "push",
+          "schedule",
+          "workflow_dispatch"
+        ],
+        "contents_read": true,
+        "no_explicit_secrets": true,
+        "concurrency": true,
+        "protected_ref": false,
+        "exact_sha": false,
+        "expected_before": false,
+        "readback": false
+      },
+      "trusted_transitives": {},
+      "reviewed_unknowns": {
+        "files": {
+          ".github/workflows/responsive-estate-v3.yml": "sha256:09843f899d6b23b9c6acfaa0a45fd93126321602f909a91fb5467d1db99aabb4",
+          "scripts/audit_responsive_estate_v3.mjs": "sha256:b4a2b76d41bd2d37fdbda2bdacf6052a12b719534a50a936e8830888c7d1a777",
+          "scripts/normalize_responsive_estate_v31.mjs": "sha256:08d54b35cd9a41b8301b47f769fd1ce2d37f4041df941531cacffd73b60967ac",
+          "scripts/responsive_audit_policy_v31.mjs": "sha256:fa93396b7107419f0475a3b6c530ac187942b5d78a68e7a00a5cfd96df5f72b9"
+        },
+        "unknowns": [
+          "ACTION_INPUTS_REVIEW_REQUIRED@.github/workflows/responsive-estate-v3.yml:102",
+          "ACTION_INPUTS_REVIEW_REQUIRED@.github/workflows/responsive-estate-v3.yml:141",
+          "ACTION_INPUTS_REVIEW_REQUIRED@.github/workflows/responsive-estate-v3.yml:49",
+          "ACTION_INPUTS_REVIEW_REQUIRED@.github/workflows/responsive-estate-v3.yml:54",
+          "ACTION_INPUTS_REVIEW_REQUIRED@.github/workflows/responsive-estate-v3.yml:60",
+          "ACTION_INPUTS_REVIEW_REQUIRED@.github/workflows/responsive-estate-v3.yml:91",
+          "ACTION_INPUTS_REVIEW_REQUIRED@.github/workflows/responsive-estate-v3.yml:96",
+          "SCRIPT_SOURCE_REVIEW_REQUIRED@.github/workflows/responsive-estate-v3.yml:1",
+          "SCRIPT_SOURCE_REVIEW_REQUIRED@scripts/audit_responsive_estate_v3.mjs:1",
+          "SCRIPT_SOURCE_REVIEW_REQUIRED@scripts/normalize_responsive_estate_v31.mjs:1",
+          "SCRIPT_SOURCE_REVIEW_REQUIRED@scripts/responsive_audit_policy_v31.mjs:1",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/responsive-estate-v3.yml:108",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/responsive-estate-v3.yml:109",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/responsive-estate-v3.yml:114",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/responsive-estate-v3.yml:115",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/responsive-estate-v3.yml:116",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/responsive-estate-v3.yml:117",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/responsive-estate-v3.yml:118",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/responsive-estate-v3.yml:119",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/responsive-estate-v3.yml:120",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/responsive-estate-v3.yml:121",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/responsive-estate-v3.yml:122",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/responsive-estate-v3.yml:123",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/responsive-estate-v3.yml:128",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/responsive-estate-v3.yml:129",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/responsive-estate-v3.yml:130",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/responsive-estate-v3.yml:131",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/responsive-estate-v3.yml:132",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/responsive-estate-v3.yml:133",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/responsive-estate-v3.yml:134",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/responsive-estate-v3.yml:135",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/responsive-estate-v3.yml:157",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/responsive-estate-v3.yml:158",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/responsive-estate-v3.yml:159",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/responsive-estate-v3.yml:160",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/responsive-estate-v3.yml:161",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/responsive-estate-v3.yml:162",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/responsive-estate-v3.yml:163",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/responsive-estate-v3.yml:164",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/responsive-estate-v3.yml:66",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/responsive-estate-v3.yml:67",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/responsive-estate-v3.yml:68",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/responsive-estate-v3.yml:69",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/responsive-estate-v3.yml:70",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/responsive-estate-v3.yml:75",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/responsive-estate-v3.yml:76",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/responsive-estate-v3.yml:79",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/responsive-estate-v3.yml:115",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/responsive-estate-v3.yml:116",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/responsive-estate-v3.yml:117",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/responsive-estate-v3.yml:118",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/responsive-estate-v3.yml:119",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/responsive-estate-v3.yml:122",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/responsive-estate-v3.yml:129",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/responsive-estate-v3.yml:130",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/responsive-estate-v3.yml:131",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/responsive-estate-v3.yml:132",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/responsive-estate-v3.yml:134",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/responsive-estate-v3.yml:157",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/responsive-estate-v3.yml:161",
+          "WORKFLOW_ENVIRONMENT_REVIEW_REQUIRED@.github/workflows/responsive-estate-v3.yml:153",
+          "WORKFLOW_ENVIRONMENT_REVIEW_REQUIRED@.github/workflows/responsive-estate-v3.yml:35"
         ]
       }
     }

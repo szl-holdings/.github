@@ -88,6 +88,11 @@ KNOWN_ACTION_EFFECTS: Mapping[str, tuple[str, str, str]] = {
         "runner:guard:egress",
         "local-write",
     ),
+    "step-security/harden-runner@05e31511f85b41b11d1cf0ef85d0992719546e2c": (
+        "runner.guard.configure",
+        "runner:guard:egress",
+        "local-write",
+    ),
     "actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1": (
         "github.contents.checkout",
         "github:repository:szl-holdings/.github:contents",
@@ -96,6 +101,11 @@ KNOWN_ACTION_EFFECTS: Mapping[str, tuple[str, str, str]] = {
     "actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97": (
         "runner.toolchain.install",
         "runner:toolchain:python",
+        "local-write",
+    ),
+    "actions/setup-node@820762786026740c76f36085b0efc47a31fe5020": (
+        "runner.toolchain.install",
+        "runner:toolchain:node",
         "local-write",
     ),
     "actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a": (
@@ -1140,6 +1150,39 @@ def analyze_workflow_source(source: str, *, path: str) -> dict[str, Any]:
                     unknown("LOCAL_ACTION_UNSUPPORTED", (*step_location, "uses"))
                 elif action in KNOWN_ACTION_EFFECTS:
                     sink, resource, access = KNOWN_ACTION_EFFECTS[action]
+                    if action == "step-security/harden-runner@05e31511f85b41b11d1cf0ef85d0992719546e2c":
+                        # Only the reviewed hosted-runner guard configuration.
+                        # Policy-store credentials, self-hosted deployment, and
+                        # disabling monitoring are separate effects, not a pin upgrade.
+                        if set(inputs) - {
+                            "egress-policy", "allowed-endpoints", "denied-endpoints",
+                            "disable-telemetry",
+                        } or inputs.get("egress-policy", "block") not in {"audit", "block"}:
+                            unknown("ACTION_EXTRA_EFFECT_UNSUPPORTED", (*step_location, "with"))
+                        # This exact action registers monitoring and reports
+                        # security telemetry. Do not hide those writes behind
+                        # its local guard configuration. Budgets count action
+                        # invocation sites, not the agent's telemetry packets.
+                        effects.append(RawEffect(
+                            "runner.guard.telemetry", "external-write", path,
+                            lines[(*step_location, "uses")],
+                            "stepsecurity:monitor:szl-holdings/.github",
+                        ))
+                        if inputs.get("egress-policy", "block") == "block":
+                            effects.append(RawEffect(
+                                "github.cache.write", "external-write", path,
+                                lines[(*step_location, "uses")],
+                                "github:repository:szl-holdings/.github:cache:harden-runner-cacheKey",
+                            ))
+                    if action == "actions/setup-node@820762786026740c76f36085b0efc47a31fe5020":
+                        # v7 enables package-manager caching implicitly. Its
+                        # post action can write the shared cache, so the narrow
+                        # toolchain-only classification requires explicit opt-out.
+                        if inputs.get("package-manager-cache", "true").lower() != "false" or set(inputs) - {
+                            "node-version", "node-version-file", "architecture",
+                            "check-latest", "token", "package-manager-cache",
+                        }:
+                            unknown("ACTION_EXTRA_EFFECT_UNSUPPORTED", (*step_location, "with"))
                     if sink in {"github.contents.checkout", "runner.toolchain.install"}:
                         for auth_input in ("token", "ssh-key"):
                             auth_value = inputs.get(auth_input, "")

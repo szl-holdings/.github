@@ -6,23 +6,8 @@
 import fs from "node:fs/promises";
 import path from "node:path";
 import process from "node:process";
-import { chromium } from "playwright";
-
-const VIEWPORTS = [
-  { name: "compact-phone", width: 320, height: 568 },
-  { name: "modern-phone", width: 375, height: 812 },
-  { name: "phone-landscape", width: 812, height: 375 },
-  { name: "desktop", width: 1440, height: 900 },
-  { name: "theatre", width: 2560, height: 1440 },
-];
-
-const CORE_VIEWPORTS = [
-  ...VIEWPORTS,
-  { name: "large-phone", width: 430, height: 932 },
-  { name: "tablet", width: 768, height: 1024 },
-  { name: "full-hd", width: 1920, height: 1080 },
-  { name: "ultrawide", width: 3440, height: 1440 },
-];
+import { pathToFileURL } from "node:url";
+import { VIEWPORTS, CORE_VIEWPORTS } from "./responsive_audit_policy_v31.mjs";
 
 function arg(name, fallback = null) {
   const index = process.argv.indexOf(name);
@@ -75,8 +60,18 @@ function safeName(value) {
   return value.toLowerCase().replace(/^https?:\/\//, "").replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 100);
 }
 
-async function inspectPage(page) {
+export async function inspectPage(page) {
   return page.evaluate(() => {
+    const primarySelector = [
+      "button", "input:not([type='hidden'])", "select", "textarea", "summary",
+      "[role='button']", "[role='tab']", "[role='checkbox']", "[role='radio']",
+      "[role='switch']", "[role='combobox']", "[role='listbox']", "[role='textbox']",
+      "[role='slider']", "[role='spinbutton']", "[role='menuitem']",
+      "a.button", "a.btn", ".gr-button",
+    ].join(",");
+    const interactiveSelector = `${primarySelector},a[href],[tabindex],[contenteditable]`;
+    const interactive = (element) => Boolean(element.matches(primarySelector)
+      || element.matches("a[href]") || element.tabIndex >= 0 || element.isContentEditable);
     const visible = (element) => {
       const style = getComputedStyle(element);
       const rect = element.getBoundingClientRect();
@@ -84,11 +79,23 @@ async function inspectPage(page) {
     };
     const rectData = (element) => {
       const rect = element.getBoundingClientRect();
+      const style = getComputedStyle(element);
       return {
         tag: element.tagName.toLowerCase(),
         id: element.id || null,
-        className: typeof element.className === "string" ? element.className.slice(0, 140) : null,
+        className: element.getAttribute("class")?.slice(0, 140) || null,
         text: (element.getAttribute("aria-label") || element.textContent || "").trim().replace(/\s+/g, " ").slice(0, 100),
+        role: element.getAttribute("role")?.trim().toLowerCase() || null,
+        ariaHidden: Boolean(element.closest('[aria-hidden="true"]')),
+        tabIndex: element.tabIndex,
+        focusable: element.tabIndex >= 0,
+        interactive: interactive(element),
+        hasInteractiveDescendant: [...element.querySelectorAll(interactiveSelector)].some(interactive),
+        contentEditable: Boolean(element.isContentEditable),
+        primaryControl: element.matches(primarySelector),
+        intentionallyClipped: rect.width <= 1 && rect.height <= 1
+          && ["absolute", "fixed"].includes(style.position)
+          && ((style.clip !== "auto" && style.clip !== "none") || style.clipPath !== "none"),
         left: Math.round(rect.left),
         right: Math.round(rect.right),
         top: Math.round(rect.top),
@@ -99,27 +106,13 @@ async function inspectPage(page) {
 
     const vw = window.innerWidth;
     const docWidth = Math.max(document.documentElement.scrollWidth, document.body?.scrollWidth || 0);
-    const targetSelector = [
-      "button",
-      "input:not([type='hidden']):not([type='checkbox']):not([type='radio'])",
-      "select",
-      "textarea",
-      "summary",
-      "[role='button']",
-      "[role='tab']",
-      "nav a",
-      "a.button",
-      "a.btn",
-      "[data-testid='stButton'] button",
-      ".gr-button",
-    ].join(",");
+    const targetSelector = `${primarySelector},nav a`;
     const targets = [...document.querySelectorAll(targetSelector)].filter((element) => visible(element) && !element.matches(":disabled,[aria-disabled='true']"));
     const undersizedTargets = targets
       .filter((element) => {
         const rect = element.getBoundingClientRect();
         return rect.width < 43.5 || rect.height < 43.5;
       })
-      .slice(0, 30)
       .map(rectData);
 
     const candidates = [...document.querySelectorAll("body *")].filter(visible);
@@ -139,7 +132,6 @@ async function inspectPage(page) {
         }
         return true;
       })
-      .slice(0, 30)
       .map(rectData);
 
     const fixedOversize = candidates
@@ -149,7 +141,6 @@ async function inspectPage(page) {
         const rect = element.getBoundingClientRect();
         return rect.width > vw + 2 || rect.left < -2 || rect.right > vw + 2;
       })
-      .slice(0, 20)
       .map(rectData);
 
     const clippedText = candidates
@@ -238,7 +229,7 @@ async function auditSurface(browser, surface) {
         result.undersizedTargets.length > 0 ||
         result.offscreen.length > 0 ||
         result.fixedOversize.length > 0 ||
-        (result.httpStatus !== null && result.httpStatus >= 400);
+        !Number.isInteger(result.httpStatus) || result.httpStatus < 200 || result.httpStatus >= 400;
       result.pass = !failed;
       rows.push(result);
       if (failed && (viewport.name === "compact-phone" || viewport.name === "theatre")) {
@@ -295,6 +286,7 @@ body{margin:0;background:#080c14;color:#eef4fb;font:16px/1.5 system-ui,sans-seri
 }
 
 async function main() {
+  const { chromium } = await import("playwright");
   await fs.mkdir(path.dirname(jsonOut), { recursive: true });
   await fs.mkdir(path.dirname(htmlOut), { recursive: true });
   await fs.mkdir(evidenceDir, { recursive: true });
@@ -322,7 +314,9 @@ async function main() {
   if (report.failCount > 0) process.exitCode = 1;
 }
 
-main().catch((error) => {
-  console.error(error);
-  process.exitCode = 2;
-});
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+  main().catch((error) => {
+    console.error(error);
+    process.exitCode = 2;
+  });
+}
