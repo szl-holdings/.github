@@ -21,17 +21,64 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - name: Install Syft
+      - name: Generate CycloneDX SBOM with digest-verified Syft
+        shell: bash
         run: |
-          curl -sSfL https://raw.githubusercontent.com/anchore/syft/main/install.sh | sh -s -- -b /usr/local/bin
-      - name: Generate CycloneDX SBOM
+          set -euo pipefail
+          tool_dir="$(mktemp -d "${RUNNER_TEMP}/syft.XXXXXX")"
+          archive="${tool_dir}/syft.tar.gz"
+          curl --fail --silent --show-error --location \
+            --proto '=https' --proto-redir '=https' \
+            --max-time 180 --max-filesize 40000000 \
+            --output "$archive" \
+            'https://github.com/anchore/syft/releases/download/v1.51.1/syft_1.51.1_linux_amd64.tar.gz'
+          printf '%s  %s\n' \
+            '8fcb33017a0dc1058298c923c436d19dfa68ae93968e0b423248542e3afb9fc3' \
+            "$archive" | sha256sum --check --status
+          release='https://github.com/anchore/syft/releases/download/v1.51.1'
+          checksums_name='syft_1.51.1_checksums.txt'
+          for name in "$checksums_name" "${checksums_name}.sig" "${checksums_name}.pem"; do
+            curl --fail --silent --show-error --location \
+              --proto '=https' --proto-redir '=https' \
+              --max-time 180 --max-filesize 100000 \
+              --output "$tool_dir/$name" "$release/$name"
+          done
+          printf '%s  %s\n' \
+            '105346699e7cb694afa37a21e2386432df6278c99f71331c24b1e0bb0f38cc75' "$tool_dir/$checksums_name" \
+            '327121fcb70d67edb79c4b36602cbd7c7cab43cc8387543f40f49967f3103913' "$tool_dir/${checksums_name}.sig" \
+            '23ad7eac1612fe53d77a58d414423b2e9064c557d214d81b8e83595caa0c14db' "$tool_dir/${checksums_name}.pem" \
+            | sha256sum --check --status
+          cosign_binary="$tool_dir/cosign"
+          curl --fail --silent --show-error --location \
+            --proto '=https' --proto-redir '=https' \
+            --max-time 180 --max-filesize 160000000 \
+            --output "$cosign_binary" \
+            'https://github.com/sigstore/cosign/releases/download/v3.0.6/cosign-linux-amd64'
+          printf '%s  %s\n' \
+            'c956e5dfcac53d52bcf058360d579472f0c1d2d9b69f55209e256fe7783f4c74' \
+            "$cosign_binary" | sha256sum --check --status
+          chmod +x "$cosign_binary"
+          "$cosign_binary" verify-blob "$tool_dir/$checksums_name" \
+            --signature "$tool_dir/${checksums_name}.sig" \
+            --certificate "$tool_dir/${checksums_name}.pem" \
+            --certificate-identity-regexp '^https://github[.]com/anchore/syft/[.]github/workflows/release[.]yaml@refs/heads/main$' \
+            --certificate-oidc-issuer 'https://token.actions.githubusercontent.com'
+          grep -Fqx \
+            '8fcb33017a0dc1058298c923c436d19dfa68ae93968e0b423248542e3afb9fc3  syft_1.51.1_linux_amd64.tar.gz' \
+            "$tool_dir/$checksums_name"
+          tar -xzf "$archive" -C "$tool_dir" syft
+          test -x "${tool_dir}/syft"
+          SYFT_CHECK_FOR_APP_UPDATE=false "${tool_dir}/syft" dir:. \
+            -o cyclonedx-json=sbom.cyclonedx.json
+      - name: Verify CycloneDX SBOM
         run: |
-          syft . --output cyclonedx-json=sbom.cyclonedx.json
-          echo "SBOM generated:"
-          wc -l sbom.cyclonedx.json
+          test -s sbom.cyclonedx.json
+          jq -e '.bomFormat == "CycloneDX" and (.components | type == "array")' \
+            sbom.cyclonedx.json > /dev/null
       - name: Upload SBOM artifact
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: sbom
           path: sbom.cyclonedx.json
+          if-no-files-found: error
           retention-days: 30

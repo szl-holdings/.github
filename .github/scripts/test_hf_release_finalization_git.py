@@ -14,8 +14,8 @@ HERE = pathlib.Path(__file__).resolve().parent
 if str(HERE) not in sys.path:
     sys.path.insert(0, str(HERE))
 
-import hf_release_finalization_git as finalizer
-from kernel_hub_git import KernelPublication, KernelSnapshot
+import hf_release_finalization_git as finalizer  # noqa: E402
+from kernel_hub_git import KernelPublication, KernelSnapshot  # noqa: E402
 
 
 class FakeTransport:
@@ -244,26 +244,31 @@ class KernelGitFinalizerTests(unittest.TestCase):
 
     def test_report_normalizes_immutable_revision_schema(self):
         instance = object.__new__(finalizer.KernelGitFinalizer)
-        with unittest.mock.patch.object(
-            finalizer.retry.RetryingFinalizer,
-            "report",
-            return_value={
-                "schema": "old",
-                "results": {
-                    "dataset": {"after_sha": "a" * 40},
-                    "kernels": {"k": {"after_sha": "b" * 40}},
+        with (
+            unittest.mock.patch.object(
+                finalizer.retry.RetryingFinalizer,
+                "report",
+                return_value={
+                    "schema": "old",
+                    "results": {
+                        "dataset": {"after_sha": "a" * 40},
+                        "kernels": {"k": {"after_sha": "b" * 40}},
+                    },
+                    "boundaries": ["base boundary"],
                 },
-                "boundaries": [],
-            },
-        ), unittest.mock.patch.object(
-            finalizer.KernelGitFinalizer,
-            "_runtime",
-            return_value={"numpy": "2.2.6", "torch": "2.7.1+cpu"},
+            ),
+            unittest.mock.patch.object(
+                finalizer.KernelGitFinalizer,
+                "_runtime",
+                return_value={"numpy": "2.2.6", "torch": "2.7.1+cpu"},
+            ),
         ):
             report = instance.report()
         self.assertEqual(report["schema"], finalizer.REPORT_SCHEMA)
         self.assertEqual(report["results"]["dataset"]["revision"], "a" * 40)
         self.assertEqual(report["results"]["kernels"]["k"]["revision"], "b" * 40)
+        self.assertIn("base boundary", report["boundaries"])
+        self.assertIn(finalizer.legacy.PROVIDER_SCOPE_BOUNDARY, report["boundaries"])
 
     def test_active_kernel_method_contains_no_generic_kernel_repo_type(self):
         source = inspect.getsource(finalizer.KernelGitFinalizer.finalize_kernel)
@@ -304,6 +309,22 @@ class KernelGitFinalizerTests(unittest.TestCase):
             "HF Release Readiness Terminal is triggered by workflow_run",
             publication,
         )
+        job_before_steps = publication.split("    steps:", 1)[0]
+        self.assertNotIn("secrets.", job_before_steps)
+        self.assertNotIn("GH_TOKEN", job_before_steps)
+        finalize_step = publication.split(
+            "      - name: Finalize and independently verify exact revisions", 1
+        )[1].split("      - name:", 1)[0]
+        self.assertIn("secrets.HF_ORG_TOKEN", finalize_step)
+        self.assertIn("secrets.HF_TOKEN", finalize_step)
+        issue_step = publication.split(
+            "      - name: Persist deterministic publication issue", 1
+        )[1].split("      - name:", 1)[0]
+        self.assertIn("GH_TOKEN: ${{ github.token }}", issue_step)
+        self.assertNotIn("secrets.HF", issue_step)
+        self.assertEqual(publication.count("HF_ORG_TOKEN: ${{"), 1)
+        self.assertEqual(publication.count("HF_TOKEN: ${{"), 1)
+        self.assertEqual(publication.count("GH_TOKEN: ${{"), 1)
 
         self.assertIn("pull_request:", pull_request)
         self.assertNotIn("secrets.", pull_request)

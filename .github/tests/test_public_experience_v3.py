@@ -135,6 +135,18 @@ class PublicExperienceV3Tests(unittest.TestCase):
         self.assertIn("page.goto", text)
         self.assertIn("screenshot", text)
 
+    def test_dispatch_filter_is_data_not_shell_source(self) -> None:
+        workflow = (ROOT / ".github" / "workflows" / "public-experience-v3.yml").read_text(
+            encoding="utf-8"
+        )
+        audit_step = workflow.split(
+            "      - name: Audit both origins and every public Space", 1
+        )[1].split("      - name: Publish readable summary", 1)[0]
+        self.assertIn("TARGET_REGEX: ${{", audit_step)
+        run_script = audit_step.split("        run: |", 1)[1]
+        self.assertNotIn("inputs.target_regex", run_script)
+        self.assertIn('target_filter="$TARGET_REGEX"', run_script)
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)

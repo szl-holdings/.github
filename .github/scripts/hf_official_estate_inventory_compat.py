@@ -25,6 +25,7 @@ from urllib.parse import parse_qsl, urlsplit
 import requests
 
 import hf_official_estate_inventory as base
+from hf_inventory_public_boundary import public_report
 
 KERNEL_LIST_URL = f"https://huggingface.co/api/kernels?author={base.ORG}&limit=100"
 MAX_KERNEL_PAGES = 10
@@ -91,49 +92,12 @@ def _next_link(header: str) -> str:
     return candidates[0] if candidates else ""
 
 
-def public_report(report: dict[str, Any]) -> dict[str, Any]:
-    """Allowlisted public projection; missing categories remain UNKNOWN.
-
-    Do not include authenticated action details, private identifiers, collection
-    notes, buckets, raw errors, or a hash of the full private inventory.
-    """
-    assets = report.get("assets") or {}
-    public_assets: dict[str, list[dict[str, Any]]] = {}
-    counts: dict[str, int | None] = {}
-    coverage: dict[str, str] = {}
-    for kind in ("models", "datasets", "spaces", "kernels"):
-        if kind not in assets or ("counts" in report and (report.get("counts") or {}).get(kind) is None):
-            counts[kind] = None
-            coverage[kind] = "UNKNOWN"
-            continue
-        rows = assets[kind]
-        public_assets[kind] = [
-            {key: item.get(key) for key in ("id", "sha", "private", "sdk", "downloads", "likes", "last_modified")}
-            for item in rows if isinstance(item, dict) and item.get("private") is False
-        ]
-        counts[kind] = len(public_assets[kind])
-        coverage[kind] = "OBSERVED_PUBLIC_ONLY"
-    canonical = report.get("canonical_a11oy") or {}
-    public_canonical = {
-        key: canonical.get(key) for key in ("repo_id", "sha", "sdk", "private", "stage", "file_count")
-    } if canonical.get("repo_id") == base.CANONICAL_SPACE and canonical.get("private") is False else None
-    return {
-        "schema": "szl.hf-official-estate-public-projection/v1",
-        "organization": base.ORG,
-        "generated_at": report.get("generated_at"),
-        "generation": report.get("generation"),
-        "scope": "Public repository metadata observed by the authenticated inventory; private details withheld; not ORG_COMPLETE or runtime qualification.",
-        "counts": counts,
-        "coverage": coverage,
-        "canonical_a11oy": public_canonical,
-        "assets": public_assets,
-        "summary": {key: (report.get("summary") or {}).get(key) for key in ("ok", "warning", "error", "dry_run")},
-        "error_class": report.get("error_class"),
-    }
-
-
 class CurrentHubEstateInventory(base.OfficialEstateInventory):
     """Official inventory with REST discovery and HfApi kernel readback."""
+
+    def record(self, target: str, action: str, status: str, detail: str = "") -> None:
+        # Operator records stay in the private report, never public Actions logs.
+        self.actions.append(base.Action(target, action, status, detail))
 
     def __init__(self, *, token: str, generation: str, publish: bool) -> None:
         super().__init__(token=token, generation=generation, publish=publish)
@@ -299,7 +263,7 @@ def main() -> int:
             raise ValueError("OPERATOR_REPORT_BOUND_EXCEEDED")
         raw = json.loads(args.public_projection.read_bytes(), object_pairs_hook=_unique_object, parse_constant=_reject_constant, parse_float=_finite_float)
         args.output.parent.mkdir(parents=True, exist_ok=True)
-        args.output.write_text(json.dumps(public_report(raw), indent=2, sort_keys=True) + "\n", encoding="utf-8")
+        args.output.write_text(json.dumps(public_report(raw), indent=2, sort_keys=True, allow_nan=False) + "\n", encoding="utf-8")
         return 0
     token = (
         os.environ.get("HF_ORG_TOKEN")
@@ -316,7 +280,7 @@ def main() -> int:
             generation=args.generation,
             publish=args.publish,
         ).run()
-    except Exception as exc:  # noqa: BLE001
+    except Exception:  # noqa: BLE001
         Path("reports").mkdir(exist_ok=True)
         failure = {
             "schema": "szl.hf-official-estate-inventory/v2",
@@ -324,18 +288,18 @@ def main() -> int:
             "generation": args.generation,
             "publish": args.publish,
             "generated_at": datetime.now(timezone.utc).isoformat(),
-            "error_class": type(exc).__name__,
-            "fatal": "Authenticated inventory failed; details retained outside public output.",
+            "error_class": "INVENTORY_FAILED",
+            "fatal": "Authenticated inventory failed; private details withheld.",
             "summary": {"ok": 0, "warning": 0, "error": 1, "dry_run": 0},
         }
         Path("reports/hf-official-estate-inventory-latest.json").write_text(
             json.dumps(failure, indent=2, sort_keys=True) + "\n",
             encoding="utf-8",
         )
-        print(f"FATAL: {type(exc).__name__}; authenticated inventory failed", file=sys.stderr)
+        print("FATAL: authenticated inventory failed; private details withheld", file=sys.stderr)
         return 2
 
-    print(json.dumps(report["summary"], indent=2, sort_keys=True))
+    print(json.dumps({"state": "INVENTORY_COMPLETED", "scope": "OPERATOR_REPORT_WITHHELD"}))
     return 1 if report["summary"]["error"] else 0
 
 

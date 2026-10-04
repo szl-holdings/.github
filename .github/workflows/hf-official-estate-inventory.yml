@@ -4,154 +4,192 @@ on:
   push:
     branches: [main]
     paths:
-      - .github/scripts/hf_official_estate_inventory.py
-      - .github/scripts/hf_official_estate_inventory_compat.py
-      - .github/scripts/test_hf_official_estate_inventory.py
-      - .github/scripts/test_hf_official_estate_inventory_compat.py
+      - .github/scripts/hf_official_estate_inventory*.py
+      - .github/scripts/test_hf_official_estate_inventory*.py
+      - .github/scripts/hf_inventory_public_boundary.py
+      - .github/scripts/verify_hf_inventory_source.py
+      - .github/scripts/test_hf_inventory*.py
       - .github/workflows/hf-official-estate-inventory.yml
   pull_request:
     branches: [main]
     paths:
-      - .github/scripts/hf_official_estate_inventory.py
-      - .github/scripts/hf_official_estate_inventory_compat.py
-      - .github/scripts/test_hf_official_estate_inventory.py
-      - .github/scripts/test_hf_official_estate_inventory_compat.py
+      - .github/scripts/hf_official_estate_inventory*.py
+      - .github/scripts/test_hf_official_estate_inventory*.py
+      - .github/scripts/hf_inventory_public_boundary.py
+      - .github/scripts/verify_hf_inventory_source.py
+      - .github/scripts/test_hf_inventory*.py
       - .github/workflows/hf-official-estate-inventory.yml
   schedule:
     - cron: '41 */12 * * *'
   workflow_dispatch:
     inputs:
       publish:
-        description: Publish the official inventory evidence report
+        description: Collect the authenticated inventory and retain private evidence
+        type: boolean
         required: false
-        default: "true"
+        default: false
 
 permissions:
   contents: read
 
 concurrency:
   group: hf-official-estate-inventory-${{ github.event_name }}-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   verify:
-    name: Models, datasets, Spaces, kernels, collections, and buckets
+    name: Credential-free inventory contract tests
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    timeout-minutes: 15
     env:
-      HF_ORG_TOKEN: ${{ secrets.HF_ORG_TOKEN || secrets.HF_ORG_TOKEN1 }}
-      HF_TOKEN: ${{ secrets.HF_TOKEN }}
       HF_HUB_DISABLE_PROGRESS_BARS: "1"
+      HF_HUB_DISABLE_TELEMETRY: "1"
+      PYTHONDONTWRITEBYTECODE: "1"
     steps:
-      - name: Checkout inventory verifier
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Checkout exact candidate without persisted credentials
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
           persist-credentials: false
-          fetch-depth: 1
-
-      - name: Determine execution mode
-        id: mode
-        env:
-          HF_INVENTORY_PUBLISH_INPUT: ${{ inputs.publish }}
-        shell: bash
-        run: |
-          set -euo pipefail
-          publish=true
-          if [ "${GITHUB_EVENT_NAME}" = "pull_request" ]; then publish=false; fi
-          if [ "${GITHUB_EVENT_NAME}" = "workflow_dispatch" ] && [ "${HF_INVENTORY_PUBLISH_INPUT}" != "true" ]; then publish=false; fi
-          echo "publish=${publish}" >> "$GITHUB_OUTPUT"
-
+          fetch-depth: 0
       - name: Set up Python
-        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
         with:
           python-version: "3.12"
-
-      - name: Install supported Hub clients
+      - name: Install supported test clients without organization credentials
         run: |
-          python -m pip install --disable-pip-version-check \
-            "huggingface_hub>=1.3,<2" \
-            "requests>=2.32,<3"
-
-      - name: Compile and test no-clone official inventory contract
+          python -m pip install --disable-pip-version-check "huggingface_hub>=1.3,<2" "requests>=2.32,<3" "PyYAML==6.0.3"
+      - name: Test inventory, public projection, and credential boundaries
         run: |
           set -euo pipefail
-          python -m py_compile \
-            .github/scripts/hf_official_estate_inventory.py \
-            .github/scripts/hf_official_estate_inventory_compat.py \
-            .github/scripts/test_hf_official_estate_inventory.py \
-            .github/scripts/test_hf_official_estate_inventory_compat.py
           python .github/scripts/test_hf_official_estate_inventory.py
           python .github/scripts/test_hf_official_estate_inventory_compat.py
+          python .github/scripts/test_hf_inventory_public_boundary.py
+          python .github/scripts/test_hf_inventory_workflow_boundary.py
+          python -m pip check
           git diff --check
+      - name: Retain reproducible public verification source
+        if: always()
+        run: |
+          python - <<'PY'
+          import hashlib, json, pathlib, subprocess, zipfile
+          paths = [
+              '.github/scripts/hf_official_estate_inventory.py',
+              '.github/scripts/hf_official_estate_inventory_compat.py',
+              '.github/scripts/test_hf_official_estate_inventory.py',
+              '.github/scripts/test_hf_official_estate_inventory_compat.py',
+              '.github/scripts/hf_inventory_public_boundary.py',
+              '.github/scripts/verify_hf_inventory_source.py',
+              '.github/scripts/test_hf_inventory_public_boundary.py',
+              '.github/scripts/test_hf_inventory_workflow_boundary.py',
+              '.github/scripts/control_plane_effect_gate.py',
+              '.github/scripts/test_control_plane_effect_gate.py',
+              '.github/data/control_plane_effect_policy.json',
+              '.github/workflows/hf-official-estate-inventory.yml',
+          ]
+          source = subprocess.check_output(['git', 'rev-parse', 'HEAD'], text=True).strip()
+          baseline = subprocess.check_output(['git', 'rev-parse', 'refs/remotes/origin/main'], text=True).strip()
+          manifest = {'source_revision': source, 'baseline_revision': baseline, 'scope': 'PUBLIC_SOURCE_ONLY_NOT_AN_ADMISSION_RECEIPT', 'files': {}}
+          pathlib.Path('reports').mkdir(exist_ok=True)
+          with zipfile.ZipFile('reports/hf-inventory-verification-source.zip', 'w', zipfile.ZIP_DEFLATED) as archive:
+              for name in paths:
+                  data = pathlib.Path(name).read_bytes()
+                  manifest['files'][name] = hashlib.sha256(data).hexdigest()
+                  archive.writestr('candidate/' + name, data)
+              for name in ('.github/data/control_plane_effect_policy.json', '.github/scripts/control_plane_effect_gate.py', '.github/scripts/test_control_plane_effect_gate.py'):
+                  data = subprocess.check_output(['git', 'show', baseline + ':' + name])
+                  archive.writestr('baseline/' + name, data)
+              archive.writestr('manifest.json', json.dumps(manifest, sort_keys=True, indent=2))
+          PY
+      - name: Upload only the public source packet
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: hf-inventory-verification-source
+          path: reports/hf-inventory-verification-source.zip
+          if-no-files-found: error
+          retention-days: 7
 
-      - name: Require organization credential for publish-mode inventory
-        if: steps.mode.outputs.publish == 'true'
+  inventory:
+    name: Protected-source authenticated inventory
+    needs: verify
+    if: >-
+      github.repository == 'szl-holdings/.github' &&
+      github.ref == 'refs/heads/main' && github.ref_protected == true &&
+      (github.event_name == 'push' || github.event_name == 'schedule' ||
+       (github.event_name == 'workflow_dispatch' && inputs.publish == true))
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    concurrency:
+      group: hf-private-evidence-SZLHOLDINGS-szl-evidence
+      cancel-in-progress: false
+    env:
+      HF_HUB_DISABLE_PROGRESS_BARS: "1"
+      HF_HUB_DISABLE_TELEMETRY: "1"
+      HF_INVENTORY_PUBLISH_INPUT: ${{ inputs.publish }}
+      PYTHONDONTWRITEBYTECODE: "1"
+    steps:
+      - name: Checkout exact protected source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: "3.12"
+      - name: Install supported clients before obtaining organization credentials
+        run: python -m pip install --disable-pip-version-check "huggingface_hub>=1.3,<2" "requests>=2.32,<3" "PyYAML==6.0.3"
+      - name: Verify protected source before credential-bearing execution
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: python .github/scripts/verify_hf_inventory_source.py
+      - name: Collect authenticated inventory without public operator logs
+        id: estate
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          HF_ORG_TOKEN: ${{ secrets.HF_ORG_TOKEN || secrets.HF_ORG_TOKEN1 }}
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
         run: |
           set -euo pipefail
-          if [ -z "${HF_ORG_TOKEN:-}" ] && [ -z "${HF_TOKEN:-}" ]; then
-            echo "::error::No supported Hugging Face organization credential is configured."
-            exit 2
-          fi
-
-      - name: Execute official supported-API inventory
-        if: steps.mode.outputs.publish == 'true'
-        id: estate
-        shell: bash
-        run: |
+          umask 077
+          private_log="${RUNNER_TEMP}/hf-inventory-private-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}.log"
+          trap 'rm -f -- "$private_log"' EXIT
+          python .github/scripts/verify_hf_inventory_source.py
           set +e
-          python .github/scripts/hf_official_estate_inventory_compat.py \
-            --publish \
-            --generation "${GITHUB_SHA}"
+          python .github/scripts/hf_official_estate_inventory_compat.py --publish --generation "$GITHUB_SHA" > "$private_log" 2>&1
           code=$?
+          set -e
           echo "exit_code=${code}" >> "$GITHUB_OUTPUT"
-          exit 0
-
-      - name: Project public metadata without private identifiers
-        if: always() && steps.mode.outputs.publish == 'true'
+          if [ "$code" -ne 0 ]; then echo '::error::Authenticated inventory failed; private diagnostics were not published.'; fi
+          exit "$code"
+      - name: Project public metadata with no organization credential
+        id: projection
+        if: always() && steps.estate.outcome != 'skipped'
         run: |
-          python .github/scripts/hf_official_estate_inventory_compat.py \
-            --public-projection reports/hf-official-estate-inventory-latest.json \
-            --output reports/hf-official-estate-inventory-public.json
-
-      - name: Upload public inventory projection
-        if: always() && steps.mode.outputs.publish == 'true'
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+          python .github/scripts/hf_official_estate_inventory_compat.py --public-projection reports/hf-official-estate-inventory-latest.json --output reports/hf-official-estate-inventory-public.json
+      - name: Upload public inventory projection only
+        if: always() && steps.projection.outcome == 'success'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           name: hf-official-estate-inventory-public-v1
           path: reports/hf-official-estate-inventory-public.json
           if-no-files-found: error
           retention-days: 90
-
-      - name: Publish inventory summary
-        if: always() && steps.mode.outputs.publish == 'true'
-        shell: bash
+      - name: Publish public-only summary
+        if: always() && steps.projection.outcome == 'success'
         run: |
           python - <<'PY'
-          import json
-          import os
+          import json, os
           from pathlib import Path
-          path = Path('reports/hf-official-estate-inventory-public.json')
-          with open(os.environ['GITHUB_STEP_SUMMARY'], 'a', encoding='utf-8') as out:
-              out.write('## Official Hugging Face estate inventory\n\n')
-              if not path.exists():
-                  out.write('No report was produced.\n')
-              else:
-                  report = json.loads(path.read_text())
-                  for key, value in report.get('counts', {}).items():
-                      out.write(f'- {key}: `{value}`\n')
-                  canonical = report.get('canonical_a11oy') or {}
-                  out.write(f"- canonical A11oy: `{canonical.get('sha', 'UNKNOWN')}` ({canonical.get('stage', 'UNKNOWN')})\n")
+          report = json.loads(Path('reports/hf-official-estate-inventory-public.json').read_text())
+          with open(os.environ['GITHUB_STEP_SUMMARY'], 'a', encoding='utf-8') as output:
+              output.write('## Observed public HF repository metadata\n\n')
+              for kind, count in report['counts'].items():
+                  output.write(f'- {kind}: {count if count is not None else "UNKNOWN"}\n')
+              output.write('\nPrivate categories and aggregate operator counters are withheld. This is not complete-organization or runtime qualification.\n')
           PY
-
-      - name: Enforce fail-closed inventory result
-        if: always() && steps.mode.outputs.publish == 'true'
-        env:
-          HF_INVENTORY_EXIT_CODE: ${{ steps.estate.outputs.exit_code }}
+      - name: Remove local operator report and private diagnostics
+        if: always()
         run: |
-          code="${HF_INVENTORY_EXIT_CODE:-}"
-          if [ -z "$code" ]; then code=2; fi
-          if [ "$code" -ne 0 ]; then
-            echo "::error::Official estate inventory failed with exit ${code}."
-            exit "$code"
-          fi
-          echo 'Official estate inventory completed successfully.'
+          rm -f -- reports/hf-official-estate-inventory-latest.json "${RUNNER_TEMP}/hf-inventory-private-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}.log"
