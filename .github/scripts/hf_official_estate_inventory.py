@@ -3,15 +3,14 @@
 
 This verifier is deliberately separate from the retired clone publisher. It is
 read-only for models, datasets, Spaces, kernels, collections, and buckets. Its
-only write is an immutable JSON evidence report in the private szl-evidence
-dataset when publish mode is enabled.
+only write is one private evidence commit that updates latest and adds a new
+content-addressed history report when publish mode is enabled.
 """
 from __future__ import annotations
 
 import argparse
 import dataclasses
 import inspect
-import io
 import json
 import os
 import re
@@ -24,6 +23,7 @@ from pathlib import Path
 from typing import Any, Iterable
 
 from huggingface_hub import HfApi
+from hf_inventory_evidence import publish_report
 
 ORG = "SZLHOLDINGS"
 CANONICAL_SPACE = f"{ORG}/a11oy"
@@ -166,7 +166,7 @@ class OfficialEstateInventory:
         self.token = token
         self.generation = generation
         self.publish = publish
-        self.api = HfApi(token=token)
+        self.api = HfApi(endpoint="https://huggingface.co", token=token)
         self.actions: list[Action] = []
         self.inventory: dict[str, Any] = {}
         self.collection_reference_count = 0
@@ -426,7 +426,7 @@ class OfficialEstateInventory:
             },
             "boundaries": [
                 "The verifier performs no model, dataset, Space, kernel, collection, bucket, visibility, or hardware mutation.",
-                "Its only publish-mode write is an immutable JSON report in the private szl-evidence dataset.",
+                "Its only publish-mode write is one expected-parent commit in the private szl-evidence dataset: latest plus a new content-addressed history record, verified by immutable readback.",
                 "SZLHOLDINGS/a11oy remains the sole permanent A11oy Space and protected GitHub main remains source authority.",
                 "Every supported collection repository reference must resolve and every historical clone reference must remain absent.",
                 "Bucket discovery and readback use supported huggingface_hub APIs rather than raw private endpoints.",
@@ -434,28 +434,16 @@ class OfficialEstateInventory:
         }
 
     def persist(self, report: dict[str, Any]) -> None:
-        rendered = (json.dumps(report, indent=2, sort_keys=True, default=str) + "\n").encode()
+        rendered = (json.dumps(report, indent=2, sort_keys=True, default=str, allow_nan=False) + "\n").encode()
         output = Path("reports/hf-official-estate-inventory-latest.json")
         output.parent.mkdir(parents=True, exist_ok=True)
         output.write_bytes(rendered)
         self.record(str(output), "local-report", "updated")
         if not self.publish:
             return
-        if not self.api.repo_exists(EVIDENCE_DATASET, repo_type="dataset"):
-            raise RuntimeError(f"evidence dataset is missing: {EVIDENCE_DATASET}")
-        timestamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
-        for destination in (
-            "estate/official-inventory/latest.json",
-            f"estate/official-inventory/history/{timestamp}.json",
-        ):
-            self.api.upload_file(
-                repo_id=EVIDENCE_DATASET,
-                repo_type="dataset",
-                path_or_fileobj=io.BytesIO(rendered),
-                path_in_repo=destination,
-                commit_message=f"chore(estate): record official Hub inventory {timestamp}",
-            )
-        self.record(EVIDENCE_DATASET, "evidence-publish", "updated")
+        # Latest and history are committed together, then read back at that OID.
+        revision = publish_report(self.api, rendered, generation=self.generation)
+        self.record(EVIDENCE_DATASET, "evidence-publish", "updated", f"readback={revision}")
 
     def run(self) -> dict[str, Any]:
         self.authenticate()
