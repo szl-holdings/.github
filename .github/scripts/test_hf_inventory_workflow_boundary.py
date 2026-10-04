@@ -85,6 +85,18 @@ class WorkflowBoundaryTests(unittest.TestCase):
         self.assertNotIn("GITHUB_ENV", json.dumps(workflow))
         self.assertNotIn("pull_request_target", workflow["on"])
 
+    def test_candidate_validation_is_a_separate_secret_free_reusable_workflow(self):
+        workflow = self.workflow()
+        self.assertNotIn("pull_request", workflow["on"])
+        self.assertEqual(workflow["jobs"]["verify"], {"uses": "./.github/workflows/hf-inventory-contract.yml"})
+        contract = yaml.load((ROOT / ".github/workflows/hf-inventory-contract.yml").read_text(), Loader=yaml.BaseLoader)
+        self.assertEqual(set(contract["on"]), {"pull_request", "workflow_call"})
+        self.assertEqual(contract["permissions"], {"contents": "read"})
+        self.assertNotIn("secrets.", json.dumps(contract))
+        self.assertNotIn("continue-on-error", json.dumps(contract))
+        self.assertNotIn("--publish", json.dumps(contract))
+        self.assertIn("test_hf_inventory_workflow_boundary.py", json.dumps(contract))
+
     def test_privileged_job_is_separate_and_protected(self):
         job = self.workflow()["jobs"]["inventory"]
         self.assertEqual(job["needs"], "verify")
@@ -123,7 +135,7 @@ class WorkflowBoundaryTests(unittest.TestCase):
         workflow = self.workflow()
         for job in workflow["jobs"].values():
             self.assertNotIn("continue-on-error", job)
-            for step in job["steps"]:
+            for step in job.get("steps", []):
                 self.assertNotIn("continue-on-error", step)
         estate = next(step for step in workflow["jobs"]["inventory"]["steps"] if step.get("id") == "estate")
         self.assertIn('exit "$code"', estate["run"])
