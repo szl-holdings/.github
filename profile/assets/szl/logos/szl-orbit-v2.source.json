@@ -1,0 +1,15 @@
+{
+  "schema": "szl.brand-projection.v1",
+  "source_repository": "szl-holdings/szl-brand",
+  "source_commit": "2594f7f726cb14c6f123a948ad1c2d1d39ac9497",
+  "source_pull_request": 142,
+  "source_path": "kit/logos/orbit-v2/szl-orbit.svg",
+  "destination_path": "profile/assets/szl/logos/szl_mark_holographic.svg",
+  "source_blob_sha": "b9eaa9d496e98b97ae24de93d7f04c248d9261be",
+  "sha256": "84a23d7b2a6dd198378ded91e52c545df2943fd33cbc4a67dd4184e94f4d94fb",
+  "identity": "SZL Holdings parent mark; matching S Z L and tilted space orbit",
+  "hub_projection": "SZLHOLDINGS/README/assets/szl-mark-holographic.svg via existing org-card publisher",
+  "account_avatar_settings": "NOT_CHANGED",
+  "live_deployment": "NOT_ATTESTED",
+  "notes": "This record binds asset bytes, not runtime readiness. Product identities, card evidence, licenses and publication safeguards remain unchanged. Cached external copies require independent readback."
+}
