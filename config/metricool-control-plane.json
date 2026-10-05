@@ -29,7 +29,12 @@
     "provider-connection-check",
     "provider-payload-preservation",
     "explicit-failure-state",
-    "publication-receipt"
+    "publication-receipt",
+    "reviewed-channel-allowlist",
+    "conditional-provider-revision",
+    "prepublication-evidence-revalidation",
+    "explicit-evidence-validity-window",
+    "provider-confirmed-delivery"
   ],
   "forbiddenCapabilities": [
     "override-release-truth",
@@ -37,5 +42,28 @@
     "bypass-provider-review",
     "publish-unsupported-security-claims",
     "store-refresh-tokens-in-source"
-  ]
+  ],
+  "approvedChannels": [
+    "x",
+    "linkedin"
+  ],
+  "publicationStates": [
+    "READY",
+    "SCHEDULED",
+    "PUBLISHED",
+    "HOLD",
+    "UNOBSERVED",
+    "FAILED"
+  ],
+  "updatePolicy": {
+    "requireConditionalWrite": true,
+    "onUnsupportedConditionalWrite": "HOLD",
+    "onProviderRevisionMismatch": "HOLD"
+  },
+  "evidencePolicy": {
+    "requireValidityWindow": true,
+    "revalidateBeforePublication": true,
+    "onExpiredOrChangedEvidence": "HOLD",
+    "onUnsupportedPrepublicationHold": "HOLD"
+  }
 }
