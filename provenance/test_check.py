@@ -77,6 +77,120 @@ class ProvenanceCheckTests(unittest.TestCase):
         report = check.evaluate(self.policy, event)
         self.assertIn("internal_head_repository", report["failed"])
 
+    def test_head_requires_lowercase_hexadecimal_string(self) -> None:
+        for head in ("z" * 40, "A" * 40, "a" * 39, "a" * 41, "a" * 40 + "\n", 10**39, None):
+            with self.subTest(head=head):
+                event = self.event()
+                event["pull_request"]["head"]["sha"] = head
+                report = check.evaluate(self.policy, event)
+                self.assertFalse(report["pass"])
+                self.assertIn("exact_head_sha", report["failed"])
+
+    def test_declared_app_bot_is_admitted(self) -> None:
+        for slug in self.policy["allowed_app_slugs"]:
+            with self.subTest(slug=slug):
+                report = check.evaluate(
+                    self.policy, self.event(sender={"login": slug + "[bot]", "type": "Bot"})
+                )
+                self.assertTrue(report["pass"], report["failed"])
+
+    def test_unapproved_and_mistyped_bots_fail(self) -> None:
+        for sender in (
+            {"login": "unapproved[bot]", "type": "Bot"},
+            {"login": "github-actions[bot]", "type": "Bot"},
+            {"login": "dependabot[bot]", "type": "User"},
+            {"login": "dependabot[bot]"},
+            {"login": "dependabot", "type": "Bot"},
+            {"login": ["dependabot[bot]"], "type": "Bot"},
+        ):
+            with self.subTest(sender=sender):
+                report = check.evaluate(self.policy, self.event(sender=sender))
+                self.assertFalse(report["pass"])
+                self.assertIn("allowed_actor", report["failed"])
+
+    def test_bot_admission_tracks_policy_without_implicit_publishers(self) -> None:
+        self.policy["allowed_app_slugs"] = []
+        report = check.evaluate(
+            self.policy, self.event(sender={"login": "dependabot[bot]", "type": "Bot"})
+        )
+        self.assertIn("allowed_actor", report["failed"])
+
+    def test_each_evidence_section_requires_content(self) -> None:
+        for name in check.HEADINGS:
+            with self.subTest(heading=name):
+                event = self.event()
+                event["pull_request"]["body"] = "\n\n".join(
+                    f"## {heading}\n" + ("" if heading == name else "Concrete evidence statement.")
+                    for heading in check.HEADINGS
+                )
+                report = check.evaluate(self.policy, event)
+                self.assertTrue(report["checks"]["pr_body_headings"])
+                self.assertIn("pr_body_evidence", report["failed"])
+                self.assertFalse(report["evidence_sections"][name])
+
+    def test_placeholders_and_hidden_comments_are_not_evidence(self) -> None:
+        for content in (
+            " ", "TODO", "**TBD**", "- [ ] Pending", "N/A", "None.", "Not run",
+            "---", "...", "- [x]", "<!-- I own the contribution. -->", "<!-- unclosed comment",
+            "### Rights evidence",
+        ):
+            with self.subTest(content=content):
+                event = self.event()
+                event["pull_request"]["body"] = BODY.replace(
+                    "I own this change or have the right to contribute every included component.",
+                    content,
+                )
+                report = check.evaluate(self.policy, event)
+                self.assertIn("pr_body_evidence", report["failed"])
+
+    def test_fenced_and_commented_headings_are_not_sections(self) -> None:
+        for body in (
+            "```markdown\n" + BODY + "\n```",
+            "~~~\n" + BODY + "\n~~~",
+            "<!--\n" + BODY + "\n-->",
+            "```markdown\n```not-a-closing-fence\n" + BODY + "\n```",
+        ):
+            with self.subTest(body=body[:15]):
+                event = self.event()
+                event["pull_request"]["body"] = body
+                report = check.evaluate(self.policy, event)
+                self.assertIn("pr_body_headings", report["failed"])
+                self.assertIn("pr_body_evidence", report["failed"])
+
+    def test_duplicate_required_sections_are_ambiguous(self) -> None:
+        event = self.event()
+        event["pull_request"]["body"] = BODY + "\n## Rights\nAnother attestation.\n"
+        report = check.evaluate(self.policy, event)
+        self.assertIn("pr_body_evidence", report["failed"])
+        self.assertFalse(report["evidence_sections"]["Rights"])
+
+    def test_code_evidence_and_explained_unavailability_are_allowed(self) -> None:
+        event = self.event()
+        event["pull_request"]["body"] = BODY.replace(
+            "python3 provenance/test_check.py", "```sh\npython3 provenance/test_check.py\n```"
+        ).replace(
+            "No secrets. Policy JSON only. Advisory workflow.",
+            "Not run: hosted security checks remain pending on this exact candidate.",
+        )
+        report = check.evaluate(self.policy, event)
+        self.assertTrue(report["pass"], report["failed"])
+
+    def test_non_text_body_fails_evidence_checks(self) -> None:
+        event = self.event()
+        event["pull_request"]["body"] = [BODY]
+        report = check.evaluate(self.policy, event)
+        self.assertIn("pr_body_headings", report["failed"])
+        self.assertIn("pr_body_evidence", report["failed"])
+
+    def test_empty_sections_unknown_bot_and_nonhex_head_fail_together(self) -> None:
+        event = self.event(sender={"login": "unapproved[bot]", "type": "Bot"})
+        event["pull_request"]["head"]["sha"] = "z" * 40
+        event["pull_request"]["body"] = "\n\n".join("## " + name for name in check.HEADINGS)
+        report = check.evaluate(self.policy, event)
+        self.assertEqual(set(report["failed"]), {"exact_head_sha", "allowed_actor", "pr_body_evidence"})
+        self.assertEqual(report["enforcement"], "advisory")
+        self.assertFalse(report["pass"])
+
 
 if __name__ == "__main__":
     unittest.main()
