@@ -67,8 +67,8 @@ canonical Git/LF source bytes, not a Windows CRLF materialization.
 | Path | SHA-256 | Enforcement |
 | --- | --- | --- |
 | `.github/workflows/metricool-contract.yml` | `10837557b65f96ce8424d28b6f5fafb3e7e156d8f0073660363f00becfd2720b` | Effect-policy source and reviewed-unknown pin |
-| `.github/scripts/metricool_contract.py` | `23e80322892458bccbcada8583bf16012df2ad231bb66632fce971d00f742f0e` | Effect-policy reviewed-unknown pin |
-| `.github/scripts/test_metricool_contract.py` | `3d6954f905685eec2503f5f31a50aec8510706cd708c10d8932aad46390848b0` | Effect-policy reviewed-unknown pin |
+| `.github/scripts/metricool_contract.py` | `c506db277920a977a2e6250b83ba2dfd30abf581e4ab77db61bd4c517aa13818` | Effect-policy reviewed-unknown pin |
+| `.github/scripts/test_metricool_contract.py` | `e9d995d2ce552a8f94c04f9668ef7848e4672b11a6d42f63b9416498cfb4f353` | Effect-policy reviewed-unknown pin |
 | `config/metricool-control-plane.json` | `a4ca4de0895ee3eb7011aa88ed5447a147c13f56784dac45766aa0681b730ab1` | Pinned workflow checks bytes before installation/validation |
 | `config/schemas/metricool-control-plane.schema.json` | `ce479e32009520906816de7ea10973a9ac812b78490ca3c32ee90fdcff84b499` | Pinned workflow checks bytes before installation/validation |
 | `schemas/metricool-publication-receipt.schema.json` | `cb9562c16c987e7a7448dfd49cc356419fd1b6df4fe2f771101d93ea5c3ca0b6` | Pinned workflow checks bytes before installation/validation |
@@ -99,8 +99,8 @@ exact-commit repository receipt.
 
 The Metricool declaration bound both recognized effect sites with one call
 each, zero external writes and no per-workflow denial reason. Its complete
-39-member eligible unknown set matched the source pins: two action-input
-reviews, two synthetic-test subprocess sites, twelve Python import sites,
+41-member eligible unknown set matched the source pins: two action-input
+reviews, three synthetic-test subprocess sites, thirteen Python import sites,
 three Python source reviews, eighteen shell-command locations, one shell
 composition and one step environment. These unknowns were inspected in the
 bounded source described above; they were not erased or generalized to future
@@ -115,7 +115,8 @@ remain a trust-root review decision with all observed reasons retained.
 
 After removing only the new Metricool declaration, parsed policy equality
 against the base blob was true. Existing declaration semantics, trust maps,
-defaults and validity dates remain unchanged. The local LF policy digest was
+defaults and validity dates remain unchanged. The historical LF policy digest
+before finite-number hardening was
 `58d1dc10897ee9268e87f53a9f630f68f378e67f2c72f11a326c3d46052d557a`.
 
 ## Required admission evidence

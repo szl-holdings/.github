@@ -157,6 +157,22 @@ class InputParsingTests(unittest.TestCase):
                 with self.assertRaises(ValueError):
                     contract.read_json(path)
 
+    def test_numeric_exponent_overflow_rejected_at_every_depth(self):
+        for text in ('1e999', '-1e999', '{"value":1e999}',
+                     '{"nested":[{"value":-1e999}]}'):
+            with self.subTest(text=text), tempfile.TemporaryDirectory() as directory:
+                path = Path(directory) / "fixture.json"
+                path.write_text(text, encoding="utf-8")
+                with self.assertRaises(ValueError):
+                    contract.read_json(path)
+
+    def test_finite_json_numbers_remain_supported(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "fixture.json"
+            path.write_text('{"values":[0,42,-1.5,1e308,-1e308,1e-308]}', encoding="utf-8")
+            self.assertEqual(contract.read_json(path),
+                             {"values": [0, 42, -1.5, 1e308, -1e308, 1e-308]})
+
     def test_oversized_json_rejected(self):
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / "fixture.json"
@@ -478,6 +494,21 @@ class CommandLineTests(unittest.TestCase):
         self.assertNotIn(directory, result.stdout + result.stderr)
         output = json.loads(result.stdout)
         self.assertEqual(output["state"], "BLOCKED")
+        self.assertIs(output["allowed_to_publish"], False)
+        self.assertEqual(output["provider_writes"], 0)
+
+    def test_real_cli_exponent_overflow_is_blocked_without_echo(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "request.json"
+            path.write_text('{"synthetic-private-marker":[{"value":-1e999}]}', encoding="utf-8")
+            result = subprocess.run([sys.executable, "-B", str(MODULE_PATH), "--request", str(path)],
+                                    cwd=ROOT, capture_output=True, text=True, timeout=30)
+        self.assertEqual(result.returncode, 2)
+        self.assertNotIn("synthetic-private-marker", result.stdout + result.stderr)
+        self.assertNotIn(directory, result.stdout + result.stderr)
+        output = json.loads(result.stdout)
+        self.assertEqual(output["state"], "BLOCKED")
+        self.assertEqual(output["reason"], "INVALID_CONTRACT_OR_DEPENDENCY")
         self.assertIs(output["allowed_to_publish"], False)
         self.assertEqual(output["provider_writes"], 0)
 

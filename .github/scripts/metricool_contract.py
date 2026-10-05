@@ -13,6 +13,7 @@ import argparse
 from datetime import datetime, timezone
 import hashlib
 import json
+import math
 import os
 from pathlib import Path
 import re
@@ -47,6 +48,13 @@ def _nonfinite(_value):
     raise ValueError("non-finite JSON value")
 
 
+def _finite_float(value):
+    result = float(value)
+    if not math.isfinite(result):
+        raise ValueError("non-finite JSON value")
+    return result
+
+
 def read_json(path):
     path = Path(path)
     with path.open("rb") as stream:
@@ -54,7 +62,7 @@ def read_json(path):
     if len(raw) > 2_000_000:
         raise ValueError("input exceeds bounded contract size")
     return json.loads(raw.decode("utf-8"), object_pairs_hook=_object,
-                      parse_constant=_nonfinite)
+                      parse_constant=_nonfinite, parse_float=_finite_float)
 
 
 def validate_schema(value, schema_name):
