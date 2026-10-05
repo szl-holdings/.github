@@ -44,6 +44,14 @@ class FakeResponse:
             raise ValueError("not JSON")
         return self._payload
 
+    def iter_content(self, chunk_size: int):
+        body = json.dumps(self._payload).encode() if self._payload is not None else self.content
+        for offset in range(0, len(body), chunk_size):
+            yield body[offset:offset + chunk_size]
+
+    def close(self) -> None:
+        pass
+
 
 class FakeSession:
     def __init__(self, *, head: FakeResponse, get: FakeResponse) -> None:
@@ -98,9 +106,10 @@ class FinalEstateProbeV5Tests(unittest.TestCase):
                 url=spec.url,
                 content_type="application/json",
                 payload={
-                    "status": "LIVE",
+                    "status": "PROCESS_ALIVE",
                     "process": {"pid": 1},
-                    "scope": "process liveness only",
+                    "scope": "process liveness only; no dependency readiness asserted",
+                    "production_ready": False,
                     "receipt_minted": False,
                 },
             ),
@@ -108,6 +117,53 @@ class FinalEstateProbeV5Tests(unittest.TestCase):
         gate = safe_probe("a11oy_livez", spec, None, session=session)
         self.assertTrue(gate.ok)
         self.assertFalse(gate.evidence["head_required"])
+
+    def test_livez_rejects_missing_or_mismatched_process_contract(self) -> None:
+        spec = PROBES["a11oy_livez"]
+        baseline = {
+            "status": "PROCESS_ALIVE",
+            "process": {"pid": 1},
+            "scope": "process liveness only; no dependency readiness asserted",
+            "production_ready": False,
+            "receipt_minted": False,
+        }
+
+        def probe(payload: dict[str, Any]) -> bool:
+            session = FakeSession(
+                head=FakeResponse(
+                    status_code=405,
+                    url=spec.url,
+                    content_type="application/json",
+                    payload={"detail": "Method Not Allowed"},
+                ),
+                get=FakeResponse(
+                    status_code=200,
+                    url=spec.url,
+                    content_type="application/json",
+                    payload=payload,
+                ),
+            )
+            return safe_probe("a11oy_livez", spec, None, session=session).ok
+
+        self.assertTrue(probe(baseline))
+        for field in baseline:
+            with self.subTest(missing=field):
+                payload = dict(baseline)
+                del payload[field]
+                self.assertFalse(probe(payload))
+
+        mismatches = {
+            "legacy-live": {"status": "LIVE"},
+            "readiness-status": {"status": "READY"},
+            "readiness-scope": {"scope": "dependency readiness asserted"},
+            "ready": {"production_ready": True},
+            "ready-null": {"production_ready": None},
+            "receipt": {"receipt_minted": True},
+            "receipt-zero": {"receipt_minted": 0},
+        }
+        for label, changes in mismatches.items():
+            with self.subTest(mismatch=label):
+                self.assertFalse(probe({**baseline, **changes}))
 
     def test_document_probe_requires_head_support(self) -> None:
         spec = PROBES["a11oy_product"]
@@ -217,7 +273,10 @@ class FinalEstateProbeV5Tests(unittest.TestCase):
             workflows / "final-estate-reconciliation-v5-pr.yml"
         ).read_text(encoding="utf-8")
         self.assertNotIn("pull_request:", privileged)
-        self.assertIn("issues: write", privileged)
+        self.assertNotIn("issues: write", privileged)
+        self.assertNotIn("--publish-issue", privileged)
+        self.assertNotIn("shell: python", privileged)
+        self.assertNotIn("ref: ${{ env.EVIDENCE_GENERATION }}", privileged)
         self.assertNotIn("secrets.", privileged)
         self.assertIn("GITHUB_TOKEN: ${{ github.token }}", privileged)
         self.assertIn("pull_request:", pull_request)

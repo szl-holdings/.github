@@ -5,14 +5,14 @@ on:
     branches: [main]
     paths:
       - .github/scripts/hf_release_readiness_terminal.py
+      - .github/scripts/kernel_hub_git.py
+      - .github/scripts/run_hf_terminal_source_tests.py
       - .github/scripts/test_hf_release_readiness_terminal.py
       - .github/workflows/hf-release-readiness-terminal.yml
       - .github/workflows/hf-release-readiness-terminal-pr.yml
       - .github/workflows/hf-release-finalization.yml
+      - .github/workflows/hf-kernel-card-publish-v2.yml
       - .github/workflows/final-estate-reconciliation-v5.yml
-      - .github/workflows/hf-release-readiness.yml
-      - .github/scripts/hf_release_readiness_verify.py
-      - .github/scripts/test_hf_release_readiness_verify.py
 
 permissions:
   contents: read
@@ -53,8 +53,10 @@ jobs:
           set -euo pipefail
           python -m py_compile \
             .github/scripts/hf_release_readiness_terminal.py \
+            .github/scripts/kernel_hub_git.py \
+            .github/scripts/run_hf_terminal_source_tests.py \
             .github/scripts/test_hf_release_readiness_terminal.py
-          python .github/scripts/test_hf_release_readiness_terminal.py
+          python .github/scripts/run_hf_terminal_source_tests.py
           git diff --check
 
       - name: Write immutable pull-request boundary evidence
@@ -89,7 +91,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: hf-release-readiness-pr-${{ github.run_id }}
+          name: hf-release-readiness-pr
           path: ${{ env.REPORT_PATH }}
           if-no-files-found: error
           retention-days: 30

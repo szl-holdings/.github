@@ -2,6 +2,8 @@
 """Contract-aware public probes for active-estate reconciliation v5."""
 from __future__ import annotations
 
+import json
+import time
 from typing import Any, Mapping
 
 import requests
@@ -13,6 +15,7 @@ from final_estate_v5_core import (
     Gate,
     GitHubClient,
     ProbeSpec,
+    bounded_content,
     https_origin,
 )
 
@@ -40,7 +43,15 @@ def _json_contract_ok(
     )
     ok = required_ok and schema_ok and statuses_ok
     if name == "a11oy_livez":
-        return ok and payload.get("receipt_minted") is False
+        return (
+            ok
+            and payload.get("status") == "PROCESS_ALIVE"
+            and payload.get("scope") == (
+                "process liveness only; no dependency readiness asserted"
+            )
+            and payload.get("production_ready") is False
+            and payload.get("receipt_minted") is False
+        )
     if name == "a11oy_build_info":
         build = payload.get("build")
         revision = build.get("revision") if isinstance(build, Mapping) else None
@@ -90,6 +101,7 @@ def safe_probe(
     session: requests.Session | None = None,
 ) -> Gate:
     session = session or requests.Session()
+    session.trust_env = False
     session.headers.update(
         {
             "Accept": "application/json,text/html;q=0.9,*/*;q=0.8",
@@ -99,10 +111,14 @@ def safe_probe(
         }
     )
     try:
-        head = session.head(spec.url, allow_redirects=True, timeout=45)
-        response = session.get(spec.url, allow_redirects=True, timeout=60)
-        head_ok = not spec.require_head or 200 <= head.status_code < 400
-        get_ok = 200 <= response.status_code < 400
+        # No redirect can expand the fixed public target set or carry credentials.
+        head = session.head(spec.url, allow_redirects=False, timeout=(10, 20))
+        head.close()
+        deadline = time.monotonic() + 60
+        response = session.get(spec.url, allow_redirects=False, stream=True, timeout=(10, 20))
+        body = bounded_content(response, deadline=deadline)
+        head_ok = not spec.require_head or 200 <= head.status_code < 300
+        get_ok = 200 <= response.status_code < 300
         content_type = str(response.headers.get("content-type") or "").lower()
         media_ok = (
             "application/json" in content_type
@@ -112,8 +128,9 @@ def safe_probe(
         ok = (
             head_ok
             and get_ok
+            and response.url == spec.url
             and https_origin(response.url) is not None
-            and len(response.content) > 0
+            and len(body) > 0
             and media_ok
         )
         evidence: dict[str, Any] = {
@@ -123,12 +140,12 @@ def safe_probe(
             "get_http_status": response.status_code,
             "final_url": response.url,
             "content_type": response.headers.get("content-type"),
-            "bytes": len(response.content),
+            "bytes": len(body),
             "media_ok": media_ok,
         }
         if spec.media_type == "json":
             try:
-                payload = response.json()
+                payload = json.loads(body)
             except ValueError as exc:
                 payload = None
                 evidence["json_error"] = str(exc)
@@ -148,7 +165,7 @@ def safe_probe(
             (
                 f"HEAD={head.status_code}{' required' if spec.require_head else ' observed'}; "
                 f"GET={response.status_code}; media={spec.media_type}; "
-                f"final={response.url}; bytes={len(response.content)}"
+                f"final={response.url}; bytes={len(body)}"
             ),
             evidence,
         )
