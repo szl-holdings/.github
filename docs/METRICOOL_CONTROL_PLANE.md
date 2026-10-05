@@ -30,7 +30,8 @@ Use Metricool for:
 Metricool MAY:
 
 - distribute already-supported public claims;
-- schedule X, LinkedIn, and any later-connected channels within provider constraints;
+- schedule only X and LinkedIn, as enumerated in `approvedChannels`, within provider constraints;
+- add another channel only after a reviewed change to the committed allowlist;
 - read channel analytics and planning state;
 - optimize publication timing;
 - carry campaign metadata that does not alter technical claims.
@@ -44,7 +45,10 @@ Metricool MUST NOT:
 - store GitHub, Hugging Face, DNS, infrastructure, or unrelated provider credentials;
 - silently transform an unverified claim into a verified one;
 - bypass human/provider approval requirements;
-- overwrite an existing scheduled post without preserving its full provider payload.
+- overwrite an existing scheduled post without preserving its full provider payload;
+- update a post without an atomic conditional write against its observed provider
+  revision or updated timestamp; use `HOLD` on mismatch or when equivalent conditional
+  writes are unavailable. A read immediately before an unconditional update is insufficient.
 
 ## Secrets and identifiers
 
@@ -69,14 +73,20 @@ Before a technical claim is scheduled:
 3. Preserve qualifiers and known limits.
 4. Reject or hold the post if the evidence is stale or contradictory.
 5. Record the scheduled provider set and publication time.
-6. After publication, analytics are observational evidence only; engagement does not
+6. Bind the schedule to an explicit evidence-validity window ending after the
+   intended publication time. Revalidate upstream evidence immediately before delivery.
+7. If evidence has changed, expired, or cannot be read, hold or cancel the queued
+   publication. If the provider cannot enforce that final check or an equivalent
+   cancellation/hold boundary, do not queue the technical claim; use `HOLD`.
+8. After publication, analytics are observational evidence only; engagement does not
    prove technical correctness.
 
 ## Connected-network behavior
 
 The adapter must treat network availability as dynamic. A network is writable only
-when the active Metricool brand reports that connection as present and the provider
-accepts the post payload.
+when it is present in the committed `approvedChannels` allowlist, the active Metricool
+brand reports that connection as present, and the provider accepts the post payload.
+Provider-side connection changes do not expand the committed write scope.
 
 Provider-specific requirements remain authoritative, including media requirements,
 AI-generated-content declarations, review flows, and platform-specific post types.
@@ -85,7 +95,13 @@ AI-generated-content declarations, review flows, and platform-specific post type
 
 Use explicit states:
 
-- `READY` — active brand resolved and requested provider connected.
+- `READY` — active brand resolved and an allowlisted requested provider connected;
+  this is a precondition, not successful scheduling or delivery.
+- `SCHEDULED` — the provider confirms acceptance of a specific post identifier and
+  scheduled time; delivery has not yet been observed.
+- `PUBLISHED` — provider readback confirms publication of the specific post, with its
+  provider/post identifier, delivery timestamp, and evidence/source revision recorded.
+  A scheduling response, elapsed time, or engagement metric cannot establish this state.
 - `HOLD` — provider not connected, required media missing, review required, or
   evidence for the public claim is insufficient.
 - `UNOBSERVED` — the integration cannot read or verify the requested provider state.
@@ -102,5 +118,7 @@ Any future direct GitHub-to-Metricool publisher must:
 - use explicit egress allowlisting for Metricool endpoints;
 - emit immutable publication receipts containing source revision, content digest,
   provider, scheduled time, resulting provider/post identifier, and final state;
+- enforce the committed channel allowlist and revision-conditional update contract;
+- revalidate exact upstream evidence before delivery within its recorded validity window;
 - preserve protected-main and existing review/security gates;
 - ship through a normal feature branch and pull request.
