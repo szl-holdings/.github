@@ -16,9 +16,7 @@ if str(HERE) not in sys.path:
     sys.path.insert(0, str(HERE))
 
 import final_estate_reconciliation_v5 as controller
-from final_estate_reconciliation_v5 import evaluate_upstream_readiness
-from final_estate_v5_core import Gate, GitHubClient, MAX_RESPONSE_BYTES
-import final_estate_v5_core as core
+from final_estate_v5_core import Gate, GitHubClient, MAX_RESPONSE_BYTES, bounded_content, requests, time
 from final_estate_v5_probes import safe_probe
 from test_final_estate_v5_probes import FakeResponse, FakeSession
 
@@ -135,7 +133,7 @@ class FinalEstateReadOnlyBoundaryTests(unittest.TestCase):
         transport.assert_not_called()
 
     def test_bounded_github_body_still_decodes_and_closes_real_response(self):
-        response = core.requests.Response()
+        response = requests.Response()
         response.status_code = 200
         response.raw = io.BytesIO(b'{"login":"szl-holdings","public_repos":3}')
         client = GitHubClient(None)
@@ -147,8 +145,8 @@ class FinalEstateReadOnlyBoundaryTests(unittest.TestCase):
     def test_expired_stream_deadline_rejects_even_small_complete_body(self):
         response = unittest.mock.Mock()
         response.iter_content.return_value = iter([b"{}"])
-        with patch.object(core.time, "monotonic", return_value=10), self.assertRaisesRegex(RuntimeError, "RESPONSE_BUDGET"):
-            core.bounded_content(response, deadline=9)
+        with patch.object(time, "monotonic", return_value=10), self.assertRaisesRegex(RuntimeError, "RESPONSE_BUDGET"):
+            bounded_content(response, deadline=9)
         response.close.assert_called_once_with()
 
     def test_public_probe_rejects_redirect_or_oversized_body(self):
@@ -193,7 +191,7 @@ class FinalEstateUpstreamTests(unittest.TestCase):
             },
             clear=False,
         ):
-            gate = evaluate_upstream_readiness()
+            gate = controller.evaluate_upstream_readiness()
         self.assertTrue(gate.ok)
         self.assertTrue(gate.evidence["workflow_run_bound"])
         self.assertEqual(gate.evidence["conclusion"], "success")
@@ -209,7 +207,7 @@ class FinalEstateUpstreamTests(unittest.TestCase):
                     },
                     clear=False,
                 ):
-                    gate = evaluate_upstream_readiness()
+                    gate = controller.evaluate_upstream_readiness()
                 self.assertFalse(gate.ok)
 
     def test_direct_manual_evaluation_keeps_issue_evidence_authoritative(self) -> None:
@@ -218,7 +216,7 @@ class FinalEstateUpstreamTests(unittest.TestCase):
         clean.pop("UPSTREAM_CONCLUSION", None)
         clean.pop("UPSTREAM_RUN_URL", None)
         with patch.dict(os.environ, clean, clear=True):
-            gate = evaluate_upstream_readiness()
+            gate = controller.evaluate_upstream_readiness()
         self.assertTrue(gate.ok)
         self.assertFalse(gate.evidence["workflow_run_bound"])
 
