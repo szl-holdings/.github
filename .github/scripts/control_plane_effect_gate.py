@@ -1150,14 +1150,17 @@ def analyze_workflow_source(source: str, *, path: str) -> dict[str, Any]:
                     unknown("LOCAL_ACTION_UNSUPPORTED", (*step_location, "uses"))
                 elif action in KNOWN_ACTION_EFFECTS:
                     sink, resource, access = KNOWN_ACTION_EFFECTS[action]
-                    if action == "step-security/harden-runner@05e31511f85b41b11d1cf0ef85d0992719546e2c":
+                    if action in {
+                        "step-security/harden-runner@05e31511f85b41b11d1cf0ef85d0992719546e2c",
+                        "step-security/harden-runner@e14015d583714f6e62063499dc959a02595150a1",
+                    }:
                         # Only the reviewed hosted-runner guard configuration.
                         # Policy-store credentials, self-hosted deployment, and
                         # disabling monitoring are separate effects, not a pin upgrade.
                         if set(inputs) - {
                             "egress-policy", "allowed-endpoints", "denied-endpoints",
-                            "disable-telemetry",
-                        } or inputs.get("egress-policy", "block") not in {"audit", "block"}:
+                            "disable-telemetry", "disable-sudo",
+                        } or inputs.get("egress-policy", "block") not in {"audit", "block"} or inputs.get("disable-sudo", "false") not in {"true", "false"}:
                             unknown("ACTION_EXTRA_EFFECT_UNSUPPORTED", (*step_location, "with"))
                         # This exact action registers monitoring and reports
                         # security telemetry. Do not hide those writes behind
