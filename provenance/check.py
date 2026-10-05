@@ -29,25 +29,76 @@ def load_policy(path: Path) -> dict:
     return data
 
 
+def _strip_html_comments(line: str, in_comment: bool) -> tuple[str, bool]:
+    """Remove HTML comments from one non-fenced line, retaining visible text."""
+    visible = ""
+    rest = line
+    while rest:
+        if in_comment:
+            end = rest.find("-->")
+            if end < 0:
+                return visible, True
+            rest = rest[end + 3 :]
+            in_comment = False
+            continue
+        start = rest.find("<!--")
+        if start < 0:
+            visible += rest
+            break
+        visible += rest[:start]
+        rest = rest[start + 4 :]
+        in_comment = True
+    return visible, in_comment
+
+
+def _strip_raw_html_code(line: str, raw_code: str) -> tuple[str, str]:
+    """Remove raw HTML pre/code regions whose Markdown is rendered literally."""
+    visible = ""
+    rest = line
+    while rest:
+        if raw_code:
+            closing = re.search(rf"</{raw_code}\s*>", rest, flags=re.IGNORECASE)
+            if not closing:
+                return visible, raw_code
+            rest = rest[closing.end() :]
+            raw_code = ""
+            continue
+        opening = re.search(r"<(pre|code)\b[^>]*>", rest, flags=re.IGNORECASE)
+        if not opening:
+            visible += rest
+            break
+        visible += rest[: opening.start()]
+        raw_code = opening[1].lower()
+        rest = rest[opening.end() :]
+    return visible, raw_code
+
+
 def evidence_sections(body: str) -> dict[str, list[str]]:
     """Extract visible sections without treating code examples as headings."""
     sections: dict[str, list[str]] = {}
     if not isinstance(body, str):
         return sections
-    body = re.sub(r"<!--.*?(?:-->|\Z)", "", body, flags=re.DOTALL)
     current: list[str] | None = None
     fence = ""
-    for line in body.splitlines():
-        marker = re.match(r"^ {0,3}(`{3,}|~{3,})", line)
+    html_comment = False
+    raw_code = ""
+    for source_line in body.splitlines():
+        marker = re.match(r"^ {0,3}(`{3,}|~{3,})", source_line)
         if fence:
             if (
                 marker and marker[1][0] == fence[0] and len(marker[1]) >= len(fence)
-                and not line[marker.end():].strip()
+                and not source_line[marker.end():].strip()
             ):
                 fence = ""
             elif current is not None:
-                current[-1] += line + "\n"
+                current[-1] += source_line + "\n"
             continue
+
+        line, html_comment = _strip_html_comments(source_line, html_comment)
+        line, raw_code = _strip_raw_html_code(line, raw_code)
+        if raw_code and not line:
+            continue
+        marker = re.match(r"^ {0,3}(`{3,}|~{3,})", line)
         if marker:
             fence = marker[1]
             continue
@@ -72,6 +123,8 @@ def substantive_section(contents: list[str]) -> bool:
         line = re.sub(r"^\s*(?:[-+*]\s*)?\[[ xX]\]\s*", "", line)
         text = re.sub(r"^[\s>*_`~\-+\[\]]+|[\s*_`~]+$", "", line).strip()
         if not re.search(r"[A-Za-z0-9]", text):
+            continue
+        if re.fullmatch(r"[A-Za-z][A-Za-z0-9 _./-]{0,80}:", text):
             continue
         if not re.fullmatch(
             r"(?:todo|tbd|pending|none|n/?a|not applicable|not run|unknown|unavailable|blocked)[.!]*",

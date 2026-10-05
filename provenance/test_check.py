@@ -132,7 +132,7 @@ class ProvenanceCheckTests(unittest.TestCase):
         for content in (
             " ", "TODO", "**TBD**", "- [ ] Pending", "N/A", "None.", "Not run",
             "---", "...", "- [x]", "<!-- I own the contribution. -->", "<!-- unclosed comment",
-            "### Rights evidence",
+            "### Rights evidence", "Rights:",
         ):
             with self.subTest(content=content):
                 event = self.event()
@@ -142,6 +142,15 @@ class ProvenanceCheckTests(unittest.TestCase):
                 )
                 report = check.evaluate(self.policy, event)
                 self.assertIn("pr_body_evidence", report["failed"])
+
+    def test_bare_rollback_template_label_is_not_evidence(self) -> None:
+        event = self.event()
+        event["pull_request"]["body"] = BODY.replace(
+            "Revert the squash merge commit on .github.", "Rollback:"
+        )
+        report = check.evaluate(self.policy, event)
+        self.assertFalse(report["evidence_sections"]["Rollback"])
+        self.assertIn("pr_body_evidence", report["failed"])
 
     def test_fenced_and_commented_headings_are_not_sections(self) -> None:
         for body in (
@@ -156,6 +165,31 @@ class ProvenanceCheckTests(unittest.TestCase):
                 report = check.evaluate(self.policy, event)
                 self.assertIn("pr_body_headings", report["failed"])
                 self.assertIn("pr_body_evidence", report["failed"])
+
+    def test_html_comment_literal_inside_fence_preserves_later_sections(self) -> None:
+        event = self.event()
+        event["pull_request"]["body"] = BODY.replace(
+            "python3 provenance/test_check.py",
+            "```sh\nrg '<!--' .github/pull_request_template.md\n```",
+        )
+        report = check.evaluate(self.policy, event)
+        self.assertTrue(report["pass"], report["failed"])
+
+    def test_raw_html_code_blocks_cannot_supply_required_headings(self) -> None:
+        for tag in ("pre", "code", "PRE", "CoDe"):
+            with self.subTest(tag=tag):
+                event = self.event()
+                event["pull_request"]["body"] = f"<{tag}>\n{BODY}\n</{tag}>"
+                report = check.evaluate(self.policy, event)
+                self.assertIn("pr_body_headings", report["failed"])
+                self.assertIn("pr_body_evidence", report["failed"])
+
+    def test_inline_raw_html_code_is_ignored_without_hiding_visible_sections(self) -> None:
+        event = self.event()
+        event["pull_request"]["body"] = "<code>## Fake\ntext</code>\n" + BODY
+        report = check.evaluate(self.policy, event)
+        self.assertTrue(report["pass"], report["failed"])
+        self.assertNotIn("Fake", report["headings"])
 
     def test_duplicate_required_sections_are_ambiguous(self) -> None:
         event = self.event()
