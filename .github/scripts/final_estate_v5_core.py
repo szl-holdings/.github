@@ -231,13 +231,13 @@ def latest_report(issue: Mapping[str, Any]) -> dict[str, Any]:
 
 
 def summary_clean(report: Mapping[str, Any]) -> bool:
-    summary = report.get("summary") or {}
+    summary = report.get("summary")
     if not isinstance(summary, Mapping):
         return False
-    try:
-        return int(summary.get("error", 1)) == 0 and int(summary.get("warning", 0)) == 0
-    except (TypeError, ValueError):
-        return False
+    return all(
+        type(summary.get(key)) is int and summary[key] == 0
+        for key in ("error", "warning")
+    )
 
 
 def https_origin(value: Any) -> str | None:
