@@ -6,6 +6,12 @@ SZL Holdings builds AI software, models and research tools that connect an outpu
 
 [**Explore Command Lab →**](https://huggingface.co/spaces/SZLHOLDINGS/szl-command-lab) · [**Build with the source →**](https://github.com/szl-holdings)
 
+## Repeat a public calculation
+
+[Input and hash](https://github.com/szl-holdings/governed-receipt-spec/tree/320983d22e76fc9b26af0b2cd20799c5000543fc/examples/public-single-cell#public-data-and-attribution) → [Executed code](https://github.com/szl-holdings/governed-receipt-spec/blob/160e39b1383a0e249399b6dfb72983b67aef7fe8/examples/public-single-cell/run_example.py) → [Retained result](https://github.com/szl-holdings/governed-receipt-spec/blob/320983d22e76fc9b26af0b2cd20799c5000543fc/examples/public-single-cell/observed-run.json) → [Repeat](https://github.com/szl-holdings/governed-receipt-spec/tree/320983d22e76fc9b26af0b2cd20799c5000543fc/examples/public-single-cell#reproduce-the-recorded-run) → [Limits](https://github.com/szl-holdings/governed-receipt-spec/tree/320983d22e76fc9b26af0b2cd20799c5000543fc/examples/public-single-cell#outputs-and-verification-boundary)
+
+The single-cell example summarizes public GEO GSE85241 data and checks integrity and repeatability. Its receipt is unsigned; it makes no biological or clinical claim.
+
 ## Choose a path
 
 - **Explore:** [Command Lab](https://huggingface.co/spaces/SZLHOLDINGS/szl-command-lab) brings the public portfolio into one searchable interface.
@@ -29,8 +35,6 @@ The source-bound public inventory records **34 public Spaces, 47 model repositor
 
 <details>
 <summary>Reproduce an example and inspect the architecture</summary>
-
-The [single-cell worked example](https://github.com/szl-holdings/governed-receipt-spec/tree/320983d22e76fc9b26af0b2cd20799c5000543fc/examples/public-single-cell) records a calculation on public GEO data. Its unsigned receipt demonstrates scoped integrity and reproducibility; it makes no biological or clinical claim.
 
 [Architecture image](./assets/evidence-lattice-v2.webp) · [Authorization rules](https://github.com/szl-holdings/.github/blob/main/TRUST.md)
 

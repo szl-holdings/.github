@@ -1186,83 +1186,7 @@ class Finalizer:
         return result
 
     def finalize_kernel(self, repo_id: str, spec: dict[str, str]) -> None:
-        source_root = self.roots[spec["source_root"]]
-        source_dir = source_root / spec["source_dir"]
-        card = source_dir / "README.md"
-        contract = source_dir / "contract.json"
-        if not card.is_file() or not contract.is_file():
-            raise RuntimeError(f"kernel source contract is incomplete: {source_dir}")
-        contract_payload = json.loads(contract.read_text(encoding="utf-8"))
-        if not isinstance(contract_payload, dict):
-            raise RuntimeError(f"kernel contract is not an object: {contract}")
-
-        before_info = self.api.kernel_info(repo_id)
-        before = str(getattr(before_info, "sha", "") or "")
-        if len(before) != 40:
-            raise RuntimeError(f"kernel repository lacks immutable revision: {repo_id}")
-        remote_files_before = set(self.api.list_repo_files(repo_id, repo_type="kernel"))
-        if not any(path.startswith("build/") for path in remote_files_before):
-            raise RuntimeError(
-                f"first-class kernel repository lacks build variants: {repo_id}"
-            )
-        self.record(
-            repo_id,
-            "kernel-preflight",
-            "validated",
-            f"before={before}; builds_present=true",
-        )
-
-        if self.publish:
-            for source, destination in (
-                (card, "README.md"),
-                (contract, "contract.json"),
-            ):
-                self.api.upload_file(
-                    repo_id=repo_id,
-                    repo_type="kernel",
-                    path_or_fileobj=str(source),
-                    path_in_repo=destination,
-                    commit_message=(
-                        "release(card): publish reviewed kernel contract "
-                        f"{self.generation[:12]}"
-                    ),
-                    commit_description=(
-                        "Card/contract-only publication from the canonical GitHub owner. "
-                        "Existing first-class kernel build variants are preserved."
-                    ),
-                )
-            self.record(repo_id, "kernel-card-publish", "updated")
-        else:
-            self.record(repo_id, "kernel-card-publish", "dry-run")
-
-        after_info = self.api.kernel_info(repo_id)
-        after = str(getattr(after_info, "sha", "") or "")
-        if len(after) != 40:
-            raise RuntimeError(f"published kernel lacks immutable revision: {repo_id}")
-        for source, filename in ((card, "README.md"), (contract, "contract.json")):
-            observed = self._download_verified(repo_id, filename, "kernel", after)
-            if observed != source.read_bytes():
-                raise RuntimeError(
-                    f"published kernel file differs from reviewed source: {repo_id}/{filename}"
-                )
-        remote_files_after = set(self.api.list_repo_files(repo_id, repo_type="kernel"))
-        if not any(path.startswith("build/") for path in remote_files_after):
-            raise RuntimeError(f"kernel publication removed build variants: {repo_id}")
-        selfcheck = self._kernel_selfcheck(repo_id, after)
-        self.record(
-            repo_id,
-            "kernel-verify",
-            "validated",
-            f"after={after}; selfcheck=passed; files={len(remote_files_after)}",
-        )
-        self.results.setdefault("kernels", {})[repo_id] = {
-            "before_sha": before,
-            "after_sha": after,
-            "card_sha256": self.digest(card),
-            "contract_sha256": self.digest(contract),
-            "remote_file_count": len(remote_files_after),
-            "selfcheck": selfcheck,
-        }
+        raise RuntimeError("UNSUPPORTED_BASE_KERNEL_PUBLISHER_USE_CANONICAL_GIT_ADAPTER")
 
     def report(self) -> dict[str, Any]:
         statuses = [action.status for action in self.actions]
@@ -1298,34 +1222,7 @@ class Finalizer:
         }
 
     def publish_evidence(self, report: dict[str, Any]) -> None:
-        rendered = (
-            json.dumps(report, indent=2, sort_keys=True, default=str) + "\n"
-        ).encode()
-        output = Path("reports/hf-release-finalization-latest.json")
-        output.parent.mkdir(parents=True, exist_ok=True)
-        output.write_bytes(rendered)
-        self.record(str(output), "local-report", "updated")
-        if not self.publish:
-            return
-        self.api.create_repo(
-            repo_id=EVIDENCE_DATASET,
-            repo_type="dataset",
-            private=True,
-            exist_ok=True,
-        )
-        timestamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
-        for destination in (
-            "release-finalization/latest.json",
-            f"release-finalization/history/{timestamp}.json",
-        ):
-            self.api.upload_file(
-                repo_id=EVIDENCE_DATASET,
-                repo_type="dataset",
-                path_or_fileobj=io.BytesIO(rendered),
-                path_in_repo=destination,
-                commit_message=f"release(evidence): record Hub finalization {timestamp}",
-            )
-        self.record(EVIDENCE_DATASET, "evidence-publish", "updated")
+        raise RuntimeError("UNSUPPORTED_BASE_EVIDENCE_PUBLISHER_USE_CANONICAL_GIT_ADAPTER")
 
     def run(self) -> dict[str, Any]:
         self.authenticate()

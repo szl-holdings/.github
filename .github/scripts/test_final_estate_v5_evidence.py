@@ -29,6 +29,12 @@ class FakeIssueClient:
     def __init__(self, issues: dict[tuple[str, int], dict[str, Any]]) -> None:
         self.issues = issues
 
+    def publication_evidence(self):
+        issue = self.issues[EVIDENCE_ISSUES["hf_release_publication"]]
+        if issue["state"] != "closed":
+            raise RuntimeError("SYNTHETIC artifact producer not successful")
+        return latest_report(issue), {"fixture": "SYNTHETIC native artifact"}
+
     def issue(self, repo: str, number: int) -> dict[str, Any]:
         return self.issues[(repo, number)]
 
