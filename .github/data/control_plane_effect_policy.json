@@ -6,6 +6,96 @@
   "unknown_effect": "deny",
   "wildcard_resources": "deny",
   "workflow_declarations": {
+    ".github/workflows/metricool-contract.yml": {
+      "intent_id": "metricool-offline-contract-v1",
+      "valid_until": "2026-11-30",
+      "source_sha256": "sha256:10837557b65f96ce8424d28b6f5fafb3e7e156d8f0073660363f00becfd2720b",
+      "credentials": [],
+      "resources": [
+        {
+          "key": "github:repository:szl-holdings/.github:contents",
+          "access": "read"
+        },
+        {
+          "key": "runner:toolchain:python",
+          "access": "local-write"
+        }
+      ],
+      "effects": [
+        {
+          "sink": "github.contents.checkout",
+          "resource": "github:repository:szl-holdings/.github:contents",
+          "access": "read",
+          "max_calls": 1
+        },
+        {
+          "sink": "runner.toolchain.install",
+          "resource": "runner:toolchain:python",
+          "access": "local-write",
+          "max_calls": 1
+        }
+      ],
+      "max_external_writes": 0,
+      "required_controls": {
+        "triggers": ["merge_group", "pull_request", "push"],
+        "contents_read": true,
+        "no_explicit_secrets": true,
+        "concurrency": true,
+        "protected_ref": false,
+        "exact_sha": false,
+        "expected_before": false,
+        "readback": false
+      },
+      "trusted_transitives": {},
+      "reviewed_unknowns": {
+        "files": {
+          ".github/scripts/metricool_contract.py": "sha256:23e80322892458bccbcada8583bf16012df2ad231bb66632fce971d00f742f0e",
+          ".github/scripts/test_metricool_contract.py": "sha256:3d6954f905685eec2503f5f31a50aec8510706cd708c10d8932aad46390848b0",
+          ".github/workflows/metricool-contract.yml": "sha256:10837557b65f96ce8424d28b6f5fafb3e7e156d8f0073660363f00becfd2720b"
+        },
+        "unknowns": [
+          "ACTION_INPUTS_REVIEW_REQUIRED@.github/workflows/metricool-contract.yml:25",
+          "ACTION_INPUTS_REVIEW_REQUIRED@.github/workflows/metricool-contract.yml:30",
+          "PYTHON_DYNAMIC_SUBPROCESS@.github/scripts/test_metricool_contract.py:461",
+          "PYTHON_DYNAMIC_SUBPROCESS@.github/scripts/test_metricool_contract.py:474",
+          "PYTHON_IMPORT_UNRESOLVED@.github/scripts/metricool_contract.py:10",
+          "PYTHON_IMPORT_UNRESOLVED@.github/scripts/metricool_contract.py:12",
+          "PYTHON_IMPORT_UNRESOLVED@.github/scripts/metricool_contract.py:19",
+          "PYTHON_IMPORT_UNRESOLVED@.github/scripts/metricool_contract.py:61",
+          "PYTHON_IMPORT_UNRESOLVED@.github/scripts/test_metricool_contract.py:4",
+          "PYTHON_IMPORT_UNRESOLVED@.github/scripts/test_metricool_contract.py:6",
+          "PYTHON_IMPORT_UNRESOLVED@.github/scripts/test_metricool_contract.py:7",
+          "PYTHON_IMPORT_UNRESOLVED@.github/scripts/test_metricool_contract.py:8",
+          "PYTHON_IMPORT_UNRESOLVED@.github/scripts/test_metricool_contract.py:9",
+          "PYTHON_IMPORT_UNRESOLVED@.github/scripts/test_metricool_contract.py:12",
+          "PYTHON_IMPORT_UNRESOLVED@.github/scripts/test_metricool_contract.py:16",
+          "PYTHON_IMPORT_UNRESOLVED@.github/scripts/test_metricool_contract.py:20",
+          "PYTHON_SOURCE_REVIEW_REQUIRED@.github/scripts/metricool_contract.py:1",
+          "PYTHON_SOURCE_REVIEW_REQUIRED@.github/scripts/test_metricool_contract.py:1",
+          "PYTHON_SOURCE_REVIEW_REQUIRED@.github/workflows/metricool-contract.yml:38",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/metricool-contract.yml:34",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/metricool-contract.yml:37",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/metricool-contract.yml:38",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/metricool-contract.yml:39",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/metricool-contract.yml:40",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/metricool-contract.yml:41",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/metricool-contract.yml:42",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/metricool-contract.yml:43",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/metricool-contract.yml:44",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/metricool-contract.yml:45",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/metricool-contract.yml:46",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/metricool-contract.yml:47",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/metricool-contract.yml:48",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/metricool-contract.yml:49",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/metricool-contract.yml:50",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/metricool-contract.yml:53",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/metricool-contract.yml:56",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/metricool-contract.yml:57",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/metricool-contract.yml:34",
+          "WORKFLOW_ENVIRONMENT_REVIEW_REQUIRED@.github/workflows/metricool-contract.yml:33"
+        ]
+      }
+    },
     ".github/workflows/hf-model-evidence-audit.yml": {
       "intent_id": "hf-model-evidence-public-census-v2",
       "valid_until": "2026-11-30",
