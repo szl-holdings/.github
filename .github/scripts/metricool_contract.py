@@ -33,6 +33,8 @@ CATEGORIES = {"thesis": set(), "architecture": {"source"},
               "research": {"source", "evaluation"}}
 # These require separate legal/financial/human substantiation, not this gate.
 MANUAL_ONLY = {"compliance", "funding", "customers", "revenue"}
+# Config uses public channel names; API records and intent hashes keep wire names.
+PROVIDER_CHANNELS = {"twitter": "x", "linkedin": "linkedin"}
 
 
 def _object(pairs):
@@ -223,7 +225,7 @@ def preflight(config, request, environ, *, now):
                 or not _fresh(brand["observedAt"], now, config["policy"]["maxEvidenceAgeSeconds"])):
             reasons.append("BRAND_READBACK_MISMATCH_OR_STALE")
         network = request["provider"]
-        if network not in config["authorizedNetworks"]:
+        if PROVIDER_CHANNELS.get(network) not in config["approvedChannels"]:
             reasons.append("NETWORK_NOT_AUTHORIZED")
         if not isinstance(brand["connectedNetworks"], list) or network not in brand["connectedNetworks"]:
             reasons.append("NETWORK_NOT_CONNECTED")

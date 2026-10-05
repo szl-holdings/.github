@@ -64,16 +64,25 @@ The base for this addition is
 decision digest are not yet assigned by this document. Digests below refer to
 canonical Git/LF source bytes, not a Windows CRLF materialization.
 
+The local integration preserves both the subsequent finite-number correction
+`a343a9935140d6b0b08b655447caa04b69f4fa73` and reviewed remote config/document
+source `fdcc7d24d296875fc40787a67512c87cfbcc68f6`. The remote `approvedChannels`,
+required controls, update/evidence policies and operational states are retained.
+A fixed `twitter` to `x` channel mapping leaves provider records and intent
+identities unchanged; it grants no new provider alias or authority. The separate
+implementation flags remain false. Local history integration is not a remote
+writer handoff, branch publication, protected admission or provider deployment.
+
 | Path | SHA-256 | Enforcement |
 | --- | --- | --- |
-| `.github/workflows/metricool-contract.yml` | `10837557b65f96ce8424d28b6f5fafb3e7e156d8f0073660363f00becfd2720b` | Effect-policy source and reviewed-unknown pin |
-| `.github/scripts/metricool_contract.py` | `c506db277920a977a2e6250b83ba2dfd30abf581e4ab77db61bd4c517aa13818` | Effect-policy reviewed-unknown pin |
-| `.github/scripts/test_metricool_contract.py` | `e9d995d2ce552a8f94c04f9668ef7848e4672b11a6d42f63b9416498cfb4f353` | Effect-policy reviewed-unknown pin |
-| `config/metricool-control-plane.json` | `a4ca4de0895ee3eb7011aa88ed5447a147c13f56784dac45766aa0681b730ab1` | Pinned workflow checks bytes before installation/validation |
-| `config/schemas/metricool-control-plane.schema.json` | `ce479e32009520906816de7ea10973a9ac812b78490ca3c32ee90fdcff84b499` | Pinned workflow checks bytes before installation/validation |
+| `.github/workflows/metricool-contract.yml` | `e070577e8ada1cabd541868fa459e6ed3a563b243a793096e52c4f02a5ee55fe` | Effect-policy source and reviewed-unknown pin |
+| `.github/scripts/metricool_contract.py` | `04d1bb86ac925231972bd3742644db198683d66142f32486203fd7aaac417cf8` | Effect-policy reviewed-unknown pin |
+| `.github/scripts/test_metricool_contract.py` | `1c3aadc57e940af02bb66dc157d390f742d25e531fd8d0617f07cd377e5f8f31` | Effect-policy reviewed-unknown pin |
+| `config/metricool-control-plane.json` | `e4f6aa9f4741023738b85fd7217e6d79f724647c588379c9bfb7520794cb7a9c` | Pinned workflow checks bytes before installation/validation |
+| `config/schemas/metricool-control-plane.schema.json` | `451b232a549ab7f04cc61d96a64f631dc4c5b1047cc091bb34bcb077587389f5` | Pinned workflow checks bytes before installation/validation |
 | `schemas/metricool-publication-receipt.schema.json` | `cb9562c16c987e7a7448dfd49cc356419fd1b6df4fe2f771101d93ea5c3ca0b6` | Pinned workflow checks bytes before installation/validation |
 | `requirements/metricool-contract.lock` | `6ff63ee80c5dab7249e3f7794b42ca1cb2a5a3bf2b989606e0c94d5955dcf606` | Pinned workflow checks bytes before installation/validation |
-| `docs/METRICOOL_CONTROL_PLANE.md` | `43e6a6b16005cf489b25dd8e5cf5c050dce1a5aedccfedcf8ce4e3c67b91f248` | Documentation-only review digest, not executable admission |
+| `docs/METRICOOL_CONTROL_PLANE.md` | `8679370b01e1597ee573d88e36dbcd3c65823fc37d86f3f341ae36241d41c296` | Documentation-only review digest, not executable admission |
 
 The static dependency grammar itself discovers the two Python files, not the
 four other-root data inputs. Their coverage comes from the reviewed, pinned

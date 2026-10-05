@@ -9,7 +9,7 @@
     ".github/workflows/metricool-contract.yml": {
       "intent_id": "metricool-offline-contract-v1",
       "valid_until": "2026-11-30",
-      "source_sha256": "sha256:10837557b65f96ce8424d28b6f5fafb3e7e156d8f0073660363f00becfd2720b",
+      "source_sha256": "sha256:e070577e8ada1cabd541868fa459e6ed3a563b243a793096e52c4f02a5ee55fe",
       "credentials": [],
       "resources": [
         {
@@ -49,21 +49,21 @@
       "trusted_transitives": {},
       "reviewed_unknowns": {
         "files": {
-          ".github/scripts/metricool_contract.py": "sha256:c506db277920a977a2e6250b83ba2dfd30abf581e4ab77db61bd4c517aa13818",
-          ".github/scripts/test_metricool_contract.py": "sha256:e9d995d2ce552a8f94c04f9668ef7848e4672b11a6d42f63b9416498cfb4f353",
-          ".github/workflows/metricool-contract.yml": "sha256:10837557b65f96ce8424d28b6f5fafb3e7e156d8f0073660363f00becfd2720b"
+          ".github/scripts/metricool_contract.py": "sha256:04d1bb86ac925231972bd3742644db198683d66142f32486203fd7aaac417cf8",
+          ".github/scripts/test_metricool_contract.py": "sha256:1c3aadc57e940af02bb66dc157d390f742d25e531fd8d0617f07cd377e5f8f31",
+          ".github/workflows/metricool-contract.yml": "sha256:e070577e8ada1cabd541868fa459e6ed3a563b243a793096e52c4f02a5ee55fe"
         },
         "unknowns": [
           "ACTION_INPUTS_REVIEW_REQUIRED@.github/workflows/metricool-contract.yml:25",
           "ACTION_INPUTS_REVIEW_REQUIRED@.github/workflows/metricool-contract.yml:30",
-          "PYTHON_DYNAMIC_SUBPROCESS@.github/scripts/test_metricool_contract.py:477",
-          "PYTHON_DYNAMIC_SUBPROCESS@.github/scripts/test_metricool_contract.py:490",
-          "PYTHON_DYNAMIC_SUBPROCESS@.github/scripts/test_metricool_contract.py:504",
+          "PYTHON_DYNAMIC_SUBPROCESS@.github/scripts/test_metricool_contract.py:555",
+          "PYTHON_DYNAMIC_SUBPROCESS@.github/scripts/test_metricool_contract.py:568",
+          "PYTHON_DYNAMIC_SUBPROCESS@.github/scripts/test_metricool_contract.py:582",
           "PYTHON_IMPORT_UNRESOLVED@.github/scripts/metricool_contract.py:10",
           "PYTHON_IMPORT_UNRESOLVED@.github/scripts/metricool_contract.py:12",
           "PYTHON_IMPORT_UNRESOLVED@.github/scripts/metricool_contract.py:16",
           "PYTHON_IMPORT_UNRESOLVED@.github/scripts/metricool_contract.py:20",
-          "PYTHON_IMPORT_UNRESOLVED@.github/scripts/metricool_contract.py:69",
+          "PYTHON_IMPORT_UNRESOLVED@.github/scripts/metricool_contract.py:71",
           "PYTHON_IMPORT_UNRESOLVED@.github/scripts/test_metricool_contract.py:4",
           "PYTHON_IMPORT_UNRESOLVED@.github/scripts/test_metricool_contract.py:6",
           "PYTHON_IMPORT_UNRESOLVED@.github/scripts/test_metricool_contract.py:7",

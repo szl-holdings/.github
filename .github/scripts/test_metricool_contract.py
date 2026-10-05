@@ -124,13 +124,56 @@ class ConfigSchemaTests(unittest.TestCase):
                 contract.validate_schema(config, "config")
 
     def test_network_and_authority_scope_is_committed_not_provider_discovery(self):
-        for field, value in (("authorizedNetworks", ["twitter", "linkedin", "instagram"]),
+        for field, value in (("approvedChannels", ["x", "linkedin", "instagram"]),
                              ("canonicalAuthority", ["metricool"]),
                              ("allowedCapabilities", ["publish-now"])):
             config = copy.deepcopy(self.config)
             config[field] = value
             with self.subTest(field=field), self.assertRaises(ValidationError):
                 contract.validate_schema(config, "config")
+
+    def test_public_contract_fields_are_required(self):
+        for field in ("approvedChannels", "publicationStates", "updatePolicy", "evidencePolicy"):
+            config = copy.deepcopy(self.config)
+            del config[field]
+            with self.subTest(field=field), self.assertRaises(ValidationError):
+                contract.validate_schema(config, "config")
+
+    def test_parallel_legacy_allowlist_is_rejected(self):
+        config = copy.deepcopy(self.config)
+        config["authorizedNetworks"] = ["twitter", "linkedin"]
+        with self.assertRaises(ValidationError):
+            contract.validate_schema(config, "config")
+        self.assertEqual(self.config["approvedChannels"], ["x", "linkedin"])
+
+    def test_hold_policies_cannot_be_relaxed_or_extended(self):
+        for section in ("updatePolicy", "evidencePolicy"):
+            for key, value in self.config[section].items():
+                config = copy.deepcopy(self.config)
+                config[section][key] = False if value is True else "ALLOW"
+                with self.subTest(section=section, key=key), self.assertRaises(ValidationError):
+                    contract.validate_schema(config, "config")
+            config = copy.deepcopy(self.config)
+            config[section]["unreviewedCapability"] = True
+            with self.subTest(section=section, mutation="extra"), self.assertRaises(ValidationError):
+                contract.validate_schema(config, "config")
+
+    def test_publication_states_and_control_names_are_exact(self):
+        self.assertEqual(self.config["publicationStates"],
+                         ["READY", "SCHEDULED", "PUBLISHED", "HOLD", "UNOBSERVED", "FAILED"])
+        self.assertEqual(self.config["requiredControls"][-5:],
+                         ["reviewed-channel-allowlist", "conditional-provider-revision",
+                          "prepublication-evidence-revalidation", "explicit-evidence-validity-window",
+                          "provider-confirmed-delivery"])
+        for field in ("publicationStates", "requiredControls"):
+            for mutation in ("remove", "append"):
+                config = copy.deepcopy(self.config)
+                if mutation == "remove":
+                    config[field].pop()
+                else:
+                    config[field].append("unreviewed-state-or-control")
+                with self.subTest(field=field, mutation=mutation), self.assertRaises(ValidationError):
+                    contract.validate_schema(config, "config")
 
     def test_schemas_have_no_external_reference_dependencies(self):
         def visit(value):
@@ -297,6 +340,28 @@ class PreflightTests(unittest.TestCase):
         self.assertTrue(result["preflight_passed"], result)
         self.assertEqual(result["state"], "DECLARED")
 
+    def test_approved_channels_use_stable_provider_wire_names(self):
+        for provider, channel in (("twitter", "x"), ("linkedin", "linkedin")):
+            request = example_request()
+            request["provider"] = provider
+            request["brand"]["connectedNetworks"] = [provider]
+            original = copy.deepcopy(request)
+            with self.subTest(provider=provider, channel=channel):
+                self.assertIn(channel, self.config["approvedChannels"])
+                result = self.check_request(request)
+                self.assertTrue(result["preflight_passed"], result)
+                self.assertEqual(request, original)
+
+    def test_new_connections_and_wire_aliases_do_not_expand_authorization(self):
+        for provider in ("x", "facebook", "instagram", "Twitter"):
+            request = example_request()
+            request["provider"] = provider
+            request["brand"]["connectedNetworks"].append(provider)
+            with self.subTest(provider=provider):
+                result = self.check_request(request)
+                self.assertIn("NETWORK_NOT_AUTHORIZED", result["reasons"])
+                self.assertFalse(result["preflight_passed"])
+
     def test_no_provider_network_or_process_side_effects(self):
         with patch.object(socket, "create_connection", side_effect=AssertionError("network forbidden")), \
              patch.object(socket.socket, "connect", side_effect=AssertionError("network forbidden")), \
@@ -379,6 +444,19 @@ class PreflightTests(unittest.TestCase):
 
 
 class IdempotencyTests(unittest.TestCase):
+    def test_channel_mapping_preserves_existing_provider_intent_identity(self):
+        request = example_request()
+        key = contract.idempotency_key(ENVIRON["METRICOOL_BRAND_ID"], request["provider"],
+                                       request["payload"], request["scheduledAt"], SOURCE)
+        # Captured at a343a99 before reconciling the config's public channel names.
+        self.assertEqual(key, "b3461f06126bccefacd92cf7cc56ee93186c60ac76512714c1404c2b11f1435c")
+        receipt = example_receipt()
+        self.assertEqual(receipt["provider"], "twitter")
+        contract.validate_schema(receipt, "receipt")
+        receipt["provider"] = "x"
+        with self.assertRaises(ValidationError):
+            contract.validate_schema(receipt, "receipt")
+
     def test_bind_account_network_media_time_source_and_content(self):
         payload = {"text": "Synthetic fixture", "media": [], "disclosure": "SAMPLE"}
         baseline = contract.idempotency_key("synthetic-brand-a", "twitter", payload, FUTURE, SOURCE)

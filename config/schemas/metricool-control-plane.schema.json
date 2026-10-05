@@ -11,7 +11,10 @@
     "role",
     "canonicalAuthority",
     "brandSelection",
-    "authorizedNetworks",
+    "approvedChannels",
+    "publicationStates",
+    "updatePolicy",
+    "evidencePolicy",
     "allowedCapabilities",
     "requiredControls",
     "forbiddenCapabilities",
@@ -35,7 +38,25 @@
         "timezoneSource": { "const": "METRICOOL_TIMEZONE" }
       }
     },
-    "authorizedNetworks": { "const": ["twitter", "linkedin"] },
+    "approvedChannels": { "const": ["x", "linkedin"] },
+    "publicationStates": {
+      "const": ["READY", "SCHEDULED", "PUBLISHED", "HOLD", "UNOBSERVED", "FAILED"]
+    },
+    "updatePolicy": {
+      "const": {
+        "requireConditionalWrite": true,
+        "onUnsupportedConditionalWrite": "HOLD",
+        "onProviderRevisionMismatch": "HOLD"
+      }
+    },
+    "evidencePolicy": {
+      "const": {
+        "requireValidityWindow": true,
+        "revalidateBeforePublication": true,
+        "onExpiredOrChangedEvidence": "HOLD",
+        "onUnsupportedPrepublicationHold": "HOLD"
+      }
+    },
     "allowedCapabilities": {
       "description": "Permitted adapter capabilities, not a declaration that a provider implements or currently authorizes them.",
       "const": [
@@ -57,9 +78,11 @@
         "provider-payload-preservation",
         "explicit-failure-state",
         "publication-receipt",
-        "explicit-channel-allowlist",
-        "conditional-provider-update",
-        "final-publication-evidence-check"
+        "reviewed-channel-allowlist",
+        "conditional-provider-revision",
+        "prepublication-evidence-revalidation",
+        "explicit-evidence-validity-window",
+        "provider-confirmed-delivery"
       ]
     },
     "forbiddenCapabilities": {

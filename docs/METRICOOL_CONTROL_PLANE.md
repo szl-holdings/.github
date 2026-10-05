@@ -31,8 +31,9 @@ Use Metricool for:
 Metricool MAY:
 
 - distribute already-supported public claims;
-- prepare X (`twitter`) and LinkedIn (`linkedin`) drafts only within the committed
-  `authorizedNetworks` allowlist; connecting another network never authorizes it;
+- prepare X and LinkedIn drafts only within the committed `approvedChannels`
+  allowlist; connecting another network never authorizes it;
+- add another channel only after a reviewed change to the committed allowlist;
 - read channel analytics and planning state;
 - optimize publication timing;
 - carry campaign metadata that does not alter technical claims.
@@ -46,7 +47,10 @@ Metricool MUST NOT:
 - store GitHub, Hugging Face, DNS, infrastructure, or unrelated provider credentials;
 - silently transform an unverified claim into a verified one;
 - bypass human/provider approval requirements;
-- overwrite an existing scheduled post without preserving its full provider payload.
+- overwrite an existing scheduled post without preserving its full provider payload;
+- update a post without an atomic conditional write against its observed provider
+  revision or updated timestamp; use `HOLD` on mismatch or when equivalent conditional
+  writes are unavailable. A read immediately before an unconditional update is insufficient.
 
 Updates additionally require a provider-enforced expected revision (or equivalent
 atomic conditional write). A read-then-write comparison alone cannot prevent a
@@ -79,7 +83,12 @@ Before a technical claim is scheduled:
 3. Preserve qualifiers and known limits.
 4. Reject or hold the post if the evidence is stale or contradictory.
 5. Record the scheduled provider set and publication time.
-6. After publication, analytics are observational evidence only; engagement does not
+6. Bind the schedule to an explicit evidence-validity window ending after the
+   intended publication time. Revalidate upstream evidence immediately before delivery.
+7. If evidence has changed, expired, or cannot be read, hold or cancel the queued
+   publication. If the provider cannot enforce that final check or an equivalent
+   cancellation/hold boundary, do not queue the technical claim; use `HOLD`.
+8. After publication, analytics are observational evidence only; engagement does not
    prove technical correctness.
 
 Evidence must also be revalidated at delivery, with an enforceable hold/cancel
@@ -104,21 +113,47 @@ Draft preflight needs an explicit runtime brand ID/timezone, fresh matching
 readback, at least one connected approved channel and the committed channel
 allowlist. A label alone is insufficient. Adding channels needs reviewed policy.
 Brand switching needs an explicit config change and a new readback.
+Provider-side connection changes do not expand the committed write scope.
+
+`approvedChannels` is the only configurable channel allowlist and retains the
+public names `x` and `linkedin`. The connector/request provider names remain
+`twitter` and `linkedin`: fixed code maps `twitter` to channel `x` for the policy
+check. Brand connection readbacks, receipts and intent digests retain the wire
+provider name. An `x` request is not accepted as a second wire alias. No mapping
+grants permission or changes an existing intent identity.
+
+`updatePolicy` and `evidencePolicy` state the required conditional-write and
+delivery-evidence safeguards. They do not establish provider support. The
+separate implementation flags `conditionalUpdatesEnabled` and
+`automaticPublicationEnabled` stay false, so all provider mutations remain
+blocked even when a caller claims those capabilities exist.
 
 Provider-specific requirements remain authoritative, including media requirements,
 AI-generated-content declarations, review flows, and platform-specific post types.
 
 ## Failure semantics
 
-Use explicit states:
+Use the explicit operational states recorded in `publicationStates`:
 
-- `READY` — active brand resolved and requested provider connected.
+- `READY` — active brand resolved and an allowlisted requested provider connected;
+  this is a precondition, not successful scheduling or delivery.
+- `SCHEDULED` — the provider confirms acceptance of a specific post identifier and
+  scheduled time; delivery has not yet been observed.
+- `PUBLISHED` — provider readback confirms publication of the specific post, with its
+  provider/post identifier, delivery timestamp, and evidence/source revision recorded.
+  A scheduling response, elapsed time, or engagement metric cannot establish this state.
 - `HOLD` — provider not connected, required media missing, review required, or
   evidence for the public claim is insufficient.
 - `UNOBSERVED` — the integration cannot read or verify the requested provider state.
 - `FAILED` — Metricool/provider rejected a bounded operation.
 
 Never infer successful publication from successful scheduling alone.
+
+These provider operational states are distinct from machine evidence labels and
+the offline preflight's `DECLARED`/`BLOCKED` verdict. A passing offline draft
+check does not emit READY, SCHEDULED or PUBLISHED, authenticate a provider record,
+or authorize an operation. No automatic conversion between these vocabularies
+is implemented.
 
 Receipts use separate lifecycle states: `DRAFT`, `SCHEDULED`, `PUBLISHED`,
 `BLOCKED`, `UNKNOWN`, `UNAVAILABLE`. `SCHEDULED` is not delivered. `PUBLISHED`
@@ -163,5 +198,7 @@ Any future direct GitHub-to-Metricool publisher must:
 - use explicit egress allowlisting for Metricool endpoints;
 - emit immutable publication receipts containing source revision, content digest,
   provider, scheduled time, resulting provider/post identifier, and final state;
+- enforce the committed channel allowlist and revision-conditional update contract;
+- revalidate exact upstream evidence before delivery within its recorded validity window;
 - preserve protected-main and existing review/security gates;
 - ship through a normal feature branch and pull request.

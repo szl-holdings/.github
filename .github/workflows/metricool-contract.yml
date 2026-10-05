@@ -38,8 +38,8 @@ jobs:
           import hashlib
           from pathlib import Path
           expected = {
-              "config/metricool-control-plane.json": "a4ca4de0895ee3eb7011aa88ed5447a147c13f56784dac45766aa0681b730ab1",
-              "config/schemas/metricool-control-plane.schema.json": "ce479e32009520906816de7ea10973a9ac812b78490ca3c32ee90fdcff84b499",
+              "config/metricool-control-plane.json": "e4f6aa9f4741023738b85fd7217e6d79f724647c588379c9bfb7520794cb7a9c",
+              "config/schemas/metricool-control-plane.schema.json": "451b232a549ab7f04cc61d96a64f631dc4c5b1047cc091bb34bcb077587389f5",
               "schemas/metricool-publication-receipt.schema.json": "cb9562c16c987e7a7448dfd49cc356419fd1b6df4fe2f771101d93ea5c3ca0b6",
               "requirements/metricool-contract.lock": "6ff63ee80c5dab7249e3f7794b42ca1cb2a5a3bf2b989606e0c94d5955dcf606",
           }
