@@ -1,0 +1,99 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/szl-holdings/.github/blob/main/schemas/metricool-publication-receipt.schema.json",
+  "title": "SZL Metricool publication observation receipt",
+  "description": "Closed structural record for a bounded publication observation. Schema validity is not a signature, independent witness, evidence authentication, provider confirmation, or publication authorization. HTTPS syntax does not prove that a reference is public or trustworthy. A trusted verifier must establish these facts separately; never put secrets or private evidence in this record.",
+  "$defs": {
+    "timestamp": {
+      "description": "RFC 3339 timestamp. The pattern checks lexical shape; validation must also enable the date-time format checker for full calendar semantics.",
+      "type": "string",
+      "format": "date-time",
+      "pattern": "^\\d{4}-(?:0[1-9]|1[0-2])-(?:0[1-9]|[12]\\d|3[01])[Tt](?:[01]\\d|2[0-3]):[0-5]\\d:(?:[0-5]\\d|60)(?:\\.\\d+)?(?:[Zz]|[+-](?:[01]\\d|2[0-3]):[0-5]\\d)$"
+    }
+  },
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "receiptVersion",
+    "generatedAt",
+    "sourceRepository",
+    "sourceRevision",
+    "evidenceRefs",
+    "claimClassification",
+    "contentSha256",
+    "metricoolBrandRef",
+    "provider",
+    "scheduledAt",
+    "metricoolPostUuid",
+    "providerPostId",
+    "state",
+    "publishedAt",
+    "observedAt",
+    "verificationStatus",
+    "failureReason",
+    "knownLimits"
+  ],
+  "properties": {
+    "receiptVersion": { "const": 1 },
+    "generatedAt": { "$ref": "#/$defs/timestamp" },
+    "sourceRepository": {
+      "type": "string",
+      "format": "uri",
+      "pattern": "^https://github\\.com/szl-holdings/[A-Za-z0-9_.-]+$"
+    },
+    "sourceRevision": { "type": "string", "pattern": "^[0-9a-f]{40}$" },
+    "evidenceRefs": {
+      "description": "References approved for public disclosure. The schema checks HTTPS syntax only, not access control, content, revision binding, freshness, or authenticity.",
+      "type": "array",
+      "uniqueItems": true,
+      "items": { "type": "string", "format": "uri", "pattern": "^https://[^/?#\\s]+(?:[/?#][^\\s]*)?$" }
+    },
+    "claimClassification": {
+      "enum": ["MEASURED", "REPORTED", "DECLARED", "SIMULATED", "SAMPLE", "MODELED", "ROADMAP", "UNKNOWN", "UNAVAILABLE", "BLOCKED"]
+    },
+    "contentSha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "metricoolBrandRef": {
+      "description": "Opaque non-secret runtime identifier. Not an API credential, account email, or proof of brand ownership.",
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^\\S+$"
+    },
+    "provider": { "enum": ["twitter", "linkedin"] },
+    "scheduledAt": { "$ref": "#/$defs/timestamp" },
+    "metricoolPostUuid": { "type": ["string", "null"], "minLength": 1, "pattern": "\\S" },
+    "providerPostId": { "type": ["string", "null"], "minLength": 1, "pattern": "\\S" },
+    "state": { "enum": ["DRAFT", "SCHEDULED", "PUBLISHED", "BLOCKED", "UNKNOWN", "UNAVAILABLE"] },
+    "publishedAt": { "anyOf": [{ "$ref": "#/$defs/timestamp" }, { "type": "null" }] },
+    "observedAt": { "$ref": "#/$defs/timestamp" },
+    "verificationStatus": { "enum": ["NOT_VERIFIED", "PROVIDER_CONFIRMED"] },
+    "failureReason": { "type": ["string", "null"], "minLength": 1, "pattern": "\\S" },
+    "knownLimits": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": { "type": "string", "minLength": 1, "pattern": "\\S" }
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "required": ["state"],
+        "properties": { "state": { "const": "PUBLISHED" } }
+      },
+      "then": {
+        "properties": {
+          "providerPostId": { "type": "string", "minLength": 1, "pattern": "\\S" },
+          "evidenceRefs": { "minItems": 1 },
+          "publishedAt": { "$ref": "#/$defs/timestamp" },
+          "verificationStatus": { "const": "PROVIDER_CONFIRMED" }
+        }
+      },
+      "else": {
+        "properties": {
+          "publishedAt": { "type": "null" },
+          "verificationStatus": { "const": "NOT_VERIFIED" }
+        }
+      }
+    }
+  ]
+}

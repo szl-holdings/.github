@@ -11,7 +11,15 @@
   "brandSelection": {
     "label": "SZL Holdings",
     "timezone": "America/New_York",
-    "brandIdSource": "METRICOOL_BRAND_ID"
+    "brandIdSource": "METRICOOL_BRAND_ID",
+    "timezoneSource": "METRICOOL_TIMEZONE"
+  },
+  "authorizedNetworks": ["twitter", "linkedin"],
+  "policy": {
+    "maxEvidenceAgeSeconds": 300,
+    "automaticPublicationEnabled": false,
+    "conditionalUpdatesEnabled": false,
+    "independentAuthorizationRequired": true
   },
   "allowedCapabilities": [
     "read-brand-settings",
@@ -29,7 +37,10 @@
     "provider-connection-check",
     "provider-payload-preservation",
     "explicit-failure-state",
-    "publication-receipt"
+    "publication-receipt",
+    "explicit-channel-allowlist",
+    "conditional-provider-update",
+    "final-publication-evidence-check"
   ],
   "forbiddenCapabilities": [
     "override-release-truth",

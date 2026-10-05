@@ -1,0 +1,91 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/szl-holdings/.github/blob/main/config/schemas/metricool-control-plane.schema.json",
+  "title": "SZL bounded Metricool control-plane configuration",
+  "description": "Closed configuration contract. Schema validity is not a signature, provider capability, evidence authentication, or authorization to publish. Runtime discovery and independent authorization remain required.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "provider",
+    "role",
+    "canonicalAuthority",
+    "brandSelection",
+    "authorizedNetworks",
+    "allowedCapabilities",
+    "requiredControls",
+    "forbiddenCapabilities",
+    "policy"
+  ],
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "provider": { "const": "metricool" },
+    "role": { "const": "bounded-social-publisher-and-analytics-adapter" },
+    "canonicalAuthority": {
+      "const": ["github", "huggingface", "a-11-oy.com", "a11oy.net"]
+    },
+    "brandSelection": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["label", "timezone", "brandIdSource", "timezoneSource"],
+      "properties": {
+        "label": { "const": "SZL Holdings" },
+        "timezone": { "const": "America/New_York" },
+        "brandIdSource": { "const": "METRICOOL_BRAND_ID" },
+        "timezoneSource": { "const": "METRICOOL_TIMEZONE" }
+      }
+    },
+    "authorizedNetworks": { "const": ["twitter", "linkedin"] },
+    "allowedCapabilities": {
+      "description": "Permitted adapter capabilities, not a declaration that a provider implements or currently authorizes them.",
+      "const": [
+        "read-brand-settings",
+        "read-scheduled-posts",
+        "read-analytics",
+        "read-best-times",
+        "create-scheduled-post",
+        "update-scheduled-post",
+        "send-post-for-review"
+      ]
+    },
+    "requiredControls": {
+      "const": [
+        "no-secrets-in-repository",
+        "preserve-upstream-truth",
+        "exact-claim-evidence",
+        "provider-connection-check",
+        "provider-payload-preservation",
+        "explicit-failure-state",
+        "publication-receipt",
+        "explicit-channel-allowlist",
+        "conditional-provider-update",
+        "final-publication-evidence-check"
+      ]
+    },
+    "forbiddenCapabilities": {
+      "const": [
+        "override-release-truth",
+        "override-runtime-truth",
+        "bypass-provider-review",
+        "publish-unsupported-security-claims",
+        "store-refresh-tokens-in-source"
+      ]
+    },
+    "policy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "maxEvidenceAgeSeconds",
+        "automaticPublicationEnabled",
+        "conditionalUpdatesEnabled",
+        "independentAuthorizationRequired"
+      ],
+      "properties": {
+        "maxEvidenceAgeSeconds": { "const": 300 },
+        "automaticPublicationEnabled": { "const": false },
+        "conditionalUpdatesEnabled": { "const": false },
+        "independentAuthorizationRequired": { "const": true }
+      }
+    }
+  }
+}
