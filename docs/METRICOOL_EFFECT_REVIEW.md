@@ -73,7 +73,7 @@ canonical Git/LF source bytes, not a Windows CRLF materialization.
 | `config/schemas/metricool-control-plane.schema.json` | `ce479e32009520906816de7ea10973a9ac812b78490ca3c32ee90fdcff84b499` | Pinned workflow checks bytes before installation/validation |
 | `schemas/metricool-publication-receipt.schema.json` | `cb9562c16c987e7a7448dfd49cc356419fd1b6df4fe2f771101d93ea5c3ca0b6` | Pinned workflow checks bytes before installation/validation |
 | `requirements/metricool-contract.lock` | `6ff63ee80c5dab7249e3f7794b42ca1cb2a5a3bf2b989606e0c94d5955dcf606` | Pinned workflow checks bytes before installation/validation |
-| `docs/METRICOOL_CONTROL_PLANE.md` | `85afbf9028178fede74ea184dd96851a4ea93d685a261ed839b066d01c5a03f9` | Documentation-only review digest, not executable admission |
+| `docs/METRICOOL_CONTROL_PLANE.md` | `43e6a6b16005cf489b25dd8e5cf5c050dce1a5aedccfedcf8ce4e3c67b91f248` | Documentation-only review digest, not executable admission |
 
 The static dependency grammar itself discovers the two Python files, not the
 four other-root data inputs. Their coverage comes from the reviewed, pinned
