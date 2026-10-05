@@ -1,0 +1,41 @@
+{
+  "schemaVersion": 1,
+  "provider": "metricool",
+  "role": "bounded-social-publisher-and-analytics-adapter",
+  "canonicalAuthority": [
+    "github",
+    "huggingface",
+    "a-11-oy.com",
+    "a11oy.net"
+  ],
+  "brandSelection": {
+    "label": "SZL Holdings",
+    "timezone": "America/New_York",
+    "brandIdSource": "METRICOOL_BRAND_ID"
+  },
+  "allowedCapabilities": [
+    "read-brand-settings",
+    "read-scheduled-posts",
+    "read-analytics",
+    "read-best-times",
+    "create-scheduled-post",
+    "update-scheduled-post",
+    "send-post-for-review"
+  ],
+  "requiredControls": [
+    "no-secrets-in-repository",
+    "preserve-upstream-truth",
+    "exact-claim-evidence",
+    "provider-connection-check",
+    "provider-payload-preservation",
+    "explicit-failure-state",
+    "publication-receipt"
+  ],
+  "forbiddenCapabilities": [
+    "override-release-truth",
+    "override-runtime-truth",
+    "bypass-provider-review",
+    "publish-unsupported-security-claims",
+    "store-refresh-tokens-in-source"
+  ]
+}
