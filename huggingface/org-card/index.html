@@ -101,7 +101,7 @@
     #szl-hf-org-card header { position: relative; z-index: 30; isolation: isolate; border-bottom: 1px solid var(--border); background: color-mix(in srgb, var(--bg) 92%, transparent); }
     #szl-hf-org-card .szl-hf-nav { min-height: 68px; display: flex; align-items: center; justify-content: space-between; gap: 12px 24px; }
     #szl-hf-org-card .szl-hf-brand { display: inline-flex; flex: 0 0 auto; align-items: center; gap: 11px; min-height: var(--tap); text-decoration: none; font-family: var(--font-display); font-weight: 700; letter-spacing: var(--tracking-caps); }
-    #szl-hf-org-card .szl-hf-brand-mark { display: block; flex: none; width: 41px; height: 24px; }
+    #szl-hf-org-card .szl-hf-brand-mark { display: block; flex: none; width: 32px; height: 32px; }
     /* Orbit mark (szl_favicon.svg paths verbatim); its paint comes from the same palette tokens. */
     #szl-hf-org-card .szl-hf-stop-silver-100 { stop-color: var(--color-silver-100); }
     #szl-hf-org-card .szl-hf-stop-silver-300 { stop-color: var(--color-silver-300); }
@@ -328,11 +328,11 @@
     }
 
     /* 2026 public identity: restrained ground, shared orbital mark, readable text. */
-    #szl-hf-org-card .szl-hf-brand-mark { width: 96px; height: auto; flex: 0 0 auto; }
+    #szl-hf-org-card .szl-hf-brand-mark { width: 48px; height: auto; flex: 0 0 auto; }
     #szl-hf-org-card .szl-hf-hero { display: grid; grid-template-columns: minmax(0, 1fr) minmax(160px, .45fr); min-height: 440px; padding: clamp(28px, 5vw, 64px); border-radius: 0; border-width: 0 0 1px; gap: 28px; }
     #szl-hf-org-card .szl-hf-hero::before, #szl-hf-org-card .szl-hf-hero::after { display: none; }
     #szl-hf-org-card .szl-hf-hero-copy { grid-column: 1; grid-row: 1; }
-    #szl-hf-org-card .szl-hf-hero-mark { grid-column: 2; grid-row: 1; width: 100%; max-width: 320px; height: auto; justify-self: center; }
+    #szl-hf-org-card .szl-hf-hero-mark { grid-column: 2; grid-row: 1; width: 100%; max-width: 240px; height: auto; justify-self: center; }
     #szl-hf-org-card .szl-hf-hero .szl-hf-eyebrow { border: 0; padding: 0; background: transparent; }
     #szl-hf-org-card .szl-hf-hero .szl-hf-eyebrow::before { display: none; }
     #szl-hf-org-card h1 { font-size: clamp(36px, 5.1vw, 64px); font-weight: 540; line-height: 1.08; letter-spacing: -.04em; }
@@ -345,7 +345,7 @@
       #szl-hf-org-card .szl-hf-hero { grid-template-columns: minmax(0, 1fr); min-height: 0; gap: 20px; padding: 32px 8px; }
       #szl-hf-org-card .szl-hf-hero-mark { grid-column: 1; grid-row: 1; width: 144px; justify-self: start; }
       #szl-hf-org-card .szl-hf-hero-copy { grid-column: 1; grid-row: 2; }
-      #szl-hf-org-card .szl-hf-brand-mark { width: 72px; }
+      #szl-hf-org-card .szl-hf-brand-mark { width: 40px; }
     }
   </style>
 
@@ -356,7 +356,7 @@
     <header>
       <div class="szl-hf-shell szl-hf-nav">
         <a class="szl-hf-brand" href="https://huggingface.co/SZLHOLDINGS" aria-label="SZL Holdings organization on Hugging Face">
-          <img class="szl-hf-brand-mark" src="https://szlholdings-readme.static.hf.space/assets/szl-mark-holographic.svg" alt="SZL Holdings" width="96" height="60" decoding="async">
+          <img class="szl-hf-brand-mark" src="https://szlholdings-readme.static.hf.space/assets/szl-mark-holographic.svg" alt="SZL Holdings" width="48" height="48" decoding="async">
           SZL HOLDINGS
         </a>
         <nav aria-label="Primary navigation">
@@ -372,7 +372,7 @@
     <main id="szl-hf-main" tabindex="-1">
       <div class="szl-hf-shell">
         <section class="szl-hf-hero" aria-labelledby="szl-hf-hero-title">
-          <img class="szl-hf-hero-mark" src="https://szlholdings-readme.static.hf.space/assets/szl-mark-holographic.svg" alt="" width="256" height="160" decoding="async">
+          <img class="szl-hf-hero-mark" src="https://szlholdings-readme.static.hf.space/assets/szl-mark-holographic.svg" alt="" width="256" height="256" decoding="async">
           <div class="szl-hf-hero-copy">
             <div class="szl-hf-eyebrow">SZL Holdings / software &amp; research</div>
             <h1 id="szl-hf-hero-title">Governed intelligence.<br><span>Checkable results.</span></h1>
