@@ -849,7 +849,7 @@ def main() -> int:
     )
     require(
         ("https://szlholdings-readme.static.hf.space/" + MARK_DESTINATION,
-         "", "256", "160", "", "async") in parser.images,
+         "", "256", "256", "", "async") in parser.images,
         "decorative hero must use the reviewed responsive SZL mark",
         failures,
     )
