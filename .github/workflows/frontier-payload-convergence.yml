@@ -41,8 +41,8 @@ concurrency:
   cancel-in-progress: false
 
 env:
-  REPORT_PATH: /tmp/szl-frontier-payload-convergence-v1.json
-  SUMMARY_PATH: /tmp/szl-frontier-payload-convergence-v1.md
+  REPORT_PATH: /tmp/szl-frontier-payload-convergence-v2.json
+  SUMMARY_PATH: /tmp/szl-frontier-payload-convergence-v2.md
 
 jobs:
   contract:
