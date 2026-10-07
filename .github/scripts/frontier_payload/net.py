@@ -114,7 +114,50 @@ def validate_json_contract(contract: str, value: Any) -> tuple[bool, dict[str, A
         return False, {"reason": "response is not a JSON object"}
     if contract == "livez":
         status = str(value.get("status") or "").upper()
-        return status == "LIVE", {"observed_status": status or None}
+        process = value.get("process")
+        process_alive = (
+            status == "PROCESS_ALIVE"
+            and isinstance(process, dict)
+            and isinstance(process.get("pid"), int)
+            and not isinstance(process.get("pid"), bool)
+            and process["pid"] > 0
+            and value.get("scope")
+            == "process liveness only; no dependency readiness asserted"
+            and value.get("production_ready") is False
+            and value.get("receipt_minted") is False
+        )
+        return process_alive, {
+            "observed_status": status or None,
+            "scope": "process liveness only",
+            "production_ready": value.get("production_ready"),
+            "receipt_minted": value.get("receipt_minted"),
+        }
+    if contract == "readyz":
+        components = value.get("components")
+        khipu = components.get("khipu") if isinstance(components, dict) else None
+        preflight = components.get("boot_preflight") if isinstance(components, dict) else None
+        ready = (
+            value.get("status") == "READY"
+            and value.get("ready") is True
+            and value.get("blocking_components") == []
+            and value.get("receipt_minted") is False
+            and isinstance(khipu, dict)
+            and khipu.get("state") == "READY"
+            and khipu.get("blocking") is False
+            and khipu.get("chain_intact") is True
+            and khipu.get("durable") is True
+            and isinstance(preflight, dict)
+            and preflight.get("blocking") is False
+        )
+        return ready, {
+            "observed_status": value.get("status"),
+            "khipu_state": khipu.get("state") if isinstance(khipu, dict) else None,
+            "khipu_chain_intact": khipu.get("chain_intact") if isinstance(khipu, dict) else None,
+            "khipu_durable": khipu.get("durable") if isinstance(khipu, dict) else None,
+            "boot_preflight_state": preflight.get("state") if isinstance(preflight, dict) else None,
+            "blocking_components": value.get("blocking_components"),
+            "receipt_minted": value.get("receipt_minted"),
+        }
     if contract == "controller":
         organ, locked = value.get("organ"), value.get("locked_formula_count")
         return organ == "a11oy" and locked == 8, {

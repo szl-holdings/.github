@@ -98,6 +98,7 @@ PROBES = (
     ProbeContract("article-12-product", "https://a-11-oy.com/eu-ai-act", ("Article 12",)),
     ProbeContract("article-12-space", "https://szlholdings-a11oy.hf.space/eu-ai-act", ("Article 12",)),
     ProbeContract("a11oy-space-livez", "https://szlholdings-a11oy.hf.space/api/livez", json_contract="livez"),
+    ProbeContract("a11oy-space-readyz", "https://szlholdings-a11oy.hf.space/api/readyz", json_contract="readyz"),
     ProbeContract("a11oy-space-build-info", "https://szlholdings-a11oy.hf.space/api/build-info", json_contract="build-info"),
     ProbeContract("killinchu-maritime", "https://szlholdings-killinchu.hf.space/", ("Maritime",)),
     ProbeContract("proof-registry", "https://a11oy.net/", ("record",)),

@@ -179,8 +179,51 @@ def _probe(contract, *, deadline: float) -> dict[str, Any]:
     contract_ok = True
     evidence: dict[str, Any] = {}
     if contract.json_contract == "livez":
-        contract_ok = value is not None and str(value.get("status") or "").upper() == "LIVE"
-        evidence = {"live": contract_ok}
+        process = value.get("process") if value is not None else None
+        contract_ok = bool(
+            value is not None
+            and value.get("status") == "PROCESS_ALIVE"
+            and isinstance(process, dict)
+            and isinstance(process.get("pid"), int)
+            and not isinstance(process.get("pid"), bool)
+            and process["pid"] > 0
+            and value.get("scope") == "process liveness only; no dependency readiness asserted"
+            and value.get("production_ready") is False
+            and value.get("receipt_minted") is False
+        )
+        evidence = {
+            "observed_status": value.get("status") if value is not None else None,
+            "scope": "process liveness only",
+            "production_ready": value.get("production_ready") if value is not None else None,
+            "receipt_minted": value.get("receipt_minted") if value is not None else None,
+        }
+    elif contract.json_contract == "readyz":
+        components = value.get("components") if value is not None else None
+        khipu = components.get("khipu") if isinstance(components, dict) else None
+        preflight = components.get("boot_preflight") if isinstance(components, dict) else None
+        contract_ok = bool(
+            value is not None
+            and value.get("status") == "READY"
+            and value.get("ready") is True
+            and value.get("blocking_components") == []
+            and value.get("receipt_minted") is False
+            and isinstance(khipu, dict)
+            and khipu.get("state") == "READY"
+            and khipu.get("blocking") is False
+            and khipu.get("chain_intact") is True
+            and khipu.get("durable") is True
+            and isinstance(preflight, dict)
+            and preflight.get("blocking") is False
+        )
+        evidence = {
+            "observed_status": value.get("status") if value is not None else None,
+            "khipu_state": khipu.get("state") if isinstance(khipu, dict) else None,
+            "khipu_chain_intact": khipu.get("chain_intact") if isinstance(khipu, dict) else None,
+            "khipu_durable": khipu.get("durable") if isinstance(khipu, dict) else None,
+            "boot_preflight_state": preflight.get("state") if isinstance(preflight, dict) else None,
+            "blocking_components": value.get("blocking_components") if value is not None else None,
+            "receipt_minted": value.get("receipt_minted") if value is not None else None,
+        }
     elif contract.json_contract == "controller":
         contract_ok = value is not None and value.get("organ") == "a11oy" and value.get("locked_formula_count") == 8
         evidence = {"organ_matches": bool(value and value.get("organ") == "a11oy"), "formula_count_matches": bool(value and value.get("locked_formula_count") == 8)}

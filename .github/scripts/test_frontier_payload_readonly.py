@@ -107,22 +107,52 @@ class ReadbackContractTests(unittest.TestCase):
             body = '# Vessels — consolidated into Killinchu\nStatus: CONSOLIDATED\nSZLHOLDINGS/killinchu\nNo live AIS feed is claimed\n'.encode()
         else:
             contract = next(item for item in verify.CONFIG.PROBES if item.url == url)
-            if contract.json_contract == 'livez': body = b'{"status":"LIVE"}'
+            if contract.json_contract == 'livez': body = json.dumps({
+                'status': 'PROCESS_ALIVE', 'process': {'pid': 1},
+                'scope': 'process liveness only; no dependency readiness asserted',
+                'production_ready': False, 'receipt_minted': False,
+            }).encode()
+            elif contract.json_contract == 'readyz': body = json.dumps({
+                'status': 'READY', 'ready': True,
+                'components': {
+                    'khipu': {'state': 'READY', 'blocking': False, 'chain_intact': True, 'durable': True},
+                    'boot_preflight': {'state': 'DEGRADED', 'blocking': False},
+                },
+                'blocking_components': [], 'receipt_minted': False,
+            }).encode()
             elif contract.json_contract == 'controller': body = b'{"organ":"a11oy","locked_formula_count":8}'
             elif contract.json_contract == 'build-info': body = json.dumps({"git_sha": "c" * 40}).encode()
             else: body = '\n'.join(contract.required_literals).encode()
         return {"status": 200, "body": body, "error": None, "elapsed_ms": 1}
 
+    def test_process_liveness_does_not_substitute_for_readiness(self):
+        livez = next(item for item in verify.CONFIG.PROBES if item.json_contract == 'livez')
+        readyz = next(item for item in verify.CONFIG.PROBES if item.json_contract == 'readyz')
+
+        def checked(contract, mutate):
+            observation = self.fixture_read(contract.url, deadline=time.monotonic()+1)
+            payload = json.loads(observation['body'])
+            mutate(payload)
+            observation['body'] = json.dumps(payload).encode()
+            with unittest.mock.patch.object(verify, 'request_public', return_value=observation):
+                return verify._probe(contract, deadline=time.monotonic()+1)
+
+        self.assertTrue(checked(livez, lambda payload: None)['verified'])
+        self.assertFalse(checked(livez, lambda payload: payload.update(production_ready=True))['verified'])
+        self.assertTrue(checked(readyz, lambda payload: None)['verified'])
+        self.assertFalse(checked(readyz, lambda payload: payload.update(ready=False))['verified'])
+        self.assertFalse(checked(readyz, lambda payload: payload['components']['khipu'].update(durable=False))['verified'])
+
     def test_complete_actual_report_uses_fixed_public_reads_only(self):
         with unittest.mock.patch.object(verify, 'request_public', side_effect=self.fixture_read) as reads:
             report = verify.collect_report(deadline=time.monotonic()+10)
-        self.assertEqual(reads.call_count, 14)
+        self.assertEqual(reads.call_count, 15)
         self.assertEqual(report['schema'], 'szl.frontier-payload-readonly/v1')
         self.assertEqual(report['status'], 'READ_ONLY_VERIFIED')
         self.assertEqual(report['operational_effects'], 'HELD')
         self.assertFalse(report['credentials_used'])
         self.assertTrue(report['public_estate']['revision_matches'])
-        self.assertEqual(len(report['public_estate']['checks']), 9)
+        self.assertEqual(len(report['public_estate']['checks']), 10)
         self.assertTrue(all(not row['dispatched'] for row in report['workflow_controls']))
         self.assertTrue(all(row['state']=='UNOBSERVED' for row in report['private_spaces']))
         with tempfile.TemporaryDirectory() as tmp:
