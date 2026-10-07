@@ -34,6 +34,16 @@ CONFIG = importlib.util.module_from_spec(_SPEC)
 sys.modules[_SPEC.name] = CONFIG
 _SPEC.loader.exec_module(CONFIG)
 
+# The active read-only workflow needs a separate readiness observation. Keep
+# this native probe out of the legacy operational controller's probe set.
+PROBES = CONFIG.PROBES + (
+    CONFIG.ProbeContract(
+        "a11oy-space-readyz",
+        "https://szlholdings-a11oy.hf.space/api/readyz",
+        json_contract="readyz",
+    ),
+)
+
 MAX_BYTES = 2_000_000
 REQUEST_SECONDS = 30.0
 TOTAL_SECONDS = 600.0
@@ -49,7 +59,7 @@ METADATA_URLS = {
 PUBLIC_URLS = frozenset(
     [MAIN_URL, CONFIG.VESSELS_CARD_URL, VESSELS_PUBLIC_URL]
     + list(METADATA_URLS.values())
-    + [probe.url for probe in CONFIG.PROBES]
+    + [probe.url for probe in PROBES]
 )
 
 
@@ -179,8 +189,51 @@ def _probe(contract, *, deadline: float) -> dict[str, Any]:
     contract_ok = True
     evidence: dict[str, Any] = {}
     if contract.json_contract == "livez":
-        contract_ok = value is not None and str(value.get("status") or "").upper() == "LIVE"
-        evidence = {"live": contract_ok}
+        process = value.get("process") if value is not None else None
+        contract_ok = bool(
+            value is not None
+            and value.get("status") == "PROCESS_ALIVE"
+            and isinstance(process, dict)
+            and isinstance(process.get("pid"), int)
+            and not isinstance(process.get("pid"), bool)
+            and process["pid"] > 0
+            and value.get("scope") == "process liveness only; no dependency readiness asserted"
+            and value.get("production_ready") is False
+            and value.get("receipt_minted") is False
+        )
+        evidence = {
+            "observed_status": value.get("status") if value is not None else None,
+            "scope": value.get("scope") if value is not None else None,
+            "production_ready": value.get("production_ready") if value is not None else None,
+            "receipt_minted": value.get("receipt_minted") if value is not None else None,
+        }
+    elif contract.json_contract == "readyz":
+        components = value.get("components") if value is not None else None
+        khipu = components.get("khipu") if isinstance(components, dict) else None
+        preflight = components.get("boot_preflight") if isinstance(components, dict) else None
+        contract_ok = bool(
+            value is not None
+            and value.get("status") == "READY"
+            and value.get("ready") is True
+            and value.get("blocking_components") == []
+            and value.get("receipt_minted") is False
+            and isinstance(khipu, dict)
+            and khipu.get("state") == "READY"
+            and khipu.get("blocking") is False
+            and khipu.get("chain_intact") is True
+            and khipu.get("durable") is True
+            and isinstance(preflight, dict)
+            and preflight.get("blocking") is False
+        )
+        evidence = {
+            "observed_status": value.get("status") if value is not None else None,
+            "khipu_state": khipu.get("state") if isinstance(khipu, dict) else None,
+            "khipu_chain_intact": khipu.get("chain_intact") if isinstance(khipu, dict) else None,
+            "khipu_durable": khipu.get("durable") if isinstance(khipu, dict) else None,
+            "boot_preflight_state": preflight.get("state") if isinstance(preflight, dict) else None,
+            "blocking_components": value.get("blocking_components") if value is not None else None,
+            "receipt_minted": value.get("receipt_minted") if value is not None else None,
+        }
     elif contract.json_contract == "controller":
         contract_ok = value is not None and value.get("organ") == "a11oy" and value.get("locked_formula_count") == 8
         evidence = {"organ_matches": bool(value and value.get("organ") == "a11oy"), "formula_count_matches": bool(value and value.get("locked_formula_count") == 8)}
@@ -241,7 +294,7 @@ def collect_report(*, deadline: float) -> dict[str, Any]:
         "provider_write_performed": False,
     }
 
-    rows = [_probe(contract, deadline=deadline) for contract in CONFIG.PROBES]
+    rows = [_probe(contract, deadline=deadline) for contract in PROBES]
     main_read = request_public(MAIN_URL, deadline=deadline)
     main = _json_body(main_read)
     expected_sha = main.get("sha") if main else None
