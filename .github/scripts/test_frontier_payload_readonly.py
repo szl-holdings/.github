@@ -31,6 +31,8 @@ def step(document, name):
 class WorkflowBoundaryTests(unittest.TestCase):
     def test_native_job_is_real_readonly_verification(self):
         source = WORKFLOW.read_text()
+        self.assertIn('REPORT_PATH: /tmp/szl-frontier-payload-convergence-v2.json', source)
+        self.assertIn('SUMMARY_PATH: /tmp/szl-frontier-payload-convergence-v2.md', source)
         self.assertNotIn('permissions: read-all', source)
         for forbidden in ('secrets.', 'github.token', 'actions: write', 'issues: write', 'gh issue comment', 'huggingface_hub', 'frontier_payload_convergence.py "'):
             self.assertNotIn(forbidden, source)

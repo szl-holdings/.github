@@ -2144,7 +2144,7 @@
     ".github/workflows/frontier-payload-convergence.yml": {
       "intent_id": "frontier-bounded-anonymous-readonly-v1",
       "valid_until": "2026-11-30",
-      "source_sha256": "sha256:ee3b068f18ef04451c8839427cdacda79947891f3459cce2f2ea28894ed82308",
+      "source_sha256": "sha256:96318d5d5a6435f04a43fb35128578b141007ae70db19cf047ecca1057bc2435",
       "credentials": [],
       "resources": [
         {
@@ -2284,8 +2284,8 @@
         "files": {
           ".github/scripts/frontier_payload/config.py": "sha256:d9d2605f8bf324ca6f4e3f9c103f2710dc3c38ef02f317661ad96f5ac98d80ff",
           ".github/scripts/frontier_payload_readonly.py": "sha256:8df91601dda5b95348952f23dfb03cd4fba5043915968ba9151ce8e970e43467",
-          ".github/scripts/test_frontier_payload_readonly.py": "sha256:3e4e086db16a5c786dfaf98048bc1eaae79973898fa8aa88535dab94897c3b83",
-          ".github/workflows/frontier-payload-convergence.yml": "sha256:ee3b068f18ef04451c8839427cdacda79947891f3459cce2f2ea28894ed82308"
+          ".github/scripts/test_frontier_payload_readonly.py": "sha256:6c4cc4ef69f7c74ea6cd43e4a1e2ede787b3c32f9f1d59db0ad122176d382ad4",
+          ".github/workflows/frontier-payload-convergence.yml": "sha256:96318d5d5a6435f04a43fb35128578b141007ae70db19cf047ecca1057bc2435"
         },
         "unknowns": [
           "ACTION_INPUTS_REVIEW_REQUIRED@.github/workflows/frontier-payload-convergence.yml:58",
@@ -2296,7 +2296,7 @@
           "ACTION_INPUTS_REVIEW_REQUIRED@.github/workflows/frontier-payload-convergence.yml:123",
           "ACTION_INPUTS_REVIEW_REQUIRED@.github/workflows/frontier-payload-convergence.yml:152",
           "HTTP_TARGET_UNRESOLVED@.github/scripts/frontier_payload_readonly.py:133",
-          "PYTHON_DYNAMIC_SUBPROCESS@.github/scripts/test_frontier_payload_readonly.py:63",
+          "PYTHON_DYNAMIC_SUBPROCESS@.github/scripts/test_frontier_payload_readonly.py:65",
           "PYTHON_IMPORT_UNRESOLVED@.github/scripts/frontier_payload/config.py:2",
           "PYTHON_IMPORT_UNRESOLVED@.github/scripts/frontier_payload/config.py:4",
           "PYTHON_IMPORT_UNRESOLVED@.github/scripts/frontier_payload_readonly.py:9",
