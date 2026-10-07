@@ -989,6 +989,20 @@ class YamlBoundaryRegressionTests(unittest.TestCase):
                 self.assertIn("ACTION_EXTRA_EFFECT_UNSUPPORTED", {item.code for item in parsed["unknowns"]})
                 self.assertFalse(bound["reviewed_unknowns_applied"])
 
+    def test_new_guard_pin_preserves_external_effects_and_restricts_inputs(self) -> None:
+        action = "step-security/harden-runner@e14015d583714f6e62063499dc959a02595150a1"
+        for mode, expected in (("audit", {"runner.guard.telemetry"}), ("block", {"runner.guard.telemetry", "github.cache.write"})):
+            with self.subTest(mode=mode):
+                source = workflow(extra_step=f"      - uses: {action}\n        with: {{egress-policy: {mode}, disable-sudo: true}}\n")
+                parsed = gate.analyze_workflow_source(source.decode(), path=WORKFLOW_PATH)
+                observed = {item.sink for item in parsed["effects"] if item.access == "external-write"}
+                self.assertEqual(observed, expected)
+                self.assertNotIn("ACTION_EXTRA_EFFECT_UNSUPPORTED", {item.code for item in parsed["unknowns"]})
+        for key, value in (("use-policy-store", "true"), ("api-key", "literal-credential"), ("deploy-on-self-hosted-vm", "true"), ("disable-file-monitoring", "true"), ("disable-sudo", "arbitrary")):
+            with self.subTest(key=key):
+                source = workflow(extra_step=f"      - uses: {action}\n        with: {json.dumps({'egress-policy': 'audit', key: value})}\n")
+                self.assert_source_denied(source, reason="UNREVIEWABLE_EFFECT_BOUNDARY", candidate=reviewed_policy_for(source))
+
     def test_other_action_revisions_remain_nonreviewable(self) -> None:
         for repository in ("actions/setup-node", "step-security/harden-runner"):
             source = workflow(extra_step=f"      - uses: {repository}@{'f' * 40}\n")
