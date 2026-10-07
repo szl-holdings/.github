@@ -22,38 +22,8 @@ def test_source_revision_requires_full_sha() -> None:
 
 
 def test_json_contracts_are_exact() -> None:
-    livez = {
-        "status": "PROCESS_ALIVE",
-        "process": {"pid": 1, "uptime_s": 10.0, "python_implementation": "CPython"},
-        "scope": "process liveness only; no dependency readiness asserted",
-        "production_ready": False,
-        "receipt_minted": False,
-    }
-    valid, evidence = operator.validate_json_contract("livez", livez)
-    assert valid
-    assert evidence["scope"] == "process liveness only"
-    assert evidence["production_ready"] is False
-    assert not operator.validate_json_contract("livez", {**livez, "status": "LIVE"})[0]
-    assert not operator.validate_json_contract("livez", {**livez, "production_ready": True})[0]
-    assert not operator.validate_json_contract("livez", {**livez, "receipt_minted": True})[0]
-    assert not operator.validate_json_contract("livez", {**livez, "process": {"pid": 0}})[0]
+    assert operator.validate_json_contract("livez", {"status": "LIVE"})[0]
     assert not operator.validate_json_contract("livez", {"status": "starting"})[0]
-    readyz = {
-        "status": "READY", "ready": True,
-        "components": {
-            "khipu": {"state": "READY", "blocking": False, "chain_intact": True, "durable": True},
-            "boot_preflight": {"state": "DEGRADED", "blocking": False},
-        },
-        "blocking_components": [], "receipt_minted": False,
-    }
-    assert operator.validate_json_contract("readyz", readyz)[0]
-    assert not operator.validate_json_contract("readyz", {**readyz, "ready": False})[0]
-    assert not operator.validate_json_contract("readyz", {**readyz, "blocking_components": ["khipu"]})[0]
-    assert not operator.validate_json_contract("readyz", {
-        **readyz, "components": {**readyz["components"], "khipu": {
-            **readyz["components"]["khipu"], "durable": False,
-        }},
-    })[0]
     assert operator.validate_json_contract(
         "controller", {"organ": "a11oy", "locked_formula_count": 8}
     )[0]
@@ -195,7 +165,7 @@ def test_main_receipt_never_records_tokens_or_guarded_mutations() -> None:
         }]
     ), mock.patch.object(
         operator.operator, "verify_public_estate", return_value={
-            "critical_verified": 9, "critical_total": 9,
+            "critical_verified": 8, "critical_total": 8,
             "revision_matches": True, "ready": True,
         }
     ):

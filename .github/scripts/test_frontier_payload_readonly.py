@@ -106,7 +106,7 @@ class ReadbackContractTests(unittest.TestCase):
         elif url in (verify.CONFIG.VESSELS_CARD_URL, verify.VESSELS_PUBLIC_URL):
             body = '# Vessels — consolidated into Killinchu\nStatus: CONSOLIDATED\nSZLHOLDINGS/killinchu\nNo live AIS feed is claimed\n'.encode()
         else:
-            contract = next(item for item in verify.CONFIG.PROBES if item.url == url)
+            contract = next(item for item in verify.PROBES if item.url == url)
             if contract.json_contract == 'livez': body = json.dumps({
                 'status': 'PROCESS_ALIVE', 'process': {'pid': 1},
                 'scope': 'process liveness only; no dependency readiness asserted',
@@ -126,8 +126,8 @@ class ReadbackContractTests(unittest.TestCase):
         return {"status": 200, "body": body, "error": None, "elapsed_ms": 1}
 
     def test_process_liveness_does_not_substitute_for_readiness(self):
-        livez = next(item for item in verify.CONFIG.PROBES if item.json_contract == 'livez')
-        readyz = next(item for item in verify.CONFIG.PROBES if item.json_contract == 'readyz')
+        livez = next(item for item in verify.PROBES if item.json_contract == 'livez')
+        readyz = next(item for item in verify.PROBES if item.json_contract == 'readyz')
 
         def checked(contract, mutate):
             observation = self.fixture_read(contract.url, deadline=time.monotonic()+1)
@@ -139,6 +139,7 @@ class ReadbackContractTests(unittest.TestCase):
 
         self.assertTrue(checked(livez, lambda payload: None)['verified'])
         self.assertFalse(checked(livez, lambda payload: payload.update(production_ready=True))['verified'])
+        self.assertFalse(checked(livez, lambda payload: payload.update(scope='full production readiness'))['verified'])
         self.assertTrue(checked(readyz, lambda payload: None)['verified'])
         self.assertFalse(checked(readyz, lambda payload: payload.update(ready=False))['verified'])
         self.assertFalse(checked(readyz, lambda payload: payload['components']['khipu'].update(durable=False))['verified'])
@@ -162,7 +163,7 @@ class ReadbackContractTests(unittest.TestCase):
             self.assertIn('Operational effects: **HELD**', summary.read_text())
 
     def test_card_metadata_parity_and_every_probe_failure_remain_nonzero(self):
-        cases = ['main-moved','zero-sha','short-sha','card-mismatch','metadata-drift'] + [item.name for item in verify.CONFIG.PROBES]
+        cases = ['main-moved','zero-sha','short-sha','card-mismatch','metadata-drift'] + [item.name for item in verify.PROBES]
         for defect in cases:
             with self.subTest(defect=defect):
                 def read(url, *, deadline):
@@ -171,7 +172,7 @@ class ReadbackContractTests(unittest.TestCase):
                         value['body'] = json.dumps({'sha':{'main-moved':'d'*40,'zero-sha':'0'*40,'short-sha':'c'*7}[defect]}).encode()
                     elif url == verify.VESSELS_PUBLIC_URL and defect == 'card-mismatch': value['body'] += b'changed'
                     elif url in verify.METADATA_URLS.values() and defect == 'metadata-drift': value['body'] = b'{}'
-                    elif any(item.url == url and item.name == defect for item in verify.CONFIG.PROBES):
+                    elif any(item.url == url and item.name == defect for item in verify.PROBES):
                         value.update(status=503, body=b'private-provider-body-canary', error='HTTP_STATUS')
                     return value
                 with tempfile.TemporaryDirectory() as tmp, unittest.mock.patch.object(verify, 'request_public', side_effect=read):
