@@ -2,6 +2,7 @@
 """Network-free contracts for the exact Nexus target bootstrap."""
 from __future__ import annotations
 
+import hashlib
 import importlib.util
 import json
 import os
@@ -332,6 +333,16 @@ class RecoveryContracts(unittest.TestCase):
                     del event[key]
                     with self.assertRaises(recovery.RecoveryError):
                         recovery.check_context(event, policy, grant)
+
+    def test_client_lock_has_explicit_lf_contract_and_reviewed_digest(self) -> None:
+        attributes = (HERE.parents[1] / ".gitattributes").read_text(encoding="utf-8")
+        self.assertIn(
+            "requirements/hf-publisher.lock text eol=lf",
+            attributes.splitlines(),
+        )
+        raw = recovery.LOCK_PATH.read_bytes()
+        self.assertNotIn(b"\r\n", raw)
+        self.assertEqual(recovery.LOCK_SHA256, hashlib.sha256(raw).hexdigest())
 
     def test_client_lock_byte_drift_blocks_before_provider_access(self) -> None:
         policy = HERE.parent / "data" / "hf-space-lifecycle-policy.json"

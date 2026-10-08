@@ -34,7 +34,9 @@ live. The provider receipt, not the source boolean alone, determines whether
 the follow-up disablement can proceed.
 
 The helper binds `requirements/hf-publisher.lock` to SHA-256
-`ee6d12365a1684cd3239c85847f860b0443b71e4bf56fff3fe459eb51aec7bd4`.
+`eec9ee849129e2034d2c7880f0f3e32857cbfd7ceecfcb5f2eb7cb541b4e4d15`.
+The lock is declared `text eol=lf` in `.gitattributes`, so this digest binds
+the committed LF bytes identically on Windows and Linux checkouts.
 The workflow reruns that credential-free check immediately before installing
 the lock with `--require-hashes --only-binary=:all:`. It checks the lock again
 before provider execution. The effect analyzer does not recognize
