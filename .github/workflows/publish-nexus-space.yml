@@ -10,12 +10,20 @@ on:
     branches: [main]
     paths:
       - .github/workflows/publish-nexus-space.yml
+      - .github/scripts/acquire_hf_publisher_token.py
+      - .github/scripts/test_acquire_hf_publisher_token.py
       - .github/scripts/hf_deploy_from_dockerfile.py
+      - .github/scripts/validate_nexus_source_binding.py
+      - .github/scripts/test_validate_nexus_source_binding.py
       - requirements/hf-publisher.lock
   push:
     branches: [main]
     paths:
       - .github/workflows/publish-nexus-space.yml
+      - .github/scripts/acquire_hf_publisher_token.py
+      - .github/scripts/hf_deploy_from_dockerfile.py
+      - .github/scripts/validate_nexus_source_binding.py
+      - requirements/hf-publisher.lock
   schedule:
     - cron: "23 * * * *"
   workflow_dispatch: {}
@@ -64,6 +72,8 @@ jobs:
               'repository: szl-holdings/nexus',
               'HF_REPO: SZLHOLDINGS/nexus',
               'acquire_hf_publisher_token.py',
+              'validate_nexus_source_binding.py',
+              'source-binding.json',
               'HF_ORG_TOKEN_CANDIDATE',
               'HF_ORG_TOKEN1_CANDIDATE',
               'HF_WRITE_TOKEN_CANDIDATE',
@@ -92,12 +102,15 @@ jobs:
               raise SystemExit('central Nexus publisher must not add a duplicate environment gate')
           print('central Nexus publisher contract: PASS')
           PY
+          python -I -B .github/scripts/test_validate_nexus_source_binding.py
+          python -I -B -m py_compile \
+            .github/scripts/validate_nexus_source_binding.py \
+            .github/scripts/test_validate_nexus_source_binding.py
           git diff --check
 
   publish:
     permissions:
       contents: read
-      security-events: write
     name: Publish exact Nexus main and attest live state
     if: github.event_name != 'pull_request'
     runs-on: ubuntu-24.04
@@ -111,19 +124,29 @@ jobs:
       - name: Checkout exact publisher policy
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          path: tools
-          ref: ${{ github.sha }}
           persist-credentials: false
           fetch-depth: 1
 
-      - name: Checkout current Nexus source main tip
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          repository: szl-holdings/nexus
-          ref: main
-          path: source
-          persist-credentials: false
-          fetch-depth: 1
+      - name: Verify protected publisher source and fetch exact Nexus main
+        id: source_ref
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$GITHUB_REPOSITORY" = "szl-holdings/.github"
+          test "$GITHUB_REF" = "refs/heads/main"
+          POLICY_SHA="$(git rev-parse HEAD)"
+          test "$POLICY_SHA" = "$GITHUB_SHA"
+          test ! -e source
+          git init -q source
+          git -C source remote add origin https://github.com/szl-holdings/nexus.git
+          git -C source fetch --depth=1 origin refs/heads/main
+          git -C source checkout --detach --quiet FETCH_HEAD
+          SOURCE_SHA="$(git -C source rev-parse HEAD)"
+          REMOTE_SHA="$(git ls-remote https://github.com/szl-holdings/nexus.git refs/heads/main | awk '{print $1}')"
+          [[ "$SOURCE_SHA" =~ ^[0-9a-f]{40}$ ]]
+          test "$SOURCE_SHA" = "$REMOTE_SHA"
+          echo "sha=$SOURCE_SHA" >> "$GITHUB_OUTPUT"
+          printf 'publisher=%s source=szl-holdings/nexus@%s remote_readback=%s\n' "$POLICY_SHA" "$SOURCE_SHA" "$REMOTE_SHA"
 
       - name: Set up exact Python
         uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
@@ -145,22 +168,25 @@ jobs:
         run: >-
           "$RUNNER_TEMP/hf-publisher-venv/bin/python" -I -P -m pip install
           --disable-pip-version-check --require-hashes --only-binary=:all:
-          --ignore-installed -r tools/requirements/hf-publisher.lock
+          --ignore-installed -r requirements/hf-publisher.lock
 
       - name: Resolve exact source and publication mode
         id: source
         shell: bash
+        env:
+          RESOLVED_SOURCE_SHA: ${{ steps.source_ref.outputs.sha }}
         run: |
           set -euo pipefail
-          SOURCE_SHA="$(git -C source rev-parse --verify HEAD)"
+          SOURCE_SHA="$RESOLVED_SOURCE_SHA"
           [[ "$SOURCE_SHA" =~ ^[0-9a-f]{40}$ ]]
+          test "$SOURCE_SHA" = "$(git -C source rev-parse --verify HEAD)"
           mkdir -p evidence/nexus
-          binding=false
-          smoke='["/","/healthz"]'
-          if grep -Eq '^COPY[[:space:]]+SOURCE_GITHUB_SHA[[:space:]]' source/space/Dockerfile; then
-            binding=true
-            smoke='["/","/healthz","/api/build-info"]'
-          fi
+          "$RUNNER_TEMP/hf-publisher-venv/bin/python" -I -P \
+            .github/scripts/validate_nexus_source_binding.py \
+            source/space/Dockerfile \
+            --report evidence/nexus/source-binding.json
+          binding=true
+          smoke='["/","/healthz","/api/build-info"]'
           echo "sha=$SOURCE_SHA" >> "$GITHUB_OUTPUT"
           echo "binding=$binding" >> "$GITHUB_OUTPUT"
           echo "smoke=$smoke" >> "$GITHUB_OUTPUT"
@@ -205,7 +231,7 @@ jobs:
         run: |
           set -euo pipefail
           "$RUNNER_TEMP/hf-publisher-venv/bin/python" -I -P \
-            tools/.github/scripts/acquire_hf_publisher_token.py \
+            .github/scripts/acquire_hf_publisher_token.py \
             --target-repo "$HF_REPO" \
             --target-type space \
             --token-file "$RUNNER_TEMP/nexus-hf-token" \
@@ -230,7 +256,7 @@ jobs:
             REVISION_ARGS+=(--source-revision-file SOURCE_GITHUB_SHA)
           fi
           HF_TOKEN="$(<"$TOKEN_FILE")" \
-            "$RUNNER_TEMP/hf-publisher-venv/bin/python" -I -P tools/.github/scripts/hf_deploy_from_dockerfile.py \
+            "$RUNNER_TEMP/hf-publisher-venv/bin/python" -I -P .github/scripts/hf_deploy_from_dockerfile.py \
             --repo-root source \
             --github-repo szl-holdings/nexus \
             --hf-repo "$HF_REPO" \
@@ -255,7 +281,7 @@ jobs:
           test -f "$TOKEN_FILE" && test ! -L "$TOKEN_FILE"
           test "$(stat -c '%a' "$TOKEN_FILE")" = "600"
           HF_TOKEN="$(<"$TOKEN_FILE")" \
-            "$RUNNER_TEMP/hf-publisher-venv/bin/python" -I -P tools/.github/scripts/hf_deploy_from_dockerfile.py \
+            "$RUNNER_TEMP/hf-publisher-venv/bin/python" -I -P .github/scripts/hf_deploy_from_dockerfile.py \
             --restart-space \
             --manifest evidence/nexus/hf-deploy-manifest.json \
             --hf-repo "$HF_REPO"
@@ -271,7 +297,7 @@ jobs:
           test -f "$TOKEN_FILE" && test ! -L "$TOKEN_FILE"
           test "$(stat -c '%a' "$TOKEN_FILE")" = "600"
           HF_TOKEN="$(<"$TOKEN_FILE")" \
-            "$RUNNER_TEMP/hf-publisher-venv/bin/python" -I -P tools/.github/scripts/hf_deploy_from_dockerfile.py \
+            "$RUNNER_TEMP/hf-publisher-venv/bin/python" -I -P .github/scripts/hf_deploy_from_dockerfile.py \
             --attest \
             --manifest evidence/nexus/hf-deploy-manifest.json \
             --hf-repo "$HF_REPO" \
@@ -349,7 +375,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: hf-central-nexus-${{ steps.source.outputs.sha || github.run_id }}
+          name: hf-central-nexus
           path: evidence/nexus/
           if-no-files-found: warn
           retention-days: 90
