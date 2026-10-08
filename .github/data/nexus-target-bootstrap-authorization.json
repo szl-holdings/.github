@@ -6,5 +6,5 @@
   "visibility": "public",
   "scope": "one-time-create-if-absent",
   "lifecycle_create_boundary": "preserved-false",
-  "enabled": true
+  "enabled": false
 }
