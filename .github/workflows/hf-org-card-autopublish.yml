@@ -65,7 +65,7 @@ jobs:
       - name: Set up exact Python
         uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
-          python-version: "3.12.10"
+          python-version: "3.12.14"
 
       - name: Test organization-card publishers
         run: >-
@@ -123,7 +123,7 @@ jobs:
       - name: Set up exact Python
         uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
-          python-version: "3.12.10"
+          python-version: "3.12.14"
 
       - name: Test cleanup and central publisher before provider access
         run: >-

@@ -40,7 +40,7 @@ env:
 jobs:
   contract:
     name: Responsive browser evidence contracts
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04 # Temporary until Playwright >=1.61 is validated for this browser audit.
     timeout-minutes: 15
     steps:
       - name: Harden runner
@@ -82,7 +82,7 @@ jobs:
     name: Read-only browser audit of public origins and Spaces
     needs: contract
     if: ${{ github.event_name != 'pull_request' && github.event_name != 'merge_group' }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04 # Temporary until Playwright >=1.61 is validated for this browser audit.
     timeout-minutes: 55
     steps:
       - name: Harden runner

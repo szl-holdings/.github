@@ -9,7 +9,7 @@
     ".github/workflows/hf-model-evidence-audit.yml": {
       "intent_id": "hf-model-evidence-public-census-v2",
       "valid_until": "2026-11-30",
-      "source_sha256": "sha256:c5bc20712427d88e95cf51b863a1f388cfd4f58fc37fa91956464433e4211666",
+      "source_sha256": "sha256:cff65b493e98f9a171283a4c8fa4bf51f248e74d6541b55aa2b6297a456eb5f0",
       "credentials": [],
       "resources": [
         {
@@ -67,7 +67,7 @@
         "files": {
           ".github/scripts/hf_model_evidence_audit.py": "sha256:7026bc0dfddb746ff928deb665c157c8ca82357059bc8c9b8cb4af7d3626e495",
           ".github/scripts/test_hf_model_evidence_audit.py": "sha256:d059055fb311922db211826da3373802b29ba9683c76557ae73d9a58a6512e23",
-          ".github/workflows/hf-model-evidence-audit.yml": "sha256:c5bc20712427d88e95cf51b863a1f388cfd4f58fc37fa91956464433e4211666"
+          ".github/workflows/hf-model-evidence-audit.yml": "sha256:cff65b493e98f9a171283a4c8fa4bf51f248e74d6541b55aa2b6297a456eb5f0"
         },
         "unknowns": [
           "ACTION_INPUTS_REVIEW_REQUIRED@.github/workflows/hf-model-evidence-audit.yml:39",
@@ -792,7 +792,7 @@
     ".github/workflows/hf-dataset-register-consistency.yml": {
       "intent_id": "hf-dataset-register-offline-consistency-v1",
       "valid_until": "2026-11-30",
-      "source_sha256": "sha256:443c439d3a770dc8f982aaf3d73654ceafbd021a0cb67cd14dd85674903c1aae",
+      "source_sha256": "sha256:86ebcf8498405a862004f5b90a19d67fa05c754e06a0794b356b5400054ad090",
       "credentials": [],
       "resources": [
         {
@@ -836,7 +836,7 @@
       "trusted_transitives": {},
       "reviewed_unknowns": {
         "files": {
-          ".github/workflows/hf-dataset-register-consistency.yml": "sha256:443c439d3a770dc8f982aaf3d73654ceafbd021a0cb67cd14dd85674903c1aae",
+          ".github/workflows/hf-dataset-register-consistency.yml": "sha256:86ebcf8498405a862004f5b90a19d67fa05c754e06a0794b356b5400054ad090",
           ".github/scripts/hf_dataset_register_consistency.py": "sha256:cfa59278dbd11ae3f5bd204773c1e970dc5b32dbe82c2cf505befc7cfba15a1d",
           ".github/scripts/test_hf_dataset_register_consistency.py": "sha256:f12bfc133b8d54463a191b0e0e4825f11ae0fda115a9c8ba5f52aae08e7dfe47"
         },
@@ -866,7 +866,7 @@
     ".github/workflows/hf-living-constellation-operator.yml": {
       "intent_id": "hf-living-constellation-runtime-probe-v2",
       "valid_until": "2026-11-30",
-      "source_sha256": "sha256:8385251f5ae9a88462cd3c2f7a085446b31ed1175448c7cc6f11aeae594ce3e9",
+      "source_sha256": "sha256:2632e537a838128e779102bae493245edc07a651af9fb18622812989fcfb1d97",
       "credentials": [
         "HF_ORG_TOKEN",
         "HF_ORG_TOKEN1",
@@ -957,7 +957,7 @@
       "reviewed_unknowns": {
         "files": {
           ".github/scripts/hf_living_constellation_operator.py": "sha256:f4baf8a3f15c3a299cefac4a676b8248ec31f56ed09c4b06f3808d5744e8fa88",
-          ".github/workflows/hf-living-constellation-operator.yml": "sha256:8385251f5ae9a88462cd3c2f7a085446b31ed1175448c7cc6f11aeae594ce3e9"
+          ".github/workflows/hf-living-constellation-operator.yml": "sha256:2632e537a838128e779102bae493245edc07a651af9fb18622812989fcfb1d97"
         },
         "unknowns": [
           "ACTION_INPUTS_REVIEW_REQUIRED@.github/workflows/hf-living-constellation-operator.yml:138",
@@ -1092,7 +1092,7 @@
     ".github/workflows/hf-org-card-autopublish.yml": {
       "intent_id": "hf-org-card-central-single-writer-v1",
       "valid_until": "2026-11-30",
-      "source_sha256": "sha256:e92b29e945df636ca75a9158c6e2fd22c394d31528a42ea7a3a8a74f6f0c467f",
+      "source_sha256": "sha256:bac93112d59416ac664527fa923e29b7d2ddc1523fb25e637e073df31c5931d3",
       "credentials": [
         "GITHUB_TOKEN",
         "HF_ORG_TOKEN",
@@ -1201,7 +1201,7 @@
       "trusted_transitives": {},
       "reviewed_unknowns": {
         "files": {
-          ".github/workflows/hf-org-card-autopublish.yml": "sha256:e92b29e945df636ca75a9158c6e2fd22c394d31528a42ea7a3a8a74f6f0c467f",
+          ".github/workflows/hf-org-card-autopublish.yml": "sha256:bac93112d59416ac664527fa923e29b7d2ddc1523fb25e637e073df31c5931d3",
           ".github/scripts/hf_org_card_autopublish.py": "sha256:9639607089280ccf8a112882b57bffcd88fb0893cae5ee9a1c4273ae3371f015",
           ".github/scripts/hf_org_card_publish_cleanup.py": "sha256:ddf1cf8b8597384c071a7f920806b9c5ea5b71aad40106943612627738af86e8",
           ".github/scripts/hf_space_visibility.py": "sha256:6f9d05d30323230bc8569147e24d95a2a08107fef27112c4ef994086a0834394",
@@ -1652,7 +1652,7 @@
     ".github/workflows/tests.yml": {
       "intent_id": "repository-credentialless-tests-v1",
       "valid_until": "2026-11-30",
-      "source_sha256": "sha256:1136cd844578365121aa2b2a5c32634e45a92ed6330e742f1ad2859c25927725",
+      "source_sha256": "sha256:908758d2870c2a77ba16c21ba46b5742d280ac2c84e24ce55ba6372e9ac0d56e",
       "credentials": [],
       "resources": [
         {
@@ -1719,7 +1719,7 @@
       "trusted_transitives": {},
       "reviewed_unknowns": {
         "files": {
-          ".github/workflows/tests.yml": "sha256:1136cd844578365121aa2b2a5c32634e45a92ed6330e742f1ad2859c25927725",
+          ".github/workflows/tests.yml": "sha256:908758d2870c2a77ba16c21ba46b5742d280ac2c84e24ce55ba6372e9ac0d56e",
           ".github/scripts/hf_deploy_from_dockerfile.py": "sha256:f2f7a6c1296493d034eebed596f4176c2928470a4ed7e23620da6cacf19b16e7",
           ".github/scripts/hf_space_source_binding.py": "sha256:9888d4c126ead29d0960de3198a99f1d686956c8104f0cf6c5c0d4c113b2a37b",
           ".github/scripts/public_front_door_check.py": "sha256:cd18b4edafaf706c8fe26d811e4fc8d2ccae01dcc37ea513850d541be840be39",
@@ -2054,7 +2054,7 @@
     ".github/workflows/responsive-estate-v3.yml": {
       "intent_id": "responsive-estate-observed-report-v31",
       "valid_until": "2026-11-30",
-      "source_sha256": "sha256:09843f899d6b23b9c6acfaa0a45fd93126321602f909a91fb5467d1db99aabb4",
+      "source_sha256": "sha256:4eb93775fbaf514620676e13a8a66eea3f292ba8b7e06964e76b76651624e84e",
       "credentials": [],
       "resources": [
         {
@@ -2130,7 +2130,7 @@
       "trusted_transitives": {},
       "reviewed_unknowns": {
         "files": {
-          ".github/workflows/responsive-estate-v3.yml": "sha256:09843f899d6b23b9c6acfaa0a45fd93126321602f909a91fb5467d1db99aabb4",
+          ".github/workflows/responsive-estate-v3.yml": "sha256:4eb93775fbaf514620676e13a8a66eea3f292ba8b7e06964e76b76651624e84e",
           "scripts/audit_responsive_estate_v3.mjs": "sha256:b4a2b76d41bd2d37fdbda2bdacf6052a12b719534a50a936e8830888c7d1a777",
           "scripts/normalize_responsive_estate_v31.mjs": "sha256:08d54b35cd9a41b8301b47f769fd1ce2d37f4041df941531cacffd73b60967ac",
           "scripts/responsive_audit_policy_v31.mjs": "sha256:fa93396b7107419f0475a3b6c530ac187942b5d78a68e7a00a5cfd96df5f72b9"
