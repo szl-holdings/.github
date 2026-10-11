@@ -97,7 +97,7 @@ jobs:
       github.event_name == 'schedule' ||
       github.event_name == 'workflow_dispatch' ||
       (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success')
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04 # Temporary until Playwright >=1.61 is validated for this browser audit.
     timeout-minutes: 70
     permissions:
       contents: read

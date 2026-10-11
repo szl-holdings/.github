@@ -376,9 +376,9 @@ def validate_document(document: str) -> list[str]:
         {"src": CANONICAL_ASSET_URL, "alt": "SZL evidence lattice architecture artwork",
          "width": "1800", "height": "776", "loading": "lazy", "decoding": "async"},
         {"class": "szl-hf-brand-mark", "src": mark_url, "alt": "SZL Holdings",
-         "width": "96", "height": "60", "decoding": "async"},
+         "width": "48", "height": "48", "decoding": "async"},
         {"class": "szl-hf-hero-mark", "src": mark_url, "alt": "",
-         "width": "256", "height": "160", "decoding": "async"},
+         "width": "256", "height": "256", "decoding": "async"},
     ]
     if (not parser.images or len(parser.images) > len(approved_images)
             or any(image not in approved_images for image in parser.images)
