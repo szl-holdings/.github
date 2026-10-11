@@ -1,0 +1,69 @@
+{
+  "schemaVersion": 1,
+  "provider": "metricool",
+  "role": "bounded-social-publisher-and-analytics-adapter",
+  "canonicalAuthority": [
+    "github",
+    "huggingface",
+    "a-11-oy.com",
+    "a11oy.net"
+  ],
+  "brandSelection": {
+    "label": "SZL Holdings",
+    "timezone": "America/New_York",
+    "brandIdSource": "METRICOOL_BRAND_ID"
+  },
+  "allowedCapabilities": [
+    "read-brand-settings",
+    "read-scheduled-posts",
+    "read-analytics",
+    "read-best-times",
+    "create-scheduled-post",
+    "update-scheduled-post",
+    "send-post-for-review"
+  ],
+  "requiredControls": [
+    "no-secrets-in-repository",
+    "preserve-upstream-truth",
+    "exact-claim-evidence",
+    "provider-connection-check",
+    "provider-payload-preservation",
+    "explicit-failure-state",
+    "publication-receipt",
+    "reviewed-channel-allowlist",
+    "conditional-provider-revision",
+    "prepublication-evidence-revalidation",
+    "explicit-evidence-validity-window",
+    "provider-confirmed-delivery"
+  ],
+  "forbiddenCapabilities": [
+    "override-release-truth",
+    "override-runtime-truth",
+    "bypass-provider-review",
+    "publish-unsupported-security-claims",
+    "store-refresh-tokens-in-source"
+  ],
+  "approvedChannels": [
+    "x",
+    "linkedin"
+  ],
+  "publicationStates": [
+    "READY",
+    "SCHEDULED",
+    "PUBLISHED",
+    "HOLD",
+    "UNOBSERVED",
+    "FAILED"
+  ],
+  "updatePolicy": {
+    "requireConditionalWrite": true,
+    "onUnsupportedConditionalWrite": "HOLD",
+    "onProviderRevisionMismatch": "HOLD"
+  },
+  "evidencePolicy": {
+    "requireValidityWindow": true,
+    "revalidateBeforePublication": true,
+    "onExpiredOrChangedEvidence": "HOLD",
+    "onUnsupportedPrepublicationHold": "HOLD"
+  }
+}
