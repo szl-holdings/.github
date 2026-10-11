@@ -38,7 +38,7 @@ def validate_official_inventory(report: Mapping[str, Any]) -> tuple[bool, str]:
         "buckets",
     )
     counts_ok = isinstance(counts, Mapping) and all(
-        isinstance(counts.get(key), int) and counts[key] > 0 for key in required
+        type(counts.get(key)) is int and counts[key] > 0 for key in required
     )
     clones_ok = (
         isinstance(clones, Mapping)
@@ -51,7 +51,7 @@ def validate_official_inventory(report: Mapping[str, Any]) -> tuple[bool, str]:
         and str(canonical.get("sdk") or "").lower() == "docker"
         and str(canonical.get("stage") or "").upper() == "RUNNING"
         and SHA40.fullmatch(str(canonical.get("sha") or "")) is not None
-        and isinstance(canonical.get("file_count"), int)
+        and type(canonical.get("file_count")) is int
         and canonical["file_count"] > 0
     )
     ok = (
@@ -77,14 +77,14 @@ def validate_release_readiness(report: Mapping[str, Any]) -> tuple[bool, str]:
         isinstance(dataset, Mapping)
         and dataset.get("viewer_http_status") == 200
         and SHA40.fullmatch(str(dataset.get("revision") or "")) is not None
-        and isinstance(dataset.get("remote_file_count"), int)
+        and type(dataset.get("remote_file_count")) is int
         and dataset["remote_file_count"] > 0
     )
     kernel_ids = set(kernels) if isinstance(kernels, Mapping) else set()
     kernels_ok = kernel_ids == KERNEL_IDS and all(
         isinstance(kernels[repo_id], Mapping)
         and SHA40.fullmatch(str(kernels[repo_id].get("revision") or "")) is not None
-        and isinstance(kernels[repo_id].get("remote_file_count"), int)
+        and type(kernels[repo_id].get("remote_file_count")) is int
         and kernels[repo_id]["remote_file_count"] > 0
         and selfcheck_passed(kernels[repo_id].get("selfcheck"))
         for repo_id in KERNEL_IDS
@@ -118,7 +118,7 @@ def validate_release_publication(report: Mapping[str, Any]) -> tuple[bool, str]:
         isinstance(dataset, Mapping)
         and dataset.get("viewer_http_status") == 200
         and SHA40.fullmatch(str(dataset.get("revision") or "")) is not None
-        and isinstance(dataset.get("remote_file_count"), int)
+        and type(dataset.get("remote_file_count")) is int
         and dataset["remote_file_count"] > 0
     )
     kernel_ids = set(kernels) if isinstance(kernels, Mapping) else set()
@@ -129,7 +129,7 @@ def validate_release_publication(report: Mapping[str, Any]) -> tuple[bool, str]:
         and kernels[repo_id].get("build_variants_preserved") is True
         and kernels[repo_id].get("card_contract_byte_parity") is True
         and SHA64.fullmatch(str(kernels[repo_id].get("build_tree_sha256") or "")) is not None
-        and isinstance(kernels[repo_id].get("remote_file_count"), int)
+        and type(kernels[repo_id].get("remote_file_count")) is int
         and kernels[repo_id]["remote_file_count"] > 0
         and selfcheck_passed(kernels[repo_id].get("selfcheck"))
         for repo_id in KERNEL_IDS
