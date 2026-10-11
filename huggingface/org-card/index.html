@@ -347,6 +347,35 @@
       #szl-hf-org-card .szl-hf-hero-copy { grid-column: 1; grid-row: 2; }
       #szl-hf-org-card .szl-hf-brand-mark { width: 40px; }
     }
+
+    /* The Hub profile strips conditional CSS groups from the embedded card.
+       Essential reflow therefore depends on container space, not @media. */
+    #szl-hf-org-card .szl-hf-nav { flex-wrap: wrap; padding-block: 12px; }
+    #szl-hf-org-card nav { flex: 1 1 420px; min-width: 0; }
+    #szl-hf-org-card nav a { white-space: normal; }
+    #szl-hf-org-card .szl-hf-hero { display: flex; flex-wrap: wrap; min-height: 0; padding: clamp(16px, 4%, 48px); }
+    #szl-hf-org-card .szl-hf-hero-copy { flex: 1 1 360px; order: 0; }
+    #szl-hf-org-card .szl-hf-hero-mark { flex: 0 1 144px; width: 144px; max-width: 100%; order: 1; align-self: center; }
+    #szl-hf-org-card h1 { font-size: clamp(28px, 5.1vw, 40px); }
+    #szl-hf-org-card .szl-hf-actions { display: flex; flex-wrap: wrap; }
+    #szl-hf-org-card .szl-hf-actions .szl-hf-button { flex: 1 1 180px; min-width: 0; max-width: 100%; padding: 12px 16px; }
+    #szl-hf-org-card .szl-hf-section-head,
+    #szl-hf-org-card .szl-hf-kernel-note,
+    #szl-hf-org-card .szl-hf-closing-panel { grid-template-columns: repeat(auto-fit, minmax(min(100%, 26rem), 1fr)); }
+    #szl-hf-org-card .szl-hf-journeys,
+    #szl-hf-org-card .szl-hf-flagships,
+    #szl-hf-org-card .szl-hf-truth,
+    #szl-hf-org-card .szl-hf-estate { grid-template-columns: repeat(auto-fit, minmax(min(100%, 26rem), 1fr)); }
+    #szl-hf-org-card .szl-hf-portfolio { grid-template-columns: repeat(auto-fit, minmax(min(100%, 30rem), 1fr)); }
+    #szl-hf-org-card .szl-hf-steps { grid-template-columns: repeat(auto-fit, minmax(min(100%, 18rem), 1fr)); }
+    #szl-hf-org-card .szl-hf-chain { grid-template-columns: repeat(auto-fit, minmax(min(100%, 9rem), 1fr)); }
+    #szl-hf-org-card .szl-hf-counts { grid-template-columns: repeat(auto-fit, minmax(min(100%, 14rem), 1fr)); }
+    @media (max-width: 640px) {
+      #szl-hf-org-card .szl-hf-steps { grid-template-columns: 1fr; }
+    }
+    @media (min-width: 900px) {
+      #szl-hf-org-card h1 { font-size: clamp(40px, 5.1vw, 64px); }
+    }
   </style>
 
 </head>
