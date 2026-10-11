@@ -277,6 +277,8 @@ class NexusWorkflowCredentialContractTests(unittest.TestCase):
         for path in (
             ".github/scripts/acquire_hf_publisher_token.py",
             ".github/scripts/test_acquire_hf_publisher_token.py",
+            ".github/scripts/validate_nexus_source_binding.py",
+            ".github/scripts/test_validate_nexus_source_binding.py",
             ".github/workflows/publish-nexus-space.yml",
             ".github/workflows/test-hf-publisher-credential-selector.yml",
         ):
@@ -285,6 +287,26 @@ class NexusWorkflowCredentialContractTests(unittest.TestCase):
             "python -I -B .github/scripts/test_acquire_hf_publisher_token.py",
             workflow,
         )
+        self.assertIn(
+            "python -I -B .github/scripts/test_validate_nexus_source_binding.py",
+            workflow,
+        )
+        self.assertIn(
+            ".github/scripts/validate_nexus_source_binding.py",
+            workflow,
+        )
+
+    def test_source_binding_validator_is_fail_closed_and_evidenced(self) -> None:
+        workflow = (_HERE.parent / "workflows" / "publish-nexus-space.yml").read_text(
+            encoding="utf-8"
+        )
+
+        self.assertIn("validate_nexus_source_binding.py", workflow)
+        self.assertIn("evidence/nexus/source-binding.json", workflow)
+        self.assertIn("binding=true", workflow)
+        self.assertIn('["/","/healthz","/api/build-info"]', workflow)
+        self.assertNotIn("grep -Eq '^COPY", workflow)
+        self.assertNotIn("binding=false", workflow)
 
     def test_selected_token_is_never_printed_or_redeclared(self) -> None:
         workflow = (_HERE.parent / "workflows" / "publish-nexus-space.yml").read_text(

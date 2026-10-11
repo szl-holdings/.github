@@ -989,6 +989,76 @@ class YamlBoundaryRegressionTests(unittest.TestCase):
                 self.assertIn("ACTION_EXTRA_EFFECT_UNSUPPORTED", {item.code for item in parsed["unknowns"]})
                 self.assertFalse(bound["reviewed_unknowns_applied"])
 
+    def test_new_guard_pin_preserves_external_effects_and_restricts_inputs(self) -> None:
+        action = "step-security/harden-runner@e14015d583714f6e62063499dc959a02595150a1"
+        for mode, expected in (("audit", {"runner.guard.telemetry"}), ("block", {"runner.guard.telemetry", "github.cache.write"})):
+            with self.subTest(mode=mode):
+                source = workflow(extra_step=f"      - uses: {action}\n        with: {{egress-policy: {mode}, disable-sudo: true}}\n")
+                parsed = gate.analyze_workflow_source(source.decode(), path=WORKFLOW_PATH)
+                observed = {item.sink for item in parsed["effects"] if item.access == "external-write"}
+                self.assertEqual(observed, expected)
+                self.assertNotIn("ACTION_EXTRA_EFFECT_UNSUPPORTED", {item.code for item in parsed["unknowns"]})
+        for key, value in (("use-policy-store", "true"), ("api-key", "literal-credential"), ("deploy-on-self-hosted-vm", "true"), ("disable-file-monitoring", "true"), ("disable-sudo", "arbitrary")):
+            with self.subTest(key=key):
+                source = workflow(extra_step=f"      - uses: {action}\n        with: {json.dumps({'egress-policy': 'audit', key: value})}\n")
+                self.assert_source_denied(source, reason="UNREVIEWABLE_EFFECT_BOUNDARY", candidate=reviewed_policy_for(source))
+
+    def test_guard_telemetry_requires_omitted_or_canonical_false(self) -> None:
+        for pin in ("05e31511f85b41b11d1cf0ef85d0992719546e2c", "e14015d583714f6e62063499dc959a02595150a1"):
+            for mode in ("audit", "block"):
+                for telemetry in (None, "false"):
+                    with self.subTest(pin=pin, mode=mode, telemetry=telemetry):
+                        inputs = {"egress-policy": mode}
+                        if telemetry is not None:
+                            inputs["disable-telemetry"] = telemetry
+                        source = workflow(extra_step=f"      - uses: step-security/harden-runner@{pin}\n        with: {json.dumps(inputs)}\n")
+                        candidate = reviewed_policy_for(source)
+                        declaration = candidate["workflow_declarations"][WORKFLOW_PATH]
+                        parsed = gate.analyze_workflow_source(source.decode(), path=WORKFLOW_PATH)
+                        for effect in parsed["effects"]:
+                            if effect.sink == "github.contents.checkout":
+                                continue
+                            declaration["resources"].append({"key": effect.resource, "access": effect.access})
+                            declaration["effects"].append({"sink": effect.sink, "resource": effect.resource, "access": effect.access, "max_calls": 1})
+                        declaration["max_external_writes"] = 1 if mode == "audit" else 2
+                        _parsed, bound = bind_source(source, candidate=candidate)
+                        self.assertEqual(bound["verdict"], "ALLOW")
+                        self.assertTrue(bound["reviewed_unknowns_applied"])
+                        self.assertEqual(sum(effect.sink == "runner.guard.telemetry" for effect in parsed["effects"]), 1)
+                        self.assertEqual(bound["external_write_sites"], declaration["max_external_writes"])
+
+    def test_guard_disabled_or_unresolved_telemetry_is_nonreviewable(self) -> None:
+        values = (
+            "true", "True", "TRUE", "tRuE", "False", "FALSE", "fAlSe",
+            " true ", " false ", "\tfalse", "false\n", "", "0", "null",
+            "arbitrary", "${{ inputs.disable_telemetry }}", "${{ false }}",
+        )
+        for pin in ("05e31511f85b41b11d1cf0ef85d0992719546e2c", "e14015d583714f6e62063499dc959a02595150a1"):
+            for mode in ("audit", "block"):
+                for value in values:
+                    with self.subTest(pin=pin, mode=mode, value=value):
+                        source = workflow(extra_step=f"      - uses: step-security/harden-runner@{pin}\n        with: {json.dumps({'egress-policy': mode, 'disable-telemetry': value})}\n")
+                        candidate = reviewed_policy_for(source)
+                        parsed, bound = self.assert_source_denied(source, reason="UNREVIEWABLE_EFFECT_BOUNDARY", candidate=candidate)
+                        self.assertIn("ACTION_EXTRA_EFFECT_UNSUPPORTED", {item.code for item in parsed["unknowns"]})
+                        self.assertFalse(bound["reviewed_unknowns_applied"])
+                        self.assertNotIn("runner.guard.telemetry", {effect.sink for effect in parsed["effects"]})
+                        self.assertNotIn("runner.guard.telemetry", {effect["sink"] for effect in bound["effects"]})
+
+    def test_guard_yaml_false_is_enabled_and_null_or_numbers_are_not(self) -> None:
+        for pin in ("05e31511f85b41b11d1cf0ef85d0992719546e2c", "e14015d583714f6e62063499dc959a02595150a1"):
+            for mode in ("audit", "block"):
+                for value in ("false", "null", "~", "0", "1", "[]", "{}"):
+                    with self.subTest(pin=pin, mode=mode, value=value):
+                        source = workflow(extra_step=f"      - uses: step-security/harden-runner@{pin}\n        with: {{egress-policy: {mode}, disable-telemetry: {value}}}\n")
+                        parsed = gate.analyze_workflow_source(source.decode(), path=WORKFLOW_PATH)
+                        if value == "false":
+                            self.assertNotIn("ACTION_EXTRA_EFFECT_UNSUPPORTED", {item.code for item in parsed["unknowns"]})
+                            self.assertEqual(sum(effect.sink == "runner.guard.telemetry" for effect in parsed["effects"]), 1)
+                        else:
+                            self.assert_source_denied(source, reason="UNREVIEWABLE_EFFECT_BOUNDARY", candidate=reviewed_policy_for(source))
+                            self.assertNotIn("runner.guard.telemetry", {effect.sink for effect in parsed["effects"]})
+
     def test_other_action_revisions_remain_nonreviewable(self) -> None:
         for repository in ("actions/setup-node", "step-security/harden-runner"):
             source = workflow(extra_step=f"      - uses: {repository}@{'f' * 40}\n")

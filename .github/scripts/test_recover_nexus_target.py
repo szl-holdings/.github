@@ -2,6 +2,7 @@
 """Network-free contracts for the exact Nexus target bootstrap."""
 from __future__ import annotations
 
+import hashlib
 import importlib.util
 import json
 import os
@@ -43,7 +44,7 @@ def central_event() -> dict[str, str]:
 class RecoveryContracts(unittest.TestCase):
     def test_disabled_grant_denies_dispatch_before_provider_access(self) -> None:
         policy = HERE.parent / "data" / "hf-space-lifecycle-policy.json"
-        grant = HERE.parent / "data" / "nexus-target-bootstrap-authorization.json"
+        grant_source = HERE.parent / "data" / "nexus-target-bootstrap-authorization.json"
         event = {
             "GITHUB_ACTIONS": "true",
             "GITHUB_REPOSITORY": "szl-holdings/.github",
@@ -55,9 +56,13 @@ class RecoveryContracts(unittest.TestCase):
             "GITHUB_WORKFLOW_SHA": "a" * 40,
             "HF_ORG_TOKEN_CANDIDATE": "hf_secret_material",
         }
-        with self.assertRaises(recovery.RecoveryError):
-            recovery.check_context(event, policy, grant)
         with tempfile.TemporaryDirectory() as temporary:
+            grant = Path(temporary) / "disabled-grant.json"
+            grant_data = json.loads(grant_source.read_text(encoding="utf-8"))
+            grant_data["enabled"] = False
+            grant.write_text(json.dumps(grant_data), encoding="utf-8")
+            with self.assertRaises(recovery.RecoveryError):
+                recovery.check_context(event, policy, grant)
             report = Path(temporary) / "receipt.json"
             with patch.dict(os.environ, event, clear=True):
                 with patch.object(recovery, "recover") as provider:
@@ -328,6 +333,16 @@ class RecoveryContracts(unittest.TestCase):
                     del event[key]
                     with self.assertRaises(recovery.RecoveryError):
                         recovery.check_context(event, policy, grant)
+
+    def test_client_lock_has_explicit_lf_contract_and_reviewed_digest(self) -> None:
+        attributes = (HERE.parents[1] / ".gitattributes").read_text(encoding="utf-8")
+        self.assertIn(
+            "requirements/hf-publisher.lock text eol=lf",
+            attributes.splitlines(),
+        )
+        raw = recovery.LOCK_PATH.read_bytes()
+        self.assertNotIn(b"\r\n", raw)
+        self.assertEqual(recovery.LOCK_SHA256, hashlib.sha256(raw).hexdigest())
 
     def test_client_lock_byte_drift_blocks_before_provider_access(self) -> None:
         policy = HERE.parent / "data" / "hf-space-lifecycle-policy.json"

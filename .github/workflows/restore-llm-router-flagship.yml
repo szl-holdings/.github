@@ -45,7 +45,7 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
-          python-version: "3.12.10"
+          python-version: "3.12.14"
       - name: Compile and validate the recovery controller
         run: |
           set -euo pipefail
@@ -75,7 +75,7 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
-          python-version: "3.12.10"
+          python-version: "3.12.14"
       - name: Install exact Hub client
         run: python -m pip install --disable-pip-version-check --no-cache-dir huggingface_hub==1.10.1
       - name: Restore and attest the flagship authority chain

@@ -85,7 +85,7 @@ jobs:
   hf-deploy:
     name: Deploy derived COPY set, bind source, and attest live state
     if: ${{ inputs.contract-only == false }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04 # Temporary until the exact Python 3.12.10 publisher closure is revalidated on 26.04.
     timeout-minutes: 30
     concurrency:
       group: hf-deploy-${{ inputs.hf-repo || github.repository }}
