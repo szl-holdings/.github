@@ -16,6 +16,19 @@
 
 </div>
 
+<!-- szl:header v1 -->
+<!-- Native identity: szl-brand@4309f6fce89179331b0b3ed8c99494e76c5be256; Orbit v2 icon. -->
+<p>
+  <a href="https://github.com/szl-holdings">
+    <img src="https://raw.githubusercontent.com/szl-holdings/szl-brand/4309f6fce89179331b0b3ed8c99494e76c5be256/kit/logos/orbit-v2/suite/szl-icon-32.svg" alt="SZL Holdings — Orbit v2" width="32" height="32" />
+  </a>
+</p>
+
+**Control before action. Evidence after.**
+
+[Product](https://a-11-oy.com) · [Proof](https://a11oy.net) · [GitHub organization](https://github.com/szl-holdings)
+<!-- /szl:header -->
+
 ---
 <!-- Repo-level README for szl-holdings/.github -->
 
@@ -169,6 +182,7 @@ and model training is unauthorized. It is not a forum-wide scrape.
 
 ## SZL Holdings
 
-<img src="./profile/assets/szl/logos/szl_logo_primary.svg" alt="SZL Holdings" width="240">
+<!-- Native footer: szl-brand@4309f6fce89179331b0b3ed8c99494e76c5be256; Orbit v2 master sha256 84a23d7b2a6dd198378ded91e52c545df2943fd33cbc4a67dd4184e94f4d94fb. -->
+<img src="https://raw.githubusercontent.com/szl-holdings/szl-brand/4309f6fce89179331b0b3ed8c99494e76c5be256/kit/logos/orbit-v2/szl-orbit.svg" alt="SZL Holdings" width="64" height="64" />
 
-*The SZL Holdings orbit mark (szl-brand `kanchay/` 1.1.1, CC BY 4.0).*
+*Orbit v2 by SZL Holdings. [Canonical artwork](https://github.com/szl-holdings/szl-brand/blob/4309f6fce89179331b0b3ed8c99494e76c5be256/kit/logos/orbit-v2/szl-orbit.svg), CC BY 4.0.*
