@@ -225,6 +225,146 @@ class ProvenanceCheckTests(unittest.TestCase):
         self.assertEqual(report["enforcement"], "advisory")
         self.assertFalse(report["pass"])
 
+    def with_rights(self, content: str) -> dict:
+        event = self.event()
+        event["pull_request"]["body"] = BODY.replace(
+            "I own this change or have the right to contribute every included component.", content,
+        )
+        return check.evaluate(self.policy, event)
+
+    def test_markup_only_and_whitespace_entities_are_not_evidence(self) -> None:
+        for content in (
+            "<br>", "<span></span>", '<a title="ownership confirmed"></a>',
+            "&nbsp;", "&#160;", "&#x20;", "&amp;", "<span>&nbsp;</span>",
+            '<input value="ownership confirmed">', "<hr>",
+            '<span title="quoted > ownership confirmed">&nbsp;</span>',
+            '<span title="quoted >\nattribute evidence"> </span>',
+        ):
+            with self.subTest(content=content):
+                self.assertFalse(self.with_rights(content)["evidence_sections"]["Rights"])
+
+    def test_visible_inline_html_text_remains_evidence(self) -> None:
+        self.assertTrue(self.with_rights("<strong>I own this change.</strong>")["pass"])
+        self.assertFalse(self.with_rights("<em>TODO</em>")["evidence_sections"]["Rights"])
+
+    def test_inline_comment_looking_code_preserves_sections(self) -> None:
+        for content in (
+            "Executed `rg '<!--' policy.md` locally.",
+            "Executed ``printf '`<!--`'`` locally.",
+            "Verified `<code>` is rendered literally.",
+        ):
+            with self.subTest(content=content):
+                event = self.event()
+                event["pull_request"]["body"] = BODY.replace("python3 provenance/test_check.py", content)
+                report = check.evaluate(self.policy, event)
+                self.assertTrue(report["pass"], report["failed"])
+
+    def test_literal_markup_is_retained_inside_code_evidence(self) -> None:
+        for content in ("`<br>`", "`&nbsp;`", "```html\n<span></span>\n```", "~~~html\n<!-- literal command -->\n~~~"):
+            with self.subTest(content=content):
+                self.assertTrue(self.with_rights(content)["evidence_sections"]["Rights"])
+
+    def test_empty_fence_info_string_is_not_evidence(self) -> None:
+        self.assertFalse(self.with_rights("```ownership\n``` ")["evidence_sections"]["Rights"])
+
+    def test_raw_html_blocks_do_not_supply_headings(self) -> None:
+        for tag in ("script", "style", "textarea", "div", "table", "section", "details"):
+            with self.subTest(tag=tag):
+                event = self.event()
+                event["pull_request"]["body"] = f'<{tag} data-note=">">\n{BODY}\n</{tag}>'
+                report = check.evaluate(self.policy, event)
+                self.assertIn("pr_body_headings", report["failed"])
+
+    def test_blank_lines_do_not_expose_headings_in_opaque_container(self) -> None:
+        event = self.event()
+        event["pull_request"]["body"] = "<div hidden>\n\n" + BODY + "\n\n</div>"
+        self.assertIn("pr_body_headings", check.evaluate(self.policy, event)["failed"])
+
+    def test_raw_html_declarations_do_not_supply_headings(self) -> None:
+        for opening, closing in (("<![CDATA[", "]]>") , ("<?instruction", "?>"), ('<!DOCTYPE note "', '">')):
+            with self.subTest(opening=opening):
+                event = self.event()
+                event["pull_request"]["body"] = opening + "\n" + BODY + "\n" + closing
+                self.assertIn("pr_body_headings", check.evaluate(self.policy, event)["failed"])
+
+    def test_multiline_quoted_tag_attributes_cannot_supply_headings(self) -> None:
+        event = self.event()
+        event["pull_request"]["body"] = '<div data-note="quoted >\n' + BODY + '\n">\n</div>'
+        self.assertIn("pr_body_headings", check.evaluate(self.policy, event)["failed"])
+
+    def test_closed_html_regions_preserve_later_real_sections(self) -> None:
+        for prefix in (
+            '<div data-note=">">\n## Rights\nignored\n</div>\n',
+            '<table>\n<tr><td title="</table>">ignored</td></tr>\n</table>\n',
+            '<!-- `not code`\n## Rights\n-->\n',
+            '<![CDATA[\n## Rights\n]]>\n',
+            '<div>\n<div>\n</div>\n## Rights\n</div>\n',
+        ):
+            with self.subTest(prefix=prefix):
+                event = self.event()
+                event["pull_request"]["body"] = prefix + BODY
+                report = check.evaluate(self.policy, event)
+                self.assertTrue(report["pass"], report["failed"])
+
+    def test_special_raw_tag_names_use_exact_boundaries(self) -> None:
+        for tag in ("code-sample", "pre-view", "script-example", "style-note"):
+            with self.subTest(tag=tag):
+                event = self.event()
+                event["pull_request"]["body"] = f"<{tag}>\nignored\n</{tag}>\n\n" + BODY
+                report = check.evaluate(self.policy, event)
+                self.assertTrue(report["pass"], report["failed"])
+
+    def test_tag_removal_cannot_create_an_atx_heading(self) -> None:
+        event = self.event()
+        event["pull_request"]["body"] = BODY.replace("## Rights", "<span></span>## Rights")
+        self.assertIn("pr_body_headings", check.evaluate(self.policy, event)["failed"])
+
+    def test_valid_closing_hashes_are_normalized(self) -> None:
+        event = self.event()
+        event["pull_request"]["body"] = BODY
+        for name in check.HEADINGS:
+            event["pull_request"]["body"] = event["pull_request"]["body"].replace("## " + name + "\n", "## " + name + " ### \t\n")
+        report = check.evaluate(self.policy, event)
+        self.assertTrue(report["pass"], report["failed"])
+
+    def test_duplicate_closing_hash_heading_remains_ambiguous(self) -> None:
+        for heading in ("## Rights ###", "## Rights ## \t", "  ## Rights #"):
+            with self.subTest(heading=heading):
+                event = self.event()
+                event["pull_request"]["body"] = BODY + "\n" + heading + "\nAnother reason.\n"
+                report = check.evaluate(self.policy, event)
+                self.assertFalse(report["evidence_sections"]["Rights"])
+
+    def test_unseparated_hashes_do_not_become_closing_hashes(self) -> None:
+        event = self.event()
+        event["pull_request"]["body"] = BODY.replace("## Rights\n", "## Rights###\n")
+        self.assertFalse(check.evaluate(self.policy, event)["headings"]["Rights"])
+
+    def test_long_heading_whitespace_is_not_repeatedly_backtracked(self) -> None:
+        # Near the body bound, the former lazy capture / trailing-whitespace
+        # regex pair took quadratic time. Keep this a semantic, untimed test.
+        padding = " " * 200000
+        name = "Rights" + padding + "x"
+        self.assertEqual(check.evidence_sections("## " + name + "\nEvidence."), {name: ["Evidence.\n"]})
+        self.assertEqual(check.evidence_sections("## Rights" + padding + "###\nEvidence."), {"Rights": ["Evidence.\n"]})
+
+    def test_multiline_raw_closing_tag_preserves_following_sections(self) -> None:
+        for tag in ("pre", "code", "script", "style", "textarea"):
+            with self.subTest(tag=tag):
+                event = self.event()
+                event["pull_request"]["body"] = f"<{tag}>\nignored\n</{tag}\n>\n" + BODY
+                report = check.evaluate(self.policy, event)
+                self.assertTrue(report["pass"], report["failed"])
+
+    def test_body_bound_fails_closed_without_changing_advisory_authority(self) -> None:
+        event = self.event()
+        event["pull_request"]["body"] = BODY + " " * check.MAX_BODY_CHARS
+        report = check.evaluate(self.policy, event)
+        self.assertIn("pr_body_headings", report["failed"])
+        self.assertIn("pr_body_evidence", report["failed"])
+        self.assertEqual(report["enforcement"], "advisory")
+        self.assertEqual(report["schema"], "szl.provenance-check/v1")
+
 
 if __name__ == "__main__":
     unittest.main()
