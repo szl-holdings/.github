@@ -97,13 +97,12 @@ class EstateAlignmentContractTests(unittest.TestCase):
         self.assertIn("github.event_name == 'workflow_dispatch'", live_job)
         self.assertIn("needs.local-contract.result == 'success'", live_job)
         self.assertNotIn("github.event_name == 'push'", live_job)
-        # Scorecard DangerousWorkflow: checkout refs never carry workflow_run/pull_request
-        # head contexts directly; a guarded resolve step admits same-repository heads only.
-        exact_head = "${{ steps.source.outputs.sha }}"
-        self.assertGreaterEqual(workflow.count(exact_head), 4)
-        self.assertEqual(workflow.count("ref: ${{ steps.source.outputs.sha }}"), 2)
+        # Checkout uses the effect gate's admitted exact-event expression. The
+        # preceding guard rejects foreign PRs and stale workflow_run commits.
+        exact_head = "${{ github.event.pull_request.head.sha || github.event.merge_group.head_sha || github.sha }}"
+        self.assertEqual(workflow.count("ref: " + exact_head), 2)
+        self.assertEqual(workflow.count("ADMITTED_SHA: " + exact_head), 2)
         self.assertNotIn("ref: ${{ github.event.workflow_run.head_sha", workflow)
-        self.assertNotIn("ref: ${{ github.event.pull_request.head.sha", workflow)
         self.assertIn('[ "$RUN_HEAD_REPOSITORY" != "$THIS_REPOSITORY" ] || [ "$RUN_HEAD_BRANCH" != "main" ]', workflow)
         self.assertIn('[[ "$sha" =~ ^[0-9a-f]{40}$ ]]', workflow)
 
