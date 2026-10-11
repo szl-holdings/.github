@@ -401,9 +401,9 @@ class EstateAlignmentContractTests(unittest.TestCase):
 
         def list_hf(kind: str):
             if kind == "models":
-                return [{}] * 45
+                return [{}] * 48
             if kind == "datasets":
-                return [{}] * 34
+                return [{}] * 37
             return [{"id": repo_id} for repo_id in space_ids]
 
         seen: list[str] = []
