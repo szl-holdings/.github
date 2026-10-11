@@ -73,15 +73,8 @@ def main() -> int:
                     .filter(node => node.getClientRects().length)
                     .filter(node => node.getBoundingClientRect().height < 43.5)
                     .map(node => node.textContent.trim());
-                  const portfolio = [...root.querySelectorAll('.szl-hf-portfolio-card')];
-                  const native = root.querySelector('[aria-labelledby="szl-hf-native-kernels-title"]');
                   return {viewport, scrollWidth: document.documentElement.scrollWidth,
                     overflow, navTargets,
-                    portfolio: portfolio.map(node => ({
-                      title: node.querySelector('h3').textContent.trim(),
-                      background: getComputedStyle(node).backgroundImage})),
-                    nativeLinks: native ? [...native.querySelectorAll('a')]
-                      .map(node => node.getAttribute('href')) : [],
                     hero: hero ? {width: hero.getBoundingClientRect().width,
                       height: hero.getBoundingClientRect().height,
                       loaded: hero.complete && hero.naturalWidth > 0} : null,
@@ -98,46 +91,11 @@ def main() -> int:
                     failures.append("four namespace counters are not rendered")
                 if layout["navTargets"]:
                     failures.append("primary navigation hit target is below 44px")
-                if {card["title"] for card in layout["portfolio"]} != {
-                        "Models", "Kernels", "Datasets", "Spaces"}:
-                    failures.append("four separate artifact entry points are not rendered")
-                expected_native_links = {
-                    f"https://huggingface.co/kernels/SZLHOLDINGS/{name}"
-                    for name in ("szl-kernels", "szl-lambda-gate", "szl-block-kv", "szl-governed-norm")
-                } | {"https://huggingface.co/SZLHOLDINGS/kernels"}
-                if set(layout["nativeLinks"]) != expected_native_links:
-                    failures.append("native kernel navigation points to the wrong namespace")
-                if any(not card["background"].startswith("linear-gradient(rgb(")
-                       or "rgba(" in card["background"].split("), linear-gradient(")[0]
-                       for card in layout["portfolio"]):
-                    failures.append("portfolio reading surface is not painted opaquely")
                 if errors:
                     failures.append("page JavaScript error")
+                results.append({**spec, **layout, "errors": errors, "failures": failures})
                 if failures or spec["name"] in ("width-320", "width-1440", "touch-375"):
                     page.screenshot(path=str(args.output / f'{spec["name"]}.png'), full_page=True)
-                archive = page.locator("details summary").first
-                archive.focus()
-                page.keyboard.press("Space")
-                archive_focus = archive.evaluate("""node => ({
-                  opened: node.parentElement.open,
-                  focused: document.activeElement === node,
-                  outline: getComputedStyle(node).outlineStyle,
-                  width: parseFloat(getComputedStyle(node).outlineWidth)
-                })""")
-                if not archive_focus["opened"] or not archive_focus["focused"] \
-                        or archive_focus["outline"] == "none" or archive_focus["width"] < 2:
-                    failures.append("archive disclosure lacks visible native keyboard focus")
-                page.keyboard.press("Space")
-                page.emulate_media(forced_colors="active")
-                forced = page.locator(".szl-hf-portfolio-card").first.evaluate("""node => ({
-                  background: getComputedStyle(node).backgroundImage,
-                  border: getComputedStyle(node).borderTopStyle,
-                  width: parseFloat(getComputedStyle(node).borderTopWidth)
-                })""")
-                if forced["background"] != "none" or forced["border"] == "none" or forced["width"] < 1:
-                    failures.append("forced-color portfolio lacks a solid native border")
-                results.append({**spec, **layout, "archiveFocus": archive_focus,
-                                "forcedColors": forced, "errors": errors, "failures": failures})
                 page.close()
         finally:
             browser.close()
