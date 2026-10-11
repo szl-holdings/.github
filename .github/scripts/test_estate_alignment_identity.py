@@ -296,8 +296,8 @@ class AlignmentWorkflowBoundaryTests(unittest.TestCase):
         self.assertEqual(self.workflow.count("persist-credentials: false"), 2)
         self.assertIn('GITHUB_TOKEN: ${{ github.token }}', live)
         self.assertIn('--source-sha "$SOURCE_SHA"', local)
-        self.assertIn("name: estate-alignment-local\n", local)
-        self.assertIn("name: estate-alignment-live\n", live)
+        self.assertIn("name: estate-alignment-local-${{ github.run_id }}-${{ github.run_attempt }}\n", local)
+        self.assertIn("name: estate-alignment-live-${{ github.run_id }}-${{ github.run_attempt }}\n", live)
 
     def test_materialize_cli_never_reaches_provider_or_authority_operations(self) -> None:
         with tempfile.TemporaryDirectory() as folder:

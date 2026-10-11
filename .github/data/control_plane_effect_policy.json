@@ -434,8 +434,8 @@
         "readback": true
       },
       "trusted_transitives": {
-        ".github/scripts/control_plane_effect_gate.py": "sha256:61e903e8766d22741c95fc97bcd0474219194022d006d6414c87c25a06ae48bb",
-        ".github/scripts/test_control_plane_effect_gate.py": "sha256:71d08f1b8a8703070b653d97f6577545c0e525dbcfc3032b074fca2f3fa477ad"
+        ".github/scripts/control_plane_effect_gate.py": "sha256:f33f84da6bcb0baaf13a7ed94d1241d4f6ab4bd9d3558eabd4c028fb32002526",
+        ".github/scripts/test_control_plane_effect_gate.py": "sha256:9a124d80ab79d7b2d48261a5cbfc6cf4c2804b01afca2d4cecab75ee98e6a75e"
       },
       "reviewed_unknowns": {
         "files": {
@@ -692,8 +692,8 @@
         "readback": false
       },
       "trusted_transitives": {
-        ".github/scripts/control_plane_effect_gate.py": "sha256:61e903e8766d22741c95fc97bcd0474219194022d006d6414c87c25a06ae48bb",
-        ".github/scripts/test_control_plane_effect_gate.py": "sha256:71d08f1b8a8703070b653d97f6577545c0e525dbcfc3032b074fca2f3fa477ad"
+        ".github/scripts/control_plane_effect_gate.py": "sha256:f33f84da6bcb0baaf13a7ed94d1241d4f6ab4bd9d3558eabd4c028fb32002526",
+        ".github/scripts/test_control_plane_effect_gate.py": "sha256:9a124d80ab79d7b2d48261a5cbfc6cf4c2804b01afca2d4cecab75ee98e6a75e"
       },
       "reviewed_unknowns": {
         "files": {
@@ -4937,7 +4937,7 @@
     ".github/workflows/estate-one-fabric-alignment.yml": {
       "intent_id": "estate-one-fabric-alignment-readback-v1",
       "valid_until": "2026-11-30",
-      "source_sha256": "sha256:929db193b5748586ed716cc4887f4991e879c055e658475630b3231668372b7f",
+      "source_sha256": "sha256:49dc50159fda554781b964d3d5b386451fb0fd93788c6dbe52df2dc7696642c9",
       "credentials": [
         "GITHUB_TOKEN"
       ],
@@ -5038,9 +5038,9 @@
           ".github/scripts/estate_alignment_contract.py": "sha256:b2fcc8b1f8e2c761df78c3f767eea5b3572996ab3c0365d80c399bd912590024",
           ".github/scripts/hf_static_space_deploy.py": "sha256:2b3a5f7313c7b52b0b16e8caa7da7da22a999045c99a382c1ca4bbd2965b081f",
           ".github/scripts/test_estate_alignment_contract.py": "sha256:3efab2c5cfe8299cf82f1d906791850753794ec9450a13d31e6c75251f0f4a88",
-          ".github/scripts/test_estate_alignment_identity.py": "sha256:cb553fe9029b488f38e5df4c090772389c0e14292afedc88cc3b3ef7e0e56bc1",
+          ".github/scripts/test_estate_alignment_identity.py": "sha256:52690a47aba7d628357df5d3a3df2b80178b4cba68972fdc6a0e686abd1934bd",
           ".github/scripts/test_estate_alignment_org_card.py": "sha256:b7bf57ff12eae902a4cd3b994f18acbbf5e45fdc6dea45cdc3b11f2d69197b72",
-          ".github/workflows/estate-one-fabric-alignment.yml": "sha256:929db193b5748586ed716cc4887f4991e879c055e658475630b3231668372b7f"
+          ".github/workflows/estate-one-fabric-alignment.yml": "sha256:49dc50159fda554781b964d3d5b386451fb0fd93788c6dbe52df2dc7696642c9"
         },
         "unknowns": [
           "ACTION_INPUTS_REVIEW_REQUIRED@.github/workflows/estate-one-fabric-alignment.yml:105",
