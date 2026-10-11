@@ -93,7 +93,7 @@
     #szl-hf-org-card p a, #szl-hf-org-card dd a { color: var(--link); text-decoration: underline; text-underline-offset: 3px; }
     #szl-hf-org-card p a:hover, #szl-hf-org-card dd a:hover { color: var(--link-hover); }
     #szl-hf-org-card h1, #szl-hf-org-card h2, #szl-hf-org-card h3, #szl-hf-org-card p, #szl-hf-org-card a, #szl-hf-org-card code, #szl-hf-org-card dt, #szl-hf-org-card dd, #szl-hf-org-card li { overflow-wrap: anywhere; }
-    #szl-hf-org-card a:focus-visible { outline: var(--border-focus) solid var(--focus); outline-offset: 2px; }
+    #szl-hf-org-card a:focus-visible, #szl-hf-org-card summary:focus-visible { outline: var(--border-focus) solid var(--focus); outline-offset: 2px; }
     #szl-hf-org-card .szl-hf-skip { position: absolute; left: -9999px; top: 0; }
     #szl-hf-org-card .szl-hf-skip:focus { left: max(16px, env(safe-area-inset-left)); top: max(16px, env(safe-area-inset-top)); z-index: 30; border: 1px solid var(--border); border-radius: var(--radius-md); padding: 10px 14px; background: var(--surface); color: var(--text); }
     #szl-hf-org-card .szl-hf-shell { width: min(1180px, calc(100% - 40px)); max-width: 100%; margin: 0 auto; }
@@ -188,8 +188,9 @@
     #szl-hf-org-card .szl-hf-chain span { display: block; margin-top: 3px; font-size: 14px; }
     #szl-hf-org-card .szl-hf-flagship-note { margin: 14px 0 0; color: var(--text-sub); font-family: var(--font-mono); font-size: 12px; }
 
-    #szl-hf-org-card .szl-hf-portfolio { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; }
-    #szl-hf-org-card .szl-hf-portfolio-card { min-width: 0; border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 22px; background: var(--surface); box-shadow: var(--shadow-sm); }
+    #szl-hf-org-card .szl-hf-portfolio { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+    /* Opaque reading surface with the canonical silver/teal foil edge. */
+    #szl-hf-org-card .szl-hf-portfolio-card { min-width: 0; border: 1px solid transparent; border-radius: var(--radius-lg); padding: 22px; background: linear-gradient(var(--surface), var(--surface)) padding-box, linear-gradient(135deg, color-mix(in srgb, var(--color-silver-100) 56%, transparent), color-mix(in srgb, var(--color-yuyay-200) 42%, transparent), color-mix(in srgb, var(--color-silver-500) 28%, transparent)) border-box; box-shadow: var(--shadow-sm); }
     #szl-hf-org-card .szl-hf-portfolio-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 14px; }
     #szl-hf-org-card .szl-hf-portfolio-card h3 { margin: 7px 0 0; font-size: 27px; font-weight: 600; letter-spacing: var(--tracking-tight); }
     #szl-hf-org-card .szl-hf-type { border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 5px 8px; background: color-mix(in srgb, var(--text) 5%, transparent); color: var(--text-sub); font-size: 12px; font-weight: 600; letter-spacing: .02em; }
@@ -325,6 +326,7 @@
     }
     @media (forced-colors: active) {
       #szl-hf-org-card .szl-hf-brand-mark, #szl-hf-org-card .szl-hf-button, #szl-hf-org-card .szl-hf-journey, #szl-hf-org-card .szl-hf-portfolio-card, #szl-hf-org-card .szl-hf-truth-panel, #szl-hf-org-card .szl-hf-status-list a, #szl-hf-org-card .szl-hf-flagship, #szl-hf-org-card .szl-hf-chain a, #szl-hf-org-card .szl-hf-estate-panel { forced-color-adjust: auto; }
+      #szl-hf-org-card .szl-hf-portfolio-card { background: Canvas; border-color: CanvasText; }
     }
 
     /* 2026 public identity: restrained ground, shared orbital mark, readable text. */
@@ -526,9 +528,24 @@
                 <li><a class="szl-hf-card" href="https://huggingface.co/SZLHOLDINGS/SZL-Khipu-1.5B"><span>Khipu 1.5B</span><span>weights</span></a></li>
                 <li><a class="szl-hf-card" href="https://huggingface.co/SZLHOLDINGS/SZL-Forge-1.5B-ReceiptAgent"><span>ReceiptAgent</span><span>weights</span></a></li>
                 <li><a class="szl-hf-card" href="https://huggingface.co/SZLHOLDINGS/SZL-Khipu-1.5B-GGUF"><span>Khipu 1.5B GGUF</span><span>CPU serving</span></a></li>
-                <li><a class="szl-hf-card" href="https://huggingface.co/SZLHOLDINGS/szl-kernels"><span>SZL Kernels</span><span>software</span></a></li>
+                <li><a class="szl-hf-card" href="https://huggingface.co/SZLHOLDINGS/szl-kernels"><span>SZL Kernels mirror</span><span>software card</span></a></li>
               </ul>
               <a class="szl-hf-browse" href="https://huggingface.co/SZLHOLDINGS/models">View every model -&gt;</a>
+            </article>
+
+            <article class="szl-hf-portfolio-card" aria-labelledby="szl-hf-native-kernels-title">
+              <div class="szl-hf-portfolio-head">
+                <div><span class="szl-hf-index">Executable software</span><h3 id="szl-hf-native-kernels-title">Kernels</h3></div>
+                <span class="szl-hf-type">Native packages</span>
+              </div>
+              <p>Inspect the native package API, backend requirements and immutable loading contract before executing kernel code.</p>
+              <ul class="szl-hf-link-list">
+                <li><a class="szl-hf-card" href="https://huggingface.co/kernels/SZLHOLDINGS/szl-kernels"><span>SZL Kernels</span><span>Torch API</span></a></li>
+                <li><a class="szl-hf-card" href="https://huggingface.co/kernels/SZLHOLDINGS/szl-lambda-gate"><span>Lambda Gate</span><span>gate library</span></a></li>
+                <li><a class="szl-hf-card" href="https://huggingface.co/kernels/SZLHOLDINGS/szl-block-kv"><span>Block KV</span><span>cache kernel</span></a></li>
+                <li><a class="szl-hf-card" href="https://huggingface.co/kernels/SZLHOLDINGS/szl-governed-norm"><span>Governed Norm</span><span>compatibility</span></a></li>
+              </ul>
+              <a class="szl-hf-browse" href="https://huggingface.co/SZLHOLDINGS/kernels">View every native kernel -&gt;</a>
             </article>
 
             <article class="szl-hf-portfolio-card">
@@ -563,7 +580,7 @@
           </div>
           <div class="szl-hf-kernel-note">
             <h3>Governed kernels are software, not trained models.</h3>
-            <p>The Models surface groups source-bound executable kernels for discovery. Their cards must not imply neural training, benchmark coverage, or production authorization that their receipts do not establish.</p>
+            <p>Native packages and model-namespace card mirrors are separate repositories, even when their names match. Load only a verified native package revision; a mirror revision does not identify executable package bytes. Their cards must not imply neural training, benchmark coverage, or production authorization that their receipts do not establish.</p>
           </div>
         </section>
 
@@ -655,7 +672,7 @@
                 <dt>Six internal engines</dt>
                 <dd>CHAPAQ (folded into Killinchu), Lyte, Killinchu, Finance, Terra, Counsel.</dd>
                 <dt>Governed kernel suite</dt>
-                <dd>Source-bound kernel software has a native Kernels namespace and legacy model mirrors, indexed by <a href="https://huggingface.co/SZLHOLDINGS/szl-kernels">SZL Kernels</a>.</dd>
+                <dd>Source-bound kernel software has a <a href="https://huggingface.co/SZLHOLDINGS/kernels">native Kernels namespace</a> and separate <a href="https://huggingface.co/SZLHOLDINGS/szl-kernels">legacy model mirrors</a>.</dd>
                 <dt>Doctrine</dt>
                 <dd>v11 LOCKED. Λ uniqueness is Conjecture 1 (open); Khipu is tamper-evident (Conjectures 2 and 3); supply chain is L1 honest, L2 attested, L3 roadmap.</dd>
               </dl>
