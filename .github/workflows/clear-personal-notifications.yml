@@ -13,6 +13,12 @@ on:
       - .github/scripts/test_clear_personal_notifications.py
       - .github/workflows/clear-personal-notifications.yml
   workflow_dispatch:
+    inputs:
+      full_history:
+        description: Acknowledge the full notification history instead of the default 3-hour incremental window.
+        type: boolean
+        default: false
+        required: false
 
 permissions:
   contents: read
@@ -76,6 +82,10 @@ jobs:
       - name: Clear authenticated user notification inbox
         id: clearance
         shell: bash
+        env:
+          # Empty on push and false when the scheduler dispatches without
+          # inputs: both select the default incremental history window.
+          CLEARANCE_FULL_HISTORY: ${{ inputs.full_history }}
         run: |
           set +e
           python .github/scripts/clear_personal_notifications.py \
@@ -112,6 +122,8 @@ jobs:
               else:
                   report = json.loads(path.read_text(encoding='utf-8'))
                   out.write(f"Status: **{report.get('status', 'UNKNOWN')}**\n\n")
+                  out.write(f"History mode: **{report.get('history_mode', 'UNKNOWN')}** (since `{report.get('history_since')}`, lookback {report.get('history_lookback_seconds')} s)\n\n")
+                  out.write(f"Server-error retries observed: **{report.get('observed_server_error_retries', 'UNAVAILABLE')}**\n\n")
                   out.write(f"Authenticated identity: `{report.get('identity', 'UNAVAILABLE')}`\n\n")
                   out.write(f"Unread before (all=false): **{report.get('before_unread_count', 'UNAVAILABLE')}**\n\n")
                   out.write(f"Unread after (all=false): **{report.get('after_unread_count', 'UNAVAILABLE')}** ({report.get('after_unread_measurement', 'UNAVAILABLE')})\n\n")

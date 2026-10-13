@@ -26,6 +26,9 @@ sys.modules[SPEC.name] = clearer
 SPEC.loader.exec_module(clearer)
 
 BASE_TIME = datetime(2026, 10, 13, tzinfo=timezone.utc)
+# The offline harness pins the clearer's clock one hour after BASE_TIME, so
+# the default 3-hour window starts two hours before the fake's threads.
+NOW = BASE_TIME + timedelta(hours=1)
 
 
 class FakeGitHub:
@@ -46,6 +49,7 @@ class FakeGitHub:
         self.poll_interval = poll_interval
         self.deleted: list[str] = []
         self.reads: list[tuple[bool, int]] = []
+        self.since_by_read: list[tuple[bool, str | None]] = []
         self.on_delete = None
         self.on_page = None
         self.bump_on_delete = False
@@ -69,11 +73,20 @@ class FakeGitHub:
         moment = BASE_TIME + timedelta(seconds=int(updated))
         return moment.isoformat().replace("+00:00", "Z")
 
-    def ordered(self, include_read: bool) -> list[str]:
+    def ordered(self, include_read: bool, since: str | None = None) -> list[str]:
+        after = (
+            None
+            if since is None
+            else datetime.fromisoformat(since.replace("Z", "+00:00"))
+        )
         visible = [
             thread_id
             for thread_id, state in self.threads.items()
-            if include_read or (state["unread"] and not state["done"])
+            if (include_read or (state["unread"] and not state["done"]))
+            and (
+                after is None
+                or BASE_TIME + timedelta(seconds=int(state["updated"])) > after
+            )
         ]
         return sorted(
             visible,
@@ -95,6 +108,9 @@ class FakeGitHub:
             include_read = query["all"][0] == "true"
             page = int(query["page"][0])
             per_page = int(query["per_page"][0])
+            since = query.get("since", [None])[0]
+            if page == 1:
+                self.since_by_read.append((include_read, since))
             if self.clock is not None and page == 1:
                 self.clock.reads.append(self.clock.now)
             self.reads.append((include_read, page))
@@ -109,7 +125,7 @@ class FakeGitHub:
                 )
             if self.on_page is not None:
                 self.on_page(self, include_read, page)
-            ordered = self.ordered(include_read)
+            ordered = self.ordered(include_read, since)
             start = (page - 1) * per_page
             body = [
                 {
@@ -169,6 +185,7 @@ def offline(api: FakeGitHub):
         patch.object(clearer.time, "sleep", clock.sleep),
         patch.object(clearer.time, "monotonic", clock.monotonic),
         patch.object(clearer.time, "time", clock.time),
+        patch.object(clearer, "_now", lambda: NOW),
     ):
         yield clock
 
@@ -380,7 +397,9 @@ class AcknowledgementTests(unittest.TestCase):
         self.assertEqual(len(api.deleted), 61)
         self.assertEqual(len(set(api.deleted)), 61)
         self.assertEqual(set(api.deleted), set(api.threads))
-        self.assertEqual(report["rounds"], 2)
+        # Both threads the page shift hid from the history listing are unread,
+        # so the never-windowed unread listing catches them in the first round.
+        self.assertEqual(report["rounds"], 1)
         self.assertEqual(report["reacknowledged_after_update"], 0)
         self.assertEqual(report["api_history_last_count"], 61)
         self.assertEqual(report["status"], "UNREAD_ZERO_VERIFIED")
@@ -481,6 +500,57 @@ class AcknowledgementTests(unittest.TestCase):
         self.assertEqual(len(api.deleted), 2)
         self.assertEqual(report["after_unread_measurement"], "MEASURED")
         self.assertEqual(report["status"], "FAILED")
+
+    def test_default_history_is_an_incremental_since_window(self):
+        api = FakeGitHub(4)
+        old = int(-4 * 3600)
+        api.add("old-read", unread=False, updated=old)
+        api.add("old-done", unread=False, updated=old - 1)
+        api.threads["old-done"]["done"] = True
+        api.add("old-unread", unread=True, updated=old - 2)
+        with offline(api):
+            report = clearer.clear_notifications("classic-token")
+        since = clearer._iso(NOW - timedelta(hours=3))
+        self.assertEqual(report["history_mode"], "INCREMENTAL")
+        self.assertEqual(report["history_since"], since)
+        self.assertEqual(report["history_lookback_seconds"], 10800)
+        self.assertEqual(clearer.HISTORY_LOOKBACK_SECONDS, 3 * 3600)
+        history_reads = [s for include_read, s in api.since_by_read if include_read]
+        unread_reads = [s for include_read, s in api.since_by_read if not include_read]
+        self.assertTrue(history_reads and all(s == since for s in history_reads))
+        self.assertTrue(unread_reads and all(s is None for s in unread_reads))
+        # Read history older than the window is not re-acknowledged; an old
+        # unread thread is still reached through the unwindowed unread listing.
+        self.assertNotIn("old-read", api.deleted)
+        self.assertNotIn("old-done", api.deleted)
+        self.assertIn("old-unread", api.deleted)
+        self.assertEqual(set(api.deleted), {"1", "2", "3", "4", "old-unread"})
+        self.assertEqual(report["api_history_before_count"], 4)
+        self.assertEqual(report["status"], "UNREAD_ZERO_VERIFIED")
+        self.assertEqual(report["full_inbox_state"], "UNKNOWN")
+        assert_count_only(self, report, api)
+
+    def test_full_history_mode_is_opt_in_and_unwindowed(self):
+        api = FakeGitHub(2)
+        api.add("old-read", unread=False, updated=-4 * 3600)
+        with offline(api):
+            report = clearer.clear_notifications("classic-token", full_history=True)
+        self.assertEqual(report["history_mode"], "FULL_HISTORY")
+        self.assertIsNone(report["history_since"])
+        self.assertIsNone(report["history_lookback_seconds"])
+        self.assertTrue(all(s is None for _include_read, s in api.since_by_read))
+        self.assertIn("old-read", api.deleted)
+        self.assertEqual(report["status"], "UNREAD_ZERO_VERIFIED")
+        self.assertEqual(report["full_inbox_state"], "UNKNOWN")
+
+    def test_full_history_env_parsing_is_strict(self):
+        self.assertFalse(clearer.full_history_mode({}))
+        self.assertFalse(clearer.full_history_mode({"CLEARANCE_FULL_HISTORY": ""}))
+        self.assertFalse(clearer.full_history_mode({"CLEARANCE_FULL_HISTORY": "false"}))
+        self.assertTrue(clearer.full_history_mode({"CLEARANCE_FULL_HISTORY": "true"}))
+        for bad in ("yes", "True", "1", "full"):
+            with self.subTest(bad=bad), self.assertRaises(clearer.NotificationError):
+                clearer.full_history_mode({"CLEARANCE_FULL_HISTORY": bad})
 
     def test_missing_poll_interval_uses_fallback(self):
         api = FakeGitHub(1, poll_interval=None)
@@ -600,6 +670,127 @@ class RequestTests(unittest.TestCase):
         self.assertNotIn("retrying", stderr.getvalue())
         self.assertIn("Rate-limit retry", str(raised.exception))
         self.assertNotIn("secret-id", str(raised.exception))
+
+    def test_transient_server_error_is_retried_with_bounded_jittered_backoff(self):
+        stats = clearer.RequestStats()
+        response = FakeResponse(200, b"[]")
+        with (
+            contextlib.redirect_stderr(io.StringIO()),
+            patch.object(
+                clearer.urllib.request,
+                "urlopen",
+                side_effect=[http_error(status=503, detail=b"Server Error"), response],
+            ),
+            patch.object(clearer.time, "sleep") as sleeper,
+            patch.object(clearer.random, "random", return_value=0.5),
+        ):
+            status, payload, _headers = clearer.request(
+                "classic-token", "GET", "/notifications?all=true", stats=stats
+            )
+        self.assertEqual(status, 200)
+        self.assertEqual(payload, [])
+        sleeper.assert_called_once_with(clearer.SERVER_ERROR_BASE_SECONDS * 0.75)
+        self.assertEqual(stats.server_error_retries_observed, 1)
+        self.assertEqual(stats.rate_limit_retries_observed, 0)
+        self.assertEqual(stats.http_attempts, 2)
+
+    def test_server_error_backoff_doubles_and_is_capped(self):
+        with patch.object(clearer.random, "random", return_value=1.0):
+            delays = [clearer.server_error_delay(n) for n in range(8)]
+        self.assertEqual(delays[:4], [2.0, 4.0, 8.0, 16.0])
+        self.assertEqual(max(delays), clearer.SERVER_ERROR_MAX_SLEEP_SECONDS)
+        with patch.object(clearer.random, "random", return_value=0.0):
+            self.assertEqual(clearer.server_error_delay(0), 1.0)
+
+    def test_server_error_exhaustion_fails_closed_after_the_ceiling(self):
+        stats = clearer.RequestStats()
+        errors = [
+            http_error(status=status, detail=b"Server Error")
+            for status in (503, 500, 502, 504, 503)
+        ]
+        with (
+            contextlib.redirect_stderr(io.StringIO()),
+            patch.object(clearer.urllib.request, "urlopen", side_effect=errors) as opener,
+            patch.object(clearer.time, "sleep") as sleeper,
+        ):
+            with self.assertRaises(clearer.NotificationError) as raised:
+                clearer.request(
+                    "classic-token",
+                    "DELETE",
+                    "/notifications/threads/secret-id",
+                    stats=stats,
+                )
+        self.assertEqual(clearer.SERVER_ERROR_RETRIES, 4)
+        self.assertEqual(opener.call_count, 5)
+        self.assertEqual(sleeper.call_count, 4)
+        self.assertEqual(stats.server_error_retries_observed, 4)
+        self.assertIn("HTTP 503 after 4 server-error retries", str(raised.exception))
+        self.assertNotIn("secret-id", str(raised.exception))
+        self.assertNotIsInstance(raised.exception, clearer.DeadlineExceeded)
+
+    def test_server_error_retry_that_would_pass_job_deadline_is_refused(self):
+        stats = clearer.RequestStats()
+        stderr = io.StringIO()
+        with (
+            contextlib.redirect_stderr(stderr),
+            patch.object(
+                clearer.urllib.request,
+                "urlopen",
+                side_effect=[http_error(status=503, detail=b"Server Error")],
+            ) as opener,
+            patch.object(clearer.time, "sleep") as sleeper,
+            patch.object(clearer.time, "time", return_value=5000.0),
+            patch.object(clearer.random, "random", return_value=1.0),
+        ):
+            with self.assertRaises(clearer.DeadlineExceeded) as raised:
+                clearer.request(
+                    "classic-token",
+                    "GET",
+                    "/notifications?all=true",
+                    stats=stats,
+                    deadline=5001.0,
+                )
+        sleeper.assert_not_called()
+        self.assertEqual(opener.call_count, 1)
+        self.assertEqual(stats.server_error_retries_observed, 0)
+        self.assertIn("Server-error retry", str(raised.exception))
+        self.assertNotIn("retrying", stderr.getvalue())
+
+    def test_other_error_statuses_still_fail_closed_without_retry(self):
+        for status in (400, 401, 404, 422, 501, 505):
+            stats = clearer.RequestStats()
+            with (
+                self.subTest(status=status),
+                patch.object(
+                    clearer.urllib.request,
+                    "urlopen",
+                    side_effect=[http_error(status=status, detail=b"no")],
+                ) as opener,
+                patch.object(clearer.time, "sleep") as sleeper,
+            ):
+                with self.assertRaises(clearer.NotificationError):
+                    clearer.request("classic-token", "GET", "/notifications?all=true", stats=stats)
+                self.assertEqual(opener.call_count, 1)
+                sleeper.assert_not_called()
+                self.assertEqual(stats.server_error_retries_observed, 0)
+
+    def test_receipt_reports_observed_server_error_retries_from_a_run(self):
+        api = FakeGitHub(2)
+        real_request = api.request
+        failed = []
+
+        def flaky(token, method, path, payload=None, *, stats=None, deadline=None):
+            if method == "GET" and "all=false" in path and not failed:
+                failed.append(True)
+                if stats is not None:
+                    stats.server_error_retries_observed += 1
+            return real_request(token, method, path, payload, stats=stats, deadline=deadline)
+
+        with offline(api), patch.object(clearer, "request", flaky):
+            report = clearer.clear_notifications("classic-token")
+        self.assertEqual(report["observed_server_error_retries"], 1)
+        self.assertEqual(report["server_error_retry_ceiling"], 4)
+        self.assertEqual(report["status"], "UNREAD_ZERO_VERIFIED")
 
     def test_job_deadline_parses_epoch_and_rejects_invalid_values(self):
         self.assertIsNone(clearer.job_deadline({}))
@@ -818,6 +1009,70 @@ class WorkflowPhaseTests(unittest.TestCase):
         self.assertIn("No issue receipt is published.", workflow)
         self.assertIn("CLEARANCE_OUTCOME: ${{ steps.clearance.outcome }}", workflow)
         self.assertIn("CLEARANCE_EXIT_CODE: ${{ steps.clearance.outputs.exit_code }}", workflow)
+
+    def test_main_with_invalid_history_mode_fails_closed_without_api_calls(self):
+        with tempfile.TemporaryDirectory() as raw:
+            path = Path(raw) / "receipt.json"
+            with (
+                patch.dict(
+                    os.environ,
+                    {
+                        "GH_NOTIFICATIONS_TOKEN": "classic-token",
+                        "CLEARANCE_FULL_HISTORY": "yes",
+                    },
+                    clear=True,
+                ),
+                patch.object(
+                    clearer, "request", side_effect=AssertionError("no API call expected")
+                ),
+                contextlib.redirect_stdout(io.StringIO()),
+            ):
+                code = clearer.main(["--report", str(path)])
+            report = json.loads(path.read_text(encoding="utf-8"))
+        self.assertEqual(code, 1)
+        self.assertEqual(report["status"], "FAILED")
+        self.assertEqual(report["history_mode"], "UNKNOWN")
+        self.assertIn("CLEARANCE_FULL_HISTORY", report["errors"][0])
+
+    def test_main_passes_the_full_history_request_through(self):
+        with tempfile.TemporaryDirectory() as raw:
+            path = Path(raw) / "receipt.json"
+            for value, expected in (("true", True), ("false", False), ("", False)):
+                with (
+                    self.subTest(value=value),
+                    patch.dict(
+                        os.environ,
+                        {"GH_NOTIFICATIONS_TOKEN": "classic-token", "CLEARANCE_FULL_HISTORY": value},
+                        clear=True,
+                    ),
+                    patch.object(
+                        clearer, "clear_notifications", return_value={"status": "FAILED"}
+                    ) as runner,
+                    patch.object(clearer, "_write_report"),
+                    contextlib.redirect_stdout(io.StringIO()),
+                ):
+                    clearer.main(["--report", str(path)])
+                    self.assertIs(runner.call_args.kwargs["full_history"], expected)
+
+    def test_workflow_full_history_is_an_explicit_dispatch_input_defaulting_false(self):
+        workflow = self.workflow_text()
+        self.assertIn(
+            "  workflow_dispatch:\n    inputs:\n      full_history:\n", workflow
+        )
+        block = workflow.split("      full_history:\n", 1)[1].split("\npermissions:", 1)[0]
+        self.assertIn("type: boolean", block)
+        self.assertIn("default: false", block)
+        self.assertIn("CLEARANCE_FULL_HISTORY: ${{ inputs.full_history }}", workflow)
+        self.assertEqual(workflow.count("inputs.full_history"), 1)
+
+    def test_scheduler_dispatch_passes_no_inputs_so_the_default_is_incremental(self):
+        scheduler = (
+            MODULE_PATH.parents[1] / "workflows" / "notification-inbox-scheduler.yml"
+        ).read_text(encoding="utf-8")
+        dispatch = scheduler.split("gh workflow run clear-personal-notifications.yml", 1)[1]
+        dispatch = dispatch.split("\n\n", 1)[0]
+        for flag in (" -f ", " -F ", "--field", "--raw-field", "--json", "full_history"):
+            self.assertNotIn(flag, dispatch)
 
     def test_main_with_invalid_job_deadline_fails_closed_without_api_calls(self):
         with tempfile.TemporaryDirectory() as raw:
