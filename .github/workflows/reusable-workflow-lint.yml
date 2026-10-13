@@ -67,19 +67,51 @@ jobs:
           FAIL_ON_WARN: ${{ inputs.fail-on-zizmor-warning }}
         run: |
           set -euo pipefail
-          # Run in SARIF mode for code-scanning upload; also emit plain text
-          # to the logs so reviewers can read findings without leaving the run.
-          zizmor --format=sarif .github/workflows > zizmor.sarif || true
-          zizmor --format=plain .github/workflows | tee zizmor.txt || true
+          # zizmor's exit status is the verdict. 0 means no findings. 11-14
+          # means findings, and the value is the highest severity reported:
+          # 13 is medium ("warning" in plain output), 14 is high ("error").
+          # SARIF mode exits 0 with findings. Any other status (1 audit
+          # error, 2 usage error, 3 no inputs collected, 10 retired since
+          # zizmor 1.14, 126/127 missing binary, 128+ signal) is a scanner
+          # failure and fails the job. The plain-text report is not parsed:
+          # zizmor 1.24.1 colours it when CI=true, which Actions always sets,
+          # so a line-start pattern such as '^error' never matches a finding.
+          #
+          # SARIF for the code-scanning upload, then plain text in the log so
+          # reviewers can read findings without leaving the run.
+          sarif_status=0
+          zizmor --format=sarif .github/workflows > zizmor.sarif || sarif_status=$?
+          plain_status=0
+          zizmor --format=plain .github/workflows || plain_status=$?
 
-          # Decide pass/fail
-          if [ "${FAIL_ON_WARN}" = "true" ]; then
-            # Fail on any finding
-            ! grep -E '^(error|warning)' zizmor.txt
-          else
-            # Fail only on errors
-            ! grep -E '^error' zizmor.txt
+          scanner_failed=0
+          for run in "sarif:${sarif_status}" "plain:${plain_status}"; do
+            case "${run#*:}" in
+              0|1[1-4]) ;;
+              *)
+                echo "::error::zizmor --format=${run%%:*} exited ${run#*:}: the scanner failed, so this run has no audit result."
+                scanner_failed=1
+                ;;
+            esac
+          done
+          if [ "${scanner_failed}" -ne 0 ]; then
+            exit 1
           fi
+          if [ ! -s zizmor.sarif ]; then
+            echo "::error::zizmor exited ${sarif_status} but wrote no SARIF report."
+            exit 1
+          fi
+
+          if [ "${FAIL_ON_WARN}" = "true" ]; then
+            threshold=13
+          else
+            threshold=14
+          fi
+          if [ "${plain_status}" -ge "${threshold}" ]; then
+            echo "::error::zizmor reported findings at or above the failure threshold (exit ${plain_status}, threshold ${threshold})."
+            exit 1
+          fi
+          echo "zizmor passed: exit ${plain_status}, failure threshold ${threshold}."
 
       - name: Upload SARIF to code-scanning
         if: always() && hashFiles('zizmor.sarif') != ''
