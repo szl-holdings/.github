@@ -302,10 +302,14 @@ def test_source_contains_no_content_dns_cloudflare_or_hf_mutator() -> None:
         assert fragment not in text
 
 
-def test_drift_issue_lookup_does_not_shell_split_the_title() -> None:
+def test_workflow_publishes_no_issue_and_holds_no_write_permission() -> None:
     text = WORKFLOW_PATH.read_text(encoding="utf-8")
-    assert '--search \\"$title in:title\\"' not in text
-    assert 'select(.title == "[runtime] Canonical public-origin drift")' in text
+    for fragment in ("issues: write", ": write", "gh issue", "GH_TOKEN", "ref: main", "github.run_id", "github.run_attempt"):
+        assert fragment not in text, fragment
+    assert "          name: public-estate-convergence-v2\n" in text
+    assert 'test "$GITHUB_REF" = "refs/heads/main"' in text
+    assert "No issue receipt is published." in text
+    assert 'code="$CONVERGE_EXIT_CODE"' in text
 
 
 if __name__ == "__main__":
