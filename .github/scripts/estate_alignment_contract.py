@@ -172,6 +172,7 @@ def validate_contract(contract: Mapping[str, Any]) -> list[str]:
     if isinstance(snapshot, dict):
         require(snapshot.get("policy_authority") is False, "Hub inventory must not be publication policy", failures)
         require(snapshot.get("governed_keep_list") == "docs/CANONICAL_FLEET.md", "governed keep-list authority mismatch", failures)
+        require(snapshot.get("observed_at_scope") == "Portfolio and inventory-only Space membership; model and dataset counts have separate observation times.", "Hub observation scope mismatch", failures)
         require(
             snapshot.get("claim_boundary")
             == "Public Hub inventory evidence only; not availability, operational readiness, or publication policy.",
@@ -200,8 +201,10 @@ def validate_contract(contract: Mapping[str, Any]) -> list[str]:
         require(snapshot.get("portfolio_space_count") == 16, "portfolio_space_count must be 16", failures)
         require(snapshot.get("public_space_count") == 17, "public_space_count must be 17", failures)
         require(snapshot.get("public_space_count") == snapshot.get("portfolio_space_count") + len(inventory_only or []), "public Space decomposition mismatch", failures)
-        require(snapshot.get("model_count") == 45, "model_count must be 45", failures)
-        require(snapshot.get("dataset_count") == 34, "dataset_count must be 34", failures)
+        require(snapshot.get("model_count") == 48, "model_count must be 48", failures)
+        require(snapshot.get("model_count_observed_at") == "2026-10-11T14:19:39Z", "model count observation time mismatch", failures)
+        require(snapshot.get("dataset_count") == 37, "dataset_count must be 37", failures)
+        require(snapshot.get("dataset_count_observed_at") == "2026-10-11T14:19:39Z", "dataset count observation time mismatch", failures)
         require(snapshot.get("organization_card_space_excluded_from_portfolio_count") == ORG_CARD_SPACE_ID, "README control-surface exclusion missing", failures)
 
     org_card = contract.get("organization_card_control_surface")

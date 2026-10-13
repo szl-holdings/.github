@@ -314,7 +314,7 @@
       "trusted_transitives": {},
       "reviewed_unknowns": {
         "files": {
-          ".github/scripts/estate_alignment_contract.py": "sha256:b23da4f50a93508080d23443cc50f6f14cd0910fe8f4eb1306fee341cf9e1145",
+          ".github/scripts/estate_alignment_contract.py": "sha256:b2fcc8b1f8e2c761df78c3f767eea5b3572996ab3c0365d80c399bd912590024",
           ".github/scripts/estate_operational_inventory.py": "sha256:e0a7870da14e2ebe1cf71a3edabd10ff01c3e93b6d22c1cd39596e5830de2874",
           ".github/scripts/router_flagship_contract.py": "sha256:b191e2fcad51426867d4272ba7064cadc15489073047aeb2a682443e774c9265",
           ".github/scripts/test_estate_operational_inventory.py": "sha256:548bc88fecab7e98d751ae4a281b1f583c41cb5d7c379d4feba0cbddb338f8f2",
@@ -324,11 +324,11 @@
           "ACTION_INPUTS_REVIEW_REQUIRED@.github/workflows/estate-operational-inventory.yml:28",
           "ACTION_INPUTS_REVIEW_REQUIRED@.github/workflows/estate-operational-inventory.yml:33",
           "GITHUB_TARGET_UNRESOLVED@.github/scripts/estate_operational_inventory.py:62",
-          "HTTP_TARGET_UNRESOLVED@.github/scripts/estate_alignment_contract.py:338",
+          "HTTP_TARGET_UNRESOLVED@.github/scripts/estate_alignment_contract.py:341",
           "PYTHON_CLIENT_UNRESOLVED@.github/scripts/estate_operational_inventory.py:183",
           "PYTHON_CLIENT_UNRESOLVED@.github/scripts/estate_operational_inventory.py:83",
           "PYTHON_DYNAMIC_EXECUTION@.github/scripts/estate_operational_inventory.py:307",
-          "PYTHON_DYNAMIC_SUBPROCESS@.github/scripts/estate_alignment_contract.py:820",
+          "PYTHON_DYNAMIC_SUBPROCESS@.github/scripts/estate_alignment_contract.py:823",
           "PYTHON_IMPORT_UNRESOLVED@.github/scripts/estate_alignment_contract.py:14",
           "PYTHON_IMPORT_UNRESOLVED@.github/scripts/estate_alignment_contract.py:15",
           "PYTHON_IMPORT_UNRESOLVED@.github/scripts/estate_alignment_contract.py:16",
@@ -434,8 +434,8 @@
         "readback": true
       },
       "trusted_transitives": {
-        ".github/scripts/control_plane_effect_gate.py": "sha256:61e903e8766d22741c95fc97bcd0474219194022d006d6414c87c25a06ae48bb",
-        ".github/scripts/test_control_plane_effect_gate.py": "sha256:71d08f1b8a8703070b653d97f6577545c0e525dbcfc3032b074fca2f3fa477ad"
+        ".github/scripts/control_plane_effect_gate.py": "sha256:f33f84da6bcb0baaf13a7ed94d1241d4f6ab4bd9d3558eabd4c028fb32002526",
+        ".github/scripts/test_control_plane_effect_gate.py": "sha256:9a124d80ab79d7b2d48261a5cbfc6cf4c2804b01afca2d4cecab75ee98e6a75e"
       },
       "reviewed_unknowns": {
         "files": {
@@ -692,8 +692,8 @@
         "readback": false
       },
       "trusted_transitives": {
-        ".github/scripts/control_plane_effect_gate.py": "sha256:61e903e8766d22741c95fc97bcd0474219194022d006d6414c87c25a06ae48bb",
-        ".github/scripts/test_control_plane_effect_gate.py": "sha256:71d08f1b8a8703070b653d97f6577545c0e525dbcfc3032b074fca2f3fa477ad"
+        ".github/scripts/control_plane_effect_gate.py": "sha256:f33f84da6bcb0baaf13a7ed94d1241d4f6ab4bd9d3558eabd4c028fb32002526",
+        ".github/scripts/test_control_plane_effect_gate.py": "sha256:9a124d80ab79d7b2d48261a5cbfc6cf4c2804b01afca2d4cecab75ee98e6a75e"
       },
       "reviewed_unknowns": {
         "files": {
@@ -3214,12 +3214,12 @@
         "files": {
           ".github/scripts/final_estate_reconciliation_v5.py": "sha256:2086a9570d12bd2d5c231874897c1502ce86c39b88bd562527f46d6a70cf9f9c",
           ".github/scripts/final_estate_v5_artifacts.py": "sha256:b8a7c4da9a972a0ebccfce15b8024cd90bffafaab1877ce68212f94b8bb09db0",
-          ".github/scripts/final_estate_v5_core.py": "sha256:44ba2b0b1f5c278d8ba65c20968a3052b6f0041ae30fd727fa611319c0fc15aa",
-          ".github/scripts/final_estate_v5_evidence.py": "sha256:3d6641b3701554a76c5e1097bdf7d179568aaa4169f3b07058d9630634ba0366",
+          ".github/scripts/final_estate_v5_core.py": "sha256:4aae9a1cdf89a534b1ebb556d0d30d4007fc6db68d158c7499c07540f0eae811",
+          ".github/scripts/final_estate_v5_evidence.py": "sha256:44a0ed550949bc146d1a7f2c08fbda37cde2d3f3ca868f14ea549736d58e8596",
           ".github/scripts/final_estate_v5_inventory.py": "sha256:94b24c5322e07da3ebb85f436fa0e139ee0009a0a1f27d844076022471c11f6f",
           ".github/scripts/final_estate_v5_probes.py": "sha256:7fc8fb1d0471b81d2b2cac9e5cf7ba60cbb193f6c98e50d6d946fef039e86381",
           ".github/scripts/test_final_estate_v5_artifacts.py": "sha256:847da69da079e78e0442a3fc67d621d78091721f3812453328945aca31e4f1a6",
-          ".github/scripts/test_final_estate_v5_evidence.py": "sha256:d19a5048a8f62ef6c7aef2781e17701041cc3f45f5d2862eedea19cf63f71479",
+          ".github/scripts/test_final_estate_v5_evidence.py": "sha256:3ba8c2a96a0a8d8e74596695ea89bdbcdeba2555c0a71b7d30da49a15b9d00e8",
           ".github/scripts/test_final_estate_v5_inventory.py": "sha256:fb02d77822468f399e9240e0b920dc110374a2f2b7fb6866be80fc872dc44795",
           ".github/scripts/test_final_estate_v5_probes.py": "sha256:b698ca534e618f25d4a63afa58e396977bfe698b791b160e641aa1cdcaf4bd7e",
           ".github/scripts/test_final_estate_v5_upstream.py": "sha256:c127238a701eaea5e43db8c67383bb54aaa4c38af734e0557108dcc0d3bb37f6",
@@ -3285,9 +3285,10 @@
           "PYTHON_IMPORT_UNRESOLVED@.github/scripts/test_final_estate_v5_artifacts.py:2",
           "PYTHON_IMPORT_UNRESOLVED@.github/scripts/test_final_estate_v5_artifacts.py:4",
           "PYTHON_IMPORT_UNRESOLVED@.github/scripts/test_final_estate_v5_artifacts.py:6",
-          "PYTHON_IMPORT_UNRESOLVED@.github/scripts/test_final_estate_v5_evidence.py:17",
+          "PYTHON_IMPORT_UNRESOLVED@.github/scripts/test_final_estate_v5_evidence.py:19",
           "PYTHON_IMPORT_UNRESOLVED@.github/scripts/test_final_estate_v5_evidence.py:2",
-          "PYTHON_IMPORT_UNRESOLVED@.github/scripts/test_final_estate_v5_evidence.py:8",
+          "PYTHON_IMPORT_UNRESOLVED@.github/scripts/test_final_estate_v5_evidence.py:4",
+          "PYTHON_IMPORT_UNRESOLVED@.github/scripts/test_final_estate_v5_evidence.py:9",
           "PYTHON_IMPORT_UNRESOLVED@.github/scripts/test_final_estate_v5_inventory.py:11",
           "PYTHON_IMPORT_UNRESOLVED@.github/scripts/test_final_estate_v5_inventory.py:12",
           "PYTHON_IMPORT_UNRESOLVED@.github/scripts/test_final_estate_v5_inventory.py:13",
@@ -3438,12 +3439,12 @@
         "files": {
           ".github/scripts/final_estate_reconciliation_v5.py": "sha256:2086a9570d12bd2d5c231874897c1502ce86c39b88bd562527f46d6a70cf9f9c",
           ".github/scripts/final_estate_v5_artifacts.py": "sha256:b8a7c4da9a972a0ebccfce15b8024cd90bffafaab1877ce68212f94b8bb09db0",
-          ".github/scripts/final_estate_v5_core.py": "sha256:44ba2b0b1f5c278d8ba65c20968a3052b6f0041ae30fd727fa611319c0fc15aa",
-          ".github/scripts/final_estate_v5_evidence.py": "sha256:3d6641b3701554a76c5e1097bdf7d179568aaa4169f3b07058d9630634ba0366",
+          ".github/scripts/final_estate_v5_core.py": "sha256:4aae9a1cdf89a534b1ebb556d0d30d4007fc6db68d158c7499c07540f0eae811",
+          ".github/scripts/final_estate_v5_evidence.py": "sha256:44a0ed550949bc146d1a7f2c08fbda37cde2d3f3ca868f14ea549736d58e8596",
           ".github/scripts/final_estate_v5_inventory.py": "sha256:94b24c5322e07da3ebb85f436fa0e139ee0009a0a1f27d844076022471c11f6f",
           ".github/scripts/final_estate_v5_probes.py": "sha256:7fc8fb1d0471b81d2b2cac9e5cf7ba60cbb193f6c98e50d6d946fef039e86381",
           ".github/scripts/test_final_estate_v5_artifacts.py": "sha256:847da69da079e78e0442a3fc67d621d78091721f3812453328945aca31e4f1a6",
-          ".github/scripts/test_final_estate_v5_evidence.py": "sha256:d19a5048a8f62ef6c7aef2781e17701041cc3f45f5d2862eedea19cf63f71479",
+          ".github/scripts/test_final_estate_v5_evidence.py": "sha256:3ba8c2a96a0a8d8e74596695ea89bdbcdeba2555c0a71b7d30da49a15b9d00e8",
           ".github/scripts/test_final_estate_v5_inventory.py": "sha256:fb02d77822468f399e9240e0b920dc110374a2f2b7fb6866be80fc872dc44795",
           ".github/scripts/test_final_estate_v5_probes.py": "sha256:b698ca534e618f25d4a63afa58e396977bfe698b791b160e641aa1cdcaf4bd7e",
           ".github/scripts/test_final_estate_v5_upstream.py": "sha256:c127238a701eaea5e43db8c67383bb54aaa4c38af734e0557108dcc0d3bb37f6",
@@ -3508,9 +3509,10 @@
           "PYTHON_IMPORT_UNRESOLVED@.github/scripts/test_final_estate_v5_artifacts.py:2",
           "PYTHON_IMPORT_UNRESOLVED@.github/scripts/test_final_estate_v5_artifacts.py:4",
           "PYTHON_IMPORT_UNRESOLVED@.github/scripts/test_final_estate_v5_artifacts.py:6",
-          "PYTHON_IMPORT_UNRESOLVED@.github/scripts/test_final_estate_v5_evidence.py:17",
+          "PYTHON_IMPORT_UNRESOLVED@.github/scripts/test_final_estate_v5_evidence.py:19",
           "PYTHON_IMPORT_UNRESOLVED@.github/scripts/test_final_estate_v5_evidence.py:2",
-          "PYTHON_IMPORT_UNRESOLVED@.github/scripts/test_final_estate_v5_evidence.py:8",
+          "PYTHON_IMPORT_UNRESOLVED@.github/scripts/test_final_estate_v5_evidence.py:4",
+          "PYTHON_IMPORT_UNRESOLVED@.github/scripts/test_final_estate_v5_evidence.py:9",
           "PYTHON_IMPORT_UNRESOLVED@.github/scripts/test_final_estate_v5_inventory.py:11",
           "PYTHON_IMPORT_UNRESOLVED@.github/scripts/test_final_estate_v5_inventory.py:12",
           "PYTHON_IMPORT_UNRESOLVED@.github/scripts/test_final_estate_v5_inventory.py:13",
@@ -4931,6 +4933,273 @@
           "SHELL_COMPOSITION_UNKNOWN@.github/workflows/test-hf-publisher-credential-selector.yml:46",
           "SHELL_COMPOSITION_UNKNOWN@.github/workflows/test-hf-publisher-credential-selector.yml:47",
           "SHELL_COMPOSITION_UNKNOWN@.github/workflows/test-hf-publisher-credential-selector.yml:48"
+        ]
+      }
+    },
+    ".github/workflows/estate-one-fabric-alignment.yml": {
+      "intent_id": "estate-one-fabric-alignment-readback-v1",
+      "valid_until": "2026-11-30",
+      "source_sha256": "sha256:49dc50159fda554781b964d3d5b386451fb0fd93788c6dbe52df2dc7696642c9",
+      "credentials": [
+        "GITHUB_TOKEN"
+      ],
+      "resources": [
+        {
+          "key": "github:actions:artifact:estate-alignment-live",
+          "access": "external-write"
+        },
+        {
+          "key": "github:actions:artifact:estate-alignment-local",
+          "access": "external-write"
+        },
+        {
+          "key": "github:repository:szl-holdings/.github:contents",
+          "access": "read"
+        },
+        {
+          "key": "huggingface:space:SZLHOLDINGS/README:contents",
+          "access": "external-write"
+        },
+        {
+          "key": "runner:guard:egress",
+          "access": "local-write"
+        },
+        {
+          "key": "runner:toolchain:python",
+          "access": "local-write"
+        },
+        {
+          "key": "stepsecurity:monitor:szl-holdings/.github",
+          "access": "external-write"
+        }
+      ],
+      "effects": [
+        {
+          "sink": "github.artifact.upload",
+          "resource": "github:actions:artifact:estate-alignment-live",
+          "access": "external-write",
+          "max_calls": 1
+        },
+        {
+          "sink": "github.artifact.upload",
+          "resource": "github:actions:artifact:estate-alignment-local",
+          "access": "external-write",
+          "max_calls": 1
+        },
+        {
+          "sink": "github.contents.checkout",
+          "resource": "github:repository:szl-holdings/.github:contents",
+          "access": "read",
+          "max_calls": 2
+        },
+        {
+          "sink": "runner.guard.configure",
+          "resource": "runner:guard:egress",
+          "access": "local-write",
+          "max_calls": 2
+        },
+        {
+          "sink": "runner.guard.telemetry",
+          "resource": "stepsecurity:monitor:szl-holdings/.github",
+          "access": "external-write",
+          "max_calls": 2
+        },
+        {
+          "sink": "runner.toolchain.install",
+          "resource": "runner:toolchain:python",
+          "access": "local-write",
+          "max_calls": 2
+        },
+        {
+          "sink": "sdk.repository.create_commit",
+          "resource": "huggingface:space:SZLHOLDINGS/README:contents",
+          "access": "external-write",
+          "max_calls": 1
+        }
+      ],
+      "max_external_writes": 5,
+      "required_controls": {
+        "triggers": [
+          "pull_request",
+          "push",
+          "schedule",
+          "workflow_dispatch",
+          "workflow_run"
+        ],
+        "contents_read": true,
+        "no_explicit_secrets": false,
+        "concurrency": true,
+        "protected_ref": false,
+        "exact_sha": false,
+        "expected_before": false,
+        "readback": false
+      },
+      "trusted_transitives": {},
+      "reviewed_unknowns": {
+        "files": {
+          ".github/scripts/estate_alignment_contract.py": "sha256:b2fcc8b1f8e2c761df78c3f767eea5b3572996ab3c0365d80c399bd912590024",
+          ".github/scripts/hf_static_space_deploy.py": "sha256:2b3a5f7313c7b52b0b16e8caa7da7da22a999045c99a382c1ca4bbd2965b081f",
+          ".github/scripts/test_estate_alignment_contract.py": "sha256:3efab2c5cfe8299cf82f1d906791850753794ec9450a13d31e6c75251f0f4a88",
+          ".github/scripts/test_estate_alignment_identity.py": "sha256:52690a47aba7d628357df5d3a3df2b80178b4cba68972fdc6a0e686abd1934bd",
+          ".github/scripts/test_estate_alignment_org_card.py": "sha256:b7bf57ff12eae902a4cd3b994f18acbbf5e45fdc6dea45cdc3b11f2d69197b72",
+          ".github/workflows/estate-one-fabric-alignment.yml": "sha256:49dc50159fda554781b964d3d5b386451fb0fd93788c6dbe52df2dc7696642c9"
+        },
+        "unknowns": [
+          "ACTION_INPUTS_REVIEW_REQUIRED@.github/workflows/estate-one-fabric-alignment.yml:105",
+          "ACTION_INPUTS_REVIEW_REQUIRED@.github/workflows/estate-one-fabric-alignment.yml:145",
+          "ACTION_INPUTS_REVIEW_REQUIRED@.github/workflows/estate-one-fabric-alignment.yml:170",
+          "ACTION_INPUTS_REVIEW_REQUIRED@.github/workflows/estate-one-fabric-alignment.yml:215",
+          "ACTION_INPUTS_REVIEW_REQUIRED@.github/workflows/estate-one-fabric-alignment.yml:222",
+          "ACTION_INPUTS_REVIEW_REQUIRED@.github/workflows/estate-one-fabric-alignment.yml:238",
+          "ACTION_INPUTS_REVIEW_REQUIRED@.github/workflows/estate-one-fabric-alignment.yml:53",
+          "ACTION_INPUTS_REVIEW_REQUIRED@.github/workflows/estate-one-fabric-alignment.yml:98",
+          "DYNAMIC_EXECUTION@.github/workflows/estate-one-fabric-alignment.yml:137",
+          "DYNAMIC_EXECUTION@.github/workflows/estate-one-fabric-alignment.yml:201",
+          "DYNAMIC_EXECUTION@.github/workflows/estate-one-fabric-alignment.yml:207",
+          "DYNAMIC_EXECUTION@.github/workflows/estate-one-fabric-alignment.yml:84",
+          "DYNAMIC_EXECUTION@.github/workflows/estate-one-fabric-alignment.yml:90",
+          "HTTP_TARGET_UNRESOLVED@.github/scripts/estate_alignment_contract.py:341",
+          "HTTP_TARGET_UNRESOLVED@.github/scripts/hf_static_space_deploy.py:378",
+          "HTTP_TARGET_UNRESOLVED@.github/scripts/hf_static_space_deploy.py:527",
+          "PYTHON_DYNAMIC_EXECUTION@.github/scripts/hf_static_space_deploy.py:552",
+          "PYTHON_DYNAMIC_EXECUTION@.github/scripts/hf_static_space_deploy.py:815",
+          "PYTHON_DYNAMIC_EXECUTION@.github/scripts/hf_static_space_deploy.py:847",
+          "PYTHON_DYNAMIC_EXECUTION@.github/scripts/hf_static_space_deploy.py:849",
+          "PYTHON_DYNAMIC_EXECUTION@.github/scripts/hf_static_space_deploy.py:904",
+          "PYTHON_DYNAMIC_SUBPROCESS@.github/scripts/estate_alignment_contract.py:823",
+          "PYTHON_DYNAMIC_SUBPROCESS@.github/scripts/test_estate_alignment_identity.py:167",
+          "PYTHON_DYNAMIC_SUBPROCESS@.github/scripts/test_estate_alignment_identity.py:244",
+          "PYTHON_IMPORT_UNRESOLVED@.github/scripts/estate_alignment_contract.py:14",
+          "PYTHON_IMPORT_UNRESOLVED@.github/scripts/estate_alignment_contract.py:15",
+          "PYTHON_IMPORT_UNRESOLVED@.github/scripts/estate_alignment_contract.py:16",
+          "PYTHON_IMPORT_UNRESOLVED@.github/scripts/estate_alignment_contract.py:17",
+          "PYTHON_IMPORT_UNRESOLVED@.github/scripts/estate_alignment_contract.py:4",
+          "PYTHON_IMPORT_UNRESOLVED@.github/scripts/estate_alignment_contract.py:6",
+          "PYTHON_IMPORT_UNRESOLVED@.github/scripts/estate_alignment_contract.py:7",
+          "PYTHON_IMPORT_UNRESOLVED@.github/scripts/hf_static_space_deploy.py:15",
+          "PYTHON_IMPORT_UNRESOLVED@.github/scripts/hf_static_space_deploy.py:16",
+          "PYTHON_IMPORT_UNRESOLVED@.github/scripts/hf_static_space_deploy.py:17",
+          "PYTHON_IMPORT_UNRESOLVED@.github/scripts/hf_static_space_deploy.py:21",
+          "PYTHON_IMPORT_UNRESOLVED@.github/scripts/hf_static_space_deploy.py:22",
+          "PYTHON_IMPORT_UNRESOLVED@.github/scripts/hf_static_space_deploy.py:23",
+          "PYTHON_IMPORT_UNRESOLVED@.github/scripts/hf_static_space_deploy.py:4",
+          "PYTHON_IMPORT_UNRESOLVED@.github/scripts/hf_static_space_deploy.py:6",
+          "PYTHON_IMPORT_UNRESOLVED@.github/scripts/hf_static_space_deploy.py:781",
+          "PYTHON_IMPORT_UNRESOLVED@.github/scripts/hf_static_space_deploy.py:9",
+          "PYTHON_IMPORT_UNRESOLVED@.github/scripts/test_estate_alignment_contract.py:3",
+          "PYTHON_IMPORT_UNRESOLVED@.github/scripts/test_estate_alignment_contract.py:5",
+          "PYTHON_IMPORT_UNRESOLVED@.github/scripts/test_estate_alignment_contract.py:6",
+          "PYTHON_IMPORT_UNRESOLVED@.github/scripts/test_estate_alignment_identity.py:10",
+          "PYTHON_IMPORT_UNRESOLVED@.github/scripts/test_estate_alignment_identity.py:14",
+          "PYTHON_IMPORT_UNRESOLVED@.github/scripts/test_estate_alignment_identity.py:16",
+          "PYTHON_IMPORT_UNRESOLVED@.github/scripts/test_estate_alignment_identity.py:20",
+          "PYTHON_IMPORT_UNRESOLVED@.github/scripts/test_estate_alignment_identity.py:21",
+          "PYTHON_IMPORT_UNRESOLVED@.github/scripts/test_estate_alignment_identity.py:4",
+          "PYTHON_IMPORT_UNRESOLVED@.github/scripts/test_estate_alignment_identity.py:6",
+          "PYTHON_IMPORT_UNRESOLVED@.github/scripts/test_estate_alignment_org_card.py:4",
+          "PYTHON_IMPORT_UNRESOLVED@.github/scripts/test_estate_alignment_org_card.py:6",
+          "PYTHON_IMPORT_UNRESOLVED@.github/scripts/test_estate_alignment_org_card.py:7",
+          "PYTHON_SOURCE_REVIEW_REQUIRED@.github/scripts/estate_alignment_contract.py:1",
+          "PYTHON_SOURCE_REVIEW_REQUIRED@.github/scripts/hf_static_space_deploy.py:1",
+          "PYTHON_SOURCE_REVIEW_REQUIRED@.github/scripts/test_estate_alignment_contract.py:1",
+          "PYTHON_SOURCE_REVIEW_REQUIRED@.github/scripts/test_estate_alignment_identity.py:1",
+          "PYTHON_SOURCE_REVIEW_REQUIRED@.github/scripts/test_estate_alignment_org_card.py:1",
+          "SCRIPT_SOURCE_REVIEW_REQUIRED@.github/workflows/estate-one-fabric-alignment.yml:1",
+          "SDK_TARGET_UNRESOLVED@.github/scripts/hf_static_space_deploy.py:807",
+          "SECRET_EXPRESSION_REVIEW_REQUIRED@.github/workflows/estate-one-fabric-alignment.yml:1",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/scripts/hf_static_space_deploy.py:504",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/estate-one-fabric-alignment.yml:109",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/estate-one-fabric-alignment.yml:117",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/estate-one-fabric-alignment.yml:118",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/estate-one-fabric-alignment.yml:119",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/estate-one-fabric-alignment.yml:125",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/estate-one-fabric-alignment.yml:134",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/estate-one-fabric-alignment.yml:135",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/estate-one-fabric-alignment.yml:136",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/estate-one-fabric-alignment.yml:137",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/estate-one-fabric-alignment.yml:138",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/estate-one-fabric-alignment.yml:139",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/estate-one-fabric-alignment.yml:186",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/estate-one-fabric-alignment.yml:187",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/estate-one-fabric-alignment.yml:188",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/estate-one-fabric-alignment.yml:189",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/estate-one-fabric-alignment.yml:190",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/estate-one-fabric-alignment.yml:191",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/estate-one-fabric-alignment.yml:192",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/estate-one-fabric-alignment.yml:193",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/estate-one-fabric-alignment.yml:194",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/estate-one-fabric-alignment.yml:195",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/estate-one-fabric-alignment.yml:196",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/estate-one-fabric-alignment.yml:197",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/estate-one-fabric-alignment.yml:198",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/estate-one-fabric-alignment.yml:199",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/estate-one-fabric-alignment.yml:200",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/estate-one-fabric-alignment.yml:201",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/estate-one-fabric-alignment.yml:202",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/estate-one-fabric-alignment.yml:203",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/estate-one-fabric-alignment.yml:206",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/estate-one-fabric-alignment.yml:207",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/estate-one-fabric-alignment.yml:208",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/estate-one-fabric-alignment.yml:209",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/estate-one-fabric-alignment.yml:210",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/estate-one-fabric-alignment.yml:229",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/estate-one-fabric-alignment.yml:69",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/estate-one-fabric-alignment.yml:70",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/estate-one-fabric-alignment.yml:71",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/estate-one-fabric-alignment.yml:72",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/estate-one-fabric-alignment.yml:73",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/estate-one-fabric-alignment.yml:74",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/estate-one-fabric-alignment.yml:75",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/estate-one-fabric-alignment.yml:76",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/estate-one-fabric-alignment.yml:77",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/estate-one-fabric-alignment.yml:78",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/estate-one-fabric-alignment.yml:79",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/estate-one-fabric-alignment.yml:80",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/estate-one-fabric-alignment.yml:81",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/estate-one-fabric-alignment.yml:82",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/estate-one-fabric-alignment.yml:83",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/estate-one-fabric-alignment.yml:84",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/estate-one-fabric-alignment.yml:85",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/estate-one-fabric-alignment.yml:86",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/estate-one-fabric-alignment.yml:89",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/estate-one-fabric-alignment.yml:90",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/estate-one-fabric-alignment.yml:91",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/estate-one-fabric-alignment.yml:92",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/estate-one-fabric-alignment.yml:93",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/estate-one-fabric-alignment.yml:134",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/estate-one-fabric-alignment.yml:135",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/estate-one-fabric-alignment.yml:136",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/estate-one-fabric-alignment.yml:137",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/estate-one-fabric-alignment.yml:138",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/estate-one-fabric-alignment.yml:186",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/estate-one-fabric-alignment.yml:187",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/estate-one-fabric-alignment.yml:188",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/estate-one-fabric-alignment.yml:189",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/estate-one-fabric-alignment.yml:192",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/estate-one-fabric-alignment.yml:193",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/estate-one-fabric-alignment.yml:194",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/estate-one-fabric-alignment.yml:198",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/estate-one-fabric-alignment.yml:200",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/estate-one-fabric-alignment.yml:201",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/estate-one-fabric-alignment.yml:206",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/estate-one-fabric-alignment.yml:210",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/estate-one-fabric-alignment.yml:69",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/estate-one-fabric-alignment.yml:70",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/estate-one-fabric-alignment.yml:71",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/estate-one-fabric-alignment.yml:72",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/estate-one-fabric-alignment.yml:75",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/estate-one-fabric-alignment.yml:76",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/estate-one-fabric-alignment.yml:77",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/estate-one-fabric-alignment.yml:81",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/estate-one-fabric-alignment.yml:83",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/estate-one-fabric-alignment.yml:84",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/estate-one-fabric-alignment.yml:89",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/estate-one-fabric-alignment.yml:93",
+          "WORKFLOW_ENVIRONMENT_REVIEW_REQUIRED@.github/workflows/estate-one-fabric-alignment.yml:123",
+          "WORKFLOW_ENVIRONMENT_REVIEW_REQUIRED@.github/workflows/estate-one-fabric-alignment.yml:131",
+          "WORKFLOW_ENVIRONMENT_REVIEW_REQUIRED@.github/workflows/estate-one-fabric-alignment.yml:175",
+          "WORKFLOW_ENVIRONMENT_REVIEW_REQUIRED@.github/workflows/estate-one-fabric-alignment.yml:226",
+          "WORKFLOW_ENVIRONMENT_REVIEW_REQUIRED@.github/workflows/estate-one-fabric-alignment.yml:58"
         ]
       }
     }

@@ -74,7 +74,12 @@ Explicit authentication inputs must resolve wholly to named secret or
 is denied without recording its value. Artifact names bind the
 actual literal destination. Only the enforcing workflow's exact
 `control-plane-effect-${{ github.run_id }}` template maps to its declared
-run-scoped artifact namespace. Other dynamic names, non-archived uploads,
+run-scoped artifact namespace. The alignment workflow alone also admits its two
+exact `estate-alignment-{local,live}-${{ github.run_id }}-${{ github.run_attempt }}`
+templates, each bound to its distinct declared artifact namespace. Those fixed
+platform identifiers preserve separate retry receipts without overwrite/delete
+authority; arbitrary expressions and use from other workflow paths remain denied.
+Other dynamic names, non-archived uploads,
 overwriting/deleting artifacts, Python cache writes, and checkout options
 that fetch unmodeled resources are denied. A checkout cannot substitute
 foreign repository or revision bytes for pinned local dependencies. Unknown

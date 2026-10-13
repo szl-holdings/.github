@@ -801,6 +801,60 @@ class YamlBoundaryRegressionTests(unittest.TestCase):
                 _parsed, corrected = bind_source(source, candidate=candidate)
                 self.assertEqual(corrected["verdict"], "ALLOW")
 
+    def bind_alignment_artifact(self, name: str, *, path: str = ".github/workflows/estate-one-fabric-alignment.yml", extra: str = "") -> dict:
+        source = workflow(extra_step=f"      - uses: {UPLOAD_ACTION}\n        with: {{name: {json.dumps(name)}{extra}}}\n")
+        parsed = gate.analyze_workflow_source(source.decode(), path=path)
+        resource = "github:actions:artifact:estate-alignment-local"
+        if name.startswith("estate-alignment-live-"):
+            resource = "github:actions:artifact:estate-alignment-live"
+        candidate = policy_for(source, workflow_path=path,
+            extra_resources=[{"key": resource, "access": "external-write"}],
+            extra_effects=[{"sink": "github.artifact.upload", "resource": resource, "access": "external-write", "max_calls": 1}],
+            max_external_writes=1)
+        declaration = candidate["workflow_declarations"][path]
+        declaration["reviewed_unknowns"] = {
+            "files": {path: gate.sha256_bytes(source)},
+            "unknowns": sorted({f"{item.code}@{item.path}:{item.line}" for item in parsed["unknowns"]}),
+        }
+        normalized = gate.load_policy_bytes(policy_bytes(candidate), as_of=AS_OF)
+        return gate.bind_declaration(path, source, parsed, normalized["workflow_declarations"][path], {})
+
+    def test_alignment_attempt_artifacts_bind_two_exact_namespaces(self) -> None:
+        for name in ("estate-alignment-local", "estate-alignment-live"):
+            with self.subTest(name=name):
+                bound = self.bind_alignment_artifact(name + "-${{ github.run_id }}-${{ github.run_attempt }}")
+                self.assertEqual(bound["verdict"], "ALLOW")
+                uploads = [item for item in bound["effects"] if item["sink"] == "github.artifact.upload"]
+                self.assertEqual(len(uploads), 1)
+                self.assertEqual(uploads[0]["resource"], "github:actions:artifact:" + name)
+                self.assertEqual(bound["external_write_sites"], 1)
+
+    def test_alignment_artifact_templates_cannot_expand_source_or_destination(self) -> None:
+        exact = "estate-alignment-local-${{ github.run_id }}-${{ github.run_attempt }}"
+        for name, path in (
+            (exact, WORKFLOW_PATH),
+            (exact, ".github/workflows/estate-one-fabric-alignment.yaml"),
+            (exact.replace("local", "other"), ".github/workflows/estate-one-fabric-alignment.yml"),
+            (exact.replace("-${{ github.run_attempt }}", ""), ".github/workflows/estate-one-fabric-alignment.yml"),
+            (exact.replace("github.run_attempt", "inputs.attempt"), ".github/workflows/estate-one-fabric-alignment.yml"),
+            (exact.replace("github.run_id", "github.run_id || inputs.name"), ".github/workflows/estate-one-fabric-alignment.yml"),
+            (exact + "-${{ github.repository }}", ".github/workflows/estate-one-fabric-alignment.yml"),
+        ):
+            with self.subTest(name=name, path=path):
+                bound = self.bind_alignment_artifact(name, path=path)
+                self.assertEqual(bound["verdict"], "DENY")
+                self.assertIn("UNREVIEWABLE_EFFECT_BOUNDARY", bound["reason_codes"])
+                self.assertFalse(bound["reviewed_unknowns_applied"])
+
+    def test_alignment_attempt_artifacts_cannot_delete_or_overwrite(self) -> None:
+        for extra in (", overwrite: true", ", OVERWRITE: true", ", archive: false"):
+            with self.subTest(extra=extra):
+                bound = self.bind_alignment_artifact(
+                    "estate-alignment-local-${{ github.run_id }}-${{ github.run_attempt }}", extra=extra)
+                self.assertEqual(bound["verdict"], "DENY")
+                self.assertIn("UNREVIEWABLE_EFFECT_BOUNDARY", bound["reason_codes"])
+                self.assertFalse(bound["reviewed_unknowns_applied"])
+
     def test_upload_overwrite_and_dynamic_names_remain_nonwaivable(self) -> None:
         for inputs in (
             "        with: {name: other-artifact, overwrite: true}\n",
