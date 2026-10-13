@@ -1228,6 +1228,13 @@ def analyze_workflow_source(source: str, *, path: str) -> dict[str, Any]:
                             # This exact run-scoped namespace is the enforcing
                             # workflow contract, not an arbitrary dynamic name.
                             resource = "github:actions:artifact:control-plane-effect"
+                        elif path == ".github/workflows/estate-one-fabric-alignment.yml" and artifact in {
+                            "estate-alignment-local-${{ github.run_id }}-${{ github.run_attempt }}",
+                            "estate-alignment-live-${{ github.run_id }}-${{ github.run_attempt }}",
+                        }:
+                            # Exact reviewed attempt-scoped destinations preserve
+                            # every retry receipt without overwrite/delete authority.
+                            resource = "github:actions:artifact:" + artifact.split("-${{", 1)[0]
                         elif re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._-]*", artifact):
                             resource = f"github:actions:artifact:{artifact}"
                         else:

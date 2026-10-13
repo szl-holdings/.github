@@ -148,7 +148,7 @@ class LifecycleTests(unittest.TestCase):
         )
         return report, code, api
 
-    def test_policy_is_exact_authenticated_inventory_and_public_only(self) -> None:
+    def test_policy_is_exact_inventory_with_factory_observation_only(self) -> None:
         policy, targets = module.load_policy(POLICY)
         self.assertEqual(len(targets), 46)
         self.assertEqual(set(targets), module.ALLOWED_REPO_IDS)
@@ -165,9 +165,15 @@ class LifecycleTests(unittest.TestCase):
             policy["token_authority"]["required_target_write_preflight"],
             'HfApi.auth_check(repo_id=target, repo_type="space", write=True)',
         )
-        self.assertTrue(all(target.visibility == "public" for target in targets.values()))
+        factory = targets[module.OBSERVATION_ONLY_FACTORY]
+        self.assertEqual(
+            (factory.visibility, factory.runtime_stage, factory.role),
+            ("private", "PAUSED", "factory"),
+        )
         self.assertTrue(
-            all(target.runtime_stage == "RUNNING" for target in targets.values())
+            target.visibility == "public" and target.runtime_stage == "RUNNING"
+            for repo_id, target in targets.items()
+            if repo_id != module.OBSERVATION_ONLY_FACTORY
         )
 
     def test_policy_rejects_unknown_duplicate_wildcard_private_and_weakened_boundary(self) -> None:
@@ -184,6 +190,21 @@ class LifecycleTests(unittest.TestCase):
         private = copy.deepcopy(self.policy)
         private["targets"][0]["desired_visibility"] = "private"
         mutations.append(private)
+        paused = copy.deepcopy(self.policy)
+        paused["targets"][0]["desired_runtime_stage"] = "PAUSED"
+        mutations.append(paused)
+        for field, value in (
+            ("desired_visibility", "public"),
+            ("desired_runtime_stage", "RUNNING"),
+            ("role", "product"),
+        ):
+            changed_factory = copy.deepcopy(self.policy)
+            target = next(
+                item for item in changed_factory["targets"]
+                if item["repo_id"] == module.OBSERVATION_ONLY_FACTORY
+            )
+            target[field] = value
+            mutations.append(changed_factory)
         weakened = copy.deepcopy(self.policy)
         weakened["boundaries"]["archive"] = True
         mutations.append(weakened)
@@ -349,6 +370,55 @@ class LifecycleTests(unittest.TestCase):
         )
         self.assertEqual(code, 2)
         self.assertEqual(report["result"], "BLOCKED_PRECONDITION")
+        self.assertEqual(api.mutations, [])
+
+    def test_factory_plan_observes_private_paused_without_write_preflight(self) -> None:
+        repo_id = module.OBSERVATION_ONLY_FACTORY
+        current = state(repo_id, "private", "PAUSED")
+        api = FakeApi({repo_id: current})
+        api.write_authorized_targets.clear()
+        report, code, api = self.run_controller(repo_id, current, api=api)
+        self.assertEqual(code, 0)
+        self.assertEqual(report["result"], "PLANNED_OBSERVATION_ONLY")
+        self.assertTrue(report["convergence"]["full_policy_converged"])
+        self.assertEqual(report["planned_transition"], None)
+        self.assertEqual(
+            report["operator"]["target_write_authority"],
+            "NOT_REQUESTED_OBSERVATION_ONLY",
+        )
+        self.assertEqual(api.auth_checks, [])
+        self.assertEqual(api.mutations, [])
+
+        drifted = state(repo_id, "public", "RUNNING")
+        report, code, api = self.run_controller(repo_id, drifted)
+        self.assertEqual(code, 0)
+        self.assertEqual(report["result"], "PLANNED_OBSERVATION_ONLY")
+        self.assertFalse(report["convergence"]["full_policy_converged"])
+        self.assertEqual(report["planned_transition"], None)
+        self.assertEqual(api.mutations, [])
+
+    def test_factory_apply_and_transition_block_before_provider_access(self) -> None:
+        repo_id = module.OBSERVATION_ONLY_FACTORY
+        current = state(repo_id, "private", "PAUSED")
+        for mode, transition in (("apply", "inspect"), ("apply", "private-to-public"),
+                                 ("plan", "private-to-public")):
+            with self.subTest(mode=mode, transition=transition):
+                api = FakeApi({repo_id: current})
+                report, code, api = self.run_controller(
+                    repo_id, current, mode=mode, transition=transition,
+                    expected=True, expected_policy=True, api=api,
+                )
+                self.assertEqual(code, 2)
+                self.assertEqual(report["result"], "BLOCKED_PRECONDITION")
+                self.assertNotIn("operator", report)
+                self.assertNotIn("before", report)
+                self.assertFalse(report["provider_request"]["attempted"])
+                self.assertEqual(api.auth_checks, [])
+                self.assertEqual(api.mutations, [])
+
+        api = FakeApi({repo_id: current})
+        with self.assertRaises(module.LifecycleError):
+            module.HubSpaceClient(api).set_public(repo_id)
         self.assertEqual(api.mutations, [])
 
     def test_apply_requires_policy_digest_exact_before_and_transition(self) -> None:

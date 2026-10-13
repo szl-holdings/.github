@@ -114,9 +114,12 @@
     "governed_keep_list": "docs/CANONICAL_FLEET.md",
     "claim_boundary": "Public Hub inventory evidence only; not availability, operational readiness, or publication policy.",
     "observed_at": "2026-09-05T21:41:24Z",
+    "observed_at_scope": "Portfolio and inventory-only Space membership; model and dataset counts have separate observation times.",
     "portfolio_space_count": 16,
-    "model_count": 45,
-    "dataset_count": 34,
+    "model_count": 48,
+    "model_count_observed_at": "2026-10-11T14:19:39Z",
+    "dataset_count": 37,
+    "dataset_count_observed_at": "2026-10-11T14:19:39Z",
     "organization_card_space_excluded_from_portfolio_count": "SZLHOLDINGS/README",
     "portfolio_spaces": [
       {
