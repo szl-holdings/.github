@@ -7,12 +7,21 @@ GitHub notification API requires a classic personal access token with
 ``notifications`` or ``repo`` scope; GitHub App and fine-grained tokens are
 intentionally unsupported by that API.
 
-Measurement contract (``szl.github-notification-clearance/v3``):
+Measurement contract (``szl.github-notification-clearance/v4``):
 
 * ``GET /notifications?all=true`` is the API *history* listing. It returns
-  unread, read and already-Done threads, sorted by latest update. Its length is
-  reported as ``api_history_*_count`` and is never treated as the active inbox:
-  a thread acknowledged as Done stays in that history.
+  unread, read and already-Done threads, sorted by latest update, and is never
+  treated as the active inbox: a thread acknowledged as Done stays in it.
+* By default (``history_mode`` ``INCREMENTAL``) the history listing is
+  windowed with ``since=<run start - 3 hours>``, an hourly schedule plus two
+  hours of overlap, so a run no longer re-acknowledges the whole history.
+  ``FULL_HISTORY`` lists the whole history and is used only when explicitly
+  requested (``CLEARANCE_FULL_HISTORY=true``). The window is reported as
+  ``history_since`` and ``history_lookback_seconds``; ``api_history_*_count``
+  counts the threads inside it.
+* The unread listing (``all=false``) is never windowed. The first round
+  acknowledges the windowed history plus every unread thread, so an unread
+  thread older than the window is still acknowledged once.
 * ``DELETE /notifications/threads/{id}`` ("Mark a thread as done") returning
   HTTP 204 is an acknowledgement, not a verified removal. The number of
   distinct threads with at least one accepted acknowledgement is
@@ -35,7 +44,11 @@ Measurement contract (``szl.github-notification-clearance/v3``):
   artifact ``github-notification-clearance-receipts``.
 
 Mutations are serial and paced. Rate-limit responses (HTTP 403/429) honor
-``Retry-After`` or ``X-RateLimit-Reset`` before retrying, and later listing
+``Retry-After`` or ``X-RateLimit-Reset`` before retrying. Transient server
+errors (HTTP 500/502/503/504) are retried at most four times per request with
+bounded exponential backoff and jitter, counted as
+``observed_server_error_retries``; any other error status fails closed. Later
+listing
 reads honor the full ``X-Poll-Interval`` returned by the previous listing.
 Every wait is bounded by the job deadline the workflow records once, at job
 start, in ``CLEARANCE_DEADLINE_EPOCH``: a wait that would end after it is
@@ -50,6 +63,7 @@ import argparse
 import json
 import math
 import os
+import random
 import sys
 import time
 import urllib.error
@@ -57,13 +71,13 @@ import urllib.parse
 import urllib.request
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, NamedTuple
 
 API = "https://api.github.com"
 API_VERSION = "2022-11-28"
-SCHEMA = "szl.github-notification-clearance/v3"
+SCHEMA = "szl.github-notification-clearance/v4"
 PER_PAGE = 50
 MAX_PAGES = 200
 MAX_ROUNDS = 8
@@ -76,6 +90,17 @@ RATE_LIMIT_RETRIES = 8
 RATE_LIMIT_FALLBACK_SECONDS = 60.0
 RATE_LIMIT_MAX_SLEEP_SECONDS = 3700.0
 RATE_LIMIT_SAFETY_SECONDS = 5.0
+# Transient server errors are retried with bounded exponential backoff and
+# jitter. Every wait still has to fit inside the job deadline.
+SERVER_ERROR_STATUSES = frozenset({500, 502, 503, 504})
+SERVER_ERROR_RETRIES = 4
+SERVER_ERROR_BASE_SECONDS = 2.0
+SERVER_ERROR_MAX_SLEEP_SECONDS = 60.0
+# Incremental history window: an hourly scheduler plus two hours of overlap.
+HISTORY_LOOKBACK_SECONDS = 3 * 3600
+FULL_HISTORY_ENV = "CLEARANCE_FULL_HISTORY"
+MODE_INCREMENTAL = "INCREMENTAL"
+MODE_FULL_HISTORY = "FULL_HISTORY"
 # Used only when a listing response carries no X-Poll-Interval header. A
 # server-provided interval is honored in full; the job deadline bounds it.
 POLL_INTERVAL_FALLBACK_SECONDS = 60.0
@@ -126,6 +151,7 @@ class RequestStats:
     logical_calls: int = 0
     http_attempts: int = 0
     rate_limit_retries_observed: int = 0
+    server_error_retries_observed: int = 0
 
 
 @dataclass
@@ -137,8 +163,16 @@ class Listing:
     poll_interval_seconds: float | None = None
 
 
+def _now() -> datetime:
+    return datetime.now(timezone.utc)
+
+
+def _iso(moment: datetime) -> str:
+    return moment.astimezone(timezone.utc).isoformat().replace("+00:00", "Z")
+
+
 def utc_now() -> str:
-    return datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
+    return _iso(_now())
 
 
 def _safe_path(path: str) -> str:
@@ -170,6 +204,24 @@ def _positive_number(value: str) -> float | None:
     if not math.isfinite(number) or number < 0:
         return None
     return number
+
+
+def full_history_mode(environ: Mapping[str, str]) -> bool:
+    """Return True only for an explicit full-history request."""
+    raw = str(environ.get(FULL_HISTORY_ENV, "") or "").strip()
+    if raw in ("", "false"):
+        return False
+    if raw == "true":
+        return True
+    raise NotificationError(f"{FULL_HISTORY_ENV} must be true, false or empty")
+
+
+def server_error_delay(attempt: int) -> float:
+    """Bounded exponential backoff with jitter for one transient 5xx retry."""
+    ceiling = min(
+        SERVER_ERROR_MAX_SLEEP_SECONDS, SERVER_ERROR_BASE_SECONDS * (2**attempt)
+    )
+    return ceiling * (0.5 + 0.5 * random.random())
 
 
 def job_deadline(environ: Mapping[str, str]) -> float | None:
@@ -246,17 +298,21 @@ def request(
     stats: RequestStats | None = None,
     deadline: float | None = None,
 ) -> ApiResponse:
-    """Issue one logical REST request, retrying only observed rate limits.
+    """Issue one logical REST request, retrying rate limits and transient 5xx.
 
     ``stats.logical_calls`` counts this call once; ``stats.http_attempts``
     counts every HTTP attempt; ``stats.rate_limit_retries_observed`` counts
-    retries caused by a real HTTP 403/429 rate-limit response.
+    retries caused by a real HTTP 403/429 rate-limit response, and
+    ``stats.server_error_retries_observed`` retries caused by HTTP
+    500/502/503/504. Any other error status fails closed.
     """
     body = None if payload is None else json.dumps(payload).encode("utf-8")
     if stats is not None:
         stats.logical_calls += 1
 
-    for attempt in range(RATE_LIMIT_RETRIES + 1):
+    rate_limit_retries = 0
+    server_error_retries = 0
+    while True:
         req = urllib.request.Request(
             API + path,
             data=body,
@@ -265,7 +321,7 @@ def request(
                 "Accept": "application/vnd.github+json",
                 "Authorization": f"Bearer {token}",
                 "X-GitHub-Api-Version": API_VERSION,
-                "User-Agent": "szl-clear-personal-notifications/3.0",
+                "User-Agent": "szl-clear-personal-notifications/4.0",
                 **({"Content-Type": "application/json"} if body is not None else {}),
             },
         )
@@ -282,25 +338,50 @@ def request(
                 status=exc.code,
                 detail=detail,
                 headers=exc.headers,
-                attempt=attempt,
+                attempt=rate_limit_retries,
             )
-            if delay is not None and attempt < RATE_LIMIT_RETRIES:
+            if delay is not None and rate_limit_retries < RATE_LIMIT_RETRIES:
                 # Refuse before counting or announcing a retry that cannot fit.
                 ensure_within_deadline(delay, deadline=deadline, reason="Rate-limit retry")
+                rate_limit_retries += 1
                 if stats is not None:
                     stats.rate_limit_retries_observed += 1
                 print(
                     "GitHub rate limit encountered; "
                     f"retrying after {math.ceil(delay)} second(s) "
-                    f"(attempt {attempt + 1}/{RATE_LIMIT_RETRIES}).",
+                    f"(attempt {rate_limit_retries}/{RATE_LIMIT_RETRIES}).",
                     file=sys.stderr,
                     flush=True,
                 )
                 time.sleep(delay)
                 continue
+            if (
+                delay is None
+                and exc.code in SERVER_ERROR_STATUSES
+                and server_error_retries < SERVER_ERROR_RETRIES
+            ):
+                delay = server_error_delay(server_error_retries)
+                ensure_within_deadline(delay, deadline=deadline, reason="Server-error retry")
+                server_error_retries += 1
+                if stats is not None:
+                    stats.server_error_retries_observed += 1
+                print(
+                    f"GitHub server error HTTP {exc.code} on {method} {_safe_path(path)}; "
+                    f"retrying after {math.ceil(delay)} second(s) "
+                    f"(retry {server_error_retries}/{SERVER_ERROR_RETRIES}).",
+                    file=sys.stderr,
+                    flush=True,
+                )
+                time.sleep(delay)
+                continue
+            exhausted = (
+                f" after {server_error_retries} server-error retries"
+                if exc.code in SERVER_ERROR_STATUSES
+                else ""
+            )
             raise NotificationError(
                 f"GitHub API {method} {_safe_path(path)} failed "
-                f"HTTP {exc.code}: {detail}"
+                f"HTTP {exc.code}{exhausted}: {detail}"
             ) from exc
         except Exception as exc:  # noqa: BLE001
             raise NotificationError(
@@ -316,8 +397,6 @@ def request(
             raise NotificationError(
                 f"GitHub API {method} {_safe_path(path)} returned non-JSON content"
             ) from exc
-
-    raise AssertionError("rate-limit retry loop exhausted without returning")
 
 
 def _thread_version(value: Any) -> datetime:
@@ -341,24 +420,27 @@ def list_notification_threads(
     include_read: bool,
     stats: RequestStats | None = None,
     deadline: float | None = None,
+    since: datetime | None = None,
 ) -> Listing:
     """Enumerate one paginated listing as ``{thread_id: updated_at}``.
 
     ``include_read=True`` is the API history listing (unread, read and Done).
-    ``include_read=False`` is the unread listing. Pages are not an atomic
+    ``include_read=False`` is the unread listing. ``since`` limits the listing
+    to threads updated after that moment. Pages are not an atomic
     snapshot: an id seen twice keeps its latest version, and a record moved
     onto an already-read page is caught only by a later enumeration.
     """
     listing = Listing()
     for page in range(1, MAX_PAGES + 1):
-        query = urllib.parse.urlencode(
-            {
-                "all": "true" if include_read else "false",
-                "participating": "false",
-                "per_page": PER_PAGE,
-                "page": page,
-            }
-        )
+        parameters: dict[str, Any] = {
+            "all": "true" if include_read else "false",
+            "participating": "false",
+            "per_page": PER_PAGE,
+            "page": page,
+        }
+        if since is not None:
+            parameters["since"] = _iso(since)
+        query = urllib.parse.urlencode(parameters)
         response = request(
             token, "GET", f"/notifications?{query}", stats=stats, deadline=deadline
         )
@@ -438,6 +520,9 @@ class Clearance:
 
     identity: str = ""
     deadline: float | None = None
+    history_mode: str = "UNKNOWN"
+    history_since: datetime | None = None
+    history_lookback_seconds: int | None = None
     api_history_before_count: int | None = None
     api_history_last_count: int | None = None
     before_unread_count: int | None = None
@@ -461,10 +546,18 @@ class Clearance:
             "identity": self.identity,
             "status": status,
             "stop_reason": self.stop_reason,
-            "api_history_listing": "GET /notifications?all=true (unread, read and Done history)",
+            "history_mode": self.history_mode,
+            "history_since": None if self.history_since is None else _iso(self.history_since),
+            "history_lookback_seconds": self.history_lookback_seconds,
+            "api_history_listing": (
+                "GET /notifications?all=true&since=<history_since> "
+                "(unread, read and Done history inside the window)"
+                if self.history_since is not None
+                else "GET /notifications?all=true (full unread, read and Done history)"
+            ),
             "api_history_before_count": self.api_history_before_count,
             "api_history_last_count": self.api_history_last_count,
-            "unread_listing": "GET /notifications?all=false",
+            "unread_listing": "GET /notifications?all=false (never windowed)",
             "before_unread_count": self.before_unread_count,
             "after_unread_count": self.after_unread_count,
             "after_unread_measurement": self.after_unread_measurement,
@@ -484,6 +577,8 @@ class Clearance:
             "http_attempts": self.stats.http_attempts,
             "rate_limit_retries_observed": self.stats.rate_limit_retries_observed,
             "rate_limit_retry_ceiling": RATE_LIMIT_RETRIES,
+            "observed_server_error_retries": self.stats.server_error_retries_observed,
+            "server_error_retry_ceiling": SERVER_ERROR_RETRIES,
             "mutation_delay_seconds": MUTATION_DELAY_SECONDS,
             "poll_interval_seconds": self.poll.last_interval_seconds,
             "job_deadline_configured": self.deadline is not None,
@@ -506,12 +601,28 @@ def _candidates(listing: Listing, state: Clearance) -> dict[str, datetime]:
     return selected
 
 
+def _merged(*listings: Listing) -> Listing:
+    """Union of listings, keeping each thread's latest observed version."""
+    merged = Listing()
+    for listing in listings:
+        for thread_id, version in listing.versions.items():
+            previous = merged.versions.get(thread_id)
+            if previous is None or version > previous:
+                merged.versions[thread_id] = version
+    return merged
+
+
 def _read(
     state: Clearance, token: str, *, include_read: bool
 ) -> Listing:
+    """Read one listing; only the history listing is windowed by ``since``."""
     state.poll.wait(state.deadline)
     listing = list_notification_threads(
-        token, include_read=include_read, stats=state.stats, deadline=state.deadline
+        token,
+        include_read=include_read,
+        stats=state.stats,
+        deadline=state.deadline,
+        since=state.history_since if include_read else None,
     )
     state.poll.observe(listing)
     return listing
@@ -533,11 +644,14 @@ def _run_rounds(
     history = _read(state, token, include_read=True)
     state.api_history_before_count = len(history.versions)
     state.api_history_last_count = len(history.versions)
-    state.before_unread_count = len(_read(state, token, include_read=False).versions)
+    unread = _read(state, token, include_read=False)
+    state.before_unread_count = len(unread.versions)
     if progress is not None:
         progress(state.report(STATUS_RUNNING))
 
-    candidates = _candidates(history, state)
+    # The unread listing is never windowed, so an unread thread older than the
+    # history window is still acknowledged once.
+    candidates = _candidates(_merged(history, unread), state)
     previous_round: set[str] | None = None
     while candidates:
         if previous_round is not None and set(candidates) == previous_round:
@@ -585,6 +699,8 @@ def clear_notifications(
     *,
     progress: Callable[[dict[str, Any]], None] | None = None,
     deadline: float | None = None,
+    full_history: bool = False,
+    lookback_seconds: int = HISTORY_LOOKBACK_SECONDS,
 ) -> dict[str, Any]:
     """Acknowledge each observed thread version once, then read back unread.
 
@@ -593,8 +709,19 @@ def clear_notifications(
     occurred, and the independent ``all=false`` readback measured zero. A wait
     that would pass ``deadline`` stops the run with ``DEADLINE``; the readback
     is still attempted and reported ``UNAVAILABLE`` if it cannot fit.
+
+    By default the history listing is windowed to the last ``lookback_seconds``
+    before the run started (``INCREMENTAL``); ``full_history`` lists all of it.
     """
     state = Clearance(deadline=deadline)
+    if full_history:
+        state.history_mode = MODE_FULL_HISTORY
+    else:
+        state.history_mode = MODE_INCREMENTAL
+        state.history_lookback_seconds = lookback_seconds
+        state.history_since = (_now() - timedelta(seconds=lookback_seconds)).replace(
+            microsecond=0
+        )
     try:
         _run_rounds(token, state, progress)
     except DeadlineExceeded as exc:
@@ -721,20 +848,32 @@ def main(argv: list[str] | None = None) -> int:
         or os.environ.get("SZL_GITHUB_TOKEN", "").strip()
     )
     deadline: float | None = None
-    deadline_error: str | None = None
+    full_history: bool | None = None
+    config_errors: list[str] = []
     try:
         deadline = job_deadline(os.environ)
     except NotificationError as exc:
-        deadline_error = f"{type(exc).__name__}: {exc}"
+        config_errors.append(f"{type(exc).__name__}: {exc}")
+    try:
+        full_history = full_history_mode(os.environ)
+    except NotificationError as exc:
+        config_errors.append(f"{type(exc).__name__}: {exc}")
 
     def record_progress(snapshot: dict[str, Any]) -> None:
         _write_report(args.report, snapshot)
 
-    if token and deadline_error is None:
-        report = clear_notifications(token, progress=record_progress, deadline=deadline)
+    if token and not config_errors:
+        report = clear_notifications(
+            token,
+            progress=record_progress,
+            deadline=deadline,
+            full_history=bool(full_history),
+        )
     else:
         state = Clearance(after_unread_measurement="UNAVAILABLE")
         state.stop_reason = STOP_ERROR
+        if full_history is not None:
+            state.history_mode = MODE_FULL_HISTORY if full_history else MODE_INCREMENTAL
         if not token:
             state.errors.append(
                 "NotificationError: GH_NOTIFICATIONS_TOKEN/SZL_GITHUB_TOKEN is not configured"
@@ -743,9 +882,9 @@ def main(argv: list[str] | None = None) -> int:
                 "NotificationError: no token for unread readback"
             )
         else:
-            state.errors.append(deadline_error or "")
+            state.errors.extend(config_errors)
             state.measurement_errors.append(
-                "NotificationError: invalid job deadline; unread readback not attempted"
+                "NotificationError: invalid configuration; unread readback not attempted"
             )
         report = state.report(STATUS_FAILED)
     _write_report(args.report, report)
