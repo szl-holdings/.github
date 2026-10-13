@@ -52,6 +52,7 @@ jobs:
           printf '%s\n' '{"schema":"szl.merge-queue-enqueue-contract/v1","stage":"source-contract","result":"STARTED"}' \
             > reports/merge-queue-enqueue/contract.json
           python .github/scripts/test_merge_queue_enqueue.py
+          python .github/scripts/test_release_admission_verifier.py
           git diff --check
 
       - name: Wait for this gate generation's App attestation and enqueue
@@ -59,6 +60,7 @@ jobs:
         shell: bash
         env:
           GH_TOKEN: ${{ secrets.SZL_GITHUB_TOKEN }}
+          ADMISSION_READ_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
           [ -n "${GH_TOKEN:-}" ] \
@@ -198,6 +200,50 @@ jobs:
           [ "$GRAPH_BASE_REF" = "$CURRENT_BASE_REF" ] && [ "$GRAPH_BASE_SHA" = "$CURRENT_BASE_SHA" ] \
             || { echo "::error::GraphQL base changed before enqueue"; exit 1; }
 
+          # Re-run the shared admission verifier immediately before the queue
+          # mutation. The write-capable token is removed from its environment;
+          # it reads with the workflow's read-only token. Its exact evidence
+          # fingerprint must equal the one the attestor's exact-head App
+          # approval named, so any head, base, body, check-generation, receipt
+          # or owner-decision drift since review prevents the enqueue.
+          set +e
+          env -u GH_TOKEN python3 -I .github/scripts/release_admission_verifier.py \
+            --repository "$REPOSITORY" \
+            --event pull_request \
+            --head-sha "$EXPECTED_HEAD" \
+            --base-ref "$CURRENT_BASE_REF" \
+            --base-sha "$CURRENT_BASE_SHA" \
+            --gate-run-id "$SOURCE_GATE_RUN_ID" \
+            --pull-request "$PR" \
+            --pr-head-sha "$EXPECTED_HEAD" \
+            --body-sha256 "$CURRENT_BODY_SHA256" \
+            --phase enqueue \
+            --token-env ADMISSION_READ_TOKEN \
+            --output reports/merge-queue-enqueue/admission.json
+          admission_code=$?
+          set -e
+          [ -s reports/merge-queue-enqueue/admission.json ] \
+            || { echo "::error::release admission verifier emitted no verdict"; exit 1; }
+          ADMISSION_DECISION="$(jq -r .decision reports/merge-queue-enqueue/admission.json)"
+          ADMISSION_FINGERPRINT="$(jq -r '.evidence_fingerprint // ""' reports/merge-queue-enqueue/admission.json)"
+          if [ "$admission_code" -ne 0 ] || [ "$ADMISSION_DECISION" != 'ADMIT' ]; then
+            echo "::error::release admission $ADMISSION_DECISION immediately before enqueue: $(jq -r '.reasons | join("; ")' reports/merge-queue-enqueue/admission.json)"
+            exit 1
+          fi
+          [[ "$ADMISSION_FINGERPRINT" =~ ^sha256:[0-9a-f]{64}$ ]] \
+            || { echo "::error::release admission fingerprint is invalid"; exit 1; }
+          gh api "repos/$REPOSITORY/pulls/$PR/reviews?per_page=100" --paginate --slurp \
+            > reports/merge-queue-enqueue/review-pages-before-enqueue.json
+          BOUND_APPROVAL_COUNT="$(jq --arg head "$EXPECTED_HEAD" --arg admission "Admission evidence: $ADMISSION_FINGERPRINT" '[.[][] | select(
+            .user.login == "qillqaq-attestor[bot]"
+            and .user.type == "Bot"
+            and .state == "APPROVED"
+            and .commit_id == $head
+            and ((.body // "") | contains($admission))
+          )] | length' reports/merge-queue-enqueue/review-pages-before-enqueue.json)"
+          [ "$BOUND_APPROVAL_COUNT" -ge 1 ] \
+            || { echo "::error::admission evidence changed between attestation and enqueue"; exit 1; }
+
           if [ -n "$QUEUE_ENTRY" ]; then
             RESULT='ALREADY_QUEUED'
           else
@@ -288,6 +334,8 @@ jobs:
             --arg pull_request_body_sha256 "$CURRENT_BODY_SHA256" \
             --arg result "$RESULT" \
             --arg queue_entry_id "$QUEUE_ENTRY" \
+            --arg admission_evidence_fingerprint "$ADMISSION_FINGERPRINT" \
+            --arg admission_decision "$ADMISSION_DECISION" \
             '{
               schema: $schema,
               repository: $repository,
@@ -299,6 +347,9 @@ jobs:
               pull_request_body_sha256: $pull_request_body_sha256,
               result: $result,
               queue_entry_id: $queue_entry_id,
+              admission_decision: $admission_decision,
+              admission_evidence_fingerprint: $admission_evidence_fingerprint,
+              admission_rechecked_immediately_before_enqueue: true,
               trusted_default_branch_controller: true,
               exact_head_attestation_verified: true,
               exact_body_attestation_verified: true,
