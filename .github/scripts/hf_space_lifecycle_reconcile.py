@@ -7,9 +7,11 @@ exact policy digest and exact provider state from a prior plan, prove that the
 checkout is still protected ``main``, and may call one supported Hub mutator:
 ``HfApi.update_repo_settings(..., private=False)`` for one named Space.
 
-This controller cannot hide, archive, create, delete, rename, upload, restart,
-pause, resize, or change storage, variables, or secrets. Runtime convergence is
-reported but intentionally belongs to a separate reviewed controller.
+Factory is an exact private/PAUSED observation-only exception: planning reports
+its state without a write preflight, and apply cannot target it. This controller
+cannot hide, archive, create, delete, rename, upload, restart, pause, resize,
+or change storage, variables, or secrets. Runtime convergence for other Spaces
+belongs to a separate reviewed controller.
 """
 
 from __future__ import annotations
@@ -33,6 +35,7 @@ POLICY_SCHEMA = "szl.hf.space-lifecycle-policy.v2"
 RECEIPT_SCHEMA = "szl.hf.space-lifecycle-receipt.v2"
 ORGANIZATION = "SZLHOLDINGS"
 CONTROL_REPOSITORY = "szl-holdings/.github"
+OBSERVATION_ONLY_FACTORY = "SZLHOLDINGS/a11oy-factory"
 AUTHORITY_RUN_ID = "33352706604"
 AUTHORITY_SOURCE_REVISION = "ab1e0669b4ac5715e4e26fdbb529db70e6affc33"
 AUTHORITY_ARTIFACT_ID = "9744148627"
@@ -251,10 +254,13 @@ def load_policy(path: Path) -> tuple[dict[str, Any], dict[str, DesiredState]]:
             raise LifecycleError(f"policy contains non-allowlisted target: {repo_id!r}")
         if repo_id in targets:
             raise LifecycleError(f"policy contains duplicate target: {repo_id}")
-        if visibility != "public":
-            raise LifecycleError(f"policy may only retain public visibility: {repo_id}")
-        if runtime_stage != "RUNNING":
-            raise LifecycleError(f"desired runtime must remain RUNNING: {repo_id}")
+        expected_state = (
+            ("private", "PAUSED", "factory")
+            if repo_id == OBSERVATION_ONLY_FACTORY
+            else ("public", "RUNNING", role)
+        )
+        if (visibility, runtime_stage, role) != expected_state:
+            raise LifecycleError(f"policy state is not allowed for {repo_id}")
         if not role:
             raise LifecycleError(f"policy role is empty for {repo_id}")
         targets[repo_id] = DesiredState(repo_id, visibility, runtime_stage, role)
@@ -291,9 +297,13 @@ class HubSpaceClient:
     def __init__(self, api: Any) -> None:
         self.api = api
 
-    def verify_operator(self, repo_id: str) -> dict[str, Any]:
+    def verify_operator(
+        self, repo_id: str, *, observation_only: bool = False
+    ) -> dict[str, Any]:
         if repo_id not in ALLOWED_REPO_IDS:
             raise LifecycleError("target write preflight requires one exact policy Space")
+        if observation_only and repo_id != OBSERVATION_ONLY_FACTORY:
+            raise LifecycleError("observation-only preflight is limited to Factory")
         info = self.api.whoami(cache=False)
         if not isinstance(info, dict) or info.get("type") != "user":
             raise LifecycleError("Hugging Face credential is not a user token")
@@ -312,6 +322,16 @@ class HubSpaceClient:
         ]
         if org_roles != ["admin"]:
             raise LifecycleError("Hugging Face credential is not unambiguously SZLHOLDINGS admin")
+        if observation_only:
+            return {
+                "credential_type": "user",
+                "access_token_role_reported": token_role.strip(),
+                "access_token_role_is_authority": False,
+                "organization": ORGANIZATION,
+                "organization_role": "admin",
+                "target_write_authority": "NOT_REQUESTED_OBSERVATION_ONLY",
+                "target_write_repository": repo_id,
+            }
         try:
             auth_result = self.api.auth_check(
                 repo_id=repo_id,
@@ -363,10 +383,18 @@ class HubSpaceClient:
         )
 
     def set_public(self, repo_id: str) -> None:
+        if repo_id == OBSERVATION_ONLY_FACTORY:
+            raise LifecycleError("Factory is observation-only")
         self.api.update_repo_settings(repo_id=repo_id, repo_type="space", private=False)
 
 
 def next_transition(current: SpaceState, desired: DesiredState) -> Transition | None:
+    if desired.repo_id == OBSERVATION_ONLY_FACTORY:
+        if (desired.visibility, desired.runtime_stage, desired.role) == (
+            "private", "PAUSED", "factory"
+        ):
+            return None
+        raise LifecycleError("Factory is observation-only")
     if desired.visibility != "public":
         raise LifecycleError("controller policy may only request public visibility")
     if current.visibility == "public":
@@ -642,7 +670,12 @@ def reconcile(
 
         desired = targets[target]
         receipt["desired"] = asdict(desired)
-        receipt["operator"] = client.verify_operator(target)
+        observation_only = target == OBSERVATION_ONLY_FACTORY
+        if observation_only and (mode != "plan" or requested_transition != "inspect"):
+            raise LifecycleError("Factory permits observation only; no apply or transition")
+        receipt["operator"] = client.verify_operator(
+            target, observation_only=observation_only
+        )
         before = client.read(target)
         receipt["before"] = asdict(before)
         compare_expected(
@@ -665,7 +698,9 @@ def reconcile(
             receipt["controller"]["verified_live_default_revision"] = control_revision
             current_convergence = convergence(before, desired)
             receipt["convergence"] = current_convergence
-            if transition is not None:
+            if observation_only:
+                result = "PLANNED_OBSERVATION_ONLY"
+            elif transition is not None:
                 result = "PLANNED_VISIBILITY_ACTION"
             elif current_convergence["full_policy_converged"]:
                 result = "PLANNED_CONVERGED"

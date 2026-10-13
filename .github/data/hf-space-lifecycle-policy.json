@@ -12,7 +12,7 @@
     "generated_at": "2026-08-31T03:06:21.407337+00:00",
     "inventory_issue": 263,
     "decision_issue": 511,
-    "selection_rule": "The exact authenticated inventory enumerates 46 existing Spaces, all public. Keep those exact repositories public; track RUNNING convergence separately and admit any future repository through a new protected policy revision."
+    "selection_rule": "The historical authenticated inventory enumerated 46 existing Spaces, all public at that run. Keep the other 45 public with RUNNING tracked separately. SZLHOLDINGS/a11oy-factory is a protected private/PAUSED observation-only exception; this controller cannot change its visibility or runtime. Admit any future repository through a new protected policy revision."
   },
   "token_authority": {
     "namespace": "SZLHOLDINGS",
@@ -23,7 +23,7 @@
   "targets": [
     {"repo_id": "SZLHOLDINGS/README", "desired_visibility": "public", "desired_runtime_stage": "RUNNING", "role": "organization-profile"},
     {"repo_id": "SZLHOLDINGS/a11oy", "desired_visibility": "public", "desired_runtime_stage": "RUNNING", "role": "product"},
-    {"repo_id": "SZLHOLDINGS/a11oy-factory", "desired_visibility": "public", "desired_runtime_stage": "RUNNING", "role": "factory"},
+    {"repo_id": "SZLHOLDINGS/a11oy-factory", "desired_visibility": "private", "desired_runtime_stage": "PAUSED", "role": "factory"},
     {"repo_id": "SZLHOLDINGS/anatomy", "desired_visibility": "public", "desired_runtime_stage": "RUNNING", "role": "anatomy"},
     {"repo_id": "SZLHOLDINGS/ayllu", "desired_visibility": "public", "desired_runtime_stage": "RUNNING", "role": "vertical"},
     {"repo_id": "SZLHOLDINGS/cosmos", "desired_visibility": "public", "desired_runtime_stage": "RUNNING", "role": "research"},
