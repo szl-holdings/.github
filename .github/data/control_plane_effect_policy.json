@@ -6,6 +6,148 @@
   "unknown_effect": "deny",
   "wildcard_resources": "deny",
   "workflow_declarations": {
+    ".github/workflows/clear-personal-notifications.yml": {
+      "intent_id": "github-notification-unread-zero-clearance-v1",
+      "valid_until": "2026-11-30",
+      "source_sha256": "sha256:5de659fae3043cf9c01820d2c2830f6c8985053e8c8e3708c79f71e7c13815e0",
+      "credentials": [
+        "GH_NOTIFICATIONS_TOKEN",
+        "SZL_GITHUB_TOKEN"
+      ],
+      "resources": [
+        {
+          "key": "github:actions:artifact:github-notification-clearance-receipts",
+          "access": "external-write"
+        },
+        {
+          "key": "github:repository:szl-holdings/.github:contents",
+          "access": "read"
+        },
+        {
+          "key": "runner:toolchain:python",
+          "access": "local-write"
+        }
+      ],
+      "effects": [
+        {
+          "sink": "github.artifact.upload",
+          "resource": "github:actions:artifact:github-notification-clearance-receipts",
+          "access": "external-write",
+          "max_calls": 1
+        },
+        {
+          "sink": "github.contents.checkout",
+          "resource": "github:repository:szl-holdings/.github:contents",
+          "access": "read",
+          "max_calls": 2
+        },
+        {
+          "sink": "runner.toolchain.install",
+          "resource": "runner:toolchain:python",
+          "access": "local-write",
+          "max_calls": 2
+        }
+      ],
+      "max_external_writes": 1,
+      "required_controls": {
+        "triggers": [
+          "pull_request",
+          "push",
+          "workflow_dispatch"
+        ],
+        "contents_read": true,
+        "no_explicit_secrets": false,
+        "concurrency": false,
+        "protected_ref": false,
+        "exact_sha": false,
+        "expected_before": false,
+        "readback": false
+      },
+      "trusted_transitives": {},
+      "reviewed_unknowns": {
+        "files": {
+          ".github/workflows/clear-personal-notifications.yml": "sha256:5de659fae3043cf9c01820d2c2830f6c8985053e8c8e3708c79f71e7c13815e0",
+          ".github/scripts/clear_personal_notifications.py": "sha256:1f2da24fbbdf7bc477a4c7e8bf646ad6745be063b13305583f82d817f5f6cd7a",
+          ".github/scripts/test_clear_personal_notifications.py": "sha256:f04deb1cf302233d9d3271fefd007259eb2ef22d00c38a0df01d33294d2a1385"
+        },
+        "unknowns": [
+          "ACTION_INPUTS_REVIEW_REQUIRED@.github/workflows/clear-personal-notifications.yml:31",
+          "ACTION_INPUTS_REVIEW_REQUIRED@.github/workflows/clear-personal-notifications.yml:66",
+          "ACTION_INPUTS_REVIEW_REQUIRED@.github/workflows/clear-personal-notifications.yml:93",
+          "HTTP_TARGET_UNRESOLVED@.github/scripts/clear_personal_notifications.py:260",
+          "PYTHON_CLIENT_UNRESOLVED@.github/scripts/clear_personal_notifications.py:362",
+          "PYTHON_CLIENT_UNRESOLVED@.github/scripts/clear_personal_notifications.py:400",
+          "PYTHON_CLIENT_UNRESOLVED@.github/scripts/clear_personal_notifications.py:525",
+          "PYTHON_CLIENT_UNRESOLVED@.github/scripts/test_clear_personal_notifications.py:566",
+          "PYTHON_CLIENT_UNRESOLVED@.github/scripts/test_clear_personal_notifications.py:590",
+          "PYTHON_CLIENT_UNRESOLVED@.github/scripts/test_clear_personal_notifications.py:618",
+          "PYTHON_CLIENT_UNRESOLVED@.github/scripts/test_clear_personal_notifications.py:634",
+          "PYTHON_DYNAMIC_EXECUTION@.github/scripts/clear_personal_notifications.py:278",
+          "PYTHON_DYNAMIC_HTTP_METHOD@.github/scripts/clear_personal_notifications.py:260",
+          "PYTHON_IMPORT_UNRESOLVED@.github/scripts/clear_personal_notifications.py:47",
+          "PYTHON_IMPORT_UNRESOLVED@.github/scripts/clear_personal_notifications.py:49",
+          "PYTHON_IMPORT_UNRESOLVED@.github/scripts/clear_personal_notifications.py:51",
+          "PYTHON_IMPORT_UNRESOLVED@.github/scripts/clear_personal_notifications.py:54",
+          "PYTHON_IMPORT_UNRESOLVED@.github/scripts/clear_personal_notifications.py:55",
+          "PYTHON_IMPORT_UNRESOLVED@.github/scripts/clear_personal_notifications.py:56",
+          "PYTHON_IMPORT_UNRESOLVED@.github/scripts/clear_personal_notifications.py:57",
+          "PYTHON_IMPORT_UNRESOLVED@.github/scripts/clear_personal_notifications.py:59",
+          "PYTHON_IMPORT_UNRESOLVED@.github/scripts/test_clear_personal_notifications.py:15",
+          "PYTHON_IMPORT_UNRESOLVED@.github/scripts/test_clear_personal_notifications.py:16",
+          "PYTHON_IMPORT_UNRESOLVED@.github/scripts/test_clear_personal_notifications.py:3",
+          "PYTHON_IMPORT_UNRESOLVED@.github/scripts/test_clear_personal_notifications.py:5",
+          "PYTHON_IMPORT_UNRESOLVED@.github/scripts/test_clear_personal_notifications.py:6",
+          "PYTHON_IMPORT_UNRESOLVED@.github/scripts/test_clear_personal_notifications.py:7",
+          "PYTHON_IMPORT_UNRESOLVED@.github/scripts/test_clear_personal_notifications.py:8",
+          "PYTHON_SOURCE_REVIEW_REQUIRED@.github/scripts/clear_personal_notifications.py:1",
+          "PYTHON_SOURCE_REVIEW_REQUIRED@.github/scripts/test_clear_personal_notifications.py:1",
+          "PYTHON_SOURCE_REVIEW_REQUIRED@.github/workflows/clear-personal-notifications.yml:103",
+          "SCRIPT_SOURCE_REVIEW_REQUIRED@.github/workflows/clear-personal-notifications.yml:1",
+          "SECRET_EXPRESSION_REVIEW_REQUIRED@.github/workflows/clear-personal-notifications.yml:1",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/clear-personal-notifications.yml:102",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/clear-personal-notifications.yml:103",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/clear-personal-notifications.yml:104",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/clear-personal-notifications.yml:105",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/clear-personal-notifications.yml:107",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/clear-personal-notifications.yml:108",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/clear-personal-notifications.yml:109",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/clear-personal-notifications.yml:110",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/clear-personal-notifications.yml:111",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/clear-personal-notifications.yml:112",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/clear-personal-notifications.yml:113",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/clear-personal-notifications.yml:114",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/clear-personal-notifications.yml:115",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/clear-personal-notifications.yml:116",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/clear-personal-notifications.yml:117",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/clear-personal-notifications.yml:118",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/clear-personal-notifications.yml:119",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/clear-personal-notifications.yml:120",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/clear-personal-notifications.yml:121",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/clear-personal-notifications.yml:128",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/clear-personal-notifications.yml:36",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/clear-personal-notifications.yml:37",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/clear-personal-notifications.yml:58",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/clear-personal-notifications.yml:71",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/clear-personal-notifications.yml:72",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/clear-personal-notifications.yml:73",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/clear-personal-notifications.yml:74",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/clear-personal-notifications.yml:80",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/clear-personal-notifications.yml:81",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/clear-personal-notifications.yml:82",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/clear-personal-notifications.yml:83",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/clear-personal-notifications.yml:84",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/clear-personal-notifications.yml:85",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/clear-personal-notifications.yml:115",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/clear-personal-notifications.yml:119",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/clear-personal-notifications.yml:58",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/clear-personal-notifications.yml:71",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/clear-personal-notifications.yml:81",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/clear-personal-notifications.yml:84",
+          "WORKFLOW_ENVIRONMENT_REVIEW_REQUIRED@.github/workflows/clear-personal-notifications.yml:126",
+          "WORKFLOW_ENVIRONMENT_REVIEW_REQUIRED@.github/workflows/clear-personal-notifications.yml:49"
+        ]
+      }
+    },
     ".github/workflows/hf-model-evidence-audit.yml": {
       "intent_id": "hf-model-evidence-public-census-v2",
       "valid_until": "2026-11-30",
