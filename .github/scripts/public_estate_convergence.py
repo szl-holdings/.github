@@ -135,17 +135,33 @@ class StylesheetLinks(HTMLParser):
         super().__init__(convert_charrefs=True)
         self.links: list[dict[str, str | None]] = []
         self.ambiguous = False
+        self.stack: list[str] = []
+        self.inert: list[str] = []
 
     def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
+        if tag in {"template", "noscript", "textarea", "title", "iframe", "xmp",
+                   "noembed", "noframes", "plaintext", "svg", "math", "select"}:
+            self.inert.append(tag)
         if tag == "base":
             self.ambiguous = True
-        if tag != "link":
-            return
-        attributes = dict(attrs)
-        if attributes.get("data-szl-proof-flow-asset") == "style":
-            if len(attributes) != len(attrs):
-                self.ambiguous = True
-            self.links.append(attributes)
+        if tag == "link":
+            attributes = dict(attrs)
+            if attributes.get("data-szl-proof-flow-asset") == "style":
+                # The canonical builder places this link directly in the head.
+                # HTMLParser is not a browser tree builder: fail closed on links
+                # in inert/foreign content even if misleading end tags appear.
+                if len(attributes) != len(attrs) or self.inert or self.stack != ["html", "head"]:
+                    self.ambiguous = True
+                self.links.append(attributes)
+        if tag not in {"area", "base", "br", "col", "embed", "hr", "img", "input",
+                       "link", "meta", "param", "source", "track", "wbr"}:
+            self.stack.append(tag)
+
+    def handle_endtag(self, tag: str) -> None:
+        if self.inert and self.inert[-1] == tag and tag != "plaintext":
+            self.inert.pop()
+        if tag in self.stack:
+            del self.stack[len(self.stack) - 1 - self.stack[::-1].index(tag):]
 
     handle_startendtag = handle_starttag
 
@@ -262,7 +278,8 @@ def probe(url: str, literals: tuple[str, ...], *, pages_stylesheet: str | None =
     if pages_stylesheet is not None:
         content_type = (result["content_type"] or "").split(";", 1)[0].strip().lower()
         binding = (pages_stylesheet_binding(url, raw, pages_stylesheet)
-                   if result["verified"] and final_url == url and content_type == "text/html"
+                   if result["verified"] and len(raw) < 2_000_000
+                   and final_url == url and content_type == "text/html"
                    else {"verified": False, "reason": "root response is unavailable or redirected"})
         result["pages_stylesheet"] = binding
         result["verified"] = bool(result["verified"] and binding["verified"])

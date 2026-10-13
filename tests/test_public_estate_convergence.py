@@ -147,6 +147,35 @@ def test_pages_link_must_be_real_unique_enabled_and_exact() -> None:
         assert pages_probe(fixture)["verified"] is False, changed
 
 
+def test_pages_stylesheet_in_inert_or_foreign_content_is_not_loaded() -> None:
+    initial = pages_fixture()
+    for tag in ("template", "noscript", "textarea", "title", "iframe", "xmp",
+                "noembed", "noframes", "plaintext", "svg", "math", "select"):
+        root = initial[0].replace(b"<link ", ("<" + tag + "><link ").encode())
+        root = root.replace(b"></head>", ("></" + tag + "></head>").encode())
+        fixture = list(copy.deepcopy(initial))
+        fixture[0] = root
+        fixture[1]["documents"]["index.html"]["served_sha256"] = hashlib.sha256(root).hexdigest()
+        assert pages_probe(fixture)["verified"] is False, tag
+    for prefix in (b"<head><template></head><head>",
+                   b"<head><template><noscript></template></head><head>",
+                   b"<head><plaintext></plaintext></head><head>"):
+        root = initial[0].replace(b"<head>", prefix)
+        fixture = list(copy.deepcopy(initial))
+        fixture[0] = root
+        fixture[1]["documents"]["index.html"]["served_sha256"] = hashlib.sha256(root).hexdigest()
+        assert pages_probe(fixture)["verified"] is False
+
+
+def test_saturated_root_read_cannot_claim_a_complete_document() -> None:
+    fixture = list(pages_fixture())
+    fixture[0] += b" " * (2_000_000 - len(fixture[0]))
+    fixture[1]["documents"]["index.html"]["served_sha256"] = hashlib.sha256(fixture[0]).hexdigest()
+    result = pages_probe(fixture)
+    assert result["bytes"] == 2_000_000
+    assert result["verified"] is False
+
+
 def test_pages_manifest_and_witness_must_agree_on_exact_artifact() -> None:
     mutations = (
         lambda m, w: m.update(schema="other"),
