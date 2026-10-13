@@ -98,6 +98,11 @@ def token_from_environment() -> tuple[str | None, str | None]:
     return None, None
 
 
+class NoRedirect(urllib.request.HTTPRedirectHandler):
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        return None
+
+
 def request(
     method: str,
     url: str,
@@ -105,6 +110,7 @@ def request(
     token: str | None = None,
     payload: Mapping[str, Any] | None = None,
     timeout: float = 30.0,
+    follow_redirects: bool = True,
 ) -> tuple[int | None, bytes, Mapping[str, str], str | None]:
     headers = {
         "User-Agent": USER_AGENT,
@@ -120,7 +126,9 @@ def request(
         headers["Content-Type"] = "application/json"
     req = urllib.request.Request(url, data=body, method=method, headers=headers)
     try:
-        with urllib.request.urlopen(req, timeout=timeout) as response:
+        open_url = (urllib.request.urlopen if follow_redirects
+                    else urllib.request.build_opener(NoRedirect()).open)
+        with open_url(req, timeout=timeout) as response:
             return response.status, response.read(2_000_000), dict(response.headers.items()), response.geturl()
     except urllib.error.HTTPError as exc:
         return exc.code, exc.read(2_000_000), dict(exc.headers.items()), exc.geturl()
@@ -180,7 +188,7 @@ def _reject_constant(value: str) -> None:
 
 
 def _exact_response(url: str, content_type: str) -> bytes:
-    status, raw, headers, final_url = request("GET", url)
+    status, raw, headers, final_url = request("GET", url, follow_redirects=False)
     actual_type = (headers.get("Content-Type") or headers.get("content-type") or "")
     if (status != 200 or not raw or len(raw) >= 2_000_000 or final_url != url
             or actual_type.split(";", 1)[0].strip().lower() != content_type):
@@ -246,6 +254,7 @@ def pages_stylesheet_binding(root: str, raw: bytes, canonical: str) -> dict[str,
         link = parser.links[0]
         if ((link.get("rel") or "").lower().split() != ["stylesheet"]
                 or link.get("href") not in {"/" + served_path, root + served_path}
+                or "integrity" in link
                 or "disabled" in link or (link.get("media") or "all").lower() != "all"):
             raise ValueError("root does not load the manifest's exact stylesheet")
         source_bytes = _exact_response(root.rstrip("/") + canonical, "text/css")
@@ -262,7 +271,10 @@ def pages_stylesheet_binding(root: str, raw: bytes, canonical: str) -> dict[str,
 
 
 def probe(url: str, literals: tuple[str, ...], *, pages_stylesheet: str | None = None) -> dict[str, Any]:
-    status, raw, headers, final_url = request("GET", url)
+    if pages_stylesheet is None:
+        status, raw, headers, final_url = request("GET", url)
+    else:
+        status, raw, headers, final_url = request("GET", url, follow_redirects=False)
     text = raw.decode("utf-8", "replace")
     found = {literal: literal in text for literal in literals}
     result = {

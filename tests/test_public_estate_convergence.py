@@ -6,11 +6,14 @@ from __future__ import annotations
 import importlib.util
 import copy
 import hashlib
+import io
 import json
+from email.message import Message
 import os
 import sys
 from pathlib import Path
 from unittest import mock
+from urllib.response import addinfourl
 
 ROOT = Path(__file__).resolve().parents[1]
 MODULE_PATH = ROOT / ".github" / "scripts" / "public_estate_convergence.py"
@@ -106,7 +109,7 @@ def pages_probe(fixture=None, *, response_change=None):
     }
 
     def request(method, url, **kwargs):
-        assert method == "GET" and not kwargs, "no token or mutation is admitted"
+        assert method == "GET" and kwargs == {"follow_redirects": False}, "no token, redirect or mutation is admitted"
         assert url in bodies, "unexpected URL was requested: " + url
         body, content_type = bodies[url]
         response = (200, body, {"Content-Type": content_type + "; charset=utf-8"}, url)
@@ -136,6 +139,7 @@ def test_pages_link_must_be_real_unique_enabled_and_exact() -> None:
         root.replace(b'href="/assets/', b'href="https://other.example/assets/'),
         root.replace(b'href="/assets/', b'href="wrong" href="/assets/'),
         root.replace(b'<link ', b'<link disabled '),
+        root.replace(b'<link ', b'<link integrity="sha256-stale" '),
         root.replace(b'<link ', b'<link media="print" '),
         root.replace(b'<head>', b'<head><base href="https://other.example/">'),
         root.replace(b'</head>', root[root.index(b'<link '):root.index(b'</head>')] + b'</head>'),
@@ -174,6 +178,25 @@ def test_saturated_root_read_cannot_claim_a_complete_document() -> None:
     result = pages_probe(fixture)
     assert result["bytes"] == 2_000_000
     assert result["verified"] is False
+
+
+def test_binding_transport_rejects_redirect_before_target_fetch() -> None:
+    requested = []
+    class MemoryHTTPS(convergence.urllib.request.HTTPSHandler):
+        def https_open(self, req):
+            requested.append(req.full_url)
+            headers = Message()
+            headers["Location"] = "https://other.example/must-not-be-fetched"
+            response = addinfourl(io.BytesIO(b"redirect"), headers, req.full_url, 302)
+            response.msg = "Found"
+            return response
+    real_builder = convergence.urllib.request.build_opener
+    with mock.patch.object(convergence.urllib.request, "build_opener",
+                           side_effect=lambda *handlers: real_builder(*handlers, MemoryHTTPS())):
+        status, _, _, final = convergence.request(
+            "GET", "https://a11oy.net/frontend-assets.json", follow_redirects=False)
+    assert status == 302 and final == "https://a11oy.net/frontend-assets.json"
+    assert requested == ["https://a11oy.net/frontend-assets.json"]
 
 
 def test_pages_manifest_and_witness_must_agree_on_exact_artifact() -> None:
