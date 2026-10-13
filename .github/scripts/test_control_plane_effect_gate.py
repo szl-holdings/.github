@@ -1424,5 +1424,142 @@ class GitReceiptTests(unittest.TestCase):
         self.assertNotIn(marker.encode("utf-8"), gate.canonical_bytes(failure))
 
 
+class LifecycleBindingTests(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls) -> None:
+        root = CHECKER_PATH.parents[2]
+        def blob(path: str) -> bytes:
+            return subprocess.check_output(
+                ["git", "-C", str(root), "cat-file", "blob", f"HEAD:{path}"],
+                timeout=20,
+            )
+
+        cls.source = blob(gate.LIFECYCLE_WORKFLOW)
+        cls.raw = gate.analyze_workflow_source(
+            cls.source.decode("utf-8"), path=gate.LIFECYCLE_WORKFLOW
+        )
+        cls.dependencies = {path: blob(path) for path in cls.raw["dependencies"]}
+        cls.policy = json.loads(root.joinpath(POLICY_PATH).read_text("utf-8"))
+        normalized = gate.load_policy_bytes(policy_bytes(cls.policy), as_of=AS_OF)
+        cls.declaration = normalized["workflow_declarations"][gate.LIFECYCLE_WORKFLOW]
+
+    def bind(self, *, raw=None, declaration=None, dependencies=None):
+        return gate.bind_declaration(
+            gate.LIFECYCLE_WORKFLOW,
+            self.source,
+            raw or self.raw,
+            declaration or self.declaration,
+            dependencies or self.dependencies,
+        )
+
+    def test_exact_lifecycle_targets_and_all_three_writes_are_accounted(self) -> None:
+        bound = self.bind()
+        self.assertEqual(bound["verdict"], "ALLOW")
+        self.assertEqual(bound["reason_codes"], [])
+        self.assertTrue(bound["reviewed_unknowns_applied"])
+        self.assertEqual(bound["credential_names"], ["GITHUB_TOKEN", "HF_ORG_TOKEN"])
+        self.assertEqual(bound["external_write_sites"], 3)
+        effects = {item["sink"]: item for item in bound["effects"]}
+        self.assertEqual(len(effects), 6)
+        self.assertEqual(effects["github.artifact.upload"]["resource"], "github:actions:artifact:hf-space-lifecycle")
+        self.assertEqual(effects["runner.guard.telemetry"]["resource"], "stepsecurity:monitor:szl-holdings/.github")
+        choices = effects["sdk.huggingface.update_repo_settings"]["possible_resources"]
+        self.assertEqual(len(choices), 45)
+        self.assertIn("huggingface:space:SZLHOLDINGS/nexus", choices)
+        self.assertNotIn("huggingface:space:SZLHOLDINGS/a11oy-factory", choices)
+
+    def test_lifecycle_choice_shape_and_wildcards_fail_policy_schema(self) -> None:
+        for mutation, expected in (
+            (lambda row: row["effects"][-1]["possible_resources"].pop(), "POLICY_SCHEMA_INVALID"),
+            (lambda row: row["effects"][-1]["possible_resources"].__setitem__(0, "huggingface:space:SZLHOLDINGS/*"), "WILDCARD_RESOURCE_DENIED"),
+            (lambda row: row["effects"][-1]["possible_resources"].__setitem__(0, row["effects"][-1]["possible_resources"][1]), "POLICY_SCHEMA_INVALID"),
+        ):
+            with self.subTest(expected=expected, mutation=mutation):
+                candidate = copy.deepcopy(self.policy)
+                mutation(candidate["workflow_declarations"][gate.LIFECYCLE_WORKFLOW])
+                with self.assertRaises(gate.GateError) as raised:
+                    gate.load_policy_bytes(policy_bytes(candidate), as_of=AS_OF)
+                self.assertEqual(raised.exception.code, expected)
+        candidate = policy_for(workflow())
+        candidate["workflow_declarations"][WORKFLOW_PATH]["effects"][0] = {
+            "sink": "github.contents.checkout",
+            "possible_resources": [CHECKOUT_RESOURCE] * 45,
+            "access": "read", "max_calls": 1,
+        }
+        with self.assertRaises(gate.GateError) as raised:
+            gate.load_policy_bytes(policy_bytes(candidate), as_of=AS_OF)
+        self.assertEqual(raised.exception.code, "POLICY_SCHEMA_INVALID")
+
+    def test_factory_or_dispatch_choice_drift_stays_hard_denied(self) -> None:
+        changed = json.loads(self.dependencies[gate.LIFECYCLE_POLICY])
+        factory = next(row for row in changed["targets"] if row["repo_id"] == "SZLHOLDINGS/a11oy-factory")
+        factory["desired_visibility"] = "public"
+        dependencies = dict(self.dependencies)
+        dependencies[gate.LIFECYCLE_POLICY] = policy_bytes(changed)
+        bound = self.bind(dependencies=dependencies)
+        self.assertEqual(bound["verdict"], "DENY")
+        self.assertIn("TARGET_CHOICE_SET_MISMATCH", bound["reason_codes"])
+        changed_source = self.source.replace(b"SZLHOLDINGS/nexus", b"SZLHOLDINGS/other")
+        self.assertIsNone(gate.lifecycle_possible_resources(changed_source, self.dependencies))
+
+    def test_hash_locked_client_dependency_is_selected_and_pinned(self) -> None:
+        self.assertIn(
+            gate.LIFECYCLE_LOCK,
+            gate.workflow_dependencies(self.source.decode(), path=gate.LIFECYCLE_WORKFLOW),
+        )
+        self.assertNotIn(gate.LIFECYCLE_LOCK, gate.workflow_dependencies(self.source.decode()))
+        changed = dict(self.dependencies)
+        changed[gate.LIFECYCLE_LOCK] += b"\n# fixture drift\n"
+        denied = self.bind(dependencies=changed)
+        self.assertIn("REVIEWED_UNKNOWN_PIN_MISMATCH", denied["reason_codes"])
+        self.assertIn("UNKNOWN_EFFECT", denied["reason_codes"])
+
+    def test_only_exact_pinned_runtime_and_artifact_templates_are_reviewable(self) -> None:
+        current_codes = {item.code for item in self.raw["unknowns"]}
+        self.assertIn("PINNED_RUNTIME_OUTPUT_REVIEW_REQUIRED", current_codes)
+        self.assertNotIn("WORKFLOW_EXPRESSION_EXECUTION_UNSUPPORTED", current_codes)
+        self.assertNotIn("ACTION_RESOURCE_OVERRIDE_UNSUPPORTED", current_codes)
+        for source, path, code in (
+            (self.source, WORKFLOW_PATH, "WORKFLOW_EXPRESSION_EXECUTION_UNSUPPORTED"),
+            (self.source.replace(b"steps.runtime.outputs.python", b"inputs.python"), gate.LIFECYCLE_WORKFLOW, "WORKFLOW_EXPRESSION_EXECUTION_UNSUPPORTED"),
+            (self.source.replace(b"${{ github.run_attempt }}", b"${{ inputs.attempt }}"), gate.LIFECYCLE_WORKFLOW, "ACTION_RESOURCE_OVERRIDE_UNSUPPORTED"),
+        ):
+            with self.subTest(path=path, code=code):
+                parsed = gate.analyze_workflow_source(source.decode(), path=path)
+                self.assertIn(code, {item.code for item in parsed["unknowns"]})
+
+    def test_reviewed_runtime_output_pin_and_provider_budget_fail_closed(self) -> None:
+        declaration = copy.deepcopy(self.declaration)
+        declaration["reviewed_unknowns"]["unknowns"] = [
+            item for item in declaration["reviewed_unknowns"]["unknowns"]
+            if not item.startswith("PINNED_RUNTIME_OUTPUT_REVIEW_REQUIRED@")
+        ]
+        denied = self.bind(declaration=declaration)
+        self.assertIn("REVIEWED_UNKNOWN_SET_MISMATCH", denied["reason_codes"])
+        self.assertIn("UNKNOWN_EFFECT", denied["reason_codes"])
+        raw = copy.deepcopy(self.raw)
+        raw["effects"].append(gate.RawEffect(
+            "sdk.huggingface.update_repo_settings", "external-write",
+            gate.LIFECYCLE_CONTROLLER, 389,
+        ))
+        denied = self.bind(raw=raw)
+        self.assertIn("MUTATION_BUDGET_EXCEEDED", denied["reason_codes"])
+        self.assertIn("EXTERNAL_WRITE_BUDGET_EXCEEDED", denied["reason_codes"])
+        self.assertEqual(denied["external_write_sites"], 4)
+
+    def test_possible_targets_conflict_with_whole_and_subresource_writers(self) -> None:
+        provider = next(item for item in self.bind()["effects"] if item["sink"] == "sdk.huggingface.update_repo_settings")
+        records = gate.conflicts([
+            {"workflow": gate.LIFECYCLE_WORKFLOW, "effects": [provider]},
+            {"workflow": "nexus", "effects": [{"resource": "huggingface:space:SZLHOLDINGS/nexus", "access": "external-write"}]},
+            {"workflow": "card", "effects": [{"resource": "huggingface:space:SZLHOLDINGS/README:settings", "access": "external-write"}]},
+            {"workflow": "other", "effects": [{"resource": "huggingface:space:OTHER/demo", "access": "external-write"}]},
+        ])
+        self.assertEqual(
+            {item["resource"] for item in records},
+            {"huggingface:space:SZLHOLDINGS/nexus", "huggingface:space:SZLHOLDINGS/README"},
+        )
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)
