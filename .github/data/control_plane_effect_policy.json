@@ -576,8 +576,8 @@
         "readback": true
       },
       "trusted_transitives": {
-        ".github/scripts/control_plane_effect_gate.py": "sha256:f33f84da6bcb0baaf13a7ed94d1241d4f6ab4bd9d3558eabd4c028fb32002526",
-        ".github/scripts/test_control_plane_effect_gate.py": "sha256:9a124d80ab79d7b2d48261a5cbfc6cf4c2804b01afca2d4cecab75ee98e6a75e"
+        ".github/scripts/control_plane_effect_gate.py": "sha256:890cf32e5383e286eabe2f95d8027a0c07aeacd9393e23f9695362583c8d2702",
+        ".github/scripts/test_control_plane_effect_gate.py": "sha256:856d5a9593b19d7d46db7cebbd6d65556e97a409e0d576e873bd251ddd5ad5f3"
       },
       "reviewed_unknowns": {
         "files": {
@@ -834,8 +834,8 @@
         "readback": false
       },
       "trusted_transitives": {
-        ".github/scripts/control_plane_effect_gate.py": "sha256:f33f84da6bcb0baaf13a7ed94d1241d4f6ab4bd9d3558eabd4c028fb32002526",
-        ".github/scripts/test_control_plane_effect_gate.py": "sha256:9a124d80ab79d7b2d48261a5cbfc6cf4c2804b01afca2d4cecab75ee98e6a75e"
+        ".github/scripts/control_plane_effect_gate.py": "sha256:890cf32e5383e286eabe2f95d8027a0c07aeacd9393e23f9695362583c8d2702",
+        ".github/scripts/test_control_plane_effect_gate.py": "sha256:856d5a9593b19d7d46db7cebbd6d65556e97a409e0d576e873bd251ddd5ad5f3"
       },
       "reviewed_unknowns": {
         "files": {
@@ -2359,7 +2359,7 @@
           ".github/scripts/test_hf_module_drift_prune.py": "sha256:19e84279dfbadf538b509c690b48dc94f17ff98ffb29c9a556dd1a16a47aca8b",
           ".github/scripts/test_hf_publisher_lock.py": "sha256:3e67a86fb0b70d35976265f984373446925097492ca5ca807e9e2a68289f1bc2",
           ".github/scripts/test_hf_source_bound_baseline.py": "sha256:ba444e68085a860dda654936089d2dac2f774991f8aa444f85788677f8828ec7",
-          ".github/scripts/test_hf_space_lifecycle_reconcile.py": "sha256:bb28951ff9401ff7e952d4131a46d51a926fa04ccf371dfa209a9d3ef9759067",
+          ".github/scripts/test_hf_space_lifecycle_reconcile.py": "sha256:ba82032048bf4d2a07b72a8afec6f092b793003456000da61e8bfe29793a9c14",
           ".github/scripts/test_hf_space_source_binding.py": "sha256:fc5d12413102c47b6fc276f9ebcfbd8e687c64ba41936e9a4a0929f21a038948",
           ".github/scripts/test_lean_numbers.py": "sha256:19a392035dae5fd3824b52bfb96318d0b8bea9762ee1e14a68fdf92eeabd213e",
           ".github/scripts/test_license_consistency.py": "sha256:a32c4f929a9004a69454b5be1c84e26fd76552ffaa5aa3cc8ad229a911e6b767",
@@ -3208,7 +3208,7 @@
       "trusted_transitives": {},
       "reviewed_unknowns": {
         "files": {
-          ".github/data/hf-space-lifecycle-policy.json": "sha256:f4e6d68427fd240d682b9f01a41adace5859abebe12ec5b27eabc11abb46f4fd",
+          ".github/data/hf-space-lifecycle-policy.json": "sha256:8e6a2b64b3b7c86a2fc17a5c0c13e862d82717e14c0cc183cfa03ba2ec369176",
           ".github/data/nexus-target-bootstrap-authorization.json": "sha256:a63fd8209dc961d3987ce80a8eb09440ffaf328fd1cc3b02993daa6a59a573c4",
           ".github/scripts/recover_nexus_target.py": "sha256:d3de4b8de0fbe64fc2c2f8a123f62fb071ea2ce30a7d233288506618e523b35b",
           ".github/scripts/test_recover_nexus_target.py": "sha256:c0d8a26784d4c634df3b8b914fa8ae06ab4bfc81f916d679e0a5c9143974e342",
@@ -5342,6 +5342,408 @@
           "WORKFLOW_ENVIRONMENT_REVIEW_REQUIRED@.github/workflows/estate-one-fabric-alignment.yml:175",
           "WORKFLOW_ENVIRONMENT_REVIEW_REQUIRED@.github/workflows/estate-one-fabric-alignment.yml:226",
           "WORKFLOW_ENVIRONMENT_REVIEW_REQUIRED@.github/workflows/estate-one-fabric-alignment.yml:58"
+        ]
+      }
+    },
+    ".github/workflows/hf-space-lifecycle-reconcile.yml": {
+      "intent_id": "hf-space-lifecycle-exact-target-reconcile-v1",
+      "valid_until": "2026-11-30",
+      "source_sha256": "sha256:fe880ab63d55cd0e9d000bfa04b64a658e0a05e427cffce5f88427f697cee6b4",
+      "credentials": [
+        "GITHUB_TOKEN",
+        "HF_ORG_TOKEN"
+      ],
+      "resources": [
+        {
+          "key": "github:actions:artifact:hf-space-lifecycle",
+          "access": "external-write"
+        },
+        {
+          "key": "github:repository:szl-holdings/.github:contents",
+          "access": "read"
+        },
+        {
+          "key": "huggingface:space:SZLHOLDINGS/README",
+          "access": "external-write"
+        },
+        {
+          "key": "huggingface:space:SZLHOLDINGS/a11oy",
+          "access": "external-write"
+        },
+        {
+          "key": "huggingface:space:SZLHOLDINGS/anatomy",
+          "access": "external-write"
+        },
+        {
+          "key": "huggingface:space:SZLHOLDINGS/ayllu",
+          "access": "external-write"
+        },
+        {
+          "key": "huggingface:space:SZLHOLDINGS/cosmos",
+          "access": "external-write"
+        },
+        {
+          "key": "huggingface:space:SZLHOLDINGS/counsel",
+          "access": "external-write"
+        },
+        {
+          "key": "huggingface:space:SZLHOLDINGS/david-leads",
+          "access": "external-write"
+        },
+        {
+          "key": "huggingface:space:SZLHOLDINGS/energy-attest-holo",
+          "access": "external-write"
+        },
+        {
+          "key": "huggingface:space:SZLHOLDINGS/energy-attested-runs",
+          "access": "external-write"
+        },
+        {
+          "key": "huggingface:space:SZLHOLDINGS/evidence-studio",
+          "access": "external-write"
+        },
+        {
+          "key": "huggingface:space:SZLHOLDINGS/experiments",
+          "access": "external-write"
+        },
+        {
+          "key": "huggingface:space:SZLHOLDINGS/governed-agent-bench",
+          "access": "external-write"
+        },
+        {
+          "key": "huggingface:space:SZLHOLDINGS/governed-norm-holo",
+          "access": "external-write"
+        },
+        {
+          "key": "huggingface:space:SZLHOLDINGS/governed-receipt-verifier",
+          "access": "external-write"
+        },
+        {
+          "key": "huggingface:space:SZLHOLDINGS/guardrail-receipt",
+          "access": "external-write"
+        },
+        {
+          "key": "huggingface:space:SZLHOLDINGS/hatun-mcp",
+          "access": "external-write"
+        },
+        {
+          "key": "huggingface:space:SZLHOLDINGS/holographic",
+          "access": "external-write"
+        },
+        {
+          "key": "huggingface:space:SZLHOLDINGS/immune",
+          "access": "external-write"
+        },
+        {
+          "key": "huggingface:space:SZLHOLDINGS/immune-lattice",
+          "access": "external-write"
+        },
+        {
+          "key": "huggingface:space:SZLHOLDINGS/khipu-lab",
+          "access": "external-write"
+        },
+        {
+          "key": "huggingface:space:SZLHOLDINGS/killinchu",
+          "access": "external-write"
+        },
+        {
+          "key": "huggingface:space:SZLHOLDINGS/lambda-gate-holo",
+          "access": "external-write"
+        },
+        {
+          "key": "huggingface:space:SZLHOLDINGS/llm-router-live",
+          "access": "external-write"
+        },
+        {
+          "key": "huggingface:space:SZLHOLDINGS/lyte-services",
+          "access": "external-write"
+        },
+        {
+          "key": "huggingface:space:SZLHOLDINGS/nexus",
+          "access": "external-write"
+        },
+        {
+          "key": "huggingface:space:SZLHOLDINGS/prove-it",
+          "access": "external-write"
+        },
+        {
+          "key": "huggingface:space:SZLHOLDINGS/receipt-chain-live",
+          "access": "external-write"
+        },
+        {
+          "key": "huggingface:space:SZLHOLDINGS/sda",
+          "access": "external-write"
+        },
+        {
+          "key": "huggingface:space:SZLHOLDINGS/second-brain",
+          "access": "external-write"
+        },
+        {
+          "key": "huggingface:space:SZLHOLDINGS/szl-atelier",
+          "access": "external-write"
+        },
+        {
+          "key": "huggingface:space:SZLHOLDINGS/szl-blocked-live",
+          "access": "external-write"
+        },
+        {
+          "key": "huggingface:space:SZLHOLDINGS/szl-command-lab",
+          "access": "external-write"
+        },
+        {
+          "key": "huggingface:space:SZLHOLDINGS/szl-estate-live",
+          "access": "external-write"
+        },
+        {
+          "key": "huggingface:space:SZLHOLDINGS/szl-experiments",
+          "access": "external-write"
+        },
+        {
+          "key": "huggingface:space:SZLHOLDINGS/szl-forge-lab",
+          "access": "external-write"
+        },
+        {
+          "key": "huggingface:space:SZLHOLDINGS/szl-govsign-live",
+          "access": "external-write"
+        },
+        {
+          "key": "huggingface:space:SZLHOLDINGS/szl-kernels-live",
+          "access": "external-write"
+        },
+        {
+          "key": "huggingface:space:SZLHOLDINGS/szl-khipu",
+          "access": "external-write"
+        },
+        {
+          "key": "huggingface:space:SZLHOLDINGS/szl-model-inference-lab",
+          "access": "external-write"
+        },
+        {
+          "key": "huggingface:space:SZLHOLDINGS/szl-provctl-live",
+          "access": "external-write"
+        },
+        {
+          "key": "huggingface:space:SZLHOLDINGS/szl-quant-live",
+          "access": "external-write"
+        },
+        {
+          "key": "huggingface:space:SZLHOLDINGS/szl-real-estate",
+          "access": "external-write"
+        },
+        {
+          "key": "huggingface:space:SZLHOLDINGS/szl-sovereign-os",
+          "access": "external-write"
+        },
+        {
+          "key": "huggingface:space:SZLHOLDINGS/terra-assurance",
+          "access": "external-write"
+        },
+        {
+          "key": "huggingface:space:SZLHOLDINGS/yarqa",
+          "access": "external-write"
+        },
+        {
+          "key": "runner:guard:egress",
+          "access": "local-write"
+        },
+        {
+          "key": "runner:toolchain:python",
+          "access": "local-write"
+        },
+        {
+          "key": "stepsecurity:monitor:szl-holdings/.github",
+          "access": "external-write"
+        }
+      ],
+      "effects": [
+        {
+          "sink": "github.artifact.upload",
+          "resource": "github:actions:artifact:hf-space-lifecycle",
+          "access": "external-write",
+          "max_calls": 1
+        },
+        {
+          "sink": "github.contents.checkout",
+          "resource": "github:repository:szl-holdings/.github:contents",
+          "access": "read",
+          "max_calls": 1
+        },
+        {
+          "sink": "runner.guard.configure",
+          "resource": "runner:guard:egress",
+          "access": "local-write",
+          "max_calls": 1
+        },
+        {
+          "sink": "runner.guard.telemetry",
+          "resource": "stepsecurity:monitor:szl-holdings/.github",
+          "access": "external-write",
+          "max_calls": 1
+        },
+        {
+          "sink": "runner.toolchain.install",
+          "resource": "runner:toolchain:python",
+          "access": "local-write",
+          "max_calls": 1
+        },
+        {
+          "sink": "sdk.huggingface.update_repo_settings",
+          "possible_resources": [
+            "huggingface:space:SZLHOLDINGS/README",
+            "huggingface:space:SZLHOLDINGS/a11oy",
+            "huggingface:space:SZLHOLDINGS/anatomy",
+            "huggingface:space:SZLHOLDINGS/ayllu",
+            "huggingface:space:SZLHOLDINGS/cosmos",
+            "huggingface:space:SZLHOLDINGS/counsel",
+            "huggingface:space:SZLHOLDINGS/david-leads",
+            "huggingface:space:SZLHOLDINGS/energy-attest-holo",
+            "huggingface:space:SZLHOLDINGS/energy-attested-runs",
+            "huggingface:space:SZLHOLDINGS/evidence-studio",
+            "huggingface:space:SZLHOLDINGS/experiments",
+            "huggingface:space:SZLHOLDINGS/governed-agent-bench",
+            "huggingface:space:SZLHOLDINGS/governed-norm-holo",
+            "huggingface:space:SZLHOLDINGS/governed-receipt-verifier",
+            "huggingface:space:SZLHOLDINGS/guardrail-receipt",
+            "huggingface:space:SZLHOLDINGS/hatun-mcp",
+            "huggingface:space:SZLHOLDINGS/holographic",
+            "huggingface:space:SZLHOLDINGS/immune",
+            "huggingface:space:SZLHOLDINGS/immune-lattice",
+            "huggingface:space:SZLHOLDINGS/khipu-lab",
+            "huggingface:space:SZLHOLDINGS/killinchu",
+            "huggingface:space:SZLHOLDINGS/lambda-gate-holo",
+            "huggingface:space:SZLHOLDINGS/llm-router-live",
+            "huggingface:space:SZLHOLDINGS/lyte-services",
+            "huggingface:space:SZLHOLDINGS/nexus",
+            "huggingface:space:SZLHOLDINGS/prove-it",
+            "huggingface:space:SZLHOLDINGS/receipt-chain-live",
+            "huggingface:space:SZLHOLDINGS/sda",
+            "huggingface:space:SZLHOLDINGS/second-brain",
+            "huggingface:space:SZLHOLDINGS/szl-atelier",
+            "huggingface:space:SZLHOLDINGS/szl-blocked-live",
+            "huggingface:space:SZLHOLDINGS/szl-command-lab",
+            "huggingface:space:SZLHOLDINGS/szl-estate-live",
+            "huggingface:space:SZLHOLDINGS/szl-experiments",
+            "huggingface:space:SZLHOLDINGS/szl-forge-lab",
+            "huggingface:space:SZLHOLDINGS/szl-govsign-live",
+            "huggingface:space:SZLHOLDINGS/szl-kernels-live",
+            "huggingface:space:SZLHOLDINGS/szl-khipu",
+            "huggingface:space:SZLHOLDINGS/szl-model-inference-lab",
+            "huggingface:space:SZLHOLDINGS/szl-provctl-live",
+            "huggingface:space:SZLHOLDINGS/szl-quant-live",
+            "huggingface:space:SZLHOLDINGS/szl-real-estate",
+            "huggingface:space:SZLHOLDINGS/szl-sovereign-os",
+            "huggingface:space:SZLHOLDINGS/terra-assurance",
+            "huggingface:space:SZLHOLDINGS/yarqa"
+          ],
+          "access": "external-write",
+          "max_calls": 1
+        }
+      ],
+      "max_external_writes": 3,
+      "required_controls": {
+        "triggers": [
+          "workflow_dispatch"
+        ],
+        "contents_read": true,
+        "no_explicit_secrets": false,
+        "concurrency": true,
+        "protected_ref": true,
+        "exact_sha": true,
+        "expected_before": false,
+        "readback": false
+      },
+      "trusted_transitives": {},
+      "reviewed_unknowns": {
+        "files": {
+          ".github/data/hf-space-lifecycle-policy.json": "sha256:8e6a2b64b3b7c86a2fc17a5c0c13e862d82717e14c0cc183cfa03ba2ec369176",
+          ".github/scripts/hf_space_lifecycle_reconcile.py": "sha256:fda7f22d5f3d63f13c51145386752125903c9f0ae0c5628972ebd8cf6f22641d",
+          ".github/scripts/test_hf_space_lifecycle_reconcile.py": "sha256:ba82032048bf4d2a07b72a8afec6f092b793003456000da61e8bfe29793a9c14",
+          ".github/workflows/hf-space-lifecycle-reconcile.yml": "sha256:fe880ab63d55cd0e9d000bfa04b64a658e0a05e427cffce5f88427f697cee6b4",
+          "requirements/hf-publisher.lock": "sha256:eec9ee849129e2034d2c7880f0f3e32857cbfd7ceecfcb5f2eb7cb541b4e4d15"
+        },
+        "unknowns": [
+          "ACTION_INPUTS_REVIEW_REQUIRED@.github/workflows/hf-space-lifecycle-reconcile.yml:119",
+          "ACTION_INPUTS_REVIEW_REQUIRED@.github/workflows/hf-space-lifecycle-reconcile.yml:124",
+          "ACTION_INPUTS_REVIEW_REQUIRED@.github/workflows/hf-space-lifecycle-reconcile.yml:139",
+          "ACTION_INPUTS_REVIEW_REQUIRED@.github/workflows/hf-space-lifecycle-reconcile.yml:184",
+          "HTTP_TARGET_UNRESOLVED@.github/scripts/hf_space_lifecycle_reconcile.py:438",
+          "PINNED_RUNTIME_OUTPUT_REVIEW_REQUIRED@.github/workflows/hf-space-lifecycle-reconcile.yml:173",
+          "PYTHON_DYNAMIC_EXECUTION@.github/scripts/hf_space_lifecycle_reconcile.py:143",
+          "PYTHON_DYNAMIC_EXECUTION@.github/scripts/hf_space_lifecycle_reconcile.py:365",
+          "PYTHON_DYNAMIC_EXECUTION@.github/scripts/hf_space_lifecycle_reconcile.py:370",
+          "PYTHON_DYNAMIC_EXECUTION@.github/scripts/hf_space_lifecycle_reconcile.py:373",
+          "PYTHON_DYNAMIC_EXECUTION@.github/scripts/hf_space_lifecycle_reconcile.py:374",
+          "PYTHON_DYNAMIC_EXECUTION@.github/scripts/hf_space_lifecycle_reconcile.py:380",
+          "PYTHON_DYNAMIC_EXECUTION@.github/scripts/hf_space_lifecycle_reconcile.py:381",
+          "PYTHON_DYNAMIC_EXECUTION@.github/scripts/hf_space_lifecycle_reconcile.py:545",
+          "PYTHON_DYNAMIC_EXECUTION@.github/scripts/hf_space_lifecycle_reconcile.py:546",
+          "PYTHON_DYNAMIC_EXECUTION@.github/scripts/hf_space_lifecycle_reconcile.py:549",
+          "PYTHON_IMPORT_UNRESOLVED@.github/scripts/hf_space_lifecycle_reconcile.py:17",
+          "PYTHON_IMPORT_UNRESOLVED@.github/scripts/hf_space_lifecycle_reconcile.py:19",
+          "PYTHON_IMPORT_UNRESOLVED@.github/scripts/hf_space_lifecycle_reconcile.py:25",
+          "PYTHON_IMPORT_UNRESOLVED@.github/scripts/hf_space_lifecycle_reconcile.py:26",
+          "PYTHON_IMPORT_UNRESOLVED@.github/scripts/hf_space_lifecycle_reconcile.py:27",
+          "PYTHON_IMPORT_UNRESOLVED@.github/scripts/hf_space_lifecycle_reconcile.py:28",
+          "PYTHON_IMPORT_UNRESOLVED@.github/scripts/hf_space_lifecycle_reconcile.py:927",
+          "PYTHON_IMPORT_UNRESOLVED@.github/scripts/hf_space_lifecycle_reconcile.py:928",
+          "PYTHON_IMPORT_UNRESOLVED@.github/scripts/test_hf_space_lifecycle_reconcile.py:16",
+          "PYTHON_IMPORT_UNRESOLVED@.github/scripts/test_hf_space_lifecycle_reconcile.py:4",
+          "PYTHON_IMPORT_UNRESOLVED@.github/scripts/test_hf_space_lifecycle_reconcile.py:6",
+          "PYTHON_IMPORT_UNRESOLVED@.github/scripts/test_hf_space_lifecycle_reconcile.py:7",
+          "PYTHON_IMPORT_UNRESOLVED@.github/scripts/test_hf_space_lifecycle_reconcile.py:8",
+          "PYTHON_IMPORT_UNRESOLVED@.github/scripts/test_hf_space_lifecycle_reconcile.py:9",
+          "PYTHON_SOURCE_REVIEW_REQUIRED@.github/scripts/hf_space_lifecycle_reconcile.py:1",
+          "PYTHON_SOURCE_REVIEW_REQUIRED@.github/scripts/test_hf_space_lifecycle_reconcile.py:1",
+          "SCRIPT_SOURCE_REVIEW_REQUIRED@requirements/hf-publisher.lock:1",
+          "SDK_TARGET_UNRESOLVED@.github/scripts/hf_space_lifecycle_reconcile.py:388",
+          "SECRET_EXPRESSION_REVIEW_REQUIRED@.github/workflows/hf-space-lifecycle-reconcile.yml:1",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/scripts/hf_space_lifecycle_reconcile.py:454",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-space-lifecycle-reconcile.yml:131",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-space-lifecycle-reconcile.yml:132",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-space-lifecycle-reconcile.yml:133",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-space-lifecycle-reconcile.yml:134",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-space-lifecycle-reconcile.yml:144",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-space-lifecycle-reconcile.yml:145",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-space-lifecycle-reconcile.yml:146",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-space-lifecycle-reconcile.yml:147",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-space-lifecycle-reconcile.yml:148",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-space-lifecycle-reconcile.yml:155",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-space-lifecycle-reconcile.yml:156",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-space-lifecycle-reconcile.yml:157",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-space-lifecycle-reconcile.yml:158",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-space-lifecycle-reconcile.yml:159",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-space-lifecycle-reconcile.yml:160",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-space-lifecycle-reconcile.yml:161",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-space-lifecycle-reconcile.yml:162",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-space-lifecycle-reconcile.yml:163",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-space-lifecycle-reconcile.yml:164",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-space-lifecycle-reconcile.yml:165",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-space-lifecycle-reconcile.yml:166",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-space-lifecycle-reconcile.yml:174",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-space-lifecycle-reconcile.yml:175",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-space-lifecycle-reconcile.yml:176",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-space-lifecycle-reconcile.yml:177",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-space-lifecycle-reconcile.yml:178",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/hf-space-lifecycle-reconcile.yml:131",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/hf-space-lifecycle-reconcile.yml:132",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/hf-space-lifecycle-reconcile.yml:133",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/hf-space-lifecycle-reconcile.yml:134",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/hf-space-lifecycle-reconcile.yml:144",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/hf-space-lifecycle-reconcile.yml:145",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/hf-space-lifecycle-reconcile.yml:155",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/hf-space-lifecycle-reconcile.yml:156",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/hf-space-lifecycle-reconcile.yml:160",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/hf-space-lifecycle-reconcile.yml:161",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/hf-space-lifecycle-reconcile.yml:162",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/hf-space-lifecycle-reconcile.yml:164",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/hf-space-lifecycle-reconcile.yml:166",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/hf-space-lifecycle-reconcile.yml:174",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/hf-space-lifecycle-reconcile.yml:175",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/hf-space-lifecycle-reconcile.yml:176",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/hf-space-lifecycle-reconcile.yml:177",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/hf-space-lifecycle-reconcile.yml:178",
+          "WORKFLOW_ENVIRONMENT_REVIEW_REQUIRED@.github/workflows/hf-space-lifecycle-reconcile.yml:112",
+          "WORKFLOW_ENVIRONMENT_REVIEW_REQUIRED@.github/workflows/hf-space-lifecycle-reconcile.yml:170"
         ]
       }
     }

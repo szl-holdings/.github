@@ -29,6 +29,13 @@ from typing import Any, Mapping, Sequence
 POLICY_SCHEMA = "szl.control-plane-effect-policy/v1"
 RECEIPT_SCHEMA = "szl.control-plane-effect-delta/v1"
 DEFAULT_POLICY_PATH = ".github/data/control_plane_effect_policy.json"
+LIFECYCLE_WORKFLOW = ".github/workflows/hf-space-lifecycle-reconcile.yml"
+LIFECYCLE_POLICY = ".github/data/hf-space-lifecycle-policy.json"
+LIFECYCLE_CONTROLLER = ".github/scripts/hf_space_lifecycle_reconcile.py"
+LIFECYCLE_LOCK = "requirements/hf-publisher.lock"
+LIFECYCLE_WORKFLOW_SHA256 = (
+    "sha256:fe880ab63d55cd0e9d000bfa04b64a658e0a05e427cffce5f88427f697cee6b4"
+)
 EXACT_SHA = re.compile(r"[0-9a-f]{40}")
 EXACT_DIGEST = re.compile(r"sha256:[0-9a-f]{64}")
 SAFE_IDENTIFIER = re.compile(r"[A-Za-z0-9][A-Za-z0-9._:/-]*")
@@ -373,37 +380,66 @@ def load_policy_bytes(raw: bytes, *, as_of: date) -> dict[str, Any]:
         if not isinstance(effects, list):
             raise GateError("POLICY_SCHEMA_INVALID", "effects must be a list")
         normalized_effects: list[dict[str, Any]] = []
-        effect_keys: set[tuple[str, str]] = set()
+        effect_keys: set[tuple[str, str | tuple[str, ...]]] = set()
         for item in effects:
             if not isinstance(item, dict):
                 raise GateError("POLICY_SCHEMA_INVALID", "effect entries must be objects")
-            strict_keys(item, {"sink", "resource", "access", "max_calls"}, "effect")
+            if "possible_resources" in item:
+                strict_keys(item, {"sink", "possible_resources", "access", "max_calls"}, "effect")
+            else:
+                strict_keys(item, {"sink", "resource", "access", "max_calls"}, "effect")
             sink = str(item["sink"] or "")
-            resource = validate_resource_key(item["resource"])
             access = str(item["access"])
             max_calls = item["max_calls"]
+            if "possible_resources" in item:
+                choices = item["possible_resources"]
+                if (
+                    workflow != LIFECYCLE_WORKFLOW
+                    or sink != "sdk.huggingface.update_repo_settings"
+                    or access != "external-write"
+                    or not isinstance(choices, list)
+                    or len(choices) != 45
+                    or any(not isinstance(choice, str) for choice in choices)
+                ):
+                    raise GateError("POLICY_SCHEMA_INVALID", "unsupported effect target choices")
+                possible_resources = [validate_resource_key(choice) for choice in choices]
+                if (
+                    len(set(possible_resources)) != len(possible_resources)
+                    or possible_resources != sorted(possible_resources)
+                    or any(
+                        not choice.startswith("huggingface:space:SZLHOLDINGS/")
+                        or resource_map.get(choice) != access
+                        for choice in possible_resources
+                    )
+                ):
+                    raise GateError("POLICY_SCHEMA_INVALID", "effect target choices must be exact declared Spaces")
+                resource_key: str | tuple[str, ...] = tuple(possible_resources)
+                normalized_effect = {
+                    "sink": sink, "possible_resources": possible_resources,
+                    "access": access, "max_calls": max_calls,
+                }
+            else:
+                resource = validate_resource_key(item["resource"])
+                resource_key = resource
+                normalized_effect = {
+                    "sink": sink, "resource": resource,
+                    "access": access, "max_calls": max_calls,
+                }
             if (
                 not SAFE_IDENTIFIER.fullmatch(sink)
                 or access not in ACCESS_MODES
                 or not isinstance(max_calls, int)
                 or isinstance(max_calls, bool)
                 or max_calls < 1
-                or resource_map.get(resource) != access
-                or (sink, resource) in effect_keys
+                or (isinstance(resource_key, str) and resource_map.get(resource_key) != access)
+                or (sink, resource_key) in effect_keys
             ):
                 raise GateError(
                     "POLICY_SCHEMA_INVALID",
                     "effects must bind unique sinks to declared resources and budgets",
                 )
-            effect_keys.add((sink, resource))
-            normalized_effects.append(
-                {
-                    "sink": sink,
-                    "resource": resource,
-                    "access": access,
-                    "max_calls": max_calls,
-                }
-            )
+            effect_keys.add((sink, resource_key))
+            normalized_effects.append(normalized_effect)
         max_external = declaration["max_external_writes"]
         if (
             not isinstance(max_external, int)
@@ -507,7 +543,8 @@ def load_policy_bytes(raw: bytes, *, as_of: date) -> dict[str, Any]:
             "credentials": credentials,
             "resources": sorted(normalized_resources, key=lambda item: item["key"]),
             "effects": sorted(
-                normalized_effects, key=lambda item: (item["sink"], item["resource"])
+                normalized_effects,
+                key=lambda item: (item["sink"], item.get("resource", "|".join(item.get("possible_resources", [])))),
             ),
             "max_external_writes": max_external,
             "required_controls": {
@@ -681,7 +718,7 @@ def run_blocks(source: str) -> list[tuple[int, str]]:
     return blocks
 
 
-def workflow_dependencies(source: str) -> list[str]:
+def workflow_dependencies(source: str, *, path: str = "") -> list[str]:
     clean = uncommented_yaml(source)
     try:
         document, _lines = parse_workflow_yaml(source)
@@ -696,6 +733,8 @@ def workflow_dependencies(source: str) -> list[str]:
         # The policy and receipt still use one canonical Git-tree path.
         dependency = spelling[2:] if spelling.startswith("./") else spelling
         dependencies.add(safe_repo_path(dependency))
+    if path == LIFECYCLE_WORKFLOW and LIFECYCLE_LOCK in clean:
+        dependencies.add(LIFECYCLE_LOCK)
     return sorted(dependencies)
 
 
@@ -1008,6 +1047,36 @@ def inline_python_blocks(
     return effects, unknowns
 
 
+def lifecycle_runtime_output_reviewed(
+    source: str, path: str, document: Mapping[str, Any], block: str
+) -> bool:
+    """Recognize one pinned producer and consumer; other run expressions still deny."""
+    if path != LIFECYCLE_WORKFLOW or sha256_bytes(source.encode("utf-8")) != LIFECYCLE_WORKFLOW_SHA256:
+        return False
+    if GITHUB_EXPRESSION.findall(block) != [" steps.runtime.outputs.python "] or (
+        '"${{ steps.runtime.outputs.python }}" -I -P' not in block
+    ):
+        return False
+    jobs = document.get("jobs", {})
+    steps = jobs.get("reconcile", {}).get("steps", []) if isinstance(jobs, dict) else []
+    producers = [step for step in steps if isinstance(step, dict) and step.get("id") == "runtime"]
+    if len(producers) != 1:
+        return False
+    producer = producers[0]
+    run = producer.get("run")
+    return (
+        set(producer) == {"name", "id", "shell", "run"}
+        and producer["shell"] == "bash"
+        and isinstance(run, str)
+        and not GITHUB_EXPRESSION.search(run)
+        and run.count('VENV="$RUNNER_TEMP/hf-space-lifecycle-venv"') == 1
+        and run.count('python3 -m venv "$VENV"') == 1
+        and run.count('echo "python=$VENV/bin/python" >> "$GITHUB_OUTPUT"') == 1
+        and run.count("VENV=") == 1
+        and run.count("$GITHUB_OUTPUT") == 1
+    )
+
+
 def analyze_workflow_source(source: str, *, path: str) -> dict[str, Any]:
     effects: list[RawEffect] = []
     unknowns: list[UnknownEffect] = []
@@ -1017,7 +1086,7 @@ def analyze_workflow_source(source: str, *, path: str) -> dict[str, Any]:
     except GateError as exc:
         return {
             "triggers": [], "permissions": [], "credentials": [],
-            "dependencies": workflow_dependencies(source),
+            "dependencies": workflow_dependencies(source, path=path),
             "controls": {key: False for key in (
                 "contents_read", "no_explicit_secrets", "concurrency",
                 "protected_ref", "exact_sha", "expected_before", "readback",
@@ -1070,7 +1139,7 @@ def analyze_workflow_source(source: str, *, path: str) -> dict[str, Any]:
         unknown("WORKFLOW_DEFAULTS_UNSUPPORTED", ("defaults",))
     if "env" in document:
         unknown("WORKFLOW_ENVIRONMENT_REVIEW_REQUIRED", ("env",))
-    dependencies = workflow_dependencies(source)
+    dependencies = workflow_dependencies(source, path=path)
     jobs = document.get("jobs")
     if not isinstance(jobs, dict) or not jobs:
         unknown("WORKFLOW_SHAPE_INVALID", ("jobs",))
@@ -1228,6 +1297,10 @@ def analyze_workflow_source(source: str, *, path: str) -> dict[str, Any]:
                             # This exact run-scoped namespace is the enforcing
                             # workflow contract, not an arbitrary dynamic name.
                             resource = "github:actions:artifact:control-plane-effect"
+                        elif path == LIFECYCLE_WORKFLOW and artifact == (
+                            "hf-space-lifecycle-${{ github.run_id }}-${{ github.run_attempt }}"
+                        ):
+                            resource = "github:actions:artifact:hf-space-lifecycle"
                         elif path == ".github/workflows/estate-one-fabric-alignment.yml" and artifact in {
                             "estate-alignment-local-${{ github.run_id }}-${{ github.run_attempt }}",
                             "estate-alignment-live-${{ github.run_id }}-${{ github.run_attempt }}",
@@ -1257,7 +1330,10 @@ def analyze_workflow_source(source: str, *, path: str) -> dict[str, Any]:
                     unknown("WORKFLOW_SHAPE_INVALID", (*step_location, "run"))
                     continue
                 if GITHUB_EXPRESSION.search(block):
-                    unknown("WORKFLOW_EXPRESSION_EXECUTION_UNSUPPORTED", (*step_location, "run"))
+                    if lifecycle_runtime_output_reviewed(source, path, document, block):
+                        unknown("PINNED_RUNTIME_OUTPUT_REVIEW_REQUIRED", (*step_location, "run"))
+                    else:
+                        unknown("WORKFLOW_EXPRESSION_EXECUTION_UNSUPPORTED", (*step_location, "run"))
                 blocks.append((lines[(*step_location, "run")], block))
 
     for start_line, block in blocks:
@@ -1513,6 +1589,52 @@ def analyze_dependency(
     return effects, unknowns
 
 
+def lifecycle_possible_resources(source: bytes, dependencies: Mapping[str, bytes]) -> tuple[str, ...] | None:
+    """Resolve the one SDK site to the exact dispatch and policy target set."""
+    policy_blob = dependencies.get(LIFECYCLE_POLICY)
+    if policy_blob is None:
+        return None
+    try:
+        policy = strict_json(policy_blob)
+        workflow, _ = parse_workflow_yaml(source.decode("utf-8", errors="strict"))
+        options = workflow["on"]["workflow_dispatch"]["inputs"]["repo_id"]["options"]
+        targets = policy["targets"]
+    except (GateError, KeyError, TypeError, UnicodeDecodeError):
+        return None
+    if (
+        not isinstance(policy, dict)
+        or policy.get("schema") != "szl.hf.space-lifecycle-policy.v2"
+        or policy.get("organization") != "SZLHOLDINGS"
+        or not isinstance(targets, list)
+        or len(targets) != 46
+        or not isinstance(options, list)
+        or len(options) != 46
+        or any(not isinstance(item, dict) for item in targets)
+    ):
+        return None
+    ids = [item.get("repo_id") for item in targets]
+    if (
+        any(not isinstance(repo_id, str) or not re.fullmatch(r"SZLHOLDINGS/[A-Za-z0-9._-]+", repo_id) for repo_id in ids)
+        or len(set(ids)) != 46
+        or any(not isinstance(option, str) for option in options)
+        or len(set(options)) != 46
+        or set(options) != set(ids)
+    ):
+        return None
+    writable: list[str] = []
+    for item in targets:
+        repo_id = item["repo_id"]
+        state = (item.get("desired_visibility"), item.get("desired_runtime_stage"))
+        if repo_id == "SZLHOLDINGS/a11oy-factory":
+            if state != ("private", "PAUSED"):
+                return None
+        elif state == ("public", "RUNNING"):
+            writable.append("huggingface:space:" + repo_id)
+        else:
+            return None
+    return tuple(sorted(writable)) if len(writable) == 45 else None
+
+
 def bind_declaration(
     workflow_path: str,
     source: bytes,
@@ -1600,27 +1722,50 @@ def bind_declaration(
         reasons.add("UNKNOWN_EFFECT")
 
     declarations = {
-        (item["sink"], item["resource"], item["access"]): item
+        (item["sink"], tuple(item["possible_resources"]) if "possible_resources" in item else item["resource"], item["access"]): item
         for item in declaration["effects"]
     }
-    counts: Counter[tuple[str, str, str]] = Counter()
+    counts: Counter[tuple[str, str | tuple[str, ...], str]] = Counter()
     bound_effects: list[dict[str, Any]] = []
+    lifecycle_targets = (
+        lifecycle_possible_resources(source, dependency_blobs)
+        if workflow_path == LIFECYCLE_WORKFLOW else None
+    )
+    if workflow_path == LIFECYCLE_WORKFLOW and lifecycle_targets is None:
+        reasons.add("TARGET_CHOICE_SET_MISMATCH")
     for effect in all_effects:
-        candidates = [
-            key
-            for key in declarations
-            if key[0] == effect.sink
-            and key[2] == effect.access
-            and (not effect.resource or key[1] == effect.resource)
-        ]
+        is_lifecycle_write = (
+            workflow_path == LIFECYCLE_WORKFLOW
+            and effect.path == LIFECYCLE_CONTROLLER
+            and effect.sink == "sdk.huggingface.update_repo_settings"
+            and effect.access == "external-write"
+        )
+        if is_lifecycle_write:
+            candidates = [
+                key for key in declarations
+                if key[0] == effect.sink and key[2] == effect.access
+                and isinstance(key[1], tuple)
+            ]
+        else:
+            candidates = [
+                key for key in declarations
+                if key[0] == effect.sink and key[2] == effect.access
+                and isinstance(key[1], str)
+                and (not effect.resource or key[1] == effect.resource)
+            ]
         if len(candidates) != 1:
             reasons.add(
                 "UNDECLARED_EFFECT" if not candidates else "AMBIGUOUS_EFFECT_BINDING"
             )
             continue
         key = candidates[0]
+        if is_lifecycle_write and key[1] != lifecycle_targets:
+            reasons.add("TARGET_CHOICE_SET_MISMATCH")
         counts[key] += 1
-        bound_effects.append({**effect.public(), "resource": key[1]})
+        if isinstance(key[1], tuple):
+            bound_effects.append({**effect.public(), "possible_resources": list(key[1])})
+        else:
+            bound_effects.append({**effect.public(), "resource": key[1]})
     for key, declared in declarations.items():
         count = counts[key]
         if count == 0:
@@ -1651,7 +1796,7 @@ def bind_declaration(
             bound_effects,
             key=lambda item: (
                 item["sink"],
-                item["resource"],
+                item.get("resource", "|".join(item.get("possible_resources", []))),
                 item["path"],
                 item["line"],
             ),
@@ -1664,17 +1809,30 @@ def bind_declaration(
     }
 
 
-def effect_signature(item: Mapping[str, Any]) -> tuple[str, str, str]:
-    return str(item["sink"]), str(item["resource"]), str(item["access"])
+def effect_signature(item: Mapping[str, Any]) -> tuple[str, tuple[str, ...], str]:
+    resources = item.get("possible_resources")
+    return (
+        str(item["sink"]),
+        tuple(resources) if resources is not None else (str(item["resource"]),),
+        str(item["access"]),
+    )
+
+
+def conflict_resource(resource: str) -> str:
+    # A whole-Space writer conflicts with a settings/contents writer on that Space.
+    if resource.startswith("huggingface:space:"):
+        return ":".join(resource.split(":")[:3])
+    return resource
 
 
 def conflicts(analyses: Sequence[Mapping[str, Any]]) -> list[dict[str, Any]]:
     claims: dict[str, list[tuple[str, str]]] = {}
     for analysis in analyses:
         for effect in analysis["effects"]:
-            claims.setdefault(effect["resource"], []).append(
-                (analysis["workflow"], effect["access"])
-            )
+            for resource in effect.get("possible_resources", [effect.get("resource")]):
+                claims.setdefault(conflict_resource(resource), []).append(
+                    (analysis["workflow"], effect["access"])
+                )
     found: list[dict[str, Any]] = []
     for resource, resource_claims in sorted(claims.items()):
         workflows = {workflow for workflow, _ in resource_claims}
@@ -1737,7 +1895,7 @@ def analyze_repository(
         if blob is None:
             continue
         dependencies = set(
-            workflow_dependencies(blob.decode("utf-8", errors="strict"))
+            workflow_dependencies(blob.decode("utf-8", errors="strict"), path=workflow)
         )
         if dependencies & changed_set:
             selected.add(workflow)
@@ -1788,25 +1946,25 @@ def analyze_repository(
         )
 
         base_blob = git_blob(root, common, workflow)
-        base_effects: set[tuple[str, str, str]] = set()
+        base_effects: set[tuple[str, tuple[str, ...], str]] = set()
         if base_blob is not None:
             base_raw = analyze_workflow_source(
                 base_blob.decode("utf-8", errors="strict"), path=workflow
             )
             base_effects = {
-                (effect.sink, effect.resource, effect.access)
+                (effect.sink, (effect.resource,), effect.access)
                 for effect in base_raw["effects"]
                 if effect.resource
             }
         head_effects = {effect_signature(effect) for effect in analysis["effects"]}
         analysis["delta"] = {
             "added": [
-                {"sink": sink, "resource": resource, "access": access}
-                for sink, resource, access in sorted(head_effects - base_effects)
+                {"sink": sink, **({"resource": resources[0]} if len(resources) == 1 else {"possible_resources": list(resources)}), "access": access}
+                for sink, resources, access in sorted(head_effects - base_effects)
             ],
             "removed": [
-                {"sink": sink, "resource": resource, "access": access}
-                for sink, resource, access in sorted(base_effects - head_effects)
+                {"sink": sink, **({"resource": resources[0]} if len(resources) == 1 else {"possible_resources": list(resources)}), "access": access}
+                for sink, resources, access in sorted(base_effects - head_effects)
             ],
         }
         analyses.append(analysis)
@@ -1857,6 +2015,7 @@ def analyze_repository(
         "TRUSTED_TRANSITIVE_SET_MISMATCH",
         "REVIEWED_UNKNOWN_PIN_MISMATCH",
         "REVIEWED_UNKNOWN_SET_MISMATCH",
+        "TARGET_CHOICE_SET_MISMATCH",
         "TRUST_ROOT_BUNDLED_WITH_DENIED_WORKFLOW",
         "UNREVIEWABLE_EFFECT_BOUNDARY",
     }
