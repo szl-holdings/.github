@@ -1058,7 +1058,7 @@ class YamlBoundaryRegressionTests(unittest.TestCase):
                 self.assert_source_denied(source, reason="UNREVIEWABLE_EFFECT_BOUNDARY", candidate=reviewed_policy_for(source))
 
     def test_guard_telemetry_requires_omitted_or_canonical_false(self) -> None:
-        for pin in ("05e31511f85b41b11d1cf0ef85d0992719546e2c", "e14015d583714f6e62063499dc959a02595150a1"):
+        for pin in ("05e31511f85b41b11d1cf0ef85d0992719546e2c", "e14015d583714f6e62063499dc959a02595150a1", "ccd8616d44fd3846e67624a50d5aad6d37bf2d25"):
             for mode in ("audit", "block"):
                 for telemetry in (None, "false"):
                     with self.subTest(pin=pin, mode=mode, telemetry=telemetry):
@@ -1087,7 +1087,7 @@ class YamlBoundaryRegressionTests(unittest.TestCase):
             " true ", " false ", "\tfalse", "false\n", "", "0", "null",
             "arbitrary", "${{ inputs.disable_telemetry }}", "${{ false }}",
         )
-        for pin in ("05e31511f85b41b11d1cf0ef85d0992719546e2c", "e14015d583714f6e62063499dc959a02595150a1"):
+        for pin in ("05e31511f85b41b11d1cf0ef85d0992719546e2c", "e14015d583714f6e62063499dc959a02595150a1", "ccd8616d44fd3846e67624a50d5aad6d37bf2d25"):
             for mode in ("audit", "block"):
                 for value in values:
                     with self.subTest(pin=pin, mode=mode, value=value):
@@ -1100,7 +1100,7 @@ class YamlBoundaryRegressionTests(unittest.TestCase):
                         self.assertNotIn("runner.guard.telemetry", {effect["sink"] for effect in bound["effects"]})
 
     def test_guard_yaml_false_is_enabled_and_null_or_numbers_are_not(self) -> None:
-        for pin in ("05e31511f85b41b11d1cf0ef85d0992719546e2c", "e14015d583714f6e62063499dc959a02595150a1"):
+        for pin in ("05e31511f85b41b11d1cf0ef85d0992719546e2c", "e14015d583714f6e62063499dc959a02595150a1", "ccd8616d44fd3846e67624a50d5aad6d37bf2d25"):
             for mode in ("audit", "block"):
                 for value in ("false", "null", "~", "0", "1", "[]", "{}"):
                     with self.subTest(pin=pin, mode=mode, value=value):
@@ -1112,6 +1112,42 @@ class YamlBoundaryRegressionTests(unittest.TestCase):
                         else:
                             self.assert_source_denied(source, reason="UNREVIEWABLE_EFFECT_BOUNDARY", candidate=reviewed_policy_for(source))
                             self.assertNotIn("runner.guard.telemetry", {effect.sink for effect in parsed["effects"]})
+
+    def test_latest_action_pins_retain_prior_input_and_effect_boundaries(self) -> None:
+        revisions = (
+            ("step-security/harden-runner", "e14015d583714f6e62063499dc959a02595150a1",
+             "ccd8616d44fd3846e67624a50d5aad6d37bf2d25", (
+                 {"egress-policy": "audit"}, {"egress-policy": "block"},
+                 {"egress-policy": "audit", "use-policy-store": "true"},
+                 {"egress-policy": "audit", "api-key": "literal-credential"},
+                 {"egress-policy": "audit", "deploy-on-self-hosted-vm": "true"},
+             )),
+            ("actions/setup-node", "820762786026740c76f36085b0efc47a31fe5020",
+             "949feb2413d6458794dcd2491c4babbbce0c15c1", (
+                 {"node-version": "22", "package-manager-cache": "false"},
+                 {"node-version": "22"}, {"package-manager-cache": "true"},
+                 {"package-manager-cache": "false", "registry-url": "https://registry.example.invalid"},
+                 {"package-manager-cache": "false", "cache": "npm"},
+                 {"package-manager-cache": "false", "mirror-token": "literal-credential"},
+             )),
+            ("actions/upload-artifact", "043fb46d1a93c77aae656e7c1c64a875d1fc6a0a",
+             "cf430e030ddbb5b0abf93d22962f4752f3646cd9", (
+                 {"name": "fixture", "path": "report.json"},
+                 {"name": "fixture", "overwrite": "true"},
+                 {"name": "${{ inputs.name }}", "path": "report.json"},
+                 {"name": "fixture", "archive": "false"},
+             )),
+        )
+        for repository, prior, current, cases in revisions:
+            for inputs in cases:
+                with self.subTest(repository=repository, inputs=inputs):
+                    parsed = []
+                    for revision in (prior, current):
+                        source = workflow(extra_step=f"      - uses: {repository}@{revision}\n        with: {json.dumps(inputs)}\n")
+                        parsed.append(gate.analyze_workflow_source(source.decode(), path=WORKFLOW_PATH))
+                    self.assertEqual(parsed[0]["effects"], parsed[1]["effects"])
+                    self.assertEqual(parsed[0]["unknowns"], parsed[1]["unknowns"])
+                    self.assertNotIn("UNCLASSIFIED_EXTERNAL_ACTION", {item.code for item in parsed[1]["unknowns"]})
 
     def test_other_action_revisions_remain_nonreviewable(self) -> None:
         for repository in ("actions/setup-node", "step-security/harden-runner"):

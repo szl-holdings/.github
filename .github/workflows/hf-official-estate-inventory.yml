@@ -125,7 +125,7 @@ jobs:
           python .github/scripts/hf_official_estate_inventory_compat.py --public-projection reports/hf-official-estate-inventory-latest.json --output reports/hf-official-estate-inventory-public.json
       - name: Upload public inventory projection only
         if: always() && steps.projection.outcome == 'success'
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         with:
           name: hf-official-estate-inventory-public-v1
           path: reports/hf-official-estate-inventory-public.json

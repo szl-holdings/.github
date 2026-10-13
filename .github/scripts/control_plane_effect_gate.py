@@ -33,9 +33,10 @@ LIFECYCLE_WORKFLOW = ".github/workflows/hf-space-lifecycle-reconcile.yml"
 LIFECYCLE_POLICY = ".github/data/hf-space-lifecycle-policy.json"
 LIFECYCLE_CONTROLLER = ".github/scripts/hf_space_lifecycle_reconcile.py"
 LIFECYCLE_LOCK = "requirements/hf-publisher.lock"
-LIFECYCLE_WORKFLOW_SHA256 = (
-    "sha256:fe880ab63d55cd0e9d000bfa04b64a658e0a05e427cffce5f88427f697cee6b4"
-)
+LIFECYCLE_WORKFLOW_SHA256S = frozenset({
+    "sha256:fe880ab63d55cd0e9d000bfa04b64a658e0a05e427cffce5f88427f697cee6b4",
+    "sha256:a87d162bb2aa66150e5f10accc414aaf0dba4d57dad31dc16728e4ac1d9ecb03",
+})
 EXACT_SHA = re.compile(r"[0-9a-f]{40}")
 EXACT_DIGEST = re.compile(r"sha256:[0-9a-f]{64}")
 SAFE_IDENTIFIER = re.compile(r"[A-Za-z0-9][A-Za-z0-9._:/-]*")
@@ -95,6 +96,11 @@ KNOWN_ACTION_EFFECTS: Mapping[str, tuple[str, str, str]] = {
         "runner:guard:egress",
         "local-write",
     ),
+    "step-security/harden-runner@ccd8616d44fd3846e67624a50d5aad6d37bf2d25": (
+        "runner.guard.configure",
+        "runner:guard:egress",
+        "local-write",
+    ),
     "step-security/harden-runner@05e31511f85b41b11d1cf0ef85d0992719546e2c": (
         "runner.guard.configure",
         "runner:guard:egress",
@@ -115,7 +121,17 @@ KNOWN_ACTION_EFFECTS: Mapping[str, tuple[str, str, str]] = {
         "runner:toolchain:node",
         "local-write",
     ),
+    "actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1": (
+        "runner.toolchain.install",
+        "runner:toolchain:node",
+        "local-write",
+    ),
     "actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a": (
+        "github.artifact.upload",
+        "github:actions:artifact:control-plane-effect",
+        "external-write",
+    ),
+    "actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9": (
         "github.artifact.upload",
         "github:actions:artifact:control-plane-effect",
         "external-write",
@@ -1051,7 +1067,7 @@ def lifecycle_runtime_output_reviewed(
     source: str, path: str, document: Mapping[str, Any], block: str
 ) -> bool:
     """Recognize one pinned producer and consumer; other run expressions still deny."""
-    if path != LIFECYCLE_WORKFLOW or sha256_bytes(source.encode("utf-8")) != LIFECYCLE_WORKFLOW_SHA256:
+    if path != LIFECYCLE_WORKFLOW or sha256_bytes(source.encode("utf-8")) not in LIFECYCLE_WORKFLOW_SHA256S:
         return False
     if GITHUB_EXPRESSION.findall(block) != [" steps.runtime.outputs.python "] or (
         '"${{ steps.runtime.outputs.python }}" -I -P' not in block
@@ -1222,6 +1238,7 @@ def analyze_workflow_source(source: str, *, path: str) -> dict[str, Any]:
                     if action in {
                         "step-security/harden-runner@05e31511f85b41b11d1cf0ef85d0992719546e2c",
                         "step-security/harden-runner@e14015d583714f6e62063499dc959a02595150a1",
+                        "step-security/harden-runner@ccd8616d44fd3846e67624a50d5aad6d37bf2d25",
                     }:
                         # Only the reviewed hosted-runner guard configuration.
                         # Policy-store credentials, self-hosted deployment, and
@@ -1252,7 +1269,10 @@ def analyze_workflow_source(source: str, *, path: str) -> dict[str, Any]:
                                 lines[(*step_location, "uses")],
                                 "github:repository:szl-holdings/.github:cache:harden-runner-cacheKey",
                             ))
-                    if action == "actions/setup-node@820762786026740c76f36085b0efc47a31fe5020":
+                    if action in {
+                        "actions/setup-node@820762786026740c76f36085b0efc47a31fe5020",
+                        "actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1",
+                    }:
                         # v7 enables package-manager caching implicitly. Its
                         # post action can write the shared cache, so the narrow
                         # toolchain-only classification requires explicit opt-out.
