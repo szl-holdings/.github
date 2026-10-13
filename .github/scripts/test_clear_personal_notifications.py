@@ -227,6 +227,7 @@ def assert_count_only(test: unittest.TestCase, report: dict, api: FakeGitHub) ->
         test.assertNotIn(retired, report)
     test.assertNotEqual(report["status"], "CLEARED")
     test.assertEqual(report["full_inbox_state"], "UNKNOWN")
+    test.assertEqual(report["issue_receipt"], "NOT_PUBLISHED")
     test.assertEqual(
         report["full_inbox_verification"], "UNVERIFIED_NO_READ_ONLY_OBSERVABLE"
     )
@@ -669,37 +670,38 @@ class WorkflowPhaseTests(unittest.TestCase):
             "FAILED(outcome=failure, exit=unavailable)",
         )
 
-    def test_post_receipt_phase_reported_as_skipped_after_initial_failure(self):
-        with tempfile.TemporaryDirectory() as raw:
-            directory = Path(raw)
-            initial = self.write(directory, "initial.json", status="FAILED")
-            code, message = clearer.enforce_phases(
-                initial_outcome="success",
-                initial_exit_code="1",
-                post_receipt_outcome="skipped",
-                post_receipt_exit_code="",
-                initial_report=initial,
-                post_receipt_report=directory / "missing.json",
-            )
-        self.assertEqual(code, 1)
-        self.assertIn("initial=FAILED(exit=1)", message)
-        self.assertIn("post-receipt=SKIPPED", message)
-        self.assertNotIn("post-receipt=2", message)
+    def enforce(self, directory: Path, *, outcome="success", exit_code="0", **overrides):
+        return clearer.enforce_phases(
+            clearance_outcome=outcome,
+            clearance_exit_code=exit_code,
+            report_path=self.write(directory, "receipt.json", **overrides),
+        )
+
+    def test_failed_clearance_is_named_and_states_no_issue_receipt(self):
+        for outcome, exit_code, expected in (
+            ("success", "1", "clearance=FAILED(exit=1)"),
+            ("skipped", "", "clearance=SKIPPED"),
+            ("", "", "clearance=NOT_REACHED"),
+        ):
+            with self.subTest(outcome=outcome), tempfile.TemporaryDirectory() as raw:
+                code, message = self.enforce(
+                    Path(raw), outcome=outcome, exit_code=exit_code, status="FAILED"
+                )
+                self.assertEqual(code, 1)
+                self.assertIn(expected, message)
+                self.assertIn("No issue receipt is published", message)
+                self.assertNotIn("post-receipt", message)
+                self.assertNotIn("=2", message)
 
     def test_enforce_phases_verifies_unread_zero_without_inbox_zero_claim(self):
         with tempfile.TemporaryDirectory() as raw:
-            directory = Path(raw)
-            code, message = clearer.enforce_phases(
-                initial_outcome="success",
-                initial_exit_code="0",
-                post_receipt_outcome="success",
-                post_receipt_exit_code="0",
-                initial_report=self.write(directory, "a.json"),
-                post_receipt_report=self.write(directory, "b.json"),
-            )
+            code, message = self.enforce(Path(raw))
         self.assertEqual(code, 0)
-        self.assertIn("Unread-zero (all=false)", message)
+        self.assertIn("Unread-zero (all=false) verified; clearance=PASSED", message)
         self.assertIn("UNKNOWN", message)
+        self.assertIn("No issue receipt is published", message)
+        self.assertIn(clearer.RECEIPT_ARTIFACT, message)
+        self.assertNotIn("receipt publication", message)
         self.assertNotIn("inbox verified at zero", message.lower())
 
     def test_enforce_phases_rejects_nonzero_or_unmeasured_unread(self):
@@ -711,49 +713,85 @@ class WorkflowPhaseTests(unittest.TestCase):
             {"schema": "szl.github-notification-clearance/v2"},
         ):
             with self.subTest(overrides=overrides), tempfile.TemporaryDirectory() as raw:
-                directory = Path(raw)
-                code, _message = clearer.enforce_phases(
-                    initial_outcome="success",
-                    initial_exit_code="0",
-                    post_receipt_outcome="success",
-                    post_receipt_exit_code="0",
-                    initial_report=self.write(directory, "a.json"),
-                    post_receipt_report=self.write(directory, "b.json", **overrides),
-                )
+                code, message = self.enforce(Path(raw), **overrides)
                 self.assertEqual(code, 1)
+                self.assertIn("No issue receipt is published", message)
+
+    def test_enforce_phases_rejects_unreadable_or_non_object_receipt(self):
+        with tempfile.TemporaryDirectory() as raw:
+            directory = Path(raw)
+            missing, _ = clearer.enforce_phases(
+                clearance_outcome="success",
+                clearance_exit_code="0",
+                report_path=directory / "missing.json",
+            )
+            listed = directory / "list.json"
+            listed.write_text("[]", encoding="utf-8")
+            not_object, message = clearer.enforce_phases(
+                clearance_outcome="success",
+                clearance_exit_code="0",
+                report_path=listed,
+            )
+        self.assertEqual(missing, 1)
+        self.assertEqual(not_object, 1)
+        self.assertIn("does not verify unread-zero", message)
 
     def test_enforce_phases_accepts_only_the_integer_zero(self):
         for value in (False, 0.0, "0", [], None):
             with self.subTest(value=value), tempfile.TemporaryDirectory() as raw:
-                directory = Path(raw)
-                code, message = clearer.enforce_phases(
-                    initial_outcome="success",
-                    initial_exit_code="0",
-                    post_receipt_outcome="success",
-                    post_receipt_exit_code="0",
-                    initial_report=self.write(directory, "a.json"),
-                    post_receipt_report=self.write(
-                        directory, "b.json", after_unread_count=value
-                    ),
-                )
+                code, message = self.enforce(Path(raw), after_unread_count=value)
                 self.assertEqual(code, 1)
                 self.assertIn("does not verify unread-zero", message)
         with tempfile.TemporaryDirectory() as raw:
-            directory = Path(raw)
-            code, _message = clearer.enforce_phases(
-                initial_outcome="success",
-                initial_exit_code="0",
-                post_receipt_outcome="success",
-                post_receipt_exit_code="0",
-                initial_report=self.write(directory, "a.json", after_unread_count=0),
-                post_receipt_report=self.write(directory, "b.json", after_unread_count=0),
-            )
+            code, _message = self.enforce(Path(raw), after_unread_count=0)
         self.assertEqual(code, 0)
 
-    def test_workflow_records_job_deadline_before_either_phase(self):
-        workflow = (
+    def test_main_enforce_reads_the_clearance_step_environment(self):
+        with tempfile.TemporaryDirectory() as raw, contextlib.chdir(raw):
+            self.write(Path(raw), "github-notification-clearance.json")
+            stdout = io.StringIO()
+            with (
+                patch.dict(
+                    os.environ,
+                    {"CLEARANCE_OUTCOME": "success", "CLEARANCE_EXIT_CODE": "0"},
+                    clear=True,
+                ),
+                contextlib.redirect_stdout(stdout),
+            ):
+                passed = clearer.main(["--enforce-phases"])
+            with (
+                patch.dict(
+                    os.environ,
+                    {"CLEARANCE_OUTCOME": "success", "CLEARANCE_EXIT_CODE": "1"},
+                    clear=True,
+                ),
+                contextlib.redirect_stdout(io.StringIO()),
+            ):
+                failed = clearer.main(["--enforce-phases"])
+            skipped_out = io.StringIO()
+            with (
+                patch.dict(
+                    os.environ,
+                    {"CLEARANCE_OUTCOME": "skipped", "CLEARANCE_EXIT_CODE": ""},
+                    clear=True,
+                ),
+                contextlib.redirect_stdout(skipped_out),
+            ):
+                skipped = clearer.main(["--enforce-phases"])
+        self.assertEqual(passed, 0)
+        self.assertEqual(failed, 1)
+        self.assertEqual(skipped, 1)
+        self.assertIn("No issue receipt is published", stdout.getvalue())
+        self.assertIn("clearance=SKIPPED", skipped_out.getvalue())
+        self.assertIn("No issue receipt is published", skipped_out.getvalue())
+
+    def workflow_text(self) -> str:
+        return (
             MODULE_PATH.parents[1] / "workflows" / "clear-personal-notifications.yml"
         ).read_text(encoding="utf-8")
+
+    def test_workflow_records_job_deadline_before_the_clearance_step(self):
+        workflow = self.workflow_text()
         timeouts = re.findall(r"^\s*timeout-minutes:\s*(\d+)\s*$", workflow, re.M)
         budget = re.search(
             r"CLEARANCE_DEADLINE_EPOCH=\$\(\( \$\(date \+%s\) \+ \((\d+) - (\d+)\) \* 60 \)\)",
@@ -767,6 +805,19 @@ class WorkflowPhaseTests(unittest.TestCase):
         self.assertLess(
             budget.start(), workflow.index("--report github-notification-clearance.json")
         )
+
+    def test_workflow_publishes_no_issue_receipt_and_holds_no_write_permission(self):
+        workflow = self.workflow_text()
+        self.assertIsNone(re.search(r"^\s*[a-z-]+:\s*write\s*$", workflow, re.M))
+        self.assertNotIn("write-all", workflow)
+        for retired in ("gh issue", "RECEIPT_TITLE", "post_receipt", "POST_RECEIPT", "github.token"):
+            self.assertNotIn(retired, workflow)
+        self.assertEqual(workflow.count("--report "), 1)
+        self.assertIn(f"name: {clearer.RECEIPT_ARTIFACT}\n", workflow)
+        self.assertIn("retention-days: 30", workflow)
+        self.assertIn("No issue receipt is published.", workflow)
+        self.assertIn("CLEARANCE_OUTCOME: ${{ steps.clearance.outcome }}", workflow)
+        self.assertIn("CLEARANCE_EXIT_CODE: ${{ steps.clearance.outputs.exit_code }}", workflow)
 
     def test_main_with_invalid_job_deadline_fails_closed_without_api_calls(self):
         with tempfile.TemporaryDirectory() as raw:
@@ -809,6 +860,7 @@ class WorkflowPhaseTests(unittest.TestCase):
         self.assertEqual(report["after_unread_measurement"], "UNAVAILABLE")
         self.assertIsNone(report["after_unread_count"])
         self.assertEqual(report["full_inbox_state"], "UNKNOWN")
+        self.assertEqual(report["issue_receipt"], "NOT_PUBLISHED")
         self.assertEqual(len(report["errors"]), 1)
         self.assertEqual(len(report["measurement_errors"]), 1)
 

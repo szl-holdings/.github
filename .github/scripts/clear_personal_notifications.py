@@ -30,6 +30,9 @@ Measurement contract (``szl.github-notification-clearance/v3``):
   operation errors, and an unavailable readback is reported as unknown.
 * GitHub exposes no read-only observable for the full Inbox view, so
   ``full_inbox_state`` is always ``UNKNOWN``.
+* No issue receipt is published (``issue_receipt`` is ``NOT_PUBLISHED``). The
+  count-only receipts are the workflow step summary and the 30-day workflow
+  artifact ``github-notification-clearance-receipts``.
 
 Mutations are serial and paced. Rate-limit responses (HTTP 403/429) honor
 ``Retry-After`` or ``X-RateLimit-Reset`` before retrying, and later listing
@@ -83,6 +86,13 @@ DEADLINE_ENV = "CLEARANCE_DEADLINE_EPOCH"
 
 FULL_INBOX_STATE = "UNKNOWN"
 FULL_INBOX_VERIFICATION = "UNVERIFIED_NO_READ_ONLY_OBSERVABLE"
+
+ISSUE_RECEIPT = "NOT_PUBLISHED"
+RECEIPT_ARTIFACT = "github-notification-clearance-receipts"
+NO_ISSUE_RECEIPT = (
+    "No issue receipt is published; the receipts are the workflow step summary "
+    f"and the 30-day workflow artifact {RECEIPT_ARTIFACT}."
+)
 
 STOP_NO_NEW_OR_ADVANCED = "NO_NEW_OR_ADVANCED_THREADS"
 STOP_NO_PROGRESS = "NO_PROGRESS"
@@ -464,6 +474,7 @@ class Clearance:
             ),
             "full_inbox_state": FULL_INBOX_STATE,
             "full_inbox_verification": FULL_INBOX_VERIFICATION,
+            "issue_receipt": ISSUE_RECEIPT,
             "distinct_done_acknowledged": len(self.ledger),
             "done_acknowledgements": self.done_acknowledgements,
             "reacknowledged_after_update": self.reacknowledged_after_update,
@@ -631,41 +642,44 @@ def describe_phase(outcome: str, exit_code: str) -> str:
 
 def enforce_phases(
     *,
-    initial_outcome: str,
-    initial_exit_code: str,
-    post_receipt_outcome: str,
-    post_receipt_exit_code: str,
-    initial_report: Path,
-    post_receipt_report: Path,
+    clearance_outcome: str,
+    clearance_exit_code: str,
+    report_path: Path,
 ) -> tuple[int, str]:
-    """Return the workflow verdict for both phases; zero only for unread-zero."""
-    initial = describe_phase(initial_outcome, initial_exit_code)
-    post_receipt = describe_phase(post_receipt_outcome, post_receipt_exit_code)
-    phases = f"initial={initial}, post-receipt={post_receipt}"
-    if initial != "PASSED" or post_receipt != "PASSED":
-        return 1, f"Notification clearance failed closed: {phases}."
+    """Return the workflow verdict for the single clearance step.
 
-    for path in (initial_report, post_receipt_report):
-        try:
-            report = json.loads(path.read_text(encoding="utf-8"))
-        except (OSError, json.JSONDecodeError) as exc:
-            return 1, f"Notification receipt unreadable ({phases}): {type(exc).__name__}"
-        if (
-            report.get("schema") != SCHEMA
-            or report.get("status") != STATUS_UNREAD_ZERO
-            or report.get("after_unread_measurement") != "MEASURED"
-            # Exactly the integer zero: JSON false and 0.0 compare equal to 0.
-            or type(report.get("after_unread_count")) is not int
-            or report.get("after_unread_count") != 0
-            or report.get("unread_zero_verified") is not True
-            or report.get("full_inbox_state") != FULL_INBOX_STATE
-        ):
-            return 1, f"Notification receipt does not verify unread-zero ({phases})."
+    Zero only for a verified unread-zero receipt. There is no post-receipt
+    phase: no issue receipt is published, and every message says so instead of
+    reporting a skipped phase.
+    """
+    clearance = describe_phase(clearance_outcome, clearance_exit_code)
+    phase = f"clearance={clearance}"
+    if clearance != "PASSED":
+        return 1, f"Notification clearance failed closed: {phase}. {NO_ISSUE_RECEIPT}"
+
+    try:
+        report = json.loads(report_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        return 1, (
+            f"Notification receipt unreadable ({phase}): {type(exc).__name__}. "
+            f"{NO_ISSUE_RECEIPT}"
+        )
+    if (
+        not isinstance(report, dict)
+        or report.get("schema") != SCHEMA
+        or report.get("status") != STATUS_UNREAD_ZERO
+        or report.get("after_unread_measurement") != "MEASURED"
+        # Exactly the integer zero: JSON false and 0.0 compare equal to 0.
+        or type(report.get("after_unread_count")) is not int
+        or report.get("after_unread_count") != 0
+        or report.get("unread_zero_verified") is not True
+        or report.get("full_inbox_state") != FULL_INBOX_STATE
+    ):
+        return 1, f"Notification receipt does not verify unread-zero ({phase}). {NO_ISSUE_RECEIPT}"
 
     return 0, (
-        "Unread-zero (all=false) verified after receipt publication; "
-        f"{phases}. Full-inbox state remains {FULL_INBOX_STATE} "
-        f"({FULL_INBOX_VERIFICATION})."
+        f"Unread-zero (all=false) verified; {phase}. Full-inbox state remains "
+        f"{FULL_INBOX_STATE} ({FULL_INBOX_VERIFICATION}). {NO_ISSUE_RECEIPT}"
     )
 
 
@@ -681,12 +695,9 @@ def _write_report(path: Path, report: dict[str, Any]) -> None:
 
 def _main_enforce() -> int:
     code, message = enforce_phases(
-        initial_outcome=os.environ.get("INITIAL_OUTCOME", ""),
-        initial_exit_code=os.environ.get("INITIAL_EXIT_CODE", ""),
-        post_receipt_outcome=os.environ.get("POST_RECEIPT_OUTCOME", ""),
-        post_receipt_exit_code=os.environ.get("POST_RECEIPT_EXIT_CODE", ""),
-        initial_report=Path("github-notification-clearance.json"),
-        post_receipt_report=Path("github-notification-post-receipt-clearance.json"),
+        clearance_outcome=os.environ.get("CLEARANCE_OUTCOME", ""),
+        clearance_exit_code=os.environ.get("CLEARANCE_EXIT_CODE", ""),
+        report_path=Path("github-notification-clearance.json"),
     )
     print(("::error::" if code else "") + message)
     return code
@@ -699,7 +710,7 @@ def main(argv: list[str] | None = None) -> int:
     mode.add_argument(
         "--enforce-phases",
         action="store_true",
-        help="Evaluate both workflow phases from step outcomes and receipts.",
+        help="Evaluate the clearance step outcome and its count-only receipt.",
     )
     args = parser.parse_args(argv)
     if args.enforce_phases:
