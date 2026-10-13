@@ -9,8 +9,6 @@ acceptance case it covers.
 
 from __future__ import annotations
 
-import copy
-import hashlib
 import importlib.util
 import io
 import itertools
@@ -193,7 +191,8 @@ class Scenario:
     def subject(self, **overrides: object) -> rav.Subject:
         values = dict(repository=REPO, event=self.event, head_sha=self.head, base_ref="main",
                       base_sha=BASE, gate_run_id=GATE_RUN, pull_request=7, pr_head_sha=HEAD,
-                      body_sha256=("9" * 64) if self.event == "pull_request" else None)
+                      body_sha256=digest(self.pull.get("body") or "").removeprefix("sha256:")
+                      if self.event == "pull_request" else None)
         values.update(overrides)
         return rav.Subject(**values)
 
@@ -601,6 +600,27 @@ class AcceptanceCaseTests(VerifierCase):
                 self.assertDecision(result, "BLOCK", code)
 
     # -- liveness and transport -------------------------------------------------
+    def test_current_body_must_match_the_controller_snapshot(self) -> None:
+        scenario = Scenario()
+        subject = scenario.subject()
+        scenario.pull["body"] = "Rollback changed after the controller snapshot"
+        result, _ = self.run_verifier(scenario, subject=subject)
+        self.assertDecision(result, "BLOCK", "SUBJECT_DRIFT")
+
+    def test_successful_old_checks_cannot_satisfy_an_unfinished_or_failed_rerun(self) -> None:
+        for status, conclusion, code in (
+            ("queued", None, "EVIDENCE_PENDING"),
+            ("in_progress", None, "EVIDENCE_PENDING"),
+            ("completed", "failure", "EVIDENCE_NOT_SUCCESS"),
+            ("completed", "cancelled", "EVIDENCE_NOT_SUCCESS"),
+        ):
+            with self.subTest(status=status, conclusion=conclusion):
+                scenario = Scenario()
+                producer = next(run for run in scenario.runs if run["id"] == EFFECT_RUN)
+                producer.update(status=status, conclusion=conclusion, run_attempt=2)
+                result, _ = self.run_verifier(scenario)
+                self.assertDecision(result, "BLOCK", code)
+
     def test_running_evidence_waits_then_fails_closed(self) -> None:
         scenario = Scenario()
         effect = next(c for c in scenario.checks if c["name"] == rav.EFFECT_CONTEXT)
@@ -719,7 +739,8 @@ class CommandLineTests(unittest.TestCase):
             code = rav.main([
                 "--repository", REPO, "--event", "pull_request", "--head-sha", HEAD,
                 "--base-ref", "main", "--base-sha", BASE, "--gate-run-id", str(GATE_RUN),
-                "--pull-request", "7", "--pr-head-sha", HEAD, "--body-sha256", "9" * 64,
+                "--pull-request", "7", "--pr-head-sha", HEAD, "--body-sha256",
+                scenario.subject().body_sha256,
                 "--phase", "attest", "--output", output,
             ], transport=FakeGitHub(scenario), environ=environ)
             raw = Path(output).read_text(encoding="utf-8")

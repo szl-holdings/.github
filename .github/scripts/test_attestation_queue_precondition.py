@@ -18,12 +18,13 @@ ROOT = Path(__file__).resolve().parents[2]
 # The shared verifier's acceptance-case suite runs from this existing entry
 # point (Tests workflow) as well as standalone.
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from test_release_admission_verifier import (  # noqa: E402,F401
-    AcceptanceCaseTests,
-    CheckerCompatibilityTests,
-    CommandLineTests,
-    RetainedReceiptTests,
-)
+import test_release_admission_verifier as admission_tests  # noqa: E402
+
+
+def load_tests(loader, tests, pattern):
+    tests.addTests(loader.loadTestsFromModule(admission_tests))
+    return tests
+
 WORKFLOW = ROOT / ".github/workflows/attest-and-approve.yml"
 GH_STUB = """#!/usr/bin/env python3
 import json

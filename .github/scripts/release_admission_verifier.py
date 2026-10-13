@@ -68,7 +68,6 @@ import io
 import json
 import os
 import re
-import sys
 import time
 import urllib.error
 import urllib.parse
@@ -373,6 +372,12 @@ def _verify_pull_request(reader: GitHubReader, subject: Subject) -> None:
     if drift:
         raise AdmissionError("SUBJECT_DRIFT", "pull request changed: " + ",".join(drift))
     if subject.event == "pull_request":
+        body = pull.get("body") or ""
+        if not isinstance(body, str):
+            raise AdmissionError("EVIDENCE_MALFORMED", "pull-request body is not text")
+        # Match jq -c '.body // ""' followed by sha256sum in both controllers.
+        if hashlib.sha256(canonical_bytes(body)).hexdigest() != subject.body_sha256:
+            raise AdmissionError("SUBJECT_DRIFT", "pull-request body digest changed")
         ref = reader.get(f"repos/{reader.repository}/git/ref/heads/{subject.base_ref}")
         tip = ((ref or {}).get("object") or {}).get("sha") if isinstance(ref, dict) else None
         if tip != subject.base_sha:
@@ -437,6 +442,11 @@ def _select_check(
     newest = max(generations, key=lambda run: int(run.get("id") or 0))
     if exact_run_id is not None and int(newest.get("id") or 0) != exact_run_id:
         raise AdmissionError("EVIDENCE_STALE", f"{context}: a newer generation than the gate run exists")
+    # A successful old check must not stand in for an unfinished rerun.
+    if newest.get("status") != "completed":
+        raise AdmissionError("EVIDENCE_PENDING", f"{context}: producer run is not complete")
+    if newest.get("conclusion") != "success":
+        raise AdmissionError("EVIDENCE_NOT_SUCCESS", f"{context}: producer run did not succeed")
     generation = exact_run_id if exact_run_id is not None else int(newest["id"])
     ignored = {"untrusted_producer": 0, "foreign": 0, "stale": 0}
     current: list[tuple[Mapping[str, Any], Mapping[str, Any]]] = []
