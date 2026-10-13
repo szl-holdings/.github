@@ -1,21 +1,41 @@
 #!/usr/bin/env python3
-"""Move every authenticated GitHub notification inbox thread to Done.
+"""Acknowledge authenticated GitHub notification threads as Done, count-only.
 
 The script records counts only. It never logs notification subjects, repository
-names, URLs, thread identifiers, or token material. The GitHub notification API
-requires a classic personal access token with ``notifications`` or ``repo``
-scope; GitHub App and fine-grained tokens are intentionally unsupported by that
-API.
+names, URLs, thread identifiers, update timestamps, or token material. The
+GitHub notification API requires a classic personal access token with
+``notifications`` or ``repo`` scope; GitHub App and fine-grained tokens are
+intentionally unsupported by that API.
 
-Inbox clearance is stronger than marking notifications read: every thread still
-returned by ``GET /notifications?all=true`` is deleted through the documented
-"Mark a thread as done" endpoint. The final readback must show both zero inbox
-threads and zero unread threads.
+Measurement contract (``szl.github-notification-clearance/v3``):
 
-Large inboxes are deliberately drained serially. Mutating requests are paced,
-and primary/secondary rate-limit responses honor ``Retry-After`` or
-``X-RateLimit-Reset`` before retrying. A count-only RUNNING receipt is updated
-during long drains so an interrupted runner never leaves an evidence vacuum.
+* ``GET /notifications?all=true`` is the API *history* listing. It returns
+  unread, read and already-Done threads, sorted by latest update. Its length is
+  reported as ``api_history_*_count`` and is never treated as the active inbox:
+  a thread acknowledged as Done stays in that history.
+* ``DELETE /notifications/threads/{id}`` ("Mark a thread as done") returning
+  HTTP 204 is an acknowledgement, not a verified removal. The number of
+  distinct threads with at least one accepted acknowledgement is
+  ``distinct_done_acknowledged``.
+* An in-memory ledger keeps each thread id with the ``updated_at`` version that
+  was acknowledged. Each observed version is acknowledged once. A thread is
+  acknowledged again only after a later listing shows its ``updated_at``
+  advanced. Unchanged observations are counted as ``unchanged_repeats_skipped``
+  and never replayed. The ledger is never written to the receipt.
+* A round whose only candidates are exactly the threads acknowledged in the
+  previous round is a no-progress round; the run stops instead of replaying.
+* After every outcome, including non-convergence and errors, an independent
+  ``all=false`` unread readback is attempted. Its result is the only verified
+  claim and is named ``unread-zero``. Readback errors are kept separate from
+  operation errors, and an unavailable readback is reported as unknown.
+* GitHub exposes no read-only observable for the full Inbox view, so
+  ``full_inbox_state`` is always ``UNKNOWN``.
+
+Mutations are serial and paced. Rate-limit responses (HTTP 403/429) honor
+``Retry-After`` or ``X-RateLimit-Reset`` before retrying, and later listing
+reads honor the ``X-Poll-Interval`` returned by the previous listing. A
+count-only RUNNING receipt is updated during long runs so an interrupted runner
+never leaves an evidence vacuum.
 """
 from __future__ import annotations
 
@@ -29,16 +49,17 @@ import urllib.error
 import urllib.parse
 import urllib.request
 from collections.abc import Callable, Mapping
+from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any
+from typing import Any, NamedTuple
 
 API = "https://api.github.com"
 API_VERSION = "2022-11-28"
+SCHEMA = "szl.github-notification-clearance/v3"
 PER_PAGE = 50
 MAX_PAGES = 200
 MAX_ROUNDS = 8
-SETTLE_SECONDS = 2.0
 
 # GitHub's REST best practices recommend serial mutation and at least one second
 # between POST/PATCH/PUT/DELETE requests. Keep these constants patchable for
@@ -48,11 +69,50 @@ RATE_LIMIT_RETRIES = 8
 RATE_LIMIT_FALLBACK_SECONDS = 60.0
 RATE_LIMIT_MAX_SLEEP_SECONDS = 3700.0
 RATE_LIMIT_SAFETY_SECONDS = 5.0
+# Used only when a listing response carries no X-Poll-Interval header.
+POLL_INTERVAL_FALLBACK_SECONDS = 60.0
+POLL_INTERVAL_MAX_SECONDS = 600.0
 PROGRESS_INTERVAL = 100
+
+FULL_INBOX_STATE = "UNKNOWN"
+FULL_INBOX_VERIFICATION = "UNVERIFIED_NO_READ_ONLY_OBSERVABLE"
+
+STOP_NO_NEW_OR_ADVANCED = "NO_NEW_OR_ADVANCED_THREADS"
+STOP_NO_PROGRESS = "NO_PROGRESS"
+STOP_ROUND_LIMIT = "ROUND_LIMIT"
+STOP_ERROR = "ERROR"
+
+STATUS_RUNNING = "RUNNING"
+STATUS_UNREAD_ZERO = "UNREAD_ZERO_VERIFIED"
+STATUS_FAILED = "FAILED"
 
 
 class NotificationError(RuntimeError):
     """Fail-closed notification API error."""
+
+
+class ApiResponse(NamedTuple):
+    status: int
+    payload: Any
+    headers: Mapping[str, str] | None
+
+
+@dataclass
+class RequestStats:
+    """Count-only request accounting kept separate from acknowledgement counts."""
+
+    logical_calls: int = 0
+    http_attempts: int = 0
+    rate_limit_retries_observed: int = 0
+
+
+@dataclass
+class Listing:
+    """One non-atomic paginated enumeration; ids stay in memory only."""
+
+    versions: dict[str, datetime] = field(default_factory=dict)
+    pages: int = 0
+    poll_interval_seconds: float | None = None
 
 
 def utc_now() -> str:
@@ -71,6 +131,12 @@ def _header(headers: Mapping[str, str] | None, name: str) -> str:
     if headers is None:
         return ""
     value = headers.get(name)
+    if value is None and hasattr(headers, "items"):
+        lowered = name.lower()
+        for key, candidate in headers.items():
+            if str(key).lower() == lowered:
+                value = candidate
+                break
     return "" if value is None else str(value).strip()
 
 
@@ -92,7 +158,12 @@ def rate_limit_delay(
     attempt: int,
     now_epoch: float | None = None,
 ) -> float | None:
-    """Return a compliant retry delay, or ``None`` for a non-rate-limit error."""
+    """Return a compliant retry delay, or ``None`` for a non-rate-limit error.
+
+    GitHub signals primary and secondary rate limits only with HTTP 403 or 429.
+    """
+    if status not in (403, 429):
+        return None
     retry_after = _positive_number(_header(headers, "Retry-After"))
     remaining = _header(headers, "X-RateLimit-Remaining")
     reset_epoch = _positive_number(_header(headers, "X-RateLimit-Reset"))
@@ -123,9 +194,18 @@ def request(
     method: str,
     path: str,
     payload: dict[str, Any] | None = None,
-) -> tuple[int, Any]:
-    """Issue one REST request, retrying only documented rate-limit failures."""
+    *,
+    stats: RequestStats | None = None,
+) -> ApiResponse:
+    """Issue one logical REST request, retrying only observed rate limits.
+
+    ``stats.logical_calls`` counts this call once; ``stats.http_attempts``
+    counts every HTTP attempt; ``stats.rate_limit_retries_observed`` counts
+    retries caused by a real HTTP 403/429 rate-limit response.
+    """
     body = None if payload is None else json.dumps(payload).encode("utf-8")
+    if stats is not None:
+        stats.logical_calls += 1
 
     for attempt in range(RATE_LIMIT_RETRIES + 1):
         req = urllib.request.Request(
@@ -136,14 +216,17 @@ def request(
                 "Accept": "application/vnd.github+json",
                 "Authorization": f"Bearer {token}",
                 "X-GitHub-Api-Version": API_VERSION,
-                "User-Agent": "szl-clear-personal-notifications/2.1",
+                "User-Agent": "szl-clear-personal-notifications/3.0",
                 **({"Content-Type": "application/json"} if body is not None else {}),
             },
         )
+        if stats is not None:
+            stats.http_attempts += 1
         try:
             with urllib.request.urlopen(req, timeout=45) as response:
                 raw = response.read()
                 status = response.status
+                headers = getattr(response, "headers", None)
         except urllib.error.HTTPError as exc:
             detail = exc.read().decode("utf-8", "replace")[:2000]
             delay = rate_limit_delay(
@@ -153,6 +236,8 @@ def request(
                 attempt=attempt,
             )
             if delay is not None and attempt < RATE_LIMIT_RETRIES:
+                if stats is not None:
+                    stats.rate_limit_retries_observed += 1
                 print(
                     "GitHub rate limit encountered; "
                     f"retrying after {math.ceil(delay)} second(s) "
@@ -173,9 +258,9 @@ def request(
             ) from exc
 
         if not raw:
-            return status, None
+            return ApiResponse(status, None, headers)
         try:
-            return status, json.loads(raw.decode("utf-8"))
+            return ApiResponse(status, json.loads(raw.decode("utf-8")), headers)
         except json.JSONDecodeError as exc:
             raise NotificationError(
                 f"GitHub API {method} {_safe_path(path)} returned non-JSON content"
@@ -184,10 +269,35 @@ def request(
     raise AssertionError("rate-limit retry loop exhausted without returning")
 
 
-def notification_thread_ids(token: str, *, include_read: bool) -> list[str]:
-    """Return current inbox thread IDs without recording notification content."""
-    ids: list[str] = []
-    seen: set[str] = set()
+def _thread_version(value: Any) -> datetime:
+    """Parse a thread ``updated_at`` without echoing it into diagnostics."""
+    if not isinstance(value, str) or not value.strip():
+        raise NotificationError("GitHub returned a notification without updated_at")
+    try:
+        parsed = datetime.fromisoformat(value.strip().replace("Z", "+00:00"))
+    except ValueError as exc:
+        raise NotificationError(
+            "GitHub returned a notification with an unparseable updated_at"
+        ) from exc
+    if parsed.tzinfo is None:
+        raise NotificationError("GitHub returned a timezone-less updated_at")
+    return parsed
+
+
+def list_notification_threads(
+    token: str,
+    *,
+    include_read: bool,
+    stats: RequestStats | None = None,
+) -> Listing:
+    """Enumerate one paginated listing as ``{thread_id: updated_at}``.
+
+    ``include_read=True`` is the API history listing (unread, read and Done).
+    ``include_read=False`` is the unread listing. Pages are not an atomic
+    snapshot: an id seen twice keeps its latest version, and a record moved
+    onto an already-read page is caught only by a later enumeration.
+    """
+    listing = Listing()
     for page in range(1, MAX_PAGES + 1):
         query = urllib.parse.urlencode(
             {
@@ -197,170 +307,297 @@ def notification_thread_ids(token: str, *, include_read: bool) -> list[str]:
                 "page": page,
             }
         )
-        _, payload = request(token, "GET", f"/notifications?{query}")
+        response = request(token, "GET", f"/notifications?{query}", stats=stats)
+        listing.pages = page
+        poll = _positive_number(_header(response.headers, "X-Poll-Interval"))
+        if poll is not None:
+            listing.poll_interval_seconds = poll
+        payload = response.payload
         if not isinstance(payload, list):
             raise NotificationError("GitHub notifications endpoint returned a non-list")
         for item in payload:
-            thread_id = str((item or {}).get("id") or "")
+            if not isinstance(item, Mapping):
+                raise NotificationError("GitHub returned a non-object notification")
+            thread_id = str(item.get("id") or "")
             if not thread_id:
                 raise NotificationError(
                     "GitHub returned a notification without a thread id"
                 )
-            if thread_id not in seen:
-                seen.add(thread_id)
-                ids.append(thread_id)
+            version = _thread_version(item.get("updated_at"))
+            previous = listing.versions.get(thread_id)
+            if previous is None or version > previous:
+                listing.versions[thread_id] = version
         if len(payload) < PER_PAGE:
-            return ids
+            return listing
     raise NotificationError(
-        "Inbox inventory exceeded the fail-closed limit of "
+        "Notification listing exceeded the fail-closed limit of "
         f"{MAX_PAGES * PER_PAGE} threads"
     )
 
 
-def mark_thread_done(token: str, thread_id: str) -> None:
+def mark_thread_done(
+    token: str, thread_id: str, *, stats: RequestStats | None = None
+) -> None:
     encoded = urllib.parse.quote(thread_id, safe="")
-    status, _ = request(token, "DELETE", f"/notifications/threads/{encoded}")
-    if status != 204:
+    response = request(
+        token, "DELETE", f"/notifications/threads/{encoded}", stats=stats
+    )
+    if response.status != 204:
         raise NotificationError(
-            f"Unexpected mark-done response status for one thread: {status}"
+            f"Unexpected mark-done response status for one thread: {response.status}"
         )
 
 
-def _running_report(
-    *,
-    identity: str,
-    before_inbox_count: int,
-    before_unread_count: int,
-    cleared_count: int,
-    clearance_rounds: int,
-    delete_attempts: int,
-    remaining_count: int | None,
-) -> dict[str, Any]:
-    return {
-        "schema": "szl.github-notification-clearance/v2",
-        "generated_at": utc_now(),
-        "identity": identity,
-        "before_inbox_count": before_inbox_count,
-        "before_unread_count": before_unread_count,
-        "after_inbox_count": remaining_count,
-        "after_unread_count": None,
-        "cleared_count": cleared_count,
-        "clearance_rounds": clearance_rounds,
-        "delete_attempts": delete_attempts,
-        "mutation_delay_seconds": MUTATION_DELAY_SECONDS,
-        "rate_limit_retries": RATE_LIMIT_RETRIES,
-        "notification_content_recorded": False,
-        "thread_ids_recorded": False,
-        "status": "RUNNING",
-    }
+class PollGate:
+    """Wait for the server's polling interval before a later listing read."""
+
+    def __init__(self) -> None:
+        self._not_before: float | None = None
+        self.last_interval_seconds: float | None = None
+
+    def observe(self, listing: Listing) -> None:
+        interval = listing.poll_interval_seconds
+        if interval is None:
+            interval = POLL_INTERVAL_FALLBACK_SECONDS
+        interval = min(interval, POLL_INTERVAL_MAX_SECONDS)
+        self.last_interval_seconds = interval
+        self._not_before = time.monotonic() + interval
+
+    def wait(self) -> None:
+        if self._not_before is None:
+            return
+        remaining = self._not_before - time.monotonic()
+        if remaining > 0:
+            time.sleep(remaining)
 
 
-def clear_inbox(
+@dataclass
+class Clearance:
+    """Count-only state for one process; the ledger never leaves memory."""
+
+    identity: str = ""
+    api_history_before_count: int | None = None
+    api_history_last_count: int | None = None
+    before_unread_count: int | None = None
+    after_unread_count: int | None = None
+    after_unread_measurement: str = "NOT_REACHED"
+    stop_reason: str | None = None
+    rounds: int = 0
+    done_acknowledgements: int = 0
+    reacknowledged_after_update: int = 0
+    unchanged_repeats_skipped: int = 0
+    ledger: dict[str, datetime] = field(default_factory=dict)
+    stats: RequestStats = field(default_factory=RequestStats)
+    poll: PollGate = field(default_factory=PollGate)
+    errors: list[str] = field(default_factory=list)
+    measurement_errors: list[str] = field(default_factory=list)
+
+    def report(self, status: str) -> dict[str, Any]:
+        return {
+            "schema": SCHEMA,
+            "generated_at": utc_now(),
+            "identity": self.identity,
+            "status": status,
+            "stop_reason": self.stop_reason,
+            "api_history_listing": "GET /notifications?all=true (unread, read and Done history)",
+            "api_history_before_count": self.api_history_before_count,
+            "api_history_last_count": self.api_history_last_count,
+            "unread_listing": "GET /notifications?all=false",
+            "before_unread_count": self.before_unread_count,
+            "after_unread_count": self.after_unread_count,
+            "after_unread_measurement": self.after_unread_measurement,
+            "unread_zero_verified": (
+                self.after_unread_measurement == "MEASURED"
+                and self.after_unread_count == 0
+            ),
+            "full_inbox_state": FULL_INBOX_STATE,
+            "full_inbox_verification": FULL_INBOX_VERIFICATION,
+            "distinct_done_acknowledged": len(self.ledger),
+            "done_acknowledgements": self.done_acknowledgements,
+            "reacknowledged_after_update": self.reacknowledged_after_update,
+            "unchanged_repeats_skipped": self.unchanged_repeats_skipped,
+            "rounds": self.rounds,
+            "logical_api_calls": self.stats.logical_calls,
+            "http_attempts": self.stats.http_attempts,
+            "rate_limit_retries_observed": self.stats.rate_limit_retries_observed,
+            "rate_limit_retry_ceiling": RATE_LIMIT_RETRIES,
+            "mutation_delay_seconds": MUTATION_DELAY_SECONDS,
+            "poll_interval_seconds": self.poll.last_interval_seconds,
+            "notification_content_recorded": False,
+            "thread_ids_recorded": False,
+            "errors": list(self.errors),
+            "measurement_errors": list(self.measurement_errors),
+        }
+
+
+def _candidates(listing: Listing, state: Clearance) -> dict[str, datetime]:
+    """Select new ids and ids whose ``updated_at`` advanced past the ledger."""
+    selected: dict[str, datetime] = {}
+    for thread_id, version in listing.versions.items():
+        acknowledged = state.ledger.get(thread_id)
+        if acknowledged is None or version > acknowledged:
+            selected[thread_id] = version
+        else:
+            state.unchanged_repeats_skipped += 1
+    return selected
+
+
+def _read(
+    state: Clearance, token: str, *, include_read: bool
+) -> Listing:
+    state.poll.wait()
+    listing = list_notification_threads(
+        token, include_read=include_read, stats=state.stats
+    )
+    state.poll.observe(listing)
+    return listing
+
+
+def _run_rounds(
+    token: str,
+    state: Clearance,
+    progress: Callable[[dict[str, Any]], None] | None,
+) -> None:
+    _, user, _ = request(token, "GET", "/user", stats=state.stats)
+    identity = str((user or {}).get("login") or "")
+    if not identity:
+        raise NotificationError("Authenticated GitHub identity did not expose a login")
+    state.identity = identity
+
+    history = _read(state, token, include_read=True)
+    state.api_history_before_count = len(history.versions)
+    state.api_history_last_count = len(history.versions)
+    state.before_unread_count = len(_read(state, token, include_read=False).versions)
+    if progress is not None:
+        progress(state.report(STATUS_RUNNING))
+
+    candidates = _candidates(history, state)
+    previous_round: set[str] | None = None
+    while candidates:
+        if previous_round is not None and set(candidates) == previous_round:
+            state.stop_reason = STOP_NO_PROGRESS
+            return
+        if state.rounds >= MAX_ROUNDS:
+            state.stop_reason = STOP_ROUND_LIMIT
+            return
+        state.rounds += 1
+        for thread_id, version in candidates.items():
+            if state.done_acknowledgements:
+                time.sleep(MUTATION_DELAY_SECONDS)
+            mark_thread_done(token, thread_id, stats=state.stats)
+            if thread_id in state.ledger:
+                state.reacknowledged_after_update += 1
+            state.ledger[thread_id] = version
+            state.done_acknowledgements += 1
+            if state.done_acknowledgements % PROGRESS_INTERVAL == 0:
+                print(
+                    "notification acknowledgement progress: "
+                    f"distinct_done_acknowledged={len(state.ledger)}",
+                    flush=True,
+                )
+                if progress is not None:
+                    progress(state.report(STATUS_RUNNING))
+
+        previous_round = set(candidates)
+        history = _read(state, token, include_read=True)
+        state.api_history_last_count = len(history.versions)
+        candidates = _candidates(history, state)
+        if progress is not None:
+            progress(state.report(STATUS_RUNNING))
+
+    state.stop_reason = STOP_NO_NEW_OR_ADVANCED
+
+
+def clear_notifications(
     token: str,
     *,
     progress: Callable[[dict[str, Any]], None] | None = None,
 ) -> dict[str, Any]:
-    _, user = request(token, "GET", "/user")
-    identity = str((user or {}).get("login") or "")
-    if not identity:
-        raise NotificationError("Authenticated GitHub identity did not expose a login")
+    """Acknowledge each observed thread version once, then read back unread.
 
-    before_inbox = notification_thread_ids(token, include_read=True)
-    before_unread = notification_thread_ids(token, include_read=False)
+    Always returns a count-only report. ``status`` is ``UNREAD_ZERO_VERIFIED``
+    only when the rounds stopped without new or advanced threads, no error
+    occurred, and the independent ``all=false`` readback measured zero.
+    """
+    state = Clearance()
+    try:
+        _run_rounds(token, state, progress)
+    except Exception as exc:  # noqa: BLE001
+        state.stop_reason = STOP_ERROR
+        state.errors.append(f"{type(exc).__name__}: {exc}")
 
-    cleared_ids: set[str] = set()
-    delete_attempts = 0
-    rounds = 0
-    remaining = before_inbox
+    try:
+        unread = _read(state, token, include_read=False)
+    except Exception as exc:  # noqa: BLE001
+        state.after_unread_count = None
+        state.after_unread_measurement = "UNAVAILABLE"
+        state.measurement_errors.append(f"{type(exc).__name__}: {exc}")
+    else:
+        state.after_unread_count = len(unread.versions)
+        state.after_unread_measurement = "MEASURED"
 
-    if progress is not None:
-        progress(
-            _running_report(
-                identity=identity,
-                before_inbox_count=len(before_inbox),
-                before_unread_count=len(before_unread),
-                cleared_count=0,
-                clearance_rounds=0,
-                delete_attempts=0,
-                remaining_count=len(remaining),
-            )
-        )
+    verified = (
+        not state.errors
+        and state.stop_reason == STOP_NO_NEW_OR_ADVANCED
+        and state.after_unread_measurement == "MEASURED"
+        and state.after_unread_count == 0
+    )
+    return state.report(STATUS_UNREAD_ZERO if verified else STATUS_FAILED)
 
-    for round_number in range(1, MAX_ROUNDS + 1):
-        rounds = round_number
-        if not remaining:
-            break
 
-        for thread_id in remaining:
-            if delete_attempts:
-                time.sleep(MUTATION_DELAY_SECONDS)
-            mark_thread_done(token, thread_id)
-            delete_attempts += 1
-            cleared_ids.add(thread_id)
+def describe_phase(outcome: str, exit_code: str) -> str:
+    """Name a workflow phase result without inventing a numeric code."""
+    outcome = (outcome or "").strip().lower()
+    exit_code = (exit_code or "").strip()
+    if outcome == "skipped":
+        return "SKIPPED"
+    if not outcome and not exit_code:
+        return "NOT_REACHED"
+    if outcome == "cancelled":
+        return "CANCELLED"
+    if exit_code == "0":
+        return "PASSED"
+    if exit_code.isdigit():
+        return f"FAILED(exit={exit_code})"
+    return f"FAILED(outcome={outcome or 'unknown'}, exit=unavailable)"
 
-            if delete_attempts % PROGRESS_INTERVAL == 0:
-                print(
-                    f"notification clearance progress: cleared={len(cleared_ids)}",
-                    flush=True,
-                )
-                if progress is not None:
-                    progress(
-                        _running_report(
-                            identity=identity,
-                            before_inbox_count=len(before_inbox),
-                            before_unread_count=len(before_unread),
-                            cleared_count=len(cleared_ids),
-                            clearance_rounds=rounds,
-                            delete_attempts=delete_attempts,
-                            remaining_count=None,
-                        )
-                    )
 
-        time.sleep(SETTLE_SECONDS)
-        remaining = notification_thread_ids(token, include_read=True)
-        if progress is not None:
-            progress(
-                _running_report(
-                    identity=identity,
-                    before_inbox_count=len(before_inbox),
-                    before_unread_count=len(before_unread),
-                    cleared_count=len(cleared_ids),
-                    clearance_rounds=rounds,
-                    delete_attempts=delete_attempts,
-                    remaining_count=len(remaining),
-                )
-            )
+def enforce_phases(
+    *,
+    initial_outcome: str,
+    initial_exit_code: str,
+    post_receipt_outcome: str,
+    post_receipt_exit_code: str,
+    initial_report: Path,
+    post_receipt_report: Path,
+) -> tuple[int, str]:
+    """Return the workflow verdict for both phases; zero only for unread-zero."""
+    initial = describe_phase(initial_outcome, initial_exit_code)
+    post_receipt = describe_phase(post_receipt_outcome, post_receipt_exit_code)
+    phases = f"initial={initial}, post-receipt={post_receipt}"
+    if initial != "PASSED" or post_receipt != "PASSED":
+        return 1, f"Notification clearance failed closed: {phases}."
 
-    if remaining:
-        raise NotificationError(
-            "Notification inbox did not converge to zero; "
-            f"remaining_count={len(remaining)}"
-        )
+    for path in (initial_report, post_receipt_report):
+        try:
+            report = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError) as exc:
+            return 1, f"Notification receipt unreadable ({phases}): {type(exc).__name__}"
+        if (
+            report.get("schema") != SCHEMA
+            or report.get("status") != STATUS_UNREAD_ZERO
+            or report.get("after_unread_measurement") != "MEASURED"
+            or report.get("after_unread_count") != 0
+            or report.get("unread_zero_verified") is not True
+            or report.get("full_inbox_state") != FULL_INBOX_STATE
+        ):
+            return 1, f"Notification receipt does not verify unread-zero ({phases})."
 
-    final_unread = notification_thread_ids(token, include_read=False)
-    if final_unread:
-        raise NotificationError(
-            "Unread notifications remained after inbox clearance; "
-            f"remaining_count={len(final_unread)}"
-        )
-
-    return {
-        "schema": "szl.github-notification-clearance/v2",
-        "generated_at": utc_now(),
-        "identity": identity,
-        "before_inbox_count": len(before_inbox),
-        "before_unread_count": len(before_unread),
-        "after_inbox_count": 0,
-        "after_unread_count": 0,
-        "cleared_count": len(cleared_ids),
-        "clearance_rounds": rounds,
-        "delete_attempts": delete_attempts,
-        "mutation_delay_seconds": MUTATION_DELAY_SECONDS,
-        "rate_limit_retries": RATE_LIMIT_RETRIES,
-        "notification_content_recorded": False,
-        "thread_ids_recorded": False,
-        "status": "CLEARED",
-    }
+    return 0, (
+        "Unread-zero (all=false) verified after receipt publication; "
+        f"{phases}. Full-inbox state remains {FULL_INBOX_STATE} "
+        f"({FULL_INBOX_VERIFICATION})."
+    )
 
 
 def _write_report(path: Path, report: dict[str, Any]) -> None:
@@ -373,48 +610,54 @@ def _write_report(path: Path, report: dict[str, Any]) -> None:
     os.replace(temporary, path)
 
 
-def main() -> int:
-    parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--report", type=Path, required=True)
-    args = parser.parse_args()
+def _main_enforce() -> int:
+    code, message = enforce_phases(
+        initial_outcome=os.environ.get("INITIAL_OUTCOME", ""),
+        initial_exit_code=os.environ.get("INITIAL_EXIT_CODE", ""),
+        post_receipt_outcome=os.environ.get("POST_RECEIPT_OUTCOME", ""),
+        post_receipt_exit_code=os.environ.get("POST_RECEIPT_EXIT_CODE", ""),
+        initial_report=Path("github-notification-clearance.json"),
+        post_receipt_report=Path("github-notification-post-receipt-clearance.json"),
+    )
+    print(("::error::" if code else "") + message)
+    return code
 
-    report: dict[str, Any]
-    last_snapshot: dict[str, Any] = {}
-    code = 1
+
+def main(argv: list[str] | None = None) -> int:
+    parser = argparse.ArgumentParser(description=__doc__)
+    mode = parser.add_mutually_exclusive_group(required=True)
+    mode.add_argument("--report", type=Path)
+    mode.add_argument(
+        "--enforce-phases",
+        action="store_true",
+        help="Evaluate both workflow phases from step outcomes and receipts.",
+    )
+    args = parser.parse_args(argv)
+    if args.enforce_phases:
+        return _main_enforce()
+
     token = (
         os.environ.get("GH_NOTIFICATIONS_TOKEN", "").strip()
         or os.environ.get("SZL_GITHUB_TOKEN", "").strip()
     )
 
     def record_progress(snapshot: dict[str, Any]) -> None:
-        last_snapshot.clear()
-        last_snapshot.update(snapshot)
         _write_report(args.report, snapshot)
 
-    try:
-        if not token:
-            raise NotificationError(
-                "GH_NOTIFICATIONS_TOKEN/SZL_GITHUB_TOKEN is not configured"
-            )
-        report = clear_inbox(token, progress=record_progress)
-        code = 0
-    except Exception as exc:  # noqa: BLE001
-        report = {
-            **last_snapshot,
-            "schema": "szl.github-notification-clearance/v2",
-            "generated_at": utc_now(),
-            "after_inbox_count": last_snapshot.get("after_inbox_count"),
-            "after_unread_count": None,
-            "notification_content_recorded": False,
-            "thread_ids_recorded": False,
-            "status": "FAILED",
-            "errors": [f"{type(exc).__name__}: {exc}"],
-        }
-    finally:
-        _write_report(args.report, report)
+    if token:
+        report = clear_notifications(token, progress=record_progress)
+    else:
+        state = Clearance(after_unread_measurement="UNAVAILABLE")
+        state.stop_reason = STOP_ERROR
+        state.errors.append(
+            "NotificationError: GH_NOTIFICATIONS_TOKEN/SZL_GITHUB_TOKEN is not configured"
+        )
+        state.measurement_errors.append("NotificationError: no token for unread readback")
+        report = state.report(STATUS_FAILED)
+    _write_report(args.report, report)
 
     print(json.dumps(report, indent=2, sort_keys=True))
-    return code
+    return 0 if report["status"] == STATUS_UNREAD_ZERO else 1
 
 
 if __name__ == "__main__":
