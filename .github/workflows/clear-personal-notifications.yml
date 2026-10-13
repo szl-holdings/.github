@@ -159,40 +159,22 @@ jobs:
                   path = Path(filename)
                   out.write(f'### {label}\n\n')
                   if not path.exists():
-                      out.write('No report was produced.\n\n')
+                      out.write('No report was produced (phase SKIPPED or not reached).\n\n')
                       continue
                   report = json.loads(path.read_text(encoding='utf-8'))
                   out.write(f"Status: **{report.get('status', 'UNKNOWN')}**\n\n")
                   out.write(f"Authenticated identity: `{report.get('identity', 'UNAVAILABLE')}`\n\n")
-                  out.write(f"Unread before: **{report.get('before_unread_count', 'UNAVAILABLE')}**\n\n")
-                  out.write(f"Unread after: **{report.get('after_unread_count', 'UNAVAILABLE')}**\n\n")
+                  out.write(f"Unread before (all=false): **{report.get('before_unread_count', 'UNAVAILABLE')}**\n\n")
+                  out.write(f"Unread after (all=false): **{report.get('after_unread_count', 'UNAVAILABLE')}** ({report.get('after_unread_measurement', 'UNAVAILABLE')})\n\n")
+                  out.write(f"Full-inbox state: **{report.get('full_inbox_state', 'UNKNOWN')}**\n\n")
               out.write('Notification content and token material were not recorded.\n')
           PY
 
       - name: Enforce exact zero unread result
         if: always()
-        run: |
-          first="${{ steps.clearance.outputs.exit_code }}"
-          second="${{ steps.post_receipt.outputs.exit_code }}"
-          if [ -z "$first" ]; then first=2; fi
-          if [ -z "$second" ]; then second=2; fi
-          if [ "$first" -ne 0 ] || [ "$second" -ne 0 ]; then
-            echo "::error::Notification clearance failed closed: initial=${first}, post-receipt=${second}."
-            exit 1
-          fi
-          python - <<'PY'
-          import json
-          from pathlib import Path
-
-          initial = json.loads(Path('github-notification-clearance.json').read_text())
-          final = json.loads(Path('github-notification-post-receipt-clearance.json').read_text())
-          assert initial['status'] == 'CLEARED'
-          assert initial['after_unread_count'] == 0
-          assert final['status'] == 'CLEARED'
-          assert final['after_unread_count'] == 0
-          print(
-              'Notification inbox verified at zero after receipt publication; '
-              f"initially cleared {initial['cleared_count']} thread(s), "
-              f"then cleared {final['cleared_count']} receipt-generated/concurrent thread(s)."
-          )
-          PY
+        env:
+          INITIAL_OUTCOME: ${{ steps.clearance.outcome }}
+          INITIAL_EXIT_CODE: ${{ steps.clearance.outputs.exit_code }}
+          POST_RECEIPT_OUTCOME: ${{ steps.post_receipt.outcome }}
+          POST_RECEIPT_EXIT_CODE: ${{ steps.post_receipt.outputs.exit_code }}
+        run: python .github/scripts/clear_personal_notifications.py --enforce-phases
