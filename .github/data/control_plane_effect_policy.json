@@ -2519,7 +2519,7 @@
     ".github/workflows/tests.yml": {
       "intent_id": "repository-credentialless-tests-v1",
       "valid_until": "2026-11-30",
-      "source_sha256": "sha256:908758d2870c2a77ba16c21ba46b5742d280ac2c84e24ce55ba6372e9ac0d56e",
+      "source_sha256": "sha256:adfd9932431b33cc3124cf6264d1ff0b16ab204811584ca38e4686967a5b88ad",
       "credentials": [],
       "resources": [
         {
@@ -2586,7 +2586,7 @@
       "trusted_transitives": {},
       "reviewed_unknowns": {
         "files": {
-          ".github/workflows/tests.yml": "sha256:908758d2870c2a77ba16c21ba46b5742d280ac2c84e24ce55ba6372e9ac0d56e",
+          ".github/workflows/tests.yml": "sha256:adfd9932431b33cc3124cf6264d1ff0b16ab204811584ca38e4686967a5b88ad",
           ".github/scripts/hf_deploy_from_dockerfile.py": "sha256:f2f7a6c1296493d034eebed596f4176c2928470a4ed7e23620da6cacf19b16e7",
           ".github/scripts/hf_space_source_binding.py": "sha256:9888d4c126ead29d0960de3198a99f1d686956c8104f0cf6c5c0d4c113b2a37b",
           ".github/scripts/public_front_door_check.py": "sha256:cd18b4edafaf706c8fe26d811e4fc8d2ccae01dcc37ea513850d541be840be39",
@@ -2618,6 +2618,7 @@
           ".github/scripts/test_receipt_shape_check.py": "sha256:b89ecebe25b826df5854b9976ef71282a216a47768a61adad6b16ea03844430f",
           ".github/scripts/test_replit_decommission.py": "sha256:ceeae82f6111d096883b4541cc56a92060c1088e27dd341d5722a8c6f6c34e47",
           ".github/scripts/test_required_check_drift.py": "sha256:dae9f0ffd01aa39e51eb4e2928f58478fb06204d8af9a3df03b851c34d80f7fb",
+          ".github/scripts/test_reusable_workflow_lint.py": "sha256:f12755f7f01e2ef20015188cad1371e331303a6416811ed8dfdddeca5b1753ec",
           ".github/scripts/test_reusable_workflow_target_check.py": "sha256:d145f78f6bb4ae0b76a9f35210882e0ff96d511ece8630d39f5d99f775f9ed54",
           ".github/scripts/test_solo_builder_provenance.py": "sha256:32abce0cee25db6fbf2d2e9d313054b73ecbbfc4eaa469462c11e1cdd6a69f14",
           ".github/scripts/test_szl_codename_gate.py": "sha256:bcfcbbf52dd4cfe7761372fa4acd08b98aec327cb4f7f7dc2c1bc86029fd5b0f"
@@ -2661,6 +2662,7 @@
           "PYTHON_DYNAMIC_SUBPROCESS@.github/scripts/test_hf_card_reconcile.py:789",
           "PYTHON_DYNAMIC_SUBPROCESS@.github/scripts/test_lockfile_registry_check.py:148",
           "PYTHON_DYNAMIC_SUBPROCESS@.github/scripts/test_lockfile_registry_check.py:97",
+          "PYTHON_DYNAMIC_SUBPROCESS@.github/scripts/test_reusable_workflow_lint.py:128",
           "PYTHON_IMPORT_UNRESOLVED@.github/scripts/hf_deploy_from_dockerfile.py:1538",
           "PYTHON_IMPORT_UNRESOLVED@.github/scripts/hf_deploy_from_dockerfile.py:43",
           "PYTHON_IMPORT_UNRESOLVED@.github/scripts/hf_deploy_from_dockerfile.py:45",
@@ -2796,6 +2798,9 @@
           "PYTHON_IMPORT_UNRESOLVED@.github/scripts/test_required_check_drift.py:27",
           "PYTHON_IMPORT_UNRESOLVED@.github/scripts/test_required_check_drift.py:28",
           "PYTHON_IMPORT_UNRESOLVED@.github/scripts/test_required_check_drift.py:85",
+          "PYTHON_IMPORT_UNRESOLVED@.github/scripts/test_reusable_workflow_lint.py:10",
+          "PYTHON_IMPORT_UNRESOLVED@.github/scripts/test_reusable_workflow_lint.py:15",
+          "PYTHON_IMPORT_UNRESOLVED@.github/scripts/test_reusable_workflow_lint.py:18",
           "PYTHON_IMPORT_UNRESOLVED@.github/scripts/test_reusable_workflow_target_check.py:15",
           "PYTHON_IMPORT_UNRESOLVED@.github/scripts/test_reusable_workflow_target_check.py:4",
           "PYTHON_IMPORT_UNRESOLVED@.github/scripts/test_reusable_workflow_target_check.py:6",
@@ -2837,6 +2842,7 @@
           "PYTHON_SOURCE_REVIEW_REQUIRED@.github/scripts/test_receipt_shape_check.py:1",
           "PYTHON_SOURCE_REVIEW_REQUIRED@.github/scripts/test_replit_decommission.py:1",
           "PYTHON_SOURCE_REVIEW_REQUIRED@.github/scripts/test_required_check_drift.py:1",
+          "PYTHON_SOURCE_REVIEW_REQUIRED@.github/scripts/test_reusable_workflow_lint.py:1",
           "PYTHON_SOURCE_REVIEW_REQUIRED@.github/scripts/test_reusable_workflow_target_check.py:1",
           "PYTHON_SOURCE_REVIEW_REQUIRED@.github/scripts/test_solo_builder_provenance.py:1",
           "PYTHON_SOURCE_REVIEW_REQUIRED@.github/scripts/test_szl_codename_gate.py:1",
@@ -2892,6 +2898,7 @@
           "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/tests.yml:291",
           "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/tests.yml:298",
           "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/tests.yml:302",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/tests.yml:311",
           "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/tests.yml:32",
           "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/tests.yml:34",
           "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/tests.yml:36",
