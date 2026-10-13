@@ -1,4 +1,4 @@
-name: GitHub Notification Inbox Zero
+name: GitHub Notification Unread Zero
 
 on:
   push:
@@ -48,7 +48,7 @@ jobs:
       cancel-in-progress: false
     env:
       GH_NOTIFICATIONS_TOKEN: ${{ secrets.GH_NOTIFICATIONS_TOKEN || secrets.SZL_GITHUB_TOKEN }}
-      RECEIPT_TITLE: '[notification-clearance] personal GitHub inbox zero'
+      RECEIPT_TITLE: '[notification-clearance] personal GitHub unread zero'
       PYTHONUNBUFFERED: '1'
     steps:
       - name: Checkout control plane
