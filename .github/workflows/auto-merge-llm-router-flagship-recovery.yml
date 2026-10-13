@@ -1,33 +1,23 @@
-name: Auto-merge LLM Router flagship recovery
+# Retired 2026-10-13. This one-shot enabler only matched head ref
+# fix/restore-llm-router-flagship-20260908 (PR #725, merged 2026-09-08; branch deleted).
+# It held contents/pull-requests write authority and requested
+# gh pr merge --auto outside the attested merge-queue path. The file is kept
+# as a disabled stub so historical run links resolve. It has no token write
+# authority, no checkout, no credential and no provider path.
+name: Auto-merge LLM Router flagship recovery (retired)
 
 "on":
-  pull_request:
-    branches: [main]
-    paths:
-      - .github/workflows/restore-llm-router-flagship.yml
-      - .github/workflows/auto-merge-llm-router-flagship-recovery.yml
-      - scripts/restore_llm_router_flagship.py
-      - huggingface/llm-router-flagship.manifest.json
-      - huggingface/llm-router-flagship.card.md
-      - docs/LLM_ROUTER_FLAGSHIP_RECOVERY.md
+  workflow_dispatch: {}
 
-permissions: read-all
+permissions:
+  contents: read
+
 jobs:
   enable:
-    permissions:
-      contents: write
-      pull-requests: write
-    name: Enable protected squash auto-merge
-    if: github.event.pull_request.head.ref == 'fix/restore-llm-router-flagship-20260908'
+    name: Retired auto-merge is disabled
+    if: ${{ false }}
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 1
     steps:
-      - name: Harden runner
-        uses: step-security/harden-runner@e14015d583714f6e62063499dc959a02595150a1 # v2.21.1
-        with:
-          egress-policy: audit
-      - name: Enable auto-merge for this exact pull request
-        env:
-          GH_TOKEN: ${{ github.token }}
-          PR_URL: ${{ github.event.pull_request.html_url }}
-        run: gh pr merge --auto --squash "$PR_URL"
+      - name: Retired no-op
+        run: "true"
