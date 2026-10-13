@@ -112,7 +112,7 @@ jobs:
 | `reusable-energy-provenance-guard.yml` | Energy-provenance honesty guard (measured-or-`UNAVAILABLE`) |
 | `reusable-receipt-shape-guard.yml` | Receipt-shape honesty guard for committed attestation data |
 
-All Actions are SHA-pinned and wrapped with [`step-security/harden-runner`](https://github.com/step-security/harden-runner) using a deny-by-default egress policy. See [`WORKFLOWS.md`](./WORKFLOWS.md) for inputs, secrets, and per-workflow examples.
+All Actions in these workflows are SHA-pinned. Every job runs [`step-security/harden-runner`](https://github.com/step-security/harden-runner) with `egress-policy: audit`, except the `exact-source-contract` job in `reusable-hf-deploy.yml`, which only checks out and verifies its own called-workflow revision. Audit mode records outbound connections but does not block them, and no workflow in this repository uses `egress-policy: block` today. Moving to block mode needs an allowlist plan first: a per-job `allowed-endpoints` list built from audit-mode observations, then a reviewed change to each workflow, because the [control-plane effect gate](./docs/CONTROL_PLANE_EFFECTS.md) treats block mode as a different effect. See [`WORKFLOWS.md`](./WORKFLOWS.md) for inputs, secrets, and per-workflow examples.
 
 ## Security posture
 
