@@ -8,6 +8,7 @@ import importlib.util
 import io
 import json
 import os
+import re
 import sys
 import tempfile
 import unittest
@@ -80,7 +81,7 @@ class FakeGitHub:
             reverse=True,
         )
 
-    def request(self, token, method, path, payload=None, *, stats=None):
+    def request(self, token, method, path, payload=None, *, stats=None, deadline=None):
         if token != "classic-token":
             raise AssertionError("wrong token")
         if stats is not None:
@@ -155,6 +156,9 @@ class FakeClock:
     def monotonic(self) -> float:
         return self.now
 
+    def time(self) -> float:
+        return self.now
+
 
 @contextlib.contextmanager
 def offline(api: FakeGitHub):
@@ -164,6 +168,7 @@ def offline(api: FakeGitHub):
         patch.object(clearer, "request", api.request),
         patch.object(clearer.time, "sleep", clock.sleep),
         patch.object(clearer.time, "monotonic", clock.monotonic),
+        patch.object(clearer.time, "time", clock.time),
     ):
         yield clock
 
@@ -245,13 +250,13 @@ class ListingContractTests(unittest.TestCase):
         self.assertEqual(clearer.PER_PAGE, 50)
         self.assertEqual(history.pages, 2)
         self.assertEqual(len(history.versions), 53)
-        self.assertTrue({"1", "2", "3"} <= set(history.versions))
+        self.assertLessEqual({"1", "2", "3"}, set(history.versions))
         self.assertEqual(len(unread.versions), 25)
         self.assertEqual(list(history.versions)[:2], ["53", "52"])
         self.assertEqual(history.poll_interval_seconds, 60.0)
 
     def test_listing_rejects_thread_without_update_version(self):
-        def no_version(token, method, path, payload=None, *, stats=None):
+        def no_version(token, method, path, payload=None, *, stats=None, deadline=None):
             return clearer.ApiResponse(200, [{"id": "1"}], {})
 
         with patch.object(clearer, "request", no_version):
@@ -422,6 +427,60 @@ class AcknowledgementTests(unittest.TestCase):
         self.assertTrue(all(gap >= 7 for gap in gaps), gaps)
         self.assertEqual(report["poll_interval_seconds"], 7.0)
 
+    def test_poll_interval_above_former_cap_is_honored_in_full(self):
+        api = FakeGitHub(1, poll_interval="900")
+        with offline(api) as clock:
+            report = clearer.clear_notifications("classic-token")
+        gaps = [later - earlier for earlier, later in zip(clock.reads, clock.reads[1:])]
+        self.assertTrue(gaps)
+        self.assertTrue(all(gap >= 900 for gap in gaps), gaps)
+        self.assertEqual(report["poll_interval_seconds"], 900.0)
+        self.assertFalse(hasattr(clearer, "POLL_INTERVAL_MAX_SECONDS"))
+        self.assertFalse(report["job_deadline_configured"])
+        self.assertEqual(report["status"], "UNREAD_ZERO_VERIFIED")
+
+    def test_full_poll_interval_waits_within_job_deadline_complete(self):
+        api = FakeGitHub(1, poll_interval="900")
+        with offline(api) as clock:
+            start = clock.now
+            report = clearer.clear_notifications("classic-token", deadline=start + 86400)
+        self.assertTrue(clock.sleeps)
+        self.assertTrue(all(seconds >= 900 for seconds in clock.sleeps), clock.sleeps)
+        self.assertEqual(report["status"], "UNREAD_ZERO_VERIFIED")
+        self.assertTrue(report["job_deadline_configured"])
+
+    def test_poll_wait_that_would_pass_job_deadline_stops_and_reports(self):
+        api = FakeGitHub(2, poll_interval="900")
+        with offline(api) as clock:
+            start = clock.now
+            report = clearer.clear_notifications("classic-token", deadline=start + 600)
+        self.assertEqual(clock.sleeps, [])
+        self.assertLessEqual(clock.now, start + 600)
+        self.assertEqual(report["stop_reason"], "DEADLINE")
+        self.assertEqual(report["status"], "FAILED")
+        self.assertEqual(len(report["errors"]), 1)
+        self.assertIn("DeadlineExceeded", report["errors"][0])
+        self.assertIn("X-Poll-Interval", report["errors"][0])
+        self.assertEqual(report["after_unread_measurement"], "UNAVAILABLE")
+        self.assertIsNone(report["after_unread_count"])
+        self.assertEqual(len(report["measurement_errors"]), 1)
+        self.assertFalse(report["unread_zero_verified"])
+        self.assertTrue(report["job_deadline_configured"])
+        self.assertEqual(api.deleted, [])
+        assert_count_only(self, report, api)
+
+    def test_mutation_pacing_is_bounded_by_job_deadline(self):
+        api = FakeGitHub(3, poll_interval="0")
+        with offline(api) as clock:
+            start = clock.now
+            report = clearer.clear_notifications("classic-token", deadline=start + 1.5)
+        self.assertLessEqual(clock.now, start + 1.5)
+        self.assertEqual(report["stop_reason"], "DEADLINE")
+        self.assertIn("Mutation pacing", report["errors"][0])
+        self.assertEqual(len(api.deleted), 2)
+        self.assertEqual(report["after_unread_measurement"], "MEASURED")
+        self.assertEqual(report["status"], "FAILED")
+
     def test_missing_poll_interval_uses_fallback(self):
         api = FakeGitHub(1, poll_interval=None)
         with offline(api) as clock:
@@ -515,6 +574,42 @@ class RequestTests(unittest.TestCase):
         self.assertEqual(stats.logical_calls, 1)
         self.assertEqual(stats.http_attempts, 2)
         self.assertEqual(stats.rate_limit_retries_observed, 1)
+
+    def test_rate_limit_retry_that_would_pass_job_deadline_fails_without_sleeping(self):
+        error = http_error(status=429, retry_after="120")
+        stats = clearer.RequestStats()
+        stderr = io.StringIO()
+        with (
+            contextlib.redirect_stderr(stderr),
+            patch.object(clearer.urllib.request, "urlopen", side_effect=[error]) as opener,
+            patch.object(clearer.time, "sleep") as sleeper,
+            patch.object(clearer.time, "time", return_value=5000.0),
+        ):
+            with self.assertRaises(clearer.DeadlineExceeded) as raised:
+                clearer.request(
+                    "classic-token",
+                    "DELETE",
+                    "/notifications/threads/secret-id",
+                    stats=stats,
+                    deadline=5060.0,
+                )
+        sleeper.assert_not_called()
+        self.assertEqual(opener.call_count, 1)
+        self.assertEqual(stats.rate_limit_retries_observed, 0)
+        self.assertNotIn("retrying", stderr.getvalue())
+        self.assertIn("Rate-limit retry", str(raised.exception))
+        self.assertNotIn("secret-id", str(raised.exception))
+
+    def test_job_deadline_parses_epoch_and_rejects_invalid_values(self):
+        self.assertIsNone(clearer.job_deadline({}))
+        self.assertIsNone(clearer.job_deadline({"CLEARANCE_DEADLINE_EPOCH": " "}))
+        self.assertEqual(
+            clearer.job_deadline({"CLEARANCE_DEADLINE_EPOCH": "1791900000"}),
+            1791900000.0,
+        )
+        for bad in ("soon", "-1", "nan", "inf"):
+            with self.subTest(bad=bad), self.assertRaises(clearer.NotificationError):
+                clearer.job_deadline({"CLEARANCE_DEADLINE_EPOCH": bad})
 
     def test_request_keeps_response_headers_for_poll_interval(self):
         response = FakeResponse(200, b"[]", {"X-Poll-Interval": "90"})
@@ -626,6 +721,79 @@ class WorkflowPhaseTests(unittest.TestCase):
                     post_receipt_report=self.write(directory, "b.json", **overrides),
                 )
                 self.assertEqual(code, 1)
+
+    def test_enforce_phases_accepts_only_the_integer_zero(self):
+        for value in (False, 0.0, "0", [], None):
+            with self.subTest(value=value), tempfile.TemporaryDirectory() as raw:
+                directory = Path(raw)
+                code, message = clearer.enforce_phases(
+                    initial_outcome="success",
+                    initial_exit_code="0",
+                    post_receipt_outcome="success",
+                    post_receipt_exit_code="0",
+                    initial_report=self.write(directory, "a.json"),
+                    post_receipt_report=self.write(
+                        directory, "b.json", after_unread_count=value
+                    ),
+                )
+                self.assertEqual(code, 1)
+                self.assertIn("does not verify unread-zero", message)
+        with tempfile.TemporaryDirectory() as raw:
+            directory = Path(raw)
+            code, _message = clearer.enforce_phases(
+                initial_outcome="success",
+                initial_exit_code="0",
+                post_receipt_outcome="success",
+                post_receipt_exit_code="0",
+                initial_report=self.write(directory, "a.json", after_unread_count=0),
+                post_receipt_report=self.write(directory, "b.json", after_unread_count=0),
+            )
+        self.assertEqual(code, 0)
+
+    def test_workflow_records_job_deadline_before_either_phase(self):
+        workflow = (
+            MODULE_PATH.parents[1] / "workflows" / "clear-personal-notifications.yml"
+        ).read_text(encoding="utf-8")
+        timeouts = re.findall(r"^\s*timeout-minutes:\s*(\d+)\s*$", workflow, re.M)
+        budget = re.search(
+            r"CLEARANCE_DEADLINE_EPOCH=\$\(\( \$\(date \+%s\) \+ \((\d+) - (\d+)\) \* 60 \)\)",
+            workflow,
+        )
+        self.assertEqual(len(timeouts), 1)
+        self.assertIsNotNone(budget)
+        self.assertEqual(budget.group(1), timeouts[0])
+        self.assertGreater(int(budget.group(2)), 0)
+        self.assertLess(int(budget.group(2)), int(timeouts[0]))
+        self.assertLess(
+            budget.start(), workflow.index("--report github-notification-clearance.json")
+        )
+
+    def test_main_with_invalid_job_deadline_fails_closed_without_api_calls(self):
+        with tempfile.TemporaryDirectory() as raw:
+            path = Path(raw) / "receipt.json"
+            with (
+                patch.dict(
+                    os.environ,
+                    {
+                        "GH_NOTIFICATIONS_TOKEN": "classic-token",
+                        "CLEARANCE_DEADLINE_EPOCH": "soon",
+                    },
+                    clear=True,
+                ),
+                patch.object(
+                    clearer, "request", side_effect=AssertionError("no API call expected")
+                ),
+                contextlib.redirect_stdout(io.StringIO()),
+            ):
+                code = clearer.main(["--report", str(path)])
+            report = json.loads(path.read_text(encoding="utf-8"))
+        self.assertEqual(code, 1)
+        self.assertEqual(report["status"], "FAILED")
+        self.assertEqual(report["after_unread_measurement"], "UNAVAILABLE")
+        self.assertEqual(len(report["errors"]), 1)
+        self.assertIn("CLEARANCE_DEADLINE_EPOCH", report["errors"][0])
+        self.assertEqual(len(report["measurement_errors"]), 1)
+        self.assertNotIn("classic-token", json.dumps(report))
 
     def test_main_without_token_writes_count_only_failure_receipt(self):
         with tempfile.TemporaryDirectory() as raw:

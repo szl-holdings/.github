@@ -33,9 +33,13 @@ Measurement contract (``szl.github-notification-clearance/v3``):
 
 Mutations are serial and paced. Rate-limit responses (HTTP 403/429) honor
 ``Retry-After`` or ``X-RateLimit-Reset`` before retrying, and later listing
-reads honor the ``X-Poll-Interval`` returned by the previous listing. A
-count-only RUNNING receipt is updated during long runs so an interrupted runner
-never leaves an evidence vacuum.
+reads honor the full ``X-Poll-Interval`` returned by the previous listing.
+Every wait is bounded by the job deadline the workflow records once, at job
+start, in ``CLEARANCE_DEADLINE_EPOCH``: a wait that would end after it is
+refused, the run stops with ``DEADLINE`` and still writes its count-only
+report instead of sleeping until the runner is killed. A count-only RUNNING
+receipt is updated during long runs so an interrupted runner never leaves an
+evidence vacuum.
 """
 from __future__ import annotations
 
@@ -69,10 +73,13 @@ RATE_LIMIT_RETRIES = 8
 RATE_LIMIT_FALLBACK_SECONDS = 60.0
 RATE_LIMIT_MAX_SLEEP_SECONDS = 3700.0
 RATE_LIMIT_SAFETY_SECONDS = 5.0
-# Used only when a listing response carries no X-Poll-Interval header.
+# Used only when a listing response carries no X-Poll-Interval header. A
+# server-provided interval is honored in full; the job deadline bounds it.
 POLL_INTERVAL_FALLBACK_SECONDS = 60.0
-POLL_INTERVAL_MAX_SECONDS = 600.0
 PROGRESS_INTERVAL = 100
+# Absolute epoch seconds written by the workflow at job start. No wait may end
+# after it. Unset only for local runs, which are then unbounded.
+DEADLINE_ENV = "CLEARANCE_DEADLINE_EPOCH"
 
 FULL_INBOX_STATE = "UNKNOWN"
 FULL_INBOX_VERIFICATION = "UNVERIFIED_NO_READ_ONLY_OBSERVABLE"
@@ -80,6 +87,7 @@ FULL_INBOX_VERIFICATION = "UNVERIFIED_NO_READ_ONLY_OBSERVABLE"
 STOP_NO_NEW_OR_ADVANCED = "NO_NEW_OR_ADVANCED_THREADS"
 STOP_NO_PROGRESS = "NO_PROGRESS"
 STOP_ROUND_LIMIT = "ROUND_LIMIT"
+STOP_DEADLINE = "DEADLINE"
 STOP_ERROR = "ERROR"
 
 STATUS_RUNNING = "RUNNING"
@@ -89,6 +97,10 @@ STATUS_FAILED = "FAILED"
 
 class NotificationError(RuntimeError):
     """Fail-closed notification API error."""
+
+
+class DeadlineExceeded(NotificationError):
+    """A required wait would end after the job deadline."""
 
 
 class ApiResponse(NamedTuple):
@@ -150,6 +162,32 @@ def _positive_number(value: str) -> float | None:
     return number
 
 
+def job_deadline(environ: Mapping[str, str]) -> float | None:
+    """Return the workflow's absolute deadline, ``None`` when unset."""
+    raw = str(environ.get(DEADLINE_ENV, "") or "").strip()
+    if not raw:
+        return None
+    value = _positive_number(raw)
+    if value is None:
+        raise NotificationError(f"{DEADLINE_ENV} is not a finite non-negative epoch")
+    return value
+
+
+def ensure_within_deadline(seconds: float, *, deadline: float | None, reason: str) -> None:
+    """Refuse a wait that would end after the deadline."""
+    if deadline is not None and time.time() + seconds > deadline:
+        raise DeadlineExceeded(
+            f"{reason} wait of {math.ceil(seconds)} second(s) would end after the job deadline"
+        )
+
+
+def bounded_sleep(seconds: float, *, deadline: float | None, reason: str) -> None:
+    """Sleep only if the wait ends by the deadline; otherwise fail closed."""
+    ensure_within_deadline(seconds, deadline=deadline, reason=reason)
+    if seconds > 0:
+        time.sleep(seconds)
+
+
 def rate_limit_delay(
     *,
     status: int,
@@ -196,6 +234,7 @@ def request(
     payload: dict[str, Any] | None = None,
     *,
     stats: RequestStats | None = None,
+    deadline: float | None = None,
 ) -> ApiResponse:
     """Issue one logical REST request, retrying only observed rate limits.
 
@@ -236,6 +275,8 @@ def request(
                 attempt=attempt,
             )
             if delay is not None and attempt < RATE_LIMIT_RETRIES:
+                # Refuse before counting or announcing a retry that cannot fit.
+                ensure_within_deadline(delay, deadline=deadline, reason="Rate-limit retry")
                 if stats is not None:
                     stats.rate_limit_retries_observed += 1
                 print(
@@ -289,6 +330,7 @@ def list_notification_threads(
     *,
     include_read: bool,
     stats: RequestStats | None = None,
+    deadline: float | None = None,
 ) -> Listing:
     """Enumerate one paginated listing as ``{thread_id: updated_at}``.
 
@@ -307,7 +349,9 @@ def list_notification_threads(
                 "page": page,
             }
         )
-        response = request(token, "GET", f"/notifications?{query}", stats=stats)
+        response = request(
+            token, "GET", f"/notifications?{query}", stats=stats, deadline=deadline
+        )
         listing.pages = page
         poll = _positive_number(_header(response.headers, "X-Poll-Interval"))
         if poll is not None:
@@ -336,11 +380,19 @@ def list_notification_threads(
 
 
 def mark_thread_done(
-    token: str, thread_id: str, *, stats: RequestStats | None = None
+    token: str,
+    thread_id: str,
+    *,
+    stats: RequestStats | None = None,
+    deadline: float | None = None,
 ) -> None:
     encoded = urllib.parse.quote(thread_id, safe="")
     response = request(
-        token, "DELETE", f"/notifications/threads/{encoded}", stats=stats
+        token,
+        "DELETE",
+        f"/notifications/threads/{encoded}",
+        stats=stats,
+        deadline=deadline,
     )
     if response.status != 204:
         raise NotificationError(
@@ -349,7 +401,7 @@ def mark_thread_done(
 
 
 class PollGate:
-    """Wait for the server's polling interval before a later listing read."""
+    """Wait the server's full polling interval before a later listing read."""
 
     def __init__(self) -> None:
         self._not_before: float | None = None
@@ -359,16 +411,15 @@ class PollGate:
         interval = listing.poll_interval_seconds
         if interval is None:
             interval = POLL_INTERVAL_FALLBACK_SECONDS
-        interval = min(interval, POLL_INTERVAL_MAX_SECONDS)
         self.last_interval_seconds = interval
         self._not_before = time.monotonic() + interval
 
-    def wait(self) -> None:
+    def wait(self, deadline: float | None = None) -> None:
         if self._not_before is None:
             return
         remaining = self._not_before - time.monotonic()
         if remaining > 0:
-            time.sleep(remaining)
+            bounded_sleep(remaining, deadline=deadline, reason="X-Poll-Interval")
 
 
 @dataclass
@@ -376,6 +427,7 @@ class Clearance:
     """Count-only state for one process; the ledger never leaves memory."""
 
     identity: str = ""
+    deadline: float | None = None
     api_history_before_count: int | None = None
     api_history_last_count: int | None = None
     before_unread_count: int | None = None
@@ -423,6 +475,7 @@ class Clearance:
             "rate_limit_retry_ceiling": RATE_LIMIT_RETRIES,
             "mutation_delay_seconds": MUTATION_DELAY_SECONDS,
             "poll_interval_seconds": self.poll.last_interval_seconds,
+            "job_deadline_configured": self.deadline is not None,
             "notification_content_recorded": False,
             "thread_ids_recorded": False,
             "errors": list(self.errors),
@@ -445,9 +498,9 @@ def _candidates(listing: Listing, state: Clearance) -> dict[str, datetime]:
 def _read(
     state: Clearance, token: str, *, include_read: bool
 ) -> Listing:
-    state.poll.wait()
+    state.poll.wait(state.deadline)
     listing = list_notification_threads(
-        token, include_read=include_read, stats=state.stats
+        token, include_read=include_read, stats=state.stats, deadline=state.deadline
     )
     state.poll.observe(listing)
     return listing
@@ -458,7 +511,9 @@ def _run_rounds(
     state: Clearance,
     progress: Callable[[dict[str, Any]], None] | None,
 ) -> None:
-    _, user, _ = request(token, "GET", "/user", stats=state.stats)
+    _, user, _ = request(
+        token, "GET", "/user", stats=state.stats, deadline=state.deadline
+    )
     identity = str((user or {}).get("login") or "")
     if not identity:
         raise NotificationError("Authenticated GitHub identity did not expose a login")
@@ -483,8 +538,14 @@ def _run_rounds(
         state.rounds += 1
         for thread_id, version in candidates.items():
             if state.done_acknowledgements:
-                time.sleep(MUTATION_DELAY_SECONDS)
-            mark_thread_done(token, thread_id, stats=state.stats)
+                bounded_sleep(
+                    MUTATION_DELAY_SECONDS,
+                    deadline=state.deadline,
+                    reason="Mutation pacing",
+                )
+            mark_thread_done(
+                token, thread_id, stats=state.stats, deadline=state.deadline
+            )
             if thread_id in state.ledger:
                 state.reacknowledged_after_update += 1
             state.ledger[thread_id] = version
@@ -512,16 +573,22 @@ def clear_notifications(
     token: str,
     *,
     progress: Callable[[dict[str, Any]], None] | None = None,
+    deadline: float | None = None,
 ) -> dict[str, Any]:
     """Acknowledge each observed thread version once, then read back unread.
 
     Always returns a count-only report. ``status`` is ``UNREAD_ZERO_VERIFIED``
     only when the rounds stopped without new or advanced threads, no error
-    occurred, and the independent ``all=false`` readback measured zero.
+    occurred, and the independent ``all=false`` readback measured zero. A wait
+    that would pass ``deadline`` stops the run with ``DEADLINE``; the readback
+    is still attempted and reported ``UNAVAILABLE`` if it cannot fit.
     """
-    state = Clearance()
+    state = Clearance(deadline=deadline)
     try:
         _run_rounds(token, state, progress)
+    except DeadlineExceeded as exc:
+        state.stop_reason = STOP_DEADLINE
+        state.errors.append(f"{type(exc).__name__}: {exc}")
     except Exception as exc:  # noqa: BLE001
         state.stop_reason = STOP_ERROR
         state.errors.append(f"{type(exc).__name__}: {exc}")
@@ -587,6 +654,8 @@ def enforce_phases(
             report.get("schema") != SCHEMA
             or report.get("status") != STATUS_UNREAD_ZERO
             or report.get("after_unread_measurement") != "MEASURED"
+            # Exactly the integer zero: JSON false and 0.0 compare equal to 0.
+            or type(report.get("after_unread_count")) is not int
             or report.get("after_unread_count") != 0
             or report.get("unread_zero_verified") is not True
             or report.get("full_inbox_state") != FULL_INBOX_STATE
@@ -640,19 +709,33 @@ def main(argv: list[str] | None = None) -> int:
         os.environ.get("GH_NOTIFICATIONS_TOKEN", "").strip()
         or os.environ.get("SZL_GITHUB_TOKEN", "").strip()
     )
+    deadline: float | None = None
+    deadline_error: str | None = None
+    try:
+        deadline = job_deadline(os.environ)
+    except NotificationError as exc:
+        deadline_error = f"{type(exc).__name__}: {exc}"
 
     def record_progress(snapshot: dict[str, Any]) -> None:
         _write_report(args.report, snapshot)
 
-    if token:
-        report = clear_notifications(token, progress=record_progress)
+    if token and deadline_error is None:
+        report = clear_notifications(token, progress=record_progress, deadline=deadline)
     else:
         state = Clearance(after_unread_measurement="UNAVAILABLE")
         state.stop_reason = STOP_ERROR
-        state.errors.append(
-            "NotificationError: GH_NOTIFICATIONS_TOKEN/SZL_GITHUB_TOKEN is not configured"
-        )
-        state.measurement_errors.append("NotificationError: no token for unread readback")
+        if not token:
+            state.errors.append(
+                "NotificationError: GH_NOTIFICATIONS_TOKEN/SZL_GITHUB_TOKEN is not configured"
+            )
+            state.measurement_errors.append(
+                "NotificationError: no token for unread readback"
+            )
+        else:
+            state.errors.append(deadline_error or "")
+            state.measurement_errors.append(
+                "NotificationError: invalid job deadline; unread readback not attempted"
+            )
         report = state.report(STATUS_FAILED)
     _write_report(args.report, report)
 

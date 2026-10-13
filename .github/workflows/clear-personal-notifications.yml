@@ -51,6 +51,14 @@ jobs:
       RECEIPT_TITLE: '[notification-clearance] personal GitHub unread zero'
       PYTHONUNBUFFERED: '1'
     steps:
+      - name: Record job deadline for bounded waits
+        shell: bash
+        run: |
+          set -euo pipefail
+          # (360 - 15) mirrors timeout-minutes above and keeps 15 minutes for the
+          # receipt, upload, summary and enforcement steps after both phases.
+          echo "CLEARANCE_DEADLINE_EPOCH=$(( $(date +%s) + (360 - 15) * 60 ))" >> "$GITHUB_ENV"
+
       - name: Checkout control plane
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
