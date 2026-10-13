@@ -2,8 +2,14 @@
 """Source contract for the protected merge-queue enqueue controller."""
 from __future__ import annotations
 
+import json
+import os
 from pathlib import Path
 import re
+import shutil
+import subprocess
+import tempfile
+import textwrap
 import unittest
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -116,6 +122,136 @@ class MergeQueueEnqueueContractTests(unittest.TestCase):
         self.assertIn("merge-queue-enqueue-${{ github.run_id }}", self.source)
         self.assertIn("merge_performed", self.source)
         self.assertIn("false", self.source)
+
+    # Acceptance case 9: re-verify immediately before enqueue, fail on drift,
+    # and keep the existing queue cleanup/readback behaviour.
+    def test_case09_admission_is_reverified_immediately_before_the_queue_mutation(self) -> None:
+        attested = self.source.index("attested=1")
+        final = self.source.index('FINAL_HEAD="$(jq -r .head.sha')
+        before = self.source.index("queue-before.json")
+        invocation = "python3 -I .github/scripts/release_admission_verifier.py"
+        verifier = self.source.index(invocation)
+        mutation = self.source.index("enqueuePullRequest")
+        self.assertLess(attested, final)
+        self.assertLess(final, before)
+        self.assertLess(before, verifier)
+        self.assertLess(verifier, mutation)
+        self.assertEqual(self.source.count(invocation), 1)
+        fragment = self.source[verifier:mutation]
+        for marker in (
+            "--phase enqueue",
+            '--head-sha "$EXPECTED_HEAD"',
+            '--base-sha "$CURRENT_BASE_SHA"',
+            '--gate-run-id "$SOURCE_GATE_RUN_ID"',
+            '--body-sha256 "$CURRENT_BODY_SHA256"',
+            "Admission evidence: $ADMISSION_FINGERPRINT",
+            "admission evidence changed between attestation and enqueue",
+        ):
+            self.assertIn(marker, fragment, marker)
+        self.assertNotIn("|| true", fragment)
+        self.assertNotIn("continue-on-error", self.source)
+        # The existing post-enqueue drift check and verified dequeue remain.
+        for marker in ("queue-postcheck.json", "dequeuePullRequest", "queue absence verified"):
+            self.assertGreater(self.source.index(marker), mutation, marker)
+
+    def test_case09_verifier_never_receives_the_write_token(self) -> None:
+        self.assertIn("ADMISSION_READ_TOKEN: ${{ github.token }}", self.source)
+        self.assertIn("env -u GH_TOKEN python3 -I .github/scripts/release_admission_verifier.py", self.source)
+        self.assertIn("--token-env ADMISSION_READ_TOKEN", self.source)
+        self.assertIn("admission_rechecked_immediately_before_enqueue: true", self.source)
+        # The controller self-tests the verifier contract from its exact
+        # trusted bytes before the write token exists in any step.
+        contract = self.source.index("python .github/scripts/test_release_admission_verifier.py")
+        self.assertGreater(contract, self.source.index("Verify the enqueue-only source contract"))
+        self.assertLess(contract, self.source.index("GH_TOKEN: ${{ secrets.SZL_GITHUB_TOKEN }}"))
+
+
+class PreEnqueueAdmissionExecutionTests(unittest.TestCase):
+    """Execute the real pre-enqueue fragment with stubbed verifier and GitHub reads."""
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        for executable in ("bash", "jq", "env"):
+            if shutil.which(executable) is None:
+                raise RuntimeError(f"pre-enqueue execution tests require {executable}")
+        source = WORKFLOW.read_text(encoding="utf-8")
+        start = source.index("          # Re-run the shared admission verifier")
+        end = source.index('          if [ -n "$QUEUE_ENTRY" ]; then', start)
+        cls.script = ("set -euo pipefail\n" + textwrap.dedent(source[start:end])
+                      + "echo REACHED_ENQUEUE_MUTATION\n")
+
+    def run_fragment(self, *, decision: str, code: int, fingerprint: str | None,
+                     review_body: str) -> tuple[subprocess.CompletedProcess[str], dict[str, str], list[str]]:
+        with tempfile.TemporaryDirectory() as directory:
+            temporary = Path(directory)
+            (temporary / "reports/merge-queue-enqueue").mkdir(parents=True)
+            stub = temporary / "bin"
+            stub.mkdir()
+            (stub / "python3").write_text(
+                "#!/usr/bin/env bash\n"
+                'env > "$STUB_ENV"\n'
+                'out=""\n'
+                'while [ $# -gt 0 ]; do if [ "$1" = "--output" ]; then out="$2"; fi; shift; done\n'
+                'printf "%s" "$STUB_RESULT" > "$out"\n'
+                'exit "$STUB_CODE"\n', encoding="utf-8")
+            (stub / "gh").write_text(
+                "#!/usr/bin/env bash\n"
+                'printf "%s\\n" "$*" >> "$STUB_CALLS"\n'
+                'case "$*" in *"/reviews?per_page=100 --paginate --slurp"*) printf "%s" "$STUB_REVIEWS";; '
+                '*) echo "unexpected provider request" >&2; exit 12;; esac\n', encoding="utf-8")
+            for name in ("python3", "gh"):
+                (stub / name).chmod(0o755)
+            result = {"decision": decision, "reasons": ["X: y"], "evidence_fingerprint": fingerprint}
+            reviews = [[{"user": {"login": "qillqaq-attestor[bot]", "type": "Bot"}, "state": "APPROVED",
+                         "commit_id": "a" * 40, "body": review_body}]]
+            environment = os.environ.copy()
+            environment.update({
+                "PATH": str(stub) + os.pathsep + environment["PATH"],
+                "GH_TOKEN": "write-token-must-not-reach-verifier",
+                "ADMISSION_READ_TOKEN": "read-token",
+                "REPOSITORY": "szl-holdings/.github", "EXPECTED_HEAD": "a" * 40, "PR": "7",
+                "CURRENT_BASE_REF": "main", "CURRENT_BASE_SHA": "b" * 40,
+                "SOURCE_GATE_RUN_ID": "5001", "CURRENT_BODY_SHA256": "9" * 64, "QUEUE_ENTRY": "",
+                "STUB_RESULT": json.dumps(result), "STUB_CODE": str(code),
+                "STUB_ENV": str(temporary / "env.txt"), "STUB_CALLS": str(temporary / "calls.txt"),
+                "STUB_REVIEWS": json.dumps(reviews),
+            })
+            completed = subprocess.run(["bash", "-c", self.script], cwd=temporary, env=environment,
+                                       text=True, capture_output=True, check=False)
+            seen = {}
+            if (temporary / "env.txt").exists():
+                for line in (temporary / "env.txt").read_text(encoding="utf-8").splitlines():
+                    key, _, value = line.partition("=")
+                    seen[key] = value
+            calls = ((temporary / "calls.txt").read_text(encoding="utf-8").splitlines()
+                     if (temporary / "calls.txt").exists() else [])
+            return completed, seen, calls
+
+    def test_matching_admission_reaches_the_mutation_without_the_write_token(self) -> None:
+        fingerprint = "sha256:" + "4" * 64
+        result, seen, _ = self.run_fragment(decision="ADMIT", code=0, fingerprint=fingerprint,
+                                            review_body=f"ATTESTED. Admission evidence: {fingerprint}")
+        self.assertEqual(result.returncode, 0, result.stderr + result.stdout)
+        self.assertIn("REACHED_ENQUEUE_MUTATION", result.stdout)
+        self.assertNotIn("GH_TOKEN", seen)
+        self.assertEqual(seen.get("ADMISSION_READ_TOKEN"), "read-token")
+
+    def test_hold_block_or_drifted_evidence_stops_before_the_mutation(self) -> None:
+        fingerprint = "sha256:" + "4" * 64
+        for label, arguments in (
+            ("hold", dict(decision="HOLD", code=3, fingerprint=None, review_body="x")),
+            ("block", dict(decision="BLOCK", code=2, fingerprint=None, review_body="x")),
+            ("lying exit", dict(decision="HOLD", code=0, fingerprint=fingerprint,
+                                review_body=f"Admission evidence: {fingerprint}")),
+            ("drifted since review", dict(decision="ADMIT", code=0, fingerprint=fingerprint,
+                                          review_body="Admission evidence: sha256:" + "5" * 64)),
+            ("malformed fingerprint", dict(decision="ADMIT", code=0, fingerprint="sha256:zz",
+                                           review_body="Admission evidence: sha256:zz")),
+        ):
+            with self.subTest(label):
+                result, _, _ = self.run_fragment(**arguments)
+                self.assertNotEqual(result.returncode, 0)
+                self.assertNotIn("REACHED_ENQUEUE_MUTATION", result.stdout)
 
 
 if __name__ == "__main__":
