@@ -70,8 +70,23 @@ serving provenance.
 
 ## Automation
 
-`.github/workflows/restore-llm-router-flagship.yml` performs the bounded
-restoration after protected merge. It:
+**Retired 2026-10-13.** `.github/workflows/restore-llm-router-flagship.yml` and
+`.github/workflows/restore-llm-router-flagship-v2.yml` are disabled stubs: they
+run only on dispatch, their single job is `if: ${{ false }}`, and they hold no
+credential, checkout or write authority. Their GitHub administration writes went
+through a variable HTTP method that the CP-eBOM checker cannot model or budget,
+and every edit to their sources started a live `--apply` run (the #894 merge on
+2026-10-11 did so and stopped after partial writes). The Space's public/RUNNING
+state is owned by `.github/workflows/hf-space-lifecycle-reconcile.yml`, and the
+organization card by `.github/workflows/hf-org-card-autopublish.yml`. Apart from
+the bounded `archived: true -> false` restore in
+`.github/workflows/archive-portfolio-governor-v2.yml`, no workflow in this
+repository now edits `szl-holdings/szl-router` metadata (description, homepage,
+issues, topics) or publishes its `space/` tree to the Space. The controller
+scripts under `scripts/` are kept as historical source and are no longer run.
+
+Historically, `.github/workflows/restore-llm-router-flagship.yml` performed the
+bounded restoration after protected merge. It:
 
 1. unarchives and relabels the existing GitHub repository;
 2. obtains its exact `main` revision;

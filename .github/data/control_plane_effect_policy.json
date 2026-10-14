@@ -585,8 +585,8 @@
         "readback": true
       },
       "trusted_transitives": {
-        ".github/scripts/control_plane_effect_gate.py": "sha256:30363661155ba918ee7800657b6f8182453708e2059fc70a2a44bd79b001757b",
-        ".github/scripts/test_control_plane_effect_gate.py": "sha256:edc5e820ab6535e90ed561914864fed2eb5ba8326d5cb224a55d8d4f45bffae8"
+        ".github/scripts/control_plane_effect_gate.py": "sha256:10e3ea601084d0f060c1be44c75cd6bca285c4723208d78fb1fce1893fb32120",
+        ".github/scripts/test_control_plane_effect_gate.py": "sha256:8ddcd2e73d5e36190c4d969104afdd5274688ffb7db087d37664946eeb5c0643"
       },
       "reviewed_unknowns": {
         "files": {
@@ -1083,8 +1083,8 @@
         "readback": false
       },
       "trusted_transitives": {
-        ".github/scripts/control_plane_effect_gate.py": "sha256:30363661155ba918ee7800657b6f8182453708e2059fc70a2a44bd79b001757b",
-        ".github/scripts/test_control_plane_effect_gate.py": "sha256:edc5e820ab6535e90ed561914864fed2eb5ba8326d5cb224a55d8d4f45bffae8"
+        ".github/scripts/control_plane_effect_gate.py": "sha256:10e3ea601084d0f060c1be44c75cd6bca285c4723208d78fb1fce1893fb32120",
+        ".github/scripts/test_control_plane_effect_gate.py": "sha256:8ddcd2e73d5e36190c4d969104afdd5274688ffb7db087d37664946eeb5c0643"
       },
       "reviewed_unknowns": {
         "files": {
@@ -6172,6 +6172,60 @@
           "WORKFLOW_ENVIRONMENT_REVIEW_REQUIRED@.github/workflows/hf-space-lifecycle-reconcile.yml:170"
         ]
       }
+    },
+    ".github/workflows/restore-llm-router-flagship.yml": {
+      "intent_id": "llm-router-restore-retired-no-authority-v1",
+      "valid_until": "2026-11-30",
+      "source_sha256": "sha256:f5e5679b61b1bde40af48b0f36d7b1523eb0ec2ed18d1ede3f7ea099c38ab591",
+      "credentials": [],
+      "resources": [
+        {
+          "key": "github:repository:szl-holdings/.github:contents",
+          "access": "read"
+        }
+      ],
+      "effects": [],
+      "max_external_writes": 0,
+      "required_controls": {
+        "triggers": [
+          "workflow_dispatch"
+        ],
+        "contents_read": true,
+        "no_explicit_secrets": true,
+        "concurrency": false,
+        "protected_ref": false,
+        "exact_sha": false,
+        "expected_before": false,
+        "readback": false
+      },
+      "trusted_transitives": {}
+    },
+    ".github/workflows/restore-llm-router-flagship-v2.yml": {
+      "intent_id": "llm-router-restore-v2-retired-no-authority-v1",
+      "valid_until": "2026-11-30",
+      "source_sha256": "sha256:78f253efbe13140c1d7cbf279fe7a6c06a7036d975c6df136e8ba550d6f3fcca",
+      "credentials": [],
+      "resources": [
+        {
+          "key": "github:repository:szl-holdings/.github:contents",
+          "access": "read"
+        }
+      ],
+      "effects": [],
+      "max_external_writes": 0,
+      "required_controls": {
+        "triggers": [
+          "workflow_dispatch"
+        ],
+        "contents_read": true,
+        "no_explicit_secrets": true,
+        "concurrency": false,
+        "protected_ref": false,
+        "exact_sha": false,
+        "expected_before": false,
+        "readback": false
+      },
+      "trusted_transitives": {}
     }
   }
 }
