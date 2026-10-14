@@ -1273,6 +1273,7 @@ class YamlBoundaryRegressionTests(unittest.TestCase):
 SARIF_DOWNLOAD_ACTION = "actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c"
 SARIF_UPLOAD_ACTION = "github/codeql-action/upload-sarif@2892aa5e19bbd11bc0cff5427e3b750a04d9e3c2"
 SARIF_ARTIFACT_RESOURCE = "github:actions:artifact:scan-sarif"
+SARIF_ARTIFACT_READ_RESOURCE = "github:actions:artifact:scan-sarif:same-run-read"
 SARIF_CODE_SCANNING_RESOURCE = "github:repository:szl-holdings/.github:code-scanning:scan"
 
 
@@ -1323,12 +1324,13 @@ def sarif_split_policy(source: bytes) -> dict[str, object]:
     declaration = candidate["workflow_declarations"][WORKFLOW_PATH]
     declaration["resources"].extend([
         {"key": SARIF_ARTIFACT_RESOURCE, "access": "external-write"},
+        {"key": SARIF_ARTIFACT_READ_RESOURCE, "access": "read"},
         {"key": SARIF_CODE_SCANNING_RESOURCE, "access": "external-write"},
     ])
     declaration["effects"].extend([
         {"sink": "github.artifact.upload", "resource": SARIF_ARTIFACT_RESOURCE,
          "access": "external-write", "max_calls": 1},
-        {"sink": "github.artifact.download", "resource": SARIF_ARTIFACT_RESOURCE,
+        {"sink": "github.artifact.download", "resource": SARIF_ARTIFACT_READ_RESOURCE,
          "access": "read", "max_calls": 1},
         {"sink": "github.code_scanning.sarif_upload", "resource": SARIF_CODE_SCANNING_RESOURCE,
          "access": "external-write", "max_calls": 1},
@@ -1351,7 +1353,7 @@ class SarifUploadScopeTests(unittest.TestCase):
         self.assertEqual(
             sorted((effect.sink, effect.resource, effect.access) for effect in parsed["effects"]),
             [
-                ("github.artifact.download", SARIF_ARTIFACT_RESOURCE, "read"),
+                ("github.artifact.download", SARIF_ARTIFACT_READ_RESOURCE, "read"),
                 ("github.artifact.upload", SARIF_ARTIFACT_RESOURCE, "external-write"),
                 ("github.code_scanning.sarif_upload", SARIF_CODE_SCANNING_RESOURCE, "external-write"),
                 ("github.contents.checkout", CHECKOUT_RESOURCE, "read"),

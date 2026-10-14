@@ -757,7 +757,9 @@ def download_artifact_resource(inputs: Mapping[str, Any]) -> str | None:
     name = inputs.get("name")
     if set(inputs) != {"name"} or not isinstance(name, str) or not LITERAL_ARTIFACT_NAME.fullmatch(name):
         return None
-    return f"github:actions:artifact:{name}"
+    # A policy resource key carries one access mode, so the read of an artifact
+    # this run uploaded is its own key; ':' cannot occur in a literal name.
+    return f"github:actions:artifact:{name}:same-run-read"
 
 
 def sarif_upload_resource(inputs: Mapping[str, Any]) -> str | None:
