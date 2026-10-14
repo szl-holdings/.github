@@ -2618,7 +2618,7 @@
           ".github/scripts/test_receipt_shape_check.py": "sha256:b89ecebe25b826df5854b9976ef71282a216a47768a61adad6b16ea03844430f",
           ".github/scripts/test_replit_decommission.py": "sha256:ceeae82f6111d096883b4541cc56a92060c1088e27dd341d5722a8c6f6c34e47",
           ".github/scripts/test_required_check_drift.py": "sha256:dae9f0ffd01aa39e51eb4e2928f58478fb06204d8af9a3df03b851c34d80f7fb",
-          ".github/scripts/test_reusable_workflow_lint.py": "sha256:f12755f7f01e2ef20015188cad1371e331303a6416811ed8dfdddeca5b1753ec",
+          ".github/scripts/test_reusable_workflow_lint.py": "sha256:8e00cc12f4f8631df77093177acf9804a8651f15a41ed172d754545a75dfb382",
           ".github/scripts/test_reusable_workflow_target_check.py": "sha256:d145f78f6bb4ae0b76a9f35210882e0ff96d511ece8630d39f5d99f775f9ed54",
           ".github/scripts/test_solo_builder_provenance.py": "sha256:32abce0cee25db6fbf2d2e9d313054b73ecbbfc4eaa469462c11e1cdd6a69f14",
           ".github/scripts/test_szl_codename_gate.py": "sha256:bcfcbbf52dd4cfe7761372fa4acd08b98aec327cb4f7f7dc2c1bc86029fd5b0f"
@@ -2662,7 +2662,8 @@
           "PYTHON_DYNAMIC_SUBPROCESS@.github/scripts/test_hf_card_reconcile.py:789",
           "PYTHON_DYNAMIC_SUBPROCESS@.github/scripts/test_lockfile_registry_check.py:148",
           "PYTHON_DYNAMIC_SUBPROCESS@.github/scripts/test_lockfile_registry_check.py:97",
-          "PYTHON_DYNAMIC_SUBPROCESS@.github/scripts/test_reusable_workflow_lint.py:128",
+          "PYTHON_DYNAMIC_SUBPROCESS@.github/scripts/test_reusable_workflow_lint.py:207",
+          "PYTHON_DYNAMIC_SUBPROCESS@.github/scripts/test_reusable_workflow_lint.py:276",
           "PYTHON_IMPORT_UNRESOLVED@.github/scripts/hf_deploy_from_dockerfile.py:1538",
           "PYTHON_IMPORT_UNRESOLVED@.github/scripts/hf_deploy_from_dockerfile.py:43",
           "PYTHON_IMPORT_UNRESOLVED@.github/scripts/hf_deploy_from_dockerfile.py:45",
@@ -6233,6 +6234,174 @@
         "readback": false
       },
       "trusted_transitives": {}
+    },
+    ".github/workflows/reusable-workflow-lint.yml": {
+      "intent_id": "reusable-workflow-lint-read-only-scan-scoped-sarif-upload-v1",
+      "valid_until": "2026-11-30",
+      "source_sha256": "sha256:e365e1ba02de8177bc8c3d8d48243543de04e0fd31fe6fe4af331a20d83313c4",
+      "credentials": [
+        "GITHUB_TOKEN"
+      ],
+      "resources": [
+        {
+          "key": "github:actions:artifact:zizmor-sarif",
+          "access": "external-write"
+        },
+        {
+          "key": "github:actions:artifact:zizmor-sarif:same-run-read",
+          "access": "read"
+        },
+        {
+          "key": "github:repository:szl-holdings/.github:code-scanning:zizmor",
+          "access": "external-write"
+        },
+        {
+          "key": "github:repository:szl-holdings/.github:contents",
+          "access": "read"
+        },
+        {
+          "key": "runner:guard:egress",
+          "access": "local-write"
+        },
+        {
+          "key": "runner:toolchain:python",
+          "access": "local-write"
+        },
+        {
+          "key": "stepsecurity:monitor:szl-holdings/.github",
+          "access": "external-write"
+        }
+      ],
+      "effects": [
+        {
+          "sink": "github.artifact.download",
+          "resource": "github:actions:artifact:zizmor-sarif:same-run-read",
+          "access": "read",
+          "max_calls": 1
+        },
+        {
+          "sink": "github.artifact.upload",
+          "resource": "github:actions:artifact:zizmor-sarif",
+          "access": "external-write",
+          "max_calls": 1
+        },
+        {
+          "sink": "github.code_scanning.sarif_upload",
+          "resource": "github:repository:szl-holdings/.github:code-scanning:zizmor",
+          "access": "external-write",
+          "max_calls": 1
+        },
+        {
+          "sink": "github.contents.checkout",
+          "resource": "github:repository:szl-holdings/.github:contents",
+          "access": "read",
+          "max_calls": 2
+        },
+        {
+          "sink": "runner.guard.configure",
+          "resource": "runner:guard:egress",
+          "access": "local-write",
+          "max_calls": 2
+        },
+        {
+          "sink": "runner.guard.telemetry",
+          "resource": "stepsecurity:monitor:szl-holdings/.github",
+          "access": "external-write",
+          "max_calls": 2
+        },
+        {
+          "sink": "runner.toolchain.install",
+          "resource": "runner:toolchain:python",
+          "access": "local-write",
+          "max_calls": 1
+        }
+      ],
+      "max_external_writes": 4,
+      "required_controls": {
+        "triggers": [
+          "workflow_call"
+        ],
+        "contents_read": true,
+        "no_explicit_secrets": false,
+        "concurrency": false,
+        "protected_ref": false,
+        "exact_sha": false,
+        "expected_before": false,
+        "readback": false
+      },
+      "trusted_transitives": {},
+      "reviewed_unknowns": {
+        "files": {
+          ".github/workflows/reusable-workflow-lint.yml": "sha256:e365e1ba02de8177bc8c3d8d48243543de04e0fd31fe6fe4af331a20d83313c4"
+        },
+        "unknowns": [
+          "ACTION_INPUTS_REVIEW_REQUIRED@.github/workflows/reusable-workflow-lint.yml:157",
+          "ACTION_INPUTS_REVIEW_REQUIRED@.github/workflows/reusable-workflow-lint.yml:177",
+          "ACTION_INPUTS_REVIEW_REQUIRED@.github/workflows/reusable-workflow-lint.yml:182",
+          "ACTION_INPUTS_REVIEW_REQUIRED@.github/workflows/reusable-workflow-lint.yml:39",
+          "ACTION_INPUTS_REVIEW_REQUIRED@.github/workflows/reusable-workflow-lint.yml:44",
+          "ACTION_INPUTS_REVIEW_REQUIRED@.github/workflows/reusable-workflow-lint.yml:77",
+          "ACTION_INPUTS_REVIEW_REQUIRED@.github/workflows/reusable-workflow-lint.yml:82",
+          "ACTION_INPUTS_REVIEW_REQUIRED@.github/workflows/reusable-workflow-lint.yml:87",
+          "HTTP_TARGET_UNRESOLVED@.github/workflows/reusable-workflow-lint.yml:54",
+          "SECRET_EXPRESSION_REVIEW_REQUIRED@.github/workflows/reusable-workflow-lint.yml:1",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-workflow-lint.yml:118",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-workflow-lint.yml:119",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-workflow-lint.yml:120",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-workflow-lint.yml:121",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-workflow-lint.yml:123",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-workflow-lint.yml:124",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-workflow-lint.yml:125",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-workflow-lint.yml:126",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-workflow-lint.yml:127",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-workflow-lint.yml:128",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-workflow-lint.yml:129",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-workflow-lint.yml:130",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-workflow-lint.yml:131",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-workflow-lint.yml:132",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-workflow-lint.yml:133",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-workflow-lint.yml:134",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-workflow-lint.yml:135",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-workflow-lint.yml:136",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-workflow-lint.yml:137",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-workflow-lint.yml:138",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-workflow-lint.yml:139",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-workflow-lint.yml:141",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-workflow-lint.yml:142",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-workflow-lint.yml:143",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-workflow-lint.yml:144",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-workflow-lint.yml:145",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-workflow-lint.yml:146",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-workflow-lint.yml:147",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-workflow-lint.yml:148",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-workflow-lint.yml:149",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-workflow-lint.yml:150",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-workflow-lint.yml:53",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-workflow-lint.yml:54",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-workflow-lint.yml:55",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-workflow-lint.yml:56",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-workflow-lint.yml:57",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-workflow-lint.yml:62",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-workflow-lint.yml:63",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-workflow-lint.yml:94",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-workflow-lint.yml:95",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/reusable-workflow-lint.yml:124",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/reusable-workflow-lint.yml:125",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/reusable-workflow-lint.yml:128",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/reusable-workflow-lint.yml:133",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/reusable-workflow-lint.yml:137",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/reusable-workflow-lint.yml:141",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/reusable-workflow-lint.yml:146",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/reusable-workflow-lint.yml:147",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/reusable-workflow-lint.yml:150",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/reusable-workflow-lint.yml:53",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/reusable-workflow-lint.yml:62",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/reusable-workflow-lint.yml:63",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/reusable-workflow-lint.yml:94",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/reusable-workflow-lint.yml:95",
+          "WORKFLOW_ENVIRONMENT_REVIEW_REQUIRED@.github/workflows/reusable-workflow-lint.yml:102"
+        ]
+      }
     }
   }
 }
