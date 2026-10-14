@@ -136,7 +136,32 @@ KNOWN_ACTION_EFFECTS: Mapping[str, tuple[str, str, str]] = {
         "github:actions:artifact:control-plane-effect",
         "external-write",
     ),
+    # v8.0.1. Classified only as a same-run, literal-name read: a token,
+    # run-id, repository, pattern or id selector reaches other runs or
+    # repositories and stays unclassified.
+    "actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c": (
+        "github.artifact.download",
+        "github:actions:artifact",
+        "read",
+    ),
+    # v4.38.2. Classified only with a literal SARIF path and category; a
+    # token, ref, sha, checkout_path, matrix or wait-for-processing input
+    # changes where or how it writes and stays unclassified.
+    "github/codeql-action/upload-sarif@2892aa5e19bbd11bc0cff5427e3b750a04d9e3c2": (
+        "github.code_scanning.sarif_upload",
+        "github:repository:szl-holdings/.github:code-scanning",
+        "external-write",
+    ),
 }
+DOWNLOAD_ARTIFACT_ACTION = "actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c"
+UPLOAD_SARIF_ACTION = "github/codeql-action/upload-sarif@2892aa5e19bbd11bc0cff5427e3b750a04d9e3c2"
+UPLOAD_ARTIFACT_ACTIONS = frozenset({
+    "actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a",
+    "actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9",
+})
+LITERAL_ARTIFACT_NAME = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]*")
+LITERAL_SARIF_FILE = re.compile(r"[A-Za-z0-9][A-Za-z0-9._/-]*\.sarif")
+LITERAL_SARIF_CATEGORY = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]*")
 
 PYTHON_MUTATORS: Mapping[str, str] = {
     "add_space_secret": "sdk.huggingface.add_space_secret",
@@ -716,6 +741,133 @@ def parsed_workflow_permissions(
     ):
         unknowns.append(UnknownEffect("GITHUB_PERMISSION_DEFAULT_UNRESOLVED", path, 1))
     return sorted(found), unknowns
+
+
+def lowered_inputs(value: Any) -> dict[str, Any] | None:
+    if value is None:
+        return {}
+    if not isinstance(value, dict) or any(not isinstance(key, str) for key in value):
+        return None
+    lowered = {key.lower(): item for key, item in value.items()}
+    return lowered if len(lowered) == len(value) else None
+
+
+def download_artifact_resource(inputs: Mapping[str, Any]) -> str | None:
+    """The artifact read by the exact pin: same run, literal name, no selector."""
+    name = inputs.get("name")
+    if set(inputs) != {"name"} or not isinstance(name, str) or not LITERAL_ARTIFACT_NAME.fullmatch(name):
+        return None
+    return f"github:actions:artifact:{name}"
+
+
+def sarif_upload_resource(inputs: Mapping[str, Any]) -> str | None:
+    """The code-scanning category written by the exact pin with literal inputs."""
+    sarif_file = inputs.get("sarif_file")
+    category = inputs.get("category")
+    if (
+        set(inputs) != {"sarif_file", "category"}
+        or not isinstance(sarif_file, str)
+        or not LITERAL_SARIF_FILE.fullmatch(sarif_file)
+        or not isinstance(category, str)
+        or not LITERAL_SARIF_CATEGORY.fullmatch(category)
+    ):
+        return None
+    try:
+        safe_repo_path(sarif_file)
+    except GateError:
+        return None
+    return f"github:repository:szl-holdings/.github:code-scanning:{category}"
+
+
+def references_credentials(value: Any) -> bool:
+    for scalar in workflow_scalar_values(value):
+        expressions = list(GITHUB_EXPRESSION.finditer(scalar))
+        if scalar.count("$" + "{{") != len(expressions):
+            return True
+        for expression in expressions:
+            text = expression.group(1)
+            if (
+                re.search(r"\bsecrets\b", text, re.I)
+                or re.search(r"\bgithub\s*(?:\.\s*token\b|\[)", text, re.I)
+                or re.search(r"\btoJSON\s*\(\s*github\s*\)", text, re.I)
+            ):
+                return True
+    return False
+
+
+def scoped_write_permissions(document: Mapping[str, Any]) -> list[str]:
+    """Write grants admitted only for the exact reviewed SARIF upload job.
+
+    ``security-events: write`` is exempt from GITHUB_WRITE_PERMISSION_PRESENT
+    only when it is the workflow's single write grant, held by one job whose
+    permissions are exactly ``contents: read`` plus ``security-events: write``,
+    whose steps are exactly the pinned same-run download-artifact read and then
+    the pinned upload-sarif write with literal inputs, whose ``needs`` job
+    uploads that artifact name, and where neither that job nor the workflow
+    env references a token or secret. Anything else returns no exemption.
+    """
+    jobs = document.get("jobs")
+    workflow_permissions = document.get("permissions")
+    if not isinstance(jobs, dict) or not isinstance(workflow_permissions, dict):
+        return []
+    if any(access not in {"read", "none"} for access in workflow_permissions.values()):
+        return []
+    if references_credentials(document.get("env", {})):
+        return []
+    writers = []
+    for job in jobs.values():
+        if not isinstance(job, dict):
+            return []
+        permission = job.get("permissions")
+        if permission == "write-all" or (
+            isinstance(permission, dict) and "write" in permission.values()
+        ):
+            writers.append(job)
+        elif permission is not None and permission != "read-all" and not isinstance(permission, dict):
+            return []
+    if len(writers) != 1:
+        return []
+    job = writers[0]
+    if job.get("permissions") != {"contents": "read", "security-events": "write"}:
+        return []
+    if set(job) - {"name", "runs-on", "permissions", "needs", "if", "timeout-minutes", "steps"}:
+        return []
+    if references_credentials(job):
+        return []
+    steps = job.get("steps")
+    if not isinstance(steps, list) or len(steps) != 2:
+        return []
+    step_inputs = []
+    for step, action in zip(steps, (DOWNLOAD_ARTIFACT_ACTION, UPLOAD_SARIF_ACTION)):
+        if (
+            not isinstance(step, dict)
+            or set(step) - {"name", "uses", "with", "if"}
+            or step.get("uses") != action
+        ):
+            return []
+        inputs = lowered_inputs(step.get("with"))
+        if inputs is None:
+            return []
+        step_inputs.append(inputs)
+    download_inputs, upload_inputs = step_inputs
+    if download_artifact_resource(download_inputs) is None or sarif_upload_resource(upload_inputs) is None:
+        return []
+    needs = job.get("needs")
+    needs = [needs] if isinstance(needs, str) else needs
+    if not isinstance(needs, list) or not needs or any(not isinstance(item, str) for item in needs):
+        return []
+    produced = False
+    for producer_name in needs:
+        producer = jobs.get(producer_name)
+        if not isinstance(producer, dict) or producer is job:
+            return []
+        producer_steps = producer.get("steps")
+        for step in producer_steps if isinstance(producer_steps, list) else []:
+            if isinstance(step, dict) and step.get("uses") in UPLOAD_ARTIFACT_ACTIONS:
+                inputs = lowered_inputs(step.get("with"))
+                if inputs is not None and inputs.get("name") == download_inputs["name"]:
+                    produced = True
+    return ["security-events:write"] if produced else []
 
 
 def run_blocks(source: str) -> list[tuple[int, str]]:
@@ -1335,6 +1487,18 @@ def analyze_workflow_source(source: str, *, path: str) -> dict[str, Any]:
                             continue
                         if inputs.get("overwrite", "false").lower() != "false":
                             unknown("ACTION_DESTRUCTIVE_INPUT_UNSUPPORTED", (*step_location, "with"))
+                    if sink == "github.artifact.download":
+                        artifact_resource = download_artifact_resource(inputs)
+                        if artifact_resource is None:
+                            unknown("ACTION_RESOURCE_OVERRIDE_UNSUPPORTED", (*step_location, "with"))
+                            continue
+                        resource = artifact_resource
+                    if sink == "github.code_scanning.sarif_upload":
+                        sarif_resource = sarif_upload_resource(inputs)
+                        if sarif_resource is None:
+                            unknown("ACTION_RESOURCE_OVERRIDE_UNSUPPORTED", (*step_location, "with"))
+                            continue
+                        resource = sarif_resource
                     if sink == "runner.toolchain.install" and (
                         inputs.get("cache") or inputs.get("cache-dependency-path")
                     ):
@@ -1386,7 +1550,7 @@ def analyze_workflow_source(source: str, *, path: str) -> dict[str, Any]:
         ),
         "readback": bool(re.search(r"read[-_ ]?back|verify.*after", clean, re.I)),
     }
-    return {
+    result = {
         "triggers": triggers,
         "permissions": permissions,
         "credentials": sorted(credentials),
@@ -1397,6 +1561,10 @@ def analyze_workflow_source(source: str, *, path: str) -> dict[str, Any]:
         "effects": sorted(effects),
         "unknowns": sorted(set(unknowns)),
     }
+    scoped = scoped_write_permissions(document)
+    if scoped:
+        result["scoped_write_permissions"] = scoped
+    return result
 
 
 def git_output(
@@ -1682,7 +1850,13 @@ def bind_declaration(
     ):
         if required[control] and not analysis["controls"][control]:
             reasons.add(f"CONTROL_{control.upper()}_MISSING")
-    if any(permission.endswith(":write") for permission in analysis["permissions"]):
+    # Only the exact reviewed SARIF upload job may hold a write grant; any
+    # other write, or a missing exemption list, still denies.
+    scoped_writes = set(analysis.get("scoped_write_permissions", []))
+    if any(
+        permission.endswith(":write") and permission not in scoped_writes
+        for permission in analysis["permissions"]
+    ):
         reasons.add("GITHUB_WRITE_PERMISSION_PRESENT")
 
     trusted_expected = declaration["trusted_transitives"]
@@ -1799,7 +1973,7 @@ def bind_declaration(
     if external_writes > declaration["max_external_writes"]:
         reasons.add("EXTERNAL_WRITE_BUDGET_EXCEEDED")
 
-    return {
+    bound = {
         "workflow": workflow_path,
         "intent_id": declaration["intent_id"],
         "source_sha256": sha256_bytes(source),
@@ -1827,6 +2001,9 @@ def bind_declaration(
         "reason_codes": sorted(reasons),
         "verdict": "DENY" if reasons else "ALLOW",
     }
+    if scoped_writes:
+        bound["scoped_write_permissions"] = sorted(scoped_writes)
+    return bound
 
 
 def effect_signature(item: Mapping[str, Any]) -> tuple[str, tuple[str, ...], str]:
