@@ -585,8 +585,8 @@
         "readback": true
       },
       "trusted_transitives": {
-        ".github/scripts/control_plane_effect_gate.py": "sha256:30363661155ba918ee7800657b6f8182453708e2059fc70a2a44bd79b001757b",
-        ".github/scripts/test_control_plane_effect_gate.py": "sha256:edc5e820ab6535e90ed561914864fed2eb5ba8326d5cb224a55d8d4f45bffae8"
+        ".github/scripts/control_plane_effect_gate.py": "sha256:10e3ea601084d0f060c1be44c75cd6bca285c4723208d78fb1fce1893fb32120",
+        ".github/scripts/test_control_plane_effect_gate.py": "sha256:8ddcd2e73d5e36190c4d969104afdd5274688ffb7db087d37664946eeb5c0643"
       },
       "reviewed_unknowns": {
         "files": {
@@ -1083,8 +1083,8 @@
         "readback": false
       },
       "trusted_transitives": {
-        ".github/scripts/control_plane_effect_gate.py": "sha256:30363661155ba918ee7800657b6f8182453708e2059fc70a2a44bd79b001757b",
-        ".github/scripts/test_control_plane_effect_gate.py": "sha256:edc5e820ab6535e90ed561914864fed2eb5ba8326d5cb224a55d8d4f45bffae8"
+        ".github/scripts/control_plane_effect_gate.py": "sha256:10e3ea601084d0f060c1be44c75cd6bca285c4723208d78fb1fce1893fb32120",
+        ".github/scripts/test_control_plane_effect_gate.py": "sha256:8ddcd2e73d5e36190c4d969104afdd5274688ffb7db087d37664946eeb5c0643"
       },
       "reviewed_unknowns": {
         "files": {
@@ -2519,7 +2519,7 @@
     ".github/workflows/tests.yml": {
       "intent_id": "repository-credentialless-tests-v1",
       "valid_until": "2026-11-30",
-      "source_sha256": "sha256:908758d2870c2a77ba16c21ba46b5742d280ac2c84e24ce55ba6372e9ac0d56e",
+      "source_sha256": "sha256:adfd9932431b33cc3124cf6264d1ff0b16ab204811584ca38e4686967a5b88ad",
       "credentials": [],
       "resources": [
         {
@@ -2586,7 +2586,7 @@
       "trusted_transitives": {},
       "reviewed_unknowns": {
         "files": {
-          ".github/workflows/tests.yml": "sha256:908758d2870c2a77ba16c21ba46b5742d280ac2c84e24ce55ba6372e9ac0d56e",
+          ".github/workflows/tests.yml": "sha256:adfd9932431b33cc3124cf6264d1ff0b16ab204811584ca38e4686967a5b88ad",
           ".github/scripts/hf_deploy_from_dockerfile.py": "sha256:f2f7a6c1296493d034eebed596f4176c2928470a4ed7e23620da6cacf19b16e7",
           ".github/scripts/hf_space_source_binding.py": "sha256:9888d4c126ead29d0960de3198a99f1d686956c8104f0cf6c5c0d4c113b2a37b",
           ".github/scripts/public_front_door_check.py": "sha256:cd18b4edafaf706c8fe26d811e4fc8d2ccae01dcc37ea513850d541be840be39",
@@ -2618,6 +2618,7 @@
           ".github/scripts/test_receipt_shape_check.py": "sha256:b89ecebe25b826df5854b9976ef71282a216a47768a61adad6b16ea03844430f",
           ".github/scripts/test_replit_decommission.py": "sha256:ceeae82f6111d096883b4541cc56a92060c1088e27dd341d5722a8c6f6c34e47",
           ".github/scripts/test_required_check_drift.py": "sha256:dae9f0ffd01aa39e51eb4e2928f58478fb06204d8af9a3df03b851c34d80f7fb",
+          ".github/scripts/test_reusable_workflow_lint.py": "sha256:8e00cc12f4f8631df77093177acf9804a8651f15a41ed172d754545a75dfb382",
           ".github/scripts/test_reusable_workflow_target_check.py": "sha256:d145f78f6bb4ae0b76a9f35210882e0ff96d511ece8630d39f5d99f775f9ed54",
           ".github/scripts/test_solo_builder_provenance.py": "sha256:32abce0cee25db6fbf2d2e9d313054b73ecbbfc4eaa469462c11e1cdd6a69f14",
           ".github/scripts/test_szl_codename_gate.py": "sha256:bcfcbbf52dd4cfe7761372fa4acd08b98aec327cb4f7f7dc2c1bc86029fd5b0f"
@@ -2661,6 +2662,8 @@
           "PYTHON_DYNAMIC_SUBPROCESS@.github/scripts/test_hf_card_reconcile.py:789",
           "PYTHON_DYNAMIC_SUBPROCESS@.github/scripts/test_lockfile_registry_check.py:148",
           "PYTHON_DYNAMIC_SUBPROCESS@.github/scripts/test_lockfile_registry_check.py:97",
+          "PYTHON_DYNAMIC_SUBPROCESS@.github/scripts/test_reusable_workflow_lint.py:207",
+          "PYTHON_DYNAMIC_SUBPROCESS@.github/scripts/test_reusable_workflow_lint.py:276",
           "PYTHON_IMPORT_UNRESOLVED@.github/scripts/hf_deploy_from_dockerfile.py:1538",
           "PYTHON_IMPORT_UNRESOLVED@.github/scripts/hf_deploy_from_dockerfile.py:43",
           "PYTHON_IMPORT_UNRESOLVED@.github/scripts/hf_deploy_from_dockerfile.py:45",
@@ -2796,6 +2799,9 @@
           "PYTHON_IMPORT_UNRESOLVED@.github/scripts/test_required_check_drift.py:27",
           "PYTHON_IMPORT_UNRESOLVED@.github/scripts/test_required_check_drift.py:28",
           "PYTHON_IMPORT_UNRESOLVED@.github/scripts/test_required_check_drift.py:85",
+          "PYTHON_IMPORT_UNRESOLVED@.github/scripts/test_reusable_workflow_lint.py:10",
+          "PYTHON_IMPORT_UNRESOLVED@.github/scripts/test_reusable_workflow_lint.py:15",
+          "PYTHON_IMPORT_UNRESOLVED@.github/scripts/test_reusable_workflow_lint.py:18",
           "PYTHON_IMPORT_UNRESOLVED@.github/scripts/test_reusable_workflow_target_check.py:15",
           "PYTHON_IMPORT_UNRESOLVED@.github/scripts/test_reusable_workflow_target_check.py:4",
           "PYTHON_IMPORT_UNRESOLVED@.github/scripts/test_reusable_workflow_target_check.py:6",
@@ -2837,6 +2843,7 @@
           "PYTHON_SOURCE_REVIEW_REQUIRED@.github/scripts/test_receipt_shape_check.py:1",
           "PYTHON_SOURCE_REVIEW_REQUIRED@.github/scripts/test_replit_decommission.py:1",
           "PYTHON_SOURCE_REVIEW_REQUIRED@.github/scripts/test_required_check_drift.py:1",
+          "PYTHON_SOURCE_REVIEW_REQUIRED@.github/scripts/test_reusable_workflow_lint.py:1",
           "PYTHON_SOURCE_REVIEW_REQUIRED@.github/scripts/test_reusable_workflow_target_check.py:1",
           "PYTHON_SOURCE_REVIEW_REQUIRED@.github/scripts/test_solo_builder_provenance.py:1",
           "PYTHON_SOURCE_REVIEW_REQUIRED@.github/scripts/test_szl_codename_gate.py:1",
@@ -2892,6 +2899,7 @@
           "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/tests.yml:291",
           "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/tests.yml:298",
           "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/tests.yml:302",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/tests.yml:311",
           "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/tests.yml:32",
           "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/tests.yml:34",
           "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/tests.yml:36",
@@ -3067,6 +3075,181 @@
           "SHELL_COMPOSITION_UNKNOWN@.github/workflows/responsive-estate-v3.yml:161",
           "WORKFLOW_ENVIRONMENT_REVIEW_REQUIRED@.github/workflows/responsive-estate-v3.yml:153",
           "WORKFLOW_ENVIRONMENT_REVIEW_REQUIRED@.github/workflows/responsive-estate-v3.yml:35"
+        ]
+      }
+    },
+    ".github/workflows/public-experience-v3.yml": {
+      "intent_id": "public-experience-v3-live-browser-audit-v1",
+      "valid_until": "2026-11-30",
+      "source_sha256": "sha256:b90dff56902f4bc9c9b0d7be0b4f669ff7eaa8e89a08d1bf90fbc4618bf4b987",
+      "credentials": [],
+      "resources": [
+        {
+          "key": "github:actions:artifact:public-experience-v3",
+          "access": "external-write"
+        },
+        {
+          "key": "github:repository:szl-holdings/.github:contents",
+          "access": "read"
+        },
+        {
+          "key": "runner:toolchain:python",
+          "access": "local-write"
+        }
+      ],
+      "effects": [
+        {
+          "sink": "github.artifact.upload",
+          "resource": "github:actions:artifact:public-experience-v3",
+          "access": "external-write",
+          "max_calls": 1
+        },
+        {
+          "sink": "github.contents.checkout",
+          "resource": "github:repository:szl-holdings/.github:contents",
+          "access": "read",
+          "max_calls": 2
+        },
+        {
+          "sink": "runner.toolchain.install",
+          "resource": "runner:toolchain:python",
+          "access": "local-write",
+          "max_calls": 2
+        }
+      ],
+      "max_external_writes": 1,
+      "required_controls": {
+        "triggers": [
+          "pull_request",
+          "push",
+          "schedule",
+          "workflow_dispatch",
+          "workflow_run"
+        ],
+        "contents_read": true,
+        "no_explicit_secrets": true,
+        "concurrency": true,
+        "protected_ref": true,
+        "exact_sha": true,
+        "expected_before": false,
+        "readback": false
+      },
+      "trusted_transitives": {},
+      "reviewed_unknowns": {
+        "files": {
+          ".github/workflows/public-experience-v3.yml": "sha256:b90dff56902f4bc9c9b0d7be0b4f669ff7eaa8e89a08d1bf90fbc4618bf4b987",
+          ".github/scripts/audit_public_experience_v3.py": "sha256:6c8f3746e9fdb837e11396c6e160af74c57792c3e2b624549508fac01eea0018",
+          ".github/scripts/holographic_target_contract.py": "sha256:d6ccfc2dad5f056fda540e05d2abdc823f778917e38dee5e49880788f07f9872",
+          ".github/scripts/responsive_space_contract.py": "sha256:17db624a036a40a90b2d6d8b81a5ab8298e93de65dc85920277ee9930f6920ee",
+          ".github/scripts/run_holographic_spaces_v2.py": "sha256:d9ece676a5a739feded87a0a67eff44377404116aa7bccb0dfc437fee1623871",
+          ".github/tests/test_holographic_target_contract.py": "sha256:ff7f6bc6d0c1a8cf81ec2772c576eee3ff896d5774dc22e428ffccccdb43bddd",
+          ".github/tests/test_public_experience_v3.py": "sha256:f97000c34888884599062686b49bd146c0cb7910d21b3a3a82c6ffa7d101a637",
+          ".github/tests/test_responsive_host_idempotence.py": "sha256:992d13c5bdebe89bc6a90bbdb555544fcc9bb413e0df4c371a467f1d334ce0b8",
+          ".github/tests/test_responsive_space_contract.py": "sha256:3744e43da8d7e5d59d2a18fa2ccebcce58798e0039ecabb35c1c066c73ff71cd",
+          ".github/workflows/rollout-holographic-space-fabric-v2.yml": "sha256:2df4ffeffbf4a3ab493c39b636d62705c68c32244784cb739fbe18015a31bd57"
+        },
+        "unknowns": [
+          "ACTION_INPUTS_REVIEW_REQUIRED@.github/workflows/public-experience-v3.yml:117",
+          "ACTION_INPUTS_REVIEW_REQUIRED@.github/workflows/public-experience-v3.yml:126",
+          "ACTION_INPUTS_REVIEW_REQUIRED@.github/workflows/public-experience-v3.yml:164",
+          "ACTION_INPUTS_REVIEW_REQUIRED@.github/workflows/public-experience-v3.yml:69",
+          "ACTION_INPUTS_REVIEW_REQUIRED@.github/workflows/public-experience-v3.yml:73",
+          "HTTP_TARGET_UNRESOLVED@.github/scripts/audit_public_experience_v3.py:123",
+          "PYTHON_DYNAMIC_EXECUTION@.github/scripts/holographic_target_contract.py:167",
+          "PYTHON_DYNAMIC_EXECUTION@.github/scripts/responsive_space_contract.py:332",
+          "PYTHON_DYNAMIC_EXECUTION@.github/scripts/responsive_space_contract.py:97",
+          "PYTHON_DYNAMIC_EXECUTION@.github/scripts/run_holographic_spaces_v2.py:72",
+          "PYTHON_IMPORT_UNRESOLVED@.github/scripts/audit_public_experience_v3.py:11",
+          "PYTHON_IMPORT_UNRESOLVED@.github/scripts/audit_public_experience_v3.py:12",
+          "PYTHON_IMPORT_UNRESOLVED@.github/scripts/audit_public_experience_v3.py:13",
+          "PYTHON_IMPORT_UNRESOLVED@.github/scripts/audit_public_experience_v3.py:16",
+          "PYTHON_IMPORT_UNRESOLVED@.github/scripts/audit_public_experience_v3.py:17",
+          "PYTHON_IMPORT_UNRESOLVED@.github/scripts/audit_public_experience_v3.py:18",
+          "PYTHON_IMPORT_UNRESOLVED@.github/scripts/audit_public_experience_v3.py:484",
+          "PYTHON_IMPORT_UNRESOLVED@.github/scripts/audit_public_experience_v3.py:9",
+          "PYTHON_IMPORT_UNRESOLVED@.github/scripts/holographic_target_contract.py:3",
+          "PYTHON_IMPORT_UNRESOLVED@.github/scripts/holographic_target_contract.py:6",
+          "PYTHON_IMPORT_UNRESOLVED@.github/scripts/responsive_space_contract.py:11",
+          "PYTHON_IMPORT_UNRESOLVED@.github/scripts/run_holographic_spaces_v2.py:3",
+          "PYTHON_IMPORT_UNRESOLVED@.github/scripts/run_holographic_spaces_v2.py:6",
+          "PYTHON_IMPORT_UNRESOLVED@.github/scripts/run_holographic_spaces_v2.py:9",
+          "PYTHON_IMPORT_UNRESOLVED@.github/tests/test_holographic_target_contract.py:3",
+          "PYTHON_IMPORT_UNRESOLVED@.github/tests/test_holographic_target_contract.py:5",
+          "PYTHON_IMPORT_UNRESOLVED@.github/tests/test_holographic_target_contract.py:9",
+          "PYTHON_IMPORT_UNRESOLVED@.github/tests/test_public_experience_v3.py:3",
+          "PYTHON_IMPORT_UNRESOLVED@.github/tests/test_public_experience_v3.py:5",
+          "PYTHON_IMPORT_UNRESOLVED@.github/tests/test_responsive_host_idempotence.py:10",
+          "PYTHON_IMPORT_UNRESOLVED@.github/tests/test_responsive_host_idempotence.py:8",
+          "PYTHON_IMPORT_UNRESOLVED@.github/tests/test_responsive_space_contract.py:11",
+          "PYTHON_IMPORT_UNRESOLVED@.github/tests/test_responsive_space_contract.py:3",
+          "PYTHON_IMPORT_UNRESOLVED@.github/tests/test_responsive_space_contract.py:5",
+          "PYTHON_SOURCE_REVIEW_REQUIRED@.github/scripts/audit_public_experience_v3.py:1",
+          "PYTHON_SOURCE_REVIEW_REQUIRED@.github/scripts/holographic_target_contract.py:1",
+          "PYTHON_SOURCE_REVIEW_REQUIRED@.github/scripts/responsive_space_contract.py:1",
+          "PYTHON_SOURCE_REVIEW_REQUIRED@.github/scripts/run_holographic_spaces_v2.py:1",
+          "PYTHON_SOURCE_REVIEW_REQUIRED@.github/tests/test_holographic_target_contract.py:1",
+          "PYTHON_SOURCE_REVIEW_REQUIRED@.github/tests/test_public_experience_v3.py:1",
+          "PYTHON_SOURCE_REVIEW_REQUIRED@.github/tests/test_responsive_host_idempotence.py:1",
+          "PYTHON_SOURCE_REVIEW_REQUIRED@.github/tests/test_responsive_space_contract.py:1",
+          "SCRIPT_SOURCE_REVIEW_REQUIRED@.github/workflows/public-experience-v3.yml:1",
+          "SCRIPT_SOURCE_REVIEW_REQUIRED@.github/workflows/rollout-holographic-space-fabric-v2.yml:1",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/public-experience-v3.yml:113",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/public-experience-v3.yml:122",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/public-experience-v3.yml:129",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/public-experience-v3.yml:130",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/public-experience-v3.yml:138",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/public-experience-v3.yml:139",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/public-experience-v3.yml:140",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/public-experience-v3.yml:141",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/public-experience-v3.yml:142",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/public-experience-v3.yml:143",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/public-experience-v3.yml:144",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/public-experience-v3.yml:145",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/public-experience-v3.yml:146",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/public-experience-v3.yml:147",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/public-experience-v3.yml:148",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/public-experience-v3.yml:149",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/public-experience-v3.yml:150",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/public-experience-v3.yml:151",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/public-experience-v3.yml:152",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/public-experience-v3.yml:153",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/public-experience-v3.yml:157",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/public-experience-v3.yml:158",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/public-experience-v3.yml:159",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/public-experience-v3.yml:177",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/public-experience-v3.yml:178",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/public-experience-v3.yml:179",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/public-experience-v3.yml:180",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/public-experience-v3.yml:181",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/public-experience-v3.yml:182",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/public-experience-v3.yml:76",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/public-experience-v3.yml:82",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/public-experience-v3.yml:85",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/public-experience-v3.yml:86",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/public-experience-v3.yml:87",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/public-experience-v3.yml:88",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/public-experience-v3.yml:90",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/public-experience-v3.yml:113",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/public-experience-v3.yml:122",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/public-experience-v3.yml:139",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/public-experience-v3.yml:141",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/public-experience-v3.yml:142",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/public-experience-v3.yml:143",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/public-experience-v3.yml:144",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/public-experience-v3.yml:148",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/public-experience-v3.yml:149",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/public-experience-v3.yml:150",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/public-experience-v3.yml:152",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/public-experience-v3.yml:157",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/public-experience-v3.yml:158",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/public-experience-v3.yml:159",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/public-experience-v3.yml:177",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/public-experience-v3.yml:178",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/public-experience-v3.yml:179",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/public-experience-v3.yml:181",
+          "WORKFLOW_ENVIRONMENT_REVIEW_REQUIRED@.github/workflows/public-experience-v3.yml:105",
+          "WORKFLOW_ENVIRONMENT_REVIEW_REQUIRED@.github/workflows/public-experience-v3.yml:135",
+          "WORKFLOW_ENVIRONMENT_REVIEW_REQUIRED@.github/workflows/public-experience-v3.yml:175"
         ]
       }
     },
@@ -5995,6 +6178,228 @@
           "SHELL_COMPOSITION_UNKNOWN@.github/workflows/hf-space-lifecycle-reconcile.yml:178",
           "WORKFLOW_ENVIRONMENT_REVIEW_REQUIRED@.github/workflows/hf-space-lifecycle-reconcile.yml:112",
           "WORKFLOW_ENVIRONMENT_REVIEW_REQUIRED@.github/workflows/hf-space-lifecycle-reconcile.yml:170"
+        ]
+      }
+    },
+    ".github/workflows/restore-llm-router-flagship.yml": {
+      "intent_id": "llm-router-restore-retired-no-authority-v1",
+      "valid_until": "2026-11-30",
+      "source_sha256": "sha256:f5e5679b61b1bde40af48b0f36d7b1523eb0ec2ed18d1ede3f7ea099c38ab591",
+      "credentials": [],
+      "resources": [
+        {
+          "key": "github:repository:szl-holdings/.github:contents",
+          "access": "read"
+        }
+      ],
+      "effects": [],
+      "max_external_writes": 0,
+      "required_controls": {
+        "triggers": [
+          "workflow_dispatch"
+        ],
+        "contents_read": true,
+        "no_explicit_secrets": true,
+        "concurrency": false,
+        "protected_ref": false,
+        "exact_sha": false,
+        "expected_before": false,
+        "readback": false
+      },
+      "trusted_transitives": {}
+    },
+    ".github/workflows/restore-llm-router-flagship-v2.yml": {
+      "intent_id": "llm-router-restore-v2-retired-no-authority-v1",
+      "valid_until": "2026-11-30",
+      "source_sha256": "sha256:78f253efbe13140c1d7cbf279fe7a6c06a7036d975c6df136e8ba550d6f3fcca",
+      "credentials": [],
+      "resources": [
+        {
+          "key": "github:repository:szl-holdings/.github:contents",
+          "access": "read"
+        }
+      ],
+      "effects": [],
+      "max_external_writes": 0,
+      "required_controls": {
+        "triggers": [
+          "workflow_dispatch"
+        ],
+        "contents_read": true,
+        "no_explicit_secrets": true,
+        "concurrency": false,
+        "protected_ref": false,
+        "exact_sha": false,
+        "expected_before": false,
+        "readback": false
+      },
+      "trusted_transitives": {}
+    },
+    ".github/workflows/reusable-workflow-lint.yml": {
+      "intent_id": "reusable-workflow-lint-read-only-scan-scoped-sarif-upload-v1",
+      "valid_until": "2026-11-30",
+      "source_sha256": "sha256:e365e1ba02de8177bc8c3d8d48243543de04e0fd31fe6fe4af331a20d83313c4",
+      "credentials": [
+        "GITHUB_TOKEN"
+      ],
+      "resources": [
+        {
+          "key": "github:actions:artifact:zizmor-sarif",
+          "access": "external-write"
+        },
+        {
+          "key": "github:actions:artifact:zizmor-sarif:same-run-read",
+          "access": "read"
+        },
+        {
+          "key": "github:repository:szl-holdings/.github:code-scanning:zizmor",
+          "access": "external-write"
+        },
+        {
+          "key": "github:repository:szl-holdings/.github:contents",
+          "access": "read"
+        },
+        {
+          "key": "runner:guard:egress",
+          "access": "local-write"
+        },
+        {
+          "key": "runner:toolchain:python",
+          "access": "local-write"
+        },
+        {
+          "key": "stepsecurity:monitor:szl-holdings/.github",
+          "access": "external-write"
+        }
+      ],
+      "effects": [
+        {
+          "sink": "github.artifact.download",
+          "resource": "github:actions:artifact:zizmor-sarif:same-run-read",
+          "access": "read",
+          "max_calls": 1
+        },
+        {
+          "sink": "github.artifact.upload",
+          "resource": "github:actions:artifact:zizmor-sarif",
+          "access": "external-write",
+          "max_calls": 1
+        },
+        {
+          "sink": "github.code_scanning.sarif_upload",
+          "resource": "github:repository:szl-holdings/.github:code-scanning:zizmor",
+          "access": "external-write",
+          "max_calls": 1
+        },
+        {
+          "sink": "github.contents.checkout",
+          "resource": "github:repository:szl-holdings/.github:contents",
+          "access": "read",
+          "max_calls": 2
+        },
+        {
+          "sink": "runner.guard.configure",
+          "resource": "runner:guard:egress",
+          "access": "local-write",
+          "max_calls": 2
+        },
+        {
+          "sink": "runner.guard.telemetry",
+          "resource": "stepsecurity:monitor:szl-holdings/.github",
+          "access": "external-write",
+          "max_calls": 2
+        },
+        {
+          "sink": "runner.toolchain.install",
+          "resource": "runner:toolchain:python",
+          "access": "local-write",
+          "max_calls": 1
+        }
+      ],
+      "max_external_writes": 4,
+      "required_controls": {
+        "triggers": [
+          "workflow_call"
+        ],
+        "contents_read": true,
+        "no_explicit_secrets": false,
+        "concurrency": false,
+        "protected_ref": false,
+        "exact_sha": false,
+        "expected_before": false,
+        "readback": false
+      },
+      "trusted_transitives": {},
+      "reviewed_unknowns": {
+        "files": {
+          ".github/workflows/reusable-workflow-lint.yml": "sha256:e365e1ba02de8177bc8c3d8d48243543de04e0fd31fe6fe4af331a20d83313c4"
+        },
+        "unknowns": [
+          "ACTION_INPUTS_REVIEW_REQUIRED@.github/workflows/reusable-workflow-lint.yml:157",
+          "ACTION_INPUTS_REVIEW_REQUIRED@.github/workflows/reusable-workflow-lint.yml:177",
+          "ACTION_INPUTS_REVIEW_REQUIRED@.github/workflows/reusable-workflow-lint.yml:182",
+          "ACTION_INPUTS_REVIEW_REQUIRED@.github/workflows/reusable-workflow-lint.yml:39",
+          "ACTION_INPUTS_REVIEW_REQUIRED@.github/workflows/reusable-workflow-lint.yml:44",
+          "ACTION_INPUTS_REVIEW_REQUIRED@.github/workflows/reusable-workflow-lint.yml:77",
+          "ACTION_INPUTS_REVIEW_REQUIRED@.github/workflows/reusable-workflow-lint.yml:82",
+          "ACTION_INPUTS_REVIEW_REQUIRED@.github/workflows/reusable-workflow-lint.yml:87",
+          "HTTP_TARGET_UNRESOLVED@.github/workflows/reusable-workflow-lint.yml:54",
+          "SECRET_EXPRESSION_REVIEW_REQUIRED@.github/workflows/reusable-workflow-lint.yml:1",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-workflow-lint.yml:118",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-workflow-lint.yml:119",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-workflow-lint.yml:120",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-workflow-lint.yml:121",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-workflow-lint.yml:123",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-workflow-lint.yml:124",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-workflow-lint.yml:125",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-workflow-lint.yml:126",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-workflow-lint.yml:127",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-workflow-lint.yml:128",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-workflow-lint.yml:129",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-workflow-lint.yml:130",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-workflow-lint.yml:131",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-workflow-lint.yml:132",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-workflow-lint.yml:133",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-workflow-lint.yml:134",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-workflow-lint.yml:135",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-workflow-lint.yml:136",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-workflow-lint.yml:137",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-workflow-lint.yml:138",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-workflow-lint.yml:139",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-workflow-lint.yml:141",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-workflow-lint.yml:142",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-workflow-lint.yml:143",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-workflow-lint.yml:144",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-workflow-lint.yml:145",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-workflow-lint.yml:146",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-workflow-lint.yml:147",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-workflow-lint.yml:148",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-workflow-lint.yml:149",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-workflow-lint.yml:150",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-workflow-lint.yml:53",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-workflow-lint.yml:54",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-workflow-lint.yml:55",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-workflow-lint.yml:56",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-workflow-lint.yml:57",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-workflow-lint.yml:62",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-workflow-lint.yml:63",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-workflow-lint.yml:94",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-workflow-lint.yml:95",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/reusable-workflow-lint.yml:124",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/reusable-workflow-lint.yml:125",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/reusable-workflow-lint.yml:128",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/reusable-workflow-lint.yml:133",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/reusable-workflow-lint.yml:137",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/reusable-workflow-lint.yml:141",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/reusable-workflow-lint.yml:146",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/reusable-workflow-lint.yml:147",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/reusable-workflow-lint.yml:150",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/reusable-workflow-lint.yml:53",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/reusable-workflow-lint.yml:62",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/reusable-workflow-lint.yml:63",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/reusable-workflow-lint.yml:94",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/reusable-workflow-lint.yml:95",
+          "WORKFLOW_ENVIRONMENT_REVIEW_REQUIRED@.github/workflows/reusable-workflow-lint.yml:102"
         ]
       }
     }

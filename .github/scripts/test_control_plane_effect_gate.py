@@ -1270,6 +1270,231 @@ class YamlBoundaryRegressionTests(unittest.TestCase):
                 self.assertFalse(bound["reviewed_unknowns_applied"])
 
 
+SARIF_DOWNLOAD_ACTION = "actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c"
+SARIF_UPLOAD_ACTION = "github/codeql-action/upload-sarif@2892aa5e19bbd11bc0cff5427e3b750a04d9e3c2"
+SARIF_ARTIFACT_RESOURCE = "github:actions:artifact:scan-sarif"
+SARIF_ARTIFACT_READ_RESOURCE = "github:actions:artifact:scan-sarif:same-run-read"
+SARIF_CODE_SCANNING_RESOURCE = "github:repository:szl-holdings/.github:code-scanning:scan"
+
+
+def sarif_split_workflow() -> str:
+    """The exact reviewed shape: a read-only scan job and a two-step upload job."""
+    return (
+        "name: fixture\n"
+        '"on": [pull_request, merge_group, push]\n'
+        "permissions:\n"
+        "  contents: read\n"
+        "concurrency:\n"
+        "  group: fixture\n"
+        "jobs:\n"
+        "  scan:\n"
+        "    runs-on: ubuntu-latest\n"
+        "    steps:\n"
+        f"      - uses: {CHECKOUT_ACTION}\n"
+        "        with:\n"
+        "          persist-credentials: 'false'\n"
+        "      - run: echo scan\n"
+        "      - if: always()\n"
+        f"        uses: {UPLOAD_ACTION}\n"
+        "        with:\n"
+        "          name: scan-sarif\n"
+        "          path: scan.sarif\n"
+        "  sarif-upload:\n"
+        "    needs: scan\n"
+        "    if: always()\n"
+        "    runs-on: ubuntu-latest\n"
+        "    permissions:\n"
+        "      contents: read\n"
+        "      security-events: write\n"
+        "    steps:\n"
+        "      - name: Download SARIF\n"
+        f"        uses: {SARIF_DOWNLOAD_ACTION}\n"
+        "        with:\n"
+        "          name: scan-sarif\n"
+        "      - name: Upload SARIF\n"
+        f"        uses: {SARIF_UPLOAD_ACTION}\n"
+        "        with:\n"
+        "          sarif_file: scan.sarif\n"
+        "          category: scan\n"
+    )
+
+
+def sarif_split_policy(source: bytes) -> dict[str, object]:
+    candidate = reviewed_policy_for(source)
+    declaration = candidate["workflow_declarations"][WORKFLOW_PATH]
+    declaration["resources"].extend([
+        {"key": SARIF_ARTIFACT_RESOURCE, "access": "external-write"},
+        {"key": SARIF_ARTIFACT_READ_RESOURCE, "access": "read"},
+        {"key": SARIF_CODE_SCANNING_RESOURCE, "access": "external-write"},
+    ])
+    declaration["effects"].extend([
+        {"sink": "github.artifact.upload", "resource": SARIF_ARTIFACT_RESOURCE,
+         "access": "external-write", "max_calls": 1},
+        {"sink": "github.artifact.download", "resource": SARIF_ARTIFACT_READ_RESOURCE,
+         "access": "read", "max_calls": 1},
+        {"sink": "github.code_scanning.sarif_upload", "resource": SARIF_CODE_SCANNING_RESOURCE,
+         "access": "external-write", "max_calls": 1},
+    ])
+    declaration["max_external_writes"] = 2
+    return candidate
+
+
+class SarifUploadScopeTests(unittest.TestCase):
+    """security-events: write is admitted only for the exact two-step upload job."""
+
+    def test_exact_split_shape_is_allowed_with_scoped_write(self) -> None:
+        source = sarif_split_workflow().encode()
+        parsed, bound = bind_source(source, candidate=sarif_split_policy(source))
+        self.assertEqual(bound["verdict"], "ALLOW", bound["reason_codes"])
+        self.assertIn("security-events:write", parsed["permissions"])
+        self.assertEqual(parsed["scoped_write_permissions"], ["security-events:write"])
+        self.assertEqual(bound["scoped_write_permissions"], ["security-events:write"])
+        self.assertEqual(parsed["credentials"], [])
+        self.assertEqual(
+            sorted((effect.sink, effect.resource, effect.access) for effect in parsed["effects"]),
+            [
+                ("github.artifact.download", SARIF_ARTIFACT_READ_RESOURCE, "read"),
+                ("github.artifact.upload", SARIF_ARTIFACT_RESOURCE, "external-write"),
+                ("github.code_scanning.sarif_upload", SARIF_CODE_SCANNING_RESOURCE, "external-write"),
+                ("github.contents.checkout", CHECKOUT_RESOURCE, "read"),
+            ],
+        )
+        self.assertFalse(any(
+            item.code in gate.NON_REVIEWABLE_UNKNOWN_CODES for item in parsed["unknowns"]
+        ))
+
+    def test_other_workflows_keep_their_receipt_shape(self) -> None:
+        source = workflow()
+        parsed, bound = bind_source(source)
+        self.assertNotIn("scoped_write_permissions", parsed)
+        self.assertNotIn("scoped_write_permissions", bound)
+        self.assertEqual(bound["verdict"], "ALLOW")
+
+    def test_adversarial_variants_deny_the_write_grant(self) -> None:
+        base = sarif_split_workflow()
+        download = (
+            "      - name: Download SARIF\n"
+            f"        uses: {SARIF_DOWNLOAD_ACTION}\n"
+            "        with:\n"
+            "          name: scan-sarif\n"
+        )
+        upload = (
+            "      - name: Upload SARIF\n"
+            f"        uses: {SARIF_UPLOAD_ACTION}\n"
+            "        with:\n"
+            "          sarif_file: scan.sarif\n"
+            "          category: scan\n"
+        )
+        upload_permissions = "      contents: read\n      security-events: write\n"
+        cases: list[tuple[str, str, str, tuple[str, ...]]] = [
+            ("wrong upload-sarif sha", SARIF_UPLOAD_ACTION,
+             "github/codeql-action/upload-sarif@" + "0" * 40, ("UNREVIEWABLE_EFFECT_BOUNDARY",)),
+            ("upload-sarif tag", SARIF_UPLOAD_ACTION,
+             "github/codeql-action/upload-sarif@v4", ("UNREVIEWABLE_EFFECT_BOUNDARY",)),
+            ("download-artifact tag", SARIF_DOWNLOAD_ACTION,
+             "actions/download-artifact@v8", ("UNREVIEWABLE_EFFECT_BOUNDARY",)),
+            ("download-artifact wrong sha", SARIF_DOWNLOAD_ACTION,
+             "actions/download-artifact@" + "1" * 40, ("UNREVIEWABLE_EFFECT_BOUNDARY",)),
+            ("extra plain step in upload job", upload,
+             upload + "      - run: echo extra\n", ()),
+            ("extra token-using step in upload job", upload,
+             upload + "      - run: echo extra\n        env:\n          GH_TOKEN: ${{ github.token }}\n", ()),
+            ("checkout in upload job", download,
+             f"      - uses: {CHECKOUT_ACTION}\n        with:\n          persist-credentials: 'false'\n" + download, ()),
+            ("security-events write without upload-sarif", upload, "      - run: echo no-upload\n", ()),
+            ("upload-sarif without download", download, "", ()),
+            ("steps out of order", download + upload, upload + download, ()),
+            ("two upload-sarif steps", upload, upload + upload, ()),
+            ("contents write alongside", upload_permissions,
+             "      contents: write\n      security-events: write\n", ()),
+            ("extra read grant", upload_permissions,
+             upload_permissions + "      actions: read\n", ()),
+            ("write-all upload job", "    permissions:\n" + upload_permissions,
+             "    permissions: write-all\n", ()),
+            ("workflow-level grant", "permissions:\n  contents: read\n",
+             "permissions:\n  contents: read\n  security-events: write\n", ()),
+            ("write-capable token in scan job", "  scan:\n    runs-on: ubuntu-latest\n",
+             "  scan:\n    runs-on: ubuntu-latest\n    permissions:\n      contents: write\n", ()),
+            ("security-events write in scan job", "  scan:\n    runs-on: ubuntu-latest\n",
+             "  scan:\n    runs-on: ubuntu-latest\n    permissions:\n"
+             "      contents: read\n      security-events: write\n", ()),
+            ("token env in upload job", "    needs: scan\n",
+             "    needs: scan\n    env:\n      GH_TOKEN: ${{ github.token }}\n", ()),
+            ("secret in workflow env", "concurrency:\n",
+             "env:\n  LEAK: ${{ secrets.SOME_TOKEN }}\nconcurrency:\n", ()),
+            ("dynamic sarif_file", "sarif_file: scan.sarif",
+             "sarif_file: ${{ inputs.report }}", ("UNREVIEWABLE_EFFECT_BOUNDARY",)),
+            ("traversing sarif_file", "sarif_file: scan.sarif",
+             "sarif_file: ../scan.sarif", ("UNREVIEWABLE_EFFECT_BOUNDARY",)),
+            ("token input", "          category: scan\n",
+             "          category: scan\n          token: ${{ github.token }}\n",
+             ("UNREVIEWABLE_EFFECT_BOUNDARY",)),
+            ("ref input", "          category: scan\n",
+             "          category: scan\n          ref: refs/heads/main\n",
+             ("UNREVIEWABLE_EFFECT_BOUNDARY",)),
+            ("omitted category", "          category: scan\n", "",
+             ("UNREVIEWABLE_EFFECT_BOUNDARY",)),
+            ("dynamic category", "category: scan", "category: ${{ github.job }}",
+             ("UNREVIEWABLE_EFFECT_BOUNDARY",)),
+            ("cross-run download", "          name: scan-sarif\n      - name: Upload SARIF\n",
+             "          name: scan-sarif\n          run-id: '123'\n"
+             "          github-token: ${{ github.token }}\n      - name: Upload SARIF\n",
+             ("UNREVIEWABLE_EFFECT_BOUNDARY",)),
+            ("cross-repository download", "          name: scan-sarif\n      - name: Upload SARIF\n",
+             "          name: scan-sarif\n          repository: other/repo\n      - name: Upload SARIF\n",
+             ("UNREVIEWABLE_EFFECT_BOUNDARY",)),
+            ("pattern download", "          name: scan-sarif\n      - name: Upload SARIF\n",
+             "          pattern: '*'\n      - name: Upload SARIF\n",
+             ("UNREVIEWABLE_EFFECT_BOUNDARY",)),
+            ("download path override", "          name: scan-sarif\n      - name: Upload SARIF\n",
+             "          name: scan-sarif\n          path: elsewhere\n      - name: Upload SARIF\n",
+             ("UNREVIEWABLE_EFFECT_BOUNDARY",)),
+            ("dynamic artifact name", "          name: scan-sarif\n      - name: Upload SARIF\n",
+             "          name: scan-sarif-${{ github.run_id }}\n      - name: Upload SARIF\n",
+             ("UNREVIEWABLE_EFFECT_BOUNDARY",)),
+            ("artifact not produced by needs job", "          name: scan-sarif\n      - name: Upload SARIF\n",
+             "          name: other-sarif\n      - name: Upload SARIF\n", ()),
+            ("upload job without needs", "    needs: scan\n", "", ()),
+        ]
+        for label, old, new, extra_reasons in cases:
+            with self.subTest(case=label):
+                self.assertIn(old, base)
+                source = base.replace(old, new, 1).encode()
+                parsed = gate.analyze_workflow_source(source.decode(), path=WORKFLOW_PATH)
+                self.assertNotIn("scoped_write_permissions", parsed)
+                _parsed, bound = bind_source(source, candidate=sarif_split_policy(source))
+                self.assertEqual(bound["verdict"], "DENY")
+                self.assertIn("GITHUB_WRITE_PERMISSION_PRESENT", bound["reason_codes"])
+                self.assertNotIn("scoped_write_permissions", bound)
+                for reason in extra_reasons:
+                    self.assertIn(reason, bound["reason_codes"])
+
+    def test_missing_exemption_list_fails_closed(self) -> None:
+        source = sarif_split_workflow().encode()
+        declaration = gate.load_policy_bytes(
+            policy_bytes(sarif_split_policy(source)), as_of=AS_OF
+        )["workflow_declarations"][WORKFLOW_PATH]
+        parsed = gate.analyze_workflow_source(source.decode(), path=WORKFLOW_PATH)
+        parsed.pop("scoped_write_permissions")
+        bound = gate.bind_declaration(WORKFLOW_PATH, source, parsed, declaration, {})
+        self.assertEqual(bound["verdict"], "DENY")
+        self.assertIn("GITHUB_WRITE_PERMISSION_PRESENT", bound["reason_codes"])
+
+    def test_actionlint_docker_action_stays_unclassified(self) -> None:
+        # The v1.7.12 commit has no action.yml; its Dockerfile builds from
+        # floating base images, so the SHA does not pin the executed bytes.
+        source = workflow(
+            extra_step="      - uses: rhysd/actionlint@914e7df21a07ef503a81201c76d2b11c789d3fca\n"
+        )
+        self.assertNotIn(
+            "rhysd/actionlint@914e7df21a07ef503a81201c76d2b11c789d3fca", gate.KNOWN_ACTION_EFFECTS
+        )
+        parsed, bound = bind_source(source, candidate=reviewed_policy_for(source))
+        self.assertIn("UNCLASSIFIED_EXTERNAL_ACTION", {item.code for item in parsed["unknowns"]})
+        self.assertEqual(bound["verdict"], "DENY")
+        self.assertIn("UNREVIEWABLE_EFFECT_BOUNDARY", bound["reason_codes"])
+
+
 class GitReceiptTests(unittest.TestCase):
     def test_no_effect_change_is_deterministic_and_has_object_provenance(self) -> None:
         with TemporaryRepository() as fixture:

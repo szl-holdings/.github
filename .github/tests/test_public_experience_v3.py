@@ -147,6 +147,52 @@ class PublicExperienceV3Tests(unittest.TestCase):
         self.assertNotIn("inputs.target_regex", run_script)
         self.assertIn('target_filter="$TARGET_REGEX"', run_script)
 
+    def test_live_audit_holds_no_write_or_token_authority_and_publishes_no_issue(self) -> None:
+        workflow = (ROOT / ".github" / "workflows" / "public-experience-v3.yml").read_text(
+            encoding="utf-8"
+        )
+        for fragment in (
+            "issues: write",
+            ": write",
+            "gh issue",
+            "GH_TOKEN",
+            "github.token",
+            "secrets.",
+            "ref: main",
+            "github.run_id",
+            "github.run_attempt",
+        ):
+            self.assertNotIn(fragment, workflow)
+        self.assertIn("          name: public-experience-v3\n", workflow)
+        self.assertIn('test "$GITHUB_REF" = "refs/heads/main"', workflow)
+        self.assertIn("test \"$(git rev-parse --verify 'HEAD^{commit}')\" = \"$GITHUB_SHA\"", workflow)
+        self.assertIn("No issue receipt is published.", workflow)
+
+    def test_run_blocks_receive_expressions_only_through_env(self) -> None:
+        lines = (ROOT / ".github" / "workflows" / "public-experience-v3.yml").read_text(
+            encoding="utf-8"
+        ).splitlines()
+        blocks: list[str] = []
+        index = 0
+        while index < len(lines):
+            stripped = lines[index].lstrip()
+            if not stripped.startswith(("run:", "- run:")):
+                index += 1
+                continue
+            indent = len(lines[index]) - len(stripped)
+            body = [stripped.split("run:", 1)[1]]
+            index += 1
+            while index < len(lines) and (
+                not lines[index].strip()
+                or len(lines[index]) - len(lines[index].lstrip()) > indent
+            ):
+                body.append(lines[index])
+                index += 1
+            blocks.append("\n".join(body))
+        self.assertGreaterEqual(len(blocks), 8)
+        for block in blocks:
+            self.assertNotIn("${{", block)
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)

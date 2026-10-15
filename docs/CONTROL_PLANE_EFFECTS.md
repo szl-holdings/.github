@@ -87,6 +87,25 @@ external actions, unresolved local actions or dependencies, and reusable
 workflows cannot be accepted by reviewing only the caller's bytes.
 Executable control hints come from run blocks, not workflow names or labels.
 
+Code-scanning uploads have one narrow shape. `actions/download-artifact` at
+exactly `3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c` (v8.0.1) is a read of an
+artifact uploaded by the same run, accepted only with a literal `name` and no
+other input; a token, run id, repository, pattern, id list, or path is denied.
+`github/codeql-action/upload-sarif` at exactly
+`2892aa5e19bbd11bc0cff5427e3b750a04d9e3c2` (v4.38.2) is an external write to
+that repository's code-scanning category, accepted only with a literal
+traversal-free `.sarif` file and a literal `category`; a token, ref, sha,
+checkout path, matrix, or wait input is denied. Any other `:write` grant still
+produces `GITHUB_WRITE_PERMISSION_PRESENT`. The only exemption is
+`security-events: write` when it is the workflow's single write grant and the
+job holding it has exactly `contents: read` plus `security-events: write`,
+exactly two steps (that download, then that upload), a `needs` job that
+uploads the same literal artifact name with a reviewed upload-artifact pin,
+and no token or secret reference in the job or the workflow `env`. The bound
+receipt then lists the grant under `scoped_write_permissions`. Container and
+Dockerfile actions, such as `rhysd/actionlint`, stay unclassified because a
+commit SHA does not pin the image bytes they build and run.
+
 Owner-reviewed unknowns remain available only for eligible bounded source
 constructs. Acceptance requires exact file digests and the complete observed
 unknown set; the receipt records whether that review was applied. This cannot
