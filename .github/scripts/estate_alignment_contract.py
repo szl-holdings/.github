@@ -773,7 +773,12 @@ def list_hf(kind: str) -> list[dict[str, Any]]:
     )
     if not isinstance(value, list):
         raise AlignmentError(f"Hugging Face {kind} endpoint did not return an array")
-    return [row for row in value if isinstance(row, dict)]
+    if any(not isinstance(row, dict) for row in value):
+        raise AlignmentError(f"Hugging Face {kind} endpoint returned a malformed row")
+    # A full bounded page cannot establish complete author membership.
+    if len(value) >= 100:
+        raise AlignmentError(f"Hugging Face {kind} membership exceeds the bounded page")
+    return value
 
 
 def validate_live(contract: Mapping[str, Any]) -> tuple[list[str], dict[str, Any]]:

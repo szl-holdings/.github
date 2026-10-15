@@ -161,6 +161,30 @@ class EstateAlignmentContractTests(unittest.TestCase):
                 failures, _observed = alignment.validate_live_public_space_membership(candidate, observation)
                 self.assertTrue(failures)
 
+    def test_public_membership_loader_preserves_strict_validation(self) -> None:
+        observation = self.contract["public_space_membership_observation"]
+        rows = [{"id": row["repo_id"]} for row in observation["spaces"]]
+        with patch.object(alignment, "fetch_bytes", return_value=json.dumps(rows).encode()):
+            loaded = alignment.list_hf("spaces")
+        failures, observed = alignment.validate_live_public_space_membership(loaded, observation)
+        self.assertEqual(failures, [])
+        self.assertEqual(observed, alignment.EXPECTED_PUBLIC_SPACE_IDS)
+        for malformed in (None, "invalid", 42, []):
+            with self.subTest(malformed=malformed), patch.object(
+                alignment, "fetch_bytes", return_value=json.dumps(rows + [malformed]).encode()
+            ):
+                with self.assertRaisesRegex(alignment.AlignmentError, "malformed row"):
+                    alignment.list_hf("spaces")
+
+    def test_provider_loader_refuses_potentially_truncated_membership(self) -> None:
+        for kind in ("spaces", "models", "datasets"):
+            for count in (100, 101):
+                with self.subTest(kind=kind, count=count), patch.object(
+                    alignment, "fetch_bytes", return_value=json.dumps([{}] * count).encode()
+                ):
+                    with self.assertRaisesRegex(alignment.AlignmentError, "bounded page"):
+                        alignment.list_hf(kind)
+
     def test_live_readback_runs_after_publication_or_explicit_audit(self) -> None:
         workflow = (
             ROOT / ".github" / "workflows" / "estate-one-fabric-alignment.yml"
