@@ -439,7 +439,7 @@ class WorkflowContractTests(unittest.TestCase):
             "CI_DIGEST_ISSUE_TOKEN: ${{ github.token }}",
             'ORG_REPOSITORY_FLOOR: "123"',
             "test_ci_health_digest_reader_inventory.py",
-            "actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a",
+            "actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9",
             "if-no-files-found: error",
             "Enforce complete authenticated coverage",
         )

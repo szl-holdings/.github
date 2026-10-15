@@ -298,7 +298,7 @@ class TestProductionWorkflowAuthContract(unittest.TestCase):
 
     def test_report_is_immutable_artifact_not_direct_main_push(self):
         self.assertIn(
-            "actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a",
+            "actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9",
             self.workflow,
         )
         self.assertIn("if-no-files-found: error", self.workflow)

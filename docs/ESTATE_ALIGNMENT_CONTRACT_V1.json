@@ -231,6 +231,184 @@
       }
     ]
   },
+  "public_space_membership_observation": {
+    "schema": "szl.public-space-membership-observation/v1",
+    "evidence_class": "MEASURED",
+    "observed_at": "2026-10-14T03:31:52.247053Z",
+    "scope": "anonymous-public-author-list",
+    "author": "SZLHOLDINGS",
+    "policy_authority": false,
+    "excluded_control_surface": "SZLHOLDINGS/README",
+    "public_space_count": 37,
+    "spaces": [
+      {
+        "repo_id": "SZLHOLDINGS/a11oy",
+        "revision": "65c1937c112b94939d7fec84cb5dda5050a4ee05"
+      },
+      {
+        "repo_id": "SZLHOLDINGS/ayllu",
+        "revision": "c8e1f8b8202ebdef6677b73b10bb2b1131cad6a2"
+      },
+      {
+        "repo_id": "SZLHOLDINGS/counsel",
+        "revision": "f1cc186ae1720187e0cbf67b41289682284245c1"
+      },
+      {
+        "repo_id": "SZLHOLDINGS/david-leads",
+        "revision": "d35364abcc1c2f8af240f77953b55f5bbb9fd695"
+      },
+      {
+        "repo_id": "SZLHOLDINGS/finance",
+        "revision": "b709a2ab9497f2e7dee3bce36224b5893de5283a"
+      },
+      {
+        "repo_id": "SZLHOLDINGS/foundation-confirmation-v2",
+        "revision": "0033e0220aa77f158cb392936fd25a5da8758285"
+      },
+      {
+        "repo_id": "SZLHOLDINGS/gdw-frontier",
+        "revision": "e296dad2966a19580b4dc206b32fb016a9715575"
+      },
+      {
+        "repo_id": "SZLHOLDINGS/governed-agent-bench",
+        "revision": "252f8ec6cca241171e9ddac30c2be8cba3c4929a"
+      },
+      {
+        "repo_id": "SZLHOLDINGS/governed-receipt-verifier",
+        "revision": "44ee94b034ed2aa0796fb00f9f7eeb6b7e22e7d4"
+      },
+      {
+        "repo_id": "SZLHOLDINGS/holographic-unify",
+        "revision": "dd3a8a8d8be7dcbc938019d6b453d7abf45a0fbc"
+      },
+      {
+        "repo_id": "SZLHOLDINGS/immune",
+        "revision": "891970d22e89867dc9a428f6bf66d5eb47cd7c78"
+      },
+      {
+        "repo_id": "SZLHOLDINGS/immune-lattice",
+        "revision": "e5eb779a1e9a9469f12adf50864276a7fecb9b6c"
+      },
+      {
+        "repo_id": "SZLHOLDINGS/killinchu",
+        "revision": "8eeba1f2a447c54d3146d5b2f82efcda400e9988"
+      },
+      {
+        "repo_id": "SZLHOLDINGS/llm-router-live",
+        "revision": "292e871c3b4fed6367c12e6dca456e7a43ebe526"
+      },
+      {
+        "repo_id": "SZLHOLDINGS/lyte",
+        "revision": "ec984b97c57cf9be51b444e475d750163423aba5"
+      },
+      {
+        "repo_id": "SZLHOLDINGS/nexus",
+        "revision": "c411f24b1801c1ba53baecf84cabaf230f49a814"
+      },
+      {
+        "repo_id": "SZLHOLDINGS/oac-system-health-lab",
+        "revision": "3b40690dbc599e3783b8eeb2502f58ac8ee6b716"
+      },
+      {
+        "repo_id": "SZLHOLDINGS/prove-it",
+        "revision": "4c43d85d03bd42828b93cf45adb274f7e5213ec5"
+      },
+      {
+        "repo_id": "SZLHOLDINGS/sentra",
+        "revision": "ceb89f31194e79306cc4a55f99828f81f4d6b3d1"
+      },
+      {
+        "repo_id": "SZLHOLDINGS/szl-atelier",
+        "revision": "31882e7c98df95bd8abf8a507675936438fdb04d"
+      },
+      {
+        "repo_id": "SZLHOLDINGS/szl-bench-suite",
+        "revision": "f03a499527ad8894349870076d959daf913f65ed"
+      },
+      {
+        "repo_id": "SZLHOLDINGS/szl-brand-campaign",
+        "revision": "67ede62303729b54ccb3707bd20acec16a70985d"
+      },
+      {
+        "repo_id": "SZLHOLDINGS/szl-command-lab",
+        "revision": "c4fba581179618dbc7eab871bb2213d1d479d1ad"
+      },
+      {
+        "repo_id": "SZLHOLDINGS/szl-constellation",
+        "revision": "1ff7a724c082d9401dfec8053de8ae46c3ae4698"
+      },
+      {
+        "repo_id": "SZLHOLDINGS/szl-forge-lab",
+        "revision": "88c1e5b411c11ac0666476bacf3335ff03156a43"
+      },
+      {
+        "repo_id": "SZLHOLDINGS/szl-foundation-confirmation",
+        "revision": "5281e2e710a13cacfc5fbfc9afc42831482ee762"
+      },
+      {
+        "repo_id": "SZLHOLDINGS/szl-frontier",
+        "revision": "75b032b6a287c750ee2e121518ac8d5a99e68b13"
+      },
+      {
+        "repo_id": "SZLHOLDINGS/szl-khipu",
+        "revision": "22a025328213070f0789a223fd8bc8706eb6e5a5"
+      },
+      {
+        "repo_id": "SZLHOLDINGS/szl-marketing-1.1",
+        "revision": "d9a0885e624b61d6c86849b2cfc3f7e9977e3760"
+      },
+      {
+        "repo_id": "SZLHOLDINGS/szl-model-inference-lab",
+        "revision": "01ec2eb89196aa4030c68ae21363282c6b80897e"
+      },
+      {
+        "repo_id": "SZLHOLDINGS/szl-router-control",
+        "revision": "2f183b57d6a67142ece4beea7a2b0b291fba5541"
+      },
+      {
+        "repo_id": "SZLHOLDINGS/szl-seismic-review",
+        "revision": "4000f94cd1e877852e9b578d81194bfdc4ff64af"
+      },
+      {
+        "repo_id": "SZLHOLDINGS/szl-typesafe-triage",
+        "revision": "42612b84849c0a55f6ae84b2c2f328f581082499"
+      },
+      {
+        "repo_id": "SZLHOLDINGS/terra",
+        "revision": "513a9e06ec6da3f6e5b3f66458de416e1c02e342"
+      },
+      {
+        "repo_id": "SZLHOLDINGS/the-grid",
+        "revision": "461f54e12c3e35dfb31e0d7cf15c0d579c13d706"
+      },
+      {
+        "repo_id": "SZLHOLDINGS/vertical-services",
+        "revision": "16a80071734645790252f6be5739ec446793ed06"
+      },
+      {
+        "repo_id": "SZLHOLDINGS/yarqa",
+        "revision": "1cfbac4adddb4ea5475a945f7faf4a1c56378000"
+      }
+    ],
+    "policy_alignment": "UNKNOWN",
+    "policy_conflicts": [
+      {
+        "repo_id": "SZLHOLDINGS/llm-router-live",
+        "github_declaration": "KEEP",
+        "a11oy_declaration": "FOLD",
+        "github_source": "https://github.com/szl-holdings/.github/blob/3ed8a867fa4c5f63f1fbdc25f80891982613855c/docs/CANONICAL_FLEET.md",
+        "a11oy_source": "https://github.com/szl-holdings/a11oy/blob/18f169dde881055a8993192d2fd1aff99ebcc592/docs/generated/github-org-public-estate.md"
+      },
+      {
+        "repo_id": "SZLHOLDINGS/szl-atelier",
+        "github_declaration": "KEEP",
+        "a11oy_declaration": "FOLD",
+        "github_source": "https://github.com/szl-holdings/.github/blob/3ed8a867fa4c5f63f1fbdc25f80891982613855c/docs/CANONICAL_FLEET.md",
+        "a11oy_source": "https://github.com/szl-holdings/a11oy/blob/18f169dde881055a8993192d2fd1aff99ebcc592/docs/generated/github-org-public-estate.md"
+      }
+    ],
+    "claim_boundary": "Anonymous public Space membership only; not fleet policy, ownership, publication eligibility, or runtime qualification."
+  },
   "organization_card_control_surface": {
     "repo_id": "SZLHOLDINGS/README",
     "class": "organization_card_control_surface",
