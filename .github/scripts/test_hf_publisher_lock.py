@@ -78,7 +78,8 @@ def main() -> None:
     ):
         assert module in tests_workflow
     assert 'version("huggingface-hub") == "1.19.0"' in tests_workflow
-    assert 'version("requests") == "2.32.5"' in tests_workflow
+    assert 'version("requests") == "2.33.0"' in tests_workflow
+    assert 'version("urllib3") == "2.8.0"' in tests_workflow
     assert '"$VENV/bin/python" -I -P -m py_compile' in tests_workflow
     assert '"$VENV/bin/python" -I -P .github/scripts/hf_deploy_from_dockerfile.py --help' in tests_workflow
     assert '"$VENV/bin/python" -I -P .github/scripts/hf_space_source_binding.py --help' in tests_workflow

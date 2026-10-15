@@ -2519,7 +2519,7 @@
     ".github/workflows/tests.yml": {
       "intent_id": "repository-credentialless-tests-v1",
       "valid_until": "2026-11-30",
-      "source_sha256": "sha256:adfd9932431b33cc3124cf6264d1ff0b16ab204811584ca38e4686967a5b88ad",
+      "source_sha256": "sha256:e73437e3687712194a802d2695e54a2c47a7ebff7c08690aaf4a8feb556f2d08",
       "credentials": [],
       "resources": [
         {
@@ -2586,7 +2586,7 @@
       "trusted_transitives": {},
       "reviewed_unknowns": {
         "files": {
-          ".github/workflows/tests.yml": "sha256:adfd9932431b33cc3124cf6264d1ff0b16ab204811584ca38e4686967a5b88ad",
+          ".github/workflows/tests.yml": "sha256:e73437e3687712194a802d2695e54a2c47a7ebff7c08690aaf4a8feb556f2d08",
           ".github/scripts/hf_deploy_from_dockerfile.py": "sha256:f2f7a6c1296493d034eebed596f4176c2928470a4ed7e23620da6cacf19b16e7",
           ".github/scripts/hf_space_source_binding.py": "sha256:9888d4c126ead29d0960de3198a99f1d686956c8104f0cf6c5c0d4c113b2a37b",
           ".github/scripts/public_front_door_check.py": "sha256:cd18b4edafaf706c8fe26d811e4fc8d2ccae01dcc37ea513850d541be840be39",
@@ -2606,7 +2606,7 @@
           ".github/scripts/test_hf_live_pr_pair.py": "sha256:8e5814a52e7460a22db174e6923acdf15aa16ba995445b0aa7c4d08a55b54483",
           ".github/scripts/test_hf_module_drift_check.py": "sha256:fdb716fcb6f8eb2b57ee61db7e05624cf1a057455ec78266a8acd152d52cb66f",
           ".github/scripts/test_hf_module_drift_prune.py": "sha256:19e84279dfbadf538b509c690b48dc94f17ff98ffb29c9a556dd1a16a47aca8b",
-          ".github/scripts/test_hf_publisher_lock.py": "sha256:3e67a86fb0b70d35976265f984373446925097492ca5ca807e9e2a68289f1bc2",
+          ".github/scripts/test_hf_publisher_lock.py": "sha256:2de4fab39751d33a4c9d1a70214ac2c7886951724094e6a11c02a3c27c929d8b",
           ".github/scripts/test_hf_source_bound_baseline.py": "sha256:ba444e68085a860dda654936089d2dac2f774991f8aa444f85788677f8828ec7",
           ".github/scripts/test_hf_space_lifecycle_reconcile.py": "sha256:ba82032048bf4d2a07b72a8afec6f092b793003456000da61e8bfe29793a9c14",
           ".github/scripts/test_hf_space_source_binding.py": "sha256:fc5d12413102c47b6fc276f9ebcfbd8e687c64ba41936e9a4a0929f21a038948",
@@ -3644,7 +3644,7 @@
         "files": {
           ".github/data/hf-space-lifecycle-policy.json": "sha256:8e6a2b64b3b7c86a2fc17a5c0c13e862d82717e14c0cc183cfa03ba2ec369176",
           ".github/data/nexus-target-bootstrap-authorization.json": "sha256:a63fd8209dc961d3987ce80a8eb09440ffaf328fd1cc3b02993daa6a59a573c4",
-          ".github/scripts/recover_nexus_target.py": "sha256:d3de4b8de0fbe64fc2c2f8a123f62fb071ea2ce30a7d233288506618e523b35b",
+          ".github/scripts/recover_nexus_target.py": "sha256:e65599ecd8392d282c4c52a159fd5cdc111ffc9de0e3f002c4c26b232a8a5872",
           ".github/scripts/test_recover_nexus_target.py": "sha256:c0d8a26784d4c634df3b8b914fa8ae06ab4bfc81f916d679e0a5c9143974e342",
           ".github/workflows/recover-nexus-target.yml": "sha256:dbddfaf1dd1a3e6d4ba272baaa69ddfaef06b86599cf04c288ecb2cc80a65279"
         },
@@ -6093,7 +6093,7 @@
           ".github/scripts/hf_space_lifecycle_reconcile.py": "sha256:fda7f22d5f3d63f13c51145386752125903c9f0ae0c5628972ebd8cf6f22641d",
           ".github/scripts/test_hf_space_lifecycle_reconcile.py": "sha256:ba82032048bf4d2a07b72a8afec6f092b793003456000da61e8bfe29793a9c14",
           ".github/workflows/hf-space-lifecycle-reconcile.yml": "sha256:a87d162bb2aa66150e5f10accc414aaf0dba4d57dad31dc16728e4ac1d9ecb03",
-          "requirements/hf-publisher.lock": "sha256:eec9ee849129e2034d2c7880f0f3e32857cbfd7ceecfcb5f2eb7cb541b4e4d15"
+          "requirements/hf-publisher.lock": "sha256:463b543da8418dd37f458f9893cf1d5f8cb21d04b249121b3b5155b6729b42e0"
         },
         "unknowns": [
           "ACTION_INPUTS_REVIEW_REQUIRED@.github/workflows/hf-space-lifecycle-reconcile.yml:119",
