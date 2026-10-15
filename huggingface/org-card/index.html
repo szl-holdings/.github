@@ -77,6 +77,7 @@
     #szl-hf-org-card { scroll-behavior: smooth; }
     #szl-hf-org-card img { display: block; max-width: 100%; }
     #szl-hf-org-card {
+      position: relative;
       margin: 0;
       padding-top: env(safe-area-inset-top);
       padding-right: env(safe-area-inset-right);
@@ -95,7 +96,7 @@
     #szl-hf-org-card h1, #szl-hf-org-card h2, #szl-hf-org-card h3, #szl-hf-org-card p, #szl-hf-org-card a, #szl-hf-org-card code, #szl-hf-org-card dt, #szl-hf-org-card dd, #szl-hf-org-card li { overflow-wrap: anywhere; }
     #szl-hf-org-card a:focus-visible, #szl-hf-org-card summary:focus-visible { outline: var(--border-focus) solid var(--focus); outline-offset: 2px; }
     #szl-hf-org-card .szl-hf-skip { position: absolute; left: -9999px; top: 0; }
-    #szl-hf-org-card .szl-hf-skip:focus { left: max(16px, env(safe-area-inset-left)); top: max(16px, env(safe-area-inset-top)); z-index: 30; border: 1px solid var(--border); border-radius: var(--radius-md); padding: 10px 14px; background: var(--surface); color: var(--text); }
+    #szl-hf-org-card .szl-hf-skip:focus { left: max(16px, env(safe-area-inset-left)); top: max(16px, env(safe-area-inset-top)); z-index: 31; max-width: calc(100% - 32px); border: 1px solid var(--border); border-radius: var(--radius-md); padding: 10px 14px; background: var(--surface); color: var(--text); }
     #szl-hf-org-card .szl-hf-shell { width: min(1180px, calc(100% - 40px)); max-width: 100%; margin: 0 auto; }
 
     #szl-hf-org-card header { position: relative; z-index: 30; isolation: isolate; border-bottom: 1px solid var(--border); background: color-mix(in srgb, var(--bg) 92%, transparent); }
@@ -375,7 +376,10 @@
     #szl-hf-org-card .szl-hf-chain { grid-template-columns: repeat(auto-fit, minmax(min(100%, 9rem), 1fr)); }
     #szl-hf-org-card .szl-hf-counts { grid-template-columns: repeat(auto-fit, minmax(min(100%, 14rem), 1fr)); }
     @media (max-width: 640px) {
-      #szl-hf-org-card .szl-hf-steps { grid-template-columns: 1fr; }
+      #szl-hf-org-card .szl-hf-actions { display: grid; grid-template-columns: 1fr; }
+      #szl-hf-org-card .szl-hf-steps,
+      #szl-hf-org-card .szl-hf-chain,
+      #szl-hf-org-card .szl-hf-counts { grid-template-columns: 1fr; }
     }
     @media (min-width: 900px) {
       #szl-hf-org-card h1 { font-size: clamp(40px, 5.1vw, 64px); }
@@ -711,14 +715,14 @@
             <article class="szl-hf-estate-panel">
               <h3>Current state</h3>
               <!-- szl:public-inventory:start -->
-<ul class="szl-hf-counts" aria-label="Public Hub inventory, observed 2026-10-09T15:47:57Z">
-<li data-szl-inventory-kind="spaces"><strong>37</strong><span>public Spaces</span></li>
+<ul class="szl-hf-counts" aria-label="Public Hub inventory, observed 2026-10-15T13:39:34Z">
+<li data-szl-inventory-kind="spaces"><strong>38</strong><span>public Spaces</span></li>
 <li data-szl-inventory-kind="models"><strong>48</strong><span>model repositories</span></li>
 <li data-szl-inventory-kind="kernels"><strong>14</strong><span>native kernels</span></li>
 <li data-szl-inventory-kind="datasets"><strong>37</strong><span>public datasets</span></li>
 </ul>
-<p data-szl-inventory="current"><strong>Source-bound snapshot:</strong> 37 public Spaces, 48 model repositories, 14 native kernels, 37 datasets. Observed <time datetime="2026-10-09T15:47:57Z">2026-10-09T15:47:57Z</time> under <code>hf-public-author-membership/v2</code>. Native kernel IDs may also appear in the model namespace; these figures do not count unique projects or trained language models. Private assets, collections and buckets are outside this scope. This dated observation is not a live count.</p>
-<p><a href="https://github.com/szl-holdings/.github/blob/main/profile/public-inventory.json">Inventory binding</a> · <a href="https://github.com/szl-holdings/a11oy/blob/b4499e8f2337f2467d901e17ed2376f63fd197c2/docs/huggingface-ecosystem-manifest.json">Exact source inventory</a>. Membership alone does not establish runtime readiness, model quality, or publication permission. The governed KEEP list remains <a href="https://github.com/szl-holdings/.github/blob/main/docs/CANONICAL_FLEET.md">docs/CANONICAL_FLEET.md</a>.</p>
+<p data-szl-inventory="current"><strong>Source-bound snapshot:</strong> 38 public Spaces, 48 model repositories, 14 native kernels, 37 datasets. Observed <time datetime="2026-10-15T13:39:34Z">2026-10-15T13:39:34Z</time> under <code>hf-public-author-membership/v2</code>. Native kernel IDs may also appear in the model namespace; these figures do not count unique projects or trained language models. Private assets, collections and buckets are outside this scope. This dated observation is not a live count.</p>
+<p><a href="https://github.com/szl-holdings/.github/blob/main/profile/public-inventory.json">Inventory binding</a> · <a href="https://github.com/szl-holdings/a11oy/blob/c0c7e9578d56b08f35fc30262410c3de7396e0a2/docs/huggingface-ecosystem-manifest.json">Exact source inventory</a>. Membership alone does not establish runtime readiness, model quality, or publication permission. The governed KEEP list remains <a href="https://github.com/szl-holdings/.github/blob/main/docs/CANONICAL_FLEET.md">docs/CANONICAL_FLEET.md</a>.</p>
 <!-- szl:public-inventory:end -->
               <p data-szl-inventory="historical"><strong>HISTORICAL estate-alignment v1:</strong> 16 portfolio Spaces (membership observed 2026-09-05T21:41:24Z) · 48 models (observed 2026-10-11T14:19:39Z) · 37 datasets (observed 2026-10-11T14:19:39Z); 1 inventory-only Space: Yarqa · governedKeep=false · disposition=FOLD. These figures describe separately dated contract observations, not current Hub membership or visibility.</p>
               <p class="szl-hf-microcopy">A cached card, screenshot, badge, or copied count is not current state.</p>

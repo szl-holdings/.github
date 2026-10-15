@@ -33,7 +33,7 @@ SHA40 = re.compile(r"[0-9a-f]{40}\Z")
 WORKFLOW_REF = "szl-holdings/.github/.github/workflows/recover-nexus-target.yml@refs/heads/main"
 MAX_POLICY_BYTES = 65536
 LOCK_PATH = Path(__file__).resolve().parents[2] / "requirements/hf-publisher.lock"
-LOCK_SHA256 = "eec9ee849129e2034d2c7880f0f3e32857cbfd7ceecfcb5f2eb7cb541b4e4d15"
+LOCK_SHA256 = "463b543da8418dd37f458f9893cf1d5f8cb21d04b249121b3b5155b6729b42e0"
 
 
 class RecoveryError(RuntimeError):

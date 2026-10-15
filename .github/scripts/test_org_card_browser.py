@@ -34,7 +34,7 @@ def main() -> int:
         browser = playwright.chromium.launch(**launch_options)
         try:
             specs = [{"name": f"width-{width}", "width": width}
-                     for width in (320, 375, 744, 768, 900, 1024, 1180, 1440, 1920)]
+                     for width in (320, 375, 390, 500, 640, 744, 768, 900, 1024, 1180, 1440, 1920)]
             specs += [{"name": "touch-375", "width": 375, "touch": True}]
             specs += [{"name": f"archive-open-{width}", "width": width, "open_archive": True}
                       for width in (320, 1440)]
@@ -127,6 +127,8 @@ ROOT_CONTAINMENT_REASON = "card root leaves its host"
 CONTENT_CONTAINMENT_REASON = "visible content leaves the card host bounds"
 SCROLL_REASON = "card host or content scrolls or clips horizontally"
 BADGE_REASON = "a card badge is hidden or excluded from containment"
+MOBILE_STACK_REASON = "mobile actions, chains and counts must be full-width single columns"
+SKIP_VISIBILITY_REASON = "focused skip link is not hit-test visible"
 
 HUB_FIXTURE_SCRIPT = """({containerWidth, hostId}) => {
   let removed = 0;
@@ -215,6 +217,9 @@ MEASURE_SCRIPT = """({hostSelector, tolerance}) => {
   const measured = new Set(content.filter(item => item.kind === 'element').map(item => item.node));
   // Every badge counts, whether or not a narrower readability selector covers it.
   const badges = [...root.querySelectorAll('.szl-hf-badge')];
+  const skipBox = skip ? skip.getBoundingClientRect() : null;
+  const skipHit = skipBox ? document.elementFromPoint(
+    skipBox.left + skipBox.width / 2, skipBox.top + skipBox.height / 2) : null;
   const containment = {
     hostSelector, hostCount: hostCandidates.length, hostFound, host: hostRect, root: rootRect, bounds,
     rootInsideHost: Boolean(hostRect) && !exceeds(rootRect, hostRect),
@@ -228,7 +233,8 @@ MEASURE_SCRIPT = """({hostSelector, tolerance}) => {
       contained: badges.filter(node => measured.has(node) && bounds
         && !exceeds(node.getBoundingClientRect(), bounds)).length},
     skip: skip ? {focused: document.activeElement === skip, exempt: skipExempt(skip),
-      measured: measured.has(skip), box: box(skip.getBoundingClientRect())} : null,
+      measured: measured.has(skip), hitTestVisible: Boolean(skipHit) && skip.contains(skipHit),
+      box: box(skipBox)} : null,
     pageScroll: {x: window.scrollX, y: window.scrollY}};
   const hero = root.querySelector('img.szl-hf-hero-mark');
   const copy = root.querySelector('.szl-hf-hero-copy');
@@ -245,9 +251,18 @@ MEASURE_SCRIPT = """({hostSelector, tolerance}) => {
     .filter(node => node.getClientRects().length)
     .filter(node => node.getBoundingClientRect().height < 43.5)
     .map(node => node.textContent.trim());
+  const mobileStacks = [...root.querySelectorAll('.szl-hf-actions, .szl-hf-chain, .szl-hf-counts')]
+    .map(group => {
+      const bounds = group.getBoundingClientRect();
+      const items = [...group.children].filter(rendered).map(node => box(node.getBoundingClientRect()));
+      return {class: group.className, count: items.length,
+        stacked: items.length > 0 && items.every((item, index) =>
+          Math.abs(item.left - bounds.left) <= 0.5 && Math.abs(item.width - bounds.width) <= 0.5
+          && (index === 0 || item.top >= items[index - 1].bottom - 0.5))};
+    });
   return {viewport, scrollWidth: document.documentElement.scrollWidth,
     overflow: overflow.slice(0, 25).map(diagnose), overflowCount: overflow.length,
-    containment, navTargets, cardWidth: rootRect.width,
+    containment, navTargets, mobileStacks, cardWidth: rootRect.width,
     heroCopy: copy ? copy.getBoundingClientRect().toJSON() : null,
     readable, gridColumns, stepCount: renderedCount('.szl-hf-step'),
     headingCount: renderedCount('.szl-hf-section-head h2'),
@@ -327,6 +342,9 @@ CONTROL_SCRIPT = """plan => {
   if (plan.op === 'closed-disclosure' || plan.op === 'open-disclosure') {
     const disclosure = document.createElement('details');
     disclosure.innerHTML = '<summary>Containment fixture</summary><div data-szl-probe="true" style="position:absolute;left:-200px;top:0;width:100px;height:20px">Disclosure probe</div>';
+    // Keep this probe outside both viewport and host even when the card is
+    // the positioned containing block inside a centered desktop fixture.
+    disclosure.querySelector('[data-szl-probe]').style.left = `${-200 - rectOf(root).left}px`;
     disclosure.open = plan.op === 'open-disclosure';
     root.append(disclosure);
     undo.push([disclosure, null, null]);
@@ -344,7 +362,9 @@ CONTROL_SCRIPT = """plan => {
     return window.scrollY;
   }
   if (plan.op === 'focus-skip') {
+    if (plan.remove_containing_block) setStyle(root, {position: 'static'});
     const skip = root.querySelector('.szl-hf-skip');
+    if (plan.cover_skip) setStyle(skip, {zIndex: '30'});
     skip.focus({preventScroll: true});
     return document.activeElement === skip ? 1 : 0;
   }
@@ -400,6 +420,9 @@ def containment_failures(spec, containment):
         failures.append(SCROLL_REASON)
     if containment["badges"]["measured"] != containment["badges"]["total"]:
         failures.append(BADGE_REASON)
+    skip = containment["skip"] or {}
+    if skip.get("focused") is True and skip.get("hitTestVisible") is not True:
+        failures.append(SKIP_VISIBILITY_REASON)
     return failures
 
 
@@ -419,6 +442,12 @@ def layout_failures(spec, layout, removed_groups, errors):
         failures.append("primary navigation hit target is below 44px")
     if errors:
         failures.append("page JavaScript error")
+    if not spec.get("hub") and spec["width"] <= 640:
+        stacks = layout["mobileStacks"]
+        if (not all(any(kind in group["class"].split() for group in stacks)
+                    for kind in ("szl-hf-actions", "szl-hf-chain", "szl-hf-counts"))
+                or any(not group["stacked"] for group in stacks)):
+            failures.append(MOBILE_STACK_REASON)
     if spec.get("hub"):
         if removed_groups == 0:
             failures.append("Hub fixture did not remove conditional CSS")
@@ -477,6 +506,10 @@ def control_plans(badge_count):
         {"name": "page-scrolled-rects-read-together", "op": "scroll-page",
          "offset": CONTROL_PAGE_SCROLL_PX, "expect": []},
         {"name": "skip-link-exemption-ends-on-focus", "op": "focus-skip", "expect": []},
+        {"name": "focused-skip-without-containing-block-is-rejected", "op": "focus-skip",
+         "remove_containing_block": True, "expect": [CONTENT_CONTAINMENT_REASON]},
+        {"name": "focused-skip-covered-by-header-is-rejected", "op": "focus-skip",
+         "cover_skip": True, "expect": [SKIP_VISIBILITY_REASON]},
     ]
     return plans
 
@@ -503,7 +536,9 @@ def control_verdict(plan, achieved, layout, observed, baseline_failures) -> bool
     containment = layout["containment"]
     if plan["op"] == "focus-skip":
         skip = containment["skip"] or {}
-        return skip.get("focused") is True and skip.get("exempt") is False and skip.get("measured") is True
+        if not (skip.get("focused") is True and skip.get("exempt") is False
+                and skip.get("measured") is True):
+            return False
     if not plan["expect"]:
         return observed == baseline_failures
     if not set(plan["expect"]) <= set(observed):

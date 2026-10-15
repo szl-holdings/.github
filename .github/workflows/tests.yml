@@ -273,7 +273,7 @@ jobs:
           "$VENV/bin/python" -I -P -m pip install \
             --disable-pip-version-check --require-hashes --only-binary=:all: \
             --ignore-installed -r requirements/hf-publisher.lock
-          "$VENV/bin/python" -I -P -c 'from importlib.metadata import version; import certifi, charset_normalizer, hf_xet, httpcore, httpx, huggingface_hub, requests, urllib3, yaml; assert version("huggingface-hub") == "1.19.0"; assert version("requests") == "2.32.5"'
+          "$VENV/bin/python" -I -P -c 'from importlib.metadata import version; import certifi, charset_normalizer, hf_xet, httpcore, httpx, huggingface_hub, requests, urllib3, yaml; assert version("huggingface-hub") == "1.19.0"; assert version("requests") == "2.33.0"; assert version("urllib3") == "2.8.0"'
           "$VENV/bin/python" -I -P -m py_compile \
             .github/scripts/hf_deploy_from_dockerfile.py \
             .github/scripts/hf_space_source_binding.py
