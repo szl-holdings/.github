@@ -51,6 +51,26 @@ def rules(text: str, card_type: str = "kernel") -> list[str]:
 
 
 class RenderTests(unittest.TestCase):
+    def test_native_identity_is_pinned_and_artwork_license_is_separate(self) -> None:
+        pin = "4309f6fce89179331b0b3ed8c99494e76c5be256"
+        for kind in ("model", "dataset", "space", "kernel"):
+            with self.subTest(kind=kind):
+                data = render.load_vars(FIXTURES / f"{kind}.card.yaml")
+                original = copy.deepcopy(data)
+                text = render.render(data)
+                self.assertEqual(data, original)
+                self.assertTrue(text.startswith("---\n" + render.front_matter_yaml(data["front_matter"]) + "---\n"))
+                self.assertEqual(text.count("<img "), 1)
+                self.assertIn(f"szl-brand/{pin}/kit/logos/orbit-v2/suite/szl-icon-32.svg", text)
+                self.assertIn('width="40" height="40"', text)
+                self.assertIn("6e2b7d72a3af3d9602b79de41df0194ede6496a9661f057108ec224c0efc92e6", text)
+                self.assertIn("Orbit v2 artwork © SZL Holdings", text)
+                self.assertIn(f"szl-brand/blob/{pin}/kit/LICENSE", text)
+                self.assertIn("Artifact and documentation licenses remain as declared by their source.", text)
+                self.assertNotIn(".github/main/profile/assets", text)
+                self.assertNotIn('width="112"', text)
+                self.assertIn(data["summary"].strip(), text)
+
     def test_limits_and_user_paths_precede_expandable_technical_evidence(self) -> None:
         data = render.load_vars(FIXTURES / "model.card.yaml")
         data["overview"] = {"artifact_type": "LoRA adapter", "stage": "Research — HOLD"}
