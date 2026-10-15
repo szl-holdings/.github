@@ -20,6 +20,16 @@ rendered or hand-written, against the same contract.
 Nothing here contacts the network or the Hub. Writing a card to the Hub stays
 the job of the source repository's committed mirror workflow (decision D1).
 
+The shared identity uses the approved Orbit v2 compact icon at 40 pixels, pinned
+to `szl-brand@4309f6fce89179331b0b3ed8c99494e76c5be256` at
+`kit/logos/orbit-v2/suite/szl-icon-32.svg` (SHA-256
+`6e2b7d72a3af3d9602b79de41df0194ede6496a9661f057108ec224c0efc92e6`).
+Visible CC BY 4.0 attribution applies to that artwork only; the renderer preserves
+each source's declared artifact license and technical body. Consumer repositories
+must review a new toolkit pin and regenerate their committed card before their
+existing publisher can deliver the change. Updating this template alone does not
+publish any Hub card.
+
 ## The contract
 
 **Front matter.** Every card needs `license`, `tags` and an `szl` mapping with
