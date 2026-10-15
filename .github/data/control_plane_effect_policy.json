@@ -465,7 +465,7 @@
       "trusted_transitives": {},
       "reviewed_unknowns": {
         "files": {
-          ".github/scripts/estate_alignment_contract.py": "sha256:b2fcc8b1f8e2c761df78c3f767eea5b3572996ab3c0365d80c399bd912590024",
+          ".github/scripts/estate_alignment_contract.py": "sha256:56ec688f621bcbd1dc20ea32653820c7362428c7d31deea88d8262f8316a459e",
           ".github/scripts/estate_operational_inventory.py": "sha256:e0a7870da14e2ebe1cf71a3edabd10ff01c3e93b6d22c1cd39596e5830de2874",
           ".github/scripts/router_flagship_contract.py": "sha256:b191e2fcad51426867d4272ba7064cadc15489073047aeb2a682443e774c9265",
           ".github/scripts/test_estate_operational_inventory.py": "sha256:548bc88fecab7e98d751ae4a281b1f583c41cb5d7c379d4feba0cbddb338f8f2",
@@ -475,11 +475,11 @@
           "ACTION_INPUTS_REVIEW_REQUIRED@.github/workflows/estate-operational-inventory.yml:28",
           "ACTION_INPUTS_REVIEW_REQUIRED@.github/workflows/estate-operational-inventory.yml:33",
           "GITHUB_TARGET_UNRESOLVED@.github/scripts/estate_operational_inventory.py:62",
-          "HTTP_TARGET_UNRESOLVED@.github/scripts/estate_alignment_contract.py:341",
+          "HTTP_TARGET_UNRESOLVED@.github/scripts/estate_alignment_contract.py:467",
           "PYTHON_CLIENT_UNRESOLVED@.github/scripts/estate_operational_inventory.py:183",
           "PYTHON_CLIENT_UNRESOLVED@.github/scripts/estate_operational_inventory.py:83",
           "PYTHON_DYNAMIC_EXECUTION@.github/scripts/estate_operational_inventory.py:307",
-          "PYTHON_DYNAMIC_SUBPROCESS@.github/scripts/estate_alignment_contract.py:823",
+          "PYTHON_DYNAMIC_SUBPROCESS@.github/scripts/estate_alignment_contract.py:962",
           "PYTHON_IMPORT_UNRESOLVED@.github/scripts/estate_alignment_contract.py:14",
           "PYTHON_IMPORT_UNRESOLVED@.github/scripts/estate_alignment_contract.py:15",
           "PYTHON_IMPORT_UNRESOLVED@.github/scripts/estate_alignment_contract.py:16",
@@ -5613,9 +5613,9 @@
       "trusted_transitives": {},
       "reviewed_unknowns": {
         "files": {
-          ".github/scripts/estate_alignment_contract.py": "sha256:b2fcc8b1f8e2c761df78c3f767eea5b3572996ab3c0365d80c399bd912590024",
+          ".github/scripts/estate_alignment_contract.py": "sha256:56ec688f621bcbd1dc20ea32653820c7362428c7d31deea88d8262f8316a459e",
           ".github/scripts/hf_static_space_deploy.py": "sha256:2b3a5f7313c7b52b0b16e8caa7da7da22a999045c99a382c1ca4bbd2965b081f",
-          ".github/scripts/test_estate_alignment_contract.py": "sha256:3efab2c5cfe8299cf82f1d906791850753794ec9450a13d31e6c75251f0f4a88",
+          ".github/scripts/test_estate_alignment_contract.py": "sha256:c34070b18d09e9742e7973c6f697b17b6281cbed99cb3a737d70c5161bba7075",
           ".github/scripts/test_estate_alignment_identity.py": "sha256:52690a47aba7d628357df5d3a3df2b80178b4cba68972fdc6a0e686abd1934bd",
           ".github/scripts/test_estate_alignment_org_card.py": "sha256:b7bf57ff12eae902a4cd3b994f18acbbf5e45fdc6dea45cdc3b11f2d69197b72",
           ".github/workflows/estate-one-fabric-alignment.yml": "sha256:14d3677b544d38ad0cd40e209bfdf00523a4fb56df28562674077fe14fd7d55e"
@@ -5634,7 +5634,7 @@
           "DYNAMIC_EXECUTION@.github/workflows/estate-one-fabric-alignment.yml:207",
           "DYNAMIC_EXECUTION@.github/workflows/estate-one-fabric-alignment.yml:84",
           "DYNAMIC_EXECUTION@.github/workflows/estate-one-fabric-alignment.yml:90",
-          "HTTP_TARGET_UNRESOLVED@.github/scripts/estate_alignment_contract.py:341",
+          "HTTP_TARGET_UNRESOLVED@.github/scripts/estate_alignment_contract.py:467",
           "HTTP_TARGET_UNRESOLVED@.github/scripts/hf_static_space_deploy.py:378",
           "HTTP_TARGET_UNRESOLVED@.github/scripts/hf_static_space_deploy.py:527",
           "PYTHON_DYNAMIC_EXECUTION@.github/scripts/hf_static_space_deploy.py:552",
@@ -5642,7 +5642,7 @@
           "PYTHON_DYNAMIC_EXECUTION@.github/scripts/hf_static_space_deploy.py:847",
           "PYTHON_DYNAMIC_EXECUTION@.github/scripts/hf_static_space_deploy.py:849",
           "PYTHON_DYNAMIC_EXECUTION@.github/scripts/hf_static_space_deploy.py:904",
-          "PYTHON_DYNAMIC_SUBPROCESS@.github/scripts/estate_alignment_contract.py:823",
+          "PYTHON_DYNAMIC_SUBPROCESS@.github/scripts/estate_alignment_contract.py:962",
           "PYTHON_DYNAMIC_SUBPROCESS@.github/scripts/test_estate_alignment_identity.py:167",
           "PYTHON_DYNAMIC_SUBPROCESS@.github/scripts/test_estate_alignment_identity.py:244",
           "PYTHON_IMPORT_UNRESOLVED@.github/scripts/estate_alignment_contract.py:14",

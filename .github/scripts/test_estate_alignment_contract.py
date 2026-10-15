@@ -83,6 +83,108 @@ class EstateAlignmentContractTests(unittest.TestCase):
         failures = alignment.validate_contract(candidate)
         self.assertIn("governed keep-list authority mismatch", failures)
 
+    def test_public_membership_observation_does_not_reclassify_fleet(self) -> None:
+        observation = self.contract["public_space_membership_observation"]
+        self.assertEqual(alignment.validate_public_space_observation(observation), [])
+        self.assertEqual(observation["public_space_count"], 37)
+        self.assertFalse(observation["policy_authority"])
+        self.assertEqual(observation["policy_alignment"], "UNKNOWN")
+        self.assertEqual(
+            {row["repo_id"] for row in observation["policy_conflicts"]},
+            {"SZLHOLDINGS/llm-router-live", "SZLHOLDINGS/szl-atelier"},
+        )
+        historical = self.contract["huggingface_inventory_snapshot"]
+        self.assertEqual(historical["public_space_count"], 17)
+        self.assertEqual(historical["portfolio_space_count"], 16)
+        self.assertEqual(
+            {row["repo_id"] for row in historical["inventory_only_spaces"]},
+            {"SZLHOLDINGS/yarqa"},
+        )
+        self.assertNotIn(alignment.ORG_CARD_SPACE_ID, alignment.EXPECTED_PUBLIC_SPACE_IDS)
+
+    def test_public_membership_observation_rejects_malformed_or_promoted_evidence(self) -> None:
+        original = self.contract["public_space_membership_observation"]
+        candidates = []
+        for label, key, value in (
+            ("policy authority", "policy_authority", True),
+            ("wrong author", "author", "another-owner"),
+            ("wrong scope", "scope", "authenticated-private-list"),
+            ("false policy convergence", "policy_alignment", "ALIGNED"),
+            ("hidden conflict", "policy_conflicts", []),
+            ("count", "public_space_count", 36),
+            ("boolean count", "public_space_count", True),
+            ("missing rows", "spaces", None),
+        ):
+            candidate = copy.deepcopy(original)
+            candidate[key] = value
+            candidates.append((label, candidate))
+        for label, mutate in (
+            ("missing ID", lambda rows: rows.pop()),
+            ("unexpected ID", lambda rows: rows.append({"repo_id": "SZLHOLDINGS/unreviewed", "revision": "a" * 40})),
+            ("duplicate ID", lambda rows: rows.append(copy.deepcopy(rows[0]))),
+            ("wrong namespace", lambda rows: rows[0].update(repo_id="another-owner/a11oy")),
+            ("README", lambda rows: rows[0].update(repo_id=alignment.ORG_CARD_SPACE_ID)),
+            ("mutable revision", lambda rows: rows[0].update(revision="main")),
+            ("malformed ID", lambda rows: rows[0].update(repo_id=[])),
+            ("classification injection", lambda rows: rows[0].update(disposition="KEEP")),
+            ("unsorted IDs", lambda rows: rows.reverse()),
+        ):
+            candidate = copy.deepcopy(original)
+            mutate(candidate["spaces"])
+            candidates.append((label, candidate))
+        for label, candidate in candidates:
+            with self.subTest(label=label):
+                self.assertTrue(alignment.validate_public_space_observation(candidate))
+        self.assertTrue(alignment.validate_public_space_observation(None))
+
+    def test_live_public_membership_requires_exact_ids_not_only_matching_count(self) -> None:
+        observation = self.contract["public_space_membership_observation"]
+        rows = [{"id": row["repo_id"]} for row in observation["spaces"]]
+        failures, observed = alignment.validate_live_public_space_membership(rows, observation)
+        self.assertEqual(failures, [])
+        self.assertEqual(observed, alignment.EXPECTED_PUBLIC_SPACE_IDS)
+        with_org_card = rows + [{"id": alignment.ORG_CARD_SPACE_ID}]
+        failures, observed = alignment.validate_live_public_space_membership(with_org_card, observation)
+        self.assertEqual(failures, [])
+        self.assertNotIn(alignment.ORG_CARD_SPACE_ID, observed)
+        for label, candidate in (
+            ("missing", rows[:-1]),
+            ("extra", rows + [{"id": "SZLHOLDINGS/unreviewed"}]),
+            ("same count wrong ID", rows[:-1] + [{"id": "SZLHOLDINGS/unreviewed"}]),
+            ("duplicate", rows + [rows[0]]),
+            ("malformed", rows + [None]),
+            ("wrong namespace", rows + [{"id": "another-owner/a11oy"}]),
+            ("unavailable", None),
+            ("empty success", []),
+        ):
+            with self.subTest(label=label):
+                failures, _observed = alignment.validate_live_public_space_membership(candidate, observation)
+                self.assertTrue(failures)
+
+    def test_public_membership_loader_preserves_strict_validation(self) -> None:
+        observation = self.contract["public_space_membership_observation"]
+        rows = [{"id": row["repo_id"]} for row in observation["spaces"]]
+        with patch.object(alignment, "fetch_bytes", return_value=json.dumps(rows).encode()):
+            loaded = alignment.list_hf("spaces")
+        failures, observed = alignment.validate_live_public_space_membership(loaded, observation)
+        self.assertEqual(failures, [])
+        self.assertEqual(observed, alignment.EXPECTED_PUBLIC_SPACE_IDS)
+        for malformed in (None, "invalid", 42, []):
+            with self.subTest(malformed=malformed), patch.object(
+                alignment, "fetch_bytes", return_value=json.dumps(rows + [malformed]).encode()
+            ):
+                with self.assertRaisesRegex(alignment.AlignmentError, "malformed row"):
+                    alignment.list_hf("spaces")
+
+    def test_provider_loader_refuses_potentially_truncated_membership(self) -> None:
+        for kind in ("spaces", "models", "datasets"):
+            for count in (100, 101):
+                with self.subTest(kind=kind, count=count), patch.object(
+                    alignment, "fetch_bytes", return_value=json.dumps([{}] * count).encode()
+                ):
+                    with self.assertRaisesRegex(alignment.AlignmentError, "bounded page"):
+                        alignment.list_hf(kind)
+
     def test_live_readback_runs_after_publication_or_explicit_audit(self) -> None:
         workflow = (
             ROOT / ".github" / "workflows" / "estate-one-fabric-alignment.yml"
@@ -386,10 +488,7 @@ class EstateAlignmentContractTests(unittest.TestCase):
             ],
         }
         revision = "f" * 40
-        space_ids = sorted(
-            alignment.EXPECTED_PORTFOLIO_SPACES
-            | alignment.EXPECTED_INVENTORY_ONLY_SPACES
-        )
+        space_ids = sorted(alignment.EXPECTED_PUBLIC_SPACE_IDS)
 
         def fetch(url: str, **_kwargs) -> bytes:
             if "/repos/" in url:
@@ -431,7 +530,7 @@ class EstateAlignmentContractTests(unittest.TestCase):
         )
         self.assertNotIn("SZLHOLDINGS/yarqa", seen)
         self.assertEqual(len(observation["runtime_source_bindings"]), 16)
-        self.assertEqual(observation["huggingface"]["public_listed_spaces"], 17)
+        self.assertEqual(observation["huggingface"]["public_listed_spaces"], 37)
         self.assertEqual(observation["huggingface"]["portfolio_spaces"], 16)
         self.assertEqual(observation["huggingface"]["inventory_only_spaces"], 1)
         self.assertEqual(

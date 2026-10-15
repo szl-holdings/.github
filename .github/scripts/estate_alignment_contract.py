@@ -50,6 +50,61 @@ EXPECTED_PORTFOLIO_SPACES = {
     "SZLHOLDINGS/ayllu",
 }
 EXPECTED_INVENTORY_ONLY_SPACES = {"SZLHOLDINGS/yarqa"}
+# Anonymous membership observation, separate from the historical fleet policy.
+EXPECTED_PUBLIC_SPACE_IDS = {
+    "SZLHOLDINGS/a11oy",
+    "SZLHOLDINGS/ayllu",
+    "SZLHOLDINGS/counsel",
+    "SZLHOLDINGS/david-leads",
+    "SZLHOLDINGS/finance",
+    "SZLHOLDINGS/foundation-confirmation-v2",
+    "SZLHOLDINGS/gdw-frontier",
+    "SZLHOLDINGS/governed-agent-bench",
+    "SZLHOLDINGS/governed-receipt-verifier",
+    "SZLHOLDINGS/holographic-unify",
+    "SZLHOLDINGS/immune",
+    "SZLHOLDINGS/immune-lattice",
+    "SZLHOLDINGS/killinchu",
+    "SZLHOLDINGS/llm-router-live",
+    "SZLHOLDINGS/lyte",
+    "SZLHOLDINGS/nexus",
+    "SZLHOLDINGS/oac-system-health-lab",
+    "SZLHOLDINGS/prove-it",
+    "SZLHOLDINGS/sentra",
+    "SZLHOLDINGS/szl-atelier",
+    "SZLHOLDINGS/szl-bench-suite",
+    "SZLHOLDINGS/szl-brand-campaign",
+    "SZLHOLDINGS/szl-command-lab",
+    "SZLHOLDINGS/szl-constellation",
+    "SZLHOLDINGS/szl-forge-lab",
+    "SZLHOLDINGS/szl-foundation-confirmation",
+    "SZLHOLDINGS/szl-frontier",
+    "SZLHOLDINGS/szl-khipu",
+    "SZLHOLDINGS/szl-marketing-1.1",
+    "SZLHOLDINGS/szl-model-inference-lab",
+    "SZLHOLDINGS/szl-router-control",
+    "SZLHOLDINGS/szl-seismic-review",
+    "SZLHOLDINGS/szl-typesafe-triage",
+    "SZLHOLDINGS/terra",
+    "SZLHOLDINGS/the-grid",
+    "SZLHOLDINGS/vertical-services",
+    "SZLHOLDINGS/yarqa",
+}
+PUBLIC_SPACE_OBSERVED_AT = "2026-10-14T03:31:52.247053Z"
+PUBLIC_SPACE_CLAIM_BOUNDARY = (
+    "Anonymous public Space membership only; not fleet policy, ownership, "
+    "publication eligibility, or runtime qualification."
+)
+PUBLIC_SPACE_POLICY_CONFLICTS = [{'repo_id': 'SZLHOLDINGS/llm-router-live',
+  'github_declaration': 'KEEP',
+  'a11oy_declaration': 'FOLD',
+  'github_source': 'https://github.com/szl-holdings/.github/blob/3ed8a867fa4c5f63f1fbdc25f80891982613855c/docs/CANONICAL_FLEET.md',
+  'a11oy_source': 'https://github.com/szl-holdings/a11oy/blob/18f169dde881055a8993192d2fd1aff99ebcc592/docs/generated/github-org-public-estate.md'},
+ {'repo_id': 'SZLHOLDINGS/szl-atelier',
+  'github_declaration': 'KEEP',
+  'a11oy_declaration': 'FOLD',
+  'github_source': 'https://github.com/szl-holdings/.github/blob/3ed8a867fa4c5f63f1fbdc25f80891982613855c/docs/CANONICAL_FLEET.md',
+  'a11oy_source': 'https://github.com/szl-holdings/a11oy/blob/18f169dde881055a8993192d2fd1aff99ebcc592/docs/generated/github-org-public-estate.md'}]
 ALLOWED_SPACE_CLASSES = {
     "commercial_flagship_runtime",
     "killinchu_capability_channel",
@@ -135,6 +190,75 @@ def exact_slugs(rows: Any, label: str, expected: list[str], failures: list[str])
     require(len(observed) == len(set(observed)), f"{label} contains duplicate slugs", failures)
 
 
+def validate_public_space_observation(observation: Any) -> list[str]:
+    failures: list[str] = []
+    if not isinstance(observation, dict):
+        return ["public Space membership observation must be an object"]
+    expected_keys = {
+        "schema", "evidence_class", "observed_at", "scope", "author", "policy_authority",
+        "excluded_control_surface", "public_space_count", "spaces", "policy_alignment",
+        "policy_conflicts", "claim_boundary",
+    }
+    require(set(observation) == expected_keys, "public Space observation fields mismatch", failures)
+    expected = {
+        "schema": "szl.public-space-membership-observation/v1",
+        "evidence_class": "MEASURED",
+        "observed_at": PUBLIC_SPACE_OBSERVED_AT,
+        "scope": "anonymous-public-author-list",
+        "author": "SZLHOLDINGS",
+        "excluded_control_surface": ORG_CARD_SPACE_ID,
+        "policy_alignment": "UNKNOWN",
+        "policy_conflicts": PUBLIC_SPACE_POLICY_CONFLICTS,
+        "claim_boundary": PUBLIC_SPACE_CLAIM_BOUNDARY,
+    }
+    for key, value in expected.items():
+        require(observation.get(key) == value, f"public Space observation {key} mismatch", failures)
+    require(observation.get("policy_authority") is False, "public Space observation must not be publication policy", failures)
+    rows = observation.get("spaces")
+    if not isinstance(rows, list):
+        return failures + ["public Space observations must be an array"]
+    ids: list[str] = []
+    for row in rows:
+        if not isinstance(row, dict) or set(row) != {"repo_id", "revision"}:
+            failures.append("public Space row must contain only repo_id and revision")
+            continue
+        repo_id = row.get("repo_id")
+        if not isinstance(repo_id, str) or re.fullmatch(r"SZLHOLDINGS/[A-Za-z0-9][A-Za-z0-9._-]*", repo_id) is None:
+            failures.append("public Space observation requires an exact SZLHOLDINGS ID")
+        else:
+            ids.append(repo_id)
+        revision = row.get("revision")
+        require(isinstance(revision, str) and SHA40.fullmatch(revision) is not None, "public Space observation requires an immutable Hub revision", failures)
+    require(ids == sorted(ids) and len(ids) == len(set(ids)), "public Space observation IDs must be unique and sorted", failures)
+    require(ORG_CARD_SPACE_ID not in ids, "README must remain outside public Space author membership", failures)
+    require(set(ids) == EXPECTED_PUBLIC_SPACE_IDS, "public Space observation exact ID set mismatch", failures)
+    require(type(observation.get("public_space_count")) is int and observation["public_space_count"] == len(rows) == len(EXPECTED_PUBLIC_SPACE_IDS), "public Space observation count mismatch", failures)
+    return failures
+
+
+def validate_live_public_space_membership(
+    spaces: Any, observation: Any
+) -> tuple[list[str], set[str]]:
+    failures = validate_public_space_observation(observation)
+    if failures:
+        return failures, set()
+    if not isinstance(spaces, list):
+        return ["live public Space membership must be an array"], set()
+    ids: list[str] = []
+    for row in spaces:
+        repo_id = row.get("id") if isinstance(row, dict) else None
+        if not isinstance(repo_id, str) or re.fullmatch(r"SZLHOLDINGS/[A-Za-z0-9][A-Za-z0-9._-]*", repo_id) is None:
+            failures.append("live public Space membership requires an exact SZLHOLDINGS ID")
+        else:
+            ids.append(repo_id)
+    require(len(ids) == len(set(ids)), "live public Space membership contains duplicate IDs", failures)
+    listed_ids = set(ids) - {ORG_CARD_SPACE_ID}
+    expected_ids = {row["repo_id"] for row in observation["spaces"]}
+    require(listed_ids == expected_ids, f"public Space inventory drift: missing={sorted(expected_ids - listed_ids)} unexpected={sorted(listed_ids - expected_ids)}", failures)
+    require(len(listed_ids) == observation["public_space_count"], f"public Space count drift: {len(listed_ids)}", failures)
+    return failures, listed_ids
+
+
 def validate_contract(contract: Mapping[str, Any]) -> list[str]:
     failures: list[str] = []
     require(contract.get("schema") == SCHEMA, f"schema must be {SCHEMA}", failures)
@@ -206,6 +330,8 @@ def validate_contract(contract: Mapping[str, Any]) -> list[str]:
         require(snapshot.get("dataset_count") == 37, "dataset_count must be 37", failures)
         require(snapshot.get("dataset_count_observed_at") == "2026-10-11T14:19:39Z", "dataset count observation time mismatch", failures)
         require(snapshot.get("organization_card_space_excluded_from_portfolio_count") == ORG_CARD_SPACE_ID, "README control-surface exclusion missing", failures)
+
+    failures.extend(validate_public_space_observation(contract.get("public_space_membership_observation")))
 
     org_card = contract.get("organization_card_control_surface")
     require(isinstance(org_card, dict), "organization_card_control_surface must be an object", failures)
@@ -647,7 +773,12 @@ def list_hf(kind: str) -> list[dict[str, Any]]:
     )
     if not isinstance(value, list):
         raise AlignmentError(f"Hugging Face {kind} endpoint did not return an array")
-    return [row for row in value if isinstance(row, dict)]
+    if any(not isinstance(row, dict) for row in value):
+        raise AlignmentError(f"Hugging Face {kind} endpoint returned a malformed row")
+    # A full bounded page cannot establish complete author membership.
+    if len(value) >= 100:
+        raise AlignmentError(f"Hugging Face {kind} membership exceeds the bounded page")
+    return value
 
 
 def validate_live(contract: Mapping[str, Any]) -> tuple[list[str], dict[str, Any]]:
@@ -686,16 +817,15 @@ def validate_live(contract: Mapping[str, Any]) -> tuple[list[str], dict[str, Any
     models = list_hf("models")
     datasets = list_hf("datasets")
     spaces = list_hf("spaces")
-    space_ids = {str(row.get("id") or "") for row in spaces}
-    listed_space_ids = space_ids - {ORG_CARD_SPACE_ID}
     snapshot = contract["huggingface_inventory_snapshot"]
     expected_portfolio = {row["repo_id"] for row in snapshot["portfolio_spaces"]}
     expected_inventory_only = {row["repo_id"] for row in snapshot["inventory_only_spaces"]}
-    expected_public = expected_portfolio | expected_inventory_only
+    membership = contract["public_space_membership_observation"]
+    membership_failures, listed_space_ids = validate_live_public_space_membership(spaces, membership)
+    failures.extend(membership_failures)
+    expected_public = {row["repo_id"] for row in membership["spaces"]}
     portfolio_ids = listed_space_ids & expected_portfolio
     inventory_only_ids = listed_space_ids & expected_inventory_only
-    require(listed_space_ids == expected_public, f"public Space inventory drift: missing={sorted(expected_public - listed_space_ids)} unexpected={sorted(listed_space_ids - expected_public)}", failures)
-    require(len(listed_space_ids) == snapshot["public_space_count"], f"public Space count drift: {len(listed_space_ids)}", failures)
     require(portfolio_ids == expected_portfolio, f"public portfolio Space drift: missing={sorted(expected_portfolio - portfolio_ids)} unexpected={sorted(portfolio_ids - expected_portfolio)}", failures)
     require(inventory_only_ids == expected_inventory_only, f"inventory-only Space drift: missing={sorted(expected_inventory_only - inventory_only_ids)} unexpected={sorted(inventory_only_ids - expected_inventory_only)}", failures)
     require(len(models) == snapshot["model_count"], f"model count drift: {len(models)}", failures)
@@ -804,6 +934,15 @@ def validate_live(contract: Mapping[str, Any]) -> tuple[list[str], dict[str, Any
                 listed_space_ids | ({ORG_CARD_SPACE_ID} if org_card_present else set())
             ),
             "public_listed_spaces": len(listed_space_ids),
+            "public_space_membership_observation": {
+                "observed_at": membership["observed_at"],
+                "scope": membership["scope"],
+                "expected_space_ids": sorted(expected_public),
+                "listed_space_ids": sorted(listed_space_ids),
+                "policy_authority": False,
+                "policy_alignment": membership["policy_alignment"],
+                "policy_conflicts": membership["policy_conflicts"],
+            },
             "portfolio_spaces": len(portfolio_ids),
             "portfolio_space_ids": sorted(portfolio_ids),
             "inventory_only_spaces": len(inventory_only_ids),
