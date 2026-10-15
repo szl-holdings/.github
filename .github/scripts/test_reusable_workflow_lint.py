@@ -26,8 +26,8 @@ ACTIONLINT_STEP_MARKER = "      - name: Install actionlint 1.7.12 (hash-checked)
 ACTIONLINT_NEXT_STEP_MARKER = "      - name: Run actionlint\n"
 ACTIONLINT_SHA256 = "8aca8db96f1b94770f1b0d72b6dddcb1ebb8123cb3712530b08cc387b349a3d8"
 ZIZMOR_WHEEL_SHA256 = "73083efc7a65e5a58f4439dd781cdcb0394b05a3750e664c7f7e414589dc49b1"
-DOWNLOAD_ARTIFACT = "actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c"
-UPLOAD_SARIF = "github/codeql-action/upload-sarif@2892aa5e19bbd11bc0cff5427e3b750a04d9e3c2"
+DOWNLOAD_ARTIFACT = "actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333"
+UPLOAD_SARIF = "github/codeql-action/upload-sarif@24c54180a607b1449ed407dd24f251e4e9147c8d"
 
 # zizmor 1.24.1 exit statuses, observed with the released binary: 0 clean,
 # 11-14 highest finding severity (11 informational, 12 low, 13 medium, 14
