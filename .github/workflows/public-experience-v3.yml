@@ -101,18 +101,25 @@ jobs:
     timeout-minutes: 70
     permissions:
       contents: read
-      issues: write
     env:
       REPORT_JSON: reports/public-experience-v3.json
       REPORT_MD: reports/public-experience-v3.md
       SCREENSHOTS: reports/public-experience-v3-screenshots
-      GH_TOKEN: ${{ github.token }}
     steps:
-      - name: Checkout protected main
+      - name: Require the protected main ref
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$GITHUB_REF" = "refs/heads/main"
+      - name: Checkout the exact event commit
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: main
           persist-credentials: false
+      - name: Verify the checked-out commit
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse --verify 'HEAD^{commit}')" = "$GITHUB_SHA"
       - name: Set up Python
         uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
@@ -126,6 +133,7 @@ jobs:
         shell: bash
         env:
           TARGET_REGEX: ${{ github.event_name == 'workflow_dispatch' && inputs.target_regex || '' }}
+          MAX_SPACES: ${{ github.event_name == 'workflow_dispatch' && inputs.max_spaces || 100 }}
         run: |
           set +e
           mkdir -p "$SCREENSHOTS"
@@ -133,7 +141,7 @@ jobs:
             --output "$REPORT_JSON"
             --markdown "$REPORT_MD"
             --screenshots-dir "$SCREENSHOTS"
-            --max-spaces "${{ github.event_name == 'workflow_dispatch' && inputs.max_spaces || 100 }}"
+            --max-spaces "$MAX_SPACES"
             --concurrency 6
             --timeout-ms 30000
           )
@@ -146,52 +154,27 @@ jobs:
       - name: Publish readable summary
         if: always()
         run: |
+          echo '> No issue receipt is published. The receipts are this step summary and the run artifact public-experience-v3.' >> "$GITHUB_STEP_SUMMARY"
           test -f "$REPORT_MD"
           cat "$REPORT_MD" >> "$GITHUB_STEP_SUMMARY"
       - name: Upload immutable responsive evidence
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: public-experience-v3-${{ github.run_id }}-${{ github.run_attempt }}
+          name: public-experience-v3
           path: |
             ${{ env.REPORT_JSON }}
             ${{ env.REPORT_MD }}
             ${{ env.SCREENSHOTS }}
           if-no-files-found: error
           retention-days: 90
-      - name: Reconcile the exact runtime exception issue
-        if: always()
-        shell: bash
-        run: |
-          set -euo pipefail
-          test -f "$REPORT_JSON"
-          title='[Public Experience v3] live responsive exceptions'
-          number="$(gh issue list --repo "$GITHUB_REPOSITORY" --state all --search "$title in:title" --json number,title --jq '.[] | select(.title == "[Public Experience v3] live responsive exceptions") | .number' | head -n1)"
-          failed="$(python -c 'import json,os; print(json.load(open(os.environ["REPORT_JSON"]))["summary"]["failed_cases"])')"
-          {
-            echo '<!-- szl-public-experience-v3 -->'
-            echo '# Public Experience v3 runtime receipt'
-            echo
-            echo "Run: ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
-            echo
-            cat "$REPORT_MD"
-          } > /tmp/public-experience-v3-issue.md
-          if [ "$failed" -gt 0 ]; then
-            if [ -n "$number" ]; then
-              gh issue edit "$number" --repo "$GITHUB_REPOSITORY" --body-file /tmp/public-experience-v3-issue.md
-              gh issue reopen "$number" --repo "$GITHUB_REPOSITORY" || true
-            else
-              gh issue create --repo "$GITHUB_REPOSITORY" --title "$title" --body-file /tmp/public-experience-v3-issue.md
-            fi
-          elif [ -n "$number" ]; then
-            gh issue edit "$number" --repo "$GITHUB_REPOSITORY" --body-file /tmp/public-experience-v3-issue.md
-            gh issue close "$number" --repo "$GITHUB_REPOSITORY" --reason completed --comment 'All measured phone-through-theatre cases passed.' || true
-          fi
       - name: Enforce the measured result
         if: always()
         shell: bash
+        env:
+          AUDIT_EXIT_CODE: ${{ steps.audit.outputs.exit_code }}
         run: |
-          code="${{ steps.audit.outputs.exit_code }}"
+          code="$AUDIT_EXIT_CODE"
           test -n "$code"
           if [ "$code" -ne 0 ]; then
             echo "::error::Public Experience v3 live audit found exact runtime exceptions."
