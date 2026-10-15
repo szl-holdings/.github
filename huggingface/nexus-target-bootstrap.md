@@ -3,9 +3,11 @@
 The one-time recovery window for the exact public Docker Space
 `SZLHOLDINGS/nexus` is closed in this protected successor. The bootstrap grant
 is restored to `enabled: false`; the independent lifecycle policy continues to
-keep global `boundaries.create: false`; and the central Nexus content publisher
-remains manually disabled until its source-binding contract is repaired and
-separately admitted.
+keep global `boundaries.create: false`. The central Nexus content publisher was
+disabled during recovery. GitHub workflow metadata read on 2026-10-15 reports
+workflow `349731106` as `active` (provider `updated_at: 2026-10-08T23:50:39Z`).
+This dated state observation does not reopen the bootstrap grant or establish
+publisher admission, runtime health, or durable storage.
 
 ## Immutable recovery evidence
 
@@ -34,9 +36,11 @@ uploaded by recovery.
 
 The central `Publish Nexus Space` workflow, ID `349731106`, was changed from
 `active` to `disabled_manually` with zero queued or running publisher runs
-before grant admission. It remained disabled throughout recovery and remains
-disabled in this successor. Therefore the grant is closed before any content
-publisher dispatch, satisfying the final ordering boundary in C-1.
+before grant admission. It remained disabled throughout that recovery window;
+the later active state is recorded above and must be checked again before any
+release relying on publisher state. The bootstrap grant remains closed. The
+content publisher has its own protected-main source and publication boundaries,
+and lock-file changes match its main-push trigger without a manual dispatch.
 
 ## Source and grant checks
 
@@ -54,7 +58,7 @@ own false fixture, so the negative contract stays executable regardless of a
 future candidate grant state.
 
 The helper binds `requirements/hf-publisher.lock` to SHA-256
-`eec9ee849129e2034d2c7880f0f3e32857cbfd7ceecfcb5f2eb7cb541b4e4d15`.
+`463b543da8418dd37f458f9893cf1d5f8cb21d04b249121b3b5155b6729b42e0`.
 The lock is declared `text eol=lf` in `.gitattributes`, so this digest binds the
 committed LF bytes identically on Windows and Linux checkouts. The workflow
 checks those bytes before installing the hash-locked, binary-only SDK closure
