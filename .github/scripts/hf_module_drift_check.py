@@ -422,18 +422,25 @@ def is_remote_add_source(source):
     return bool(re.fullmatch(r"[A-Za-z0-9._-]+@[A-Za-z0-9.-]+:.+", value))
 
 
-def normalize_copy_source(source: str) -> str:
-    """Remove repeated literal ``./`` prefixes and nothing else.
+def normalize_copy_source(source: str) -> str | None:
+    """Return one repository-relative COPY source, or None to reject it.
 
-    ``str.lstrip("./")`` is a character class. It deletes the leading dot
-    from ``.github`` and ``.well-known``, and it rewrites absolute paths,
-    ``..`` traversal, and ``.../`` paths into different relative spellings.
-    Those inputs stay intact so a later lookup cannot accept the stripped
-    spelling as a repository path.
+    Repeated literal ``./`` prefixes are removed. No character class is
+    stripped, so ``.github`` and ``.well-known`` stay intact. An empty
+    result, an absolute path, a backslash path, or a ``..`` segment is
+    rejected instead of being returned as a lookup path.
     """
+    if not isinstance(source, str):
+        return None
     text = source.strip()
     while text.startswith("./"):
         text = text[2:]
+    if not text or text.startswith(("/", "\\")) or "\\" in text:
+        return None
+    if len(text) >= 2 and text[0].isalpha() and text[1] == ":":
+        return None
+    if any(part == ".." for part in text.split("/")):
+        return None
     return text
 
 

@@ -961,7 +961,7 @@ def _character_class_strip(source: str) -> str:
 
 
 class TestCopySourceNormalization(unittest.TestCase):
-    """Literal './' prefixes only. Unsafe input is not rewritten into a path."""
+    """Literal './' prefixes only. Unsafe input is omitted, not rewritten."""
 
     def test_dotted_repository_paths_keep_their_dot(self):
         dotted = (
@@ -996,37 +996,64 @@ class TestCopySourceNormalization(unittest.TestCase):
         self.assertEqual(drift.normalize_copy_source("serve.py"), "serve.py")
         self.assertEqual(drift.normalize_copy_source("dir/file.py"), "dir/file.py")
         self.assertEqual(drift.normalize_copy_source("."), ".")
-        self.assertEqual(drift.normalize_copy_source(".."), "..")
-        self.assertEqual(drift.normalize_copy_source(""), "")
-        self.assertEqual(drift.normalize_copy_source("   "), "")
-        self.assertEqual(drift.normalize_copy_source("./"), "")
-        self.assertEqual(drift.normalize_copy_source("././"), "")
+        self.assertEqual(drift.normalize_copy_source("foo/./bar"), "foo/./bar")
+        self.assertEqual(drift.normalize_copy_source(".../hidden"), ".../hidden")
+        self.assertIsNone(drift.normalize_copy_source(".."))
+        self.assertIsNone(drift.normalize_copy_source(""))
+        self.assertIsNone(drift.normalize_copy_source("   "))
+        self.assertIsNone(drift.normalize_copy_source("./"))
+        self.assertIsNone(drift.normalize_copy_source("././"))
         self.assertEqual(drift.parse_copy_sources("COPY ./ /dest\n"), [])
         self.assertEqual(drift.parse_copy_sources("COPY ././ /dest\n"), [])
-
-    def test_absolute_and_traversal_inputs_are_not_rewritten(self):
-        rewritten_by_character_class = {
-            "/etc/passwd": "/etc/passwd",
-            "//etc/passwd": "//etc/passwd",
-            "../secret": "../secret",
-            "./../secret": "../secret",
-            "././../etc/passwd": "../etc/passwd",
-            ".../hidden": ".../hidden",
-        }
-        for raw, expected in rewritten_by_character_class.items():
-            self.assertNotEqual(_character_class_strip(raw), expected)
-            self.assertEqual(drift.normalize_copy_source(raw), expected)
-            self.assertEqual(
-                drift.parse_copy_sources(f"COPY {raw} /dest\n"),
-                [expected],
-            )
-        interior = "foo/../../etc/passwd"
-        self.assertEqual(_character_class_strip(interior), interior)
-        self.assertEqual(drift.normalize_copy_source(interior), interior)
         self.assertEqual(
-            drift.parse_copy_sources(f"COPY {interior} /dest\n"),
-            [interior],
+            drift.parse_copy_sources("COPY .../hidden /dest\n"),
+            [".../hidden"],
         )
+
+    def test_absolute_and_traversal_inputs_are_rejected(self):
+        rejected = (
+            "/etc/passwd",
+            "//etc/passwd",
+            "../secret",
+            "./../secret",
+            "././../etc/passwd",
+            "foo/../../etc/passwd",
+            "C:/Windows",
+            ".\\github\\x",
+            "foo\\..\\secret",
+            None,
+        )
+        for raw in rejected:
+            self.assertIsNone(drift.normalize_copy_source(raw), repr(raw))
+            if isinstance(raw, str):
+                self.assertEqual(
+                    drift.parse_copy_sources(f"COPY {raw} /dest\n"),
+                    [],
+                    repr(raw),
+                )
+        dockerfile = "\n".join((
+            "FROM scratch",
+            "COPY /etc/passwd /tmp/passwd",
+            "COPY ../secret /tmp/secret",
+            "COPY ./../secret /tmp/secret2",
+            "COPY foo/../../etc/passwd /tmp/passwd2",
+            "COPY ././ /app/empty",
+            "COPY .github/scripts/publish_readiness_verdict.py /app/a",
+            "COPY .well-known/security.txt /app/b",
+            "COPY serve.py /app/serve.py",
+        ))
+        parsed = drift.parse_copy_sources(dockerfile)
+        self.assertEqual(
+            parsed,
+            [
+                ".github/scripts/publish_readiness_verdict.py",
+                ".well-known/security.txt",
+                "serve.py",
+            ],
+        )
+        self.assertNotIn("etc/passwd", parsed)
+        self.assertNotIn("secret", parsed)
+        self.assertNotIn("passwd", parsed)
 
 
 if __name__ == "__main__":
