@@ -1,0 +1,113 @@
+{
+  "schema": "szl.hf.collection-navigation-policy/v1",
+  "owner": {
+    "name": "SZLHOLDINGS",
+    "type": "org",
+    "id": "6a18de7657b5b7a615a55801"
+  },
+  "provider_writes": false,
+  "promotion_allowed": false,
+  "model_quality": "NOT_EVALUATED",
+  "production_readiness": "NOT_EVALUATED",
+  "legacy_start_here_reconciliation": "UNRESOLVED_SEPARATE_CONTRACT",
+  "targets": [
+    {
+      "id": "khipu-family",
+      "slug": "SZLHOLDINGS/khipu-and-receiptagent-models-6a950ff26e805e8ff7f30400",
+      "title": "Khipu & ReceiptAgent Models",
+      "classification": "CANDIDATE_NAVIGATION",
+      "required_members": [
+        "SZLHOLDINGS/SZL-Khipu-1.5B",
+        "SZLHOLDINGS/SZL-Forge-1.5B-ReceiptAgent",
+        "SZLHOLDINGS/SZL-Khipu-1.5B-GGUF"
+      ],
+      "optional_members": [
+        "SZLHOLDINGS/szl-receiptagent-qwen35-0.8b-v2",
+        "SZLHOLDINGS/szl-receiptagent-qwen35-0.8b-v3",
+        "SZLHOLDINGS/A11OY-MINI"
+      ],
+      "forbidden_members": [
+        "SZLHOLDINGS/szl-nemo"
+      ],
+      "description_exact": null,
+      "member_classifications": {
+        "SZLHOLDINGS/SZL-Khipu-1.5B": "CANDIDATE_NAVIGATION",
+        "SZLHOLDINGS/SZL-Forge-1.5B-ReceiptAgent": "CANDIDATE_NAVIGATION",
+        "SZLHOLDINGS/SZL-Khipu-1.5B-GGUF": "CANDIDATE_NAVIGATION",
+        "SZLHOLDINGS/szl-receiptagent-qwen35-0.8b-v2": "CANDIDATE_NAVIGATION",
+        "SZLHOLDINGS/szl-receiptagent-qwen35-0.8b-v3": "CANDIDATE_NAVIGATION",
+        "SZLHOLDINGS/A11OY-MINI": "CANDIDATE_NAVIGATION"
+      },
+      "source_refs": [
+        ".github/scripts/hf_collection_truth_reconcile.py:34",
+        "docs/GITHUB_HF_ALIGNMENT.md:66",
+        "docs/VERTICAL_FASHION.md:72",
+        "docs/CODEX_ESTATE_UPGRADE.md:150"
+      ]
+    },
+    {
+      "id": "model-showcase",
+      "slug": "SZLHOLDINGS/szl-flagship-models-6a9315c1c853da528726dd8d",
+      "title": "SZL Flagship Models",
+      "classification": "NO_MODEL_PROMOTED",
+      "required_members": [],
+      "optional_members": [],
+      "forbidden_members": [],
+      "description_exact": "No model is promoted. See https://holdings.a-11-oy.com/frontier/ for public artifacts and their evidence. Lambda uniqueness remains Conjecture 1.",
+      "member_classifications": {},
+      "source_refs": [
+        "docs/CODEX_ESTATE_UPGRADE.md:150",
+        "docs/ESTATE_ALIGNMENT_CONTRACT_V1.json:453"
+      ]
+    },
+    {
+      "id": "software-kernels",
+      "slug": "SZLHOLDINGS/szl-kernels-software-6a9315c19d509bb9214d3e64",
+      "title": "SZL Kernels (SOFTWARE)",
+      "classification": "SOFTWARE_NAVIGATION",
+      "required_members": [
+        "SZLHOLDINGS/szl-kernels"
+      ],
+      "optional_members": [
+        "SZLHOLDINGS/szl-lambda-gate",
+        "SZLHOLDINGS/szl-governed-norm",
+        "SZLHOLDINGS/szl-formulas",
+        "SZLHOLDINGS/szl-invariants",
+        "SZLHOLDINGS/szl-blocked",
+        "SZLHOLDINGS/szl-govsign",
+        "SZLHOLDINGS/szl-provctl",
+        "SZLHOLDINGS/szl-ouroboros",
+        "SZLHOLDINGS/szl-maskmod",
+        "SZLHOLDINGS/szl-block-kv",
+        "SZLHOLDINGS/governed-inference-meter",
+        "SZLHOLDINGS/szl-receipt-attn",
+        "SZLHOLDINGS/YARQA-ATTN"
+      ],
+      "forbidden_members": [],
+      "description_exact": "Software kernels. Not LoRA-trained models. Source on GitHub; Hub is the mirror.",
+      "member_classifications": {
+        "SZLHOLDINGS/szl-kernels": "SOFTWARE",
+        "SZLHOLDINGS/szl-lambda-gate": "SOFTWARE",
+        "SZLHOLDINGS/szl-governed-norm": "DEPRECATED_SOFTWARE",
+        "SZLHOLDINGS/szl-formulas": "SOFTWARE",
+        "SZLHOLDINGS/szl-invariants": "SOFTWARE",
+        "SZLHOLDINGS/szl-blocked": "SOFTWARE",
+        "SZLHOLDINGS/szl-govsign": "SOFTWARE",
+        "SZLHOLDINGS/szl-provctl": "SOFTWARE",
+        "SZLHOLDINGS/szl-ouroboros": "SOFTWARE",
+        "SZLHOLDINGS/szl-maskmod": "SOFTWARE",
+        "SZLHOLDINGS/szl-block-kv": "SOFTWARE",
+        "SZLHOLDINGS/governed-inference-meter": "SOFTWARE",
+        "SZLHOLDINGS/szl-receipt-attn": "SOFTWARE",
+        "SZLHOLDINGS/YARQA-ATTN": "SOFTWARE"
+      },
+      "source_refs": [
+        "docs/PUBLIC-SURFACE-ATLAS.md:26",
+        "docs/PUBLIC-SURFACE-ATLAS.md:28",
+        "docs/GITHUB_HF_ALIGNMENT.md:44",
+        "docs/GITHUB_HF_ALIGNMENT_2026-09-25.md:90",
+        "docs/CODEX_ESTATE_UPGRADE.md:147"
+      ]
+    }
+  ]
+}
