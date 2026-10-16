@@ -17,10 +17,10 @@ import os
 import sys
 import tempfile
 import unittest
+import unittest.mock
 import urllib.error
 from datetime import datetime
 from pathlib import Path
-from unittest import mock
 
 
 HERE = Path(__file__).resolve().parent
@@ -426,7 +426,7 @@ class NavigationContracts(unittest.TestCase):
             snapshot_path = root / "snapshot.json"
             snapshot_path.write_text(json.dumps(snapshot_fixture()), encoding="utf-8")
             output = io.StringIO()
-            with contextlib.redirect_stdout(output), mock.patch("socket.socket", side_effect=AssertionError("unexpected network")):
+            with contextlib.redirect_stdout(output), unittest.mock.patch("socket.socket", side_effect=AssertionError("unexpected network")):
                 code = check.main(["--snapshot", str(snapshot_path), "--report", str(root / "missing-parent" / "receipt.json")])
         self.assertEqual(code, 2)
         receipt = json.loads(output.getvalue())
@@ -447,7 +447,7 @@ class NavigationContracts(unittest.TestCase):
             ):
                 with self.subTest(mode=mode):
                     output = io.StringIO()
-                    with mock.patch.object(check, "POLICY_PATH", policy_path), contextlib.redirect_stdout(output), mock.patch("socket.socket", side_effect=AssertionError("unexpected network")):
+                    with unittest.mock.patch.object(check, "POLICY_PATH", policy_path), contextlib.redirect_stdout(output), unittest.mock.patch("socket.socket", side_effect=AssertionError("unexpected network")):
                         code = check.main(args)
                     self.assertEqual(code, 2)
                     receipt = json.loads(output.getvalue())
@@ -462,7 +462,7 @@ class NavigationContracts(unittest.TestCase):
             for policy_path, expected_digest in ((POLICY_PATH, digest), (root / "missing-policy.json", None)):
                 with self.subTest(policy_loaded=expected_digest is not None):
                     output = io.StringIO()
-                    with mock.patch.object(check, "POLICY_PATH", policy_path), contextlib.redirect_stdout(output), mock.patch("socket.socket", side_effect=AssertionError("unexpected network")):
+                    with unittest.mock.patch.object(check, "POLICY_PATH", policy_path), contextlib.redirect_stdout(output), unittest.mock.patch("socket.socket", side_effect=AssertionError("unexpected network")):
                         code = check.main(["--snapshot", str(root / "missing-snapshot.json")])
                     self.assertEqual(code, 2)
                     receipt = json.loads(output.getvalue())
@@ -475,7 +475,7 @@ class NavigationContracts(unittest.TestCase):
         snapshot = snapshot_fixture()
         before = copy.deepcopy(snapshot)
         policy_before = copy.deepcopy(self.policy)
-        with mock.patch("socket.socket", side_effect=AssertionError("unexpected network")):
+        with unittest.mock.patch("socket.socket", side_effect=AssertionError("unexpected network")):
             receipt = check.check_snapshot(self.policy, snapshot, mode="snapshot")
         self.assertEqual(receipt["navigation_status"], "PASS")
         self.assert_boundaries(receipt)
@@ -611,12 +611,12 @@ class PublicReadTransportContracts(unittest.TestCase):
 
     def fetch_with_fake_opener(self, responses):
         opener = FakeOpener(responses)
-        with mock.patch.object(check.urllib.request, "build_opener", return_value=opener) as factory:
-            with mock.patch.dict(os.environ, {
+        with unittest.mock.patch.object(check.urllib.request, "build_opener", return_value=opener) as factory:
+            with unittest.mock.patch.dict(os.environ, {
                 "HF_TOKEN": "credential-canary-never-used",
                 "HF_ORG_TOKEN": "credential-canary-never-used",
                 "HF_ORG_TOKEN1": "credential-canary-never-used",
-            }), mock.patch("socket.socket", side_effect=AssertionError("unexpected real network")):
+            }), unittest.mock.patch("socket.socket", side_effect=AssertionError("unexpected real network")):
                 snapshot = check.fetch_live(self.policy)
         factory.assert_called_once()
         handlers = factory.call_args.args
@@ -673,7 +673,7 @@ class PublicReadTransportContracts(unittest.TestCase):
 
     def test_deadline_expiration_stops_reading_and_remains_normalized(self) -> None:
         ticks = iter((0, check.TIMEOUT_SECONDS + 1))
-        with mock.patch.object(check.time, "monotonic", side_effect=lambda: next(ticks, check.TIMEOUT_SECONDS + 1)):
+        with unittest.mock.patch.object(check.time, "monotonic", side_effect=lambda: next(ticks, check.TIMEOUT_SECONDS + 1)):
             snapshot = self.fetch_with_fake_opener(self.responses)
         self.assertEqual(snapshot["responses"][0]["error"], "TIMEOUT")
         self.assertEqual(self.responses[0].read_sizes, [])
@@ -692,7 +692,7 @@ class PublicReadTransportContracts(unittest.TestCase):
                 return chunk
 
         first = SlowEOFResponse(self.responses[0].url, self.responses[0].raw)
-        with mock.patch.object(check.time, "monotonic", side_effect=lambda: clock[0]):
+        with unittest.mock.patch.object(check.time, "monotonic", side_effect=lambda: clock[0]):
             snapshot = self.fetch_with_fake_opener([first, *self.responses[1:]])
         self.assertEqual(first.offset, len(first.raw))
         self.assertEqual(len(first.read_sizes), 2)
