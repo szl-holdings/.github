@@ -954,5 +954,80 @@ class TestRemoteAddContextSemantics(unittest.TestCase):
             ["local.tgz"],
         )
 
+
+def _character_class_strip(source: str) -> str:
+    """Historical main behavior at add3ae2b. Not the repair."""
+    return source.strip().lstrip("./") or source.strip()
+
+
+class TestCopySourceNormalization(unittest.TestCase):
+    """Literal './' prefixes only. Unsafe input is not rewritten into a path."""
+
+    def test_dotted_repository_paths_keep_their_dot(self):
+        dotted = (
+            ".github/scripts/publish_readiness_verdict.py",
+            ".well-known/security.txt",
+        )
+        for path in dotted:
+            self.assertNotEqual(_character_class_strip(path), path)
+            self.assertEqual(drift.normalize_copy_source(path), path)
+            self.assertEqual(
+                drift.parse_copy_sources(f"COPY {path} /app/kept\n"),
+                [path],
+            )
+
+    def test_literal_and_repeated_dot_slash_prefixes(self):
+        self.assertEqual(drift.normalize_copy_source("./Dockerfile"), "Dockerfile")
+        self.assertEqual(drift.normalize_copy_source("./././Dockerfile"), "Dockerfile")
+        self.assertEqual(
+            drift.normalize_copy_source("  ./.github/scripts/publish_readiness_verdict.py  "),
+            ".github/scripts/publish_readiness_verdict.py",
+        )
+        self.assertEqual(
+            drift.normalize_copy_source("././.well-known/security.txt"),
+            ".well-known/security.txt",
+        )
+        self.assertEqual(
+            drift.parse_copy_sources("COPY ././app.py /app/app.py\n"),
+            ["app.py"],
+        )
+
+    def test_normal_paths_and_empty_input(self):
+        self.assertEqual(drift.normalize_copy_source("serve.py"), "serve.py")
+        self.assertEqual(drift.normalize_copy_source("dir/file.py"), "dir/file.py")
+        self.assertEqual(drift.normalize_copy_source("."), ".")
+        self.assertEqual(drift.normalize_copy_source(".."), "..")
+        self.assertEqual(drift.normalize_copy_source(""), "")
+        self.assertEqual(drift.normalize_copy_source("   "), "")
+        self.assertEqual(drift.normalize_copy_source("./"), "")
+        self.assertEqual(drift.normalize_copy_source("././"), "")
+        self.assertEqual(drift.parse_copy_sources("COPY ./ /dest\n"), [])
+        self.assertEqual(drift.parse_copy_sources("COPY ././ /dest\n"), [])
+
+    def test_absolute_and_traversal_inputs_are_not_rewritten(self):
+        rewritten_by_character_class = {
+            "/etc/passwd": "/etc/passwd",
+            "//etc/passwd": "//etc/passwd",
+            "../secret": "../secret",
+            "./../secret": "../secret",
+            "././../etc/passwd": "../etc/passwd",
+            ".../hidden": ".../hidden",
+        }
+        for raw, expected in rewritten_by_character_class.items():
+            self.assertNotEqual(_character_class_strip(raw), expected)
+            self.assertEqual(drift.normalize_copy_source(raw), expected)
+            self.assertEqual(
+                drift.parse_copy_sources(f"COPY {raw} /dest\n"),
+                [expected],
+            )
+        interior = "foo/../../etc/passwd"
+        self.assertEqual(_character_class_strip(interior), interior)
+        self.assertEqual(drift.normalize_copy_source(interior), interior)
+        self.assertEqual(
+            drift.parse_copy_sources(f"COPY {interior} /dest\n"),
+            [interior],
+        )
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)
