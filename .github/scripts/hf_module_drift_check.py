@@ -422,6 +422,28 @@ def is_remote_add_source(source):
     return bool(re.fullmatch(r"[A-Za-z0-9._-]+@[A-Za-z0-9.-]+:.+", value))
 
 
+def normalize_copy_source(source):
+    """Return one repository-relative COPY source, or None to reject it.
+
+    Repeated literal ``./`` prefixes are removed. No character class is
+    stripped, so ``.github`` and ``.well-known`` stay intact. An empty
+    result, an absolute path, a backslash path, or a ``..`` segment is
+    rejected instead of being rewritten into another lookup path.
+    """
+    if not isinstance(source, str):
+        return None
+    text = source.strip()
+    while text.startswith("./"):
+        text = text[2:]
+    if not text or text.startswith(("/", "\\")) or "\\" in text:
+        return None
+    if len(text) >= 2 and text[0].isalpha() and text[1] == ":":
+        return None
+    if any(part == ".." for part in text.split("/")):
+        return None
+    return text
+
+
 def parse_copy_sources(dockerfile_text):
     """Return repository build-context sources from COPY and local ADD.
 
@@ -489,7 +511,7 @@ def parse_copy_sources(dockerfile_text):
     out = []
     seen = set()
     for source in sources:
-        source = source.strip().lstrip("./") or source.strip()
+        source = normalize_copy_source(source)
         if source and source not in seen:
             seen.add(source)
             out.append(source)

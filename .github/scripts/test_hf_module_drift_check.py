@@ -954,5 +954,91 @@ class TestRemoteAddContextSemantics(unittest.TestCase):
             ["local.tgz"],
         )
 
+
+class TestCopySourceNormalization(unittest.TestCase):
+    def test_buggy_character_strip_differs_from_the_owned_normalizer(self):
+        dotted = ".github/scripts/publish_readiness_verdict.py"
+        self.assertEqual(dotted.strip().lstrip("./"), "github/scripts/publish_readiness_verdict.py")
+        self.assertEqual(drift.normalize_copy_source(dotted), dotted)
+        self.assertEqual(
+            ".well-known/security.txt".strip().lstrip("./"),
+            "well-known/security.txt",
+        )
+
+    def test_dotted_and_ordinary_paths_stay_repository_relative(self):
+        dockerfile = "\n".join((
+            "FROM scratch",
+            "COPY .github/scripts/publish_readiness_verdict.py /app/a",
+            "COPY .well-known/security.txt /app/b",
+            "COPY ././.github/workflows/x.yml /app/c",
+            "COPY ./.well-known/security.txt /app/d",
+            "COPY ./Dockerfile /app/Dockerfile",
+            "COPY ././dir/file.py /app/file.py",
+            "COPY serve.py /app/serve.py",
+        ))
+        self.assertEqual(
+            drift.parse_copy_sources(dockerfile),
+            [
+                ".github/scripts/publish_readiness_verdict.py",
+                ".well-known/security.txt",
+                ".github/workflows/x.yml",
+                "Dockerfile",
+                "dir/file.py",
+                "serve.py",
+            ],
+        )
+
+    def test_repeated_prefixes_empty_absolute_and_traversal_are_not_accepted(self):
+        kept = {
+            ".github/scripts/publish_readiness_verdict.py": ".github/scripts/publish_readiness_verdict.py",
+            "  .well-known/security.txt  ": ".well-known/security.txt",
+            "./Dockerfile": "Dockerfile",
+            "./././a.py": "a.py",
+            "serve.py": "serve.py",
+            "dir/file.py": "dir/file.py",
+            ".": ".",
+            "foo/./bar": "foo/./bar",
+            ".../foo": ".../foo",
+        }
+        for raw, expected in kept.items():
+            self.assertEqual(drift.normalize_copy_source(raw), expected, raw)
+        rejected = (
+            "",
+            "   ",
+            "./",
+            "././",
+            "/etc/passwd",
+            "//server/share",
+            "../secret",
+            "./../secret",
+            "././../etc/passwd",
+            "foo/../../etc/passwd",
+            "..",
+            "C:/Windows",
+            ".\\github\\x",
+            "foo\\..\\secret",
+            None,
+        )
+        for raw in rejected:
+            self.assertIsNone(drift.normalize_copy_source(raw), repr(raw))
+
+    def test_parser_does_not_rewrite_unsafe_sources_into_lookup_paths(self):
+        dockerfile = "\n".join((
+            "FROM scratch",
+            "COPY /etc/passwd /tmp/passwd",
+            "COPY ../secret /tmp/secret",
+            "COPY ./../secret /tmp/secret2",
+            "COPY foo/../../etc/passwd /tmp/passwd2",
+            "COPY ././ /app/empty",
+            "COPY C:/Windows/system32 /tmp/win",
+            "COPY serve.py /app/serve.py",
+        ))
+        parsed = drift.parse_copy_sources(dockerfile)
+        self.assertEqual(parsed, ["serve.py"])
+        self.assertNotIn("etc/passwd", parsed)
+        self.assertNotIn("secret", parsed)
+        self.assertNotIn("passwd", parsed)
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)
