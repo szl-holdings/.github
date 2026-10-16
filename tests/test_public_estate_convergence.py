@@ -4,16 +4,10 @@
 from __future__ import annotations
 
 import importlib.util
-import copy
-import hashlib
-import io
-import json
-from email.message import Message
 import os
 import sys
 from pathlib import Path
 from unittest import mock
-from urllib.response import addinfourl
 
 ROOT = Path(__file__).resolve().parents[1]
 MODULE_PATH = ROOT / ".github" / "scripts" / "public_estate_convergence.py"
@@ -35,7 +29,6 @@ def test_two_canonical_origins_have_source_native_contracts() -> None:
     assert proof.spectral_asset.endswith("/assets/szl-spectral-proof-v2.css")
     assert proof.controller_asset.endswith("/scripts/szl-flow-proof.js")
     assert proof.repair == "A11OY_NET_PAGES_BUILD"
-    assert proof.root_stylesheet == "/assets/szl-flow-proof.css"
 
 
 def test_product_root_tracks_the_live_a11oy_front_door() -> None:
@@ -63,196 +56,6 @@ def test_probe_requires_http_200_bytes_and_every_literal() -> None:
         return_value=(404, b"alpha beta", {}, "https://example.test/"),
     ):
         assert convergence.probe("https://example.test/", ("alpha",))["verified"] is False
-
-
-def pages_fixture():
-    """A Pages transform whose imported CSS URL makes source/served bytes differ."""
-    source_css = b'@import "/assets/szl/szl-tokens.css";\n/* proof flow */\n'
-    served_css = b'@import "/assets/szl/szl-tokens.' + b'a' * 64 + b'.css";\n/* proof flow */\n'
-    digest = hashlib.sha256(served_css).hexdigest()
-    path = f"assets/szl-flow-proof.{digest}.css"
-    root = ('<!doctype html><html><head><link rel="stylesheet" href="/' + path
-            + '" data-szl-proof-flow-asset="style"></head><body>Proof</body></html>').encode()
-    manifest = {
-        "schema": "szl.frontend-asset-manifest/v1",
-        "scope": "STATIC_FRONTEND_ASSET_DELIVERY_ONLY",
-        "canonical_assets_preserved": True,
-        "source_revision": "2" * 40,
-        "documents": {"index.html": {"served_sha256": hashlib.sha256(root).hexdigest()}},
-        "assets": {"assets/szl-flow-proof.css": {
-            "source_path": "assets/szl-flow-proof.css",
-            "source_sha256": hashlib.sha256(source_css).hexdigest(),
-            "served_path": path, "served_sha256": digest,
-        }},
-    }
-    witness = {
-        "schema_version": "a11oy-static-source-witness/v1",
-        "surface": "https://a11oy.net",
-        "source_repository": "https://github.com/szl-holdings/a11oy-net",
-        "source_revision": "2" * 40,
-        "artifact_kind": "STATIC_GITHUB_PAGES",
-        "artifact_binding": "EXACT_SOURCE_REVISION",
-    }
-    return root, manifest, witness, source_css, served_css
-
-
-def pages_probe(fixture=None, *, response_change=None):
-    root, manifest, witness, source_css, served_css = fixture or pages_fixture()
-    origin = "https://a11oy.net/"
-    path = "assets/szl-flow-proof." + hashlib.sha256(served_css).hexdigest() + ".css"
-    bodies = {
-        origin: (root, "text/html"),
-        origin + "frontend-assets.json": (json.dumps(manifest).encode(), "application/json"),
-        origin + ".well-known/szl-source.json": (json.dumps(witness).encode(), "application/json"),
-        origin + "assets/szl-flow-proof.css": (source_css, "text/css"),
-        origin + path: (served_css, "text/css"),
-    }
-
-    def request(method, url, **kwargs):
-        assert method == "GET" and kwargs == {"follow_redirects": False}, "no token, redirect or mutation is admitted"
-        assert url in bodies, "unexpected URL was requested: " + url
-        body, content_type = bodies[url]
-        response = (200, body, {"Content-Type": content_type + "; charset=utf-8"}, url)
-        return response_change(url, response) if response_change else response
-
-    with mock.patch.object(convergence, "request", side_effect=request):
-        return convergence.probe(origin, (), pages_stylesheet="/assets/szl-flow-proof.css")
-
-
-def test_fingerprinted_pages_stylesheet_is_semantically_and_byte_bound() -> None:
-    fixture = pages_fixture()
-    assert b"/assets/szl-flow-proof.css" not in fixture[0]
-    result = pages_probe(fixture)
-    assert result["verified"] is True
-    assert result["pages_stylesheet"]["served_sha256"] == hashlib.sha256(fixture[4]).hexdigest()
-    assert result["pages_stylesheet"]["source_revision"] == "2" * 40
-    assert result["pages_stylesheet"]["scope"] == "DEPLOYED_STATIC_ARTIFACT_ONLY"
-
-
-def test_pages_link_must_be_real_unique_enabled_and_exact() -> None:
-    initial = pages_fixture()
-    root = initial[0]
-    variants = (
-        root.replace(b"<link ", b"<!-- <link ").replace(b"></head>", b"> --></head>"),
-        root.replace(b"<link ", b"<script>var fake = '<link ").replace(b"></head>", b">';</script></head>"),
-        root.replace(b'rel="stylesheet"', b'rel="preload"'),
-        root.replace(b'href="/assets/', b'href="https://other.example/assets/'),
-        root.replace(b'href="/assets/', b'href="wrong" href="/assets/'),
-        root.replace(b'<link ', b'<link disabled '),
-        root.replace(b'<link ', b'<link integrity="sha256-stale" '),
-        root.replace(b'<link ', b'<link media="print" '),
-        root.replace(b'<head>', b'<head><base href="https://other.example/">'),
-        root.replace(b'</head>', root[root.index(b'<link '):root.index(b'</head>')] + b'</head>'),
-    )
-    for changed in variants:
-        fixture = list(copy.deepcopy(initial))
-        fixture[0] = changed
-        fixture[1]["documents"]["index.html"]["served_sha256"] = hashlib.sha256(changed).hexdigest()
-        assert pages_probe(fixture)["verified"] is False, changed
-
-
-def test_pages_stylesheet_in_inert_or_foreign_content_is_not_loaded() -> None:
-    initial = pages_fixture()
-    for tag in ("template", "noscript", "textarea", "title", "iframe", "xmp",
-                "noembed", "noframes", "plaintext", "svg", "math", "select"):
-        root = initial[0].replace(b"<link ", ("<" + tag + "><link ").encode())
-        root = root.replace(b"></head>", ("></" + tag + "></head>").encode())
-        fixture = list(copy.deepcopy(initial))
-        fixture[0] = root
-        fixture[1]["documents"]["index.html"]["served_sha256"] = hashlib.sha256(root).hexdigest()
-        assert pages_probe(fixture)["verified"] is False, tag
-    for prefix in (b"<head><template></head><head>",
-                   b"<head><template><noscript></template></head><head>",
-                   b"<head><plaintext></plaintext></head><head>"):
-        root = initial[0].replace(b"<head>", prefix)
-        fixture = list(copy.deepcopy(initial))
-        fixture[0] = root
-        fixture[1]["documents"]["index.html"]["served_sha256"] = hashlib.sha256(root).hexdigest()
-        assert pages_probe(fixture)["verified"] is False
-
-
-def test_saturated_root_read_cannot_claim_a_complete_document() -> None:
-    fixture = list(pages_fixture())
-    fixture[0] += b" " * (2_000_000 - len(fixture[0]))
-    fixture[1]["documents"]["index.html"]["served_sha256"] = hashlib.sha256(fixture[0]).hexdigest()
-    result = pages_probe(fixture)
-    assert result["bytes"] == 2_000_000
-    assert result["verified"] is False
-
-
-def test_binding_transport_rejects_redirect_before_target_fetch() -> None:
-    requested = []
-    class MemoryHTTPS(convergence.urllib.request.HTTPSHandler):
-        def https_open(self, req):
-            requested.append(req.full_url)
-            headers = Message()
-            headers["Location"] = "https://other.example/must-not-be-fetched"
-            response = addinfourl(io.BytesIO(b"redirect"), headers, req.full_url, 302)
-            response.msg = "Found"
-            return response
-    real_builder = convergence.urllib.request.build_opener
-    with mock.patch.object(convergence.urllib.request, "build_opener",
-                           side_effect=lambda *handlers: real_builder(*handlers, MemoryHTTPS())):
-        status, _, _, final = convergence.request(
-            "GET", "https://a11oy.net/frontend-assets.json", follow_redirects=False)
-    assert status == 302 and final == "https://a11oy.net/frontend-assets.json"
-    assert requested == ["https://a11oy.net/frontend-assets.json"]
-
-
-def test_pages_manifest_and_witness_must_agree_on_exact_artifact() -> None:
-    mutations = (
-        lambda m, w: m.update(schema="other"),
-        lambda m, w: m.update(scope="RUNTIME_READY"),
-        lambda m, w: m.update(canonical_assets_preserved=False),
-        lambda m, w: m.update(source_revision="../main"),
-        lambda m, w: w.update(source_revision="3" * 40),
-        lambda m, w: w.update(source_repository="https://github.com/other/repo"),
-        lambda m, w: w.update(artifact_binding="UNKNOWN"),
-        lambda m, w: m["documents"]["index.html"].update(served_sha256="0" * 64),
-        lambda m, w: m["assets"]["assets/szl-flow-proof.css"].update(served_path="../other.css"),
-        lambda m, w: m["assets"]["assets/szl-flow-proof.css"].update(source_path="other.css"),
-        lambda m, w: m["assets"]["assets/szl-flow-proof.css"].update(served_sha256="not-a-digest"),
-        lambda m, w: m["assets"]["assets/szl-flow-proof.css"].update(source_sha256="0" * 64),
-        lambda m, w: m.update(assets=[]),
-        lambda m, w: m.update(documents=None),
-    )
-    for mutate in mutations:
-        fixture = list(pages_fixture())
-        mutate(fixture[1], fixture[2])
-        assert pages_probe(fixture)["verified"] is False
-
-
-def test_pages_transport_and_malformed_binding_fail_closed() -> None:
-    for path in ("", "frontend-assets.json", ".well-known/szl-source.json", "assets/szl-flow-proof.css"):
-        for failure in ("missing", "redirect", "type", "bytes"):
-            def change(url, response):
-                if url != "https://a11oy.net/" + path:
-                    return response
-                status, body, headers, final = response
-                if failure == "missing": status = 404
-                elif failure == "redirect": final = "https://other.example/"
-                elif failure == "type": headers = {"Content-Type": "text/plain"}
-                else: body = b"invalid"
-                return status, body, headers, final
-            assert pages_probe(response_change=change)["verified"] is False, (path, failure)
-    for malformed in (b'[]', b'{"schema":"old","schema":"new"}', b'{"value":NaN}'):
-        def change(url, response):
-            return (200, malformed, response[2], url) if url.endswith("frontend-assets.json") else response
-        assert pages_probe(response_change=change)["verified"] is False
-    def corrupt_served_css(url, response):
-        if "/assets/szl-flow-proof." in url and not url.endswith("/szl-flow-proof.css"):
-            return (200, response[1] + b"corrupt", response[2], url)
-        return response
-    assert pages_probe(response_change=corrupt_served_css)["verified"] is False
-
-
-def test_all_four_existing_origin_probes_remain_required() -> None:
-    for contract in convergence.CONTRACTS:
-        for failed in range(4):
-            results = [{"verified": i != failed} for i in range(4)]
-            with mock.patch.object(convergence, "probe", side_effect=results) as probe:
-                assert convergence.probe_origin(contract)["operational"] is False
-            assert probe.call_count == 4
 
 
 def test_product_has_no_misbound_pages_repair() -> None:

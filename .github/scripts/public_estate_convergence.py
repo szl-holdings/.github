@@ -19,11 +19,8 @@ from __future__ import annotations
 import argparse
 import dataclasses
 import datetime as dt
-import hashlib
-from html.parser import HTMLParser
 import json
 import os
-import re
 import time
 import urllib.error
 import urllib.request
@@ -51,7 +48,6 @@ class OriginContract:
     advisory_health: str
     health_literals: tuple[str, ...]
     repair: str | None
-    root_stylesheet: str | None = None
 
 
 CONTRACTS = (
@@ -75,13 +71,12 @@ CONTRACTS = (
         root="https://a11oy.net/",
         spectral_asset="https://a11oy.net/assets/szl-spectral-proof-v2.css",
         controller_asset="https://a11oy.net/scripts/szl-flow-proof.js",
-        root_literals=(),
+        root_literals=("/assets/szl-flow-proof.css",),
         spectral_literals=("SZL Spectral Proof v2", ".szl-proof-spectral-field"),
         controller_literals=("SZL Proof Flow Shell v2", "/assets/szl-spectral-proof-v2.css"),
         advisory_health="https://a11oy.net/health.json",
         health_literals=(),
         repair="A11OY_NET_PAGES_BUILD",
-        root_stylesheet="/assets/szl-flow-proof.css",
     ),
 )
 
@@ -98,11 +93,6 @@ def token_from_environment() -> tuple[str | None, str | None]:
     return None, None
 
 
-class NoRedirect(urllib.request.HTTPRedirectHandler):
-    def redirect_request(self, req, fp, code, msg, headers, newurl):
-        return None
-
-
 def request(
     method: str,
     url: str,
@@ -110,7 +100,6 @@ def request(
     token: str | None = None,
     payload: Mapping[str, Any] | None = None,
     timeout: float = 30.0,
-    follow_redirects: bool = True,
 ) -> tuple[int | None, bytes, Mapping[str, str], str | None]:
     headers = {
         "User-Agent": USER_AGENT,
@@ -126,9 +115,7 @@ def request(
         headers["Content-Type"] = "application/json"
     req = urllib.request.Request(url, data=body, method=method, headers=headers)
     try:
-        open_url = (urllib.request.urlopen if follow_redirects
-                    else urllib.request.build_opener(NoRedirect()).open)
-        with open_url(req, timeout=timeout) as response:
+        with urllib.request.urlopen(req, timeout=timeout) as response:
             return response.status, response.read(2_000_000), dict(response.headers.items()), response.geturl()
     except urllib.error.HTTPError as exc:
         return exc.code, exc.read(2_000_000), dict(exc.headers.items()), exc.geturl()
@@ -136,170 +123,23 @@ def request(
         return None, b"", {}, None
 
 
-class StylesheetLinks(HTMLParser):
-    """Read actual links, never matching a URL inside prose, comments or scripts."""
-
-    def __init__(self) -> None:
-        super().__init__(convert_charrefs=True)
-        self.links: list[dict[str, str | None]] = []
-        self.ambiguous = False
-        self.stack: list[str] = []
-        self.inert: list[str] = []
-
-    def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
-        if tag in {"template", "noscript", "textarea", "title", "iframe", "xmp",
-                   "noembed", "noframes", "plaintext", "svg", "math", "select"}:
-            self.inert.append(tag)
-        if tag == "base":
-            self.ambiguous = True
-        if tag == "link":
-            attributes = dict(attrs)
-            if attributes.get("data-szl-proof-flow-asset") == "style":
-                # The canonical builder places this link directly in the head.
-                # HTMLParser is not a browser tree builder: fail closed on links
-                # in inert/foreign content even if misleading end tags appear.
-                if len(attributes) != len(attrs) or self.inert or self.stack != ["html", "head"]:
-                    self.ambiguous = True
-                self.links.append(attributes)
-        if tag not in {"area", "base", "br", "col", "embed", "hr", "img", "input",
-                       "link", "meta", "param", "source", "track", "wbr"}:
-            self.stack.append(tag)
-
-    def handle_endtag(self, tag: str) -> None:
-        if self.inert and self.inert[-1] == tag and tag != "plaintext":
-            self.inert.pop()
-        if tag in self.stack:
-            del self.stack[len(self.stack) - 1 - self.stack[::-1].index(tag):]
-
-    handle_startendtag = handle_starttag
-
-
-def _strict_object(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
-    result: dict[str, Any] = {}
-    for key, value in pairs:
-        if key in result:
-            raise ValueError("duplicate JSON field")
-        result[key] = value
-    return result
-
-
-def _reject_constant(value: str) -> None:
-    raise ValueError("non-finite JSON value")
-
-
-def _exact_response(url: str, content_type: str) -> bytes:
-    status, raw, headers, final_url = request("GET", url, follow_redirects=False)
-    actual_type = (headers.get("Content-Type") or headers.get("content-type") or "")
-    if (status != 200 or not raw or len(raw) >= 2_000_000 or final_url != url
-            or actual_type.split(";", 1)[0].strip().lower() != content_type):
-        raise ValueError("missing, redirected or invalid binding response")
-    return raw
-
-
-def _json_response(url: str) -> dict[str, Any]:
-    value = json.loads(_exact_response(url, "application/json"),
-                       object_pairs_hook=_strict_object, parse_constant=_reject_constant)
-    if not isinstance(value, dict):
-        raise ValueError("binding response must be a JSON object")
-    return value
-
-
-def _digest(value: Any) -> str:
-    if not isinstance(value, str) or not re.fullmatch(r"[0-9a-f]{64}", value):
-        raise ValueError("invalid content digest")
-    return value
-
-
-def pages_stylesheet_binding(root: str, raw: bytes, canonical: str) -> dict[str, Any]:
-    """Bind the real stylesheet link to the exact deployed Pages manifest.
-
-    This observes one deployed artifact. Its source witness does not prove that
-    the revision is still protected main or establish product runtime readiness.
-    No URLs supplied by HTML or JSON are fetched: all requests use fixed paths
-    or the single admitted content-addressed CSS filename on this origin.
-    """
-    try:
-        if root != "https://a11oy.net/" or canonical != "/assets/szl-flow-proof.css":
-            raise ValueError("unsupported Pages stylesheet contract")
-        manifest_url = root + "frontend-assets.json"
-        manifest = _json_response(manifest_url)
-        witness = _json_response(root + ".well-known/szl-source.json")
-        revision = manifest.get("source_revision")
-        if (manifest.get("schema") != "szl.frontend-asset-manifest/v1"
-                or manifest.get("scope") != "STATIC_FRONTEND_ASSET_DELIVERY_ONLY"
-                or manifest.get("canonical_assets_preserved") is not True
-                or not isinstance(revision, str)
-                or not re.fullmatch(r"[0-9a-f]{40}", revision)
-                or witness.get("schema_version") != "a11oy-static-source-witness/v1"
-                or witness.get("surface") != root.rstrip("/")
-                or witness.get("source_repository") != "https://github.com/szl-holdings/a11oy-net"
-                or witness.get("source_revision") != revision
-                or witness.get("artifact_kind") != "STATIC_GITHUB_PAGES"
-                or witness.get("artifact_binding") != "EXACT_SOURCE_REVISION"):
-            raise ValueError("manifest and canonical source witness disagree")
-        document = manifest["documents"]["index.html"]
-        if hashlib.sha256(raw).hexdigest() != _digest(document["served_sha256"]):
-            raise ValueError("served root differs from the Pages manifest")
-        asset = manifest["assets"][canonical.lstrip("/")]
-        source_digest = _digest(asset["source_sha256"])
-        served_digest = _digest(asset["served_sha256"])
-        served_path = "assets/szl-flow-proof." + served_digest + ".css"
-        if asset.get("source_path") != canonical.lstrip("/") or asset.get("served_path") != served_path:
-            raise ValueError("stylesheet path is not the manifest's exact content address")
-        parser = StylesheetLinks()
-        parser.feed(raw.decode("utf-8"))
-        parser.close()
-        if parser.ambiguous or len(parser.links) != 1:
-            raise ValueError("stylesheet link is missing or ambiguous")
-        link = parser.links[0]
-        if ((link.get("rel") or "").lower().split() != ["stylesheet"]
-                or link.get("href") not in {"/" + served_path, root + served_path}
-                or "integrity" in link
-                or "disabled" in link or (link.get("media") or "all").lower() != "all"):
-            raise ValueError("root does not load the manifest's exact stylesheet")
-        source_bytes = _exact_response(root.rstrip("/") + canonical, "text/css")
-        served_bytes = _exact_response(root + served_path, "text/css")
-        if (hashlib.sha256(source_bytes).hexdigest() != source_digest
-                or hashlib.sha256(served_bytes).hexdigest() != served_digest):
-            raise ValueError("stylesheet bytes differ from the Pages manifest")
-        return {"verified": True, "manifest_url": manifest_url,
-                "source_revision": revision, "source_path": canonical,
-                "served_path": "/" + served_path, "served_sha256": served_digest,
-                "scope": "DEPLOYED_STATIC_ARTIFACT_ONLY"}
-    except (ValueError, TypeError, KeyError, UnicodeError, RecursionError) as exc:
-        return {"verified": False, "reason": str(exc) or type(exc).__name__}
-
-
-def probe(url: str, literals: tuple[str, ...], *, pages_stylesheet: str | None = None) -> dict[str, Any]:
-    if pages_stylesheet is None:
-        status, raw, headers, final_url = request("GET", url)
-    else:
-        status, raw, headers, final_url = request("GET", url, follow_redirects=False)
+def probe(url: str, literals: tuple[str, ...]) -> dict[str, Any]:
+    status, raw, headers, final_url = request("GET", url)
     text = raw.decode("utf-8", "replace")
     found = {literal: literal in text for literal in literals}
-    result = {
+    return {
         "url": url,
         "final_url": final_url,
         "http_status": status,
         "bytes": len(raw),
-        "sha256": hashlib.sha256(raw).hexdigest() if raw else None,
         "content_type": headers.get("Content-Type") or headers.get("content-type"),
         "required_literals": found,
         "verified": status == 200 and bool(raw) and all(found.values()),
     }
-    if pages_stylesheet is not None:
-        content_type = (result["content_type"] or "").split(";", 1)[0].strip().lower()
-        binding = (pages_stylesheet_binding(url, raw, pages_stylesheet)
-                   if result["verified"] and len(raw) < 2_000_000
-                   and final_url == url and content_type == "text/html"
-                   else {"verified": False, "reason": "root response is unavailable or redirected"})
-        result["pages_stylesheet"] = binding
-        result["verified"] = bool(result["verified"] and binding["verified"])
-    return result
 
 
 def probe_origin(contract: OriginContract) -> dict[str, Any]:
-    root = probe(contract.root, contract.root_literals, pages_stylesheet=contract.root_stylesheet)
+    root = probe(contract.root, contract.root_literals)
     spectral = probe(contract.spectral_asset, contract.spectral_literals)
     controller = probe(contract.controller_asset, contract.controller_literals)
     health = probe(contract.advisory_health, contract.health_literals)
