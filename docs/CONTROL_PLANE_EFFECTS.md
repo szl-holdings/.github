@@ -163,9 +163,14 @@ The workflow recognizes these verdict and process-exit pairs:
 
 Any missing receipt, malformed receipt, unknown exit code, or disagreement
 between the receipt and process exit fails the workflow. `REVIEW_REQUIRED`
-completes the reporting step so reviewers can inspect its artifact; the
-receipt's decision remains `REVIEW_REQUIRED`. Acceptance depends on the
-recorded owner decision and normal protected-branch review and merge rules.
+stays the receipt verdict. The required effect check passes that verdict only
+when the release-admission verifier accepts one unedited owner decision for
+the pull-request head. A missing, edited, stale-head, or wrong-owner decision
+fails the check. A merge-group run uses that same pull-request head, and the
+group's base, tree, and raw diff must be the ones the owner accepted. `ALLOW`
+does not need an owner decision. `DENY` fails even when an owner decision is
+present. The check does not relabel the receipt `ALLOW`. Direct push has no
+owner-decision subject, so `REVIEW_REQUIRED` fails closed there.
 
 The uploaded Actions artifact is run-scoped evidence with limited retention.
 It is not an immutable attestation. Durable release evidence must bind the

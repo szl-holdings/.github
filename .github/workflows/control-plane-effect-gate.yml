@@ -9,6 +9,7 @@ name: Control-Plane Effect Gate
 
 permissions:
   contents: read
+  pull-requests: read
 
 concurrency:
   group: control-plane-effect-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
@@ -19,6 +20,11 @@ jobs:
     name: Static control-plane effect boundary
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    permissions:
+      contents: read
+      issues: read
+      pull-requests: read
+      actions: read
 
     steps:
       - name: Harden runner
@@ -116,12 +122,16 @@ jobs:
         run: |
           set -euo pipefail
           python -I .github/scripts/test_control_plane_effect_gate.py 2>&1 | tee cp-ebom/self-tests.log
+          python -I .github/scripts/test_effect_check_enforcement.py 2>&1 | tee -a cp-ebom/self-tests.log
 
       - name: Emit and enforce the effect receipt
         shell: bash
         env:
           BASE_SHA: ${{ steps.revisions.outputs.base }}
           HEAD_SHA: ${{ steps.revisions.outputs.head }}
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number || 0 }}
+          COMMENT_PATH: ${{ runner.temp }}/owner-comments.json
         run: |
           set +e
           set -uo pipefail
@@ -132,30 +142,23 @@ jobs:
             --policy .github/data/control_plane_effect_policy.json \
             --report cp-ebom/report.json
           gate_exit=$?
-          export GATE_EXIT="${gate_exit}"
           set -e
-          python -I <<'PY'
-          import json
-          import os
-          from pathlib import Path
-
-          receipt_path = Path("cp-ebom/report.json")
-          if not receipt_path.is_file():
-              raise SystemExit("the analyzer did not emit a receipt")
-          receipt = json.loads(receipt_path.read_text("utf-8"))
-          verdict = receipt.get("verdict")
-          exit_code = int(os.environ["GATE_EXIT"])
-          expected = {0: "ALLOW", 2: "DENY", 3: "REVIEW_REQUIRED"}.get(exit_code)
-          if expected is None or verdict != expected:
-              raise SystemExit("analyzer exit and receipt verdict do not agree")
-
-          Path("cp-ebom/status.txt").write_text(
-              f"verdict={verdict}\nclaim={receipt.get('claim', 'MISSING')}\n",
-              encoding="utf-8",
-          )
-          if verdict == "DENY":
-              raise SystemExit(exit_code)
-          PY
+          python -I .github/scripts/effect_check_enforcement.py \
+            --fetch-comments \
+            --comments "${COMMENT_PATH}" \
+            --run-created-path "${RUNNER_TEMP}/effect-run-created-at" \
+            --subject "${RUNNER_TEMP}/owner-subject.json"
+          run_created_at="$(cat "${RUNNER_TEMP}/effect-run-created-at")"
+          python -I .github/scripts/effect_check_enforcement.py \
+            --exit-code "${gate_exit}" \
+            --receipt cp-ebom/report.json \
+            --status cp-ebom/status.txt \
+            --comments "${COMMENT_PATH}" \
+            --subject "${RUNNER_TEMP}/owner-subject.json" \
+            --repository "${GITHUB_REPOSITORY}" \
+            --pull-request "${PR_NUMBER}" \
+            --run-id "${GITHUB_RUN_ID}" \
+            --run-created-at "${run_created_at}"
 
       - name: Upload the run-scoped effect report
         if: ${{ always() }}
