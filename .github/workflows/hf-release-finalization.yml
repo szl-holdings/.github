@@ -13,6 +13,7 @@ on:
       - .github/scripts/test_kernel_hub_git.py
       - .github/scripts/test_hf_release_finalization.py
       - .github/scripts/test_hf_release_finalization_entrypoint.py
+      - .github/scripts/test_hf_release_finalization_events.py
       - .github/scripts/test_hf_release_finalization_git.py
       - .github/scripts/hf_release_readiness_terminal.py
       - .github/scripts/test_hf_release_readiness_terminal.py
@@ -91,10 +92,12 @@ jobs:
             .github/scripts/test_kernel_hub_git.py \
             .github/scripts/test_hf_release_finalization.py \
             .github/scripts/test_hf_release_finalization_entrypoint.py \
+            .github/scripts/test_hf_release_finalization_events.py \
             .github/scripts/test_hf_release_finalization_git.py
           PYTHONPATH=.github/scripts python .github/scripts/test_kernel_hub_git.py
           PYTHONPATH=.github/scripts python .github/scripts/test_hf_release_finalization.py
           PYTHONPATH=.github/scripts python .github/scripts/test_hf_release_finalization_entrypoint.py
+          PYTHONPATH=.github/scripts python .github/scripts/test_hf_release_finalization_events.py
           PYTHONPATH=.github/scripts python .github/scripts/test_hf_release_finalization_git.py
           python - <<'PY'
           import numpy
@@ -127,12 +130,14 @@ jobs:
           python .github/scripts/hf_release_sources.py verify --operational
           set +e
           args=(
-            --publish
             --generation "$GITHUB_SHA"
             --lake-root release-sources/lake
             --energy-root release-sources/energy
             --lambda-root release-sources/lambda-gate
           )
+          if [ "${GITHUB_EVENT_NAME}" = "workflow_dispatch" ]; then
+            args+=(--publish)
+          fi
           PYTHONPATH=.github/scripts \
             python .github/scripts/hf_release_finalization_git.py "${args[@]}"
           code=$?
