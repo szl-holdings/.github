@@ -444,11 +444,12 @@ def normalize_copy_source(source: str) -> str | None:
     return text
 
 
-def parse_copy_sources(dockerfile_text):
-    """Return repository build-context sources from COPY and local ADD.
+def _partition_copy_sources(dockerfile_text):
+    """Return accepted COPY sources and the spellings that were rejected.
 
     Multi-stage ``COPY --from`` and remote ``ADD`` inputs are excluded
-    because Docker resolves them outside the repository context.
+    because Docker resolves them outside the repository context. A rejected
+    spelling is omitted from the accepted list and stays in the second list.
     """
     logical = []
     buffer = ""
@@ -508,14 +509,40 @@ def parse_copy_sources(dockerfile_text):
             ]
         sources.extend(context_sources)
 
-    out = []
+    accepted = []
+    rejected = []
     seen = set()
+    seen_rejected = set()
     for source in sources:
-        source = normalize_copy_source(source)
-        if source and source not in seen:
-            seen.add(source)
-            out.append(source)
-    return out
+        normalized = normalize_copy_source(source)
+        if normalized is None:
+            raw = source.strip() if isinstance(source, str) else ""
+            label = raw or "(empty)"
+            if label not in seen_rejected:
+                seen_rejected.add(label)
+                rejected.append(label)
+            continue
+        if normalized not in seen:
+            seen.add(normalized)
+            accepted.append(normalized)
+    return accepted, rejected
+
+
+def parse_copy_sources(dockerfile_text):
+    """Return accepted repository-relative COPY sources.
+
+    Rejected spellings are available from ``rejected_copy_sources``. Callers
+    that need a coverage verdict must read both lists. An accepted list alone
+    is not complete coverage when the rejected list is non-empty.
+    """
+    accepted, _rejected = _partition_copy_sources(dockerfile_text)
+    return accepted
+
+
+def rejected_copy_sources(dockerfile_text):
+    """Return COPY spellings that were omitted instead of rewritten."""
+    _accepted, rejected = _partition_copy_sources(dockerfile_text)
+    return rejected
 
 # --------------------------------------------------------------------------- #
 # GitHub side: file -> git-blob-sha map
@@ -745,7 +772,9 @@ def managed_snapshot(github_repo, ref, dockerfile_path="Dockerfile"):
     ref = require_full_sha(ref, "managed snapshot GitHub SHA")
     tree = github_tree_remote(github_repo, ref)
     dockerfile = fetch_github_file(github_repo, ref, dockerfile_path)
-    sources = parse_copy_sources(dockerfile.decode("utf-8", "replace"))
+    dockerfile_text = dockerfile.decode("utf-8", "replace")
+    sources = parse_copy_sources(dockerfile_text)
+    rejected_sources = rejected_copy_sources(dockerfile_text)
     managed, unresolved = expand_managed_sources(sources, tree)
     # The Dockerfile controls the live build even though it is not its own COPY
     # source. Treat it as a managed control file in every candidate plan.
@@ -757,6 +786,7 @@ def managed_snapshot(github_repo, ref, dockerfile_path="Dockerfile"):
         "ref": ref,
         "tree": tree,
         "copy_sources": sources,
+        "rejected_copy_sources": rejected_sources,
         "managed_paths": managed,
         "unresolved_sources": unresolved,
     }
@@ -768,7 +798,9 @@ def candidate_managed_delta(github_repo, baseline_ref, candidate_ref,
 
     Existing unresolved COPY sources remain visible but non-blocking. Only a
     newly introduced unresolved source makes the candidate plan invalid; this
-    is a no-allowlist ratchet over the trusted deployed baseline.
+    is a no-allowlist ratchet over the trusted deployed baseline. A rejected
+    COPY source on either snapshot also makes the plan invalid, because
+    omitting it is not aligned coverage.
     """
     baseline_ref = require_full_sha(baseline_ref, "candidate baseline GitHub SHA")
     candidate_ref = require_full_sha(candidate_ref, "candidate GitHub SHA")
@@ -805,10 +837,15 @@ def candidate_managed_delta(github_repo, baseline_ref, candidate_ref,
     baseline_unresolved = set(baseline["unresolved_sources"])
     candidate_unresolved = set(candidate["unresolved_sources"])
     newly_unresolved = sorted(candidate_unresolved - baseline_unresolved)
+    baseline_rejected = list(baseline.get("rejected_copy_sources") or [])
+    candidate_rejected = list(candidate.get("rejected_copy_sources") or [])
+    # A rejected COPY source was omitted from the managed set. "no-changes"
+    # would claim aligned coverage of a plan that did not include that source.
+    coverage_incomplete = bool(baseline_rejected or candidate_rejected)
     report = {
         "schema": 1,
         "mode": "candidate-managed-delta",
-        "status": "invalid" if newly_unresolved else (
+        "status": "invalid" if (newly_unresolved or coverage_incomplete) else (
             "changes" if deltas else "no-changes"),
         "generated_utc": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
         "github_repo": github_repo,
@@ -817,6 +854,8 @@ def candidate_managed_delta(github_repo, baseline_ref, candidate_ref,
         "dockerfile_path": dockerfile_path,
         "baseline_copy_sources": baseline["copy_sources"],
         "candidate_copy_sources": candidate["copy_sources"],
+        "baseline_rejected_copy_sources": baseline_rejected,
+        "candidate_rejected_copy_sources": candidate_rejected,
         "baseline_unresolved_sources": sorted(baseline_unresolved),
         "candidate_unresolved_sources": sorted(candidate_unresolved),
         "new_unresolved_sources": newly_unresolved,
@@ -991,6 +1030,7 @@ def compare(args, allow=None, include_dockerfile=False):
         with open(os.path.join(args.repo_root, dockerfile_path), "rb") as fh:
             dockerfile_text = fh.read().decode("utf-8", "replace")
     sources = parse_copy_sources(dockerfile_text)
+    rejected_sources = rejected_copy_sources(dockerfile_text)
 
     if args.github_remote:
         gh_files = github_tree_remote(args.github_repo, github_ref)
@@ -1107,6 +1147,17 @@ def compare(args, allow=None, include_dockerfile=False):
             entry["canonical_repos"] = canonical_repos
         add(entry, "error")
 
+    for raw in rejected_sources:
+        findings.append({
+            "path": raw,
+            "kind": "rejected-copy-source",
+            "severity": "error",
+            "detail": (
+                "COPY source was rejected and omitted from comparison; "
+                "coverage is incomplete"
+            ),
+        })
+
     findings.sort(key=lambda e: (e["severity"] != "error", e["path"]))
     errors = [f for f in findings if f["severity"] == "error"]
     warns = [f for f in findings if f["severity"] == "warn"]
@@ -1122,6 +1173,7 @@ def compare(args, allow=None, include_dockerfile=False):
         "hf_ref": hf_ref,
         "dockerfile_path": dockerfile_path,
         "copy_sources": len(sources),
+        "rejected_copy_sources": list(rejected_sources),
         "files_compared": len(targets),
         "error_count": len(errors),
         "warn_count": len(warns),
@@ -1270,6 +1322,16 @@ def trusted_baseline_compare(args):
                     "candidate Dockerfile introduces a managed source that "
                     "does not resolve at the exact candidate revision"),
             })
+        for source in candidate_report.get("candidate_rejected_copy_sources") or []:
+            contract_errors.append({
+                "path": source,
+                "kind": "rejected-copy-source",
+                "severity": "error",
+                "detail": (
+                    "candidate COPY source was rejected and omitted; "
+                    "the managed-file plan is not complete coverage"
+                ),
+            })
 
     errors = contract_errors + drift_errors
     findings = errors + warns
@@ -1311,6 +1373,10 @@ def print_candidate_plan(report):
         print(f"   {entry['kind'].upper():15} {entry['path']}")
     for source in report["new_unresolved_sources"]:
         print(f"::error title=Candidate COPY source unresolved::{source}")
+    for source in report.get("candidate_rejected_copy_sources") or []:
+        print(f"::error title=Candidate COPY source rejected::{source}")
+    for source in report.get("baseline_rejected_copy_sources") or []:
+        print(f"::error title=Baseline COPY source rejected::{source}")
 
 
 def fmt(entry):

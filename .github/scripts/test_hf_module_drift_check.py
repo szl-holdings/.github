@@ -770,6 +770,32 @@ class TestTransientHTTPInconclusive(unittest.TestCase):
             github_remote=True, report_out=os.path.join(self._tmp, "r.json"),
             warn_only=False, registry="", siblings=[])
 
+    def test_retry_after_selects_the_reset_delay(self):
+        """A 429 Retry-After is the delay. This does not call Hugging Face."""
+        import urllib.error
+        delays = []
+        original_sleep = drift.time.sleep
+        original_open = drift.urllib.request.urlopen
+        drift.time.sleep = delays.append
+
+        def always_429(url, *args, **kwargs):
+            raise urllib.error.HTTPError(
+                url, 429, "Too Many Requests", {"Retry-After": "0"}, None)
+
+        drift.urllib.request.urlopen = always_429
+        try:
+            with self.assertRaises(drift.TransientHTTPError) as ctx:
+                drift._http(
+                    "https://huggingface.co/api/spaces/x/tree/main", retries=1)
+        finally:
+            drift.time.sleep = original_sleep
+            drift.urllib.request.urlopen = original_open
+        self.assertEqual(ctx.exception.code, 429)
+        self.assertEqual(len(delays), 1)
+        # Retry-After 0 plus jitter stays below the 2s exponential fallback.
+        self.assertGreaterEqual(delays[0], 0)
+        self.assertLess(delays[0], 2.0)
+
     def test_http_raises_transient_on_persistent_429(self):
         # _http must raise the distinct TransientHTTPError (not plain RuntimeError)
         # when 429 persists past the retry budget, so callers can go inconclusive.
@@ -796,19 +822,27 @@ class TestTransientHTTPInconclusive(unittest.TestCase):
         drift.github_tree_remote = lambda repo, ref="main": {"mod.py": "abc"}
 
         # Mirror main()'s dispatch: compare() raises -> _emit_inconclusive.
+        # This fixture does not contact Hugging Face. Exit 0 is the neutral
+        # gate result for an unverified comparison.
+        output = io.StringIO()
         try:
-            drift.compare(args)
+            with contextlib.redirect_stdout(output):
+                drift.compare(args)
             self.fail("expected TransientHTTPError")
         except drift.TransientHTTPError as e:
-            rc = drift._emit_inconclusive(args, e)
+            with contextlib.redirect_stdout(output):
+                rc = drift._emit_inconclusive(args, e)
+        output = output.getvalue()
 
         self.assertEqual(rc, 0)  # NEUTRAL exit -- gate not marked red
         with open(args.report_out) as fh:
             report = json.load(fh)
         self.assertEqual(report["status"], "inconclusive")
+        self.assertNotEqual(report["status"], "ok")
         self.assertEqual(report["reason"], "hf_api_429")
         self.assertEqual(report["error_count"], 0)
         self.assertEqual(report["findings"], [])
+        self.assertIn("NOT a verified in-sync pass", output)
 
     def test_ok_report_carries_status_ok(self):
         args = self._args()
@@ -1054,6 +1088,131 @@ class TestCopySourceNormalization(unittest.TestCase):
         self.assertNotIn("etc/passwd", parsed)
         self.assertNotIn("secret", parsed)
         self.assertNotIn("passwd", parsed)
+
+
+class TestRejectedCopyCoverage(unittest.TestCase):
+    """Omitting an unsafe COPY source must not become complete coverage."""
+
+    def setUp(self):
+        self._saved = {
+            name: getattr(drift, name)
+            for name in (
+                "_http",
+                "github_tree_remote",
+                "hf_tree",
+                "fetch_github_file",
+                "github_file_date",
+                "hf_dir_dates",
+            )
+        }
+
+    def tearDown(self):
+        for name, value in self._saved.items():
+            setattr(drift, name, value)
+
+    def _compare(self, dockerfile, tree):
+        drift._http = lambda *args, **kwargs: (200, dockerfile, None)
+        drift.github_tree_remote = lambda repo, ref="main": dict(tree)
+        drift.hf_tree = lambda repo, ref="main": {
+            name: {"oid": sha, "lfs_oid": None, "size": 1}
+            for name, sha in tree.items()
+            if name != "Dockerfile"
+        }
+        drift.github_file_date = lambda *args, **kwargs: None
+        drift.hf_dir_dates = lambda *args, **kwargs: {}
+        args = argparse.Namespace(
+            repo_root=".",
+            github_repo="szl-holdings/a11oy",
+            hf_repo="SZLHOLDINGS/a11oy",
+            ref="main",
+            github_ref=None,
+            hf_ref=None,
+            allow="",
+            github_remote=True,
+            report_out="",
+            warn_only=False,
+            siblings=[],
+            dockerfile_path="Dockerfile",
+        )
+        return drift.compare(args, allow={})
+
+    def test_mixed_safe_and_unsafe_sources_are_incomplete(self):
+        report, errors, warns = self._compare(
+            b"COPY serve.py /app/serve.py\nCOPY ../secret /tmp/secret\n",
+            {"Dockerfile": "df", "serve.py": "same"},
+        )
+        self.assertNotEqual(report["status"], "ok")
+        self.assertEqual(report["status"], "drift")
+        self.assertEqual(report["rejected_copy_sources"], ["../secret"])
+        self.assertEqual(report["files_compared"], 1)
+        self.assertEqual(
+            [(entry["kind"], entry["path"]) for entry in errors],
+            [("rejected-copy-source", "../secret")],
+        )
+        self.assertNotIn("secret", [entry["path"] for entry in errors])
+        self.assertEqual(warns, [])
+
+    def test_all_unsafe_sources_are_incomplete(self):
+        report, errors, warns = self._compare(
+            b"COPY ../secret /tmp/secret\nCOPY /etc/passwd /tmp/passwd\n",
+            {"Dockerfile": "df"},
+        )
+        self.assertNotEqual(report["status"], "ok")
+        self.assertEqual(report["status"], "drift")
+        self.assertEqual(report["copy_sources"], 0)
+        self.assertEqual(report["files_compared"], 0)
+        self.assertEqual(
+            report["rejected_copy_sources"],
+            ["../secret", "/etc/passwd"],
+        )
+        self.assertEqual(
+            [(entry["kind"], entry["path"]) for entry in errors],
+            [
+                ("rejected-copy-source", "../secret"),
+                ("rejected-copy-source", "/etc/passwd"),
+            ],
+        )
+        self.assertNotIn("secret", report["rejected_copy_sources"])
+        self.assertNotIn("etc/passwd", report["rejected_copy_sources"])
+        self.assertEqual(warns, [])
+
+    def _delta(self, base_dockerfile, head_dockerfile, tree):
+        base = "a" * 40
+        head = "b" * 40
+        trees = {base: dict(tree), head: dict(tree)}
+        dockerfiles = {base: base_dockerfile, head: head_dockerfile}
+        drift.github_tree_remote = lambda repo, ref="main": trees[ref]
+        drift.fetch_github_file = lambda repo, ref, path: dockerfiles[ref]
+        return drift.candidate_managed_delta("szl-holdings/a11oy", base, head)
+
+    def test_candidate_mixed_sources_are_not_no_changes(self):
+        report = self._delta(
+            b"COPY serve.py /app/serve.py\n",
+            b"COPY serve.py /app/serve.py\nCOPY ../secret /tmp/secret\n",
+            {"Dockerfile": "df", "serve.py": "same"},
+        )
+        self.assertNotEqual(report["status"], "no-changes")
+        self.assertEqual(report["status"], "invalid")
+        self.assertEqual(report["candidate_copy_sources"], ["serve.py"])
+        self.assertEqual(report["candidate_rejected_copy_sources"], ["../secret"])
+        self.assertEqual(report["baseline_rejected_copy_sources"], [])
+        self.assertEqual(report["new_unresolved_sources"], [])
+        self.assertEqual(report["delta_count"], 0)
+
+    def test_candidate_all_unsafe_sources_are_not_no_changes(self):
+        report = self._delta(
+            b"COPY /etc/passwd /tmp/passwd\n",
+            b"COPY ../secret /tmp/secret\n",
+            {"Dockerfile": "df"},
+        )
+        self.assertNotEqual(report["status"], "no-changes")
+        self.assertEqual(report["status"], "invalid")
+        self.assertEqual(report["candidate_copy_sources"], [])
+        self.assertEqual(report["baseline_copy_sources"], [])
+        self.assertEqual(report["baseline_rejected_copy_sources"], ["/etc/passwd"])
+        self.assertEqual(report["candidate_rejected_copy_sources"], ["../secret"])
+        self.assertEqual(report["delta_count"], 0)
+        self.assertEqual(report["new_unresolved_sources"], [])
 
 
 if __name__ == "__main__":
