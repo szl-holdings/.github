@@ -11,6 +11,10 @@ jobs:
     name: Reusable publisher exact-source witness
     permissions:
       contents: read
+      # Permission interface of the new reusable revision. contract-only skips
+      # the publishing job; the witness itself has an explicit read-only job.
+      id-token: write
+      attestations: write
     uses: ./.github/workflows/reusable-hf-deploy.yml
     with:
       contract-only: true

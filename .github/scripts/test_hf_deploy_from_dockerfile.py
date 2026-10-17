@@ -1426,5 +1426,70 @@ class TestDurableTransaction(unittest.TestCase):
             dep.reconcile_transaction(self.path, "SZLHOLDINGS/a11oy")
 
 
+class TestAuthenticatedRuntimeBinding(unittest.TestCase):
+    def fixture(self):
+        names = ["observer_runtime.py", "szl_runtime_identity.py", "serve.py", "gdw_runtime.py",
+                 ".github/workflows/hf-sync.yml", "console/index.html", "later.html"]
+        files = {name: {"sha256": dep.sha256(name.encode()), "size": len(name)} for name in names}
+        docker = ("FROM python AS ignored\nCOPY later.html /app/ignored\n"
+                  "FROM python AS runtime\nWORKDIR /app\n"
+                  "COPY observer_runtime.py szl_runtime_identity.py serve.py gdw_runtime.py ./\n"
+                  "COPY .github/workflows/hf-sync.yml ./.github/scripts/\n"
+                  "COPY console/ ./static/\nCOPY later.html ./static/index.html\n"
+                  "COPY .szl-runtime-marker.json /tmp/\n"
+                  "RUN python <<'PY'\nfrom pathlib import Path\nPY\n")
+        return docker, files
+
+    def test_final_stage_mapping_preserves_overwrites_and_ignores_python_import(self):
+        docker, files = self.fixture()
+        catalog = dep.runtime_copy_catalog(docker, files)
+        self.assertNotIn("ignored", catalog)
+        self.assertEqual(catalog["static/index.html"]["source_path"], "later.html")
+        self.assertEqual(catalog[".github/scripts/hf-sync.yml"]["source_path"], ".github/workflows/hf-sync.yml")
+        self.assertNotIn(dep.RUNTIME_MARKER, catalog)  # marker is bound by the signed subject
+
+    def test_unknown_copy_semantics_and_wrong_marker_are_rejected(self):
+        docker, files = self.fixture()
+        for mutation in ["COPY --from=builder /out /app/out\n", "ADD https://x.test/a /app/a\n",
+                         "COPY *.py /app/\n", "COPY serve.py /app/../bad\n"]:
+            with self.subTest(mutation=mutation), self.assertRaises(dep.DeployContractError):
+                dep.runtime_copy_catalog(docker + mutation, files)
+        with self.assertRaises(dep.DeployContractError):
+            dep.runtime_copy_catalog(docker.replace("COPY .szl-runtime-marker.json /tmp/", "COPY .szl-runtime-marker.json /app/"), files)
+
+    def test_marker_requires_canonical_exact_source_and_workflow_context(self):
+        args = types.SimpleNamespace(github_repo="szl-holdings/a11oy", hf_repo="SZLHOLDINGS/a11oy",
+                                     require_default_branch_tip=True, source_sha="a" * 40)
+        env = {"GITHUB_RUN_ID": "123", "GITHUB_RUN_ATTEMPT": "2", "RUNTIME_IDENTITY_PUBLISHER_SHA": "c" * 40}
+        with mock.patch.dict(os.environ, env):
+            marker = dep.runtime_identity_marker(args)
+            self.assertEqual(marker["run_id"], 123)
+            self.assertEqual(marker["run_attempt"], 2)
+            self.assertNotEqual(marker["nonce"], dep.runtime_identity_marker(args)["nonce"])
+            args.hf_repo = "SZLHOLDINGS/other"
+            with self.assertRaises(dep.DeployContractError):
+                dep.runtime_identity_marker(args)
+        with mock.patch.dict(os.environ, {}, clear=True), self.assertRaises(dep.DeployContractError):
+            dep.runtime_identity_marker(args)
+
+    def test_binding_never_claims_image_hardware_or_execution(self):
+        body = dep.runtime_binding({"runtime_identity": {"nonce": "d" * 64}, "hf_commit_oid": "b" * 40})
+        self.assertFalse(body["image_attestation"])
+        self.assertFalse(body["hardware_attestation"])
+        self.assertFalse(body["execution_authority"])
+        with self.assertRaises(dep.DeployContractError):
+            dep.runtime_binding({"runtime_identity": {}})
+
+    def test_signed_binding_upload_precedes_runtime_wait(self):
+        path = os.path.join(_HERE, "..", "workflows", "reusable-hf-deploy.yml")
+        with open(path, encoding="utf-8") as fh:
+            workflow = fh.read()
+        self.assertLess(workflow.index("Attest canonical runtime source binding"),
+                        workflow.index("Publish immutable runtime source binding before readiness"))
+        self.assertLess(workflow.index("Publish immutable runtime source binding before readiness"),
+                        workflow.index("Attest exact running commit, bytes, and smoke routes"))
+        self.assertIn("hf-runtime-identity-${{ github.run_id }}-${{ github.run_attempt }}", workflow)
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)
