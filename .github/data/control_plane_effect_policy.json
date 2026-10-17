@@ -1569,7 +1569,7 @@
     ".github/workflows/hf-dataset-badge-refresh.yml": {
       "intent_id": "hf-dataset-badge-source-ownership-v1",
       "valid_until": "2026-11-30",
-      "source_sha256": "sha256:a6c007887f3fcac17b62724a01782d0c68f18b77036e93466b136a61f14a8ac5",
+      "source_sha256": "sha256:fc8558bb8a21771b33b7d87d8f8bcb6a48f9e394e256ea15ac5ef1fadac1ae1e",
       "credentials": [
         "HF_ORG_TOKEN"
       ],
@@ -1635,9 +1635,9 @@
       "trusted_transitives": {},
       "reviewed_unknowns": {
         "files": {
-          ".github/scripts/hf_dataset_badge_refresh.mjs": "sha256:447e48aae0540ba578ed569342899b2be84d96b0700cfce9472f2445ad2a8ade",
-          ".github/scripts/test_hf_dataset_badge_refresh.mjs": "sha256:933592d674105d72a7d4ea1ed305eec5dcb597f6bc320fae0520a311b564af48",
-          ".github/workflows/hf-dataset-badge-refresh.yml": "sha256:a6c007887f3fcac17b62724a01782d0c68f18b77036e93466b136a61f14a8ac5"
+          ".github/scripts/hf_dataset_badge_refresh.mjs": "sha256:71a9dbcfc7bacc9d870b6f1fa8d0516cdd10575402c631b47a0070fc6a841447",
+          ".github/scripts/test_hf_dataset_badge_refresh.mjs": "sha256:d8ad00c8b05636b9bc6082dd97509457aac96aad7a36dd952e4686e8ed642809",
+          ".github/workflows/hf-dataset-badge-refresh.yml": "sha256:fc8558bb8a21771b33b7d87d8f8bcb6a48f9e394e256ea15ac5ef1fadac1ae1e"
         },
         "unknowns": [
           "ACTION_INPUTS_REVIEW_REQUIRED@.github/workflows/hf-dataset-badge-refresh.yml:57",
