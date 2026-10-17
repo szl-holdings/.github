@@ -27,6 +27,8 @@ import io
 import json
 import os
 import shutil
+import subprocess
+import sys
 import tempfile
 import unittest
 
@@ -1046,7 +1048,14 @@ class TestCopySourceNormalization(unittest.TestCase):
     def test_normal_paths_and_empty_input(self):
         self.assertEqual(drift.normalize_copy_source("serve.py"), "serve.py")
         self.assertEqual(drift.normalize_copy_source("dir/file.py"), "dir/file.py")
-        self.assertEqual(drift.normalize_copy_source("."), ".")
+        self.assertIsNone(drift.normalize_copy_source("."))
+        self.assertEqual(drift.unsupported_context_roots("COPY . /dest\n"), ["."])
+        self.assertEqual(drift.unsupported_context_roots("COPY ./ /dest\n"), ["./"])
+        self.assertEqual(
+            drift.unsupported_context_roots("COPY ././ /dest\n"), ["././"])
+        self.assertEqual(drift.rejected_copy_sources("COPY . /dest\n"), [])
+        self.assertEqual(drift.rejected_copy_sources("COPY ./ /dest\n"), [])
+        self.assertEqual(drift.rejected_copy_sources("COPY ././ /dest\n"), [])
         self.assertEqual(drift.normalize_copy_source("foo/./bar"), "foo/./bar")
         self.assertEqual(drift.normalize_copy_source(".../hidden"), ".../hidden")
         self.assertIsNone(drift.normalize_copy_source(".."))
@@ -1104,6 +1113,8 @@ class TestCopySourceNormalization(unittest.TestCase):
         )
         self.assertNotIn("etc/passwd", parsed)
         self.assertNotIn("secret", parsed)
+        self.assertNotIn("././", drift.rejected_copy_sources(dockerfile))
+        self.assertEqual(drift.unsupported_context_roots(dockerfile), ["././"])
         self.assertNotIn("passwd", parsed)
 
 
@@ -1194,17 +1205,32 @@ class TestRejectedCopyCoverage(unittest.TestCase):
             [(entry["kind"], entry["path"]) for entry in mixed_errors],
             [("rejected-copy-source", "../secret")],
         )
-        dotted, dotted_errors, _dotted_warns = self._compare(
-            b"COPY ./ /dest\n",
-            {"Dockerfile": "df"},
-        )
-        self.assertEqual(dotted["status"], "drift")
-        self.assertEqual(dotted["files_compared"], 0)
-        self.assertEqual(dotted["rejected_copy_sources"], ["./"])
-        self.assertEqual(
-            [(entry["kind"], entry["path"]) for entry in dotted_errors],
-            [("rejected-copy-source", "./")],
-        )
+        for spelling, dockerfile in (
+            (".", b"COPY . /dest\n"),
+            ("./", b"COPY ./ /dest\n"),
+        ):
+            rooted, rooted_errors, rooted_warns = self._compare(
+                dockerfile,
+                {"Dockerfile": "df", "serve.py": "different-from-hf"},
+                allow={"accepted_divergences": {spelling: "backlog"}},
+            )
+            self.assertEqual(rooted["status"], "drift", spelling)
+            self.assertEqual(rooted["files_compared"], 0, spelling)
+            self.assertEqual(rooted["copy_sources"], 0, spelling)
+            self.assertEqual(rooted["rejected_copy_sources"], [], spelling)
+            self.assertEqual(rooted["unsupported_context_roots"], [spelling])
+            self.assertEqual(
+                [(entry["kind"], entry["path"], entry["severity"])
+                 for entry in rooted_errors],
+                [("context-root-unsupported", spelling, "error")],
+            )
+            self.assertEqual(rooted_warns, [])
+            kinds = [entry["kind"] for entry in rooted["findings"]]
+            self.assertNotIn("missing-both", kinds)
+            self.assertNotIn("rejected-copy-source", kinds)
+            details = " ".join(entry.get("detail", "") for entry in rooted["findings"])
+            self.assertNotIn("traversal", details)
+            self.assertNotIn("..", details)
         kept, kept_errors, _kept_warns = self._compare(
             b"COPY .github/scripts/publish_readiness_verdict.py /a\n"
             b"COPY .well-known/security.txt /b\n",
@@ -1281,6 +1307,346 @@ class TestRejectedCopyCoverage(unittest.TestCase):
         self.assertEqual(report["delta_count"], 0)
         self.assertEqual(report["new_unresolved_sources"], [])
 
+    def test_context_root_spellings_are_equivalent_and_invalid(self):
+        for spelling, dockerfile in (
+            (".", b"COPY . /app\n"),
+            ("./", b"COPY ./ /app\n"),
+        ):
+            report = self._delta(
+                b"COPY serve.py /app/serve.py\n",
+                dockerfile,
+                {"Dockerfile": "df", "serve.py": "same"},
+            )
+            self.assertEqual(report["status"], "invalid", spelling)
+            self.assertEqual(
+                report["candidate_unsupported_context_roots"], [spelling])
+            self.assertEqual(report["baseline_unsupported_context_roots"], [])
+            self.assertEqual(report["candidate_rejected_copy_sources"], [])
+            self.assertEqual(report["new_unresolved_sources"], [])
+        baseline_root = self._delta(
+            b"COPY ./ /app\n",
+            b"COPY serve.py /app/serve.py\n",
+            {"Dockerfile": "df", "serve.py": "same"},
+        )
+        self.assertEqual(baseline_root["status"], "invalid")
+        self.assertEqual(
+            baseline_root["baseline_unsupported_context_roots"], ["./"])
+        self.assertEqual(baseline_root["candidate_rejected_copy_sources"], [])
+
+
+
+def _drift_process_status():
+    try:
+        code = drift.main()
+    except SystemExit as exc:
+        code = exc.code
+    if code is None:
+        return 0
+    return code if isinstance(code, int) else 1
+
+
+def _drift_exit_probe(argv):
+    """Run one stubbed caller and return the process status from main()."""
+    import json
+    import urllib.parse
+    import urllib.request
+
+    if len(argv) != 1:
+        return 97
+    case = argv[0]
+    gh_repo = "fixture-owner/fixture-repo"
+    hf_repo = "fixture-owner/fixture-space"
+    source = "a" * 40
+    candidate = "b" * 40
+    live = "c" * 40
+    base = "d" * 40
+    safe = "FROM scratch\nCOPY serve.py /app/serve.py\n"
+    traversal = "FROM scratch\nCOPY ../secret /app/secret\n"
+    mixed = "FROM scratch\nCOPY serve.py /app/serve.py\nCOPY ../secret /app/secret\n"
+    all_rejected = "FROM scratch\nCOPY ../secret /etc/passwd /app/\n"
+    dot = "FROM scratch\nCOPY . /app\n"
+    dot_slash = "FROM scratch\nCOPY ./ /app\n"
+    dotted = (
+        "FROM scratch\n"
+        "COPY .github /app/.github\n"
+        "COPY .well-known /app/.well-known\n"
+        "COPY ./.github /app/.github-again\n"
+    )
+    single = {
+        "single-traversal": traversal,
+        "single-mixed": mixed,
+        "single-all-rejected": all_rejected,
+        "single-dot": dot,
+        "single-dot-slash": dot_slash,
+        "single-dotted": dotted,
+    }
+    registry = {
+        "registry-traversal": traversal,
+        "registry-mixed": mixed,
+        "registry-all-rejected": all_rejected,
+        "registry-dot": dot,
+        "registry-dot-slash": dot_slash,
+        "registry-dotted": dotted,
+    }
+    trusted = {
+        "trusted-invalid": traversal,
+        "trusted-mixed": mixed,
+        "trusted-all-rejected": all_rejected,
+        "trusted-dot": dot,
+        "trusted-dot-slash": dot_slash,
+    }
+
+    def block_network():
+        def blocked(*_args, **_kwargs):
+            raise RuntimeError("network blocked")
+
+        urllib.request.urlopen = blocked
+        drift._http = blocked
+        drift.github_file_date = lambda *_args, **_kwargs: None
+        drift.hf_dir_dates = lambda *_args, **_kwargs: {}
+
+    def memory_blobs(dockerfile):
+        blobs = {
+            "Dockerfile": dockerfile.encode("utf-8"),
+            "serve.py": b'print("serve")\n',
+            ".github/CODEOWNERS": b"* @fixture\n",
+            ".well-known/health": b"ok\n",
+            ".dockerignore": b"*\n",
+        }
+        shas = {path: drift.git_blob_sha1(data) for path, data in blobs.items()}
+        return blobs, shas
+
+    def write_repo(root, dockerfile):
+        blobs, _shas = memory_blobs(dockerfile)
+        for rel, data in blobs.items():
+            path = os.path.join(root, *rel.split("/"))
+            os.makedirs(os.path.dirname(path), exist_ok=True)
+            with open(path, "wb") as handle:
+                handle.write(data)
+
+    with tempfile.TemporaryDirectory(prefix="szl-drift-exit-") as tmp:
+        block_network()
+        allow = os.path.join(tmp, "allow.json")
+        with open(allow, "w", encoding="utf-8", newline="\n") as handle:
+            handle.write("{}\n")
+        if case in single:
+            repo = os.path.join(tmp, "repo")
+            write_repo(repo, single[case])
+
+            def hf_tree(_repo, ref="main"):
+                files = drift.github_tree_local(repo)
+                return {
+                    path: {"oid": sha, "lfs_oid": None, "size": 1}
+                    for path, sha in files.items()
+                }
+
+            drift.hf_tree = hf_tree
+            sys.argv = [
+                "hf_module_drift_check.py",
+                "--repo-root", repo,
+                "--github-repo", gh_repo,
+                "--hf-repo", hf_repo,
+                "--allow", allow,
+                "--warn-only",
+            ]
+            return _drift_process_status()
+        if case in registry:
+            blobs, shas = memory_blobs(registry[case])
+
+            def gh_get(url, want_headers=False):
+                parsed = urllib.parse.urlparse(url)
+                path = urllib.parse.unquote(parsed.path)
+                status, body = 404, b""
+                if parsed.netloc == "raw.githubusercontent.com":
+                    parts = path.strip("/").split("/")
+                    rel = "/".join(parts[3:]) if len(parts) >= 4 else ""
+                    if rel in blobs:
+                        status, body = 200, blobs[rel]
+                    elif rel != ".github/hf-module-drift-allow.json":
+                        raise RuntimeError("network blocked: " + url)
+                elif parsed.netloc == "api.github.com" and "/git/trees/" in path:
+                    payload = {
+                        "truncated": False,
+                        "tree": [
+                            {"path": rel, "type": "blob", "sha": sha}
+                            for rel, sha in shas.items()
+                        ],
+                    }
+                    status, body = 200, json.dumps(payload).encode("utf-8")
+                else:
+                    raise RuntimeError("network blocked: " + url)
+                return status, body, {} if want_headers else None
+
+            drift.gh_get = gh_get
+            drift.hf_tree = lambda _repo, ref="main": {
+                rel: {"oid": sha, "lfs_oid": None, "size": len(blobs[rel])}
+                for rel, sha in shas.items()
+            }
+            registry_path = os.path.join(tmp, "registry.json")
+            with open(registry_path, "w", encoding="utf-8", newline="\n") as handle:
+                json.dump(
+                    {
+                        "spaces": [{
+                            "github": gh_repo,
+                            "hf": hf_repo,
+                            "ref": source,
+                            "github_ref": source,
+                            "hf_ref": live,
+                        }]
+                    },
+                    handle,
+                )
+            sys.argv = [
+                "hf_module_drift_check.py",
+                "--registry", registry_path,
+                "--ref", source,
+                "--allow", allow,
+                "--warn-only",
+            ]
+            return _drift_process_status()
+        if case == "trusted-dotted":
+            candidate_df = dotted
+        elif case in trusted:
+            candidate_df = trusted[case]
+        elif case == "trusted-warn-only":
+            candidate_df = None
+        else:
+            return 97
+        if case != "trusted-warn-only":
+            trees = {}
+            blobs_by_ref = {}
+            for ref, dockerfile in ((source, safe if case != "trusted-dotted" else dotted),
+                                    (candidate, candidate_df)):
+                blobs, shas = memory_blobs(dockerfile)
+                trees[ref] = shas
+                blobs_by_ref[ref] = blobs
+            drift.fetch_github_file = (
+                lambda _repo, ref, path: blobs_by_ref[ref][path]
+            )
+            drift.github_tree_remote = lambda _repo, ref="main": dict(trees[ref])
+            drift.hf_tree = lambda _repo, ref="main": {
+                path: {
+                    "oid": sha,
+                    "lfs_oid": None,
+                    "size": len(blobs_by_ref[source][path]),
+                }
+                for path, sha in trees[source].items()
+            }
+            drift.github_ref_is_ancestor = lambda *_args, **_kwargs: (True, "ahead")
+
+            def hf_space_state(_repo, observation_count=2):
+                return {
+                    "head_sha": live,
+                    "runtime_sha": live,
+                    "runtime_stage": "RUNNING",
+                    "observation_status": "stable",
+                    "observation_count": observation_count,
+                    "required_observation_count": observation_count,
+                    "observations": [{}, {}],
+                }
+
+            drift.hf_space_state = hf_space_state
+        lock_path = os.path.join(tmp, "lock.json")
+        with open(lock_path, "w", encoding="utf-8", newline="\n") as handle:
+            json.dump(
+                {
+                    "schema": 1,
+                    "github_repo": gh_repo,
+                    "github_source_sha": source,
+                    "hf_repo": hf_repo,
+                    "hf_commit_sha": live,
+                },
+                handle,
+            )
+        sys.argv = [
+            "hf_module_drift_check.py",
+            "--github-repo", gh_repo,
+            "--hf-repo", hf_repo,
+            "--deployment-lock", lock_path,
+            "--trusted-base-ref", base,
+            "--candidate-ref", candidate,
+            "--ref", source,
+            "--allow", allow,
+        ]
+        if case == "trusted-warn-only":
+            sys.argv.append("--warn-only")
+        return _drift_process_status()
+
+
+class TestContractProcessExit(unittest.TestCase):
+    """Process status is the contract. A drift label alone is not."""
+
+    def _run(self, case):
+        env = os.environ.copy()
+        env["SZL_DRIFT_EXIT_PROBE"] = "1"
+        env["PYTHONDONTWRITEBYTECODE"] = "1"
+        return subprocess.run(
+            [sys.executable, os.path.abspath(__file__), case],
+            cwd=_HERE,
+            env=env,
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            timeout=30,
+        )
+
+    def test_warn_only_contract_failures_exit_nonzero(self):
+        expected = {
+            "single-traversal": 1,
+            "single-mixed": 1,
+            "single-all-rejected": 1,
+            "single-dot": 1,
+            "single-dot-slash": 1,
+            "single-dotted": 0,
+            "registry-traversal": 1,
+            "registry-mixed": 1,
+            "registry-all-rejected": 1,
+            "registry-dot": 1,
+            "registry-dot-slash": 1,
+            "registry-dotted": 0,
+            "trusted-invalid": 1,
+            "trusted-mixed": 1,
+            "trusted-all-rejected": 1,
+            "trusted-dot": 1,
+            "trusted-dot-slash": 1,
+            "trusted-dotted": 0,
+            "trusted-warn-only": 2,
+        }
+        context_cases = {
+            "single-dot",
+            "single-dot-slash",
+            "registry-dot",
+            "registry-dot-slash",
+            "trusted-dot",
+            "trusted-dot-slash",
+        }
+        for case, code in expected.items():
+            with self.subTest(case=case):
+                completed = self._run(case)
+                self.assertEqual(
+                    completed.returncode,
+                    code,
+                    completed.stdout + "\n" + completed.stderr,
+                )
+                if code == 1:
+                    self.assertIn("\nFAIL:", "\n" + completed.stdout)
+                    self.assertNotIn("\nOK:", "\n" + completed.stdout)
+                elif code == 0:
+                    self.assertIn("\nOK:", "\n" + completed.stdout)
+                    self.assertNotIn("\nFAIL:", "\n" + completed.stdout)
+                    self.assertNotIn("context-root-unsupported", completed.stdout)
+                    self.assertNotIn("rejected-copy-source", completed.stdout)
+                else:
+                    self.assertIn("forbidden", completed.stderr)
+                if case in context_cases:
+                    self.assertIn("context-root-unsupported", completed.stdout)
+                    self.assertNotIn("missing-both", completed.stdout)
+                    self.assertNotIn("traversal", completed.stdout.lower())
+
+
 
 if __name__ == "__main__":
+    if os.environ.get("SZL_DRIFT_EXIT_PROBE") == "1":
+        raise SystemExit(_drift_exit_probe(sys.argv[1:]))
     unittest.main(verbosity=2)
