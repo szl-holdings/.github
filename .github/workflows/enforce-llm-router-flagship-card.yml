@@ -8,6 +8,7 @@ name: Enforce LLM Router flagship card
       - scripts/enforce_llm_router_flagship_card.py
       - huggingface/llm-router-flagship.card.md
       - huggingface/llm-router-flagship.manifest.json
+      - .github/tests/test_flagship_publication_events.py
   push:
     branches: [main]
     paths:
@@ -16,6 +17,7 @@ name: Enforce LLM Router flagship card
       - huggingface/llm-router-flagship.card.md
       - huggingface/llm-router-flagship.manifest.json
       - huggingface/org-card.manifest.json
+      - .github/tests/test_flagship_publication_events.py
   schedule:
     - cron: "17 8 * * *"
   workflow_dispatch: {}
@@ -30,7 +32,7 @@ concurrency:
 jobs:
   validate:
     name: Validate durable showcase contract
-    if: github.event_name == 'pull_request'
+    if: github.event_name != 'workflow_dispatch'
     runs-on: ubuntu-latest
     timeout-minutes: 6
     steps:
@@ -54,10 +56,11 @@ jobs:
           python scripts/enforce_llm_router_flagship_card.py \
             --card huggingface/llm-router-flagship.card.md \
             --receipt /tmp/not-written.json
+          python .github/tests/test_flagship_publication_events.py
 
   enforce:
     name: Enforce public running Space and org-card showcase
-    if: github.event_name != 'pull_request'
+    if: github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     timeout-minutes: 25
     env:
