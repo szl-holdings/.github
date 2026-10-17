@@ -27,6 +27,9 @@ import io
 import json
 import os
 import shutil
+import socket
+import subprocess
+import sys
 import tempfile
 import unittest
 
@@ -1056,6 +1059,17 @@ class TestCopySourceNormalization(unittest.TestCase):
         self.assertIsNone(drift.normalize_copy_source("././"))
         self.assertEqual(drift.parse_copy_sources("COPY ./ /dest\n"), [])
         self.assertEqual(drift.parse_copy_sources("COPY ././ /dest\n"), [])
+        self.assertEqual(drift.parse_copy_sources("COPY . /dest\n"), [])
+        self.assertEqual(drift.parse_copy_sources("COPY ./. /dest\n"), [])
+        self.assertEqual(drift.context_root_copy_sources("COPY . /dest\n"), ["."])
+        self.assertEqual(drift.context_root_copy_sources("COPY ./ /dest\n"), ["./"])
+        self.assertEqual(drift.context_root_copy_sources("COPY ././ /dest\n"), ["././"])
+        self.assertEqual(drift.context_root_copy_sources("COPY ./. /dest\n"), ["./."])
+        self.assertEqual(drift.rejected_copy_sources("COPY ./ /dest\n"), [])
+        self.assertEqual(
+            drift.context_root_copy_sources("COPY .github/scripts/publish_readiness_verdict.py /a\n"),
+            [],
+        )
         self.assertEqual(
             drift.parse_copy_sources("COPY .../hidden /dest\n"),
             [".../hidden"],
@@ -1194,17 +1208,33 @@ class TestRejectedCopyCoverage(unittest.TestCase):
             [(entry["kind"], entry["path"]) for entry in mixed_errors],
             [("rejected-copy-source", "../secret")],
         )
-        dotted, dotted_errors, _dotted_warns = self._compare(
-            b"COPY ./ /dest\n",
-            {"Dockerfile": "df"},
-        )
-        self.assertEqual(dotted["status"], "drift")
-        self.assertEqual(dotted["files_compared"], 0)
-        self.assertEqual(dotted["rejected_copy_sources"], ["./"])
-        self.assertEqual(
-            [(entry["kind"], entry["path"]) for entry in dotted_errors],
-            [("rejected-copy-source", "./")],
-        )
+        for spelling, dockerfile in (
+            (".", b"COPY . /dest\n"),
+            ("./", b"COPY ./ /dest\n"),
+            ("././", b"COPY ././ /dest\n"),
+            ("./.", b"COPY ./. /dest\n"),
+        ):
+            rooted, rooted_errors, rooted_warns = self._compare(
+                dockerfile,
+                {"Dockerfile": "df", "serve.py": "same"},
+                allow={"accepted_divergences": {spelling: "backlog"}},
+            )
+            self.assertEqual(rooted["status"], "drift", spelling)
+            self.assertEqual(rooted["files_compared"], 0, spelling)
+            self.assertEqual(rooted["copy_sources"], 0, spelling)
+            self.assertEqual(rooted["rejected_copy_sources"], [], spelling)
+            self.assertEqual(rooted["context_root_sources"], [spelling], spelling)
+            self.assertEqual(
+                [(entry["kind"], entry["path"], entry["severity"]) for entry in rooted_errors],
+                [("context-root-unsupported", spelling, "error")],
+                spelling,
+            )
+            self.assertEqual(rooted_warns, [], spelling)
+            self.assertNotIn(
+                "missing-both",
+                [entry["kind"] for entry in rooted_errors + rooted_warns],
+                spelling,
+            )
         kept, kept_errors, _kept_warns = self._compare(
             b"COPY .github/scripts/publish_readiness_verdict.py /a\n"
             b"COPY .well-known/security.txt /b\n",
@@ -1281,6 +1311,296 @@ class TestRejectedCopyCoverage(unittest.TestCase):
         self.assertEqual(report["delta_count"], 0)
         self.assertEqual(report["new_unresolved_sources"], [])
 
+    def test_context_roots_are_not_aligned_coverage(self):
+        report = self._delta(
+            b"COPY . /dest\n",
+            b"COPY ./ /dest\n",
+            {"Dockerfile": "df", "serve.py": "same"},
+        )
+        self.assertEqual(report["status"], "invalid")
+        self.assertEqual(report["baseline_context_root_sources"], ["."])
+        self.assertEqual(report["candidate_context_root_sources"], ["./"])
+        self.assertEqual(report["baseline_rejected_copy_sources"], [])
+        self.assertEqual(report["candidate_rejected_copy_sources"], [])
+        self.assertNotEqual(report["status"], "no-changes")
+
+
+_PROCESS_BASE = "1111111111111111111111111111111111111111"
+_PROCESS_CAND = "2222222222222222222222222222222222222222"
+_PROCESS_HF = "3333333333333333333333333333333333333333"
+_PROCESS_GH = "szl-holdings/a11oy"
+_PROCESS_SPACE = "SZLHOLDINGS/a11oy"
+_PROCESS_DOCKERFILES = {
+    "traversal": b"COPY ../secret /dest\n",
+    "mixed": b"COPY ../secret serve.py /dest\n",
+    "all-rejected": b"COPY ../secret /tmp/secret\nCOPY /etc/passwd /tmp/passwd\n",
+    "dot": b"COPY . /dest\n",
+    "dot-slash": b"COPY ./ /dest\n",
+    "dotted-control": (
+        b"COPY .github/scripts/publish_readiness_verdict.py /a\n"
+        b"COPY .well-known/security.txt /b\n"
+    ),
+    "invalid-plan": b"COPY serve.py /app/serve.py\n",
+    "ordinary-drift": b"COPY serve.py /app/serve.py\n",
+}
+
+
+def _process_dockerfile(ref, case):
+    if case == "invalid-plan" and ref == _PROCESS_CAND:
+        return b"COPY ../secret /dest\n"
+    return _PROCESS_DOCKERFILES[case]
+
+
+def _process_tree(ref, case):
+    dockerfile_blob = "blob-df-cand" if case == "invalid-plan" and ref == _PROCESS_CAND else "blob-df"
+    return {
+        "Dockerfile": dockerfile_blob,
+        "serve.py": "blob-serve",
+        ".github/scripts/publish_readiness_verdict.py": "blob-gh",
+        ".well-known/security.txt": "blob-wk",
+    }
+
+
+def _process_expected_exit(case, caller, warn):
+    if warn and caller in ("trusted-baseline", "source-bound"):
+        return 2
+    if case == "dotted-control":
+        return 0
+    if case == "ordinary-drift":
+        return 0 if warn else 1
+    if case == "invalid-plan" and caller in ("single-pair", "registry"):
+        return 0
+    return 1
+
+
+def _process_child():
+    case = os.environ["COPY_PROCESS_CASE"]
+    caller = os.environ["COPY_PROCESS_CALLER"]
+    warn = os.environ["COPY_PROCESS_WARN"] == "1"
+    out_dir = os.environ["COPY_PROCESS_OUT"]
+    os.makedirs(out_dir, exist_ok=True)
+    attempts = []
+
+    def blocked(self, address):
+        attempts.append(repr(address))
+        raise OSError("network blocked by the COPY-source process regression")
+
+    socket.socket.connect = blocked
+
+    def blocked_create(*args, **kwargs):
+        attempts.append("create_connection")
+        raise OSError("network blocked by the COPY-source process regression")
+
+    socket.create_connection = blocked_create
+
+    import hf_module_drift_check as process_drift
+    import hf_source_bound_baseline as process_baseline
+
+    def gh_get(url, want_headers=False):
+        if "/compare/" in url:
+            return 200, b'{"status":"ahead"}', {}
+        if url.rstrip("/").endswith("/Dockerfile"):
+            marker = f"/{_PROCESS_GH}/"
+            ref = url.split(marker, 1)[1].split("/", 1)[0] if marker in url else "main"
+            return 200, _process_dockerfile(ref, case), {}
+        if "hf-module-drift-allow.json" in url:
+            return 404, b"", {}
+        raise OSError("unstubbed GitHub GET")
+
+    def github_tree(repo, ref="main"):
+        return {} if repo != _PROCESS_GH else _process_tree(ref, case)
+
+    def hf_tree(repo, ref="main"):
+        tree = _process_tree(_PROCESS_BASE, case)
+        if case == "ordinary-drift":
+            tree = dict(tree)
+            tree["serve.py"] = "blob-hf-drift"
+        return {
+            path: {"oid": oid, "lfs_oid": None, "size": 1}
+            for path, oid in tree.items()
+        }
+
+    process_drift.gh_get = gh_get
+    process_drift._http = lambda *args, **kwargs: (_ for _ in ()).throw(OSError("unstubbed HTTP"))
+    process_drift.github_tree_remote = github_tree
+    process_drift.hf_tree = hf_tree
+    process_drift.fetch_github_file = lambda repo, ref, path: _process_dockerfile(ref, case)
+    process_drift.github_file_date = lambda *args, **kwargs: None
+    process_drift.hf_dir_dates = lambda *args, **kwargs: {}
+    process_drift.hf_space_state = lambda *args, **kwargs: {
+        "observation_status": "stable",
+        "observation_count": 2,
+        "head_sha": _PROCESS_HF,
+        "runtime_sha": _PROCESS_HF,
+        "runtime_stage": "RUNNING",
+        "observations": [],
+    }
+    process_baseline.drift = process_drift
+    process_baseline.source_probe_state = lambda *args, **kwargs: {
+        "observation_status": "stable",
+        "observation_count": 2,
+        "required_observation_count": 2,
+        "source_revision": _PROCESS_BASE,
+        "probe_path": "/api/build-info",
+        "origin": "https://example.invalid",
+        "observations": [],
+    }
+    report_path = os.path.join(out_dir, "report.json")
+    candidate_path = os.path.join(out_dir, "candidate-report.json")
+    lock_path = os.path.join(out_dir, "deployment-lock.json")
+    registry_path = os.path.join(out_dir, "registry.json")
+    with open(lock_path, "w", encoding="utf-8") as handle:
+        json.dump({
+            "schema": 1,
+            "github_repo": _PROCESS_GH,
+            "github_source_sha": _PROCESS_BASE,
+            "hf_repo": _PROCESS_SPACE,
+            "hf_commit_sha": _PROCESS_HF,
+        }, handle)
+    with open(registry_path, "w", encoding="utf-8") as handle:
+        json.dump({"spaces": [{"github": _PROCESS_GH, "hf": _PROCESS_SPACE, "ref": "main"}]}, handle)
+    argv = []
+    if caller in ("single-pair", "trusted-baseline"):
+        argv = [
+            "hf_module_drift_check.py", "--github-repo", _PROCESS_GH, "--hf-repo", _PROCESS_SPACE,
+            "--repo-root", out_dir, "--report-out", report_path,
+        ]
+        if caller == "single-pair":
+            argv.extend(["--github-remote", "--ref", "main"])
+        else:
+            argv.extend([
+                "--deployment-lock", lock_path, "--trusted-base-ref", _PROCESS_BASE,
+                "--candidate-report-out", candidate_path,
+            ])
+        if case == "invalid-plan":
+            argv.extend(["--candidate-ref", _PROCESS_CAND])
+        if warn:
+            argv.append("--warn-only")
+        sys.argv = argv
+        code = process_drift.main()
+    elif caller == "registry":
+        argv = [
+            "hf_module_drift_check.py", "--registry", registry_path, "--repo-root", out_dir,
+            "--report-out", report_path, "--ref", "main",
+        ]
+        if case == "invalid-plan":
+            argv.extend(["--candidate-ref", _PROCESS_CAND])
+        if warn:
+            argv.append("--warn-only")
+        sys.argv = argv
+        code = process_drift.main()
+    elif caller == "source-bound":
+        argv = [
+            "hf_source_bound_baseline.py", "--github-repo", _PROCESS_GH, "--hf-repo", _PROCESS_SPACE,
+            "--trusted-base-ref", _PROCESS_BASE, "--report-out", report_path,
+            "--candidate-report-out", candidate_path,
+        ]
+        if case == "invalid-plan":
+            argv.extend(["--candidate-ref", _PROCESS_CAND])
+        if warn:
+            argv.append("--warn-only")
+        sys.argv = argv
+        code = process_baseline.main()
+    else:
+        raise SystemExit("unknown caller")
+    with open(os.path.join(out_dir, "socket.json"), "w", encoding="utf-8") as handle:
+        json.dump({"socket_attempts": len(attempts)}, handle)
+    return int(code)
+
+
+class TestCopySourceProcessExit(unittest.TestCase):
+    """Real process exits for the four COPY-source callers.
+
+    The driver, fixtures, and captured stdout stay in the test process output.
+    """
+
+    def test_exact_process_exits(self):
+        cases = (
+            "traversal", "mixed", "all-rejected", "invalid-plan",
+            "dot", "dot-slash", "dotted-control", "ordinary-drift",
+        )
+        callers = ("single-pair", "registry", "trusted-baseline", "source-bound")
+        rows = []
+        for case in cases:
+            for caller in callers:
+                for warn in (False, True):
+                    with self.subTest(case=case, caller=caller, warn=warn):
+                        with tempfile.TemporaryDirectory() as out_dir:
+                            env = os.environ.copy()
+                            env.update({
+                                "COPY_PROCESS_CHILD": "1",
+                                "COPY_PROCESS_CASE": case,
+                                "COPY_PROCESS_CALLER": caller,
+                                "COPY_PROCESS_WARN": "1" if warn else "0",
+                                "COPY_PROCESS_OUT": out_dir,
+                                "PYTHONDONTWRITEBYTECODE": "1",
+                            })
+                            completed = subprocess.run(
+                                [sys.executable, os.path.abspath(__file__)],
+                                cwd=out_dir,
+                                env=env,
+                                capture_output=True,
+                                text=True,
+                                check=False,
+                            )
+                            (Path_stdout, Path_stderr) = (
+                                os.path.join(out_dir, "stdout.txt"),
+                                os.path.join(out_dir, "stderr.txt"),
+                            )
+                            # Retain the child output beside the assertion so a
+                            # failure still has the process text in the temp dir
+                            # until this subTest ends. The committed evidence
+                            # driver is separate and is not deleted here.
+                            with open(Path_stdout, "w", encoding="utf-8") as handle:
+                                handle.write(completed.stdout)
+                            with open(Path_stderr, "w", encoding="utf-8") as handle:
+                                handle.write(completed.stderr)
+                            expected = _process_expected_exit(case, caller, warn)
+                            self.assertEqual(completed.returncode, expected, completed.stderr[-500:])
+                            socket_path = os.path.join(out_dir, "socket.json")
+                            if os.path.exists(socket_path):
+                                with open(socket_path, encoding="utf-8") as handle:
+                                    socket_info = json.loads(handle.read())
+                                self.assertEqual(socket_info["socket_attempts"], 0)
+                            report_path = os.path.join(out_dir, "report.json")
+                            if expected != 2:
+                                self.assertTrue(os.path.exists(report_path))
+                                with open(report_path, encoding="utf-8") as handle:
+                                    report = json.loads(handle.read())
+                                findings = list(report.get("findings") or [])
+                                for pair in report.get("pairs") or []:
+                                    findings.extend(pair.get("findings") or [])
+                                kinds = {item.get("kind") for item in findings}
+                                if case in ("dot", "dot-slash") and caller:
+                                    self.assertIn("context-root-unsupported", kinds)
+                                    self.assertNotIn("missing-both", kinds)
+                                    self.assertNotIn("rejected-copy-source", kinds)
+                                if case in ("traversal", "mixed", "all-rejected"):
+                                    self.assertIn("rejected-copy-source", kinds)
+                                if case == "invalid-plan" and caller in ("trusted-baseline", "source-bound"):
+                                    self.assertIn("rejected-copy-source", kinds)
+                                if case == "ordinary-drift":
+                                    self.assertIn("drift", kinds)
+                                    self.assertNotIn("rejected-copy-source", kinds)
+                                if case == "dotted-control":
+                                    self.assertEqual(kinds, set())
+                            ok_line = "\nOK:" in completed.stdout or completed.stdout.startswith("OK:")
+                            if expected == 1:
+                                self.assertFalse(ok_line)
+                            rows.append({
+                                "case": case,
+                                "caller": caller,
+                                "warn_only": warn,
+                                "exit": completed.returncode,
+                            })
+        self.assertEqual(len(rows), 64)
+
 
 if __name__ == "__main__":
+    if os.environ.get("COPY_PROCESS_CHILD") == "1":
+        try:
+            raise SystemExit(_process_child())
+        except SystemExit as exc:
+            code = exc.code
+            raise SystemExit(code if isinstance(code, int) else 2)
     unittest.main(verbosity=2)

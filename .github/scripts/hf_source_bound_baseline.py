@@ -449,6 +449,30 @@ def source_bound_baseline_compare(args: argparse.Namespace):
                     ),
                 }
             )
+        for source in candidate_report.get("candidate_context_root_sources") or []:
+            contract_errors.append(
+                {
+                    "path": source,
+                    "kind": "context-root-unsupported",
+                    "severity": "error",
+                    "detail": (
+                        "candidate COPY context root is not expanded and Docker "
+                        "ignore coverage is not implemented; verification stays blocked"
+                    ),
+                }
+            )
+        for source in candidate_report.get("baseline_context_root_sources") or []:
+            contract_errors.append(
+                {
+                    "path": source,
+                    "kind": "context-root-unsupported",
+                    "severity": "error",
+                    "detail": (
+                        "baseline COPY context root is not expanded and Docker "
+                        "ignore coverage is not implemented; verification stays blocked"
+                    ),
+                }
+            )
 
     errors = contract_errors + drift_errors
     findings = errors + warns

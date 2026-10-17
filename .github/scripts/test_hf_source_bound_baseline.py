@@ -387,13 +387,15 @@ class SourceBoundBaselineTests(unittest.TestCase):
             [("rejected-copy-source", "../secret")],
         )
 
-    def test_rejected_baseline_copy_source_is_not_ok(self):
+    def test_context_root_baseline_copy_source_is_not_ok(self):
         self.install_clean()
         drift.candidate_managed_delta = lambda *_args: {
             "status": "invalid",
             "new_unresolved_sources": [],
             "candidate_rejected_copy_sources": [],
-            "baseline_rejected_copy_sources": ["./"],
+            "baseline_rejected_copy_sources": [],
+            "candidate_context_root_sources": [],
+            "baseline_context_root_sources": ["./"],
             "delta_count": 0,
             "deltas": [],
             "baseline_ref": self.SOURCE,
@@ -406,7 +408,7 @@ class SourceBoundBaselineTests(unittest.TestCase):
         self.assertNotEqual(report["status"], "ok")
         self.assertEqual(
             [(item["kind"], item["path"]) for item in errors],
-            [("rejected-copy-source", "./")],
+            [("context-root-unsupported", "./")],
         )
 
     def test_source_bound_module_contains_no_mutation_or_warn_only(self):

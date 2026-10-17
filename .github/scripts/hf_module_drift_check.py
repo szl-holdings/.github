@@ -56,6 +56,9 @@ Four run modes:
                    per-repo copy-paste.
 
 Exit status: non-zero if any non-allowlisted drift is found, unless --warn-only.
+--warn-only still reports ordinary drift without failing. It does not hide a
+rejected COPY source, an unsupported context root, or an unresolved candidate
+COPY source. Trusted-baseline mode rejects --warn-only.
 
 stdlib only (no huggingface_hub / requests) so it runs on a bare runner.
 """
@@ -444,6 +447,25 @@ def normalize_copy_source(source: str) -> str | None:
     return text
 
 
+def context_root_spelling(source: str) -> bool:
+    """Return true for an unexpanded build-context root.
+
+    ``.``, ``./``, and a run of ``./`` prefixes that leaves ``.`` or an empty
+    path select the whole context. ``.github`` and ``.well-known`` do not.
+    This is not a ``..`` traversal spelling, and no Docker ignore file is
+    applied here, so callers must block these spellings instead of comparing
+    zero files.
+    """
+    if not isinstance(source, str):
+        return False
+    text = source.strip()
+    if not text:
+        return False
+    while text.startswith("./"):
+        text = text[2:]
+    return text in {"", "."}
+
+
 def _partition_copy_sources(dockerfile_text):
     """Return accepted COPY sources and the spellings that were rejected.
 
@@ -511,12 +533,20 @@ def _partition_copy_sources(dockerfile_text):
 
     accepted = []
     rejected = []
+    context_roots = []
     seen = set()
     seen_rejected = set()
+    seen_roots = set()
     for source in sources:
+        raw = source.strip() if isinstance(source, str) else ""
+        if context_root_spelling(source):
+            label = raw or "(empty)"
+            if label not in seen_roots:
+                seen_roots.add(label)
+                context_roots.append(label)
+            continue
         normalized = normalize_copy_source(source)
         if normalized is None:
-            raw = source.strip() if isinstance(source, str) else ""
             label = raw or "(empty)"
             if label not in seen_rejected:
                 seen_rejected.add(label)
@@ -525,7 +555,7 @@ def _partition_copy_sources(dockerfile_text):
         if normalized not in seen:
             seen.add(normalized)
             accepted.append(normalized)
-    return accepted, rejected
+    return accepted, rejected, context_roots
 
 
 def parse_copy_sources(dockerfile_text):
@@ -535,14 +565,24 @@ def parse_copy_sources(dockerfile_text):
     that need a coverage verdict must read both lists. An accepted list alone
     is not complete coverage when the rejected list is non-empty.
     """
-    accepted, _rejected = _partition_copy_sources(dockerfile_text)
+    accepted, _rejected, _context_roots = _partition_copy_sources(dockerfile_text)
     return accepted
 
 
 def rejected_copy_sources(dockerfile_text):
     """Return COPY spellings that were omitted instead of rewritten."""
-    _accepted, rejected = _partition_copy_sources(dockerfile_text)
+    _accepted, rejected, _context_roots = _partition_copy_sources(dockerfile_text)
     return rejected
+
+
+def context_root_copy_sources(dockerfile_text):
+    """Return COPY spellings that mean the whole build context.
+
+    These stay out of the accepted and rejected lists. Coverage is
+    unsupported until context expansion and Docker ignore handling exist.
+    """
+    _accepted, _rejected, context_roots = _partition_copy_sources(dockerfile_text)
+    return context_roots
 
 # --------------------------------------------------------------------------- #
 # GitHub side: file -> git-blob-sha map
@@ -775,6 +815,7 @@ def managed_snapshot(github_repo, ref, dockerfile_path="Dockerfile"):
     dockerfile_text = dockerfile.decode("utf-8", "replace")
     sources = parse_copy_sources(dockerfile_text)
     rejected_sources = rejected_copy_sources(dockerfile_text)
+    context_roots = context_root_copy_sources(dockerfile_text)
     managed, unresolved = expand_managed_sources(sources, tree)
     # The Dockerfile controls the live build even though it is not its own COPY
     # source. Treat it as a managed control file in every candidate plan.
@@ -787,6 +828,7 @@ def managed_snapshot(github_repo, ref, dockerfile_path="Dockerfile"):
         "tree": tree,
         "copy_sources": sources,
         "rejected_copy_sources": rejected_sources,
+        "context_root_sources": context_roots,
         "managed_paths": managed,
         "unresolved_sources": unresolved,
     }
@@ -839,9 +881,15 @@ def candidate_managed_delta(github_repo, baseline_ref, candidate_ref,
     newly_unresolved = sorted(candidate_unresolved - baseline_unresolved)
     baseline_rejected = list(baseline.get("rejected_copy_sources") or [])
     candidate_rejected = list(candidate.get("rejected_copy_sources") or [])
-    # A rejected COPY source was omitted from the managed set. "no-changes"
-    # would claim aligned coverage of a plan that did not include that source.
-    coverage_incomplete = bool(baseline_rejected or candidate_rejected)
+    baseline_context_roots = list(baseline.get("context_root_sources") or [])
+    candidate_context_roots = list(candidate.get("context_root_sources") or [])
+    # A rejected COPY source was omitted from the managed set. An unexpanded
+    # context root is also incomplete: "no-changes" must not claim coverage
+    # that was never implemented.
+    coverage_incomplete = bool(
+        baseline_rejected or candidate_rejected
+        or baseline_context_roots or candidate_context_roots
+    )
     report = {
         "schema": 1,
         "mode": "candidate-managed-delta",
@@ -856,6 +904,8 @@ def candidate_managed_delta(github_repo, baseline_ref, candidate_ref,
         "candidate_copy_sources": candidate["copy_sources"],
         "baseline_rejected_copy_sources": baseline_rejected,
         "candidate_rejected_copy_sources": candidate_rejected,
+        "baseline_context_root_sources": baseline_context_roots,
+        "candidate_context_root_sources": candidate_context_roots,
         "baseline_unresolved_sources": sorted(baseline_unresolved),
         "candidate_unresolved_sources": sorted(candidate_unresolved),
         "new_unresolved_sources": newly_unresolved,
@@ -1031,6 +1081,7 @@ def compare(args, allow=None, include_dockerfile=False):
             dockerfile_text = fh.read().decode("utf-8", "replace")
     sources = parse_copy_sources(dockerfile_text)
     rejected_sources = rejected_copy_sources(dockerfile_text)
+    context_roots = context_root_copy_sources(dockerfile_text)
 
     if args.github_remote:
         gh_files = github_tree_remote(args.github_repo, github_ref)
@@ -1157,6 +1208,16 @@ def compare(args, allow=None, include_dockerfile=False):
                 "coverage is incomplete"
             ),
         })
+    for raw in context_roots:
+        findings.append({
+            "path": raw,
+            "kind": "context-root-unsupported",
+            "severity": "error",
+            "detail": (
+                "COPY context root is not expanded and Docker ignore coverage "
+                "is not implemented; verification stays blocked"
+            ),
+        })
 
     findings.sort(key=lambda e: (e["severity"] != "error", e["path"]))
     errors = [f for f in findings if f["severity"] == "error"]
@@ -1174,6 +1235,7 @@ def compare(args, allow=None, include_dockerfile=False):
         "dockerfile_path": dockerfile_path,
         "copy_sources": len(sources),
         "rejected_copy_sources": list(rejected_sources),
+        "context_root_sources": list(context_roots),
         "files_compared": len(targets),
         "error_count": len(errors),
         "warn_count": len(warns),
@@ -1342,6 +1404,26 @@ def trusted_baseline_compare(args):
                     "the managed-file plan is not complete coverage"
                 ),
             })
+        for source in candidate_report.get("candidate_context_root_sources") or []:
+            contract_errors.append({
+                "path": source,
+                "kind": "context-root-unsupported",
+                "severity": "error",
+                "detail": (
+                    "candidate COPY context root is not expanded and Docker "
+                    "ignore coverage is not implemented; verification stays blocked"
+                ),
+            })
+        for source in candidate_report.get("baseline_context_root_sources") or []:
+            contract_errors.append({
+                "path": source,
+                "kind": "context-root-unsupported",
+                "severity": "error",
+                "detail": (
+                    "baseline COPY context root is not expanded and Docker "
+                    "ignore coverage is not implemented; verification stays blocked"
+                ),
+            })
 
     errors = contract_errors + drift_errors
     findings = errors + warns
@@ -1387,6 +1469,10 @@ def print_candidate_plan(report):
         print(f"::error title=Candidate COPY source rejected::{source}")
     for source in report.get("baseline_rejected_copy_sources") or []:
         print(f"::error title=Baseline COPY source rejected::{source}")
+    for source in report.get("candidate_context_root_sources") or []:
+        print(f"::error title=Candidate COPY context root unsupported::{source}")
+    for source in report.get("baseline_context_root_sources") or []:
+        print(f"::error title=Baseline COPY context root unsupported::{source}")
 
 
 def fmt(entry):
@@ -1493,6 +1579,21 @@ def _emit_inconclusive(args, exc):
     return 0
 
 
+_COVERAGE_BLOCK_KINDS = frozenset({
+    "rejected-copy-source",
+    "context-root-unsupported",
+    "candidate-unresolved-copy-source",
+})
+
+
+def coverage_blocks_warn_only(findings) -> bool:
+    """Return true when --warn-only must not turn this result into exit 0."""
+    return any(
+        isinstance(item, dict) and item.get("kind") in _COVERAGE_BLOCK_KINDS
+        for item in findings or []
+    )
+
+
 # --------------------------------------------------------------------------- #
 # Registry mode: org-wide sweep over a GitHub<->HF map (no checkout)
 # --------------------------------------------------------------------------- #
@@ -1506,6 +1607,7 @@ def run_registry(args):
 
     pair_reports = []
     total_errors = 0
+    coverage_must_fail = False
     scanned = 0
     skipped = []
     inconclusive = []
@@ -1612,6 +1714,8 @@ def run_registry(args):
 
         scanned += 1
         total_errors += len(errors)
+        if coverage_blocks_warn_only(errors):
+            coverage_must_fail = True
         pair_reports.append(report)
         print()
         print_pair(report, errors, warns, gh, hf, ref)
@@ -1638,7 +1742,7 @@ def run_registry(args):
     print(f"\n== org HF module-drift sweep: {scanned} pair(s) scanned, "
           f"{len(skipped)} skipped, {len(inconclusive)} inconclusive, "
           f"{total_errors} error(s) ==")
-    if total_errors and not args.warn_only:
+    if total_errors and (not args.warn_only or coverage_must_fail):
         print("\nFAIL: drifted/one-sided COPY'd module(s) between GitHub and a live "
               "HF Space. A human must pick which side is the source of truth, "
               "reconcile, and commit -- the guard never auto-overwrites.")
@@ -1761,7 +1865,7 @@ def main():
 
     _write_report(args.report_out, report)
 
-    if errors and not args.warn_only:
+    if errors and (not args.warn_only or coverage_blocks_warn_only(errors)):
         print(f"\nFAIL: {len(errors)} drifted/one-sided COPY'd module(s) between GitHub "
               "and the live HF Space. A human must pick which side is the source of truth, "
               "reconcile, and commit -- the guard never auto-overwrites.")
