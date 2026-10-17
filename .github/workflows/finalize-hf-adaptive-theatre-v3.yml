@@ -6,12 +6,14 @@ on:
     paths:
       - ".github/scripts/finalize_hf_adaptive_theatre_v3.py"
       - ".github/tests/test_finalize_hf_adaptive_theatre_v3.py"
+      - ".github/tests/test_theatre_finalizer_events.py"
       - ".github/workflows/finalize-hf-adaptive-theatre-v3.yml"
   push:
     branches: [main]
     paths:
       - ".github/scripts/finalize_hf_adaptive_theatre_v3.py"
       - ".github/tests/test_finalize_hf_adaptive_theatre_v3.py"
+      - ".github/tests/test_theatre_finalizer_events.py"
       - ".github/workflows/finalize-hf-adaptive-theatre-v3.yml"
   workflow_dispatch:
     inputs:
@@ -49,6 +51,7 @@ jobs:
         run: |
           python -m py_compile .github/scripts/finalize_hf_adaptive_theatre_v3.py .github/tests/test_finalize_hf_adaptive_theatre_v3.py
           python .github/tests/test_finalize_hf_adaptive_theatre_v3.py -v
+          python .github/tests/test_theatre_finalizer_events.py -v
           git diff --check
       - name: Prohibit bypass primitives
         shell: bash
@@ -63,7 +66,7 @@ jobs:
   finalize:
     name: Merge exact green application PRs and observe publishers
     needs: contract
-    if: ${{ github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.apply) }}
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.apply }}
     runs-on: ubuntu-latest
     timeout-minutes: 60
     env:
