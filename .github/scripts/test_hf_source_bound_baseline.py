@@ -365,6 +365,50 @@ class SourceBoundBaselineTests(unittest.TestCase):
             "candidate-unresolved-copy-source", {item["kind"] for item in errors}
         )
 
+    def test_rejected_candidate_copy_source_is_not_ok(self):
+        self.install_clean()
+        drift.candidate_managed_delta = lambda *_args: {
+            "status": "invalid",
+            "new_unresolved_sources": [],
+            "candidate_rejected_copy_sources": ["../secret"],
+            "baseline_rejected_copy_sources": [],
+            "delta_count": 0,
+            "deltas": [],
+            "baseline_ref": self.SOURCE,
+            "candidate_ref": self.HEAD,
+        }
+        report, errors, _warns, candidate = baseline.source_bound_baseline_compare(
+            self.args()
+        )
+        self.assertEqual(candidate["status"], "invalid")
+        self.assertNotEqual(report["status"], "ok")
+        self.assertEqual(
+            [(item["kind"], item["path"]) for item in errors],
+            [("rejected-copy-source", "../secret")],
+        )
+
+    def test_rejected_baseline_copy_source_is_not_ok(self):
+        self.install_clean()
+        drift.candidate_managed_delta = lambda *_args: {
+            "status": "invalid",
+            "new_unresolved_sources": [],
+            "candidate_rejected_copy_sources": [],
+            "baseline_rejected_copy_sources": ["./"],
+            "delta_count": 0,
+            "deltas": [],
+            "baseline_ref": self.SOURCE,
+            "candidate_ref": self.HEAD,
+        }
+        report, errors, _warns, candidate = baseline.source_bound_baseline_compare(
+            self.args()
+        )
+        self.assertEqual(candidate["status"], "invalid")
+        self.assertNotEqual(report["status"], "ok")
+        self.assertEqual(
+            [(item["kind"], item["path"]) for item in errors],
+            [("rejected-copy-source", "./")],
+        )
+
     def test_source_bound_module_contains_no_mutation_or_warn_only(self):
         with open(MODULE_PATH, encoding="utf-8") as handle:
             source = handle.read()

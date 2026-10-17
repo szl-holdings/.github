@@ -425,6 +425,30 @@ def source_bound_baseline_compare(args: argparse.Namespace):
                     ),
                 }
             )
+        for source in candidate_report.get("candidate_rejected_copy_sources") or []:
+            contract_errors.append(
+                {
+                    "path": source,
+                    "kind": "rejected-copy-source",
+                    "severity": "error",
+                    "detail": (
+                        "candidate COPY source was rejected and omitted; "
+                        "the managed-file plan is not complete coverage"
+                    ),
+                }
+            )
+        for source in candidate_report.get("baseline_rejected_copy_sources") or []:
+            contract_errors.append(
+                {
+                    "path": source,
+                    "kind": "rejected-copy-source",
+                    "severity": "error",
+                    "detail": (
+                        "baseline COPY source was rejected and omitted; "
+                        "the managed-file plan is not complete coverage"
+                    ),
+                }
+            )
 
     errors = contract_errors + drift_errors
     findings = errors + warns
