@@ -31,8 +31,10 @@ Verdict semantics:
   or trust root changed.
 * ``REVIEW_REQUIRED`` and any admission-producer change hold, unless a
   separately verified owner decision binds the same base, head, head tree,
-  raw-diff digest, receipt digest and effect run. The receipt is never
-  relabeled ALLOW.
+  raw-diff digest, receipt digest and effect run. A merge group binds the
+  digest, run and decision time to the original pull-request effect
+  receipt, not to the merge-group run. The verifier does not poll for its
+  own run to become that evidence. The receipt is never relabeled ALLOW.
 
 Owner decision record. It is a pull-request conversation comment, unedited,
 whose author login is in ``OWNER_DECISION_ACTORS`` and whose account type is
@@ -488,7 +490,13 @@ def _select_check(
     }
 
 
-def _receipt_from_artifact(reader: GitHubReader, run_id: int, subject: Subject) -> tuple[dict[str, Any], dict[str, Any]]:
+def _receipt_from_artifact(
+    reader: GitHubReader,
+    run_id: int,
+    subject: Subject,
+    *,
+    expected_head: str | None = None,
+) -> tuple[dict[str, Any], dict[str, Any]]:
     artifacts = reader.paged(f"repos/{reader.repository}/actions/runs/{run_id}/artifacts", "artifacts")
     name = f"control-plane-effect-{run_id}"
     matches = [item for item in artifacts if item.get("name") == name]
@@ -498,8 +506,9 @@ def _receipt_from_artifact(reader: GitHubReader, run_id: int, subject: Subject) 
     artifact = matches[0]
     workflow_run = artifact.get("workflow_run") or {}
     digest = str(artifact.get("digest") or "")
+    bound_head = subject.head_sha if expected_head is None else expected_head
     if (artifact.get("expired") is not False or workflow_run.get("id") != run_id
-            or workflow_run.get("head_sha") != subject.head_sha or not EXACT_DIGEST.fullmatch(digest)):
+            or workflow_run.get("head_sha") != bound_head or not EXACT_DIGEST.fullmatch(digest)):
         raise AdmissionError("RECEIPT_UNAVAILABLE", "effect artifact is expired, foreign or undigested")
     archive = reader.artifact_zip(int(artifact["id"]))
     if sha256_bytes(archive) != digest:
@@ -621,6 +630,63 @@ def _decision_block(body: Any) -> dict[str, str] | None:
     return fields
 
 
+def _original_pull_request_effect(
+    reader: GitHubReader,
+    subject: Subject,
+    *,
+    merge_receipt: Mapping[str, Any],
+    head_tree: str,
+    current_run_id: int,
+) -> tuple[dict[str, Any] | None, list[str]]:
+    """The owner-accepted pull-request effect, not the merge-group run.
+
+    Exactly one completed pull_request effect run on the original head is
+    usable. The current merge-group run is excluded so admission cannot wait
+    for this verifier to name itself.
+    """
+    runs = reader.paged(
+        f"repos/{reader.repository}/actions/runs?head_sha={subject.pr_head_sha}",
+        "workflow_runs")
+    matches = [
+        run for run in runs
+        if run.get("path") == EFFECT_WORKFLOW
+        and run.get("event") == "pull_request"
+        and run.get("head_sha") == subject.pr_head_sha
+        and int(run.get("id") or 0) != current_run_id
+        and (run.get("head_repository") or {}).get("full_name") == subject.repository
+        and run.get("status") == "completed"
+        and run.get("conclusion") == "success"
+        and run.get("created_at")
+    ]
+    if len(matches) != 1:
+        return None, ["OWNER_PR_RECEIPT_REQUIRED"]
+    run = matches[0]
+    try:
+        receipt, _artifact = _receipt_from_artifact(
+            reader, int(run["id"]), subject, expected_head=subject.pr_head_sha)
+        body = {key: value for key, value in receipt.items() if key != "decision_digest"}
+        recomputed = sha256_bytes(canonical_bytes(body))
+    except (AdmissionError, TypeError, ValueError):
+        return None, ["OWNER_PR_RECEIPT_REQUIRED"]
+    claimed = str(receipt.get("decision_digest") or "")
+    same_diff = (
+        receipt.get("head_revision") == subject.pr_head_sha
+        and receipt.get("base_revision") == subject.base_sha
+        and receipt.get("head_tree") == head_tree
+        and receipt.get("diff_sha256") == merge_receipt.get("diff_sha256")
+        and receipt.get("verdict") == merge_receipt.get("verdict")
+        and EXACT_DIGEST.fullmatch(claimed) is not None
+        and recomputed == claimed
+    )
+    if not same_diff:
+        return None, ["OWNER_PR_RECEIPT_REQUIRED"]
+    return {
+        "decision_digest": claimed,
+        "run_id": int(run["id"]),
+        "created_at": str(run.get("created_at")),
+    }, []
+
+
 def _owner_decision(
     reader: GitHubReader,
     subject: Subject,
@@ -673,6 +739,20 @@ def _owner_decision(
         expected["cp_ebom_decision_digest"] = str(receipt.get("decision_digest"))
         expected["cp_ebom_run_id"] = str(effect_run["run_id"])
         if str(comment.get("created_at")) < str(effect_run.get("created_at") or ""):
+            return record, ["OWNER_DECISION_PREDATES_EVIDENCE"], ignored
+    else:
+        # The merge-group run is new evidence. The owner decision stays bound
+        # to the pull-request receipt, run and time. Missing original evidence
+        # holds; it is not polled, and this run is never accepted as itself.
+        original, problems = _original_pull_request_effect(
+            reader, subject, merge_receipt=receipt, head_tree=head_tree,
+            current_run_id=int(effect_run["run_id"]))
+        if problems:
+            return record, problems, ignored
+        assert original is not None
+        expected["cp_ebom_decision_digest"] = original["decision_digest"]
+        expected["cp_ebom_run_id"] = str(original["run_id"])
+        if str(comment.get("created_at")) < str(original["created_at"]):
             return record, ["OWNER_DECISION_PREDATES_EVIDENCE"], ignored
     # A merge-group receipt has new commit identities but must carry the same
     # base, tree and raw diff the owner accepted on the pull-request head.

@@ -35,6 +35,7 @@ BASE_TREE = "d" * 40
 MG_HEAD = "e" * 40
 OTHER = "f" * 40
 GATE_RUN, PROV_RUN, EFFECT_RUN = 5001, 5002, 5003
+PR_EFFECT_RUN = 5103
 OWNER = "stephenlutar2-hash"
 POLICY = ".github/data/control_plane_effect_policy.json"
 STORAGE = "https://productionresults.blob.core.windows.net/artifacts/"
@@ -149,8 +150,29 @@ class Scenario:
         receipt["decision_digest"] = digest(receipt)
         return receipt
 
+    def attach_original_pr_receipt(self) -> dict:
+        """Publish the pull-request effect the owner can accept.
+
+        The merge-group receipt keeps its own head. This receipt uses the
+        original head and the same base, tree, diff and verdict.
+        """
+        if self.event != "merge_group":
+            raise AssertionError("original PR receipt belongs on a merge group")
+        self.add_run(PR_EFFECT_RUN, rav.EFFECT_WORKFLOW, "pull_request",
+                     head=HEAD, created_at="2026-10-13T10:00:00Z")
+        receipt = self.build_receipt(head_revision=HEAD)
+        policy = dict(receipt["policy"])
+        if policy.get("authority_revision") == self.head:
+            policy["authority_revision"] = HEAD
+            receipt["policy"] = policy
+        body = {key: value for key, value in receipt.items() if key != "decision_digest"}
+        receipt["decision_digest"] = digest(body)
+        self.publish_receipt(PR_EFFECT_RUN, receipt, head_sha=HEAD)
+        return receipt
+
     def publish_receipt(self, run_id: int, receipt: object, *, raw: bytes | None = None,
-                        members: dict[str, bytes] | None = None, digest_override: str | None = None) -> None:
+                        members: dict[str, bytes] | None = None, digest_override: str | None = None,
+                        head_sha: str | None = None) -> None:
         buffer = io.BytesIO()
         with zipfile.ZipFile(buffer, "w") as bundle:
             files = members if members is not None else {
@@ -165,7 +187,7 @@ class Scenario:
         self.artifacts[run_id] = [{
             "id": artifact_id, "name": f"control-plane-effect-{run_id}", "expired": False,
             "digest": digest_override or rav.sha256_bytes(blob),
-            "workflow_run": {"id": run_id, "head_sha": self.head},
+            "workflow_run": {"id": run_id, "head_sha": head_sha or self.head},
         }]
 
     def decision(self, *, login: str = OWNER, user_type: str = "User", action: str = "ACCEPT",
@@ -249,8 +271,9 @@ class FakeGitHub:
                         "check_suite": {"id": 1}} for index in range(s.check_padding)]
             return self.page(padding + s.checks, query, "check_runs")
         if rest == "actions/runs":
-            assert query.get("head_sha") == [s.head]
-            return self.page(s.runs, query, "workflow_runs")
+            wanted = (query.get("head_sha") or [None])[0]
+            matched = [run for run in s.runs if run.get("head_sha") == wanted]
+            return self.page(matched, query, "workflow_runs")
         if rest.startswith("actions/runs/") and rest.endswith("/artifacts"):
             return self.page(s.artifacts.get(int(rest.split("/")[2]), []), query, "artifacts")
         if rest.startswith("actions/artifacts/") and rest.endswith("/zip"):
@@ -542,12 +565,55 @@ class AcceptanceCaseTests(VerifierCase):
         group = Scenario(event="merge_group", verdict="REVIEW_REQUIRED", changed=(POLICY,))
         result, _ = self.run_verifier(group)
         self.assertDecision(result, "HOLD", "OWNER_DECISION_MISSING")
+        self.assertEqual(result["receipt_verdict"], "REVIEW_REQUIRED")
         group.decision(cp_ebom_decision_digest="sha256:" + "5" * 64, cp_ebom_run_id="4999")
         result, _ = self.run_verifier(group)
+        self.assertDecision(result, "HOLD", "OWNER_PR_RECEIPT_REQUIRED")
+        self.assertEqual(result["receipt_verdict"], "REVIEW_REQUIRED")
+
+        unbound = Scenario(event="merge_group", verdict="REVIEW_REQUIRED", changed=(POLICY,))
+        unbound.attach_original_pr_receipt()
+        unbound.decision()  # cites the merge-group receipt and this verifier's run
+        result, _ = self.run_verifier(unbound)
+        self.assertDecision(result, "HOLD", "OWNER_DECISION_MISMATCH")
+        self.assertNotIn("EVIDENCE_PENDING", " ".join(result["reasons"]))
+
+        wrong = Scenario(event="merge_group", verdict="REVIEW_REQUIRED", changed=(POLICY,))
+        original = wrong.attach_original_pr_receipt()
+        wrong.decision(cp_ebom_decision_digest="sha256:" + "5" * 64,
+                       cp_ebom_run_id=str(PR_EFFECT_RUN))
+        result, _ = self.run_verifier(wrong)
+        self.assertDecision(result, "HOLD", "OWNER_DECISION_MISMATCH")
+        invalid_run = Scenario(event="merge_group", verdict="REVIEW_REQUIRED", changed=(POLICY,))
+        original = invalid_run.attach_original_pr_receipt()
+        invalid_run.decision(cp_ebom_decision_digest=original["decision_digest"],
+                             cp_ebom_run_id="4999")
+        result, _ = self.run_verifier(invalid_run)
+        self.assertDecision(result, "HOLD", "OWNER_DECISION_MISMATCH")
+        premature = Scenario(event="merge_group", verdict="REVIEW_REQUIRED", changed=(POLICY,))
+        original = premature.attach_original_pr_receipt()
+        premature.decision(cp_ebom_decision_digest=original["decision_digest"],
+                           cp_ebom_run_id=str(PR_EFFECT_RUN),
+                           created_at="2026-10-13T08:00:00Z")
+        result, _ = self.run_verifier(premature)
+        self.assertDecision(result, "HOLD", "OWNER_DECISION_PREDATES_EVIDENCE")
+        self.assertEqual(result["receipt_verdict"], "REVIEW_REQUIRED")
+
+        valid = Scenario(event="merge_group", verdict="REVIEW_REQUIRED", changed=(POLICY,))
+        original = valid.attach_original_pr_receipt()
+        valid.decision(cp_ebom_decision_digest=original["decision_digest"],
+                       cp_ebom_run_id=str(PR_EFFECT_RUN))
+        result, _ = self.run_verifier(valid)
         self.assertDecision(result, "ADMIT")
         self.assertEqual(result["basis"], "REVIEW_REQUIRED_OWNER_ACCEPTED")
+        self.assertEqual(result["receipt_verdict"], "REVIEW_REQUIRED")
+        self.assertEqual(result["evidence"]["effect"]["verdict"], "REVIEW_REQUIRED")
+
         drifted = Scenario(event="merge_group", verdict="REVIEW_REQUIRED", changed=(POLICY,))
-        drifted.decision(head_tree=OTHER)
+        original = drifted.attach_original_pr_receipt()
+        drifted.decision(head_tree=OTHER,
+                         cp_ebom_decision_digest=original["decision_digest"],
+                         cp_ebom_run_id=str(PR_EFFECT_RUN))
         result, _ = self.run_verifier(drifted)
         self.assertDecision(result, "HOLD", "OWNER_DECISION_MISMATCH")
 
