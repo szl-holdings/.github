@@ -73,6 +73,11 @@ on:
         required: false
         type: boolean
         default: false
+      runtime-identity:
+        description: "Canonical A11oy only: attest publication and final /app source COPY binding before runtime wait."
+        required: false
+        type: boolean
+        default: false
     secrets:
       HF_TOKEN:
         description: "HF write token with organization write access to the target Space."
@@ -87,6 +92,10 @@ jobs:
     if: ${{ inputs.contract-only == false }}
     runs-on: ubuntu-24.04 # Temporary until the exact Python 3.12.10 publisher closure is revalidated on 26.04.
     timeout-minutes: 30
+    permissions:
+      contents: read
+      id-token: write
+      attestations: write
     concurrency:
       group: hf-deploy-${{ inputs.hf-repo || github.repository }}
       cancel-in-progress: false
@@ -218,6 +227,8 @@ jobs:
           REQUIRE_DEFAULT_BRANCH_TIP: ${{ inputs.require-default-branch-tip }}
           SOURCE_SHA: ${{ steps.hf.outputs.source_sha }}
           SMOKE_PATHS: ${{ inputs.smoke-paths }}
+          RUNTIME_IDENTITY: ${{ inputs.runtime-identity }}
+          RUNTIME_IDENTITY_PUBLISHER_SHA: ${{ job.workflow_sha }}
         run: |
           set -euo pipefail
           PRUNE_ARGS=()
@@ -227,6 +238,10 @@ jobs:
             TIP_GUARD_ARGS+=(--require-default-branch-tip)
           fi
           SOURCE_REVISION_ARGS=()
+          RUNTIME_IDENTITY_ARGS=()
+          if [ "$RUNTIME_IDENTITY" = "true" ]; then
+            RUNTIME_IDENTITY_ARGS+=(--runtime-identity)
+          fi
           if [ -n "$SOURCE_REVISION_FILE" ]; then
             SOURCE_REVISION_ARGS+=(--source-revision-file "$SOURCE_REVISION_FILE")
           fi
@@ -238,11 +253,29 @@ jobs:
             --source-sha "$SOURCE_SHA" \
             --dockerfile-path "$DOCKERFILE_PATH" \
             "${SOURCE_REVISION_ARGS[@]}" \
+            "${RUNTIME_IDENTITY_ARGS[@]}" \
             --include-readme "$INCLUDE_README" \
             --smoke-paths "${SMOKE_PATHS}" \
             "${PRUNE_ARGS[@]}" \
             "${TIP_GUARD_ARGS[@]}" \
             --manifest-out hf-deploy-manifest.json
+
+      # The application verifies this publication binding asynchronously. It
+      # must exist before the RUNNING/smoke wait, not depend on its own readiness.
+      - name: Attest canonical runtime source binding
+        if: inputs.runtime-identity == true
+        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        with:
+          subject-path: hf-runtime-binding.json
+
+      - name: Publish immutable runtime source binding before readiness
+        if: inputs.runtime-identity == true
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: hf-runtime-identity-${{ github.run_id }}-${{ github.run_attempt }}
+          path: hf-runtime-binding.json
+          if-no-files-found: error
+          retention-days: 90
 
       - name: Bind exact source revision after publication
         if: steps.hf.outputs.source_binding == 'true'
