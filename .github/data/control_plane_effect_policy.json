@@ -861,163 +861,31 @@
       "trusted_transitives": {}
     },
     ".github/workflows/enforce-llm-router-flagship-card.yml": {
-      "intent_id": "llm-router-flagship-card-hf-showcase-v1",
+      "intent_id": "llm-router-flagship-duplicate-writer-retired-v1",
       "valid_until": "2026-11-30",
-      "source_sha256": "sha256:9228a2dd03caa03dd06303acf405c4a353d8405670f3a4f6af5810e249bc3ff9",
-      "credentials": [
-        "HF_API_TOKEN",
-        "HF_TOKEN",
-        "HUGGINGFACE_TOKEN"
-      ],
+      "source_sha256": "sha256:6172afae351401ee78107f69169315a67f06088b9198ea214400bed1585ca416",
+      "credentials": [],
       "resources": [
-        {
-          "key": "github:actions:artifact:llm-router-flagship-card-enforcement",
-          "access": "external-write"
-        },
         {
           "key": "github:repository:szl-holdings/.github:contents",
           "access": "read"
-        },
-        {
-          "key": "huggingface:space:SZLHOLDINGS/README:contents",
-          "access": "external-write"
-        },
-        {
-          "key": "huggingface:space:SZLHOLDINGS/llm-router-live:runtime",
-          "access": "external-write"
-        },
-        {
-          "key": "huggingface:space:SZLHOLDINGS/llm-router-live:settings",
-          "access": "external-write"
-        },
-        {
-          "key": "runner:guard:egress",
-          "access": "local-write"
-        },
-        {
-          "key": "runner:toolchain:python",
-          "access": "local-write"
-        },
-        {
-          "key": "stepsecurity:monitor:szl-holdings/.github",
-          "access": "external-write"
         }
       ],
-      "effects": [
-        {
-          "sink": "github.artifact.upload",
-          "resource": "github:actions:artifact:llm-router-flagship-card-enforcement",
-          "access": "external-write",
-          "max_calls": 1
-        },
-        {
-          "sink": "github.contents.checkout",
-          "resource": "github:repository:szl-holdings/.github:contents",
-          "access": "read",
-          "max_calls": 2
-        },
-        {
-          "sink": "runner.guard.configure",
-          "resource": "runner:guard:egress",
-          "access": "local-write",
-          "max_calls": 2
-        },
-        {
-          "sink": "runner.guard.telemetry",
-          "resource": "stepsecurity:monitor:szl-holdings/.github",
-          "access": "external-write",
-          "max_calls": 2
-        },
-        {
-          "sink": "runner.toolchain.install",
-          "resource": "runner:toolchain:python",
-          "access": "local-write",
-          "max_calls": 2
-        },
-        {
-          "sink": "sdk.huggingface.restart_space",
-          "resource": "huggingface:space:SZLHOLDINGS/llm-router-live:runtime",
-          "access": "external-write",
-          "max_calls": 1
-        },
-        {
-          "sink": "sdk.huggingface.update_repo_settings",
-          "resource": "huggingface:space:SZLHOLDINGS/llm-router-live:settings",
-          "access": "external-write",
-          "max_calls": 1
-        },
-        {
-          "sink": "sdk.repository.upload_file",
-          "resource": "huggingface:space:SZLHOLDINGS/README:contents",
-          "access": "external-write",
-          "max_calls": 1
-        }
-      ],
-      "max_external_writes": 6,
+      "effects": [],
+      "max_external_writes": 0,
       "required_controls": {
         "triggers": [
-          "pull_request",
-          "push",
-          "schedule",
           "workflow_dispatch"
         ],
         "contents_read": true,
-        "no_explicit_secrets": false,
-        "concurrency": true,
+        "no_explicit_secrets": true,
+        "concurrency": false,
         "protected_ref": false,
         "exact_sha": false,
         "expected_before": false,
         "readback": false
       },
-      "trusted_transitives": {},
-      "reviewed_unknowns": {
-        "files": {
-          ".github/workflows/enforce-llm-router-flagship-card.yml": "sha256:9228a2dd03caa03dd06303acf405c4a353d8405670f3a4f6af5810e249bc3ff9",
-          "scripts/enforce_llm_router_flagship_card.py": "sha256:f06bb07d2b5979d530a54a56bcd7fa92cb56c083dc7d93413c6901ef000a9977"
-        },
-        "unknowns": [
-          "ACTION_INPUTS_REVIEW_REQUIRED@.github/workflows/enforce-llm-router-flagship-card.yml:40",
-          "ACTION_INPUTS_REVIEW_REQUIRED@.github/workflows/enforce-llm-router-flagship-card.yml:44",
-          "ACTION_INPUTS_REVIEW_REQUIRED@.github/workflows/enforce-llm-router-flagship-card.yml:49",
-          "ACTION_INPUTS_REVIEW_REQUIRED@.github/workflows/enforce-llm-router-flagship-card.yml:69",
-          "ACTION_INPUTS_REVIEW_REQUIRED@.github/workflows/enforce-llm-router-flagship-card.yml:73",
-          "ACTION_INPUTS_REVIEW_REQUIRED@.github/workflows/enforce-llm-router-flagship-card.yml:78",
-          "ACTION_INPUTS_REVIEW_REQUIRED@.github/workflows/enforce-llm-router-flagship-card.yml:95",
-          "PYTHON_DYNAMIC_EXECUTION@scripts/enforce_llm_router_flagship_card.py:31",
-          "PYTHON_DYNAMIC_EXECUTION@scripts/enforce_llm_router_flagship_card.py:34",
-          "PYTHON_IMPORT_UNRESOLVED@scripts/enforce_llm_router_flagship_card.py:10",
-          "PYTHON_IMPORT_UNRESOLVED@scripts/enforce_llm_router_flagship_card.py:3",
-          "PYTHON_IMPORT_UNRESOLVED@scripts/enforce_llm_router_flagship_card.py:5",
-          "PYTHON_IMPORT_UNRESOLVED@scripts/enforce_llm_router_flagship_card.py:76",
-          "PYTHON_IMPORT_UNRESOLVED@scripts/enforce_llm_router_flagship_card.py:77",
-          "PYTHON_SOURCE_REVIEW_REQUIRED@scripts/enforce_llm_router_flagship_card.py:1",
-          "SCRIPT_SOURCE_REVIEW_REQUIRED@.github/workflows/enforce-llm-router-flagship-card.yml:1",
-          "SDK_TARGET_UNRESOLVED@scripts/enforce_llm_router_flagship_card.py:127",
-          "SDK_TARGET_UNRESOLVED@scripts/enforce_llm_router_flagship_card.py:87",
-          "SDK_TARGET_UNRESOLVED@scripts/enforce_llm_router_flagship_card.py:91",
-          "SECRET_EXPRESSION_REVIEW_REQUIRED@.github/workflows/enforce-llm-router-flagship-card.yml:1",
-          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/enforce-llm-router-flagship-card.yml:53",
-          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/enforce-llm-router-flagship-card.yml:54",
-          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/enforce-llm-router-flagship-card.yml:55",
-          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/enforce-llm-router-flagship-card.yml:56",
-          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/enforce-llm-router-flagship-card.yml:80",
-          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/enforce-llm-router-flagship-card.yml:84",
-          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/enforce-llm-router-flagship-card.yml:85",
-          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/enforce-llm-router-flagship-card.yml:86",
-          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/enforce-llm-router-flagship-card.yml:87",
-          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/enforce-llm-router-flagship-card.yml:88",
-          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/enforce-llm-router-flagship-card.yml:89",
-          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/enforce-llm-router-flagship-card.yml:90",
-          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/enforce-llm-router-flagship-card.yml:54",
-          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/enforce-llm-router-flagship-card.yml:55",
-          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/enforce-llm-router-flagship-card.yml:84",
-          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/enforce-llm-router-flagship-card.yml:86",
-          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/enforce-llm-router-flagship-card.yml:87",
-          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/enforce-llm-router-flagship-card.yml:88",
-          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/enforce-llm-router-flagship-card.yml:89",
-          "WORKFLOW_ENVIRONMENT_REVIEW_REQUIRED@.github/workflows/enforce-llm-router-flagship-card.yml:64"
-        ]
-      }
+      "trusted_transitives": {}
     },
     ".github/workflows/hf-inventory-contract.yml": {
       "intent_id": "hf-inventory-offline-candidate-contract-v2",
