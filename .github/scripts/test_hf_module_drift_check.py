@@ -611,6 +611,23 @@ class TestTrustedBaselineCompare(unittest.TestCase):
         self.assertIn(
             "candidate-unresolved-copy-source", {e["kind"] for e in errors})
 
+    def test_baseline_rejected_copy_source_is_not_ok(self):
+        self._stub_clean_pair()
+        drift.candidate_managed_delta = lambda *_a, **_k: {
+            "status": "invalid",
+            "new_unresolved_sources": [],
+            "baseline_rejected_copy_sources": ["../secret"],
+            "candidate_rejected_copy_sources": [],
+        }
+        report, errors, _warns, candidate = drift.trusted_baseline_compare(
+            self._args(candidate_ref="4" * 40))
+        self.assertEqual(candidate["status"], "invalid")
+        self.assertNotEqual(report["status"], "ok")
+        self.assertEqual(
+            [(entry["kind"], entry["path"]) for entry in errors],
+            [("rejected-copy-source", "../secret")],
+        )
+
 
 class TestReusableWorkflowTrustedBaselineContract(unittest.TestCase):
     def test_workflow_reads_lock_from_base_and_never_passes_candidate_as_hf_ref(self):
@@ -1110,7 +1127,7 @@ class TestRejectedCopyCoverage(unittest.TestCase):
         for name, value in self._saved.items():
             setattr(drift, name, value)
 
-    def _compare(self, dockerfile, tree):
+    def _compare(self, dockerfile, tree, allow=None):
         drift._http = lambda *args, **kwargs: (200, dockerfile, None)
         drift.github_tree_remote = lambda repo, ref="main": dict(tree)
         drift.hf_tree = lambda repo, ref="main": {
@@ -1134,7 +1151,7 @@ class TestRejectedCopyCoverage(unittest.TestCase):
             siblings=[],
             dockerfile_path="Dockerfile",
         )
-        return drift.compare(args, allow={})
+        return drift.compare(args, allow={} if allow is None else allow)
 
     def test_mixed_safe_and_unsafe_sources_are_incomplete(self):
         report, errors, warns = self._compare(
@@ -1151,6 +1168,56 @@ class TestRejectedCopyCoverage(unittest.TestCase):
         )
         self.assertNotIn("secret", [entry["path"] for entry in errors])
         self.assertEqual(warns, [])
+
+    def test_reproduced_parent_and_dot_sources_are_not_ok(self):
+        parent, parent_errors, _parent_warns = self._compare(
+            b"COPY ../secret /dest\n",
+            {"Dockerfile": "df"},
+            allow={"accepted_divergences": {"../secret": "backlog"}},
+        )
+        self.assertEqual(parent["status"], "drift")
+        self.assertEqual(parent["files_compared"], 0)
+        self.assertEqual(parent["copy_sources"], 0)
+        self.assertEqual(
+            [(entry["kind"], entry["path"], entry["severity"])
+             for entry in parent_errors],
+            [("rejected-copy-source", "../secret", "error")],
+        )
+        mixed, mixed_errors, _mixed_warns = self._compare(
+            b"COPY ../secret serve.py /dest\n",
+            {"Dockerfile": "df", "serve.py": "same"},
+        )
+        self.assertEqual(mixed["status"], "drift")
+        self.assertEqual(mixed["files_compared"], 1)
+        self.assertEqual(mixed["copy_sources"], 1)
+        self.assertEqual(
+            [(entry["kind"], entry["path"]) for entry in mixed_errors],
+            [("rejected-copy-source", "../secret")],
+        )
+        dotted, dotted_errors, _dotted_warns = self._compare(
+            b"COPY ./ /dest\n",
+            {"Dockerfile": "df"},
+        )
+        self.assertEqual(dotted["status"], "drift")
+        self.assertEqual(dotted["files_compared"], 0)
+        self.assertEqual(dotted["rejected_copy_sources"], ["./"])
+        self.assertEqual(
+            [(entry["kind"], entry["path"]) for entry in dotted_errors],
+            [("rejected-copy-source", "./")],
+        )
+        kept, kept_errors, _kept_warns = self._compare(
+            b"COPY .github/scripts/publish_readiness_verdict.py /a\n"
+            b"COPY .well-known/security.txt /b\n",
+            {
+                "Dockerfile": "df",
+                ".github/scripts/publish_readiness_verdict.py": "g",
+                ".well-known/security.txt": "w",
+            },
+        )
+        self.assertEqual(kept["status"], "ok")
+        self.assertEqual(kept["files_compared"], 2)
+        self.assertEqual(kept["rejected_copy_sources"], [])
+        self.assertEqual(kept_errors, [])
 
     def test_all_unsafe_sources_are_incomplete(self):
         report, errors, warns = self._compare(
