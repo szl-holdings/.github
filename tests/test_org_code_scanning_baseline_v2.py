@@ -6,10 +6,15 @@ from __future__ import annotations
 import importlib.util
 import json
 import os
+import re
+import subprocess
 import sys
 import tempfile
+import textwrap
 from pathlib import Path
 from unittest import mock
+
+import pytest
 
 ROOT = Path(__file__).resolve().parents[1]
 MODULE_PATH = ROOT / ".github" / "scripts" / "org_code_scanning_baseline_v2.py"
@@ -270,3 +275,206 @@ def test_source_can_change_only_native_default_setup_and_command_issue() -> None
         '"archived":',
     ):
         assert forbidden not in source
+
+
+WORKFLOW_PATH = ROOT / ".github/workflows/org-code-scanning-baseline.yml"
+CONTRACT_PATH = ROOT / ".github/workflows/org-code-scanning-baseline-contract.yml"
+
+
+def run_workflow_contract(source: str, directory: Path) -> subprocess.CompletedProcess[str]:
+    """Execute the exact CI assertion against an isolated, credential-free fixture."""
+    contract = CONTRACT_PATH.read_text(encoding="utf-8")
+    step = "      - name: Validate the workflow authority and mutation boundary\n"
+    assert contract.count(step) == 1
+    program = contract.split(step, 1)[1].split("          python - <<'PY'\n", 1)[1]
+    program = textwrap.dedent(program.split("          PY\n", 1)[0])
+    target = directory / ".github/workflows/org-code-scanning-baseline.yml"
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_bytes(source.encode("utf-8"))
+    return subprocess.run(
+        [sys.executable, "-I", "-c", program],
+        cwd=directory,
+        env={"PYTHONIOENCODING": "utf-8"},
+        capture_output=True,
+        text=True,
+        timeout=10,
+        check=False,
+    )
+
+
+def test_workflow_contract_accepts_existing_job_scoped_authority(tmp_path: Path) -> None:
+    result = run_workflow_contract(WORKFLOW_PATH.read_text(encoding="utf-8"), tmp_path)
+    assert result.returncode == 0, result.stderr
+
+
+@pytest.mark.parametrize(
+    ("old", "new"),
+    [
+        pytest.param("permissions: read-all", "permissions: write-all", id="root-write-all"),
+        pytest.param(
+            "permissions: read-all",
+            "permissions:\n  contents: read\n  issues: write\n  security-events: write",
+            id="root-write-mapping",
+        ),
+        pytest.param("permissions: read-all", "permissions: read-all\npermissions: write-all", id="duplicate-root-grant"),
+        pytest.param("      contents: read", "      contents: write", id="contents-write"),
+        *[
+            pytest.param(
+                "      contents: read",
+                f"      contents: read\n      {scope}: write",
+                id=f"extra-{scope}",
+            )
+            for scope in ("actions", "id-token", "packages", "pull-requests")
+        ],
+        *[
+            pytest.param(f"      {scope}: {grant}\n", "", id=f"missing-{scope}")
+            for scope, grant in (("contents", "read"), ("issues", "write"), ("security-events", "write"))
+        ],
+        *[
+            pytest.param(f"      {scope}: {grant}", f"      {scope}: none", id=f"downgraded-{scope}")
+            for scope, grant in (("contents", "read"), ("issues", "write"), ("security-events", "write"))
+        ],
+        pytest.param("      issues: write", "      issues: write\n      issues: none", id="duplicate-grant"),
+        pytest.param("    permissions:", "    permissions: write-all\n    permissions:", id="duplicate-job-grant"),
+        pytest.param("jobs:\n", "jobs: {}\njobs:\n", id="duplicate-jobs"),
+        pytest.param("  converge:\n", "  converge: {}\n  converge:\n", id="duplicate-converge"),
+        pytest.param("  converge:\n", "  extra:\n    permissions: write-all\n  converge:\n", id="additional-job"),
+        pytest.param("permissions: read-all", '"permissions": read-all', id="quoted-root-key"),
+        pytest.param("    permissions:", '    "permissions":', id="quoted-job-key"),
+        pytest.param("    permissions:", '    "\\x70ermissions":', id="escaped-job-key"),
+        pytest.param("jobs:\n", '"jobs":\n', id="quoted-jobs-key"),
+        pytest.param("  converge:\n", '  "converge":\n', id="quoted-converge-key"),
+        pytest.param("      issues: write", '      "issues": write', id="quoted-grant-key"),
+        pytest.param("      issues: write", '      issues: "write"', id="quoted-grant-value"),
+        pytest.param("    permissions:", "    permissions: {contents: read, issues: write, security-events: write}", id="flow-mapping"),
+        pytest.param("    permissions:", "    permissions: &grants", id="anchor"),
+        pytest.param("    permissions:", "    permissions: *grants", id="alias"),
+        pytest.param("      issues: write", "      <<: *grants\n      issues: write", id="merge-key"),
+        pytest.param("    permissions:", "    ? permissions\n    :", id="explicit-key"),
+        pytest.param("    permissions:", "    permissions: !!map", id="tag"),
+        pytest.param("      issues: write", "      issues: ${{ 'write' }}", id="expression-grant"),
+        pytest.param("      issues: write", "      issues: >\n        write", id="folded-grant"),
+        pytest.param("      issues: write", "      issues:\n        nested: write", id="nested-grant"),
+        pytest.param("      issues: write", "    issues: write", id="wrong-scope"),
+        pytest.param("permissions: read-all", "# permissions: read-all", id="commented-root"),
+        pytest.param("    permissions:", "    # permissions:", id="commented-job"),
+        pytest.param("      issues: write", "      # issues: write", id="commented-grant"),
+        pytest.param("permissions: read-all", 'description: "permissions: read-all"', id="quoted-root-decoy"),
+        pytest.param("permissions: read-all", 'description: "continued\npermissions: read-all\n  end"', id="multiline-root-decoy"),
+        pytest.param("permissions: read-all", "---\npermissions: read-all", id="document-start"),
+        pytest.param("permissions: read-all", "%YAML 1.2\npermissions: read-all", id="directive"),
+        pytest.param("    steps:\n", "    steps: |\n", id="noncanonical-boundary"),
+        pytest.param("    steps:\n", "    steps:\n    steps:\n", id="duplicate-boundary"),
+    ],
+)
+def test_workflow_contract_rejects_authority_prefix_mutations(
+    tmp_path: Path, old: str, new: str
+) -> None:
+    source = WORKFLOW_PATH.read_text(encoding="utf-8")
+    assert source.count(old) == 1
+    result = run_workflow_contract(source.replace(old, new, 1), tmp_path)
+    assert result.returncode != 0, (old, new, result.stdout)
+
+
+@pytest.mark.parametrize(
+    "suffix",
+    [
+        pytest.param("\npermissions: write-all\n", id="late-root-grant"),
+        pytest.param("\n    permissions: write-all\n", id="late-job-grant"),
+        pytest.param("\n  extra:\n    permissions: write-all\n", id="late-extra-job"),
+        pytest.param("\njobs:\n  converge:\n    permissions: write-all\n", id="late-duplicate-jobs"),
+        pytest.param('\n"permissions": write-all\n', id="late-quoted-root"),
+        pytest.param('\n    "\\x70ermissions": write-all\n', id="late-escaped-job"),
+        pytest.param("\n    <<: *grants\n", id="late-job-merge"),
+        pytest.param("\n    ? permissions\n    : write-all\n", id="late-explicit-key"),
+        pytest.param("\n---\npermissions: write-all\n", id="late-document-start"),
+        pytest.param("\n...\n", id="late-document-end"),
+        pytest.param("\n%YAML 1.2\n", id="late-directive"),
+        pytest.param("\n# harmless comment\npermissions: write-all\n", id="comment-hides-dedent"),
+        pytest.param('      - name: "continued\npermissions: write-all\n        end"\n', id="multiline-string-dedent"),
+        pytest.param("      - run: |\npermissions: write-all\n", id="literal-block-dedent"),
+        *[
+            pytest.param(f"      # comment{separator}permissions: write-all\n", id=f"unicode-line-{ord(separator):x}")
+            for separator in ("\x85", "\u2028", "\u2029")
+        ],
+        pytest.param("\n      # carriage return\r\n", id="carriage-return"),
+        pytest.param("\n      # tab\t\n", id="tab"),
+        pytest.param("\n      # nul\0\n", id="nul"),
+    ],
+)
+def test_workflow_contract_rejects_suffix_authority_and_control_characters(
+    tmp_path: Path, suffix: str
+) -> None:
+    source = WORKFLOW_PATH.read_text(encoding="utf-8")
+    result = run_workflow_contract(source + suffix, tmp_path)
+    assert result.returncode != 0, (suffix, result.stdout)
+
+
+@pytest.mark.parametrize(
+    "decoy",
+    [
+        "\n      # permissions: read-all\n",
+        "\n      - env:\n          DECOY: 'permissions: read-all'\n",
+        "\n      - run: |\n          permissions: read-all\n",
+    ],
+    ids=("comment", "env-string", "run-literal"),
+)
+def test_workflow_contract_rejects_permissions_present_only_in_decoys(
+    tmp_path: Path, decoy: str
+) -> None:
+    source = WORKFLOW_PATH.read_text(encoding="utf-8").replace("permissions: read-all\n", "", 1)
+    result = run_workflow_contract(source + decoy, tmp_path)
+    assert result.returncode != 0, result.stdout
+
+
+def test_workflow_contract_allows_step_comments_and_action_pin_changes(tmp_path: Path) -> None:
+    source = WORKFLOW_PATH.read_text(encoding="utf-8")
+    references = list(re.finditer(
+        r"(?m)^        uses: step-security/harden-runner@([0-9a-f]{40})(?: #.*)?$",
+        source,
+    ))
+    assert len(references) == 1
+    reference = references[0]
+    original_sha = reference.group(1)
+    changed_sha = ("0" if original_sha[0] != "0" else "1") + original_sha[1:]
+    changed = source[:reference.start(1)] + changed_sha + source[reference.end(1):]
+    assert changed != source
+    source = changed
+    source += "\n# A comment cannot redefine authority.\n      # Step-local documentation.\n"
+    result = run_workflow_contract(source, tmp_path)
+    assert result.returncode == 0, result.stderr
+
+
+@pytest.mark.parametrize(
+    "token",
+    [
+        "python .github/scripts/org_code_scanning_baseline_v2.py",
+        "--apply",
+        "if-no-files-found: error",
+        "org-code-scanning-baseline-${{ github.run_id }}-${{ github.run_attempt }}",
+        "secrets.SZL_ORG_ADMIN_TOKEN || secrets.ORG_ADMIN_TOKEN || secrets.SZL_GITHUB_TOKEN || secrets.GH_PAT || github.token",
+    ],
+)
+@pytest.mark.parametrize("mutation", ("missing", "repeated"))
+def test_workflow_contract_preserves_required_markers(
+    tmp_path: Path, token: str, mutation: str
+) -> None:
+    source = WORKFLOW_PATH.read_text(encoding="utf-8")
+    assert source.count(token) == 1
+    if mutation == "missing":
+        source = source.replace(token, "omitted-contract-marker", 1)
+    else:
+        source += f"\n      # {token}\n"
+    result = run_workflow_contract(source, tmp_path)
+    assert result.returncode != 0, (token, mutation, result.stdout)
+
+
+@pytest.mark.parametrize(
+    "token",
+    ("continue-on-error: true", "|| true", "contents: write", "pull-requests: write"),
+)
+def test_workflow_contract_preserves_forbidden_markers(tmp_path: Path, token: str) -> None:
+    source = WORKFLOW_PATH.read_text(encoding="utf-8") + f"\n      # {token}\n"
+    result = run_workflow_contract(source, tmp_path)
+    assert result.returncode != 0, result.stdout
+    assert "forbidden CodeQL workflow weakening:" in result.stderr

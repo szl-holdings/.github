@@ -30,7 +30,7 @@ jobs:
     timeout-minutes: 10
     steps:
       - name: Harden runner
-        uses: step-security/harden-runner@e14015d583714f6e62063499dc959a02595150a1 # v2.21.1
+        uses: step-security/harden-runner@ccd8616d44fd3846e67624a50d5aad6d37bf2d25 # v2.22.1
         with:
           egress-policy: audit
 
@@ -55,9 +55,26 @@ jobs:
         run: |
           set -euo pipefail
           python - <<'PY'
+          import hashlib
           from pathlib import Path
 
-          workflow = Path(".github/workflows/org-code-scanning-baseline.yml").read_text(encoding="utf-8")
+          workflow = Path(".github/workflows/org-code-scanning-baseline.yml").read_bytes().decode("utf-8")
+          if any(character in workflow for character in ("\r", "\t", "\0")):
+              raise SystemExit("noncanonical CodeQL workflow control characters")
+          boundary = "    steps:\n"
+          if workflow.count(boundary) != 1:
+              raise SystemExit("CodeQL workflow needs one canonical steps boundary")
+          prefix, steps = workflow.split(boundary)
+          # Bind the reviewed root read-all and sole converge job's exact grants.
+          # Action pins are outside this prefix; no general YAML parser is implied.
+          expected_prefix_sha256 = "0336aee13c20757b172432e08e761b4ccac1b3ed1060dd9c84a8cfc57fa88136"
+          if hashlib.sha256((prefix + boundary).encode("utf-8")).hexdigest() != expected_prefix_sha256:
+              raise SystemExit("CodeQL workflow authority prefix differs from the reviewed source")
+          for line in steps.splitlines():
+              if not line.strip(" ") or line.lstrip(" ").startswith("#"):
+                  continue
+              if not line.startswith("      "):
+                  raise SystemExit("CodeQL workflow steps cannot introduce root or job authority")
           artifact_template = (
               "org-code-scanning-baseline-$"
               + "{{ github.run_id }}-$"
@@ -68,7 +85,6 @@ jobs:
               "secrets.SZL_GITHUB_TOKEN || secrets.GH_PAT || github.token"
           )
           required = (
-              "permissions:\n  contents: read\n  issues: write\n  security-events: write",
               "python .github/scripts/org_code_scanning_baseline_v2.py",
               "--apply",
               "if-no-files-found: error",
