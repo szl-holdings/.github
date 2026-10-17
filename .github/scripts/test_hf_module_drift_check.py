@@ -1056,5 +1056,167 @@ class TestCopySourceNormalization(unittest.TestCase):
         self.assertNotIn("passwd", parsed)
 
 
+class TestRejectedCopySourceCallers(unittest.TestCase):
+    """Caller results keep rejected COPY sources visible.
+
+    The parser may omit an unsafe lookup. compare() and managed_snapshot()
+    must still refuse a verified-ok or clean-plan verdict. These tests do not
+    call GitHub or Hugging Face.
+    """
+
+    def setUp(self):
+        self._saved = {
+            key: getattr(drift, key)
+            for key in ("hf_tree", "github_tree_remote", "fetch_github_file")
+        }
+        self.tmp = tempfile.mkdtemp()
+        drift.github_tree_remote = self._blocked
+        drift.fetch_github_file = self._blocked
+
+    def tearDown(self):
+        for key, value in self._saved.items():
+            setattr(drift, key, value)
+        shutil.rmtree(self.tmp, ignore_errors=True)
+
+    @staticmethod
+    def _blocked(*_args, **_kwargs):
+        raise AssertionError("network call")
+
+    def _compare(self, dockerfile, files=None, hf_files=None, allow=None):
+        with open(os.path.join(self.tmp, "Dockerfile"), "w", encoding="utf-8", newline="\n") as fh:
+            fh.write(dockerfile)
+        for name, data in (files or {}).items():
+            path = os.path.join(self.tmp, *name.split("/"))
+            os.makedirs(os.path.dirname(path), exist_ok=True)
+            with open(path, "wb") as fh:
+                fh.write(data)
+        drift.hf_tree = lambda *_args, **_kwargs: {} if hf_files is None else hf_files
+        args = argparse.Namespace(
+            repo_root=self.tmp,
+            github_repo="szl-holdings/a11oy",
+            hf_repo="SZLHOLDINGS/a11oy",
+            ref="main",
+            allow=None,
+            github_remote=False,
+            report_out="",
+            warn_only=False,
+            siblings=[],
+        )
+        return drift.compare(args, allow={} if allow is None else allow)
+
+    def _assert_rejected(self, report, errors):
+        self.assertNotEqual(report["status"], "ok")
+        self.assertEqual(report["status"], "incomplete")
+        self.assertEqual(report["coverage"], "incomplete")
+        self.assertNotEqual(report.get("reason"), "hf_api_429")
+        self.assertTrue(any(item["kind"] == "rejected-copy-source" for item in errors))
+        self.assertTrue(all(item["severity"] == "error" for item in errors if item["kind"] == "rejected-copy-source"))
+
+    def test_parent_source_alone_is_incomplete(self):
+        report, errors, warns = self._compare("COPY ../secret /dest\n")
+        self._assert_rejected(report, errors)
+        self.assertEqual(report["files_compared"], 0)
+        self.assertEqual(report["copy_sources"], 0)
+        self.assertEqual(errors[0]["path"], "../secret")
+        self.assertEqual(errors[0]["reason"], "copy-source-parent-segment")
+        self.assertEqual(warns, [])
+
+    def test_dot_slash_alone_is_incomplete(self):
+        report, errors, _warns = self._compare("COPY ./ /dest\n")
+        self._assert_rejected(report, errors)
+        self.assertEqual(report["files_compared"], 0)
+        self.assertEqual(errors[0]["path"], "./")
+        self.assertEqual(errors[0]["reason"], "copy-source-empty")
+
+    def test_mixed_source_rejects_even_when_safe_file_matches(self):
+        data = b"print('serve')\n"
+        blob = drift.git_blob_sha1(data)
+        report, errors, warns = self._compare(
+            "COPY ../secret serve.py /dest\n",
+            files={"serve.py": data},
+            hf_files={"serve.py": {"oid": blob, "lfs_oid": None, "size": len(data)}},
+        )
+        self._assert_rejected(report, errors)
+        self.assertEqual(report["files_compared"], 1)
+        self.assertEqual(report["copy_sources"], 1)
+        self.assertEqual([item["kind"] for item in errors], ["rejected-copy-source"])
+        self.assertEqual(warns, [])
+
+    def test_allowlist_cannot_clear_a_rejected_source(self):
+        report, errors, _warns = self._compare(
+            "COPY ../secret /dest\n",
+            allow={"accepted_divergences": {"../secret": "not a clearance"}},
+        )
+        self._assert_rejected(report, errors)
+        self.assertEqual(errors[0]["severity"], "error")
+
+    def test_dotted_repository_paths_stay_comparable(self):
+        files = {
+            ".github/scripts/publish_readiness_verdict.py": b"verdict\n",
+            ".well-known/security.txt": b"contact\n",
+        }
+        hf_files = {
+            name: {
+                "oid": drift.git_blob_sha1(data),
+                "lfs_oid": None,
+                "size": len(data),
+            }
+            for name, data in files.items()
+        }
+        dockerfile = (
+            "COPY .github/scripts/publish_readiness_verdict.py /app/a\n"
+            "COPY .well-known/security.txt /app/b\n"
+        )
+        report, errors, warns = self._compare(dockerfile, files=files, hf_files=hf_files)
+        self.assertEqual(report["status"], "ok")
+        self.assertEqual(report["coverage"], "admitted")
+        self.assertEqual(report["rejected_copy_sources"], [])
+        self.assertEqual(errors, [])
+        self.assertEqual(warns, [])
+        self.assertEqual(report["files_compared"], 2)
+
+    def test_managed_snapshot_all_rejected_is_incomplete(self):
+        drift.github_tree_remote = lambda *_args, **_kwargs: {"Dockerfile": "df"}
+        drift.fetch_github_file = lambda *_args, **_kwargs: (
+            b"COPY ../secret /dest\nCOPY ./ /dest\n")
+        snapshot = drift.managed_snapshot("szl-holdings/a11oy", "c" * 40)
+        self.assertEqual(snapshot["coverage"], "incomplete")
+        self.assertEqual(snapshot["copy_sources"], [])
+        self.assertEqual(
+            [(item["source"], item["reason"]) for item in snapshot["rejected_copy_sources"]],
+            [
+                ("../secret", "copy-source-parent-segment"),
+                ("./", "copy-source-empty"),
+            ],
+        )
+
+    def test_candidate_all_rejected_is_not_a_clean_plan(self):
+        drift.github_tree_remote = lambda *_args, **_kwargs: {"Dockerfile": "df"}
+        drift.fetch_github_file = lambda *_args, **_kwargs: b"COPY ../secret /dest\n"
+        report = drift.candidate_managed_delta(
+            "szl-holdings/a11oy", "a" * 40, "b" * 40)
+        self.assertEqual(report["status"], "invalid")
+        self.assertEqual(report["coverage"], "incomplete")
+        self.assertNotEqual(report["status"], "no-changes")
+        self.assertEqual(report["delta_count"], 0)
+
+    def test_candidate_mixed_match_stays_invalid(self):
+        blob = "serve-blob"
+        trees = {
+            "a" * 40: {"Dockerfile": "df", "serve.py": blob},
+            "b" * 40: {"Dockerfile": "df", "serve.py": blob},
+        }
+        drift.github_tree_remote = lambda _repo, ref="main": trees[ref]
+        drift.fetch_github_file = lambda *_args, **_kwargs: (
+            b"COPY ../secret serve.py /dest\n")
+        report = drift.candidate_managed_delta(
+            "szl-holdings/a11oy", "a" * 40, "b" * 40)
+        self.assertEqual(report["status"], "invalid")
+        self.assertEqual(report["coverage"], "incomplete")
+        self.assertEqual(
+            report["candidate_rejected_copy_sources"][0]["source"], "../secret")
+        self.assertNotEqual(report["status"], "no-changes")
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)
