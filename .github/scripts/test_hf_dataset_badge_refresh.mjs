@@ -4,8 +4,10 @@ import test from "node:test";
 import {
   SOURCE_OWNED_DATASETS,
   assertBadgeWriteAllowed,
+  assertFilesBadgeOnly,
   isSourceOwnedDataset,
   publishReadmeCommit,
+  shouldPublish,
 } from "./hf_dataset_badge_refresh.mjs";
 
 const LAKE = "SZLHOLDINGS/szl-lake";
@@ -50,7 +52,53 @@ test("publish helper refuses Lake aliases before network access", async () => {
   assert.equal(calls, 0);
 });
 
-test("non-source-owned datasets retain the commit path", async () => {
+const CARD = [
+  "---",
+  "license: apache-2.0",
+  "---",
+  "",
+  "[![files](https://img.shields.io/badge/files-949-5b8dee?style=flat-square)](#files)",
+  "[![license](https://img.shields.io/badge/license-undefined-7e8aa3?style=flat-square)](#license)",
+  "body provenance stays",
+].join("\n");
+
+const FILES_ONLY = CARD.replace("files-949-", "files-957-");
+const LICENSE_CHANGED = CARD.replace("license-undefined-", "license-apache--2.0-");
+
+test("schedule and push cannot admit a card commit", () => {
+  assert.equal(shouldPublish("schedule", "false"), false);
+  assert.equal(shouldPublish("push", "false"), false);
+  assert.equal(shouldPublish("workflow_dispatch", "true"), false);
+  assert.equal(shouldPublish("workflow_dispatch", "false"), true);
+  assert.equal(shouldPublish(undefined, undefined), false);
+});
+
+test("a license or body change never reaches the commit endpoint", async () => {
+  let calls = 0;
+  const fetchImpl = async () => {
+    calls += 1;
+    throw new Error("network must not run");
+  };
+  await assert.rejects(
+    publishReadmeCommit({
+      id: "SZLHOLDINGS/szl-evidence",
+      previous: CARD,
+      content: LICENSE_CHANGED,
+      nfiles: 957,
+      license: "apache-2.0",
+      fetch: fetchImpl,
+      headers: { Authorization: "Bearer test-only" },
+    }),
+    /license badge change refused/,
+  );
+  assert.throws(
+    () => assertFilesBadgeOnly(CARD, CARD.replace("body provenance stays", "rewritten")),
+    /outside the files badge refused/,
+  );
+  assert.equal(calls, 0);
+});
+
+test("non-source-owned datasets retain the files-only commit path", async () => {
   const requests = [];
   const response = { ok: true, status: 200 };
   const fetchImpl = async (...args) => {
@@ -60,8 +108,9 @@ test("non-source-owned datasets retain the commit path", async () => {
 
   const actual = await publishReadmeCommit({
     id: "SZLHOLDINGS/example-dataset",
-    content: "example",
-    nfiles: 7,
+    previous: CARD,
+    content: FILES_ONLY,
+    nfiles: 957,
     license: "apache-2.0",
     fetch: fetchImpl,
     headers: { Authorization: "Bearer test-only" },
