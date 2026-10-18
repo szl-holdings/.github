@@ -1,8 +1,13 @@
-# Optional A11oy runtime source binding
+# Canonical A11oy runtime source binding
 
-The reusable HF publisher's `runtime-identity` input is disabled by default and
-only accepts `szl-holdings/a11oy` publishing `SZLHOLDINGS/a11oy` with an exact
-default-branch tip. Its caller job must explicitly grant `contents: read`,
+This new immutable reusable publisher version is an intentionally incompatible,
+A11oy-only interface. Every publishing invocation must enable `runtime-identity`
+and `require-default-branch-tip`, name `szl-holdings/a11oy` at its exact `github.sha`
+on `refs/heads/main`, and target `SZLHOLDINGS/a11oy`. The validator rejects other
+callers, refs and targets before caller checkout or HF credentials are used.
+It fixes Dockerfile, README inclusion, the `SZL_GIT_SHA` variable and the
+`/api/build-info` probe. Prune remains optional, confined to the existing
+COPY-derived deletion set and protected-file exclusions. Its caller job must explicitly grant `contents: read`,
 `id-token: write`, and `attestations: write`. This is a permission-interface
 change for this immutable workflow revision. Other consumers retain their
 existing pinned revision until deliberately upgraded; do not remove job
@@ -16,12 +21,27 @@ to `/tmp/.szl-runtime-marker.json`, outside the source catalog. Unsupported
 COPY semantics and ambiguous destinations fail closed.
 
 Once the provider acknowledges an immutable HF commit, the publisher writes
-`hf-runtime-binding.json` with the selector and that commit, attests it using
-GitHub OIDC, and uploads the exact-run/attempt artifact with 90-day retention.
-These steps precede RUNNING and smoke waits, allowing the boot verifier to
+`hf-runtime-binding.json` with the selector and that commit, and uploads the
+exact-run/attempt artifact with 90-day retention. A separate job downloads that
+exact artifact and attests it using GitHub OIDC. Only this two-step job holds
+the OIDC/attestation write permissions; it has no shell, caller checkout, HF
+secret, alternate artifact selector, or registry-upload input. Runtime readback
+depends on this job. These steps precede RUNNING and smoke waits, allowing the boot verifier to
 read its binding while deployment checks continue. A binding is a **REPORTED**
 publication statement. It is not a runtime-readiness receipt, independent
 witness, full-image or hardware attestation, or execution authorization.
+
+The manifest and source-variable binding report are both required and transferred
+in `hf-publication-inputs-{run_id}-{run_attempt}`. A prior attempt cannot supply
+the downstream readback inputs. The reusable workflow holds the distinct
+`hf-deploy-SZLHOLDINGS/a11oy` concurrency group throughout publication, signing
+and readback, with cancellation disabled. The caller retains its whole-run
+`sync-relock-canonical-a11oy` lock; the groups are different to avoid deadlock.
+
+The exact local source-witness caller can select typed `contract-only: true`.
+It validates the same-source `.github` invocation and performs only the two
+immutable tools checkouts and source comparison. All publishing, signing and
+runtime readback jobs are disabled. This does not attest a live deployment.
 
 Adopting runtimes must verify the signature, canonical reusable workflow,
 immutable publisher/source SHAs, source ref, OIDC issuer, hosted-runner policy,

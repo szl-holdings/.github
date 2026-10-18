@@ -66,6 +66,8 @@ NON_REVIEWABLE_UNKNOWN_CODES = frozenset({
     "UNCLASSIFIED_EXTERNAL_ACTION", "ACTION_DESTRUCTIVE_INPUT_UNSUPPORTED",
     "LOCAL_DEPENDENCY_MISSING", "ACTION_EXTRA_EFFECT_UNSUPPORTED",
     "CHECKOUT_SOURCE_BOUNDARY_UNSUPPORTED",
+    "CANONICAL_RUNTIME_INTERFACE_UNSUPPORTED",
+    "CANONICAL_RUNTIME_VALIDATOR_MISMATCH",
 })
 MUTATING_HTTP_VERBS = frozenset({"POST", "PUT", "PATCH", "DELETE"})
 ACCESS_MODES = frozenset({"read", "local-write", "external-write"})
@@ -162,6 +164,21 @@ UPLOAD_ARTIFACT_ACTIONS = frozenset({
 LITERAL_ARTIFACT_NAME = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]*")
 LITERAL_SARIF_FILE = re.compile(r"[A-Za-z0-9][A-Za-z0-9._/-]*\.sarif")
 LITERAL_SARIF_CATEGORY = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]*")
+RUNTIME_PUBLISHER = ".github/workflows/reusable-hf-deploy.yml"
+RUNTIME_WITNESS = ".github/workflows/reusable-hf-deploy-source-witness.yml"
+RUNTIME_WITNESS_RUN_DIGEST = "sha256:a0c1e8be71b3cf618a6e9cb75e03f1f1489a94a8dc92230b8e5c05273c8bdb98"
+RUNTIME_VALIDATOR = ".github/scripts/hf_runtime_publish_contract.py"
+RUNTIME_LOCK = "requirements/hf-publisher.lock"
+RUNTIME_BINDING_ARTIFACT = "hf-runtime-identity-${{ github.run_id }}-${{ github.run_attempt }}"
+RUNTIME_INPUTS_ARTIFACT = "hf-publication-inputs-${{ github.run_id }}-${{ github.run_attempt }}"
+ATTEST_ACTION = "actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8"
+# Reviewed upstream closure: the wrapper invokes actions/attest at this exact
+# commit. Registry and artifact-metadata storage branches are excluded by the
+# sole admitted subject-path input. See docs/CONTROL_PLANE_EFFECTS.md.
+ATTEST_TRANSITIVE = "actions/attest@508db95dd578ae2727ebd6217d5ba78e4fbda05d"
+RUNTIME_VALIDATOR_DIGEST = "sha256:7cc16d1421b4e76ce281e3dcadfee36b790891fbc56a533c53fd43bdf0bf55a1"
+RUNTIME_TOOLS = frozenset({RUNTIME_VALIDATOR, RUNTIME_LOCK,
+    ".github/scripts/hf_deploy_from_dockerfile.py", ".github/scripts/hf_space_source_binding.py"})
 
 PYTHON_MUTATORS: Mapping[str, str] = {
     "add_space_secret": "sdk.huggingface.add_space_secret",
@@ -888,11 +905,187 @@ def run_blocks(source: str) -> list[tuple[int, str]]:
     return blocks
 
 
+def runtime_tools_checkout(inputs: Mapping[str, str]) -> bool:
+    return inputs == {"repository": "${{ job.workflow_repository }}", "ref": "${{ job.workflow_sha }}",
+                      "path": "tools", "persist-credentials": "false", "fetch-depth": "1"}
+
+
+def runtime_caller_checkout(inputs: Mapping[str, str]) -> bool:
+    return inputs == {"repository": "szl-holdings/a11oy", "ref": "${{ github.sha }}",
+                      "path": "caller", "persist-credentials": "false", "fetch-depth": "1"}
+
+
+def canonical_runtime_profile(document: Mapping[str, Any]) -> bool:
+    """Recognize the bounded invocation graph, never a generic reusable workflow.
+
+    The guard's exact bytes are checked separately by bind_declaration. Source
+    review still covers shell/Python behavior; this function only discharges the
+    previously unmodeled checkout and invocation boundaries.
+    """
+    if (set(document) != {"name", "on", "permissions", "concurrency", "jobs"}
+            or not isinstance(document.get("on"), dict)
+            or set(document["on"]) != {"workflow_call"}
+            or document.get("permissions") != {"contents": "read"}):
+        return False
+    call = document["on"]["workflow_call"]
+    if not isinstance(call, dict) or set(call) != {"inputs", "secrets"}:
+        return False
+    if not isinstance(call.get("inputs"), dict):
+        return False
+    for name in ("contract-only", "runtime-identity", "require-default-branch-tip"):
+        value = call["inputs"].get(name, {})
+        if not isinstance(value, dict) or value.get("type") != "boolean" or value.get("default") != "false":
+            return False
+    if call["secrets"] != {"HF_TOKEN": {"description": "HF write token with organization write access to the target Space.", "required": "true"}}:
+        return False
+    if document.get("concurrency") != {"group": "hf-deploy-SZLHOLDINGS/a11oy", "cancel-in-progress": "false"}:
+        return False
+    jobs = document.get("jobs", {})
+    if not isinstance(jobs, dict) or set(jobs) != {"invocation", "hf-deploy", "runtime-attestation", "runtime-readback", "exact-source-contract"}:
+        return False
+    if any(not isinstance(job, dict) for job in jobs.values()):
+        return False
+    invocation = jobs["invocation"]
+    if set(invocation) != {"name", "runs-on", "timeout-minutes", "permissions", "steps"}:
+        return False
+    if invocation["permissions"] != {"contents": "read"}:
+        return False
+    steps = invocation["steps"]
+    if not isinstance(steps, list) or len(steps) != 2 or any(not isinstance(x, dict) for x in steps):
+        return False
+    checkout, guard = steps
+    if (set(checkout) != {"name", "uses", "with"}
+            or checkout["uses"] != "actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1"
+            or not runtime_tools_checkout(lowered_inputs(checkout["with"]) or {})):
+        return False
+    expected_env = {
+        "WORKFLOW_REPOSITORY": "${{ job.workflow_repository }}", "WORKFLOW_SHA": "${{ job.workflow_sha }}",
+        "CALLER_REPOSITORY": "${{ github.repository }}", "EVENT_SHA": "${{ github.sha }}",
+        "EVENT_REF": "${{ github.ref }}", "EVENT_NAME": "${{ github.event_name }}",
+        "CONTRACT_ONLY": "${{ inputs.contract-only }}", "RUNTIME_IDENTITY": "${{ inputs.runtime-identity }}",
+        "HF_REPO": "${{ inputs.hf-repo }}", "DEPLOY_REF": "${{ inputs.ref }}",
+        "REQUIRE_TIP": "${{ inputs.require-default-branch-tip }}", "DOCKERFILE": "${{ inputs.dockerfile-path }}",
+        "SOURCE_REVISION_FILE": "${{ inputs.source-revision-file }}",
+        "SOURCE_VARIABLE": "${{ inputs.source-revision-variable }}", "SOURCE_PROBE": "${{ inputs.source-revision-probe-path }}",
+        "INCLUDE_README": "${{ inputs.include-readme }}", "PRUNE": "${{ inputs.prune }}",
+        "RESTART": "${{ inputs.restart-space }}", "WAIT_RUNNING": "${{ inputs.wait-running }}",
+    }
+    if (set(guard) != {"name", "env", "run"} or guard["env"] != expected_env
+            or guard["run"] != "python3 -I -P tools/.github/scripts/hf_runtime_publish_contract.py"):
+        return False
+    for name, needs, condition in (
+        ("hf-deploy", "invocation", "false"),
+        ("runtime-attestation", "hf-deploy", "false"),
+        ("runtime-readback", ["hf-deploy", "runtime-attestation"], "false"),
+        ("exact-source-contract", "invocation", "true"),
+    ):
+        job = jobs[name]
+        if job.get("needs") != needs or job.get("if") != "${{ inputs.contract-only == " + condition + " }}":
+            return False
+        expected_permissions = {"contents": "read"}
+        if name == "runtime-attestation":
+            expected_permissions.update({"id-token": "write", "attestations": "write"})
+        if job.get("permissions") != expected_permissions or job.get("continue-on-error") not in (None, "false"):
+            return False
+    witness = jobs["exact-source-contract"]
+    if set(witness) != {"name", "needs", "if", "permissions", "runs-on", "timeout-minutes", "steps"}:
+        return False
+    witness_steps = witness.get("steps")
+    if (not isinstance(witness_steps, list) or len(witness_steps) != 2
+            or any(not isinstance(step, dict) for step in witness_steps)):
+        return False
+    witness_checkout, witness_run = witness_steps
+    if (set(witness_checkout) != {"name", "uses", "with"}
+            or witness_checkout.get("uses") != "actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1"
+            or not runtime_tools_checkout(lowered_inputs(witness_checkout.get("with")) or {})):
+        return False
+    if (set(witness_run) != {"name", "shell", "env", "run"} or witness_run.get("shell") != "bash"
+            or witness_run.get("env") != {
+                "WORKFLOW_REPOSITORY": "${{ job.workflow_repository }}",
+                "EXPECTED_WORKFLOW_SHA": "${{ job.workflow_sha }}", "EXPECTED_EVENT_SHA": "${{ github.sha }}"}
+            or sha256_bytes(str(witness_run.get("run", "")).encode()) != RUNTIME_WITNESS_RUN_DIGEST):
+        return False
+    # No caller bytes are execution dependencies. This sole read is mounted at
+    # caller/, while all admitted executable/lock paths resolve under tools/.
+    caller_reads = [step for step in jobs["hf-deploy"].get("steps", [])
+                    if isinstance(step, dict) and runtime_caller_checkout(lowered_inputs(step.get("with")) or {})]
+    input_producers = [step for step in jobs["hf-deploy"].get("steps", [])
+                       if isinstance(step, dict) and step.get("uses") in UPLOAD_ARTIFACT_ACTIONS
+                       and lowered_inputs(step.get("with")) == {
+                           "name": RUNTIME_INPUTS_ARTIFACT,
+                           "path": "hf-deploy-manifest.json\nhf-source-binding-bind.json\n",
+                           "if-no-files-found": "error", "retention-days": "90"}]
+    input_consumers = [step for step in jobs["runtime-readback"].get("steps", [])
+                       if isinstance(step, dict) and step.get("uses") == DOWNLOAD_ARTIFACT_ACTION
+                       and set(step) == {"name", "uses", "with"}
+                       and lowered_inputs(step.get("with")) == {"name": RUNTIME_INPUTS_ARTIFACT}]
+    required_files = "test -s hf-deploy-manifest.json\ntest -s hf-source-binding-bind.json\n"
+    for job_name in ("hf-deploy", "runtime-readback"):
+        if not any(isinstance(step, dict) and set(step) == {"name", "run"}
+                   and step.get("run") == required_files for step in jobs[job_name].get("steps", [])):
+            return False
+    return len(caller_reads) == len(input_producers) == len(input_consumers) == 1
+
+
+def runtime_signing_job(document: Mapping[str, Any]) -> bool:
+    if not canonical_runtime_profile(document):
+        return False
+    job = document["jobs"]["runtime-attestation"]
+    if set(job) != {"name", "needs", "if", "runs-on", "timeout-minutes", "permissions", "steps"}:
+        return False
+    if references_credentials(job) or references_credentials(document.get("env", {})):
+        return False
+    steps = job["steps"]
+    if not isinstance(steps, list) or len(steps) != 2:
+        return False
+    for step, action, inputs in zip(steps, (DOWNLOAD_ARTIFACT_ACTION, ATTEST_ACTION),
+            ({"name": RUNTIME_BINDING_ARTIFACT}, {"subject-path": "hf-runtime-binding.json"})):
+        if (not isinstance(step, dict) or set(step) != {"name", "uses", "with"}
+                or step.get("uses") != action or lowered_inputs(step.get("with")) != inputs):
+            return False
+    producers = document["jobs"]["hf-deploy"].get("steps", [])
+    return sum(isinstance(step, dict) and step.get("uses") in UPLOAD_ARTIFACT_ACTIONS
+               and lowered_inputs(step.get("with")) == {
+                   "name": RUNTIME_BINDING_ARTIFACT, "path": "hf-runtime-binding.json",
+                   "if-no-files-found": "error", "retention-days": "90"}
+               for step in producers) == 1
+
+
+def runtime_contract_call(document: Mapping[str, Any]) -> bool:
+    jobs = document.get("jobs", {})
+    if (not isinstance(jobs, dict) or set(document) != {"name", "on", "permissions", "jobs"}
+            or document.get("on") != {"push": ""}
+            or document.get("permissions") != {"contents": "read"}
+            or set(jobs) != {"reusable-publisher-exact-source-witness"}):
+        return False
+    job = jobs["reusable-publisher-exact-source-witness"]
+    return (isinstance(job, dict) and set(job) == {"name", "permissions", "uses", "with", "secrets"}
+            and job["uses"] == "./" + RUNTIME_PUBLISHER
+            and job["with"] == {"contract-only": "true"}
+            and job["secrets"] == {"HF_TOKEN": "${{ github.token }}"}
+            and job["permissions"] == {"contents": "read", "id-token": "write", "attestations": "write"})
+
+
+def runtime_artifact_resource(path: str, name: str, *, read: bool = False) -> str | None:
+    if path == RUNTIME_PUBLISHER and name in {RUNTIME_BINDING_ARTIFACT, RUNTIME_INPUTS_ARTIFACT}:
+        return "github:repository:szl-holdings/a11oy:artifact:" + name.split("-${{", 1)[0] + (":same-run-read" if read else "")
+    if path == ".github/workflows/hf-public-smoke-contract.yml" and name in {
+        "hf-public-smoke-py311-${{ github.run_id }}-${{ github.run_attempt }}",
+        "hf-public-smoke-py312-${{ github.run_id }}-${{ github.run_attempt }}",
+    } and not read:
+        return "github:actions:artifact:" + name.split("-${{", 1)[0]
+    return None
+
+
 def workflow_dependencies(source: str, *, path: str = "") -> list[str]:
     clean = uncommented_yaml(source)
+    runtime_profile = False
+    contract_call = False
     try:
         document, _lines = parse_workflow_yaml(source)
         clean += "\n" + "\n".join(workflow_scalar_values(document))
+        runtime_profile = path == RUNTIME_PUBLISHER and canonical_runtime_profile(document)
+        contract_call = path == RUNTIME_WITNESS and runtime_contract_call(document)
     except GateError:
         # A malformed workflow still fails analysis; retain discoverable raw paths.
         pass
@@ -902,9 +1095,15 @@ def workflow_dependencies(source: str, *, path: str = "") -> list[str]:
         # A leading ./ is GitHub's explicit repository-local uses syntax.
         # The policy and receipt still use one canonical Git-tree path.
         dependency = spelling[2:] if spelling.startswith("./") else spelling
+        if runtime_profile and dependency.startswith("tools/") and dependency[6:] in RUNTIME_TOOLS:
+            dependency = dependency[6:]
         dependencies.add(safe_repo_path(dependency))
     if path == LIFECYCLE_WORKFLOW and LIFECYCLE_LOCK in clean:
         dependencies.add(LIFECYCLE_LOCK)
+    if runtime_profile:
+        dependencies.update(RUNTIME_TOOLS)
+    if contract_call:
+        dependencies.update({RUNTIME_PUBLISHER, RUNTIME_VALIDATOR})
     return sorted(dependencies)
 
 
@@ -1310,6 +1509,13 @@ def analyze_workflow_source(source: str, *, path: str) -> dict[str, Any]:
     if "env" in document:
         unknown("WORKFLOW_ENVIRONMENT_REVIEW_REQUIRED", ("env",))
     dependencies = workflow_dependencies(source, path=path)
+    runtime_profile = path == RUNTIME_PUBLISHER and canonical_runtime_profile(document)
+    runtime_signing = runtime_profile and runtime_signing_job(document)
+    contract_call = path == RUNTIME_WITNESS and runtime_contract_call(document)
+    if path == RUNTIME_PUBLISHER and not (runtime_profile and runtime_signing):
+        unknown("CANONICAL_RUNTIME_INTERFACE_UNSUPPORTED", ())
+    if path == RUNTIME_WITNESS and not contract_call:
+        unknown("CANONICAL_RUNTIME_INTERFACE_UNSUPPORTED", ())
     jobs = document.get("jobs")
     if not isinstance(jobs, dict) or not jobs:
         unknown("WORKFLOW_SHAPE_INVALID", ("jobs",))
@@ -1337,6 +1543,14 @@ def analyze_workflow_source(source: str, *, path: str) -> dict[str, Any]:
         if "env" in job:
             unknown("WORKFLOW_ENVIRONMENT_REVIEW_REQUIRED", (*location, "env"))
         if "uses" in job:
+            if contract_call:
+                # This exact caller delegates grants to a same-source callee,
+                # whose typed contract-only graph is validated by the binder.
+                # Only two credential-free contents reads are reachable.
+                for _ in range(2):
+                    effects.append(RawEffect("github.contents.checkout", "read", path,
+                        lines[(*location, "uses")], "github:repository:szl-holdings/.github:contents"))
+                continue
             unknown("REUSABLE_WORKFLOW_UNSUPPORTED", (*location, "uses"))
             if "secrets" in job:
                 explicit_credentials = True
@@ -1387,6 +1601,17 @@ def analyze_workflow_source(source: str, *, path: str) -> dict[str, Any]:
                     unknown("ACTION_INPUTS_REVIEW_REQUIRED", (*step_location, "with"))
                 if action.startswith("./"):
                     unknown("LOCAL_ACTION_UNSUPPORTED", (*step_location, "uses"))
+                elif action == ATTEST_ACTION and runtime_signing and job_name == "runtime-attestation":
+                    # Exact wrapper + transitive actions/attest closure, with
+                    # no registry, predicate, token or alternate subject input.
+                    for sink, access, resource in (
+                        ("github.oidc.issue", "external-write", "github:repository:szl-holdings/a11oy:oidc:runtime-source"),
+                        ("sigstore.certificate.issue", "external-write", "sigstore:public:fulcio:szl-holdings/a11oy:runtime-source"),
+                        ("sigstore.transparency.append", "external-write", "sigstore:public:rekor:szl-holdings/a11oy:runtime-source"),
+                        ("github.attestation.upload", "external-write", "github:repository:szl-holdings/a11oy:attestations:runtime-source"),
+                        ("runner.attestation.bundle", "local-write", "runner:artifact:hf-runtime-binding:attestation-bundle"),
+                    ):
+                        effects.append(RawEffect(sink, access, path, lines[(*step_location, "uses")], resource))
                 elif action in KNOWN_ACTION_EFFECTS:
                     sink, resource, access = KNOWN_ACTION_EFFECTS[action]
                     if action in {
@@ -1415,7 +1640,7 @@ def analyze_workflow_source(source: str, *, path: str) -> dict[str, Any]:
                         effects.append(RawEffect(
                             "runner.guard.telemetry", "external-write", path,
                             lines[(*step_location, "uses")],
-                            "stepsecurity:monitor:szl-holdings/.github",
+                            "stepsecurity:monitor:szl-holdings/a11oy" if runtime_profile else "stepsecurity:monitor:szl-holdings/.github",
                         ))
                         if inputs.get("egress-policy", "block") == "block":
                             effects.append(RawEffect(
@@ -1443,22 +1668,26 @@ def analyze_workflow_source(source: str, *, path: str) -> dict[str, Any]:
                                 if not AUTH_INPUT_EXPRESSION.fullmatch(auth_value):
                                     unknown("SECRET_NAME_UNRESOLVED", (*step_location, "with"))
                     if sink == "github.contents.checkout":
+                        runtime_checkout = runtime_profile and (
+                            runtime_tools_checkout(inputs) or (job_name == "hf-deploy" and runtime_caller_checkout(inputs)))
                         if (
                             inputs.get("github-server-url", "https://github.com") != "https://github.com"
                             or inputs.get("submodules", "false").lower() != "false"
                             or inputs.get("lfs", "false").lower() != "false"
                             or inputs.get("allow-unsafe-pr-checkout", "false").lower() != "false"
-                            or bool(inputs.get("path"))
+                            or (bool(inputs.get("path")) and not runtime_checkout)
                         ):
                             unknown("ACTION_EXTRA_EFFECT_UNSUPPORTED", (*step_location, "with"))
                         exact_event_head = "${{ github.event.pull_request.head.sha || github.event.merge_group.head_sha || github.sha }}"
-                        if dependencies and (
+                        if dependencies and not runtime_checkout and (
                             inputs.get("repository", "szl-holdings/.github") != "szl-holdings/.github"
                             or ("ref" in inputs and inputs["ref"] != exact_event_head)
                         ):
                             unknown("CHECKOUT_SOURCE_BOUNDARY_UNSUPPORTED", (*step_location, "with"))
                     if sink == "github.contents.checkout" and "repository" in inputs:
                         repository = inputs["repository"]
+                        if runtime_profile and runtime_tools_checkout(inputs):
+                            repository = "szl-holdings/.github"
                         if not re.fullmatch(r"[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+", repository):
                             unknown("ACTION_RESOURCE_OVERRIDE_UNSUPPORTED", (*step_location, "with"))
                             continue
@@ -1467,7 +1696,10 @@ def analyze_workflow_source(source: str, *, path: str) -> dict[str, Any]:
                         if inputs.get("archive", "true").lower() != "true":
                             unknown("ACTION_RESOURCE_OVERRIDE_UNSUPPORTED", (*step_location, "with"))
                         artifact = inputs.get("name", "artifact")
-                        if artifact == "control-plane-effect-${{ github.run_id }}":
+                        runtime_resource = runtime_artifact_resource(path, artifact)
+                        if runtime_resource and (path != RUNTIME_PUBLISHER or runtime_profile):
+                            resource = runtime_resource
+                        elif artifact == "control-plane-effect-${{ github.run_id }}":
                             # This exact run-scoped namespace is the enforcing
                             # workflow contract, not an arbitrary dynamic name.
                             resource = "github:actions:artifact:control-plane-effect"
@@ -1491,6 +1723,12 @@ def analyze_workflow_source(source: str, *, path: str) -> dict[str, Any]:
                             unknown("ACTION_DESTRUCTIVE_INPUT_UNSUPPORTED", (*step_location, "with"))
                     if sink == "github.artifact.download":
                         artifact_resource = download_artifact_resource(inputs)
+                        if (runtime_signing and job_name == "runtime-attestation"
+                                and inputs == {"name": RUNTIME_BINDING_ARTIFACT}):
+                            artifact_resource = runtime_artifact_resource(path, RUNTIME_BINDING_ARTIFACT, read=True)
+                        if (runtime_profile and job_name == "runtime-readback"
+                                and inputs == {"name": RUNTIME_INPUTS_ARTIFACT}):
+                            artifact_resource = runtime_artifact_resource(path, RUNTIME_INPUTS_ARTIFACT, read=True)
                         if artifact_resource is None:
                             unknown("ACTION_RESOURCE_OVERRIDE_UNSUPPORTED", (*step_location, "with"))
                             continue
@@ -1564,6 +1802,8 @@ def analyze_workflow_source(source: str, *, path: str) -> dict[str, Any]:
         "unknowns": sorted(set(unknowns)),
     }
     scoped = scoped_write_permissions(document)
+    if runtime_signing or contract_call:
+        scoped.extend(["id-token:write", "attestations:write"])
     if scoped:
         result["scoped_write_permissions"] = scoped
     return result
@@ -1874,6 +2114,25 @@ def bind_declaration(
 
     all_effects = list(analysis["effects"])
     all_unknowns = list(analysis["unknowns"])
+    runtime_contract = workflow_path in {RUNTIME_PUBLISHER, RUNTIME_WITNESS}
+    if runtime_contract:
+        validator = dependency_blobs.get(RUNTIME_VALIDATOR)
+        if validator is None or sha256_bytes(validator) != RUNTIME_VALIDATOR_DIGEST:
+            all_unknowns.append(UnknownEffect("CANONICAL_RUNTIME_VALIDATOR_MISMATCH", workflow_path, 1))
+        if workflow_path == RUNTIME_WITNESS:
+            try:
+                callee, _ = parse_workflow_yaml(dependency_blobs.get(RUNTIME_PUBLISHER, b"").decode("utf-8"))
+                valid_callee = canonical_runtime_profile(callee) and runtime_signing_job(callee)
+            except (GateError, UnicodeError, TypeError, AttributeError):
+                valid_callee = False
+            if not valid_callee:
+                all_unknowns.append(UnknownEffect("CANONICAL_RUNTIME_INTERFACE_UNSUPPORTED", RUNTIME_PUBLISHER, 1))
+        else:
+            # Optional prune is a distinct deletion effect on the guarded
+            # COPY-derived file set. Count the logical invocation site, not
+            # batches/retries; no repository deletion authority is admitted.
+            all_effects.append(RawEffect("hf.space.files.prune", "external-write", workflow_path, 1,
+                                        "huggingface:space:SZLHOLDINGS/a11oy:copy-derived-files"))
     for dependency in analysis["dependencies"]:
         content = dependency_blobs.get(dependency)
         if content is None:
@@ -1883,7 +2142,19 @@ def bind_declaration(
             continue
         if dependency in TRUSTED_TOOL_PATHS:
             continue
+        if workflow_path == RUNTIME_WITNESS and dependency == RUNTIME_PUBLISHER:
+            # Bound exact local callee, not generic recursive reusable support.
+            # Publishing jobs are unreachable under literal boolean true.
+            all_unknowns.append(UnknownEffect("SCRIPT_SOURCE_REVIEW_REQUIRED", dependency, 1))
+            continue
         dep_effects, dep_unknowns = analyze_dependency(dependency, content)
+        if workflow_path == RUNTIME_PUBLISHER and dependency in RUNTIME_TOOLS:
+            dep_effects = [RawEffect(item.sink, item.access, item.path, item.line,
+                ("huggingface:space:SZLHOLDINGS/a11oy:source-variable:SZL_GIT_SHA"
+                 if item.sink == "sdk.huggingface.add_space_variable"
+                 else "huggingface:space:SZLHOLDINGS/a11oy")
+                if item.sink in {"sdk.repository.create_commit", "sdk.huggingface.add_space_variable", "sdk.huggingface.restart_space"}
+                else item.resource) for item in dep_effects]
         all_effects.extend(dep_effects)
         all_unknowns.extend(dep_unknowns)
     # Preserve multiplicity through binding too, including separate Python

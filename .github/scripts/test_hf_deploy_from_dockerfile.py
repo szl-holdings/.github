@@ -1484,9 +1484,9 @@ class TestAuthenticatedRuntimeBinding(unittest.TestCase):
         path = os.path.join(_HERE, "..", "workflows", "reusable-hf-deploy.yml")
         with open(path, encoding="utf-8") as fh:
             workflow = fh.read()
-        self.assertLess(workflow.index("Attest canonical runtime source binding"),
-                        workflow.index("Publish immutable runtime source binding before readiness"))
         self.assertLess(workflow.index("Publish immutable runtime source binding before readiness"),
+                        workflow.index("Attest canonical runtime source binding"))
+        self.assertLess(workflow.index("Attest canonical runtime source binding"),
                         workflow.index("Attest exact running commit, bytes, and smoke routes"))
         self.assertIn("hf-runtime-identity-${{ github.run_id }}-${{ github.run_attempt }}", workflow)
 

@@ -9,12 +9,12 @@ on:
   workflow_call:
     inputs:
       hf-repo:
-        description: "HF Space repo (e.g. SZLHOLDINGS/a11oy). Empty = derive SZLHOLDINGS/<github-repo-name>."
+        description: "This revision accepts only SZLHOLDINGS/a11oy for publication."
         required: false
         type: string
         default: ""
       ref:
-        description: "Branch/ref to deploy."
+        description: "Publication requires the caller exact github.sha on main."
         required: false
         type: string
         default: "main"
@@ -86,19 +86,61 @@ on:
 permissions:
   contents: read
 
+# One lock spans commit, isolated signing, and runtime readback. Its literal
+# group preserves exclusion with callers still using the old publisher job lock.
+concurrency:
+  group: hf-deploy-SZLHOLDINGS/a11oy
+  cancel-in-progress: false
+
 jobs:
+  invocation:
+    name: Admit only canonical A11oy or read-only source witness
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout the immutable invocation validator
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: ${{ job.workflow_repository }}
+          ref: ${{ job.workflow_sha }}
+          path: tools
+          persist-credentials: false
+          fetch-depth: 1
+      - name: Validate the bounded invocation before caller checkout or HF credentials
+        env:
+          WORKFLOW_REPOSITORY: ${{ job.workflow_repository }}
+          WORKFLOW_SHA: ${{ job.workflow_sha }}
+          CALLER_REPOSITORY: ${{ github.repository }}
+          EVENT_SHA: ${{ github.sha }}
+          EVENT_REF: ${{ github.ref }}
+          EVENT_NAME: ${{ github.event_name }}
+          CONTRACT_ONLY: ${{ inputs.contract-only }}
+          RUNTIME_IDENTITY: ${{ inputs.runtime-identity }}
+          HF_REPO: ${{ inputs.hf-repo }}
+          DEPLOY_REF: ${{ inputs.ref }}
+          REQUIRE_TIP: ${{ inputs.require-default-branch-tip }}
+          DOCKERFILE: ${{ inputs.dockerfile-path }}
+          SOURCE_REVISION_FILE: ${{ inputs.source-revision-file }}
+          SOURCE_VARIABLE: ${{ inputs.source-revision-variable }}
+          SOURCE_PROBE: ${{ inputs.source-revision-probe-path }}
+          INCLUDE_README: ${{ inputs.include-readme }}
+          PRUNE: ${{ inputs.prune }}
+          RESTART: ${{ inputs.restart-space }}
+          WAIT_RUNNING: ${{ inputs.wait-running }}
+        run: python3 -I -P tools/.github/scripts/hf_runtime_publish_contract.py
+
   hf-deploy:
     name: Deploy derived COPY set, bind source, and attest live state
+    needs: invocation
     if: ${{ inputs.contract-only == false }}
     runs-on: ubuntu-24.04 # Temporary until the exact Python 3.12.10 publisher closure is revalidated on 26.04.
     timeout-minutes: 30
     permissions:
       contents: read
-      id-token: write
-      attestations: write
-    concurrency:
-      group: hf-deploy-${{ inputs.hf-repo || github.repository }}
-      cancel-in-progress: false
+    outputs:
+      source_sha: ${{ steps.hf.outputs.source_sha }}
     steps:
       - name: Harden runner
         uses: step-security/harden-runner@e14015d583714f6e62063499dc959a02595150a1 # v2.21.1
@@ -108,8 +150,9 @@ jobs:
       - name: Checkout caller source of truth
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          repository: szl-holdings/a11oy
           path: caller
-          ref: ${{ inputs.ref }}
+          ref: ${{ github.sha }}
           persist-credentials: false
           fetch-depth: 1
 
@@ -260,14 +303,6 @@ jobs:
             "${TIP_GUARD_ARGS[@]}" \
             --manifest-out hf-deploy-manifest.json
 
-      # The application verifies this publication binding asynchronously. It
-      # must exist before the RUNNING/smoke wait, not depend on its own readiness.
-      - name: Attest canonical runtime source binding
-        if: inputs.runtime-identity == true
-        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
-        with:
-          subject-path: hf-runtime-binding.json
-
       - name: Publish immutable runtime source binding before readiness
         if: inputs.runtime-identity == true
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
@@ -307,10 +342,125 @@ jobs:
             --manifest hf-deploy-manifest.json \
             --hf-repo "$HF_REPO"
 
+      - name: Require both exact publication inputs
+        run: |
+          test -s hf-deploy-manifest.json
+          test -s hf-source-binding-bind.json
+
+      - name: Preserve exact publication inputs for downstream readback
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: hf-publication-inputs-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            hf-deploy-manifest.json
+            hf-source-binding-bind.json
+          if-no-files-found: error
+          retention-days: 90
+
+  runtime-attestation:
+    name: Attest the exact published source binding
+    needs: hf-deploy
+    if: ${{ inputs.contract-only == false }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      id-token: write
+      attestations: write
+    steps:
+      - name: Read this run's binding without caller credentials
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: hf-runtime-identity-${{ github.run_id }}-${{ github.run_attempt }}
+      - name: Attest canonical runtime source binding
+        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        with:
+          subject-path: hf-runtime-binding.json
+
+  runtime-readback:
+    name: Verify exact runtime commit and source after attestation
+    needs: [hf-deploy, runtime-attestation]
+    if: ${{ inputs.contract-only == false }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout exact reusable-workflow revision
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: ${{ job.workflow_repository }}
+          ref: ${{ job.workflow_sha }}
+          path: tools
+          persist-credentials: false
+          fetch-depth: 1
+
+      - name: Assert exact reusable-workflow tools revision
+        shell: bash
+        env:
+          WORKFLOW_REPOSITORY: ${{ job.workflow_repository }}
+          EXPECTED_TOOLS_SHA: ${{ job.workflow_sha }}
+        run: |
+          set -euo pipefail
+          if [[ ! "$EXPECTED_TOOLS_SHA" =~ ^[0-9a-f]{40}$ ]]; then
+            echo "::error::job.workflow_sha is not an exact 40-character commit SHA: $EXPECTED_TOOLS_SHA"
+            exit 2
+          fi
+          ACTUAL_TOOLS_SHA="$(git -C tools rev-parse --verify HEAD)"
+          if [[ ! "$ACTUAL_TOOLS_SHA" =~ ^[0-9a-f]{40}$ ]]; then
+            echo "::error::Checked-out tools HEAD is not an exact 40-character commit SHA: $ACTUAL_TOOLS_SHA"
+            exit 2
+          fi
+          if [ "$ACTUAL_TOOLS_SHA" != "$EXPECTED_TOOLS_SHA" ]; then
+            echo "::error::Reusable-workflow tools mismatch: expected $EXPECTED_TOOLS_SHA, found $ACTUAL_TOOLS_SHA"
+            exit 2
+          fi
+          printf 'job.workflow_repository=%s\n' "$WORKFLOW_REPOSITORY"
+          printf 'job.workflow_sha=%s\n' "$EXPECTED_TOOLS_SHA"
+          printf 'checked_out_tools_head=%s\n' "$ACTUAL_TOOLS_SHA"
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12.10"
+
+      - name: Create fresh publisher virtual environment
+        shell: bash
+        run: |
+          set -euo pipefail
+          VENV="$RUNNER_TEMP/hf-publisher-venv"
+          if [ -e "$VENV" ]; then
+            echo '::error::Refusing preexisting publisher virtual environment.'
+            exit 2
+          fi
+          python3 -m venv "$VENV"
+          ACTUAL_VERSION="$("$VENV/bin/python" -I -P -c 'import platform; print(platform.python_version())')"
+          if [ "$ACTUAL_VERSION" != "3.12.10" ]; then
+            echo "::error::Expected publisher Python 3.12.10, found $ACTUAL_VERSION."
+            exit 2
+          fi
+
+      - name: Install hash-locked deployment client closure
+        shell: bash
+        run: >-
+          "$RUNNER_TEMP/hf-publisher-venv/bin/python" -I -P -m pip install
+          --disable-pip-version-check --require-hashes --only-binary=:all:
+          --ignore-installed -r tools/requirements/hf-publisher.lock
+
+      - name: Read this run's exact publication inputs
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: hf-publication-inputs-${{ github.run_id }}-${{ github.run_attempt }}
+
+      - name: Require both downloaded publication inputs
+        run: |
+          test -s hf-deploy-manifest.json
+          test -s hf-source-binding-bind.json
+
       - name: Attest exact running commit, bytes, and smoke routes
         env:
           HF_TOKEN: ${{ secrets.HF_TOKEN }}
-          HF_REPO: ${{ steps.hf.outputs.hf_repo }}
+          HF_REPO: SZLHOLDINGS/a11oy
           WAIT_RUNNING: ${{ inputs.wait-running }}
         run: |
           set -euo pipefail
@@ -321,11 +471,10 @@ jobs:
             --wait-running "${WAIT_RUNNING}"
 
       - name: Verify running application source identity
-        if: steps.hf.outputs.source_binding == 'true'
         env:
           HF_TOKEN: ${{ secrets.HF_TOKEN }}
-          HF_REPO: ${{ steps.hf.outputs.hf_repo }}
-          SOURCE_SHA: ${{ steps.hf.outputs.source_sha }}
+          HF_REPO: SZLHOLDINGS/a11oy
+          SOURCE_SHA: ${{ needs.hf-deploy.outputs.source_sha }}
           SOURCE_REVISION_VARIABLE: ${{ inputs.source-revision-variable }}
           SOURCE_REVISION_PROBE_PATH: ${{ inputs.source-revision-probe-path }}
         run: |
@@ -354,6 +503,7 @@ jobs:
 
   exact-source-contract:
     name: Reusable publisher exact-source witness
+    needs: invocation
     if: ${{ inputs.contract-only == true }}
     permissions:
       contents: read
