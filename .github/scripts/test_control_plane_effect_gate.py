@@ -1822,5 +1822,261 @@ class LifecycleBindingTests(unittest.TestCase):
         )
 
 
+class CanonicalRuntimePublisherTests(unittest.TestCase):
+    """No generic checkout, reusable-call or write-grant exemption is created."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.root = Path(__file__).resolve().parents[2]
+        cls.source = cls.root.joinpath(gate.RUNTIME_PUBLISHER).read_text("utf-8")
+        cls.document, _ = gate.parse_workflow_yaml(cls.source)
+        cls.witness = cls.root.joinpath(gate.RUNTIME_WITNESS).read_text("utf-8")
+        cls.witness_document, _ = gate.parse_workflow_yaml(cls.witness)
+        spec = importlib.util.spec_from_file_location("runtime_contract_fixture", cls.root / gate.RUNTIME_VALIDATOR)
+        cls.contract = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(cls.contract)
+
+    def source_for(self, document):
+        import yaml
+        return yaml.safe_dump(document, sort_keys=False)
+
+    def assert_hard_denied(self, document, path=None):
+        path = path or gate.RUNTIME_PUBLISHER
+        source = self.source_for(document)
+        parsed = gate.analyze_workflow_source(source, path=path)
+        self.assertTrue(any(item.code in gate.NON_REVIEWABLE_UNKNOWN_CODES for item in parsed["unknowns"]),
+                        [(item.code, item.line) for item in parsed["unknowns"]])
+
+    def test_exact_profile_and_attestation_effects(self):
+        parsed = gate.analyze_workflow_source(self.source, path=gate.RUNTIME_PUBLISHER)
+        self.assertTrue(gate.canonical_runtime_profile(self.document))
+        self.assertTrue(gate.runtime_signing_job(self.document))
+        self.assertEqual(set(parsed["dependencies"]), gate.RUNTIME_TOOLS)
+        self.assertEqual(set(parsed["scoped_write_permissions"]), {"id-token:write", "attestations:write"})
+        self.assertFalse(set(item.code for item in parsed["unknowns"]) & gate.NON_REVIEWABLE_UNKNOWN_CODES)
+        sinks = [effect.sink for effect in parsed["effects"]]
+        for sink in ("github.oidc.issue", "sigstore.certificate.issue", "sigstore.transparency.append",
+                     "github.attestation.upload", "runner.attestation.bundle"):
+            self.assertEqual(sinks.count(sink), 1)
+        self.assertEqual(sum(effect.sink == "github.contents.checkout" and "a11oy" in effect.resource
+                             for effect in parsed["effects"]), 1)
+        self.assertNotIn("tools/requirements/hf-publisher.lock", parsed["dependencies"])
+
+    def test_contract_call_is_exact_and_read_only(self):
+        parsed = gate.analyze_workflow_source(self.witness, path=gate.RUNTIME_WITNESS)
+        self.assertTrue(gate.runtime_contract_call(self.witness_document))
+        self.assertEqual([effect.access for effect in parsed["effects"]], ["read", "read"])
+        self.assertEqual(parsed["credentials"], ["GITHUB_TOKEN"])
+        self.assertEqual(set(parsed["dependencies"]), {gate.RUNTIME_PUBLISHER, gate.RUNTIME_VALIDATOR})
+
+    def test_canonical_scope_is_not_reusable_elsewhere(self):
+        self.assert_hard_denied(self.document, path=WORKFLOW_PATH)
+        self.assert_hard_denied(self.witness_document, path=WORKFLOW_PATH)
+
+    def test_checkout_pair_deviations_fail_closed(self):
+        for index, field, value in ((0, "repository", "other/repo"), (0, "ref", "${{ github.sha }}"),
+                (0, "path", "caller"), (0, "token", "${{ github.token }}"),
+                (0, "submodules", "recursive"), (0, "persist-credentials", "true")):
+            with self.subTest(field=field):
+                changed = copy.deepcopy(self.document)
+                changed["jobs"]["invocation"]["steps"][index]["with"][field] = value
+                self.assert_hard_denied(changed)
+        for field, value in (("repository", "other/repo"), ("ref", "main"), ("path", "tools"), ("ssh-key", "${{ secrets.KEY }}")):
+            with self.subTest(caller=field):
+                changed = copy.deepcopy(self.document)
+                changed["jobs"]["hf-deploy"]["steps"][1]["with"][field] = value
+                self.assert_hard_denied(changed)
+
+    def test_guards_dependencies_and_types_cannot_be_weakened(self):
+        for job in ("hf-deploy", "runtime-attestation", "runtime-readback", "exact-source-contract"):
+            for key, value in (("if", "${{ always() }}"), ("needs", "other"), ("continue-on-error", "true")):
+                with self.subTest(job=job, key=key):
+                    changed = copy.deepcopy(self.document)
+                    changed["jobs"][job][key] = value
+                    self.assert_hard_denied(changed)
+        for name in ("contract-only", "runtime-identity", "require-default-branch-tip"):
+            changed = copy.deepcopy(self.document)
+            changed["on"]["workflow_call"]["inputs"][name]["type"] = "string"
+            self.assert_hard_denied(changed)
+        changed = copy.deepcopy(self.document)
+        changed["jobs"]["invocation"]["steps"][1]["env"]["HF_REPO"] = "SZLHOLDINGS/other"
+        self.assert_hard_denied(changed)
+
+    def test_signer_cannot_acquire_shell_credentials_or_more_authority(self):
+        changes = (
+            lambda job: job["steps"].append({"run": "echo unsafe"}),
+            lambda job: job.update(env={"TOKEN": "${{ github.token }}"}),
+            lambda job: job["permissions"].update({"contents": "write"}),
+            lambda job: job["steps"][1]["with"].update({"push-to-registry": "true"}),
+            lambda job: job["steps"][1]["with"].update({"github-token": "${{ github.token }}"}),
+            lambda job: job["steps"][1]["with"].update({"subject-path": "other.json"}),
+            lambda job: job["steps"][1].update(uses="actions/attest-build-provenance@main"),
+            lambda job: job["steps"][0]["with"].update({"run-id": "123"}),
+            lambda job: job["steps"][0]["with"].update({"repository": "other/repo"}),
+        )
+        for index, mutate in enumerate(changes):
+            with self.subTest(index=index):
+                changed = copy.deepcopy(self.document)
+                mutate(changed["jobs"]["runtime-attestation"])
+                self.assert_hard_denied(changed)
+
+    def test_attempt_artifacts_and_required_input_pair(self):
+        for job_name in ("hf-deploy", "runtime-attestation", "runtime-readback"):
+            for index, step in enumerate(self.document["jobs"][job_name]["steps"]):
+                if step.get("with", {}).get("name") in {gate.RUNTIME_BINDING_ARTIFACT, gate.RUNTIME_INPUTS_ARTIFACT}:
+                    for name in ("prior-attempt", "binding-${{ github.run_id }}", "${{ inputs.ref }}"):
+                        changed = copy.deepcopy(self.document)
+                        changed["jobs"][job_name]["steps"][index]["with"]["name"] = name
+                        self.assert_hard_denied(changed)
+        for job_name in ("hf-deploy", "runtime-readback"):
+            changed = copy.deepcopy(self.document)
+            for step in changed["jobs"][job_name]["steps"]:
+                if step.get("run", "").startswith("test -s hf-deploy-manifest.json"):
+                    step["run"] = "test -s hf-deploy-manifest.json\n"
+            self.assert_hard_denied(changed)
+
+    def test_witness_cannot_enable_publication_or_replace_callee(self):
+        for key, value in (("uses", "./.github/workflows/other.yml"), ("secrets", "inherit"),
+                ("with", {"contract-only": "false"}), ("with", {"contract-only": "${{ inputs.contract }}"})):
+            changed = copy.deepcopy(self.witness_document)
+            changed["jobs"]["reusable-publisher-exact-source-witness"][key] = value
+            self.assert_hard_denied(changed, path=gate.RUNTIME_WITNESS)
+        changed = copy.deepcopy(self.document)
+        changed["jobs"]["exact-source-contract"]["steps"][1]["run"] += "curl https://example.invalid\n"
+        self.assert_hard_denied(changed)
+
+    def test_binder_rejects_guard_drift_or_unreviewable_callee_even_when_pinned(self):
+        source = self.witness.encode()
+        parsed = gate.analyze_workflow_source(self.witness, path=gate.RUNTIME_WITNESS)
+        declaration = policy_for(source, workflow_path=gate.RUNTIME_WITNESS)["workflow_declarations"][gate.RUNTIME_WITNESS]
+        dependencies = {gate.RUNTIME_PUBLISHER: self.source.encode(), gate.RUNTIME_VALIDATOR: self.root.joinpath(gate.RUNTIME_VALIDATOR).read_text("utf-8").encode()}
+        for target in (gate.RUNTIME_VALIDATOR, gate.RUNTIME_PUBLISHER):
+            changed = dict(dependencies)
+            if target == gate.RUNTIME_VALIDATOR:
+                changed[target] += b"\n# drift\n"
+            else:
+                bad = copy.deepcopy(self.document)
+                bad["jobs"]["hf-deploy"]["if"] = "${{ always() }}"
+                changed[target] = self.source_for(bad).encode()
+            candidate = copy.deepcopy(declaration)
+            # Exact-byte review cannot waive these execution boundaries.
+            candidate["reviewed_unknowns"] = {"files": {gate.RUNTIME_WITNESS: gate.sha256_bytes(source),
+                **{key: gate.sha256_bytes(value) for key, value in changed.items()}}, "unknowns": []}
+            bound = gate.bind_declaration(gate.RUNTIME_WITNESS, source, parsed, candidate, changed)
+            self.assertIn("UNREVIEWABLE_EFFECT_BOUNDARY", bound["reason_codes"])
+
+    def test_bounded_invocation_guard(self):
+        env = {"WORKFLOW_REPOSITORY": "szl-holdings/.github", "WORKFLOW_SHA": "a" * 40,
+            "EVENT_SHA": "b" * 40, "CONTRACT_ONLY": "false", "CALLER_REPOSITORY": "szl-holdings/a11oy",
+            "EVENT_REF": "refs/heads/main", "EVENT_NAME": "push", "DEPLOY_REF": "b" * 40,
+            "HF_REPO": "SZLHOLDINGS/a11oy", "RUNTIME_IDENTITY": "true", "REQUIRE_TIP": "true",
+            "DOCKERFILE": "Dockerfile", "SOURCE_REVISION_FILE": "", "SOURCE_VARIABLE": "SZL_GIT_SHA",
+            "SOURCE_PROBE": "/api/build-info", "INCLUDE_README": "true", "PRUNE": "true",
+            "RESTART": "false", "WAIT_RUNNING": "600"}
+        self.assertEqual(self.contract.validate(env), "CANONICAL_A11OY_PUBLICATION")
+        for key, bad in (("WORKFLOW_REPOSITORY", "other/repo"), ("WORKFLOW_SHA", "main"),
+                ("EVENT_SHA", "b" * 39), ("CONTRACT_ONLY", "FALSE"), ("CALLER_REPOSITORY", "szl-holdings/other"),
+                ("EVENT_REF", "refs/heads/feature"), ("EVENT_NAME", "pull_request"), ("DEPLOY_REF", "main"),
+                ("HF_REPO", "SZLHOLDINGS/other"), ("RUNTIME_IDENTITY", "false"), ("REQUIRE_TIP", "false"),
+                ("DOCKERFILE", "other/Dockerfile"), ("SOURCE_REVISION_FILE", "generated.py"),
+                ("SOURCE_VARIABLE", "other"), ("SOURCE_PROBE", "//elsewhere"), ("INCLUDE_README", "false"),
+                ("PRUNE", "TRUE"), ("RESTART", "yes"), ("WAIT_RUNNING", "1201"), ("WAIT_RUNNING", "-1"),
+                ("WAIT_RUNNING", "1;exit")):
+            with self.subTest(key=key, bad=bad), self.assertRaises(ValueError):
+                self.contract.validate({**env, key: bad})
+        witness = {**env, "CONTRACT_ONLY": "true", "CALLER_REPOSITORY": "szl-holdings/.github",
+                   "EVENT_SHA": "a" * 40, "RUNTIME_IDENTITY": "false"}
+        self.assertEqual(self.contract.validate(witness), "READ_ONLY_EXACT_SOURCE_CONTRACT")
+        for key, value in (("EVENT_SHA", "b" * 40), ("CALLER_REPOSITORY", "szl-holdings/a11oy"), ("RUNTIME_IDENTITY", "true")):
+            with self.subTest(witness=key), self.assertRaises(ValueError):
+                self.contract.validate({**witness, key: value})
+
+
+class CanonicalSeismicPublisherTests(unittest.TestCase):
+    """The seismic publisher has a separate exact-byte effect boundary."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.root = Path(__file__).resolve().parents[2]
+        cls.source = cls.root.joinpath(gate.SEISMIC_PUBLISHER).read_text("utf-8")
+        cls.witness = cls.root.joinpath(gate.SEISMIC_WITNESS).read_text("utf-8")
+        cls.policy = json.loads(cls.root.joinpath(POLICY_PATH).read_text("utf-8"))
+
+    def bound(self, path: str, source: str, *, validator: bytes | None = None):
+        analysis = gate.analyze_workflow_source(source, path=path)
+        dependencies = {
+            dep: self.root.joinpath(dep).read_text("utf-8").encode("utf-8")
+            for dep in analysis["dependencies"]
+            if self.root.joinpath(dep).is_file()
+        }
+        if validator is not None:
+            dependencies[gate.SEISMIC_VALIDATOR] = validator
+        declaration = self.policy["workflow_declarations"][path]
+        return gate.bind_declaration(path, source.encode("utf-8"), analysis,
+                                     declaration, dependencies)
+
+    def test_exact_seismic_publisher_and_read_only_witness_are_admitted(self):
+        publisher, _ = gate.parse_workflow_yaml(self.source)
+        witness, _ = gate.parse_workflow_yaml(self.witness)
+        self.assertTrue(gate.seismic_publisher_profile(self.source, publisher))
+        self.assertTrue(gate.seismic_contract_call(self.witness, witness))
+        for path, source, expected_writes in (
+            (gate.SEISMIC_PUBLISHER, self.source, 6),
+            (gate.SEISMIC_WITNESS, self.witness, 0),
+        ):
+            with self.subTest(path=path):
+                result = self.bound(path, source)
+                self.assertEqual(result["verdict"], "ALLOW", result["reason_codes"])
+                self.assertEqual(result["external_write_sites"], expected_writes)
+                self.assertTrue(result["reviewed_unknowns_applied"])
+
+    def test_target_checkout_lock_tool_revision_branch_guard_and_source_drift_deny(self):
+        changes = (
+            ("repository: szl-holdings/szl-seismic-review",
+             "repository: szl-holdings/other"),
+            ("--hf-repo SZLHOLDINGS/szl-seismic-review",
+             "--hf-repo SZLHOLDINGS/other"),
+            ("group: hf-deploy-SZLHOLDINGS/szl-seismic-review",
+             "group: hf-deploy-SZLHOLDINGS/other"),
+            ("ref: ${{ job.workflow_sha }}", "ref: main"),
+            ("if: ${{ inputs.contract-only == false }}", "if: ${{ always() }}"),
+            ("--manifest-out hf-deploy-manifest.json",
+             "--prune --manifest-out hf-deploy-manifest.json"),
+            ("# This version keeps publication and public readback under one Space writer lock.",
+             "# Changed without an effect-policy review."),
+        )
+        for original, replacement in changes:
+            with self.subTest(change=original):
+                self.assertIn(original, self.source)
+                changed = self.source.replace(original, replacement, 1)
+                analysis = gate.analyze_workflow_source(changed, path=gate.SEISMIC_PUBLISHER)
+                self.assertIn("CANONICAL_RUNTIME_INTERFACE_UNSUPPORTED",
+                              {item.code for item in analysis["unknowns"]})
+                result = self.bound(gate.SEISMIC_PUBLISHER, changed)
+                self.assertEqual(result["verdict"], "DENY")
+                self.assertIn("WORKFLOW_DIGEST_MISMATCH", result["reason_codes"])
+                self.assertIn("UNREVIEWABLE_EFFECT_BOUNDARY", result["reason_codes"])
+
+    def test_witness_and_validator_cannot_change_under_existing_declaration(self):
+        for original, replacement in (
+            ("contract-only: true", "contract-only: false"),
+            ("uses: ./.github/workflows/reusable-hf-deploy-seismic.yml",
+             "uses: ./.github/workflows/reusable-hf-deploy.yml"),
+            ("HF_TOKEN: ${{ github.token }}", "HF_TOKEN: ${{ secrets.HF_TOKEN }}"),
+        ):
+            with self.subTest(change=original):
+                changed = self.witness.replace(original, replacement, 1)
+                result = self.bound(gate.SEISMIC_WITNESS, changed)
+                self.assertEqual(result["verdict"], "DENY")
+                self.assertIn("WORKFLOW_DIGEST_MISMATCH", result["reason_codes"])
+                self.assertIn("UNREVIEWABLE_EFFECT_BOUNDARY", result["reason_codes"])
+        validator = self.root.joinpath(gate.SEISMIC_VALIDATOR).read_text("utf-8").encode("utf-8")
+        result = self.bound(gate.SEISMIC_PUBLISHER, self.source,
+                            validator=validator + b"\n# unreviewed change\n")
+        self.assertEqual(result["verdict"], "DENY")
+        self.assertIn("CANONICAL_RUNTIME_VALIDATOR_MISMATCH",
+                      {item["code"] for item in result["unknowns"]})
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

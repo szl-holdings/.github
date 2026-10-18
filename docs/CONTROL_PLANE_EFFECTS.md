@@ -111,6 +111,96 @@ constructs. Acceptance requires exact file digests and the complete observed
 unknown set; the receipt records whether that review was applied. This cannot
 waive invalid YAML, unresolved authority or execution boundaries, or fan-out.
 
+## Bounded canonical A11oy publisher
+
+The new version of `reusable-hf-deploy.yml` has one additional admitted
+invocation graph, not generic reusable-workflow or dynamic-checkout support.
+Before caller source or HF credentials are used, an isolated Python validator
+at an exact checker-pinned digest requires the canonical A11oy repository,
+main event SHA, exact target, runtime identity and default-branch-tip guard.
+Its publication interface is intentionally incompatible with arbitrary callers;
+consumers at prior immutable revisions are unchanged. Both the validator and
+the complete shell/Python/lock closure remain part of the exact source review.
+
+The paired `job.workflow_repository` / `job.workflow_sha` checkout is accepted
+only at `tools/` in this graph, with depth 1 and credentials disabled. Only the
+four explicitly named executable/lock paths map from that workspace to their
+immutable `.github` source blobs. The sole caller checkout is literal
+`szl-holdings/a11oy` at `github.sha` under `caller/`. Caller bytes are publisher
+data; the tools interpreter uses `-I -P` and literal tools executable paths.
+Any other checkout resource, path, ref, credential or execution boundary still
+denies. Hash-locked `requirements/hf-publisher.lock` is included explicitly.
+
+The exact local `reusable-hf-deploy-source-witness.yml` invocation is separately
+modeled. It supplies literal boolean `contract-only: true`, the declared
+permission interface and one named token mapping. Its exact callee and validator
+are checked too. Only the two read-only tools checkouts, pure invocation check
+and pinned source-comparison block are reachable; every mutating job is guarded
+off. Caller bytes alone cannot approve a different callee or enable publication.
+
+The signer is an isolated job with exactly a same-run artifact download and
+`actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8`.
+That wrapper's reviewed transitive is
+`actions/attest@508db95dd578ae2727ebd6217d5ba78e4fbda05d`. The sole admitted input
+is literal `subject-path: hf-runtime-binding.json`. The classified sites are
+GitHub OIDC issuance, public Sigstore Fulcio certificate issuance, Rekor append,
+GitHub attestation upload, and a local bundle write. Registry push and artifact
+metadata storage are excluded because their enabling inputs are not admitted.
+Only this exact job may hold `id-token: write` and `attestations: write`; extra
+steps, env, credentials, subjects, selectors or write grants deny. The local
+contract-only caller delegates that interface but reaches no signing job.
+
+Runtime binding and publication-input artifact names include both `run_id` and
+`run_attempt`; downloads admit no alternate run, repository, token or path.
+Both publication input files must exist before upload and after download. Public
+smoke coverage uses two explicit Python 3.11/3.12 jobs and distinct attempt-scoped
+artifacts; arbitrary matrix fan-out remains unsupported. Normal and optimized
+Python regressions are retained in each job.
+
+The declaration includes optional pruning as an external deletion effect on
+the fixed A11oy COPY-derived file set, preserving protected-file exclusions;
+it does not grant repository deletion. Budgets count statically observed
+invocation/source sites, not HTTP packets, commit batches, retries or proof of
+runtime call counts. SDK-shaped sites in offline regression fixtures retain
+explicit credentialless test-harness resources rather than production targets.
+Publication, source-variable update, optional restart, telemetry, artifacts and
+attestation effects are all separately visible. This source model establishes
+neither live authorization nor deployment, runtime readiness, complete image
+identity, hardware provenance, or independent witness authority.
+
+Upstream action sources reviewed for these classifications:
+[wrapper action.yml](https://github.com/actions/attest-build-provenance/blob/4d101475d8b20a2381f78447822ac1eab6504dd8/action.yml),
+[attest main.ts](https://github.com/actions/attest/blob/508db95dd578ae2727ebd6217d5ba78e4fbda05d/src/main.ts),
+[attest.ts](https://github.com/actions/attest/blob/508db95dd578ae2727ebd6217d5ba78e4fbda05d/src/attest.ts).
+
+## Bounded seismic publisher
+
+`reusable-hf-deploy-seismic.yml` is a separate workflow for the exact
+`szl-holdings/szl-seismic-review` caller and
+`SZLHOLDINGS/szl-seismic-review` Space. Its invocation job checks the
+immutable called-workflow revision, main-branch event SHA, target, Dockerfile,
+source-revision inputs, smoke paths and default-branch-tip requirement before
+the publication job can receive an HF token. The caller checkout is a literal
+repository at `github.sha`; publisher tools come from `job.workflow_sha` at
+`tools/`. The publisher keeps the established Space writer lock and uses
+`ubuntu-24.04` with the existing hash-locked Python 3.12.10 client closure.
+
+Publication derives its file set from Dockerfile COPY sources and writes
+`SOURCE_REVISION` inside that set. It checks the exact main tip before the HF
+commit, binds the non-secret `SZL_SOURCE_REVISION` variable, checks Space bytes
+and smoke routes, then verifies `/api/build-info` reports the source revision.
+The local source witness uses the literal `contract-only: true` branch; no HF
+publication job is reachable from that branch. The effect declaration binds
+the workflow, validator, tool closure, reviewed unknowns and target resources
+to exact source digests. It grants no authority to another caller or Space.
+
+These checks report source and observed runtime state for a particular run.
+They do not certify seismic science, independent model quality, external
+authorization or future availability. A failed or incomplete run remains
+failed or incomplete. Rollback is a protected change to the seismic caller's
+immutable reusable-workflow pin, followed by normal exact-head checks and a
+new authorized publisher run; the existing A11oy publisher is unaffected.
+
 ## Trust-root bootstrap boundary
 
 The policy, checker, checker tests, and enforcing workflow form a trust root.
