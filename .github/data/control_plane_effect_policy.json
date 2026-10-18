@@ -585,8 +585,8 @@
         "readback": true
       },
       "trusted_transitives": {
-        ".github/scripts/control_plane_effect_gate.py": "sha256:82bb6cecf993c23333c8467492e0927ffa2ed62e4ad8b17034d0a53310b363f1",
-        ".github/scripts/test_control_plane_effect_gate.py": "sha256:69ea81a9d8093866cf0e901fdf71a7f1d85ec038f2da68ba72ba5a6bbfa3b891"
+        ".github/scripts/control_plane_effect_gate.py": "sha256:e1c4ab8ef9df0fecd38017b51dabbb5313ec3b4bd445d5db3bc6584a4c1bdc98",
+        ".github/scripts/test_control_plane_effect_gate.py": "sha256:5fdd8cbede8a1517e5870f90bce53f9ac31e4df57e6b87632e686f7946071eff"
       },
       "reviewed_unknowns": {
         "files": {
@@ -1083,8 +1083,8 @@
         "readback": false
       },
       "trusted_transitives": {
-        ".github/scripts/control_plane_effect_gate.py": "sha256:82bb6cecf993c23333c8467492e0927ffa2ed62e4ad8b17034d0a53310b363f1",
-        ".github/scripts/test_control_plane_effect_gate.py": "sha256:69ea81a9d8093866cf0e901fdf71a7f1d85ec038f2da68ba72ba5a6bbfa3b891"
+        ".github/scripts/control_plane_effect_gate.py": "sha256:e1c4ab8ef9df0fecd38017b51dabbb5313ec3b4bd445d5db3bc6584a4c1bdc98",
+        ".github/scripts/test_control_plane_effect_gate.py": "sha256:5fdd8cbede8a1517e5870f90bce53f9ac31e4df57e6b87632e686f7946071eff"
       },
       "reviewed_unknowns": {
         "files": {
@@ -2519,7 +2519,7 @@
     ".github/workflows/tests.yml": {
       "intent_id": "repository-credentialless-tests-v1",
       "valid_until": "2026-11-30",
-      "source_sha256": "sha256:9bf3e5003288d54731c986e8a59725ec0c31a782588d475ce2e766d1054d5526",
+      "source_sha256": "sha256:cf9bb3090b016d5a5c0e735439774d5d05568131e5b0018d1f6fe18845578a3e",
       "credentials": [],
       "resources": [
         {
@@ -2586,7 +2586,6 @@
       "trusted_transitives": {},
       "reviewed_unknowns": {
         "files": {
-          ".github/workflows/tests.yml": "sha256:9bf3e5003288d54731c986e8a59725ec0c31a782588d475ce2e766d1054d5526",
           ".github/policies/hf-collection-navigation.v1.json": "sha256:24306b3620a85e2a4486b511fa7f198798561e9b08b3f704e72f1c8568da5f85",
           ".github/scripts/hf_collection_navigation_check.py": "sha256:11debeda2a40faad3089810119ce879379a50e9a1f33c7ad4cdc72c2bc2788fb",
           ".github/scripts/hf_deploy_from_dockerfile.py": "sha256:373add34da38a219e5dafce52e7a86a417c019ac13b139678fc72c93c1ad1318",
@@ -2610,6 +2609,7 @@
           ".github/scripts/test_hf_module_drift_check.py": "sha256:fdb716fcb6f8eb2b57ee61db7e05624cf1a057455ec78266a8acd152d52cb66f",
           ".github/scripts/test_hf_module_drift_prune.py": "sha256:19e84279dfbadf538b509c690b48dc94f17ff98ffb29c9a556dd1a16a47aca8b",
           ".github/scripts/test_hf_publisher_lock.py": "sha256:2de4fab39751d33a4c9d1a70214ac2c7886951724094e6a11c02a3c27c929d8b",
+          ".github/scripts/test_hf_seismic_publish_contract.py": "sha256:e8c0b3bf75e0a128313f9fd8805c8a9943a47fce57db0639f64db301b8a8198c",
           ".github/scripts/test_hf_source_bound_baseline.py": "sha256:ba444e68085a860dda654936089d2dac2f774991f8aa444f85788677f8828ec7",
           ".github/scripts/test_hf_space_lifecycle_reconcile.py": "sha256:ba82032048bf4d2a07b72a8afec6f092b793003456000da61e8bfe29793a9c14",
           ".github/scripts/test_hf_space_source_binding.py": "sha256:fc5d12413102c47b6fc276f9ebcfbd8e687c64ba41936e9a4a0929f21a038948",
@@ -2624,7 +2624,8 @@
           ".github/scripts/test_reusable_workflow_lint.py": "sha256:8e00cc12f4f8631df77093177acf9804a8651f15a41ed172d754545a75dfb382",
           ".github/scripts/test_reusable_workflow_target_check.py": "sha256:d145f78f6bb4ae0b76a9f35210882e0ff96d511ece8630d39f5d99f775f9ed54",
           ".github/scripts/test_solo_builder_provenance.py": "sha256:32abce0cee25db6fbf2d2e9d313054b73ecbbfc4eaa469462c11e1cdd6a69f14",
-          ".github/scripts/test_szl_codename_gate.py": "sha256:bcfcbbf52dd4cfe7761372fa4acd08b98aec327cb4f7f7dc2c1bc86029fd5b0f"
+          ".github/scripts/test_szl_codename_gate.py": "sha256:bcfcbbf52dd4cfe7761372fa4acd08b98aec327cb4f7f7dc2c1bc86029fd5b0f",
+          ".github/workflows/tests.yml": "sha256:cf9bb3090b016d5a5c0e735439774d5d05568131e5b0018d1f6fe18845578a3e"
         },
         "unknowns": [
           "ACTION_INPUTS_REVIEW_REQUIRED@.github/workflows/tests.yml:29",
@@ -2796,6 +2797,8 @@
           "PYTHON_IMPORT_UNRESOLVED@.github/scripts/test_hf_module_drift_prune.py:14",
           "PYTHON_IMPORT_UNRESOLVED@.github/scripts/test_hf_module_drift_prune.py:16",
           "PYTHON_IMPORT_UNRESOLVED@.github/scripts/test_hf_publisher_lock.py:1",
+          "PYTHON_IMPORT_UNRESOLVED@.github/scripts/test_hf_seismic_publish_contract.py:3",
+          "PYTHON_IMPORT_UNRESOLVED@.github/scripts/test_hf_seismic_publish_contract.py:5",
           "PYTHON_IMPORT_UNRESOLVED@.github/scripts/test_hf_source_bound_baseline.py:2",
           "PYTHON_IMPORT_UNRESOLVED@.github/scripts/test_hf_source_bound_baseline.py:4",
           "PYTHON_IMPORT_UNRESOLVED@.github/scripts/test_hf_source_bound_baseline.py:5",
@@ -2872,6 +2875,7 @@
           "PYTHON_SOURCE_REVIEW_REQUIRED@.github/scripts/test_hf_module_drift_check.py:1",
           "PYTHON_SOURCE_REVIEW_REQUIRED@.github/scripts/test_hf_module_drift_prune.py:1",
           "PYTHON_SOURCE_REVIEW_REQUIRED@.github/scripts/test_hf_publisher_lock.py:1",
+          "PYTHON_SOURCE_REVIEW_REQUIRED@.github/scripts/test_hf_seismic_publish_contract.py:1",
           "PYTHON_SOURCE_REVIEW_REQUIRED@.github/scripts/test_hf_source_bound_baseline.py:1",
           "PYTHON_SOURCE_REVIEW_REQUIRED@.github/scripts/test_hf_space_lifecycle_reconcile.py:1",
           "PYTHON_SOURCE_REVIEW_REQUIRED@.github/scripts/test_hf_space_source_binding.py:1",
@@ -2914,10 +2918,8 @@
           "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/tests.yml:241",
           "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/tests.yml:251",
           "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/tests.yml:254",
-          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/tests.yml:261",
-          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/tests.yml:267",
-          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/tests.yml:268",
-          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/tests.yml:269",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/tests.yml:257",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/tests.yml:264",
           "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/tests.yml:270",
           "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/tests.yml:271",
           "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/tests.yml:272",
@@ -2937,10 +2939,13 @@
           "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/tests.yml:286",
           "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/tests.yml:287",
           "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/tests.yml:288",
-          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/tests.yml:296",
-          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/tests.yml:303",
-          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/tests.yml:307",
-          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/tests.yml:316",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/tests.yml:289",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/tests.yml:290",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/tests.yml:291",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/tests.yml:299",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/tests.yml:306",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/tests.yml:310",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/tests.yml:319",
           "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/tests.yml:32",
           "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/tests.yml:34",
           "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/tests.yml:36",
@@ -2953,21 +2958,21 @@
           "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/tests.yml:74",
           "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/tests.yml:84",
           "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/tests.yml:92",
-          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/tests.yml:267",
-          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/tests.yml:268",
-          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/tests.yml:272",
-          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/tests.yml:273",
-          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/tests.yml:274",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/tests.yml:270",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/tests.yml:271",
           "SHELL_COMPOSITION_UNKNOWN@.github/workflows/tests.yml:275",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/tests.yml:276",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/tests.yml:277",
           "SHELL_COMPOSITION_UNKNOWN@.github/workflows/tests.yml:278",
-          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/tests.yml:279",
           "SHELL_COMPOSITION_UNKNOWN@.github/workflows/tests.yml:281",
           "SHELL_COMPOSITION_UNKNOWN@.github/workflows/tests.yml:282",
-          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/tests.yml:283",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/tests.yml:284",
           "SHELL_COMPOSITION_UNKNOWN@.github/workflows/tests.yml:285",
           "SHELL_COMPOSITION_UNKNOWN@.github/workflows/tests.yml:286",
-          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/tests.yml:287",
-          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/tests.yml:288"
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/tests.yml:288",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/tests.yml:289",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/tests.yml:290",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/tests.yml:291"
         ]
       }
     },
@@ -7324,6 +7329,436 @@
           "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-public-smoke-contract.yml:99",
           "WORKFLOW_ENVIRONMENT_REVIEW_REQUIRED@.github/workflows/hf-public-smoke-contract.yml:38",
           "WORKFLOW_ENVIRONMENT_REVIEW_REQUIRED@.github/workflows/hf-public-smoke-contract.yml:95"
+        ]
+      }
+    },
+    ".github/workflows/reusable-hf-deploy-seismic.yml": {
+      "intent_id": "canonical-seismic-ubuntu24-publisher-v1",
+      "valid_until": "2026-11-30",
+      "source_sha256": "sha256:3d17fbae56bb593c23b0bbac548ce879d6c61d57fe24b71875e72a00ba96e44b",
+      "credentials": [
+        "GITHUB_TOKEN",
+        "HF_TOKEN"
+      ],
+      "resources": [
+        {
+          "key": "github:repository:szl-holdings/.github:contents",
+          "access": "read"
+        },
+        {
+          "key": "github:repository:szl-holdings/szl-seismic-review:artifact:hf-deploy-evidence",
+          "access": "external-write"
+        },
+        {
+          "key": "github:repository:szl-holdings/szl-seismic-review:contents",
+          "access": "read"
+        },
+        {
+          "key": "huggingface:space:SZLHOLDINGS/szl-seismic-review",
+          "access": "external-write"
+        },
+        {
+          "key": "huggingface:space:SZLHOLDINGS/szl-seismic-review:source-variable:SZL_SOURCE_REVISION",
+          "access": "external-write"
+        },
+        {
+          "key": "runner:guard:egress",
+          "access": "local-write"
+        },
+        {
+          "key": "runner:toolchain:python",
+          "access": "local-write"
+        },
+        {
+          "key": "stepsecurity:monitor:szl-holdings/szl-seismic-review",
+          "access": "external-write"
+        }
+      ],
+      "effects": [
+        {
+          "sink": "github.artifact.upload",
+          "resource": "github:repository:szl-holdings/szl-seismic-review:artifact:hf-deploy-evidence",
+          "access": "external-write",
+          "max_calls": 1
+        },
+        {
+          "sink": "github.contents.checkout",
+          "resource": "github:repository:szl-holdings/.github:contents",
+          "access": "read",
+          "max_calls": 3
+        },
+        {
+          "sink": "github.contents.checkout",
+          "resource": "github:repository:szl-holdings/szl-seismic-review:contents",
+          "access": "read",
+          "max_calls": 1
+        },
+        {
+          "sink": "runner.guard.configure",
+          "resource": "runner:guard:egress",
+          "access": "local-write",
+          "max_calls": 1
+        },
+        {
+          "sink": "runner.guard.telemetry",
+          "resource": "stepsecurity:monitor:szl-holdings/szl-seismic-review",
+          "access": "external-write",
+          "max_calls": 1
+        },
+        {
+          "sink": "runner.toolchain.install",
+          "resource": "runner:toolchain:python",
+          "access": "local-write",
+          "max_calls": 1
+        },
+        {
+          "sink": "sdk.huggingface.add_space_variable",
+          "resource": "huggingface:space:SZLHOLDINGS/szl-seismic-review:source-variable:SZL_SOURCE_REVISION",
+          "access": "external-write",
+          "max_calls": 1
+        },
+        {
+          "sink": "sdk.huggingface.restart_space",
+          "resource": "huggingface:space:SZLHOLDINGS/szl-seismic-review",
+          "access": "external-write",
+          "max_calls": 2
+        },
+        {
+          "sink": "sdk.repository.create_commit",
+          "resource": "huggingface:space:SZLHOLDINGS/szl-seismic-review",
+          "access": "external-write",
+          "max_calls": 1
+        }
+      ],
+      "max_external_writes": 6,
+      "required_controls": {
+        "triggers": [
+          "workflow_call"
+        ],
+        "contents_read": true,
+        "no_explicit_secrets": false,
+        "concurrency": true,
+        "protected_ref": false,
+        "exact_sha": false,
+        "expected_before": false,
+        "readback": false
+      },
+      "trusted_transitives": {},
+      "reviewed_unknowns": {
+        "files": {
+          ".github/scripts/hf_deploy_from_dockerfile.py": "sha256:373add34da38a219e5dafce52e7a86a417c019ac13b139678fc72c93c1ad1318",
+          ".github/scripts/hf_seismic_publish_contract.py": "sha256:171561401429289c4be789240586914b9ba76c7efc80e5452f6de640b5c3a586",
+          ".github/scripts/hf_space_source_binding.py": "sha256:9888d4c126ead29d0960de3198a99f1d686956c8104f0cf6c5c0d4c113b2a37b",
+          ".github/workflows/reusable-hf-deploy-seismic.yml": "sha256:3d17fbae56bb593c23b0bbac548ce879d6c61d57fe24b71875e72a00ba96e44b",
+          "requirements/hf-publisher.lock": "sha256:463b543da8418dd37f458f9893cf1d5f8cb21d04b249121b3b5155b6729b42e0"
+        },
+        "unknowns": [
+          "ACTION_INPUTS_REVIEW_REQUIRED@.github/workflows/reusable-hf-deploy-seismic.yml:100",
+          "ACTION_INPUTS_REVIEW_REQUIRED@.github/workflows/reusable-hf-deploy-seismic.yml:148",
+          "ACTION_INPUTS_REVIEW_REQUIRED@.github/workflows/reusable-hf-deploy-seismic.yml:153",
+          "ACTION_INPUTS_REVIEW_REQUIRED@.github/workflows/reusable-hf-deploy-seismic.yml:162",
+          "ACTION_INPUTS_REVIEW_REQUIRED@.github/workflows/reusable-hf-deploy-seismic.yml:195",
+          "ACTION_INPUTS_REVIEW_REQUIRED@.github/workflows/reusable-hf-deploy-seismic.yml:310",
+          "ACTION_INPUTS_REVIEW_REQUIRED@.github/workflows/reusable-hf-deploy-seismic.yml:330",
+          "DYNAMIC_EXECUTION@.github/workflows/reusable-hf-deploy-seismic.yml:228",
+          "DYNAMIC_EXECUTION@.github/workflows/reusable-hf-deploy-seismic.yml:256",
+          "DYNAMIC_EXECUTION@.github/workflows/reusable-hf-deploy-seismic.yml:258",
+          "DYNAMIC_EXECUTION@.github/workflows/reusable-hf-deploy-seismic.yml:276",
+          "DYNAMIC_EXECUTION@.github/workflows/reusable-hf-deploy-seismic.yml:304",
+          "DYNAMIC_EXECUTION@.github/workflows/reusable-hf-deploy-seismic.yml:354",
+          "HTTP_TARGET_UNRESOLVED@.github/scripts/hf_deploy_from_dockerfile.py:1497",
+          "HTTP_TARGET_UNRESOLVED@.github/scripts/hf_deploy_from_dockerfile.py:732",
+          "PYTHON_DYNAMIC_EXECUTION@.github/scripts/hf_deploy_from_dockerfile.py:1175",
+          "PYTHON_DYNAMIC_EXECUTION@.github/scripts/hf_deploy_from_dockerfile.py:1177",
+          "PYTHON_DYNAMIC_EXECUTION@.github/scripts/hf_deploy_from_dockerfile.py:1179",
+          "PYTHON_DYNAMIC_EXECUTION@.github/scripts/hf_deploy_from_dockerfile.py:1192",
+          "PYTHON_DYNAMIC_EXECUTION@.github/scripts/hf_deploy_from_dockerfile.py:1211",
+          "PYTHON_DYNAMIC_EXECUTION@.github/scripts/hf_deploy_from_dockerfile.py:1216",
+          "PYTHON_DYNAMIC_EXECUTION@.github/scripts/hf_deploy_from_dockerfile.py:1236",
+          "PYTHON_DYNAMIC_EXECUTION@.github/scripts/hf_deploy_from_dockerfile.py:1426",
+          "PYTHON_DYNAMIC_EXECUTION@.github/scripts/hf_deploy_from_dockerfile.py:1427",
+          "PYTHON_DYNAMIC_EXECUTION@.github/scripts/hf_deploy_from_dockerfile.py:1429",
+          "PYTHON_DYNAMIC_EXECUTION@.github/scripts/hf_deploy_from_dockerfile.py:1431",
+          "PYTHON_DYNAMIC_EXECUTION@.github/scripts/hf_deploy_from_dockerfile.py:1440",
+          "PYTHON_DYNAMIC_EXECUTION@.github/scripts/hf_deploy_from_dockerfile.py:1441",
+          "PYTHON_DYNAMIC_EXECUTION@.github/scripts/hf_deploy_from_dockerfile.py:1552",
+          "PYTHON_DYNAMIC_EXECUTION@.github/scripts/hf_deploy_from_dockerfile.py:1563",
+          "PYTHON_DYNAMIC_EXECUTION@.github/scripts/hf_deploy_from_dockerfile.py:1565",
+          "PYTHON_DYNAMIC_EXECUTION@.github/scripts/hf_deploy_from_dockerfile.py:1666",
+          "PYTHON_DYNAMIC_EXECUTION@.github/scripts/hf_deploy_from_dockerfile.py:1746",
+          "PYTHON_DYNAMIC_EXECUTION@.github/scripts/hf_deploy_from_dockerfile.py:1752",
+          "PYTHON_DYNAMIC_EXECUTION@.github/scripts/hf_deploy_from_dockerfile.py:1879",
+          "PYTHON_DYNAMIC_EXECUTION@.github/scripts/hf_deploy_from_dockerfile.py:627",
+          "PYTHON_DYNAMIC_EXECUTION@.github/scripts/hf_deploy_from_dockerfile.py:801",
+          "PYTHON_DYNAMIC_EXECUTION@.github/scripts/hf_deploy_from_dockerfile.py:953",
+          "PYTHON_DYNAMIC_EXECUTION@.github/scripts/hf_deploy_from_dockerfile.py:965",
+          "PYTHON_DYNAMIC_EXECUTION@.github/scripts/hf_deploy_from_dockerfile.py:966",
+          "PYTHON_DYNAMIC_EXECUTION@.github/scripts/hf_deploy_from_dockerfile.py:979",
+          "PYTHON_DYNAMIC_EXECUTION@.github/scripts/hf_deploy_from_dockerfile.py:989",
+          "PYTHON_DYNAMIC_EXECUTION@.github/scripts/hf_deploy_from_dockerfile.py:995",
+          "PYTHON_DYNAMIC_EXECUTION@.github/scripts/hf_deploy_from_dockerfile.py:996",
+          "PYTHON_DYNAMIC_EXECUTION@.github/scripts/hf_space_source_binding.py:92",
+          "PYTHON_IMPORT_UNRESOLVED@.github/scripts/hf_deploy_from_dockerfile.py:1820",
+          "PYTHON_IMPORT_UNRESOLVED@.github/scripts/hf_deploy_from_dockerfile.py:43",
+          "PYTHON_IMPORT_UNRESOLVED@.github/scripts/hf_deploy_from_dockerfile.py:45",
+          "PYTHON_IMPORT_UNRESOLVED@.github/scripts/hf_deploy_from_dockerfile.py:46",
+          "PYTHON_IMPORT_UNRESOLVED@.github/scripts/hf_deploy_from_dockerfile.py:48",
+          "PYTHON_IMPORT_UNRESOLVED@.github/scripts/hf_deploy_from_dockerfile.py:49",
+          "PYTHON_IMPORT_UNRESOLVED@.github/scripts/hf_deploy_from_dockerfile.py:51",
+          "PYTHON_IMPORT_UNRESOLVED@.github/scripts/hf_deploy_from_dockerfile.py:52",
+          "PYTHON_IMPORT_UNRESOLVED@.github/scripts/hf_deploy_from_dockerfile.py:53",
+          "PYTHON_IMPORT_UNRESOLVED@.github/scripts/hf_deploy_from_dockerfile.py:54",
+          "PYTHON_IMPORT_UNRESOLVED@.github/scripts/hf_deploy_from_dockerfile.py:56",
+          "PYTHON_IMPORT_UNRESOLVED@.github/scripts/hf_deploy_from_dockerfile.py:57",
+          "PYTHON_IMPORT_UNRESOLVED@.github/scripts/hf_deploy_from_dockerfile.py:61",
+          "PYTHON_IMPORT_UNRESOLVED@.github/scripts/hf_deploy_from_dockerfile.py:62",
+          "PYTHON_IMPORT_UNRESOLVED@.github/scripts/hf_deploy_from_dockerfile.py:63",
+          "PYTHON_IMPORT_UNRESOLVED@.github/scripts/hf_deploy_from_dockerfile.py:64",
+          "PYTHON_IMPORT_UNRESOLVED@.github/scripts/hf_deploy_from_dockerfile.py:798",
+          "PYTHON_IMPORT_UNRESOLVED@.github/scripts/hf_seismic_publish_contract.py:4",
+          "PYTHON_IMPORT_UNRESOLVED@.github/scripts/hf_space_source_binding.py:20",
+          "PYTHON_IMPORT_UNRESOLVED@.github/scripts/hf_space_source_binding.py:22",
+          "PYTHON_IMPORT_UNRESOLVED@.github/scripts/hf_space_source_binding.py:26",
+          "PYTHON_IMPORT_UNRESOLVED@.github/scripts/hf_space_source_binding.py:30",
+          "PYTHON_IMPORT_UNRESOLVED@.github/scripts/hf_space_source_binding.py:32",
+          "PYTHON_IMPORT_UNRESOLVED@.github/scripts/hf_space_source_binding.py:33",
+          "PYTHON_SOURCE_REVIEW_REQUIRED@.github/scripts/hf_deploy_from_dockerfile.py:1",
+          "PYTHON_SOURCE_REVIEW_REQUIRED@.github/scripts/hf_seismic_publish_contract.py:1",
+          "PYTHON_SOURCE_REVIEW_REQUIRED@.github/scripts/hf_space_source_binding.py:1",
+          "SCRIPT_SOURCE_REVIEW_REQUIRED@requirements/hf-publisher.lock:1",
+          "SDK_TARGET_UNRESOLVED@.github/scripts/hf_deploy_from_dockerfile.py:1654",
+          "SDK_TARGET_UNRESOLVED@.github/scripts/hf_deploy_from_dockerfile.py:800",
+          "SDK_TARGET_UNRESOLVED@.github/scripts/hf_deploy_from_dockerfile.py:824",
+          "SDK_TARGET_UNRESOLVED@.github/scripts/hf_space_source_binding.py:116",
+          "SECRET_EXPRESSION_REVIEW_REQUIRED@.github/workflows/reusable-hf-deploy-seismic.yml:1",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-deploy-seismic.yml:111",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-deploy-seismic.yml:112",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-deploy-seismic.yml:134",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-deploy-seismic.yml:175",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-deploy-seismic.yml:176",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-deploy-seismic.yml:177",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-deploy-seismic.yml:178",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-deploy-seismic.yml:179",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-deploy-seismic.yml:180",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-deploy-seismic.yml:181",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-deploy-seismic.yml:182",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-deploy-seismic.yml:183",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-deploy-seismic.yml:184",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-deploy-seismic.yml:185",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-deploy-seismic.yml:186",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-deploy-seismic.yml:187",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-deploy-seismic.yml:188",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-deploy-seismic.yml:189",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-deploy-seismic.yml:190",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-deploy-seismic.yml:201",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-deploy-seismic.yml:202",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-deploy-seismic.yml:203",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-deploy-seismic.yml:204",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-deploy-seismic.yml:205",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-deploy-seismic.yml:206",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-deploy-seismic.yml:207",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-deploy-seismic.yml:208",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-deploy-seismic.yml:209",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-deploy-seismic.yml:210",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-deploy-seismic.yml:211",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-deploy-seismic.yml:216",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-deploy-seismic.yml:226",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-deploy-seismic.yml:227",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-deploy-seismic.yml:228",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-deploy-seismic.yml:229",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-deploy-seismic.yml:230",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-deploy-seismic.yml:231",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-deploy-seismic.yml:232",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-deploy-seismic.yml:239",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-deploy-seismic.yml:240",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-deploy-seismic.yml:241",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-deploy-seismic.yml:242",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-deploy-seismic.yml:251",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-deploy-seismic.yml:252",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-deploy-seismic.yml:253",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-deploy-seismic.yml:254",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-deploy-seismic.yml:255",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-deploy-seismic.yml:256",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-deploy-seismic.yml:257",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-deploy-seismic.yml:258",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-deploy-seismic.yml:259",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-deploy-seismic.yml:260",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-deploy-seismic.yml:261",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-deploy-seismic.yml:262",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-deploy-seismic.yml:270",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-deploy-seismic.yml:271",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-deploy-seismic.yml:272",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-deploy-seismic.yml:273",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-deploy-seismic.yml:274",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-deploy-seismic.yml:275",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-deploy-seismic.yml:276",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-deploy-seismic.yml:284",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-deploy-seismic.yml:285",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-deploy-seismic.yml:286",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-deploy-seismic.yml:287",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-deploy-seismic.yml:288",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-deploy-seismic.yml:296",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-deploy-seismic.yml:297",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-deploy-seismic.yml:298",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-deploy-seismic.yml:299",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-deploy-seismic.yml:300",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-deploy-seismic.yml:301",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-deploy-seismic.yml:302",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-deploy-seismic.yml:303",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-deploy-seismic.yml:304",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-deploy-seismic.yml:344",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-deploy-seismic.yml:345",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-deploy-seismic.yml:346",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-deploy-seismic.yml:347",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-deploy-seismic.yml:348",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-deploy-seismic.yml:349",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-deploy-seismic.yml:350",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-deploy-seismic.yml:351",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-deploy-seismic.yml:352",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-deploy-seismic.yml:353",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-deploy-seismic.yml:354",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-deploy-seismic.yml:355",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-deploy-seismic.yml:356",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-deploy-seismic.yml:357",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-deploy-seismic.yml:358",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-deploy-seismic.yml:359",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-deploy-seismic.yml:360",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-deploy-seismic.yml:361",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-deploy-seismic.yml:362",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-deploy-seismic.yml:363",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-deploy-seismic.yml:364",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-deploy-seismic.yml:365",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-deploy-seismic.yml:366",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-deploy-seismic.yml:367",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-deploy-seismic.yml:368",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/reusable-hf-deploy-seismic.yml:111",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/reusable-hf-deploy-seismic.yml:112",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/reusable-hf-deploy-seismic.yml:175",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/reusable-hf-deploy-seismic.yml:176",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/reusable-hf-deploy-seismic.yml:179",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/reusable-hf-deploy-seismic.yml:180",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/reusable-hf-deploy-seismic.yml:181",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/reusable-hf-deploy-seismic.yml:184",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/reusable-hf-deploy-seismic.yml:185",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/reusable-hf-deploy-seismic.yml:188",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/reusable-hf-deploy-seismic.yml:189",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/reusable-hf-deploy-seismic.yml:190",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/reusable-hf-deploy-seismic.yml:201",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/reusable-hf-deploy-seismic.yml:202",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/reusable-hf-deploy-seismic.yml:206",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/reusable-hf-deploy-seismic.yml:207",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/reusable-hf-deploy-seismic.yml:208",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/reusable-hf-deploy-seismic.yml:209",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/reusable-hf-deploy-seismic.yml:216",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/reusable-hf-deploy-seismic.yml:226",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/reusable-hf-deploy-seismic.yml:227",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/reusable-hf-deploy-seismic.yml:231",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/reusable-hf-deploy-seismic.yml:232",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/reusable-hf-deploy-seismic.yml:239",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/reusable-hf-deploy-seismic.yml:251",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/reusable-hf-deploy-seismic.yml:252",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/reusable-hf-deploy-seismic.yml:253",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/reusable-hf-deploy-seismic.yml:254",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/reusable-hf-deploy-seismic.yml:255",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/reusable-hf-deploy-seismic.yml:256",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/reusable-hf-deploy-seismic.yml:257",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/reusable-hf-deploy-seismic.yml:258",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/reusable-hf-deploy-seismic.yml:259",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/reusable-hf-deploy-seismic.yml:260",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/reusable-hf-deploy-seismic.yml:261",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/reusable-hf-deploy-seismic.yml:270",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/reusable-hf-deploy-seismic.yml:271",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/reusable-hf-deploy-seismic.yml:272",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/reusable-hf-deploy-seismic.yml:273",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/reusable-hf-deploy-seismic.yml:274",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/reusable-hf-deploy-seismic.yml:275",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/reusable-hf-deploy-seismic.yml:284",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/reusable-hf-deploy-seismic.yml:285",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/reusable-hf-deploy-seismic.yml:286",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/reusable-hf-deploy-seismic.yml:287",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/reusable-hf-deploy-seismic.yml:288",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/reusable-hf-deploy-seismic.yml:296",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/reusable-hf-deploy-seismic.yml:297",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/reusable-hf-deploy-seismic.yml:298",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/reusable-hf-deploy-seismic.yml:299",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/reusable-hf-deploy-seismic.yml:300",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/reusable-hf-deploy-seismic.yml:301",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/reusable-hf-deploy-seismic.yml:302",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/reusable-hf-deploy-seismic.yml:303",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/reusable-hf-deploy-seismic.yml:344",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/reusable-hf-deploy-seismic.yml:345",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/reusable-hf-deploy-seismic.yml:348",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/reusable-hf-deploy-seismic.yml:349",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/reusable-hf-deploy-seismic.yml:350",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/reusable-hf-deploy-seismic.yml:353",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/reusable-hf-deploy-seismic.yml:354",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/reusable-hf-deploy-seismic.yml:357",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/reusable-hf-deploy-seismic.yml:358",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/reusable-hf-deploy-seismic.yml:361",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/reusable-hf-deploy-seismic.yml:362",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/reusable-hf-deploy-seismic.yml:365",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/reusable-hf-deploy-seismic.yml:366",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/reusable-hf-deploy-seismic.yml:367",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/reusable-hf-deploy-seismic.yml:368",
+          "WORKFLOW_ENVIRONMENT_REVIEW_REQUIRED@.github/workflows/reusable-hf-deploy-seismic.yml:108",
+          "WORKFLOW_ENVIRONMENT_REVIEW_REQUIRED@.github/workflows/reusable-hf-deploy-seismic.yml:115",
+          "WORKFLOW_ENVIRONMENT_REVIEW_REQUIRED@.github/workflows/reusable-hf-deploy-seismic.yml:171",
+          "WORKFLOW_ENVIRONMENT_REVIEW_REQUIRED@.github/workflows/reusable-hf-deploy-seismic.yml:223",
+          "WORKFLOW_ENVIRONMENT_REVIEW_REQUIRED@.github/workflows/reusable-hf-deploy-seismic.yml:236",
+          "WORKFLOW_ENVIRONMENT_REVIEW_REQUIRED@.github/workflows/reusable-hf-deploy-seismic.yml:246",
+          "WORKFLOW_ENVIRONMENT_REVIEW_REQUIRED@.github/workflows/reusable-hf-deploy-seismic.yml:266",
+          "WORKFLOW_ENVIRONMENT_REVIEW_REQUIRED@.github/workflows/reusable-hf-deploy-seismic.yml:280",
+          "WORKFLOW_ENVIRONMENT_REVIEW_REQUIRED@.github/workflows/reusable-hf-deploy-seismic.yml:292",
+          "WORKFLOW_ENVIRONMENT_REVIEW_REQUIRED@.github/workflows/reusable-hf-deploy-seismic.yml:339"
+        ]
+      }
+    },
+    ".github/workflows/reusable-hf-deploy-seismic-source-witness.yml": {
+      "intent_id": "readonly-seismic-publisher-source-witness-v1",
+      "valid_until": "2026-11-30",
+      "source_sha256": "sha256:90865f00ff2d5385abd449be0e6f8e1e5f0d0ad6717bcc447b5a8b2638d4d5db",
+      "credentials": [
+        "GITHUB_TOKEN"
+      ],
+      "resources": [
+        {
+          "key": "github:repository:szl-holdings/.github:contents",
+          "access": "read"
+        }
+      ],
+      "effects": [
+        {
+          "sink": "github.contents.checkout",
+          "resource": "github:repository:szl-holdings/.github:contents",
+          "access": "read",
+          "max_calls": 2
+        }
+      ],
+      "max_external_writes": 0,
+      "required_controls": {
+        "triggers": [
+          "push"
+        ],
+        "contents_read": true,
+        "no_explicit_secrets": false,
+        "concurrency": false,
+        "protected_ref": false,
+        "exact_sha": false,
+        "expected_before": false,
+        "readback": false
+      },
+      "trusted_transitives": {},
+      "reviewed_unknowns": {
+        "files": {
+          ".github/scripts/hf_seismic_publish_contract.py": "sha256:171561401429289c4be789240586914b9ba76c7efc80e5452f6de640b5c3a586",
+          ".github/workflows/reusable-hf-deploy-seismic-source-witness.yml": "sha256:90865f00ff2d5385abd449be0e6f8e1e5f0d0ad6717bcc447b5a8b2638d4d5db",
+          ".github/workflows/reusable-hf-deploy-seismic.yml": "sha256:3d17fbae56bb593c23b0bbac548ce879d6c61d57fe24b71875e72a00ba96e44b"
+        },
+        "unknowns": [
+          "PYTHON_IMPORT_UNRESOLVED@.github/scripts/hf_seismic_publish_contract.py:4",
+          "PYTHON_SOURCE_REVIEW_REQUIRED@.github/scripts/hf_seismic_publish_contract.py:1",
+          "SCRIPT_SOURCE_REVIEW_REQUIRED@.github/workflows/reusable-hf-deploy-seismic.yml:1",
+          "SECRET_EXPRESSION_REVIEW_REQUIRED@.github/workflows/reusable-hf-deploy-seismic-source-witness.yml:1"
         ]
       }
     }

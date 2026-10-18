@@ -173,6 +173,34 @@ Upstream action sources reviewed for these classifications:
 [attest main.ts](https://github.com/actions/attest/blob/508db95dd578ae2727ebd6217d5ba78e4fbda05d/src/main.ts),
 [attest.ts](https://github.com/actions/attest/blob/508db95dd578ae2727ebd6217d5ba78e4fbda05d/src/attest.ts).
 
+## Bounded seismic publisher
+
+`reusable-hf-deploy-seismic.yml` is a separate workflow for the exact
+`szl-holdings/szl-seismic-review` caller and
+`SZLHOLDINGS/szl-seismic-review` Space. Its invocation job checks the
+immutable called-workflow revision, main-branch event SHA, target, Dockerfile,
+source-revision inputs, smoke paths and default-branch-tip requirement before
+the publication job can receive an HF token. The caller checkout is a literal
+repository at `github.sha`; publisher tools come from `job.workflow_sha` at
+`tools/`. The publisher keeps the established Space writer lock and uses
+`ubuntu-24.04` with the existing hash-locked Python 3.12.10 client closure.
+
+Publication derives its file set from Dockerfile COPY sources and writes
+`SOURCE_REVISION` inside that set. It checks the exact main tip before the HF
+commit, binds the non-secret `SZL_SOURCE_REVISION` variable, checks Space bytes
+and smoke routes, then verifies `/api/build-info` reports the source revision.
+The local source witness uses the literal `contract-only: true` branch; no HF
+publication job is reachable from that branch. The effect declaration binds
+the workflow, validator, tool closure, reviewed unknowns and target resources
+to exact source digests. It grants no authority to another caller or Space.
+
+These checks report source and observed runtime state for a particular run.
+They do not certify seismic science, independent model quality, external
+authorization or future availability. A failed or incomplete run remains
+failed or incomplete. Rollback is a protected change to the seismic caller's
+immutable reusable-workflow pin, followed by normal exact-head checks and a
+new authorized publisher run; the existing A11oy publisher is unaffected.
+
 ## Trust-root bootstrap boundary
 
 The policy, checker, checker tests, and enforcing workflow form a trust root.

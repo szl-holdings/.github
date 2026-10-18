@@ -179,6 +179,17 @@ ATTEST_TRANSITIVE = "actions/attest@508db95dd578ae2727ebd6217d5ba78e4fbda05d"
 RUNTIME_VALIDATOR_DIGEST = "sha256:7cc16d1421b4e76ce281e3dcadfee36b790891fbc56a533c53fd43bdf0bf55a1"
 RUNTIME_TOOLS = frozenset({RUNTIME_VALIDATOR, RUNTIME_LOCK,
     ".github/scripts/hf_deploy_from_dockerfile.py", ".github/scripts/hf_space_source_binding.py"})
+SEISMIC_PUBLISHER = ".github/workflows/reusable-hf-deploy-seismic.yml"
+SEISMIC_WITNESS = ".github/workflows/reusable-hf-deploy-seismic-source-witness.yml"
+SEISMIC_VALIDATOR = ".github/scripts/hf_seismic_publish_contract.py"
+SEISMIC_EVIDENCE_ARTIFACT = "hf-deploy-evidence-${{ github.run_id }}-${{ github.run_attempt }}"
+# Unlike the A11oy publisher, this is a deliberately separate, fixed seismic
+# interface. Every byte change needs a new trust-root and policy review.
+SEISMIC_PUBLISHER_DIGEST = "sha256:3d17fbae56bb593c23b0bbac548ce879d6c61d57fe24b71875e72a00ba96e44b"
+SEISMIC_WITNESS_DIGEST = "sha256:90865f00ff2d5385abd449be0e6f8e1e5f0d0ad6717bcc447b5a8b2638d4d5db"
+SEISMIC_VALIDATOR_DIGEST = "sha256:171561401429289c4be789240586914b9ba76c7efc80e5452f6de640b5c3a586"
+SEISMIC_TOOLS = frozenset({SEISMIC_VALIDATOR, RUNTIME_LOCK,
+    ".github/scripts/hf_deploy_from_dockerfile.py", ".github/scripts/hf_space_source_binding.py"})
 
 PYTHON_MUTATORS: Mapping[str, str] = {
     "add_space_secret": "sdk.huggingface.add_space_secret",
@@ -915,6 +926,35 @@ def runtime_caller_checkout(inputs: Mapping[str, str]) -> bool:
                       "path": "caller", "persist-credentials": "false", "fetch-depth": "1"}
 
 
+def seismic_caller_checkout(inputs: Mapping[str, str]) -> bool:
+    return inputs == {"repository": "szl-holdings/szl-seismic-review", "ref": "${{ github.sha }}",
+                      "path": "caller", "persist-credentials": "false", "fetch-depth": "1"}
+
+
+def seismic_publisher_profile(source: str, document: Mapping[str, Any]) -> bool:
+    """Admit only the reviewed, exact-byte seismic publisher graph."""
+    return (sha256_bytes(source.encode("utf-8")) == SEISMIC_PUBLISHER_DIGEST
+            and isinstance(document.get("jobs"), dict)
+            and set(document["jobs"]) == {"invocation", "hf-deploy", "exact-source-contract"}
+            and document.get("permissions") == {"contents": "read"}
+            and document.get("concurrency") == {
+                "group": "hf-deploy-SZLHOLDINGS/szl-seismic-review", "cancel-in-progress": "false"}
+            and document["jobs"]["hf-deploy"].get("if") == "${{ inputs.contract-only == false }}"
+            and document["jobs"]["exact-source-contract"].get("if") == "${{ inputs.contract-only == true }}")
+
+
+def seismic_contract_call(source: str, document: Mapping[str, Any]) -> bool:
+    """The local witness is likewise pinned to its read-only exact bytes."""
+    jobs = document.get("jobs")
+    return (sha256_bytes(source.encode("utf-8")) == SEISMIC_WITNESS_DIGEST
+            and isinstance(jobs, dict) and set(jobs) == {"seismic-publisher-exact-source-witness"}
+            and isinstance(jobs["seismic-publisher-exact-source-witness"], dict)
+            and jobs["seismic-publisher-exact-source-witness"].get("uses") == "./" + SEISMIC_PUBLISHER
+            and jobs["seismic-publisher-exact-source-witness"].get("with") == {"contract-only": "true"}
+            and jobs["seismic-publisher-exact-source-witness"].get("secrets") == {
+                "HF_TOKEN": "${{ github.token }}"})
+
+
 def canonical_runtime_profile(document: Mapping[str, Any]) -> bool:
     """Recognize the bounded invocation graph, never a generic reusable workflow.
 
@@ -1069,6 +1109,8 @@ def runtime_contract_call(document: Mapping[str, Any]) -> bool:
 def runtime_artifact_resource(path: str, name: str, *, read: bool = False) -> str | None:
     if path == RUNTIME_PUBLISHER and name in {RUNTIME_BINDING_ARTIFACT, RUNTIME_INPUTS_ARTIFACT}:
         return "github:repository:szl-holdings/a11oy:artifact:" + name.split("-${{", 1)[0] + (":same-run-read" if read else "")
+    if path == SEISMIC_PUBLISHER and name == SEISMIC_EVIDENCE_ARTIFACT and not read:
+        return "github:repository:szl-holdings/szl-seismic-review:artifact:hf-deploy-evidence"
     if path == ".github/workflows/hf-public-smoke-contract.yml" and name in {
         "hf-public-smoke-py311-${{ github.run_id }}-${{ github.run_attempt }}",
         "hf-public-smoke-py312-${{ github.run_id }}-${{ github.run_attempt }}",
@@ -1081,11 +1123,15 @@ def workflow_dependencies(source: str, *, path: str = "") -> list[str]:
     clean = uncommented_yaml(source)
     runtime_profile = False
     contract_call = False
+    seismic_profile = False
+    seismic_call = False
     try:
         document, _lines = parse_workflow_yaml(source)
         clean += "\n" + "\n".join(workflow_scalar_values(document))
         runtime_profile = path == RUNTIME_PUBLISHER and canonical_runtime_profile(document)
         contract_call = path == RUNTIME_WITNESS and runtime_contract_call(document)
+        seismic_profile = path == SEISMIC_PUBLISHER and seismic_publisher_profile(source, document)
+        seismic_call = path == SEISMIC_WITNESS and seismic_contract_call(source, document)
     except GateError:
         # A malformed workflow still fails analysis; retain discoverable raw paths.
         pass
@@ -1095,15 +1141,21 @@ def workflow_dependencies(source: str, *, path: str = "") -> list[str]:
         # A leading ./ is GitHub's explicit repository-local uses syntax.
         # The policy and receipt still use one canonical Git-tree path.
         dependency = spelling[2:] if spelling.startswith("./") else spelling
-        if runtime_profile and dependency.startswith("tools/") and dependency[6:] in RUNTIME_TOOLS:
+        if (runtime_profile or seismic_profile) and dependency.startswith("tools/") and (
+            dependency[6:] in RUNTIME_TOOLS or dependency[6:] in SEISMIC_TOOLS
+        ):
             dependency = dependency[6:]
         dependencies.add(safe_repo_path(dependency))
     if path == LIFECYCLE_WORKFLOW and LIFECYCLE_LOCK in clean:
         dependencies.add(LIFECYCLE_LOCK)
     if runtime_profile:
         dependencies.update(RUNTIME_TOOLS)
+    if seismic_profile:
+        dependencies.update(SEISMIC_TOOLS)
     if contract_call:
         dependencies.update({RUNTIME_PUBLISHER, RUNTIME_VALIDATOR})
+    if seismic_call:
+        dependencies.update({SEISMIC_PUBLISHER, SEISMIC_VALIDATOR})
     return sorted(dependencies)
 
 
@@ -1512,9 +1564,15 @@ def analyze_workflow_source(source: str, *, path: str) -> dict[str, Any]:
     runtime_profile = path == RUNTIME_PUBLISHER and canonical_runtime_profile(document)
     runtime_signing = runtime_profile and runtime_signing_job(document)
     contract_call = path == RUNTIME_WITNESS and runtime_contract_call(document)
+    seismic_profile = path == SEISMIC_PUBLISHER and seismic_publisher_profile(source, document)
+    seismic_call = path == SEISMIC_WITNESS and seismic_contract_call(source, document)
     if path == RUNTIME_PUBLISHER and not (runtime_profile and runtime_signing):
         unknown("CANONICAL_RUNTIME_INTERFACE_UNSUPPORTED", ())
     if path == RUNTIME_WITNESS and not contract_call:
+        unknown("CANONICAL_RUNTIME_INTERFACE_UNSUPPORTED", ())
+    if path == SEISMIC_PUBLISHER and not seismic_profile:
+        unknown("CANONICAL_RUNTIME_INTERFACE_UNSUPPORTED", ())
+    if path == SEISMIC_WITNESS and not seismic_call:
         unknown("CANONICAL_RUNTIME_INTERFACE_UNSUPPORTED", ())
     jobs = document.get("jobs")
     if not isinstance(jobs, dict) or not jobs:
@@ -1543,7 +1601,7 @@ def analyze_workflow_source(source: str, *, path: str) -> dict[str, Any]:
         if "env" in job:
             unknown("WORKFLOW_ENVIRONMENT_REVIEW_REQUIRED", (*location, "env"))
         if "uses" in job:
-            if contract_call:
+            if contract_call or seismic_call:
                 # This exact caller delegates grants to a same-source callee,
                 # whose typed contract-only graph is validated by the binder.
                 # Only two credential-free contents reads are reachable.
@@ -1640,7 +1698,9 @@ def analyze_workflow_source(source: str, *, path: str) -> dict[str, Any]:
                         effects.append(RawEffect(
                             "runner.guard.telemetry", "external-write", path,
                             lines[(*step_location, "uses")],
-                            "stepsecurity:monitor:szl-holdings/a11oy" if runtime_profile else "stepsecurity:monitor:szl-holdings/.github",
+                            ("stepsecurity:monitor:szl-holdings/a11oy" if runtime_profile else
+                             "stepsecurity:monitor:szl-holdings/szl-seismic-review" if seismic_profile else
+                             "stepsecurity:monitor:szl-holdings/.github"),
                         ))
                         if inputs.get("egress-policy", "block") == "block":
                             effects.append(RawEffect(
@@ -1668,8 +1728,12 @@ def analyze_workflow_source(source: str, *, path: str) -> dict[str, Any]:
                                 if not AUTH_INPUT_EXPRESSION.fullmatch(auth_value):
                                     unknown("SECRET_NAME_UNRESOLVED", (*step_location, "with"))
                     if sink == "github.contents.checkout":
-                        runtime_checkout = runtime_profile and (
-                            runtime_tools_checkout(inputs) or (job_name == "hf-deploy" and runtime_caller_checkout(inputs)))
+                        runtime_checkout = (
+                            runtime_profile and (runtime_tools_checkout(inputs)
+                                or (job_name == "hf-deploy" and runtime_caller_checkout(inputs)))
+                            or seismic_profile and (runtime_tools_checkout(inputs)
+                                or (job_name == "hf-deploy" and seismic_caller_checkout(inputs)))
+                        )
                         if (
                             inputs.get("github-server-url", "https://github.com") != "https://github.com"
                             or inputs.get("submodules", "false").lower() != "false"
@@ -1686,7 +1750,7 @@ def analyze_workflow_source(source: str, *, path: str) -> dict[str, Any]:
                             unknown("CHECKOUT_SOURCE_BOUNDARY_UNSUPPORTED", (*step_location, "with"))
                     if sink == "github.contents.checkout" and "repository" in inputs:
                         repository = inputs["repository"]
-                        if runtime_profile and runtime_tools_checkout(inputs):
+                        if (runtime_profile or seismic_profile) and runtime_tools_checkout(inputs):
                             repository = "szl-holdings/.github"
                         if not re.fullmatch(r"[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+", repository):
                             unknown("ACTION_RESOURCE_OVERRIDE_UNSUPPORTED", (*step_location, "with"))
@@ -1697,7 +1761,8 @@ def analyze_workflow_source(source: str, *, path: str) -> dict[str, Any]:
                             unknown("ACTION_RESOURCE_OVERRIDE_UNSUPPORTED", (*step_location, "with"))
                         artifact = inputs.get("name", "artifact")
                         runtime_resource = runtime_artifact_resource(path, artifact)
-                        if runtime_resource and (path != RUNTIME_PUBLISHER or runtime_profile):
+                        if runtime_resource and (path not in {RUNTIME_PUBLISHER, SEISMIC_PUBLISHER}
+                                or runtime_profile or seismic_profile):
                             resource = runtime_resource
                         elif artifact == "control-plane-effect-${{ github.run_id }}":
                             # This exact run-scoped namespace is the enforcing
@@ -2133,6 +2198,20 @@ def bind_declaration(
             # batches/retries; no repository deletion authority is admitted.
             all_effects.append(RawEffect("hf.space.files.prune", "external-write", workflow_path, 1,
                                         "huggingface:space:SZLHOLDINGS/a11oy:copy-derived-files"))
+    seismic_contract = workflow_path in {SEISMIC_PUBLISHER, SEISMIC_WITNESS}
+    if seismic_contract:
+        validator = dependency_blobs.get(SEISMIC_VALIDATOR)
+        if validator is None or sha256_bytes(validator) != SEISMIC_VALIDATOR_DIGEST:
+            all_unknowns.append(UnknownEffect("CANONICAL_RUNTIME_VALIDATOR_MISMATCH", workflow_path, 1))
+        if workflow_path == SEISMIC_WITNESS:
+            try:
+                source_text = dependency_blobs[SEISMIC_PUBLISHER].decode("utf-8")
+                callee, _ = parse_workflow_yaml(source_text)
+                valid_callee = seismic_publisher_profile(source_text, callee)
+            except (KeyError, GateError, UnicodeError, TypeError, AttributeError):
+                valid_callee = False
+            if not valid_callee:
+                all_unknowns.append(UnknownEffect("CANONICAL_RUNTIME_INTERFACE_UNSUPPORTED", SEISMIC_PUBLISHER, 1))
     for dependency in analysis["dependencies"]:
         content = dependency_blobs.get(dependency)
         if content is None:
@@ -2147,6 +2226,11 @@ def bind_declaration(
             # Publishing jobs are unreachable under literal boolean true.
             all_unknowns.append(UnknownEffect("SCRIPT_SOURCE_REVIEW_REQUIRED", dependency, 1))
             continue
+        if workflow_path == SEISMIC_WITNESS and dependency == SEISMIC_PUBLISHER:
+            # Only contract-only validation and exact-source comparison are
+            # reachable from the pinned local witness.
+            all_unknowns.append(UnknownEffect("SCRIPT_SOURCE_REVIEW_REQUIRED", dependency, 1))
+            continue
         dep_effects, dep_unknowns = analyze_dependency(dependency, content)
         if workflow_path == RUNTIME_PUBLISHER and dependency in RUNTIME_TOOLS:
             dep_effects = [RawEffect(item.sink, item.access, item.path, item.line,
@@ -2154,6 +2238,14 @@ def bind_declaration(
                  if item.sink == "sdk.huggingface.add_space_variable"
                  else "huggingface:space:SZLHOLDINGS/a11oy")
                 if item.sink in {"sdk.repository.create_commit", "sdk.huggingface.add_space_variable", "sdk.huggingface.restart_space"}
+                else item.resource) for item in dep_effects]
+        if workflow_path == SEISMIC_PUBLISHER and dependency in SEISMIC_TOOLS:
+            dep_effects = [RawEffect(item.sink, item.access, item.path, item.line,
+                ("huggingface:space:SZLHOLDINGS/szl-seismic-review:source-variable:SZL_SOURCE_REVISION"
+                 if item.sink == "sdk.huggingface.add_space_variable"
+                 else "huggingface:space:SZLHOLDINGS/szl-seismic-review")
+                if item.sink in {"sdk.repository.create_commit", "sdk.huggingface.add_space_variable",
+                                 "sdk.huggingface.restart_space"}
                 else item.resource) for item in dep_effects]
         all_effects.extend(dep_effects)
         all_unknowns.extend(dep_unknowns)
