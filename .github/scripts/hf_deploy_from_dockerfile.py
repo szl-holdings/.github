@@ -1006,8 +1006,8 @@ def approved_runtime_nonce(args, context):
     try:
         plan = strict_json(data)
         actual = manifest_identity(plan) if type(plan) is dict else None
-    except RecursionError as exc:
-        raise DeployContractError("approved runtime manifest nesting exceeds parser bound") from exc
+    except (ValueError, TypeError, RecursionError) as exc:
+        raise DeployContractError("approved runtime manifest must be bounded JSON") from exc
     if (type(plan) is not dict or plan.get("manifest_sha256") != expected
             or actual != expected):
         raise DeployContractError("approved runtime manifest digest mismatch")
@@ -1042,8 +1042,11 @@ def runtime_copy_catalog(dockerfile_text, files, *, ignored_sources=frozenset())
     if pending:
         raise DeployContractError("unterminated runtime Docker heredoc")
     catalog, workdir, marker_destination, directories = {}, "/", None, {"/"}
+    marker_path = "/tmp/" + RUNTIME_MARKER
 
     def add_directory(path):
+        if path == marker_path or path.startswith(marker_path + "/"):
+            raise DeployContractError("runtime directory overlaps the reserved marker file")
         while path not in directories:
             if path.startswith("/app/") and path[len("/app/"):] in catalog:
                 raise DeployContractError("runtime COPY file/directory collision")
@@ -1081,7 +1084,39 @@ def runtime_copy_catalog(dockerfile_text, files, *, ignored_sources=frozenset())
         if RUNTIME_MARKER in sources:
             if kind != "COPY" or flags:
                 raise DeployContractError("runtime marker requires literal local COPY")
-            marker_destination = posixpath.join(target, RUNTIME_MARKER) if destination.endswith("/") else target
+            marker_destination = (posixpath.join(target, RUNTIME_MARKER)
+                                  if destination.endswith("/") or target in directories else target)
+        # The fixed marker is outside /app, but its COPY mapping must remain
+        # unambiguous and must not be shadowed by a directory or another file.
+        if (target == marker_path or target.startswith(marker_path + "/")
+                or marker_path.startswith(target.rstrip("/") + "/")):
+            if kind != "COPY" or any(not f.startswith(("--chown=", "--chmod=")) for f in flags):
+                raise DeployContractError("runtime marker overlap requires literal local COPY")
+            for raw_source in sources:
+                source = raw_source.removeprefix("./").rstrip("/")
+                is_marker = source == RUNTIME_MARKER
+                if any(c in source for c in "*?[") or source in ("", "."):
+                    raise DeployContractError("ambiguous runtime marker overlap")
+                directory = not is_marker and source not in files
+                matches = ([path for path in files if path.startswith(source + "/")]
+                           if directory else [source])
+                matches = [path for path in matches if path not in ignored_sources]
+                if not matches or (len(sources) > 1 and not destination.endswith("/")):
+                    raise DeployContractError("ambiguous runtime marker overlap")
+                target_directory = directory or destination.endswith("/") or target in directories
+                if target_directory:
+                    add_directory(target)
+                for path in matches:
+                    suffix = path[len(source) + 1:] if directory else posixpath.basename(source)
+                    full = posixpath.join(target, suffix) if target_directory else target
+                    if is_marker:
+                        if flags or full != marker_path:
+                            raise DeployContractError("runtime marker requires its fixed literal COPY path")
+                        marker_destination = full
+                    elif (full == marker_path or full.startswith(marker_path + "/")
+                          or marker_path.startswith(full.rstrip("/") + "/")):
+                        raise DeployContractError("runtime COPY overlaps the reserved marker file")
+                    add_directory(posixpath.dirname(full))
         if target != "/app" and not target.startswith("/app/"):
             continue
         if kind != "COPY" or any(not f.startswith(("--chown=", "--chmod=")) for f in flags):
@@ -1091,7 +1126,8 @@ def runtime_copy_catalog(dockerfile_text, files, *, ignored_sources=frozenset())
             if any(c in source for c in "*?[") or source in ("", "."):
                 raise DeployContractError("runtime COPY globs/whole context are unsupported")
             if source == RUNTIME_MARKER:
-                marker_destination = posixpath.join(target, source) if destination.endswith("/") else target
+                marker_destination = (posixpath.join(target, source)
+                                      if destination.endswith("/") or target in directories else target)
                 continue
             directory = source not in files
             if not directory and source in ignored_sources:

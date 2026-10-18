@@ -1622,6 +1622,12 @@ class TestAuthenticatedRuntimeBinding(unittest.TestCase):
         self.assertIsInstance(failures[0], dep.DeployContractError)
         self.assertFalse(os.path.exists(args.transaction_journal))
 
+    def test_approved_plan_nonfinite_exponent_is_refused_before_effect(self):
+        args, _ = self.approved_fixture()
+        with open(args.approved_manifest, "wb") as fh:
+            fh.write(b'{"schema":1e999}')
+        self.assert_transaction_refused_before_effect(args)
+
     def test_unknown_copy_semantics_and_wrong_marker_are_rejected(self):
         docker, files = self.fixture()
         for mutation in ["COPY --from=builder /out /app/out\n", "ADD https://x.test/a /app/a\n",
@@ -1663,6 +1669,76 @@ class TestAuthenticatedRuntimeBinding(unittest.TestCase):
         self.assertLess(workflow.index("Attest canonical runtime source binding"),
                         workflow.index("Attest exact running commit, bytes, and smoke routes"))
         self.assertIn("hf-runtime-identity-${{ github.run_id }}-${{ github.run_attempt }}", workflow)
+
+
+class TestRuntimeMarkerCollisions(unittest.TestCase):
+    # Reuse fixture builders, not their TestCase, so original tests are not
+    # inherited and executed twice.
+    fixture = TestAuthenticatedRuntimeBinding.fixture
+    derive_fixture = TestAuthenticatedRuntimeBinding.derive_fixture
+
+    def assert_marker_collision_refused(self, dockerfile, extras=None):
+        args, _ = self.derive_fixture({**(extras or {}), "Dockerfile": dockerfile})
+        with self.assertRaises(dep.DeployContractError):
+            dep.derive(args)
+
+    def test_preexisting_marker_directory_is_rejected(self):
+        dockerfile, _ = self.fixture()
+        self.assert_marker_collision_refused(dockerfile.replace(
+            "COPY .szl-runtime-marker.json /tmp/\n",
+            "COPY later.html /tmp/.szl-runtime-marker.json/\n"
+            "COPY .szl-runtime-marker.json /tmp/\n",
+        ))
+
+    def test_later_copy_overwriting_marker_is_rejected(self):
+        dockerfile, _ = self.fixture()
+        self.assert_marker_collision_refused(
+            dockerfile + "COPY later.html /tmp/.szl-runtime-marker.json\n")
+
+    def test_workdir_below_marker_is_rejected(self):
+        dockerfile, _ = self.fixture()
+        workdir = "WORKDIR /tmp/.szl-runtime-marker.json/x\nWORKDIR /app\n"
+        for before in (True, False):
+            with self.subTest(before_marker=before):
+                modified = (dockerfile.replace(
+                    "COPY .szl-runtime-marker.json /tmp/\n",
+                    workdir + "COPY .szl-runtime-marker.json /tmp/\n",
+                ) if before else dockerfile + workdir)
+                self.assert_marker_collision_refused(modified)
+
+    def test_directory_copy_with_marker_basename_is_rejected(self):
+        dockerfile, _ = self.fixture()
+        self.assert_marker_collision_refused(
+            dockerfile + "COPY bundle/ /tmp/\n",
+            {"bundle/.szl-runtime-marker.json": "not publisher generated\n"},
+        )
+
+    def test_add_to_marker_ancestor_is_rejected(self):
+        dockerfile, _ = self.fixture()
+        self.assert_marker_collision_refused(
+            dockerfile + "ADD payload.tar /tmp/\n",
+            {"payload.tar": "opaque archive bytes\n"},
+        )
+
+    def test_cross_stage_copy_to_marker_ancestor_is_rejected(self):
+        dockerfile, _ = self.fixture()
+        self.assert_marker_collision_refused(
+            dockerfile + "COPY --from=ignored /out /tmp/\n")
+
+    def test_canonical_combined_tmp_copy_remains_valid(self):
+        dockerfile, _ = self.fixture()
+        args, _ = self.derive_fixture({
+            "Dockerfile": dockerfile.replace(
+                "COPY .szl-runtime-marker.json /tmp/\n",
+                "COPY requirements-runtime.txt .szl-runtime-marker.json /tmp/\n",
+            ),
+            "requirements-runtime.txt": "# runtime requirements\n",
+        })
+        manifest, files = dep.derive(args)
+        self.assertIn("requirements-runtime.txt", files)
+        self.assertIn(dep.RUNTIME_MARKER, files)
+        self.assertNotIn("requirements-runtime.txt", manifest["runtime_identity"]["catalog"])
+        self.assertNotIn(dep.RUNTIME_MARKER, manifest["runtime_identity"]["catalog"])
 
 
 if __name__ == "__main__":
