@@ -1992,5 +1992,91 @@ class CanonicalRuntimePublisherTests(unittest.TestCase):
                 self.contract.validate({**witness, key: value})
 
 
+class CanonicalSeismicPublisherTests(unittest.TestCase):
+    """The seismic publisher has a separate exact-byte effect boundary."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.root = Path(__file__).resolve().parents[2]
+        cls.source = cls.root.joinpath(gate.SEISMIC_PUBLISHER).read_text("utf-8")
+        cls.witness = cls.root.joinpath(gate.SEISMIC_WITNESS).read_text("utf-8")
+        cls.policy = json.loads(cls.root.joinpath(POLICY_PATH).read_text("utf-8"))
+
+    def bound(self, path: str, source: str, *, validator: bytes | None = None):
+        analysis = gate.analyze_workflow_source(source, path=path)
+        dependencies = {
+            dep: self.root.joinpath(dep).read_text("utf-8").encode("utf-8")
+            for dep in analysis["dependencies"]
+            if self.root.joinpath(dep).is_file()
+        }
+        if validator is not None:
+            dependencies[gate.SEISMIC_VALIDATOR] = validator
+        declaration = self.policy["workflow_declarations"][path]
+        return gate.bind_declaration(path, source.encode("utf-8"), analysis,
+                                     declaration, dependencies)
+
+    def test_exact_seismic_publisher_and_read_only_witness_are_admitted(self):
+        publisher, _ = gate.parse_workflow_yaml(self.source)
+        witness, _ = gate.parse_workflow_yaml(self.witness)
+        self.assertTrue(gate.seismic_publisher_profile(self.source, publisher))
+        self.assertTrue(gate.seismic_contract_call(self.witness, witness))
+        for path, source, expected_writes in (
+            (gate.SEISMIC_PUBLISHER, self.source, 6),
+            (gate.SEISMIC_WITNESS, self.witness, 0),
+        ):
+            with self.subTest(path=path):
+                result = self.bound(path, source)
+                self.assertEqual(result["verdict"], "ALLOW", result["reason_codes"])
+                self.assertEqual(result["external_write_sites"], expected_writes)
+                self.assertTrue(result["reviewed_unknowns_applied"])
+
+    def test_target_checkout_lock_tool_revision_branch_guard_and_source_drift_deny(self):
+        changes = (
+            ("repository: szl-holdings/szl-seismic-review",
+             "repository: szl-holdings/other"),
+            ("--hf-repo SZLHOLDINGS/szl-seismic-review",
+             "--hf-repo SZLHOLDINGS/other"),
+            ("group: hf-deploy-SZLHOLDINGS/szl-seismic-review",
+             "group: hf-deploy-SZLHOLDINGS/other"),
+            ("ref: ${{ job.workflow_sha }}", "ref: main"),
+            ("if: ${{ inputs.contract-only == false }}", "if: ${{ always() }}"),
+            ("--manifest-out hf-deploy-manifest.json",
+             "--prune --manifest-out hf-deploy-manifest.json"),
+            ("# This version keeps publication and public readback under one Space writer lock.",
+             "# Changed without an effect-policy review."),
+        )
+        for original, replacement in changes:
+            with self.subTest(change=original):
+                self.assertIn(original, self.source)
+                changed = self.source.replace(original, replacement, 1)
+                analysis = gate.analyze_workflow_source(changed, path=gate.SEISMIC_PUBLISHER)
+                self.assertIn("CANONICAL_RUNTIME_INTERFACE_UNSUPPORTED",
+                              {item.code for item in analysis["unknowns"]})
+                result = self.bound(gate.SEISMIC_PUBLISHER, changed)
+                self.assertEqual(result["verdict"], "DENY")
+                self.assertIn("WORKFLOW_DIGEST_MISMATCH", result["reason_codes"])
+                self.assertIn("UNREVIEWABLE_EFFECT_BOUNDARY", result["reason_codes"])
+
+    def test_witness_and_validator_cannot_change_under_existing_declaration(self):
+        for original, replacement in (
+            ("contract-only: true", "contract-only: false"),
+            ("uses: ./.github/workflows/reusable-hf-deploy-seismic.yml",
+             "uses: ./.github/workflows/reusable-hf-deploy.yml"),
+            ("HF_TOKEN: ${{ github.token }}", "HF_TOKEN: ${{ secrets.HF_TOKEN }}"),
+        ):
+            with self.subTest(change=original):
+                changed = self.witness.replace(original, replacement, 1)
+                result = self.bound(gate.SEISMIC_WITNESS, changed)
+                self.assertEqual(result["verdict"], "DENY")
+                self.assertIn("WORKFLOW_DIGEST_MISMATCH", result["reason_codes"])
+                self.assertIn("UNREVIEWABLE_EFFECT_BOUNDARY", result["reason_codes"])
+        validator = self.root.joinpath(gate.SEISMIC_VALIDATOR).read_text("utf-8").encode("utf-8")
+        result = self.bound(gate.SEISMIC_PUBLISHER, self.source,
+                            validator=validator + b"\n# unreviewed change\n")
+        self.assertEqual(result["verdict"], "DENY")
+        self.assertIn("CANONICAL_RUNTIME_VALIDATOR_MISMATCH",
+                      {item["code"] for item in result["unknowns"]})
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)
