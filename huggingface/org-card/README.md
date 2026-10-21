@@ -29,7 +29,7 @@ Public GEO GSE85241 example: integrity and repeatability checks, unsigned receip
 
 - **Use:** [A11oy](https://a-11-oy.com), with its current capability state.
 - **Build:** [models, kernels, datasets and Spaces](https://huggingface.co/SZLHOLDINGS).
-- **Verify:** [computation records](https://a11oy.net) and their stated limits.
+- **Verify:** [computation records](https://a11oy.net), [evidence diagrams](https://a11oy.net/diagrams/) and stated limits.
 
 ## Inference flagship
 
