@@ -11,12 +11,12 @@ Every public archived repository in the `szl-holdings` organization, mapped to t
 
 | Metric | Count |
 |---|---:|
-| Public repositories total | 117 |
-| Active public repositories | 89 |
-| Archived public repositories (tombstones) | 28 |
+| Public repositories total | 128 |
+| Active public repositories | 99 |
+| Archived public repositories (tombstones) | 29 |
 | Tombstones with a resolved successor | 22 |
 | Tombstones terminal by design | 6 |
-| Tombstones with UNKNOWN successor | 0 |
+| Tombstones with UNKNOWN successor | 1 |
 | Structural defects | 0 |
 
 ## Resolved tombstones
@@ -56,6 +56,14 @@ Every public archived repository in the `szl-holdings` organization, mapped to t
 | `szl-otel-mesh` | Published OpenTelemetry/DSSE research artifact with DOI 10.5281/zenodo.20434276. Immutable archival evidence by design. |
 | `szl-uds-deployment` | Frozen WarHacker-2026 UDS deployment evidence snapshot. Retained for reproducibility; it has no active software successor. |
 | `warhacker-demo` | One-off WarHacker-2026 hardware and air-gap dry-run snapshot. The archived demonstration is retained as evidence, not a maintained product. |
+
+## ⚠️ UNKNOWN successor — owner decision required
+
+These archived repositories carry no `Canonical:` pointer and are not declared terminal. Each needs one of: a successor pointer added to its description, or an entry in `TERMINAL_BY_DESIGN` in the generator explaining why it is terminal. **They are reported, not guessed.**
+
+| Archived repo | Description | Last push |
+|---|---|---|
+| `a-11-oy.github.io` | SZL Holdings — a-11-oy.com front door | 2026-09-30 |
 
 ---
 
