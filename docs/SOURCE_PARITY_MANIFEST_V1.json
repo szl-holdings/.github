@@ -121,30 +121,33 @@
       "kind": "space",
       "observed_revision": "23b6f81f3dd6d5fefb7e212333a830a4306afc9d",
       "github_source": "szl-holdings/a11oy@2ce00a0430088100a0d5f076d315bfd6e0e8e712",
-      "status": "SOURCE_BOUND_VERIFIED",
-      "evidence": "README.md, Dockerfile, serve.py, web/src/main.tsx, and requirements-runtime.txt byte-match the current GitHub source snapshot; runtime reported RUNNING with /data attached."
+      "status": "KEY_FILE_PARITY_RUNTIME_SHA_STALE",
+      "evidence": "Verified key files byte-match the current GitHub snapshot, but the Space source marker still reports the older source SHA; governed source-map refresh is required before full runtime parity can be claimed.",
+      "runtime_reported_source_sha": "f9508acc2e60ef86a3d2240d56a4293db06b1426",
+      "runtime_sha_matches_github": false
     },
     {
       "artifact": "SZLHOLDINGS/szl-khipu",
       "kind": "space",
       "observed_revision": "62422bc56e048e800da5a1153a5faee85a61efa7",
       "github_source": "szl-holdings/szl-khipu@8ba6893099aecfe1e7cced1b50075ccdd169e744",
-      "status": "SOURCE_BOUND_VERIFIED",
-      "evidence": "szl_khipu/anatomy.py, szl_khipu/http_app.py, and szl_khipu/formulas.py byte-match; the Space's flattened layout is a deployment adapter."
+      "status": "KEY_FILE_PARITY_RUNTIME_UNVERIFIED",
+      "evidence": "Verified package files byte-match the GitHub snapshot; the flattened Space layout is a deployment adapter. No full runtime source marker was used to promote this to a verified deployment claim."
     },
     {
       "artifact": "betterwithage/anatomy",
       "kind": "space",
-      "observed_revision": "2cdb2244",
       "github_source": "szl-holdings/anatomy@39a271820550ce1ead178e906de4f8f2674c8115",
       "status": "SOURCE_BOUND_OUTSIDE_SZLHOLDINGS",
-      "evidence": "README.md, server.py, and Dockerfile match the GitHub source; the Space is owned by betterwithage, not SZLHOLDINGS. No transfer or overwrite was performed."
+      "evidence": "README.md, server.py, and Dockerfile match the GitHub source; the Space is owned by betterwithage, not SZLHOLDINGS. No transfer or overwrite was performed.",
+      "observed_revision_prefix": "2cdb2244"
     },
     {
       "artifact": "SZLHOLDINGS/szl-second-brain-inrepo",
       "kind": "dataset",
       "status": "PROJECTION_ARTIFACT_ONLY",
-      "evidence": "Dataset presence does not establish a deployed frontend/backend or replace the canonical GitHub source."
+      "evidence": "Dataset presence does not establish a deployed frontend/backend or replace the canonical GitHub source.",
+      "observed_revision": "c9823ec107fc1fd4df6166c4ad0a37c776ee7e64"
     },
     {
       "artifact": "SZLHOLDINGS/SZL-Khipu-1.5B",
@@ -156,19 +159,39 @@
       "artifact": "SZLHOLDINGS/SZL-Forge-1.5B-ReceiptAgent",
       "kind": "model",
       "status": "MODEL_ARTIFACT",
-      "evidence": "Gated model artifact; no source-authority claim."
+      "evidence": "Gated model artifact; no source-authority claim.",
+      "observed_revision": "3aa6c979f3795ac51f37f1d30e87b8e22f353247"
+    },
+    {
+      "artifact": "SZLHOLDINGS/a11oy-verifiable-corpus",
+      "kind": "dataset",
+      "observed_revision": "70cc622ad01b49eb352e55838fa67dc42fcd81a2",
+      "status": "PROJECTION_ARTIFACT_ONLY",
+      "evidence": "Public corpus artifact; it is not application source or deployment authority."
+    },
+    {
+      "artifact": "SZLHOLDINGS/szl-lake",
+      "kind": "dataset",
+      "observed_revision": "7d7c2b24b661678766e41e80e7b3f1edf0976c41",
+      "status": "EVIDENCE_ARTIFACT",
+      "evidence": "Evidence lake artifact; it does not replace the canonical Python runtime source."
     }
   ],
   "blockers": [
     {
       "id": "HF-ANATOMY-OWNER",
       "status": "OWNER_REVIEW_REQUIRED",
-      "detail": "Anatomy runtime is source-bound to GitHub but its live Space is under betterwithage. Keep it read-only until the owner chooses whether to keep that ownership or establish a reviewed SZLHOLDINGS Space."
+      "detail": "The HF A11oy Space key files match the GitHub snapshot, but its runtime source marker reports f9508acc... while current GitHub main is 2ce00a.... Refresh only through the protected GitHub-to-HF workflow."
     },
     {
       "id": "HF-SECOND-BRAIN-SPACE",
       "status": "NO_SPACE_OBSERVED",
       "detail": "No dedicated SZLHOLDINGS Second Brain Space was observed. Do not create a duplicate runtime without an explicit canonical deployment decision."
+    },
+    {
+      "id": "HF-A11OY-SOURCE-MARKER",
+      "status": "WORKFLOW_REFRESH_REQUIRED",
+      "detail": "Do not edit the Hub marker directly. The existing protected GitHub workflow must publish the current source revision and then perform immutable readback."
     }
   ],
   "evidence": {
