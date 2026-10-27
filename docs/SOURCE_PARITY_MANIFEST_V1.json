@@ -121,10 +121,11 @@
       "kind": "space",
       "observed_revision": "23b6f81f3dd6d5fefb7e212333a830a4306afc9d",
       "github_source": "szl-holdings/a11oy@2ce00a0430088100a0d5f076d315bfd6e0e8e712",
-      "status": "KEY_FILE_PARITY_RUNTIME_SHA_STALE",
-      "evidence": "Verified key files byte-match the current GitHub snapshot, but the Space source marker still reports the older source SHA; governed source-map refresh is required before full runtime parity can be claimed.",
+      "status": "PROVIDER_READBACK_PARTIAL",
+      "evidence": "The HF Space contains the Python/static deployment overlay and verified backend/package files, while the canonical React/Vite TypeScript frontend remains in GitHub web/. The Space source marker still reports the older source SHA; protected source-map refresh and readback are required before full runtime parity can be claimed.",
       "runtime_reported_source_sha": "f9508acc2e60ef86a3d2240d56a4293db06b1426",
-      "runtime_sha_matches_github": false
+      "runtime_sha_matches_github": false,
+      "frontend_source_in_hf": false
     },
     {
       "artifact": "SZLHOLDINGS/szl-khipu",
@@ -179,9 +180,9 @@
   ],
   "blockers": [
     {
-      "id": "HF-ANATOMY-OWNER",
+      "id": "HF-A11OY-RUNTIME-DRIFT",
       "status": "OWNER_REVIEW_REQUIRED",
-      "detail": "The HF A11oy Space key files match the GitHub snapshot, but its runtime source marker reports f9508acc... while current GitHub main is 2ce00a.... Refresh only through the protected GitHub-to-HF workflow."
+      "detail": "The HF A11oy Space contains the Python/static deployment overlay, but its runtime source marker reports f9508acc... while current GitHub main is 2ce00a.... Refresh only through the protected GitHub-to-HF workflow."
     },
     {
       "id": "HF-SECOND-BRAIN-SPACE",
@@ -192,6 +193,11 @@
       "id": "HF-A11OY-SOURCE-MARKER",
       "status": "WORKFLOW_REFRESH_REQUIRED",
       "detail": "Do not edit the Hub marker directly. The existing protected GitHub workflow must publish the current source revision and then perform immutable readback."
+    },
+    {
+      "id": "HF-A11OY-FRONTEND-OVERLAY",
+      "status": "EXPECTED_ADAPTER",
+      "detail": "The HF A11oy Space is a deployment overlay and does not contain the canonical web/ TypeScript source tree. GitHub remains the frontend source of truth; the Docker build output is the runtime artifact."
     }
   ],
   "evidence": {
