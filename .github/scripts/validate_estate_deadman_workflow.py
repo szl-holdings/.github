@@ -17,7 +17,7 @@ EXPECTED_PERMISSIONS = {
 SCALAR = re.compile(r"^  ([a-z][a-z0-9-]*): (read|write|none)$")
 CHECKOUT_ACTION = "actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1"
 EXPECTED_WORKFLOW_SHA256 = (
-    "1f518a525b257440a8b018d2a86453123e8e21c81273e03cb0c838358e3188dd"
+    "0d4af4c5f4e444f3b557aa2a93e3a9fc8bbacd9576eaf1439fb86ed4c1a8a171"
 )
 EXPECTED_STEP_NAMES = (
     "Harden runner",
