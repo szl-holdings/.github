@@ -51,17 +51,4 @@ These are architecture roles. Inspect each artifact's source and stated use limi
 
 </details>
 
-## Runtime infrastructure (measured)
-
-Dated house observation **2026-10-17**. This is registry evidence for where computation runs. It does not certify uptime, model quality, or deploy authorization.
-
-| Role | Provider | Status |
-|---|---|---|
-| Living Souls HQ (pulse / memory / sandboxes) | Hetzner Cloud CCX53-class | **LIVE** |
-| Stateless inference mouth (Ternary Bonsai 27B) | Massed Compute RTX A6000 48GB | **LIVE** (~$0.57/hr list) |
-| Product edge | Cloudflare → [a-11-oy.com](https://a-11-oy.com) | **LIVE** (HTTP 200) |
-| Proof edge | Cloudflare → GitHub Pages [a11oy.net](https://a11oy.net) | **LIVE** (HTTP 200) |
-| TensorDock / Lambda Labs HA nodes | Enterprise marketplaces | **EVALUATION_ONLY** (no house keys / no live rentals) |
-| InfiniBand Hetzner ↔ Massed | — | **Not present** (IB is within-cluster on some Lambda SKUs only) |
-
-Full MEASURED audit: [`docs/LIVING_SOULS_INFRASTRUCTURE_AUDIT_2026-10-17.md`](../docs/LIVING_SOULS_INFRASTRUCTURE_AUDIT_2026-10-17.md) · House mirror: [alloyszlholdings.com audit](https://alloyszlholdings.com/forge/files/LIVING_SOULS_INFRASTRUCTURE_AUDIT.md) · Hardware map: [STEPHEN-ALL-HARDWARE](https://alloyszlholdings.com/forge/files/STEPHEN-ALL-HARDWARE.md).
+Measured runtime snapshot: [full audit](../docs/LIVING_SOULS_INFRASTRUCTURE_AUDIT_2026-10-17.md).
