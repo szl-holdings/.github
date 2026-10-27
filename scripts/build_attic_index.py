@@ -210,18 +210,6 @@ def render(analysis: dict) -> str:
         lines.append("|---|---|---|")
         for name, repo in analysis["unknown"]:
             description = (repo.get("description") or "—").replace("|", "\\|")
-            # GitHub's public metadata can cross transports with either the
-            # original em dash or U+FFFD when a hosted runner decodes the
-            # same UTF-8 description differently.  Normalize both to the
-            # same ASCII separator so the generated public artifact is
-            # byte-stable without changing its meaning.
-            for marker in (" \u2014 ", " \ufffd ", " \u00e2\u20ac\u201d "):
-                description = description.replace(marker, " - ")
-            description = (
-                description.replace("\u2014", "-")
-                .replace("\ufffd", "-")
-                .replace("\u00e2\u20ac\u201d", "-")
-            )
             if len(description) > 110:
                 description = description[:107] + "..."
             pushed_at = (repo.get("pushedAt") or "")[:10] or "—"
