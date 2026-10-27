@@ -63,7 +63,7 @@ These archived repositories carry no `Canonical:` pointer and are not declared t
 
 | Archived repo | Description | Last push |
 |---|---|---|
-| `a-11-oy.github.io` | SZL Holdings â€” a-11-oy.com front door | 2026-09-30 |
+| `a-11-oy.github.io` | SZL Holdings - a-11-oy.com front door | 2026-09-30 |
 
 ---
 
