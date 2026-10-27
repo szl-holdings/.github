@@ -65,4 +65,3 @@ Dated house observation **2026-10-17**. This is registry evidence for where comp
 | InfiniBand Hetzner ↔ Massed | — | **Not present** (IB is within-cluster on some Lambda SKUs only) |
 
 Full MEASURED audit: [`docs/LIVING_SOULS_INFRASTRUCTURE_AUDIT_2026-10-17.md`](../docs/LIVING_SOULS_INFRASTRUCTURE_AUDIT_2026-10-17.md) · House mirror: [alloyszlholdings.com audit](https://alloyszlholdings.com/forge/files/LIVING_SOULS_INFRASTRUCTURE_AUDIT.md) · Hardware map: [STEPHEN-ALL-HARDWARE](https://alloyszlholdings.com/forge/files/STEPHEN-ALL-HARDWARE.md).
-

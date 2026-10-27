@@ -2,9 +2,9 @@
 <!-- Native identity: szl-brand@4309f6fce89179331b0b3ed8c99494e76c5be256 -->
 # Living Souls infrastructure — deep audit (MEASURED)
 
-**Observed at:** 2026-10-17T15:38:34Z (HQ local clock) · refreshed at publish  
-**Observer:** AlloyScape House caretaker (Outside Dev G) on HQ `ubuntu-128gb-ash-1`  
-**Evidence class:** SNAPSHOT / MEASURED live probes · UNKNOWN ≠ PASS  
+**Observed at:** 2026-10-17T15:38:34Z (HQ local clock) · refreshed at publish
+**Observer:** AlloyScape House caretaker (Outside Dev G) on HQ `ubuntu-128gb-ash-1`
+**Evidence class:** SNAPSHOT / MEASURED live probes · UNKNOWN ≠ PASS
 **Doctrine:** Control before action. Evidence after.
 
 This audit binds the Living Souls HQ node, the Massed Compute A6000 inference mouth, enterprise HA marketplace alternatives (TensorDock / Lambda), Cloudflare edge posture for `a-11-oy.com` / `a11oy.net`, and InfiniBand claims — then hooks the map into GitHub `szl-holdings`, Hugging Face `SZLHOLDINGS`, and the product/proof domains.
@@ -112,15 +112,15 @@ Do not document InfiniBand as a live link in the Living Souls ↔ Massed path.
 
 ## 9. Still Stephen minutes
 
-1. Cloudflare API token + zone ids → APPLY EDGE  
-2. Massed portal → paste HQ SSH pubkey (`alloyscape hq`)  
-3. NVIDIA Inception portal → save Product AlloyScape Active  
-4. Tailscale Share for workshop peer(s) as separately ordered  
-5. Merge the GitHub PRs opened from this audit after review  
+1. Cloudflare API token + zone ids → APPLY EDGE
+2. Massed portal → paste HQ SSH pubkey (`alloyscape hq`)
+3. NVIDIA Inception portal → save Product AlloyScape Active
+4. Tailscale Share for workshop peer(s) as separately ordered
+5. Merge the GitHub PRs opened from this audit after review
 
 ## 10. Limits
 
-- This document is a dated observation. It does not certify uptime SLAs, model quality, or production safety.  
-- Public IPs already disclosed on house STATUS surfaces are restated for MEASURED binding. Tailscale CGNAT addresses are omitted from product-served HTML.  
-- TensorDock/Lambda remain evaluation references until Rosa GO rents capacity and house keys exist.  
+- This document is a dated observation. It does not certify uptime SLAs, model quality, or production safety.
+- Public IPs already disclosed on house STATUS surfaces are restated for MEASURED binding. Tailscale CGNAT addresses are omitted from product-served HTML.
+- TensorDock/Lambda remain evaluation references until Rosa GO rents capacity and house keys exist.
 - Merge ≠ deploy for `a-11-oy.com`. Proof Pages deploy from `a11oy-net` main after checks.
