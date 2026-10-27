@@ -50,3 +50,5 @@ The source-bound public inventory records **38 public Spaces, 48 model repositor
 These are architecture roles. Inspect each artifact's source and stated use limits before choosing a use.
 
 </details>
+
+Measured runtime snapshot: [full audit](../docs/LIVING_SOULS_INFRASTRUCTURE_AUDIT_2026-10-17.md).
