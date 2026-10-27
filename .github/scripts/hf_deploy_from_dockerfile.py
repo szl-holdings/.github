@@ -48,6 +48,9 @@ import hashlib
 import http.client
 import io
 import json
+import posixpath
+import secrets
+import stat
 import math
 import os
 import posixpath
@@ -167,9 +170,9 @@ def materialize_source_revision_file(repo_root, requested_path, source_sha):
     return rel
 
 
-def _dockerignore_pattern_regex(pattern):
+def _dockerignore_pattern_regex(pattern, *, rooted=False):
     """Compile Docker patternmatcher wildcards for slash-delimited repo paths."""
-    pieces = ["^(?:.*/)?" if "/" not in pattern else "^"]
+    pieces = ["^(?:.*/)?" if not rooted and "/" not in pattern else "^"]
     index = 0
     while index < len(pattern):
         char = pattern[index]
@@ -227,7 +230,7 @@ def _dockerignore_pattern_regex(pattern):
         ) from exc
 
 
-def _dockerignore_patterns(ignore_path):
+def _dockerignore_patterns(ignore_path, *, runtime=False):
     """Load normalized patternmatcher rules from one effective ignore file."""
     with open(ignore_path, "rb") as fh:
         data = fh.read(262145)
@@ -255,8 +258,28 @@ def _dockerignore_patterns(ignore_path):
         pattern = posixpath.normpath(pattern).strip("/")
         if pattern in ("", "."):
             continue
-        patterns.append((negated, _dockerignore_pattern_regex(pattern)))
+        if runtime and (any(c in pattern for c in "[]\\") or any(
+                "**" in component and component != "**" for component in pattern.split("/"))):
+            raise DeployContractError("unsupported runtime Docker ignore pattern")
+        patterns.append((negated, _dockerignore_pattern_regex(pattern, rooted=runtime)))
     return patterns
+
+
+def runtime_context_ignored(path, patterns):
+    """Ordered, root-relative supported Docker rules, including parent matches.
+
+    A later exception can restore a child of an ignored directory. Unlike
+    gitignore, an unqualified literal is rooted; **/ explicitly adds depth.
+    Unsupported pattern syntax is rejected while loading runtime rules.
+    See moby/patternmatcher MatchesOrParentMatches and Docker build-context docs.
+    """
+    parts = path.split("/")
+    candidates = ["/".join(parts[:end]) for end in range(1, len(parts) + 1)]
+    ignored = False
+    for negated, pattern in patterns:
+        if any(pattern.fullmatch(candidate) for candidate in candidates):
+            ignored = not negated
+    return ignored
 
 
 def _effective_dockerignore(repo_root, dockerfile_rel):
@@ -921,7 +944,236 @@ def probe_smoke_routes(hf_repo, smoke_paths, retries=6, delay=5):
 # --------------------------------------------------------------------------- #
 # derive: Dockerfile -> deploy manifest (no network, no push)
 # --------------------------------------------------------------------------- #
+RUNTIME_MARKER = ".szl-runtime-marker.json"
+
+
+def runtime_identity_marker(args):
+    """Unique publication selector; no credentials or self-issued authority."""
+    if (args.github_repo != "szl-holdings/a11oy" or args.hf_repo != "SZLHOLDINGS/a11oy"
+            or not getattr(args, "require_default_branch_tip", False)
+            or not re.fullmatch(r"[0-9a-f]{40}", args.source_sha or "")):
+        raise DeployContractError("runtime identity requires canonical A11oy protected source")
+    run, attempt = os.environ.get("GITHUB_RUN_ID", ""), os.environ.get("GITHUB_RUN_ATTEMPT", "")
+    publisher = os.environ.get("RUNTIME_IDENTITY_PUBLISHER_SHA", "")
+    if not (run.isascii() and run.isdigit() and int(run) > 0
+            and attempt.isascii() and attempt.isdigit() and int(attempt) > 0
+            and re.fullmatch(r"[0-9a-f]{40}", publisher)):
+        raise DeployContractError("runtime identity requires exact publisher run, attempt and revision")
+    marker = {"schema": "szl.runtime-source-marker/v1", "source_repository": args.github_repo,
+            "source_sha": args.source_sha, "target": args.hf_repo, "run_id": int(run),
+            "run_attempt": int(attempt), "publisher_sha": publisher}
+    approved = str(getattr(args, "approved_manifest", "") or "")
+    transaction = any(getattr(args, name, "") for name in (
+        "expected_hf_parent", "operation_id", "expected_manifest_sha256", "transaction_journal"))
+    if transaction and not approved:
+        raise DeployContractError("runtime identity transaction requires --approved-manifest")
+    if approved:
+        marker["nonce"] = approved_runtime_nonce(args, marker)
+    else:
+        marker["nonce"] = secrets.token_hex(32)
+    return marker
+
+
+def approved_runtime_nonce(args, context):
+    """Reuse only a validated selector nonce, never approved source/catalog bytes."""
+    if not all(getattr(args, name, "") for name in (
+            "expected_hf_parent", "operation_id", "expected_manifest_sha256", "transaction_journal")):
+        raise DeployContractError("approved runtime manifest requires all transaction options")
+    expected = str(args.expected_manifest_sha256)
+    if not re.fullmatch(r"[0-9a-f]{64}", expected):
+        raise DeployContractError("approved runtime manifest requires exact expected digest")
+    requested = os.path.abspath(args.approved_manifest)
+    resolved = os.path.realpath(requested)
+    if os.path.normcase(requested) != os.path.normcase(resolved):
+        raise DeployContractError("approved runtime manifest must not traverse symlinks")
+    output = str(getattr(args, "manifest_out", "") or "")
+    if output and (os.path.normcase(os.path.realpath(output)) == os.path.normcase(resolved)
+                   or (os.path.exists(output) and os.path.samefile(output, resolved))):
+        raise DeployContractError("manifest output must not replace the approved plan")
+    limit = 16 * 1024 * 1024
+    try:
+        fd = os.open(requested, os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0)
+                     | getattr(os, "O_NONBLOCK", 0) | getattr(os, "O_BINARY", 0))
+        with os.fdopen(fd, "rb") as handle:
+            info = os.fstat(handle.fileno())
+            if not stat.S_ISREG(info.st_mode) or info.st_size > limit:
+                raise DeployContractError("approved runtime manifest is not a bounded regular file")
+            data = handle.read(limit + 1)
+    except OSError as exc:
+        raise DeployContractError("approved runtime manifest is unavailable") from exc
+    if len(data) > limit:
+        raise DeployContractError("approved runtime manifest exceeds byte bound")
+    try:
+        plan = strict_json(data)
+        actual = manifest_identity(plan) if type(plan) is dict else None
+    except (ValueError, TypeError, RecursionError) as exc:
+        raise DeployContractError("approved runtime manifest must be bounded JSON") from exc
+    if (type(plan) is not dict or plan.get("manifest_sha256") != expected
+            or actual != expected):
+        raise DeployContractError("approved runtime manifest digest mismatch")
+    marker = plan.get("runtime_identity")
+    if (type(marker) is not dict or set(marker) != set(context) | {"nonce", "catalog"}
+            or type(marker.get("catalog")) is not dict or not 0 < len(marker["catalog"]) <= 10000
+            or not isinstance(marker.get("nonce"), str) or not re.fullmatch(r"[0-9a-f]{64}", marker["nonce"])
+            or any(type(marker.get(key)) is not type(value) or marker[key] != value for key, value in context.items())):
+        raise DeployContractError("approved runtime selector differs from this source/run/attempt/publisher")
+    return marker["nonce"]
+
+
+def runtime_copy_catalog(dockerfile_text, files, *, ignored_sources=frozenset()):
+    """Map the final stage's unchanged source COPY files beneath /app.
+
+    This is not an image/dependency attestation. Ambiguous Docker constructs
+    are refused rather than guessed; later COPY instructions replace earlier
+    destinations exactly as in Docker. Build-generated files are out of scope.
+    """
+    # A Python `from ... import ...` in a RUN heredoc is not a Docker FROM.
+    # Consume heredocs before looking at any Docker instruction.
+    lines, pending = [], []
+    for line in re.sub(r"\\\r?\n", " ", dockerfile_text).splitlines():
+        if pending:
+            if line.strip() == pending[0]:
+                pending.pop(0)
+            continue
+        lines.append(line)
+        if re.match(r"^\s*RUN\s", line, re.I):
+            pending = [m[0] or m[1] or m[2] for m in re.findall(
+                r"<<-?(?:'([A-Za-z_][A-Za-z0-9_]*)'|\"([A-Za-z_][A-Za-z0-9_]*)\"|([A-Za-z_][A-Za-z0-9_]*))", line)]
+    if pending:
+        raise DeployContractError("unterminated runtime Docker heredoc")
+    catalog, workdir, marker_destination, directories = {}, "/", None, {"/"}
+    marker_path = "/tmp/" + RUNTIME_MARKER
+
+    def add_directory(path):
+        if path == marker_path or path.startswith(marker_path + "/"):
+            raise DeployContractError("runtime directory overlaps the reserved marker file")
+        while path not in directories:
+            if path.startswith("/app/") and path[len("/app/"):] in catalog:
+                raise DeployContractError("runtime COPY file/directory collision")
+            directories.add(path)
+            path = posixpath.dirname(path)
+
+    for line in lines:
+        match = re.match(r"^\s*(FROM|WORKDIR|COPY|ADD)\s+(.*)$", line, re.I)
+        if not match:
+            continue
+        kind, rest = match[1].upper(), match[2].strip()
+        if kind == "FROM":
+            catalog, workdir, marker_destination, directories = {}, "/", None, {"/"}
+            continue
+        if kind == "WORKDIR":
+            if "$" in rest or "\\" in rest or " " in rest:
+                raise DeployContractError("runtime WORKDIR must be literal")
+            workdir = posixpath.normpath(posixpath.join(workdir, rest))
+            add_directory(workdir)
+            continue
+        flags = []
+        while rest.startswith("--"):
+            flag, sep, rest = rest.partition(" ")
+            if not sep:
+                raise DeployContractError("invalid runtime COPY flags")
+            flags.append(flag)
+            rest = rest.lstrip()
+        tokens = json.loads(rest) if rest.startswith("[") else rest.split()
+        if not isinstance(tokens, list) or len(tokens) < 2 or not all(type(x) is str for x in tokens):
+            raise DeployContractError("invalid runtime COPY")
+        sources, destination = tokens[:-1], tokens[-1]
+        if any("$" in x or "\\" in x or ".." in x.split("/") for x in tokens):
+            raise DeployContractError("runtime COPY paths must be literal and contained")
+        target = posixpath.normpath(posixpath.join(workdir, destination))
+        if RUNTIME_MARKER in sources:
+            if kind != "COPY" or flags:
+                raise DeployContractError("runtime marker requires literal local COPY")
+            marker_destination = (posixpath.join(target, RUNTIME_MARKER)
+                                  if destination.endswith("/") or target in directories else target)
+        # The fixed marker is outside /app, but its COPY mapping must remain
+        # unambiguous and must not be shadowed by a directory or another file.
+        if (target == marker_path or target.startswith(marker_path + "/")
+                or marker_path.startswith(target.rstrip("/") + "/")):
+            if kind != "COPY" or any(not f.startswith(("--chown=", "--chmod=")) for f in flags):
+                raise DeployContractError("runtime marker overlap requires literal local COPY")
+            for raw_source in sources:
+                source = raw_source.removeprefix("./").rstrip("/")
+                is_marker = source == RUNTIME_MARKER
+                if any(c in source for c in "*?[") or source in ("", "."):
+                    raise DeployContractError("ambiguous runtime marker overlap")
+                directory = not is_marker and source not in files
+                matches = ([path for path in files if path.startswith(source + "/")]
+                           if directory else [source])
+                matches = [path for path in matches if path not in ignored_sources]
+                if not matches or (len(sources) > 1 and not destination.endswith("/")):
+                    raise DeployContractError("ambiguous runtime marker overlap")
+                target_directory = directory or destination.endswith("/") or target in directories
+                if target_directory:
+                    add_directory(target)
+                for path in matches:
+                    suffix = path[len(source) + 1:] if directory else posixpath.basename(source)
+                    full = posixpath.join(target, suffix) if target_directory else target
+                    if is_marker:
+                        if flags or full != marker_path:
+                            raise DeployContractError("runtime marker requires its fixed literal COPY path")
+                        marker_destination = full
+                    elif (full == marker_path or full.startswith(marker_path + "/")
+                          or marker_path.startswith(full.rstrip("/") + "/")):
+                        raise DeployContractError("runtime COPY overlaps the reserved marker file")
+                    add_directory(posixpath.dirname(full))
+        if target != "/app" and not target.startswith("/app/"):
+            continue
+        if kind != "COPY" or any(not f.startswith(("--chown=", "--chmod=")) for f in flags):
+            raise DeployContractError("runtime /app catalog requires literal local COPY")
+        for raw_source in sources:
+            source = raw_source.removeprefix("./").rstrip("/")
+            if any(c in source for c in "*?[") or source in ("", "."):
+                raise DeployContractError("runtime COPY globs/whole context are unsupported")
+            if source == RUNTIME_MARKER:
+                marker_destination = (posixpath.join(target, source)
+                                      if destination.endswith("/") or target in directories else target)
+                continue
+            directory = source not in files
+            if not directory and source in ignored_sources:
+                raise DeployContractError("explicit runtime COPY source is Docker-ignored: " + source)
+            matches = [path for path in files if path.startswith(source + "/")
+                       and path not in ignored_sources] if directory else [source]
+            if not matches or (len(sources) > 1 and not destination.endswith("/")):
+                raise DeployContractError("ambiguous runtime COPY destination")
+            target_directory = directory or destination.endswith("/") or target in directories
+            if target_directory:
+                add_directory(target)
+            for path in matches:
+                suffix = path[len(source) + 1:] if directory else posixpath.basename(source)
+                full = posixpath.join(target, suffix) if target_directory else target
+                if full in directories:
+                    raise DeployContractError("runtime COPY would overwrite a directory with a file")
+                add_directory(posixpath.dirname(full))
+                relative = posixpath.relpath(full, "/app")
+                if relative in (".", "..") or relative.startswith("../"):
+                    raise DeployContractError("runtime COPY escapes /app")
+                meta = files[path]
+                catalog[relative] = {"source_path": path, "sha256": meta["sha256"], "size": meta["size"]}
+    if marker_destination != "/tmp/" + RUNTIME_MARKER or not catalog:
+        raise DeployContractError("runtime marker must land at the fixed final /tmp path")
+    required = {"observer_runtime.py", "szl_runtime_identity.py", "serve.py", "gdw_runtime.py",
+                ".github/scripts/hf-sync.yml"}
+    if not required.issubset(catalog):
+        raise DeployContractError("runtime catalog lacks required process or publisher source")
+    if len(catalog) > 10000:
+        raise DeployContractError("runtime catalog exceeds file bound")
+    return dict(sorted(catalog.items()))
+
+
+def runtime_binding(manifest):
+    marker = manifest.get("runtime_identity")
+    revision = manifest.get("hf_commit_oid")
+    if not isinstance(marker, dict) or not re.fullmatch(r"[0-9a-f]{40}", revision or ""):
+        raise DeployContractError("runtime binding requires acknowledged exact HF commit")
+    return {"schema": "szl.runtime-source-binding/v1", "marker": marker, "hf_revision": revision,
+            "scope": "FINAL_APP_SOURCE_COPY_FILES", "image_attestation": False,
+            "hardware_attestation": False, "execution_authority": False}
+
+
 def derive(args):
+    if getattr(args, "approved_manifest", "") and not getattr(args, "runtime_identity", False):
+        raise DeployContractError("--approved-manifest is only supported with runtime identity")
     source_sha = str(getattr(args, "source_sha", "") or "")
     readme_path = validate_readme_target(args.readme_path, args.include_readme)
     requested_revision = getattr(args, "source_revision_file", "")
@@ -980,7 +1232,19 @@ def derive(args):
         revision_rel = revision_candidate
         revision_content = source_sha + "\n"
 
+    runtime_marker = None
+    if getattr(args, "runtime_identity", False):
+        runtime_marker = runtime_identity_marker(args)
+        if source_revision_is_dockerignored(args.repo_root, dockerfile_rel, RUNTIME_MARKER):
+            raise DeployContractError("runtime marker is excluded from the Docker build context")
     tree = local_tree(args.repo_root)
+    if runtime_marker is not None:
+        if RUNTIME_MARKER in tree:
+            _, marker_path = source_file(args.repo_root, RUNTIME_MARKER)
+            with open(marker_path, "rb") as fh:
+                if fh.read() != b'{"schema":"szl.runtime-source-marker/unavailable"}\n':
+                    raise DeployContractError("runtime marker must be publisher-generated, not caller supplied")
+        tree[RUNTIME_MARKER] = "generated"
     if revision_rel:
         tree[revision_rel] = git_blob_sha1(revision_content.encode("ascii"))
     targets, unresolved = expand_sources(sources, tree)
@@ -1008,6 +1272,8 @@ def derive(args):
 
     files = {}
     for rel, src in sorted(targets.items()):
+        if rel == RUNTIME_MARKER and runtime_marker is not None:
+            continue
         source_meta = {"source_path": rel}
         if rel == revision_rel:
             source_meta["generated_content_utf8"] = revision_content
@@ -1113,6 +1379,22 @@ def derive(args):
         "source_revision_file": revision_rel,
         "files": files,
     }
+    if runtime_marker is not None:
+        if RUNTIME_MARKER not in eligible_targets:
+            raise DeployContractError("runtime marker must be explicitly COPYed into the image")
+        rules = _dockerignore_patterns(ignore_path, runtime=True) if ignore_path else []
+        ignored_sources = {path for path in files if runtime_context_ignored(path, rules)}
+        runtime_marker["catalog"] = runtime_copy_catalog(dockerfile_text, files, ignored_sources=ignored_sources)
+        data = json.dumps(runtime_marker, sort_keys=True, separators=(",", ":")).encode()
+        if len(data) > 1024 * 1024:
+            raise DeployContractError("runtime marker exceeds byte bound")
+        files[RUNTIME_MARKER] = {
+            "git_blob_sha1": git_blob_sha1(data), "sha256": sha256(data), "size": len(data),
+            "source_path": RUNTIME_MARKER, "copy_source": RUNTIME_MARKER,
+            "generated_content_utf8": data.decode(),
+        }
+        manifest["runtime_identity"] = runtime_marker
+        manifest["files_deployed"] = len(files)
     return manifest, files
 
 
@@ -1594,6 +1876,9 @@ def deploy(args):
         with open(args.manifest_out, "w") as fh:
             json.dump(manifest, fh, indent=2, sort_keys=True)
             fh.write("\n")
+    if getattr(args, "runtime_identity", False):
+        with open("hf-runtime-binding.json", "x", encoding="utf-8") as fh:
+            json.dump(runtime_binding(manifest), fh, sort_keys=True, separators=(",", ":"))
     return 0
 
 
@@ -1694,12 +1979,16 @@ def main(argv=None):
         help="JSON array of same-host live app paths to require after deploy",
     )
     ap.add_argument("--manifest-out", default="")
+    ap.add_argument("--runtime-identity", action="store_true",
+                    help="canonical A11oy only: bind final /app source COPY bytes to this publication")
     ap.add_argument("--expected-hf-parent", default="",
                     help="transaction: exact remote parent enforced by provider CAS")
     ap.add_argument("--operation-id", default="",
                     help="transaction: unique 64-character lowercase hex operation ID")
     ap.add_argument("--expected-manifest-sha256", default="",
                     help="transaction: manifest_sha256 from the approved dry-run")
+    ap.add_argument("--approved-manifest", default="",
+                    help="runtime identity transaction: frozen dry-run plan supplying its validated nonce")
     ap.add_argument("--transaction-journal", default="",
                     help="transaction: new durable intent path outside the payload")
     ap.add_argument("--reconcile-transaction", default="",
