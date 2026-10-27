@@ -7,9 +7,9 @@ name: HF Dataset Badge Refresh
 # the opposite of the honesty standard the badges exist to signal.
 #
 # The script recomputes each dataset's recursive file count and front-matter
-# license from the LIVE tree and rewrites ONLY the badge values inside the
-# existing badge row (targeted regex on the shields.io URL). Body text is
-# never touched; a README is re-committed only when a badge value changed.
+# license from the LIVE tree and may rewrite ONLY the files-badge value.
+# Body text and the license badge stay unchanged. A README commit happens
+# only for an explicit dispatch, and the schedule never publishes.
 # Source-owned atomic publications such as SZLHOLDINGS/szl-lake are excluded:
 # their source workflow owns README.md and the closed index as one revision.
 # Badge palette/format matches the estate house style (files 5b8dee,
@@ -68,10 +68,10 @@ jobs:
           EVENT_NAME: ${{ github.event_name }}
           DRY_RUN: ${{ github.event.inputs.dry_run || 'false' }}
         run: |
-          # Push-triggered runs validate in dry-run; schedule/dispatch publish
-          # (unless dispatch asked for dry_run).
-          if [ "$EVENT_NAME" = "push" ] || [ "$DRY_RUN" = "true" ]; then
-            node .github/scripts/hf_dataset_badge_refresh.mjs
-          else
+          # Schedule and push stay dry-run. Dispatch publishes only when
+          # dry_run is not true. The script repeats that admission itself.
+          if [ "$EVENT_NAME" = "workflow_dispatch" ] && [ "$DRY_RUN" != "true" ]; then
             node .github/scripts/hf_dataset_badge_refresh.mjs --publish
+          else
+            node .github/scripts/hf_dataset_badge_refresh.mjs
           fi
