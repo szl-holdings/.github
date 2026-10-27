@@ -1,0 +1,188 @@
+{
+  "schema": "szl.source-parity/v1",
+  "generated_at": "2026-10-27",
+  "github_organization": "szl-holdings",
+  "huggingface_organization": "SZLHOLDINGS",
+  "requested_alias": "szlholdigns",
+  "requested_alias_status": "NO_GITHUB_ORG_MATCH",
+  "policy": {
+    "canonical_source": "GitHub",
+    "runtime_mirror": "Hugging Face",
+    "source_write_authority": "canonical-repository-workflow-only",
+    "direct_huggingface_overwrite": false,
+    "readiness_rule": "source parity and runtime evidence are separate claims"
+  },
+  "github_source_inventory": [
+    {
+      "repository": "szl-holdings/a11oy",
+      "main_revision": "2ce00a0430088100a0d5f076d315bfd6e0e8e712",
+      "backend": {
+        "language": "python",
+        "framework": "FastAPI/uvicorn-compatible runtime",
+        "paths": [
+          "serve.py",
+          "requirements-runtime.txt"
+        ]
+      },
+      "frontend": {
+        "framework": "React/Vite/TypeScript",
+        "paths": [
+          "web/src/main.tsx",
+          "web/src/App.tsx",
+          "web/package.json"
+        ]
+      },
+      "packaging": [
+        "Dockerfile"
+      ],
+      "status": "SOURCE_PRESENT"
+    },
+    {
+      "repository": "szl-holdings/anatomy",
+      "main_revision": "39a271820550ce1ead178e906de4f8f2674c8115",
+      "backend": {
+        "language": "python",
+        "framework": "Python HTTP/FastAPI runtime",
+        "paths": [
+          "server.py",
+          "living_runtime.py",
+          "requirements.txt"
+        ]
+      },
+      "frontend": {
+        "framework": "vendored static HTML/JavaScript atlas",
+        "paths": [
+          "index.html",
+          "app.js",
+          "data.js",
+          "live-body.html",
+          "live-body.js"
+        ]
+      },
+      "packaging": [
+        "Dockerfile"
+      ],
+      "status": "SOURCE_PRESENT"
+    },
+    {
+      "repository": "szl-holdings/szl-second-brain",
+      "main_revision": "138208a6cc96948c9c9cdce28a45f005a18fce4a",
+      "backend": {
+        "language": "python",
+        "framework": "FastAPI/uvicorn",
+        "paths": [
+          "app.py",
+          "app_refinement.py",
+          "requirements.txt",
+          "pyproject.toml"
+        ]
+      },
+      "frontend": {
+        "framework": "static HTML/CSS/JavaScript",
+        "paths": [
+          "static/index.html",
+          "static/chamber.html"
+        ]
+      },
+      "packaging": [
+        "Dockerfile"
+      ],
+      "status": "SOURCE_PRESENT",
+      "note": "No dedicated SZLHOLDINGS Space was observed; public projection datasets are separate artifacts."
+    },
+    {
+      "repository": "szl-holdings/szl-khipu",
+      "main_revision": "8ba6893099aecfe1e7cced1b50075ccdd169e744",
+      "backend": {
+        "language": "python",
+        "framework": "Python package and HTTP application",
+        "paths": [
+          "szl_khipu/anatomy.py",
+          "szl_khipu/http_app.py",
+          "szl_khipu/formulas.py"
+        ]
+      },
+      "frontend": {
+        "framework": "static Space presentation",
+        "paths": [
+          "space/index.html",
+          "spaces"
+        ]
+      },
+      "packaging": [
+        "Dockerfile"
+      ],
+      "status": "SOURCE_PRESENT"
+    }
+  ],
+  "hf_alignment": [
+    {
+      "artifact": "SZLHOLDINGS/a11oy",
+      "kind": "space",
+      "observed_revision": "23b6f81f3dd6d5fefb7e212333a830a4306afc9d",
+      "github_source": "szl-holdings/a11oy@2ce00a0430088100a0d5f076d315bfd6e0e8e712",
+      "status": "SOURCE_BOUND_VERIFIED",
+      "evidence": "README.md, Dockerfile, serve.py, web/src/main.tsx, and requirements-runtime.txt byte-match the current GitHub source snapshot; runtime reported RUNNING with /data attached."
+    },
+    {
+      "artifact": "SZLHOLDINGS/szl-khipu",
+      "kind": "space",
+      "observed_revision": "62422bc56e048e800da5a1153a5faee85a61efa7",
+      "github_source": "szl-holdings/szl-khipu@8ba6893099aecfe1e7cced1b50075ccdd169e744",
+      "status": "SOURCE_BOUND_VERIFIED",
+      "evidence": "szl_khipu/anatomy.py, szl_khipu/http_app.py, and szl_khipu/formulas.py byte-match; the Space's flattened layout is a deployment adapter."
+    },
+    {
+      "artifact": "betterwithage/anatomy",
+      "kind": "space",
+      "observed_revision": "2cdb2244",
+      "github_source": "szl-holdings/anatomy@39a271820550ce1ead178e906de4f8f2674c8115",
+      "status": "SOURCE_BOUND_OUTSIDE_SZLHOLDINGS",
+      "evidence": "README.md, server.py, and Dockerfile match the GitHub source; the Space is owned by betterwithage, not SZLHOLDINGS. No transfer or overwrite was performed."
+    },
+    {
+      "artifact": "SZLHOLDINGS/szl-second-brain-inrepo",
+      "kind": "dataset",
+      "status": "PROJECTION_ARTIFACT_ONLY",
+      "evidence": "Dataset presence does not establish a deployed frontend/backend or replace the canonical GitHub source."
+    },
+    {
+      "artifact": "SZLHOLDINGS/SZL-Khipu-1.5B",
+      "kind": "model",
+      "status": "MODEL_ARTIFACT",
+      "evidence": "Model metadata and weights are not treated as application source."
+    },
+    {
+      "artifact": "SZLHOLDINGS/SZL-Forge-1.5B-ReceiptAgent",
+      "kind": "model",
+      "status": "MODEL_ARTIFACT",
+      "evidence": "Gated model artifact; no source-authority claim."
+    }
+  ],
+  "blockers": [
+    {
+      "id": "HF-ANATOMY-OWNER",
+      "status": "OWNER_REVIEW_REQUIRED",
+      "detail": "Anatomy runtime is source-bound to GitHub but its live Space is under betterwithage. Keep it read-only until the owner chooses whether to keep that ownership or establish a reviewed SZLHOLDINGS Space."
+    },
+    {
+      "id": "HF-SECOND-BRAIN-SPACE",
+      "status": "NO_SPACE_OBSERVED",
+      "detail": "No dedicated SZLHOLDINGS Second Brain Space was observed. Do not create a duplicate runtime without an explicit canonical deployment decision."
+    }
+  ],
+  "evidence": {
+    "github_api": [
+      "https://api.github.com/repos/szl-holdings/a11oy/contents/serve.py?ref=main",
+      "https://api.github.com/repos/szl-holdings/a11oy/contents/web/src/main.tsx?ref=main",
+      "https://api.github.com/repos/szl-holdings/anatomy/contents/server.py?ref=main",
+      "https://api.github.com/repos/szl-holdings/szl-second-brain/contents/app.py?ref=main",
+      "https://api.github.com/repos/szl-holdings/szl-khipu/contents/szl_khipu/http_app.py?ref=main"
+    ],
+    "huggingface": [
+      "https://huggingface.co/spaces/SZLHOLDINGS/a11oy",
+      "https://huggingface.co/spaces/SZLHOLDINGS/szl-khipu",
+      "https://huggingface.co/spaces/betterwithage/anatomy"
+    ]
+  }
+}
