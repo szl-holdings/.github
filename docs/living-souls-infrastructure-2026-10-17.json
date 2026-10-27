@@ -1,0 +1,79 @@
+{
+  "claim_boundaries": {
+    "meaning": "SNAPSHOT observation only. Not an SLA, quality certificate, or deploy authorization."
+  },
+  "cloudflare_api_control": "WAITING_STEPHEN",
+  "domains": {
+    "product": {
+      "edge": "cloudflare",
+      "host": "a-11-oy.com",
+      "http": 200,
+      "status": "LIVE"
+    },
+    "proof": {
+      "edge": "cloudflare",
+      "host": "a11oy.net",
+      "http": 200,
+      "origin": "github-pages",
+      "status": "LIVE"
+    }
+  },
+  "evidence_class": "SNAPSHOT",
+  "ha_alternatives": {
+    "lambda_labs": {
+      "a6000_list_price_usd_per_hr": 1.09,
+      "house_keys": false,
+      "live_instance": false,
+      "status": "EVALUATION_ONLY"
+    },
+    "tensordock": {
+      "house_keys": false,
+      "live_instance": false,
+      "status": "EVALUATION_ONLY"
+    }
+  },
+  "hf_public_counts_api": {
+    "datasets": 37,
+    "models": 48,
+    "spaces": 38
+  },
+  "networking": {
+    "infiniband_hetzner_to_massed": false,
+    "infiniband_note": "InfiniBand is a within-cluster interconnect on some Lambda cluster SKUs. It is not a fabric between Hetzner HQ and Massed."
+  },
+  "nodes": {
+    "living_souls_hq": {
+      "builder_sandboxes": 120,
+      "gpu": null,
+      "host": "ubuntu-128gb-ash-1",
+      "pm2_online": 735,
+      "provider": "hetzner_cloud",
+      "public_ipv4": "5.161.126.99",
+      "ram_gib": 122,
+      "role": "pulse_memory_sandboxes",
+      "status": "LIVE",
+      "think_online": 108,
+      "vcpu": 32
+    },
+    "massed_a6000_mouth": {
+      "gpu": "NVIDIA RTX A6000 48GB",
+      "health": "ok",
+      "instance_id": "d1a50da9-f615-4475-8a5b-03fc8fe96f67",
+      "list_price_usd_per_hr": 0.57,
+      "model": "Ternary-Bonsai-2-27B-PQ2_0",
+      "mouth": "http://64.247.206.118:8080",
+      "provider": "massed_compute",
+      "public_ipv4": "64.247.206.118",
+      "role": "stateless_inference_mouth",
+      "status": "LIVE",
+      "tribe_bonsai": 1
+    }
+  },
+  "observed_at": "2026-10-17T15:38:34Z",
+  "observer": "alloyscape-house-caretaker",
+  "organization": {
+    "github": "szl-holdings",
+    "huggingface": "SZLHOLDINGS"
+  },
+  "schema": "szl.estate.infrastructure_observation/v1"
+}
