@@ -1,0 +1,540 @@
+{
+  "schema": "szl.source-hf-alignment/v1",
+  "observed_at": "2026-10-27",
+  "authority_order": [
+    "https://github.com/szl-holdings",
+    "https://huggingface.co/SZLHOLDINGS",
+    "https://a-11-oy.com",
+    "https://a11oy.net"
+  ],
+  "source_of_truth": "GitHub",
+  "hub_role": "Hugging Face is the published artifact and runtime mirror; it is not the canonical source tree.",
+  "rules": [
+    "Every product or service entry must identify its GitHub source repository.",
+    "Python backend source and frontend source are recorded separately; libraries, kernels, proof repositories, and API-only services may explicitly declare that a frontend is not required.",
+    "A Hub artifact is aligned only after its card names the GitHub source, the publisher path is identified, and immutable source/runtime evidence is available.",
+    "UNKNOWN, UNAVAILABLE, LINKED_NOT_PUBLISHED, and EVALUATION remain explicit states; reachability is not proof of parity or readiness.",
+    "Provider writes remain review-gated; this manifest and the registry are inspection and validation inputs, not permission to publish or mutate Hub assets."
+  ],
+  "direct_space_registry_candidates": [
+    {
+      "github": "szl-holdings/a11oy",
+      "hf": "SZLHOLDINGS/a11oy",
+      "dockerfile": "Dockerfile",
+      "source_mode": "direct"
+    },
+    {
+      "github": "szl-holdings/killinchu",
+      "hf": "SZLHOLDINGS/killinchu",
+      "dockerfile": "Dockerfile",
+      "source_mode": "direct"
+    },
+    {
+      "github": "szl-holdings/szl-command-lab",
+      "hf": "SZLHOLDINGS/szl-command-lab",
+      "dockerfile": "Dockerfile",
+      "source_mode": "direct"
+    },
+    {
+      "github": "szl-holdings/szl-frontier",
+      "hf": "SZLHOLDINGS/szl-frontier",
+      "dockerfile": "Dockerfile",
+      "source_mode": "direct"
+    },
+    {
+      "github": "szl-holdings/lyte-services",
+      "hf": "SZLHOLDINGS/lyte",
+      "dockerfile": "Dockerfile",
+      "source_mode": "delegated-publisher"
+    },
+    {
+      "github": "szl-holdings/ayllu",
+      "hf": "SZLHOLDINGS/ayllu",
+      "dockerfile": "Dockerfile",
+      "source_mode": "direct"
+    }
+  ],
+  "entries": [
+    {
+      "github_repo": "szl-holdings/szl-platform",
+      "role": "python_engineering_layer",
+      "source_status": "PRESENT",
+      "backend": {
+        "required": true,
+        "language": [
+          "python"
+        ],
+        "verified_paths": [
+          "pyproject.toml",
+          "packages/",
+          "Makefile"
+        ]
+      },
+      "frontend": {
+        "required": false,
+        "mode": "none",
+        "reason": "Shared Python receipts, payload, audit, and control-plane packages."
+      },
+      "hf_artifacts": [],
+      "alignment": "SOURCE_ONLY",
+      "verification": [
+        "make install",
+        "make test"
+      ]
+    },
+    {
+      "github_repo": "szl-holdings/platform",
+      "role": "product_monorepo",
+      "source_status": "PRESENT",
+      "backend": {
+        "required": true,
+        "language": [
+          "python",
+          "typescript"
+        ],
+        "verified_paths": [
+          "pyproject.toml",
+          "apps/",
+          "services/",
+          "workers/"
+        ]
+      },
+      "frontend": {
+        "required": true,
+        "language": [
+          "typescript",
+          "react"
+        ],
+        "verified_paths": [
+          "package.json",
+          "lib/",
+          "packages/"
+        ]
+      },
+      "hf_artifacts": [],
+      "alignment": "SHARED_SOURCE",
+      "verification": [
+        "pnpm install",
+        "pnpm lint:ci",
+        "pnpm typecheck",
+        "pnpm test"
+      ]
+    },
+    {
+      "github_repo": "szl-holdings/a11oy",
+      "role": "governed_command_center",
+      "source_status": "PRESENT",
+      "backend": {
+        "required": true,
+        "language": [
+          "python"
+        ],
+        "verified_paths": [
+          "Dockerfile",
+          "organs/",
+          "routers/",
+          "organs/amaru/serve.py",
+          "organs/sentra/serve.py",
+          "scripts/"
+        ]
+      },
+      "frontend": {
+        "required": true,
+        "language": [
+          "typescript",
+          "react"
+        ],
+        "verified_paths": [
+          "web/src/main.tsx",
+          "web/console/src/main.tsx",
+          "organs/sentra/web/src/"
+        ]
+      },
+      "hf_artifacts": [
+        {
+          "repo_id": "SZLHOLDINGS/a11oy",
+          "kind": "space",
+          "source_mode": "direct"
+        }
+      ],
+      "alignment": "SOURCE_BOUND",
+      "verification": [
+        "pnpm test:doctrine",
+        "pnpm typecheck:doctrine",
+        "pnpm payload:verify",
+        "pnpm payload:huggingface",
+        "pnpm payload:bundle:verify"
+      ]
+    },
+    {
+      "github_repo": "szl-holdings/killinchu",
+      "role": "cyber_physical_resilience",
+      "source_status": "PRESENT",
+      "backend": {
+        "required": true,
+        "language": [
+          "python"
+        ],
+        "verified_paths": [
+          "Dockerfile",
+          "killinchu_backend.py",
+          "szl_unay_routes.py",
+          "khipu_lmdb/"
+        ]
+      },
+      "frontend": {
+        "required": true,
+        "language": [
+          "html",
+          "css",
+          "prebuilt-react"
+        ],
+        "verified_paths": [
+          "static/",
+          "deploy/space/"
+        ]
+      },
+      "hf_artifacts": [
+        {
+          "repo_id": "SZLHOLDINGS/killinchu",
+          "kind": "space",
+          "source_mode": "direct"
+        }
+      ],
+      "alignment": "SOURCE_BOUND",
+      "verification": [
+        "python -m compileall",
+        "pytest",
+        "HF universal frontend checks"
+      ]
+    },
+    {
+      "github_repo": "szl-holdings/szl-command-lab",
+      "role": "estate_atlas",
+      "source_status": "PRESENT",
+      "backend": {
+        "required": true,
+        "language": [
+          "python"
+        ],
+        "verified_paths": [
+          "Dockerfile",
+          "server.py",
+          "gateway.py"
+        ]
+      },
+      "frontend": {
+        "required": true,
+        "language": [
+          "typescript",
+          "react"
+        ],
+        "verified_paths": [
+          "src/",
+          "src/router.tsx",
+          "src/components/",
+          "public/"
+        ]
+      },
+      "hf_artifacts": [
+        {
+          "repo_id": "SZLHOLDINGS/szl-command-lab",
+          "kind": "space",
+          "source_mode": "direct"
+        }
+      ],
+      "alignment": "SOURCE_BOUND",
+      "verification": [
+        "pytest",
+        "Docker build",
+        "Space runtime/readiness readback"
+      ]
+    },
+    {
+      "github_repo": "szl-holdings/szl-frontier",
+      "role": "governed_memory_plane",
+      "source_status": "PRESENT",
+      "backend": {
+        "required": true,
+        "language": [
+          "python",
+          "typescript"
+        ],
+        "verified_paths": [
+          "python/",
+          "src/routes/api/",
+          "src/lib/frontier/"
+        ]
+      },
+      "frontend": {
+        "required": true,
+        "language": [
+          "typescript",
+          "react"
+        ],
+        "verified_paths": [
+          "src/",
+          "src/router.tsx",
+          "src/routes/",
+          "public/"
+        ]
+      },
+      "hf_artifacts": [
+        {
+          "repo_id": "SZLHOLDINGS/szl-frontier",
+          "kind": "space",
+          "source_mode": "direct"
+        }
+      ],
+      "alignment": "SOURCE_BOUND",
+      "verification": [
+        "npm ci",
+        "npm run typecheck",
+        "npm run build",
+        "HF deployment.json readback"
+      ]
+    },
+    {
+      "github_repo": "szl-holdings/szl-forge",
+      "role": "training_qualification_and_inference",
+      "source_status": "PRESENT",
+      "backend": {
+        "required": true,
+        "language": [
+          "python"
+        ],
+        "verified_paths": [
+          "model-lab/src/szl_model_lab/app.py",
+          "khipu/serve_khipu.py",
+          "spaces/szl-model-inference-lab/"
+        ]
+      },
+      "frontend": {
+        "required": true,
+        "language": [
+          "html",
+          "css",
+          "python-rendered"
+        ],
+        "verified_paths": [
+          "spaces/szl-model-inference-lab/README.md",
+          "spaces/szl-model-inference-lab/"
+        ]
+      },
+      "hf_artifacts": [
+        {
+          "repo_id": "SZLHOLDINGS/szl-model-inference-lab",
+          "kind": "space",
+          "source_mode": "subdirectory_deploy"
+        },
+        {
+          "repo_id": "SZLHOLDINGS/SZL-Khipu-1.5B",
+          "kind": "model",
+          "source_mode": "qualified_artifact"
+        },
+        {
+          "repo_id": "SZLHOLDINGS/SZL-Forge-1.5B-ReceiptAgent",
+          "kind": "model",
+          "source_mode": "qualified_artifact"
+        }
+      ],
+      "alignment": "SOURCE_BOUND_WITH_QUALIFICATION",
+      "verification": [
+        "python -m compileall",
+        "pytest",
+        "model-source binding checks",
+        "Space build-info readback"
+      ]
+    },
+    {
+      "github_repo": "szl-holdings/lyte-services",
+      "role": "business_and_agent_observability",
+      "source_status": "PRESENT",
+      "backend": {
+        "required": true,
+        "language": [
+          "python"
+        ],
+        "verified_paths": [
+          "Dockerfile",
+          "pyproject.toml",
+          "lyte/app.py",
+          "lyte_engine/",
+          "lyte_api/"
+        ]
+      },
+      "frontend": {
+        "required": true,
+        "language": [
+          "html",
+          "css",
+          "python-rendered"
+        ],
+        "verified_paths": [
+          "space/",
+          "tools/verify_frontend.py"
+        ]
+      },
+      "hf_artifacts": [
+        {
+          "repo_id": "SZLHOLDINGS/lyte",
+          "kind": "space",
+          "source_mode": "delegated_publisher"
+        }
+      ],
+      "alignment": "SOURCE_BOUND_WITH_DELEGATED_PUBLISHER",
+      "verification": [
+        "pytest",
+        "python tools/verify_frontend.py",
+        "source_revision and build-receipt readback"
+      ]
+    },
+    {
+      "github_repo": "szl-holdings/vertical-services",
+      "role": "shared_vertical_fastapi_fabric",
+      "source_status": "PRESENT",
+      "backend": {
+        "required": true,
+        "language": [
+          "python"
+        ],
+        "verified_paths": [
+          "services/*/app.py",
+          "frontier_fabric/",
+          "deploy/Dockerfile",
+          ".github/workflows/hf-space.yml"
+        ]
+      },
+      "frontend": {
+        "required": false,
+        "mode": "space_presentation",
+        "reason": "API-first service fabric; presentation is deployed through the Space and vertical consumers."
+      },
+      "hf_artifacts": [
+        {
+          "repo_id": "SZLHOLDINGS/vertical-services",
+          "kind": "space",
+          "source_mode": "direct_deploy_subdirectory"
+        }
+      ],
+      "alignment": "SOURCE_BOUND",
+      "verification": [
+        "python -m compileall",
+        "pytest",
+        "docker build --file deploy/Dockerfile",
+        "runtime identity verification"
+      ]
+    },
+    {
+      "github_repo": "szl-holdings/szl-real-estate",
+      "role": "terra_backend_and_static_frontdoor",
+      "source_status": "PRESENT",
+      "backend": {
+        "required": true,
+        "language": [
+          "python"
+        ],
+        "verified_paths": [
+          "pyproject.toml",
+          "szl_re/",
+          "app.py",
+          "Dockerfile"
+        ]
+      },
+      "frontend": {
+        "required": true,
+        "language": [
+          "html",
+          "python-rendered"
+        ],
+        "verified_paths": [
+          "index.html",
+          "app.py"
+        ]
+      },
+      "hf_artifacts": [
+        {
+          "repo_id": "SZLHOLDINGS/terra",
+          "kind": "space",
+          "source_mode": "a11oy_delegated_publisher",
+          "status": "LINKED_NOT_PUBLISHED_UNLESS_RECEIPTED"
+        }
+      ],
+      "alignment": "LINKED_NOT_PUBLISHED",
+      "verification": [
+        "pytest",
+        "python scripts/verify_terra_delegation.py",
+        "publisher and live deployment receipt readback"
+      ]
+    },
+    {
+      "github_repo": "szl-holdings/ayllu",
+      "role": "agent_counsel_and_psyche",
+      "source_status": "PRESENT",
+      "backend": {
+        "required": true,
+        "language": [
+          "python"
+        ],
+        "verified_paths": [
+          "pyproject.toml",
+          "app.py",
+          "ayllu/",
+          ".hf-space.json"
+        ]
+      },
+      "frontend": {
+        "required": true,
+        "language": [
+          "html",
+          "python-rendered"
+        ],
+        "verified_paths": [
+          "ayllu/space.py",
+          "app.py"
+        ]
+      },
+      "hf_artifacts": [
+        {
+          "repo_id": "SZLHOLDINGS/ayllu",
+          "kind": "space",
+          "source_mode": "direct"
+        }
+      ],
+      "alignment": "SOURCE_BOUND",
+      "verification": [
+        "pytest",
+        "python -m compileall",
+        "HF space smoke paths from .hf-space.json"
+      ]
+    },
+    {
+      "github_repo": "szl-holdings/szl-second-brain",
+      "role": "memory_engine",
+      "source_status": "PRESENT",
+      "backend": {
+        "required": true,
+        "language": [
+          "python"
+        ],
+        "verified_paths": [
+          "pyproject.toml",
+          "frontier/"
+        ]
+      },
+      "frontend": {
+        "required": false,
+        "mode": "none",
+        "reason": "Memory engine is consumed by the frontier and vertical surfaces."
+      },
+      "hf_artifacts": [
+        {
+          "repo_id": "SZLHOLDINGS/szl-second-brain-inrepo",
+          "kind": "dataset",
+          "source_mode": "consumed_by_frontier"
+        }
+      ],
+      "alignment": "SOURCE_BOUND_BY_CONSUMER"
+    }
+  ]
+}
