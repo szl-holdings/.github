@@ -22,8 +22,10 @@ Python.
 
 ## Current alignment
 
-- SZLHOLDINGS/a11oy is source-bound to szl-holdings/a11oy and its observed
-  runtime revision matches the recorded key-file snapshot.
+- SZLHOLDINGS/a11oy contains the Python/static deployment overlay for
+  szl-holdings/a11oy. GitHub remains the full frontend source of truth, and
+  the observed runtime source marker is stale until the protected sync run
+  completes its independent readback.
 - SZLHOLDINGS/szl-khipu is source-bound to szl-holdings/szl-khipu; its
   flattened Space layout is a deployment adapter.
 - betterwithage/anatomy matches szl-holdings/anatomy, but the Space is
