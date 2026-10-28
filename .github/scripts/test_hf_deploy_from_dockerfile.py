@@ -18,10 +18,12 @@ Runs with NO network (derivation + expansion are pure stdlib).
 from __future__ import annotations
 
 import importlib.util
+import copy
 import json
 import os
 import sys
 import tempfile
+import threading
 import types
 import unittest
 from unittest import mock
@@ -1424,6 +1426,319 @@ class TestDurableTransaction(unittest.TestCase):
         self.interrupted()
         with self.assertRaises(dep.DeployContractError):
             dep.reconcile_transaction(self.path, "SZLHOLDINGS/a11oy")
+
+
+class TestAuthenticatedRuntimeBinding(unittest.TestCase):
+    def derive_fixture(self, extras=None):
+        temp = tempfile.TemporaryDirectory()
+        self.addCleanup(temp.cleanup)
+        root = os.path.join(temp.name, "payload")
+        os.mkdir(root)
+        docker, metadata = self.fixture()
+        contents = {name: name for name in metadata}
+        contents.update({"Dockerfile": docker, **(extras or {})})
+        for name, content in contents.items():
+            path = os.path.join(root, *name.split("/"))
+            os.makedirs(os.path.dirname(path), exist_ok=True)
+            with open(path, "w", encoding="utf-8", newline="\n") as fh:
+                fh.write(content)
+        env = {"GITHUB_RUN_ID": "123", "GITHUB_RUN_ATTEMPT": "2", "RUNTIME_IDENTITY_PUBLISHER_SHA": "c" * 40}
+        patch = mock.patch.dict(os.environ, env)
+        patch.start()
+        self.addCleanup(patch.stop)
+        args = types.SimpleNamespace(repo_root=root, dockerfile_path="Dockerfile", include_readme=False,
+            readme_path="README.md", github_repo="szl-holdings/a11oy", hf_repo="SZLHOLDINGS/a11oy",
+            ref="a" * 40, source_sha="a" * 40, runtime_identity=True, require_default_branch_tip=True,
+            source_revision_file="", manifest_out="", smoke_paths='["/"]', dry_run=False, prune=False)
+        return args, temp.name
+
+    def approved_fixture(self):
+        args, evidence = self.derive_fixture()
+        manifest, _ = dep.derive(args)
+        manifest["manifest_sha256"] = dep.manifest_identity(manifest)
+        args.approved_manifest = os.path.join(evidence, "approved.json")
+        args.expected_hf_parent = "b" * 40
+        args.operation_id = "d" * 64
+        args.expected_manifest_sha256 = manifest["manifest_sha256"]
+        args.transaction_journal = os.path.join(evidence, "operation.json")
+        self.write_plan(args, manifest)
+        return args, manifest
+
+    def write_plan(self, args, manifest):
+        with open(args.approved_manifest, "w", encoding="utf-8") as fh:
+            json.dump(manifest, fh)
+
+    def assert_transaction_refused_before_effect(self, args):
+        with mock.patch.object(dep, "_http") as network, mock.patch.object(dep, "commit_with_transaction") as commit:
+            with self.assertRaises(dep.DeployContractError):
+                dep.deploy(args)
+            network.assert_not_called()
+            commit.assert_not_called()
+        self.assertFalse(os.path.exists(args.transaction_journal))
+
+    def fixture(self):
+        names = ["observer_runtime.py", "szl_runtime_identity.py", "serve.py", "gdw_runtime.py",
+                 ".github/workflows/hf-sync.yml", "console/index.html", "later.html"]
+        files = {name: {"sha256": dep.sha256(name.encode()), "size": len(name)} for name in names}
+        docker = ("FROM python AS ignored\nCOPY later.html /app/ignored\n"
+                  "FROM python AS runtime\nWORKDIR /app\n"
+                  "COPY observer_runtime.py szl_runtime_identity.py serve.py gdw_runtime.py ./\n"
+                  "COPY .github/workflows/hf-sync.yml ./.github/scripts/\n"
+                  "COPY console/ ./static/\nCOPY later.html ./static/index.html\n"
+                  "COPY .szl-runtime-marker.json /tmp/\n"
+                  "RUN python <<'PY'\nfrom pathlib import Path\nPY\n")
+        return docker, files
+
+    def test_final_stage_mapping_preserves_overwrites_and_ignores_python_import(self):
+        docker, files = self.fixture()
+        catalog = dep.runtime_copy_catalog(docker, files)
+        self.assertNotIn("ignored", catalog)
+        self.assertEqual(catalog["static/index.html"]["source_path"], "later.html")
+        self.assertEqual(catalog[".github/scripts/hf-sync.yml"]["source_path"], ".github/workflows/hf-sync.yml")
+        self.assertNotIn(dep.RUNTIME_MARKER, catalog)  # marker is bound by the signed subject
+
+    def test_existing_copy_directory_without_slash_keeps_file_basename(self):
+        docker, files = self.fixture()
+        catalog = dep.runtime_copy_catalog(docker.replace("COPY later.html ./static/index.html", "COPY later.html ./static"), files)
+        self.assertEqual(catalog["static/later.html"]["source_path"], "later.html")
+        self.assertNotIn("static", catalog)
+
+    def test_workdir_and_nested_copy_parents_are_known_directories(self):
+        docker, files = self.fixture()
+        for addition, expected in (("WORKDIR /app/new\nCOPY later.html .\n", "new/later.html"),
+                ("COPY later.html /app/parent/child/file.html\nCOPY serve.py /app/parent\n", "parent/serve.py")):
+            with self.subTest(addition=addition):
+                catalog = dep.runtime_copy_catalog(docker + addition, files)
+                self.assertIn(expected, catalog)
+        for addition in ("COPY later.html /app/file\nCOPY console/ /app/file\n",
+                         "COPY later.html /app/file\nWORKDIR /app/file/nested\n"):
+            with self.subTest(addition=addition), self.assertRaises(dep.DeployContractError):
+                dep.runtime_copy_catalog(docker + addition, files)
+
+    def test_effective_ignore_filters_directory_members_and_honors_precedence(self):
+        args, _ = self.derive_fixture({"console/ignored.txt": "ignored", ".dockerignore": "console/ignored.txt\n"})
+        manifest, files = dep.derive(args)
+        self.assertIn("console/ignored.txt", files)  # source publication and image COPY are distinct
+        self.assertNotIn("static/ignored.txt", manifest["runtime_identity"]["catalog"])
+        with open(os.path.join(args.repo_root, "Dockerfile.dockerignore"), "w") as fh:
+            fh.write("# Dockerfile-specific file takes precedence\n")
+        manifest, _ = dep.derive(args)
+        self.assertIn("static/ignored.txt", manifest["runtime_identity"]["catalog"])
+
+    def test_ordered_ignore_exceptions_restore_children_and_literals_are_rooted(self):
+        args, _ = self.derive_fixture({"console/ignored.txt": "excluded", "console/keep.txt": "included",
+            ".dockerignore": "console\n!console/keep.txt\n!console/index.html\nignored.txt\n"})
+        manifest, _ = dep.derive(args)
+        self.assertIn("static/keep.txt", manifest["runtime_identity"]["catalog"])
+        self.assertNotIn("static/ignored.txt", manifest["runtime_identity"]["catalog"])
+        with open(os.path.join(args.repo_root, ".dockerignore"), "w") as fh:
+            fh.write("ignored.txt\n")
+        manifest, _ = dep.derive(args)
+        self.assertIn("static/ignored.txt", manifest["runtime_identity"]["catalog"])
+        with open(os.path.join(args.repo_root, ".dockerignore"), "w") as fh:
+            fh.write("**/ignored.txt\n")
+        manifest, _ = dep.derive(args)
+        self.assertNotIn("static/ignored.txt", manifest["runtime_identity"]["catalog"])
+
+    def test_ignored_required_explicit_source_and_unsupported_ignore_fail_closed(self):
+        args, _ = self.derive_fixture()
+        for pattern in (".github/*\n", "serve.py\n", "console/[ab].txt\n", "console/a**b\n", "console/\\x\n"):
+            with self.subTest(pattern=pattern):
+                with open(os.path.join(args.repo_root, ".dockerignore"), "w") as fh:
+                    fh.write(pattern)
+                with self.assertRaises(dep.DeployContractError):
+                    dep.derive(args)
+
+    def test_approved_transaction_reuses_nonce_but_rederives_exact_plan(self):
+        args, plan = self.approved_fixture()
+        with mock.patch.object(dep.secrets, "token_hex", side_effect=AssertionError("must preserve approved nonce")):
+            fresh, files = dep.derive(args)
+        self.assertEqual(fresh["runtime_identity"], plan["runtime_identity"])
+        self.assertEqual(files[dep.RUNTIME_MARKER], plan["files"][dep.RUNTIME_MARKER])
+        self.assertEqual(dep.manifest_identity(fresh), args.expected_manifest_sha256)
+        self.assertIsNotNone(dep.transaction_options(args, fresh))
+        self.assertFalse(os.path.exists(args.transaction_journal))
+
+    def test_approved_plan_tampering_and_live_source_drift_fail_before_effect(self):
+        args, plan = self.approved_fixture()
+        for change in (lambda p: p["runtime_identity"].update(nonce="e" * 64),
+                       lambda p: p["files"]["serve.py"].update(size=0)):
+            changed = copy.deepcopy(plan); change(changed)
+            self.write_plan(args, changed)
+            self.assert_transaction_refused_before_effect(args)
+        self.write_plan(args, plan)
+        with open(os.path.join(args.repo_root, "serve.py"), "a") as fh:
+            fh.write("drift")
+        self.assert_transaction_refused_before_effect(args)
+
+    def test_self_consistent_plan_cannot_replace_current_context_or_catalog(self):
+        args, plan = self.approved_fixture()
+        changes = [("source_repository", "other/repo"), ("target", "SZLHOLDINGS/other"),
+            ("source_sha", "e" * 40), ("run_id", 124), ("run_attempt", 3), ("publisher_sha", "f" * 40),
+            ("nonce", "bad"), ("run_id", True), ("catalog", {"serve.py": {"size": 1}})]
+        for key, value in changes:
+            with self.subTest(key=key):
+                changed = copy.deepcopy(plan); changed["runtime_identity"][key] = value
+                changed["manifest_sha256"] = dep.manifest_identity(changed)
+                args.expected_manifest_sha256 = changed["manifest_sha256"]
+                self.write_plan(args, changed)
+                self.assert_transaction_refused_before_effect(args)
+
+    def test_approved_input_required_bounded_strict_and_not_overwritten(self):
+        args, plan = self.approved_fixture()
+        path = args.approved_manifest
+        args.approved_manifest = ""
+        self.assert_transaction_refused_before_effect(args)
+        args.approved_manifest = path
+        args.manifest_out = path
+        self.assert_transaction_refused_before_effect(args)
+        with open(path, encoding="utf-8") as fh:
+            self.assertEqual(json.load(fh), plan)
+        args.manifest_out = ""
+        for body in (b'{"schema":2,"schema":2}', b'{"x":NaN}', b'[]', b'[' * 1500 + b']' * 1500):
+            with open(path, "wb") as fh: fh.write(body)
+            self.assert_transaction_refused_before_effect(args)
+        with open(path, "wb") as fh:
+            fh.seek(16 * 1024 * 1024); fh.write(b"x")
+        self.assert_transaction_refused_before_effect(args)
+        args.runtime_identity = False
+        self.assert_transaction_refused_before_effect(args)
+
+    @unittest.skipUnless(hasattr(os, "mkfifo"), "POSIX FIFO required")
+    def test_approved_fifo_without_writer_is_rejected_without_blocking(self):
+        args, _ = self.approved_fixture()
+        os.unlink(args.approved_manifest)
+        os.mkfifo(args.approved_manifest)
+        failures = []
+        def attempt():
+            try:
+                dep.runtime_identity_marker(args)
+            except Exception as exc:
+                failures.append(exc)
+        worker = threading.Thread(target=attempt, daemon=True)
+        worker.start(); worker.join(timeout=2)
+        self.assertFalse(worker.is_alive(), "approved plan reader blocked on FIFO")
+        self.assertEqual(len(failures), 1)
+        self.assertIsInstance(failures[0], dep.DeployContractError)
+        self.assertFalse(os.path.exists(args.transaction_journal))
+
+    def test_approved_plan_nonfinite_exponent_is_refused_before_effect(self):
+        args, _ = self.approved_fixture()
+        with open(args.approved_manifest, "wb") as fh:
+            fh.write(b'{"schema":1e999}')
+        self.assert_transaction_refused_before_effect(args)
+
+    def test_unknown_copy_semantics_and_wrong_marker_are_rejected(self):
+        docker, files = self.fixture()
+        for mutation in ["COPY --from=builder /out /app/out\n", "ADD https://x.test/a /app/a\n",
+                         "COPY *.py /app/\n", "COPY serve.py /app/../bad\n"]:
+            with self.subTest(mutation=mutation), self.assertRaises(dep.DeployContractError):
+                dep.runtime_copy_catalog(docker + mutation, files)
+        with self.assertRaises(dep.DeployContractError):
+            dep.runtime_copy_catalog(docker.replace("COPY .szl-runtime-marker.json /tmp/", "COPY .szl-runtime-marker.json /app/"), files)
+
+    def test_marker_requires_canonical_exact_source_and_workflow_context(self):
+        args = types.SimpleNamespace(github_repo="szl-holdings/a11oy", hf_repo="SZLHOLDINGS/a11oy",
+                                     require_default_branch_tip=True, source_sha="a" * 40)
+        env = {"GITHUB_RUN_ID": "123", "GITHUB_RUN_ATTEMPT": "2", "RUNTIME_IDENTITY_PUBLISHER_SHA": "c" * 40}
+        with mock.patch.dict(os.environ, env):
+            marker = dep.runtime_identity_marker(args)
+            self.assertEqual(marker["run_id"], 123)
+            self.assertEqual(marker["run_attempt"], 2)
+            self.assertNotEqual(marker["nonce"], dep.runtime_identity_marker(args)["nonce"])
+            args.hf_repo = "SZLHOLDINGS/other"
+            with self.assertRaises(dep.DeployContractError):
+                dep.runtime_identity_marker(args)
+        with mock.patch.dict(os.environ, {}, clear=True), self.assertRaises(dep.DeployContractError):
+            dep.runtime_identity_marker(args)
+
+    def test_binding_never_claims_image_hardware_or_execution(self):
+        body = dep.runtime_binding({"runtime_identity": {"nonce": "d" * 64}, "hf_commit_oid": "b" * 40})
+        self.assertFalse(body["image_attestation"])
+        self.assertFalse(body["hardware_attestation"])
+        self.assertFalse(body["execution_authority"])
+        with self.assertRaises(dep.DeployContractError):
+            dep.runtime_binding({"runtime_identity": {}})
+
+    def test_signed_binding_upload_precedes_runtime_wait(self):
+        path = os.path.join(_HERE, "..", "workflows", "reusable-hf-deploy.yml")
+        with open(path, encoding="utf-8") as fh:
+            workflow = fh.read()
+        self.assertLess(workflow.index("Publish immutable runtime source binding before readiness"),
+                        workflow.index("Attest canonical runtime source binding"))
+        self.assertLess(workflow.index("Attest canonical runtime source binding"),
+                        workflow.index("Attest exact running commit, bytes, and smoke routes"))
+        self.assertIn("hf-runtime-identity-${{ github.run_id }}-${{ github.run_attempt }}", workflow)
+
+
+class TestRuntimeMarkerCollisions(unittest.TestCase):
+    # Reuse fixture builders, not their TestCase, so original tests are not
+    # inherited and executed twice.
+    fixture = TestAuthenticatedRuntimeBinding.fixture
+    derive_fixture = TestAuthenticatedRuntimeBinding.derive_fixture
+
+    def assert_marker_collision_refused(self, dockerfile, extras=None):
+        args, _ = self.derive_fixture({**(extras or {}), "Dockerfile": dockerfile})
+        with self.assertRaises(dep.DeployContractError):
+            dep.derive(args)
+
+    def test_preexisting_marker_directory_is_rejected(self):
+        dockerfile, _ = self.fixture()
+        self.assert_marker_collision_refused(dockerfile.replace(
+            "COPY .szl-runtime-marker.json /tmp/\n",
+            "COPY later.html /tmp/.szl-runtime-marker.json/\n"
+            "COPY .szl-runtime-marker.json /tmp/\n",
+        ))
+
+    def test_later_copy_overwriting_marker_is_rejected(self):
+        dockerfile, _ = self.fixture()
+        self.assert_marker_collision_refused(
+            dockerfile + "COPY later.html /tmp/.szl-runtime-marker.json\n")
+
+    def test_workdir_below_marker_is_rejected(self):
+        dockerfile, _ = self.fixture()
+        workdir = "WORKDIR /tmp/.szl-runtime-marker.json/x\nWORKDIR /app\n"
+        for before in (True, False):
+            with self.subTest(before_marker=before):
+                modified = (dockerfile.replace(
+                    "COPY .szl-runtime-marker.json /tmp/\n",
+                    workdir + "COPY .szl-runtime-marker.json /tmp/\n",
+                ) if before else dockerfile + workdir)
+                self.assert_marker_collision_refused(modified)
+
+    def test_directory_copy_with_marker_basename_is_rejected(self):
+        dockerfile, _ = self.fixture()
+        self.assert_marker_collision_refused(
+            dockerfile + "COPY bundle/ /tmp/\n",
+            {"bundle/.szl-runtime-marker.json": "not publisher generated\n"},
+        )
+
+    def test_add_to_marker_ancestor_is_rejected(self):
+        dockerfile, _ = self.fixture()
+        self.assert_marker_collision_refused(
+            dockerfile + "ADD payload.tar /tmp/\n",
+            {"payload.tar": "opaque archive bytes\n"},
+        )
+
+    def test_cross_stage_copy_to_marker_ancestor_is_rejected(self):
+        dockerfile, _ = self.fixture()
+        self.assert_marker_collision_refused(
+            dockerfile + "COPY --from=ignored /out /tmp/\n")
+
+    def test_canonical_combined_tmp_copy_remains_valid(self):
+        dockerfile, _ = self.fixture()
+        args, _ = self.derive_fixture({
+            "Dockerfile": dockerfile.replace(
+                "COPY .szl-runtime-marker.json /tmp/\n",
+                "COPY requirements-runtime.txt .szl-runtime-marker.json /tmp/\n",
+            ),
+            "requirements-runtime.txt": "# runtime requirements\n",
+        })
+        manifest, files = dep.derive(args)
+        self.assertIn("requirements-runtime.txt", files)
+        self.assertIn(dep.RUNTIME_MARKER, files)
+        self.assertNotIn("requirements-runtime.txt", manifest["runtime_identity"]["catalog"])
+        self.assertNotIn(dep.RUNTIME_MARKER, manifest["runtime_identity"]["catalog"])
 
 
 if __name__ == "__main__":

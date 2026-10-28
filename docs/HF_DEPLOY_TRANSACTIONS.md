@@ -19,6 +19,17 @@ enable `--require-default-branch-tip`, and provide all four transaction options:
 - `--expected-manifest-sha256`: the inspected dry-run plan identity.
 - `--transaction-journal`: a new local evidence path outside the payload tree.
 
+When `--runtime-identity` is enabled, also supply `--approved-manifest` pointing
+to that frozen dry-run JSON. The reader is bounded to 16 MiB, requires strict
+JSON and the complete expected manifest digest, and checks the selector's
+canonical source, target, run, attempt and publisher against the current
+invocation. It reuses only the approved nonce. The catalog, source bytes and
+generated marker payload are derived again; the original full-plan comparison
+still rejects any drift before provider access or journal creation. A different
+run/attempt needs a fresh plan. `--manifest-out` cannot overwrite the approved
+input. Ordinary runtime-identity derivations continue to create a fresh nonce;
+omitting the approved input in transaction mode fails closed.
+
 The journal must have an existing parent directory. It cannot overwrite an
 earlier intent or be published as part of the image payload. The controller
 flushes and fsyncs `OUTCOME_UNCERTAIN` intent before its single `create_commit`
