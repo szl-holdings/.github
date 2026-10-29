@@ -157,7 +157,7 @@ The SZL substrate repos cross-link reciprocally. Two live products (a11oy + kill
 
 - [`a11oy`](https://github.com/szl-holdings/a11oy) — command platform; signed-receipt substrate with built-in reasoning, policy & operator capabilities (TypeScript packages, MCP server)
 - [`killinchu`](https://github.com/szl-holdings/killinchu) — drones & vessels field tool; counter-UAS + maritime picture; DSSE receipt per engagement
-- [`lutar-lean`](https://github.com/szl-holdings/lutar-lean) — Lean 4 + Mathlib proofs of the Λ aggregator (749 decl / 14 axioms / 163 sorries; 8 formulas proven {F1,F4,F7,F11,F12,F18,F19,F22}, Λ = Conjecture 1)
+- [`lutar-lean`](https://github.com/szl-holdings/lutar-lean) — Lean 4 + Mathlib proofs of the Λ aggregator (749 decl / 14 axioms / 163 sorries at the Doctrine v11 lock, `c7c0ba17`; 8 formulas proven {F1,F4,F7,F11,F12,F18,F19,F22}, Λ = Conjecture 1)
 - [`szl-papers`](https://github.com/szl-holdings/szl-papers) — DOI-pinned thesis lineage (v1 → v23)
 - [`ouroboros`](https://github.com/szl-holdings/ouroboros) — bounded-recursion runtime
 - [`platform`](https://github.com/szl-holdings/platform) — composing monorepo for the substrate runtime
@@ -168,7 +168,7 @@ The SZL substrate repos cross-link reciprocally. Two live products (a11oy + kill
 - [`developers`](https://github.com/szl-holdings/developers) · [`docs-site`](https://github.com/szl-holdings/docs-site) · [`szl-cookbook`](https://github.com/szl-holdings/szl-cookbook) — build-on-SZL hub, docs & recipes
 - [`szl-trust`](https://github.com/szl-holdings/szl-trust) — public proof portal · [`khipu-consensus`](https://github.com/szl-holdings/khipu-consensus) — BFT witnessing
 
-Org page: [github.com/szl-holdings](https://github.com/szl-holdings) · Doctrine v11 · 14 unique axioms · 749 declarations · 163 sorries · DOI [`10.5281/zenodo.20434276`](https://doi.org/10.5281/zenodo.20434276)
+Org page: [github.com/szl-holdings](https://github.com/szl-holdings) · Doctrine v11 lock (`c7c0ba17`): 14 unique axioms · 749 declarations · 163 sorries · DOI [`10.5281/zenodo.20434276`](https://doi.org/10.5281/zenodo.20434276)
 
 ## Science forum insight index
 
