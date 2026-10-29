@@ -71,7 +71,12 @@ CONTRACTS = (
         root="https://a11oy.net/",
         spectral_asset="https://a11oy.net/assets/szl-spectral-proof-v2.css",
         controller_asset="https://a11oy.net/scripts/szl-flow-proof.js",
-        root_literals=("/assets/szl-flow-proof.css",),
+        # Pages fingerprints the stylesheet href. The stable marker and the
+        # szl-flow-proof. prefix match both the source path and the hashed URL.
+        root_literals=(
+            'data-szl-proof-flow-asset="style"',
+            "/assets/szl-flow-proof.",
+        ),
         spectral_literals=("SZL Spectral Proof v2", ".szl-proof-spectral-field"),
         controller_literals=("SZL Proof Flow Shell v2", "/assets/szl-spectral-proof-v2.css"),
         advisory_health="https://a11oy.net/health.json",

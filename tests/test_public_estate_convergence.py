@@ -42,6 +42,23 @@ def test_product_root_tracks_the_live_a11oy_front_door() -> None:
     assert '"status":"ok"' in product.health_literals
 
 
+def test_proof_root_accepts_the_fingerprinted_stylesheet() -> None:
+    proof = convergence.CONTRACTS[1]
+    hashed = (
+        '<link rel="stylesheet" href="/assets/szl-flow-proof.'
+        'f6f4981719fabbc13fc209fce6af232f8ed53de73abea81a5ff12153b4cc2156.css" '
+        'data-szl-proof-flow-asset="style" />'
+    )
+    with mock.patch.object(
+        convergence,
+        "request",
+        return_value=(200, hashed.encode("utf-8"), {"Content-Type": "text/html"}, "https://a11oy.net/"),
+    ):
+        observed = convergence.probe(proof.root, proof.root_literals)
+    assert observed["verified"] is True
+    assert observed["required_literals"]["/assets/szl-flow-proof."] is True
+
+
 def test_probe_requires_http_200_bytes_and_every_literal() -> None:
     with mock.patch.object(
         convergence,
