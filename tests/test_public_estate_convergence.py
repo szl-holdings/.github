@@ -205,10 +205,20 @@ def test_rollback_leaves_main_and_live_workloads_untouched() -> None:
     )["source_mutation"] is False
 
 
-def test_drift_issue_lookup_does_not_shell_split_the_title() -> None:
+def test_drift_receipt_is_a_structured_log_without_an_issue_write() -> None:
     text = WORKFLOW_PATH.read_text(encoding="utf-8")
     assert '--search \\"$title in:title\\"' not in text
-    assert 'select(.title == "[runtime] Canonical public-origin drift")' in text
+    assert "gh issue" not in text
+    assert "issues: write" not in text.lower()
+    assert "contents: read" in text
+    assert "/tmp/public-origin-drift.json" in text
+    assert '"issue_write": False' in text
+    receipt = text.split("Emit the public-origin drift receipt", 1)[1].split(
+        "- name: Upload immutable convergence evidence", 1
+    )[0]
+    assert "set -euo pipefail" in receipt
+    assert "set +e" not in receipt
+    assert "exit 0" not in receipt
 
 
 if __name__ == "__main__":
