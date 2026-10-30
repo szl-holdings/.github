@@ -3,7 +3,11 @@ from __future__ import annotations
 
 import argparse
 import importlib.util
+import json
 import os
+import subprocess
+import sys
+import tempfile
 import unittest
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -112,6 +116,12 @@ class SourceBoundBaselineTests(unittest.TestCase):
             "compare": drift.compare,
             "candidate_managed_delta": drift.candidate_managed_delta,
             "source_probe_state": baseline.source_probe_state,
+            "fetch_github_file": drift.fetch_github_file,
+            "github_tree_remote": drift.github_tree_remote,
+            "hf_tree": drift.hf_tree,
+            "github_file_date": drift.github_file_date,
+            "hf_dir_dates": drift.hf_dir_dates,
+            "_http": drift._http,
         }
 
     def tearDown(self):
@@ -365,6 +375,165 @@ class SourceBoundBaselineTests(unittest.TestCase):
             "candidate-unresolved-copy-source", {item["kind"] for item in errors}
         )
 
+    def test_rejected_candidate_copy_source_is_not_ok(self):
+        self.install_clean()
+        drift.candidate_managed_delta = lambda *_args: {
+            "status": "invalid",
+            "new_unresolved_sources": [],
+            "candidate_rejected_copy_sources": ["../secret"],
+            "baseline_rejected_copy_sources": [],
+            "delta_count": 0,
+            "deltas": [],
+            "baseline_ref": self.SOURCE,
+            "candidate_ref": self.HEAD,
+        }
+        report, errors, _warns, candidate = baseline.source_bound_baseline_compare(
+            self.args()
+        )
+        self.assertEqual(candidate["status"], "invalid")
+        self.assertNotEqual(report["status"], "ok")
+        self.assertEqual(
+            [(item["kind"], item["path"]) for item in errors],
+            [("rejected-copy-source", "../secret")],
+        )
+
+    def test_rejected_baseline_copy_source_is_not_ok(self):
+        self.install_clean()
+        drift.candidate_managed_delta = lambda *_args: {
+            "status": "invalid",
+            "new_unresolved_sources": [],
+            "candidate_rejected_copy_sources": [],
+            "baseline_rejected_copy_sources": ["./"],
+            "delta_count": 0,
+            "deltas": [],
+            "baseline_ref": self.SOURCE,
+            "candidate_ref": self.HEAD,
+        }
+        report, errors, _warns, candidate = baseline.source_bound_baseline_compare(
+            self.args()
+        )
+        self.assertEqual(candidate["status"], "invalid")
+        self.assertNotEqual(report["status"], "ok")
+        self.assertEqual(
+            [(item["kind"], item["path"]) for item in errors],
+            [("rejected-copy-source", "./")],
+        )
+    def _install_real_plan(self, source_sha, candidate_sha, live_sha, source_df, candidate_df):
+        blobs = {}
+        trees = {}
+
+        def add(ref, dockerfile):
+            raw = {
+                "Dockerfile": dockerfile.encode("utf-8"),
+                "serve.py": b'print("serve")\n',
+                ".github/CODEOWNERS": b"* @fixture\n",
+                ".well-known/health": b"ok\n",
+            }
+            trees[ref] = {
+                path: drift.git_blob_sha1(data) for path, data in raw.items()
+            }
+            blobs[ref] = raw
+
+        add(source_sha, source_df)
+        add(candidate_sha, candidate_df)
+        drift.fetch_github_file = lambda _repo, ref, path: blobs[ref][path]
+        drift.github_tree_remote = lambda _repo, ref="main": dict(trees[ref])
+        drift.hf_tree = lambda _repo, ref="main": {
+            path: {"oid": sha, "lfs_oid": None, "size": len(blobs[source_sha][path])}
+            for path, sha in trees[source_sha].items()
+        }
+        drift.github_file_date = lambda *_args, **_kwargs: None
+        drift.hf_dir_dates = lambda *_args, **_kwargs: {}
+        drift._http = lambda *_args, **_kwargs: (_ for _ in ()).throw(
+            RuntimeError("network blocked")
+        )
+        drift.hf_space_state = lambda _repo: {
+            "observation_status": "stable",
+            "observation_count": 2,
+            "required_observation_count": 2,
+            "head_sha": live_sha,
+            "runtime_sha": live_sha,
+            "runtime_stage": "RUNNING",
+            "observations": [],
+        }
+        baseline.source_probe_state = lambda _repo, _path: {
+            "observation_status": "stable",
+            "observation_count": 2,
+            "required_observation_count": 2,
+            "source_revision": source_sha,
+            "observations": [],
+        }
+        drift.github_ref_is_ancestor = lambda *_args: (True, "ahead")
+        drift.compare = self.saved["compare"]
+        drift.candidate_managed_delta = self.saved["candidate_managed_delta"]
+
+    def test_omitted_unsafe_candidate_is_not_an_ok_plan(self):
+        source = "a" * 40
+        candidate = "b" * 40
+        live = "c" * 40
+        safe = "FROM scratch\nCOPY serve.py /app/serve.py\n"
+        self._install_real_plan(
+            source,
+            candidate,
+            live,
+            safe,
+            "FROM scratch\nCOPY ../secret /app/secret\n",
+        )
+        args = self.args()
+        args.trusted_base_ref = "d" * 40
+        args.candidate_ref = candidate
+        args.expected_source_ref = source
+        report, errors, _warns, plan = baseline.source_bound_baseline_compare(args)
+        self.assertEqual(plan["status"], "invalid")
+        self.assertEqual(plan["candidate_rejected_copy_sources"], ["../secret"])
+        self.assertNotEqual(report["status"], "ok")
+        self.assertIn("rejected-copy-source", {item["kind"] for item in errors})
+
+    def test_context_roots_and_dotted_controls_keep_their_kinds(self):
+        source = "a" * 40
+        candidate = "b" * 40
+        live = "c" * 40
+        safe = "FROM scratch\nCOPY serve.py /app/serve.py\n"
+        dotted = (
+            "FROM scratch\n"
+            "COPY .github /app/.github\n"
+            "COPY .well-known /app/.well-known\n"
+            "COPY ./.github /app/.github-again\n"
+        )
+        for spelling, dockerfile in (
+            (".", "FROM scratch\nCOPY . /app\n"),
+            ("./", "FROM scratch\nCOPY ./ /app\n"),
+        ):
+            self._install_real_plan(source, candidate, live, safe, dockerfile)
+            args = self.args()
+            args.trusted_base_ref = "d" * 40
+            args.candidate_ref = candidate
+            args.expected_source_ref = source
+            report, errors, _warns, plan = baseline.source_bound_baseline_compare(args)
+            self.assertEqual(plan["status"], "invalid", spelling)
+            self.assertEqual(
+                plan["candidate_unsupported_context_roots"], [spelling], spelling
+            )
+            self.assertEqual(plan["candidate_rejected_copy_sources"], [], spelling)
+            self.assertNotEqual(report["status"], "ok", spelling)
+            self.assertIn(
+                "context-root-unsupported", {item["kind"] for item in errors}, spelling
+            )
+            self.assertNotIn(
+                "missing-both", {item["kind"] for item in errors}, spelling
+            )
+        self._install_real_plan(source, candidate, live, dotted, dotted)
+        args = self.args()
+        args.trusted_base_ref = "d" * 40
+        args.candidate_ref = candidate
+        args.expected_source_ref = source
+        report, errors, _warns, plan = baseline.source_bound_baseline_compare(args)
+        self.assertEqual(errors, [])
+        self.assertEqual(report["status"], "ok")
+        self.assertEqual(plan["status"], "no-changes")
+        self.assertEqual(plan["candidate_unsupported_context_roots"], [])
+        self.assertEqual(plan["candidate_rejected_copy_sources"], [])
+
     def test_source_bound_module_contains_no_mutation_or_warn_only(self):
         with open(MODULE_PATH, encoding="utf-8") as handle:
             source = handle.read()
@@ -428,5 +597,158 @@ class ReusableWorkflowTests(unittest.TestCase):
         self.assertIn("retention-days: 90", self.workflow)
 
 
+
+def _source_bound_process_status():
+    try:
+        code = baseline.main()
+    except SystemExit as exc:
+        code = exc.code
+    if code is None:
+        return 0
+    return code if isinstance(code, int) else 1
+
+
+def _source_bound_exit_probe(argv):
+    """Run source-bound main() with network stubs and return its status."""
+    import urllib.request
+
+    if len(argv) != 1:
+        return 97
+    case = argv[0]
+    gh_repo = "fixture-owner/fixture-repo"
+    hf_repo = "fixture-owner/fixture-space"
+    source = "a" * 40
+    candidate = "b" * 40
+    live = "c" * 40
+    base = "d" * 40
+    safe = "FROM scratch\nCOPY serve.py /app/serve.py\n"
+    cases = {
+        "invalid": "FROM scratch\nCOPY ../secret /app/secret\n",
+        "mixed": "FROM scratch\nCOPY serve.py /app/serve.py\nCOPY ../secret /app/secret\n",
+        "all-rejected": "FROM scratch\nCOPY ../secret /etc/passwd /app/\n",
+        "dot": "FROM scratch\nCOPY . /app\n",
+        "dot-slash": "FROM scratch\nCOPY ./ /app\n",
+        "dotted": (
+            "FROM scratch\n"
+            "COPY .github /app/.github\n"
+            "COPY .well-known /app/.well-known\n"
+            "COPY ./.github /app/.github-again\n"
+        ),
+    }
+    if case not in cases:
+        return 97
+    baseline_df = cases["dotted"] if case == "dotted" else safe
+
+    def blobs_for(dockerfile):
+        blobs = {
+            "Dockerfile": dockerfile.encode("utf-8"),
+            "serve.py": b'print("serve")\n',
+            ".github/CODEOWNERS": b"* @fixture\n",
+            ".well-known/health": b"ok\n",
+            ".dockerignore": b"*\n",
+        }
+        shas = {path: drift.git_blob_sha1(data) for path, data in blobs.items()}
+        return blobs, shas
+
+    trees = {}
+    blobs_by_ref = {}
+    for ref, dockerfile in ((source, baseline_df), (candidate, cases[case])):
+        blobs, shas = blobs_for(dockerfile)
+        trees[ref] = shas
+        blobs_by_ref[ref] = blobs
+
+    def blocked(*_args, **_kwargs):
+        raise RuntimeError("network blocked")
+
+    urllib.request.urlopen = blocked
+    drift._http = blocked
+    drift.github_file_date = lambda *_args, **_kwargs: None
+    drift.hf_dir_dates = lambda *_args, **_kwargs: {}
+    drift.fetch_github_file = lambda _repo, ref, path: blobs_by_ref[ref][path]
+    drift.github_tree_remote = lambda _repo, ref="main": dict(trees[ref])
+    drift.hf_tree = lambda _repo, ref="main": {
+        path: {"oid": sha, "lfs_oid": None, "size": len(blobs_by_ref[source][path])}
+        for path, sha in trees[source].items()
+    }
+    drift.github_ref_is_ancestor = lambda *_args, **_kwargs: (True, "ahead")
+    drift.hf_space_state = lambda _repo, observation_count=2: {
+        "head_sha": live,
+        "runtime_sha": live,
+        "runtime_stage": "RUNNING",
+        "observation_status": "stable",
+        "observation_count": observation_count,
+        "required_observation_count": observation_count,
+        "observations": [{}, {}],
+    }
+    baseline.source_probe_state = lambda _repo, _path, observation_count=2: {
+        "observation_status": "stable",
+        "observation_count": observation_count,
+        "required_observation_count": observation_count,
+        "source_revision": source,
+        "observations": [],
+    }
+    sys.argv = [
+        "hf_source_bound_baseline.py",
+        "--github-repo", gh_repo,
+        "--hf-repo", hf_repo,
+        "--trusted-base-ref", base,
+        "--candidate-ref", candidate,
+        "--expected-source-ref", source,
+        "--source-probe-path", "/api/build-info",
+    ]
+    return _source_bound_process_status()
+
+
+class TestSourceBoundProcessExit(unittest.TestCase):
+    """The source-bound caller must fail closed without a warn-only flag."""
+
+    def _run(self, case):
+        env = os.environ.copy()
+        env["SZL_SOURCE_BOUND_EXIT_PROBE"] = "1"
+        env["PYTHONDONTWRITEBYTECODE"] = "1"
+        return subprocess.run(
+            [sys.executable, os.path.abspath(__file__), case],
+            cwd=HERE,
+            env=env,
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            timeout=30,
+        )
+
+    def test_invalid_plans_and_context_roots_exit_nonzero(self):
+        expected = {
+            "invalid": 1,
+            "mixed": 1,
+            "all-rejected": 1,
+            "dot": 1,
+            "dot-slash": 1,
+            "dotted": 0,
+        }
+        for case, code in expected.items():
+            with self.subTest(case=case):
+                completed = self._run(case)
+                self.assertEqual(
+                    completed.returncode,
+                    code,
+                    completed.stdout + "\n" + completed.stderr,
+                )
+                if code == 1:
+                    self.assertIn("\nFAIL:", "\n" + completed.stdout)
+                    self.assertNotIn("\nOK:", "\n" + completed.stdout)
+                else:
+                    self.assertIn("\nOK:", "\n" + completed.stdout)
+                    self.assertNotIn("\nFAIL:", "\n" + completed.stdout)
+                    self.assertNotIn("context-root-unsupported", completed.stdout)
+                    self.assertNotIn("rejected-copy-source", completed.stdout)
+                if case in {"dot", "dot-slash"}:
+                    self.assertIn("context-root-unsupported", completed.stdout)
+                    self.assertNotIn("missing-both", completed.stdout)
+                    self.assertNotIn("traversal", completed.stdout.lower())
+
+
 if __name__ == "__main__":
+    if os.environ.get("SZL_SOURCE_BOUND_EXIT_PROBE") == "1":
+        raise SystemExit(_source_bound_exit_probe(sys.argv[1:]))
     unittest.main(verbosity=2)
