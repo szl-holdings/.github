@@ -19,6 +19,7 @@ from __future__ import annotations
 import argparse
 import dataclasses
 import datetime as dt
+import hashlib
 import json
 import os
 import time
@@ -86,8 +87,100 @@ CONTRACTS = (
 )
 
 
+ROLLBACK = (
+    "Revert the review branch or close the PR. "
+    "Do not touch protected main or live workloads."
+)
+FORBIDDEN_RIGHTS = frozenset(
+    {"publish", "merge", "train", "dns", "credentials", "billing", "security-settings"}
+)
+
+
 def utc_now() -> str:
     return dt.datetime.now(dt.timezone.utc).isoformat().replace("+00:00", "Z")
+
+
+def canonical_payload(payload: Mapping[str, Any]) -> bytes:
+    return json.dumps(payload, sort_keys=True, separators=(",", ":")).encode("utf-8")
+
+
+def rights_state(contract: OriginContract) -> str:
+    if contract.repair is None:
+        return "OBSERVE"
+    if contract.repair == "A11OY_NET_PAGES_BUILD":
+        return "REPAIR_DECLARED"
+    return "BLOCKED"
+
+
+def rights_permit(state: str, right: str) -> bool:
+    if right in FORBIDDEN_RIGHTS or state == "BLOCKED":
+        return False
+    if state == "OBSERVE":
+        return right == "read"
+    if state == "REPAIR_DECLARED":
+        return right in {"read", "pages-build-request"}
+    return False
+
+
+def proof_envelope(observed: Mapping[str, Any]) -> dict[str, Any]:
+    payload = {
+        "bytes": observed.get("bytes"),
+        "http_status": observed.get("http_status"),
+        "required_literals": observed.get("required_literals"),
+        "url": observed.get("url"),
+        "verified": observed.get("verified"),
+    }
+    return {
+        "schema": "szl.public-estate-proof-envelope/v1",
+        "algorithm": "UNSIGNED",
+        "payload": payload,
+        "payload_sha256": hashlib.sha256(canonical_payload(payload)).hexdigest(),
+        "signed": False,
+        "source_mutation": False,
+    }
+
+
+def validate_signed_receipt(receipt: Mapping[str, Any]) -> dict[str, Any]:
+    payload = receipt.get("payload")
+    if not isinstance(payload, Mapping):
+        return {"valid": False, "signed": False, "reason": "PAYLOAD_ABSENT"}
+    digest = hashlib.sha256(canonical_payload(payload)).hexdigest()
+    if receipt.get("payload_sha256") != digest:
+        return {"valid": False, "signed": False, "reason": "PAYLOAD_HASH_MISMATCH"}
+    if receipt.get("algorithm") == "UNSIGNED" or receipt.get("signed") is not True:
+        return {"valid": False, "signed": False, "reason": "UNSIGNED"}
+    if receipt.get("algorithm") != "ed25519":
+        return {"valid": False, "signed": False, "reason": "ALGORITHM_UNACCEPTED"}
+    signature = receipt.get("signature")
+    if not isinstance(signature, str) or len(signature) < 64:
+        return {"valid": False, "signed": False, "reason": "SIGNATURE_ABSENT"}
+    return {"valid": False, "signed": False, "reason": "NO_PINNED_PUBLIC_KEY"}
+
+
+def parity_readback(
+    source_sha: str | None,
+    hf_sha: str | None,
+    runtime_sha: str | None,
+) -> dict[str, Any]:
+    pins = {
+        "source": (source_sha or "").strip(),
+        "hf": (hf_sha or "").strip(),
+        "runtime": (runtime_sha or "").strip(),
+    }
+    if any(not value for value in pins.values()):
+        state = "NOT_SUPPLIED"
+    elif len(set(pins.values())) == 1:
+        state = "MATCH"
+    else:
+        state = "DIVERGENT"
+    return {
+        "schema": "szl.public-estate-parity-readback/v1",
+        "pins": pins,
+        "state": state,
+        "source_mutation": False,
+        "hf_mutation": False,
+        "runtime_mutation": False,
+    }
 
 
 def token_from_environment() -> tuple[str | None, str | None]:
@@ -274,6 +367,18 @@ def main() -> int:
             "origins_not_operational": sum(1 for row in after if not row["operational"]),
             "complete": complete,
         },
+        "proof_envelopes": [
+            {"origin": row["name"], "root": proof_envelope(row["root"])} for row in after
+        ],
+        "parity_readback": parity_readback(
+            os.environ.get("SZL_PARITY_SOURCE_SHA"),
+            os.environ.get("SZL_PARITY_HF_SHA"),
+            os.environ.get("SZL_PARITY_RUNTIME_SHA"),
+        ),
+        "rights": [
+            {"origin": contract.name, "state": rights_state(contract)} for contract in CONTRACTS
+        ],
+        "rollback": ROLLBACK,
     }
     write_report(args.report, report)
     print(json.dumps(report, indent=2, sort_keys=True))

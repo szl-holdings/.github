@@ -122,6 +122,89 @@ def test_source_contains_no_content_dns_cloudflare_or_hf_mutator() -> None:
         assert fragment not in text
 
 
+def test_exact_head_parity_readback() -> None:
+    head = "9be0cdb392f5fba9225d7284813191578a14c766"
+    match = convergence.parity_readback(head, head, head)
+    assert match["state"] == "MATCH"
+    assert match["source_mutation"] is False
+    assert match["hf_mutation"] is False
+    assert match["runtime_mutation"] is False
+    drifted = convergence.parity_readback(head, head, "a" * 40)
+    assert drifted["state"] == "DIVERGENT"
+    assert convergence.parity_readback(head, "", head)["state"] == "NOT_SUPPLIED"
+
+
+def test_signed_receipt_validation_fails_closed() -> None:
+    payload = {"url": "https://a11oy.net/", "verified": True}
+    digest = convergence.hashlib.sha256(convergence.canonical_payload(payload)).hexdigest()
+    unsigned = convergence.proof_envelope(
+        {
+            "url": payload["url"],
+            "http_status": 200,
+            "bytes": 12,
+            "verified": True,
+            "required_literals": {},
+        }
+    )
+    assert unsigned["signed"] is False
+    assert unsigned["algorithm"] == "UNSIGNED"
+    assert convergence.validate_signed_receipt(unsigned)["reason"] == "UNSIGNED"
+    mismatched = {
+        "payload": payload,
+        "payload_sha256": "0" * 64,
+        "algorithm": "ed25519",
+        "signed": True,
+        "signature": "ab" * 32,
+    }
+    assert convergence.validate_signed_receipt(mismatched)["reason"] == "PAYLOAD_HASH_MISMATCH"
+    unbound = {
+        "payload": payload,
+        "payload_sha256": digest,
+        "algorithm": "ed25519",
+        "signed": True,
+        "signature": "ab" * 32,
+    }
+    result = convergence.validate_signed_receipt(unbound)
+    assert result["valid"] is False
+    assert result["reason"] == "NO_PINNED_PUBLIC_KEY"
+
+
+def test_rights_state_gate_blocks_undeclared_effects() -> None:
+    product, proof = convergence.CONTRACTS
+    assert convergence.rights_state(product) == "OBSERVE"
+    assert convergence.rights_state(proof) == "REPAIR_DECLARED"
+    blocked = convergence.OriginContract(
+        name="blocked.example",
+        root="https://blocked.example/",
+        spectral_asset="https://blocked.example/a",
+        controller_asset="https://blocked.example/b",
+        root_literals=(),
+        spectral_literals=(),
+        controller_literals=(),
+        advisory_health="https://blocked.example/health",
+        health_literals=(),
+        repair="UNDECLARED",
+    )
+    assert convergence.rights_state(blocked) == "BLOCKED"
+    for right in ("publish", "merge", "train", "dns", "credentials", "billing", "security-settings"):
+        assert convergence.rights_permit("OBSERVE", right) is False
+        assert convergence.rights_permit("REPAIR_DECLARED", right) is False
+        assert convergence.rights_permit("BLOCKED", right) is False
+    assert convergence.rights_permit("OBSERVE", "read") is True
+    assert convergence.rights_permit("REPAIR_DECLARED", "pages-build-request") is True
+    assert convergence.rights_permit("OBSERVE", "pages-build-request") is False
+
+
+def test_rollback_leaves_main_and_live_workloads_untouched() -> None:
+    assert "Do not touch protected main" in convergence.ROLLBACK
+    assert "close the PR" in convergence.ROLLBACK
+    text = MODULE_PATH.read_text(encoding="utf-8")
+    assert "source_mutation" in text
+    assert convergence.proof_envelope(
+        {"url": "https://a11oy.net/", "http_status": 200, "bytes": 1, "verified": False, "required_literals": {}}
+    )["source_mutation"] is False
+
+
 def test_drift_issue_lookup_does_not_shell_split_the_title() -> None:
     text = WORKFLOW_PATH.read_text(encoding="utf-8")
     assert '--search \\"$title in:title\\"' not in text
