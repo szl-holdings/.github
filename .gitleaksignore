@@ -1,0 +1,6 @@
+# Historical generic-api-key false positive.
+# docs/SOURCE_PARITY_MANIFEST_V1.json line 224 is a 40-hex revision id
+# in the field hf_api_revision, on commit 5561e45 only
+# (branch codex/source-parity-20261027, not an ancestor of main).
+# fetch-depth 0 plus git log --all makes the main gitleaks job scan it.
+5561e45b7f95a733976e1c418e736455b2e34da1:docs/SOURCE_PARITY_MANIFEST_V1.json:generic-api-key:224

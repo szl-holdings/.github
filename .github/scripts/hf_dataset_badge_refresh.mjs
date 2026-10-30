@@ -18,7 +18,8 @@ import { pathToFileURL } from "node:url";
 
 const TOKEN = process.env.HF_TOKEN || process.env.HUGGINGFACE_API_TOKEN;
 const HF = TOKEN ? { Authorization: "Bearer " + TOKEN } : {};
-const PUBLISH = process.argv.includes("--publish");
+const PUBLISH_REQUESTED = process.argv.includes("--publish");
+const PUBLISH = PUBLISH_REQUESTED && shouldPublish(process.env.EVENT_NAME, process.env.DRY_RUN);
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 
 // Lake README.md is part of one atomic, source-owned closed publication.
@@ -40,6 +41,38 @@ export function isSourceOwnedDataset(id) {
 export function assertBadgeWriteAllowed(id) {
   if (isSourceOwnedDataset(id)) {
     throw new Error(`${id}: badge write refused; dataset is source-owned`);
+  }
+}
+
+export function shouldPublish(eventName, dryRun) {
+  return eventName === "workflow_dispatch" && String(dryRun) !== "true";
+}
+
+function badgeValue(text, pattern) {
+  const match = pattern.exec(text);
+  return match ? match[2] : null;
+}
+
+function withoutFilesValue(text) {
+  const match = FILES_RE.exec(text);
+  if (!match) return null;
+  return text.slice(0, match.index) + match[1] + match[3] + text.slice(match.index + match[0].length);
+}
+
+// A publish may change the files-badge value and nothing else. License text,
+// body text, and a missing files badge are refused before any network write.
+export function assertFilesBadgeOnly(before, after) {
+  if (typeof before !== "string" || typeof after !== "string") {
+    throw new Error("badge preservation requires the previous and next card");
+  }
+  if (badgeValue(before, FILES_RE) === null || badgeValue(after, FILES_RE) === null) {
+    throw new Error("files badge missing; refusing card write");
+  }
+  if (badgeValue(before, LICENSE_RE) !== badgeValue(after, LICENSE_RE)) {
+    throw new Error("license badge change refused; card provenance preserved");
+  }
+  if (withoutFilesValue(before) !== withoutFilesValue(after)) {
+    throw new Error("card change outside the files badge refused");
   }
 }
 
@@ -89,12 +122,14 @@ async function countFiles(id) {
 export async function publishReadmeCommit({
   id,
   content,
+  previous,
   nfiles,
   license,
   fetch = globalThis.fetch,
   headers = HF,
 }) {
   assertBadgeWriteAllowed(id);
+  assertFilesBadgeOnly(previous, content);
   const body = [
     JSON.stringify({ key: "header", value: { summary: `docs: refresh badge stats (files=${nfiles}, license=${license})`, description: "Automated badge-row refresh from the live tree; body preserved verbatim." } }),
     JSON.stringify({ key: "file", value: { path: "README.md", content: Buffer.from(content).toString("base64"), encoding: "base64" } }),
@@ -103,6 +138,11 @@ export async function publishReadmeCommit({
 }
 
 async function main() {
+  if (PUBLISH_REQUESTED && !PUBLISH) {
+    console.error("REFUSING publish: only an explicit non-dry-run dispatch may commit a files badge");
+    process.exitCode = 1;
+    return;
+  }
   if (!TOKEN) {
     console.error("FATAL: HF_TOKEN is not set — cannot audit private datasets or commit. Refusing to run public-only.");
     process.exitCode = 1;
@@ -128,7 +168,10 @@ async function main() {
       const nfiles = await countFiles(id);
       const lic = (txt.match(/^license:\s*(\S+)/m) || [])[1] || "other";
       let out = txt.replace(FILES_RE, (_, a, cur, z) => a + esc(String(nfiles)) + z);
-      out = out.replace(LICENSE_RE, (_, a, cur, z) => a + esc(lic) + z);
+      const licBadge = (txt.match(LICENSE_RE) || [])[2];
+      if (licBadge !== esc(lic)) {
+        console.log(`HOLD ${d}: license badge ${licBadge ?? "absent"} left unchanged`);
+      }
       if (out === txt) { console.log(`ok   ${d}: files=${nfiles}, license=${lic}`); continue; }
       drifted++;
       const oldFiles = (txt.match(FILES_RE) || [])[2];
@@ -136,7 +179,7 @@ async function main() {
       console.log(`DRIFT ${d}: files ${oldFiles} -> ${esc(String(nfiles))}, license ${oldLic} -> ${esc(lic)}${PUBLISH ? "" : " (dry run)"}`);
       if (PUBLISH) {
         const r = await publishReadmeCommit({
-          id, content: out, nfiles, license: lic,
+          id, content: out, previous: txt, nfiles, license: lic,
         });
         console.log(`  publish ${d}: ${r.status}${r.ok ? "" : " " + (await r.text()).slice(0, 200)}`);
         if (!r.ok) failed++;
