@@ -1019,6 +1019,223 @@
         ]
       }
     },
+    ".github/workflows/finalize-hf-adaptive-theatre-v3.yml": {
+  "intent_id": "hf-adaptive-theatre-manual-finalizer-v1",
+  "valid_until": "2026-11-30",
+  "source_sha256": "sha256:4991ad1edf865d9847dd1abdf6f84c57b233d0a43e8b62dd697768a6a112e9e8",
+  "credentials": [
+    "GH_ORG_TOKEN",
+    "GITHUB_PAT",
+    "ORG_ADMIN_TOKEN",
+    "SZL_ORG_ADMIN_PAT"
+  ],
+  "resources": [
+    {
+      "key": "github:actions:artifact:hf-adaptive-theatre-v3-final",
+      "access": "external-write"
+    },
+    {
+      "key": "github:repository:szl-holdings/.github:contents",
+      "access": "read"
+    },
+    {
+      "key": "runner:toolchain:python",
+      "access": "local-write"
+    }
+  ],
+  "effects": [
+    {
+      "sink": "github.artifact.upload",
+      "resource": "github:actions:artifact:hf-adaptive-theatre-v3-final",
+      "access": "external-write",
+      "max_calls": 1
+    },
+    {
+      "sink": "github.contents.checkout",
+      "resource": "github:repository:szl-holdings/.github:contents",
+      "access": "read",
+      "max_calls": 2
+    },
+    {
+      "sink": "runner.toolchain.install",
+      "resource": "runner:toolchain:python",
+      "access": "local-write",
+      "max_calls": 2
+    }
+  ],
+  "max_external_writes": 1,
+  "required_controls": {
+    "triggers": [
+      "pull_request",
+      "push",
+      "workflow_dispatch"
+    ],
+    "contents_read": true,
+    "no_explicit_secrets": false,
+    "concurrency": true,
+    "protected_ref": false,
+    "exact_sha": false,
+    "expected_before": false,
+    "readback": false
+  },
+  "trusted_transitives": {},
+  "reviewed_unknowns": {
+    "files": {
+      ".github/scripts/finalize_hf_adaptive_theatre_v3.py": "sha256:f582b003265657a17ac24b46f2294c284b47a55213170c5928804d84bc18e46d",
+      ".github/tests/test_finalize_hf_adaptive_theatre_v3.py": "sha256:f2f33f9eeafa9d7a6bbf3a71262a9d9ed16db9f2b7de16c5711579da6e257f85",
+      ".github/tests/test_theatre_finalizer_events.py": "sha256:620badebe1bf2088e0f236769cfbd490ebca8a2d73ba9147575828174bbff0b9",
+      ".github/workflows/finalize-hf-adaptive-theatre-v3.yml": "sha256:4991ad1edf865d9847dd1abdf6f84c57b233d0a43e8b62dd697768a6a112e9e8"
+    },
+    "unknowns": [
+      "ACTION_INPUTS_REVIEW_REQUIRED@.github/workflows/finalize-hf-adaptive-theatre-v3.yml:103",
+      "ACTION_INPUTS_REVIEW_REQUIRED@.github/workflows/finalize-hf-adaptive-theatre-v3.yml:45",
+      "ACTION_INPUTS_REVIEW_REQUIRED@.github/workflows/finalize-hf-adaptive-theatre-v3.yml:49",
+      "ACTION_INPUTS_REVIEW_REQUIRED@.github/workflows/finalize-hf-adaptive-theatre-v3.yml:79",
+      "ACTION_INPUTS_REVIEW_REQUIRED@.github/workflows/finalize-hf-adaptive-theatre-v3.yml:83",
+      "HTTP_TARGET_UNRESOLVED@.github/scripts/finalize_hf_adaptive_theatre_v3.py:68",
+      "PYTHON_CLIENT_UNRESOLVED@.github/tests/test_finalize_hf_adaptive_theatre_v3.py:45",
+      "PYTHON_DYNAMIC_HTTP_METHOD@.github/scripts/finalize_hf_adaptive_theatre_v3.py:68",
+      "PYTHON_IMPORT_UNRESOLVED@.github/scripts/finalize_hf_adaptive_theatre_v3.py:11",
+      "PYTHON_IMPORT_UNRESOLVED@.github/scripts/finalize_hf_adaptive_theatre_v3.py:14",
+      "PYTHON_IMPORT_UNRESOLVED@.github/scripts/finalize_hf_adaptive_theatre_v3.py:15",
+      "PYTHON_IMPORT_UNRESOLVED@.github/scripts/finalize_hf_adaptive_theatre_v3.py:16",
+      "PYTHON_IMPORT_UNRESOLVED@.github/scripts/finalize_hf_adaptive_theatre_v3.py:17",
+      "PYTHON_IMPORT_UNRESOLVED@.github/scripts/finalize_hf_adaptive_theatre_v3.py:9",
+      "PYTHON_IMPORT_UNRESOLVED@.github/tests/test_finalize_hf_adaptive_theatre_v3.py:3",
+      "PYTHON_IMPORT_UNRESOLVED@.github/tests/test_finalize_hf_adaptive_theatre_v3.py:5",
+      "PYTHON_SOURCE_REVIEW_REQUIRED@.github/scripts/finalize_hf_adaptive_theatre_v3.py:1",
+      "PYTHON_SOURCE_REVIEW_REQUIRED@.github/tests/test_finalize_hf_adaptive_theatre_v3.py:1",
+      "PYTHON_SOURCE_REVIEW_REQUIRED@.github/tests/test_theatre_finalizer_events.py:1",
+      "PYTHON_SOURCE_REVIEW_REQUIRED@.github/workflows/finalize-hf-adaptive-theatre-v3.yml:117",
+      "SCRIPT_SOURCE_REVIEW_REQUIRED@.github/workflows/finalize-hf-adaptive-theatre-v3.yml:1",
+      "SECRET_EXPRESSION_REVIEW_REQUIRED@.github/workflows/finalize-hf-adaptive-theatre-v3.yml:1",
+      "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/finalize-hf-adaptive-theatre-v3.yml:111",
+      "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/finalize-hf-adaptive-theatre-v3.yml:112",
+      "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/finalize-hf-adaptive-theatre-v3.yml:113",
+      "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/finalize-hf-adaptive-theatre-v3.yml:114",
+      "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/finalize-hf-adaptive-theatre-v3.yml:115",
+      "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/finalize-hf-adaptive-theatre-v3.yml:116",
+      "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/finalize-hf-adaptive-theatre-v3.yml:117",
+      "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/finalize-hf-adaptive-theatre-v3.yml:118",
+      "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/finalize-hf-adaptive-theatre-v3.yml:119",
+      "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/finalize-hf-adaptive-theatre-v3.yml:120",
+      "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/finalize-hf-adaptive-theatre-v3.yml:121",
+      "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/finalize-hf-adaptive-theatre-v3.yml:122",
+      "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/finalize-hf-adaptive-theatre-v3.yml:123",
+      "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/finalize-hf-adaptive-theatre-v3.yml:124",
+      "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/finalize-hf-adaptive-theatre-v3.yml:125",
+      "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/finalize-hf-adaptive-theatre-v3.yml:126",
+      "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/finalize-hf-adaptive-theatre-v3.yml:127",
+      "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/finalize-hf-adaptive-theatre-v3.yml:128",
+      "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/finalize-hf-adaptive-theatre-v3.yml:129",
+      "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/finalize-hf-adaptive-theatre-v3.yml:52",
+      "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/finalize-hf-adaptive-theatre-v3.yml:53",
+      "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/finalize-hf-adaptive-theatre-v3.yml:54",
+      "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/finalize-hf-adaptive-theatre-v3.yml:55",
+      "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/finalize-hf-adaptive-theatre-v3.yml:60",
+      "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/finalize-hf-adaptive-theatre-v3.yml:61",
+      "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/finalize-hf-adaptive-theatre-v3.yml:62",
+      "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/finalize-hf-adaptive-theatre-v3.yml:63",
+      "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/finalize-hf-adaptive-theatre-v3.yml:64",
+      "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/finalize-hf-adaptive-theatre-v3.yml:88",
+      "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/finalize-hf-adaptive-theatre-v3.yml:89",
+      "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/finalize-hf-adaptive-theatre-v3.yml:90",
+      "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/finalize-hf-adaptive-theatre-v3.yml:91",
+      "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/finalize-hf-adaptive-theatre-v3.yml:92",
+      "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/finalize-hf-adaptive-theatre-v3.yml:93",
+      "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/finalize-hf-adaptive-theatre-v3.yml:94",
+      "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/finalize-hf-adaptive-theatre-v3.yml:95",
+      "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/finalize-hf-adaptive-theatre-v3.yml:96",
+      "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/finalize-hf-adaptive-theatre-v3.yml:97",
+      "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/finalize-hf-adaptive-theatre-v3.yml:98",
+      "SHELL_COMPOSITION_UNKNOWN@.github/workflows/finalize-hf-adaptive-theatre-v3.yml:111",
+      "SHELL_COMPOSITION_UNKNOWN@.github/workflows/finalize-hf-adaptive-theatre-v3.yml:112",
+      "SHELL_COMPOSITION_UNKNOWN@.github/workflows/finalize-hf-adaptive-theatre-v3.yml:113",
+      "SHELL_COMPOSITION_UNKNOWN@.github/workflows/finalize-hf-adaptive-theatre-v3.yml:116",
+      "SHELL_COMPOSITION_UNKNOWN@.github/workflows/finalize-hf-adaptive-theatre-v3.yml:122",
+      "SHELL_COMPOSITION_UNKNOWN@.github/workflows/finalize-hf-adaptive-theatre-v3.yml:126",
+      "SHELL_COMPOSITION_UNKNOWN@.github/workflows/finalize-hf-adaptive-theatre-v3.yml:128",
+      "SHELL_COMPOSITION_UNKNOWN@.github/workflows/finalize-hf-adaptive-theatre-v3.yml:61",
+      "SHELL_COMPOSITION_UNKNOWN@.github/workflows/finalize-hf-adaptive-theatre-v3.yml:62",
+      "SHELL_COMPOSITION_UNKNOWN@.github/workflows/finalize-hf-adaptive-theatre-v3.yml:63",
+      "SHELL_COMPOSITION_UNKNOWN@.github/workflows/finalize-hf-adaptive-theatre-v3.yml:64",
+      "SHELL_COMPOSITION_UNKNOWN@.github/workflows/finalize-hf-adaptive-theatre-v3.yml:89",
+      "SHELL_COMPOSITION_UNKNOWN@.github/workflows/finalize-hf-adaptive-theatre-v3.yml:90",
+      "SHELL_COMPOSITION_UNKNOWN@.github/workflows/finalize-hf-adaptive-theatre-v3.yml:91",
+      "SHELL_COMPOSITION_UNKNOWN@.github/workflows/finalize-hf-adaptive-theatre-v3.yml:92",
+      "SHELL_COMPOSITION_UNKNOWN@.github/workflows/finalize-hf-adaptive-theatre-v3.yml:93",
+      "SHELL_COMPOSITION_UNKNOWN@.github/workflows/finalize-hf-adaptive-theatre-v3.yml:94",
+      "SHELL_COMPOSITION_UNKNOWN@.github/workflows/finalize-hf-adaptive-theatre-v3.yml:95",
+      "SHELL_COMPOSITION_UNKNOWN@.github/workflows/finalize-hf-adaptive-theatre-v3.yml:97",
+      "SHELL_COMPOSITION_UNKNOWN@.github/workflows/finalize-hf-adaptive-theatre-v3.yml:98",
+      "WORKFLOW_ENVIRONMENT_REVIEW_REQUIRED@.github/workflows/finalize-hf-adaptive-theatre-v3.yml:34",
+      "WORKFLOW_ENVIRONMENT_REVIEW_REQUIRED@.github/workflows/finalize-hf-adaptive-theatre-v3.yml:73"
+    ]
+  }
+},
+    ".github/workflows/zz-fix-finalizer-guard-once.yml": {
+  "intent_id": "hf-adaptive-theatre-guard-audit-v1",
+  "valid_until": "2026-11-30",
+  "source_sha256": "sha256:80db040ab53ee59bed5cb533e0ae882b597c88cd25c5ca94d22d6a8684c32296",
+  "credentials": [],
+  "resources": [
+    {
+      "key": "github:repository:szl-holdings/.github:contents",
+      "access": "read"
+    }
+  ],
+  "effects": [
+    {
+      "sink": "github.contents.checkout",
+      "resource": "github:repository:szl-holdings/.github:contents",
+      "access": "read",
+      "max_calls": 1
+    }
+  ],
+  "max_external_writes": 0,
+  "required_controls": {
+    "triggers": [
+      "workflow_dispatch"
+    ],
+    "contents_read": true,
+    "no_explicit_secrets": true,
+    "concurrency": false,
+    "protected_ref": false,
+    "exact_sha": false,
+    "expected_before": false,
+    "readback": false
+  },
+  "trusted_transitives": {},
+  "reviewed_unknowns": {
+    "files": {
+      ".github/scripts/finalize_hf_adaptive_theatre_v3.py": "sha256:f582b003265657a17ac24b46f2294c284b47a55213170c5928804d84bc18e46d",
+      ".github/tests/test_finalize_hf_adaptive_theatre_v3.py": "sha256:f2f33f9eeafa9d7a6bbf3a71262a9d9ed16db9f2b7de16c5711579da6e257f85",
+      ".github/workflows/zz-fix-finalizer-guard-once.yml": "sha256:80db040ab53ee59bed5cb533e0ae882b597c88cd25c5ca94d22d6a8684c32296"
+    },
+    "unknowns": [
+      "ACTION_INPUTS_REVIEW_REQUIRED@.github/workflows/zz-fix-finalizer-guard-once.yml:18",
+      "HTTP_TARGET_UNRESOLVED@.github/scripts/finalize_hf_adaptive_theatre_v3.py:68",
+      "PYTHON_CLIENT_UNRESOLVED@.github/tests/test_finalize_hf_adaptive_theatre_v3.py:45",
+      "PYTHON_DYNAMIC_HTTP_METHOD@.github/scripts/finalize_hf_adaptive_theatre_v3.py:68",
+      "PYTHON_IMPORT_UNRESOLVED@.github/scripts/finalize_hf_adaptive_theatre_v3.py:11",
+      "PYTHON_IMPORT_UNRESOLVED@.github/scripts/finalize_hf_adaptive_theatre_v3.py:14",
+      "PYTHON_IMPORT_UNRESOLVED@.github/scripts/finalize_hf_adaptive_theatre_v3.py:15",
+      "PYTHON_IMPORT_UNRESOLVED@.github/scripts/finalize_hf_adaptive_theatre_v3.py:16",
+      "PYTHON_IMPORT_UNRESOLVED@.github/scripts/finalize_hf_adaptive_theatre_v3.py:17",
+      "PYTHON_IMPORT_UNRESOLVED@.github/scripts/finalize_hf_adaptive_theatre_v3.py:9",
+      "PYTHON_IMPORT_UNRESOLVED@.github/tests/test_finalize_hf_adaptive_theatre_v3.py:3",
+      "PYTHON_IMPORT_UNRESOLVED@.github/tests/test_finalize_hf_adaptive_theatre_v3.py:5",
+      "PYTHON_SOURCE_REVIEW_REQUIRED@.github/scripts/finalize_hf_adaptive_theatre_v3.py:1",
+      "PYTHON_SOURCE_REVIEW_REQUIRED@.github/tests/test_finalize_hf_adaptive_theatre_v3.py:1",
+      "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/zz-fix-finalizer-guard-once.yml:22",
+      "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/zz-fix-finalizer-guard-once.yml:23",
+      "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/zz-fix-finalizer-guard-once.yml:24",
+      "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/zz-fix-finalizer-guard-once.yml:25",
+      "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/zz-fix-finalizer-guard-once.yml:26",
+      "SHELL_COMPOSITION_UNKNOWN@.github/workflows/zz-fix-finalizer-guard-once.yml:25"
+    ]
+  }
+},
     ".github/workflows/hf-inventory-contract.yml": {
       "intent_id": "hf-inventory-offline-candidate-contract-v2",
       "valid_until": "2026-11-30",

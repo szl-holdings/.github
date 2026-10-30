@@ -6,12 +6,14 @@ on:
     paths:
       - ".github/scripts/finalize_hf_adaptive_theatre_v3.py"
       - ".github/tests/test_finalize_hf_adaptive_theatre_v3.py"
+      - ".github/tests/test_theatre_finalizer_events.py"
       - ".github/workflows/finalize-hf-adaptive-theatre-v3.yml"
   push:
     branches: [main]
     paths:
       - ".github/scripts/finalize_hf_adaptive_theatre_v3.py"
       - ".github/tests/test_finalize_hf_adaptive_theatre_v3.py"
+      - ".github/tests/test_theatre_finalizer_events.py"
       - ".github/workflows/finalize-hf-adaptive-theatre-v3.yml"
   workflow_dispatch:
     inputs:
@@ -49,6 +51,7 @@ jobs:
         run: |
           python -m py_compile .github/scripts/finalize_hf_adaptive_theatre_v3.py .github/tests/test_finalize_hf_adaptive_theatre_v3.py
           python .github/tests/test_finalize_hf_adaptive_theatre_v3.py -v
+          python .github/tests/test_theatre_finalizer_events.py -v
           git diff --check
       - name: Prohibit bypass primitives
         shell: bash
@@ -63,7 +66,7 @@ jobs:
   finalize:
     name: Merge exact green application PRs and observe publishers
     needs: contract
-    if: ${{ github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.apply) }}
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.apply }}
     runs-on: ubuntu-latest
     timeout-minutes: 60
     env:
@@ -92,13 +95,13 @@ jobs:
             --report "$FINAL_REPORT"
           code=$?
           echo "exit_code=$code" >> "$GITHUB_OUTPUT"
-          exit 0
+          exit "$code"
       - name: Upload immutable secret-free finalization receipt
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: hf-adaptive-theatre-v3-final-${{ github.run_id }}-${{ github.run_attempt }}
-          path: ${{ env.FINAL_REPORT }}
+          name: hf-adaptive-theatre-v3-final
+          path: /tmp/hf-adaptive-theatre-v3-final.json
           if-no-files-found: error
           retention-days: 90
       - name: Publish exact summary
@@ -124,13 +127,3 @@ jobs:
           for row in report.get('residual') or []:
               print(f"- residual: `{row.get('repository')}#{row.get('number')}` — `{row.get('reason')}`")
           PY
-      - name: Enforce controller result
-        if: always()
-        shell: bash
-        run: |
-          code="${{ steps.finalize.outputs.exit_code }}"
-          test -n "$code"
-          if [ "$code" -ne 0 ]; then
-            echo "::error::Adaptive Theatre finalization failed with exit $code."
-            exit "$code"
-          fi
