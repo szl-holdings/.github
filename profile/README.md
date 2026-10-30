@@ -17,7 +17,9 @@ The single-cell example summarizes public GEO GSE85241 data and checks integrity
 - **Explore:** [Command Lab](https://huggingface.co/spaces/SZLHOLDINGS/szl-command-lab) brings the public portfolio into one searchable interface.
 - **Use:** [A11oy](https://a-11-oy.com) exposes tools and their current capability state.
 - **Build:** browse [models, kernels, datasets and Spaces](https://huggingface.co/SZLHOLDINGS), or [published Python packages](https://pypi.org/user/betterwithage/).
-- **Verify:** [a11oy.net](https://a11oy.net) links computation records and their limits.
+- **Verify:** [a11oy.net](https://a11oy.net) links computation records and their limits, with [evidence diagrams](https://a11oy.net/diagrams/) drawn from recorded runs.
+
+<a href="https://a11oy.net/diagrams/"><img src="https://raw.githubusercontent.com/szl-holdings/.github/main/profile/assets/diagrams/evidence-diagrams-overview.png" alt="Overview of four SZL evidence diagrams" width="720" /></a>
 
 ## What we build
 
@@ -48,3 +50,5 @@ The source-bound public inventory records **38 public Spaces, 48 model repositor
 These are architecture roles. Inspect each artifact's source and stated use limits before choosing a use.
 
 </details>
+
+Measured runtime snapshot: [full audit](../docs/LIVING_SOULS_INFRASTRUCTURE_AUDIT_2026-10-17.md).
