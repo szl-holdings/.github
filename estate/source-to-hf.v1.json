@@ -45,7 +45,7 @@
       "github": "szl-holdings/lyte-services",
       "hf": "SZLHOLDINGS/lyte",
       "dockerfile": "Dockerfile",
-      "source_mode": "delegated-publisher"
+      "source_mode": "delegated_publisher"
     },
     {
       "github": "szl-holdings/ayllu",
