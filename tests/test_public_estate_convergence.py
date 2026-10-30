@@ -42,6 +42,23 @@ def test_product_root_tracks_the_live_a11oy_front_door() -> None:
     assert '"status":"ok"' in product.health_literals
 
 
+def test_proof_root_accepts_the_fingerprinted_stylesheet() -> None:
+    proof = convergence.CONTRACTS[1]
+    hashed = (
+        '<link rel="stylesheet" href="/assets/szl-flow-proof.'
+        'f6f4981719fabbc13fc209fce6af232f8ed53de73abea81a5ff12153b4cc2156.css" '
+        'data-szl-proof-flow-asset="style" />'
+    )
+    with mock.patch.object(
+        convergence,
+        "request",
+        return_value=(200, hashed.encode("utf-8"), {"Content-Type": "text/html"}, "https://a11oy.net/"),
+    ):
+        observed = convergence.probe(proof.root, proof.root_literals)
+    assert observed["verified"] is True
+    assert observed["required_literals"]["/assets/szl-flow-proof."] is True
+
+
 def test_probe_requires_http_200_bytes_and_every_literal() -> None:
     with mock.patch.object(
         convergence,
@@ -105,10 +122,103 @@ def test_source_contains_no_content_dns_cloudflare_or_hf_mutator() -> None:
         assert fragment not in text
 
 
-def test_drift_issue_lookup_does_not_shell_split_the_title() -> None:
+def test_exact_head_parity_readback() -> None:
+    head = "9be0cdb392f5fba9225d7284813191578a14c766"
+    match = convergence.parity_readback(head, head, head)
+    assert match["state"] == "MATCH"
+    assert match["source_mutation"] is False
+    assert match["hf_mutation"] is False
+    assert match["runtime_mutation"] is False
+    drifted = convergence.parity_readback(head, head, "a" * 40)
+    assert drifted["state"] == "DIVERGENT"
+    assert convergence.parity_readback(head, "", head)["state"] == "NOT_SUPPLIED"
+
+
+def test_signed_receipt_validation_fails_closed() -> None:
+    payload = {"url": "https://a11oy.net/", "verified": True}
+    digest = convergence.hashlib.sha256(convergence.canonical_payload(payload)).hexdigest()
+    unsigned = convergence.proof_envelope(
+        {
+            "url": payload["url"],
+            "http_status": 200,
+            "bytes": 12,
+            "verified": True,
+            "required_literals": {},
+        }
+    )
+    assert unsigned["signed"] is False
+    assert unsigned["algorithm"] == "UNSIGNED"
+    assert convergence.validate_signed_receipt(unsigned)["reason"] == "UNSIGNED"
+    mismatched = {
+        "payload": payload,
+        "payload_sha256": "0" * 64,
+        "algorithm": "ed25519",
+        "signed": True,
+        "signature": "ab" * 32,
+    }
+    assert convergence.validate_signed_receipt(mismatched)["reason"] == "PAYLOAD_HASH_MISMATCH"
+    unbound = {
+        "payload": payload,
+        "payload_sha256": digest,
+        "algorithm": "ed25519",
+        "signed": True,
+        "signature": "ab" * 32,
+    }
+    result = convergence.validate_signed_receipt(unbound)
+    assert result["valid"] is False
+    assert result["reason"] == "NO_PINNED_PUBLIC_KEY"
+
+
+def test_rights_state_gate_blocks_undeclared_effects() -> None:
+    product, proof = convergence.CONTRACTS
+    assert convergence.rights_state(product) == "OBSERVE"
+    assert convergence.rights_state(proof) == "REPAIR_DECLARED"
+    blocked = convergence.OriginContract(
+        name="blocked.example",
+        root="https://blocked.example/",
+        spectral_asset="https://blocked.example/a",
+        controller_asset="https://blocked.example/b",
+        root_literals=(),
+        spectral_literals=(),
+        controller_literals=(),
+        advisory_health="https://blocked.example/health",
+        health_literals=(),
+        repair="UNDECLARED",
+    )
+    assert convergence.rights_state(blocked) == "BLOCKED"
+    for right in ("publish", "merge", "train", "dns", "credentials", "billing", "security-settings"):
+        assert convergence.rights_permit("OBSERVE", right) is False
+        assert convergence.rights_permit("REPAIR_DECLARED", right) is False
+        assert convergence.rights_permit("BLOCKED", right) is False
+    assert convergence.rights_permit("OBSERVE", "read") is True
+    assert convergence.rights_permit("REPAIR_DECLARED", "pages-build-request") is True
+    assert convergence.rights_permit("OBSERVE", "pages-build-request") is False
+
+
+def test_rollback_leaves_main_and_live_workloads_untouched() -> None:
+    assert "Do not touch protected main" in convergence.ROLLBACK
+    assert "close the PR" in convergence.ROLLBACK
+    text = MODULE_PATH.read_text(encoding="utf-8")
+    assert "source_mutation" in text
+    assert convergence.proof_envelope(
+        {"url": "https://a11oy.net/", "http_status": 200, "bytes": 1, "verified": False, "required_literals": {}}
+    )["source_mutation"] is False
+
+
+def test_drift_receipt_is_a_structured_log_without_an_issue_write() -> None:
     text = WORKFLOW_PATH.read_text(encoding="utf-8")
     assert '--search \\"$title in:title\\"' not in text
-    assert 'select(.title == "[runtime] Canonical public-origin drift")' in text
+    assert "gh issue" not in text
+    assert "issues: write" not in text.lower()
+    assert "contents: read" in text
+    assert "/tmp/public-origin-drift.json" in text
+    assert '"issue_write": False' in text
+    receipt = text.split("Emit the public-origin drift receipt", 1)[1].split(
+        "- name: Upload immutable convergence evidence", 1
+    )[0]
+    assert "set -euo pipefail" in receipt
+    assert "set +e" not in receipt
+    assert "exit 0" not in receipt
 
 
 if __name__ == "__main__":

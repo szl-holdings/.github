@@ -26,7 +26,6 @@ on:
 
 permissions:
   contents: read
-  issues: write
 
 env:
   REPORT_PATH: /tmp/public-estate-convergence-v2.json
@@ -81,7 +80,7 @@ jobs:
 
   converge:
     name: Verify and selectively repair both public origins
-    if: github.event_name != 'pull_request'
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
     needs: contract
     runs-on: ubuntu-latest
     timeout-minutes: 18
@@ -97,7 +96,7 @@ jobs:
       - name: Checkout protected convergence policy
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: main
+          ref: ${{ github.event.pull_request.head.sha || github.event.merge_group.head_sha || github.sha }}
           persist-credentials: false
           fetch-depth: 1
 
@@ -118,6 +117,7 @@ jobs:
           python -I -P .github/scripts/public_estate_convergence.py "${args[@]}"
           code=$?
           echo "exit_code=$code" >> "$GITHUB_OUTPUT"
+          printf '%s' "$code" > "$RUNNER_TEMP/public-estate-convergence-exit-code"
           exit 0
 
       - name: Publish exact origin summary
@@ -150,58 +150,75 @@ jobs:
                   print(f"- `{row['origin']}` — `{row['action']}` / `{row['state']}`")
           PY
 
-      - name: Upload immutable convergence evidence
-        if: always()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
-        with:
-          name: public-estate-convergence-v2-${{ github.run_id }}-${{ github.run_attempt }}
-          path: ${{ env.REPORT_PATH }}
-          if-no-files-found: error
-          retention-days: 90
-
-      - name: Reconcile the public-origin drift issue
+      - name: Emit the public-origin drift receipt
         if: always()
         shell: bash
         run: |
-          set +e
-          python -I -P <<'PY' > /tmp/public-origin-drift.md
+          set -euo pipefail
+          python -I -P <<'PY'
           import json
           import os
           from pathlib import Path
 
-          report = json.loads(Path(os.environ["REPORT_PATH"]).read_text(encoding="utf-8"))
-          print("## Public Estate convergence receipt")
-          print()
-          print(f"- Run: {os.environ['GITHUB_SERVER_URL']}/{os.environ['GITHUB_REPOSITORY']}/actions/runs/{os.environ['GITHUB_RUN_ID']}")
-          print(f"- Complete: `{report['summary']['complete']}`")
-          print("- Source, DNS, and Cloudflare mutations: `false`")
+          report_path = Path(os.environ["REPORT_PATH"])
+          report = json.loads(report_path.read_text(encoding="utf-8"))
+          summary = report["summary"]
+          complete = summary["complete"]
+          if type(complete) is not bool:
+              raise SystemExit("convergence complete flag is not a boolean")
+          origins = []
           for row in report["after"]:
-              print(
-                  f"- `{row['name']}` — `{'OPERATIONAL' if row['operational'] else 'NOT PROVEN'}`; "
-                  f"root `{row['root']['http_status']}`; surface `{row['spectral_asset']['http_status']}`; "
-                  f"controller `{row['controller_asset']['http_status']}`; health `{row['advisory_health']['http_status']}`"
+              origins.append(
+                  {
+                      "name": row["name"],
+                      "operational": bool(row["operational"]),
+                      "root_http_status": row["root"]["http_status"],
+                      "surface_http_status": row["spectral_asset"]["http_status"],
+                      "controller_http_status": row["controller_asset"]["http_status"],
+                      "health_http_status": row["advisory_health"]["http_status"],
+                  }
               )
+          receipt = {
+              "schema": "szl.public-origin-drift-receipt.v1",
+              "issue_write": False,
+              "permission": "contents: read",
+              "complete": complete,
+              "run_url": (
+                  os.environ["GITHUB_SERVER_URL"]
+                  + "/"
+                  + os.environ["GITHUB_REPOSITORY"]
+                  + "/actions/runs/"
+                  + os.environ["GITHUB_RUN_ID"]
+              ),
+              "origins": origins,
+              "dns_mutation": False,
+              "cloudflare_mutation": False,
+          }
+          text = json.dumps(receipt, indent=2, sort_keys=True) + "\n"
+          destination = Path("/tmp/public-origin-drift.json")
+          destination.write_text(text, encoding="utf-8")
+          reread = json.loads(destination.read_text(encoding="utf-8"))
+          if reread.get("issue_write") is not False or reread.get("complete") is not complete:
+              raise SystemExit("drift receipt did not round-trip")
+          print(text, end="")
           PY
-          title='[runtime] Canonical public-origin drift'
-          issue="$(gh issue list --state open --limit 100 --json number,title --jq '.[] | select(.title == "[runtime] Canonical public-origin drift") | .number' | head -n1)"
-          complete="$(python -I -P -c 'import json,os; print(str(bool(json.load(open(os.environ["REPORT_PATH"]))["summary"]["complete"])).lower())')"
-          if [ "$complete" = true ]; then
-            if [ -n "$issue" ]; then
-              gh issue comment "$issue" --body-file /tmp/public-origin-drift.md
-              gh issue close "$issue" --reason completed
-            fi
-          elif [ -n "$issue" ]; then
-            gh issue comment "$issue" --body-file /tmp/public-origin-drift.md
-          else
-            gh issue create --title "$title" --body-file /tmp/public-origin-drift.md
-          fi
-          exit 0
+
+      - name: Upload immutable convergence evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: public-estate-convergence-v2
+          path: |
+            ${{ env.REPORT_PATH }}
+            /tmp/public-origin-drift.json
+          if-no-files-found: error
+          retention-days: 90
 
       - name: Enforce canonical origins
         if: always()
         shell: bash
         run: |
-          code="${{ steps.converge.outputs.exit_code }}"
+          code="$(cat "$RUNNER_TEMP/public-estate-convergence-exit-code")"
           test -n "$code"
           if [ "$code" -ne 0 ]; then
             echo "::error::One or more canonical origins were not proven operational; inspect the exact artifact."
