@@ -13,7 +13,7 @@ ROOT = Path(__file__).resolve().parents[2]
 GOVERNANCE = ROOT / ".governance"
 APP_TOKEN_ACTION_PREFIX = "actions/create-github-app-token@"
 APP_TOKEN_ACTION = (
-    APP_TOKEN_ACTION_PREFIX + "bcd2ba49218906704ab6c1aa796996da409d3eb1"
+    APP_TOKEN_ACTION_PREFIX + "64ab729a6294000f5aa4a4bc0b73d1f32bc45510"
 )
 APP_TOKEN_USES_LINE = re.compile(
     r"^(?P<dash>-\s+)?uses\s*:\s*(?P<value>.*)$"

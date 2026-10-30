@@ -17,7 +17,7 @@ EXPECTED_PERMISSIONS = {
 SCALAR = re.compile(r"^  ([a-z][a-z0-9-]*): (read|write|none)$")
 CHECKOUT_ACTION = "actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1"
 EXPECTED_WORKFLOW_SHA256 = (
-    "1f518a525b257440a8b018d2a86453123e8e21c81273e03cb0c838358e3188dd"
+    "0d4af4c5f4e444f3b557aa2a93e3a9fc8bbacd9576eaf1439fb86ed4c1a8a171"
 )
 EXPECTED_STEP_NAMES = (
     "Harden runner",
@@ -32,11 +32,11 @@ EXPECTED_STEP_NAMES = (
     "Require a confirmed healthy control plane",
 )
 EXPECTED_ACTIONS = (
-    "step-security/harden-runner@e14015d583714f6e62063499dc959a02595150a1",
+    "step-security/harden-runner@dc2769abcc0fcfbadfc1df54081c1608579ef6b2",
     CHECKOUT_ACTION,
-    "actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97",
-    "actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1",
-    "actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a",
+    "actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0",
+    "actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510",
+    "actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9",
 )
 EXPECTED_EXPRESSIONS = (
     "github.event.repository.default_branch",
