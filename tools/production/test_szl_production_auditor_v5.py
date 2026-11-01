@@ -64,6 +64,70 @@ class RedactionTests(unittest.TestCase):
 
 
 class ReportTests(unittest.TestCase):
+    def gate_report(self):
+        profile = json.loads(PROFILE_PATH.read_text(encoding="utf-8"))
+        profile["gates"] = [dict(profile["gates"][0], controls=["required-a", "required-b"])]
+        return AUD.Report(profile)
+
+    def test_unrelated_passes_cannot_satisfy_required_controls(self) -> None:
+        report = self.gate_report()
+        for control in ("probe-a", "probe-b", "probe-c"):
+            report.proof("G00", control, "org", "PASS")
+        self.assertEqual(report.gate_results()[0]["status"], "PARTIAL")
+
+    def test_all_named_controls_pass(self) -> None:
+        report = self.gate_report()
+        for control in ("required-a", "required-b"):
+            report.proof("G00", control, "org", "PASS")
+        self.assertEqual(report.gate_results()[0]["status"], "PASS")
+
+    def test_failed_proof_cannot_be_hidden_by_other_target(self) -> None:
+        report = self.gate_report()
+        for control in ("required-a", "required-b"):
+            report.proof("G00", control, "passing-target", "PASS")
+        report.proof("G00", "required-a", "failing-target", "FAIL")
+        self.assertEqual(report.gate_results()[0]["status"], "FAIL")
+
+    def test_incomplete_proof_status_cannot_become_pass(self) -> None:
+        for status in ("PARTIAL", "SKIPPED", "UNKNOWN", "UNAVAILABLE", "unexpected"):
+            with self.subTest(status=status):
+                report = self.gate_report()
+                for control in ("required-a", "required-b"):
+                    report.proof("G00", control, "org", "PASS")
+                report.proof("G00", "additional-probe", "org", status)
+                self.assertEqual(report.gate_results()[0]["status"], "PARTIAL")
+
+    def test_empty_control_contract_cannot_pass(self) -> None:
+        report = self.gate_report()
+        report.profile["gates"][0]["controls"] = []
+        report.proof("G00", "probe", "org", "PASS")
+        self.assertEqual(report.gate_results()[0]["status"], "PARTIAL")
+
+    def test_warning_does_not_hide_missing_controls(self) -> None:
+        report = self.gate_report()
+        report.proof("G00", "required-a", "org", "PASS")
+        report.finding("G00", "P2", "WARN", "org", "advisory", "detail", "fix")
+        self.assertEqual(report.gate_results()[0]["status"], "PARTIAL")
+
+    def test_warning_proof_is_not_a_pass(self) -> None:
+        report = self.gate_report()
+        for control in ("required-a", "required-b"):
+            report.proof("G00", control, "org", "PASS")
+        report.proof("G00", "additional-probe", "org", "WARN")
+        self.assertEqual(report.gate_results()[0]["status"], "WARN")
+
+    def test_failed_proof_blocks_serialized_release_report(self) -> None:
+        report = self.gate_report()
+        for control in ("required-a", "required-b"):
+            report.proof("G00", control, "org", "PASS")
+        report.proof("G00", "extra", "org", "FAIL")
+        with tempfile.TemporaryDirectory() as tmp:
+            result, code = AUD.write_outputs(report, Path(tmp), PROFILE_PATH)
+            saved = json.loads((Path(tmp) / "production_readiness.json").read_text())
+        self.assertEqual(code, 2)
+        self.assertEqual(result["overall_status"], "BLOCKED")
+        self.assertEqual(saved["gates"][0]["status"], "FAIL")
+
     def test_missing_evidence_is_unknown_not_pass(self) -> None:
         profile = json.loads(PROFILE_PATH.read_text(encoding="utf-8"))
         report = AUD.Report(profile)
@@ -98,3 +162,4 @@ class ReportTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
