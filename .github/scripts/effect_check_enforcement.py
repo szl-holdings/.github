@@ -21,6 +21,7 @@ import os
 import re
 import sys
 import urllib.error
+import urllib.parse
 import urllib.request
 from pathlib import Path
 
@@ -287,8 +288,20 @@ def fetch_comments(path: Path, created_path: Path, subject_path: Path) -> int:
             raise SystemExit("comment page is malformed")
         items.extend(page)
         next_url = _next_page(link)
-        if not next_url or len(page) < 100:
+        if not next_url:
             break
+        if len(page) != 100:
+            raise SystemExit("comment pagination is incomplete")
+        target = urllib.parse.urlsplit(next_url)
+        expected_path = f"/repos/{repository}/issues/{number_text}/comments"
+        if (
+            target.scheme != "https" or target.netloc != "api.github.com"
+            or target.path != expected_path or target.fragment
+            or urllib.parse.parse_qs(target.query, keep_blank_values=True) != {
+                "per_page": ["100"], "page": [str(_page + 2)],
+            }
+        ):
+            raise SystemExit("comment pagination changed its subject or page sequence")
         url = next_url
     else:
         raise SystemExit("comment pagination exceeded its bound")

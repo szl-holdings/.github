@@ -330,6 +330,86 @@ class EffectCheckEnforcementTests(unittest.TestCase):
         self.assertEqual(code, 3)
         self.assertIn("SUBJECT_INVALID", text)
 
+    def test_read_only_comment_policy_does_not_allow_write_permissions_or_extra_secrets(self):
+        # Even re-pinning the workflow source cannot widen the read-only token.
+        root = Path(__file__).resolve().parents[2]
+        gate_path = root / ".github/scripts/control_plane_effect_gate.py"
+        spec = importlib.util.spec_from_file_location("effect_policy_test_gate", gate_path)
+        gate = importlib.util.module_from_spec(spec)
+        sys.modules[spec.name] = gate
+        spec.loader.exec_module(gate)
+        path = ".github/workflows/control-plane-effect-gate.yml"
+        source = (root / path).read_text()
+        policy = json.loads((root / ".github/data/control_plane_effect_policy.json").read_text())
+        declaration = policy["workflow_declarations"][path]
+        self.assertEqual(declaration["credentials"], ["GITHUB_TOKEN"])
+        mutations = (
+            (source.replace("issues: read", "issues: write", 1), "GITHUB_WRITE_PERMISSION_PRESENT"),
+            (source.replace("GH_TOKEN: ${{ github.token }}", "GH_TOKEN: ${{ secrets.EXTRA_TOKEN }}", 1),
+             "CREDENTIAL_BINDING_MISMATCH"),
+        )
+        for changed, reason in mutations:
+            with self.subTest(reason=reason):
+                self.assertNotEqual(changed, source)
+                raw = gate.analyze_workflow_source(changed, path=path)
+                blobs = {name: (root / name).read_bytes() for name in raw["dependencies"]}
+                repinned = {**declaration, "source_sha256": gate.sha256_bytes(changed.encode())}
+                result = gate.bind_declaration(path, changed.encode(), raw, repinned, blobs)
+                self.assertEqual(result["verdict"], "DENY")
+                self.assertIn(reason, result["reason_codes"])
+
+    def _fetch_pages(self, directory, responses):
+        root = Path(directory)
+        with mock.patch.dict(os.environ, {
+            "GITHUB_EVENT_NAME": "pull_request", "PR_NUMBER": "938",
+            "GH_TOKEN": "fake-test-token", "GITHUB_REPOSITORY": "szl-holdings/.github",
+            "GITHUB_RUN_ID": RUN_ID,
+        }, clear=True), mock.patch.object(enforcement, "_github_get", side_effect=responses) as get:
+            enforcement.fetch_comments(root / "comments", root / "created", root / "subject")
+            return json.loads((root / "comments").read_text()), get.call_args_list
+
+    def test_short_comment_page_with_next_link_fails_closed(self):
+        # An incomplete first page must never hide a later owner revocation.
+        link = '<https://api.github.com/repos/szl-holdings/.github/issues/938/comments?per_page=100&page=2>; rel="next"'
+        with tempfile.TemporaryDirectory() as directory:
+            with self.assertRaisesRegex(SystemExit, "incomplete"):
+                self._fetch_pages(directory, [([_accept()], link), ({"created_at": RUN_CREATED}, "")])
+            self.assertFalse((Path(directory) / "comments").exists())
+
+    def test_later_page_revocation_is_preserved(self):
+        link = '<https://api.github.com/repos/szl-holdings/.github/issues/938/comments?per_page=100&page=2>; rel="next"'
+        revoked = _accept()
+        revoked["id"] = 200
+        revoked["body"] = revoked["body"].replace("ACCEPT", "REVOKE")
+        with tempfile.TemporaryDirectory() as directory:
+            comments, calls = self._fetch_pages(directory, [
+                ([{**_accept(), "id": index + 1} for index in range(100)], link),
+                ([revoked], ""), ({"created_at": RUN_CREATED}, ""),
+            ])
+            self.assertEqual(len(comments), 101)
+            self.assertIn("page=2", calls[1].args[0])
+            owner, reasons = enforcement.bind_owner_decision(
+                _receipt("REVIEW_REQUIRED", "TRUST_ROOT_CHANGED_REVIEW_REQUIRED"), comments,
+                repository="szl-holdings/.github", pull_request=938,
+                run_id=RUN_ID, run_created_at=RUN_CREATED,
+            )
+            self.assertEqual(owner, "HOLD")
+            self.assertIn("OWNER_DECISION_REVOKED", reasons)
+
+    def test_comment_next_link_cannot_change_subject_or_skip_pages(self):
+        for target in (
+            "https://api.github.com/repos/other/repo/issues/938/comments?per_page=100&page=2",
+            "https://api.github.com/repos/szl-holdings/.github/issues/939/comments?per_page=100&page=2",
+            "https://api.github.com/repos/szl-holdings/.github/issues/938/comments?per_page=100&page=3",
+            "https://api.github.com/repos/szl-holdings/.github/issues/938/comments?per_page=100&page=1",
+            "https://api.github.com/repos/szl-holdings/.github/issues/938/comments?per_page=100&page=2&since=2027-01-01",
+        ):
+            with self.subTest(target=target), tempfile.TemporaryDirectory() as directory:
+                link = f'<{target}>; rel="next"'
+                with self.assertRaisesRegex(SystemExit, "pagination"):
+                    self._fetch_pages(directory, [([_accept()] * 100, link), ([], ""), ({"created_at": RUN_CREATED}, "")])
+                self.assertFalse((Path(directory) / "comments").exists())
+
     def test_fetch_does_not_require_an_exit_code(self):
         keys = (
             "GITHUB_EVENT_NAME", "GITHUB_REF", "PR_NUMBER", "GH_TOKEN",
