@@ -9,6 +9,9 @@ Apply authenticates with --auth token (the first nonempty TOKEN_KEYS secret, use
 for every target) or --auth oidc (one Trusted Publisher token per target, read from
 HF_OIDC_TOKEN_<RESOURCE>; a missing target token fails closed before any request).
 Only the standard library is used; credentials are never retained in receipts.
+Plans are anonymous unless --authenticated-plan uses HF_CARD_READ_TOKEN.
+Private targets require an authenticated local plan; their complete card bytes
+must never enter public Actions logs or artifacts.
 """
 from __future__ import annotations
 
@@ -33,6 +36,7 @@ SHA = re.compile(r"[0-9a-f]{40}")
 HUB_TOKEN_SHAPE = re.compile(r"hf_[A-Za-z0-9._-]+")
 SCALAR = re.compile(r"^([A-Za-z_][A-Za-z0-9_-]*):[ \t]*(.*)$")
 TOKEN_KEYS = ("HF_CARD_WRITE_TOKEN", "HF_ORG_TOKEN", "HF_ORG_TOKEN1", "HF_TOKEN", "HF_WRITE_TOKEN")
+READ_TOKEN_KEY = "HF_CARD_READ_TOKEN"
 OIDC_ENV_PREFIX = "HF_OIDC_TOKEN_"
 
 
@@ -275,6 +279,8 @@ def load_config(config: str, bodies_dir: str, only: str) -> tuple[dict, list, di
         seen.add(repo_id)
         if asset.get("kind") not in ("spaces", "datasets", "models"):
             raise ValueError(f"invalid kind: {repo_id}")
+        if "private" in asset and not isinstance(asset["private"], bool):
+            raise ValueError(f"private must be a boolean: {repo_id}")
         if asset["kind"] == "spaces" and "short_description" in asset:
             description = asset["short_description"]
             if not isinstance(description, str) or not 1 <= len(description) <= 60:
@@ -312,7 +318,10 @@ def plan_asset(asset: dict, defaults: dict, token: str | None, bodies_dir: str,
     try:
         if status != 200:
             raise ValueError(f"repository read HTTP {status}")
-        revision = json.loads(detail).get("sha", "")
+        metadata = json.loads(detail)
+        if asset.get("private") is True and metadata.get("private") is not True:
+            raise ValueError("private target visibility changed; refusing to publish")
+        revision = metadata.get("sha", "")
         if not isinstance(revision, str) or not SHA.fullmatch(revision):
             raise ValueError("repository returned no exact revision")
         row["hub_revision"] = revision
@@ -567,6 +576,8 @@ def main() -> int:
     parser.add_argument("--out-json", default="reports/governance/hf-card-reconcile.json")
     parser.add_argument("--only", default="")
     parser.add_argument("--apply", action="store_true")
+    parser.add_argument("--authenticated-plan", action="store_true",
+                        help="plan locally using HF_CARD_READ_TOKEN; never write or use an apply credential")
     parser.add_argument("--allow-body-replace", action="store_true")
     parser.add_argument("--prefer-pr", action="store_true")
     parser.add_argument("--expected-plan")
@@ -584,8 +595,10 @@ def main() -> int:
                "source_revision": os.environ.get("GITHUB_SHA", ""), "mode": "apply" if args.apply else "plan",
                "body_replace_allowed": args.allow_body_replace, "assets": [], "receipt_state": "UNSIGNED_HONEST"}
     # Token mode keeps the original precedence; OIDC mode never reads a long-lived secret.
-    source = None if args.auth == "oidc" else next((key for key in TOKEN_KEYS if os.environ.get(key)), None)
-    token = os.environ[source] if source else None
+    source = (next((key for key in TOKEN_KEYS if os.environ.get(key)), None)
+              if args.apply and args.auth == "token" else
+              READ_TOKEN_KEY if args.authenticated_plan else None)
+    token = os.environ.get(source) if source else None
     tokens: dict[str, str] = {}
     if args.apply:
         payload["auth"] = {"mode": args.auth, "token_recorded": False}
@@ -595,10 +608,22 @@ def main() -> int:
     try:
         if args.apply and not args.expected_plan:
             raise ValueError("--apply requires --expected-plan")
+        if args.authenticated_plan:
+            if args.apply or args.auth == "oidc":
+                raise ValueError("--authenticated-plan is plan-only and cannot use OIDC")
+            if not token:
+                raise ValueError("--authenticated-plan requires HF_CARD_READ_TOKEN")
+            if os.environ.get("GITHUB_ACTIONS") == "true":
+                raise ValueError("authenticated plans require a private local runner, not Actions artifacts")
         if args.auth == "oidc" and not args.apply:
             raise ValueError("--auth oidc is only valid with --apply; plans read anonymously")
         cfg, assets, hashes = load_config(args.config, args.bodies_dir, args.only)
         payload.update(hashes)
+        if any(asset.get("private") is True for asset in assets):
+            if os.environ.get("GITHUB_ACTIONS") == "true":
+                raise ValueError("private card receipts must remain outside GitHub Actions")
+            if not args.apply and not args.authenticated_plan:
+                raise ValueError("private targets require --authenticated-plan")
         if args.expected_plan and not args.apply:
             raise ValueError("--expected-plan is only valid with --apply")
         if args.apply and args.auth == "oidc":
@@ -627,12 +652,18 @@ def main() -> int:
         else:
             code = 0
     except (ValueError, OSError, TypeError, KeyError, AttributeError) as exc:
-        present = [value for key, value in os.environ.items() if key in TOKEN_KEYS or key.startswith(OIDC_ENV_PREFIX)]
+        present = [value for key, value in os.environ.items()
+                   if key in (*TOKEN_KEYS, READ_TOKEN_KEY) or key.startswith(OIDC_ENV_PREFIX)]
         payload["error"] = redact(str(exc), [token, *tokens.values(), *present])
     payload["success"] = code == 0
     output = Path(args.out_json)
     output.parent.mkdir(parents=True, exist_ok=True)
-    output.write_bytes((json.dumps(payload, indent=2, sort_keys=True, ensure_ascii=False) + "\n").encode("utf-8"))
+    # Receipts can include private card bytes. Reject symlinks and restrict new
+    # and existing receipt files before writing their contents.
+    flags = os.O_WRONLY | os.O_CREAT | os.O_TRUNC | getattr(os, "O_NOFOLLOW", 0)
+    with os.fdopen(os.open(output, flags, 0o600), "wb") as stream:
+        os.fchmod(stream.fileno(), 0o600)
+        stream.write((json.dumps(payload, indent=2, sort_keys=True, ensure_ascii=False) + "\n").encode("utf-8"))
     for row in payload["assets"]:
         print(f"{row['repo_id']}: {row['label']} changes={row['changes']} applied={row.get('applied', 'plan-only')}")
     if payload.get("error"):
