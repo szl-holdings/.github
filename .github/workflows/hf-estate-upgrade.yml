@@ -46,6 +46,7 @@ jobs:
       GH_TOKEN: ${{ github.token }}
       GITHUB_TOKEN: ${{ github.token }}
       REPORT_ISSUE_TITLE: '[hf-canonicalization-report] single A11oy Space'
+      REPORT_PATH: ${{ runner.temp }}/hf-canonical-a11oy-${{ github.run_id }}-${{ github.run_attempt }}.json
     steps:
       - name: Checkout singleton verifier
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -161,12 +162,74 @@ jobs:
         shell: bash
         run: |
           set +e
-          args=(--generation "${GITHUB_SHA}")
+          args=(--generation "${GITHUB_SHA}" --report-out "$REPORT_PATH")
           if [ "${{ steps.mode.outputs.publish }}" = "true" ]; then args+=(--publish); fi
           python .github/scripts/hf_a11oy_singleton_verify.py "${args[@]}"
           code=$?
           echo "exit_code=${code}" >> "$GITHUB_OUTPUT"
           exit 0
+
+      # Never reuse the versioned historical report when a prerequisite fails.
+      # This path is unique to the current run attempt and is shared by every
+      # local consumer. The original verifier exit remains the terminal gate.
+      - name: Finalize evidence for this run attempt only
+        id: report
+        if: always()
+        shell: bash
+        env:
+          ESTATE_EXIT_CODE: ${{ steps.estate.outputs.exit_code }}
+        run: |
+          python - <<'PY'
+          import json
+          import os
+          import re
+          from datetime import datetime, timezone
+          from pathlib import Path
+          path = Path(os.environ['REPORT_PATH'])
+          source = os.environ.get('A11OY_EXPECTED_GITHUB_SHA') or None
+          generation = os.environ['GITHUB_SHA']
+          try:
+              report = json.loads(path.read_text(encoding='utf-8'))
+          except (OSError, ValueError):
+              report = None
+          source_bound = (
+              isinstance(report, dict)
+              and report.get('schema') == 'szl.hf-a11oy-singleton-report/v1'
+              and report.get('generation') == generation
+              and isinstance(source, str)
+              and re.fullmatch(r'[0-9a-f]{40}', source) is not None
+              and report.get('expected_github_source_sha') == source
+              and isinstance(report.get('summary'), dict)
+              and type(report['summary'].get('error')) is int
+              and report['summary']['error'] >= 0
+          )
+          current = (source_bound and os.environ.get('ESTATE_EXIT_CODE') == '0'
+                     and report['summary']['error'] == 0)
+          if not source_bound:
+              report = {
+                  'schema': 'szl.hf-a11oy-singleton-report/v1',
+                  'generated_at': datetime.now(timezone.utc).isoformat(),
+                  'generation': generation,
+                  'expected_github_source_sha': source,
+                  'status': 'UNVERIFIED',
+                  'reason': 'Current invocation did not produce a successful source-bound report.',
+                  'summary': {'ok': 0, 'warning': 0, 'error': 1, 'dry_run': 0},
+                  'actions': [],
+                  'boundaries': ['No historical inventory or runtime observation was reused.'],
+              }
+          elif not current:
+              report['status'] = 'UNVERIFIED'
+              report['reason'] = 'Current source-bound verification did not complete successfully.'
+          report['workflow_context'] = {
+              'run_id': os.environ['GITHUB_RUN_ID'],
+              'run_attempt': os.environ['GITHUB_RUN_ATTEMPT'],
+              'verifier_exit_code': os.environ.get('ESTATE_EXIT_CODE') or None,
+          }
+          path.parent.mkdir(parents=True, exist_ok=True)
+          path.write_text(json.dumps(report, indent=2, sort_keys=True) + '\n', encoding='utf-8')
+          with open(os.environ['GITHUB_OUTPUT'], 'a', encoding='utf-8') as output:
+              output.write(f'current={str(bool(current)).lower()}\n')
+          PY
 
       - name: Upload immutable singleton evidence
         if: always()
@@ -174,7 +237,7 @@ jobs:
         with:
           name: hf-canonical-a11oy-${{ github.run_id }}
           path: |
-            reports/hf-estate-upgrade-latest.json
+            ${{ env.REPORT_PATH }}
             hf-canonical-a11oy-drift.json
           if-no-files-found: error
           retention-days: 90
@@ -184,7 +247,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          test -f reports/hf-estate-upgrade-latest.json
+          test -f "$REPORT_PATH"
           {
             echo '<!-- szl-hf-single-a11oy-report -->'
             echo '# Single governed A11oy Space'
@@ -194,7 +257,7 @@ jobs:
             echo "- Expected A11oy source: \`${{ steps.source.outputs.sha }}\`"
             echo
             echo '```json'
-            cat reports/hf-estate-upgrade-latest.json
+            cat "$REPORT_PATH"
             echo '```'
           } > /tmp/hf-single-a11oy.md
           issue_number="$(gh issue list \
@@ -218,7 +281,7 @@ jobs:
           import json
           import os
           from pathlib import Path
-          path = Path('reports/hf-estate-upgrade-latest.json')
+          path = Path(os.environ['REPORT_PATH'])
           with open(os.environ['GITHUB_STEP_SUMMARY'], 'a', encoding='utf-8') as out:
               out.write('## Canonical A11oy verification\n\n')
               if not path.exists():
@@ -243,6 +306,10 @@ jobs:
       - name: Enforce fail-closed completion
         if: always()
         run: |
+          if [ "${{ steps.report.outputs.current }}" != 'true' ]; then
+            echo "::error::No successful source-bound report from this run attempt."
+            exit 2
+          fi
           code="${{ steps.estate.outputs.exit_code }}"
           if [ -z "$code" ]; then code=2; fi
           if [ "$code" -ne 0 ]; then
@@ -250,3 +317,4 @@ jobs:
             exit "$code"
           fi
           echo 'Canonical A11oy is current, byte-aligned, public, Docker-backed, RUNNING, route-verified, and clone-free.'
+

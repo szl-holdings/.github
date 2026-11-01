@@ -60,13 +60,15 @@ def contains_value(value: Any, expected: str) -> bool:
 
 
 class CanonicalA11oyVerifier:
-    def __init__(self, token: str, generation: str, publish: bool) -> None:
+    def __init__(self, token: str, generation: str, publish: bool,
+                 report_path: Path | None = None) -> None:
         expected = os.environ.get("A11OY_EXPECTED_GITHUB_SHA", "").strip().lower()
         if not SHA_RE.fullmatch(expected):
             raise RuntimeError("A11OY_EXPECTED_GITHUB_SHA must be an exact 40-character SHA")
         self.token = token
         self.generation = generation
         self.publish = publish
+        self.report_path = report_path or Path("reports/hf-estate-upgrade-latest.json")
         self.expected_github_sha = expected
         self.api = HfApi(token=token)
         self.http = requests.Session()
@@ -306,8 +308,8 @@ class CanonicalA11oyVerifier:
 
     def persist_report(self, report: dict[str, Any]) -> None:
         rendered = (json.dumps(report, indent=2, sort_keys=True) + "\n").encode()
-        Path("reports").mkdir(exist_ok=True)
-        Path("reports/hf-estate-upgrade-latest.json").write_bytes(rendered)
+        self.report_path.parent.mkdir(parents=True, exist_ok=True)
+        self.report_path.write_bytes(rendered)
         if not self.publish:
             return
         if not self.api.repo_exists(EVIDENCE_DATASET, repo_type="dataset"):
@@ -329,7 +331,7 @@ class CanonicalA11oyVerifier:
         report = self.report()
         self.persist_report(report)
         report = self.report()
-        Path("reports/hf-estate-upgrade-latest.json").write_text(
+        self.report_path.write_text(
             json.dumps(report, indent=2, sort_keys=True) + "\n", encoding="utf-8")
         return report
 
@@ -339,6 +341,8 @@ def main() -> int:
     parser.add_argument("--publish", action="store_true")
     parser.add_argument("--generation", default=os.environ.get("GITHUB_SHA")
                         or f"manual-{int(time.time())}")
+    parser.add_argument("--report-out", type=Path,
+                        default=Path("reports/hf-estate-upgrade-latest.json"))
     args = parser.parse_args()
     token = os.environ.get("HF_ORG_TOKEN") or os.environ.get("HF_ORG_TOKEN1") \
         or os.environ.get("HF_TOKEN")
@@ -346,7 +350,7 @@ def main() -> int:
         print("FATAL: no supported Hugging Face credential is configured", file=sys.stderr)
         return 2
     try:
-        report = CanonicalA11oyVerifier(token, args.generation, args.publish).run()
+        report = CanonicalA11oyVerifier(token, args.generation, args.publish, args.report_out).run()
     except Exception as exc:  # noqa: BLE001
         print(f"FATAL: {exc!r}", file=sys.stderr)
         return 2
@@ -356,3 +360,4 @@ def main() -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
+
