@@ -585,8 +585,8 @@
         "readback": true
       },
       "trusted_transitives": {
-        ".github/scripts/control_plane_effect_gate.py": "sha256:e1c4ab8ef9df0fecd38017b51dabbb5313ec3b4bd445d5db3bc6584a4c1bdc98",
-        ".github/scripts/test_control_plane_effect_gate.py": "sha256:5fdd8cbede8a1517e5870f90bce53f9ac31e4df57e6b87632e686f7946071eff"
+        ".github/scripts/control_plane_effect_gate.py": "sha256:1fc74d96f5e9d5cf5b5fda72bcc08ac78f7ceb74904d7dd3fd96323d89023b63",
+        ".github/scripts/test_control_plane_effect_gate.py": "sha256:d93f786236d4b1e7a796e91394c939646e6dff708790ced667e3394a67d4379a"
       },
       "reviewed_unknowns": {
         "files": {
@@ -1022,7 +1022,7 @@
     ".github/workflows/finalize-hf-adaptive-theatre-v3.yml": {
   "intent_id": "hf-adaptive-theatre-manual-finalizer-v1",
   "valid_until": "2026-11-30",
-  "source_sha256": "sha256:4991ad1edf865d9847dd1abdf6f84c57b233d0a43e8b62dd697768a6a112e9e8",
+  "source_sha256": "sha256:ce9d0b14d5c09c3995e2554922b1b2b1ef105b67f8137fb82a8e4c0d83713285",
   "credentials": [
     "GH_ORG_TOKEN",
     "GITHUB_PAT",
@@ -1081,10 +1081,10 @@
   "trusted_transitives": {},
   "reviewed_unknowns": {
     "files": {
-      ".github/scripts/finalize_hf_adaptive_theatre_v3.py": "sha256:f582b003265657a17ac24b46f2294c284b47a55213170c5928804d84bc18e46d",
-      ".github/tests/test_finalize_hf_adaptive_theatre_v3.py": "sha256:f2f33f9eeafa9d7a6bbf3a71262a9d9ed16db9f2b7de16c5711579da6e257f85",
-      ".github/tests/test_theatre_finalizer_events.py": "sha256:620badebe1bf2088e0f236769cfbd490ebca8a2d73ba9147575828174bbff0b9",
-      ".github/workflows/finalize-hf-adaptive-theatre-v3.yml": "sha256:4991ad1edf865d9847dd1abdf6f84c57b233d0a43e8b62dd697768a6a112e9e8"
+      ".github/scripts/finalize_hf_adaptive_theatre_v3.py": "sha256:c8dafbc8dcc52070664659c817f8bbda0a3f7c33b4a7622969869db45398d4fc",
+      ".github/tests/test_finalize_hf_adaptive_theatre_v3.py": "sha256:4fdfb4f405951755dbce48d18bf6e337be4ecd6d8022d48514eca7a85fbf1359",
+      ".github/tests/test_theatre_finalizer_events.py": "sha256:ac6370874140f7b4f6d2b4694bf8a6c9e2a18e31480ee6ef153b08d8f43d7ac0",
+      ".github/workflows/finalize-hf-adaptive-theatre-v3.yml": "sha256:ce9d0b14d5c09c3995e2554922b1b2b1ef105b67f8137fb82a8e4c0d83713285"
     },
     "unknowns": [
       "ACTION_INPUTS_REVIEW_REQUIRED@.github/workflows/finalize-hf-adaptive-theatre-v3.yml:103",
@@ -1176,7 +1176,7 @@
     ".github/workflows/zz-fix-finalizer-guard-once.yml": {
   "intent_id": "hf-adaptive-theatre-guard-audit-v1",
   "valid_until": "2026-11-30",
-  "source_sha256": "sha256:80db040ab53ee59bed5cb533e0ae882b597c88cd25c5ca94d22d6a8684c32296",
+  "source_sha256": "sha256:7576d43b99f460a16189df8dbc4df55c126145beec8b1b65de1c7e479aae74be",
   "credentials": [],
   "resources": [
     {
@@ -1208,9 +1208,9 @@
   "trusted_transitives": {},
   "reviewed_unknowns": {
     "files": {
-      ".github/scripts/finalize_hf_adaptive_theatre_v3.py": "sha256:f582b003265657a17ac24b46f2294c284b47a55213170c5928804d84bc18e46d",
-      ".github/tests/test_finalize_hf_adaptive_theatre_v3.py": "sha256:f2f33f9eeafa9d7a6bbf3a71262a9d9ed16db9f2b7de16c5711579da6e257f85",
-      ".github/workflows/zz-fix-finalizer-guard-once.yml": "sha256:80db040ab53ee59bed5cb533e0ae882b597c88cd25c5ca94d22d6a8684c32296"
+      ".github/scripts/finalize_hf_adaptive_theatre_v3.py": "sha256:c8dafbc8dcc52070664659c817f8bbda0a3f7c33b4a7622969869db45398d4fc",
+      ".github/tests/test_finalize_hf_adaptive_theatre_v3.py": "sha256:4fdfb4f405951755dbce48d18bf6e337be4ecd6d8022d48514eca7a85fbf1359",
+      ".github/workflows/zz-fix-finalizer-guard-once.yml": "sha256:7576d43b99f460a16189df8dbc4df55c126145beec8b1b65de1c7e479aae74be"
     },
     "unknowns": [
       "ACTION_INPUTS_REVIEW_REQUIRED@.github/workflows/zz-fix-finalizer-guard-once.yml:18",
@@ -1300,8 +1300,8 @@
         "readback": false
       },
       "trusted_transitives": {
-        ".github/scripts/control_plane_effect_gate.py": "sha256:e1c4ab8ef9df0fecd38017b51dabbb5313ec3b4bd445d5db3bc6584a4c1bdc98",
-        ".github/scripts/test_control_plane_effect_gate.py": "sha256:5fdd8cbede8a1517e5870f90bce53f9ac31e4df57e6b87632e686f7946071eff"
+        ".github/scripts/control_plane_effect_gate.py": "sha256:1fc74d96f5e9d5cf5b5fda72bcc08ac78f7ceb74904d7dd3fd96323d89023b63",
+        ".github/scripts/test_control_plane_effect_gate.py": "sha256:d93f786236d4b1e7a796e91394c939646e6dff708790ced667e3394a67d4379a"
       },
       "reviewed_unknowns": {
         "files": {

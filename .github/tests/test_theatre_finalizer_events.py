@@ -40,6 +40,18 @@ class TheatreFinalizerEvents(unittest.TestCase):
         self.assertNotIn("visibility", self.text.lower())
         self.assertIn("contents: read", self.text)
 
+    def test_retry_receipts_have_distinct_names_without_overwrite(self):
+        upload = self.finalize.split("- name: Upload immutable", 1)[1].split(
+            "- name: Publish exact summary", 1
+        )[0]
+        name = next(line.strip()[6:] for line in upload.splitlines()
+                    if line.strip().startswith("name: "))
+        names = {name.replace("${{ github.run_id }}", run).replace(
+            "${{ github.run_attempt }}", attempt
+        ) for run, attempt in (("100", "1"), ("100", "2"), ("101", "1"))}
+        self.assertEqual(len(names), 3)
+        self.assertNotIn("overwrite: true", upload)
+
 
 if __name__ == "__main__":
     unittest.main()

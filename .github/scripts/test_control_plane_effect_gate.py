@@ -801,10 +801,10 @@ class YamlBoundaryRegressionTests(unittest.TestCase):
                 _parsed, corrected = bind_source(source, candidate=candidate)
                 self.assertEqual(corrected["verdict"], "ALLOW")
 
-    def bind_alignment_artifact(self, name: str, *, path: str = ".github/workflows/estate-one-fabric-alignment.yml", extra: str = "") -> dict:
+    def bind_alignment_artifact(self, name: str, *, path: str = ".github/workflows/estate-one-fabric-alignment.yml", extra: str = "", resource: str | None = None) -> dict:
         source = workflow(extra_step=f"      - uses: {UPLOAD_ACTION}\n        with: {{name: {json.dumps(name)}{extra}}}\n")
         parsed = gate.analyze_workflow_source(source.decode(), path=path)
-        resource = "github:actions:artifact:estate-alignment-local"
+        resource = resource or "github:actions:artifact:estate-alignment-local"
         if name.startswith("estate-alignment-live-"):
             resource = "github:actions:artifact:estate-alignment-live"
         candidate = policy_for(source, workflow_path=path,
@@ -818,6 +818,29 @@ class YamlBoundaryRegressionTests(unittest.TestCase):
         }
         normalized = gate.load_policy_bytes(policy_bytes(candidate), as_of=AS_OF)
         return gate.bind_declaration(path, source, parsed, normalized["workflow_declarations"][path], {})
+
+    def test_theatre_retry_artifact_is_exact_and_non_destructive(self) -> None:
+        path = ".github/workflows/finalize-hf-adaptive-theatre-v3.yml"
+        name = "hf-adaptive-theatre-v3-final-${{ github.run_id }}-${{ github.run_attempt }}"
+        resource = "github:actions:artifact:hf-adaptive-theatre-v3-final"
+        bound = self.bind_alignment_artifact(name, path=path, resource=resource)
+        self.assertEqual(bound["verdict"], "ALLOW")
+        uploads = [item for item in bound["effects"] if item["sink"] == "github.artifact.upload"]
+        self.assertEqual([item["resource"] for item in uploads], [resource])
+        self.assertEqual(bound["external_write_sites"], 1)
+        for changed_name, changed_path, extra in (
+            (name, WORKFLOW_PATH, ""),
+            (name, path.replace(".yml", ".yaml"), ""),
+            (name.replace("-final-", "-other-"), path, ""),
+            (name.replace("-${{ github.run_attempt }}", ""), path, ""),
+            (name.replace("github.run_attempt", "inputs.destination"), path, ""),
+            (name, path, ", overwrite: true"),
+            (name, path, ", archive: false"),
+        ):
+            with self.subTest(name=changed_name, path=changed_path, extra=extra):
+                denied = self.bind_alignment_artifact(changed_name, path=changed_path,
+                                                     resource=resource, extra=extra)
+                self.assertEqual(denied["verdict"], "DENY")
 
     def test_alignment_attempt_artifacts_bind_two_exact_namespaces(self) -> None:
         for name in ("estate-alignment-local", "estate-alignment-live"):
