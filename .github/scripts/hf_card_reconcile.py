@@ -609,6 +609,8 @@ def main() -> int:
         if args.apply and not args.expected_plan:
             raise ValueError("--apply requires --expected-plan")
         if args.authenticated_plan:
+            if not hasattr(os, "fchmod"):
+                raise ValueError("authenticated plans require POSIX receipt permissions")
             if args.apply or args.auth == "oidc":
                 raise ValueError("--authenticated-plan is plan-only and cannot use OIDC")
             if not token:
@@ -620,6 +622,8 @@ def main() -> int:
         cfg, assets, hashes = load_config(args.config, args.bodies_dir, args.only)
         payload.update(hashes)
         if any(asset.get("private") is True for asset in assets):
+            if not hasattr(os, "fchmod"):
+                raise ValueError("private targets require POSIX receipt permissions")
             if os.environ.get("GITHUB_ACTIONS") == "true":
                 raise ValueError("private card receipts must remain outside GitHub Actions")
             if not args.apply and not args.authenticated_plan:
@@ -662,7 +666,8 @@ def main() -> int:
     # and existing receipt files before writing their contents.
     flags = os.O_WRONLY | os.O_CREAT | os.O_TRUNC | getattr(os, "O_NOFOLLOW", 0)
     with os.fdopen(os.open(output, flags, 0o600), "wb") as stream:
-        os.fchmod(stream.fileno(), 0o600)
+        if hasattr(os, "fchmod"):
+            os.fchmod(stream.fileno(), 0o600)
         stream.write((json.dumps(payload, indent=2, sort_keys=True, ensure_ascii=False) + "\n").encode("utf-8"))
     for row in payload["assets"]:
         print(f"{row['repo_id']}: {row['label']} changes={row['changes']} applied={row.get('applied', 'plan-only')}")
