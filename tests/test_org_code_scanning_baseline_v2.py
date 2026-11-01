@@ -270,3 +270,24 @@ def test_source_can_change_only_native_default_setup_and_command_issue() -> None
         '"archived":',
     ):
         assert forbidden not in source
+
+
+def test_workflow_authority_contract_accepts_job_scoped_permissions(tmp_path: Path) -> None:
+    import subprocess
+    import textwrap
+
+    contract = (ROOT / ".github/workflows/org-code-scanning-baseline-contract.yml").read_text()
+    script = textwrap.dedent(contract.split("          python - <<'PY'\n", 1)[1].split("          PY\n", 1)[0])
+    workflow = (ROOT / ".github/workflows/org-code-scanning-baseline.yml").read_text()
+    target = tmp_path / ".github/workflows/org-code-scanning-baseline.yml"
+    target.parent.mkdir(parents=True)
+    for source, accepted in [
+        (workflow, True),
+        (workflow.replace("permissions: read-all", "permissions: write-all"), False),
+        (workflow.replace("      contents: read", "      contents: write"), False),
+        (workflow.replace("      issues: write\n", ""), False),
+        (workflow.replace("      issues: write", "      issues: write\n      packages: write"), False),
+    ]:
+        target.write_text(source)
+        result = subprocess.run([sys.executable, "-"], input=script, text=True, capture_output=True, cwd=tmp_path)
+        assert (result.returncode == 0) is accepted, result.stderr

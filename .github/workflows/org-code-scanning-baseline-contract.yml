@@ -56,6 +56,7 @@ jobs:
           set -euo pipefail
           python - <<'PY'
           from pathlib import Path
+          import re
 
           workflow = Path(".github/workflows/org-code-scanning-baseline.yml").read_text(encoding="utf-8")
           artifact_template = (
@@ -68,19 +69,32 @@ jobs:
               "secrets.SZL_GITHUB_TOKEN || secrets.GH_PAT || github.token"
           )
           required = (
-              "permissions:\n  contents: read\n  issues: write\n  security-events: write",
+              "permissions: read-all",
               "python .github/scripts/org_code_scanning_baseline_v2.py",
               "--apply",
               "if-no-files-found: error",
               artifact_template,
               token_chain,
           )
+          permission_block = re.search(
+              r"^  converge:\n    permissions:\n((?:      [^\n]+\n)+)",
+              workflow,
+              flags=re.MULTILINE,
+          )
+          expected_permissions = {"contents": "read", "issues": "write", "security-events": "write"}
+          actual_permissions = (
+              dict(line.strip().split(": ", 1) for line in permission_block.group(1).splitlines())
+              if permission_block else {}
+          )
+          if actual_permissions != expected_permissions:
+              raise SystemExit("CodeQL converge job permissions differ from the explicit boundary")
           for token in required:
               if workflow.count(token) != 1:
                   raise SystemExit(f"missing or repeated CodeQL workflow contract: {token}")
           for forbidden in (
               "continue-on-error: true",
               "|| true",
+              "permissions: write-all",
               "contents: write",
               "pull-requests: write",
           ):
