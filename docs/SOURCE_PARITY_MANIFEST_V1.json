@@ -121,15 +121,16 @@
       "kind": "space",
       "observed_revision": "ce2e8f314b95c61a8c5cde0963ba7244ead2f96c",
       "github_source": "szl-holdings/a11oy@2ce00a0430088100a0d5f076d315bfd6e0e8e712",
-      "status": "SOURCE_RUNTIME_SHA_ALIGNED_FINAL_WORKFLOW_PENDING",
-      "evidence": "Independent readback reports /api/build-info and /.well-known/source.json bound to GitHub main 2ce00a...; the HF API revision is ce2e8f... and the runtime marker names the same source. The final GitHub smoke/readback job remains in progress.",
+      "status": "HISTORICAL_RUNTIME_READBACK_PASSED_EXECUTION_EVIDENCE_UNAVAILABLE",
+      "evidence": "Recorded runtime readback named GitHub revision 2ce00a0430088100a0d5f076d315bfd6e0e8e712 and HF revision ce2e8f314b95c61a8c5cde0963ba7244ead2f96c. Runtime/source verification job 122530231615 completed successfully on October 27. Overall run 40601233480 failed later while collecting independent execution evidence. These historical observations do not establish current live parity or execution authorization.",
       "runtime_reported_source_sha": "2ce00a0430088100a0d5f076d315bfd6e0e8e712",
-      "runtime_sha_matches_github": true,
       "frontend_source_in_hf": false,
       "publication_run_id": 40601233480,
       "runtime_status": "UNSIGNED-honest",
       "certified": false,
-      "publication_eligible": false
+      "publication_eligible": false,
+      "runtime_sha_matches_recorded_github_revision": true,
+      "execution_authorized": false
     },
     {
       "artifact": "SZLHOLDINGS/szl-khipu",
@@ -185,38 +186,48 @@
   "blockers": [
     {
       "id": "HF-A11OY-RUNTIME-DRIFT",
-      "status": "FINAL_WORKFLOW_READBACK_PENDING",
-      "detail": "Provider publication and source marker now report GitHub main 2ce00a...; retain the hold until final smoke/readback job 122530231615 completes."
+      "status": "HISTORICAL_RUNTIME_READBACK_PASSED_CURRENT_PARITY_UNMEASURED",
+      "detail": "Job 122530231615 succeeded at 2026-10-27T23:25:26Z for recorded source 2ce00a0430088100a0d5f076d315bfd6e0e8e712. No claim about later main or current runtime is made."
     },
     {
       "id": "HF-SECOND-BRAIN-SPACE",
-      "status": "NO_SPACE_OBSERVED",
-      "detail": "No dedicated SZLHOLDINGS Second Brain Space was observed. Do not create a duplicate runtime without an explicit canonical deployment decision."
+      "status": "NO_SPACE_OBSERVED_IN_HISTORICAL_SNAPSHOT",
+      "detail": "No dedicated SZLHOLDINGS Second Brain Space was observed on October 27. This record is not an exhaustive current inventory or a deployment decision."
     },
     {
       "id": "HF-A11OY-SOURCE-MARKER",
-      "status": "READBACK_OBSERVED",
-      "detail": "The protected run 40601233480 wrote the current source marker. Independent readback is observed; the final workflow evidence upload is still pending."
+      "status": "HISTORICAL_READBACK_COMPLETED",
+      "detail": "Protected run 40601233480 wrote the recorded source marker and its runtime verification job uploaded evidence successfully. The overall run later failed during execution-evidence collection."
     },
     {
       "id": "HF-A11OY-FRONTEND-OVERLAY",
       "status": "EXPECTED_ADAPTER",
       "detail": "The HF A11oy Space is a deployment overlay and does not contain the canonical web/ TypeScript source tree. GitHub remains the frontend source of truth; the Docker build output is the runtime artifact."
+    },
+    {
+      "id": "HF-A11OY-EXECUTION-EVIDENCE",
+      "status": "COLLECTION_UNAVAILABLE",
+      "detail": "Job 122533095547 failed at 2026-10-27T23:27:56Z with EXECUTION_EXPORT_COLLECTION_UNAVAILABLE and execution_authorized=false. Final live/singleton proof, strict parity and post-proof reauthorization were skipped. Passive readback success is not an admitted execution receipt."
     }
   ],
   "evidence": {
     "github_api": [
-      "https://api.github.com/repos/szl-holdings/a11oy/contents/serve.py?ref=main",
-      "https://api.github.com/repos/szl-holdings/a11oy/contents/web/src/main.tsx?ref=main",
-      "https://api.github.com/repos/szl-holdings/anatomy/contents/server.py?ref=main",
-      "https://api.github.com/repos/szl-holdings/szl-second-brain/contents/app.py?ref=main",
-      "https://api.github.com/repos/szl-holdings/szl-khipu/contents/szl_khipu/http_app.py?ref=main"
+      "https://api.github.com/repos/szl-holdings/a11oy/contents/serve.py?ref=2ce00a0430088100a0d5f076d315bfd6e0e8e712",
+      "https://api.github.com/repos/szl-holdings/a11oy/contents/web/src/main.tsx?ref=2ce00a0430088100a0d5f076d315bfd6e0e8e712",
+      "https://api.github.com/repos/szl-holdings/anatomy/contents/server.py?ref=39a271820550ce1ead178e906de4f8f2674c8115",
+      "https://api.github.com/repos/szl-holdings/szl-second-brain/contents/app.py?ref=138208a6cc96948c9c9cdce28a45f005a18fce4a",
+      "https://api.github.com/repos/szl-holdings/szl-khipu/contents/szl_khipu/http_app.py?ref=8ba6893099aecfe1e7cced1b50075ccdd169e744"
     ],
     "huggingface": [
       "https://huggingface.co/spaces/SZLHOLDINGS/a11oy",
       "https://huggingface.co/spaces/SZLHOLDINGS/szl-khipu",
       "https://huggingface.co/spaces/betterwithage/anatomy"
-    ]
+    ],
+    "workflow_api": [
+      "https://api.github.com/repos/szl-holdings/a11oy/actions/runs/40601233480",
+      "https://api.github.com/repos/szl-holdings/a11oy/actions/runs/40601233480/jobs?per_page=100"
+    ],
+    "execution_evidence_job": "https://github.com/szl-holdings/a11oy/actions/runs/40601233480/job/122533095547"
   },
   "post_publish_observation": {
     "workflow_run": 40601233480,
@@ -224,6 +235,21 @@
     "hf_api_revision": "ce2e8f314b95c61a8c5cde0963ba7244ead2f96c",
     "runtime_source_sha": "2ce00a0430088100a0d5f076d315bfd6e0e8e712",
     "final_verification_job": 122530231615,
-    "final_verification_status": "IN_PROGRESS"
-  }
+    "final_verification_status": "SUCCESS",
+    "final_verification_completed_at": "2026-10-27T23:25:26Z",
+    "workflow_status": "COMPLETED",
+    "workflow_conclusion": "FAILURE",
+    "workflow_updated_at": "2026-10-27T23:27:57Z",
+    "execution_evidence_job": 122533095547,
+    "execution_evidence_status": "FAILURE",
+    "execution_evidence_error": "EXECUTION_EXPORT_COLLECTION_UNAVAILABLE",
+    "execution_authorized": false,
+    "live_singleton_proof_status": "SKIPPED",
+    "strict_parity_status": "SKIPPED",
+    "reauthorization_status": "SKIPPED",
+    "completion_evidence_checked_at": "2026-11-01T23:42:40Z"
+  },
+  "last_reviewed_at": "2026-11-01T23:42:40Z",
+  "temporal_scope": "HISTORICAL_SNAPSHOT_NOT_CURRENT_DEPLOYMENT",
+  "review_scope": "Rechecked completion of recorded GitHub publication run and jobs; no fresh Hugging Face runtime or organization-wide inventory measurement."
 }
