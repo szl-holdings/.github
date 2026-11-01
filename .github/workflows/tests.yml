@@ -290,6 +290,14 @@ jobs:
           "$VENV/bin/python" -I -P .github/scripts/test_hf_deploy_from_dockerfile.py
           "$VENV/bin/python" -I -P .github/scripts/test_hf_space_source_binding.py
 
+      - name: HF singleton current-attempt evidence (offline)
+        env:
+          HF_HUB_OFFLINE: "1"
+          HF_HUB_DISABLE_IMPLICIT_TOKEN: "1"
+        run: >-
+          "$RUNNER_TEMP/hf-publisher-venv/bin/python" -I -P
+          .github/scripts/test_hf_a11oy_singleton_verify.py -v
+
       # Pins the canonical static-Space publication path used by the Hugging
       # Face organization front door. The tests are network-free and lock safe
       # path handling, immutable source identity, and generated deployment

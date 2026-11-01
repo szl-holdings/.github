@@ -203,13 +203,37 @@ class CurrentRunReportTests(unittest.TestCase):
 
     def test_workflow_consumers_and_completion_use_current_attempt(self):
         workflow = (SCRIPT_DIR.parent / "workflows" / "hf-estate-upgrade.yml").read_text()
-        self.assertIn("${{ runner.temp }}/hf-canonical-a11oy-${{ github.run_id }}-${{ github.run_attempt }}.json", workflow)
+        self.assertNotIn("${{ runner.temp }}", workflow.split("    steps:", 1)[0])
         self.assertNotIn("reports/hf-estate-upgrade-latest.json", workflow)
         self.assertIn('--report-out "$REPORT_PATH"', workflow)
         self.assertIn("${{ env.REPORT_PATH }}", workflow)
         self.assertIn('cat "$REPORT_PATH"', workflow)
         self.assertIn("steps.report.outputs.current", workflow)
         self.assertIn('code="${{ steps.estate.outputs.exit_code }}"', workflow)
+
+    def test_report_path_initialization_is_runner_scoped_and_attempt_specific(self):
+        workflow = (SCRIPT_DIR.parent / "workflows" / "hf-estate-upgrade.yml").read_text()
+        first_step = workflow.split("    steps:\n", 1)[1].split("      - name: ")
+        self.assertTrue(first_step[1].startswith("Initialize report path for this run attempt\n"))
+        program = textwrap.dedent(first_step[1].split("        run: |\n", 1)[1])
+        with tempfile.TemporaryDirectory(prefix="singleton runner ") as scratch:
+            root = pathlib.Path(scratch)
+            paths = []
+            for attempt in ("1", "2"):
+                env_file = root / f"environment {attempt}"
+                subprocess.run(["bash", "-euo", "pipefail", "-c", program], check=True,
+                               capture_output=True, text=True, env={
+                                   "PATH": os.defpath,
+                                   "RUNNER_TEMP": str(root),
+                                   "GITHUB_RUN_ID": "100",
+                                   "GITHUB_RUN_ATTEMPT": attempt,
+                                   "GITHUB_ENV": str(env_file),
+                               })
+                expected = root / f"hf-canonical-a11oy-100-{attempt}.json"
+                self.assertEqual(env_file.read_text(), f"REPORT_PATH={expected}\n")
+                self.assertFalse(expected.exists())
+                paths.append(expected)
+            self.assertNotEqual(paths[0], paths[1])
 
 
 if __name__ == "__main__":

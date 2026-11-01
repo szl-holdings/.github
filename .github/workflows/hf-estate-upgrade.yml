@@ -46,8 +46,14 @@ jobs:
       GH_TOKEN: ${{ github.token }}
       GITHUB_TOKEN: ${{ github.token }}
       REPORT_ISSUE_TITLE: '[hf-canonicalization-report] single A11oy Space'
-      REPORT_PATH: ${{ runner.temp }}/hf-canonical-a11oy-${{ github.run_id }}-${{ github.run_attempt }}.json
     steps:
+      - name: Initialize report path for this run attempt
+        shell: bash
+        run: |
+          set -euo pipefail
+          printf 'REPORT_PATH=%s/hf-canonical-a11oy-%s-%s.json\n' \
+            "$RUNNER_TEMP" "$GITHUB_RUN_ID" "$GITHUB_RUN_ATTEMPT" >> "$GITHUB_ENV"
+
       - name: Checkout singleton verifier
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
