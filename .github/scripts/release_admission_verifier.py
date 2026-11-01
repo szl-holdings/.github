@@ -103,6 +103,8 @@ PROVENANCE_BY_EVENT = {
     "merge_group": ("Exact merge-group provenance", "merge_group"),
 }
 TRUST_ROOT_PATHS = frozenset({
+    ".github/scripts/effect_check_enforcement.py",
+    ".github/scripts/test_effect_check_enforcement.py",
     ".github/data/control_plane_effect_policy.json",
     ".github/scripts/control_plane_effect_gate.py",
     ".github/scripts/test_control_plane_effect_gate.py",

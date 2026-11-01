@@ -145,6 +145,8 @@ jobs:
           set -e
           python -I .github/scripts/effect_check_enforcement.py \
             --fetch-comments \
+            --exit-code "${gate_exit}" \
+            --receipt cp-ebom/report.json \
             --comments "${COMMENT_PATH}" \
             --run-created-path "${RUNNER_TEMP}/effect-run-created-at" \
             --subject "${RUNNER_TEMP}/owner-subject.json"

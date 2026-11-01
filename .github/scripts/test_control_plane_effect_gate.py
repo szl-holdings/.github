@@ -1532,6 +1532,17 @@ class GitReceiptTests(unittest.TestCase):
                 receipt["claim"], "VERIFIED_STATIC_EFFECT_BOUNDARY"
             )
 
+    def test_effect_enforcer_cannot_certify_its_own_change(self) -> None:
+        for path in (".github/scripts/effect_check_enforcement.py",
+                     ".github/scripts/test_effect_check_enforcement.py"):
+            with self.subTest(path=path), TemporaryRepository() as fixture:
+                base = fixture.install_baseline()
+                fixture.write(path, b"raise SystemExit(0)\n")
+                head = fixture.commit("change effect enforcer")
+                receipt = analyze(fixture.root, base, head)
+                self.assertEqual(receipt["verdict"], "REVIEW_REQUIRED")
+                self.assertIn(path, receipt["trust_root_changes"])
+
     def test_trust_root_bundled_with_matching_digest_denied_workflow_stays_deny(self) -> None:
         source = workflow(extra_step='      - {"r\\u0075n": "git push origin main"}\n')
         with TemporaryRepository() as fixture:

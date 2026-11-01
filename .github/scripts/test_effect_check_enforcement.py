@@ -13,6 +13,7 @@ import os
 import sys
 import tempfile
 import unittest
+from unittest import mock
 from pathlib import Path
 
 MODULE_PATH = Path(__file__).with_name("effect_check_enforcement.py")
@@ -71,6 +72,49 @@ def _accept(head: str = HEAD, author: str = "stephenlutar2-hash",
 
 
 class EffectCheckEnforcementTests(unittest.TestCase):
+    def test_review_required_still_fails_when_comment_api_is_unavailable(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            receipt = root / "receipt.json"
+            receipt.write_text(json.dumps({"verdict": "REVIEW_REQUIRED"}))
+            with mock.patch.object(enforcement, "fetch_comments", side_effect=SystemExit("API unavailable")) as fetch:
+                with self.assertRaises(SystemExit):
+                    enforcement.main([
+                        "--fetch-comments", "--exit-code", "3", "--receipt", str(receipt),
+                        "--comments", str(root / "comments"), "--run-created-path", str(root / "created"),
+                        "--subject", str(root / "subject"),
+                    ])
+                fetch.assert_called_once()
+
+    def test_agreeing_allow_and_deny_do_not_fetch_comments(self):
+        for verdict, exit_code in (("ALLOW", 0), ("DENY", 2)):
+            with self.subTest(verdict=verdict), tempfile.TemporaryDirectory() as directory:
+                root = Path(directory)
+                receipt = root / "receipt.json"
+                receipt.write_text(json.dumps({"verdict": verdict}))
+                with mock.patch.object(enforcement, "fetch_comments", side_effect=SystemExit("API unavailable")) as fetch:
+                    self.assertEqual(enforcement.main([
+                        "--fetch-comments", "--exit-code", str(exit_code), "--receipt", str(receipt),
+                        "--comments", str(root / "comments"), "--run-created-path", str(root / "created"),
+                        "--subject", str(root / "subject"),
+                    ]), 0)
+                    fetch.assert_not_called()
+                self.assertEqual(json.loads((root / "comments").read_text()), [])
+
+    def test_fetch_receipt_disagreement_fails_before_network(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            receipt = root / "receipt.json"
+            receipt.write_text(json.dumps({"verdict": "ALLOW"}))
+            with mock.patch.object(enforcement, "fetch_comments", return_value=0) as fetch:
+                with self.assertRaises(SystemExit):
+                    enforcement.main([
+                        "--fetch-comments", "--exit-code", "3", "--receipt", str(receipt),
+                        "--comments", str(root / "comments"), "--run-created-path", str(root / "created"),
+                        "--subject", str(root / "subject"),
+                    ])
+                fetch.assert_not_called()
+
     def test_review_required_is_not_an_analyzer_pass(self):
         self.assertEqual(enforcement.check_decision(3, "REVIEW_REQUIRED"), "FAIL")
 

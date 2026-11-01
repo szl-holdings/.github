@@ -325,6 +325,22 @@ def main(argv: list[str] | None = None) -> int:
             if args.comments is None or args.run_created_path is None or args.subject is None:
                 raise SystemExit(
                     "comment fetch needs --comments, --run-created-path, and --subject")
+            if args.exit_code is not None or args.receipt is not None:
+                if args.exit_code is None or args.receipt is None:
+                    raise SystemExit("conditional comment fetch needs --exit-code and --receipt")
+                try:
+                    receipt = json.loads(args.receipt.read_text("utf-8"))
+                except (OSError, UnicodeError, json.JSONDecodeError):
+                    raise SystemExit("the analyzer receipt is unavailable or malformed") from None
+                if not isinstance(receipt, dict) or check_decision(
+                    args.exit_code, receipt.get("verdict")
+                ) == "DISAGREE":
+                    raise SystemExit("analyzer exit and receipt verdict do not agree")
+                if receipt["verdict"] != "REVIEW_REQUIRED":
+                    args.comments.write_text("[]", encoding="utf-8")
+                    args.run_created_path.write_text("", encoding="utf-8")
+                    _write_subject(args.subject, os.environ.get("GITHUB_EVENT_NAME") or "unknown", 0, "")
+                    return 0
             return fetch_comments(args.comments, args.run_created_path, args.subject)
         if args.exit_code is None or args.receipt is None or args.status is None:
             raise SystemExit("enforce needs --exit-code, --receipt, and --status")

@@ -81,6 +81,8 @@ TRUSTED_TOOL_PATHS = frozenset(
 TRUST_ROOT_PATHS = frozenset(
     {
         DEFAULT_POLICY_PATH,
+        ".github/scripts/effect_check_enforcement.py",
+        ".github/scripts/test_effect_check_enforcement.py",
         ".github/scripts/control_plane_effect_gate.py",
         ".github/scripts/test_control_plane_effect_gate.py",
         ".github/workflows/control-plane-effect-gate.yml",
