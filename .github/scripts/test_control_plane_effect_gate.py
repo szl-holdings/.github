@@ -287,6 +287,47 @@ class SinkRecognitionTests(unittest.TestCase):
             [".github/workflows/reusable-production-readiness.yml"],
         )
 
+    def test_quoted_gh_workflow_run_endpoints_are_not_local_files(self) -> None:
+        for repository in ("$REPOSITORY", "${REPOSITORY}", "szl-holdings/.github"):
+            for prefix in ("", "https://api.github.com/"):
+                for quote in ("'", '"'):
+                    endpoint = f"{prefix}repos/{repository}/actions/workflows/gates.yml/runs?event=pull_request&per_page=100"
+                    source = f"LATEST=$(gh api {quote}{endpoint}{quote} --jq '.workflow_runs')"
+                    with self.subTest(source=source):
+                        self.assertEqual(gate.workflow_dependencies(source), [])
+
+    def test_api_path_exclusion_preserves_real_adjacent_and_embedded_dependencies(self) -> None:
+        endpoint = 'repos/$REPOSITORY/actions/workflows/gates.yml/runs'
+        cases = (
+            (f'gh api "{endpoint}"; python scripts/real.py', ['scripts/real.py']),
+            (f'gh api "{endpoint}"; cat actions/workflows/gates.yml', ['actions/workflows/gates.yml']),
+            (f'gh api "{endpoint}" < .github/data/payload.json', ['.github/data/payload.json']),
+            (f'gh api "{endpoint}?x=$(python scripts/real.py)"', ['actions/workflows/gates.yml', 'scripts/real.py']),
+            (f'gh api "{endpoint}?x=`python tools/real.py`"', ['actions/workflows/gates.yml', 'tools/real.py']),
+            (f'cat "{endpoint}"', ['actions/workflows/gates.yml']),
+            ('gh api "repos/$(python scripts/real.py)/actions/workflows/gates.yml/runs"', ['actions/workflows/gates.yml', 'scripts/real.py']),
+            ('python actions/workflows/gates.yml', ['actions/workflows/gates.yml']),
+            ('uses: ./actions/workflows/gates.yml', ['actions/workflows/gates.yml']),
+        )
+        for source, expected in cases:
+            with self.subTest(source=source):
+                self.assertEqual(gate.workflow_dependencies(source), expected)
+
+    def test_only_exact_quoted_workflow_run_route_is_excluded(self) -> None:
+        for command in (
+            'gh api "repos/$REPOSITORY/actions/workflows/gates.yml/dispatches"',
+            'gh api "repos/$REPOSITORY/actions/workflows/gates.yml/../runs"',
+            'gh api "https://example.invalid/repos/$REPOSITORY/actions/workflows/gates.yml/runs"',
+            'gh api repos/$REPOSITORY/actions/workflows/gates.yml/runs',
+            'gh api --hostname example.invalid "repos/$REPOSITORY/actions/workflows/gates.yml/runs"',
+        ):
+            with self.subTest(command=command):
+                self.assertEqual(gate.workflow_dependencies(command), ['actions/workflows/gates.yml'])
+
+    def test_decoded_api_route_keeps_separate_decoded_source_read(self) -> None:
+        source = workflow(extra_step='      - "r\\u0075n": "gh api \'repos/$REPOSITORY/actions/workflows/gates.yml/runs\'; python scripts/fi\\u0078ture.py"\n')
+        self.assertEqual(gate.workflow_dependencies(source.decode()), ['scripts/fixture.py'])
+
     def test_unclassified_shell_commands_cannot_earn_allow(self) -> None:
         for command in (
             "aws s3 cp artifact s3://bucket/key",
@@ -1223,6 +1264,13 @@ class YamlBoundaryRegressionTests(unittest.TestCase):
         self.assertEqual(bound["dependencies"], [{"path": "scripts/fixture.py", "sha256": gate.sha256_bytes(b"pass\n")}])
         local_uses = workflow(extra_step='      - "u\\u0073es": "./.github/workflows/fi\\u0078ture.yml"\n')
         self.assertEqual(gate.workflow_dependencies(local_uses.decode()), [".github/workflows/fixture.yml"])
+
+    def test_workflow_run_api_selector_does_not_require_a_local_actions_file(self) -> None:
+        source = workflow(extra_step='      - run: gh api "repos/$REPOSITORY/actions/workflows/gates.yml/runs"\n')
+        candidate = reviewed_policy_for(source)
+        parsed, bound = bind_source(source, candidate=candidate)
+        self.assertEqual(parsed["dependencies"], [])
+        self.assertEqual(bound["verdict"], "ALLOW")
 
     def test_missing_dependency_cannot_be_waived_by_unknown_entry(self) -> None:
         source = workflow(extra_step="      - run: python scripts/fixture.py\n")

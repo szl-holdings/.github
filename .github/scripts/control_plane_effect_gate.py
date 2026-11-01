@@ -218,6 +218,19 @@ LOCAL_PATH = re.compile(
 )
 
 
+# A workflow filename in this exact quoted gh API route is a remote selector,
+# not a Git-tree dependency. Keep the exclusion bounded to the route itself:
+# query interpolation, command substitutions, other commands and adjacent
+# source-file arguments must retain normal conservative dependency scanning.
+GITHUB_WORKFLOW_RUN_API = re.compile(
+    r"(?<![A-Za-z0-9_./-])gh[ \t]+api[ \t]+(?P<quote>[\"'])"
+    r"(?P<endpoint>(?:https://api\.github\.com/)?repos/"
+    r"(?:\$REPOSITORY|\$\{REPOSITORY\}|[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+)/"
+    r"actions/workflows/[A-Za-z0-9_.-]+\.ya?ml)"
+    r"/runs(?:\?[^\"'$`\\\s]*)?(?P=quote)"
+)
+
+
 class GateError(RuntimeError):
     """Policy, repository, or analysis state cannot be trusted."""
 
@@ -1137,8 +1150,15 @@ def workflow_dependencies(source: str, *, path: str = "") -> list[str]:
     except GateError:
         # A malformed workflow still fails analysis; retain discoverable raw paths.
         pass
+    remote_selectors = [
+        (match.start("endpoint"), match.end("endpoint"))
+        for match in GITHUB_WORKFLOW_RUN_API.finditer(clean)
+    ]
     dependencies: set[str] = set()
     for match in LOCAL_PATH.finditer(clean):
+        if any(start <= match.start(1) and match.end(1) <= end
+               for start, end in remote_selectors):
+            continue
         spelling = match.group(1)
         # A leading ./ is GitHub's explicit repository-local uses syntax.
         # The policy and receipt still use one canonical Git-tree path.

@@ -587,8 +587,8 @@
         "readback": true
       },
       "trusted_transitives": {
-        ".github/scripts/control_plane_effect_gate.py": "sha256:45102f62b483c096b2338258073da95142d67c00be6d5eab3555046128ff110d",
-        ".github/scripts/test_control_plane_effect_gate.py": "sha256:2284dbd358528041b4ce2e741b746076c7e3d161bd2713c5ab80bf810cd307c1"
+        ".github/scripts/control_plane_effect_gate.py": "sha256:d1b9f420e7707792a03aa3282da36053a555bad46b65cc6fe6b36a7797eea976",
+        ".github/scripts/test_control_plane_effect_gate.py": "sha256:32724d67c0ca2be76d57f8bdd2aa8da8797aa1b9b592b9a18a75fb2237e89d42"
       },
       "reviewed_unknowns": {
         "files": {
@@ -1113,8 +1113,8 @@
         "readback": false
       },
       "trusted_transitives": {
-        ".github/scripts/control_plane_effect_gate.py": "sha256:45102f62b483c096b2338258073da95142d67c00be6d5eab3555046128ff110d",
-        ".github/scripts/test_control_plane_effect_gate.py": "sha256:2284dbd358528041b4ce2e741b746076c7e3d161bd2713c5ab80bf810cd307c1"
+        ".github/scripts/control_plane_effect_gate.py": "sha256:d1b9f420e7707792a03aa3282da36053a555bad46b65cc6fe6b36a7797eea976",
+        ".github/scripts/test_control_plane_effect_gate.py": "sha256:32724d67c0ca2be76d57f8bdd2aa8da8797aa1b9b592b9a18a75fb2237e89d42"
       },
       "reviewed_unknowns": {
         "files": {
