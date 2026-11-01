@@ -1082,21 +1082,39 @@ def compare(args, allow=None, include_dockerfile=False):
     sources, rejected_sources, context_roots = _classify_copy_sources(
         dockerfile_text)
 
-    if args.github_remote:
-        gh_files = github_tree_remote(args.github_repo, github_ref)
-    else:
-        gh_files = github_tree_local(args.repo_root)
+    comparison_unavailable = None
+    try:
+        if args.github_remote:
+            gh_files = github_tree_remote(args.github_repo, github_ref)
+        else:
+            gh_files = github_tree_local(args.repo_root)
+        hf_files = hf_tree(args.hf_repo, hf_ref)
+    except TransientHTTPError as exc:
+        if not rejected_sources and not context_roots:
+            raise
+        # The Dockerfile already proves a contract violation. An unavailable
+        # provider cannot erase it or turn --warn-only into a neutral pass.
+        # No byte comparison completed, so do not invent missing-both rows.
+        gh_files, hf_files = {}, {}
+        comparison_unavailable = str(exc)
 
-    hf_files = hf_tree(args.hf_repo, hf_ref)
-
-    targets = sorted(expand_targets(sources, gh_files, hf_files, allow))
-    if include_dockerfile and not is_ignored(dockerfile_path, allow):
+    targets = ([] if comparison_unavailable else
+               sorted(expand_targets(sources, gh_files, hf_files, allow)))
+    if (not comparison_unavailable and include_dockerfile
+            and not is_ignored(dockerfile_path, allow)):
         targets = sorted(set(targets) | {dockerfile_path})
 
     # Every finding carries a severity: "error" (real GitHub<->HF divergence,
     # fails the job) or "warn" (allowlisted backlog, or a COPY source absent on
     # BOTH sides -- the latter is dockerfile-copy-guard's domain, not drift).
     findings = []
+    if comparison_unavailable:
+        findings.append({
+            "path": "(pair)",
+            "kind": "comparison-unavailable",
+            "severity": "warn",
+            "detail": "Byte parity was not verified: " + comparison_unavailable,
+        })
     _hf_date_cache = {}
     _github_lfs_sha256_cache = {}
 
@@ -1114,7 +1132,14 @@ def compare(args, allow=None, include_dockerfile=False):
                 and hf_size > MAX_REMOTE_LFS_COMPARE_BYTES):
             value = None
         elif args.github_remote:
-            value = github_file_sha256_remote(args.github_repo, path, github_ref)
+            try:
+                value = github_file_sha256_remote(args.github_repo, path, github_ref)
+            except TransientHTTPError:
+                if not rejected_sources and not context_roots:
+                    raise
+                # Preserve the already-known COPY failure while reporting
+                # this LFS content identity as unverified.
+                value = None
         else:
             value = github_file_sha256_local(args.repo_root, path)
         _github_lfs_sha256_cache[path] = value

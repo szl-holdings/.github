@@ -874,6 +874,23 @@ class TestTransientHTTPInconclusive(unittest.TestCase):
         self.assertEqual(report["status"], "ok")
         self.assertEqual(errors, [])
 
+    def test_known_copy_error_survives_lfs_content_read_outage(self):
+        args = self._args()
+
+        def gh_get(url, *args, **kwargs):
+            if url.endswith("/Dockerfile"):
+                return 200, b"COPY mod.py /app/\nCOPY ../secret /tmp/\n", None
+            raise drift.TransientHTTPError(url, 429, 8)
+
+        drift.gh_get = gh_get
+        drift.github_tree_remote = lambda *args, **kwargs: {"mod.py": "different"}
+        drift.hf_tree = lambda *args, **kwargs: {
+            "mod.py": {"oid": "hf", "lfs_oid": "a" * 64, "size": 1}}
+        report, errors, _warns = drift.compare(args)
+        self.assertEqual(report["status"], "drift")
+        self.assertEqual({row["kind"] for row in errors},
+                         {"rejected-copy-source", "lfs-unverified"})
+
 
 class TestRegistryInconclusiveHonesty(unittest.TestCase):
     """Registry mode must never give an inconclusive sweep a terminal OK."""
@@ -1354,6 +1371,9 @@ def _drift_exit_probe(argv):
     if len(argv) != 1:
         return 97
     case = argv[0]
+    hf_unavailable = case.endswith("-hf429")
+    if hf_unavailable:
+        case = case.removesuffix("-hf429")
     gh_repo = "fixture-owner/fixture-repo"
     hf_repo = "fixture-owner/fixture-space"
     source = "a" * 40
@@ -1434,6 +1454,8 @@ def _drift_exit_probe(argv):
             write_repo(repo, single[case])
 
             def hf_tree(_repo, ref="main"):
+                if hf_unavailable:
+                    raise drift.TransientHTTPError("https://huggingface.co/fixture", 429, 8)
                 files = drift.github_tree_local(repo)
                 return {
                     path: {"oid": sha, "lfs_oid": None, "size": 1}
@@ -1478,10 +1500,15 @@ def _drift_exit_probe(argv):
                 return status, body, {} if want_headers else None
 
             drift.gh_get = gh_get
-            drift.hf_tree = lambda _repo, ref="main": {
-                rel: {"oid": sha, "lfs_oid": None, "size": len(blobs[rel])}
-                for rel, sha in shas.items()
-            }
+            def registry_hf_tree(_repo, ref="main"):
+                if hf_unavailable:
+                    raise drift.TransientHTTPError("https://huggingface.co/fixture", 429, 8)
+                return {
+                    rel: {"oid": sha, "lfs_oid": None, "size": len(blobs[rel])}
+                    for rel, sha in shas.items()
+                }
+
+            drift.hf_tree = registry_hf_tree
             registry_path = os.path.join(tmp, "registry.json")
             with open(registry_path, "w", encoding="utf-8", newline="\n") as handle:
                 json.dump(
@@ -1643,6 +1670,24 @@ class TestContractProcessExit(unittest.TestCase):
                     self.assertIn("context-root-unsupported", completed.stdout)
                     self.assertNotIn("missing-both", completed.stdout)
                     self.assertNotIn("traversal", completed.stdout.lower())
+
+    def test_known_copy_contract_failures_survive_hf_outage(self):
+        for mode in ("single", "registry"):
+            for source in ("traversal", "mixed", "all-rejected", "dot", "dot-slash"):
+                with self.subTest(mode=mode, source=source):
+                    completed = self._run(f"{mode}-{source}-hf429")
+                    self.assertEqual(completed.returncode, 1, completed.stdout + completed.stderr)
+                    self.assertIn("\nFAIL:", "\n" + completed.stdout)
+                    self.assertIn("files compared: 0", completed.stdout)
+                    self.assertNotIn("\nOK:", "\n" + completed.stdout)
+
+    def test_safe_sources_remain_inconclusive_during_hf_outage(self):
+        for mode in ("single", "registry"):
+            with self.subTest(mode=mode):
+                completed = self._run(f"{mode}-dotted-hf429")
+                self.assertEqual(completed.returncode, 0, completed.stdout + completed.stderr)
+                self.assertIn("INCONCLUSIVE", completed.stdout)
+                self.assertNotIn("\nOK:", "\n" + completed.stdout)
 
 
 
