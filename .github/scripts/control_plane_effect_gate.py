@@ -200,6 +200,17 @@ SEISMIC_WITNESS_DIGEST = "sha256:90865f00ff2d5385abd449be0e6f8e1e5f0d0ad6717bcc4
 SEISMIC_VALIDATOR_DIGEST = "sha256:171561401429289c4be789240586914b9ba76c7efc80e5452f6de640b5c3a586"
 SEISMIC_TOOLS = frozenset({SEISMIC_VALIDATOR, RUNTIME_LOCK,
     ".github/scripts/hf_deploy_from_dockerfile.py", ".github/scripts/hf_space_source_binding.py"})
+THE_GRID_PUBLISHER = ".github/workflows/reusable-hf-deploy-the-grid.yml"
+THE_GRID_WITNESS = ".github/workflows/reusable-hf-deploy-the-grid-source-witness.yml"
+THE_GRID_VALIDATOR = ".github/scripts/hf_the_grid_publish_contract.py"
+THE_GRID_EVIDENCE_ARTIFACT = "hf-deploy-evidence-${{ github.run_id }}-${{ github.run_attempt }}"
+# The-grid has a separate fixed interface. It shares the reviewed publisher
+# helper closure but intentionally has no application source-variable effect.
+THE_GRID_PUBLISHER_DIGEST = "sha256:5efedd22489d63367b063e7fd393dac171e180719b83510d727ffb769bbf5dfd"
+THE_GRID_WITNESS_DIGEST = "sha256:2f7b009fe23b613331e16bb90eed7ca1e3e8507b604c2ba0a61b3159d0cf16d0"
+THE_GRID_VALIDATOR_DIGEST = "sha256:2c11646478044367d148de01f082ad10825671671c48bfb7f581fdc90c3a7056"
+THE_GRID_TOOLS = frozenset({THE_GRID_VALIDATOR, RUNTIME_LOCK,
+    ".github/scripts/hf_deploy_from_dockerfile.py"})
 
 PYTHON_MUTATORS: Mapping[str, str] = {
     "add_space_secret": "sdk.huggingface.add_space_secret",
@@ -1048,6 +1059,11 @@ def seismic_caller_checkout(inputs: Mapping[str, str]) -> bool:
                       "path": "caller", "persist-credentials": "false", "fetch-depth": "1"}
 
 
+def the_grid_caller_checkout(inputs: Mapping[str, str]) -> bool:
+    return inputs == {"repository": "szl-holdings/The-grid", "ref": "${{ github.sha }}",
+                      "path": "caller", "persist-credentials": "false", "fetch-depth": "1"}
+
+
 def seismic_publisher_profile(source: str, document: Mapping[str, Any]) -> bool:
     """Admit only the reviewed, exact-byte seismic publisher graph."""
     return (sha256_bytes(source.encode("utf-8")) == SEISMIC_PUBLISHER_DIGEST
@@ -1070,6 +1086,30 @@ def seismic_contract_call(source: str, document: Mapping[str, Any]) -> bool:
             and jobs["seismic-publisher-exact-source-witness"].get("with") == {"contract-only": "true"}
             and jobs["seismic-publisher-exact-source-witness"].get("secrets") == {
                 "HF_TOKEN": "${{ github.token }}"})
+
+
+def the_grid_publisher_profile(source: str, document: Mapping[str, Any]) -> bool:
+    """Admit only the reviewed, exact-byte The-grid publisher graph."""
+    return (sha256_bytes(source.encode("utf-8")) == THE_GRID_PUBLISHER_DIGEST
+            and isinstance(document.get("jobs"), dict)
+            and set(document["jobs"]) == {"invocation", "hf-deploy", "exact-source-contract"}
+            and document.get("permissions") == {"contents": "read"}
+            and document.get("concurrency") == {
+                "group": "hf-deploy-SZLHOLDINGS/the-grid", "cancel-in-progress": "false"}
+            and document["jobs"]["hf-deploy"].get("if") == "${{ inputs.contract-only == false }}"
+            and document["jobs"]["exact-source-contract"].get("if") == "${{ inputs.contract-only == true }}")
+
+
+def the_grid_contract_call(source: str, document: Mapping[str, Any]) -> bool:
+    """The local witness is pinned to its read-only exact bytes."""
+    jobs = document.get("jobs")
+    job_name = "the-grid-publisher-exact-source-witness"
+    return (sha256_bytes(source.encode("utf-8")) == THE_GRID_WITNESS_DIGEST
+            and isinstance(jobs, dict) and set(jobs) == {job_name}
+            and isinstance(jobs[job_name], dict)
+            and jobs[job_name].get("uses") == "./" + THE_GRID_PUBLISHER
+            and jobs[job_name].get("with") == {"contract-only": "true"}
+            and jobs[job_name].get("secrets") == {"HF_TOKEN": "${{ github.token }}"})
 
 
 def canonical_runtime_profile(document: Mapping[str, Any]) -> bool:
@@ -1231,6 +1271,8 @@ def runtime_artifact_resource(path: str, name: str, *, read: bool = False) -> st
         return "github:repository:szl-holdings/a11oy:artifact:" + name.split("-${{", 1)[0] + (":same-run-read" if read else "")
     if path == SEISMIC_PUBLISHER and name == SEISMIC_EVIDENCE_ARTIFACT and not read:
         return "github:repository:szl-holdings/szl-seismic-review:artifact:hf-deploy-evidence"
+    if path == THE_GRID_PUBLISHER and name == THE_GRID_EVIDENCE_ARTIFACT and not read:
+        return "github:repository:szl-holdings/The-grid:artifact:hf-deploy-evidence"
     if path == ".github/workflows/hf-public-smoke-contract.yml" and name in {
         "hf-public-smoke-py311-${{ github.run_id }}-${{ github.run_attempt }}",
         "hf-public-smoke-py312-${{ github.run_id }}-${{ github.run_attempt }}",
@@ -1245,6 +1287,8 @@ def workflow_dependencies(source: str, *, path: str = "") -> list[str]:
     contract_call = False
     seismic_profile = False
     seismic_call = False
+    the_grid_profile = False
+    the_grid_call = False
     try:
         document, _lines = parse_workflow_yaml(source)
         clean += "\n" + "\n".join(workflow_scalar_values(document))
@@ -1252,6 +1296,8 @@ def workflow_dependencies(source: str, *, path: str = "") -> list[str]:
         contract_call = path == RUNTIME_WITNESS and runtime_contract_call(document)
         seismic_profile = path == SEISMIC_PUBLISHER and seismic_publisher_profile(source, document)
         seismic_call = path == SEISMIC_WITNESS and seismic_contract_call(source, document)
+        the_grid_profile = path == THE_GRID_PUBLISHER and the_grid_publisher_profile(source, document)
+        the_grid_call = path == THE_GRID_WITNESS and the_grid_contract_call(source, document)
     except GateError:
         # A malformed workflow still fails analysis; retain discoverable raw paths.
         pass
@@ -1261,8 +1307,9 @@ def workflow_dependencies(source: str, *, path: str = "") -> list[str]:
         # A leading ./ is GitHub's explicit repository-local uses syntax.
         # The policy and receipt still use one canonical Git-tree path.
         dependency = spelling[2:] if spelling.startswith("./") else spelling
-        if (runtime_profile or seismic_profile) and dependency.startswith("tools/") and (
+        if (runtime_profile or seismic_profile or the_grid_profile) and dependency.startswith("tools/") and (
             dependency[6:] in RUNTIME_TOOLS or dependency[6:] in SEISMIC_TOOLS
+            or dependency[6:] in THE_GRID_TOOLS
         ):
             dependency = dependency[6:]
         dependencies.add(safe_repo_path(dependency))
@@ -1276,6 +1323,10 @@ def workflow_dependencies(source: str, *, path: str = "") -> list[str]:
         dependencies.update({RUNTIME_PUBLISHER, RUNTIME_VALIDATOR})
     if seismic_call:
         dependencies.update({SEISMIC_PUBLISHER, SEISMIC_VALIDATOR})
+    if the_grid_profile:
+        dependencies.update(THE_GRID_TOOLS)
+    if the_grid_call:
+        dependencies.update({THE_GRID_PUBLISHER, THE_GRID_VALIDATOR})
     return sorted(dependencies)
 
 
@@ -1687,6 +1738,8 @@ def analyze_workflow_source(source: str, *, path: str) -> dict[str, Any]:
     seismic_profile = path == SEISMIC_PUBLISHER and seismic_publisher_profile(source, document)
     seismic_call = path == SEISMIC_WITNESS and seismic_contract_call(source, document)
     forge9_attestor = path == FORGE9_ATTESTOR and forge9_attestor_profile(document)
+    the_grid_profile = path == THE_GRID_PUBLISHER and the_grid_publisher_profile(source, document)
+    the_grid_call = path == THE_GRID_WITNESS and the_grid_contract_call(source, document)
     if path == RUNTIME_PUBLISHER and not (runtime_profile and runtime_signing):
         unknown("CANONICAL_RUNTIME_INTERFACE_UNSUPPORTED", ())
     if path == RUNTIME_WITNESS and not contract_call:
@@ -1694,6 +1747,10 @@ def analyze_workflow_source(source: str, *, path: str) -> dict[str, Any]:
     if path == SEISMIC_PUBLISHER and not seismic_profile:
         unknown("CANONICAL_RUNTIME_INTERFACE_UNSUPPORTED", ())
     if path == SEISMIC_WITNESS and not seismic_call:
+        unknown("CANONICAL_RUNTIME_INTERFACE_UNSUPPORTED", ())
+    if path == THE_GRID_PUBLISHER and not the_grid_profile:
+        unknown("CANONICAL_RUNTIME_INTERFACE_UNSUPPORTED", ())
+    if path == THE_GRID_WITNESS and not the_grid_call:
         unknown("CANONICAL_RUNTIME_INTERFACE_UNSUPPORTED", ())
     jobs = document.get("jobs")
     if not isinstance(jobs, dict) or not jobs:
@@ -1722,7 +1779,7 @@ def analyze_workflow_source(source: str, *, path: str) -> dict[str, Any]:
         if "env" in job:
             unknown("WORKFLOW_ENVIRONMENT_REVIEW_REQUIRED", (*location, "env"))
         if "uses" in job:
-            if contract_call or seismic_call:
+            if contract_call or seismic_call or the_grid_call:
                 # This exact caller delegates grants to a same-source callee,
                 # whose typed contract-only graph is validated by the binder.
                 # Only two credential-free contents reads are reachable.
@@ -1841,6 +1898,7 @@ def analyze_workflow_source(source: str, *, path: str) -> dict[str, Any]:
                             lines[(*step_location, "uses")],
                             ("stepsecurity:monitor:szl-holdings/a11oy" if runtime_profile else
                              "stepsecurity:monitor:szl-holdings/szl-seismic-review" if seismic_profile else
+                             "stepsecurity:monitor:szl-holdings/The-grid" if the_grid_profile else
                              "stepsecurity:monitor:szl-holdings/.github"),
                         ))
                         if inputs.get("egress-policy", "block") == "block":
@@ -1874,6 +1932,8 @@ def analyze_workflow_source(source: str, *, path: str) -> dict[str, Any]:
                                 or (job_name == "hf-deploy" and runtime_caller_checkout(inputs)))
                             or seismic_profile and (runtime_tools_checkout(inputs)
                                 or (job_name == "hf-deploy" and seismic_caller_checkout(inputs)))
+                            or the_grid_profile and (runtime_tools_checkout(inputs)
+                                or (job_name == "hf-deploy" and the_grid_caller_checkout(inputs)))
                         )
                         if (
                             inputs.get("github-server-url", "https://github.com") != "https://github.com"
@@ -1900,7 +1960,7 @@ def analyze_workflow_source(source: str, *, path: str) -> dict[str, Any]:
                             unknown("CHECKOUT_SOURCE_BOUNDARY_UNSUPPORTED", (*step_location, "with"))
                     if sink == "github.contents.checkout" and "repository" in inputs:
                         repository = inputs["repository"]
-                        if (runtime_profile or seismic_profile) and runtime_tools_checkout(inputs):
+                        if (runtime_profile or seismic_profile or the_grid_profile) and runtime_tools_checkout(inputs):
                             repository = "szl-holdings/.github"
                         if not re.fullmatch(r"[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+", repository):
                             unknown("ACTION_RESOURCE_OVERRIDE_UNSUPPORTED", (*step_location, "with"))
@@ -1911,8 +1971,9 @@ def analyze_workflow_source(source: str, *, path: str) -> dict[str, Any]:
                             unknown("ACTION_RESOURCE_OVERRIDE_UNSUPPORTED", (*step_location, "with"))
                         artifact = inputs.get("name", "artifact")
                         runtime_resource = runtime_artifact_resource(path, artifact)
-                        if runtime_resource and (path not in {RUNTIME_PUBLISHER, SEISMIC_PUBLISHER}
-                                or runtime_profile or seismic_profile):
+                        if runtime_resource and (path not in {
+                                RUNTIME_PUBLISHER, SEISMIC_PUBLISHER, THE_GRID_PUBLISHER}
+                                or runtime_profile or seismic_profile or the_grid_profile):
                             resource = runtime_resource
                         elif artifact == "control-plane-effect-${{ github.run_id }}":
                             # This exact run-scoped namespace is the enforcing
@@ -2392,6 +2453,21 @@ def bind_declaration(
                 valid_callee = False
             if not valid_callee:
                 all_unknowns.append(UnknownEffect("CANONICAL_RUNTIME_INTERFACE_UNSUPPORTED", SEISMIC_PUBLISHER, 1))
+    the_grid_contract = workflow_path in {THE_GRID_PUBLISHER, THE_GRID_WITNESS}
+    if the_grid_contract:
+        validator = dependency_blobs.get(THE_GRID_VALIDATOR)
+        if validator is None or sha256_bytes(validator) != THE_GRID_VALIDATOR_DIGEST:
+            all_unknowns.append(UnknownEffect("CANONICAL_RUNTIME_VALIDATOR_MISMATCH", workflow_path, 1))
+        if workflow_path == THE_GRID_WITNESS:
+            try:
+                source_text = dependency_blobs[THE_GRID_PUBLISHER].decode("utf-8")
+                callee, _ = parse_workflow_yaml(source_text)
+                valid_callee = the_grid_publisher_profile(source_text, callee)
+            except (KeyError, GateError, UnicodeError, TypeError, AttributeError):
+                valid_callee = False
+            if not valid_callee:
+                all_unknowns.append(UnknownEffect(
+                    "CANONICAL_RUNTIME_INTERFACE_UNSUPPORTED", THE_GRID_PUBLISHER, 1))
     for dependency in analysis["dependencies"]:
         content = dependency_blobs.get(dependency)
         if content is None:
@@ -2411,6 +2487,11 @@ def bind_declaration(
             # reachable from the pinned local witness.
             all_unknowns.append(UnknownEffect("SCRIPT_SOURCE_REVIEW_REQUIRED", dependency, 1))
             continue
+        if workflow_path == THE_GRID_WITNESS and dependency == THE_GRID_PUBLISHER:
+            # Only contract-only validation and exact-source comparison are
+            # reachable from the pinned local witness.
+            all_unknowns.append(UnknownEffect("SCRIPT_SOURCE_REVIEW_REQUIRED", dependency, 1))
+            continue
         dep_effects, dep_unknowns = analyze_dependency(dependency, content)
         if workflow_path == RUNTIME_PUBLISHER and dependency in RUNTIME_TOOLS:
             dep_effects = [RawEffect(item.sink, item.access, item.path, item.line,
@@ -2426,6 +2507,11 @@ def bind_declaration(
                  else "huggingface:space:SZLHOLDINGS/szl-seismic-review")
                 if item.sink in {"sdk.repository.create_commit", "sdk.huggingface.add_space_variable",
                                  "sdk.huggingface.restart_space"}
+                else item.resource) for item in dep_effects]
+        if workflow_path == THE_GRID_PUBLISHER and dependency in THE_GRID_TOOLS:
+            dep_effects = [RawEffect(item.sink, item.access, item.path, item.line,
+                "huggingface:space:SZLHOLDINGS/the-grid"
+                if item.sink in {"sdk.repository.create_commit", "sdk.huggingface.restart_space"}
                 else item.resource) for item in dep_effects]
         all_effects.extend(dep_effects)
         all_unknowns.extend(dep_unknowns)
