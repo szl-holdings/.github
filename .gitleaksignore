@@ -9,3 +9,8 @@
 # verified against publication job 122530231615. Scope this exception to
 # the exact signed commit, path, rule and line; future findings still fail.
 df1582c8b72bfc610ed0d23f83ac0070cea7319b:docs/SOURCE_PARITY_MANIFEST_V1.json:generic-api-key:235
+
+# The protected merge queue squashed #968 into this signed GitHub commit,
+# moving the same verified public HF Git revision to line 247. Keep the
+# exception bound to that exact admitted commit, path, rule, and line.
+3a802d5a6530304212f44b18b72539dbde12b9ba:docs/SOURCE_PARITY_MANIFEST_V1.json:generic-api-key:247
