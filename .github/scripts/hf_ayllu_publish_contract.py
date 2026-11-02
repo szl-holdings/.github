@@ -33,13 +33,23 @@ def validate(env: Mapping[str, str]) -> str:
 
     need("WORKFLOW_REPOSITORY", "szl-holdings/.github")
     for field in ("WORKFLOW_SHA", "EVENT_SHA"):
-        if SHA40.fullmatch(env.get(field, "")) is None:
+        if not isinstance(env.get(field), str) or SHA40.fullmatch(env[field]) is None:
             raise ValueError(f"AYLLU_PUBLISHER_INVOCATION_REJECTED:{field}")
 
     contract_only = env.get("CONTRACT_ONLY")
     if contract_only == "true":
         need("CALLER_REPOSITORY", "szl-holdings/.github")
         need("EVENT_NAME", "push")
+        ref = env.get("EVENT_REF", "")
+        if not isinstance(ref, str) or not ref.startswith("refs/heads/") or len(ref) <= 11:
+            raise ValueError("AYLLU_PUBLISHER_INVOCATION_REJECTED:EVENT_REF")
+        need("CALLER_WORKFLOW_REF", "szl-holdings/.github/.github/workflows/reusable-hf-deploy-ayllu-source-witness.yml@" + ref)
+        need("DOCKERFILE", "Dockerfile")
+        need("INCLUDE_README", "true")
+        need("PRUNE", "false")
+        need("RESTART", "false")
+        need("WAIT_RUNNING", "900")
+        need("SMOKE_PATHS", '["/"]')
         need("EVENT_SHA", env["WORKFLOW_SHA"])
         need("HF_REPO", "")
         need("DEPLOY_REF", "main")
@@ -69,7 +79,7 @@ def validate(env: Mapping[str, str]) -> str:
     need("WAIT_RUNNING", "900")
     try:
         paths = json.loads(env.get("SMOKE_PATHS", ""))
-    except json.JSONDecodeError as exc:
+    except (ValueError, TypeError) as exc:
         raise ValueError("AYLLU_PUBLISHER_INVOCATION_REJECTED:SMOKE_PATHS") from exc
     if paths != SMOKE_PATHS:
         raise ValueError("AYLLU_PUBLISHER_INVOCATION_REJECTED:SMOKE_PATHS")

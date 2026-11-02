@@ -255,6 +255,8 @@ jobs:
 
       - name: Ayllu publisher invocation contract self-test
         run: python3 -I -P .github/scripts/test_hf_ayllu_publish_contract.py
+      - name: Ayllu exact source and effect boundary
+        run: python3 -I -P .github/scripts/test_hf_ayllu_effect_contract.py
       - name: Seismic publisher invocation contract self-test
         run: python3 -I -P .github/scripts/test_hf_seismic_publish_contract.py
 
