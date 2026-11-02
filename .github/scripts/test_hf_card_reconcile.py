@@ -535,6 +535,31 @@ class CardReconcileTests(unittest.TestCase):
                 self.assertEqual(receipt["assets"][0]["label"], "UNAVAILABLE")
                 self.assertEqual(requests.call_count, 1)
 
+    def test_runtime_private_repository_requires_explicit_private_config_before_card_read(self):
+        metadata = json.dumps({"sha": HEAD, "private": True})
+        with patch.object(RECONCILE, "hub_request", return_value=(metadata, 200)) as requests:
+            row = RECONCILE.plan_asset(self.asset, self.defaults, TOKEN, str(self.root), True)
+        self.assertEqual(row["label"], "UNAVAILABLE")
+        self.assertIn("not marked private", row["detail"])
+        requests.assert_called_once_with("GET", "/api/spaces/SZLHOLDINGS/yarqa", TOKEN)
+        self.assertNotIn("original_text", row)
+        self.assertNotIn("new_text", row)
+
+    def test_runtime_private_visibility_drift_in_actions_apply_never_reads_or_writes_card(self):
+        expected, _ = self.expected_plan()
+        code, receipt, requests = self.run_main(
+            ["--apply", "--expected-plan", str(expected)],
+            [self.identity(), (json.dumps({"sha": HEAD, "private": True}), 200)], TOKEN,
+            env_extra={"GITHUB_ACTIONS": "true"})
+        self.assertEqual(code, 1)
+        self.assertEqual(receipt["assets"][0]["label"], "UNAVAILABLE")
+        self.assertIn("not marked private", receipt["assets"][0]["detail"])
+        self.assertEqual([call.args[1] for call in requests.call_args_list],
+                         ["/api/whoami-v2", "/api/spaces/SZLHOLDINGS/yarqa"])
+        self.assertTrue(all(call.args[0] == "GET" for call in requests.call_args_list))
+        self.assertNotIn("original_text", receipt["assets"][0])
+        self.assertNotIn("new_text", receipt["assets"][0])
+
     def test_private_apply_still_requires_exact_plan_and_verified_readback(self):
         self.private_config()
         metadata = (json.dumps({"sha": HEAD, "private": True}), 200)

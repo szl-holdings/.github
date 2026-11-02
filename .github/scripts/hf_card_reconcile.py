@@ -319,6 +319,8 @@ def plan_asset(asset: dict, defaults: dict, token: str | None, bodies_dir: str,
         if status != 200:
             raise ValueError(f"repository read HTTP {status}")
         metadata = json.loads(detail)
+        if metadata.get("private") is True and asset.get("private") is not True:
+            raise ValueError("repository is private at runtime but target is not marked private; refusing to read card")
         if asset.get("private") is True and metadata.get("private") is not True:
             raise ValueError("private target visibility changed; refusing to publish")
         revision = metadata.get("sha", "")
