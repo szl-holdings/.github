@@ -116,5 +116,90 @@ class EnabledStageTests(unittest.TestCase):
                 self.assertEqual(output.read_text(), "enabled=false\n")
 
 
+class PackageManagerInputTests(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls.source = WORKFLOW.read_text(encoding="utf-8")
+
+    def run_body(self, name, manager, *, lock=False, status=0):
+        step, body = step_body(self.source, f"      - name: {name}\n")
+        self.assertIn("PACKAGE_MANAGER: ${{ inputs.package-manager }}", step)
+        self.assertNotIn("${{ inputs.package-manager }}", body)
+        with tempfile.TemporaryDirectory(prefix="node-ci-input-") as directory:
+            root = Path(directory)
+            for binary_name in ("npm", "pnpm", "yarn"):
+                binary = root / binary_name
+                binary.write_text('#!/bin/sh\nprintf "%s\\n" "$@" > "$INVOCATION"\nexit "$MANAGER_STATUS"\n', encoding="utf-8")
+                binary.chmod(0o755)
+            if lock:
+                for filename in ("package-lock.json", "pnpm-lock.yaml", "yarn.lock"):
+                    (root / filename).touch()
+            invocation, output, marker = (root / name for name in ("invocation", "output", "injected"))
+            env = dict(os.environ, PATH=str(root) + os.pathsep + os.environ["PATH"],
+                       PACKAGE_MANAGER=manager, HAS_LOCKFILE=str(lock).lower(),
+                       MANAGER_STATUS=str(status), INVOCATION=str(invocation),
+                       GITHUB_OUTPUT=str(output), INJECTION_MARKER=str(marker))
+            result = subprocess.run(["bash", "--noprofile", "--norc", "-eo", "pipefail", "-c", body],
+                                    cwd=root, env=env, text=True, capture_output=True, timeout=15)
+            return (result, invocation.read_text() if invocation.exists() else None,
+                    output.read_text() if output.exists() else None, marker.exists())
+
+    def test_validation_precedes_installation_and_checkout(self):
+        position = self.source.index("      - name: Validate package manager\n")
+        for name in ("Harden runner", "Checkout", "Detect lockfile", "Install dependencies"):
+            self.assertLess(position, self.source.index(f"      - name: {name}\n"))
+        step, _ = step_body(self.source, "      - name: Validate package manager\n")
+        self.assertIn("if: steps.skip.outputs.enabled == 'true'", step)
+
+    def test_supported_managers_are_accepted(self):
+        for manager in ("npm", "pnpm", "yarn"):
+            with self.subTest(manager=manager):
+                result, invocation, _, marker = self.run_body("Validate package manager", manager)
+                self.assertEqual(result.returncode, 0, result.stderr)
+                self.assertIsNone(invocation)
+                self.assertFalse(marker)
+
+    def test_unsupported_managers_are_rejected_without_shell_execution(self):
+        for manager in ("", "bun", "/bin/true", "npm --version", "NPM",
+                        '$(touch "$INJECTION_MARKER")', '`touch "$INJECTION_MARKER"`',
+                        'npm"; touch "$INJECTION_MARKER"; #'):
+            with self.subTest(manager=manager):
+                result, invocation, _, marker = self.run_body("Validate package manager", manager)
+                self.assertNotEqual(result.returncode, 0)
+                self.assertIsNone(invocation)
+                self.assertFalse(marker)
+
+    def test_detection_and_installation_treat_input_as_data(self):
+        for step in ("Detect lockfile", "Install dependencies"):
+            for manager in ('$(touch "$INJECTION_MARKER")', '`touch "$INJECTION_MARKER"`',
+                            'npm"; touch "$INJECTION_MARKER"; #'):
+                with self.subTest(step=step, manager=manager):
+                    _, invocation, _, marker = self.run_body(step, manager)
+                    self.assertIsNone(invocation)
+                    self.assertFalse(marker)
+
+    def test_lockfile_detection_preserves_manager_mapping(self):
+        for manager, filename in (("npm", "package-lock.json"), ("pnpm", "pnpm-lock.yaml"), ("yarn", "yarn.lock")):
+            for lock in (False, True):
+                with self.subTest(manager=manager, lock=lock):
+                    result, invocation, output, marker = self.run_body("Detect lockfile", manager, lock=lock)
+                    self.assertEqual(result.returncode, 0, result.stderr)
+                    self.assertEqual(output, f"found=true\nfile={filename}\n" if lock else "found=false\n")
+                    self.assertIsNone(invocation)
+                    self.assertFalse(marker)
+
+    def test_install_modes_and_failures_are_preserved(self):
+        for manager, locked_args, unlocked_args in (("npm", "ci\n", "install\n--no-package-lock\n"),
+                                                  ("pnpm", "install\n--frozen-lockfile\n", "install\n--no-frozen-lockfile\n"),
+                                                  ("yarn", "install\n--frozen-lockfile\n", "install\n")):
+            for lock in (False, True):
+                for status in (0, 37):
+                    with self.subTest(manager=manager, lock=lock, status=status):
+                        result, invocation, _, marker = self.run_body("Install dependencies", manager, lock=lock, status=status)
+                        self.assertEqual(result.returncode, status, result.stderr)
+                        self.assertEqual(invocation, locked_args if lock else unlocked_args)
+                        self.assertFalse(marker)
+
+
 if __name__ == "__main__":
     unittest.main()

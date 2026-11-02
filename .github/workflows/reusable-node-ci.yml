@@ -75,6 +75,17 @@ jobs:
           esac
           echo "enabled=$enabled" >> "$GITHUB_OUTPUT"
 
+      - name: Validate package manager
+        if: steps.skip.outputs.enabled == 'true'
+        shell: bash
+        env:
+          PACKAGE_MANAGER: ${{ inputs.package-manager }}
+        run: |
+          case "$PACKAGE_MANAGER" in
+            npm|pnpm|yarn) ;;
+            *) echo '::error::package-manager must be npm, pnpm, or yarn'; exit 1;;
+          esac
+
       - name: Harden runner
         if: steps.skip.outputs.enabled == 'true'
         uses: step-security/harden-runner@e14015d583714f6e62063499dc959a02595150a1 # v2.21.1
@@ -90,8 +101,10 @@ jobs:
         id: lockfile
         working-directory: ${{ inputs.working-directory }}
         shell: bash
+        env:
+          PACKAGE_MANAGER: ${{ inputs.package-manager }}
         run: |
-          PM="${{ inputs.package-manager }}"
+          PM="$PACKAGE_MANAGER"
           case "$PM" in
             pnpm) FILE="pnpm-lock.yaml";;
             yarn) FILE="yarn.lock";;
@@ -149,8 +162,9 @@ jobs:
         shell: bash
         env:
           HAS_LOCKFILE: ${{ steps.lockfile.outputs.found }}
+          PACKAGE_MANAGER: ${{ inputs.package-manager }}
         run: |
-          PM="${{ inputs.package-manager }}"
+          PM="$PACKAGE_MANAGER"
           if [ "$HAS_LOCKFILE" = "true" ]; then
             case "$PM" in
               pnpm) pnpm install --frozen-lockfile;;
