@@ -861,31 +861,79 @@
       "trusted_transitives": {}
     },
     ".github/workflows/enforce-llm-router-flagship-card.yml": {
-      "intent_id": "llm-router-flagship-duplicate-writer-retired-v1",
+      "intent_id": "llm-router-flagship-anonymous-scheduled-observation-v1",
       "valid_until": "2026-11-30",
-      "source_sha256": "sha256:6172afae351401ee78107f69169315a67f06088b9198ea214400bed1585ca416",
+      "source_sha256": "sha256:fe439b44f1e1b8ccd1fedd389647951fba3ef633fac5508887dce66497a96c4f",
       "credentials": [],
       "resources": [
         {
           "key": "github:repository:szl-holdings/.github:contents",
           "access": "read"
+        },
+        {
+          "key": "runner:toolchain:python",
+          "access": "local-write"
         }
       ],
-      "effects": [],
+      "effects": [
+        {
+          "sink": "github.contents.checkout",
+          "resource": "github:repository:szl-holdings/.github:contents",
+          "access": "read",
+          "max_calls": 1
+        },
+        {
+          "sink": "runner.toolchain.install",
+          "resource": "runner:toolchain:python",
+          "access": "local-write",
+          "max_calls": 1
+        }
+      ],
       "max_external_writes": 0,
       "required_controls": {
-        "triggers": [
-          "workflow_dispatch"
-        ],
         "contents_read": true,
         "no_explicit_secrets": true,
-        "concurrency": false,
+        "concurrency": true,
         "protected_ref": false,
         "exact_sha": false,
         "expected_before": false,
-        "readback": false
+        "readback": false,
+        "triggers": [
+          "pull_request",
+          "schedule",
+          "workflow_dispatch"
+        ]
       },
-      "trusted_transitives": {}
+      "trusted_transitives": {},
+      "reviewed_unknowns": {
+        "files": {
+          ".github/scripts/router_flagship_observation.py": "sha256:bd3dea2d268abb707ebdc5fdd138f27a31ba96813c5e063ae22386000c161d32",
+          ".github/scripts/test_router_flagship_observation.py": "sha256:0aa366823dc50bfb25982312dc102d4f8e57326be10f6a7733a74bc545117152",
+          ".github/workflows/enforce-llm-router-flagship-card.yml": "sha256:fe439b44f1e1b8ccd1fedd389647951fba3ef633fac5508887dce66497a96c4f"
+        },
+        "unknowns": [
+          "ACTION_INPUTS_REVIEW_REQUIRED@.github/workflows/enforce-llm-router-flagship-card.yml:47",
+          "ACTION_INPUTS_REVIEW_REQUIRED@.github/workflows/enforce-llm-router-flagship-card.yml:52",
+          "DYNAMIC_EXECUTION@.github/workflows/enforce-llm-router-flagship-card.yml:58",
+          "HTTP_TARGET_UNRESOLVED@.github/scripts/router_flagship_observation.py:37",
+          "HTTP_TARGET_UNRESOLVED@.github/scripts/test_router_flagship_observation.py:137",
+          "PYTHON_IMPORT_UNRESOLVED@.github/scripts/router_flagship_observation.py:11",
+          "PYTHON_IMPORT_UNRESOLVED@.github/scripts/router_flagship_observation.py:12",
+          "PYTHON_IMPORT_UNRESOLVED@.github/scripts/router_flagship_observation.py:13",
+          "PYTHON_IMPORT_UNRESOLVED@.github/scripts/router_flagship_observation.py:3",
+          "PYTHON_IMPORT_UNRESOLVED@.github/scripts/router_flagship_observation.py:5",
+          "PYTHON_IMPORT_UNRESOLVED@.github/scripts/test_router_flagship_observation.py:1",
+          "PYTHON_IMPORT_UNRESOLVED@.github/scripts/test_router_flagship_observation.py:10",
+          "PYTHON_IMPORT_UNRESOLVED@.github/scripts/test_router_flagship_observation.py:3",
+          "PYTHON_IMPORT_UNRESOLVED@.github/scripts/test_router_flagship_observation.py:8",
+          "PYTHON_SOURCE_REVIEW_REQUIRED@.github/scripts/router_flagship_observation.py:1",
+          "PYTHON_SOURCE_REVIEW_REQUIRED@.github/scripts/test_router_flagship_observation.py:1",
+          "SCRIPT_SOURCE_REVIEW_REQUIRED@.github/workflows/enforce-llm-router-flagship-card.yml:1",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/enforce-llm-router-flagship-card.yml:54",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/enforce-llm-router-flagship-card.yml:58",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/enforce-llm-router-flagship-card.yml:58"
+        ]
+      }
     },
     ".github/workflows/finalize-hf-adaptive-theatre-v3.yml": {
   "intent_id": "hf-adaptive-theatre-manual-finalizer-v1",

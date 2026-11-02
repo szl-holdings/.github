@@ -4,13 +4,27 @@
 # the exact llm-router-live public/RUNNING treatment. The legacy writer used
 # mutable reads, type fallback and unconditional README uploads, which could
 # overwrite the canonical card. Preserve its history without a second writer.
-name: Enforce LLM Router flagship card (retired)
+# The original daily cadence now observes anonymous public reads only. Drift
+# fails this workflow for the canonical owners; it never starts a repair.
+name: LLM Router public observation (writer retired)
 
 "on":
   workflow_dispatch: {}
+  schedule:
+    - cron: "17 8 * * *"
+  pull_request:
+    paths:
+      - .github/workflows/enforce-llm-router-flagship-card.yml
+      - .github/scripts/router_flagship_observation.py
+      - .github/scripts/test_router_flagship_observation.py
+      - huggingface/org-card/README.md
 
 permissions:
   contents: read
+
+concurrency:
+  group: router-flagship-public-observation-${{ github.ref }}
+  cancel-in-progress: false
 
 jobs:
   enforce:
@@ -21,3 +35,25 @@ jobs:
     steps:
       - name: Retired no-op
         run: "true"
+
+  observe:
+    name: Observe public flagship without repair authority
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Checkout exact source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.event.merge_group.head_sha || github.sha }}
+          persist-credentials: false
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12.14"
+      - name: Verify offline observation contract
+        run: python -m unittest discover -s .github/scripts -p test_router_flagship_observation.py -v
+      - name: Observe public state and retain the report in this run
+        if: github.event_name != 'pull_request'
+        run: >-
+          python .github/scripts/router_flagship_observation.py
+          --source-sha "${GITHUB_SHA}"
