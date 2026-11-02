@@ -4,3 +4,8 @@
 # (branch codex/source-parity-20261027, not an ancestor of main).
 # fetch-depth 0 plus git log --all makes the main gitleaks job scan it.
 5561e45b7f95a733976e1c418e736455b2e34da1:docs/SOURCE_PARITY_MANIFEST_V1.json:generic-api-key:224
+
+# False positive: hf_api_revision is the historical public HF Git commit,
+# verified against publication job 122530231615. Scope this exception to
+# the exact signed commit, path, rule and line; future findings still fail.
+df1582c8b72bfc610ed0d23f83ac0070cea7319b:docs/SOURCE_PARITY_MANIFEST_V1.json:generic-api-key:235
