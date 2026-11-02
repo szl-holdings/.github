@@ -66,10 +66,15 @@ class AylluAdmission(unittest.TestCase):
     def test_readonly_witness_is_exact_source_and_org_local(self):
         env = publication()
         env.update(CALLER_REPOSITORY='szl-holdings/.github', EVENT_SHA='1'*40,
-                   CONTRACT_ONLY='true', HF_REPO='', DEPLOY_REF='main', REQUIRE_TIP='false')
+                   CONTRACT_ONLY='true', HF_REPO='', DEPLOY_REF='main', REQUIRE_TIP='false',
+                   PRUNE='false', SMOKE_PATHS='["/"]',
+                   CALLER_WORKFLOW_REF='szl-holdings/.github/.github/workflows/reusable-hf-deploy-ayllu-source-witness.yml@refs/heads/main')
         self.assertEqual(CONTRACT.validate(env), 'READ_ONLY_AYLLU_EXACT_SOURCE_CONTRACT')
         for field, value in [('EVENT_SHA', '2'*40), ('CALLER_REPOSITORY', 'szl-holdings/ayllu'),
-                             ('EVENT_NAME', 'pull_request'), ('HF_REPO', 'SZLHOLDINGS/ayllu')]:
+                             ('EVENT_NAME', 'pull_request'), ('HF_REPO', 'SZLHOLDINGS/ayllu'),
+                             ('CALLER_WORKFLOW_REF', 'attacker/workflow@refs/heads/main'),
+                             ('EVENT_REF', 'refs/tags/release'), ('PRUNE', 'true'),
+                             ('RESTART', 'true'), ('SOURCE_VARIABLE', 'UNREVIEWED')]:
             with self.subTest(field=field):
                 altered = dict(env); altered[field] = value
                 with self.assertRaisesRegex(ValueError, field): CONTRACT.validate(altered)
@@ -108,7 +113,7 @@ class WorkflowBoundary(unittest.TestCase):
         self.assertNotIn('--restart-space', self.workflow)
 
     def test_immutable_runtime_and_artifact_contract(self):
-        self.assertIn('python-version: "3.12.10"', self.workflow)
+        self.assertIn('python-version: "3.12.14"', self.workflow)
         self.assertIn('--require-hashes --only-binary=:all:', self.workflow)
         self.assertIn('-r tools/requirements/hf-publisher.lock', self.workflow)
         self.assertIn('name: hf-deploy-evidence\n', self.workflow)

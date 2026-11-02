@@ -193,7 +193,7 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
-          python-version: "3.12.10"
+          python-version: "3.12.14"
 
       - name: Create fresh publisher virtual environment
         shell: bash
@@ -206,8 +206,8 @@ jobs:
           fi
           python3 -m venv "$VENV"
           ACTUAL_VERSION="$("$VENV/bin/python" -I -P -c 'import platform; print(platform.python_version())')"
-          if [ "$ACTUAL_VERSION" != "3.12.10" ]; then
-            echo "::error::Expected publisher Python 3.12.10, found $ACTUAL_VERSION."
+          if [ "$ACTUAL_VERSION" != "3.12.14" ]; then
+            echo "::error::Expected publisher Python 3.12.14, found $ACTUAL_VERSION."
             exit 2
           fi
 
