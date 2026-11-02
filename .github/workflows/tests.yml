@@ -28,6 +28,28 @@ jobs:
         with:
           python-version: "3.12.14"
 
+      # Binds the root .python-version, the aggregate Tests workflow, declared
+      # dependency files and every discovered test_*.py execution path. A new
+      # orphan test or stale indirect-test exception fails before the suite can
+      # present a partial green result.
+      - name: Repository verification contract
+        run: python3 -I -P .github/scripts/verify_repository_contract.py
+
+      - name: Repository verification contract negative controls
+        run: python3 -I -P .github/scripts/test_verify_repository_contract.py
+
+      # These four network-free suites existed without any workflow execution
+      # path. Keep their source/operator, accessibility, inventory-scope and
+      # responsive-estate boundaries in the aggregate gate.
+      - name: Frontier payload operational-boundary self-test
+        run: python3 -I -P tests/test_frontier_payload_convergence.py
+      - name: Hugging Face org-card touch-target self-test
+        run: python3 -I -P tests/test_hf_org_card_touch_targets.py
+      - name: Inventory scope declaration self-test
+        run: python3 -I -P tests/test_inventory_scope_declaration.py
+      - name: Responsive estate source contract self-test
+        run: python3 -I -P tests/test_responsive_estate_v3.py
+
       - name: Solo-builder provenance contract self-test
         run: python3 .github/scripts/test_solo_builder_provenance.py
       - name: Effective branch merge-queue precondition self-test

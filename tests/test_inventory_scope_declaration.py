@@ -54,3 +54,14 @@ def test_forbidden_mix_rules_are_explicit() -> None:
     assert "46/35/21" in forbidden
     assert "44/30/48" in forbidden
     assert "14" in forbidden
+
+
+if __name__ == "__main__":
+    tests = [
+        value
+        for name, value in sorted(globals().items())
+        if name.startswith("test_") and callable(value)
+    ]
+    for test in tests:
+        test()
+    print(f"{len(tests)} inventory-scope declaration tests passed")
