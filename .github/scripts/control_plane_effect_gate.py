@@ -1107,6 +1107,9 @@ def runtime_contract_call(document: Mapping[str, Any]) -> bool:
 
 
 def runtime_artifact_resource(path: str, name: str, *, read: bool = False) -> str | None:
+    if (path == ".github/workflows/finalize-hf-adaptive-theatre-v3.yml" and not read
+            and name == "hf-adaptive-theatre-v3-final-${{ github.run_id }}-${{ github.run_attempt }}"):
+        return "github:actions:artifact:hf-adaptive-theatre-v3-final"
     if path == RUNTIME_PUBLISHER and name in {RUNTIME_BINDING_ARTIFACT, RUNTIME_INPUTS_ARTIFACT}:
         return "github:repository:szl-holdings/a11oy:artifact:" + name.split("-${{", 1)[0] + (":same-run-read" if read else "")
     if path == SEISMIC_PUBLISHER and name == SEISMIC_EVIDENCE_ARTIFACT and not read:
