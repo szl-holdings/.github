@@ -59,12 +59,15 @@ jobs:
         id: enqueue
         shell: bash
         env:
-          GH_TOKEN: ${{ secrets.SZL_GITHUB_TOKEN }}
+          QUEUE_WRITE_TOKEN: ${{ secrets.SZL_GITHUB_TOKEN }}
           ADMISSION_READ_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          [ -n "${GH_TOKEN:-}" ] \
+          [ -n "${QUEUE_WRITE_TOKEN:-}" ] \
             || { echo "::error::governed SZL_GITHUB_TOKEN is unavailable"; exit 1; }
+          [ -n "${ADMISSION_READ_TOKEN:-}" ] \
+            || { echo "::error::ephemeral read token is unavailable"; exit 1; }
+          export GH_TOKEN="$ADMISSION_READ_TOKEN"
 
           OWNER="${REPOSITORY%%/*}"
           NAME="${REPOSITORY#*/}"
@@ -102,8 +105,10 @@ jobs:
 
             [ "$CURRENT_HEAD" = "$EXPECTED_HEAD" ] \
               || { echo "::error::pull request head moved from $EXPECTED_HEAD to $CURRENT_HEAD"; exit 1; }
-            [ "$CURRENT_STATE" = 'OPEN' ] \
-              || { echo "::error::pull request state is $CURRENT_STATE, not OPEN"; exit 1; }
+            if [ "$CURRENT_STATE" != 'OPEN' ]; then
+              echo "Gate run $SOURCE_GATE_RUN_ID became stale when PR $PR changed to $CURRENT_STATE; nothing to enqueue"
+              exit 0
+            fi
             if [ "$CURRENT_DRAFT" = 'true' ]; then
               echo "Gate run $SOURCE_GATE_RUN_ID is for draft PR $PR; queue request deferred"
               exit 0
@@ -161,8 +166,10 @@ jobs:
             --jq "[.workflow_runs[] | select(.head_sha == \"$EXPECTED_HEAD\")] | max_by(.id) | .id // 0")"
           [ "$FINAL_HEAD" = "$EXPECTED_HEAD" ] \
             || { echo "::error::pull request head moved before enqueue"; exit 1; }
-          [ "$FINAL_STATE" = 'OPEN' ] \
-            || { echo "::error::pull request state changed before enqueue"; exit 1; }
+          if [ "$FINAL_STATE" != 'OPEN' ]; then
+            echo "Gate run $SOURCE_GATE_RUN_ID became stale before enqueue; PR $PR is $FINAL_STATE"
+            exit 0
+          fi
           [ "$FINAL_DRAFT" = 'false' ] \
             || { echo "::error::pull request returned to draft before enqueue"; exit 1; }
           [ "$FINAL_BODY_SHA256" = "$CURRENT_BODY_SHA256" ] \
@@ -193,8 +200,10 @@ jobs:
             || { echo "::error::GraphQL head mismatch"; exit 1; }
           [ "$GRAPH_DRAFT" = 'false' ] \
             || { echo "::error::GraphQL reports draft state"; exit 1; }
-          [ "$GRAPH_STATE" = 'OPEN' ] \
-            || { echo "::error::GraphQL state is $GRAPH_STATE, not OPEN"; exit 1; }
+          if [ "$GRAPH_STATE" != 'OPEN' ]; then
+            echo "Gate run $SOURCE_GATE_RUN_ID became stale at final readback; PR $PR is $GRAPH_STATE"
+            exit 0
+          fi
           [ "$GRAPH_BODY_SHA256" = "$CURRENT_BODY_SHA256" ] \
             || { echo "::error::GraphQL body changed before enqueue"; exit 1; }
           [ "$GRAPH_BASE_REF" = "$CURRENT_BASE_REF" ] && [ "$GRAPH_BASE_SHA" = "$CURRENT_BASE_SHA" ] \
@@ -207,7 +216,7 @@ jobs:
           # approval named, so any head, base, body, check-generation, receipt
           # or owner-decision drift since review prevents the enqueue.
           set +e
-          env -u GH_TOKEN python3 -I .github/scripts/release_admission_verifier.py \
+          env -u GH_TOKEN -u QUEUE_WRITE_TOKEN python3 -I .github/scripts/release_admission_verifier.py \
             --repository "$REPOSITORY" \
             --event pull_request \
             --head-sha "$EXPECTED_HEAD" \
@@ -248,7 +257,7 @@ jobs:
             RESULT='ALREADY_QUEUED'
           else
             set +e
-            gh api graphql \
+            GH_TOKEN="$QUEUE_WRITE_TOKEN" gh api graphql \
               -f query='mutation($id:ID!,$head:GitObjectID!){enqueuePullRequest(input:{pullRequestId:$id,expectedHeadOid:$head}){mergeQueueEntry{id}}}' \
               -F id="$PULL_REQUEST_ID" \
               -F head="$EXPECTED_HEAD" \
@@ -299,7 +308,7 @@ jobs:
               || [ -z "$QUEUE_ENTRY" ]; then
             if [ -n "$QUEUE_ENTRY" ]; then
               set +e
-              gh api graphql \
+              GH_TOKEN="$QUEUE_WRITE_TOKEN" gh api graphql \
                 -f query='mutation($id:ID!){dequeuePullRequest(input:{id:$id}){clientMutationId}}' \
                 -F id="$PULL_REQUEST_ID" \
                 > reports/merge-queue-enqueue/dequeue-result.json \

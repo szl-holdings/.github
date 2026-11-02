@@ -103,10 +103,26 @@ jobs:
               ) | .number' \
               "$RUNNER_TEMP/pulls.json"
           )
-          if [ "${#PRS[@]}" -ne 1 ]; then
-            echo "::error::expected exactly one open main or release/* PR for $HEAD_SHA; found ${#PRS[@]}"
-            exit 1
+          mapfile -t STALE_PRS < <(
+            jq -r --arg sha "$HEAD_SHA" --arg repository "$REPOSITORY" \
+              '.[] | select(
+                .state != "open"
+                and .head.sha == $sha
+                and .head.repo.full_name == $repository
+                and (
+                  .base.ref == "main"
+                  or (.base.ref | startswith("release/"))
+                )
+              ) | .number' \
+              "$RUNNER_TEMP/pulls.json"
+          )
+          if [ "${#PRS[@]}" -eq 0 ] && [ "${#STALE_PRS[@]}" -gt 0 ]; then
+            echo "kind=stale" >> "$GITHUB_OUTPUT"
+            echo "Gate run for $HEAD_SHA belongs only to closed or merged PRs; no attestation mutation is needed"
+            exit 0
           fi
+          [ "${#PRS[@]}" -eq 1 ] \
+            || { echo "::error::expected exactly one open main or release/* PR for $HEAD_SHA; found ${#PRS[@]}"; exit 1; }
           PR="${PRS[0]}"
           gh api "repos/$REPOSITORY/pulls/$PR" > "$RUNNER_TEMP/pr.json"
           PR_DRAFT="$(jq -r .draft "$RUNNER_TEMP/pr.json")"
@@ -137,14 +153,7 @@ jobs:
           if [ -n "$PR" ]; then
           BODY=$(jq -r '.body // ""' "$RUNNER_TEMP/pr.json")
 
-          grep -Eq 'Satisfies:[[:space:]]*(AT-[0-9]+|C-[0-9]+)' <<<"$BODY" \
-            || { echo "::error::P1 missing Satisfies: AT-n or C-n"; exit 1; }
-          grep -Eq 'Rollback:[[:space:]]*\S' <<<"$BODY" \
-            || { echo "::error::P2 missing Rollback"; exit 1; }
-          grep -Eq 'Labels:[[:space:]]*\S' <<<"$BODY" \
-            || { echo "::error::P3 missing Labels"; exit 1; }
-          grep -Eq 'Risk:[[:space:]]*[ABCD][[:space:]]*[-—]' <<<"$BODY" \
-            || { echo "::error::missing Risk: A-D classification"; exit 1; }
+          printf '%s' "$BODY" | python3 -I .github/scripts/validate_forge9_pr_metadata.py
 
           gh api "repos/$REPOSITORY/pulls/$PR/files?per_page=100" --paginate \
             --jq '.[].filename' > "$RUNNER_TEMP/files.txt"
