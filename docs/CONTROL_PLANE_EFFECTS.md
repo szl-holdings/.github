@@ -201,6 +201,55 @@ failed or incomplete. Rollback is a protected change to the seismic caller's
 immutable reusable-workflow pin, followed by normal exact-head checks and a
 new authorized publisher run; the existing A11oy publisher is unaffected.
 
+## Bounded FORGE-9 App attestor
+
+`attest-and-approve.yml` has a separate exact-byte effect boundary. The
+analyzer recognizes current main and the already reviewed PR #939
+expected-head variant, while the policy declaration binds only the source
+actually on the protected base. Any other bytes remain a nonreviewable
+interface. The local release-admission verifier and the complete observed
+shell/Python unknown set are bound by exact digests. The apparent
+`actions/workflows/gates.yml` spelling is a GitHub REST route in a quoted
+command, not a local executable dependency.
+
+The independent App token action is fixed at
+`actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1`
+(v3.2.0). Its admitted inputs select only the event repository and request
+read administration/checks/contents/metadata plus write pull-request/status
+permissions. The effect model records installation-token creation and the
+post-action revocation attempt separately. The upstream post action skips an
+already expired token and turns revocation failure into a warning, so this
+contract does not claim successful cleanup.
+
+The installer is fixed at
+`sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6`
+(v4.1.2), with its default Cosign v3.0.6 Linux AMD64 binary bound to embedded
+SHA-256
+`c956e5dfcac53d52bcf058360d579472f0c1d2d9b69f55209e256fe7783f4c74`.
+The sole signing command is `cosign sign-blob --yes --bundle` over the fixed
+merge receipt. Cosign v3.0.6 uses its TUF-provided signing configuration by
+default; the logical sites recorded here are Actions OIDC issuance, public
+Fulcio certificate issuance, public Rekor append, public timestamp issuance,
+and the local Sigstore bundle write. These are service-class effects selected
+under the Sigstore trust root, not promises about a permanently fixed URL or
+the number of network retries.
+
+The remaining external writes are the exact-head merge-receipt artifact, App
+approval for the exact commit, the fixed `attestation/qillqaq` status on that
+head, and a protected auto-merge request limited by the workflow to release
+branches. The PR #939 variant gives that final request an additional
+`--match-head-commit` binding; its resource is recorded separately with an
+`expected-head` suffix. Current main does not receive that stronger claim.
+Only this exact profile may hold `contents: write`, `id-token: write`, and
+`pull-requests: write`. A pin, permission, token scope, artifact namespace,
+signing command, merge destination, or source-digest change fails closed.
+
+Upstream sources reviewed for this closure:
+[App-token main](https://github.com/actions/create-github-app-token/blob/bcd2ba49218906704ab6c1aa796996da409d3eb1/lib/main.js),
+[App-token post](https://github.com/actions/create-github-app-token/blob/bcd2ba49218906704ab6c1aa796996da409d3eb1/lib/post.js),
+[Cosign installer](https://github.com/sigstore/cosign-installer/blob/6f9f17788090df1f26f669e9d70d6ae9567deba6/action.yml),
+and [Cosign v3.0.6 sign-blob](https://github.com/sigstore/cosign/blob/v3.0.6/cmd/cosign/cli/sign/sign_blob.go).
+
 ## Trust-root bootstrap boundary
 
 The policy, checker, checker tests, and enforcing workflow form a trust root.

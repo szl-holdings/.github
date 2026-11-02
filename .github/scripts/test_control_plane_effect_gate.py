@@ -1845,6 +1845,131 @@ class LifecycleBindingTests(unittest.TestCase):
         )
 
 
+class CanonicalAttestorTests(unittest.TestCase):
+    """The App attestor has one exact workflow and transitive effect boundary."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.root = Path(__file__).resolve().parents[2]
+        cls.source = cls.root.joinpath(gate.ATTESTOR_WORKFLOW).read_text("utf-8")
+        cls.document, _ = gate.parse_workflow_yaml(cls.source)
+        cls.verifier = cls.root.joinpath(gate.ATTESTOR_VERIFIER).read_text("utf-8").encode()
+        policy = json.loads(cls.root.joinpath(POLICY_PATH).read_text("utf-8"))
+        cls.declaration = gate.load_policy_bytes(
+            policy_bytes(policy), as_of=AS_OF
+        )["workflow_declarations"][gate.ATTESTOR_WORKFLOW]
+
+    def parsed(self, source=None):
+        return gate.analyze_workflow_source(
+            source or self.source, path=gate.ATTESTOR_WORKFLOW
+        )
+
+    def bound(self, source=None, verifier=None):
+        text = source or self.source
+        raw = self.parsed(text)
+        dependency = verifier if verifier is not None else self.verifier
+        return gate.bind_declaration(
+            gate.ATTESTOR_WORKFLOW,
+            text.encode("utf-8"),
+            raw,
+            self.declaration,
+            {gate.ATTESTOR_VERIFIER: dependency},
+        )
+
+    def test_current_profile_is_fully_bound(self):
+        raw = self.parsed()
+        self.assertTrue(gate.attestor_profile(self.source, self.document))
+        self.assertEqual(raw["dependencies"], [gate.ATTESTOR_VERIFIER])
+        self.assertEqual(
+            set(raw["scoped_write_permissions"]),
+            {"contents:write", "id-token:write", "pull-requests:write"},
+        )
+        self.assertFalse(
+            {item.code for item in raw["unknowns"]}
+            & gate.NON_REVIEWABLE_UNKNOWN_CODES
+        )
+        expected = {
+            "github.app_installation_token.create",
+            "github.app_installation_token.revoke_attempt",
+            "github.artifact.upload",
+            "github.commit_status.publish",
+            "github.contents.checkout",
+            "github.oidc.issue",
+            "github.pull_request.protected_merge_request",
+            "github.pull_request.review.approve",
+            "runner.attestation.bundle",
+            "runner.toolchain.install",
+            "sigstore.certificate.issue",
+            "sigstore.timestamp.issue",
+            "sigstore.transparency.append",
+        }
+        self.assertEqual({item.sink for item in raw["effects"]}, expected)
+        result = self.bound()
+        self.assertEqual(result["verdict"], "ALLOW", result["reason_codes"])
+        self.assertTrue(result["reviewed_unknowns_applied"])
+
+    def test_expected_head_variant_reuses_only_the_reviewed_closure(self):
+        current = 'gh pr merge "$PR" --repo "$REPOSITORY" --auto --squash\n'
+        expected = current.rstrip() + ' --match-head-commit "$HEAD_SHA"\n'
+        source = (
+            self.source
+            if '--match-head-commit "$HEAD_SHA"' in self.source
+            else self.source.replace(current, expected)
+        )
+        document, _ = gate.parse_workflow_yaml(source)
+        self.assertTrue(gate.attestor_profile(source, document))
+        raw = self.parsed(source)
+        merge = next(
+            item for item in raw["effects"]
+            if item.sink == "github.pull_request.protected_merge_request"
+        )
+        self.assertTrue(merge.resource.endswith(":expected-head"))
+        # Either admitted byte graph still needs its own declaration pin.
+        declaration = copy.deepcopy(self.declaration)
+        source_digest = gate.sha256_bytes(source.encode("utf-8"))
+        other_digest = next(
+            item for item in gate.ATTESTOR_WORKFLOW_DIGESTS
+            if item != source_digest
+        )
+        declaration["source_sha256"] = other_digest
+        declaration["reviewed_unknowns"]["files"][gate.ATTESTOR_WORKFLOW] = other_digest
+        result = gate.bind_declaration(
+            gate.ATTESTOR_WORKFLOW,
+            source.encode("utf-8"),
+            raw,
+            declaration,
+            {gate.ATTESTOR_VERIFIER: self.verifier},
+        )
+        self.assertIn("WORKFLOW_DIGEST_MISMATCH", result["reason_codes"])
+
+    def test_pin_scope_and_destination_drift_fail_closed(self):
+        cases = (
+            (ATTESTOR_APP_TOKEN_ACTION := gate.ATTESTOR_APP_TOKEN_ACTION,
+             ATTESTOR_APP_TOKEN_ACTION[:-1] + "0"),
+            ('permission-statuses: write', 'permission-statuses: read'),
+            (gate.ATTESTOR_COSIGN_INSTALLER, gate.ATTESTOR_COSIGN_INSTALLER[:-1] + "0"),
+            ('cosign sign-blob --yes --bundle merge-receipt.bundle merge-receipt.json',
+             'cosign sign-blob --yes --tlog-upload=false --bundle merge-receipt.bundle merge-receipt.json'),
+            ('name: merge-receipt-${{ github.event.workflow_run.head_sha }}',
+             'name: merge-receipt-latest'),
+            ('gh pr merge "$PR" --repo "$REPOSITORY" --auto --squash',
+             'gh pr merge "$PR" --repo "$REPOSITORY" --admin --squash'),
+        )
+        for old, new in cases:
+            with self.subTest(old=old):
+                source = self.source.replace(old, new)
+                self.assertNotEqual(source, self.source)
+                raw = self.parsed(source)
+                codes = {item.code for item in raw["unknowns"]}
+                self.assertIn("CANONICAL_RUNTIME_INTERFACE_UNSUPPORTED", codes)
+                self.assertTrue(codes & gate.NON_REVIEWABLE_UNKNOWN_CODES)
+
+    def test_verifier_dependency_is_digest_bound(self):
+        result = self.bound(verifier=self.verifier + b"\n# drift\n")
+        self.assertIn("REVIEWED_UNKNOWN_PIN_MISMATCH", result["reason_codes"])
+        self.assertEqual(result["verdict"], "DENY")
+
+
 class CanonicalRuntimePublisherTests(unittest.TestCase):
     """No generic checkout, reusable-call or write-grant exemption is created."""
 

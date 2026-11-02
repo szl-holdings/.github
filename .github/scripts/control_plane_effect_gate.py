@@ -190,6 +190,25 @@ SEISMIC_WITNESS_DIGEST = "sha256:90865f00ff2d5385abd449be0e6f8e1e5f0d0ad6717bcc4
 SEISMIC_VALIDATOR_DIGEST = "sha256:171561401429289c4be789240586914b9ba76c7efc80e5452f6de640b5c3a586"
 SEISMIC_TOOLS = frozenset({SEISMIC_VALIDATOR, RUNTIME_LOCK,
     ".github/scripts/hf_deploy_from_dockerfile.py", ".github/scripts/hf_space_source_binding.py"})
+ATTESTOR_WORKFLOW = ".github/workflows/attest-and-approve.yml"
+ATTESTOR_VERIFIER = ".github/scripts/release_admission_verifier.py"
+ATTESTOR_APP_TOKEN_ACTION = (
+    "actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1"
+)
+ATTESTOR_COSIGN_INSTALLER = (
+    "sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6"
+)
+# The first digest is current main. The second is the already-reviewed #939
+# expected-head variant. The declaration still pins exactly one source digest;
+# this set only lets that later declaration update reuse the reviewed action
+# closure without broadening the analyzer to arbitrary attestor bytes.
+ATTESTOR_WORKFLOW_DIGESTS = frozenset({
+    "sha256:5db150d121166aec67398579921491126c954c2b8c70d5e129f7e349dd64789a",
+    "sha256:2fcaf7e8bd9e4b6c3d4314e0323f742be08f53aa731b11943a1614f5c608050d",
+})
+ATTESTOR_COSIGN_BINARY_SHA256 = (
+    "c956e5dfcac53d52bcf058360d579472f0c1d2d9b69f55209e256fe7783f4c74"
+)
 
 PYTHON_MUTATORS: Mapping[str, str] = {
     "add_space_secret": "sdk.huggingface.add_space_secret",
@@ -955,6 +974,90 @@ def seismic_contract_call(source: str, document: Mapping[str, Any]) -> bool:
                 "HF_TOKEN": "${{ github.token }}"})
 
 
+def attestor_profile(source: str, document: Mapping[str, Any]) -> bool:
+    """Recognize only the two reviewed attestor byte graphs and action closure."""
+    if sha256_bytes(source.encode("utf-8")) not in ATTESTOR_WORKFLOW_DIGESTS:
+        return False
+    if (
+        set(document) != {"name", "on", "permissions", "concurrency", "jobs"}
+        or document.get("on") != {
+            "workflow_run": {"workflows": ["FORGE-9 gates"], "types": ["completed"]}
+        }
+        or document.get("permissions") != "read-all"
+        or document.get("concurrency") != {
+            "group": "forge9-attest-${{ github.event.workflow_run.head_sha }}",
+            "cancel-in-progress": "false",
+        }
+    ):
+        return False
+    jobs = document.get("jobs")
+    if not isinstance(jobs, dict) or set(jobs) != {"attest"}:
+        return False
+    job = jobs["attest"]
+    if (
+        not isinstance(job, dict)
+        or job.get("permissions") != {
+            "actions": "read",
+            "checks": "read",
+            "contents": "write",
+            "id-token": "write",
+            "pull-requests": "write",
+        }
+        or job.get("runs-on") != "ubuntu-latest"
+    ):
+        return False
+    steps = job.get("steps")
+    if not isinstance(steps, list) or len(steps) != 13 or any(
+        not isinstance(step, dict) for step in steps
+    ):
+        return False
+    app_inputs = {
+        "client-id": "${{ vars.QILLQAQ_CLIENT_ID }}",
+        "private-key": "${{ secrets.QILLQAQ_PRIVATE_KEY }}",
+        "owner": "${{ github.repository_owner }}",
+        "repositories": "${{ github.event.repository.name }}",
+        "permission-administration": "read",
+        "permission-checks": "read",
+        "permission-contents": "read",
+        "permission-metadata": "read",
+        "permission-pull-requests": "write",
+        "permission-statuses": "write",
+    }
+    receipt_inputs = {
+        "name": "merge-receipt-${{ github.event.workflow_run.head_sha }}",
+        "path": "merge-receipt.json\nmerge-receipt.bundle\n",
+        "if-no-files-found": "error",
+        "retention-days": "90",
+    }
+    if (
+        steps[0].get("uses")
+        != "actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1"
+        or lowered_inputs(steps[0].get("with"))
+        != {"persist-credentials": "false", "fetch-depth": "1"}
+        or steps[1].get("uses") != ATTESTOR_APP_TOKEN_ACTION
+        or lowered_inputs(steps[1].get("with")) != app_inputs
+        or steps[6].get("uses") != ATTESTOR_COSIGN_INSTALLER
+        or lowered_inputs(steps[6].get("with")) != {}
+        or steps[7].get("run")
+        != "cosign sign-blob --yes --bundle merge-receipt.bundle merge-receipt.json"
+        or steps[8].get("uses") not in UPLOAD_ARTIFACT_ACTIONS
+        or lowered_inputs(steps[8].get("with")) != receipt_inputs
+    ):
+        return False
+    merge_command = 'gh pr merge "$PR" --repo "$REPOSITORY" --auto --squash'
+    merge_run = steps[12].get("run")
+    if not isinstance(merge_run, str) or not (
+        merge_command in merge_run
+        and merge_run.count(merge_command) == 1
+        and (
+            merge_command + '\n' in merge_run
+            or merge_command + ' --match-head-commit "$HEAD_SHA"\n' in merge_run
+        )
+    ):
+        return False
+    return True
+
+
 def canonical_runtime_profile(document: Mapping[str, Any]) -> bool:
     """Recognize the bounded invocation graph, never a generic reusable workflow.
 
@@ -1107,6 +1210,12 @@ def runtime_contract_call(document: Mapping[str, Any]) -> bool:
 
 
 def runtime_artifact_resource(path: str, name: str, *, read: bool = False) -> str | None:
+    if (
+        path == ATTESTOR_WORKFLOW
+        and name == "merge-receipt-${{ github.event.workflow_run.head_sha }}"
+        and not read
+    ):
+        return "github:actions:artifact:merge-receipt-exact-head"
     if (path == ".github/workflows/finalize-hf-adaptive-theatre-v3.yml" and not read
             and name == "hf-adaptive-theatre-v3-final-${{ github.run_id }}-${{ github.run_attempt }}"):
         return "github:actions:artifact:hf-adaptive-theatre-v3-final"
@@ -1128,6 +1237,7 @@ def workflow_dependencies(source: str, *, path: str = "") -> list[str]:
     contract_call = False
     seismic_profile = False
     seismic_call = False
+    attestor = False
     try:
         document, _lines = parse_workflow_yaml(source)
         clean += "\n" + "\n".join(workflow_scalar_values(document))
@@ -1135,6 +1245,7 @@ def workflow_dependencies(source: str, *, path: str = "") -> list[str]:
         contract_call = path == RUNTIME_WITNESS and runtime_contract_call(document)
         seismic_profile = path == SEISMIC_PUBLISHER and seismic_publisher_profile(source, document)
         seismic_call = path == SEISMIC_WITNESS and seismic_contract_call(source, document)
+        attestor = path == ATTESTOR_WORKFLOW and attestor_profile(source, document)
     except GateError:
         # A malformed workflow still fails analysis; retain discoverable raw paths.
         pass
@@ -1144,6 +1255,10 @@ def workflow_dependencies(source: str, *, path: str = "") -> list[str]:
         # A leading ./ is GitHub's explicit repository-local uses syntax.
         # The policy and receipt still use one canonical Git-tree path.
         dependency = spelling[2:] if spelling.startswith("./") else spelling
+        if attestor and dependency == "actions/workflows/gates.yml":
+            # This spelling is a GitHub REST route inside a quoted gh command,
+            # not a repository-local executable dependency.
+            continue
         if (runtime_profile or seismic_profile) and dependency.startswith("tools/") and (
             dependency[6:] in RUNTIME_TOOLS or dependency[6:] in SEISMIC_TOOLS
         ):
@@ -1569,6 +1684,7 @@ def analyze_workflow_source(source: str, *, path: str) -> dict[str, Any]:
     contract_call = path == RUNTIME_WITNESS and runtime_contract_call(document)
     seismic_profile = path == SEISMIC_PUBLISHER and seismic_publisher_profile(source, document)
     seismic_call = path == SEISMIC_WITNESS and seismic_contract_call(source, document)
+    attestor = path == ATTESTOR_WORKFLOW and attestor_profile(source, document)
     if path == RUNTIME_PUBLISHER and not (runtime_profile and runtime_signing):
         unknown("CANONICAL_RUNTIME_INTERFACE_UNSUPPORTED", ())
     if path == RUNTIME_WITNESS and not contract_call:
@@ -1576,6 +1692,8 @@ def analyze_workflow_source(source: str, *, path: str) -> dict[str, Any]:
     if path == SEISMIC_PUBLISHER and not seismic_profile:
         unknown("CANONICAL_RUNTIME_INTERFACE_UNSUPPORTED", ())
     if path == SEISMIC_WITNESS and not seismic_call:
+        unknown("CANONICAL_RUNTIME_INTERFACE_UNSUPPORTED", ())
+    if path == ATTESTOR_WORKFLOW and not attestor:
         unknown("CANONICAL_RUNTIME_INTERFACE_UNSUPPORTED", ())
     jobs = document.get("jobs")
     if not isinstance(jobs, dict) or not jobs:
@@ -1662,6 +1780,22 @@ def analyze_workflow_source(source: str, *, path: str) -> dict[str, Any]:
                     unknown("ACTION_INPUTS_REVIEW_REQUIRED", (*step_location, "with"))
                 if action.startswith("./"):
                     unknown("LOCAL_ACTION_UNSUPPORTED", (*step_location, "uses"))
+                elif action == ATTESTOR_APP_TOKEN_ACTION and attestor and job_name == "attest":
+                    for sink in (
+                        "github.app_installation_token.create",
+                        "github.app_installation_token.revoke_attempt",
+                    ):
+                        effects.append(RawEffect(
+                            sink, "external-write", path,
+                            lines[(*step_location, "uses")],
+                            "github:repository:szl-holdings/.github:app-installation-token",
+                        ))
+                elif action == ATTESTOR_COSIGN_INSTALLER and attestor and job_name == "attest":
+                    effects.append(RawEffect(
+                        "runner.toolchain.install", "local-write", path,
+                        lines[(*step_location, "uses")],
+                        "runner:toolchain:cosign:v3.0.6:linux-amd64:" + ATTESTOR_COSIGN_BINARY_SHA256,
+                    ))
                 elif action == ATTEST_ACTION and runtime_signing and job_name == "runtime-attestation":
                     # Exact wrapper + transitive actions/attest closure, with
                     # no registry, predicate, token or alternate subject input.
@@ -1840,6 +1974,39 @@ def analyze_workflow_source(source: str, *, path: str) -> dict[str, Any]:
         effects.extend(inline_effects)
         unknowns.extend(inline_unknowns)
 
+    if attestor:
+        # Replace generic shell guesses with the exact reviewed mutation sites.
+        # The source digest set above admits only current main and #939's
+        # expected-head variant; every other shell byte graph remains denied.
+        effects = [
+            item for item in effects
+            if item.sink not in {"github.api.post", "github.pull_request.merge"}
+        ]
+        steps = document["jobs"]["attest"]["steps"]
+        signing_line = lines[("jobs", "attest", "steps", 7, "run")]
+        for sink, access, resource in (
+            ("github.oidc.issue", "external-write", "github:repository:szl-holdings/.github:oidc:merge-receipt"),
+            ("sigstore.certificate.issue", "external-write", "sigstore:public:fulcio:szl-holdings/.github:merge-receipt"),
+            ("sigstore.transparency.append", "external-write", "sigstore:public:rekor:szl-holdings/.github:merge-receipt"),
+            ("sigstore.timestamp.issue", "external-write", "sigstore:public:timestamp:szl-holdings/.github:merge-receipt"),
+            ("runner.attestation.bundle", "local-write", "runner:artifact:merge-receipt:sigstore-bundle"),
+        ):
+            effects.append(RawEffect(sink, access, path, signing_line, resource))
+        for index, sink, resource in (
+            (10, "github.pull_request.review.approve", "github:repository:szl-holdings/.github:pull-request:exact-head-review"),
+            (11, "github.commit_status.publish", "github:repository:szl-holdings/.github:commit-status:attestation/qillqaq:exact-head"),
+            (
+                12,
+                "github.pull_request.protected_merge_request",
+                "github:repository:szl-holdings/.github:pull-request:release-branches:protected-auto-merge"
+                + (":expected-head" if "--match-head-commit" in str(steps[12].get("run", "")) else ""),
+            ),
+        ):
+            effects.append(RawEffect(
+                sink, "external-write", path,
+                lines[("jobs", "attest", "steps", index, "run")], resource,
+            ))
+
     concurrency = document.get("concurrency")
     # Only executable blocks supply control hints; workflow names, labels,
     # action inputs, and other metadata cannot spoof those indicators.
@@ -1872,6 +2039,8 @@ def analyze_workflow_source(source: str, *, path: str) -> dict[str, Any]:
     scoped = scoped_write_permissions(document)
     if runtime_signing or contract_call:
         scoped.extend(["id-token:write", "attestations:write"])
+    if attestor:
+        scoped.extend(["contents:write", "id-token:write", "pull-requests:write"])
     if scoped:
         result["scoped_write_permissions"] = scoped
     return result
