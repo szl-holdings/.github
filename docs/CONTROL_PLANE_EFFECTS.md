@@ -201,6 +201,39 @@ failed or incomplete. Rollback is a protected change to the seismic caller's
 immutable reusable-workflow pin, followed by normal exact-head checks and a
 new authorized publisher run; the existing A11oy publisher is unaffected.
 
+## Bounded Killinchu publisher
+
+`reusable-hf-deploy-killinchu.yml` is a separate exact-byte graph for
+`szl-holdings/killinchu` and `SZLHOLDINGS/killinchu`. Its credentialless
+admission job fixes the caller workflow to `hf-sync.yml` on `main`, requires
+the deploy ref to equal the event SHA, and rejects any change to the target,
+Dockerfile, source variable, source probe, prune, restart, wait or smoke-path
+contract. Caller source is checked out at `github.sha`; publisher tools are
+checked out at `job.workflow_sha` and executed from the hash-locked Python
+3.12.14 environment.
+
+The publishing job derives its file set from Dockerfile COPY sources, requires
+the current default-branch tip, prunes only the governed COPY directories,
+binds `SZL_GIT_SHA`, restarts the fixed Space, reads back the exact HF commit
+and bytes, and requires `/api/build-info` to report the same source SHA. Its
+artifact remains `hf-deploy-evidence` so the existing Killinchu caller can
+build its independent GitHub OIDC release receipt after a later immutable-pin
+migration.
+
+The push-only local witness selects literal `contract-only: true` with a
+read-only GitHub token. Exact workflow, witness, validator, helper and lock
+digests are part of the declaration. The seven external-write sites are the
+COPY-derived commit, guarded prune, source-variable update, two conservatively
+modeled restart sites in the shared helper, StepSecurity telemetry and evidence
+upload. The two helper restart sites are a static authority budget; one
+workflow invocation selects restart mode.
+
+This source qualification does not change the Killinchu caller pin, publish a
+Space revision, establish runtime readiness, or turn the fail-closed public-risk
+route into a readiness claim. The shared workflow must merge first. A separate
+Killinchu PR may then pin the actual merged SHA and retain the caller's
+post-deploy 503 guards and release-receipt checks.
+
 ## Trust-root bootstrap boundary
 
 The policy, checker, checker tests, and enforcing workflow form a trust root.

@@ -21,6 +21,7 @@ of redefining the same logic locally.
 | `reusable-scorecard.yml` | OpenSSF Scorecard supply-chain hygiene | weekly cron, `branch_protection_rule` |
 | `reusable-trivy.yml` | Trivy filesystem vulnerability scan | `push`, weekly cron |
 | `reusable-hf-candidate-plan.yml` | Build a provider-free exact base-to-head Dockerfile payload plan and revalidate the live PR pair | base-controlled `pull_request_target` |
+| `reusable-hf-deploy-killinchu.yml` | Publish only `szl-holdings/killinchu` to `SZLHOLDINGS/killinchu`, bind `SZL_GIT_SHA`, and verify the running source | Killinchu `push` or `workflow_dispatch` on `main` |
 | `reusable-hf-module-drift-check.yml` | Detect drift between a repo's source-of-truth and its live Hugging Face Space | caller-chosen |
 
 ### Repository-native provenance compatibility

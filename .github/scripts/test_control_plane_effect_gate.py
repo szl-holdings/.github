@@ -2101,5 +2101,230 @@ class CanonicalSeismicPublisherTests(unittest.TestCase):
                       {item["code"] for item in result["unknowns"]})
 
 
+class CanonicalKillinchuPublisherTests(unittest.TestCase):
+    """Killinchu has a separate fixed caller, target, and source readback graph."""
+
+    ROUTES = [
+        "/",
+        "/healthz",
+        "/api/killinchu/healthz",
+        "/api/build-info",
+        "/console",
+        "/defend",
+        "/resilience",
+        "/api/defend/status",
+        "/api/defend/source",
+        "/api/killinchu/v1/code/capabilities",
+        "/static/analyst.html",
+        "/api/killinchu/v1/defensive-intake/tools",
+    ]
+
+    @classmethod
+    def setUpClass(cls):
+        cls.root = Path(__file__).resolve().parents[2]
+        cls.source = cls.root.joinpath(gate.KILLINCHU_PUBLISHER).read_text("utf-8")
+        cls.witness = cls.root.joinpath(gate.KILLINCHU_WITNESS).read_text("utf-8")
+        cls.policy = json.loads(cls.root.joinpath(POLICY_PATH).read_text("utf-8"))
+        spec = importlib.util.spec_from_file_location(
+            "killinchu_contract_fixture", cls.root / gate.KILLINCHU_VALIDATOR
+        )
+        cls.contract = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(cls.contract)
+
+    def bound(
+        self,
+        path: str,
+        source: str,
+        *,
+        declaration=None,
+        changed_dependencies=None,
+    ):
+        analysis = gate.analyze_workflow_source(source, path=path)
+        dependencies = {
+            dep: self.root.joinpath(dep).read_bytes()
+            for dep in analysis["dependencies"]
+            if self.root.joinpath(dep).is_file()
+        }
+        dependencies.update(changed_dependencies or {})
+        declaration = declaration or self.policy["workflow_declarations"][path]
+        return gate.bind_declaration(
+            path, source.encode("utf-8"), analysis, declaration, dependencies
+        )
+
+    def publication(self):
+        return {
+            "WORKFLOW_REPOSITORY": "szl-holdings/.github",
+            "WORKFLOW_SHA": "1" * 40,
+            "CALLER_REPOSITORY": "szl-holdings/killinchu",
+            "CALLER_WORKFLOW_REF": (
+                "szl-holdings/killinchu/.github/workflows/"
+                "hf-sync.yml@refs/heads/main"
+            ),
+            "EVENT_SHA": "2" * 40,
+            "EVENT_REF": "refs/heads/main",
+            "EVENT_NAME": "push",
+            "CONTRACT_ONLY": "false",
+            "HF_REPO": "SZLHOLDINGS/killinchu",
+            "DEPLOY_REF": "2" * 40,
+            "REQUIRE_TIP": "true",
+            "DOCKERFILE": "Dockerfile",
+            "SOURCE_REVISION_FILE": "",
+            "SOURCE_VARIABLE": "SZL_GIT_SHA",
+            "SOURCE_PROBE": "/api/build-info",
+            "INCLUDE_README": "true",
+            "SMOKE_PATHS": json.dumps(self.ROUTES),
+            "PRUNE": "true",
+            "RESTART": "true",
+            "WAIT_RUNNING": "1200",
+        }
+
+    def test_exact_publisher_and_read_only_witness_are_admitted(self):
+        publisher, _ = gate.parse_workflow_yaml(self.source)
+        witness, _ = gate.parse_workflow_yaml(self.witness)
+        self.assertTrue(gate.killinchu_publisher_profile(self.source, publisher))
+        self.assertTrue(gate.killinchu_contract_call(self.witness, witness))
+        for path, source, writes in (
+            (gate.KILLINCHU_PUBLISHER, self.source, 7),
+            (gate.KILLINCHU_WITNESS, self.witness, 0),
+        ):
+            with self.subTest(path=path):
+                result = self.bound(path, source)
+                self.assertEqual(result["verdict"], "ALLOW", result["reason_codes"])
+                self.assertEqual(result["external_write_sites"], writes)
+                self.assertTrue(result["reviewed_unknowns_applied"])
+
+    def test_invocation_is_exact_for_push_dispatch_and_witness(self):
+        for event in ("push", "workflow_dispatch"):
+            env = self.publication()
+            env["EVENT_NAME"] = event
+            self.assertEqual(
+                self.contract.validate(env), "CANONICAL_KILLINCHU_PUBLICATION"
+            )
+        changes = {
+            "WORKFLOW_REPOSITORY": "other/.github",
+            "WORKFLOW_SHA": "main",
+            "CALLER_REPOSITORY": "szl-holdings/a11oy",
+            "CALLER_WORKFLOW_REF": "attacker/workflow@refs/heads/main",
+            "EVENT_SHA": "main",
+            "EVENT_REF": "refs/heads/feature",
+            "EVENT_NAME": "pull_request",
+            "CONTRACT_ONLY": "maybe",
+            "HF_REPO": "SZLHOLDINGS/a11oy",
+            "DEPLOY_REF": "3" * 40,
+            "REQUIRE_TIP": "false",
+            "DOCKERFILE": "other/Dockerfile",
+            "SOURCE_REVISION_FILE": "SOURCE_REVISION",
+            "SOURCE_VARIABLE": "OTHER",
+            "SOURCE_PROBE": "/elsewhere",
+            "INCLUDE_README": "false",
+            "SMOKE_PATHS": json.dumps(self.ROUTES[:-1]),
+            "PRUNE": "false",
+            "RESTART": "false",
+            "WAIT_RUNNING": "600",
+        }
+        for field, bad in changes.items():
+            with self.subTest(field=field), self.assertRaisesRegex(ValueError, field):
+                self.contract.validate({**self.publication(), field: bad})
+        witness = self.publication()
+        witness.update(
+            CALLER_REPOSITORY="szl-holdings/.github",
+            CALLER_WORKFLOW_REF=(
+                "szl-holdings/.github/.github/workflows/"
+                "reusable-hf-deploy-killinchu-source-witness.yml@refs/heads/main"
+            ),
+            EVENT_SHA="1" * 40,
+            CONTRACT_ONLY="true",
+            HF_REPO="",
+            DEPLOY_REF="main",
+            REQUIRE_TIP="false",
+            SOURCE_VARIABLE="",
+            SOURCE_PROBE="",
+            SMOKE_PATHS='["/"]',
+            PRUNE="false",
+            RESTART="false",
+        )
+        self.assertEqual(
+            self.contract.validate(witness),
+            "READ_ONLY_KILLINCHU_EXACT_SOURCE_CONTRACT",
+        )
+
+    def test_target_source_binding_restart_prune_and_readback_drift_deny(self):
+        changes = (
+            ("repository: szl-holdings/killinchu", "repository: szl-holdings/other"),
+            ("--hf-repo SZLHOLDINGS/killinchu", "--hf-repo SZLHOLDINGS/other"),
+            ("group: hf-deploy-SZLHOLDINGS/killinchu", "group: other"),
+            ("ref: ${{ job.workflow_sha }}", "ref: main"),
+            ("if: ${{ inputs.contract-only == false }}", "if: ${{ always() }}"),
+            ("--variable SZL_GIT_SHA", "--variable OTHER"),
+            ("--probe-path /api/build-info", "--probe-path /elsewhere"),
+            ("--restart-space", "--dry-run"),
+            ("--prune", "--dry-run"),
+            ("--mode verify", "--mode bind"),
+            ("name: hf-deploy-evidence", "name: other-evidence"),
+            ("# Sole reusable publisher", "# Unreviewed publisher"),
+        )
+        for original, replacement in changes:
+            with self.subTest(change=original):
+                self.assertIn(original, self.source)
+                changed = self.source.replace(original, replacement, 1)
+                analysis = gate.analyze_workflow_source(
+                    changed, path=gate.KILLINCHU_PUBLISHER
+                )
+                self.assertIn(
+                    "CANONICAL_RUNTIME_INTERFACE_UNSUPPORTED",
+                    {item.code for item in analysis["unknowns"]},
+                )
+                result = self.bound(gate.KILLINCHU_PUBLISHER, changed)
+                self.assertEqual(result["verdict"], "DENY")
+                self.assertIn("WORKFLOW_DIGEST_MISMATCH", result["reason_codes"])
+                self.assertIn("UNREVIEWABLE_EFFECT_BOUNDARY", result["reason_codes"])
+
+    def test_dependencies_and_witness_are_exact(self):
+        for dependency in gate.KILLINCHU_TOOLS:
+            with self.subTest(dependency=dependency):
+                changed = self.root.joinpath(dependency).read_bytes() + b"\n# drift\n"
+                result = self.bound(
+                    gate.KILLINCHU_PUBLISHER,
+                    self.source,
+                    changed_dependencies={dependency: changed},
+                )
+                self.assertEqual(result["verdict"], "DENY")
+        for original, replacement in (
+            ("contract-only: true", "contract-only: false"),
+            (
+                "reusable-hf-deploy-killinchu.yml",
+                "reusable-hf-deploy.yml",
+            ),
+            ("HF_TOKEN: ${{ github.token }}", "HF_TOKEN: ${{ secrets.HF_TOKEN }}"),
+        ):
+            changed = self.witness.replace(original, replacement, 1)
+            result = self.bound(gate.KILLINCHU_WITNESS, changed)
+            self.assertEqual(result["verdict"], "DENY")
+            self.assertIn("UNREVIEWABLE_EFFECT_BOUNDARY", result["reason_codes"])
+
+    def test_prune_must_be_declared_and_profile_is_not_reusable_elsewhere(self):
+        declaration = copy.deepcopy(
+            self.policy["workflow_declarations"][gate.KILLINCHU_PUBLISHER]
+        )
+        declaration["effects"] = [
+            item
+            for item in declaration["effects"]
+            if item["sink"] != "hf.space.files.prune"
+        ]
+        result = self.bound(
+            gate.KILLINCHU_PUBLISHER,
+            self.source,
+            declaration=declaration,
+        )
+        self.assertIn("UNDECLARED_EFFECT", result["reason_codes"])
+        analysis = gate.analyze_workflow_source(
+            self.source, path=".github/workflows/fixture.yml"
+        )
+        self.assertIn(
+            "CHECKOUT_SOURCE_BOUNDARY_UNSUPPORTED",
+            {item.code for item in analysis["unknowns"]},
+        )
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

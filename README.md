@@ -98,6 +98,7 @@ jobs:
 | Workflow | What it does |
 |---|---|
 | `reusable-hf-deploy.yml` | GitHub → Hugging Face Space deployer (Dockerfile-derived file set) |
+| `reusable-hf-deploy-killinchu.yml` | Killinchu-only HF publisher with exact caller, target, source binding, restart and live readback |
 | `reusable-hf-candidate-plan.yml` | Build an exact, provider-free base-to-head HF deployment plan and revalidate the live PR pair |
 | `reusable-hf-module-drift-check.yml` | Detect drift between a repo's source and its live HF Space |
 | `reusable-anatomy-map-drift.yml` | Guard the shared SZL Anatomy map across its surfaces |
