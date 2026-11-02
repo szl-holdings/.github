@@ -289,7 +289,9 @@ class AdmissionVerifierWiringTests(unittest.TestCase):
         self.assertLess(self.source.index(checkout), self.source.index("- name: Mint the independent App token"))
         job_permissions = self.source.split("    permissions:\n", 1)[1].split("    runs-on:", 1)[0]
         writes = sorted(line.split(":")[0].strip() for line in job_permissions.splitlines() if line.strip().endswith(": write"))
-        self.assertEqual(writes, ["contents", "id-token", "pull-requests"])
+        self.assertEqual(writes, ["id-token"])
+        self.assertIn("contents: read", job_permissions)
+        self.assertIn("pull-requests: read", job_permissions)
         self.assertIn("checks: read", job_permissions)
 
     def test_single_page_gate_lookup_is_replaced_by_the_verifier(self) -> None:

@@ -32,6 +32,7 @@ jobs:
       REPOSITORY: ${{ github.repository }}
       EXPECTED_HEAD: ${{ github.event.workflow_run.head_sha }}
       SOURCE_GATE_RUN_ID: ${{ github.event.workflow_run.id }}
+      GATE_WORKFLOW: gates.yml
     steps:
       - name: Harden runner
         uses: step-security/harden-runner@e14015d583714f6e62063499dc959a02595150a1 # v2.21.1
@@ -116,7 +117,7 @@ jobs:
             [ "$CURRENT_DRAFT" = 'false' ] \
               || { echo "::error::pull request draft state is invalid"; exit 1; }
 
-            LATEST_GATE_RUN_ID="$(gh api "repos/$REPOSITORY/actions/workflows/gates.yml/runs?event=pull_request&per_page=100" \
+            LATEST_GATE_RUN_ID="$(gh api "repos/$REPOSITORY/actions/workflows/$GATE_WORKFLOW/runs?event=pull_request&per_page=100" \
               --jq "[.workflow_runs[] | select(.head_sha == \"$EXPECTED_HEAD\")] | max_by(.id) | .id // 0")"
             if [ "$LATEST_GATE_RUN_ID" != "$SOURCE_GATE_RUN_ID" ]; then
               echo "Gate run $SOURCE_GATE_RUN_ID is stale; newer generation $LATEST_GATE_RUN_ID owns this head"
@@ -162,7 +163,7 @@ jobs:
           FINAL_STATE="$(jq -r '.state | ascii_upcase' reports/merge-queue-enqueue/pull-request-before-enqueue.json)"
           FINAL_DRAFT="$(jq -r .draft reports/merge-queue-enqueue/pull-request-before-enqueue.json)"
           FINAL_BODY_SHA256="$(jq -c '.body // ""' reports/merge-queue-enqueue/pull-request-before-enqueue.json | sha256sum | cut -d' ' -f1)"
-          LATEST_GATE_RUN_ID="$(gh api "repos/$REPOSITORY/actions/workflows/gates.yml/runs?event=pull_request&per_page=100" \
+          LATEST_GATE_RUN_ID="$(gh api "repos/$REPOSITORY/actions/workflows/$GATE_WORKFLOW/runs?event=pull_request&per_page=100" \
             --jq "[.workflow_runs[] | select(.head_sha == \"$EXPECTED_HEAD\")] | max_by(.id) | .id // 0")"
           [ "$FINAL_HEAD" = "$EXPECTED_HEAD" ] \
             || { echo "::error::pull request head moved before enqueue"; exit 1; }
@@ -296,7 +297,7 @@ jobs:
           POST_STATE="$(jq -r .data.repository.pullRequest.state reports/merge-queue-enqueue/queue-postcheck.json)"
           POST_BODY_SHA256="$(jq -c '.data.repository.pullRequest.body // ""' reports/merge-queue-enqueue/queue-postcheck.json | sha256sum | cut -d' ' -f1)"
           QUEUE_ENTRY="$(jq -r '.data.repository.pullRequest.mergeQueueEntry.id // empty' reports/merge-queue-enqueue/queue-postcheck.json)"
-          LATEST_GATE_RUN_ID="$(gh api "repos/$REPOSITORY/actions/workflows/gates.yml/runs?event=pull_request&per_page=100" \
+          LATEST_GATE_RUN_ID="$(gh api "repos/$REPOSITORY/actions/workflows/$GATE_WORKFLOW/runs?event=pull_request&per_page=100" \
             --jq "[.workflow_runs[] | select(.head_sha == \"$EXPECTED_HEAD\")] | max_by(.id) | .id // 0")"
           if [ "$POST_HEAD" != "$EXPECTED_HEAD" ] \
               || [ "$POST_BASE_REF" != "$CURRENT_BASE_REF" ] \

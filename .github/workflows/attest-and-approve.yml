@@ -18,9 +18,9 @@ jobs:
     permissions:
       actions: read
       checks: read
-      contents: write
+      contents: read
       id-token: write
-      pull-requests: write
+      pull-requests: read
     runs-on: ubuntu-latest
     steps:
       # workflow_run loads this controller from the default branch; check out
@@ -356,6 +356,7 @@ jobs:
         if: steps.subject.outputs.kind == 'pull_request' && steps.subject.outputs.draft == 'false'
         env:
           GH_TOKEN: ${{ github.token }}
+          GATE_WORKFLOW: gates.yml
           HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
           PR: ${{ steps.subject.outputs.number }}
           PR_BASE_REF: ${{ steps.subject.outputs.base_ref }}
@@ -371,7 +372,7 @@ jobs:
           CURRENT_BASE_SHA="$(gh api "repos/$REPOSITORY/git/ref/heads/$CURRENT_BASE_REF" --jq .object.sha)"
           CURRENT_DRAFT="$(jq -r .draft "$RUNNER_TEMP/pr-before-app-mutation.json")"
           CURRENT_BODY_SHA256="$(jq -c '.body // ""' "$RUNNER_TEMP/pr-before-app-mutation.json" | sha256sum | cut -d' ' -f1)"
-          LATEST_GATE_RUN_ID="$(gh api "repos/$REPOSITORY/actions/workflows/gates.yml/runs?event=pull_request&per_page=100" \
+          LATEST_GATE_RUN_ID="$(gh api "repos/$REPOSITORY/actions/workflows/$GATE_WORKFLOW/runs?event=pull_request&per_page=100" \
             --jq "[.workflow_runs[] | select(.head_sha == \"$HEAD_SHA\")] | max_by(.id) | .id // 0")"
           [ "$CURRENT_HEAD" = "$HEAD_SHA" ] \
             || { echo "::error::pull request head moved before App mutation"; exit 1; }
@@ -447,6 +448,7 @@ jobs:
         if: steps.subject.outputs.kind == 'pull_request' && steps.subject.outputs.draft == 'false'
         env:
           GH_TOKEN: ${{ github.token }}
+          GATE_WORKFLOW: gates.yml
           HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
           PR: ${{ steps.subject.outputs.number }}
           PR_BASE_REF: ${{ steps.subject.outputs.base_ref }}
@@ -468,7 +470,7 @@ jobs:
           CURRENT_BASE_REF=$(jq -r .base.ref "$RUNNER_TEMP/pr-before-queue.json")
           CURRENT_BASE_SHA=$(gh api "repos/$REPOSITORY/git/ref/heads/$CURRENT_BASE_REF" --jq .object.sha)
           CURRENT_BODY_SHA256=$(jq -c '.body // ""' "$RUNNER_TEMP/pr-before-queue.json" | sha256sum | cut -d' ' -f1)
-          LATEST_GATE_RUN_ID="$(gh api "repos/$REPOSITORY/actions/workflows/gates.yml/runs?event=pull_request&per_page=100" \
+          LATEST_GATE_RUN_ID="$(gh api "repos/$REPOSITORY/actions/workflows/$GATE_WORKFLOW/runs?event=pull_request&per_page=100" \
             --jq "[.workflow_runs[] | select(.head_sha == \"$HEAD_SHA\")] | max_by(.id) | .id // 0")"
           [ "$CURRENT_HEAD" = "$HEAD_SHA" ] \
             || { echo "::error::pull request head moved before queue request"; exit 1; }
