@@ -166,7 +166,6 @@ def verify_all() -> None:
         ".github/scripts/run_forge9_gate.py",
         ".github/scripts/test_merge_queue_enqueue.py",
         ".github/scripts/test_solo_builder_provenance.py",
-        ".github/scripts/validate_forge9_pr_metadata.py",
         ".github/scripts/verify_forge9_governance.py",
         ".governance/forge9_gate_runner.py",
     ):
