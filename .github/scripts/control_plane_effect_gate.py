@@ -2087,6 +2087,146 @@ def analyze_dependency(
     return effects, unknowns
 
 
+
+HF_CARD_WORKFLOW = ".github/workflows/hf-card-reconcile.yml"
+HF_CARD_CONFIG = ".github/config/hf_card_expectations.json"
+HF_CARD_TARGETS = frozenset({"SZLHOLDINGS/yarqa", "SZLHOLDINGS/szl-constellation"})
+
+
+def hf_card_candidate_contract(source: bytes, config_blob: bytes) -> dict[str, Any]:
+    """Check declarative preconditions for a future hf-card effect profile.
+
+    This is NOT an admission predicate. In particular, these structural checks
+    cannot prove shell reachability, the dynamic HTTP destination, or how a
+    minted credential is used. No caller in the admission path uses this result
+    to suppress unknowns, grant permissions, or bind an effect.
+    """
+    result: dict[str, Any] = {
+        "schema": "szl.hf-card-candidate-contract/v1",
+        "disposition": "NOT_ADMITTED",
+        "preconditions_matched": False,
+        "source_sha256": sha256_bytes(source),
+        "config_sha256": sha256_bytes(config_blob),
+        "reason_codes": [],
+        "unverified_boundaries": [
+            "controller HTTP method, destination and README-only payload",
+            "shell main-ref, exact reviewed-plan and post-write readback enforcement",
+            "per-target OIDC exchange, credential confinement and dependency closure",
+            "all remaining effects, exact-source review and owner decision",
+        ],
+    }
+    reasons: set[str] = set()
+    try:
+        config = strict_json(config_blob)
+        document, _ = parse_workflow_yaml(source.decode("utf-8", errors="strict"))
+    except (GateError, ValueError, RecursionError):
+        result["reason_codes"] = ["HF_CARD_DOCUMENT_INVALID"]
+        return result
+    if (not isinstance(config, dict)
+            or set(config) - {"schema", "doc", "defaults", "assets"}
+            or config.get("schema") != "szl.governance.hf_card_expectations/v1"):
+        result["reason_codes"] = ["HF_CARD_CONFIG_INVALID"]
+        return result
+    defaults = config.get("defaults")
+    if (not isinstance(defaults, dict)
+            or set(defaults) - {"license", "require_stamp", "stamp_heading", "org", "source_org"}
+            or defaults.get("org") != "SZLHOLDINGS"
+            or defaults.get("source_org") != "szl-holdings"):
+        reasons.add("HF_CARD_DEFAULTS_UNSUPPORTED")
+    assets = config.get("assets")
+    targets = []
+    if not isinstance(assets, list) or len(assets) != len(HF_CARD_TARGETS):
+        reasons.add("HF_CARD_TARGET_SET_MISMATCH")
+    else:
+        for asset in assets:
+            if not isinstance(asset, dict):
+                reasons.add("HF_CARD_TARGET_INVALID")
+                continue
+            if set(asset) - {"repo_id", "kind", "license", "title", "short_description",
+                             "source_repo", "reason", "require_stamp"}:
+                # Body replacement and private planning need another profile;
+                # neither may be silently imported into this public target set.
+                reasons.add("HF_CARD_TARGET_FIELDS_UNSUPPORTED")
+            repo_id = asset.get("repo_id")
+            if (not isinstance(repo_id, str) or repo_id not in HF_CARD_TARGETS
+                    or asset.get("kind") != "spaces"
+                    or asset.get("source_repo") != "szl-holdings/" + repo_id.split("/")[-1]):
+                reasons.add("HF_CARD_TARGET_INVALID")
+                continue
+            targets.append({"repo_id": repo_id, "kind": "spaces",
+                            "oidc_resource": "spaces/" + repo_id})
+        if {item["repo_id"] for item in targets} != HF_CARD_TARGETS or len(targets) != 2:
+            reasons.add("HF_CARD_TARGET_SET_MISMATCH")
+    events = document.get("on")
+    if (not isinstance(events, dict) or set(events) != {"workflow_dispatch", "push"}
+            or not isinstance(events.get("push"), dict)
+            or set(events["push"]) - {"branches", "paths"}
+            or events["push"].get("branches") != ["main"]):
+        reasons.add("HF_CARD_TRIGGERS_UNSUPPORTED")
+    dispatch = events.get("workflow_dispatch") if isinstance(events, dict) else None
+    inputs = dispatch.get("inputs") if isinstance(dispatch, dict) else None
+    apply_input = inputs.get("apply") if isinstance(inputs, dict) else None
+    if (not isinstance(apply_input, dict) or apply_input.get("type") != "boolean"
+            or apply_input.get("default") != "false"):
+        reasons.add("HF_CARD_APPLY_INPUT_UNSUPPORTED")
+    if document.get("permissions") != {"contents": "read"}:
+        reasons.add("HF_CARD_PERMISSION_SCOPE_UNSUPPORTED")
+    if document.get("concurrency") != {"group": "hf-card-reconcile", "cancel-in-progress": "false"}:
+        reasons.add("HF_CARD_CONCURRENCY_UNSUPPORTED")
+    jobs = document.get("jobs")
+    if not isinstance(jobs, dict) or set(jobs) != {"contract", "reconcile", "apply"}:
+        result["reason_codes"] = sorted(reasons | {"HF_CARD_JOBS_UNSUPPORTED"})
+        return result
+    uploads = []
+    for name, job in jobs.items():
+        if not isinstance(job, dict):
+            reasons.add("HF_CARD_JOBS_UNSUPPORTED")
+            continue
+        expected_permissions = {"contents": "read"}
+        if name == "apply":
+            expected_permissions.update({"actions": "read", "id-token": "write"})
+        if job.get("permissions") != expected_permissions:
+            reasons.add("HF_CARD_PERMISSION_SCOPE_UNSUPPORTED")
+        expected_if = {
+            "apply": "github.event_name == 'workflow_dispatch' && inputs.apply == true",
+            "reconcile": "github.event_name != 'workflow_dispatch' || inputs.apply != true",
+        }
+        if name in expected_if and (job.get("if") != expected_if[name] or job.get("needs") != "contract"):
+            reasons.add("HF_CARD_JOB_GUARD_UNSUPPORTED")
+        steps = job.get("steps")
+        if not isinstance(steps, list):
+            reasons.add("HF_CARD_STEPS_UNSUPPORTED")
+            continue
+        for step in steps:
+            if not isinstance(step, dict):
+                reasons.add("HF_CARD_STEPS_UNSUPPORTED")
+                continue
+            uses = step.get("uses")
+            if not isinstance(uses, str) or not uses.startswith("actions/upload-artifact@"):
+                continue
+            uploads.append(name)
+            if (uses != "actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a"
+                    or step.get("if") != "always()"
+                    or step.get("with") != {
+                        "name": "hf-card-reconcile-${{ github.run_id }}-${{ github.run_attempt }}",
+                        "path": "reports/governance/", "if-no-files-found": "error",
+                        "retention-days": "90",
+                    }):
+                reasons.add("HF_CARD_ARTIFACT_SCOPE_UNSUPPORTED")
+    if sorted(uploads) != ["apply", "reconcile"]:
+        reasons.add("HF_CARD_ARTIFACT_SCOPE_UNSUPPORTED")
+    result["reason_codes"] = sorted(reasons)
+    result["preconditions_matched"] = not reasons
+    if not reasons:
+        result["candidate_targets"] = sorted(targets, key=lambda item: item["repo_id"])
+        result["candidate_artifact"] = {
+            "name_family": "hf-card-reconcile-RUN_ID-RUN_ATTEMPT",
+            "path": "reports/governance/", "jobs": ["apply", "reconcile"],
+        }
+        result["candidate_oidc_job"] = "apply"
+    return result
+
+
 def lifecycle_possible_resources(source: bytes, dependencies: Mapping[str, bytes]) -> tuple[str, ...] | None:
     """Resolve the one SDK site to the exact dispatch and policy target set."""
     policy_blob = dependencies.get(LIFECYCLE_POLICY)

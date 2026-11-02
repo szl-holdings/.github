@@ -2101,5 +2101,135 @@ class CanonicalSeismicPublisherTests(unittest.TestCase):
                       {item["code"] for item in result["unknowns"]})
 
 
+
+class HfCardCandidateContractTests(unittest.TestCase):
+    """Candidate scope narrows future work without earning admission today."""
+
+    def setUp(self):
+        root = Path(__file__).resolve().parents[2]
+        self.source = (root / gate.HF_CARD_WORKFLOW).read_bytes()
+        self.config_blob = (root / gate.HF_CARD_CONFIG).read_bytes()
+        self.document = gate.parse_workflow_yaml(self.source.decode())[0]
+        self.config = json.loads(self.config_blob)
+
+    def candidate(self, *, document=None, config=...):
+        source = self.source if document is None else json.dumps(document).encode()
+        blob = self.config_blob if config is ... else json.dumps(config).encode()
+        return gate.hf_card_candidate_contract(source, blob)
+
+    def reject(self, *, document=None, config=...):
+        result = self.candidate(document=document, config=config)
+        self.assertFalse(result["preconditions_matched"], result)
+        self.assertEqual(result["disposition"], "NOT_ADMITTED")
+        self.assertTrue(result["reason_codes"])
+        self.assertNotIn("candidate_targets", result)
+
+    def test_current_scope_is_exact_but_never_admitted(self):
+        result = self.candidate()
+        self.assertTrue(result["preconditions_matched"], result)
+        self.assertEqual(result["disposition"], "NOT_ADMITTED")
+        self.assertEqual(result["source_sha256"], gate.sha256_bytes(self.source))
+        self.assertEqual(result["config_sha256"], gate.sha256_bytes(self.config_blob))
+        self.assertEqual([item["repo_id"] for item in result["candidate_targets"]],
+                         sorted(gate.HF_CARD_TARGETS))
+        self.assertTrue(result["unverified_boundaries"])
+        self.assertNotIn("scoped_write_permissions", result)
+        self.assertNotIn("reviewed_unknowns", result)
+
+    def test_target_expansion_renaming_duplicate_and_kind_changes_reject(self):
+        for mutation in ("add", "remove", "rename", "duplicate", "kind", "source", "private", "body"):
+            with self.subTest(mutation=mutation):
+                cfg = copy.deepcopy(self.config)
+                if mutation == "add": cfg["assets"].append(dict(cfg["assets"][0], repo_id="SZLHOLDINGS/other"))
+                if mutation == "remove": cfg["assets"].pop()
+                if mutation == "rename": cfg["assets"][0]["repo_id"] = "SZLHOLDINGS/other"
+                if mutation == "duplicate": cfg["assets"][1] = copy.deepcopy(cfg["assets"][0])
+                if mutation == "kind": cfg["assets"][0]["kind"] = "models"
+                if mutation == "source": cfg["assets"][0]["source_repo"] = "szl-holdings/other"
+                if mutation == "private": cfg["assets"][0]["private"] = True
+                if mutation == "body": cfg["assets"][0]["body_file"] = "../../README.md"
+                self.reject(config=cfg)
+
+    def test_malformed_config_is_structured_not_an_exception(self):
+        for cfg in (None, [], {}, {"schema": "other"},
+                    dict(self.config, assets=None), dict(self.config, assets=[None, []]),
+                    dict(self.config, defaults=[]), dict(self.config, ignored_target="other")):
+            with self.subTest(cfg=cfg): self.reject(config=cfg)
+        for raw in (b'{"a":1,"a":2}', b'{"value":NaN}', b'[]', b'\xff', b'{', b'[' * 1500):
+            with self.subTest(raw=raw[:20]):
+                result = gate.hf_card_candidate_contract(self.source, raw)
+                self.assertFalse(result["preconditions_matched"])
+                self.assertEqual(result["disposition"], "NOT_ADMITTED")
+
+    def test_oidc_is_only_a_candidate_for_the_apply_job(self):
+        for job in (None, "contract", "reconcile"):
+            with self.subTest(job=job):
+                doc = copy.deepcopy(self.document)
+                (doc if job is None else doc["jobs"][job])["permissions"]["id-token"] = "write"
+                self.reject(document=doc)
+        for value in ("write-all", {}, {"contents": "write", "id-token": "write"}):
+            doc = copy.deepcopy(self.document)
+            doc["jobs"]["apply"]["permissions"] = value
+            self.reject(document=doc)
+
+    def test_oversized_json_integer_returns_invalid_document(self):
+        limit = getattr(sys, "get_int_max_str_digits", lambda: 0)()
+        if not limit:
+            self.skipTest("Python integer conversion limit is disabled")
+        raw = b'{"schema":' + b"9" * (limit + 1) + b"}"
+        result = gate.hf_card_candidate_contract(self.source, raw)
+        self.assertFalse(result["preconditions_matched"])
+        self.assertEqual(result["disposition"], "NOT_ADMITTED")
+        self.assertEqual(result["reason_codes"], ["HF_CARD_DOCUMENT_INVALID"])
+
+    def test_apply_guard_and_manual_false_default_are_required(self):
+        for expr in (None, "always()", "github.event_name == 'push'", True):
+            doc = copy.deepcopy(self.document)
+            doc["jobs"]["apply"]["if"] = expr
+            self.reject(document=doc)
+        for value in (True, "False", None, 0, "${{ true }}"):
+            doc = copy.deepcopy(self.document)
+            doc["on"]["workflow_dispatch"]["inputs"]["apply"]["default"] = value
+            self.reject(document=doc)
+        doc = copy.deepcopy(self.document)
+        doc["jobs"]["apply"]["needs"] = []
+        self.reject(document=doc)
+
+    def test_push_scope_extra_jobs_and_cancellation_reject(self):
+        for kind in ("tag", "branch", "event", "job", "cancel", "jobshape", "stepshape"):
+            doc = copy.deepcopy(self.document)
+            if kind == "tag": doc["on"]["push"]["tags"] = ["*"]
+            if kind == "branch": doc["on"]["push"]["branches"] = ["*"]
+            if kind == "event": doc["on"]["pull_request_target"] = {}
+            if kind == "job": doc["jobs"]["other"] = copy.deepcopy(doc["jobs"]["apply"])
+            if kind == "cancel": doc["concurrency"]["cancel-in-progress"] = True
+            if kind == "jobshape": doc["jobs"]["apply"] = []
+            if kind == "stepshape": doc["jobs"]["apply"]["steps"] = [None]
+            with self.subTest(kind=kind): self.reject(document=doc)
+
+    def test_artifact_family_path_pin_and_duplicate_upload_reject(self):
+        for key, value in (("name", "other"), ("path", "**/*"), ("retention-days", 1),
+                           ("include-hidden-files", True), ("if-no-files-found", "ignore")):
+            doc = copy.deepcopy(self.document)
+            upload = next(s for s in doc["jobs"]["apply"]["steps"] if s.get("uses", "").startswith("actions/upload-artifact@"))
+            upload["with"][key] = value
+            with self.subTest(key=key): self.reject(document=doc)
+        doc = copy.deepcopy(self.document)
+        steps = doc["jobs"]["apply"]["steps"]
+        upload = next(s for s in steps if s.get("uses", "").startswith("actions/upload-artifact@"))
+        steps.append(copy.deepcopy(upload))
+        self.reject(document=doc)
+        steps.pop()
+        upload["uses"] = "actions/upload-artifact@" + "a" * 40
+        self.reject(document=doc)
+
+    def test_candidate_cannot_suppress_existing_admission_failures(self):
+        before = gate.analyze_workflow_source(self.source.decode(), path=gate.HF_CARD_WORKFLOW)
+        self.candidate()
+        after = gate.analyze_workflow_source(self.source.decode(), path=gate.HF_CARD_WORKFLOW)
+        self.assertEqual(before, after)
+        self.assertNotIn("id-token:write", after.get("scoped_write_permissions", []))
+        self.assertIn("ACTION_RESOURCE_OVERRIDE_UNSUPPORTED", {u.code for u in after["unknowns"]})
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)
