@@ -2,6 +2,7 @@ name: Reusable — Node CI
 
 # Standard Node/TypeScript CI: install, lint, typecheck, test, build.
 # Caller can opt-out of any stage by passing `false` for that input.
+# An enabled stage requires a non-empty script; missing or malformed manifests fail.
 # Tolerates repos without a committed lockfile (cache + frozen-lockfile
 # are skipped automatically — see `Detect lockfile` step below).
 
@@ -168,11 +169,21 @@ jobs:
         if: steps.skip.outputs.enabled == 'true'
         working-directory: ${{ inputs.working-directory }}
         shell: bash
+        env:
+          PACKAGE_MANAGER: ${{ inputs.package-manager }}
+          CI_TASK: ${{ matrix.task }}
         run: |
-          PM="${{ inputs.package-manager }}"
-          # Skip silently if the script isn't defined
-          if ! node -e "const p=require('./package.json'); process.exit(p.scripts && p.scripts['${{ matrix.task }}'] ? 0 : 1)"; then
-            echo "::notice::No '${{ matrix.task }}' script in package.json — skipping"
-            exit 0
-          fi
-          $PM run ${{ matrix.task }}
+          set -euo pipefail
+          node - "$CI_TASK" <<'NODE'
+          const fs = require('node:fs');
+          const task = process.argv[2];
+          const manifest = JSON.parse(fs.readFileSync('package.json', 'utf8'));
+          const scripts = manifest && manifest.scripts;
+          if (!scripts || typeof scripts !== 'object' || Array.isArray(scripts) ||
+              !Object.hasOwn(scripts, task) || typeof scripts[task] !== 'string' ||
+              !scripts[task].trim()) {
+            console.error(`::error::Enabled stage '${task}' requires a non-empty package.json script. Set run-${task}: false only when this stage is intentionally disabled.`);
+            process.exit(1);
+          }
+          NODE
+          "$PACKAGE_MANAGER" run "$CI_TASK"
