@@ -2,8 +2,9 @@
 
 This document records the source authority for the SZL application surfaces
 and preserves the observations made on October 27, 2026. Workflow completion
-was checked again on November 1, 2026. This is historical evidence, not a
-claim about the current default branches or live deployments.
+was checked again on November 1, 2026. The historical Anatomy revision and
+three source files were rechecked on November 2, 2026. This is historical
+evidence, not a claim about current default branches or live deployments.
 
 GitHub is the canonical source. Hugging Face is a runtime or artifact surface
 whose revision must be compared against an immutable GitHub revision before a
@@ -38,9 +39,13 @@ Python.
 - At the recorded revisions, selected SZLHOLDINGS/szl-khipu package files
   matched szl-holdings/szl-khipu. Its flattened Space layout is a deployment
   adapter; full runtime qualification was not established.
-- At the recorded revisions, selected betterwithage/anatomy files matched
-  szl-holdings/anatomy. The Space is outside the SZLHOLDINGS organization;
-  the observation grants no transfer or write authority.
+- At HF revision `2cdb2244b0fe080f62dad9ed947984da228092bd`, the Anatomy
+  `README.md`, `server.py`, and `Dockerfile` byte-match GitHub revision
+  `39a271820550ce1ead178e906de4f8f2674c8115`. The full historical HF revision
+  was recovered from the recorded prefix and those files rechecked on
+  November 2, 2026; the manifest records the lookup and file hashes. This
+  does not verify the current runtime. The Space is outside the
+  SZLHOLDINGS organization; the observation grants no transfer or write authority.
 - No dedicated SZLHOLDINGS Second Brain Space was observed in that snapshot.
   This is not a current exhaustive inventory. The Second Brain
   datasets are projection artifacts and do not replace the GitHub runtime.

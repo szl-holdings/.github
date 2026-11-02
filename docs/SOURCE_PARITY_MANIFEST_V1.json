@@ -145,8 +145,20 @@
       "kind": "space",
       "github_source": "szl-holdings/anatomy@39a271820550ce1ead178e906de4f8f2674c8115",
       "status": "SOURCE_BOUND_OUTSIDE_SZLHOLDINGS",
-      "evidence": "README.md, server.py, and Dockerfile match the GitHub source; the Space is owned by betterwithage, not SZLHOLDINGS. No transfer or overwrite was performed.",
-      "observed_revision_prefix": "2cdb2244"
+      "evidence": "README.md, server.py, and Dockerfile byte-match the recorded immutable GitHub source. The full historical HF revision was recovered from the recorded prefix on November 2, 2026, and these three files were rechecked at that commit. This does not verify the current runtime. The Space is owned by betterwithage, not SZLHOLDINGS; no transfer or overwrite was performed.",
+      "observed_revision": "2cdb2244b0fe080f62dad9ed947984da228092bd",
+      "revision_recovery": {
+        "checked_at": "2026-11-02T00:44:24.902280+00:00",
+        "historical_observed_prefix": "2cdb2244",
+        "method": "The public Hugging Face revision API resolved the recorded prefix to a full commit; selected files were byte-compared at immutable HF and GitHub revisions.",
+        "metadata_url": "https://huggingface.co/api/spaces/betterwithage/anatomy/revision/2cdb2244b0fe080f62dad9ed947984da228092bd",
+        "selected_files_sha256": {
+          "README.md": "2a5a09d1076cc46bcceb8ec7294ec8e79e7e95e89e21a8e9dc5c3ec4085e2e06",
+          "server.py": "b9c7bd496b5f628e859af580d002ed21e7a177c440b695c8260fbf7f792d83d3",
+          "Dockerfile": "6f31a5da157a67019d33eb272f18b7282c08f413585e9e68f4848270e7435edd"
+        },
+        "current_runtime_verified": false
+      }
     },
     {
       "artifact": "SZLHOLDINGS/szl-second-brain-inrepo",
@@ -249,7 +261,7 @@
     "reauthorization_status": "SKIPPED",
     "completion_evidence_checked_at": "2026-11-01T23:42:40Z"
   },
-  "last_reviewed_at": "2026-11-01T23:42:40Z",
+  "last_reviewed_at": "2026-11-02T00:44:24.902280+00:00",
   "temporal_scope": "HISTORICAL_SNAPSHOT_NOT_CURRENT_DEPLOYMENT",
-  "review_scope": "Rechecked completion of recorded GitHub publication run and jobs; no fresh Hugging Face runtime or organization-wide inventory measurement."
+  "review_scope": "Rechecked completion of recorded GitHub publication run and jobs; recovered the full historical anatomy HF revision and rechecked three immutable source files. No current Hugging Face runtime or organization-wide inventory measurement."
 }
