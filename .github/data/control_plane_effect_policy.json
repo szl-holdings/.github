@@ -2736,7 +2736,7 @@
     ".github/workflows/tests.yml": {
       "intent_id": "repository-credentialless-tests-v1",
       "valid_until": "2026-11-30",
-      "source_sha256": "sha256:cf9bb3090b016d5a5c0e735439774d5d05568131e5b0018d1f6fe18845578a3e",
+      "source_sha256": "sha256:fe50469d4a80cf4d8b3e01707eb5950dfde31474c430023e14113feb7158b260",
       "credentials": [],
       "resources": [
         {
@@ -2825,7 +2825,7 @@
           ".github/scripts/test_hf_live_pr_pair.py": "sha256:8e5814a52e7460a22db174e6923acdf15aa16ba995445b0aa7c4d08a55b54483",
           ".github/scripts/test_hf_module_drift_check.py": "sha256:fdb716fcb6f8eb2b57ee61db7e05624cf1a057455ec78266a8acd152d52cb66f",
           ".github/scripts/test_hf_module_drift_prune.py": "sha256:19e84279dfbadf538b509c690b48dc94f17ff98ffb29c9a556dd1a16a47aca8b",
-          ".github/scripts/test_hf_publisher_lock.py": "sha256:2de4fab39751d33a4c9d1a70214ac2c7886951724094e6a11c02a3c27c929d8b",
+          ".github/scripts/test_hf_publisher_lock.py": "sha256:2155df425ecdaacfad961971c9365ab07c09d4c776b07854a842253eeb4da6f0",
           ".github/scripts/test_hf_seismic_publish_contract.py": "sha256:e8c0b3bf75e0a128313f9fd8805c8a9943a47fce57db0639f64db301b8a8198c",
           ".github/scripts/test_hf_source_bound_baseline.py": "sha256:ba444e68085a860dda654936089d2dac2f774991f8aa444f85788677f8828ec7",
           ".github/scripts/test_hf_space_lifecycle_reconcile.py": "sha256:ba82032048bf4d2a07b72a8afec6f092b793003456000da61e8bfe29793a9c14",
@@ -2842,7 +2842,7 @@
           ".github/scripts/test_reusable_workflow_target_check.py": "sha256:d145f78f6bb4ae0b76a9f35210882e0ff96d511ece8630d39f5d99f775f9ed54",
           ".github/scripts/test_solo_builder_provenance.py": "sha256:32abce0cee25db6fbf2d2e9d313054b73ecbbfc4eaa469462c11e1cdd6a69f14",
           ".github/scripts/test_szl_codename_gate.py": "sha256:bcfcbbf52dd4cfe7761372fa4acd08b98aec327cb4f7f7dc2c1bc86029fd5b0f",
-          ".github/workflows/tests.yml": "sha256:cf9bb3090b016d5a5c0e735439774d5d05568131e5b0018d1f6fe18845578a3e"
+          ".github/workflows/tests.yml": "sha256:fe50469d4a80cf4d8b3e01707eb5950dfde31474c430023e14113feb7158b260"
         },
         "unknowns": [
           "ACTION_INPUTS_REVIEW_REQUIRED@.github/workflows/tests.yml:29",
@@ -5182,7 +5182,7 @@
     ".github/workflows/publish-nexus-space.yml": {
       "intent_id": "nexus-central-publisher-source-bound-v1",
       "valid_until": "2026-11-30",
-      "source_sha256": "sha256:09f333adabe3a77191539fe50a32d0643c14b7a53c05e19e2955b179fa32f6a5",
+      "source_sha256": "sha256:031409cfa1b2a9d1651a6f9c8833260a08c1b7f3e13011c6ac2f4cf25dac635d",
       "credentials": [
         "GITHUB_TOKEN",
         "HF_ORG_TOKEN",
@@ -5279,7 +5279,7 @@
       "trusted_transitives": {},
       "reviewed_unknowns": {
         "files": {
-          ".github/workflows/publish-nexus-space.yml": "sha256:09f333adabe3a77191539fe50a32d0643c14b7a53c05e19e2955b179fa32f6a5",
+          ".github/workflows/publish-nexus-space.yml": "sha256:031409cfa1b2a9d1651a6f9c8833260a08c1b7f3e13011c6ac2f4cf25dac635d",
           ".github/scripts/acquire_hf_publisher_token.py": "sha256:6c7fb1966a35dbfa63870a00c8557500c990a09b8ff5d050e976d83d02f54016",
           ".github/scripts/hf_deploy_from_dockerfile.py": "sha256:373add34da38a219e5dafce52e7a86a417c019ac13b139678fc72c93c1ad1318",
           ".github/scripts/test_acquire_hf_publisher_token.py": "sha256:a4545b51f3ed5831e96ac2247e11838c7b4febe585adcf464e2028cbbc21d8d7",
@@ -5745,7 +5745,7 @@
           ".github/scripts/test_acquire_hf_publisher_token.py": "sha256:a4545b51f3ed5831e96ac2247e11838c7b4febe585adcf464e2028cbbc21d8d7",
           ".github/scripts/test_validate_nexus_source_binding.py": "sha256:a7c5289f9ae888d2329d3d7f28bc53888853d23dbc2d723166e54a197dd9da4e",
           ".github/scripts/validate_nexus_source_binding.py": "sha256:b1828ffa6a253fd0341b5201b1f376bd6b7bf6a15d1445831ba1bc878a11b730",
-          ".github/workflows/publish-nexus-space.yml": "sha256:09f333adabe3a77191539fe50a32d0643c14b7a53c05e19e2955b179fa32f6a5"
+          ".github/workflows/publish-nexus-space.yml": "sha256:031409cfa1b2a9d1651a6f9c8833260a08c1b7f3e13011c6ac2f4cf25dac635d"
         },
         "unknowns": [
           "ACTION_INPUTS_REVIEW_REQUIRED@.github/workflows/test-hf-publisher-credential-selector.yml:27",
@@ -6684,7 +6684,7 @@
     ".github/workflows/reusable-hf-deploy.yml": {
       "intent_id": "canonical-a11oy-authenticated-source-publisher-v1",
       "valid_until": "2026-11-30",
-      "source_sha256": "sha256:ec761c2f030c8798a5f4236f0879b3059572617bfe1ec2cfd1ff8fa948dc062e",
+      "source_sha256": "sha256:691024a670e446b688958addcfe69198831fcb59a923e0e0ca0c59d2ca5fe58e",
       "credentials": [
         "GITHUB_TOKEN",
         "HF_TOKEN"
@@ -6895,7 +6895,7 @@
       "trusted_transitives": {},
       "reviewed_unknowns": {
         "files": {
-          ".github/workflows/reusable-hf-deploy.yml": "sha256:ec761c2f030c8798a5f4236f0879b3059572617bfe1ec2cfd1ff8fa948dc062e",
+          ".github/workflows/reusable-hf-deploy.yml": "sha256:691024a670e446b688958addcfe69198831fcb59a923e0e0ca0c59d2ca5fe58e",
           ".github/scripts/hf_deploy_from_dockerfile.py": "sha256:373add34da38a219e5dafce52e7a86a417c019ac13b139678fc72c93c1ad1318",
           ".github/scripts/hf_runtime_publish_contract.py": "sha256:7cc16d1421b4e76ce281e3dcadfee36b790891fbc56a533c53fd43bdf0bf55a1",
           ".github/scripts/hf_space_source_binding.py": "sha256:9888d4c126ead29d0960de3198a99f1d686956c8104f0cf6c5c0d4c113b2a37b",
@@ -7305,7 +7305,7 @@
         "files": {
           ".github/workflows/reusable-hf-deploy-source-witness.yml": "sha256:9e39165a2197e44cb6a5b4386c48383babf68704b4fa3caa8b15730d38948b2d",
           ".github/scripts/hf_runtime_publish_contract.py": "sha256:7cc16d1421b4e76ce281e3dcadfee36b790891fbc56a533c53fd43bdf0bf55a1",
-          ".github/workflows/reusable-hf-deploy.yml": "sha256:ec761c2f030c8798a5f4236f0879b3059572617bfe1ec2cfd1ff8fa948dc062e"
+          ".github/workflows/reusable-hf-deploy.yml": "sha256:691024a670e446b688958addcfe69198831fcb59a923e0e0ca0c59d2ca5fe58e"
         },
         "unknowns": [
           "PYTHON_SOURCE_REVIEW_REQUIRED@.github/scripts/hf_runtime_publish_contract.py:1",
