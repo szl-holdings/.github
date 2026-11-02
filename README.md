@@ -127,8 +127,9 @@ All Actions in these workflows are SHA-pinned. Every job runs [`step-security/ha
 - Python governance checks use the exact root version in
   [`.python-version`](./.python-version). Run `make verify` to validate the
   toolchain, declared dependency files, and test-to-workflow coverage without
-  installing dependencies. This command validates wiring; the hosted `Tests`
-  workflow executes the admitted suites.
+  installing dependencies. This command validates wiring; the path-triggered
+  `Repository verification` workflow executes the contract and newly admitted
+  suites, while the aggregate `Tests` workflow remains the full-suite gate.
 - Conventional Commits (`feat:`, `fix:`, `chore:`, `docs:`, `ci:`, `refactor:`, `test:`)
 - Squash-merge into `main`; release automation handled by `release-please`
 - All PRs run reusable security suite before merge
