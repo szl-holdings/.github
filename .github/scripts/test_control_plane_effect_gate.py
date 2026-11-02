@@ -842,10 +842,10 @@ class YamlBoundaryRegressionTests(unittest.TestCase):
                 _parsed, corrected = bind_source(source, candidate=candidate)
                 self.assertEqual(corrected["verdict"], "ALLOW")
 
-    def bind_alignment_artifact(self, name: str, *, path: str = ".github/workflows/estate-one-fabric-alignment.yml", extra: str = "") -> dict:
+    def bind_alignment_artifact(self, name: str, *, path: str = ".github/workflows/estate-one-fabric-alignment.yml", extra: str = "", resource: str | None = None) -> dict:
         source = workflow(extra_step=f"      - uses: {UPLOAD_ACTION}\n        with: {{name: {json.dumps(name)}{extra}}}\n")
         parsed = gate.analyze_workflow_source(source.decode(), path=path)
-        resource = "github:actions:artifact:estate-alignment-local"
+        resource = resource or "github:actions:artifact:estate-alignment-local"
         if name.startswith("estate-alignment-live-"):
             resource = "github:actions:artifact:estate-alignment-live"
         candidate = policy_for(source, workflow_path=path,
@@ -859,6 +859,29 @@ class YamlBoundaryRegressionTests(unittest.TestCase):
         }
         normalized = gate.load_policy_bytes(policy_bytes(candidate), as_of=AS_OF)
         return gate.bind_declaration(path, source, parsed, normalized["workflow_declarations"][path], {})
+
+    def test_theatre_retry_artifact_is_exact_and_non_destructive(self) -> None:
+        path = ".github/workflows/finalize-hf-adaptive-theatre-v3.yml"
+        name = "hf-adaptive-theatre-v3-final-${{ github.run_id }}-${{ github.run_attempt }}"
+        resource = "github:actions:artifact:hf-adaptive-theatre-v3-final"
+        bound = self.bind_alignment_artifact(name, path=path, resource=resource)
+        self.assertEqual(bound["verdict"], "ALLOW")
+        uploads = [item for item in bound["effects"] if item["sink"] == "github.artifact.upload"]
+        self.assertEqual([item["resource"] for item in uploads], [resource])
+        self.assertEqual(bound["external_write_sites"], 1)
+        for changed_name, changed_path, extra in (
+            (name, WORKFLOW_PATH, ""),
+            (name, path.replace(".yml", ".yaml"), ""),
+            (name.replace("-final-", "-other-"), path, ""),
+            (name.replace("-${{ github.run_attempt }}", ""), path, ""),
+            (name.replace("github.run_attempt", "inputs.destination"), path, ""),
+            (name, path, ", overwrite: true"),
+            (name, path, ", archive: false"),
+        ):
+            with self.subTest(name=changed_name, path=changed_path, extra=extra):
+                denied = self.bind_alignment_artifact(changed_name, path=changed_path,
+                                                     resource=resource, extra=extra)
+                self.assertEqual(denied["verdict"], "DENY")
 
     def test_alignment_attempt_artifacts_bind_two_exact_namespaces(self) -> None:
         for name in ("estate-alignment-local", "estate-alignment-live"):
@@ -1879,6 +1902,94 @@ class LifecycleBindingTests(unittest.TestCase):
             {item["resource"] for item in records},
             {"huggingface:space:SZLHOLDINGS/nexus", "huggingface:space:SZLHOLDINGS/README"},
         )
+
+
+class ProtectedQueueModelTests(unittest.TestCase):
+    def setUp(self):
+        self.source = (CHECKER_PATH.parents[2] / gate.QUEUE_WORKFLOW).read_text()
+
+    def test_exact_graph_models_both_mutations_and_all_four_reads(self):
+        raw = gate.analyze_workflow_source(self.source, path=gate.QUEUE_WORKFLOW)
+        sinks = [item.sink for item in raw["effects"]]
+        self.assertEqual(sinks.count("github.pull_request.enqueue"), 1)
+        self.assertEqual(sinks.count("github.pull_request.dequeue"), 1)
+        self.assertEqual(sinks.count("github.graphql.query"), 4)
+        self.assertEqual(sinks.count("github.artifact.upload"), 1)
+        self.assertFalse({item.code for item in raw["unknowns"]} & gate.NON_REVIEWABLE_UNKNOWN_CODES)
+        self.assertNotIn("scoped_write_permissions", raw)
+
+    def test_source_changes_cannot_repin_their_way_to_another_privilege(self):
+        replacements = (
+            ("ref: ${{ github.sha }}", "ref: ${{ github.event.workflow_run.head_sha }}"),
+            ("ref: ${{ github.sha }}", "ref: ${{ github.event.repository.default_branch }}"),
+            ("persist-credentials: false", "persist-credentials: true"),
+            ("contents: read", "contents: write"),
+            ("SZL_GITHUB_TOKEN", "OTHER_TOKEN"),
+            ("expectedHeadOid:$head", "expectedHeadOid:$id"),
+            ("enqueuePullRequest", "mergePullRequest"),
+            ("if: always()", "if: failure()"),
+        )
+        for before, after in replacements:
+            with self.subTest(after=after):
+                changed = self.source.replace(before, after)
+                self.assertNotEqual(changed, self.source)
+                raw = gate.analyze_workflow_source(changed, path=gate.QUEUE_WORKFLOW)
+                self.assertIn("CANONICAL_QUEUE_INTERFACE_UNSUPPORTED", {u.code for u in raw["unknowns"]})
+                self.assertFalse(gate.queue_source_profile(changed, gate.QUEUE_WORKFLOW))
+
+    def test_mutation_parser_rejects_aliases_extra_fields_and_redirected_hosts(self):
+        query = "mutation($id:ID!,$head:GitObjectID!){enqueuePullRequest(input:{pullRequestId:$id,expectedHeadOid:$head}){mergeQueueEntry{id}}}"
+        command = f"gh api graphql -f query='{query}' -F id=\"$PULL_REQUEST_ID\" -F head=\"$EXPECTED_HEAD\""
+        effects, unknowns = gate.queue_graphql_effects(command, path=gate.QUEUE_WORKFLOW)
+        self.assertEqual([x.sink for x in effects], ["github.pull_request.enqueue"])
+        self.assertEqual(unknowns, [])
+        for altered in (
+            command.replace("enqueuePullRequest", "x:enqueuePullRequest"),
+            command.replace("$PULL_REQUEST_ID", "$OTHER_ID"),
+            command.replace("$EXPECTED_HEAD", "$(cat scripts/head.py)"),
+            command + " -F id=$OTHER_ID", command + " --hostname example.invalid",
+            command + " --input input.json", command + " -f query='query{viewer{login}}'",
+            command.replace(" -f query=", " -F query="),
+            command + " > $(cat scripts/output.py)",
+        ):
+            with self.subTest(altered=altered):
+                effects, unknowns = gate.queue_graphql_effects(altered, path=gate.QUEUE_WORKFLOW)
+                self.assertEqual(effects, [])
+                self.assertEqual({u.code for u in unknowns}, {"QUEUE_GRAPHQL_OPERATION_UNSUPPORTED"})
+
+    def test_queue_profile_cannot_be_used_by_another_workflow(self):
+        self.assertFalse(gate.queue_source_profile(self.source, ".github/workflows/attest-and-approve.yml"))
+        raw = gate.analyze_workflow_source(self.source, path=WORKFLOW_PATH)
+        codes = {u.code for u in raw["unknowns"]}
+        self.assertIn("CHECKOUT_SOURCE_BOUNDARY_UNSUPPORTED", codes)
+        self.assertIn("ACTION_RESOURCE_OVERRIDE_UNSUPPORTED", codes)
+
+    def test_queue_declaration_binds_verifier_bytes_and_cannot_waive_a_new_graph(self):
+        root = CHECKER_PATH.parents[2]
+        policy = json.loads((root / POLICY_PATH).read_text())
+        declaration = copy.deepcopy(policy["workflow_declarations"][gate.QUEUE_WORKFLOW])
+        raw = gate.analyze_workflow_source(self.source, path=gate.QUEUE_WORKFLOW)
+        blobs = {p: (root / p).read_bytes() for p in raw["dependencies"]}
+        result = gate.bind_declaration(gate.QUEUE_WORKFLOW, self.source.encode(), raw, declaration, blobs)
+        self.assertEqual(result["verdict"], "ALLOW")
+        changed_blobs = dict(blobs)
+        verifier = ".github/scripts/release_admission_verifier.py"
+        changed_blobs[verifier] += b"\n# source changed after review\n"
+        changed = gate.bind_declaration(gate.QUEUE_WORKFLOW, self.source.encode(), raw, declaration, changed_blobs)
+        self.assertEqual(changed["verdict"], "DENY")
+        self.assertIn("REVIEWED_UNKNOWN_PIN_MISMATCH", changed["reason_codes"])
+
+        source = self.source.replace("expectedHeadOid:$head", "expectedHeadOid:$id")
+        raw = gate.analyze_workflow_source(source, path=gate.QUEUE_WORKFLOW)
+        declaration["source_sha256"] = gate.sha256_bytes(source.encode())
+        declaration["reviewed_unknowns"]["files"][gate.QUEUE_WORKFLOW] = declaration["source_sha256"]
+        observed = gate.bind_declaration(gate.QUEUE_WORKFLOW, source.encode(), raw, declaration, blobs)
+        declaration["reviewed_unknowns"]["unknowns"] = [
+            f"{x['code']}@{x['path']}:{x['line']}" for x in observed["unknowns"]
+        ]
+        repinned = gate.bind_declaration(gate.QUEUE_WORKFLOW, source.encode(), raw, declaration, blobs)
+        self.assertEqual(repinned["verdict"], "DENY")
+        self.assertIn("UNREVIEWABLE_EFFECT_BOUNDARY", repinned["reason_codes"])
 
 
 class CanonicalRuntimePublisherTests(unittest.TestCase):

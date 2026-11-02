@@ -475,5 +475,5 @@ jobs:
           fi
           [[ "$PR_BASE_REF" == release/* ]] \
             || { echo "::error::unsupported protected base $PR_BASE_REF"; exit 1; }
-          gh pr merge "$PR" --repo "$REPOSITORY" --auto --squash
+          gh pr merge "$PR" --repo "$REPOSITORY" --auto --squash --match-head-commit "$HEAD_SHA"
           echo "Requested the protected merge path for PR $PR"

@@ -266,6 +266,33 @@ class AdmissionVerifierWiringTests(unittest.TestCase):
         self.assertIn("contains($admission)", approve)
         self.assertLess(approve.index("ADMISSION_FINGERPRINT\" =~"), approve.index("-X POST"))
 
+    def test_release_merge_request_rejects_a_head_that_moves_after_precheck(self) -> None:
+        # Execute the real final command. The fake provider moves the PR after
+        # the earlier read; only the merge command's own expected-head guard
+        # can prevent a request against that new revision.
+        step = workflow_step(self.source, "Request protected merge after attestation")
+        command = next(line.strip() for line in step.splitlines() if "gh pr merge" in line)
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            stub = root / "gh"
+            stub.write_text(
+                "#!/usr/bin/env python3\nimport os,sys\n"
+                "args=sys.argv[1:]\n"
+                "if '--match-head-commit' in args:\n"
+                " expected=args[args.index('--match-head-commit')+1]\n"
+                " if expected != os.environ['STUB_CURRENT_HEAD']: sys.exit(9)\n"
+                "print('MERGE_REQUESTED')\n", encoding="utf-8")
+            stub.chmod(0o755)
+            env = {**os.environ, "PATH": str(root) + os.pathsep + os.environ["PATH"],
+                   "HEAD_SHA": "a" * 40, "PR": "7", "REPOSITORY": "szl-holdings/.github"}
+            unchanged = subprocess.run(["bash", "-c", command], env={**env, "STUB_CURRENT_HEAD": "a" * 40},
+                                       capture_output=True, text=True, check=False)
+            moved = subprocess.run(["bash", "-c", command], env={**env, "STUB_CURRENT_HEAD": "b" * 40},
+                                   capture_output=True, text=True, check=False)
+            self.assertEqual(unchanged.returncode, 0, unchanged.stderr)
+            self.assertNotEqual(moved.returncode, 0)
+            self.assertNotIn("MERGE_REQUESTED", moved.stdout)
+
 
 class AdmissionVerifierStepExecutionTests(unittest.TestCase):
     """Execute the real attestor verifier step with a stub verifier process."""
