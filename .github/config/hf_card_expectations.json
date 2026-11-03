@@ -24,6 +24,14 @@
       "license": "apache-2.0",
       "source_repo": "szl-holdings/szl-constellation",
       "reason": "Owner-authored Hub card kept by owner decision (Hub main de68f6e0aa84e8d62534ce5259d16c395eceeb6a, README 2399 bytes); license apache-2.0 is now declared on the Hub. The body is owner-authored and never rewritten; the reconciler only completes missing governance marker lines inside the existing Governance section. Its estate-count prose is outside this lane."
+    },
+    {
+      "repo_id": "SZLHOLDINGS/ChaskaLLM",
+      "kind": "models",
+      "license": "apache-2.0",
+      "source_repo": "szl-holdings/ChaskaLLM",
+      "body_file": "ChaskaLLM.md",
+      "reason": "GitHub-canonical body for the Hub card, which was written outside any GitHub workflow (Hub README 6281 bytes, last modified 2026-11-02T16:44:19Z, after the 2026-10-28 Qwen3-4B-Instruct-2507 rebuild). The body file is those live bytes plus three additions: the retired 3B receipt scope (PASS_3B_ONLY, full receipt pass:false), a License section separating the Apache-2.0 code from upstream weight licenses as GitHub NOTICE does, and the Governance stamp. license mirrors the live front matter and the upstream Hub tags; it is not a legal determination and is flagged for counsel. The Hub repository is private, so anonymous plans read UNAVAILABLE until it is public or plans authenticate."
     }
   ]
 }
