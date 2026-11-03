@@ -585,8 +585,8 @@
         "readback": true
       },
       "trusted_transitives": {
-        ".github/scripts/control_plane_effect_gate.py": "sha256:1fc74d96f5e9d5cf5b5fda72bcc08ac78f7ceb74904d7dd3fd96323d89023b63",
-        ".github/scripts/test_control_plane_effect_gate.py": "sha256:d93f786236d4b1e7a796e91394c939646e6dff708790ced667e3394a67d4379a"
+        ".github/scripts/control_plane_effect_gate.py": "sha256:8c163c07e53192a797897916869380ddc7758a92acb093fdcf871ffe03274532",
+        ".github/scripts/test_control_plane_effect_gate.py": "sha256:8611a21ea5f795583ef8bea1dbc01445ff0153941c88d0a93344bcfd1e96b1db"
       },
       "reviewed_unknowns": {
         "files": {
@@ -1216,8 +1216,8 @@
         "readback": false
       },
       "trusted_transitives": {
-        ".github/scripts/control_plane_effect_gate.py": "sha256:1fc74d96f5e9d5cf5b5fda72bcc08ac78f7ceb74904d7dd3fd96323d89023b63",
-        ".github/scripts/test_control_plane_effect_gate.py": "sha256:d93f786236d4b1e7a796e91394c939646e6dff708790ced667e3394a67d4379a"
+        ".github/scripts/control_plane_effect_gate.py": "sha256:8c163c07e53192a797897916869380ddc7758a92acb093fdcf871ffe03274532",
+        ".github/scripts/test_control_plane_effect_gate.py": "sha256:8611a21ea5f795583ef8bea1dbc01445ff0153941c88d0a93344bcfd1e96b1db"
       },
       "reviewed_unknowns": {
         "files": {
@@ -7462,6 +7462,454 @@
           "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/hf-public-smoke-contract.yml:99",
           "WORKFLOW_ENVIRONMENT_REVIEW_REQUIRED@.github/workflows/hf-public-smoke-contract.yml:38",
           "WORKFLOW_ENVIRONMENT_REVIEW_REQUIRED@.github/workflows/hf-public-smoke-contract.yml:95"
+        ]
+      }
+    },
+    ".github/workflows/reusable-hf-deploy-killinchu.yml": {
+      "intent_id": "canonical-killinchu-ubuntu24-publisher-v1",
+      "valid_until": "2026-11-30",
+      "source_sha256": "sha256:c239572c43d0eaf71f7614354dc1d6273ec60da5d99f3d617cc1bcc4494d2050",
+      "credentials": [
+        "GITHUB_TOKEN",
+        "HF_TOKEN"
+      ],
+      "resources": [
+        {
+          "key": "github:repository:szl-holdings/.github:contents",
+          "access": "read"
+        },
+        {
+          "key": "github:repository:szl-holdings/killinchu:artifact:hf-deploy-evidence",
+          "access": "external-write"
+        },
+        {
+          "key": "github:repository:szl-holdings/killinchu:contents",
+          "access": "read"
+        },
+        {
+          "key": "huggingface:space:SZLHOLDINGS/killinchu",
+          "access": "external-write"
+        },
+        {
+          "key": "huggingface:space:SZLHOLDINGS/killinchu:source-variable:SZL_GIT_SHA",
+          "access": "external-write"
+        },
+        {
+          "key": "runner:guard:egress",
+          "access": "local-write"
+        },
+        {
+          "key": "runner:toolchain:python",
+          "access": "local-write"
+        },
+        {
+          "key": "stepsecurity:monitor:szl-holdings/killinchu",
+          "access": "external-write"
+        },
+        {
+          "key": "huggingface:space:SZLHOLDINGS/killinchu:copy-derived-files",
+          "access": "external-write"
+        }
+      ],
+      "effects": [
+        {
+          "sink": "github.artifact.upload",
+          "resource": "github:repository:szl-holdings/killinchu:artifact:hf-deploy-evidence",
+          "access": "external-write",
+          "max_calls": 1
+        },
+        {
+          "sink": "github.contents.checkout",
+          "resource": "github:repository:szl-holdings/.github:contents",
+          "access": "read",
+          "max_calls": 3
+        },
+        {
+          "sink": "github.contents.checkout",
+          "resource": "github:repository:szl-holdings/killinchu:contents",
+          "access": "read",
+          "max_calls": 1
+        },
+        {
+          "sink": "runner.guard.configure",
+          "resource": "runner:guard:egress",
+          "access": "local-write",
+          "max_calls": 1
+        },
+        {
+          "sink": "runner.guard.telemetry",
+          "resource": "stepsecurity:monitor:szl-holdings/killinchu",
+          "access": "external-write",
+          "max_calls": 1
+        },
+        {
+          "sink": "runner.toolchain.install",
+          "resource": "runner:toolchain:python",
+          "access": "local-write",
+          "max_calls": 1
+        },
+        {
+          "sink": "sdk.huggingface.add_space_variable",
+          "resource": "huggingface:space:SZLHOLDINGS/killinchu:source-variable:SZL_GIT_SHA",
+          "access": "external-write",
+          "max_calls": 1
+        },
+        {
+          "sink": "sdk.huggingface.restart_space",
+          "resource": "huggingface:space:SZLHOLDINGS/killinchu",
+          "access": "external-write",
+          "max_calls": 2
+        },
+        {
+          "sink": "sdk.repository.create_commit",
+          "resource": "huggingface:space:SZLHOLDINGS/killinchu",
+          "access": "external-write",
+          "max_calls": 1
+        },
+        {
+          "sink": "hf.space.files.prune",
+          "resource": "huggingface:space:SZLHOLDINGS/killinchu:copy-derived-files",
+          "access": "external-write",
+          "max_calls": 1
+        }
+      ],
+      "max_external_writes": 7,
+      "required_controls": {
+        "triggers": [
+          "workflow_call"
+        ],
+        "contents_read": true,
+        "no_explicit_secrets": false,
+        "concurrency": true,
+        "protected_ref": false,
+        "exact_sha": false,
+        "expected_before": false,
+        "readback": false
+      },
+      "trusted_transitives": {},
+      "reviewed_unknowns": {
+        "files": {
+          ".github/scripts/hf_deploy_from_dockerfile.py": "sha256:373add34da38a219e5dafce52e7a86a417c019ac13b139678fc72c93c1ad1318",
+          ".github/scripts/hf_killinchu_publish_contract.py": "sha256:e5a27ad99e24c18164f52b234d4bdc88bc2797a0d461281c298adc431e6ae36a",
+          ".github/scripts/hf_space_source_binding.py": "sha256:9888d4c126ead29d0960de3198a99f1d686956c8104f0cf6c5c0d4c113b2a37b",
+          ".github/workflows/reusable-hf-deploy-killinchu.yml": "sha256:c239572c43d0eaf71f7614354dc1d6273ec60da5d99f3d617cc1bcc4494d2050",
+          "requirements/hf-publisher.lock": "sha256:463b543da8418dd37f458f9893cf1d5f8cb21d04b249121b3b5155b6729b42e0"
+        },
+        "unknowns": [
+          "ACTION_INPUTS_REVIEW_REQUIRED@.github/workflows/reusable-hf-deploy-killinchu.yml:100",
+          "ACTION_INPUTS_REVIEW_REQUIRED@.github/workflows/reusable-hf-deploy-killinchu.yml:149",
+          "ACTION_INPUTS_REVIEW_REQUIRED@.github/workflows/reusable-hf-deploy-killinchu.yml:154",
+          "ACTION_INPUTS_REVIEW_REQUIRED@.github/workflows/reusable-hf-deploy-killinchu.yml:163",
+          "ACTION_INPUTS_REVIEW_REQUIRED@.github/workflows/reusable-hf-deploy-killinchu.yml:196",
+          "ACTION_INPUTS_REVIEW_REQUIRED@.github/workflows/reusable-hf-deploy-killinchu.yml:321",
+          "ACTION_INPUTS_REVIEW_REQUIRED@.github/workflows/reusable-hf-deploy-killinchu.yml:341",
+          "DYNAMIC_EXECUTION@.github/workflows/reusable-hf-deploy-killinchu.yml:229",
+          "DYNAMIC_EXECUTION@.github/workflows/reusable-hf-deploy-killinchu.yml:257",
+          "DYNAMIC_EXECUTION@.github/workflows/reusable-hf-deploy-killinchu.yml:260",
+          "DYNAMIC_EXECUTION@.github/workflows/reusable-hf-deploy-killinchu.yml:277",
+          "DYNAMIC_EXECUTION@.github/workflows/reusable-hf-deploy-killinchu.yml:315",
+          "DYNAMIC_EXECUTION@.github/workflows/reusable-hf-deploy-killinchu.yml:365",
+          "HTTP_TARGET_UNRESOLVED@.github/scripts/hf_deploy_from_dockerfile.py:732",
+          "HTTP_TARGET_UNRESOLVED@.github/scripts/hf_deploy_from_dockerfile.py:1497",
+          "PYTHON_DYNAMIC_EXECUTION@.github/scripts/hf_deploy_from_dockerfile.py:627",
+          "PYTHON_DYNAMIC_EXECUTION@.github/scripts/hf_deploy_from_dockerfile.py:801",
+          "PYTHON_DYNAMIC_EXECUTION@.github/scripts/hf_deploy_from_dockerfile.py:953",
+          "PYTHON_DYNAMIC_EXECUTION@.github/scripts/hf_deploy_from_dockerfile.py:965",
+          "PYTHON_DYNAMIC_EXECUTION@.github/scripts/hf_deploy_from_dockerfile.py:966",
+          "PYTHON_DYNAMIC_EXECUTION@.github/scripts/hf_deploy_from_dockerfile.py:979",
+          "PYTHON_DYNAMIC_EXECUTION@.github/scripts/hf_deploy_from_dockerfile.py:989",
+          "PYTHON_DYNAMIC_EXECUTION@.github/scripts/hf_deploy_from_dockerfile.py:995",
+          "PYTHON_DYNAMIC_EXECUTION@.github/scripts/hf_deploy_from_dockerfile.py:996",
+          "PYTHON_DYNAMIC_EXECUTION@.github/scripts/hf_deploy_from_dockerfile.py:1175",
+          "PYTHON_DYNAMIC_EXECUTION@.github/scripts/hf_deploy_from_dockerfile.py:1177",
+          "PYTHON_DYNAMIC_EXECUTION@.github/scripts/hf_deploy_from_dockerfile.py:1179",
+          "PYTHON_DYNAMIC_EXECUTION@.github/scripts/hf_deploy_from_dockerfile.py:1192",
+          "PYTHON_DYNAMIC_EXECUTION@.github/scripts/hf_deploy_from_dockerfile.py:1211",
+          "PYTHON_DYNAMIC_EXECUTION@.github/scripts/hf_deploy_from_dockerfile.py:1216",
+          "PYTHON_DYNAMIC_EXECUTION@.github/scripts/hf_deploy_from_dockerfile.py:1236",
+          "PYTHON_DYNAMIC_EXECUTION@.github/scripts/hf_deploy_from_dockerfile.py:1426",
+          "PYTHON_DYNAMIC_EXECUTION@.github/scripts/hf_deploy_from_dockerfile.py:1427",
+          "PYTHON_DYNAMIC_EXECUTION@.github/scripts/hf_deploy_from_dockerfile.py:1429",
+          "PYTHON_DYNAMIC_EXECUTION@.github/scripts/hf_deploy_from_dockerfile.py:1431",
+          "PYTHON_DYNAMIC_EXECUTION@.github/scripts/hf_deploy_from_dockerfile.py:1440",
+          "PYTHON_DYNAMIC_EXECUTION@.github/scripts/hf_deploy_from_dockerfile.py:1441",
+          "PYTHON_DYNAMIC_EXECUTION@.github/scripts/hf_deploy_from_dockerfile.py:1552",
+          "PYTHON_DYNAMIC_EXECUTION@.github/scripts/hf_deploy_from_dockerfile.py:1563",
+          "PYTHON_DYNAMIC_EXECUTION@.github/scripts/hf_deploy_from_dockerfile.py:1565",
+          "PYTHON_DYNAMIC_EXECUTION@.github/scripts/hf_deploy_from_dockerfile.py:1666",
+          "PYTHON_DYNAMIC_EXECUTION@.github/scripts/hf_deploy_from_dockerfile.py:1746",
+          "PYTHON_DYNAMIC_EXECUTION@.github/scripts/hf_deploy_from_dockerfile.py:1752",
+          "PYTHON_DYNAMIC_EXECUTION@.github/scripts/hf_deploy_from_dockerfile.py:1879",
+          "PYTHON_DYNAMIC_EXECUTION@.github/scripts/hf_space_source_binding.py:92",
+          "PYTHON_IMPORT_UNRESOLVED@.github/scripts/hf_deploy_from_dockerfile.py:43",
+          "PYTHON_IMPORT_UNRESOLVED@.github/scripts/hf_deploy_from_dockerfile.py:45",
+          "PYTHON_IMPORT_UNRESOLVED@.github/scripts/hf_deploy_from_dockerfile.py:46",
+          "PYTHON_IMPORT_UNRESOLVED@.github/scripts/hf_deploy_from_dockerfile.py:48",
+          "PYTHON_IMPORT_UNRESOLVED@.github/scripts/hf_deploy_from_dockerfile.py:49",
+          "PYTHON_IMPORT_UNRESOLVED@.github/scripts/hf_deploy_from_dockerfile.py:51",
+          "PYTHON_IMPORT_UNRESOLVED@.github/scripts/hf_deploy_from_dockerfile.py:52",
+          "PYTHON_IMPORT_UNRESOLVED@.github/scripts/hf_deploy_from_dockerfile.py:53",
+          "PYTHON_IMPORT_UNRESOLVED@.github/scripts/hf_deploy_from_dockerfile.py:54",
+          "PYTHON_IMPORT_UNRESOLVED@.github/scripts/hf_deploy_from_dockerfile.py:56",
+          "PYTHON_IMPORT_UNRESOLVED@.github/scripts/hf_deploy_from_dockerfile.py:57",
+          "PYTHON_IMPORT_UNRESOLVED@.github/scripts/hf_deploy_from_dockerfile.py:61",
+          "PYTHON_IMPORT_UNRESOLVED@.github/scripts/hf_deploy_from_dockerfile.py:62",
+          "PYTHON_IMPORT_UNRESOLVED@.github/scripts/hf_deploy_from_dockerfile.py:63",
+          "PYTHON_IMPORT_UNRESOLVED@.github/scripts/hf_deploy_from_dockerfile.py:64",
+          "PYTHON_IMPORT_UNRESOLVED@.github/scripts/hf_deploy_from_dockerfile.py:798",
+          "PYTHON_IMPORT_UNRESOLVED@.github/scripts/hf_deploy_from_dockerfile.py:1820",
+          "PYTHON_IMPORT_UNRESOLVED@.github/scripts/hf_killinchu_publish_contract.py:4",
+          "PYTHON_IMPORT_UNRESOLVED@.github/scripts/hf_space_source_binding.py:20",
+          "PYTHON_IMPORT_UNRESOLVED@.github/scripts/hf_space_source_binding.py:22",
+          "PYTHON_IMPORT_UNRESOLVED@.github/scripts/hf_space_source_binding.py:26",
+          "PYTHON_IMPORT_UNRESOLVED@.github/scripts/hf_space_source_binding.py:30",
+          "PYTHON_IMPORT_UNRESOLVED@.github/scripts/hf_space_source_binding.py:32",
+          "PYTHON_IMPORT_UNRESOLVED@.github/scripts/hf_space_source_binding.py:33",
+          "PYTHON_SOURCE_REVIEW_REQUIRED@.github/scripts/hf_deploy_from_dockerfile.py:1",
+          "PYTHON_SOURCE_REVIEW_REQUIRED@.github/scripts/hf_killinchu_publish_contract.py:1",
+          "PYTHON_SOURCE_REVIEW_REQUIRED@.github/scripts/hf_space_source_binding.py:1",
+          "SCRIPT_SOURCE_REVIEW_REQUIRED@requirements/hf-publisher.lock:1",
+          "SDK_TARGET_UNRESOLVED@.github/scripts/hf_deploy_from_dockerfile.py:800",
+          "SDK_TARGET_UNRESOLVED@.github/scripts/hf_deploy_from_dockerfile.py:824",
+          "SDK_TARGET_UNRESOLVED@.github/scripts/hf_deploy_from_dockerfile.py:1654",
+          "SDK_TARGET_UNRESOLVED@.github/scripts/hf_space_source_binding.py:116",
+          "SECRET_EXPRESSION_REVIEW_REQUIRED@.github/workflows/reusable-hf-deploy-killinchu.yml:1",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-deploy-killinchu.yml:111",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-deploy-killinchu.yml:112",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-deploy-killinchu.yml:135",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-deploy-killinchu.yml:176",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-deploy-killinchu.yml:177",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-deploy-killinchu.yml:178",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-deploy-killinchu.yml:179",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-deploy-killinchu.yml:180",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-deploy-killinchu.yml:181",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-deploy-killinchu.yml:182",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-deploy-killinchu.yml:183",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-deploy-killinchu.yml:184",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-deploy-killinchu.yml:185",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-deploy-killinchu.yml:186",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-deploy-killinchu.yml:187",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-deploy-killinchu.yml:188",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-deploy-killinchu.yml:189",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-deploy-killinchu.yml:190",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-deploy-killinchu.yml:191",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-deploy-killinchu.yml:202",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-deploy-killinchu.yml:203",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-deploy-killinchu.yml:204",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-deploy-killinchu.yml:205",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-deploy-killinchu.yml:206",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-deploy-killinchu.yml:207",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-deploy-killinchu.yml:208",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-deploy-killinchu.yml:209",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-deploy-killinchu.yml:210",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-deploy-killinchu.yml:211",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-deploy-killinchu.yml:212",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-deploy-killinchu.yml:217",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-deploy-killinchu.yml:227",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-deploy-killinchu.yml:228",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-deploy-killinchu.yml:229",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-deploy-killinchu.yml:230",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-deploy-killinchu.yml:231",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-deploy-killinchu.yml:232",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-deploy-killinchu.yml:233",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-deploy-killinchu.yml:240",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-deploy-killinchu.yml:241",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-deploy-killinchu.yml:242",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-deploy-killinchu.yml:243",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-deploy-killinchu.yml:252",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-deploy-killinchu.yml:253",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-deploy-killinchu.yml:254",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-deploy-killinchu.yml:255",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-deploy-killinchu.yml:256",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-deploy-killinchu.yml:257",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-deploy-killinchu.yml:258",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-deploy-killinchu.yml:259",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-deploy-killinchu.yml:260",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-deploy-killinchu.yml:261",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-deploy-killinchu.yml:262",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-deploy-killinchu.yml:263",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-deploy-killinchu.yml:271",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-deploy-killinchu.yml:272",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-deploy-killinchu.yml:273",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-deploy-killinchu.yml:274",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-deploy-killinchu.yml:275",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-deploy-killinchu.yml:276",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-deploy-killinchu.yml:277",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-deploy-killinchu.yml:284",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-deploy-killinchu.yml:285",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-deploy-killinchu.yml:286",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-deploy-killinchu.yml:287",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-deploy-killinchu.yml:295",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-deploy-killinchu.yml:296",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-deploy-killinchu.yml:297",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-deploy-killinchu.yml:298",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-deploy-killinchu.yml:299",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-deploy-killinchu.yml:307",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-deploy-killinchu.yml:308",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-deploy-killinchu.yml:309",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-deploy-killinchu.yml:310",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-deploy-killinchu.yml:311",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-deploy-killinchu.yml:312",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-deploy-killinchu.yml:313",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-deploy-killinchu.yml:314",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-deploy-killinchu.yml:315",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-deploy-killinchu.yml:355",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-deploy-killinchu.yml:356",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-deploy-killinchu.yml:357",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-deploy-killinchu.yml:358",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-deploy-killinchu.yml:359",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-deploy-killinchu.yml:360",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-deploy-killinchu.yml:361",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-deploy-killinchu.yml:362",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-deploy-killinchu.yml:363",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-deploy-killinchu.yml:364",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-deploy-killinchu.yml:365",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-deploy-killinchu.yml:366",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-deploy-killinchu.yml:367",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-deploy-killinchu.yml:368",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-deploy-killinchu.yml:369",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-deploy-killinchu.yml:370",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-deploy-killinchu.yml:371",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-deploy-killinchu.yml:372",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-deploy-killinchu.yml:373",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-deploy-killinchu.yml:374",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-deploy-killinchu.yml:375",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-deploy-killinchu.yml:376",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-deploy-killinchu.yml:377",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-deploy-killinchu.yml:378",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-deploy-killinchu.yml:379",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/reusable-hf-deploy-killinchu.yml:111",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/reusable-hf-deploy-killinchu.yml:112",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/reusable-hf-deploy-killinchu.yml:176",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/reusable-hf-deploy-killinchu.yml:177",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/reusable-hf-deploy-killinchu.yml:180",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/reusable-hf-deploy-killinchu.yml:181",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/reusable-hf-deploy-killinchu.yml:182",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/reusable-hf-deploy-killinchu.yml:185",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/reusable-hf-deploy-killinchu.yml:186",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/reusable-hf-deploy-killinchu.yml:189",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/reusable-hf-deploy-killinchu.yml:190",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/reusable-hf-deploy-killinchu.yml:191",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/reusable-hf-deploy-killinchu.yml:202",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/reusable-hf-deploy-killinchu.yml:203",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/reusable-hf-deploy-killinchu.yml:207",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/reusable-hf-deploy-killinchu.yml:208",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/reusable-hf-deploy-killinchu.yml:209",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/reusable-hf-deploy-killinchu.yml:210",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/reusable-hf-deploy-killinchu.yml:217",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/reusable-hf-deploy-killinchu.yml:227",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/reusable-hf-deploy-killinchu.yml:228",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/reusable-hf-deploy-killinchu.yml:232",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/reusable-hf-deploy-killinchu.yml:233",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/reusable-hf-deploy-killinchu.yml:240",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/reusable-hf-deploy-killinchu.yml:252",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/reusable-hf-deploy-killinchu.yml:253",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/reusable-hf-deploy-killinchu.yml:254",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/reusable-hf-deploy-killinchu.yml:255",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/reusable-hf-deploy-killinchu.yml:256",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/reusable-hf-deploy-killinchu.yml:257",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/reusable-hf-deploy-killinchu.yml:258",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/reusable-hf-deploy-killinchu.yml:259",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/reusable-hf-deploy-killinchu.yml:260",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/reusable-hf-deploy-killinchu.yml:261",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/reusable-hf-deploy-killinchu.yml:262",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/reusable-hf-deploy-killinchu.yml:271",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/reusable-hf-deploy-killinchu.yml:272",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/reusable-hf-deploy-killinchu.yml:273",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/reusable-hf-deploy-killinchu.yml:274",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/reusable-hf-deploy-killinchu.yml:275",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/reusable-hf-deploy-killinchu.yml:276",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/reusable-hf-deploy-killinchu.yml:284",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/reusable-hf-deploy-killinchu.yml:285",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/reusable-hf-deploy-killinchu.yml:286",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/reusable-hf-deploy-killinchu.yml:295",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/reusable-hf-deploy-killinchu.yml:296",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/reusable-hf-deploy-killinchu.yml:297",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/reusable-hf-deploy-killinchu.yml:298",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/reusable-hf-deploy-killinchu.yml:299",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/reusable-hf-deploy-killinchu.yml:307",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/reusable-hf-deploy-killinchu.yml:308",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/reusable-hf-deploy-killinchu.yml:309",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/reusable-hf-deploy-killinchu.yml:310",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/reusable-hf-deploy-killinchu.yml:311",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/reusable-hf-deploy-killinchu.yml:312",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/reusable-hf-deploy-killinchu.yml:313",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/reusable-hf-deploy-killinchu.yml:314",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/reusable-hf-deploy-killinchu.yml:355",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/reusable-hf-deploy-killinchu.yml:356",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/reusable-hf-deploy-killinchu.yml:359",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/reusable-hf-deploy-killinchu.yml:360",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/reusable-hf-deploy-killinchu.yml:361",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/reusable-hf-deploy-killinchu.yml:364",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/reusable-hf-deploy-killinchu.yml:365",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/reusable-hf-deploy-killinchu.yml:368",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/reusable-hf-deploy-killinchu.yml:369",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/reusable-hf-deploy-killinchu.yml:372",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/reusable-hf-deploy-killinchu.yml:373",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/reusable-hf-deploy-killinchu.yml:376",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/reusable-hf-deploy-killinchu.yml:377",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/reusable-hf-deploy-killinchu.yml:378",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/reusable-hf-deploy-killinchu.yml:379",
+          "WORKFLOW_ENVIRONMENT_REVIEW_REQUIRED@.github/workflows/reusable-hf-deploy-killinchu.yml:108",
+          "WORKFLOW_ENVIRONMENT_REVIEW_REQUIRED@.github/workflows/reusable-hf-deploy-killinchu.yml:115",
+          "WORKFLOW_ENVIRONMENT_REVIEW_REQUIRED@.github/workflows/reusable-hf-deploy-killinchu.yml:172",
+          "WORKFLOW_ENVIRONMENT_REVIEW_REQUIRED@.github/workflows/reusable-hf-deploy-killinchu.yml:224",
+          "WORKFLOW_ENVIRONMENT_REVIEW_REQUIRED@.github/workflows/reusable-hf-deploy-killinchu.yml:237",
+          "WORKFLOW_ENVIRONMENT_REVIEW_REQUIRED@.github/workflows/reusable-hf-deploy-killinchu.yml:247",
+          "WORKFLOW_ENVIRONMENT_REVIEW_REQUIRED@.github/workflows/reusable-hf-deploy-killinchu.yml:267",
+          "WORKFLOW_ENVIRONMENT_REVIEW_REQUIRED@.github/workflows/reusable-hf-deploy-killinchu.yml:281",
+          "WORKFLOW_ENVIRONMENT_REVIEW_REQUIRED@.github/workflows/reusable-hf-deploy-killinchu.yml:291",
+          "WORKFLOW_ENVIRONMENT_REVIEW_REQUIRED@.github/workflows/reusable-hf-deploy-killinchu.yml:303",
+          "WORKFLOW_ENVIRONMENT_REVIEW_REQUIRED@.github/workflows/reusable-hf-deploy-killinchu.yml:350"
+        ]
+      }
+    },
+    ".github/workflows/reusable-hf-deploy-killinchu-source-witness.yml": {
+      "intent_id": "readonly-killinchu-publisher-source-witness-v1",
+      "valid_until": "2026-11-30",
+      "source_sha256": "sha256:c20572bbf803830b2326a8044eb65452b6f0a6befc1c342250c5f8d0a29e363e",
+      "credentials": [
+        "GITHUB_TOKEN"
+      ],
+      "resources": [
+        {
+          "key": "github:repository:szl-holdings/.github:contents",
+          "access": "read"
+        }
+      ],
+      "effects": [
+        {
+          "sink": "github.contents.checkout",
+          "resource": "github:repository:szl-holdings/.github:contents",
+          "access": "read",
+          "max_calls": 2
+        }
+      ],
+      "max_external_writes": 0,
+      "required_controls": {
+        "triggers": [
+          "push"
+        ],
+        "contents_read": true,
+        "no_explicit_secrets": false,
+        "concurrency": false,
+        "protected_ref": false,
+        "exact_sha": false,
+        "expected_before": false,
+        "readback": false
+      },
+      "trusted_transitives": {},
+      "reviewed_unknowns": {
+        "files": {
+          ".github/scripts/hf_killinchu_publish_contract.py": "sha256:e5a27ad99e24c18164f52b234d4bdc88bc2797a0d461281c298adc431e6ae36a",
+          ".github/workflows/reusable-hf-deploy-killinchu-source-witness.yml": "sha256:c20572bbf803830b2326a8044eb65452b6f0a6befc1c342250c5f8d0a29e363e",
+          ".github/workflows/reusable-hf-deploy-killinchu.yml": "sha256:c239572c43d0eaf71f7614354dc1d6273ec60da5d99f3d617cc1bcc4494d2050"
+        },
+        "unknowns": [
+          "PYTHON_IMPORT_UNRESOLVED@.github/scripts/hf_killinchu_publish_contract.py:4",
+          "PYTHON_SOURCE_REVIEW_REQUIRED@.github/scripts/hf_killinchu_publish_contract.py:1",
+          "SCRIPT_SOURCE_REVIEW_REQUIRED@.github/workflows/reusable-hf-deploy-killinchu.yml:1",
+          "SECRET_EXPRESSION_REVIEW_REQUIRED@.github/workflows/reusable-hf-deploy-killinchu-source-witness.yml:1"
         ]
       }
     },
