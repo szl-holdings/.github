@@ -8296,6 +8296,78 @@
           "WORKFLOW_ENVIRONMENT_REVIEW_REQUIRED@.github/workflows/solo-builder-provenance.yml:34"
         ]
       }
+    },
+    ".github/workflows/repository-verification.yml": {
+      "intent_id": "repository-verification-contract-v1",
+      "valid_until": "2026-11-30",
+      "source_sha256": "sha256:471d656f4dc1f6f36acbb24501db338354ed60733fb74d34e7a3bdc0e60d9846",
+      "credentials": [],
+      "resources": [
+        {
+          "key": "github:repository:szl-holdings/.github:contents",
+          "access": "read"
+        },
+        {
+          "key": "runner:toolchain:python",
+          "access": "local-write"
+        }
+      ],
+      "effects": [
+        {
+          "sink": "github.contents.checkout",
+          "resource": "github:repository:szl-holdings/.github:contents",
+          "access": "read",
+          "max_calls": 1
+        },
+        {
+          "sink": "runner.toolchain.install",
+          "resource": "runner:toolchain:python",
+          "access": "local-write",
+          "max_calls": 1
+        }
+      ],
+      "max_external_writes": 0,
+      "required_controls": {
+        "triggers": [
+          "merge_group",
+          "pull_request",
+          "push",
+          "workflow_dispatch"
+        ],
+        "contents_read": true,
+        "no_explicit_secrets": true,
+        "concurrency": false,
+        "protected_ref": false,
+        "exact_sha": false,
+        "expected_before": false,
+        "readback": false
+      },
+      "trusted_transitives": {},
+      "reviewed_unknowns": {
+        "files": {
+          ".github/scripts/test_verify_repository_contract.py": "sha256:36e9a24ae01867c00d7c06abd829f198d3c9d949e4651dbe1e1a23dc64c12cdc",
+          ".github/scripts/verify_repository_contract.py": "sha256:9f01ad5425f24ba241ad9b3992ef409b1f228e2d0132212c693c30e6bf9125fd",
+          ".github/workflows/repository-verification.yml": "sha256:471d656f4dc1f6f36acbb24501db338354ed60733fb74d34e7a3bdc0e60d9846"
+        },
+        "unknowns": [
+          "ACTION_INPUTS_REVIEW_REQUIRED@.github/workflows/repository-verification.yml:52",
+          "PYTHON_IMPORT_UNRESOLVED@.github/scripts/test_verify_repository_contract.py:15",
+          "PYTHON_IMPORT_UNRESOLVED@.github/scripts/test_verify_repository_contract.py:4",
+          "PYTHON_IMPORT_UNRESOLVED@.github/scripts/verify_repository_contract.py:11",
+          "PYTHON_IMPORT_UNRESOLVED@.github/scripts/verify_repository_contract.py:13",
+          "PYTHON_IMPORT_UNRESOLVED@.github/scripts/verify_repository_contract.py:14",
+          "PYTHON_IMPORT_UNRESOLVED@.github/scripts/verify_repository_contract.py:17",
+          "PYTHON_IMPORT_UNRESOLVED@.github/scripts/verify_repository_contract.py:19",
+          "PYTHON_SOURCE_REVIEW_REQUIRED@.github/scripts/test_verify_repository_contract.py:1",
+          "PYTHON_SOURCE_REVIEW_REQUIRED@.github/scripts/verify_repository_contract.py:1",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/repository-verification.yml:55",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/repository-verification.yml:58",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/repository-verification.yml:62",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/repository-verification.yml:63",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/repository-verification.yml:64",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/repository-verification.yml:65"
+        ]
+      }
     }
   }
 }
