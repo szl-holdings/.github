@@ -27,13 +27,15 @@ class MergeQueueEnqueueContractTests(unittest.TestCase):
             "FORGE-9 gates",
             "github.event.workflow_run.conclusion == 'success'",
             "github.event.workflow_run.event == 'pull_request'",
-            "ref: ${{ github.event.repository.default_branch }}",
+            "ref: ${{ github.sha }}",
             "Checkout trusted controller source",
         )
         for marker in required:
             self.assertIn(marker, self.source, marker)
         self.assertNotRegex(self.source, re.compile(r"^\s+pull_request:\s*$", re.M))
         self.assertNotIn("github.event.pull_request.head.sha", self.source)
+        self.assertNotIn("ref: ${{ github.event.repository.default_branch }}", self.source)
+        self.assertIn("persist-credentials: false", self.source)
 
     def test_write_token_never_reaches_checkout_or_contract_test(self) -> None:
         secret = "GH_TOKEN: ${{ secrets.SZL_GITHUB_TOKEN }}"
@@ -119,7 +121,7 @@ class MergeQueueEnqueueContractTests(unittest.TestCase):
 
     def test_receipt_is_retained_and_never_claims_a_merge(self) -> None:
         self.assertIn("retention-days: 90", self.source)
-        self.assertIn("merge-queue-enqueue-${{ github.run_id }}", self.source)
+        self.assertIn("merge-queue-enqueue-${{ github.run_id }}-${{ github.run_attempt }}", self.source)
         self.assertIn("merge_performed", self.source)
         self.assertIn("false", self.source)
 

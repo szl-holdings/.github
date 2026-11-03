@@ -314,6 +314,7 @@ class AcceptanceCaseTests(VerifierCase):
         scenario.publish_receipt(EFFECT_RUN, scenario.build_receipt(changed_paths=[]))
         result, _ = self.run_verifier(scenario)
         self.assertDecision(result, "BLOCK", "RECEIPT_INCONSISTENT")
+
         # An ALLOW that hides a trust-root change GitHub reports cannot admit.
         hidden = Scenario(changed=(POLICY,))
         hidden.publish_receipt(EFFECT_RUN, hidden.build_receipt(trust_root_changes=[]))
@@ -323,6 +324,15 @@ class AcceptanceCaseTests(VerifierCase):
         lying.publish_receipt(EFFECT_RUN, lying.build_receipt(reason_codes=[]))
         result, _ = self.run_verifier(lying)
         self.assertDecision(result, "BLOCK", "RECEIPT_INCONSISTENT")
+
+    def test_enforcer_change_cannot_hide_behind_allow_receipt(self) -> None:
+        for path in (".github/scripts/effect_check_enforcement.py",
+                     ".github/scripts/test_effect_check_enforcement.py"):
+            with self.subTest(path=path):
+                hidden = Scenario(changed=(path,))
+                hidden.publish_receipt(EFFECT_RUN, hidden.build_receipt(trust_root_changes=[]))
+                result, _ = self.run_verifier(hidden)
+                self.assertDecision(result, "BLOCK", "RECEIPT_INCONSISTENT")
 
     # -- case 2 -----------------------------------------------------------------
     def test_case02_eight_green_gates_with_failed_or_missing_provenance_never_admit(self) -> None:

@@ -16,6 +16,7 @@ import hashlib
 import json
 import os
 import re
+import shlex
 import subprocess
 import sys
 import tempfile
@@ -29,6 +30,12 @@ from typing import Any, Mapping, Sequence
 POLICY_SCHEMA = "szl.control-plane-effect-policy/v1"
 RECEIPT_SCHEMA = "szl.control-plane-effect-delta/v1"
 DEFAULT_POLICY_PATH = ".github/data/control_plane_effect_policy.json"
+QUEUE_WORKFLOW = ".github/workflows/merge-queue-enqueue.yml"
+# Reviewed controller graph: immutable workflow_run checkout, read-only
+# workflow token, separate existing queue credential, exact-head admission,
+# enqueue/dequeue only, and verified rollback when authority drifts.
+QUEUE_SOURCE_SHA256 = "sha256:0c4764f53af598d50211b8b58e46d37a2827d12eeb30b8541cfa44af73509554"
+QUEUE_RESOURCE = "github:repository:szl-holdings/.github:pull-request-queue"
 LIFECYCLE_WORKFLOW = ".github/workflows/hf-space-lifecycle-reconcile.yml"
 LIFECYCLE_POLICY = ".github/data/hf-space-lifecycle-policy.json"
 LIFECYCLE_CONTROLLER = ".github/scripts/hf_space_lifecycle_reconcile.py"
@@ -68,6 +75,7 @@ NON_REVIEWABLE_UNKNOWN_CODES = frozenset({
     "CHECKOUT_SOURCE_BOUNDARY_UNSUPPORTED",
     "CANONICAL_RUNTIME_INTERFACE_UNSUPPORTED",
     "CANONICAL_RUNTIME_VALIDATOR_MISMATCH",
+    "CANONICAL_QUEUE_INTERFACE_UNSUPPORTED", "QUEUE_GRAPHQL_OPERATION_UNSUPPORTED",
 })
 MUTATING_HTTP_VERBS = frozenset({"POST", "PUT", "PATCH", "DELETE"})
 ACCESS_MODES = frozenset({"read", "local-write", "external-write"})
@@ -81,6 +89,8 @@ TRUSTED_TOOL_PATHS = frozenset(
 TRUST_ROOT_PATHS = frozenset(
     {
         DEFAULT_POLICY_PATH,
+        ".github/scripts/effect_check_enforcement.py",
+        ".github/scripts/test_effect_check_enforcement.py",
         ".github/scripts/control_plane_effect_gate.py",
         ".github/scripts/test_control_plane_effect_gate.py",
         ".github/workflows/control-plane-effect-gate.yml",
@@ -213,6 +223,19 @@ LOCAL_PATH = re.compile(
     r"((?:\./)?(?:\.github|scripts|tools|actions)/"
     r"[A-Za-z0-9_.\-/]+\.(?:py|sh|bash|ps1|js|mjs|cjs|ts|json|yml|yaml))"
     r"(?![A-Za-z0-9_.-])"
+)
+
+
+# A workflow filename in this exact quoted gh API route is a remote selector,
+# not a Git-tree dependency. Keep the exclusion bounded to the route itself:
+# query interpolation, command substitutions, other commands and adjacent
+# source-file arguments must retain normal conservative dependency scanning.
+GITHUB_WORKFLOW_RUN_API = re.compile(
+    r"(?<![A-Za-z0-9_./-])gh[ \t]+api[ \t]+(?P<quote>[\"'])"
+    r"(?P<endpoint>(?:https://api\.github\.com/)?repos/"
+    r"(?:\$REPOSITORY|\$\{REPOSITORY\}|[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+)/"
+    r"actions/workflows/[A-Za-z0-9_.-]+\.ya?ml)"
+    r"/runs(?:\?[^\"'$`\\\s]*)?(?P=quote)"
 )
 
 
@@ -1138,8 +1161,15 @@ def workflow_dependencies(source: str, *, path: str = "") -> list[str]:
     except GateError:
         # A malformed workflow still fails analysis; retain discoverable raw paths.
         pass
+    remote_selectors = [
+        (match.start("endpoint"), match.end("endpoint"))
+        for match in GITHUB_WORKFLOW_RUN_API.finditer(clean)
+    ]
     dependencies: set[str] = set()
     for match in LOCAL_PATH.finditer(clean):
+        if any(start <= match.start(1) and match.end(1) <= end
+               for start, end in remote_selectors):
+            continue
         spelling = match.group(1)
         # A leading ./ is GitHub's explicit repository-local uses syntax.
         # The policy and receipt still use one canonical Git-tree path.
@@ -1182,6 +1212,86 @@ def literal_command(node: ast.AST) -> str | None:
             values.append(item.value)
         return " ".join(values)
     return None
+
+
+def queue_source_profile(source: str, path: str) -> bool:
+    """One reviewed controller, never a generic privileged-checkout exception."""
+    return path == QUEUE_WORKFLOW and sha256_bytes(source.encode("utf-8")) == QUEUE_SOURCE_SHA256
+
+
+def queue_graphql_effects(
+    source: str, *, path: str, line_offset: int = 0,
+) -> tuple[list[RawEffect], list[UnknownEffect]]:
+    """Inventory the exact queue operations; unsupported variants stay hard DENY.
+
+    Source-profile binding separately proves where the variables come from.
+    This recognizer only accepts the literal query and exact argument vector;
+    it never treats an arbitrary POST or an unknown GraphQL document as a read.
+    """
+    effects: list[RawEffect] = []
+    unknowns: list[UnknownEffect] = []
+    common = {"owner": "$OWNER", "name": "$NAME", "number": "$PR"}
+    operations = {
+        "mutation($id:ID!,$head:GitObjectID!){enqueuePullRequest(input:{pullRequestId:$id,expectedHeadOid:$head}){mergeQueueEntry{id}}}":
+            ("github.pull_request.enqueue", "external-write", {"id": "$PULL_REQUEST_ID", "head": "$EXPECTED_HEAD"}),
+        "mutation($id:ID!){dequeuePullRequest(input:{id:$id}){clientMutationId}}":
+            ("github.pull_request.dequeue", "external-write", {"id": "$PULL_REQUEST_ID"}),
+        "query($owner:String!,$name:String!,$number:Int!){repository(owner:$owner,name:$name){pullRequest(number:$number){headRefOid mergeQueueEntry{id}}}}":
+            ("github.graphql.query", "read", common),
+        "query($owner:String!,$name:String!,$number:Int!){repository(owner:$owner,name:$name){pullRequest(number:$number){mergeQueueEntry{id}}}}":
+            ("github.graphql.query", "read", common),
+    }
+    for fields in ("id headRefOid baseRefName isDraft state body", "headRefOid baseRefName isDraft state body"):
+        query = ("query($owner:String!,$name:String!,$number:Int!,$base:String!){repository(owner:$owner,name:$name){ref(qualifiedName:$base){target{oid}} pullRequest(number:$number){"
+                 + fields + " mergeQueueEntry{id}}}}")
+        operations[query] = ("github.graphql.query", "read", {**common, "base": "refs/heads/$CURRENT_BASE_REF"})
+    logical = ""
+    start = 1
+    for number, line in enumerate(source.splitlines(), 1):
+        if not logical:
+            start = number
+        logical += line.rstrip()[:-1] + " " if line.rstrip().endswith("\\") else line
+        if line.rstrip().endswith("\\"):
+            continue
+        command, logical = logical, ""
+        if not re.search(r"\bgh\s+api\s+graphql\b", command):
+            continue
+        line_no = line_offset + start
+        try:
+            args = shlex.split(command)
+        except ValueError:
+            args = []
+        values: dict[str, str] = {}
+        query = ""
+        valid = args[:3] == ["gh", "api", "graphql"]
+        index = 3
+        while valid and index < len(args):
+            flag = args[index]
+            if flag in {">", "2>"}:
+                valid = index + 1 < len(args) and bool(re.fullmatch(
+                    r"reports/merge-queue-enqueue/[A-Za-z0-9_.-]+", args[index + 1]))
+                index += 2
+                continue
+            if flag not in {"-f", "-F"} or index + 1 >= len(args):
+                valid = False
+                break
+            key, separator, value = args[index + 1].partition("=")
+            if not separator or key in values or (key in {"query", "base"}) != (flag == "-f"):
+                valid = False
+                break
+            values[key] = value
+            index += 2
+        query = values.pop("query", "")
+        operation = operations.get(query)
+        if not valid or operation is None or values != operation[2]:
+            unknowns.append(UnknownEffect("QUEUE_GRAPHQL_OPERATION_UNSUPPORTED", path, line_no))
+            continue
+        sink, access, _fields = operation
+        resource = QUEUE_RESOURCE if access == "external-write" else QUEUE_RESOURCE + ":read"
+        effects.append(RawEffect(sink, access, path, line_no, resource))
+    if logical and re.search(r"\bgh\s+api\s+graphql\b", logical):
+        unknowns.append(UnknownEffect("QUEUE_GRAPHQL_OPERATION_UNSUPPORTED", path, line_offset + start))
+    return effects, unknowns
 
 
 def shell_effects(
@@ -1564,6 +1674,9 @@ def analyze_workflow_source(source: str, *, path: str) -> dict[str, Any]:
     if "env" in document:
         unknown("WORKFLOW_ENVIRONMENT_REVIEW_REQUIRED", ("env",))
     dependencies = workflow_dependencies(source, path=path)
+    queue_profile = queue_source_profile(source, path)
+    if path == QUEUE_WORKFLOW and not queue_profile:
+        unknown("CANONICAL_QUEUE_INTERFACE_UNSUPPORTED", ())
     runtime_profile = path == RUNTIME_PUBLISHER and canonical_runtime_profile(document)
     runtime_signing = runtime_profile and runtime_signing_job(document)
     contract_call = path == RUNTIME_WITNESS and runtime_contract_call(document)
@@ -1731,6 +1844,9 @@ def analyze_workflow_source(source: str, *, path: str) -> dict[str, Any]:
                                 if not AUTH_INPUT_EXPRESSION.fullmatch(auth_value):
                                     unknown("SECRET_NAME_UNRESOLVED", (*step_location, "with"))
                     if sink == "github.contents.checkout":
+                        queue_checkout = queue_profile and job_name == "enqueue" and inputs == {
+                            "ref": "${{ github.sha }}", "persist-credentials": "false", "fetch-depth": "1",
+                        }
                         runtime_checkout = (
                             runtime_profile and (runtime_tools_checkout(inputs)
                                 or (job_name == "hf-deploy" and runtime_caller_checkout(inputs)))
@@ -1746,7 +1862,7 @@ def analyze_workflow_source(source: str, *, path: str) -> dict[str, Any]:
                         ):
                             unknown("ACTION_EXTRA_EFFECT_UNSUPPORTED", (*step_location, "with"))
                         exact_event_head = "${{ github.event.pull_request.head.sha || github.event.merge_group.head_sha || github.sha }}"
-                        if dependencies and not runtime_checkout and (
+                        if dependencies and not runtime_checkout and not queue_checkout and (
                             inputs.get("repository", "szl-holdings/.github") != "szl-holdings/.github"
                             or ("ref" in inputs and inputs["ref"] != exact_event_head)
                         ):
@@ -1771,6 +1887,8 @@ def analyze_workflow_source(source: str, *, path: str) -> dict[str, Any]:
                             # This exact run-scoped namespace is the enforcing
                             # workflow contract, not an arbitrary dynamic name.
                             resource = "github:actions:artifact:control-plane-effect"
+                        elif queue_profile and artifact == "merge-queue-enqueue-${{ github.run_id }}-${{ github.run_attempt }}":
+                            resource = "github:actions:artifact:merge-queue-enqueue"
                         elif path == LIFECYCLE_WORKFLOW and artifact == (
                             "hf-space-lifecycle-${{ github.run_id }}-${{ github.run_attempt }}"
                         ):
@@ -1834,6 +1952,12 @@ def analyze_workflow_source(source: str, *, path: str) -> dict[str, Any]:
         )
         effects.extend(block_effects)
         unknowns.extend(block_unknowns)
+        if path == QUEUE_WORKFLOW:
+            queue_effects, queue_unknowns = queue_graphql_effects(
+                block, path=path, line_offset=start_line - 1,
+            )
+            effects.extend(queue_effects)
+            unknowns.extend(queue_unknowns)
         inline_effects, inline_unknowns = inline_python_blocks(
             block, path=path, start_line=start_line
         )
