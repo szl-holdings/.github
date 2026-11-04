@@ -5,13 +5,19 @@
   "external_dco_or_cla_required": true,
   "required_check": "szl/provenance",
   "enforcement": "advisory",
-  "allowed_human_actors": ["stephenlutar2-hash"],
-  "allowed_app_slugs": [
-    "web-flow",
-    "dependabot",
-    "chatgpt-codex-connector"
+  "allowed_human_actors": [
+    "Carlota-1",
+    "stephenlutar2-hash"
   ],
-  "merge_modes": ["squash"],
+  "allowed_app_slugs": [
+    "chatgpt-codex-connector",
+    "cursor",
+    "dependabot",
+    "web-flow"
+  ],
+  "merge_modes": [
+    "squash"
+  ],
   "direct_default_branch_push": false,
   "required_evidence": [
     "exact_head_sha",

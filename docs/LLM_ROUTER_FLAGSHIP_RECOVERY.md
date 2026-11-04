@@ -85,6 +85,17 @@ repository now edits `szl-holdings/szl-router` metadata (description, homepage,
 issues, topics) or publishes its `space/` tree to the Space. The controller
 scripts under `scripts/` are kept as historical source and are no longer run.
 
+The retired `enforce-llm-router-flagship-card.yml` writer keeps its daily
+08:17 UTC cadence as an anonymous public observer. Its writer job remains
+disabled. The observer compares exact router source/runtime revisions and the
+immutable organization-card README bytes with this checked-out source. It
+rechecks moving refs and fails on drift or unavailable evidence; its JSON report
+is retained in the workflow run logs. Pull requests exercise offline fixtures
+only. No provider token, restart, upload, visibility change, or automatic repair
+is authorized by this observation. The existing canonical publishers and
+lifecycle reconciler own remediation. An observed match does not certify
+inference readiness or provider availability.
+
 Historically, `.github/workflows/restore-llm-router-flagship.yml` performed the
 bounded restoration after protected merge. It:
 

@@ -31,6 +31,13 @@ RECEIPT_SCHEMA = "szl.estate-deadman-receipt/v1"
 INCIDENT_STATE_SCHEMA = "szl.estate-deadman-incident-state/v1"
 GITHUB_ACTIONS_BOT = "github-actions[bot]"
 CONTROLLER_WORKFLOW_PATH = ".github/workflows/estate-deadman.yml"
+# Targets whose LATEST_RUN_FAILED mode is treated as EXTERNAL/provider soft-fail
+# when confirming the supervisor aggregate (HF Space runtime / HF credential plane).
+# Internal states (disabled workflow, observer errors, inconclusive) stay hard-fail.
+EXTERNAL_PROVIDER_SOFT_TARGET_IDS = frozenset({
+    "scheduled-estate-census",
+    "public-estate-live-witness",
+})
 USER_AGENT = "SZLHOLDINGS-EstateDeadman/1.0"
 MAX_RESPONSE_BYTES = 1_048_576
 REPOSITORY = re.compile(r"^szl-holdings/[A-Za-z0-9_.-]+$")
@@ -1134,6 +1141,105 @@ def reconcile_incident(
     return {"action": "refreshed", "ok": True, "issue_number": number}
 
 
+
+def classify_external_provider_soft_exit(report: Mapping[str, Any]) -> dict[str, Any]:
+    """Honesty doctrine: keep confirmed_healthy false; soft-exit only for EXTERNAL provider.
+
+    Matches szl-estate-os readiness soft-exit when the only failed lane maps to
+    EXTERNAL_ACTION_REQUIRED provider remediations. Here the analogous measured
+    case is CONFIRMED_FAILURE whose every confirmed failed target is a known
+    EXTERNAL-provider-dependent control plane stuck in LATEST_RUN_FAILED with no
+    observer error_kind. Do not soft-exit INCONCLUSIVE or internal control faults.
+    """
+    require(isinstance(report, Mapping), "receipt must be an object")
+    confirmation_state = report.get("confirmation_state")
+    confirmed_healthy = report.get("confirmed_healthy") is True
+    failed_ids = report.get("confirmed_failed_target_ids")
+    require(isinstance(failed_ids, list), "confirmed_failed_target_ids must be a list")
+    final_sample = report.get("final_sample")
+    require(isinstance(final_sample, list), "final_sample must be a list")
+    by_id = {}
+    for row in final_sample:
+        require(isinstance(row, Mapping), "final_sample row must be an object")
+        target_id = require_string(row.get("id"), "final_sample.id")
+        by_id[target_id] = row
+
+    detail = {
+        "eligible": False,
+        "reason": "not-applicable",
+        "failed_target_ids": list(failed_ids),
+        "external_provider_soft_target_ids": sorted(EXTERNAL_PROVIDER_SOFT_TARGET_IDS),
+    }
+    if confirmed_healthy:
+        detail["reason"] = "confirmed-healthy"
+        return detail
+    if confirmation_state != "CONFIRMED_FAILURE":
+        detail["reason"] = f"confirmation-state:{confirmation_state}"
+        return detail
+    if not failed_ids:
+        detail["reason"] = "confirmed-failure-without-ids"
+        return detail
+    unknown = [item for item in failed_ids if item not in EXTERNAL_PROVIDER_SOFT_TARGET_IDS]
+    if unknown:
+        detail["reason"] = "includes-non-external-targets"
+        detail["non_external_target_ids"] = unknown
+        return detail
+    for target_id in failed_ids:
+        row = by_id.get(target_id)
+        require(row is not None, f"missing final_sample row for {target_id}")
+        if row.get("state") != "LATEST_RUN_FAILED":
+            detail["reason"] = f"{target_id}:state:{row.get('state')}"
+            return detail
+        if row.get("error_kind"):
+            detail["reason"] = f"{target_id}:observer-error:{row.get('error_kind')}"
+            return detail
+        if row.get("healthy") is not False:
+            detail["reason"] = f"{target_id}:healthy-flag-inconsistent"
+            return detail
+    detail["eligible"] = True
+    detail["reason"] = "confirmed-failure-external-provider-only"
+    return detail
+
+
+def gate_supervisor_receipt(path: Path) -> int:
+    """Terminal gate: hard-require integrity; soft-exit measured EXTERNAL-only red."""
+    report = json.loads(
+        path.read_text(encoding="utf-8"), object_pairs_hook=reject_duplicate_pairs
+    )
+    require(isinstance(report, dict), "receipt must be an object")
+    require(report.get("schema") == RECEIPT_SCHEMA, "unexpected receipt schema")
+    require(report.get("secret_values_recorded") is False, "secret values recorded")
+    authority = report.get("authority")
+    require(isinstance(authority, Mapping), "authority missing")
+    require(authority.get("controller_tip_reverified") is True, "controller tip not reverified")
+    require(authority.get("workflow_mutation") is False, "workflow mutation claimed")
+    require(authority.get("deployment_mutation") is False, "deployment mutation claimed")
+    incident = report.get("incident")
+    require(isinstance(incident, Mapping), "incident missing")
+    require(incident.get("ok") is True, "incident lifecycle not ok")
+
+    if report.get("confirmed_healthy") is True:
+        print("aggregate: confirmed healthy")
+        return 0
+
+    soft = classify_external_provider_soft_exit(report)
+    if soft.get("eligible") is True:
+        failed = ",".join(soft.get("failed_target_ids") or [])
+        print(
+            "::warning title=DEADMAN_EXTERNAL_MEASURED_FAILED::"
+            f"confirmed_healthy remains false; EXTERNAL provider control planes only: {failed}. "
+            "Evidence packet preserves CONFIRMED_FAILURE; soft-exit aggregate "
+            "(HF Space runtime / HF credential plane)."
+        )
+        print("aggregate: MEASURED-failed soft-exit for EXTERNAL provider targets")
+        print(json.dumps(soft, sort_keys=True))
+        return 0
+
+    print("aggregate: hard-fail; soft-exit not eligible")
+    print(json.dumps(soft, sort_keys=True))
+    return 1
+
+
 def write_json_atomic(path: Path, value: Any) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     temporary = path.with_name(f".{path.name}.{uuid.uuid4().hex}.tmp")
@@ -1307,12 +1413,20 @@ def build_parser() -> argparse.ArgumentParser:
         default=Path("reports/estate-deadman.json"),
     )
     parser.add_argument("--offline-contract-only", action="store_true")
+    parser.add_argument(
+        "--gate-receipt",
+        type=Path,
+        default=None,
+        help="Validate an existing supervisor receipt and soft-exit EXTERNAL-only red",
+    )
     return parser
 
 
 def main(argv: Sequence[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
     try:
+        if args.gate_receipt is not None:
+            return gate_supervisor_receipt(args.gate_receipt)
         policy, policy_sha256 = load_policy(args.policy)
         if args.offline_contract_only:
             result = offline_contract(policy, policy_sha256)
