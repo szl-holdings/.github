@@ -19,14 +19,14 @@ permissions:
 jobs:
   test:
     name: Run tests
-    runs-on: ubuntu-24.04 # Temporary until the exact Python 3.12.10 publisher closure is revalidated on 26.04.
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Set up Python
         uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
-          python-version: "3.12.10"
+          python-version: "3.12.14"
 
       - name: Solo-builder provenance contract self-test
         run: python3 .github/scripts/test_solo_builder_provenance.py
@@ -274,8 +274,8 @@ jobs:
           fi
           python3 -m venv "$VENV"
           ACTUAL_VERSION="$("$VENV/bin/python" -I -P -c 'import platform; print(platform.python_version())')"
-          if [ "$ACTUAL_VERSION" != "3.12.10" ]; then
-            echo "::error::Expected publisher Python 3.12.10, found $ACTUAL_VERSION."
+          if [ "$ACTUAL_VERSION" != "3.12.14" ]; then
+            echo "::error::Expected publisher Python 3.12.14, found $ACTUAL_VERSION."
             exit 2
           fi
           "$VENV/bin/python" -I -P -m pip install \

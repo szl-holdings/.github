@@ -861,161 +861,77 @@
       "trusted_transitives": {}
     },
     ".github/workflows/enforce-llm-router-flagship-card.yml": {
-      "intent_id": "llm-router-flagship-card-hf-showcase-v1",
+      "intent_id": "llm-router-flagship-anonymous-scheduled-observation-v1",
       "valid_until": "2026-11-30",
-      "source_sha256": "sha256:9228a2dd03caa03dd06303acf405c4a353d8405670f3a4f6af5810e249bc3ff9",
-      "credentials": [
-        "HF_API_TOKEN",
-        "HF_TOKEN",
-        "HUGGINGFACE_TOKEN"
-      ],
+      "source_sha256": "sha256:fe439b44f1e1b8ccd1fedd389647951fba3ef633fac5508887dce66497a96c4f",
+      "credentials": [],
       "resources": [
-        {
-          "key": "github:actions:artifact:llm-router-flagship-card-enforcement",
-          "access": "external-write"
-        },
         {
           "key": "github:repository:szl-holdings/.github:contents",
           "access": "read"
         },
         {
-          "key": "huggingface:space:SZLHOLDINGS/README:contents",
-          "access": "external-write"
-        },
-        {
-          "key": "huggingface:space:SZLHOLDINGS/llm-router-live:runtime",
-          "access": "external-write"
-        },
-        {
-          "key": "huggingface:space:SZLHOLDINGS/llm-router-live:settings",
-          "access": "external-write"
-        },
-        {
-          "key": "runner:guard:egress",
-          "access": "local-write"
-        },
-        {
           "key": "runner:toolchain:python",
           "access": "local-write"
-        },
-        {
-          "key": "stepsecurity:monitor:szl-holdings/.github",
-          "access": "external-write"
         }
       ],
       "effects": [
         {
-          "sink": "github.artifact.upload",
-          "resource": "github:actions:artifact:llm-router-flagship-card-enforcement",
-          "access": "external-write",
-          "max_calls": 1
-        },
-        {
           "sink": "github.contents.checkout",
           "resource": "github:repository:szl-holdings/.github:contents",
           "access": "read",
-          "max_calls": 2
-        },
-        {
-          "sink": "runner.guard.configure",
-          "resource": "runner:guard:egress",
-          "access": "local-write",
-          "max_calls": 2
-        },
-        {
-          "sink": "runner.guard.telemetry",
-          "resource": "stepsecurity:monitor:szl-holdings/.github",
-          "access": "external-write",
-          "max_calls": 2
+          "max_calls": 1
         },
         {
           "sink": "runner.toolchain.install",
           "resource": "runner:toolchain:python",
           "access": "local-write",
-          "max_calls": 2
-        },
-        {
-          "sink": "sdk.huggingface.restart_space",
-          "resource": "huggingface:space:SZLHOLDINGS/llm-router-live:runtime",
-          "access": "external-write",
-          "max_calls": 1
-        },
-        {
-          "sink": "sdk.huggingface.update_repo_settings",
-          "resource": "huggingface:space:SZLHOLDINGS/llm-router-live:settings",
-          "access": "external-write",
-          "max_calls": 1
-        },
-        {
-          "sink": "sdk.repository.upload_file",
-          "resource": "huggingface:space:SZLHOLDINGS/README:contents",
-          "access": "external-write",
           "max_calls": 1
         }
       ],
-      "max_external_writes": 6,
+      "max_external_writes": 0,
       "required_controls": {
-        "triggers": [
-          "pull_request",
-          "push",
-          "schedule",
-          "workflow_dispatch"
-        ],
         "contents_read": true,
-        "no_explicit_secrets": false,
+        "no_explicit_secrets": true,
         "concurrency": true,
         "protected_ref": false,
         "exact_sha": false,
         "expected_before": false,
-        "readback": false
+        "readback": false,
+        "triggers": [
+          "pull_request",
+          "schedule",
+          "workflow_dispatch"
+        ]
       },
       "trusted_transitives": {},
       "reviewed_unknowns": {
         "files": {
-          ".github/workflows/enforce-llm-router-flagship-card.yml": "sha256:9228a2dd03caa03dd06303acf405c4a353d8405670f3a4f6af5810e249bc3ff9",
-          "scripts/enforce_llm_router_flagship_card.py": "sha256:f06bb07d2b5979d530a54a56bcd7fa92cb56c083dc7d93413c6901ef000a9977"
+          ".github/scripts/router_flagship_observation.py": "sha256:bd3dea2d268abb707ebdc5fdd138f27a31ba96813c5e063ae22386000c161d32",
+          ".github/scripts/test_router_flagship_observation.py": "sha256:0aa366823dc50bfb25982312dc102d4f8e57326be10f6a7733a74bc545117152",
+          ".github/workflows/enforce-llm-router-flagship-card.yml": "sha256:fe439b44f1e1b8ccd1fedd389647951fba3ef633fac5508887dce66497a96c4f"
         },
         "unknowns": [
-          "ACTION_INPUTS_REVIEW_REQUIRED@.github/workflows/enforce-llm-router-flagship-card.yml:40",
-          "ACTION_INPUTS_REVIEW_REQUIRED@.github/workflows/enforce-llm-router-flagship-card.yml:44",
-          "ACTION_INPUTS_REVIEW_REQUIRED@.github/workflows/enforce-llm-router-flagship-card.yml:49",
-          "ACTION_INPUTS_REVIEW_REQUIRED@.github/workflows/enforce-llm-router-flagship-card.yml:69",
-          "ACTION_INPUTS_REVIEW_REQUIRED@.github/workflows/enforce-llm-router-flagship-card.yml:73",
-          "ACTION_INPUTS_REVIEW_REQUIRED@.github/workflows/enforce-llm-router-flagship-card.yml:78",
-          "ACTION_INPUTS_REVIEW_REQUIRED@.github/workflows/enforce-llm-router-flagship-card.yml:95",
-          "PYTHON_DYNAMIC_EXECUTION@scripts/enforce_llm_router_flagship_card.py:31",
-          "PYTHON_DYNAMIC_EXECUTION@scripts/enforce_llm_router_flagship_card.py:34",
-          "PYTHON_IMPORT_UNRESOLVED@scripts/enforce_llm_router_flagship_card.py:10",
-          "PYTHON_IMPORT_UNRESOLVED@scripts/enforce_llm_router_flagship_card.py:3",
-          "PYTHON_IMPORT_UNRESOLVED@scripts/enforce_llm_router_flagship_card.py:5",
-          "PYTHON_IMPORT_UNRESOLVED@scripts/enforce_llm_router_flagship_card.py:76",
-          "PYTHON_IMPORT_UNRESOLVED@scripts/enforce_llm_router_flagship_card.py:77",
-          "PYTHON_SOURCE_REVIEW_REQUIRED@scripts/enforce_llm_router_flagship_card.py:1",
+          "ACTION_INPUTS_REVIEW_REQUIRED@.github/workflows/enforce-llm-router-flagship-card.yml:47",
+          "ACTION_INPUTS_REVIEW_REQUIRED@.github/workflows/enforce-llm-router-flagship-card.yml:52",
+          "DYNAMIC_EXECUTION@.github/workflows/enforce-llm-router-flagship-card.yml:58",
+          "HTTP_TARGET_UNRESOLVED@.github/scripts/router_flagship_observation.py:37",
+          "HTTP_TARGET_UNRESOLVED@.github/scripts/test_router_flagship_observation.py:137",
+          "PYTHON_IMPORT_UNRESOLVED@.github/scripts/router_flagship_observation.py:11",
+          "PYTHON_IMPORT_UNRESOLVED@.github/scripts/router_flagship_observation.py:12",
+          "PYTHON_IMPORT_UNRESOLVED@.github/scripts/router_flagship_observation.py:13",
+          "PYTHON_IMPORT_UNRESOLVED@.github/scripts/router_flagship_observation.py:3",
+          "PYTHON_IMPORT_UNRESOLVED@.github/scripts/router_flagship_observation.py:5",
+          "PYTHON_IMPORT_UNRESOLVED@.github/scripts/test_router_flagship_observation.py:1",
+          "PYTHON_IMPORT_UNRESOLVED@.github/scripts/test_router_flagship_observation.py:10",
+          "PYTHON_IMPORT_UNRESOLVED@.github/scripts/test_router_flagship_observation.py:3",
+          "PYTHON_IMPORT_UNRESOLVED@.github/scripts/test_router_flagship_observation.py:8",
+          "PYTHON_SOURCE_REVIEW_REQUIRED@.github/scripts/router_flagship_observation.py:1",
+          "PYTHON_SOURCE_REVIEW_REQUIRED@.github/scripts/test_router_flagship_observation.py:1",
           "SCRIPT_SOURCE_REVIEW_REQUIRED@.github/workflows/enforce-llm-router-flagship-card.yml:1",
-          "SDK_TARGET_UNRESOLVED@scripts/enforce_llm_router_flagship_card.py:127",
-          "SDK_TARGET_UNRESOLVED@scripts/enforce_llm_router_flagship_card.py:87",
-          "SDK_TARGET_UNRESOLVED@scripts/enforce_llm_router_flagship_card.py:91",
-          "SECRET_EXPRESSION_REVIEW_REQUIRED@.github/workflows/enforce-llm-router-flagship-card.yml:1",
-          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/enforce-llm-router-flagship-card.yml:53",
           "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/enforce-llm-router-flagship-card.yml:54",
-          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/enforce-llm-router-flagship-card.yml:55",
-          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/enforce-llm-router-flagship-card.yml:56",
-          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/enforce-llm-router-flagship-card.yml:80",
-          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/enforce-llm-router-flagship-card.yml:84",
-          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/enforce-llm-router-flagship-card.yml:85",
-          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/enforce-llm-router-flagship-card.yml:86",
-          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/enforce-llm-router-flagship-card.yml:87",
-          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/enforce-llm-router-flagship-card.yml:88",
-          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/enforce-llm-router-flagship-card.yml:89",
-          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/enforce-llm-router-flagship-card.yml:90",
-          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/enforce-llm-router-flagship-card.yml:54",
-          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/enforce-llm-router-flagship-card.yml:55",
-          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/enforce-llm-router-flagship-card.yml:84",
-          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/enforce-llm-router-flagship-card.yml:86",
-          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/enforce-llm-router-flagship-card.yml:87",
-          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/enforce-llm-router-flagship-card.yml:88",
-          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/enforce-llm-router-flagship-card.yml:89",
-          "WORKFLOW_ENVIRONMENT_REVIEW_REQUIRED@.github/workflows/enforce-llm-router-flagship-card.yml:64"
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/enforce-llm-router-flagship-card.yml:58",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/enforce-llm-router-flagship-card.yml:58"
         ]
       }
     },
@@ -2736,7 +2652,7 @@
     ".github/workflows/tests.yml": {
       "intent_id": "repository-credentialless-tests-v1",
       "valid_until": "2026-11-30",
-      "source_sha256": "sha256:cf9bb3090b016d5a5c0e735439774d5d05568131e5b0018d1f6fe18845578a3e",
+      "source_sha256": "sha256:fe50469d4a80cf4d8b3e01707eb5950dfde31474c430023e14113feb7158b260",
       "credentials": [],
       "resources": [
         {
@@ -2825,7 +2741,7 @@
           ".github/scripts/test_hf_live_pr_pair.py": "sha256:8e5814a52e7460a22db174e6923acdf15aa16ba995445b0aa7c4d08a55b54483",
           ".github/scripts/test_hf_module_drift_check.py": "sha256:fdb716fcb6f8eb2b57ee61db7e05624cf1a057455ec78266a8acd152d52cb66f",
           ".github/scripts/test_hf_module_drift_prune.py": "sha256:19e84279dfbadf538b509c690b48dc94f17ff98ffb29c9a556dd1a16a47aca8b",
-          ".github/scripts/test_hf_publisher_lock.py": "sha256:2de4fab39751d33a4c9d1a70214ac2c7886951724094e6a11c02a3c27c929d8b",
+          ".github/scripts/test_hf_publisher_lock.py": "sha256:2155df425ecdaacfad961971c9365ab07c09d4c776b07854a842253eeb4da6f0",
           ".github/scripts/test_hf_seismic_publish_contract.py": "sha256:e8c0b3bf75e0a128313f9fd8805c8a9943a47fce57db0639f64db301b8a8198c",
           ".github/scripts/test_hf_source_bound_baseline.py": "sha256:ba444e68085a860dda654936089d2dac2f774991f8aa444f85788677f8828ec7",
           ".github/scripts/test_hf_space_lifecycle_reconcile.py": "sha256:ba82032048bf4d2a07b72a8afec6f092b793003456000da61e8bfe29793a9c14",
@@ -2842,7 +2758,7 @@
           ".github/scripts/test_reusable_workflow_target_check.py": "sha256:d145f78f6bb4ae0b76a9f35210882e0ff96d511ece8630d39f5d99f775f9ed54",
           ".github/scripts/test_solo_builder_provenance.py": "sha256:32abce0cee25db6fbf2d2e9d313054b73ecbbfc4eaa469462c11e1cdd6a69f14",
           ".github/scripts/test_szl_codename_gate.py": "sha256:bcfcbbf52dd4cfe7761372fa4acd08b98aec327cb4f7f7dc2c1bc86029fd5b0f",
-          ".github/workflows/tests.yml": "sha256:cf9bb3090b016d5a5c0e735439774d5d05568131e5b0018d1f6fe18845578a3e"
+          ".github/workflows/tests.yml": "sha256:fe50469d4a80cf4d8b3e01707eb5950dfde31474c430023e14113feb7158b260"
         },
         "unknowns": [
           "ACTION_INPUTS_REVIEW_REQUIRED@.github/workflows/tests.yml:29",
@@ -5182,7 +5098,7 @@
     ".github/workflows/publish-nexus-space.yml": {
       "intent_id": "nexus-central-publisher-source-bound-v1",
       "valid_until": "2026-11-30",
-      "source_sha256": "sha256:09f333adabe3a77191539fe50a32d0643c14b7a53c05e19e2955b179fa32f6a5",
+      "source_sha256": "sha256:031409cfa1b2a9d1651a6f9c8833260a08c1b7f3e13011c6ac2f4cf25dac635d",
       "credentials": [
         "GITHUB_TOKEN",
         "HF_ORG_TOKEN",
@@ -5279,7 +5195,7 @@
       "trusted_transitives": {},
       "reviewed_unknowns": {
         "files": {
-          ".github/workflows/publish-nexus-space.yml": "sha256:09f333adabe3a77191539fe50a32d0643c14b7a53c05e19e2955b179fa32f6a5",
+          ".github/workflows/publish-nexus-space.yml": "sha256:031409cfa1b2a9d1651a6f9c8833260a08c1b7f3e13011c6ac2f4cf25dac635d",
           ".github/scripts/acquire_hf_publisher_token.py": "sha256:6c7fb1966a35dbfa63870a00c8557500c990a09b8ff5d050e976d83d02f54016",
           ".github/scripts/hf_deploy_from_dockerfile.py": "sha256:373add34da38a219e5dafce52e7a86a417c019ac13b139678fc72c93c1ad1318",
           ".github/scripts/test_acquire_hf_publisher_token.py": "sha256:a4545b51f3ed5831e96ac2247e11838c7b4febe585adcf464e2028cbbc21d8d7",
@@ -5745,7 +5661,7 @@
           ".github/scripts/test_acquire_hf_publisher_token.py": "sha256:a4545b51f3ed5831e96ac2247e11838c7b4febe585adcf464e2028cbbc21d8d7",
           ".github/scripts/test_validate_nexus_source_binding.py": "sha256:a7c5289f9ae888d2329d3d7f28bc53888853d23dbc2d723166e54a197dd9da4e",
           ".github/scripts/validate_nexus_source_binding.py": "sha256:b1828ffa6a253fd0341b5201b1f376bd6b7bf6a15d1445831ba1bc878a11b730",
-          ".github/workflows/publish-nexus-space.yml": "sha256:09f333adabe3a77191539fe50a32d0643c14b7a53c05e19e2955b179fa32f6a5"
+          ".github/workflows/publish-nexus-space.yml": "sha256:031409cfa1b2a9d1651a6f9c8833260a08c1b7f3e13011c6ac2f4cf25dac635d"
         },
         "unknowns": [
           "ACTION_INPUTS_REVIEW_REQUIRED@.github/workflows/test-hf-publisher-credential-selector.yml:27",
@@ -6684,7 +6600,7 @@
     ".github/workflows/reusable-hf-deploy.yml": {
       "intent_id": "canonical-a11oy-authenticated-source-publisher-v1",
       "valid_until": "2026-11-30",
-      "source_sha256": "sha256:ec761c2f030c8798a5f4236f0879b3059572617bfe1ec2cfd1ff8fa948dc062e",
+      "source_sha256": "sha256:691024a670e446b688958addcfe69198831fcb59a923e0e0ca0c59d2ca5fe58e",
       "credentials": [
         "GITHUB_TOKEN",
         "HF_TOKEN"
@@ -6895,7 +6811,7 @@
       "trusted_transitives": {},
       "reviewed_unknowns": {
         "files": {
-          ".github/workflows/reusable-hf-deploy.yml": "sha256:ec761c2f030c8798a5f4236f0879b3059572617bfe1ec2cfd1ff8fa948dc062e",
+          ".github/workflows/reusable-hf-deploy.yml": "sha256:691024a670e446b688958addcfe69198831fcb59a923e0e0ca0c59d2ca5fe58e",
           ".github/scripts/hf_deploy_from_dockerfile.py": "sha256:373add34da38a219e5dafce52e7a86a417c019ac13b139678fc72c93c1ad1318",
           ".github/scripts/hf_runtime_publish_contract.py": "sha256:7cc16d1421b4e76ce281e3dcadfee36b790891fbc56a533c53fd43bdf0bf55a1",
           ".github/scripts/hf_space_source_binding.py": "sha256:9888d4c126ead29d0960de3198a99f1d686956c8104f0cf6c5c0d4c113b2a37b",
@@ -7305,7 +7221,7 @@
         "files": {
           ".github/workflows/reusable-hf-deploy-source-witness.yml": "sha256:9e39165a2197e44cb6a5b4386c48383babf68704b4fa3caa8b15730d38948b2d",
           ".github/scripts/hf_runtime_publish_contract.py": "sha256:7cc16d1421b4e76ce281e3dcadfee36b790891fbc56a533c53fd43bdf0bf55a1",
-          ".github/workflows/reusable-hf-deploy.yml": "sha256:ec761c2f030c8798a5f4236f0879b3059572617bfe1ec2cfd1ff8fa948dc062e"
+          ".github/workflows/reusable-hf-deploy.yml": "sha256:691024a670e446b688958addcfe69198831fcb59a923e0e0ca0c59d2ca5fe58e"
         },
         "unknowns": [
           "PYTHON_SOURCE_REVIEW_REQUIRED@.github/scripts/hf_runtime_publish_contract.py:1",
@@ -8203,7 +8119,7 @@
     ".github/workflows/solo-builder-provenance.yml": {
       "intent_id": "solo-builder-organization-head-v1",
       "valid_until": "2026-11-30",
-      "source_sha256": "sha256:507610129df98b62f30fcd4c3c5733ea57343202460f22dc80e6211a90261c2e",
+      "source_sha256": "sha256:26d2e490a35378f77c205998f314f50b0f877c72154ec739914c100b851e6719",
       "credentials": [
         "GITHUB_TOKEN"
       ],
@@ -8231,23 +8147,24 @@
       "trusted_transitives": {},
       "reviewed_unknowns": {
         "files": {
-          ".github/workflows/solo-builder-provenance.yml": "sha256:507610129df98b62f30fcd4c3c5733ea57343202460f22dc80e6211a90261c2e"
+          ".github/workflows/solo-builder-provenance.yml": "sha256:26d2e490a35378f77c205998f314f50b0f877c72154ec739914c100b851e6719"
         },
         "unknowns": [
-          "GITHUB_TARGET_UNRESOLVED@.github/workflows/solo-builder-provenance.yml:100",
-          "GITHUB_TARGET_UNRESOLVED@.github/workflows/solo-builder-provenance.yml:103",
-          "GITHUB_TARGET_UNRESOLVED@.github/workflows/solo-builder-provenance.yml:134",
-          "GITHUB_TARGET_UNRESOLVED@.github/workflows/solo-builder-provenance.yml:137",
-          "GITHUB_TARGET_UNRESOLVED@.github/workflows/solo-builder-provenance.yml:139",
-          "GITHUB_TARGET_UNRESOLVED@.github/workflows/solo-builder-provenance.yml:64",
-          "GITHUB_TARGET_UNRESOLVED@.github/workflows/solo-builder-provenance.yml:83",
-          "GITHUB_TARGET_UNRESOLVED@.github/workflows/solo-builder-provenance.yml:89",
+          "GITHUB_TARGET_UNRESOLVED@.github/workflows/solo-builder-provenance.yml:99",
+          "GITHUB_TARGET_UNRESOLVED@.github/workflows/solo-builder-provenance.yml:102",
+          "GITHUB_TARGET_UNRESOLVED@.github/workflows/solo-builder-provenance.yml:133",
+          "GITHUB_TARGET_UNRESOLVED@.github/workflows/solo-builder-provenance.yml:136",
+          "GITHUB_TARGET_UNRESOLVED@.github/workflows/solo-builder-provenance.yml:138",
+          "GITHUB_TARGET_UNRESOLVED@.github/workflows/solo-builder-provenance.yml:63",
+          "GITHUB_TARGET_UNRESOLVED@.github/workflows/solo-builder-provenance.yml:82",
+          "GITHUB_TARGET_UNRESOLVED@.github/workflows/solo-builder-provenance.yml:88",
           "SECRET_EXPRESSION_REVIEW_REQUIRED@.github/workflows/solo-builder-provenance.yml:1",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/solo-builder-provenance.yml:99",
           "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/solo-builder-provenance.yml:100",
           "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/solo-builder-provenance.yml:101",
           "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/solo-builder-provenance.yml:102",
           "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/solo-builder-provenance.yml:103",
-          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/solo-builder-provenance.yml:104",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/solo-builder-provenance.yml:124",
           "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/solo-builder-provenance.yml:125",
           "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/solo-builder-provenance.yml:126",
           "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/solo-builder-provenance.yml:127",
@@ -8255,11 +8172,11 @@
           "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/solo-builder-provenance.yml:129",
           "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/solo-builder-provenance.yml:130",
           "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/solo-builder-provenance.yml:131",
-          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/solo-builder-provenance.yml:132",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/solo-builder-provenance.yml:133",
           "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/solo-builder-provenance.yml:134",
           "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/solo-builder-provenance.yml:135",
           "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/solo-builder-provenance.yml:136",
-          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/solo-builder-provenance.yml:137",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/solo-builder-provenance.yml:138",
           "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/solo-builder-provenance.yml:139",
           "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/solo-builder-provenance.yml:140",
           "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/solo-builder-provenance.yml:141",
@@ -8267,7 +8184,7 @@
           "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/solo-builder-provenance.yml:143",
           "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/solo-builder-provenance.yml:144",
           "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/solo-builder-provenance.yml:145",
-          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/solo-builder-provenance.yml:146",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/solo-builder-provenance.yml:45",
           "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/solo-builder-provenance.yml:46",
           "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/solo-builder-provenance.yml:47",
           "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/solo-builder-provenance.yml:48",
@@ -8284,7 +8201,7 @@
           "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/solo-builder-provenance.yml:59",
           "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/solo-builder-provenance.yml:60",
           "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/solo-builder-provenance.yml:61",
-          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/solo-builder-provenance.yml:62",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/solo-builder-provenance.yml:63",
           "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/solo-builder-provenance.yml:64",
           "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/solo-builder-provenance.yml:65",
           "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/solo-builder-provenance.yml:66",
@@ -8301,12 +8218,12 @@
           "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/solo-builder-provenance.yml:77",
           "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/solo-builder-provenance.yml:78",
           "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/solo-builder-provenance.yml:79",
-          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/solo-builder-provenance.yml:80",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/solo-builder-provenance.yml:81",
           "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/solo-builder-provenance.yml:82",
           "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/solo-builder-provenance.yml:83",
           "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/solo-builder-provenance.yml:84",
           "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/solo-builder-provenance.yml:85",
-          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/solo-builder-provenance.yml:86",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/solo-builder-provenance.yml:87",
           "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/solo-builder-provenance.yml:88",
           "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/solo-builder-provenance.yml:89",
           "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/solo-builder-provenance.yml:90",
@@ -8316,13 +8233,13 @@
           "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/solo-builder-provenance.yml:94",
           "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/solo-builder-provenance.yml:95",
           "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/solo-builder-provenance.yml:96",
-          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/solo-builder-provenance.yml:97",
-          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/solo-builder-provenance.yml:99",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/solo-builder-provenance.yml:98",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/solo-builder-provenance.yml:99",
           "SHELL_COMPOSITION_UNKNOWN@.github/workflows/solo-builder-provenance.yml:100",
           "SHELL_COMPOSITION_UNKNOWN@.github/workflows/solo-builder-provenance.yml:101",
           "SHELL_COMPOSITION_UNKNOWN@.github/workflows/solo-builder-provenance.yml:102",
           "SHELL_COMPOSITION_UNKNOWN@.github/workflows/solo-builder-provenance.yml:103",
-          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/solo-builder-provenance.yml:104",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/solo-builder-provenance.yml:124",
           "SHELL_COMPOSITION_UNKNOWN@.github/workflows/solo-builder-provenance.yml:125",
           "SHELL_COMPOSITION_UNKNOWN@.github/workflows/solo-builder-provenance.yml:126",
           "SHELL_COMPOSITION_UNKNOWN@.github/workflows/solo-builder-provenance.yml:127",
@@ -8330,27 +8247,27 @@
           "SHELL_COMPOSITION_UNKNOWN@.github/workflows/solo-builder-provenance.yml:129",
           "SHELL_COMPOSITION_UNKNOWN@.github/workflows/solo-builder-provenance.yml:130",
           "SHELL_COMPOSITION_UNKNOWN@.github/workflows/solo-builder-provenance.yml:131",
-          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/solo-builder-provenance.yml:132",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/solo-builder-provenance.yml:133",
           "SHELL_COMPOSITION_UNKNOWN@.github/workflows/solo-builder-provenance.yml:134",
           "SHELL_COMPOSITION_UNKNOWN@.github/workflows/solo-builder-provenance.yml:135",
           "SHELL_COMPOSITION_UNKNOWN@.github/workflows/solo-builder-provenance.yml:136",
-          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/solo-builder-provenance.yml:137",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/solo-builder-provenance.yml:138",
           "SHELL_COMPOSITION_UNKNOWN@.github/workflows/solo-builder-provenance.yml:139",
-          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/solo-builder-provenance.yml:140",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/solo-builder-provenance.yml:143",
           "SHELL_COMPOSITION_UNKNOWN@.github/workflows/solo-builder-provenance.yml:144",
           "SHELL_COMPOSITION_UNKNOWN@.github/workflows/solo-builder-provenance.yml:145",
-          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/solo-builder-provenance.yml:146",
-          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/solo-builder-provenance.yml:46",
-          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/solo-builder-provenance.yml:48",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/solo-builder-provenance.yml:45",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/solo-builder-provenance.yml:47",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/solo-builder-provenance.yml:49",
           "SHELL_COMPOSITION_UNKNOWN@.github/workflows/solo-builder-provenance.yml:50",
           "SHELL_COMPOSITION_UNKNOWN@.github/workflows/solo-builder-provenance.yml:51",
           "SHELL_COMPOSITION_UNKNOWN@.github/workflows/solo-builder-provenance.yml:52",
           "SHELL_COMPOSITION_UNKNOWN@.github/workflows/solo-builder-provenance.yml:53",
-          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/solo-builder-provenance.yml:54",
-          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/solo-builder-provenance.yml:56",
-          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/solo-builder-provenance.yml:58",
-          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/solo-builder-provenance.yml:60",
-          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/solo-builder-provenance.yml:62",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/solo-builder-provenance.yml:55",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/solo-builder-provenance.yml:57",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/solo-builder-provenance.yml:59",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/solo-builder-provenance.yml:61",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/solo-builder-provenance.yml:63",
           "SHELL_COMPOSITION_UNKNOWN@.github/workflows/solo-builder-provenance.yml:64",
           "SHELL_COMPOSITION_UNKNOWN@.github/workflows/solo-builder-provenance.yml:65",
           "SHELL_COMPOSITION_UNKNOWN@.github/workflows/solo-builder-provenance.yml:66",
@@ -8358,26 +8275,97 @@
           "SHELL_COMPOSITION_UNKNOWN@.github/workflows/solo-builder-provenance.yml:68",
           "SHELL_COMPOSITION_UNKNOWN@.github/workflows/solo-builder-provenance.yml:69",
           "SHELL_COMPOSITION_UNKNOWN@.github/workflows/solo-builder-provenance.yml:70",
-          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/solo-builder-provenance.yml:71",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/solo-builder-provenance.yml:73",
           "SHELL_COMPOSITION_UNKNOWN@.github/workflows/solo-builder-provenance.yml:74",
           "SHELL_COMPOSITION_UNKNOWN@.github/workflows/solo-builder-provenance.yml:75",
           "SHELL_COMPOSITION_UNKNOWN@.github/workflows/solo-builder-provenance.yml:76",
           "SHELL_COMPOSITION_UNKNOWN@.github/workflows/solo-builder-provenance.yml:77",
           "SHELL_COMPOSITION_UNKNOWN@.github/workflows/solo-builder-provenance.yml:78",
           "SHELL_COMPOSITION_UNKNOWN@.github/workflows/solo-builder-provenance.yml:79",
-          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/solo-builder-provenance.yml:80",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/solo-builder-provenance.yml:81",
           "SHELL_COMPOSITION_UNKNOWN@.github/workflows/solo-builder-provenance.yml:82",
-          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/solo-builder-provenance.yml:83",
-          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/solo-builder-provenance.yml:86",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/solo-builder-provenance.yml:85",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/solo-builder-provenance.yml:87",
           "SHELL_COMPOSITION_UNKNOWN@.github/workflows/solo-builder-provenance.yml:88",
-          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/solo-builder-provenance.yml:89",
-          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/solo-builder-provenance.yml:91",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/solo-builder-provenance.yml:90",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/solo-builder-provenance.yml:94",
           "SHELL_COMPOSITION_UNKNOWN@.github/workflows/solo-builder-provenance.yml:95",
           "SHELL_COMPOSITION_UNKNOWN@.github/workflows/solo-builder-provenance.yml:96",
-          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/solo-builder-provenance.yml:97",
-          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/solo-builder-provenance.yml:99",
-          "WORKFLOW_ENVIRONMENT_REVIEW_REQUIRED@.github/workflows/solo-builder-provenance.yml:117",
-          "WORKFLOW_ENVIRONMENT_REVIEW_REQUIRED@.github/workflows/solo-builder-provenance.yml:35"
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/solo-builder-provenance.yml:98",
+          "WORKFLOW_ENVIRONMENT_REVIEW_REQUIRED@.github/workflows/solo-builder-provenance.yml:116",
+          "WORKFLOW_ENVIRONMENT_REVIEW_REQUIRED@.github/workflows/solo-builder-provenance.yml:34"
+        ]
+      }
+    },
+    ".github/workflows/repository-verification.yml": {
+      "intent_id": "repository-verification-contract-v1",
+      "valid_until": "2026-11-30",
+      "source_sha256": "sha256:471d656f4dc1f6f36acbb24501db338354ed60733fb74d34e7a3bdc0e60d9846",
+      "credentials": [],
+      "resources": [
+        {
+          "key": "github:repository:szl-holdings/.github:contents",
+          "access": "read"
+        },
+        {
+          "key": "runner:toolchain:python",
+          "access": "local-write"
+        }
+      ],
+      "effects": [
+        {
+          "sink": "github.contents.checkout",
+          "resource": "github:repository:szl-holdings/.github:contents",
+          "access": "read",
+          "max_calls": 1
+        },
+        {
+          "sink": "runner.toolchain.install",
+          "resource": "runner:toolchain:python",
+          "access": "local-write",
+          "max_calls": 1
+        }
+      ],
+      "max_external_writes": 0,
+      "required_controls": {
+        "triggers": [
+          "merge_group",
+          "pull_request",
+          "push",
+          "workflow_dispatch"
+        ],
+        "contents_read": true,
+        "no_explicit_secrets": true,
+        "concurrency": false,
+        "protected_ref": false,
+        "exact_sha": false,
+        "expected_before": false,
+        "readback": false
+      },
+      "trusted_transitives": {},
+      "reviewed_unknowns": {
+        "files": {
+          ".github/scripts/test_verify_repository_contract.py": "sha256:36e9a24ae01867c00d7c06abd829f198d3c9d949e4651dbe1e1a23dc64c12cdc",
+          ".github/scripts/verify_repository_contract.py": "sha256:9f01ad5425f24ba241ad9b3992ef409b1f228e2d0132212c693c30e6bf9125fd",
+          ".github/workflows/repository-verification.yml": "sha256:471d656f4dc1f6f36acbb24501db338354ed60733fb74d34e7a3bdc0e60d9846"
+        },
+        "unknowns": [
+          "ACTION_INPUTS_REVIEW_REQUIRED@.github/workflows/repository-verification.yml:52",
+          "PYTHON_IMPORT_UNRESOLVED@.github/scripts/test_verify_repository_contract.py:15",
+          "PYTHON_IMPORT_UNRESOLVED@.github/scripts/test_verify_repository_contract.py:4",
+          "PYTHON_IMPORT_UNRESOLVED@.github/scripts/verify_repository_contract.py:11",
+          "PYTHON_IMPORT_UNRESOLVED@.github/scripts/verify_repository_contract.py:13",
+          "PYTHON_IMPORT_UNRESOLVED@.github/scripts/verify_repository_contract.py:14",
+          "PYTHON_IMPORT_UNRESOLVED@.github/scripts/verify_repository_contract.py:17",
+          "PYTHON_IMPORT_UNRESOLVED@.github/scripts/verify_repository_contract.py:19",
+          "PYTHON_SOURCE_REVIEW_REQUIRED@.github/scripts/test_verify_repository_contract.py:1",
+          "PYTHON_SOURCE_REVIEW_REQUIRED@.github/scripts/verify_repository_contract.py:1",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/repository-verification.yml:55",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/repository-verification.yml:58",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/repository-verification.yml:62",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/repository-verification.yml:63",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/repository-verification.yml:64",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/repository-verification.yml:65"
         ]
       }
     }

@@ -1,0 +1,267 @@
+{
+  "schema": "szl.source-parity/v1",
+  "generated_at": "2026-10-27",
+  "github_organization": "szl-holdings",
+  "huggingface_organization": "SZLHOLDINGS",
+  "requested_alias": "szlholdigns",
+  "requested_alias_status": "NO_GITHUB_ORG_MATCH",
+  "policy": {
+    "canonical_source": "GitHub",
+    "runtime_mirror": "Hugging Face",
+    "source_write_authority": "canonical-repository-workflow-only",
+    "direct_huggingface_overwrite": false,
+    "readiness_rule": "source parity and runtime evidence are separate claims"
+  },
+  "github_source_inventory": [
+    {
+      "repository": "szl-holdings/a11oy",
+      "main_revision": "2ce00a0430088100a0d5f076d315bfd6e0e8e712",
+      "backend": {
+        "language": "python",
+        "framework": "FastAPI/uvicorn-compatible runtime",
+        "paths": [
+          "serve.py",
+          "requirements-runtime.txt"
+        ]
+      },
+      "frontend": {
+        "framework": "React/Vite/TypeScript",
+        "paths": [
+          "web/src/main.tsx",
+          "web/src/App.tsx",
+          "web/package.json"
+        ]
+      },
+      "packaging": [
+        "Dockerfile"
+      ],
+      "status": "SOURCE_PRESENT"
+    },
+    {
+      "repository": "szl-holdings/anatomy",
+      "main_revision": "39a271820550ce1ead178e906de4f8f2674c8115",
+      "backend": {
+        "language": "python",
+        "framework": "Python HTTP/FastAPI runtime",
+        "paths": [
+          "server.py",
+          "living_runtime.py",
+          "requirements.txt"
+        ]
+      },
+      "frontend": {
+        "framework": "vendored static HTML/JavaScript atlas",
+        "paths": [
+          "index.html",
+          "app.js",
+          "data.js",
+          "live-body.html",
+          "live-body.js"
+        ]
+      },
+      "packaging": [
+        "Dockerfile"
+      ],
+      "status": "SOURCE_PRESENT"
+    },
+    {
+      "repository": "szl-holdings/szl-second-brain",
+      "main_revision": "138208a6cc96948c9c9cdce28a45f005a18fce4a",
+      "backend": {
+        "language": "python",
+        "framework": "FastAPI/uvicorn",
+        "paths": [
+          "app.py",
+          "app_refinement.py",
+          "requirements.txt",
+          "pyproject.toml"
+        ]
+      },
+      "frontend": {
+        "framework": "static HTML/CSS/JavaScript",
+        "paths": [
+          "static/index.html",
+          "static/chamber.html"
+        ]
+      },
+      "packaging": [
+        "Dockerfile"
+      ],
+      "status": "SOURCE_PRESENT",
+      "note": "No dedicated SZLHOLDINGS Space was observed; public projection datasets are separate artifacts."
+    },
+    {
+      "repository": "szl-holdings/szl-khipu",
+      "main_revision": "8ba6893099aecfe1e7cced1b50075ccdd169e744",
+      "backend": {
+        "language": "python",
+        "framework": "Python package and HTTP application",
+        "paths": [
+          "szl_khipu/anatomy.py",
+          "szl_khipu/http_app.py",
+          "szl_khipu/formulas.py"
+        ]
+      },
+      "frontend": {
+        "framework": "static Space presentation",
+        "paths": [
+          "space/index.html",
+          "spaces"
+        ]
+      },
+      "packaging": [
+        "Dockerfile"
+      ],
+      "status": "SOURCE_PRESENT"
+    }
+  ],
+  "hf_alignment": [
+    {
+      "artifact": "SZLHOLDINGS/a11oy",
+      "kind": "space",
+      "observed_revision": "ce2e8f314b95c61a8c5cde0963ba7244ead2f96c",
+      "github_source": "szl-holdings/a11oy@2ce00a0430088100a0d5f076d315bfd6e0e8e712",
+      "status": "HISTORICAL_RUNTIME_READBACK_PASSED_EXECUTION_EVIDENCE_UNAVAILABLE",
+      "evidence": "Recorded runtime readback named GitHub revision 2ce00a0430088100a0d5f076d315bfd6e0e8e712 and HF revision ce2e8f314b95c61a8c5cde0963ba7244ead2f96c. Runtime/source verification job 122530231615 completed successfully on October 27. Overall run 40601233480 failed later while collecting independent execution evidence. These historical observations do not establish current live parity or execution authorization.",
+      "runtime_reported_source_sha": "2ce00a0430088100a0d5f076d315bfd6e0e8e712",
+      "frontend_source_in_hf": false,
+      "publication_run_id": 40601233480,
+      "runtime_status": "UNSIGNED-honest",
+      "certified": false,
+      "publication_eligible": false,
+      "runtime_sha_matches_recorded_github_revision": true,
+      "execution_authorized": false
+    },
+    {
+      "artifact": "SZLHOLDINGS/szl-khipu",
+      "kind": "space",
+      "observed_revision": "62422bc56e048e800da5a1153a5faee85a61efa7",
+      "github_source": "szl-holdings/szl-khipu@8ba6893099aecfe1e7cced1b50075ccdd169e744",
+      "status": "KEY_FILE_PARITY_RUNTIME_UNVERIFIED",
+      "evidence": "Verified package files byte-match the GitHub snapshot; the flattened Space layout is a deployment adapter. No full runtime source marker was used to promote this to a verified deployment claim."
+    },
+    {
+      "artifact": "betterwithage/anatomy",
+      "kind": "space",
+      "github_source": "szl-holdings/anatomy@39a271820550ce1ead178e906de4f8f2674c8115",
+      "status": "SOURCE_BOUND_OUTSIDE_SZLHOLDINGS",
+      "evidence": "README.md, server.py, and Dockerfile byte-match the recorded immutable GitHub source. The full historical HF revision was recovered from the recorded prefix on November 2, 2026, and these three files were rechecked at that commit. This does not verify the current runtime. The Space is owned by betterwithage, not SZLHOLDINGS; no transfer or overwrite was performed.",
+      "observed_revision": "2cdb2244b0fe080f62dad9ed947984da228092bd",
+      "revision_recovery": {
+        "checked_at": "2026-11-02T00:44:24.902280+00:00",
+        "historical_observed_prefix": "2cdb2244",
+        "method": "The public Hugging Face revision API resolved the recorded prefix to a full commit; selected files were byte-compared at immutable HF and GitHub revisions.",
+        "metadata_url": "https://huggingface.co/api/spaces/betterwithage/anatomy/revision/2cdb2244b0fe080f62dad9ed947984da228092bd",
+        "selected_files_sha256": {
+          "README.md": "2a5a09d1076cc46bcceb8ec7294ec8e79e7e95e89e21a8e9dc5c3ec4085e2e06",
+          "server.py": "b9c7bd496b5f628e859af580d002ed21e7a177c440b695c8260fbf7f792d83d3",
+          "Dockerfile": "6f31a5da157a67019d33eb272f18b7282c08f413585e9e68f4848270e7435edd"
+        },
+        "current_runtime_verified": false
+      }
+    },
+    {
+      "artifact": "SZLHOLDINGS/szl-second-brain-inrepo",
+      "kind": "dataset",
+      "status": "PROJECTION_ARTIFACT_ONLY",
+      "evidence": "Dataset presence does not establish a deployed frontend/backend or replace the canonical GitHub source.",
+      "observed_revision": "c9823ec107fc1fd4df6166c4ad0a37c776ee7e64"
+    },
+    {
+      "artifact": "SZLHOLDINGS/SZL-Khipu-1.5B",
+      "kind": "model",
+      "status": "MODEL_ARTIFACT",
+      "evidence": "Model metadata and weights are not treated as application source."
+    },
+    {
+      "artifact": "SZLHOLDINGS/SZL-Forge-1.5B-ReceiptAgent",
+      "kind": "model",
+      "status": "MODEL_ARTIFACT",
+      "evidence": "Gated model artifact; no source-authority claim.",
+      "observed_revision": "3aa6c979f3795ac51f37f1d30e87b8e22f353247"
+    },
+    {
+      "artifact": "SZLHOLDINGS/a11oy-verifiable-corpus",
+      "kind": "dataset",
+      "observed_revision": "70cc622ad01b49eb352e55838fa67dc42fcd81a2",
+      "status": "PROJECTION_ARTIFACT_ONLY",
+      "evidence": "Public corpus artifact; it is not application source or deployment authority."
+    },
+    {
+      "artifact": "SZLHOLDINGS/szl-lake",
+      "kind": "dataset",
+      "observed_revision": "7d7c2b24b661678766e41e80e7b3f1edf0976c41",
+      "status": "EVIDENCE_ARTIFACT",
+      "evidence": "Evidence lake artifact; it does not replace the canonical Python runtime source."
+    }
+  ],
+  "blockers": [
+    {
+      "id": "HF-A11OY-RUNTIME-DRIFT",
+      "status": "HISTORICAL_RUNTIME_READBACK_PASSED_CURRENT_PARITY_UNMEASURED",
+      "detail": "Job 122530231615 succeeded at 2026-10-27T23:25:26Z for recorded source 2ce00a0430088100a0d5f076d315bfd6e0e8e712. No claim about later main or current runtime is made."
+    },
+    {
+      "id": "HF-SECOND-BRAIN-SPACE",
+      "status": "NO_SPACE_OBSERVED_IN_HISTORICAL_SNAPSHOT",
+      "detail": "No dedicated SZLHOLDINGS Second Brain Space was observed on October 27. This record is not an exhaustive current inventory or a deployment decision."
+    },
+    {
+      "id": "HF-A11OY-SOURCE-MARKER",
+      "status": "HISTORICAL_READBACK_COMPLETED",
+      "detail": "Protected run 40601233480 wrote the recorded source marker and its runtime verification job uploaded evidence successfully. The overall run later failed during execution-evidence collection."
+    },
+    {
+      "id": "HF-A11OY-FRONTEND-OVERLAY",
+      "status": "EXPECTED_ADAPTER",
+      "detail": "The HF A11oy Space is a deployment overlay and does not contain the canonical web/ TypeScript source tree. GitHub remains the frontend source of truth; the Docker build output is the runtime artifact."
+    },
+    {
+      "id": "HF-A11OY-EXECUTION-EVIDENCE",
+      "status": "COLLECTION_UNAVAILABLE",
+      "detail": "Job 122533095547 failed at 2026-10-27T23:27:56Z with EXECUTION_EXPORT_COLLECTION_UNAVAILABLE and execution_authorized=false. Final live/singleton proof, strict parity and post-proof reauthorization were skipped. Passive readback success is not an admitted execution receipt."
+    }
+  ],
+  "evidence": {
+    "github_api": [
+      "https://api.github.com/repos/szl-holdings/a11oy/contents/serve.py?ref=2ce00a0430088100a0d5f076d315bfd6e0e8e712",
+      "https://api.github.com/repos/szl-holdings/a11oy/contents/web/src/main.tsx?ref=2ce00a0430088100a0d5f076d315bfd6e0e8e712",
+      "https://api.github.com/repos/szl-holdings/anatomy/contents/server.py?ref=39a271820550ce1ead178e906de4f8f2674c8115",
+      "https://api.github.com/repos/szl-holdings/szl-second-brain/contents/app.py?ref=138208a6cc96948c9c9cdce28a45f005a18fce4a",
+      "https://api.github.com/repos/szl-holdings/szl-khipu/contents/szl_khipu/http_app.py?ref=8ba6893099aecfe1e7cced1b50075ccdd169e744"
+    ],
+    "huggingface": [
+      "https://huggingface.co/spaces/SZLHOLDINGS/a11oy",
+      "https://huggingface.co/spaces/SZLHOLDINGS/szl-khipu",
+      "https://huggingface.co/spaces/betterwithage/anatomy"
+    ],
+    "workflow_api": [
+      "https://api.github.com/repos/szl-holdings/a11oy/actions/runs/40601233480",
+      "https://api.github.com/repos/szl-holdings/a11oy/actions/runs/40601233480/jobs?per_page=100"
+    ],
+    "execution_evidence_job": "https://github.com/szl-holdings/a11oy/actions/runs/40601233480/job/122533095547"
+  },
+  "post_publish_observation": {
+    "workflow_run": 40601233480,
+    "github_main": "2ce00a0430088100a0d5f076d315bfd6e0e8e712",
+    "hf_api_revision": "ce2e8f314b95c61a8c5cde0963ba7244ead2f96c",
+    "runtime_source_sha": "2ce00a0430088100a0d5f076d315bfd6e0e8e712",
+    "final_verification_job": 122530231615,
+    "final_verification_status": "SUCCESS",
+    "final_verification_completed_at": "2026-10-27T23:25:26Z",
+    "workflow_status": "COMPLETED",
+    "workflow_conclusion": "FAILURE",
+    "workflow_updated_at": "2026-10-27T23:27:57Z",
+    "execution_evidence_job": 122533095547,
+    "execution_evidence_status": "FAILURE",
+    "execution_evidence_error": "EXECUTION_EXPORT_COLLECTION_UNAVAILABLE",
+    "execution_authorized": false,
+    "live_singleton_proof_status": "SKIPPED",
+    "strict_parity_status": "SKIPPED",
+    "reauthorization_status": "SKIPPED",
+    "completion_evidence_checked_at": "2026-11-01T23:42:40Z"
+  },
+  "last_reviewed_at": "2026-11-02T00:44:24.902280+00:00",
+  "temporal_scope": "HISTORICAL_SNAPSHOT_NOT_CURRENT_DEPLOYMENT",
+  "review_scope": "Rechecked completion of recorded GitHub publication run and jobs; recovered the full historical anatomy HF revision and rechecked three immutable source files. No current Hugging Face runtime or organization-wide inventory measurement."
+}
