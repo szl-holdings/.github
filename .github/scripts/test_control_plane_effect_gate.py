@@ -1510,13 +1510,128 @@ class SarifUploadScopeTests(unittest.TestCase):
             extra_step="      - uses: rhysd/actionlint@914e7df21a07ef503a81201c76d2b11c789d3fca\n"
         )
         self.assertNotIn(
-            "rhysd/actionlint@914e7df21a07ef503a81201c76d2b11c789d3fca", gate.KNOWN_ACTION_EFFECTS
+            "rhysd/actionlint@914e7df21a07ef503a81201c76d2b11c789d3fca",
+            gate.KNOWN_ACTION_EFFECTS,
         )
         parsed, bound = bind_source(source, candidate=reviewed_policy_for(source))
-        self.assertIn("UNCLASSIFIED_EXTERNAL_ACTION", {item.code for item in parsed["unknowns"]})
+        self.assertIn(
+            "UNCLASSIFIED_EXTERNAL_ACTION", {item.code for item in parsed["unknowns"]}
+        )
         self.assertEqual(bound["verdict"], "DENY")
         self.assertIn("UNREVIEWABLE_EFFECT_BOUNDARY", bound["reason_codes"])
 
+
+class Forge9ControllerScopeTests(unittest.TestCase):
+    """FORGE-9 authority is admitted only for the exact default-branch shapes."""
+
+    @staticmethod
+    def source(name: str) -> str:
+        return (CHECKER_PATH.parents[1] / "workflows" / name).read_text(
+            encoding="utf-8"
+        )
+
+    def test_exact_attestor_scopes_oidc_and_classifies_signing_effects(self) -> None:
+        source = self.source("attest-and-approve.yml")
+        document, _lines = gate.parse_workflow_yaml(source)
+        self.assertTrue(gate.forge9_attestor_profile(document))
+        parsed = gate.analyze_workflow_source(source, path=gate.FORGE9_ATTESTOR)
+        self.assertEqual(parsed["scoped_write_permissions"], ["id-token:write"])
+        self.assertFalse(
+            {item.code for item in parsed["unknowns"]}
+            & gate.NON_REVIEWABLE_UNKNOWN_CODES
+        )
+        signatures = {
+            (effect.sink, effect.resource, effect.access)
+            for effect in parsed["effects"]
+        }
+        self.assertTrue(
+            {
+                (
+                    "github.app.installation_token.issue",
+                    "github:app:qillqaq:installation-token",
+                    "external-write",
+                ),
+                (
+                    "github.oidc.issue",
+                    "github:repository:szl-holdings/.github:oidc:forge9-merge-bap",
+                    "external-write",
+                ),
+                (
+                    "sigstore.certificate.issue",
+                    "sigstore:public:fulcio:szl-holdings/.github:forge9-merge-bap",
+                    "external-write",
+                ),
+                (
+                    "sigstore.transparency.append",
+                    "sigstore:public:rekor:szl-holdings/.github:forge9-merge-bap",
+                    "external-write",
+                ),
+                (
+                    "github.artifact.upload",
+                    "github:actions:artifact:forge9-merge-receipt",
+                    "external-write",
+                ),
+            }.issubset(signatures)
+        )
+
+    def test_attestor_authority_variants_fail_closed(self) -> None:
+        source = self.source("attest-and-approve.yml")
+        cases = (
+            ("contents grant", "      contents: read\n", "      contents: write\n"),
+            ("app action pin", gate.FORGE9_APP_TOKEN_ACTION, "actions/create-github-app-token@" + "0" * 40),
+            ("cosign action pin", gate.FORGE9_COSIGN_INSTALLER_ACTION, "sigstore/cosign-installer@" + "1" * 40),
+            ("sign command", "cosign sign-blob --yes", "cosign sign-blob"),
+            ("artifact namespace", gate.FORGE9_ATTEST_ARTIFACT, "merge-receipt-latest"),
+        )
+        for label, old, new in cases:
+            with self.subTest(case=label):
+                self.assertIn(old, source)
+                candidate = source.replace(old, new, 1)
+                document, _lines = gate.parse_workflow_yaml(candidate)
+                self.assertFalse(gate.forge9_attestor_profile(document))
+                parsed = gate.analyze_workflow_source(
+                    candidate, path=gate.FORGE9_ATTESTOR
+                )
+                self.assertNotIn("scoped_write_permissions", parsed)
+
+    def test_attestor_profile_is_path_scoped(self) -> None:
+        parsed = gate.analyze_workflow_source(
+            self.source("attest-and-approve.yml"), path=WORKFLOW_PATH
+        )
+        self.assertNotIn("scoped_write_permissions", parsed)
+        self.assertIn(
+            "UNCLASSIFIED_EXTERNAL_ACTION", {item.code for item in parsed["unknowns"]}
+        )
+
+    def test_exact_queue_controller_has_bounded_checkout_and_receipt(self) -> None:
+        source = self.source("merge-queue-enqueue.yml")
+        parsed = gate.analyze_workflow_source(
+            source, path=gate.FORGE9_QUEUE_CONTROLLER
+        )
+        self.assertFalse(
+            {item.code for item in parsed["unknowns"]}
+            & gate.NON_REVIEWABLE_UNKNOWN_CODES
+        )
+        signatures = {
+            (effect.sink, effect.resource, effect.access)
+            for effect in parsed["effects"]
+        }
+        self.assertIn(
+            (
+                "github.contents.checkout",
+                "github:repository:szl-holdings/.github:contents",
+                "read",
+            ),
+            signatures,
+        )
+        self.assertIn(
+            (
+                "github.artifact.upload",
+                "github:actions:artifact:forge9-queue-receipt",
+                "external-write",
+            ),
+            signatures,
+        )
 
 class GitReceiptTests(unittest.TestCase):
     def test_no_effect_change_is_deterministic_and_has_object_provenance(self) -> None:

@@ -161,6 +161,16 @@ UPLOAD_ARTIFACT_ACTIONS = frozenset({
     "actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a",
     "actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9",
 })
+FORGE9_ATTESTOR = ".github/workflows/attest-and-approve.yml"
+FORGE9_QUEUE_CONTROLLER = ".github/workflows/merge-queue-enqueue.yml"
+FORGE9_APP_TOKEN_ACTION = (
+    "actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1"
+)
+FORGE9_COSIGN_INSTALLER_ACTION = (
+    "sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6"
+)
+FORGE9_ATTEST_ARTIFACT = "merge-receipt-${{ github.event.workflow_run.head_sha }}"
+FORGE9_QUEUE_ARTIFACT = "merge-queue-enqueue-${{ github.run_id }}"
 LITERAL_ARTIFACT_NAME = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]*")
 LITERAL_SARIF_FILE = re.compile(r"[A-Za-z0-9][A-Za-z0-9._/-]*\.sarif")
 LITERAL_SARIF_CATEGORY = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]*")
@@ -825,8 +835,113 @@ def references_credentials(value: Any) -> bool:
     return False
 
 
-def scoped_write_permissions(document: Mapping[str, Any]) -> list[str]:
-    """Write grants admitted only for the exact reviewed SARIF upload job.
+def forge9_attestor_profile(document: Mapping[str, Any]) -> bool:
+    """Recognize the exact default-branch FORGE-9 signing controller shape."""
+    if set(document) != {"name", "on", "permissions", "concurrency", "jobs"}:
+        return False
+    if document.get("on") != {
+        "workflow_run": {"workflows": ["FORGE-9 gates"], "types": ["completed"]}
+    }:
+        return False
+    if document.get("permissions") != "read-all" or document.get("concurrency") != {
+        "group": "forge9-attest-${{ github.event.workflow_run.head_sha }}",
+        "cancel-in-progress": "false",
+    }:
+        return False
+    jobs = document.get("jobs")
+    if not isinstance(jobs, dict) or set(jobs) != {"attest"}:
+        return False
+    job = jobs["attest"]
+    if not isinstance(job, dict) or set(job) != {"if", "permissions", "runs-on", "steps"}:
+        return False
+    if (
+        job.get("if") != "github.event.workflow_run.conclusion == 'success'"
+        or job.get("runs-on") != "ubuntu-latest"
+        or job.get("permissions")
+        != {
+            "actions": "read",
+            "checks": "read",
+            "contents": "read",
+            "id-token": "write",
+            "pull-requests": "read",
+        }
+    ):
+        return False
+    steps = job.get("steps")
+    if not isinstance(steps, list) or [step.get("name") for step in steps if isinstance(step, dict)] != [
+        "Checkout trusted admission verifier source",
+        "Mint the independent App token",
+        "Resolve the attestation subject",
+        "Verify gates and preconditions P1-P7",
+        "Verify exact-head admission evidence",
+        "Build and sign the merge BAP",
+        "Install Cosign",
+        "Sign the merge BAP with Actions OIDC",
+        "Upload the signed merge BAP",
+        "Revalidate current PR generation before App mutations",
+        "Approve as the App and verify the review identity",
+        "Publish required App attestation status",
+        "Request protected merge after attestation",
+    ]:
+        return False
+    if len(steps) != 13 or any(not isinstance(step, dict) for step in steps):
+        return False
+    action_steps = {index for index, step in enumerate(steps) if "uses" in step}
+    if action_steps != {0, 1, 6, 8} or any(
+        "run" not in step for index, step in enumerate(steps) if index not in action_steps
+    ):
+        return False
+    if steps[0].get("uses") != (
+        "actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1"
+    ) or steps[0].get("with") != {"persist-credentials": "false", "fetch-depth": "1"}:
+        return False
+    if (
+        steps[1].get("id") != "app-token"
+        or steps[1].get("uses") != FORGE9_APP_TOKEN_ACTION
+        or steps[1].get("with")
+        != {
+            "client-id": "${{ vars.QILLQAQ_CLIENT_ID }}",
+            "private-key": "${{ secrets.QILLQAQ_PRIVATE_KEY }}",
+            "owner": "${{ github.repository_owner }}",
+            "repositories": "${{ github.event.repository.name }}",
+            "permission-administration": "read",
+            "permission-checks": "read",
+            "permission-contents": "read",
+            "permission-metadata": "read",
+            "permission-pull-requests": "write",
+            "permission-statuses": "write",
+        }
+    ):
+        return False
+    signing_if = (
+        "steps.subject.outputs.kind == 'merge_group' || "
+        "steps.subject.outputs.draft == 'false'"
+    )
+    if (
+        steps[6].get("uses") != FORGE9_COSIGN_INSTALLER_ACTION
+        or steps[6].get("if") != signing_if
+        or steps[7].get("if") != signing_if
+        or str(steps[7].get("run", "")).strip()
+        != "cosign sign-blob --yes --bundle merge-receipt.bundle merge-receipt.json"
+        or steps[8].get("if") != signing_if
+        or steps[8].get("uses")
+        != "actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a"
+        or steps[8].get("with")
+        != {
+            "name": FORGE9_ATTEST_ARTIFACT,
+            "path": "merge-receipt.json\nmerge-receipt.bundle\n",
+            "if-no-files-found": "error",
+            "retention-days": "90",
+        }
+    ):
+        return False
+    return True
+
+
+def scoped_write_permissions(
+    document: Mapping[str, Any], *, path: str = ""
+) -> list[str]:
+    """Write grants admitted only for exact reviewed signing/upload shapes.
 
     ``security-events: write`` is exempt from GITHUB_WRITE_PERMISSION_PRESENT
     only when it is the workflow's single write grant, held by one job whose
@@ -836,6 +951,8 @@ def scoped_write_permissions(document: Mapping[str, Any]) -> list[str]:
     uploads that artifact name, and where neither that job nor the workflow
     env references a token or secret. Anything else returns no exemption.
     """
+    if path == FORGE9_ATTESTOR and forge9_attestor_profile(document):
+        return ["id-token:write"]
     jobs = document.get("jobs")
     workflow_permissions = document.get("permissions")
     if not isinstance(jobs, dict) or not isinstance(workflow_permissions, dict):
@@ -1569,6 +1686,7 @@ def analyze_workflow_source(source: str, *, path: str) -> dict[str, Any]:
     contract_call = path == RUNTIME_WITNESS and runtime_contract_call(document)
     seismic_profile = path == SEISMIC_PUBLISHER and seismic_publisher_profile(source, document)
     seismic_call = path == SEISMIC_WITNESS and seismic_contract_call(source, document)
+    forge9_attestor = path == FORGE9_ATTESTOR and forge9_attestor_profile(document)
     if path == RUNTIME_PUBLISHER and not (runtime_profile and runtime_signing):
         unknown("CANONICAL_RUNTIME_INTERFACE_UNSUPPORTED", ())
     if path == RUNTIME_WITNESS and not contract_call:
@@ -1673,6 +1791,26 @@ def analyze_workflow_source(source: str, *, path: str) -> dict[str, Any]:
                         ("runner.attestation.bundle", "local-write", "runner:artifact:hf-runtime-binding:attestation-bundle"),
                     ):
                         effects.append(RawEffect(sink, access, path, lines[(*step_location, "uses")], resource))
+                elif forge9_attestor and action == FORGE9_APP_TOKEN_ACTION:
+                    effects.append(
+                        RawEffect(
+                            "github.app.installation_token.issue",
+                            "external-write",
+                            path,
+                            lines[(*step_location, "uses")],
+                            "github:app:qillqaq:installation-token",
+                        )
+                    )
+                elif forge9_attestor and action == FORGE9_COSIGN_INSTALLER_ACTION:
+                    effects.append(
+                        RawEffect(
+                            "runner.toolchain.install",
+                            "local-write",
+                            path,
+                            lines[(*step_location, "uses")],
+                            "runner:toolchain:cosign",
+                        )
+                    )
                 elif action in KNOWN_ACTION_EFFECTS:
                     sink, resource, access = KNOWN_ACTION_EFFECTS[action]
                     if action in {
@@ -1746,7 +1884,16 @@ def analyze_workflow_source(source: str, *, path: str) -> dict[str, Any]:
                         ):
                             unknown("ACTION_EXTRA_EFFECT_UNSUPPORTED", (*step_location, "with"))
                         exact_event_head = "${{ github.event.pull_request.head.sha || github.event.merge_group.head_sha || github.sha }}"
-                        if dependencies and not runtime_checkout and (
+                        trusted_queue_default = (
+                            path == FORGE9_QUEUE_CONTROLLER
+                            and inputs.get("ref")
+                            == "${{ github.event.repository.default_branch }}"
+                            and inputs.get("repository", "szl-holdings/.github")
+                            == "szl-holdings/.github"
+                            and inputs.get("persist-credentials", "false").lower()
+                            == "false"
+                        )
+                        if dependencies and not runtime_checkout and not trusted_queue_default and (
                             inputs.get("repository", "szl-holdings/.github") != "szl-holdings/.github"
                             or ("ref" in inputs and inputs["ref"] != exact_event_head)
                         ):
@@ -1771,6 +1918,10 @@ def analyze_workflow_source(source: str, *, path: str) -> dict[str, Any]:
                             # This exact run-scoped namespace is the enforcing
                             # workflow contract, not an arbitrary dynamic name.
                             resource = "github:actions:artifact:control-plane-effect"
+                        elif path == FORGE9_ATTESTOR and artifact == FORGE9_ATTEST_ARTIFACT:
+                            resource = "github:actions:artifact:forge9-merge-receipt"
+                        elif path == FORGE9_QUEUE_CONTROLLER and artifact == FORGE9_QUEUE_ARTIFACT:
+                            resource = "github:actions:artifact:forge9-queue-receipt"
                         elif path == LIFECYCLE_WORKFLOW and artifact == (
                             "hf-space-lifecycle-${{ github.run_id }}-${{ github.run_attempt }}"
                         ):
@@ -1840,6 +1991,32 @@ def analyze_workflow_source(source: str, *, path: str) -> dict[str, Any]:
         effects.extend(inline_effects)
         unknowns.extend(inline_unknowns)
 
+    if forge9_attestor:
+        signing_line = lines[("jobs", "attest", "steps", 7, "run")]
+        for sink, access, resource in (
+            (
+                "github.oidc.issue",
+                "external-write",
+                "github:repository:szl-holdings/.github:oidc:forge9-merge-bap",
+            ),
+            (
+                "sigstore.certificate.issue",
+                "external-write",
+                "sigstore:public:fulcio:szl-holdings/.github:forge9-merge-bap",
+            ),
+            (
+                "sigstore.transparency.append",
+                "external-write",
+                "sigstore:public:rekor:szl-holdings/.github:forge9-merge-bap",
+            ),
+            (
+                "runner.attestation.bundle",
+                "local-write",
+                "runner:artifact:forge9-merge-bap:bundle",
+            ),
+        ):
+            effects.append(RawEffect(sink, access, path, signing_line, resource))
+
     concurrency = document.get("concurrency")
     # Only executable blocks supply control hints; workflow names, labels,
     # action inputs, and other metadata cannot spoof those indicators.
@@ -1869,7 +2046,7 @@ def analyze_workflow_source(source: str, *, path: str) -> dict[str, Any]:
         "effects": sorted(effects),
         "unknowns": sorted(set(unknowns)),
     }
-    scoped = scoped_write_permissions(document)
+    scoped = scoped_write_permissions(document, path=path)
     if runtime_signing or contract_call:
         scoped.extend(["id-token:write", "attestations:write"])
     if scoped:
