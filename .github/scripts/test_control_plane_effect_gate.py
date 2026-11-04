@@ -2101,5 +2101,246 @@ class CanonicalSeismicPublisherTests(unittest.TestCase):
                       {item["code"] for item in result["unknowns"]})
 
 
+class NexusManualReleaseTests(unittest.TestCase):
+    """Repin adversarial bytes to prove graph denials are not digest accidents."""
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls.root = CHECKER_PATH.parent.parent.parent
+        cls.path = gate.NEXUS_PUBLISHER
+        cls.source = (cls.root / cls.path).read_bytes()
+        cls.document, _lines = gate.parse_workflow_yaml(cls.source.decode())
+        cls.policy = gate.load_policy(cls.root / POLICY_PATH, as_of=date(2026, 11, 3))
+
+    def bound(self, document: dict[str, object]) -> dict[str, object]:
+        import yaml
+
+        source = yaml.safe_dump(document, sort_keys=False, allow_unicode=True).encode()
+        analysis = gate.analyze_workflow_source(source.decode(), path=self.path)
+        dependencies = {
+            path: (self.root / path).read_bytes()
+            for path in analysis["dependencies"] if (self.root / path).is_file()
+        }
+        declaration = copy.deepcopy(self.policy["workflow_declarations"][self.path])
+        declaration["source_sha256"] = gate.sha256_bytes(source)
+        declaration["reviewed_unknowns"]["files"] = {
+            self.path: gate.sha256_bytes(source),
+            **{path: gate.sha256_bytes(content) for path, content in dependencies.items()
+               if path not in gate.TRUSTED_TOOL_PATHS},
+        }
+        observed = gate.bind_declaration(self.path, source, analysis, declaration, dependencies)
+        declaration["reviewed_unknowns"]["unknowns"] = sorted({
+            f"{item['code']}@{item['path']}:{item['line']}" for item in observed["unknowns"]
+        })
+        return gate.bind_declaration(self.path, source, analysis, declaration, dependencies)
+
+    def deny(self, document: dict[str, object], reason: str) -> None:
+        bound = self.bound(document)
+        self.assertEqual(bound["verdict"], "DENY")
+        self.assertIn("NEXUS_RELEASE_" + reason, bound["reason_codes"])
+        self.assertNotIn("WORKFLOW_DIGEST_MISMATCH", bound["reason_codes"])
+        self.assertNotIn("REVIEWED_UNKNOWN_PIN_MISMATCH", bound["reason_codes"])
+        self.assertNotIn("REVIEWED_UNKNOWN_SET_MISMATCH", bound["reason_codes"])
+
+    def test_actual_manual_graph_and_equivalent_yaml_are_allowed(self) -> None:
+        self.assertEqual(self.bound(self.document)["verdict"], "ALLOW")
+        analysis = gate.analyze_workflow_source(self.source.decode(), path=self.path)
+        self.assertEqual(analysis["nexus_release_errors"], [])
+        self.assertTrue(analysis["controls"]["concurrency"])
+
+    def test_automatic_events_and_floating_or_optional_input_deny(self) -> None:
+        for event in ("push", "schedule", "pull_request", "workflow_run"):
+            document = copy.deepcopy(self.document)
+            document["on"][event] = {}
+            with self.subTest(event=event):
+                self.deny(document, "AUTOMATIC_RELEASE_EVENT")
+        for mutation in ("absent", "optional", "floating", "wrong_type"):
+            document = copy.deepcopy(self.document)
+            inputs = document["on"]["workflow_dispatch"]["inputs"]
+            if mutation == "absent":
+                inputs.clear()
+            elif mutation == "optional":
+                inputs["source_sha"]["required"] = "false"
+            elif mutation == "floating":
+                inputs["source_sha"]["default"] = "main"
+            else:
+                inputs["source_sha"]["type"] = "choice"
+            with self.subTest(input=mutation):
+                self.deny(document, "EXACT_SOURCE_INPUT")
+
+    def test_missing_or_dynamic_approval_dependency_and_revision_deny(self) -> None:
+        for key, value, reason in (
+            ("environment", None, "FIXED_PRODUCTION_APPROVAL"),
+            ("environment", "${{ inputs.environment }}", "FIXED_PRODUCTION_APPROVAL"),
+            ("needs", None, "VALIDATION_DEPENDENCY"),
+            ("needs", "different", "VALIDATION_DEPENDENCY"),
+            ("env", {"REQUESTED_SOURCE_SHA": "main"}, "REVIEWED_SOURCE_BINDING"),
+            ("name", "Publish", "REVIEWED_SOURCE_BINDING"),
+        ):
+            document = copy.deepcopy(self.document)
+            if value is None:
+                document["jobs"]["publish"].pop(key)
+            else:
+                document["jobs"]["publish"][key] = value
+            with self.subTest(key=key, value=value):
+                self.deny(document, reason)
+
+    def test_wrong_context_and_failing_validation_cannot_reach_mutation(self) -> None:
+        for job in ("validate", "publish"):
+            for before, after in (
+                ("workflow_dispatch", "push"),
+                ("szl-holdings/.github", "fork/.github"),
+                ("refs/heads/main", "refs/heads/feature"),
+                (" && github.ref_protected", ""),
+                (" && ", " || "),
+            ):
+                document = copy.deepcopy(self.document)
+                document["jobs"][job]["if"] = document["jobs"][job]["if"].replace(before, after)
+                with self.subTest(job=job, before=before):
+                    self.deny(document, "PROTECTED_MANUAL_CONTEXT")
+        document = copy.deepcopy(self.document)
+        document["jobs"]["publish"]["if"] = "always()"
+        self.deny(document, "PROTECTED_MANUAL_CONTEXT")
+
+    def test_credential_or_mutation_before_approval_and_extra_job_deny(self) -> None:
+        for run in (
+            "python .github/scripts/hf_deploy_from_dockerfile.py",
+            "python .github/scripts/acquire_hf_publisher_token.py",
+            "curl -X POST https://example.invalid/mutation",
+        ):
+            document = copy.deepcopy(self.document)
+            document["jobs"]["validate"]["steps"].insert(0, {"run": run})
+            with self.subTest(run=run):
+                self.deny(document, "READ_ONLY_VALIDATION_GRAPH")
+        document = copy.deepcopy(self.document)
+        document["jobs"]["validate"]["env"] = {"HF_TOKEN": "${{ secrets.HF_TOKEN }}"}
+        self.deny(document, "VALIDATION_CREDENTIAL_OR_ENVIRONMENT")
+        document = copy.deepcopy(self.document)
+        document["jobs"]["bypass"] = {"runs-on": "ubuntu-latest", "steps": [{"run": "echo bypass"}]}
+        self.deny(document, "RELEASE_JOB_GRAPH")
+
+    def test_stale_or_dead_source_validation_and_freshness_deny(self) -> None:
+        for job, stage in (("validate", "source_ref"), ("publish", "source_ref"),
+                           ("publish", "freshness")):
+            for mutation in ("missing_main", "dead_branch", "ignore", "floating"):
+                document = copy.deepcopy(self.document)
+                step = next(s for s in document["jobs"][job]["steps"] if s.get("id") == stage)
+                if mutation == "missing_main":
+                    step["run"] = step["run"].replace('--main-sha="$REMOTE_SHA"', "")
+                elif mutation == "dead_branch":
+                    step["run"] = "if false; then\n" + step["run"] + "\nfi\n"
+                elif mutation == "ignore":
+                    step["run"] = step["run"].replace(
+                        '--main-sha="$REMOTE_SHA"', '--main-sha="$REMOTE_SHA" || true')
+                else:
+                    step["run"] = step["run"].replace('origin "$REQUESTED_SOURCE_SHA"', "origin main")
+                    if stage == "freshness":
+                        step["run"] = step["run"].replace('"$REQUESTED_SOURCE_SHA"', '"$REMOTE_SHA"')
+                reason = ("READ_ONLY_EXACT_SOURCE_VALIDATION" if job == "validate" else
+                          "PRE_CREDENTIAL_FRESHNESS" if stage == "freshness" else
+                          "APPROVED_EXACT_SOURCE_CHECKOUT")
+                with self.subTest(job=job, stage=stage, mutation=mutation):
+                    self.deny(document, reason)
+
+    def test_skipped_guards_or_unguarded_mutation_deny(self) -> None:
+        for stage in ("source_ref", "freshness", "credential", "deploy", "restart", "attest"):
+            for key, value in (("if", "always()"), ("continue-on-error", "true")):
+                document = copy.deepcopy(self.document)
+                step = next(s for s in document["jobs"]["publish"]["steps"] if s.get("id") == stage)
+                step[key] = value
+                with self.subTest(stage=stage, key=key):
+                    self.deny(document, "UNSKIPPABLE_RELEASE_STAGES")
+        document = copy.deepcopy(self.document)
+        steps = document["jobs"]["publish"]["steps"]
+        steps[8], steps[9] = steps[9], steps[8]
+        self.deny(document, "PRE_CREDENTIAL_FRESHNESS")
+
+    def test_missing_dynamic_or_cancelling_job_lock_deny(self) -> None:
+        for lock in (None, {"group": "publish-nexus-space", "cancel-in-progress": "true"},
+                     {"group": "${{ github.sha }}", "cancel-in-progress": "false"},
+                     {"group": "another-writer", "cancel-in-progress": "false"}):
+            document = copy.deepcopy(self.document)
+            if lock is None:
+                document["jobs"]["publish"].pop("concurrency")
+                document["concurrency"] = {"group": "publish-nexus-space", "cancel-in-progress": "false"}
+            else:
+                document["jobs"]["publish"]["concurrency"] = lock
+            with self.subTest(lock=lock):
+                self.deny(document, "SAFE_PUBLISH_CONCURRENCY")
+        ordinary = workflow().decode().replace("concurrency:\n  group: fixture\n", "")
+        ordinary = ordinary.replace("    runs-on:", "    concurrency:\n      group: fixture\n    runs-on:")
+        self.assertFalse(gate.analyze_workflow_source(ordinary, path=WORKFLOW_PATH)["controls"]["concurrency"])
+
+    def test_inserted_unguarded_mutation_or_removed_immediate_guard_deny(self) -> None:
+        document = copy.deepcopy(self.document)
+        document["jobs"]["publish"]["steps"].insert(0, {
+            "run": "python .github/scripts/hf_deploy_from_dockerfile.py",
+        })
+        self.deny(document, "GUARDED_MUTATION_STAGE")
+        self.deny(document, "PUBLISH_STEP_GRAPH")
+        document = copy.deepcopy(self.document)
+        document["jobs"]["publish"]["steps"][4]["run"] = (
+            "python .github/scripts/hf_deploy_from_dockerfile.py # -m py_compile")
+        self.deny(document, "GUARDED_MUTATION_STAGE")
+        for mutation in ("comment", "floating"):
+            document = copy.deepcopy(self.document)
+            deploy = next(step for step in document["jobs"]["publish"]["steps"]
+                          if step.get("id") == "deploy")
+            if mutation == "comment":
+                deploy["run"] = deploy["run"].replace("--require-default-branch-tip", "")
+                deploy["run"] += "\n# --require-default-branch-tip\n"
+                reason = "IMMEDIATE_MUTATION_GUARDS"
+            else:
+                deploy["run"] = deploy["run"].replace('--ref "$SOURCE_SHA"', "--ref main")
+                reason = "IMMUTABLE_DEPLOY_SOURCE"
+            with self.subTest(mutation=mutation):
+                self.deny(document, reason)
+        document = copy.deepcopy(self.document)
+        deploy = next(step for step in document["jobs"]["publish"]["steps"]
+                      if step.get("id") == "deploy")
+        deploy["run"] += "\npython .github/scripts/hf_deploy_from_dockerfile.py --attest\n"
+        self.deny(document, "GUARDED_MUTATION_MODE")
+        self.deny(document, "SINGLE_HELPER_INVOCATIONS")
+
+    def test_release_contract_cannot_be_missing_unknown_or_reused(self) -> None:
+        raw = json.loads((self.root / POLICY_PATH).read_text())
+        for mutation in ("missing", "version", "wrong_path", "auto_trigger"):
+            candidate = copy.deepcopy(raw)
+            declaration = candidate["workflow_declarations"][self.path]
+            if mutation == "missing":
+                declaration.pop("release_contract")
+            elif mutation == "version":
+                declaration["release_contract"] = "nexus-manual-production/v999"
+            elif mutation == "wrong_path":
+                candidate["workflow_declarations"][WORKFLOW_PATH] = declaration
+            else:
+                declaration["required_controls"]["triggers"].append("push")
+            with self.subTest(mutation=mutation), self.assertRaises(gate.GateError) as raised:
+                gate.load_policy_bytes(policy_bytes(candidate), as_of=date(2026, 11, 3))
+            self.assertEqual(raised.exception.code, "POLICY_SCHEMA_INVALID")
+        # Dropping BOTH the new intent and contract cannot revive the automatic
+        # legacy policy. All source/dependency pins below still match.
+        declaration = copy.deepcopy(self.policy["workflow_declarations"][self.path])
+        declaration.pop("release_contract")
+        declaration["intent_id"] = "nexus-central-publisher-source-bound-v1"
+        analysis = gate.analyze_workflow_source(self.source.decode(), path=self.path)
+        dependencies = {path: (self.root / path).read_bytes()
+                        for path in analysis["dependencies"] if (self.root / path).is_file()}
+        bound = gate.bind_declaration(self.path, self.source, analysis, declaration, dependencies)
+        self.assertEqual(bound["verdict"], "DENY")
+        self.assertIn("NEXUS_RELEASE_CONTRACT_MISSING", bound["reason_codes"])
+        self.assertNotIn("WORKFLOW_DIGEST_MISMATCH", bound["reason_codes"])
+
+    def test_all_exact_current_declarations_still_bind(self) -> None:
+        for path, declaration in self.policy["workflow_declarations"].items():
+            source = (self.root / path).read_bytes()
+            analysis = gate.analyze_workflow_source(source.decode(), path=path)
+            dependencies = {dep: (self.root / dep).read_bytes()
+                            for dep in analysis["dependencies"] if (self.root / dep).is_file()}
+            bound = gate.bind_declaration(path, source, analysis, declaration, dependencies)
+            with self.subTest(workflow=path):
+                self.assertEqual(bound["verdict"], "ALLOW", bound["reason_codes"])
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

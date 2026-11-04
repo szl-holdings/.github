@@ -2,45 +2,30 @@
 name: Publish Nexus Space
 
 # Nexus is source-owned by szl-holdings/nexus, but provider credentials are
-# intentionally owned by this central control repository. Pull requests perform
-# network-free contract validation only. Protected main, schedule, or owner
-# dispatch publishes the exact current Nexus main tip and attests live readback.
-on:
-  pull_request:
-    branches: [main]
-    paths:
-      - .github/workflows/publish-nexus-space.yml
-      - .github/scripts/acquire_hf_publisher_token.py
-      - .github/scripts/test_acquire_hf_publisher_token.py
-      - .github/scripts/hf_deploy_from_dockerfile.py
-      - .github/scripts/validate_nexus_source_binding.py
-      - .github/scripts/test_validate_nexus_source_binding.py
-      - requirements/hf-publisher.lock
-  push:
-    branches: [main]
-    paths:
-      - .github/workflows/publish-nexus-space.yml
-      - .github/scripts/acquire_hf_publisher_token.py
-      - .github/scripts/hf_deploy_from_dockerfile.py
-      - .github/scripts/validate_nexus_source_binding.py
-      - requirements/hf-publisher.lock
-  schedule:
-    - cron: "23 * * * *"
-  workflow_dispatch: {}
+# intentionally owned by this central control repository. Source admission and
+# production release are separate: only an exact manual request may reach the
+# existing production environment. tests.yml tests this contract on PRs and main
+# pushes even while this publisher is administratively disabled.
+"on":
+  workflow_dispatch:
+    inputs:
+      source_sha:
+        description: Exact lowercase 40-hex Nexus main revision to review and release
+        required: true
+        type: string
 
 permissions: read-all
-concurrency:
-  group: publish-nexus-space-${{ github.event_name }}
-  cancel-in-progress: true
 
 jobs:
   validate:
-    name: Validate central Nexus publisher contract
-    if: github.event_name == 'pull_request'
+    name: Validate requested Nexus source without provider credentials
+    if: github.event_name == 'workflow_dispatch' && github.repository == 'szl-holdings/.github' && github.ref == 'refs/heads/main' && github.ref_protected
     runs-on: ubuntu-latest
     timeout-minutes: 8
     permissions:
       contents: read
+    outputs:
+      source_sha: ${{ steps.source_ref.outputs.sha }}
     steps:
       - name: Harden runner
         uses: step-security/harden-runner@ccd8616d44fd3846e67624a50d5aad6d37bf2d25 # v2.22.1
@@ -52,67 +37,67 @@ jobs:
         with:
           persist-credentials: false
           fetch-depth: 1
+          ref: ${{ github.event.pull_request.head.sha || github.event.merge_group.head_sha || github.sha }}
 
       - name: Set up exact Python
         uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
           python-version: "3.12.14"
 
-      - name: Validate syntax, pins, and immutable boundary
+      - name: Validate protected request and fetch only its exact Nexus revision
+        id: source_ref
+        shell: bash
+        env:
+          REQUESTED_SOURCE_SHA: ${{ inputs.source_sha }}
+        run: |
+          set -euo pipefail
+          test "$GITHUB_EVENT_NAME" = "workflow_dispatch"
+          test "$GITHUB_REPOSITORY" = "szl-holdings/.github"
+          test "$GITHUB_REF" = "refs/heads/main"
+          test "$GITHUB_REF_PROTECTED" = "true"
+          test "$GITHUB_WORKFLOW_SHA" = "$GITHUB_SHA"
+          POLICY_SHA="$(git rev-parse HEAD)"
+          python -I -B .github/scripts/validate_nexus_release.py \
+            --source-sha="$REQUESTED_SOURCE_SHA" --policy-sha="$POLICY_SHA"
+          test ! -e source
+          git init -q source
+          git -C source remote add origin https://github.com/szl-holdings/nexus.git
+          git -C source fetch --depth=1 origin "$REQUESTED_SOURCE_SHA"
+          git -C source checkout --detach --quiet FETCH_HEAD
+          SOURCE_SHA="$(git -C source rev-parse HEAD)"
+          REMOTE_SHA="$(git ls-remote https://github.com/szl-holdings/nexus.git refs/heads/main | awk '{print $1}')"
+          python -I -B .github/scripts/validate_nexus_release.py \
+            --source-sha="$REQUESTED_SOURCE_SHA" --policy-sha="$POLICY_SHA" \
+            --checkout-sha="$SOURCE_SHA" --main-sha="$REMOTE_SHA"
+          python -I -B .github/scripts/validate_nexus_source_binding.py source/space/Dockerfile
+          echo "sha=$SOURCE_SHA" >> "$GITHUB_OUTPUT"
+          {
+            echo "### Requested Nexus release — awaiting production approval"
+            echo "- Exact source: https://github.com/szl-holdings/nexus/commit/${SOURCE_SHA}"
+            echo "- Fixed environment: production"
+            echo "- No provider credential or mutation in this validation job."
+            echo "- Approval goes stale if Nexus main moves; no automatic upgrade."
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Prove source-binding grammar without network
         shell: bash
         run: |
           set -euo pipefail
-          python -I -P <<'PY'
-          from pathlib import Path
-          import re
-
-          path = Path('.github/workflows/publish-nexus-space.yml')
-          text = path.read_text(encoding='utf-8')
-          required = (
-              'repository: szl-holdings/nexus',
-              'HF_REPO: SZLHOLDINGS/nexus',
-              'acquire_hf_publisher_token.py',
-              'validate_nexus_source_binding.py',
-              'source-binding.json',
-              'HF_ORG_TOKEN_CANDIDATE',
-              'HF_ORG_TOKEN1_CANDIDATE',
-              'HF_WRITE_TOKEN_CANDIDATE',
-              'HF_TOKEN_CANDIDATE',
-              '--token-file "$RUNNER_TEMP/nexus-hf-token"',
-              '--target-type space',
-              '--dockerfile-path space/Dockerfile',
-              '--require-default-branch-tip',
-              '--restart-space',
-              '--attest',
-              '--wait-running 1200',
-              'secrets.HF_ORG_TOKEN',
-              'secrets.HF_ORG_TOKEN1',
-              'secrets.HF_TOKEN',
-              'secrets.HF_WRITE_TOKEN',
-              'github.event_name != \'pull_request\'',
-          )
-          missing = [item for item in required if item not in text]
-          if missing:
-              raise SystemExit(f'missing central Nexus publisher controls: {missing!r}')
-          uses = re.findall(r'^\s*uses:\s*(\S+)\s*(?:#.*)?$', text, re.MULTILINE)
-          bad = [value for value in uses if not re.fullmatch(r'[^@\s]+@[0-9a-f]{40}', value)]
-          if bad:
-              raise SystemExit(f'unpinned actions: {bad!r}')
-          if re.search(r'(?m)^    environment:', text):
-              raise SystemExit('central Nexus publisher must not add a duplicate environment gate')
-          print('central Nexus publisher contract: PASS')
-          PY
           python -I -B .github/scripts/test_validate_nexus_source_binding.py
-          python -I -B -m py_compile \
-            .github/scripts/validate_nexus_source_binding.py \
-            .github/scripts/test_validate_nexus_source_binding.py
           git diff --check
 
   publish:
     permissions:
       contents: read
-    name: Publish exact Nexus main and attest live state
-    if: github.event_name != 'pull_request'
+    name: Publish approved Nexus ${{ needs.validate.outputs.source_sha }}
+    needs: validate
+    if: github.event_name == 'workflow_dispatch' && github.repository == 'szl-holdings/.github' && github.ref == 'refs/heads/main' && github.ref_protected
+    environment: production
+    concurrency:
+      group: publish-nexus-space
+      cancel-in-progress: false
+    env:
+      REQUESTED_SOURCE_SHA: ${{ needs.validate.outputs.source_sha }}
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
@@ -126,25 +111,31 @@ jobs:
         with:
           persist-credentials: false
           fetch-depth: 1
+          ref: ${{ github.event.pull_request.head.sha || github.event.merge_group.head_sha || github.sha }}
 
-      - name: Verify protected publisher source and fetch exact Nexus main
+      - name: Revalidate protected policy and fetch the approved Nexus revision
         id: source_ref
         shell: bash
         run: |
           set -euo pipefail
+          test "$GITHUB_EVENT_NAME" = "workflow_dispatch"
           test "$GITHUB_REPOSITORY" = "szl-holdings/.github"
           test "$GITHUB_REF" = "refs/heads/main"
+          test "$GITHUB_REF_PROTECTED" = "true"
+          test "$GITHUB_WORKFLOW_SHA" = "$GITHUB_SHA"
           POLICY_SHA="$(git rev-parse HEAD)"
-          test "$POLICY_SHA" = "$GITHUB_SHA"
+          python -I -B .github/scripts/validate_nexus_release.py \
+            --source-sha="$REQUESTED_SOURCE_SHA" --policy-sha="$POLICY_SHA"
           test ! -e source
           git init -q source
           git -C source remote add origin https://github.com/szl-holdings/nexus.git
-          git -C source fetch --depth=1 origin refs/heads/main
+          git -C source fetch --depth=1 origin "$REQUESTED_SOURCE_SHA"
           git -C source checkout --detach --quiet FETCH_HEAD
           SOURCE_SHA="$(git -C source rev-parse HEAD)"
           REMOTE_SHA="$(git ls-remote https://github.com/szl-holdings/nexus.git refs/heads/main | awk '{print $1}')"
-          [[ "$SOURCE_SHA" =~ ^[0-9a-f]{40}$ ]]
-          test "$SOURCE_SHA" = "$REMOTE_SHA"
+          python -I -B .github/scripts/validate_nexus_release.py \
+            --source-sha="$REQUESTED_SOURCE_SHA" --policy-sha="$POLICY_SHA" \
+            --checkout-sha="$SOURCE_SHA" --main-sha="$REMOTE_SHA"
           echo "sha=$SOURCE_SHA" >> "$GITHUB_OUTPUT"
           printf 'publisher=%s source=szl-holdings/nexus@%s remote_readback=%s\n' "$POLICY_SHA" "$SOURCE_SHA" "$REMOTE_SHA"
 
@@ -220,7 +211,18 @@ jobs:
           print('Nexus Hugging Face card: PASS')
           PY
 
+      - name: Abort stale approval before acquiring any provider credential
+        id: freshness
+        shell: bash
+        run: |
+          set -euo pipefail
+          REMOTE_SHA="$(git ls-remote https://github.com/szl-holdings/nexus.git refs/heads/main | awk '{print $1}')"
+          python -I -B .github/scripts/validate_nexus_release.py \
+            --source-sha="$REQUESTED_SOURCE_SHA" --policy-sha="$(git rev-parse HEAD)" \
+            --checkout-sha="$(git -C source rev-parse HEAD)" --main-sha="$REMOTE_SHA"
+
       - name: Acquire independently validated Nexus publisher credential
+        id: credential
         shell: bash
         env:
           HF_ORG_TOKEN_CANDIDATE: ${{ secrets.HF_ORG_TOKEN }}
@@ -238,6 +240,7 @@ jobs:
             --report evidence/nexus/hf-publisher-credential.json
 
       - name: Deploy exact Dockerfile-derived Nexus closure
+        id: deploy
         shell: bash
         env:
           GITHUB_TOKEN: ${{ github.token }}
@@ -271,6 +274,7 @@ jobs:
             --manifest-out evidence/nexus/hf-deploy-manifest.json
 
       - name: Restart Space after governed publication
+        id: restart
         shell: bash
         env:
           HF_REPO: SZLHOLDINGS/nexus
@@ -287,6 +291,7 @@ jobs:
             --hf-repo "$HF_REPO"
 
       - name: Attest exact running commit, bytes, and smoke routes
+        id: attest
         shell: bash
         env:
           HF_REPO: SZLHOLDINGS/nexus
@@ -304,6 +309,7 @@ jobs:
             --wait-running 1200
 
       - name: Remove the ephemeral publisher credential
+        id: cleanup
         if: always()
         shell: bash
         run: |
@@ -362,9 +368,10 @@ jobs:
           SOURCE_BINDING: ${{ steps.source.outputs.binding }}
         run: |
           {
-            echo "### Central Nexus publication"
+            echo "### Explicitly approved central Nexus publication"
             echo
             echo "- GitHub source: \`szl-holdings/nexus@${SOURCE_SHA}\`"
+            echo "- Release gate: fixed production environment"
             echo "- Hugging Face target: \`SZLHOLDINGS/nexus\`"
             echo "- Default-tip guard: passed"
             echo "- Runtime and byte attestation: passed"

@@ -16,6 +16,7 @@ import hashlib
 import json
 import os
 import re
+import shlex
 import subprocess
 import sys
 import tempfile
@@ -29,6 +30,9 @@ from typing import Any, Mapping, Sequence
 POLICY_SCHEMA = "szl.control-plane-effect-policy/v1"
 RECEIPT_SCHEMA = "szl.control-plane-effect-delta/v1"
 DEFAULT_POLICY_PATH = ".github/data/control_plane_effect_policy.json"
+NEXUS_PUBLISHER = ".github/workflows/publish-nexus-space.yml"
+NEXUS_RELEASE_CONTRACT = "nexus-manual-production/v1"
+NEXUS_RELEASE_INTENT = "nexus-manual-production-release-v2"
 LIFECYCLE_WORKFLOW = ".github/workflows/hf-space-lifecycle-reconcile.yml"
 LIFECYCLE_POLICY = ".github/data/hf-space-lifecycle-policy.json"
 LIFECYCLE_CONTROLLER = ".github/scripts/hf_space_lifecycle_reconcile.py"
@@ -383,7 +387,8 @@ def load_policy_bytes(raw: bytes, *, as_of: date) -> dict[str, Any]:
         if not isinstance(declaration, dict):
             raise GateError("POLICY_SCHEMA_INVALID", "workflow declaration must be an object")
         strict_keys(
-            {key: value for key, value in declaration.items() if key != "reviewed_unknowns"},
+            {key: value for key, value in declaration.items()
+             if key not in {"reviewed_unknowns", "release_contract"}},
             {
                 "intent_id",
                 "valid_until",
@@ -557,6 +562,17 @@ def load_policy_bytes(raw: bytes, *, as_of: date) -> dict[str, Any]:
             if not isinstance(controls[key], bool):
                 raise GateError("POLICY_SCHEMA_INVALID", f"control {key} must be boolean")
 
+        release_contract = declaration.get("release_contract")
+        if release_contract is not None or intent_id == NEXUS_RELEASE_INTENT:
+            if (workflow != NEXUS_PUBLISHER
+                    or intent_id != NEXUS_RELEASE_INTENT
+                    or release_contract != NEXUS_RELEASE_CONTRACT
+                    or triggers != ["workflow_dispatch"]
+                    or not all(controls[key] for key in (
+                        "contents_read", "concurrency", "protected_ref", "exact_sha", "readback"
+                    ))):
+                raise GateError("POLICY_SCHEMA_INVALID", "invalid scoped Nexus release contract")
+
         trusted = declaration["trusted_transitives"]
         if not isinstance(trusted, dict):
             raise GateError(
@@ -622,6 +638,7 @@ def load_policy_bytes(raw: bytes, *, as_of: date) -> dict[str, Any]:
             },
             "trusted_transitives": dict(sorted(normalized_trusted.items())),
             "reviewed_unknowns": normalized_reviewed,
+            **({"release_contract": release_contract} if release_contract is not None else {}),
         }
     policy["workflow_declarations"] = dict(sorted(normalized.items()))
     policy["_sha256"] = sha256_bytes(raw)
@@ -1869,6 +1886,17 @@ def analyze_workflow_source(source: str, *, path: str) -> dict[str, Any]:
         "effects": sorted(effects),
         "unknowns": sorted(set(unknowns)),
     }
+    if path == NEXUS_PUBLISHER:
+        result["nexus_release_errors"] = nexus_release_contract_errors(document)
+        # Only this exact target's fixed, non-cancelling publish-job lock is
+        # modeled here. A random job lock never supplies a global control.
+        jobs = document.get("jobs")
+        publish_job = jobs.get("publish") if isinstance(jobs, dict) else None
+        controls["concurrency"] = controls["concurrency"] or (
+            isinstance(publish_job, dict) and publish_job.get("concurrency") == {
+                "group": "publish-nexus-space", "cancel-in-progress": "false"
+            }
+        )
     scoped = scoped_write_permissions(document)
     if runtime_signing or contract_call:
         scoped.extend(["id-token:write", "attestations:write"])
@@ -2133,6 +2161,201 @@ def lifecycle_possible_resources(source: bytes, dependencies: Mapping[str, bytes
     return tuple(sorted(writable)) if len(writable) == 45 else None
 
 
+def nexus_release_contract_errors(document: Mapping[str, Any]) -> list[str]:
+    """Validate one versioned graph and critical executable command grammar.
+
+    This is deliberately NOT a generic shell proof or a global environment
+    exemption. Exact source/dependency/unknown pins still bind all other code.
+    Critical request/freshness scripts have a closed grammar so comments,
+    labels, ignored failures and dead branches cannot supply these guards.
+    """
+    errors: set[str] = set()
+
+    def require(condition: bool, reason: str) -> None:
+        if not condition:
+            errors.add(reason)
+
+    def script(step: Mapping[str, Any]) -> str:
+        return str(step.get("run", "")).strip()
+
+    event = document.get("on")
+    require(isinstance(event, dict) and set(event) == {"workflow_dispatch"},
+            "AUTOMATIC_RELEASE_EVENT")
+    dispatch = event.get("workflow_dispatch", {}) if isinstance(event, dict) else {}
+    inputs = dispatch.get("inputs", {}) if isinstance(dispatch, dict) else {}
+    source_input = inputs.get("source_sha", {}) if isinstance(inputs, dict) else {}
+    require(isinstance(inputs, dict) and set(inputs) == {"source_sha"}
+            and isinstance(source_input, dict)
+            and source_input.get("required") == "true"
+            and source_input.get("type") == "string" and "default" not in source_input,
+            "EXACT_SOURCE_INPUT")
+    jobs = document.get("jobs", {})
+    if not isinstance(jobs, dict) or set(jobs) != {"validate", "publish"}:
+        return sorted(errors | {"RELEASE_JOB_GRAPH"})
+    validate, publish = jobs["validate"], jobs["publish"]
+    if not isinstance(validate, dict) or not isinstance(publish, dict):
+        return sorted(errors | {"RELEASE_JOB_GRAPH"})
+    guard = ("github.event_name == 'workflow_dispatch' && "
+             "github.repository == 'szl-holdings/.github' && "
+             "github.ref == 'refs/heads/main' && github.ref_protected")
+    for job in (validate, publish):
+        require(job.get("if") == guard and "continue-on-error" not in job,
+                "PROTECTED_MANUAL_CONTEXT")
+        require(job.get("permissions") == {"contents": "read"}, "RELEASE_TOKEN_AUTHORITY")
+    require("env" not in document and "defaults" not in document,
+            "RELEASE_CONTEXT_OVERRIDE")
+    require("environment" not in validate and "env" not in validate
+            and not SECRET_REFERENCE.search(json.dumps(validate))
+            and not SECRET_INDEX_REFERENCE.search(json.dumps(validate)),
+            "VALIDATION_CREDENTIAL_OR_ENVIRONMENT")
+    require(publish.get("environment") == "production", "FIXED_PRODUCTION_APPROVAL")
+    require(publish.get("needs") == "validate", "VALIDATION_DEPENDENCY")
+    require(publish.get("concurrency") == {
+        "group": "publish-nexus-space", "cancel-in-progress": "false"
+    } and "concurrency" not in document, "SAFE_PUBLISH_CONCURRENCY")
+    require(validate.get("outputs") == {
+        "source_sha": "${{ steps.source_ref.outputs.sha }}"
+    }, "VALIDATED_SOURCE_OUTPUT")
+    sealed = "${{ needs.validate.outputs.source_sha }}"
+    require(publish.get("env") == {"REQUESTED_SOURCE_SHA": sealed}
+            and sealed in str(publish.get("name", "")), "REVIEWED_SOURCE_BINDING")
+
+    # A complete, read-only command sequence, not a search for helpful strings.
+    source_prefix = """set -euo pipefail
+test "$GITHUB_EVENT_NAME" = "workflow_dispatch"
+test "$GITHUB_REPOSITORY" = "szl-holdings/.github"
+test "$GITHUB_REF" = "refs/heads/main"
+test "$GITHUB_REF_PROTECTED" = "true"
+test "$GITHUB_WORKFLOW_SHA" = "$GITHUB_SHA"
+POLICY_SHA="$(git rev-parse HEAD)"
+python -I -B .github/scripts/validate_nexus_release.py \\
+  --source-sha="$REQUESTED_SOURCE_SHA" --policy-sha="$POLICY_SHA"
+test ! -e source
+git init -q source
+git -C source remote add origin https://github.com/szl-holdings/nexus.git
+git -C source fetch --depth=1 origin "$REQUESTED_SOURCE_SHA"
+git -C source checkout --detach --quiet FETCH_HEAD
+SOURCE_SHA="$(git -C source rev-parse HEAD)"
+REMOTE_SHA="$(git ls-remote https://github.com/szl-holdings/nexus.git refs/heads/main | awk '{print $1}')"
+python -I -B .github/scripts/validate_nexus_release.py \\
+  --source-sha="$REQUESTED_SOURCE_SHA" --policy-sha="$POLICY_SHA" \\
+  --checkout-sha="$SOURCE_SHA" --main-sha="$REMOTE_SHA"
+"""
+    summary = """python -I -B .github/scripts/validate_nexus_source_binding.py source/space/Dockerfile
+echo "sha=$SOURCE_SHA" >> "$GITHUB_OUTPUT"
+{
+  echo "### Requested Nexus release — awaiting production approval"
+  echo "- Exact source: https://github.com/szl-holdings/nexus/commit/${SOURCE_SHA}"
+  echo "- Fixed environment: production"
+  echo "- No provider credential or mutation in this validation job."
+  echo "- Approval goes stale if Nexus main moves; no automatic upgrade."
+} >> "$GITHUB_STEP_SUMMARY"
+"""
+    publish_output = """echo "sha=$SOURCE_SHA" >> "$GITHUB_OUTPUT"
+printf 'publisher=%s source=szl-holdings/nexus@%s remote_readback=%s\\n' "$POLICY_SHA" "$SOURCE_SHA" "$REMOTE_SHA"
+"""
+    freshness = """set -euo pipefail
+REMOTE_SHA="$(git ls-remote https://github.com/szl-holdings/nexus.git refs/heads/main | awk '{print $1}')"
+python -I -B .github/scripts/validate_nexus_release.py \\
+  --source-sha="$REQUESTED_SOURCE_SHA" --policy-sha="$(git rev-parse HEAD)" \\
+  --checkout-sha="$(git -C source rev-parse HEAD)" --main-sha="$REMOTE_SHA"
+"""
+    vsteps, psteps = validate.get("steps", []), publish.get("steps", [])
+    if (not isinstance(vsteps, list) or not isinstance(psteps, list)
+            or not all(isinstance(step, dict) for step in vsteps + psteps)):
+        return sorted(errors | {"RELEASE_STEP_GRAPH"})
+    require(len(vsteps) == 5, "READ_ONLY_VALIDATION_GRAPH")
+    for index, action in enumerate(("step-security/harden-runner@", "actions/checkout@",
+                                    "actions/setup-python@")):
+        require(len(vsteps) > index and str(vsteps[index].get("uses", "")).startswith(action),
+                "READ_ONLY_VALIDATION_GRAPH")
+    require(len(vsteps) == 5 and script(vsteps[3]) == (source_prefix + summary).strip()
+            and vsteps[3].get("id") == "source_ref"
+            and vsteps[3].get("env") == {"REQUESTED_SOURCE_SHA": "${{ inputs.source_sha }}"}
+            and script(vsteps[4]) == (
+                "set -euo pipefail\n"
+                "python -I -B .github/scripts/test_validate_nexus_source_binding.py\n"
+                "git diff --check"), "READ_ONLY_EXACT_SOURCE_VALIDATION")
+    require(all("if" not in step and "continue-on-error" not in step
+                and (index == 3 or "env" not in step)
+                for index, step in enumerate(vsteps)), "UNSKIPPABLE_VALIDATION")
+    ids = [step.get("id") for step in psteps if "id" in step]
+    ordered = ["source_ref", "source", "freshness", "credential", "deploy",
+               "restart", "attest", "cleanup"]
+    require(ids == ordered, "ORDERED_RELEASE_STAGES")
+    require(len(psteps) == 17 and
+            [(index, step.get("id")) for index, step in enumerate(psteps) if "id" in step]
+            == list(zip((2, 6, 8, 9, 10, 11, 12, 13), ordered)),
+            "PUBLISH_STEP_GRAPH")
+    stages = {step["id"]: step for step in psteps if "id" in step}
+    if any(name not in stages for name in ordered):
+        return sorted(errors | {"ORDERED_RELEASE_STAGES"})
+    require(all("if" not in stages[name] and "continue-on-error" not in stages[name]
+                for name in ordered[:-1]), "UNSKIPPABLE_RELEASE_STAGES")
+    require(stages["cleanup"].get("if") == "always()", "ALWAYS_CLEANUP")
+    require(script(stages["source_ref"]) == (source_prefix + publish_output).strip()
+            and "env" not in stages["source_ref"], "APPROVED_EXACT_SOURCE_CHECKOUT")
+    require(script(stages["freshness"]) == freshness.strip()
+            and "env" not in stages["freshness"]
+            and psteps.index(stages["credential"]) == psteps.index(stages["freshness"]) + 1,
+            "PRE_CREDENTIAL_FRESHNESS")
+    require(stages["source"].get("env") == {
+        "RESOLVED_SOURCE_SHA": "${{ steps.source_ref.outputs.sha }}"
+    } and stages["deploy"].get("env", {}).get("SOURCE_SHA")
+            == "${{ steps.source.outputs.sha }}", "IMMUTABLE_DEPLOY_SOURCE")
+    helper_calls: Counter[str] = Counter()
+    for index, step in enumerate(psteps):
+        require(index == 9 or not (
+            SECRET_REFERENCE.search(json.dumps(step))
+            or SECRET_INDEX_REFERENCE.search(json.dumps(step))
+        ), "CREDENTIAL_STAGE_ONLY")
+        for helper, expected_stages in (
+            ("acquire_hf_publisher_token.py", {"credential"}),
+            ("hf_deploy_from_dockerfile.py", {"deploy", "restart", "attest"}),
+        ):
+            for line in script(step).replace("\\\n", " ").splitlines():
+                if helper not in line or line.lstrip().startswith(("#", "echo ", "printf ")):
+                    continue
+                try:
+                    tokens = shlex.split(line, comments=True)
+                except ValueError:
+                    tokens = []
+                if ".github/scripts/" + helper not in tokens:
+                    continue
+                stage = step.get("id")
+                require(stage in expected_stages, "GUARDED_MUTATION_STAGE")
+                if stage in expected_stages:
+                    helper_calls[stage] += 1
+                if helper == "hf_deploy_from_dockerfile.py":
+                    require(("--restart-space" in tokens) == (stage == "restart")
+                            and ("--attest" in tokens) == (stage == "attest"),
+                            "GUARDED_MUTATION_MODE")
+    require(helper_calls == {"credential": 1, "deploy": 1, "restart": 1, "attest": 1},
+            "SINGLE_HELPER_INVOCATIONS")
+    deploy_commands = []
+    for line in script(stages["deploy"]).replace("\\\n", " ").splitlines():
+        if ".github/scripts/hf_deploy_from_dockerfile.py" not in line:
+            continue
+        try:
+            tokens = shlex.split(line, comments=True)
+        except ValueError:
+            tokens = []
+        target = ".github/scripts/hf_deploy_from_dockerfile.py"
+        if target in tokens:
+            deploy_commands.append(tokens[tokens.index(target) + 1:])
+    required_flags = {"--require-default-branch-tip", "--prune", "--manifest-out",
+                      "--source-sha", "--ref", "--dockerfile-path", "--smoke-paths"}
+    require(len(deploy_commands) == 1 and required_flags.issubset(deploy_commands[0]),
+            "IMMEDIATE_MUTATION_GUARDS")
+    if len(deploy_commands) == 1:
+        args = deploy_commands[0]
+        for flag, value in (("--ref", "$SOURCE_SHA"), ("--source-sha", "$SOURCE_SHA"),
+                            ("--dockerfile-path", "space/Dockerfile")):
+            require(args.count(flag) == 1 and args.index(flag) + 1 < len(args)
+                    and args[args.index(flag) + 1] == value, "IMMUTABLE_DEPLOY_SOURCE")
+    return sorted(errors)
+
+
 def bind_declaration(
     workflow_path: str,
     source: bytes,
@@ -2147,6 +2370,11 @@ def bind_declaration(
         reasons.add("CREDENTIAL_BINDING_MISMATCH")
 
     required = declaration["required_controls"]
+    if workflow_path == NEXUS_PUBLISHER:
+        if declaration.get("release_contract") != NEXUS_RELEASE_CONTRACT:
+            reasons.add("NEXUS_RELEASE_CONTRACT_MISSING")
+        for error in analysis.get("nexus_release_errors", ["RELEASE_MODEL_MISSING"]):
+            reasons.add("NEXUS_RELEASE_" + error)
     if not set(required["triggers"]).issubset(analysis["triggers"]):
         reasons.add("REQUIRED_TRIGGER_MISSING")
     for control in (
