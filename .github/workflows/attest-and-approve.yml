@@ -18,9 +18,9 @@ jobs:
     permissions:
       actions: read
       checks: read
-      contents: write
+      contents: read
       id-token: write
-      pull-requests: write
+      pull-requests: read
     runs-on: ubuntu-latest
     steps:
       # workflow_run loads this controller from the default branch; check out
@@ -103,10 +103,26 @@ jobs:
               ) | .number' \
               "$RUNNER_TEMP/pulls.json"
           )
-          if [ "${#PRS[@]}" -ne 1 ]; then
-            echo "::error::expected exactly one open main or release/* PR for $HEAD_SHA; found ${#PRS[@]}"
-            exit 1
+          mapfile -t STALE_PRS < <(
+            jq -r --arg sha "$HEAD_SHA" --arg repository "$REPOSITORY" \
+              '.[] | select(
+                .state != "open"
+                and .head.sha == $sha
+                and .head.repo.full_name == $repository
+                and (
+                  .base.ref == "main"
+                  or (.base.ref | startswith("release/"))
+                )
+              ) | .number' \
+              "$RUNNER_TEMP/pulls.json"
+          )
+          if [ "${#PRS[@]}" -eq 0 ] && [ "${#STALE_PRS[@]}" -gt 0 ]; then
+            echo "kind=stale" >> "$GITHUB_OUTPUT"
+            echo "Gate run for $HEAD_SHA belongs only to closed or merged PRs; no attestation mutation is needed"
+            exit 0
           fi
+          [ "${#PRS[@]}" -eq 1 ] \
+            || { echo "::error::expected exactly one open main or release/* PR for $HEAD_SHA; found ${#PRS[@]}"; exit 1; }
           PR="${PRS[0]}"
           gh api "repos/$REPOSITORY/pulls/$PR" > "$RUNNER_TEMP/pr.json"
           PR_DRAFT="$(jq -r .draft "$RUNNER_TEMP/pr.json")"
@@ -137,14 +153,7 @@ jobs:
           if [ -n "$PR" ]; then
           BODY=$(jq -r '.body // ""' "$RUNNER_TEMP/pr.json")
 
-          grep -Eq 'Satisfies:[[:space:]]*(AT-[0-9]+|C-[0-9]+)' <<<"$BODY" \
-            || { echo "::error::P1 missing Satisfies: AT-n or C-n"; exit 1; }
-          grep -Eq 'Rollback:[[:space:]]*\S' <<<"$BODY" \
-            || { echo "::error::P2 missing Rollback"; exit 1; }
-          grep -Eq 'Labels:[[:space:]]*\S' <<<"$BODY" \
-            || { echo "::error::P3 missing Labels"; exit 1; }
-          grep -Eq 'Risk:[[:space:]]*[ABCD][[:space:]]*[-—]' <<<"$BODY" \
-            || { echo "::error::missing Risk: A-D classification"; exit 1; }
+          printf '%s' "$BODY" | python3 -I .github/scripts/validate_forge9_pr_metadata.py
 
           gh api "repos/$REPOSITORY/pulls/$PR/files?per_page=100" --paginate \
             --jq '.[].filename' > "$RUNNER_TEMP/files.txt"
@@ -347,6 +356,7 @@ jobs:
         if: steps.subject.outputs.kind == 'pull_request' && steps.subject.outputs.draft == 'false'
         env:
           GH_TOKEN: ${{ github.token }}
+          GATE_WORKFLOW: gates.yml
           HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
           PR: ${{ steps.subject.outputs.number }}
           PR_BASE_REF: ${{ steps.subject.outputs.base_ref }}
@@ -362,7 +372,7 @@ jobs:
           CURRENT_BASE_SHA="$(gh api "repos/$REPOSITORY/git/ref/heads/$CURRENT_BASE_REF" --jq .object.sha)"
           CURRENT_DRAFT="$(jq -r .draft "$RUNNER_TEMP/pr-before-app-mutation.json")"
           CURRENT_BODY_SHA256="$(jq -c '.body // ""' "$RUNNER_TEMP/pr-before-app-mutation.json" | sha256sum | cut -d' ' -f1)"
-          LATEST_GATE_RUN_ID="$(gh api "repos/$REPOSITORY/actions/workflows/gates.yml/runs?event=pull_request&per_page=100" \
+          LATEST_GATE_RUN_ID="$(gh api "repos/$REPOSITORY/actions/workflows/$GATE_WORKFLOW/runs?event=pull_request&per_page=100" \
             --jq "[.workflow_runs[] | select(.head_sha == \"$HEAD_SHA\")] | max_by(.id) | .id // 0")"
           [ "$CURRENT_HEAD" = "$HEAD_SHA" ] \
             || { echo "::error::pull request head moved before App mutation"; exit 1; }
@@ -438,6 +448,7 @@ jobs:
         if: steps.subject.outputs.kind == 'pull_request' && steps.subject.outputs.draft == 'false'
         env:
           GH_TOKEN: ${{ github.token }}
+          GATE_WORKFLOW: gates.yml
           HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
           PR: ${{ steps.subject.outputs.number }}
           PR_BASE_REF: ${{ steps.subject.outputs.base_ref }}
@@ -459,7 +470,7 @@ jobs:
           CURRENT_BASE_REF=$(jq -r .base.ref "$RUNNER_TEMP/pr-before-queue.json")
           CURRENT_BASE_SHA=$(gh api "repos/$REPOSITORY/git/ref/heads/$CURRENT_BASE_REF" --jq .object.sha)
           CURRENT_BODY_SHA256=$(jq -c '.body // ""' "$RUNNER_TEMP/pr-before-queue.json" | sha256sum | cut -d' ' -f1)
-          LATEST_GATE_RUN_ID="$(gh api "repos/$REPOSITORY/actions/workflows/gates.yml/runs?event=pull_request&per_page=100" \
+          LATEST_GATE_RUN_ID="$(gh api "repos/$REPOSITORY/actions/workflows/$GATE_WORKFLOW/runs?event=pull_request&per_page=100" \
             --jq "[.workflow_runs[] | select(.head_sha == \"$HEAD_SHA\")] | max_by(.id) | .id // 0")"
           [ "$CURRENT_HEAD" = "$HEAD_SHA" ] \
             || { echo "::error::pull request head moved before queue request"; exit 1; }

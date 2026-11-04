@@ -118,6 +118,11 @@ KNOWN_ACTION_EFFECTS: Mapping[str, tuple[str, str, str]] = {
         "runner:toolchain:python",
         "local-write",
     ),
+    "actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1": (
+        "github.app.token.mint",
+        "runner:github-app-token",
+        "local-write",
+    ),
     "actions/setup-node@820762786026740c76f36085b0efc47a31fe5020": (
         "runner.toolchain.install",
         "runner:toolchain:node",
@@ -161,6 +166,16 @@ UPLOAD_ARTIFACT_ACTIONS = frozenset({
     "actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a",
     "actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9",
 })
+FORGE9_ATTESTOR = ".github/workflows/attest-and-approve.yml"
+FORGE9_QUEUE_CONTROLLER = ".github/workflows/merge-queue-enqueue.yml"
+FORGE9_APP_TOKEN_ACTION = (
+    "actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1"
+)
+FORGE9_COSIGN_INSTALLER_ACTION = (
+    "sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6"
+)
+FORGE9_ATTEST_ARTIFACT = "merge-receipt-${{ github.event.workflow_run.head_sha }}"
+FORGE9_QUEUE_ARTIFACT = "merge-queue-enqueue-${{ github.run_id }}"
 LITERAL_ARTIFACT_NAME = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]*")
 LITERAL_SARIF_FILE = re.compile(r"[A-Za-z0-9][A-Za-z0-9._/-]*\.sarif")
 LITERAL_SARIF_CATEGORY = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]*")
@@ -190,6 +205,17 @@ SEISMIC_WITNESS_DIGEST = "sha256:90865f00ff2d5385abd449be0e6f8e1e5f0d0ad6717bcc4
 SEISMIC_VALIDATOR_DIGEST = "sha256:171561401429289c4be789240586914b9ba76c7efc80e5452f6de640b5c3a586"
 SEISMIC_TOOLS = frozenset({SEISMIC_VALIDATOR, RUNTIME_LOCK,
     ".github/scripts/hf_deploy_from_dockerfile.py", ".github/scripts/hf_space_source_binding.py"})
+THE_GRID_PUBLISHER = ".github/workflows/reusable-hf-deploy-the-grid.yml"
+THE_GRID_WITNESS = ".github/workflows/reusable-hf-deploy-the-grid-source-witness.yml"
+THE_GRID_VALIDATOR = ".github/scripts/hf_the_grid_publish_contract.py"
+THE_GRID_EVIDENCE_ARTIFACT = "hf-deploy-evidence-${{ github.run_id }}-${{ github.run_attempt }}"
+# The-grid has a separate fixed interface. It shares the reviewed publisher
+# helper closure but intentionally has no application source-variable effect.
+THE_GRID_PUBLISHER_DIGEST = "sha256:5efedd22489d63367b063e7fd393dac171e180719b83510d727ffb769bbf5dfd"
+THE_GRID_WITNESS_DIGEST = "sha256:2f7b009fe23b613331e16bb90eed7ca1e3e8507b604c2ba0a61b3159d0cf16d0"
+THE_GRID_VALIDATOR_DIGEST = "sha256:2c11646478044367d148de01f082ad10825671671c48bfb7f581fdc90c3a7056"
+THE_GRID_TOOLS = frozenset({THE_GRID_VALIDATOR, RUNTIME_LOCK,
+    ".github/scripts/hf_deploy_from_dockerfile.py"})
 
 PYTHON_MUTATORS: Mapping[str, str] = {
     "add_space_secret": "sdk.huggingface.add_space_secret",
@@ -825,8 +851,113 @@ def references_credentials(value: Any) -> bool:
     return False
 
 
-def scoped_write_permissions(document: Mapping[str, Any]) -> list[str]:
-    """Write grants admitted only for the exact reviewed SARIF upload job.
+def forge9_attestor_profile(document: Mapping[str, Any]) -> bool:
+    """Recognize the exact default-branch FORGE-9 signing controller shape."""
+    if set(document) != {"name", "on", "permissions", "concurrency", "jobs"}:
+        return False
+    if document.get("on") != {
+        "workflow_run": {"workflows": ["FORGE-9 gates"], "types": ["completed"]}
+    }:
+        return False
+    if document.get("permissions") != "read-all" or document.get("concurrency") != {
+        "group": "forge9-attest-${{ github.event.workflow_run.head_sha }}",
+        "cancel-in-progress": "false",
+    }:
+        return False
+    jobs = document.get("jobs")
+    if not isinstance(jobs, dict) or set(jobs) != {"attest"}:
+        return False
+    job = jobs["attest"]
+    if not isinstance(job, dict) or set(job) != {"if", "permissions", "runs-on", "steps"}:
+        return False
+    if (
+        job.get("if") != "github.event.workflow_run.conclusion == 'success'"
+        or job.get("runs-on") != "ubuntu-latest"
+        or job.get("permissions")
+        != {
+            "actions": "read",
+            "checks": "read",
+            "contents": "read",
+            "id-token": "write",
+            "pull-requests": "read",
+        }
+    ):
+        return False
+    steps = job.get("steps")
+    if not isinstance(steps, list) or [step.get("name") for step in steps if isinstance(step, dict)] != [
+        "Checkout trusted admission verifier source",
+        "Mint the independent App token",
+        "Resolve the attestation subject",
+        "Verify gates and preconditions P1-P7",
+        "Verify exact-head admission evidence",
+        "Build and sign the merge BAP",
+        "Install Cosign",
+        "Sign the merge BAP with Actions OIDC",
+        "Upload the signed merge BAP",
+        "Revalidate current PR generation before App mutations",
+        "Approve as the App and verify the review identity",
+        "Publish required App attestation status",
+        "Request protected merge after attestation",
+    ]:
+        return False
+    if len(steps) != 13 or any(not isinstance(step, dict) for step in steps):
+        return False
+    action_steps = {index for index, step in enumerate(steps) if "uses" in step}
+    if action_steps != {0, 1, 6, 8} or any(
+        "run" not in step for index, step in enumerate(steps) if index not in action_steps
+    ):
+        return False
+    if steps[0].get("uses") != (
+        "actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1"
+    ) or steps[0].get("with") != {"persist-credentials": "false", "fetch-depth": "1"}:
+        return False
+    if (
+        steps[1].get("id") != "app-token"
+        or steps[1].get("uses") != FORGE9_APP_TOKEN_ACTION
+        or steps[1].get("with")
+        != {
+            "client-id": "${{ vars.QILLQAQ_CLIENT_ID }}",
+            "private-key": "${{ secrets.QILLQAQ_PRIVATE_KEY }}",
+            "owner": "${{ github.repository_owner }}",
+            "repositories": "${{ github.event.repository.name }}",
+            "permission-administration": "read",
+            "permission-checks": "read",
+            "permission-contents": "read",
+            "permission-metadata": "read",
+            "permission-pull-requests": "write",
+            "permission-statuses": "write",
+        }
+    ):
+        return False
+    signing_if = (
+        "steps.subject.outputs.kind == 'merge_group' || "
+        "steps.subject.outputs.draft == 'false'"
+    )
+    if (
+        steps[6].get("uses") != FORGE9_COSIGN_INSTALLER_ACTION
+        or steps[6].get("if") != signing_if
+        or steps[7].get("if") != signing_if
+        or str(steps[7].get("run", "")).strip()
+        != "cosign sign-blob --yes --bundle merge-receipt.bundle merge-receipt.json"
+        or steps[8].get("if") != signing_if
+        or steps[8].get("uses")
+        != "actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a"
+        or steps[8].get("with")
+        != {
+            "name": FORGE9_ATTEST_ARTIFACT,
+            "path": "merge-receipt.json\nmerge-receipt.bundle\n",
+            "if-no-files-found": "error",
+            "retention-days": "90",
+        }
+    ):
+        return False
+    return True
+
+
+def scoped_write_permissions(
+    document: Mapping[str, Any], *, path: str = ""
+) -> list[str]:
+    """Write grants admitted only for exact reviewed signing/upload shapes.
 
     ``security-events: write`` is exempt from GITHUB_WRITE_PERMISSION_PRESENT
     only when it is the workflow's single write grant, held by one job whose
@@ -836,6 +967,8 @@ def scoped_write_permissions(document: Mapping[str, Any]) -> list[str]:
     uploads that artifact name, and where neither that job nor the workflow
     env references a token or secret. Anything else returns no exemption.
     """
+    if path == FORGE9_ATTESTOR and forge9_attestor_profile(document):
+        return ["id-token:write"]
     jobs = document.get("jobs")
     workflow_permissions = document.get("permissions")
     if not isinstance(jobs, dict) or not isinstance(workflow_permissions, dict):
@@ -931,6 +1064,11 @@ def seismic_caller_checkout(inputs: Mapping[str, str]) -> bool:
                       "path": "caller", "persist-credentials": "false", "fetch-depth": "1"}
 
 
+def the_grid_caller_checkout(inputs: Mapping[str, str]) -> bool:
+    return inputs == {"repository": "szl-holdings/The-grid", "ref": "${{ github.sha }}",
+                      "path": "caller", "persist-credentials": "false", "fetch-depth": "1"}
+
+
 def seismic_publisher_profile(source: str, document: Mapping[str, Any]) -> bool:
     """Admit only the reviewed, exact-byte seismic publisher graph."""
     return (sha256_bytes(source.encode("utf-8")) == SEISMIC_PUBLISHER_DIGEST
@@ -953,6 +1091,30 @@ def seismic_contract_call(source: str, document: Mapping[str, Any]) -> bool:
             and jobs["seismic-publisher-exact-source-witness"].get("with") == {"contract-only": "true"}
             and jobs["seismic-publisher-exact-source-witness"].get("secrets") == {
                 "HF_TOKEN": "${{ github.token }}"})
+
+
+def the_grid_publisher_profile(source: str, document: Mapping[str, Any]) -> bool:
+    """Admit only the reviewed, exact-byte The-grid publisher graph."""
+    return (sha256_bytes(source.encode("utf-8")) == THE_GRID_PUBLISHER_DIGEST
+            and isinstance(document.get("jobs"), dict)
+            and set(document["jobs"]) == {"invocation", "hf-deploy", "exact-source-contract"}
+            and document.get("permissions") == {"contents": "read"}
+            and document.get("concurrency") == {
+                "group": "hf-deploy-SZLHOLDINGS/the-grid", "cancel-in-progress": "false"}
+            and document["jobs"]["hf-deploy"].get("if") == "${{ inputs.contract-only == false }}"
+            and document["jobs"]["exact-source-contract"].get("if") == "${{ inputs.contract-only == true }}")
+
+
+def the_grid_contract_call(source: str, document: Mapping[str, Any]) -> bool:
+    """The local witness is pinned to its read-only exact bytes."""
+    jobs = document.get("jobs")
+    job_name = "the-grid-publisher-exact-source-witness"
+    return (sha256_bytes(source.encode("utf-8")) == THE_GRID_WITNESS_DIGEST
+            and isinstance(jobs, dict) and set(jobs) == {job_name}
+            and isinstance(jobs[job_name], dict)
+            and jobs[job_name].get("uses") == "./" + THE_GRID_PUBLISHER
+            and jobs[job_name].get("with") == {"contract-only": "true"}
+            and jobs[job_name].get("secrets") == {"HF_TOKEN": "${{ github.token }}"})
 
 
 def canonical_runtime_profile(document: Mapping[str, Any]) -> bool:
@@ -1114,6 +1276,8 @@ def runtime_artifact_resource(path: str, name: str, *, read: bool = False) -> st
         return "github:repository:szl-holdings/a11oy:artifact:" + name.split("-${{", 1)[0] + (":same-run-read" if read else "")
     if path == SEISMIC_PUBLISHER and name == SEISMIC_EVIDENCE_ARTIFACT and not read:
         return "github:repository:szl-holdings/szl-seismic-review:artifact:hf-deploy-evidence"
+    if path == THE_GRID_PUBLISHER and name == THE_GRID_EVIDENCE_ARTIFACT and not read:
+        return "github:repository:szl-holdings/The-grid:artifact:hf-deploy-evidence"
     if path == ".github/workflows/hf-public-smoke-contract.yml" and name in {
         "hf-public-smoke-py311-${{ github.run_id }}-${{ github.run_attempt }}",
         "hf-public-smoke-py312-${{ github.run_id }}-${{ github.run_attempt }}",
@@ -1128,6 +1292,8 @@ def workflow_dependencies(source: str, *, path: str = "") -> list[str]:
     contract_call = False
     seismic_profile = False
     seismic_call = False
+    the_grid_profile = False
+    the_grid_call = False
     try:
         document, _lines = parse_workflow_yaml(source)
         clean += "\n" + "\n".join(workflow_scalar_values(document))
@@ -1135,6 +1301,8 @@ def workflow_dependencies(source: str, *, path: str = "") -> list[str]:
         contract_call = path == RUNTIME_WITNESS and runtime_contract_call(document)
         seismic_profile = path == SEISMIC_PUBLISHER and seismic_publisher_profile(source, document)
         seismic_call = path == SEISMIC_WITNESS and seismic_contract_call(source, document)
+        the_grid_profile = path == THE_GRID_PUBLISHER and the_grid_publisher_profile(source, document)
+        the_grid_call = path == THE_GRID_WITNESS and the_grid_contract_call(source, document)
     except GateError:
         # A malformed workflow still fails analysis; retain discoverable raw paths.
         pass
@@ -1144,8 +1312,9 @@ def workflow_dependencies(source: str, *, path: str = "") -> list[str]:
         # A leading ./ is GitHub's explicit repository-local uses syntax.
         # The policy and receipt still use one canonical Git-tree path.
         dependency = spelling[2:] if spelling.startswith("./") else spelling
-        if (runtime_profile or seismic_profile) and dependency.startswith("tools/") and (
+        if (runtime_profile or seismic_profile or the_grid_profile) and dependency.startswith("tools/") and (
             dependency[6:] in RUNTIME_TOOLS or dependency[6:] in SEISMIC_TOOLS
+            or dependency[6:] in THE_GRID_TOOLS
         ):
             dependency = dependency[6:]
         dependencies.add(safe_repo_path(dependency))
@@ -1159,6 +1328,10 @@ def workflow_dependencies(source: str, *, path: str = "") -> list[str]:
         dependencies.update({RUNTIME_PUBLISHER, RUNTIME_VALIDATOR})
     if seismic_call:
         dependencies.update({SEISMIC_PUBLISHER, SEISMIC_VALIDATOR})
+    if the_grid_profile:
+        dependencies.update(THE_GRID_TOOLS)
+    if the_grid_call:
+        dependencies.update({THE_GRID_PUBLISHER, THE_GRID_VALIDATOR})
     return sorted(dependencies)
 
 
@@ -1569,6 +1742,9 @@ def analyze_workflow_source(source: str, *, path: str) -> dict[str, Any]:
     contract_call = path == RUNTIME_WITNESS and runtime_contract_call(document)
     seismic_profile = path == SEISMIC_PUBLISHER and seismic_publisher_profile(source, document)
     seismic_call = path == SEISMIC_WITNESS and seismic_contract_call(source, document)
+    forge9_attestor = path == FORGE9_ATTESTOR and forge9_attestor_profile(document)
+    the_grid_profile = path == THE_GRID_PUBLISHER and the_grid_publisher_profile(source, document)
+    the_grid_call = path == THE_GRID_WITNESS and the_grid_contract_call(source, document)
     if path == RUNTIME_PUBLISHER and not (runtime_profile and runtime_signing):
         unknown("CANONICAL_RUNTIME_INTERFACE_UNSUPPORTED", ())
     if path == RUNTIME_WITNESS and not contract_call:
@@ -1576,6 +1752,10 @@ def analyze_workflow_source(source: str, *, path: str) -> dict[str, Any]:
     if path == SEISMIC_PUBLISHER and not seismic_profile:
         unknown("CANONICAL_RUNTIME_INTERFACE_UNSUPPORTED", ())
     if path == SEISMIC_WITNESS and not seismic_call:
+        unknown("CANONICAL_RUNTIME_INTERFACE_UNSUPPORTED", ())
+    if path == THE_GRID_PUBLISHER and not the_grid_profile:
+        unknown("CANONICAL_RUNTIME_INTERFACE_UNSUPPORTED", ())
+    if path == THE_GRID_WITNESS and not the_grid_call:
         unknown("CANONICAL_RUNTIME_INTERFACE_UNSUPPORTED", ())
     jobs = document.get("jobs")
     if not isinstance(jobs, dict) or not jobs:
@@ -1604,7 +1784,7 @@ def analyze_workflow_source(source: str, *, path: str) -> dict[str, Any]:
         if "env" in job:
             unknown("WORKFLOW_ENVIRONMENT_REVIEW_REQUIRED", (*location, "env"))
         if "uses" in job:
-            if contract_call or seismic_call:
+            if contract_call or seismic_call or the_grid_call:
                 # This exact caller delegates grants to a same-source callee,
                 # whose typed contract-only graph is validated by the binder.
                 # Only two credential-free contents reads are reachable.
@@ -1673,6 +1853,26 @@ def analyze_workflow_source(source: str, *, path: str) -> dict[str, Any]:
                         ("runner.attestation.bundle", "local-write", "runner:artifact:hf-runtime-binding:attestation-bundle"),
                     ):
                         effects.append(RawEffect(sink, access, path, lines[(*step_location, "uses")], resource))
+                elif forge9_attestor and action == FORGE9_APP_TOKEN_ACTION:
+                    effects.append(
+                        RawEffect(
+                            "github.app.installation_token.issue",
+                            "external-write",
+                            path,
+                            lines[(*step_location, "uses")],
+                            "github:app:qillqaq:installation-token",
+                        )
+                    )
+                elif forge9_attestor and action == FORGE9_COSIGN_INSTALLER_ACTION:
+                    effects.append(
+                        RawEffect(
+                            "runner.toolchain.install",
+                            "local-write",
+                            path,
+                            lines[(*step_location, "uses")],
+                            "runner:toolchain:cosign",
+                        )
+                    )
                 elif action in KNOWN_ACTION_EFFECTS:
                     sink, resource, access = KNOWN_ACTION_EFFECTS[action]
                     if action in {
@@ -1703,6 +1903,7 @@ def analyze_workflow_source(source: str, *, path: str) -> dict[str, Any]:
                             lines[(*step_location, "uses")],
                             ("stepsecurity:monitor:szl-holdings/a11oy" if runtime_profile else
                              "stepsecurity:monitor:szl-holdings/szl-seismic-review" if seismic_profile else
+                             "stepsecurity:monitor:szl-holdings/The-grid" if the_grid_profile else
                              "stepsecurity:monitor:szl-holdings/.github"),
                         ))
                         if inputs.get("egress-policy", "block") == "block":
@@ -1736,6 +1937,8 @@ def analyze_workflow_source(source: str, *, path: str) -> dict[str, Any]:
                                 or (job_name == "hf-deploy" and runtime_caller_checkout(inputs)))
                             or seismic_profile and (runtime_tools_checkout(inputs)
                                 or (job_name == "hf-deploy" and seismic_caller_checkout(inputs)))
+                            or the_grid_profile and (runtime_tools_checkout(inputs)
+                                or (job_name == "hf-deploy" and the_grid_caller_checkout(inputs)))
                         )
                         if (
                             inputs.get("github-server-url", "https://github.com") != "https://github.com"
@@ -1746,14 +1949,27 @@ def analyze_workflow_source(source: str, *, path: str) -> dict[str, Any]:
                         ):
                             unknown("ACTION_EXTRA_EFFECT_UNSUPPORTED", (*step_location, "with"))
                         exact_event_head = "${{ github.event.pull_request.head.sha || github.event.merge_group.head_sha || github.sha }}"
-                        if dependencies and not runtime_checkout and (
+                        exact_sha_aliases = {
+                            exact_event_head,
+                            "${{ github.sha }}",
+                        }
+                        trusted_queue_default = (
+                            path == FORGE9_QUEUE_CONTROLLER
+                            and inputs.get("ref")
+                            == "${{ github.event.repository.default_branch }}"
+                            and inputs.get("repository", "szl-holdings/.github")
+                            == "szl-holdings/.github"
+                            and inputs.get("persist-credentials", "false").lower()
+                            == "false"
+                        )
+                        if dependencies and not runtime_checkout and not trusted_queue_default and (
                             inputs.get("repository", "szl-holdings/.github") != "szl-holdings/.github"
-                            or ("ref" in inputs and inputs["ref"] != exact_event_head)
+                            or ("ref" in inputs and inputs["ref"] not in exact_sha_aliases)
                         ):
                             unknown("CHECKOUT_SOURCE_BOUNDARY_UNSUPPORTED", (*step_location, "with"))
                     if sink == "github.contents.checkout" and "repository" in inputs:
                         repository = inputs["repository"]
-                        if (runtime_profile or seismic_profile) and runtime_tools_checkout(inputs):
+                        if (runtime_profile or seismic_profile or the_grid_profile) and runtime_tools_checkout(inputs):
                             repository = "szl-holdings/.github"
                         if not re.fullmatch(r"[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+", repository):
                             unknown("ACTION_RESOURCE_OVERRIDE_UNSUPPORTED", (*step_location, "with"))
@@ -1764,13 +1980,22 @@ def analyze_workflow_source(source: str, *, path: str) -> dict[str, Any]:
                             unknown("ACTION_RESOURCE_OVERRIDE_UNSUPPORTED", (*step_location, "with"))
                         artifact = inputs.get("name", "artifact")
                         runtime_resource = runtime_artifact_resource(path, artifact)
-                        if runtime_resource and (path not in {RUNTIME_PUBLISHER, SEISMIC_PUBLISHER}
-                                or runtime_profile or seismic_profile):
+                        if runtime_resource and (path not in {
+                                RUNTIME_PUBLISHER, SEISMIC_PUBLISHER, THE_GRID_PUBLISHER}
+                                or runtime_profile or seismic_profile or the_grid_profile):
                             resource = runtime_resource
                         elif artifact == "control-plane-effect-${{ github.run_id }}":
                             # This exact run-scoped namespace is the enforcing
                             # workflow contract, not an arbitrary dynamic name.
                             resource = "github:actions:artifact:control-plane-effect"
+                        elif artifact == "estate-deadman-${{ github.run_id }}-${{ github.run_attempt }}":
+                            resource = "github:actions:artifact:estate-deadman"
+                        elif artifact == "estate-deadman-contract-${{ github.run_id }}-${{ github.run_attempt }}":
+                            resource = "github:actions:artifact:estate-deadman-contract"
+                        elif path == FORGE9_ATTESTOR and artifact == FORGE9_ATTEST_ARTIFACT:
+                            resource = "github:actions:artifact:forge9-merge-receipt"
+                        elif path == FORGE9_QUEUE_CONTROLLER and artifact == FORGE9_QUEUE_ARTIFACT:
+                            resource = "github:actions:artifact:forge9-queue-receipt"
                         elif path == LIFECYCLE_WORKFLOW and artifact == (
                             "hf-space-lifecycle-${{ github.run_id }}-${{ github.run_attempt }}"
                         ):
@@ -1840,6 +2065,32 @@ def analyze_workflow_source(source: str, *, path: str) -> dict[str, Any]:
         effects.extend(inline_effects)
         unknowns.extend(inline_unknowns)
 
+    if forge9_attestor:
+        signing_line = lines[("jobs", "attest", "steps", 7, "run")]
+        for sink, access, resource in (
+            (
+                "github.oidc.issue",
+                "external-write",
+                "github:repository:szl-holdings/.github:oidc:forge9-merge-bap",
+            ),
+            (
+                "sigstore.certificate.issue",
+                "external-write",
+                "sigstore:public:fulcio:szl-holdings/.github:forge9-merge-bap",
+            ),
+            (
+                "sigstore.transparency.append",
+                "external-write",
+                "sigstore:public:rekor:szl-holdings/.github:forge9-merge-bap",
+            ),
+            (
+                "runner.attestation.bundle",
+                "local-write",
+                "runner:artifact:forge9-merge-bap:bundle",
+            ),
+        ):
+            effects.append(RawEffect(sink, access, path, signing_line, resource))
+
     concurrency = document.get("concurrency")
     # Only executable blocks supply control hints; workflow names, labels,
     # action inputs, and other metadata cannot spoof those indicators.
@@ -1869,7 +2120,7 @@ def analyze_workflow_source(source: str, *, path: str) -> dict[str, Any]:
         "effects": sorted(effects),
         "unknowns": sorted(set(unknowns)),
     }
-    scoped = scoped_write_permissions(document)
+    scoped = scoped_write_permissions(document, path=path)
     if runtime_signing or contract_call:
         scoped.extend(["id-token:write", "attestations:write"])
     if scoped:
@@ -2163,10 +2414,18 @@ def bind_declaration(
     # Only the exact reviewed SARIF upload job may hold a write grant; any
     # other write, or a missing exemption list, still denies.
     scoped_writes = set(analysis.get("scoped_write_permissions", []))
-    if any(
-        permission.endswith(":write") and permission not in scoped_writes
+    write_permissions = {
+        permission
         for permission in analysis["permissions"]
-    ):
+        if permission.endswith(":write") and permission not in scoped_writes
+    }
+    # Only the estate dead-man supervisor may hold exactly issues:write for its
+    # reserved incident lifecycle. All other write grants remain denied here.
+    if write_permissions == {"issues:write"} and workflow_path == ".github/workflows/estate-deadman.yml":
+        analysis["scoped_write_permissions"] = sorted(
+            set(analysis.get("scoped_write_permissions", [])) | {"issues:write"}
+        )
+    elif write_permissions:
         reasons.add("GITHUB_WRITE_PERMISSION_PRESENT")
 
     trusted_expected = declaration["trusted_transitives"]
@@ -2215,6 +2474,21 @@ def bind_declaration(
                 valid_callee = False
             if not valid_callee:
                 all_unknowns.append(UnknownEffect("CANONICAL_RUNTIME_INTERFACE_UNSUPPORTED", SEISMIC_PUBLISHER, 1))
+    the_grid_contract = workflow_path in {THE_GRID_PUBLISHER, THE_GRID_WITNESS}
+    if the_grid_contract:
+        validator = dependency_blobs.get(THE_GRID_VALIDATOR)
+        if validator is None or sha256_bytes(validator) != THE_GRID_VALIDATOR_DIGEST:
+            all_unknowns.append(UnknownEffect("CANONICAL_RUNTIME_VALIDATOR_MISMATCH", workflow_path, 1))
+        if workflow_path == THE_GRID_WITNESS:
+            try:
+                source_text = dependency_blobs[THE_GRID_PUBLISHER].decode("utf-8")
+                callee, _ = parse_workflow_yaml(source_text)
+                valid_callee = the_grid_publisher_profile(source_text, callee)
+            except (KeyError, GateError, UnicodeError, TypeError, AttributeError):
+                valid_callee = False
+            if not valid_callee:
+                all_unknowns.append(UnknownEffect(
+                    "CANONICAL_RUNTIME_INTERFACE_UNSUPPORTED", THE_GRID_PUBLISHER, 1))
     for dependency in analysis["dependencies"]:
         content = dependency_blobs.get(dependency)
         if content is None:
@@ -2234,6 +2508,11 @@ def bind_declaration(
             # reachable from the pinned local witness.
             all_unknowns.append(UnknownEffect("SCRIPT_SOURCE_REVIEW_REQUIRED", dependency, 1))
             continue
+        if workflow_path == THE_GRID_WITNESS and dependency == THE_GRID_PUBLISHER:
+            # Only contract-only validation and exact-source comparison are
+            # reachable from the pinned local witness.
+            all_unknowns.append(UnknownEffect("SCRIPT_SOURCE_REVIEW_REQUIRED", dependency, 1))
+            continue
         dep_effects, dep_unknowns = analyze_dependency(dependency, content)
         if workflow_path == RUNTIME_PUBLISHER and dependency in RUNTIME_TOOLS:
             dep_effects = [RawEffect(item.sink, item.access, item.path, item.line,
@@ -2249,6 +2528,11 @@ def bind_declaration(
                  else "huggingface:space:SZLHOLDINGS/szl-seismic-review")
                 if item.sink in {"sdk.repository.create_commit", "sdk.huggingface.add_space_variable",
                                  "sdk.huggingface.restart_space"}
+                else item.resource) for item in dep_effects]
+        if workflow_path == THE_GRID_PUBLISHER and dependency in THE_GRID_TOOLS:
+            dep_effects = [RawEffect(item.sink, item.access, item.path, item.line,
+                "huggingface:space:SZLHOLDINGS/the-grid"
+                if item.sink in {"sdk.repository.create_commit", "sdk.huggingface.restart_space"}
                 else item.resource) for item in dep_effects]
         all_effects.extend(dep_effects)
         all_unknowns.extend(dep_unknowns)
