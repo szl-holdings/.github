@@ -1,0 +1,19 @@
+name: The-grid publisher exact-source witness
+
+on:
+  push:
+
+permissions:
+  contents: read
+
+jobs:
+  the-grid-publisher-exact-source-witness:
+    name: The-grid publisher exact-source witness
+    permissions:
+      contents: read
+    uses: ./.github/workflows/reusable-hf-deploy-the-grid.yml
+    with:
+      contract-only: true
+    secrets:
+      # The witness never enters hf-deploy and cannot reach the HF write token.
+      HF_TOKEN: ${{ github.token }}

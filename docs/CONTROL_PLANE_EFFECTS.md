@@ -106,6 +106,18 @@ receipt then lists the grant under `scoped_write_permissions`. Container and
 Dockerfile actions, such as `rhysd/actionlint`, stay unclassified because a
 commit SHA does not pin the image bytes they build and run.
 
+The FORGE-9 attestor has one additional path-scoped signing profile. It must
+remain a default-branch `workflow_run` controller with the exact 13-step job,
+read-only GitHub permissions except for `id-token: write`, the reviewed
+GitHub App-token and Cosign-installer action pins, the fixed App permission
+request, the literal `cosign sign-blob` command, and the run-scoped merge-BAP
+artifact namespace. The analyzer records App-token issuance, OIDC issuance,
+Fulcio certificate issuance, Rekor append, the local bundle, and artifact
+upload as distinct effects. A changed pin, command, permission, step set, or
+artifact namespace removes the scoped exemption and denies the workflow.
+The merge-queue controller may check out only the repository's trusted default
+branch and may upload only its run-scoped enqueue receipt namespace.
+
 Owner-reviewed unknowns remain available only for eligible bounded source
 constructs. Acceptance requires exact file digests and the complete observed
 unknown set; the receipt records whether that review was applied. This cannot
