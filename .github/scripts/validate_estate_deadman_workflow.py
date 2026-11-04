@@ -17,7 +17,7 @@ EXPECTED_PERMISSIONS = {
 SCALAR = re.compile(r"^  ([a-z][a-z0-9-]*): (read|write|none)$")
 CHECKOUT_ACTION = "actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1"
 EXPECTED_WORKFLOW_SHA256 = (
-    "1f518a525b257440a8b018d2a86453123e8e21c81273e03cb0c838358e3188dd"
+    "00de3bf8ba49e80000f90d922159d3bdb224df1286de5ce3161be8be2e66f7d6"
 )
 EXPECTED_STEP_NAMES = (
     "Harden runner",
@@ -361,12 +361,7 @@ def validate_workflow_source(source: str) -> dict[str, object]:
             "receipt_sha=\"$(sha256sum reports/estate-deadman.json | cut -d' ' -f1)\"",
             "expected_sha=\"$(tr -d '\\r\\n' < reports/estate-deadman.json.sha256)\"",
             'test "$receipt_sha" = "$expected_sha"',
-            "jq -e '.schema == \"szl.estate-deadman-receipt/v1\"' reports/estate-deadman.json >/dev/null",
-            "jq -e '.secret_values_recorded == false' reports/estate-deadman.json >/dev/null",
-            "jq -e '.authority.controller_tip_reverified == true' reports/estate-deadman.json >/dev/null",
-            "jq -e '.authority.workflow_mutation == false and .authority.deployment_mutation == false' reports/estate-deadman.json >/dev/null",
-            "jq -e '.incident.ok == true' reports/estate-deadman.json >/dev/null",
-            "jq -e '.confirmed_healthy == true' reports/estate-deadman.json >/dev/null",
+            "python .github/scripts/estate_deadman.py --gate-receipt reports/estate-deadman.json",
         ],
         "terminal health gate script is not exact",
     )

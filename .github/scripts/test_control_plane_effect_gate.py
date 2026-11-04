@@ -801,10 +801,10 @@ class YamlBoundaryRegressionTests(unittest.TestCase):
                 _parsed, corrected = bind_source(source, candidate=candidate)
                 self.assertEqual(corrected["verdict"], "ALLOW")
 
-    def bind_alignment_artifact(self, name: str, *, path: str = ".github/workflows/estate-one-fabric-alignment.yml", extra: str = "") -> dict:
+    def bind_alignment_artifact(self, name: str, *, path: str = ".github/workflows/estate-one-fabric-alignment.yml", extra: str = "", resource: str | None = None) -> dict:
         source = workflow(extra_step=f"      - uses: {UPLOAD_ACTION}\n        with: {{name: {json.dumps(name)}{extra}}}\n")
         parsed = gate.analyze_workflow_source(source.decode(), path=path)
-        resource = "github:actions:artifact:estate-alignment-local"
+        resource = resource or "github:actions:artifact:estate-alignment-local"
         if name.startswith("estate-alignment-live-"):
             resource = "github:actions:artifact:estate-alignment-live"
         candidate = policy_for(source, workflow_path=path,
@@ -818,6 +818,29 @@ class YamlBoundaryRegressionTests(unittest.TestCase):
         }
         normalized = gate.load_policy_bytes(policy_bytes(candidate), as_of=AS_OF)
         return gate.bind_declaration(path, source, parsed, normalized["workflow_declarations"][path], {})
+
+    def test_theatre_retry_artifact_is_exact_and_non_destructive(self) -> None:
+        path = ".github/workflows/finalize-hf-adaptive-theatre-v3.yml"
+        name = "hf-adaptive-theatre-v3-final-${{ github.run_id }}-${{ github.run_attempt }}"
+        resource = "github:actions:artifact:hf-adaptive-theatre-v3-final"
+        bound = self.bind_alignment_artifact(name, path=path, resource=resource)
+        self.assertEqual(bound["verdict"], "ALLOW")
+        uploads = [item for item in bound["effects"] if item["sink"] == "github.artifact.upload"]
+        self.assertEqual([item["resource"] for item in uploads], [resource])
+        self.assertEqual(bound["external_write_sites"], 1)
+        for changed_name, changed_path, extra in (
+            (name, WORKFLOW_PATH, ""),
+            (name, path.replace(".yml", ".yaml"), ""),
+            (name.replace("-final-", "-other-"), path, ""),
+            (name.replace("-${{ github.run_attempt }}", ""), path, ""),
+            (name.replace("github.run_attempt", "inputs.destination"), path, ""),
+            (name, path, ", overwrite: true"),
+            (name, path, ", archive: false"),
+        ):
+            with self.subTest(name=changed_name, path=changed_path, extra=extra):
+                denied = self.bind_alignment_artifact(changed_name, path=changed_path,
+                                                     resource=resource, extra=extra)
+                self.assertEqual(denied["verdict"], "DENY")
 
     def test_alignment_attempt_artifacts_bind_two_exact_namespaces(self) -> None:
         for name in ("estate-alignment-local", "estate-alignment-live"):
@@ -1487,13 +1510,128 @@ class SarifUploadScopeTests(unittest.TestCase):
             extra_step="      - uses: rhysd/actionlint@914e7df21a07ef503a81201c76d2b11c789d3fca\n"
         )
         self.assertNotIn(
-            "rhysd/actionlint@914e7df21a07ef503a81201c76d2b11c789d3fca", gate.KNOWN_ACTION_EFFECTS
+            "rhysd/actionlint@914e7df21a07ef503a81201c76d2b11c789d3fca",
+            gate.KNOWN_ACTION_EFFECTS,
         )
         parsed, bound = bind_source(source, candidate=reviewed_policy_for(source))
-        self.assertIn("UNCLASSIFIED_EXTERNAL_ACTION", {item.code for item in parsed["unknowns"]})
+        self.assertIn(
+            "UNCLASSIFIED_EXTERNAL_ACTION", {item.code for item in parsed["unknowns"]}
+        )
         self.assertEqual(bound["verdict"], "DENY")
         self.assertIn("UNREVIEWABLE_EFFECT_BOUNDARY", bound["reason_codes"])
 
+
+class Forge9ControllerScopeTests(unittest.TestCase):
+    """FORGE-9 authority is admitted only for the exact default-branch shapes."""
+
+    @staticmethod
+    def source(name: str) -> str:
+        return (CHECKER_PATH.parents[1] / "workflows" / name).read_text(
+            encoding="utf-8"
+        )
+
+    def test_exact_attestor_scopes_oidc_and_classifies_signing_effects(self) -> None:
+        source = self.source("attest-and-approve.yml")
+        document, _lines = gate.parse_workflow_yaml(source)
+        self.assertTrue(gate.forge9_attestor_profile(document))
+        parsed = gate.analyze_workflow_source(source, path=gate.FORGE9_ATTESTOR)
+        self.assertEqual(parsed["scoped_write_permissions"], ["id-token:write"])
+        self.assertFalse(
+            {item.code for item in parsed["unknowns"]}
+            & gate.NON_REVIEWABLE_UNKNOWN_CODES
+        )
+        signatures = {
+            (effect.sink, effect.resource, effect.access)
+            for effect in parsed["effects"]
+        }
+        self.assertTrue(
+            {
+                (
+                    "github.app.installation_token.issue",
+                    "github:app:qillqaq:installation-token",
+                    "external-write",
+                ),
+                (
+                    "github.oidc.issue",
+                    "github:repository:szl-holdings/.github:oidc:forge9-merge-bap",
+                    "external-write",
+                ),
+                (
+                    "sigstore.certificate.issue",
+                    "sigstore:public:fulcio:szl-holdings/.github:forge9-merge-bap",
+                    "external-write",
+                ),
+                (
+                    "sigstore.transparency.append",
+                    "sigstore:public:rekor:szl-holdings/.github:forge9-merge-bap",
+                    "external-write",
+                ),
+                (
+                    "github.artifact.upload",
+                    "github:actions:artifact:forge9-merge-receipt",
+                    "external-write",
+                ),
+            }.issubset(signatures)
+        )
+
+    def test_attestor_authority_variants_fail_closed(self) -> None:
+        source = self.source("attest-and-approve.yml")
+        cases = (
+            ("contents grant", "      contents: read\n", "      contents: write\n"),
+            ("app action pin", gate.FORGE9_APP_TOKEN_ACTION, "actions/create-github-app-token@" + "0" * 40),
+            ("cosign action pin", gate.FORGE9_COSIGN_INSTALLER_ACTION, "sigstore/cosign-installer@" + "1" * 40),
+            ("sign command", "cosign sign-blob --yes", "cosign sign-blob"),
+            ("artifact namespace", gate.FORGE9_ATTEST_ARTIFACT, "merge-receipt-latest"),
+        )
+        for label, old, new in cases:
+            with self.subTest(case=label):
+                self.assertIn(old, source)
+                candidate = source.replace(old, new, 1)
+                document, _lines = gate.parse_workflow_yaml(candidate)
+                self.assertFalse(gate.forge9_attestor_profile(document))
+                parsed = gate.analyze_workflow_source(
+                    candidate, path=gate.FORGE9_ATTESTOR
+                )
+                self.assertNotIn("scoped_write_permissions", parsed)
+
+    def test_attestor_profile_is_path_scoped(self) -> None:
+        parsed = gate.analyze_workflow_source(
+            self.source("attest-and-approve.yml"), path=WORKFLOW_PATH
+        )
+        self.assertNotIn("scoped_write_permissions", parsed)
+        self.assertIn(
+            "UNCLASSIFIED_EXTERNAL_ACTION", {item.code for item in parsed["unknowns"]}
+        )
+
+    def test_exact_queue_controller_has_bounded_checkout_and_receipt(self) -> None:
+        source = self.source("merge-queue-enqueue.yml")
+        parsed = gate.analyze_workflow_source(
+            source, path=gate.FORGE9_QUEUE_CONTROLLER
+        )
+        self.assertFalse(
+            {item.code for item in parsed["unknowns"]}
+            & gate.NON_REVIEWABLE_UNKNOWN_CODES
+        )
+        signatures = {
+            (effect.sink, effect.resource, effect.access)
+            for effect in parsed["effects"]
+        }
+        self.assertIn(
+            (
+                "github.contents.checkout",
+                "github:repository:szl-holdings/.github:contents",
+                "read",
+            ),
+            signatures,
+        )
+        self.assertIn(
+            (
+                "github.artifact.upload",
+                "github:actions:artifact:forge9-queue-receipt",
+                "external-write",
+            ),
+            signatures,
+        )
 
 class GitReceiptTests(unittest.TestCase):
     def test_no_effect_change_is_deterministic_and_has_object_provenance(self) -> None:
@@ -2072,6 +2210,90 @@ class CanonicalSeismicPublisherTests(unittest.TestCase):
                 self.assertIn("UNREVIEWABLE_EFFECT_BOUNDARY", result["reason_codes"])
         validator = self.root.joinpath(gate.SEISMIC_VALIDATOR).read_text("utf-8").encode("utf-8")
         result = self.bound(gate.SEISMIC_PUBLISHER, self.source,
+                            validator=validator + b"\n# unreviewed change\n")
+        self.assertEqual(result["verdict"], "DENY")
+        self.assertIn("CANONICAL_RUNTIME_VALIDATOR_MISMATCH",
+                      {item["code"] for item in result["unknowns"]})
+
+
+class CanonicalTheGridPublisherTests(unittest.TestCase):
+    """The-grid publisher has a separate exact-byte effect boundary."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.root = Path(__file__).resolve().parents[2]
+        cls.source = cls.root.joinpath(gate.THE_GRID_PUBLISHER).read_text("utf-8")
+        cls.witness = cls.root.joinpath(gate.THE_GRID_WITNESS).read_text("utf-8")
+        cls.policy = json.loads(cls.root.joinpath(POLICY_PATH).read_text("utf-8"))
+
+    def bound(self, path: str, source: str, *, validator: bytes | None = None):
+        analysis = gate.analyze_workflow_source(source, path=path)
+        dependencies = {
+            dep: self.root.joinpath(dep).read_text("utf-8").encode("utf-8")
+            for dep in analysis["dependencies"]
+            if self.root.joinpath(dep).is_file()
+        }
+        if validator is not None:
+            dependencies[gate.THE_GRID_VALIDATOR] = validator
+        declaration = self.policy["workflow_declarations"][path]
+        return gate.bind_declaration(path, source.encode("utf-8"), analysis,
+                                     declaration, dependencies)
+
+    def test_exact_the_grid_publisher_and_read_only_witness_are_admitted(self):
+        publisher, _ = gate.parse_workflow_yaml(self.source)
+        witness, _ = gate.parse_workflow_yaml(self.witness)
+        self.assertTrue(gate.the_grid_publisher_profile(self.source, publisher))
+        self.assertTrue(gate.the_grid_contract_call(self.witness, witness))
+        for path, source, expected_writes in (
+            (gate.THE_GRID_PUBLISHER, self.source, 5),
+            (gate.THE_GRID_WITNESS, self.witness, 0),
+        ):
+            with self.subTest(path=path):
+                result = self.bound(path, source)
+                self.assertEqual(result["verdict"], "ALLOW", result["reason_codes"])
+                self.assertEqual(result["external_write_sites"], expected_writes)
+                self.assertTrue(result["reviewed_unknowns_applied"])
+
+    def test_target_checkout_lock_tool_revision_branch_guard_and_source_drift_deny(self):
+        changes = (
+            ("repository: szl-holdings/The-grid", "repository: szl-holdings/other"),
+            ("--hf-repo SZLHOLDINGS/the-grid", "--hf-repo SZLHOLDINGS/other"),
+            ("group: hf-deploy-SZLHOLDINGS/the-grid",
+             "group: hf-deploy-SZLHOLDINGS/other"),
+            ("ref: ${{ job.workflow_sha }}", "ref: main"),
+            ("if: ${{ inputs.contract-only == false }}", "if: ${{ always() }}"),
+            ("--manifest-out hf-deploy-manifest.json",
+             "--prune --manifest-out hf-deploy-manifest.json"),
+            ("# readback share one Space writer lock.",
+             "# Changed without an effect-policy review."),
+        )
+        for original, replacement in changes:
+            with self.subTest(change=original):
+                self.assertIn(original, self.source)
+                changed = self.source.replace(original, replacement, 1)
+                analysis = gate.analyze_workflow_source(changed, path=gate.THE_GRID_PUBLISHER)
+                self.assertIn("CANONICAL_RUNTIME_INTERFACE_UNSUPPORTED",
+                              {item.code for item in analysis["unknowns"]})
+                result = self.bound(gate.THE_GRID_PUBLISHER, changed)
+                self.assertEqual(result["verdict"], "DENY")
+                self.assertIn("WORKFLOW_DIGEST_MISMATCH", result["reason_codes"])
+                self.assertIn("UNREVIEWABLE_EFFECT_BOUNDARY", result["reason_codes"])
+
+    def test_witness_and_validator_cannot_change_under_existing_declaration(self):
+        for original, replacement in (
+            ("contract-only: true", "contract-only: false"),
+            ("uses: ./.github/workflows/reusable-hf-deploy-the-grid.yml",
+             "uses: ./.github/workflows/reusable-hf-deploy.yml"),
+            ("HF_TOKEN: ${{ github.token }}", "HF_TOKEN: ${{ secrets.HF_TOKEN }}"),
+        ):
+            with self.subTest(change=original):
+                changed = self.witness.replace(original, replacement, 1)
+                result = self.bound(gate.THE_GRID_WITNESS, changed)
+                self.assertEqual(result["verdict"], "DENY")
+                self.assertIn("WORKFLOW_DIGEST_MISMATCH", result["reason_codes"])
+                self.assertIn("UNREVIEWABLE_EFFECT_BOUNDARY", result["reason_codes"])
+        validator = self.root.joinpath(gate.THE_GRID_VALIDATOR).read_text("utf-8").encode("utf-8")
+        result = self.bound(gate.THE_GRID_PUBLISHER, self.source,
                             validator=validator + b"\n# unreviewed change\n")
         self.assertEqual(result["verdict"], "DENY")
         self.assertIn("CANONICAL_RUNTIME_VALIDATOR_MISMATCH",

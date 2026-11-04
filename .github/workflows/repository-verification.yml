@@ -1,0 +1,65 @@
+name: Repository verification
+
+on:
+  push:
+    branches:
+    - main
+    paths:
+    - .github/scripts/**
+    - .github/tests/**
+    - .github/workflows/**
+    - tests/**
+    - config/repository-verification.json
+    - requirements/**
+    - coordination/anatomy_alive/requirements.txt
+    - hf-card/requirements.txt
+    - .python-version
+    - Makefile
+  pull_request:
+    branches:
+    - main
+    paths:
+    - .github/scripts/**
+    - .github/tests/**
+    - .github/workflows/**
+    - tests/**
+    - config/repository-verification.json
+    - requirements/**
+    - coordination/anatomy_alive/requirements.txt
+    - hf-card/requirements.txt
+    - .python-version
+    - Makefile
+  workflow_dispatch: null
+  merge_group:
+    types:
+    - checks_requested
+    branches:
+    - main
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    name: Verify repository contract
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12.14"
+
+      - name: Verify repository contract
+        run: python3 -I -P .github/scripts/verify_repository_contract.py
+
+      - name: Exercise contract negative controls
+        run: python3 -I -P .github/scripts/test_verify_repository_contract.py
+
+      - name: Exercise previously unwired suites
+        run: |
+          python3 -I -P tests/test_frontier_payload_convergence.py
+          python3 -I -P tests/test_hf_org_card_touch_targets.py
+          python3 -I -P tests/test_inventory_scope_declaration.py
+          python3 -I -P tests/test_responsive_estate_v3.py
