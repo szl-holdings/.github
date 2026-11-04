@@ -256,6 +256,9 @@ jobs:
       - name: Seismic publisher invocation contract self-test
         run: python3 -I -P .github/scripts/test_hf_seismic_publish_contract.py
 
+      - name: The-grid publisher invocation contract self-test
+        run: python3 -I -P .github/scripts/test_hf_the_grid_publish_contract.py
+
       # Pins the one-Space lifecycle controller to the authenticated 46-Space
       # inventory and its public-only compare-and-set boundary. The tests are
       # network-free and prove that archive/private/runtime/upload/secret paths

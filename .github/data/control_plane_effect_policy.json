@@ -585,8 +585,8 @@
         "readback": true
       },
       "trusted_transitives": {
-        ".github/scripts/control_plane_effect_gate.py": "sha256:7b197574dfe6f304888224aed98b02778c0d4036f262f91e2c22a4347a0dc458",
-        ".github/scripts/test_control_plane_effect_gate.py": "sha256:02dcbbf81e0d70b9bf97ee05db1cbc6b212e306f42ad9cec49673d1567fc9565"
+        ".github/scripts/control_plane_effect_gate.py": "sha256:a73f8d4da886b6d2d4f9e2f7c8d3edfd1e978a8fb4e8d83e72f9257de9877bea",
+        ".github/scripts/test_control_plane_effect_gate.py": "sha256:52aaabc7832a2655e9f1134db9a9ab3c6d9a82a1a75ed17b41ae3fde8334883d"
       },
       "reviewed_unknowns": {
         "files": {
@@ -1216,8 +1216,8 @@
         "readback": false
       },
       "trusted_transitives": {
-        ".github/scripts/control_plane_effect_gate.py": "sha256:7b197574dfe6f304888224aed98b02778c0d4036f262f91e2c22a4347a0dc458",
-        ".github/scripts/test_control_plane_effect_gate.py": "sha256:02dcbbf81e0d70b9bf97ee05db1cbc6b212e306f42ad9cec49673d1567fc9565"
+        ".github/scripts/control_plane_effect_gate.py": "sha256:a73f8d4da886b6d2d4f9e2f7c8d3edfd1e978a8fb4e8d83e72f9257de9877bea",
+        ".github/scripts/test_control_plane_effect_gate.py": "sha256:52aaabc7832a2655e9f1134db9a9ab3c6d9a82a1a75ed17b41ae3fde8334883d"
       },
       "reviewed_unknowns": {
         "files": {
@@ -2652,7 +2652,7 @@
     ".github/workflows/tests.yml": {
       "intent_id": "repository-credentialless-tests-v1",
       "valid_until": "2026-11-30",
-      "source_sha256": "sha256:fe50469d4a80cf4d8b3e01707eb5950dfde31474c430023e14113feb7158b260",
+      "source_sha256": "sha256:97e52d7c6d660f81ebd38d5f9d2d013c564472e3ca019fd828110b6455e2b9be",
       "credentials": [],
       "resources": [
         {
@@ -2719,6 +2719,7 @@
       "trusted_transitives": {},
       "reviewed_unknowns": {
         "files": {
+          ".github/policies/hf-collection-navigation.v1.json": "sha256:24306b3620a85e2a4486b511fa7f198798561e9b08b3f704e72f1c8568da5f85",
           ".github/scripts/hf_collection_navigation_check.py": "sha256:11debeda2a40faad3089810119ce879379a50e9a1f33c7ad4cdc72c2bc2788fb",
           ".github/scripts/hf_deploy_from_dockerfile.py": "sha256:373add34da38a219e5dafce52e7a86a417c019ac13b139678fc72c93c1ad1318",
           ".github/scripts/hf_space_source_binding.py": "sha256:9888d4c126ead29d0960de3198a99f1d686956c8104f0cf6c5c0d4c113b2a37b",
@@ -2745,6 +2746,7 @@
           ".github/scripts/test_hf_source_bound_baseline.py": "sha256:ba444e68085a860dda654936089d2dac2f774991f8aa444f85788677f8828ec7",
           ".github/scripts/test_hf_space_lifecycle_reconcile.py": "sha256:ba82032048bf4d2a07b72a8afec6f092b793003456000da61e8bfe29793a9c14",
           ".github/scripts/test_hf_space_source_binding.py": "sha256:fc5d12413102c47b6fc276f9ebcfbd8e687c64ba41936e9a4a0929f21a038948",
+          ".github/scripts/test_hf_the_grid_publish_contract.py": "sha256:28092caf71996560cd3dacb557f4f36e165d287448cff3ec9aaafd64a8be67f8",
           ".github/scripts/test_lean_numbers.py": "sha256:19a392035dae5fd3824b52bfb96318d0b8bea9762ee1e14a68fdf92eeabd213e",
           ".github/scripts/test_license_consistency.py": "sha256:a32c4f929a9004a69454b5be1c84e26fd76552ffaa5aa3cc8ad229a911e6b767",
           ".github/scripts/test_lockfile_registry_check.py": "sha256:856e95621872cd27f3237520c10276934e0dcbb46100fe34bd719b0447a5f1c4",
@@ -2757,7 +2759,7 @@
           ".github/scripts/test_reusable_workflow_target_check.py": "sha256:d145f78f6bb4ae0b76a9f35210882e0ff96d511ece8630d39f5d99f775f9ed54",
           ".github/scripts/test_solo_builder_provenance.py": "sha256:32abce0cee25db6fbf2d2e9d313054b73ecbbfc4eaa469462c11e1cdd6a69f14",
           ".github/scripts/test_szl_codename_gate.py": "sha256:bcfcbbf52dd4cfe7761372fa4acd08b98aec327cb4f7f7dc2c1bc86029fd5b0f",
-          ".github/workflows/tests.yml": "sha256:fe50469d4a80cf4d8b3e01707eb5950dfde31474c430023e14113feb7158b260"
+          ".github/workflows/tests.yml": "sha256:97e52d7c6d660f81ebd38d5f9d2d013c564472e3ca019fd828110b6455e2b9be"
         },
         "unknowns": [
           "ACTION_INPUTS_REVIEW_REQUIRED@.github/workflows/tests.yml:29",
@@ -2945,6 +2947,8 @@
           "PYTHON_IMPORT_UNRESOLVED@.github/scripts/test_hf_space_source_binding.py:2",
           "PYTHON_IMPORT_UNRESOLVED@.github/scripts/test_hf_space_source_binding.py:4",
           "PYTHON_IMPORT_UNRESOLVED@.github/scripts/test_hf_space_source_binding.py:9",
+          "PYTHON_IMPORT_UNRESOLVED@.github/scripts/test_hf_the_grid_publish_contract.py:3",
+          "PYTHON_IMPORT_UNRESOLVED@.github/scripts/test_hf_the_grid_publish_contract.py:5",
           "PYTHON_IMPORT_UNRESOLVED@.github/scripts/test_lean_numbers.py:17",
           "PYTHON_IMPORT_UNRESOLVED@.github/scripts/test_lean_numbers.py:19",
           "PYTHON_IMPORT_UNRESOLVED@.github/scripts/test_lean_numbers.py:20",
@@ -3012,6 +3016,7 @@
           "PYTHON_SOURCE_REVIEW_REQUIRED@.github/scripts/test_hf_source_bound_baseline.py:1",
           "PYTHON_SOURCE_REVIEW_REQUIRED@.github/scripts/test_hf_space_lifecycle_reconcile.py:1",
           "PYTHON_SOURCE_REVIEW_REQUIRED@.github/scripts/test_hf_space_source_binding.py:1",
+          "PYTHON_SOURCE_REVIEW_REQUIRED@.github/scripts/test_hf_the_grid_publish_contract.py:1",
           "PYTHON_SOURCE_REVIEW_REQUIRED@.github/scripts/test_lean_numbers.py:1",
           "PYTHON_SOURCE_REVIEW_REQUIRED@.github/scripts/test_license_consistency.py:1",
           "PYTHON_SOURCE_REVIEW_REQUIRED@.github/scripts/test_lockfile_registry_check.py:1",
@@ -3052,10 +3057,8 @@
           "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/tests.yml:251",
           "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/tests.yml:254",
           "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/tests.yml:257",
-          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/tests.yml:264",
-          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/tests.yml:270",
-          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/tests.yml:271",
-          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/tests.yml:272",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/tests.yml:260",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/tests.yml:267",
           "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/tests.yml:273",
           "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/tests.yml:274",
           "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/tests.yml:275",
@@ -3075,11 +3078,14 @@
           "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/tests.yml:289",
           "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/tests.yml:290",
           "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/tests.yml:291",
-          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/tests.yml:299",
-          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/tests.yml:306",
-          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/tests.yml:310",
-          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/tests.yml:319",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/tests.yml:292",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/tests.yml:293",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/tests.yml:294",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/tests.yml:302",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/tests.yml:309",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/tests.yml:313",
           "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/tests.yml:32",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/tests.yml:322",
           "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/tests.yml:34",
           "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/tests.yml:36",
           "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/tests.yml:38",
@@ -3091,21 +3097,21 @@
           "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/tests.yml:74",
           "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/tests.yml:84",
           "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/tests.yml:92",
-          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/tests.yml:270",
-          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/tests.yml:271",
-          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/tests.yml:275",
-          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/tests.yml:276",
-          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/tests.yml:277",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/tests.yml:273",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/tests.yml:274",
           "SHELL_COMPOSITION_UNKNOWN@.github/workflows/tests.yml:278",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/tests.yml:279",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/tests.yml:280",
           "SHELL_COMPOSITION_UNKNOWN@.github/workflows/tests.yml:281",
-          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/tests.yml:282",
           "SHELL_COMPOSITION_UNKNOWN@.github/workflows/tests.yml:284",
           "SHELL_COMPOSITION_UNKNOWN@.github/workflows/tests.yml:285",
-          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/tests.yml:286",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/tests.yml:287",
           "SHELL_COMPOSITION_UNKNOWN@.github/workflows/tests.yml:288",
           "SHELL_COMPOSITION_UNKNOWN@.github/workflows/tests.yml:289",
-          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/tests.yml:290",
-          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/tests.yml:291"
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/tests.yml:291",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/tests.yml:292",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/tests.yml:293",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/tests.yml:294"
         ]
       }
     },
@@ -9725,6 +9731,379 @@
           "SHELL_COMPOSITION_UNKNOWN@.github/workflows/merge-queue-enqueue.yml:98",
           "WORKFLOW_ENVIRONMENT_REVIEW_REQUIRED@.github/workflows/merge-queue-enqueue.yml:32",
           "WORKFLOW_ENVIRONMENT_REVIEW_REQUIRED@.github/workflows/merge-queue-enqueue.yml:63"
+        ]
+      }
+    },
+    ".github/workflows/reusable-hf-deploy-the-grid-source-witness.yml": {
+      "intent_id": "readonly-the-grid-publisher-source-witness-v1",
+      "valid_until": "2026-11-30",
+      "source_sha256": "sha256:2f7b009fe23b613331e16bb90eed7ca1e3e8507b604c2ba0a61b3159d0cf16d0",
+      "credentials": [
+        "GITHUB_TOKEN"
+      ],
+      "resources": [
+        {
+          "key": "github:repository:szl-holdings/.github:contents",
+          "access": "read"
+        }
+      ],
+      "effects": [
+        {
+          "sink": "github.contents.checkout",
+          "resource": "github:repository:szl-holdings/.github:contents",
+          "access": "read",
+          "max_calls": 2
+        }
+      ],
+      "max_external_writes": 0,
+      "required_controls": {
+        "triggers": [
+          "push"
+        ],
+        "contents_read": true,
+        "no_explicit_secrets": false,
+        "concurrency": false,
+        "protected_ref": false,
+        "exact_sha": false,
+        "expected_before": false,
+        "readback": false
+      },
+      "trusted_transitives": {},
+      "reviewed_unknowns": {
+        "files": {
+          ".github/scripts/hf_the_grid_publish_contract.py": "sha256:2c11646478044367d148de01f082ad10825671671c48bfb7f581fdc90c3a7056",
+          ".github/workflows/reusable-hf-deploy-the-grid-source-witness.yml": "sha256:2f7b009fe23b613331e16bb90eed7ca1e3e8507b604c2ba0a61b3159d0cf16d0",
+          ".github/workflows/reusable-hf-deploy-the-grid.yml": "sha256:5efedd22489d63367b063e7fd393dac171e180719b83510d727ffb769bbf5dfd"
+        },
+        "unknowns": [
+          "PYTHON_IMPORT_UNRESOLVED@.github/scripts/hf_the_grid_publish_contract.py:4",
+          "PYTHON_SOURCE_REVIEW_REQUIRED@.github/scripts/hf_the_grid_publish_contract.py:1",
+          "SCRIPT_SOURCE_REVIEW_REQUIRED@.github/workflows/reusable-hf-deploy-the-grid.yml:1",
+          "SECRET_EXPRESSION_REVIEW_REQUIRED@.github/workflows/reusable-hf-deploy-the-grid-source-witness.yml:1"
+        ]
+      }
+    },
+    ".github/workflows/reusable-hf-deploy-the-grid.yml": {
+      "intent_id": "canonical-the-grid-ubuntu24-publisher-v1",
+      "valid_until": "2026-11-30",
+      "source_sha256": "sha256:5efedd22489d63367b063e7fd393dac171e180719b83510d727ffb769bbf5dfd",
+      "credentials": [
+        "GITHUB_TOKEN",
+        "HF_TOKEN"
+      ],
+      "resources": [
+        {
+          "key": "github:repository:szl-holdings/.github:contents",
+          "access": "read"
+        },
+        {
+          "key": "github:repository:szl-holdings/The-grid:artifact:hf-deploy-evidence",
+          "access": "external-write"
+        },
+        {
+          "key": "github:repository:szl-holdings/The-grid:contents",
+          "access": "read"
+        },
+        {
+          "key": "huggingface:space:SZLHOLDINGS/the-grid",
+          "access": "external-write"
+        },
+        {
+          "key": "runner:guard:egress",
+          "access": "local-write"
+        },
+        {
+          "key": "runner:toolchain:python",
+          "access": "local-write"
+        },
+        {
+          "key": "stepsecurity:monitor:szl-holdings/The-grid",
+          "access": "external-write"
+        }
+      ],
+      "effects": [
+        {
+          "sink": "github.artifact.upload",
+          "resource": "github:repository:szl-holdings/The-grid:artifact:hf-deploy-evidence",
+          "access": "external-write",
+          "max_calls": 1
+        },
+        {
+          "sink": "github.contents.checkout",
+          "resource": "github:repository:szl-holdings/.github:contents",
+          "access": "read",
+          "max_calls": 3
+        },
+        {
+          "sink": "github.contents.checkout",
+          "resource": "github:repository:szl-holdings/The-grid:contents",
+          "access": "read",
+          "max_calls": 1
+        },
+        {
+          "sink": "runner.guard.configure",
+          "resource": "runner:guard:egress",
+          "access": "local-write",
+          "max_calls": 1
+        },
+        {
+          "sink": "runner.guard.telemetry",
+          "resource": "stepsecurity:monitor:szl-holdings/The-grid",
+          "access": "external-write",
+          "max_calls": 1
+        },
+        {
+          "sink": "runner.toolchain.install",
+          "resource": "runner:toolchain:python",
+          "access": "local-write",
+          "max_calls": 1
+        },
+        {
+          "sink": "sdk.huggingface.restart_space",
+          "resource": "huggingface:space:SZLHOLDINGS/the-grid",
+          "access": "external-write",
+          "max_calls": 2
+        },
+        {
+          "sink": "sdk.repository.create_commit",
+          "resource": "huggingface:space:SZLHOLDINGS/the-grid",
+          "access": "external-write",
+          "max_calls": 1
+        }
+      ],
+      "max_external_writes": 5,
+      "required_controls": {
+        "triggers": [
+          "workflow_call"
+        ],
+        "contents_read": true,
+        "no_explicit_secrets": false,
+        "concurrency": true,
+        "protected_ref": false,
+        "exact_sha": false,
+        "expected_before": false,
+        "readback": false
+      },
+      "trusted_transitives": {},
+      "reviewed_unknowns": {
+        "files": {
+          ".github/scripts/hf_deploy_from_dockerfile.py": "sha256:373add34da38a219e5dafce52e7a86a417c019ac13b139678fc72c93c1ad1318",
+          ".github/scripts/hf_the_grid_publish_contract.py": "sha256:2c11646478044367d148de01f082ad10825671671c48bfb7f581fdc90c3a7056",
+          ".github/workflows/reusable-hf-deploy-the-grid.yml": "sha256:5efedd22489d63367b063e7fd393dac171e180719b83510d727ffb769bbf5dfd",
+          "requirements/hf-publisher.lock": "sha256:463b543da8418dd37f458f9893cf1d5f8cb21d04b249121b3b5155b6729b42e0"
+        },
+        "unknowns": [
+          "ACTION_INPUTS_REVIEW_REQUIRED@.github/workflows/reusable-hf-deploy-the-grid.yml:133",
+          "ACTION_INPUTS_REVIEW_REQUIRED@.github/workflows/reusable-hf-deploy-the-grid.yml:138",
+          "ACTION_INPUTS_REVIEW_REQUIRED@.github/workflows/reusable-hf-deploy-the-grid.yml:147",
+          "ACTION_INPUTS_REVIEW_REQUIRED@.github/workflows/reusable-hf-deploy-the-grid.yml:180",
+          "ACTION_INPUTS_REVIEW_REQUIRED@.github/workflows/reusable-hf-deploy-the-grid.yml:264",
+          "ACTION_INPUTS_REVIEW_REQUIRED@.github/workflows/reusable-hf-deploy-the-grid.yml:281",
+          "ACTION_INPUTS_REVIEW_REQUIRED@.github/workflows/reusable-hf-deploy-the-grid.yml:85",
+          "DYNAMIC_EXECUTION@.github/workflows/reusable-hf-deploy-the-grid.yml:213",
+          "DYNAMIC_EXECUTION@.github/workflows/reusable-hf-deploy-the-grid.yml:241",
+          "DYNAMIC_EXECUTION@.github/workflows/reusable-hf-deploy-the-grid.yml:305",
+          "HTTP_TARGET_UNRESOLVED@.github/scripts/hf_deploy_from_dockerfile.py:1497",
+          "HTTP_TARGET_UNRESOLVED@.github/scripts/hf_deploy_from_dockerfile.py:732",
+          "PYTHON_DYNAMIC_EXECUTION@.github/scripts/hf_deploy_from_dockerfile.py:1175",
+          "PYTHON_DYNAMIC_EXECUTION@.github/scripts/hf_deploy_from_dockerfile.py:1177",
+          "PYTHON_DYNAMIC_EXECUTION@.github/scripts/hf_deploy_from_dockerfile.py:1179",
+          "PYTHON_DYNAMIC_EXECUTION@.github/scripts/hf_deploy_from_dockerfile.py:1192",
+          "PYTHON_DYNAMIC_EXECUTION@.github/scripts/hf_deploy_from_dockerfile.py:1211",
+          "PYTHON_DYNAMIC_EXECUTION@.github/scripts/hf_deploy_from_dockerfile.py:1216",
+          "PYTHON_DYNAMIC_EXECUTION@.github/scripts/hf_deploy_from_dockerfile.py:1236",
+          "PYTHON_DYNAMIC_EXECUTION@.github/scripts/hf_deploy_from_dockerfile.py:1426",
+          "PYTHON_DYNAMIC_EXECUTION@.github/scripts/hf_deploy_from_dockerfile.py:1427",
+          "PYTHON_DYNAMIC_EXECUTION@.github/scripts/hf_deploy_from_dockerfile.py:1429",
+          "PYTHON_DYNAMIC_EXECUTION@.github/scripts/hf_deploy_from_dockerfile.py:1431",
+          "PYTHON_DYNAMIC_EXECUTION@.github/scripts/hf_deploy_from_dockerfile.py:1440",
+          "PYTHON_DYNAMIC_EXECUTION@.github/scripts/hf_deploy_from_dockerfile.py:1441",
+          "PYTHON_DYNAMIC_EXECUTION@.github/scripts/hf_deploy_from_dockerfile.py:1552",
+          "PYTHON_DYNAMIC_EXECUTION@.github/scripts/hf_deploy_from_dockerfile.py:1563",
+          "PYTHON_DYNAMIC_EXECUTION@.github/scripts/hf_deploy_from_dockerfile.py:1565",
+          "PYTHON_DYNAMIC_EXECUTION@.github/scripts/hf_deploy_from_dockerfile.py:1666",
+          "PYTHON_DYNAMIC_EXECUTION@.github/scripts/hf_deploy_from_dockerfile.py:1746",
+          "PYTHON_DYNAMIC_EXECUTION@.github/scripts/hf_deploy_from_dockerfile.py:1752",
+          "PYTHON_DYNAMIC_EXECUTION@.github/scripts/hf_deploy_from_dockerfile.py:1879",
+          "PYTHON_DYNAMIC_EXECUTION@.github/scripts/hf_deploy_from_dockerfile.py:627",
+          "PYTHON_DYNAMIC_EXECUTION@.github/scripts/hf_deploy_from_dockerfile.py:801",
+          "PYTHON_DYNAMIC_EXECUTION@.github/scripts/hf_deploy_from_dockerfile.py:953",
+          "PYTHON_DYNAMIC_EXECUTION@.github/scripts/hf_deploy_from_dockerfile.py:965",
+          "PYTHON_DYNAMIC_EXECUTION@.github/scripts/hf_deploy_from_dockerfile.py:966",
+          "PYTHON_DYNAMIC_EXECUTION@.github/scripts/hf_deploy_from_dockerfile.py:979",
+          "PYTHON_DYNAMIC_EXECUTION@.github/scripts/hf_deploy_from_dockerfile.py:989",
+          "PYTHON_DYNAMIC_EXECUTION@.github/scripts/hf_deploy_from_dockerfile.py:995",
+          "PYTHON_DYNAMIC_EXECUTION@.github/scripts/hf_deploy_from_dockerfile.py:996",
+          "PYTHON_IMPORT_UNRESOLVED@.github/scripts/hf_deploy_from_dockerfile.py:1820",
+          "PYTHON_IMPORT_UNRESOLVED@.github/scripts/hf_deploy_from_dockerfile.py:43",
+          "PYTHON_IMPORT_UNRESOLVED@.github/scripts/hf_deploy_from_dockerfile.py:45",
+          "PYTHON_IMPORT_UNRESOLVED@.github/scripts/hf_deploy_from_dockerfile.py:46",
+          "PYTHON_IMPORT_UNRESOLVED@.github/scripts/hf_deploy_from_dockerfile.py:48",
+          "PYTHON_IMPORT_UNRESOLVED@.github/scripts/hf_deploy_from_dockerfile.py:49",
+          "PYTHON_IMPORT_UNRESOLVED@.github/scripts/hf_deploy_from_dockerfile.py:51",
+          "PYTHON_IMPORT_UNRESOLVED@.github/scripts/hf_deploy_from_dockerfile.py:52",
+          "PYTHON_IMPORT_UNRESOLVED@.github/scripts/hf_deploy_from_dockerfile.py:53",
+          "PYTHON_IMPORT_UNRESOLVED@.github/scripts/hf_deploy_from_dockerfile.py:54",
+          "PYTHON_IMPORT_UNRESOLVED@.github/scripts/hf_deploy_from_dockerfile.py:56",
+          "PYTHON_IMPORT_UNRESOLVED@.github/scripts/hf_deploy_from_dockerfile.py:57",
+          "PYTHON_IMPORT_UNRESOLVED@.github/scripts/hf_deploy_from_dockerfile.py:61",
+          "PYTHON_IMPORT_UNRESOLVED@.github/scripts/hf_deploy_from_dockerfile.py:62",
+          "PYTHON_IMPORT_UNRESOLVED@.github/scripts/hf_deploy_from_dockerfile.py:63",
+          "PYTHON_IMPORT_UNRESOLVED@.github/scripts/hf_deploy_from_dockerfile.py:64",
+          "PYTHON_IMPORT_UNRESOLVED@.github/scripts/hf_deploy_from_dockerfile.py:798",
+          "PYTHON_IMPORT_UNRESOLVED@.github/scripts/hf_the_grid_publish_contract.py:4",
+          "PYTHON_SOURCE_REVIEW_REQUIRED@.github/scripts/hf_deploy_from_dockerfile.py:1",
+          "PYTHON_SOURCE_REVIEW_REQUIRED@.github/scripts/hf_the_grid_publish_contract.py:1",
+          "SCRIPT_SOURCE_REVIEW_REQUIRED@requirements/hf-publisher.lock:1",
+          "SDK_TARGET_UNRESOLVED@.github/scripts/hf_deploy_from_dockerfile.py:1654",
+          "SDK_TARGET_UNRESOLVED@.github/scripts/hf_deploy_from_dockerfile.py:800",
+          "SDK_TARGET_UNRESOLVED@.github/scripts/hf_deploy_from_dockerfile.py:824",
+          "SECRET_EXPRESSION_REVIEW_REQUIRED@.github/workflows/reusable-hf-deploy-the-grid.yml:1",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-deploy-the-grid.yml:119",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-deploy-the-grid.yml:160",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-deploy-the-grid.yml:161",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-deploy-the-grid.yml:162",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-deploy-the-grid.yml:163",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-deploy-the-grid.yml:164",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-deploy-the-grid.yml:165",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-deploy-the-grid.yml:166",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-deploy-the-grid.yml:167",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-deploy-the-grid.yml:168",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-deploy-the-grid.yml:169",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-deploy-the-grid.yml:170",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-deploy-the-grid.yml:171",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-deploy-the-grid.yml:172",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-deploy-the-grid.yml:173",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-deploy-the-grid.yml:174",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-deploy-the-grid.yml:175",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-deploy-the-grid.yml:186",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-deploy-the-grid.yml:187",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-deploy-the-grid.yml:188",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-deploy-the-grid.yml:189",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-deploy-the-grid.yml:190",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-deploy-the-grid.yml:191",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-deploy-the-grid.yml:192",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-deploy-the-grid.yml:193",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-deploy-the-grid.yml:194",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-deploy-the-grid.yml:195",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-deploy-the-grid.yml:196",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-deploy-the-grid.yml:201",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-deploy-the-grid.yml:211",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-deploy-the-grid.yml:212",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-deploy-the-grid.yml:213",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-deploy-the-grid.yml:214",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-deploy-the-grid.yml:215",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-deploy-the-grid.yml:216",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-deploy-the-grid.yml:217",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-deploy-the-grid.yml:224",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-deploy-the-grid.yml:225",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-deploy-the-grid.yml:226",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-deploy-the-grid.yml:227",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-deploy-the-grid.yml:236",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-deploy-the-grid.yml:237",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-deploy-the-grid.yml:238",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-deploy-the-grid.yml:239",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-deploy-the-grid.yml:240",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-deploy-the-grid.yml:241",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-deploy-the-grid.yml:242",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-deploy-the-grid.yml:243",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-deploy-the-grid.yml:244",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-deploy-the-grid.yml:245",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-deploy-the-grid.yml:246",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-deploy-the-grid.yml:254",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-deploy-the-grid.yml:255",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-deploy-the-grid.yml:256",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-deploy-the-grid.yml:257",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-deploy-the-grid.yml:258",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-deploy-the-grid.yml:295",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-deploy-the-grid.yml:296",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-deploy-the-grid.yml:297",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-deploy-the-grid.yml:298",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-deploy-the-grid.yml:299",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-deploy-the-grid.yml:300",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-deploy-the-grid.yml:301",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-deploy-the-grid.yml:302",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-deploy-the-grid.yml:303",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-deploy-the-grid.yml:304",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-deploy-the-grid.yml:305",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-deploy-the-grid.yml:306",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-deploy-the-grid.yml:307",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-deploy-the-grid.yml:308",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-deploy-the-grid.yml:309",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-deploy-the-grid.yml:310",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-deploy-the-grid.yml:311",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-deploy-the-grid.yml:312",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-deploy-the-grid.yml:313",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-deploy-the-grid.yml:314",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-deploy-the-grid.yml:315",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-deploy-the-grid.yml:316",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-deploy-the-grid.yml:317",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-deploy-the-grid.yml:318",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-deploy-the-grid.yml:319",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-deploy-the-grid.yml:96",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-deploy-the-grid.yml:97",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/reusable-hf-deploy-the-grid.yml:160",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/reusable-hf-deploy-the-grid.yml:161",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/reusable-hf-deploy-the-grid.yml:164",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/reusable-hf-deploy-the-grid.yml:165",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/reusable-hf-deploy-the-grid.yml:166",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/reusable-hf-deploy-the-grid.yml:169",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/reusable-hf-deploy-the-grid.yml:170",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/reusable-hf-deploy-the-grid.yml:173",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/reusable-hf-deploy-the-grid.yml:174",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/reusable-hf-deploy-the-grid.yml:175",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/reusable-hf-deploy-the-grid.yml:186",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/reusable-hf-deploy-the-grid.yml:187",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/reusable-hf-deploy-the-grid.yml:191",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/reusable-hf-deploy-the-grid.yml:192",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/reusable-hf-deploy-the-grid.yml:193",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/reusable-hf-deploy-the-grid.yml:194",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/reusable-hf-deploy-the-grid.yml:201",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/reusable-hf-deploy-the-grid.yml:211",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/reusable-hf-deploy-the-grid.yml:212",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/reusable-hf-deploy-the-grid.yml:216",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/reusable-hf-deploy-the-grid.yml:217",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/reusable-hf-deploy-the-grid.yml:224",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/reusable-hf-deploy-the-grid.yml:236",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/reusable-hf-deploy-the-grid.yml:237",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/reusable-hf-deploy-the-grid.yml:238",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/reusable-hf-deploy-the-grid.yml:239",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/reusable-hf-deploy-the-grid.yml:240",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/reusable-hf-deploy-the-grid.yml:241",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/reusable-hf-deploy-the-grid.yml:242",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/reusable-hf-deploy-the-grid.yml:243",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/reusable-hf-deploy-the-grid.yml:244",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/reusable-hf-deploy-the-grid.yml:245",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/reusable-hf-deploy-the-grid.yml:254",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/reusable-hf-deploy-the-grid.yml:255",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/reusable-hf-deploy-the-grid.yml:256",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/reusable-hf-deploy-the-grid.yml:257",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/reusable-hf-deploy-the-grid.yml:258",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/reusable-hf-deploy-the-grid.yml:295",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/reusable-hf-deploy-the-grid.yml:296",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/reusable-hf-deploy-the-grid.yml:299",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/reusable-hf-deploy-the-grid.yml:300",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/reusable-hf-deploy-the-grid.yml:301",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/reusable-hf-deploy-the-grid.yml:304",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/reusable-hf-deploy-the-grid.yml:305",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/reusable-hf-deploy-the-grid.yml:308",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/reusable-hf-deploy-the-grid.yml:309",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/reusable-hf-deploy-the-grid.yml:312",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/reusable-hf-deploy-the-grid.yml:313",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/reusable-hf-deploy-the-grid.yml:316",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/reusable-hf-deploy-the-grid.yml:317",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/reusable-hf-deploy-the-grid.yml:318",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/reusable-hf-deploy-the-grid.yml:319",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/reusable-hf-deploy-the-grid.yml:96",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/reusable-hf-deploy-the-grid.yml:97",
+          "WORKFLOW_ENVIRONMENT_REVIEW_REQUIRED@.github/workflows/reusable-hf-deploy-the-grid.yml:100",
+          "WORKFLOW_ENVIRONMENT_REVIEW_REQUIRED@.github/workflows/reusable-hf-deploy-the-grid.yml:156",
+          "WORKFLOW_ENVIRONMENT_REVIEW_REQUIRED@.github/workflows/reusable-hf-deploy-the-grid.yml:208",
+          "WORKFLOW_ENVIRONMENT_REVIEW_REQUIRED@.github/workflows/reusable-hf-deploy-the-grid.yml:221",
+          "WORKFLOW_ENVIRONMENT_REVIEW_REQUIRED@.github/workflows/reusable-hf-deploy-the-grid.yml:231",
+          "WORKFLOW_ENVIRONMENT_REVIEW_REQUIRED@.github/workflows/reusable-hf-deploy-the-grid.yml:250",
+          "WORKFLOW_ENVIRONMENT_REVIEW_REQUIRED@.github/workflows/reusable-hf-deploy-the-grid.yml:290",
+          "WORKFLOW_ENVIRONMENT_REVIEW_REQUIRED@.github/workflows/reusable-hf-deploy-the-grid.yml:93"
         ]
       }
     }
