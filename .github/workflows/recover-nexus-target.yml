@@ -2,7 +2,9 @@
 name: Recover exact Nexus provider target
 
 # This central, owner-dispatched bootstrap only creates the declared Hub target.
-# The separate publish-nexus-space.yml remains the sole content/runtime writer.
+# Content releases use the separately approved publish-nexus-space.yml.
+# This bootstrap cannot publish content or restart a Space; other estate
+# operators may independently restart an existing Hub revision.
 on:
   pull_request:
     branches: [main]

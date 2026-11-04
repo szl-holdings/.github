@@ -284,11 +284,16 @@ jobs:
           "$VENV/bin/python" -I -P -c 'from importlib.metadata import version; import certifi, charset_normalizer, hf_xet, httpcore, httpx, huggingface_hub, requests, urllib3, yaml; assert version("huggingface-hub") == "1.19.0"; assert version("requests") == "2.33.0"; assert version("urllib3") == "2.8.0"'
           "$VENV/bin/python" -I -P -m py_compile \
             .github/scripts/hf_deploy_from_dockerfile.py \
-            .github/scripts/hf_space_source_binding.py
+            .github/scripts/hf_space_source_binding.py \
+            .github/scripts/validate_nexus_release.py \
+            .github/scripts/test_validate_nexus_release.py
           "$VENV/bin/python" -I -P .github/scripts/hf_deploy_from_dockerfile.py --help >/dev/null
           "$VENV/bin/python" -I -P .github/scripts/hf_space_source_binding.py --help >/dev/null
           "$VENV/bin/python" -I -P .github/scripts/test_hf_deploy_from_dockerfile.py
           "$VENV/bin/python" -I -P .github/scripts/test_hf_space_source_binding.py
+          # This admission test runs even while the separate publisher is disabled.
+          "$VENV/bin/python" -I -B .github/scripts/test_validate_nexus_release.py
+          "$VENV/bin/python" -I -B -O .github/scripts/test_validate_nexus_release.py
 
       # Pins the canonical static-Space publication path used by the Hugging
       # Face organization front door. The tests are network-free and lock safe

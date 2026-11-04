@@ -5,6 +5,7 @@ from __future__ import annotations
 import importlib.util
 import json
 import os
+import re
 import sys
 import tempfile
 import types
@@ -253,13 +254,18 @@ class NexusWorkflowCredentialContractTests(unittest.TestCase):
             encoding="utf-8"
         )
 
-        for variable in (
-            "HF_ORG_TOKEN_CANDIDATE",
-            "HF_ORG_TOKEN1_CANDIDATE",
-            "HF_WRITE_TOKEN_CANDIDATE",
-            "HF_TOKEN_CANDIDATE",
-        ):
-            self.assertEqual(2, workflow.count(variable), variable)
+        # Check real environment bindings, not a duplicate name in the retired
+        # inline self-check. The structural release suite also parses this job.
+        bindings = re.findall(
+            r"(?m)^\s+(HF_[A-Z0-9_]+_CANDIDATE):\s*"
+            r"(\$\{\{\s*secrets\.[A-Z0-9_]+\s*\}\})\s*$",
+            workflow,
+        )
+        expected = [
+            (alias + "_CANDIDATE", "${{ secrets." + alias + " }}")
+            for alias in ("HF_ORG_TOKEN", "HF_ORG_TOKEN1", "HF_WRITE_TOKEN", "HF_TOKEN")
+        ]
+        self.assertCountEqual(expected, bindings)
         self.assertIn("acquire_hf_publisher_token.py", workflow)
         self.assertIn('--token-file "$RUNNER_TEMP/nexus-hf-token"', workflow)
         self.assertNotIn("$GITHUB_ENV", workflow)

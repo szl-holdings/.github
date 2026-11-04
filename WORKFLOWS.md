@@ -69,6 +69,57 @@ For maximum supply-chain hygiene, replace `@main` with a 40-character SHA from
 this repository. Organization refs are exempt from the automated pin check, but
 immutable pins remain preferred for non-experimental consumers.
 
+## Nexus explicit release approval
+
+Source PR admission is not permission to publish to `SZLHOLDINGS/nexus`.
+`publish-nexus-space.yml` accepts only an owner `workflow_dispatch` on this
+repository's protected `main`, with required `source_sha`: exactly 40 lowercase
+hexadecimal characters naming the current Nexus `main` tip. There is no cron,
+push publisher, floating revision, or rollback override. Ordinary `tests.yml`
+PR/main checks validate the release contract even when the publisher is disabled.
+
+The read-only validation job checks the exact requested source and Docker source
+binding before the dependent publish job can enter the existing fixed
+`production` environment. Its summary and pending publish job name display the
+requested revision. The release owner must review that exact commit and approve
+the environment deployment; this is separate from reviewing or merging a source
+PR. Reuse the existing environment protections, including its owner-review and
+wait timer. This change neither configures those protections nor requires a
+second human. It does not enable an administratively disabled workflow.
+
+After approval, the publisher fetches the requested immutable SHA again, never a
+replacement revision. It aborts if Nexus `main` has moved, checks again before
+loading provider credentials, and retains the deployer's immediate pre-mutation
+default-tip guard. A stale request needs a new dispatch and new approval, not an
+automatic upgrade. Release jobs share one fixed concurrency group with
+`cancel-in-progress: false`; GitHub may replace pending queued jobs, but must not
+cancel a publication already in progress. Read-only validation is not serialized.
+
+Release-owner sequence: inspect the desired Nexus `main` commit and central
+policy; separately authorize enabling the disabled publisher if appropriate;
+dispatch on central `main` with that exact `source_sha`; inspect the validation
+summary and requested SHA in the pending job; approve the fixed `production`
+deployment; then inspect the manifest, running-byte/source readbacks and smoke
+results. A successful workflow alone is not complete runtime qualification.
+
+This is a gate on this one content publisher, not a universal deployment lock.
+The target-recovery bootstrap has no content-publication/restart authority.
+Other estate operators can independently restart an existing Hub revision;
+their actions and any external integrations require their own authorization.
+
+CP-eBOM declares this policy as `nexus-manual-production-release-v2`, with the
+scoped `nexus-manual-production/v1` graph/critical-command contract. It rejects
+automatic events, missing approval/dependency, stale or substituted source,
+unguarded mutation stages, and a cancelling or dynamic publish lock, even when
+source pins are recomputed. Other workflows retain their existing contracts.
+Dropping the new intent/contract cannot restore automatic Nexus publication.
+Exact source/dependency and observed-unknown pins remain required; this bounded
+model is not a proof about arbitrary shell or provider authentication. Changing
+the policy or analyzer is a trust-root transition: retain its
+`REVIEW_REQUIRED` receipt and obtain the exact-head owner attestation and real
+protected checks described in `docs/CONTROL_PLANE_EFFECTS.md`. No attestation,
+independent review, or deployment authorization is implied by this proposal.
+
 ## HF Space module drift
 
 Spaces built by Dockerfile `COPY` can silently diverge from GitHub source. Two
