@@ -118,6 +118,11 @@ KNOWN_ACTION_EFFECTS: Mapping[str, tuple[str, str, str]] = {
         "runner:toolchain:python",
         "local-write",
     ),
+    "actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1": (
+        "github.app.token.mint",
+        "runner:github-app-token",
+        "local-write",
+    ),
     "actions/setup-node@820762786026740c76f36085b0efc47a31fe5020": (
         "runner.toolchain.install",
         "runner:toolchain:node",
@@ -1944,6 +1949,10 @@ def analyze_workflow_source(source: str, *, path: str) -> dict[str, Any]:
                         ):
                             unknown("ACTION_EXTRA_EFFECT_UNSUPPORTED", (*step_location, "with"))
                         exact_event_head = "${{ github.event.pull_request.head.sha || github.event.merge_group.head_sha || github.sha }}"
+                        exact_sha_aliases = {
+                            exact_event_head,
+                            "${{ github.sha }}",
+                        }
                         trusted_queue_default = (
                             path == FORGE9_QUEUE_CONTROLLER
                             and inputs.get("ref")
@@ -1955,7 +1964,7 @@ def analyze_workflow_source(source: str, *, path: str) -> dict[str, Any]:
                         )
                         if dependencies and not runtime_checkout and not trusted_queue_default and (
                             inputs.get("repository", "szl-holdings/.github") != "szl-holdings/.github"
-                            or ("ref" in inputs and inputs["ref"] != exact_event_head)
+                            or ("ref" in inputs and inputs["ref"] not in exact_sha_aliases)
                         ):
                             unknown("CHECKOUT_SOURCE_BOUNDARY_UNSUPPORTED", (*step_location, "with"))
                     if sink == "github.contents.checkout" and "repository" in inputs:
@@ -1979,6 +1988,10 @@ def analyze_workflow_source(source: str, *, path: str) -> dict[str, Any]:
                             # This exact run-scoped namespace is the enforcing
                             # workflow contract, not an arbitrary dynamic name.
                             resource = "github:actions:artifact:control-plane-effect"
+                        elif artifact == "estate-deadman-${{ github.run_id }}-${{ github.run_attempt }}":
+                            resource = "github:actions:artifact:estate-deadman"
+                        elif artifact == "estate-deadman-contract-${{ github.run_id }}-${{ github.run_attempt }}":
+                            resource = "github:actions:artifact:estate-deadman-contract"
                         elif path == FORGE9_ATTESTOR and artifact == FORGE9_ATTEST_ARTIFACT:
                             resource = "github:actions:artifact:forge9-merge-receipt"
                         elif path == FORGE9_QUEUE_CONTROLLER and artifact == FORGE9_QUEUE_ARTIFACT:
@@ -2401,10 +2414,18 @@ def bind_declaration(
     # Only the exact reviewed SARIF upload job may hold a write grant; any
     # other write, or a missing exemption list, still denies.
     scoped_writes = set(analysis.get("scoped_write_permissions", []))
-    if any(
-        permission.endswith(":write") and permission not in scoped_writes
+    write_permissions = {
+        permission
         for permission in analysis["permissions"]
-    ):
+        if permission.endswith(":write") and permission not in scoped_writes
+    }
+    # Only the estate dead-man supervisor may hold exactly issues:write for its
+    # reserved incident lifecycle. All other write grants remain denied here.
+    if write_permissions == {"issues:write"} and workflow_path == ".github/workflows/estate-deadman.yml":
+        analysis["scoped_write_permissions"] = sorted(
+            set(analysis.get("scoped_write_permissions", [])) | {"issues:write"}
+        )
+    elif write_permissions:
         reasons.add("GITHUB_WRITE_PERMISSION_PRESENT")
 
     trusted_expected = declaration["trusted_transitives"]
