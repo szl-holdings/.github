@@ -1,0 +1,35 @@
+{
+  "schema": "szl.repository-verification/v1",
+  "python_version": "3.12.14",
+  "test_roots": [
+    ".github/scripts",
+    ".github/tests",
+    "tests"
+  ],
+  "indirect_tests": [
+    {
+      "path": ".github/scripts/test_ci_health_digest_public.py",
+      "loaded_by": ".github/scripts/test_ci_health_digest.py",
+      "reason": "The parent suite imports this module through unittest.load_tests so one workflow command executes both suites."
+    }
+  ],
+  "dependency_contracts": [
+    {
+      "path": "requirements/hf-publisher.lock",
+      "consumer_workflow": ".github/workflows/tests.yml",
+      "required_tokens": [
+        "--require-hashes",
+        "-r requirements/hf-publisher.lock"
+      ],
+      "scope": "The only dependency closure installed by the aggregate Tests workflow."
+    },
+    {
+      "path": "coordination/anatomy_alive/requirements.txt",
+      "scope": "Specialized Anatomy harness; outside the stdlib repository contract."
+    },
+    {
+      "path": "hf-card/requirements.txt",
+      "scope": "Specialized Hugging Face card utility; outside the stdlib repository contract."
+    }
+  ]
+}
