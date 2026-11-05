@@ -18,7 +18,7 @@ def main() -> None:
     lock = LOCK.read_text(encoding="utf-8")
 
     for source in (workflow, tests_workflow):
-        assert 'python-version: "3.12.10"' in source
+        assert 'python-version: "3.12.14"' in source
         assert 'VENV="$RUNNER_TEMP/hf-publisher-venv"' in source
         assert 'if [ -e "$VENV" ]; then' in source
         assert 'python3 -m venv "$VENV"' in source
