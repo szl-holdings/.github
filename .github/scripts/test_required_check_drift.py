@@ -30,6 +30,8 @@ import os
 import sys
 import tempfile
 import unittest
+from unittest import mock
+import urllib.error
 
 _HERE = os.path.dirname(os.path.abspath(__file__))
 _MODULE_PATH = os.path.join(_HERE, "required_check_drift.py")
@@ -64,7 +66,7 @@ def _run_main(*, token, config, allowlist=None, ruleset=(set(), []),
         rcd.load_config = lambda path: dict(config)
         rcd.load_allowlist = lambda path: dict(allowlist or {"ignore_repos": []})
         rcd.gh_json = lambda path, tok, **kw: {"default_branch": "main"}
-        rcd.ruleset_contexts = lambda org, repo, tok: ruleset
+        rcd.ruleset_contexts = lambda org, repo, db, tok: ruleset
         rcd.classic_contexts = lambda org, repo, db, tok: classic
         sys.argv = [
             "required_check_drift.py",
@@ -159,6 +161,115 @@ class TestRequiredCheckDriftGuard(unittest.TestCase):
         self.assertEqual(len(multi), 2)
         self.assertEqual({g["id"] for g in multi},
                          {"lockfile-registry", "overclaim-honesty"})
+
+
+def _effective_rule(context=_CTX, *, rid=10, source_type="Repository"):
+    return {
+        "type": "required_status_checks",
+        "ruleset_id": rid,
+        "ruleset_source": "fixture/repo" if source_type == "Repository" else "fixture",
+        "ruleset_source_type": source_type,
+        "parameters": {"required_status_checks": [{"context": context}]},
+    }
+
+
+class TestEffectiveBranchRules(unittest.TestCase):
+    def test_excluded_default_branch_never_counts_as_enforced(self):
+        # This definition includes the default alias but explicitly excludes main.
+        # GitHub's effective endpoint correctly returns no rules for main.
+        definition = {
+            "enforcement": "active",
+            "conditions": {"ref_name": {"include": ["~DEFAULT_BRANCH"],
+                                        "exclude": ["refs/heads/main"]}},
+            "rules": [_effective_rule()],
+        }
+        replies = {
+            "/repos/szl-holdings/a11oy": {"default_branch": "main"},
+            "/repos/szl-holdings/a11oy/rulesets": [{"id": 10, "target": "branch"}],
+            "/repos/szl-holdings/a11oy/rulesets/10": definition,
+            "/repos/szl-holdings/a11oy/rules/branches/main?per_page=100&page=1": [],
+            "/repos/szl-holdings/a11oy/branches/main/protection/required_status_checks": None,
+        }
+        with mock.patch.object(rcd, "_token", return_value="fixture"), \
+                mock.patch.object(rcd, "load_config", return_value=_CONFIG), \
+                mock.patch.object(rcd, "load_allowlist", return_value={"ignore_repos": []}), \
+                mock.patch.object(rcd, "gh_json", side_effect=lambda path, *_a, **_k: replies[path]):
+            report = rcd.run_check(type("Args", (), {"config": "fixture", "allowlist": "fixture"})())
+        self.assertEqual(report["totals"]["drift"], 1)
+        self.assertFalse(report["checks"][0]["repos"][0]["required_via_ruleset"])
+
+    def test_effective_repository_and_inherited_active_contexts_are_unioned(self):
+        rules = [_effective_rule(), _effective_rule(_CTX2, rid=20, source_type="Organization")]
+        with mock.patch.object(rcd, "gh_json", return_value=rules) as request:
+            contexts, seen = rcd.ruleset_contexts("fixture", "repo", "main", "token")
+        self.assertEqual(contexts, {_CTX, _CTX2})
+        self.assertEqual({x["ruleset_source_type"] for x in seen}, {"Repository", "Organization"})
+        self.assertTrue(all(x["enforcement"] == "active" for x in seen))
+        request.assert_called_once_with(
+            "/repos/fixture/repo/rules/branches/main?per_page=100&page=1", "token")
+
+    def test_empty_effective_rules_do_not_credit_disabled_or_evaluate_definitions(self):
+        # The endpoint excludes both inactive enforcement modes. No local
+        # definitions may be substituted for its empty authoritative result.
+        with mock.patch.object(rcd, "gh_json", return_value=[]) as request:
+            contexts, seen = rcd.ruleset_contexts("fixture", "repo", "main", "token")
+        self.assertEqual((contexts, seen), (set(), []))
+        self.assertEqual(request.call_count, 1)
+
+    def test_every_effective_rule_page_is_read(self):
+        unrelated = [{"type": "deletion", "ruleset_id": n + 1,
+                      "ruleset_source": "fixture", "ruleset_source_type": "Organization"}
+                     for n in range(100)]
+        with mock.patch.object(rcd, "gh_json", side_effect=[unrelated, [_effective_rule(rid=200)]]) as request:
+            contexts, seen = rcd.ruleset_contexts("fixture", "repo", "main", "token")
+        self.assertEqual(contexts, {_CTX})
+        self.assertEqual(len(seen), 101)
+        self.assertEqual(request.call_args_list[-1], mock.call(
+            "/repos/fixture/repo/rules/branches/main?per_page=100&page=2", "token"))
+
+    def test_default_branch_is_url_encoded_for_both_mechanisms(self):
+        with mock.patch.object(rcd, "gh_json", return_value=[]) as request:
+            rcd.ruleset_contexts("fixture", "repo", "release/stable", "token")
+        self.assertIn("/release%2Fstable?", request.call_args.args[0])
+        with mock.patch.object(rcd, "gh_json", return_value=None) as request:
+            rcd.classic_contexts("fixture", "repo", "release/stable", "token")
+        self.assertIn("/release%2Fstable/protection/", request.call_args.args[0])
+
+    def test_effective_endpoint_errors_are_never_an_empty_ruleset(self):
+        for status in (401, 403, 404, 503):
+            with self.subTest(status=status):
+                error = urllib.error.HTTPError("https://api.github.com/fixture", status,
+                                               "fixture failure", {}, io.BytesIO(b"fixture"))
+                with mock.patch.object(rcd, "_request", side_effect=error):
+                    with self.assertRaises(rcd.CheckError):
+                        rcd.ruleset_contexts("fixture", "repo", "main", "token")
+
+    def test_malformed_pages_cannot_credit_an_effective_context(self):
+        bad = _effective_rule()
+        bad["parameters"] = {"required_status_checks": [{"context": False}]}
+        for page in (None, {}, "", [None], [{}], [bad], [_effective_rule()] * 101):
+            with self.subTest(page=page), mock.patch.object(rcd, "gh_json", return_value=page):
+                with self.assertRaises(rcd.CheckError):
+                    rcd.ruleset_contexts("fixture", "repo", "main", "token")
+
+    def test_incomplete_pagination_is_an_error(self):
+        with mock.patch.object(rcd, "MAX_RULE_PAGES", 2), \
+                mock.patch.object(rcd, "gh_json", return_value=[_effective_rule()] * 100) as request:
+            with self.assertRaisesRegex(rcd.CheckError, "pagination incomplete"):
+                rcd.ruleset_contexts("fixture", "repo", "main", "token")
+        self.assertEqual(request.call_count, 2)
+
+    def test_unknown_default_branch_is_an_error_before_ruleset_inspection(self):
+        for meta in ({}, {"default_branch": None}, {"default_branch": " "}):
+            with self.subTest(meta=meta), \
+                    mock.patch.object(rcd, "_token", return_value="fixture"), \
+                    mock.patch.object(rcd, "load_config", return_value=_CONFIG), \
+                    mock.patch.object(rcd, "load_allowlist", return_value={"ignore_repos": []}), \
+                    mock.patch.object(rcd, "gh_json", return_value=meta), \
+                    mock.patch.object(rcd, "ruleset_contexts") as inspect:
+                with self.assertRaisesRegex(rcd.CheckError, "Default branch unavailable"):
+                    rcd.run_check(type("Args", (), {"config": "fixture", "allowlist": "fixture"})())
+                inspect.assert_not_called()
 
 
 if __name__ == "__main__":

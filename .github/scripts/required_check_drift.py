@@ -39,10 +39,11 @@ Config supports two shapes:
   * LEGACY (single check): top-level `required_context` + `repos`.
 Both normalize to the same internal list of check groups.
 
-Auth: reads a token from $SZL_GITHUB_TOKEN / $GH_TOKEN / $GITHUB_TOKEN. The
-rulesets and classic-protection endpoints require admin on each repo, so the
-built-in Actions GITHUB_TOKEN is NOT sufficient — set the SZL_GITHUB_TOKEN PAT
-secret. Any auth/permission/API failure is reported as an ERROR (exit 2) and
+Auth: reads a token from $SZL_GITHUB_TOKEN / $GH_TOKEN / $GITHUB_TOKEN. Effective
+branch rules need metadata read access, while classic protection requires admin
+on each repo. The built-in Actions GITHUB_TOKEN is NOT sufficient for the full
+check — set the SZL_GITHUB_TOKEN PAT secret. Any auth/permission/API failure is
+reported as an ERROR (exit 2) and
 never as a silent pass, so a missing token can never produce a false green.
 
 Usage:
@@ -62,16 +63,13 @@ import json
 import os
 import sys
 import urllib.error
+import urllib.parse
 import urllib.request
 from datetime import datetime, timezone
 
 API = "https://api.github.com"
 
-# Rulesets that are not "active" do not actually enforce anything.
-ACTIVE_ENFORCEMENT = "active"
-# A ruleset condition targeting the default branch can be written either as the
-# symbolic alias or the literal ref.
-DEFAULT_BRANCH_TOKENS = {"~DEFAULT_BRANCH"}
+MAX_RULE_PAGES = 100
 
 
 class CheckError(RuntimeError):
@@ -195,45 +193,62 @@ def check_groups(cfg: dict) -> list[dict]:
 # --------------------------------------------------------------------------- #
 # Effective required contexts (per repo, both mechanisms)
 
-def _condition_targets_default(conditions: dict) -> bool:
-    include = ((conditions or {}).get("ref_name") or {}).get("include") or []
-    return any(tok in DEFAULT_BRANCH_TOKENS for tok in include)
+def ruleset_contexts(org: str, repo: str, default_branch: str,
+                     token: str) -> tuple[set[str], list]:
+    """Use GitHub's effective active rules, including inherited ref exclusions.
 
-
-def ruleset_contexts(org: str, repo: str, token: str) -> tuple[set[str], list]:
-    """Required-status-check contexts from ACTIVE default-branch rulesets."""
+    The branch-rules endpoint evaluates inclusion/exclusion patterns server-side
+    and omits evaluate/disabled rulesets. Do not infer enforcement from an include
+    token in a ruleset definition. Endpoint contract:
+    https://docs.github.com/en/rest/repos/rules#get-rules-for-a-branch
+    """
     contexts: set[str] = set()
-    seen: list = []
-    rulesets = gh_json(f"/repos/{org}/{repo}/rulesets", token, allow_404=True) or []
-    for rs in rulesets:
-        if rs.get("target") != "branch":
-            continue
-        full = gh_json(f"/repos/{org}/{repo}/rulesets/{rs['id']}", token)
-        active = full.get("enforcement") == ACTIVE_ENFORCEMENT
-        targets_default = _condition_targets_default(full.get("conditions"))
-        rule_ctxs: set[str] = set()
-        for rule in full.get("rules", []):
+    seen: dict[tuple, dict] = {}
+    branch = urllib.parse.quote(default_branch, safe="")
+    endpoint = f"/repos/{org}/{repo}/rules/branches/{branch}"
+    for page in range(1, MAX_RULE_PAGES + 1):
+        rules = gh_json(f"{endpoint}?per_page=100&page={page}", token)
+        if not isinstance(rules, list) or len(rules) > 100:
+            raise CheckError(f"Malformed effective branch-rule page for {org}/{repo}")
+        for rule in rules:
+            if not isinstance(rule, dict) or not isinstance(rule.get("type"), str):
+                raise CheckError(f"Malformed effective branch rule for {org}/{repo}")
+            rid = rule.get("ruleset_id")
+            source = rule.get("ruleset_source")
+            source_type = rule.get("ruleset_source_type")
+            if (type(rid) is not int or rid <= 0 or not isinstance(source, str)
+                    or not source or not isinstance(source_type, str) or not source_type):
+                raise CheckError(f"Missing effective ruleset identity for {org}/{repo}")
+            entry = seen.setdefault((rid, source, source_type), {
+                "id": rid,
+                "ruleset_source": source,
+                "ruleset_source_type": source_type,
+                "enforcement": "active",
+                "targets_default_branch": True,
+                "has_required_status_checks_rule": False,
+                "evidence_endpoint": endpoint,
+            })
             if rule.get("type") != "required_status_checks":
                 continue
-            for c in (rule.get("parameters") or {}).get("required_status_checks", []):
-                if c.get("context"):
-                    rule_ctxs.add(c["context"])
-        seen.append({
-            "id": rs["id"],
-            "name": rs.get("name"),
-            "enforcement": full.get("enforcement"),
-            "targets_default_branch": targets_default,
-            "has_required_status_checks_rule": bool(rule_ctxs),
-        })
-        if active and targets_default:
-            contexts |= rule_ctxs
-    return contexts, seen
+            parameters = rule.get("parameters")
+            checks = parameters.get("required_status_checks") if isinstance(parameters, dict) else None
+            if not isinstance(checks, list):
+                raise CheckError(f"Malformed effective required status checks for {org}/{repo}")
+            for check in checks:
+                context = check.get("context") if isinstance(check, dict) else None
+                if not isinstance(context, str) or not context:
+                    raise CheckError(f"Malformed effective required context for {org}/{repo}")
+                contexts.add(context)
+            entry["has_required_status_checks_rule"] = True
+        if len(rules) < 100:
+            return contexts, list(seen.values())
+    raise CheckError(f"Effective branch-rule pagination incomplete for {org}/{repo}")
 
 
 def classic_contexts(org: str, repo: str, default_branch: str, token: str) -> tuple[set[str], bool]:
     """Required-status-check contexts from classic branch protection."""
     rsc = gh_json(
-        f"/repos/{org}/{repo}/branches/{default_branch}/protection/required_status_checks",
+        f"/repos/{org}/{repo}/branches/{urllib.parse.quote(default_branch, safe='')}/protection/required_status_checks",
         token, allow_404=True,
     )
     if rsc is None:
@@ -266,8 +281,10 @@ def run_check(args) -> dict:
     def repo_state(repo: str) -> dict:
         if repo not in repo_cache:
             meta = gh_json(f"/repos/{org}/{repo}", token)
-            default_branch = meta.get("default_branch", "main")
-            rs_ctxs, rs_seen = ruleset_contexts(org, repo, token)
+            default_branch = meta.get("default_branch") if isinstance(meta, dict) else None
+            if not isinstance(default_branch, str) or not default_branch.strip():
+                raise CheckError(f"Default branch unavailable for {org}/{repo}")
+            rs_ctxs, rs_seen = ruleset_contexts(org, repo, default_branch, token)
             cl_ctxs, classic_present = classic_contexts(
                 org, repo, default_branch, token)
             repo_cache[repo] = {
