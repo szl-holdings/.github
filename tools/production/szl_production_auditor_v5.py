@@ -42,7 +42,7 @@ from html.parser import HTMLParser
 from pathlib import Path
 from typing import Any, Iterable, Mapping, Sequence
 
-VERSION = "5.0.0"
+VERSION = "5.0.1"
 USER_AGENT = f"szl-production-auditor/{VERSION}"
 SKIP_DIRS = {
     ".git", "node_modules", ".venv", "venv", "dist", "build", ".next",
@@ -144,24 +144,33 @@ class Report:
             gid = gate["id"]
             findings = [x for x in self.findings if x["gate_id"] == gid]
             evidence = [x for x in self.evidence if x["gate_id"] == gid]
-            if any(x["blocking"] and x["status"] == "FAIL" for x in findings):
+            required_controls = set(gate.get("controls", []))
+            controls_seen = {x["control"] for x in evidence if x["status"] == "PASS"}
+            missing_controls = sorted(required_controls - controls_seen)
+            # Probe counts cannot certify the broader controls in the profile.
+            # A failed observation also stands without a duplicate finding.
+            if any(x["blocking"] and x["status"] == "FAIL" for x in findings) or any(
+                x["status"] == "FAIL" for x in evidence
+            ):
                 status = "FAIL"
             elif any(x["blocking"] and x["status"] in {"UNKNOWN", "UNAVAILABLE"} for x in findings):
                 status = "UNKNOWN"
             elif not evidence:
                 status = "UNKNOWN"
-            elif any(x["status"] in {"UNKNOWN", "UNAVAILABLE"} for x in evidence):
+            elif any(x["status"] not in {"PASS", "WARN"} for x in evidence):
                 status = "PARTIAL"
-            elif any(x["status"] == "WARN" for x in findings):
+            elif not required_controls or missing_controls:
+                status = "PARTIAL"
+            elif any(x["status"] == "WARN" for x in findings + evidence):
                 status = "WARN"
             else:
-                controls_seen = {x["control"] for x in evidence if x["status"] == "PASS"}
-                status = "PASS" if len(controls_seen) >= len(gate.get("controls", [])) else "PARTIAL"
+                status = "PASS"
             results.append({
                 "id": gid, "name": gate["name"], "domain": gate["domain"],
                 "priority": gate["priority"], "block_release": gate["block_release"],
                 "status": status, "finding_count": len(findings),
                 "evidence_count": len(evidence),
+                "missing_controls": missing_controls,
             })
         return results
 
@@ -813,7 +822,9 @@ def audit_hf(report: Report, http: HTTP) -> None:
 
 def write_outputs(report: Report, out: Path, profile_path: Path) -> tuple[dict[str, Any], int]:
     gates = report.gate_results()
-    if any(x["blocking"] and x["status"] == "FAIL" for x in report.findings):
+    if any(x["blocking"] and x["status"] == "FAIL" for x in report.findings) or any(
+        x["block_release"] and x["status"] == "FAIL" for x in gates
+    ):
         overall, code = "BLOCKED", 2
     elif any(x["blocking"] and x["status"] in {"UNKNOWN", "UNAVAILABLE"} for x in report.findings) or any(
         x["block_release"] and x["status"] != "PASS" for x in gates
@@ -989,3 +1000,4 @@ def main(argv: Sequence[str] | None = None) -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
+
