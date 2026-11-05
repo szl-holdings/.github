@@ -40,6 +40,15 @@ def digest(text: str) -> str:
     return hashlib.sha256(text.encode("utf-8")).hexdigest()
 
 
+class NoHubRedirect(urllib.request.HTTPRedirectHandler):
+    """Keep credentials, reviewed targets, and readback on the original URL."""
+
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        # Even same-origin redirects can select another repository or revision.
+        # urllib's default handler also forwards Authorization across origins.
+        return None
+
+
 def hub_request(method: str, path: str, token: str | None,
                 body: bytes | None = None, content_type: str | None = None):
     headers = {"User-Agent": "szl-hf-card-reconcile/2.0"}
@@ -48,11 +57,12 @@ def hub_request(method: str, path: str, token: str | None,
     if content_type:
         headers["Content-Type"] = content_type
     req = urllib.request.Request(HUB + path, data=body, headers=headers, method=method)
+    opener = urllib.request.build_opener(NoHubRedirect())
     # A timed-out POST may already have committed; never repeat ambiguous writes.
     limit = 3 if method == "GET" else 1
     for attempt in range(limit):
         try:
-            with urllib.request.urlopen(req, timeout=45) as resp:
+            with opener.open(req, timeout=45) as resp:
                 return resp.read().decode("utf-8"), resp.status
         except urllib.error.HTTPError as exc:
             detail = exc.read().decode("utf-8", "replace")[:400]
@@ -532,7 +542,8 @@ def apply_asset(row: dict, token: str, message: str, prefer_pr: bool = False) ->
         if status != 403:
             break
     row.update(applied=False, verified=False, detail=f"card write HTTP {row['apply_status']}",
-               outcome="unknown_write_result" if row["apply_status"] == 0 or row["apply_status"] >= 500 else "write_failed")
+               outcome="unknown_write_result" if row["apply_status"] == 0 or 300 <= row["apply_status"] < 400
+               or row["apply_status"] >= 500 else "write_failed")
     return row
 
 
