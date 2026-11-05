@@ -8152,7 +8152,7 @@
         "files": {
           ".github/workflows/responsive-estate-v3.yml": "sha256:8dd355219f6b90c2eabc56effed9d1dc8fa55ce311ebfc0a3d4f7203f7341680",
           "scripts/audit_responsive_estate_v3.mjs": "sha256:b4a2b76d41bd2d37fdbda2bdacf6052a12b719534a50a936e8830888c7d1a777",
-          "scripts/normalize_responsive_estate_v31.mjs": "sha256:08d54b35cd9a41b8301b47f769fd1ce2d37f4041df941531cacffd73b60967ac",
+          "scripts/normalize_responsive_estate_v31.mjs": "sha256:7ef9be1f8bc887feed648e1ce739a3bfee0bf5dac60d716af96120e60a1f520c",
           "scripts/responsive_audit_policy_v31.mjs": "sha256:fa93396b7107419f0475a3b6c530ac187942b5d78a68e7a00a5cfd96df5f72b9"
         },
         "unknowns": [
