@@ -9,7 +9,6 @@ on:
 
 permissions:
   contents: read
-  issues: write
 
 concurrency:
   group: hf-release-readiness-terminal-${{ github.event.workflow_run.id || github.run_id }}
@@ -26,6 +25,9 @@ env:
 
 jobs:
   verify:
+    permissions:
+      contents: read
+      issues: write
     name: Lake Viewer plus first-class Kernel selfchecks
     runs-on: ubuntu-latest
     timeout-minutes: 45

@@ -17,12 +17,14 @@ on:
     types: [published]
 
 permissions:
-  id-token: write
-  contents: write
-  actions: read
+  contents: read
 
 jobs:
   slsa-verify:
+    permissions:
+      id-token: write
+      contents: write
+      actions: read
     name: SLSA supply-chain checks
     runs-on: ubuntu-latest
     if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'

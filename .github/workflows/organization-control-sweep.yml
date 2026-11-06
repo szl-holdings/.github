@@ -35,7 +35,6 @@ on:
 
 permissions:
   contents: read
-  issues: write
 
 concurrency:
   group: organization-control-sweep-${{ github.ref }}
@@ -43,6 +42,9 @@ concurrency:
 
 jobs:
   contract:
+    permissions:
+      contents: read
+      issues: write
     name: Compile and test all control contracts
     runs-on: ubuntu-latest
     timeout-minutes: 10
@@ -80,6 +82,9 @@ jobs:
           git diff --check
 
   organization-health:
+    permissions:
+      contents: read
+      issues: write
     name: Authenticated organization health
     if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
@@ -143,6 +148,9 @@ jobs:
           echo 'Organization health is verified from current protected main.'
 
   github-license:
+    permissions:
+      contents: read
+      issues: write
     name: GitHub license consistency
     if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
@@ -193,6 +201,9 @@ jobs:
           echo 'GitHub license consistency is verified from current protected main.'
 
   hugging-face-license:
+    permissions:
+      contents: read
+      issues: write
     name: Hugging Face license consistency
     if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
@@ -244,6 +255,9 @@ jobs:
           echo 'Hugging Face license consistency is verified from current protected main.'
 
   public-links:
+    permissions:
+      contents: read
+      issues: write
     name: Public repository link reachability
     if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
