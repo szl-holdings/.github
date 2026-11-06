@@ -5,9 +5,7 @@ on:
     - cron: "7,22,37,52 * * * *"
 
 permissions:
-  actions: read
   contents: read
-  issues: write
 
 concurrency:
   group: estate-deadman-supervisor
@@ -15,6 +13,10 @@ concurrency:
 
 jobs:
   supervise:
+    permissions:
+      actions: read
+      contents: read
+      issues: write
     name: Observe, confirm, incident, and attest
     runs-on: ubuntu-24.04
     timeout-minutes: 12

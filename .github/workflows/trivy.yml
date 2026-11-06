@@ -11,7 +11,6 @@ on:
 
 permissions:
   contents: read
-  security-events: write
 
 env:
   # ghcr.io serves the Trivy DB under an aggressive global rate limit
@@ -24,6 +23,9 @@ env:
 
 jobs:
   trivy:
+    permissions:
+      contents: read
+      security-events: write
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1

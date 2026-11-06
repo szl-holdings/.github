@@ -28,7 +28,6 @@ on:
 
 permissions:
   contents: read
-  issues: write
 
 concurrency:
   group: hf-canonical-a11oy-verification-${{ github.event_name }}-${{ github.ref }}
@@ -36,6 +35,9 @@ concurrency:
 
 jobs:
   verify:
+    permissions:
+      contents: read
+      issues: write
     name: Verify one canonical A11oy Space
     runs-on: ubuntu-latest
     timeout-minutes: 180
