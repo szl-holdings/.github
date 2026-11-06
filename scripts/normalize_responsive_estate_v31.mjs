@@ -21,6 +21,11 @@ import {
 } from "./responsive_audit_policy_v31.mjs";
 
 const DECORATIVE_CLASS = /(?:^|[\s_-])(spectral|hologram|holo|aurora|glow|backdrop|background|noise|particle|beam|scanline|motif|decoration|ornament|ambient|orb)(?:$|[\s_-])/i;
+// Exact layers created by design/holographic-v2/szl-space-hologram.js inside
+// #szl-space-holo-v2-ambient. Their stylesheet uses negative inset and
+// pointer-events: none, so offscreen geometry is the layer contract. A longer
+// or prefixed class is not this layer.
+const AMBIENT_LAYER_CLASS = /(?:^|\s)szl-space-(?:field|orbit|beam|scan|nodes)(?:\s|$)/;
 const ASSISTIVE_CLASS = /(?:^|[\s_-])(sr-only|screen-reader|visually-hidden|a11y-hidden)(?:$|[\s_-])/i;
 const PRIMARY_TAGS = new Set(["button", "input", "select", "textarea", "summary"]);
 const ACTIONABLE_TAGS = new Set([...PRIMARY_TAGS, "a"]);
@@ -53,9 +58,11 @@ function isAssistive(item) {
 }
 
 function isDecorative(item) {
+  const className = String(item.className ?? "");
   return observedNonInteractive(item) && item.ariaHidden === true
     && String(item.text ?? "").trim().length === 0
-    && DECORATIVE_CLASS.test(`${item.id ?? ""} ${item.className ?? ""}`);
+    && (DECORATIVE_CLASS.test(`${item.id ?? ""} ${className}`)
+      || AMBIENT_LAYER_CLASS.test(className));
 }
 
 function isActionable(item) {
