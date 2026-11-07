@@ -11,8 +11,8 @@ Every public archived repository in the `szl-holdings` organization, mapped to t
 
 | Metric | Count |
 |---|---:|
-| Public repositories total | 130 |
-| Active public repositories | 101 |
+| Public repositories total | 134 |
+| Active public repositories | 105 |
 | Archived public repositories (tombstones) | 29 |
 | Tombstones with a resolved successor | 22 |
 | Tombstones terminal by design | 6 |
@@ -23,7 +23,7 @@ Every public archived repository in the `szl-holdings` organization, mapped to t
 
 | Archived repo | Canonical successor | Language | Last push |
 |---|---|---|---|
-| `cosmos` | [`anatomy`](https://github.com/szl-holdings/anatomy) | JavaScript | 2026-08-29 |
+| `cosmos` | [`anatomy`](https://github.com/szl-holdings/anatomy) | JavaScript | 2026-11-05 |
 | `counsel` | [`ayllu`](https://github.com/szl-holdings/ayllu) | Python | 2026-08-29 |
 | `developers` | [`a11oy-net`](https://github.com/szl-holdings/a11oy-net) | HTML | 2026-07-29 |
 | `docs-site` | [`a11oy-net`](https://github.com/szl-holdings/a11oy-net) | JavaScript | 2026-10-28 |
