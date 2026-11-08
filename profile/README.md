@@ -27,6 +27,31 @@ The single-cell example summarizes public GEO GSE85241 data and checks integrity
 
 A published file, running application and independently checked result establish different things. Each artifact needs its own evidence and use limits.
 
+
+## The flagship estate
+
+| Flagship | What it is | Live |
+|---|---|---|
+| **a11oy** | The governed runtime — x402-monetized API surfaces, receipts, doctrine | [a-11-oy.com](https://a-11-oy.com) · [Space](https://huggingface.co/spaces/SZLHOLDINGS/a11oy) |
+| **Living Anatomy** | The canonical anatomy engine — org Space, verified publish (run #874) | [szlholdings-anatomy.hf.space](https://szlholdings-anatomy.hf.space) · [repo](https://github.com/szl-holdings/anatomy) |
+| **Second Brain** | The estate's memory and knowledge plane | [Space](https://huggingface.co/spaces/SZLHOLDINGS/szl-second-brain) · [repo](https://github.com/szl-holdings/szl-second-brain) |
+| **hatun-mcp** | Production MCP tooling on sovereign compute (A6000) | [repo](https://github.com/szl-holdings/hatun-mcp) · [mcp.a-11-oy.com](https://mcp.a-11-oy.com) |
+| **killinchu** | Counter-UAS intelligence, continuously certified | [killinchu.a-11-oy.com](https://killinchu.a-11-oy.com) · [repo](https://github.com/szl-holdings/killinchu) |
+
+## Measured result: the confabulation floor
+
+One 6-probe battery, every model receipted, every failure published — [receipts](https://huggingface.co/datasets/SZLHOLDINGS/model-eval-receipts).
+
+| Model | Method | Abstained | Verdict |
+|---|---|---|---|
+| Estate students (0.8B–4B) | SFT · ouroboros · DPO ×2 · cookie-DPO | 0–2/6 | **FAIL** |
+| Qwen3-8B | open weights | 1/6 | **FAIL** |
+| Qwen3-14B | open weights | 1/6 | **FAIL** |
+| Estate teacher + copy-constrained decoding | logits masked to source tokens | **21.9%** capture (46/210) | **16× the free-decoding floor** |
+| Claude Sonnet 4.5 (`claude-sonnet-4-5-20250929`) | frontier alignment | **5/6** | **PASS — first in the arc** |
+
+**The law, measured nine ways:** the confabulation floor is an *alignment property expressed through decoding* — estate training at ≤4B does not move it, open-model scale to 14B does not move it, constrained decoding moves it 16×, frontier alignment clears it. Papers: [P8](https://doi.org/10.5281/zenodo.24043620) · [P9](https://doi.org/10.5281/zenodo.24043622).
+
 ## Current state
 
 <!-- szl:public-inventory:start -->
