@@ -47,13 +47,22 @@ jobs:
     # Admin action required: add org secret HF_TOKEN (HF write token scoped to SZLHOLDINGS)
     # to re-enable. See FOUNDER_SECRETS_RUNBOOK.md.
     steps:
+      - name: Harden runner
+        uses: step-security/harden-runner@e14015d583714f6e62063499dc959a02595150a1 # v2.21.1
+        with:
+          egress-policy: audit
+
       - name: Checkout .github
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
 
       - name: Check HF_TOKEN availability
         id: hf-check
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
         run: |
-          if [ -z "${{ secrets.HF_TOKEN }}" ]; then
+          if [ -z "${HF_TOKEN:-}" ]; then
             echo "has_token=false" >> "$GITHUB_OUTPUT"
             echo "::notice title=HF_TOKEN absent::HF Daily Activity skipped — add org secret HF_TOKEN (HF write token scoped to SZLHOLDINGS) to enable. See FOUNDER_SECRETS_RUNBOOK.md."
           else
@@ -64,13 +73,22 @@ jobs:
         if: steps.hf-check.outputs.has_token == 'true'
         uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
-          python-version: '3.12'
+          python-version: '3.12.14'
 
-      - name: Install dependencies
+      - name: Install hash-locked dependencies in an isolated environment
         if: steps.hf-check.outputs.has_token == 'true'
         run: |
-          python -m pip install --upgrade pip
-          python -m pip install huggingface_hub requests "sigstore>=2.0.0"
+          set -euo pipefail
+          VENV="$RUNNER_TEMP/hf-daily-activity-venv"
+          if [ -e "$VENV" ]; then
+            echo '::error::Refusing preexisting HF daily activity environment.'
+            exit 2
+          fi
+          python3 -m venv "$VENV"
+          "$VENV/bin/python" -I -P -m pip install \
+            --disable-pip-version-check --require-hashes --only-binary=:all: \
+            -r requirements/hf-daily-activity.lock
+          echo "$VENV/bin" >> "$GITHUB_PATH"
 
       - name: Fetch live counts from HF API
         id: counts
