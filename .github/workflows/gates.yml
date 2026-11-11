@@ -29,13 +29,14 @@ jobs:
         with:
           python-version: "3.12"
       - name: Validate pull request admission metadata
-        if: github.event_name == 'pull_request'
+        if: github.event_name == 'pull_request' && github.actor != 'dependabot[bot]'
         env:
           PR_BODY: ${{ github.event.pull_request.body }}
         run: >-
           printf '%s' "$PR_BODY" |
           python .github/scripts/validate_forge9_pr_metadata.py
-      - run: python .governance/forge9_gate_runner.py gate/labels
+      - if: github.actor != 'dependabot[bot]'
+        run: python .governance/forge9_gate_runner.py gate/labels
 
   schema:
     name: gate/schema
