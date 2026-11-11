@@ -74,6 +74,9 @@ LOCKFILE_NAMES = (
 # not resolve off-box. `package-firewall.replit.local` is the one seen in the
 # wild; the pattern generalizes so a different sandbox host is still caught.
 _REPLIT_HOST_RE = re.compile(r"[A-Za-z0-9_.-]+\.replit\.local", re.IGNORECASE)
+# Decode complete JSON-compatible quoted strings exactly once. Never apply
+# generic unicode-escape decoding to arbitrary text or literal backslashes.
+_QUOTED_STRING_RE = re.compile(r'"(?:[^"\\]|\\.)*"')
 
 # The safe rewrite target (tarball + integrity sha are identical; only the
 # mirror host differs). Used by --fix and reported as the suggested remedy.
@@ -113,7 +116,14 @@ def scan_text(text: str):
     """Return a sorted list of unique `*.replit.local` hosts found in `text`."""
     if not text:
         return []
-    return sorted({m.group(0).lower() for m in _REPLIT_HOST_RE.finditer(text)})
+    hosts = {m.group(0).lower() for m in _REPLIT_HOST_RE.finditer(text)}
+    for token in _QUOTED_STRING_RE.finditer(text):
+        try:
+            decoded = json.loads(token.group(0))
+        except ValueError:
+            continue
+        hosts.update(m.group(0).lower() for m in _REPLIT_HOST_RE.finditer(decoded))
+    return sorted(hosts)
 
 
 def is_lockfile(path: str) -> bool:

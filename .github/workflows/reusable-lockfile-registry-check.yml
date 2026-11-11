@@ -17,7 +17,8 @@ name: Reusable — Lockfile Registry Check
 #     lockfiles:
 #       uses: szl-holdings/.github/.github/workflows/reusable-lockfile-registry-check.yml@<full-commit-sha>  # SHA-pin per pin-check.yml
 #
-# The check is a self-contained grep so it works even in a repo that does not
+# The check uses a self-contained stdlib scanner, including JSON string escapes,
+# so it works even in a repo that does not
 # vendor the python script. The accompanying script
 # (.github/scripts/lockfile_registry_check.py) offers a `--fix` mode that rewrites
 # the host back to https://registry.npmjs.org/ (tarball + integrity sha unchanged).
@@ -50,7 +51,7 @@ jobs:
           persist-credentials: false
           sparse-checkout: .github/workflows
 
-      - name: Grep committed lockfiles for *.replit.local hosts
+      - name: Scan committed lockfiles for *.replit.local hosts
         shell: bash
         run: |
           set -euo pipefail
@@ -84,24 +85,34 @@ jobs:
           echo "Scanning ${#files[@]} lockfile(s):"
           printf '  - %s\n' "${files[@]}"
 
-          # Any host ending in .replit.local is an internal Replit mirror.
-          pattern='[A-Za-z0-9_.-]+\.replit\.local'
           found=0
           for f in "${files[@]}"; do
             # cat-file reads the committed blob even though it is intentionally
             # absent from the sparse worktree. A missing/unreadable object is a
             # hard failure under `set -e` rather than a false clean result.
             git cat-file blob "HEAD:$f" > "$lockfile_blob"
-            if hits="$(grep -aEo "$pattern" "$lockfile_blob" | LC_ALL=C sort -u)"; then
-              :
-            else
-              grep_status=$?
-              if [ "$grep_status" -ne 1 ]; then
-                echo "::error file=${f}::Lockfile scan failed with grep status ${grep_status}."
-                exit "$grep_status"
-              fi
-              hits=""
-            fi
+            # The trusted workflow supplies this scanner; caller code is never
+            # executed. Decode quoted JSON strings once as well as scanning raw
+            # text, so escaped npm URLs and DNS case cannot conceal the host.
+            # A scanner failure propagates through this assignment under set -e.
+            hits="$(python3 -I -P - "$lockfile_blob" <<'PYTHON_SCAN'
+          import json
+          import re
+          import sys
+          from pathlib import Path
+
+          text = Path(sys.argv[1]).read_text(encoding="utf-8", errors="replace")
+          pattern = re.compile(r"[A-Za-z0-9_.-]+\.replit\.local", re.IGNORECASE)
+          hosts = {match.group(0).lower() for match in pattern.finditer(text)}
+          for token in re.finditer(r'"(?:[^"\\]|\\.)*"', text):
+              try:
+                  decoded = json.loads(token.group(0))
+              except ValueError:
+                  continue
+              hosts.update(match.group(0).lower() for match in pattern.finditer(decoded))
+          print("\n".join(sorted(hosts)), end="")
+          PYTHON_SCAN
+            )"
             if [ -n "$hits" ]; then
               found=1
               joined="${hits//$'\n'/, }"
