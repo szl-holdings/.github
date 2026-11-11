@@ -42,7 +42,8 @@ fails on real honesty drift, not on expected chrome differences.
 Exit status:
   0  every surface agrees and is honest.
   1  drift / a broken honesty invariant on at least one surface.
-  2  a surface could not be fetched (network/auth). NEVER a silent green --
+  2  no surfaces were checked, or a surface could not be fetched (network/auth).
+     NEVER a silent green --
      coverage can't look clean when the check could not actually run.
 
 stdlib only (no requests / huggingface_hub) so it runs on a bare runner.
@@ -275,6 +276,13 @@ def evaluate(surfaces):
     canon = _sorted_fids(CANONICAL_LOCKED)
     findings = []
     fps = [fingerprint(s) for s in surfaces]
+    if not fps:
+        return {
+            "canonical_locked": list(canon),
+            "surfaces": [],
+            "findings": ["No surfaces were checked; consistency is unverified."],
+            "ok": False,
+        }, 2
 
     for fp in fps:
         for e in fp["errors"]:
@@ -470,7 +478,7 @@ def main(argv=None):
         print("✓ SZL anatomy map is consistent across all surfaces: "
               f"locked-8 = {{{', '.join(report['canonical_locked'])}}}, "
               "Λ = Conjecture 1 on every surface, capability ladder in sync.")
-    else:
+    elif code == 1:
         print("::error::SZL anatomy-map DRIFT detected:")
         for f in report["findings"]:
             print(f"::error::  - {f}")
@@ -478,6 +486,10 @@ def main(argv=None):
               "{F1,F4,F7,F11,F12,F18,F19,F22}, the Λ=Conjecture-1 label, and the "
               "capability ladder match on a11oy /console, killinchu /elite, and "
               "the SZLHOLDINGS/anatomy HF Space.")
+    else:
+        print("::error::SZL anatomy-map consistency could not be verified:")
+        for f in report["findings"]:
+            print(f"::error::  - {f}")
     return code
 
 

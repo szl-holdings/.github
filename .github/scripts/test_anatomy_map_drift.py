@@ -23,8 +23,13 @@ matching the locked ladder, the Λ label, the capability list, or the markers
 from __future__ import annotations
 
 import importlib.util
+import contextlib
+import io
+import json
 import os
+import tempfile
 import unittest
+from unittest import mock
 
 _HERE = os.path.dirname(os.path.abspath(__file__))
 _MODULE_PATH = os.path.join(_HERE, "anatomy_map_drift.py")
@@ -137,6 +142,37 @@ class TestExtractors(unittest.TestCase):
 
 
 class TestEvaluate(unittest.TestCase):
+    def test_empty_coverage_is_unverified_not_consistent(self):
+        report, code = amd.evaluate([])
+        self.assertEqual(code, 2)
+        self.assertFalse(report["ok"])
+        self.assertEqual(report["surfaces"], [])
+        self.assertTrue(report["findings"])
+
+    def test_one_selected_surface_can_still_pass(self):
+        report, code = amd.evaluate([_surfaces()[-1]])
+        self.assertEqual(code, 0, report["findings"])
+        self.assertTrue(report["ok"])
+
+    def test_empty_registry_cli_retains_failed_coverage_report(self):
+        with tempfile.TemporaryDirectory() as directory:
+            registry = os.path.join(directory, "registry.json")
+            output = os.path.join(directory, "report.json")
+            with open(registry, "w", encoding="utf-8") as stream:
+                json.dump({"surfaces": []}, stream)
+            console = io.StringIO()
+            with mock.patch.object(amd, "fetch_surface") as fetch, \
+                    contextlib.redirect_stdout(console):
+                code = amd.main(["--registry", registry, "--report", output])
+            fetch.assert_not_called()
+            with open(output, encoding="utf-8") as stream:
+                report = json.load(stream)
+        self.assertEqual(code, 2)
+        self.assertFalse(report["ok"])
+        self.assertEqual(report["surfaces"], [])
+        self.assertIn("could not be verified", console.getvalue())
+        self.assertNotIn("is consistent across all surfaces", console.getvalue())
+
     def test_passes_when_in_sync(self):
         report, code = amd.evaluate(_surfaces())
         self.assertEqual(code, 0, report["findings"])
