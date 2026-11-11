@@ -21,6 +21,7 @@ import os
 import threading
 import time
 import urllib.error
+import urllib.parse
 import urllib.request
 from dataclasses import dataclass, field
 from typing import Any, Mapping, Sequence
@@ -79,6 +80,49 @@ class ApiError(DigestError):
         self.status = status
         self.detail_class = detail_class
         self.retry_after_seconds = retry_after_seconds
+
+
+def _require_api_origin(url: str, operation: str) -> None:
+    """Keep organization credentials on the fixed GitHub HTTPS API origin."""
+    try:
+        parsed = urllib.parse.urlsplit(url)
+        trusted = (
+            parsed.scheme == "https"
+            and parsed.netloc.lower() in {"api.github.com", "api.github.com:443"}
+            and not parsed.fragment
+            and not any(
+                ord(character) <= 32 or ord(character) == 127
+                for character in url
+            )
+        )
+    except (TypeError, ValueError):
+        trusted = False
+    if not trusted:
+        # Do not echo a supplied URL: it may contain credentials or private data.
+        raise ApiError(
+            operation=operation, status=0, detail_class="untrusted_api_origin"
+        )
+
+
+class _GitHubRedirectHandler(urllib.request.HTTPRedirectHandler):
+    def __init__(self, operation: str) -> None:
+        super().__init__()
+        self.operation = operation
+
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        try:
+            _require_api_origin(newurl, self.operation)
+        except ApiError:
+            fp.close()
+            raise
+        return super().redirect_request(req, fp, code, msg, headers, newurl)
+
+
+def _open_api_request(request: urllib.request.Request, *, operation: str):
+    # Use a local opener: replacing urllib's global opener could affect other
+    # concurrent requests. GitHub's same-origin repository redirects still work.
+    opener = urllib.request.build_opener(_GitHubRedirectHandler(operation))
+    return opener.open(request, timeout=45)
 
 
 @dataclass(frozen=True)
@@ -243,6 +287,7 @@ def request_json(
         raise DigestError(f"no credential supplied for {operation}")
     if attempts < 1:
         raise DigestError("request attempts must be positive")
+    _require_api_origin(url, operation)
     expected = expected or {200}
     data = json.dumps(body).encode("utf-8") if body is not None else None
     headers = {
@@ -265,7 +310,7 @@ def request_json(
         )
         try:
             with _HTTP_SEMAPHORE:
-                with urllib.request.urlopen(request, timeout=45) as response:
+                with _open_api_request(request, operation=operation) as response:
                     status = int(response.status)
                     raw = response.read()
                     payload = json.loads(raw) if raw else {}
@@ -607,3 +652,4 @@ def select_reader() -> ReaderSelection:
             attempts=tuple(attempts),
         )
     raise ReaderSelectionError(attempts)
+
