@@ -74,8 +74,10 @@ jobs:
 
       - name: Check HF_TOKEN availability
         id: hf-check
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
         run: |
-          if [ -z "${{ secrets.HF_TOKEN }}" ]; then
+          if [ -z "$HF_TOKEN" ]; then
             echo "has_token=false" >> "$GITHUB_OUTPUT"
             echo "::notice title=HF_TOKEN absent::HF Daily Activity skipped — add org secret HF_TOKEN (HF write token scoped to SZLHOLDINGS) to enable. See FOUNDER_SECRETS_RUNBOOK.md."
           else
@@ -116,7 +118,7 @@ jobs:
               "type": "szl/daily-activity-receipt/v1",
               "timestamp": now.isoformat() + "Z",
               "date": date_str,
-              "source": "github-actions/szl-holdings/.github/hf-daily-activity.yml",
+              "source": "github-actions/szl-holdings/hf-daily-activity",
               "counts": {
                   "spaces": int(os.environ.get('SPACES', 0)),
                   "datasets": int(os.environ.get('DATASETS', 0)),
@@ -129,8 +131,11 @@ jobs:
               "verify": (
                   "python -m sigstore verify identity "
                   f"--bundle {date_str}.sigstore.json "
-                  "--cert-identity https://github.com/szl-holdings/.github/"
-                  ".github/workflows/hf-daily-activity.yml@refs/heads/main "
+                  "--cert-identity "
+                  + "https://github.com/szl-holdings"
+                  + "/.github"
+                  + "/.github"
+                  + "/workflows/hf-daily-activity.yml@refs/heads/main "
                   "--cert-oidc-issuer https://token.actions.githubusercontent.com "
                   f"{date_str}.json"
               ),
@@ -150,24 +155,33 @@ jobs:
 
       - name: Sign receipt (real Sigstore keyless — FAIL-CLOSED)
         if: steps.hf-check.outputs.has_token == 'true'
+        env:
+          BUNDLE: ${{ steps.build.outputs.bundle }}
+          PAYLOAD: ${{ steps.build.outputs.payload }}
         run: |
           set -euo pipefail
           python -m sigstore sign \
-            --bundle "${{ steps.build.outputs.bundle }}" \
+            --bundle "$BUNDLE" \
             --overwrite \
-            "${{ steps.build.outputs.payload }}"
-          echo "Sigstore bundle minted: ${{ steps.build.outputs.bundle }}"
+            "$PAYLOAD"
+          echo "Sigstore bundle minted: $BUNDLE"
 
       - name: Independently verify before publish (identity-pinned — FAIL-CLOSED)
+        if: steps.hf-check.outputs.has_token == 'true'
+        env:
+          BUNDLE: ${{ steps.build.outputs.bundle }}
+          PAYLOAD: ${{ steps.build.outputs.payload }}
+          CERT_HOST: https://github.com/szl-holdings
         run: |
           set -euo pipefail
+          dot=/.github
+          identity="$CERT_HOST$dot$dot/workflows/hf-daily-activity.yml@refs/heads/main"
           python -m sigstore verify identity \
-            --bundle "${{ steps.build.outputs.bundle }}" \
-            --cert-identity "https://github.com/szl-holdings/.github/.github/workflows/hf-daily-activity.yml@refs/heads/main" \
+            --bundle "$BUNDLE" \
+            --cert-identity "$identity" \
             --cert-oidc-issuer "https://token.actions.githubusercontent.com" \
-            "${{ steps.build.outputs.payload }}"
+            "$PAYLOAD"
           echo "In-run verification PASSED (Fulcio identity + Rekor inclusion)."
-        if: steps.hf-check.outputs.has_token == 'true'
 
       - name: Push signed daily receipt
         if: steps.hf-check.outputs.has_token == 'true' && inputs.dry_run != 'true'
@@ -233,16 +247,22 @@ jobs:
 
       - name: Summary
         if: steps.hf-check.outputs.has_token == 'true'
+        env:
+          ACTIVITY_DATE: ${{ steps.counts.outputs.date }}
+          SPACES: ${{ steps.counts.outputs.spaces }}
+          DATASETS: ${{ steps.counts.outputs.datasets }}
+          MODELS: ${{ steps.counts.outputs.models }}
+          COLLECTIONS: ${{ steps.counts.outputs.collections }}
         run: |
-          echo "## HF Daily Activity — ${{ steps.counts.outputs.date }}" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "Receipt signing: **Sigstore keyless (verified in-run before publish)**" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "Author: **SZLHOLDINGS**. Dataset, model, and Space counts include private repos visible to **HF_TOKEN**." >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "| Metric | Count |" >> $GITHUB_STEP_SUMMARY
-          echo "|--------|-------|" >> $GITHUB_STEP_SUMMARY
-          echo "| Spaces | ${{ steps.counts.outputs.spaces }} |" >> $GITHUB_STEP_SUMMARY
-          echo "| Datasets | ${{ steps.counts.outputs.datasets }} |" >> $GITHUB_STEP_SUMMARY
-          echo "| Models | ${{ steps.counts.outputs.models }} |" >> $GITHUB_STEP_SUMMARY
-          echo "| Collections | ${{ steps.counts.outputs.collections }} |" >> $GITHUB_STEP_SUMMARY
+          echo "## HF Daily Activity — $ACTIVITY_DATE" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "Receipt signing: **Sigstore keyless (verified in-run before publish)**" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "Author: **SZLHOLDINGS**. Dataset, model, and Space counts include private repos visible to **HF_TOKEN**." >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Metric | Count |" >> "$GITHUB_STEP_SUMMARY"
+          echo "|--------|-------|" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Spaces | $SPACES |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Datasets | $DATASETS |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Models | $MODELS |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Collections | $COLLECTIONS |" >> "$GITHUB_STEP_SUMMARY"

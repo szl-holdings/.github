@@ -184,7 +184,7 @@ def http_get(url: str, token: str | None) -> tuple[int, bytes, str]:
     opener = urllib.request.build_opener(_RefuseRedirect)
     try:
         with opener.open(request, timeout=45) as response:
-            status = getattr(response, "status", 200)
+            status = response.status
             link = response.headers.get("Link") or ""
             body = response.read(MAX_PAGE_BYTES + 1)
     except urllib.error.HTTPError as exc:
