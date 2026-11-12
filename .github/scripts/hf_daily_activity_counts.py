@@ -5,8 +5,14 @@ Dataset, model, and Space listings follow every ``Link: rel="next"`` page.
 A single ``limit`` is not the full inventory: the Hub defaults to a short
 page and puts the rest behind a cursor. The next URL is accepted only when
 it stays on ``https://huggingface.co/api/<kind>`` and still filters
-``author=SZLHOLDINGS``, so the bearer token is never sent to another host
+``author=SZLHOLDINGS`` (the Hub org id; ``szl-holdings`` is the GitHub org
+and returns no datasets). The bearer token is never sent to another host
 or to an unfiltered listing.
+
+The daily workflow passes ``HF_TOKEN`` on every page. Authenticated pages
+include private repos, and those rows are counted with the public ones.
+There is no public-only filter. Without the token the count step does not
+run.
 
 Collections are a different endpoint. ``namespace=`` does not filter to the
 org, and its next link drops the query, so this script keeps the historical
@@ -84,7 +90,11 @@ def list_author_repos(
     page_limit: int = PAGE_LIMIT,
     max_pages: int = MAX_PAGES,
 ) -> list[dict]:
-    """Return every repo summary for ``kind`` under ``ORG``."""
+    """Return every repo summary for ``kind`` under ``ORG``.
+
+    Private rows are kept. The caller decides whether ``token`` is sent;
+    the workflow always sends ``HF_TOKEN``.
+    """
     if isinstance(page_limit, bool) or not isinstance(page_limit, int):
         raise RuntimeError("HF page limit rejected")
     if not 1 <= page_limit <= PAGE_LIMIT:

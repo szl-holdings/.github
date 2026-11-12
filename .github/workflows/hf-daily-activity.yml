@@ -97,8 +97,8 @@ jobs:
       - name: Fetch live counts from HF API
         id: counts
         if: steps.hf-check.outputs.has_token == 'true'
-        # Page every author-filtered datasets, models, and spaces listing.
-        # The first Hub page is not the inventory.
+        # Author is the Hub org SZLHOLDINGS. Follow every page. HF_TOKEN is
+        # sent on each page, so private repos the token can read are counted.
         run: python3 .github/scripts/hf_daily_activity_counts.py
         env:
           HF_TOKEN: ${{ secrets.HF_TOKEN }}
@@ -237,6 +237,8 @@ jobs:
           echo "## HF Daily Activity — ${{ steps.counts.outputs.date }}" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "Receipt signing: **Sigstore keyless (verified in-run before publish)**" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Author: **SZLHOLDINGS**. Dataset, model, and Space counts include private repos visible to **HF_TOKEN**." >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "| Metric | Count |" >> $GITHUB_STEP_SUMMARY
           echo "|--------|-------|" >> $GITHUB_STEP_SUMMARY

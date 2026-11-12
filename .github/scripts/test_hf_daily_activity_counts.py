@@ -178,6 +178,28 @@ class DailyActivityCountTests(unittest.TestCase):
             server.shutdown()
             server.server_close()
 
+    def test_private_datasets_for_the_hub_org_are_counted(self) -> None:
+        self.assertEqual(counts.ORG, "SZLHOLDINGS")
+        first = f"https://huggingface.co/api/datasets?author={ORG}&limit=50"
+        second = f"https://huggingface.co/api/datasets?author={ORG}&limit=50&cursor=private"
+        transport = FakeGet(
+            {
+                first: _page(
+                    [{"id": f"{ORG}/public-set", "private": False}],
+                    f'<{second}>; rel="next"',
+                ),
+                second: _page([{"id": f"{ORG}/private-set", "private": True}]),
+            }
+        )
+        found = counts.list_author_repos("datasets", transport, "hf-token", page_limit=50)
+        self.assertEqual(
+            [(item["id"], item["private"]) for item in found],
+            [(f"{ORG}/public-set", False), (f"{ORG}/private-set", True)],
+        )
+        self.assertTrue(all(call[1] == "hf-token" for call in transport.calls))
+        self.assertIn(f"author={ORG}", transport.calls[0][0])
+        self.assertNotIn("author=szl-holdings", transport.calls[0][0])
+
     def test_workflow_calls_the_pager_and_does_not_publish_on_pull_request(self) -> None:
         text = WORKFLOW.read_text(encoding="utf-8")
         self.assertIn("python3 .github/scripts/hf_daily_activity_counts.py", text)
@@ -186,6 +208,9 @@ class DailyActivityCountTests(unittest.TestCase):
         self.assertNotIn("/api/datasets?", text)
         self.assertIn("if: github.event_name != 'pull_request'", text)
         self.assertIn("if: github.event_name == 'pull_request'", text)
+        self.assertIn("HF_TOKEN: ${{ secrets.HF_TOKEN }}", text)
+        self.assertIn("private repos visible to **HF_TOKEN**", text)
+        self.assertIn("Author: **SZLHOLDINGS**", text)
 
 
 if __name__ == "__main__":
