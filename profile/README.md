@@ -27,6 +27,16 @@ The single-cell example summarizes public GEO GSE85241 data and checks integrity
 
 A published file, running application and independently checked result establish different things. Each artifact needs its own evidence and use limits.
 
+## Latest measured work (2026-11-12, dated observation)
+
+- **Receipts chain:** [`SZLHOLDINGS/frontier-54-runs`](https://huggingface.co/datasets/SZLHOLDINGS/frontier-54-runs), with a browsable [explorer](https://szlholdings-szl-receipts-chain.hf.space). Each receipt carries its own SHA-256. The Lean prove-or-abstain runs are also linked by previous hash. Agent proving-ground receipts are self-hashed only and are **unsigned**.
+- **Honesty battery:** [`quant-master-v1-candidate`](https://huggingface.co/SZLHOLDINGS/quant-master-v1-candidate), a LoRA on Qwen3-1.7B, scored 5/6 on the estate's 6-probe abstention battery. Earlier candidates scored 3/6. With n = 6 the difference is **not statistically significant** (Fisher p ≈ 0.27). It is a signal to test at scale, not a result.
+- **Agent Proving Ground:** three receipted runs, two REJECTED and one `PROMOTED_TO_AGENT`. The promotion reflects the 6-question honesty screen. The authority stage currently checks the SDK gate function, not the model's own tool use.
+- **Lean:** a full `lake build` of the Lutar Lean library finished with 9,242 jobs and zero errors on an NVIDIA RTX A6000 host ([receipt](https://huggingface.co/datasets/SZLHOLDINGS/frontier-54-runs/blob/main/lean/lake-build-complete.json)). Twelve model-written proof sketches are queued for machine checking. None are verified yet.
+- **SDK:** [`szl` on PyPI](https://pypi.org/project/szl/) (0.1.0) provides khipu signing, the Kamachikuna gate, provenance badges and the router.
+
+Every line above links to its evidence. Each one establishes only what the linked artifact records.
+
 ## Current state
 
 <!-- szl:public-inventory:start -->
