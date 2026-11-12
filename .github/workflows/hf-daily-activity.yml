@@ -32,13 +32,32 @@ on:
         description: 'Dry run (sign + verify, skip push to HF)'
         required: false
         default: 'false'
+  pull_request:
+    paths:
+      - .github/workflows/hf-daily-activity.yml
+      - .github/scripts/hf_daily_activity_counts.py
+      - .github/scripts/test_hf_daily_activity_counts.py
 
 permissions:
   contents: read
 
 jobs:
+  pagination-contract:
+    name: Pagination contract
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout .github
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Test dataset pagination
+        run: python3 .github/scripts/test_hf_daily_activity_counts.py
+
   hf-daily-refresh:
     name: Refresh HF org card + push signed activity receipt
+    if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -49,6 +68,9 @@ jobs:
     steps:
       - name: Checkout .github
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Test dataset pagination
+        run: python3 .github/scripts/test_hf_daily_activity_counts.py
 
       - name: Check HF_TOKEN availability
         id: hf-check
@@ -75,33 +97,9 @@ jobs:
       - name: Fetch live counts from HF API
         id: counts
         if: steps.hf-check.outputs.has_token == 'true'
-        run: |
-          python3 << 'PYEOF'
-          import requests, json, os
-
-          headers = {"Authorization": f"Bearer {os.environ['HF_TOKEN']}"}
-
-          spaces = requests.get("https://huggingface.co/api/spaces?author=SZLHOLDINGS&limit=50", headers=headers).json()
-          datasets = requests.get("https://huggingface.co/api/datasets?author=SZLHOLDINGS&limit=50", headers=headers).json()
-          models = requests.get("https://huggingface.co/api/models?author=SZLHOLDINGS&limit=50", headers=headers).json()
-          collections = list(requests.get("https://huggingface.co/api/collections?namespace=SZLHOLDINGS&limit=20", headers=headers).json())
-
-          counts = {
-              "spaces": len(spaces),
-              "datasets": len(datasets),
-              "models": len(models),
-              "collections": len(collections),
-              "date": __import__('datetime').datetime.utcnow().strftime("%Y-%m-%d"),
-          }
-          print(json.dumps(counts, indent=2))
-
-          with open(os.environ['GITHUB_OUTPUT'], 'a') as f:
-              f.write(f"spaces={counts['spaces']}\n")
-              f.write(f"datasets={counts['datasets']}\n")
-              f.write(f"models={counts['models']}\n")
-              f.write(f"collections={counts['collections']}\n")
-              f.write(f"date={counts['date']}\n")
-          PYEOF
+        # Page every author-filtered datasets, models, and spaces listing.
+        # The first Hub page is not the inventory.
+        run: python3 .github/scripts/hf_daily_activity_counts.py
         env:
           HF_TOKEN: ${{ secrets.HF_TOKEN }}
 
