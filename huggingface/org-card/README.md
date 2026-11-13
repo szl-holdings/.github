@@ -62,6 +62,6 @@ Supplemental observation on 2026-11-13: the public page listed 107 model reposit
 Reproduce with `python .github/scripts/hf_static_space_deploy.py --manifest huggingface/org-card.manifest.json --materialize preview_dir`; serve with `python -m http.server 8000`.
 
 
-Roles: Three commercial flagships A11oy, Killinchu, Forge; one inference flagship SZL Router; Five public domain bodies Terra, Killinchu, PRISM Counsel, PURIQ Finance, LYTE; Six internal engines CHAPAQ, Lyte, Killinchu, Finance, Terra, Counsel.
+Roles: three commercial flagships — A11oy, Killinchu, Forge; one inference flagship — SZL Router; five public domain bodies — Terra, Killinchu, PRISM Counsel, PURIQ Finance, LYTE; six internal engines — CHAPAQ, Lyte, Killinchu, Finance, Terra, Counsel.
 
 </details>
