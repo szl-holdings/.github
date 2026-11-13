@@ -57,22 +57,8 @@ Supplemental observation on 2026-11-13: the public page listed 107 model reposit
 
 [Architecture](https://huggingface.co/spaces/SZLHOLDINGS/README/resolve/main/assets/estate-command-system.svg).
 
-Check source and digests in [`deployment.json`](https://szlholdings-readme.static.hf.space/deployment.json) against the [manifest](https://github.com/szl-holdings/.github/blob/main/huggingface/org-card.manifest.json). Signatures establish scoped integrity and origin, never accuracy or fitness.
+[`deployment.json`](https://szlholdings-readme.static.hf.space/deployment.json) records the source revision; compare it with the [publisher manifest](https://github.com/szl-holdings/.github/blob/main/huggingface/org-card.manifest.json). A signature proves scoped integrity and origin, never accuracy or fitness.
 
-```bash
-preview_dir="$(mktemp -d)"
-python .github/scripts/hf_static_space_deploy.py --repo-root . \
-  --manifest huggingface/org-card.manifest.json \
-  --source-sha "$(git rev-parse HEAD)" --materialize "$preview_dir"
-python -m http.server 8000 --directory "$preview_dir"
-```
-
-### Portfolio roles
-
-- **Three commercial flagships:** A11oy, Killinchu, Forge.
-- **One inference flagship:** SZL Router.
-- **Five public domain bodies:** Terra, Killinchu, PRISM Counsel, PURIQ Finance, LYTE.
-- **Six internal engines:** CHAPAQ (folded into Killinchu), Lyte, Killinchu, Finance, Terra, Counsel.
-
+Reproduce with `python .github/scripts/hf_static_space_deploy.py --manifest huggingface/org-card.manifest.json --materialize preview_dir`; serve with `python -m http.server 8000`.
 
 </details>
