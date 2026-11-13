@@ -16,15 +16,15 @@ license: apache-2.0
 
 # Governed intelligence. Checkable results.
 
-SZL Holdings builds AI software and research tools with checkable sources. Inspect stages and use limits.
+SZL Holdings builds source-traceable AI research software.
 
-[**Explore Command Lab →**](https://huggingface.co/spaces/SZLHOLDINGS/szl-command-lab) · [**Build source →**](https://github.com/szl-holdings)
+[**Explore Command Lab**](https://huggingface.co/spaces/SZLHOLDINGS/szl-command-lab) · [**Build source**](https://github.com/szl-holdings)
 
 ## Repeat a public calculation
 
-[Input and hash](https://github.com/szl-holdings/governed-receipt-spec/tree/320983d22e76fc9b26af0b2cd20799c5000543fc/examples/public-single-cell#public-data-and-attribution) → [Executed code](https://github.com/szl-holdings/governed-receipt-spec/blob/160e39b1383a0e249399b6dfb72983b67aef7fe8/examples/public-single-cell/run_example.py) → [Retained result](https://github.com/szl-holdings/governed-receipt-spec/blob/320983d22e76fc9b26af0b2cd20799c5000543fc/examples/public-single-cell/observed-run.json) → [Repeat](https://github.com/szl-holdings/governed-receipt-spec/tree/320983d22e76fc9b26af0b2cd20799c5000543fc/examples/public-single-cell#reproduce-the-recorded-run) → [Limits](https://github.com/szl-holdings/governed-receipt-spec/tree/320983d22e76fc9b26af0b2cd20799c5000543fc/examples/public-single-cell#outputs-and-verification-boundary)
+[Input and hash](https://github.com/szl-holdings/governed-receipt-spec/tree/320983d22e76fc9b26af0b2cd20799c5000543fc/examples/public-single-cell#public-data-and-attribution) [Executed code](https://github.com/szl-holdings/governed-receipt-spec/blob/160e39b1383a0e249399b6dfb72983b67aef7fe8/examples/public-single-cell/run_example.py) [Retained result](https://github.com/szl-holdings/governed-receipt-spec/blob/320983d22e76fc9b26af0b2cd20799c5000543fc/examples/public-single-cell/observed-run.json) [Repeat](https://github.com/szl-holdings/governed-receipt-spec/tree/320983d22e76fc9b26af0b2cd20799c5000543fc/examples/public-single-cell#reproduce-the-recorded-run) [Limits](https://github.com/szl-holdings/governed-receipt-spec/tree/320983d22e76fc9b26af0b2cd20799c5000543fc/examples/public-single-cell#outputs-and-verification-boundary)
 
-Public GEO GSE85241 example: integrity and repeatability checks, unsigned receipt, no biological or clinical claim.
+GEO GSE85241: integrity and repeatability checks; unsigned receipt; no biological or clinical claim.
 
 ## Choose a path
 
@@ -48,20 +48,16 @@ Killinchu's public effectors remain **SIMULATED**.
 The source-bound public inventory records **52 public Spaces, 138 model repositories, 14 native kernels, 68 datasets** at **2026-11-14T04:09:48Z** under `hf-public-author-membership/v2`. This is a dated observation, not a live count. Native kernel IDs may also appear in the model namespace; these figures do not count unique projects or trained language models. [Inventory binding](https://github.com/szl-holdings/.github/blob/main/profile/public-inventory.json) · [Exact source](https://github.com/szl-holdings/a11oy/blob/dac5a4cac8011af907146e813b0e8996a3bee424/docs/huggingface-ecosystem-manifest.json) · [Current Hub listing](https://huggingface.co/SZLHOLDINGS). Hub inventory is registry evidence, not availability, operational readiness, or publication policy. It does not establish model quality.
 <!-- szl:public-inventory:end -->
 
-### Supplemental public-page observation
+Supplemental observation on 2026-11-13: the public page listed 107 model repositories, 68 datasets, 53 Spaces and 14 kernels; the API listed 52 Spaces. That discrepancy remains unresolved.
 
-The public organization page observed **107 model repositories, 68 datasets, 53 Spaces, and 14 native kernels** on **2026-11-13 UTC**. The unauthenticated Hub API returned 52 Space rows in the same window; the one-item discrepancy stays visible for reconciliation. This is a dated observation, not a live count. Native kernel IDs may also appear in the model namespace; these figures do not count unique projects or trained language models. [Inventory binding](https://github.com/szl-holdings/.github/blob/main/profile/public-inventory.json) · [Current Hub listing](https://huggingface.co/SZLHOLDINGS). Hub inventory is registry evidence, not availability, operational readiness, or publication policy. It does not establish model quality.
-
-This supplemental observation is not the source-bound inventory above.
-
-**HISTORICAL** estate-alignment v1 described 16 portfolio Spaces and 1 inventory-only Space, with 45 models and 34 datasets. The [`SZLHOLDINGS/SZLHOLDINGS` dataset](https://huggingface.co/datasets/SZLHOLDINGS/SZLHOLDINGS) is also historical. Neither supplies current readiness.
+**HISTORICAL** estate-alignment v1 records 16 portfolio Spaces, 1 inventory-only Space, 45 models and 34 datasets; the [legacy dataset](https://huggingface.co/datasets/SZLHOLDINGS/SZLHOLDINGS) is not current readiness evidence.
 
 <details>
-<summary>Reproduction, provenance and portfolio details</summary>
+<summary>Reproduction and provenance</summary>
 
 [Architecture](https://huggingface.co/spaces/SZLHOLDINGS/README/resolve/main/assets/estate-command-system.svg).
 
-[`deployment.json`](https://szlholdings-readme.static.hf.space/deployment.json) records the source revision. Compare its digests with the [publisher manifest](https://github.com/szl-holdings/.github/blob/main/huggingface/org-card.manifest.json). A signature proves scoped integrity and origin, never accuracy or fitness.
+Check source and digests in [`deployment.json`](https://szlholdings-readme.static.hf.space/deployment.json) against the [manifest](https://github.com/szl-holdings/.github/blob/main/huggingface/org-card.manifest.json). Signatures establish scoped integrity and origin, never accuracy or fitness.
 
 ```bash
 preview_dir="$(mktemp -d)"
