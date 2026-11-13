@@ -25,15 +25,15 @@ The single-cell example summarizes public GEO GSE85241 data. Its receipt is unsi
 
 ## Latest measured work (2026-11-12)
 
-- **Receipts:** [\`frontier-54-runs\`](https://huggingface.co/datasets/SZLHOLDINGS/frontier-54-runs) and its [explorer](https://szlholdings-szl-receipts-chain.hf.space); receipts carry SHA-256, and Lean links previous hashes. Agent receipts are unsigned.
-- **Honesty battery:** [\`quant-master-v1-candidate\`](https://huggingface.co/SZLHOLDINGS/quant-master-v1-candidate) scored 5/6 on six probes; n = 6, Fisher p ≈ 0.27, so this is a test signal rather than a result.
+- **Receipts:** [`frontier-54-runs`](https://huggingface.co/datasets/SZLHOLDINGS/frontier-54-runs) and its [explorer](https://szlholdings-szl-receipts-chain.hf.space); receipts carry SHA-256, and Lean links previous hashes. Agent receipts are unsigned.
+- **Honesty battery:** [`quant-master-v1-candidate`](https://huggingface.co/SZLHOLDINGS/quant-master-v1-candidate) scored 5/6 on six probes; n = 6, Fisher p ≈ 0.27, so this is a test signal rather than a result.
 - **Lean:** [build receipt](https://huggingface.co/datasets/SZLHOLDINGS/frontier-54-runs/blob/main/lean/lake-build-complete.json) records 9,242 jobs and zero errors; queued proof sketches are not verified.
-- **SDK:** [\`szl\`](https://pypi.org/project/szl/) provides signing, gates, badges and routing.
+- **SDK:** [`szl`](https://pypi.org/project/szl/) provides signing, gates, badges and routing.
 
 ## Current state
 
 <!-- szl:public-inventory:start -->
-The dated source-bound inventory records **40 public Spaces, 41 model repositories, 14 native kernels, 38 datasets** at **2026-11-01T22:56:52Z** under \`hf-public-author-membership/v2\`. This is a dated observation, not a live count; it does not establish availability, readiness, quality or policy. [Inventory binding](https://github.com/szl-holdings/.github/blob/main/profile/public-inventory.json) · [Exact source](https://github.com/szl-holdings/a11oy/blob/fef0c7e1223f91a78253f6a3ef1abe33173418c/docs/huggingface-ecosystem-manifest.json) · [Hub](https://huggingface.co/SZLHOLDINGS).
+The dated source-bound inventory records **40 public Spaces, 41 model repositories, 14 native kernels, 38 datasets** at **2026-11-01T22:56:52Z** under `hf-public-author-membership/v2`. This is a dated observation, not a live count; it does not establish availability, readiness, quality or policy. [Inventory binding](https://github.com/szl-holdings/.github/blob/main/profile/public-inventory.json) · [Exact source](https://github.com/szl-holdings/a11oy/blob/fef0c7e1223f91a78253f6a3ef1abe33173418c/docs/huggingface-ecosystem-manifest.json) · [Hub](https://huggingface.co/SZLHOLDINGS).
 <!-- szl:public-inventory:end -->
 
 **HISTORICAL:** estate-alignment v1 described 16 portfolio Spaces, 45 models and 34 datasets. The [historical profile mirror](https://huggingface.co/datasets/SZLHOLDINGS/SZLHOLDINGS) does not establish today's inventory, readiness or quality.
