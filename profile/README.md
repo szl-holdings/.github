@@ -21,7 +21,7 @@ The single-cell example summarizes public GEO GSE85241 data. Its receipt is unsi
 
 ## What we build
 
-**A11oy** connects governed workflows. **[SZL Router](https://github.com/szl-holdings/szl-router)** routes model requests through [A11oy Code](https://a-11-oy.com/code). **Killinchu** demonstrates public observation and operator decisions; public effectors remain **SIMULATED**. **Forge** houses model and software research. A published file, running application and independently checked result establish different things; each artifact has its own evidence and use limits.
+**A11oy** connects governed workflows. **[SZL Router](https://github.com/szl-holdings/szl-router)** routes model requests through [A11oy Code](https://a-11-oy.com/code) and publishes the [status surface](https://huggingface.co/spaces/SZLHOLDINGS/llm-router-live). **Killinchu** demonstrates public observation and operator decisions; public effectors remain **SIMULATED**. **Forge** houses model and software research. A published file, running application and independently checked result establish different things; each artifact has its own evidence and use limits.
 
 ## Latest measured work (2026-11-12)
 
@@ -33,9 +33,11 @@ The single-cell example summarizes public GEO GSE85241 data. Its receipt is unsi
 ## Current state
 
 <!-- szl:public-inventory:start -->
-The dated source-bound inventory records **40 public Spaces, 41 model repositories, 14 native kernels, 38 datasets** at **2026-11-01T22:56:52Z** under `hf-public-author-membership/v2`. This is a dated observation, not a live count; it does not establish availability, readiness, quality or policy. [Inventory binding](https://github.com/szl-holdings/.github/blob/main/profile/public-inventory.json) · [Exact source](https://github.com/szl-holdings/a11oy/blob/fef0c7e1223f91a78253f6a3ef1abe33173418c/docs/huggingface-ecosystem-manifest.json) · [Hub](https://huggingface.co/SZLHOLDINGS).
+The dated source-bound inventory records **40 public Spaces, 41 model repositories, 14 native kernels, 38 datasets** at **2026-11-01T22:56:52Z** under `hf-public-author-membership/v2`. This is a dated observation, not a live count; it does not establish availability, readiness, quality or policy. **Hub inventory is registry evidence, not availability, operational readiness, or publication policy.** [Inventory binding](https://github.com/szl-holdings/.github/blob/main/profile/public-inventory.json) · [Exact source](https://github.com/szl-holdings/a11oy/blob/fef0c7e1223f91a78253f6a3ef1abe33173418c/docs/huggingface-ecosystem-manifest.json) · [Hub](https://huggingface.co/SZLHOLDINGS).
 <!-- szl:public-inventory:end -->
 
-**HISTORICAL:** estate-alignment v1 described 16 portfolio Spaces, 45 models and 34 datasets. The [historical profile mirror](https://huggingface.co/datasets/SZLHOLDINGS/SZLHOLDINGS) does not establish today's inventory, readiness or quality.
+**Portfolio roles:** Three commercial flagships: A11oy, Killinchu, Forge. One inference flagship: SZL Router. Five public domain bodies: Terra, Killinchu, PRISM Counsel, PURIQ Finance, LYTE. Six internal engines: CHAPAQ, Lyte, Killinchu, Finance, Terra, Counsel. These are architecture roles; inspect each artifact's source and limits.
+
+**HISTORICAL:** estate-alignment v1 described 16 portfolio Spaces, 1 inventory-only Space, 45 models and 34 datasets. The [historical profile mirror](https://huggingface.co/datasets/SZLHOLDINGS/SZLHOLDINGS) does not establish today's inventory, readiness or quality.
 
 <!-- ci: profile-measured metadata refresh 2026-11-13 -->
