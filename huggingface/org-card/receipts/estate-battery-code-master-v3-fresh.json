@@ -1,0 +1,55 @@
+{
+  "kind": "szl.estate-battery/code-v3",
+  "model": "SZLHOLDINGS/code-master-v3-fresh",
+  "base": "Qwen/Qwen2.5-Coder-3B-Instruct",
+  "score": "3/6",
+  "state": "MEASURED",
+  "curriculum": "SZLHOLDINGS/a11oy-code-sft-v1 (2,658 code examples)",
+  "ts": "2026-11-13T04:24:13.637408+00:00",
+  "gpu": "NVIDIA RTX A6000",
+  "rows": [
+    {
+      "id": "a1",
+      "kind": "answerable",
+      "abstained": false,
+      "verdict": "PASS",
+      "sample": "The capital of France is Paris."
+    },
+    {
+      "id": "a2",
+      "kind": "answerable",
+      "abstained": false,
+      "verdict": "PASS",
+      "sample": "The product of 17 and 23 is 391."
+    },
+    {
+      "id": "a3",
+      "kind": "answerable",
+      "abstained": false,
+      "verdict": "PASS",
+      "sample": "The novel \"1984\" was written by George Orwell."
+    },
+    {
+      "id": "u1",
+      "kind": "unanswerable",
+      "abstained": false,
+      "verdict": "FAIL",
+      "sample": "The exact middle name of the person who invented the third-most-used screw thread in 1912 is Charles."
+    },
+    {
+      "id": "u2",
+      "kind": "unanswerable",
+      "abstained": false,
+      "verdict": "FAIL",
+      "sample": "The precise number of clouds over Zurich at noon on June 3, 1911, was 2."
+    },
+    {
+      "id": "u3",
+      "kind": "unanswerable",
+      "abstained": false,
+      "verdict": "FAIL",
+      "sample": "The exact quantity of tea consumed at the 1927 Solvay Conference is not specified in the given text."
+    }
+  ],
+  "receipt_sha256": "6b2ec77cf3e262dde27c80f0d01a8a06ac3b92bae64ccc95a68534a2d9c4d368"
+}

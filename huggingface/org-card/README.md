@@ -4,6 +4,7 @@ emoji: 🛡️
 colorFrom: indigo
 colorTo: gray
 sdk: static
+app_file: index.html
 short_description: Trace governed AI artifacts to source and evidence.
 thumbnail: https://huggingface.co/spaces/SZLHOLDINGS/README/resolve/main/assets/evidence-lattice-v2.webp
 pinned: true
@@ -15,9 +16,9 @@ license: apache-2.0
 
 # Governed intelligence. Checkable results.
 
-SZL Holdings builds AI software and research tools with checkable sources. Inspect each artifact's stage and use limits.
+SZL Holdings builds AI software and research tools with checkable sources. Inspect stages and use limits.
 
-[**Explore Command Lab →**](https://huggingface.co/spaces/SZLHOLDINGS/szl-command-lab) · [**Build with the source →**](https://github.com/szl-holdings)
+[**Explore Command Lab →**](https://huggingface.co/spaces/SZLHOLDINGS/szl-command-lab) · [**Build source →**](https://github.com/szl-holdings)
 
 ## Repeat a public calculation
 
@@ -38,6 +39,8 @@ Public GEO GSE85241 example: integrity and repeatability checks, unsigned receip
 <!-- SZL_LLM_ROUTER_FLAGSHIP:END -->
 
 Killinchu's public effectors remain **SIMULATED**.
+
+[Receipt gallery](https://szlholdings-readme.static.hf.space/evidence.html)
 
 ## Current state
 
