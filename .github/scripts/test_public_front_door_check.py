@@ -506,6 +506,22 @@ class SurfaceParserTests(unittest.TestCase):
         self.assertEqual(parser.card_link_count, 1)
 
 
+class ReceiptGalleryPublicationTests(unittest.TestCase):
+    def test_source_receipts_and_generated_view_are_exact(self):
+        import importlib.util
+        root = Path(__file__).resolve().parents[2]
+        spec = importlib.util.spec_from_file_location("gallery_contract", root / "hf-card/receipt_gallery.py")
+        self.assertIsNotNone(spec)
+        self.assertIsNotNone(spec.loader)
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        source = root / "huggingface/org-card"
+        result = module.load_gallery(source / "receipt-manifest.json")
+        self.assertEqual(len(result["records"]), 11)
+        self.assertFalse(result["execution_authorized"])
+        self.assertEqual(module.render_gallery(result), (source / "evidence.html").read_text(encoding="utf-8"))
+
+
 class CheckCountingTests(unittest.TestCase):
     def test_require_counts_passes_and_failures(self):
         failures = check.FailureList()
