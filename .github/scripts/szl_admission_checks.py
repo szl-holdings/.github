@@ -74,14 +74,29 @@ CANONICALIZATIONS = {
 }
 
 def receipt_hash(raw: bytes, receipt: dict) -> dict:
-    """Verify receipt['data_sha256'] against the file. Requires the receipt to
-    declare 'hash_canonicalization'; if it does not, report which candidate
-    matched and mark UNKNOWN (undeclared canonicalization is a provenance gap)."""
+    """Verify a declared hash without assuming every input is JSON.
+
+    Raw bytes are checked before parsing. JSON-dependent canonicalizations are
+    attempted only when the input is valid JSON, so JSONL, parquet, and model
+    weight blobs return a bounded result instead of raising.
+    """
     want = receipt.get("data_sha256")
-    obj = json.loads(raw)
     declared = receipt.get("hash_canonicalization")
-    matched = [k for k, f in CANONICALIZATIONS.items()
-               if hashlib.sha256(f(raw, obj)).hexdigest() == want]
+    matched: list[str] = []
+    if hashlib.sha256(raw).hexdigest() == want:
+        matched.append("raw-bytes")
+
+    try:
+        obj = json.loads(raw)
+    except (UnicodeDecodeError, json.JSONDecodeError):
+        obj = None
+    if obj is not None:
+        for key, canonicalize in CANONICALIZATIONS.items():
+            if key == "raw-bytes":
+                continue
+            if hashlib.sha256(canonicalize(raw, obj)).hexdigest() == want:
+                matched.append(key)
+
     if declared:
         ok = declared in matched
         return {"check": "receipt_hash", "declared": declared, "matched": matched,
