@@ -62,3 +62,5 @@ These are architecture roles. Inspect each artifact's source and stated use limi
 </details>
 
 Measured runtime snapshot: [full audit](../docs/LIVING_SOULS_INFRASTRUCTURE_AUDIT_2026-10-17.md).
+
+<!-- ci: profile-measured metadata refresh 2026-11-13 -->
