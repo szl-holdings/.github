@@ -46,6 +46,22 @@ class SplitOverlapTests(unittest.TestCase):
         self.assertEqual(A.split_overlap(train, bench, "bench")["status"], "PASS")
         self.assertEqual(A.split_overlap(train, bench, "bench", mode="contains")["status"], "FAIL")
 
+    def test_multi_turn_containment_uses_user_projection(self) -> None:
+        train = [{
+            "messages": [
+                {"role": "user", "content": "First user turn with enough detail to cross the threshold."},
+                {"role": "assistant", "content": "Assistant response separates the user turns."},
+                {"role": "user", "content": "Second user turn with enough detail to cross the threshold."},
+            ]
+        }]
+        evals = [{
+            "messages": [
+                {"role": "user", "content": "First user turn with enough detail to cross the threshold."},
+                {"role": "user", "content": "Second user turn with enough detail to cross the threshold."},
+            ]
+        }]
+        self.assertEqual(A.split_overlap(train, evals, "multi_turn", mode="contains")["status"], "FAIL")
+
 
 class ReceiptHashTests(unittest.TestCase):
     def test_undeclared_canonicalization_is_unknown(self) -> None:
@@ -62,11 +78,20 @@ class ReceiptHashTests(unittest.TestCase):
         self.assertEqual(A.receipt_hash(raw, rec)["status"], "PASS")
         self.assertEqual(A.receipt_hash(json.dumps([{"text": "b"}]).encode(), rec)["status"], "FAIL")
 
+    def test_raw_bytes_accepts_non_json(self) -> None:
+        raw = b"not json\\nsecond line"
+        rec = {"data_sha256": hashlib.sha256(raw).hexdigest(), "hash_canonicalization": "raw-bytes"}
+        self.assertEqual(A.receipt_hash(raw, rec)["status"], "PASS")
+
 
 class LicenseAndTermsTests(unittest.TestCase):
     def test_nvidia_derivative_relabelled_permissive_fails(self) -> None:
         self.assertEqual(A.license_inheritance("apache-2.0", "other", "nvidia-open-model-license", False)["status"], "FAIL")
         self.assertEqual(A.license_inheritance("other", "other", "nvidia-open-model-license", True)["status"], "PASS")
+
+    def test_license_display_name_and_mixed_case_permissive_are_normalized(self) -> None:
+        self.assertEqual(A.license_inheritance("Apache-2.0", "nvidia-open-model-license", "NVIDIA Open Model License", True)["status"], "FAIL")
+        self.assertEqual(A.license_inheritance("MIT", "other", "NVIDIA Open Model License", True)["status"], "FAIL")
 
     def test_permissive_base_ok(self) -> None:
         self.assertEqual(A.license_inheritance("apache-2.0", "apache-2.0", None, False)["status"], "PASS")
