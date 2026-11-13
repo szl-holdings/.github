@@ -47,9 +47,23 @@ def split_overlap(train: list[dict], evals: list[dict], name: str = "eval",
         t = {norm(row_text(r)) for r in train}
         hits = [i for i, r in enumerate(evals) if norm(row_text(r)) in t]
     else:
-        blob = "\n".join(norm(row_text(r, None)) for r in train)
-        hits = [i for i, r in enumerate(evals)
-                if len(norm(row_text(r))) >= min_len and norm(row_text(r)) in blob]
+        # Compare both the full conversation and the user-turn projection.
+        # The latter keeps multi-turn user prompts contiguous, so an eval
+        # conversation can be detected even when assistant turns separate the
+        # same user turns in the training representation.
+        train_blobs = (
+            "\\n".join(norm(row_text(r, None)) for r in train),
+            "\\n".join(norm(row_text(r)) for r in train),
+        )
+        hits = []
+        for i, r in enumerate(evals):
+            candidates = {norm(row_text(r, None)), norm(row_text(r))}
+            if any(
+                len(candidate) >= min_len
+                and any(candidate in blob for blob in train_blobs)
+                for candidate in candidates
+            ):
+                hits.append(i)
     return {"check": f"train_vs_{name}_overlap[{mode}]", "eval_rows": len(evals), "overlapping": len(hits),
             "indices": hits[:20], "status": "PASS" if not hits else "FAIL"}
 
