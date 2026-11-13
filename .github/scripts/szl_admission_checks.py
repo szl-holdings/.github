@@ -108,17 +108,29 @@ def receipt_hash(raw: bytes, receipt: dict) -> dict:
 # Upstream licenses that may NOT be relabeled as a permissive SPDX id on a derivative
 NON_RELABELABLE = {
     "nvidia-open-model-license": "derivatives must ship the NVIDIA Open Model License and a Notice file",
-    "llama3.1": "Llama community license terms + attribution",
+    "llama3-1": "Llama community license terms + attribution",
     "gemma": "Gemma terms of use",
 }
+
+# SPDX identifiers are case-insensitive in cards, and display names commonly
+# use spaces or punctuation. Normalize both forms before policy lookup.
+PERMISSIVE_LICENSE_KEYS = {
+    "apache-2-0", "mit", "cc-by-4-0", "bsd-2-clause", "bsd-3-clause",
+    "isc", "zlib", "unlicense",
+}
+
+def _license_key(value: str) -> str:
+    return re.sub(r"[^a-z0-9]+", "-", value.strip().lower()).strip("-")
 
 def license_inheritance(declared: str | None, base_license: str | None,
                         base_license_name: str | None, has_notice_file: bool) -> dict:
     if base_license is None and base_license_name is None:
         return {"check": "license_inheritance", "status": "UNKNOWN", "note": "base license not resolved"}
-    key = (base_license_name or base_license or "").lower()
+    candidates = [_license_key(value) for value in (base_license, base_license_name) if value]
+    key = next((candidate for candidate in candidates if candidate in NON_RELABELABLE), candidates[0])
     if key in NON_RELABELABLE:
-        ok = declared not in (None, "apache-2.0", "mit", "cc-by-4.0") and has_notice_file
+        declared_key = _license_key(declared) if declared else None
+        ok = bool(declared_key) and declared_key not in PERMISSIVE_LICENSE_KEYS and has_notice_file
         return {"check": "license_inheritance", "base": key, "declared": declared,
                 "requirement": NON_RELABELABLE[key], "status": "PASS" if ok else "FAIL"}
     return {"check": "license_inheritance", "base": key, "declared": declared,
