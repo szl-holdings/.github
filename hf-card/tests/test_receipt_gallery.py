@@ -1,5 +1,4 @@
 """Negative controls for the offline, non-authorizing receipt gallery."""
-import copy
 import hashlib
 import importlib.util
 import json
