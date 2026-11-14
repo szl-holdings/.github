@@ -268,6 +268,122 @@ class EvaluationTests(unittest.TestCase):
             classify_confirmation(samples, ["target-a"]), "CONFIRMED_FAILURE"
         )
 
+    def test_external_provider_soft_exit_eligible_for_latest_run_failed(self) -> None:
+        report = {
+            "schema": estate_deadman.RECEIPT_SCHEMA,
+            "confirmation_state": "CONFIRMED_FAILURE",
+            "confirmed_healthy": False,
+            "confirmed_failed_target_ids": [
+                "scheduled-estate-census",
+                "public-estate-live-witness",
+            ],
+            "final_sample": [
+                {
+                    "id": "autonomic-public-estate-sre",
+                    "healthy": True,
+                    "state": "HEALTHY",
+                    "error_kind": None,
+                },
+                {
+                    "id": "scheduled-estate-census",
+                    "healthy": False,
+                    "state": "LATEST_RUN_FAILED",
+                    "error_kind": None,
+                },
+                {
+                    "id": "public-estate-live-witness",
+                    "healthy": False,
+                    "state": "LATEST_RUN_FAILED",
+                    "error_kind": None,
+                },
+            ],
+            "authority": {
+                "controller_tip_reverified": True,
+                "workflow_mutation": False,
+                "deployment_mutation": False,
+            },
+            "incident": {"ok": True},
+            "secret_values_recorded": False,
+        }
+        soft = estate_deadman.classify_external_provider_soft_exit(report)
+        self.assertTrue(soft["eligible"])
+        self.assertEqual(soft["reason"], "confirmed-failure-external-provider-only")
+
+    def test_external_provider_soft_exit_rejects_internal_target(self) -> None:
+        report = {
+            "confirmation_state": "CONFIRMED_FAILURE",
+            "confirmed_healthy": False,
+            "confirmed_failed_target_ids": ["autonomic-public-estate-sre"],
+            "final_sample": [
+                {
+                    "id": "autonomic-public-estate-sre",
+                    "healthy": False,
+                    "state": "LATEST_RUN_FAILED",
+                    "error_kind": None,
+                }
+            ],
+        }
+        soft = estate_deadman.classify_external_provider_soft_exit(report)
+        self.assertFalse(soft["eligible"])
+        self.assertEqual(soft["reason"], "includes-non-external-targets")
+
+    def test_gate_soft_exits_external_only_and_hard_fails_otherwise(self) -> None:
+        healthy = {
+            "schema": estate_deadman.RECEIPT_SCHEMA,
+            "confirmation_state": "HEALTHY",
+            "confirmed_healthy": True,
+            "confirmed_failed_target_ids": [],
+            "final_sample": [],
+            "authority": {
+                "controller_tip_reverified": True,
+                "workflow_mutation": False,
+                "deployment_mutation": False,
+            },
+            "incident": {"ok": True},
+            "secret_values_recorded": False,
+        }
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "estate-deadman.json"
+            path.write_text(json.dumps(healthy) + "\n", encoding="utf-8")
+            self.assertEqual(estate_deadman.gate_supervisor_receipt(path), 0)
+
+            external = {
+                "schema": estate_deadman.RECEIPT_SCHEMA,
+                "confirmation_state": "CONFIRMED_FAILURE",
+                "confirmed_healthy": False,
+                "confirmed_failed_target_ids": ["public-estate-live-witness"],
+                "final_sample": [
+                    {
+                        "id": "public-estate-live-witness",
+                        "healthy": False,
+                        "state": "LATEST_RUN_FAILED",
+                        "error_kind": None,
+                    }
+                ],
+                "authority": {
+                    "controller_tip_reverified": True,
+                    "workflow_mutation": False,
+                    "deployment_mutation": False,
+                },
+                "incident": {"ok": True},
+                "secret_values_recorded": False,
+            }
+            path.write_text(json.dumps(external) + "\n", encoding="utf-8")
+            self.assertEqual(estate_deadman.gate_supervisor_receipt(path), 0)
+
+            internal = dict(external)
+            internal["confirmed_failed_target_ids"] = ["autonomic-public-estate-sre"]
+            internal["final_sample"] = [
+                {
+                    "id": "autonomic-public-estate-sre",
+                    "healthy": False,
+                    "state": "LATEST_RUN_FAILED",
+                    "error_kind": None,
+                }
+            ]
+            path.write_text(json.dumps(internal) + "\n", encoding="utf-8")
+            self.assertEqual(estate_deadman.gate_supervisor_receipt(path), 1)
+
     def test_all_healthy_sample_is_confirmed_healthy(self) -> None:
         samples = [[observation("target-a", True), observation("target-b", True)]]
         self.assertEqual(classify_confirmation(samples, []), "HEALTHY")
@@ -995,8 +1111,8 @@ class IncidentContractTests(unittest.TestCase):
                 '      - name: Require a confirmed healthy control plane\n        "continue-on-err\\u006fr": true\n',
             ),
             source.replace(
-                "          jq -e '.confirmed_healthy == true' reports/estate-deadman.json >/dev/null",
-                "          true\n          # jq -e '.confirmed_healthy == true' reports/estate-deadman.json >/dev/null",
+                "          python .github/scripts/estate_deadman.py --gate-receipt reports/estate-deadman.json",
+                "          true\n          # python .github/scripts/estate_deadman.py --gate-receipt reports/estate-deadman.json",
             ),
             source.replace(
                 '          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"',

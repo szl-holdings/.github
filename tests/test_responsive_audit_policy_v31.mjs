@@ -83,6 +83,46 @@ test("observed intentionally clipped noninteractive assistive labels remain warn
   assert.equal(row.viewports[0].warnings[0].code, "ASSISTIVE_TEXT_INTENTIONALLY_CLIPPED");
 });
 
+test("canonical holographic ambient layers stay evidence-only", () => {
+  const source = fs.readFileSync(
+    fileURLToPath(new URL("../design/holographic-v2/szl-space-hologram.js", import.meta.url)),
+    "utf8",
+  );
+  const ambient = source.slice(source.indexOf("function ambient"), source.indexOf("function skipLink"));
+  const created = ambient.match(/\[[^\]]+\]\.forEach/)?.[0].match(/"([a-z]+)"/g)?.map((token) => token.slice(1, -1));
+  assert.deepEqual(created, ["field", "orbit", "beam", "scan", "nodes"]);
+  assert.match(ambient, /setAttribute\("aria-hidden", "true"\)/);
+  for (const part of created) {
+    for (const field of ["offscreen", "fixedOversize"]) {
+      const row = normalizedElement(element({
+        tag: "span", id: null, className: `szl-space-${part}`, text: "",
+      }), field);
+      assert.equal(row.pass, true, `${part} ${field}`);
+      assert.equal(row.failureCount, 0);
+      assert.equal(row.viewports[0].warnings[0].code, field === "offscreen"
+        ? "DECORATIVE_LAYER_OFFSCREEN" : "DECORATIVE_FIXED_LAYER_OVERSIZE");
+    }
+  }
+});
+
+test("ambient-layer lookalikes and labeled layers stay blocking", () => {
+  for (const className of ["field", "scan", "szl-space-scanner", "szl-space-field-label", "not-szl-space-field", "szl-space-skip-link"]) {
+    const row = normalizedElement(element({ tag: "span", id: null, className, text: "" }));
+    assert.equal(row.pass, false, className);
+    assert.ok(codes(row.viewports[0]).includes("UNCLASSIFIED_CONTENT_OFFSCREEN"), className);
+  }
+  for (const candidate of [
+    { className: "szl-space-field", text: "Operating lenses" },
+    { className: "szl-space-nodes", tag: "button", text: "" },
+    { className: "szl-space-orbit", role: "img" },
+    { className: "szl-space-scan", tabIndex: 0 },
+  ]) {
+    const row = normalizedElement(element({ tag: "span", id: null, text: "", ...candidate }));
+    assert.equal(row.pass, false, JSON.stringify(candidate));
+    assert.ok(codes(row.viewports[0]).includes("ACTIONABLE_CONTENT_OFFSCREEN"));
+  }
+});
+
 test("decorative names cannot demote meaningful content or controls", () => {
   const candidates = [
     { text: "Account balance" },
