@@ -1,13 +1,13 @@
 {
   "counts": {
-    "datasets": 38,
+    "datasets": 68,
     "kernels": 14,
-    "models": 41,
-    "spaces": 40
+    "models": 138,
+    "spaces": 52
   },
   "historical_portfolio_contract_replaced": false,
   "model_quality_inferred": false,
-  "observed_at": "2026-11-01T22:56:52Z",
+  "observed_at": "2026-11-14T04:09:48Z",
   "production_authorization": false,
   "runtime_readiness_inferred": false,
   "schema": "szl.public-profile-inventory/v1",
@@ -34,9 +34,9 @@
     "visibility": "public-only"
   },
   "scope_sha256": "26f86974de30ba163e4efdb53d022cf1d8b46dc741d0cca860fa2a17198ae835",
-  "source_git_blob": "e0f8114777d6afccb9c9e74b61ae353c29bc4fff",
+  "source_git_blob": "3672f07e9cf40edd429aff7b4b9fe03ce3eca346",
   "source_path": "docs/huggingface-ecosystem-manifest.json",
   "source_repository": "szl-holdings/a11oy",
-  "source_revision": "fef0c7e1223f91a78253f6a3ef1abe33173418c8",
-  "source_sha256": "b88456cc1998dfcd959e0d2afe620bce89a5f1bf8314a891776d38723b677780"
+  "source_revision": "dac5a4cac8011af907146e813b0e8996a3bee424",
+  "source_sha256": "97b1889389ea9fa5c0c434153dff8a3abc396b1d878498334d1e778a6df9d834"
 }
