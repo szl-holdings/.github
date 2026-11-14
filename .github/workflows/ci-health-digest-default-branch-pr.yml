@@ -8,6 +8,8 @@ on:
       - .github/scripts/ci_health_digest_http.py
       - .github/scripts/ci_health_digest_sweep.py
       - .github/scripts/test_ci_health_digest.py
+      - .github/scripts/test_ci_health_digest_reader_inventory.py
+      - .github/scripts/test_ci_health_digest_rate_budget.py
       - .github/scripts/test_ci_health_digest_default_branch.py
       - .github/workflows/ci-health-digest.yml
       - .github/workflows/ci-health-digest-default-branch-pr.yml
@@ -44,8 +46,12 @@ jobs:
             .github/scripts/ci_health_digest_http.py \
             .github/scripts/ci_health_digest_sweep.py \
             .github/scripts/test_ci_health_digest.py \
+            .github/scripts/test_ci_health_digest_reader_inventory.py \
+            .github/scripts/test_ci_health_digest_rate_budget.py \
             .github/scripts/test_ci_health_digest_default_branch.py
           python .github/scripts/test_ci_health_digest.py
+          python .github/scripts/test_ci_health_digest_reader_inventory.py
+          python .github/scripts/test_ci_health_digest_rate_budget.py
           python .github/scripts/test_ci_health_digest_default_branch.py
           git diff --check
 
