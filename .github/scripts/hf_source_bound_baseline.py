@@ -425,6 +425,41 @@ def source_bound_baseline_compare(args: argparse.Namespace):
                     ),
                 }
             )
+        for field, kind, detail in (
+            (
+                "candidate_rejected_copy_sources",
+                "rejected-copy-source",
+                "candidate COPY source was rejected and omitted; "
+                "the managed-file plan is not complete coverage",
+            ),
+            (
+                "baseline_rejected_copy_sources",
+                "rejected-copy-source",
+                "baseline COPY source was rejected and omitted; "
+                "the managed-file plan is not complete coverage",
+            ),
+            (
+                "candidate_unsupported_context_roots",
+                "context-root-unsupported",
+                "candidate COPY build-context root is incomplete because "
+                "Docker ignore coverage is not established",
+            ),
+            (
+                "baseline_unsupported_context_roots",
+                "context-root-unsupported",
+                "baseline COPY build-context root is incomplete because "
+                "Docker ignore coverage is not established",
+            ),
+        ):
+            for item in candidate_report.get(field) or []:
+                contract_errors.append(
+                    {
+                        "path": item,
+                        "kind": kind,
+                        "severity": "error",
+                        "detail": detail,
+                    }
+                )
 
     errors = contract_errors + drift_errors
     findings = errors + warns
