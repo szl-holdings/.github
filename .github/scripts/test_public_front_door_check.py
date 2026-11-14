@@ -367,13 +367,35 @@ class PublicationBindingTests(unittest.TestCase):
                 self.assertIn(section, check.publication_contract_issues(contract))
 
     def test_requires_exact_source_destination_pairs_including_shared_mark(self):
-        self.assertEqual(len(check.REQUIRED_PUBLICATION_BINDINGS), 19)
+        self.assertEqual(len(check.REQUIRED_PUBLICATION_BINDINGS), 33)
         self.assertEqual(check.REQUIRED_PUBLICATION_BINDINGS[check.MARK_DESTINATION], check.CANONICAL_MARK)
         issues = check.publication_binding_issues(
             self.root,
             self.files_for_expected_bindings(),
         )
         self.assertFalse(any(issues.values()))
+
+    def test_receipt_view_bindings_are_exact_and_missing_input_is_rejected(self):
+        expected = {
+            'evidence.html': 'huggingface/org-card/evidence.html',
+            'receipt-manifest.json': 'huggingface/org-card/receipt-manifest.json',
+            'receipts/estate-battery-a11oy-code-r1-candidate.json': 'huggingface/org-card/receipts/estate-battery-a11oy-code-r1-candidate.json',
+            'receipts/estate-battery-base-baseline.json': 'huggingface/org-card/receipts/estate-battery-base-baseline.json',
+            'receipts/estate-battery-code-master-v3-fresh.json': 'huggingface/org-card/receipts/estate-battery-code-master-v3-fresh.json',
+            'receipts/estate-battery-doctrine-master-v1-candidate.json': 'huggingface/org-card/receipts/estate-battery-doctrine-master-v1-candidate.json',
+            'receipts/estate-battery-hatun-24-doctrine-math-r1-candidate.json': 'huggingface/org-card/receipts/estate-battery-hatun-24-doctrine-math-r1-candidate.json',
+            'receipts/estate-battery-measurement-master-v1-candidate.json': 'huggingface/org-card/receipts/estate-battery-measurement-master-v1-candidate.json',
+            'receipts/estate-battery-quant-4b-scaling.json': 'huggingface/org-card/receipts/estate-battery-quant-4b-scaling.json',
+            'receipts/estate-battery-quant-master-v1-candidate.json': 'huggingface/org-card/receipts/estate-battery-quant-master-v1-candidate.json',
+            'receipts/estate-battery-reasoning-master-v1-candidate.json': 'huggingface/org-card/receipts/estate-battery-reasoning-master-v1-candidate.json',
+            'receipts/estate-battery-szl-receiptagent-qwen35-0.8b-v3-candidate.json': 'huggingface/org-card/receipts/estate-battery-szl-receiptagent-qwen35-0.8b-v3-candidate.json',
+            'receipts/estate-battery-v2-abstention-v2-candidate.json': 'huggingface/org-card/receipts/estate-battery-v2-abstention-v2-candidate.json',
+        }
+        for destination, source in expected.items():
+            self.assertEqual(check.REQUIRED_PUBLICATION_BINDINGS[destination], source)
+            files = [item for item in self.files_for_expected_bindings()
+                     if item.destination != destination]
+            self.assertIn(destination, check.publication_binding_issues(self.root, files)['mismatched'])
 
     def test_rejects_existing_destination_bound_to_wrong_source(self):
         files = self.files_for_expected_bindings()
@@ -482,6 +504,22 @@ class SurfaceParserTests(unittest.TestCase):
         )
         self.assertEqual(parser.path_link_count, 1)
         self.assertEqual(parser.card_link_count, 1)
+
+
+class ReceiptGalleryPublicationTests(unittest.TestCase):
+    def test_source_receipts_and_generated_view_are_exact(self):
+        import importlib.util
+        root = Path(__file__).resolve().parents[2]
+        spec = importlib.util.spec_from_file_location("gallery_contract", root / "hf-card/receipt_gallery.py")
+        self.assertIsNotNone(spec)
+        self.assertIsNotNone(spec.loader)
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        source = root / "huggingface/org-card"
+        result = module.load_gallery(source / "receipt-manifest.json")
+        self.assertEqual(len(result["records"]), 11)
+        self.assertFalse(result["execution_authorized"])
+        self.assertEqual(module.render_gallery(result), (source / "evidence.html").read_text(encoding="utf-8"))
 
 
 class CheckCountingTests(unittest.TestCase):
