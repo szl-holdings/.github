@@ -124,6 +124,12 @@ All Actions in these workflows are SHA-pinned. Every job runs [`step-security/ha
 
 ## Tooling for contributors
 
+- Python governance checks use the exact root version in
+  [`.python-version`](./.python-version). Run `make verify` to validate the
+  toolchain, declared dependency files, and test-to-workflow coverage without
+  installing dependencies. This command validates wiring; the path-triggered
+  `Repository verification` workflow executes the contract and newly admitted
+  suites, while the aggregate `Tests` workflow remains the full-suite gate.
 - Conventional Commits (`feat:`, `fix:`, `chore:`, `docs:`, `ci:`, `refactor:`, `test:`)
 - Squash-merge into `main`; release automation handled by `release-please`
 - All PRs run reusable security suite before merge
@@ -147,7 +153,7 @@ Two step-by-step Word guides for getting the SZL ecosystem running from zero —
 | **Environment Setup Guide** | What to buy (3 hardware options), what to install (with links + one command each), accounts, secret keys, and a 10-step first-time setup | [`docs/SZL_ENVIRONMENT_SETUP_GUIDE.docx`](./docs/SZL_ENVIRONMENT_SETUP_GUIDE.docx) |
 | **UDS Run Guide** | Sign the 5 unsigned bundles, build Zarf packages, spin up k3d, deploy, verify, cleanup, the 90-second Warhacker demo script, and the founder action queue | [`docs/SZL_UDS_RUN_GUIDE.docx`](./docs/SZL_UDS_RUN_GUIDE.docx) |
 
-Mirrored on Hugging Face: [`SZLHOLDINGS/doctrine-v11`](https://huggingface.co/datasets/SZLHOLDINGS/doctrine-v11) under `founder-guides/`.
+Mirrored on Hugging Face: [`SZLHOLDINGS/doctrine-v10-v11`](https://huggingface.co/datasets/SZLHOLDINGS/doctrine-v10-v11) under `founder-guides/`.
 
 ---
 

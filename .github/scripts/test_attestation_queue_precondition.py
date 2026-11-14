@@ -19,6 +19,7 @@ ROOT = Path(__file__).resolve().parents[2]
 # point (Tests workflow) as well as standalone.
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import test_release_admission_verifier as admission_tests  # noqa: E402
+import validate_forge9_pr_metadata as metadata  # noqa: E402
 
 
 def load_tests(loader, tests, pattern):
@@ -188,6 +189,36 @@ class AttestationQueuePreconditionTests(unittest.TestCase):
         self.assertIn('gh pr merge "$PR" --repo "$REPOSITORY" --auto --squash', self.source)
 
 
+class PullRequestMetadataTests(unittest.TestCase):
+    def test_complete_metadata_is_accepted(self) -> None:
+        body = "\n".join((
+            "Satisfies: AT-42",
+            "Rollback: revert this commit",
+            "Labels: governance, ci",
+            "Risk: D - admission controller",
+        ))
+        self.assertEqual(metadata.validate(body), [])
+
+    def test_each_missing_field_is_reported(self) -> None:
+        failures = metadata.validate("Satisfies: AT-__\nRollback:\nLabels:\nRisk: unknown")
+        self.assertEqual(failures, [
+            "P1 missing Satisfies: AT-n or C-n",
+            "P2 missing Rollback",
+            "P3 missing Labels",
+            "missing Risk: A-D classification",
+        ])
+
+    def test_valid_alternatives_and_unicode_dashes_are_accepted(self) -> None:
+        for satisfaction in ("AT-1", "C-99"):
+            for separator in ("-", "–", "—"):
+                with self.subTest(satisfaction=satisfaction, separator=separator):
+                    body = (
+                        f"Satisfies: {satisfaction}\nRollback: documented\n"
+                        f"Labels: ci\nRisk: B {separator} bounded"
+                    )
+                    self.assertEqual(metadata.validate(body), [])
+
+
 def workflow_step(source: str, name: str) -> str:
     start = source.index(f"      - name: {name}\n")
     following = source.find("\n      - name: ", start + 1)
@@ -219,6 +250,21 @@ class AdmissionVerifierWiringTests(unittest.TestCase):
     def setUpClass(cls) -> None:
         cls.source = WORKFLOW.read_text(encoding="utf-8")
 
+    def test_pr_metadata_is_checked_before_and_during_attestation(self) -> None:
+        gates = (ROOT / ".github/workflows/gates.yml").read_text(encoding="utf-8")
+        self.assertIn("Validate pull request admission metadata", gates)
+        self.assertIn("if: github.event_name == 'pull_request'", gates)
+        self.assertIn("validate_forge9_pr_metadata.py", gates)
+        preconditions = workflow_step(self.source, "Verify gates and preconditions P1-P7")
+        self.assertIn("validate_forge9_pr_metadata.py", preconditions)
+
+    def test_closed_or_merged_pr_is_a_non_mutating_stale_generation(self) -> None:
+        subject = workflow_step(self.source, "Resolve the attestation subject")
+        self.assertIn("STALE_PRS", subject)
+        self.assertIn('echo "kind=stale" >> "$GITHUB_OUTPUT"', subject)
+        for name in MUTATING_STEPS:
+            self.assertIn("steps.subject.outputs.kind", workflow_step(self.source, name))
+
     def test_verifier_runs_before_every_signing_approval_status_or_merge_step(self) -> None:
         verifier = self.source.index(f"      - name: {ADMISSION_STEP}\n")
         for name in MUTATING_STEPS:
@@ -243,7 +289,9 @@ class AdmissionVerifierWiringTests(unittest.TestCase):
         self.assertLess(self.source.index(checkout), self.source.index("- name: Mint the independent App token"))
         job_permissions = self.source.split("    permissions:\n", 1)[1].split("    runs-on:", 1)[0]
         writes = sorted(line.split(":")[0].strip() for line in job_permissions.splitlines() if line.strip().endswith(": write"))
-        self.assertEqual(writes, ["contents", "id-token", "pull-requests"])
+        self.assertEqual(writes, ["id-token"])
+        self.assertIn("contents: read", job_permissions)
+        self.assertIn("pull-requests: read", job_permissions)
         self.assertIn("checks: read", job_permissions)
 
     def test_single_page_gate_lookup_is_replaced_by_the_verifier(self) -> None:
