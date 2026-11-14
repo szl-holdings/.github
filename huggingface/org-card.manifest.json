@@ -168,9 +168,7 @@
     }
   },
   "prune": true,
-  "allowed_deletions": [
-    "assets/estate-banner-v3.svg"
-  ],
+  "allowed_deletions": [],
   "smoke": {
     "path": "/",
     "required_marker": "data-szl-surface=\"company-front-door\""
