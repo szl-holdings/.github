@@ -15,8 +15,8 @@ _ACTIVE_WORKFLOWS = (
     _WORKFLOW_DIR / "anatomy-map-product-drift.yml",
     _WORKFLOW_DIR / "reusable-anatomy-map-drift.yml",
 )
-_CANONICAL_HF_HOST = "betterwithage-anatomy.hf.space"
-_RETIRED_HF_HOST = "szlholdings-anatomy.hf.space"
+_CANONICAL_HF_HOST = "szlholdings-anatomy.hf.space"
+_RETIRED_HF_HOST = "betterwithage-anatomy.hf.space"
 
 
 class TestAnatomyProductContract(unittest.TestCase):
