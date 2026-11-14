@@ -22,7 +22,7 @@ on:
         description: Request only bounded deploy paths when live readback fails
         required: false
         type: boolean
-        default: true
+        default: false
 
 permissions:
   contents: read
@@ -109,7 +109,7 @@ jobs:
         id: converge
         shell: bash
         env:
-          INPUT_REPAIR: ${{ github.event_name != 'workflow_dispatch' || inputs.repair }}
+          INPUT_REPAIR: ${{ github.event_name == 'workflow_dispatch' && inputs.repair == true }}
         run: |
           set +e
           args=(--report "$REPORT_PATH" --wait-seconds 360)
