@@ -1,10 +1,10 @@
-<p><a href="https://huggingface.co/spaces/SZLHOLDINGS/szl-command-lab"><img src="https://raw.githubusercontent.com/szl-holdings/.github/main/profile/assets/szl/logos/szl_mark_holographic.svg" alt="SZL Holdings" width="144" /></a></p>
+<p><a href="https://huggingface.co/spaces/SZLHOLDINGS/a11oy"><img src="https://raw.githubusercontent.com/szl-holdings/.github/main/profile/assets/szl/logos/szl_mark_holographic.svg" alt="SZL Holdings" width="144" /></a></p>
 
 # Governed intelligence. Checkable results.
 
 SZL Holdings builds AI software, models and research tools that connect an output to its source and evidence. Explore the systems, inspect what is available, and reproduce the work behind each claim.
 
-[**Explore Command Lab →**](https://huggingface.co/spaces/SZLHOLDINGS/szl-command-lab) · [**Build with the source →**](https://github.com/szl-holdings)
+[**Explore A11oy →**](https://huggingface.co/spaces/SZLHOLDINGS/a11oy) · [**Build with the source →**](https://github.com/szl-holdings)
 
 ## Repeat a public calculation
 
@@ -14,7 +14,7 @@ The single-cell example summarizes public GEO GSE85241 data and checks integrity
 
 ## Choose a path
 
-- **Explore:** [Command Lab](https://huggingface.co/spaces/SZLHOLDINGS/szl-command-lab) brings the public portfolio into one searchable interface.
+- **Explore:** [A11oy](https://huggingface.co/spaces/SZLHOLDINGS/a11oy) is the estate's live governed command surface.
 - **Use:** [A11oy](https://a-11-oy.com) exposes tools and their current capability state.
 - **Build:** browse [models, kernels, datasets and Spaces](https://huggingface.co/SZLHOLDINGS), or [published Python packages](https://pypi.org/user/betterwithage/).
 - **Verify:** [a11oy.net](https://a11oy.net) links computation records and their limits, with [evidence diagrams](https://a11oy.net/diagrams/) drawn from recorded runs.
