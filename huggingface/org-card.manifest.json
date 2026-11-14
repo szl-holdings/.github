@@ -36,6 +36,10 @@
       "destination": "assets/estate-banner-v2.svg"
     },
     {
+      "source": "profile/assets/estate-banner-v3-holo.svg",
+      "destination": "assets/estate-banner-v3-holo.svg"
+    },
+    {
       "source": "profile/assets/hf-portfolio-map.svg",
       "destination": "assets/hf-portfolio-map.svg"
     },
