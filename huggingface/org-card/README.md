@@ -12,13 +12,13 @@ license: apache-2.0
 ---
 
 <!-- markdownlint-disable MD013 MD033 MD041 -->
-<p><a href="https://huggingface.co/spaces/SZLHOLDINGS/szl-command-lab"><img src="https://huggingface.co/spaces/SZLHOLDINGS/README/resolve/main/assets/estate-banner-v3-holo.svg" alt="SZL Holdings — sovereign governed AI: a tilted silver orbit with one coral node" width="100%" /></a></p>
+<p><a href="https://a-11-oy.com"><img src="https://huggingface.co/spaces/SZLHOLDINGS/README/resolve/main/assets/estate-banner-v3-holo.svg" alt="SZL Holdings — sovereign governed AI: a tilted silver orbit with one coral node" width="100%" /></a></p>
 
 # Governed intelligence. Receipted evidence. Checkable results.
 
 SZL Holdings builds source-traceable AI research software. Every public claim on this card is either linked to evidence or labeled as a limit.
 
-[**Command Lab**](https://huggingface.co/spaces/SZLHOLDINGS/szl-command-lab) · [**Hub inventory**](https://huggingface.co/SZLHOLDINGS) · [**Evidence ledger**](https://a11oy.net) · [**Product**](https://a-11-oy.com) · [**Source**](https://github.com/szl-holdings)
+[**Command surface**](https://huggingface.co/spaces/SZLHOLDINGS/a11oy) · [**Hub inventory**](https://huggingface.co/SZLHOLDINGS) · [**Evidence ledger**](https://a11oy.net) · [**Product**](https://a-11-oy.com) · [**Source**](https://github.com/szl-holdings)
 
 ## Flagships
 
@@ -26,11 +26,11 @@ Three commercial flagships, one shared doctrine — control before action, evide
 
 - **[A11oy](https://a-11-oy.com)** — the governed product surface; its current capability state is published, not implied.
 - **[Forge](https://github.com/szl-holdings)** — source-first build: models, native kernels, datasets, and the tooling that receipts them.
-- **Killinchu** — the automation body; its public effectors remain **SIMULATED** by doctrine, and its receipts are published.
+- **Killinchu** — the automation body ([public surface](https://huggingface.co/spaces/SZLHOLDINGS/killinchu)); its public effectors remain **SIMULATED** by doctrine, and its receipts are published.
 
 ## Live surfaces
 
-- [**Command Lab**](https://huggingface.co/spaces/SZLHOLDINGS/szl-command-lab) — the estate's interactive front door.
+- [**Command surface**](https://huggingface.co/spaces/SZLHOLDINGS/a11oy) — the estate's interactive front door.
 - [**Router status**](https://huggingface.co/spaces/SZLHOLDINGS/llm-router-live) — live inference gateway board.
 - [**Receipt gallery**](https://szlholdings-readme.static.hf.space/evidence.html) — hash-chained computation records.
 - [**Evidence diagrams**](https://a11oy.net/diagrams/) — the provenance topology, drawn.
