@@ -527,10 +527,13 @@ class CardReconcileTests(unittest.TestCase):
     def test_repository_expectation_keeps_owner_hub_bodies(self):
         config = Path(__file__).resolve().parents[1] / "config" / "hf_card_expectations.json"
         cfg, selected, hashes = RECONCILE.load_config(str(config), str(config.parent / "hf_cards"), "")
-        self.assertEqual({a["repo_id"] for a in selected}, {"SZLHOLDINGS/yarqa", "SZLHOLDINGS/szl-constellation"})
+        self.assertEqual({a["repo_id"] for a in selected},
+                         {"SZLHOLDINGS/yarqa", "SZLHOLDINGS/szl-constellation", "SZLHOLDINGS/ChaskaLLM"})
         self.assertEqual(cfg["defaults"]["stamp_heading"], "## Governance")
-        self.assertFalse([a["repo_id"] for a in selected if "body_file" in a])
-        self.assertEqual(hashes["body_files_sha256"], {})
+        # ChaskaLLM is the only GitHub-authored body; yarqa and szl-constellation keep owner Hub bodies.
+        self.assertEqual([a["repo_id"] for a in selected if "body_file" in a], ["SZLHOLDINGS/ChaskaLLM"])
+        self.assertEqual(hashes["body_files_sha256"],
+                         {"ChaskaLLM.md": "9fc7d6ec8f3e1429078569ada79991e46d7663be85c7b13de1dc9b2243a3b5fa"})
 
     def test_completion_plan_binds_apply_to_the_exact_completed_bytes(self):
         asset = self.governed()
