@@ -14,7 +14,7 @@ import hf_static_space_deploy as deploy
 
 
 REQUIRED_LINKS = {
-    "https://huggingface.co/spaces/SZLHOLDINGS/szl-command-lab",
+    "https://huggingface.co/spaces/SZLHOLDINGS/a11oy",
     "https://a-11-oy.com",
     "https://a11oy.net",
     "https://github.com/szl-holdings",
@@ -60,6 +60,7 @@ REQUIRED_PUBLICATION_BINDINGS = {
     "estate-alignment.json": "docs/ESTATE_ALIGNMENT_CONTRACT_V1.json",
     "assets/estate-command-system.svg": "profile/assets/estate-command-system.svg",
     "assets/estate-banner-v2.svg": "profile/assets/estate-banner-v2.svg",
+    "assets/estate-banner-v3-holo.svg": "profile/assets/estate-banner-v3-holo.svg",
     "assets/hf-portfolio-map.svg": "profile/assets/hf-portfolio-map.svg",
     "assets/hf-card-command.svg": "profile/assets/hf-card-command.svg",
     "assets/hf-card-intelligence.svg": "profile/assets/hf-card-intelligence.svg",
@@ -948,7 +949,7 @@ def main() -> int:
         for source in REQUIRED_PUBLICATION_BINDINGS.values()
         if source.endswith(".svg")
     )
-    require(len(svg_sources) == 8, "compatibility SVG family is incomplete", failures)
+    require(len(svg_sources) == 9, "compatibility SVG family is incomplete", failures)
     for source in svg_sources:
         svg = (root / source).read_text(encoding="utf-8")
         require(
