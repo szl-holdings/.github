@@ -55,7 +55,7 @@ GEO GSE85241: integrity and repeatability; unsigned receipt; no clinical claim.
 ## Current state
 
 <!-- szl:public-inventory:start -->
-The source-bound public inventory records **52 public Spaces, 138 model repositories, 14 native kernels, 68 datasets** at **2026-11-14T04:09:48Z** under `hf-public-author-membership/v2`. This is a dated observation, not a live count. Native kernel IDs may also appear in the model namespace; these figures do not count unique projects or trained language models. [Inventory binding](https://github.com/szl-holdings/.github/blob/main/profile/public-inventory.json) · [Exact source](https://github.com/szl-holdings/a11oy/blob/dac5a4cac8011af907146e813b0e8996a3bee424/docs/huggingface-ecosystem-manifest.json) · [Current Hub listing](https://huggingface.co/SZLHOLDINGS). Hub inventory is registry evidence, not availability, operational readiness, or publication policy. It does not establish model quality.
+The source-bound public inventory records **12 public Spaces, 92 model repositories, 14 native kernels, 68 datasets** at **2026-11-14T19:19:26Z** under `hf-public-author-membership/v2`. This is a dated observation, not a live count. Native kernel IDs may also appear in the model namespace; these figures do not count unique projects or trained language models. [Inventory binding](https://github.com/szl-holdings/.github/blob/main/profile/public-inventory.json) · [Exact source](https://github.com/szl-holdings/a11oy/blob/c2e28480d18421891c6d1f2eb2b2aa3bba377c7e/docs/huggingface-ecosystem-manifest.json) · [Current Hub listing](https://huggingface.co/SZLHOLDINGS). Hub inventory is registry evidence, not availability, operational readiness, or publication policy. It does not establish model quality.
 <!-- szl:public-inventory:end -->
 
 **HISTORICAL** alignment v1 recorded 16 portfolio Spaces, 1 inventory-only Space, 45 models, 34 datasets; the [legacy dataset](https://huggingface.co/datasets/SZLHOLDINGS/SZLHOLDINGS) is not readiness evidence.
@@ -72,3 +72,4 @@ Reproduce with `python .github/scripts/hf_static_space_deploy.py --manifest hugg
 Roles: Three commercial flagships — A11oy, Killinchu, Forge; One inference flagship — SZL Router; Five public domain bodies — Terra, Killinchu, PRISM Counsel, PURIQ Finance, LYTE; Six internal engines — CHAPAQ, Lyte, Killinchu, Finance, Terra, Counsel.
 
 </details>
+
