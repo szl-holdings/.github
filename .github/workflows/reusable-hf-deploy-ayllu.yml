@@ -1,0 +1,337 @@
+name: Reusable — Ayllu HF Deploy from Dockerfile
+
+# Sole reusable publisher for szl-holdings/ayllu ->
+# SZLHOLDINGS/ayllu. The pushed set follows Dockerfile COPY sources.
+# This version keeps publication and public readback under one Space writer lock.
+
+on:
+  workflow_call:
+    inputs:
+      hf-repo:
+        description: "Must be SZLHOLDINGS/ayllu."
+        required: false
+        type: string
+        default: ""
+      ref:
+        description: "Must be the exact caller github.sha on main."
+        required: false
+        type: string
+        default: "main"
+      dockerfile-path:
+        description: "Path to the Dockerfile whose COPY sources define the deploy set."
+        required: false
+        type: string
+        default: "Dockerfile"
+      source-revision-file:
+        description: "Must be empty; Ayllu records source SHA in the verified deployment manifest."
+        required: false
+        type: string
+        default: ""
+      include-readme:
+        description: "Mirror README.md so the Space card remains source-controlled."
+        required: false
+        type: boolean
+        default: true
+      smoke-paths:
+        description: "Must equal the ten routes in the Ayllu .hf-space.json contract."
+        required: false
+        type: string
+        default: '["/"]'
+      prune:
+        description: "Must be true; preserve existing COPY-scoped pruning, never arbitrary repository pruning."
+        required: false
+        type: boolean
+        default: false
+      wait-running:
+        description: "Must be 900 seconds for bounded exact-revision runtime convergence."
+        required: false
+        type: number
+        default: 900
+      restart-space:
+        description: "Must be false; this publisher does not restart the Space."
+        required: false
+        type: boolean
+        default: false
+      source-revision-variable:
+        description: "Must be empty; no Space variable write is admitted."
+        required: false
+        type: string
+        default: ""
+      source-revision-probe-path:
+        description: "Must be empty; preserve manifest/commit/running-byte and caller receipt checks."
+        required: false
+        type: string
+        default: ""
+      require-default-branch-tip:
+        description: "Must be true; fail at mutation boundary unless source is the current main tip."
+        required: false
+        type: boolean
+        default: false
+      contract-only:
+        description: "Run only the read-only exact-source workflow_call witness; never publish."
+        required: false
+        type: boolean
+        default: false
+    secrets:
+      HF_TOKEN:
+        description: "HF write token with organization write access to the target Space."
+        required: true
+
+permissions:
+  contents: read
+
+# Preserve exclusion with the previous generic publisher's literal job lock.
+# The caller also holds its independent hf-write/space/SZLHOLDINGS/ayllu lock.
+concurrency:
+  group: hf-deploy-SZLHOLDINGS/ayllu
+  cancel-in-progress: false
+
+jobs:
+  invocation:
+    name: Admit only canonical ayllu publication or read-only source witness
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout exact reusable-workflow validator
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: ${{ job.workflow_repository }}
+          ref: ${{ job.workflow_sha }}
+          path: tools
+          persist-credentials: false
+          fetch-depth: 1
+      - name: Assert validator source revision
+        shell: bash
+        env:
+          EXPECTED_TOOLS_SHA: ${{ job.workflow_sha }}
+        run: |
+          set -euo pipefail
+          [[ "$EXPECTED_TOOLS_SHA" =~ ^[0-9a-f]{40}$ ]]
+          test "$(git -C tools rev-parse --verify HEAD)" = "$EXPECTED_TOOLS_SHA"
+      - name: Validate the bounded invocation before caller checkout or HF credentials
+        env:
+          WORKFLOW_REPOSITORY: ${{ job.workflow_repository }}
+          WORKFLOW_SHA: ${{ job.workflow_sha }}
+          CALLER_REPOSITORY: ${{ github.repository }}
+          CALLER_WORKFLOW_REF: ${{ github.workflow_ref }}
+          EVENT_SHA: ${{ github.sha }}
+          EVENT_REF: ${{ github.ref }}
+          EVENT_NAME: ${{ github.event_name }}
+          CONTRACT_ONLY: ${{ inputs.contract-only }}
+          HF_REPO: ${{ inputs.hf-repo }}
+          DEPLOY_REF: ${{ inputs.ref }}
+          REQUIRE_TIP: ${{ inputs.require-default-branch-tip }}
+          DOCKERFILE: ${{ inputs.dockerfile-path }}
+          SOURCE_REVISION_FILE: ${{ inputs.source-revision-file }}
+          SOURCE_VARIABLE: ${{ inputs.source-revision-variable }}
+          SOURCE_PROBE: ${{ inputs.source-revision-probe-path }}
+          INCLUDE_README: ${{ inputs.include-readme }}
+          SMOKE_PATHS: ${{ inputs.smoke-paths }}
+          PRUNE: ${{ inputs.prune }}
+          RESTART: ${{ inputs.restart-space }}
+          WAIT_RUNNING: ${{ inputs.wait-running }}
+        run: python3 -I -P tools/.github/scripts/hf_ayllu_publish_contract.py
+
+  hf-deploy:
+    name: Deploy derived COPY set and verify exact live state
+    needs: invocation
+    if: ${{ inputs.contract-only == false }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    steps:
+      - name: Harden runner
+        uses: step-security/harden-runner@e14015d583714f6e62063499dc959a02595150a1 # v2.21.1
+        with:
+          egress-policy: audit
+
+      - name: Checkout caller source of truth
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: szl-holdings/ayllu
+          path: caller
+          ref: ${{ github.sha }}
+          persist-credentials: false
+          fetch-depth: 1
+
+      - name: Checkout exact reusable-workflow revision
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: ${{ job.workflow_repository }}
+          ref: ${{ job.workflow_sha }}
+          path: tools
+          persist-credentials: false
+          fetch-depth: 1
+
+      - name: Assert exact reusable-workflow tools revision
+        shell: bash
+        env:
+          WORKFLOW_REPOSITORY: ${{ job.workflow_repository }}
+          EXPECTED_TOOLS_SHA: ${{ job.workflow_sha }}
+        run: |
+          set -euo pipefail
+          if [[ ! "$EXPECTED_TOOLS_SHA" =~ ^[0-9a-f]{40}$ ]]; then
+            echo "::error::job.workflow_sha is not an exact 40-character commit SHA: $EXPECTED_TOOLS_SHA"
+            exit 2
+          fi
+          ACTUAL_TOOLS_SHA="$(git -C tools rev-parse --verify HEAD)"
+          if [[ ! "$ACTUAL_TOOLS_SHA" =~ ^[0-9a-f]{40}$ ]]; then
+            echo "::error::Checked-out tools HEAD is not an exact 40-character commit SHA: $ACTUAL_TOOLS_SHA"
+            exit 2
+          fi
+          if [ "$ACTUAL_TOOLS_SHA" != "$EXPECTED_TOOLS_SHA" ]; then
+            echo "::error::Reusable-workflow tools mismatch: expected $EXPECTED_TOOLS_SHA, found $ACTUAL_TOOLS_SHA"
+            exit 2
+          fi
+          printf 'job.workflow_repository=%s\n' "$WORKFLOW_REPOSITORY"
+          printf 'job.workflow_sha=%s\n' "$EXPECTED_TOOLS_SHA"
+          printf 'checked_out_tools_head=%s\n' "$ACTUAL_TOOLS_SHA"
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12.10"
+
+      - name: Create fresh publisher virtual environment
+        shell: bash
+        run: |
+          set -euo pipefail
+          VENV="$RUNNER_TEMP/hf-publisher-venv"
+          if [ -e "$VENV" ]; then
+            echo '::error::Refusing preexisting publisher virtual environment.'
+            exit 2
+          fi
+          python3 -m venv "$VENV"
+          ACTUAL_VERSION="$("$VENV/bin/python" -I -P -c 'import platform; print(platform.python_version())')"
+          if [ "$ACTUAL_VERSION" != "3.12.10" ]; then
+            echo "::error::Expected publisher Python 3.12.10, found $ACTUAL_VERSION."
+            exit 2
+          fi
+
+      - name: Install hash-locked deployment client closure
+        shell: bash
+        run: >-
+          "$RUNNER_TEMP/hf-publisher-venv/bin/python" -I -P -m pip install
+          --disable-pip-version-check --require-hashes --only-binary=:all:
+          --ignore-installed -r tools/requirements/hf-publisher.lock
+
+      - name: Resolve target and exact checked-out source
+        id: hf
+        env:
+          EVENT_SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          SOURCE_SHA="$(git -C caller rev-parse HEAD)"
+          if [[ ! "$SOURCE_SHA" =~ ^[0-9a-f]{40}$ ]] || [ "$SOURCE_SHA" != "$EVENT_SHA" ]; then
+            echo '::error::Checked-out ayllu source differs from the exact caller event SHA.'
+            exit 2
+          fi
+          echo "source_sha=${SOURCE_SHA}" >> "$GITHUB_OUTPUT"
+          echo "Deploying szl-holdings/ayllu -> SZLHOLDINGS/ayllu (${SOURCE_SHA})"
+
+      - name: Require governed publisher
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+        run: |
+          set -euo pipefail
+          test -n "${HF_TOKEN:-}" || {
+            echo '::error::HF_TOKEN is not configured for the reusable deployer.'
+            exit 2
+          }
+
+      - name: Deploy Dockerfile-derived files to the Space
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+          GITHUB_TOKEN: ${{ github.token }}
+          SOURCE_SHA: ${{ steps.hf.outputs.source_sha }}
+        run: |
+          set -euo pipefail
+          "$RUNNER_TEMP/hf-publisher-venv/bin/python" -I -P tools/.github/scripts/hf_deploy_from_dockerfile.py \
+            --repo-root caller \
+            --github-repo szl-holdings/ayllu \
+            --hf-repo SZLHOLDINGS/ayllu \
+            --ref "$SOURCE_SHA" \
+            --source-sha "$SOURCE_SHA" \
+            --dockerfile-path Dockerfile \
+            --include-readme true \
+            --smoke-paths '["/healthz", "/", "/counsel", "/psyche", "/health", "/readyz", "/api/v1/ayllu/roster", "/api/v1/ayllu/manifest", "/api/v1/counsel/allodial", "/api/v1/psyche/health"]' \
+            --require-default-branch-tip \
+            --prune \
+            --manifest-out hf-deploy-manifest.json
+
+      - name: Verify exact running commit, bytes, and smoke routes
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+          WAIT_RUNNING: ${{ inputs.wait-running }}
+        run: |
+          set -euo pipefail
+          "$RUNNER_TEMP/hf-publisher-venv/bin/python" -I -P tools/.github/scripts/hf_deploy_from_dockerfile.py \
+            --attest \
+            --manifest hf-deploy-manifest.json \
+            --hf-repo SZLHOLDINGS/ayllu \
+            --wait-running "${WAIT_RUNNING}"
+
+      - name: Upload immutable deployment evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: hf-deploy-evidence
+          path: |
+            hf-deploy-manifest.json
+          if-no-files-found: error
+          retention-days: 90
+
+  exact-source-contract:
+    name: Reusable publisher exact-source witness
+    needs: invocation
+    if: ${{ inputs.contract-only == true }}
+    permissions:
+      contents: read
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Checkout called reusable-workflow revision
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: ${{ job.workflow_repository }}
+          ref: ${{ job.workflow_sha }}
+          path: tools
+          persist-credentials: false
+          fetch-depth: 1
+
+      - name: Assert exact called-workflow source
+        shell: bash
+        env:
+          WORKFLOW_REPOSITORY: ${{ job.workflow_repository }}
+          EXPECTED_WORKFLOW_SHA: ${{ job.workflow_sha }}
+          EXPECTED_EVENT_SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          if [[ ! "$EXPECTED_WORKFLOW_SHA" =~ ^[0-9a-f]{40}$ ]]; then
+            echo "::error::job.workflow_sha is not an exact 40-character commit SHA: $EXPECTED_WORKFLOW_SHA"
+            exit 2
+          fi
+          ACTUAL_TOOLS_SHA="$(git -C tools rev-parse --verify HEAD)"
+          if [[ ! "$ACTUAL_TOOLS_SHA" =~ ^[0-9a-f]{40}$ ]]; then
+            echo "::error::Checked-out tools HEAD is not an exact 40-character commit SHA: $ACTUAL_TOOLS_SHA"
+            exit 2
+          fi
+          if [ "$ACTUAL_TOOLS_SHA" != "$EXPECTED_WORKFLOW_SHA" ]; then
+            echo "::error::Called-workflow source mismatch: expected $EXPECTED_WORKFLOW_SHA, found $ACTUAL_TOOLS_SHA"
+            exit 2
+          fi
+          if [[ ! "$EXPECTED_EVENT_SHA" =~ ^[0-9a-f]{40}$ ]]; then
+            echo "::error::github.sha is not an exact 40-character commit SHA: $EXPECTED_EVENT_SHA"
+            exit 2
+          fi
+          if [ "$EXPECTED_WORKFLOW_SHA" != "$EXPECTED_EVENT_SHA" ]; then
+            echo "::error::Called workflow is not the exact event head: workflow $EXPECTED_WORKFLOW_SHA, event $EXPECTED_EVENT_SHA"
+            exit 2
+          fi
+          printf 'job.workflow_repository=%s\n' "$WORKFLOW_REPOSITORY"
+          printf 'job.workflow_sha=%s\n' "$EXPECTED_WORKFLOW_SHA"
+          printf 'github.sha=%s\n' "$EXPECTED_EVENT_SHA"
+          printf 'checked_out_tools_head=%s\n' "$ACTUAL_TOOLS_SHA"
