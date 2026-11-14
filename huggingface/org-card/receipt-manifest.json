@@ -1,0 +1,73 @@
+{
+  "schema": "szl.receipt-gallery-input/v1",
+  "revision": "bba3ccb77000ea398bf9c9e1d616c24c76aa3aa9",
+  "observed_at": "2026-11-13T20:31:19.996168+00:00",
+  "entries": [
+    {
+      "path": "receipts/estate-battery-a11oy-code-r1-candidate.json",
+      "file_sha256": "bed6a5216bf0b762018c500c1a5d7357d1c6ec73d17093dda4dbc377babcc5a6",
+      "size_bytes": 1756,
+      "url": "https://huggingface.co/datasets/SZLHOLDINGS/frontier-54-runs/resolve/bba3ccb77000ea398bf9c9e1d616c24c76aa3aa9/benchmark/estate-battery-a11oy-code-r1-candidate.json"
+    },
+    {
+      "path": "receipts/estate-battery-base-baseline.json",
+      "file_sha256": "572333cdc5f0adbed8ff0aa9d69faa23a8af1c60a4b228a3f9de87489ea261ae",
+      "size_bytes": 3558,
+      "url": "https://huggingface.co/datasets/SZLHOLDINGS/frontier-54-runs/resolve/bba3ccb77000ea398bf9c9e1d616c24c76aa3aa9/benchmark/estate-battery-base-baseline.json"
+    },
+    {
+      "path": "receipts/estate-battery-code-master-v3-fresh.json",
+      "file_sha256": "9cb9221df9e053a80bfa703e494df7706e21bec978c5100502dd660cc44f54df",
+      "size_bytes": 1586,
+      "url": "https://huggingface.co/datasets/SZLHOLDINGS/frontier-54-runs/resolve/bba3ccb77000ea398bf9c9e1d616c24c76aa3aa9/benchmark/estate-battery-code-master-v3-fresh.json"
+    },
+    {
+      "path": "receipts/estate-battery-doctrine-master-v1-candidate.json",
+      "file_sha256": "afc82b4d646d9a1400881932605a2f99b4fd84958b1e9da0e2e75584bea12465",
+      "size_bytes": 3529,
+      "url": "https://huggingface.co/datasets/SZLHOLDINGS/frontier-54-runs/resolve/bba3ccb77000ea398bf9c9e1d616c24c76aa3aa9/benchmark/estate-battery-doctrine-master-v1-candidate.json"
+    },
+    {
+      "path": "receipts/estate-battery-hatun-24-doctrine-math-r1-candidate.json",
+      "file_sha256": "602a25b41c4720ace5e8e32ae0911bc71646e70a399f4c03436c75895256579d",
+      "size_bytes": 2354,
+      "url": "https://huggingface.co/datasets/SZLHOLDINGS/frontier-54-runs/resolve/bba3ccb77000ea398bf9c9e1d616c24c76aa3aa9/benchmark/estate-battery-hatun-24-doctrine-math-r1-candidate.json"
+    },
+    {
+      "path": "receipts/estate-battery-measurement-master-v1-candidate.json",
+      "file_sha256": "b1d3a371ac4cc6ec913eb0a9df88e7e9676c89582aa6fbe52a0a0653fff57b82",
+      "size_bytes": 3550,
+      "url": "https://huggingface.co/datasets/SZLHOLDINGS/frontier-54-runs/resolve/bba3ccb77000ea398bf9c9e1d616c24c76aa3aa9/benchmark/estate-battery-measurement-master-v1-candidate.json"
+    },
+    {
+      "path": "receipts/estate-battery-quant-4b-scaling.json",
+      "file_sha256": "0f0d9c6c4405dc3ac8350ff727c65d6b3a94424d1f559d62af9259969019c3cc",
+      "size_bytes": 3473,
+      "url": "https://huggingface.co/datasets/SZLHOLDINGS/frontier-54-runs/resolve/bba3ccb77000ea398bf9c9e1d616c24c76aa3aa9/benchmark/estate-battery-quant-4b-scaling.json"
+    },
+    {
+      "path": "receipts/estate-battery-quant-master-v1-candidate.json",
+      "file_sha256": "9e106e8f569193504111ae22fcb0b0867a2c20257d3e21251bcaa1dc5c0d70b2",
+      "size_bytes": 2133,
+      "url": "https://huggingface.co/datasets/SZLHOLDINGS/frontier-54-runs/resolve/bba3ccb77000ea398bf9c9e1d616c24c76aa3aa9/benchmark/estate-battery-quant-master-v1-candidate.json"
+    },
+    {
+      "path": "receipts/estate-battery-reasoning-master-v1-candidate.json",
+      "file_sha256": "43ac7ee43168ae82d2a7e6a2257ea64012b213c56c232b1c10cc81f7d7577bd0",
+      "size_bytes": 3471,
+      "url": "https://huggingface.co/datasets/SZLHOLDINGS/frontier-54-runs/resolve/bba3ccb77000ea398bf9c9e1d616c24c76aa3aa9/benchmark/estate-battery-reasoning-master-v1-candidate.json"
+    },
+    {
+      "path": "receipts/estate-battery-szl-receiptagent-qwen35-0.8b-v3-candidate.json",
+      "file_sha256": "16cf873f69bfbe4854bc14004ba87f5f879ddc6d97fe8f351d83ff4058868fd9",
+      "size_bytes": 2370,
+      "url": "https://huggingface.co/datasets/SZLHOLDINGS/frontier-54-runs/resolve/bba3ccb77000ea398bf9c9e1d616c24c76aa3aa9/benchmark/estate-battery-szl-receiptagent-qwen35-0.8b-v3-candidate.json"
+    },
+    {
+      "path": "receipts/estate-battery-v2-abstention-v2-candidate.json",
+      "file_sha256": "45a24761e66438086b0c362d347fbc8d2712a11af38fc8eacf4f96353782c208",
+      "size_bytes": 1991,
+      "url": "https://huggingface.co/datasets/SZLHOLDINGS/frontier-54-runs/resolve/bba3ccb77000ea398bf9c9e1d616c24c76aa3aa9/benchmark/estate-battery-v2-abstention-v2-candidate.json"
+    }
+  ]
+}
