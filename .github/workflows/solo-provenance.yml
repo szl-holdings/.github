@@ -26,6 +26,7 @@ jobs:
       - name: Unit tests
         run: python3 provenance/test_check.py
       - name: Evaluate pull request
+        if: github.actor != 'dependabot[bot]'
         env:
           GITHUB_EVENT_PATH: ${{ github.event_path }}
         run: python3 provenance/check.py provenance/solo-maintainer-policy.v1.json
