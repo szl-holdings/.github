@@ -1,4 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 360" width="1200" height="360" role="img" aria-label="SZL Holdings - sovereign governed AI; a tilted silver orbit with a single coral node; the estate that receipts its own thinking">
+  <title>SZL Holdings — sovereign governed AI</title>
+  <desc>Navy estate banner: a silver receipt orbit tilted -22 degrees with five receipt nodes, one coral node and the Lambda glyph; the orbit slowly drifts.</desc>
   <defs>
     <radialGradient id="holo-bg" cx="68%" cy="46%" r="75%">
       <stop offset="0%" stop-color="#0c1734"/>
