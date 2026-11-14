@@ -532,6 +532,118 @@ class CardReconcileTests(unittest.TestCase):
         self.assertFalse([a["repo_id"] for a in selected if "body_file" in a])
         self.assertEqual(hashes["body_files_sha256"], {})
 
+    def private_config(self):
+        self.asset.update(repo_id="SZLHOLDINGS/private-fixture", kind="models",
+                          source_repo="szl-holdings/private-fixture", private=True)
+        self.write_config()
+
+    def test_anonymous_plan_ignores_inherited_read_and_write_credentials(self):
+        code, receipt, requests = self.run_main(
+            responses=[(json.dumps({"sha": HEAD}), 200), (self.card, 200)],
+            token=TOKEN, env_extra={"HF_CARD_READ_TOKEN": "hf_read_only"})
+        self.assertEqual(code, 0)
+        self.assertTrue(all(call.args[2] is None for call in requests.call_args_list))
+
+    def test_private_plan_requires_read_token_and_private_runner_before_network(self):
+        self.private_config()
+        cases = [([], {}), (["--authenticated-plan"], {}),
+                 (["--authenticated-plan"], {"HF_CARD_READ_TOKEN": TOKEN, "GITHUB_ACTIONS": "true"})]
+        for args, env in cases:
+            with self.subTest(args=args, env_keys=list(env)):
+                code, receipt, requests = self.run_main(args, env_extra=env)
+                self.assertEqual(code, 1)
+                self.assertFalse(receipt["success"])
+                requests.assert_not_called()
+
+    def test_authenticated_private_plan_never_posts_and_restricts_receipt_permissions(self):
+        self.private_config()
+        output = self.root / "receipt.json"
+        output.write_text("old")
+        output.chmod(0o644)
+        code, receipt, requests = self.run_main(
+            ["--authenticated-plan"], [(json.dumps({"sha": HEAD, "private": True}), 200), (self.card, 200)],
+            token="hf_unrelated_writer", env_extra={"HF_CARD_READ_TOKEN": TOKEN})
+        self.assertEqual(code, 0, receipt.get("error"))
+        self.assertTrue(all(call.args[0] == "GET" and call.args[2] == TOKEN for call in requests.call_args_list))
+        self.assertNotIn(TOKEN, json.dumps(receipt))
+        self.assertEqual(output.stat().st_mode & 0o777, 0o600)
+
+    def test_private_visibility_drift_and_unavailable_reads_still_fail_closed(self):
+        self.private_config()
+        for response in (("denied", 401), ("missing", 404),
+                         (json.dumps({"sha": HEAD, "private": False}), 200),
+                         (json.dumps({"sha": HEAD}), 200)):
+            with self.subTest(response=response):
+                code, receipt, requests = self.run_main(
+                    ["--authenticated-plan"], [response], env_extra={"HF_CARD_READ_TOKEN": TOKEN})
+                self.assertEqual(code, 1)
+                self.assertEqual(receipt["assets"][0]["label"], "UNAVAILABLE")
+                self.assertEqual(requests.call_count, 1)
+
+    def test_runtime_private_repository_requires_explicit_private_config_before_card_read(self):
+        metadata = json.dumps({"sha": HEAD, "private": True})
+        with patch.object(RECONCILE, "hub_request", return_value=(metadata, 200)) as requests:
+            row = RECONCILE.plan_asset(self.asset, self.defaults, TOKEN, str(self.root), True)
+        self.assertEqual(row["label"], "UNAVAILABLE")
+        self.assertIn("not marked private", row["detail"])
+        requests.assert_called_once_with("GET", "/api/spaces/SZLHOLDINGS/yarqa", TOKEN)
+        self.assertNotIn("original_text", row)
+        self.assertNotIn("new_text", row)
+
+    def test_runtime_private_visibility_drift_in_actions_apply_never_reads_or_writes_card(self):
+        expected, _ = self.expected_plan()
+        code, receipt, requests = self.run_main(
+            ["--apply", "--expected-plan", str(expected)],
+            [self.identity(), (json.dumps({"sha": HEAD, "private": True}), 200)], TOKEN,
+            env_extra={"GITHUB_ACTIONS": "true"})
+        self.assertEqual(code, 1)
+        self.assertEqual(receipt["assets"][0]["label"], "UNAVAILABLE")
+        self.assertIn("not marked private", receipt["assets"][0]["detail"])
+        self.assertEqual([call.args[1] for call in requests.call_args_list],
+                         ["/api/whoami-v2", "/api/spaces/SZLHOLDINGS/yarqa"])
+        self.assertTrue(all(call.args[0] == "GET" for call in requests.call_args_list))
+        self.assertNotIn("original_text", receipt["assets"][0])
+        self.assertNotIn("new_text", receipt["assets"][0])
+
+    def test_private_apply_still_requires_exact_plan_and_verified_readback(self):
+        self.private_config()
+        metadata = (json.dumps({"sha": HEAD, "private": True}), 200)
+        code, plan, _ = self.run_main(["--authenticated-plan"], [metadata, (self.card, 200)],
+                                    env_extra={"HF_CARD_READ_TOKEN": "hf_reader"})
+        self.assertEqual(code, 0)
+        expected = self.root / "private-plan.json"
+        expected.write_text(json.dumps(plan))
+        desired = plan["assets"][0]["new_text"]
+        responses = [self.identity(), metadata, (self.card, 200),
+                     (json.dumps({"commitOid": COMMIT}), 200), (desired, 200),
+                     (json.dumps({"sha": COMMIT}), 200)]
+        code, receipt, requests = self.run_main(["--apply", "--expected-plan", str(expected)], responses, TOKEN)
+        self.assertEqual(code, 0, receipt.get("error"))
+        self.assertTrue(receipt["assets"][0]["main_verified"])
+        posts = [call for call in requests.call_args_list if call.args[0] == "POST"]
+        self.assertEqual(len(posts), 1)
+        records = [json.loads(line) for line in posts[0].args[3].decode().splitlines()]
+        self.assertEqual(records[0]["value"]["parentCommit"], HEAD)
+        self.assertEqual(base64.b64decode(records[1]["value"]["content"]).decode(), desired)
+        code, _, requests = self.run_main(["--apply", "--expected-plan", str(expected)], token=TOKEN,
+                                         env_extra={"GITHUB_ACTIONS": "true"})
+        self.assertEqual(code, 1)
+        requests.assert_not_called()
+
+    def test_read_credential_cannot_be_used_for_apply_via_plan_flag(self):
+        code, receipt, requests = self.run_main(
+            ["--apply", "--authenticated-plan", "--expected-plan", "unused"],
+            env_extra={"HF_CARD_READ_TOKEN": TOKEN})
+        self.assertEqual(code, 1)
+        requests.assert_not_called()
+
+    def test_private_flag_must_be_boolean(self):
+        self.asset["private"] = "true"
+        self.write_config()
+        code, _, requests = self.run_main()
+        self.assertEqual(code, 1)
+        requests.assert_not_called()
+
     def test_completion_plan_binds_apply_to_the_exact_completed_bytes(self):
         asset = self.governed()
         self.cfg["assets"] = [asset]
