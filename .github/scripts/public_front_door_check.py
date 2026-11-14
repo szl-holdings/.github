@@ -14,7 +14,7 @@ import hf_static_space_deploy as deploy
 
 
 REQUIRED_LINKS = {
-    "https://huggingface.co/spaces/SZLHOLDINGS/szl-command-lab",
+    "https://huggingface.co/spaces/SZLHOLDINGS/a11oy",
     "https://a-11-oy.com",
     "https://a11oy.net",
     "https://github.com/szl-holdings",
@@ -60,6 +60,7 @@ REQUIRED_PUBLICATION_BINDINGS = {
     "estate-alignment.json": "docs/ESTATE_ALIGNMENT_CONTRACT_V1.json",
     "assets/estate-command-system.svg": "profile/assets/estate-command-system.svg",
     "assets/estate-banner-v2.svg": "profile/assets/estate-banner-v2.svg",
+    "assets/estate-banner-v3-holo.svg": "profile/assets/estate-banner-v3-holo.svg",
     "assets/hf-portfolio-map.svg": "profile/assets/hf-portfolio-map.svg",
     "assets/hf-card-command.svg": "profile/assets/hf-card-command.svg",
     "assets/hf-card-intelligence.svg": "profile/assets/hf-card-intelligence.svg",
@@ -72,6 +73,19 @@ REQUIRED_PUBLICATION_BINDINGS = {
     "SEVEN_SPACES.md": "huggingface/org-card/SEVEN_SPACES.md",
     "SPACE_PROVENANCE_FRONTIER.json": "huggingface/org-card/SPACE_PROVENANCE_FRONTIER.json",
     "seven-spaces.yaml": "huggingface/org-card/seven-spaces.yaml",
+    "evidence.html": "huggingface/org-card/evidence.html",
+    "receipt-manifest.json": "huggingface/org-card/receipt-manifest.json",
+    "receipts/estate-battery-a11oy-code-r1-candidate.json": "huggingface/org-card/receipts/estate-battery-a11oy-code-r1-candidate.json",
+    "receipts/estate-battery-base-baseline.json": "huggingface/org-card/receipts/estate-battery-base-baseline.json",
+    "receipts/estate-battery-code-master-v3-fresh.json": "huggingface/org-card/receipts/estate-battery-code-master-v3-fresh.json",
+    "receipts/estate-battery-doctrine-master-v1-candidate.json": "huggingface/org-card/receipts/estate-battery-doctrine-master-v1-candidate.json",
+    "receipts/estate-battery-hatun-24-doctrine-math-r1-candidate.json": "huggingface/org-card/receipts/estate-battery-hatun-24-doctrine-math-r1-candidate.json",
+    "receipts/estate-battery-measurement-master-v1-candidate.json": "huggingface/org-card/receipts/estate-battery-measurement-master-v1-candidate.json",
+    "receipts/estate-battery-quant-4b-scaling.json": "huggingface/org-card/receipts/estate-battery-quant-4b-scaling.json",
+    "receipts/estate-battery-quant-master-v1-candidate.json": "huggingface/org-card/receipts/estate-battery-quant-master-v1-candidate.json",
+    "receipts/estate-battery-reasoning-master-v1-candidate.json": "huggingface/org-card/receipts/estate-battery-reasoning-master-v1-candidate.json",
+    "receipts/estate-battery-szl-receiptagent-qwen35-0.8b-v3-candidate.json": "huggingface/org-card/receipts/estate-battery-szl-receiptagent-qwen35-0.8b-v3-candidate.json",
+    "receipts/estate-battery-v2-abstention-v2-candidate.json": "huggingface/org-card/receipts/estate-battery-v2-abstention-v2-candidate.json",
 }
 REQUIRED_PUSH_PATHS = {
     "huggingface/org-card/**",
@@ -935,7 +949,7 @@ def main() -> int:
         for source in REQUIRED_PUBLICATION_BINDINGS.values()
         if source.endswith(".svg")
     )
-    require(len(svg_sources) == 8, "compatibility SVG family is incomplete", failures)
+    require(len(svg_sources) == 9, "compatibility SVG family is incomplete", failures)
     for source in svg_sources:
         svg = (root / source).read_text(encoding="utf-8")
         require(
