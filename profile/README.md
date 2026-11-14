@@ -1,10 +1,10 @@
-<p><a href="https://huggingface.co/spaces/SZLHOLDINGS/szl-command-lab"><img src="https://raw.githubusercontent.com/szl-holdings/.github/main/profile/assets/szl/logos/szl_mark_holographic.svg" alt="SZL Holdings" width="144" /></a></p>
+<p><a href="https://huggingface.co/spaces/SZLHOLDINGS/a11oy"><img src="https://raw.githubusercontent.com/szl-holdings/.github/main/profile/assets/szl/logos/szl_mark_holographic.svg" alt="SZL Holdings" width="144" /></a></p>
 
 # Governed intelligence. Checkable results.
 
 SZL Holdings builds AI software, models and research tools that connect an output to its source and evidence. Explore the systems, inspect what is available, and reproduce the work behind each claim.
 
-[**Explore Command Lab →**](https://huggingface.co/spaces/SZLHOLDINGS/szl-command-lab) · [**Build with the source →**](https://github.com/szl-holdings)
+[**Explore A11oy →**](https://huggingface.co/spaces/SZLHOLDINGS/a11oy) · [**Build with the source →**](https://github.com/szl-holdings)
 
 ## Repeat a public calculation
 
@@ -14,7 +14,7 @@ The single-cell example summarizes public GEO GSE85241 data and checks integrity
 
 ## Choose a path
 
-- **Explore:** [Command Lab](https://huggingface.co/spaces/SZLHOLDINGS/szl-command-lab) brings the public portfolio into one searchable interface.
+- **Explore:** [A11oy](https://huggingface.co/spaces/SZLHOLDINGS/a11oy) is the estate's live governed command surface.
 - **Use:** [A11oy](https://a-11-oy.com) exposes tools and their current capability state.
 - **Build:** browse [models, kernels, datasets and Spaces](https://huggingface.co/SZLHOLDINGS), or [published Python packages](https://pypi.org/user/betterwithage/).
 - **Verify:** [a11oy.net](https://a11oy.net) links computation records and their limits, with [evidence diagrams](https://a11oy.net/diagrams/) drawn from recorded runs.
@@ -30,7 +30,7 @@ A published file, running application and independently checked result establish
 ## Current state
 
 <!-- szl:public-inventory:start -->
-The source-bound public inventory records **40 public Spaces, 41 model repositories, 14 native kernels, 38 datasets** at **2026-11-01T22:56:52Z** under `hf-public-author-membership/v2`. This is a dated observation, not a live count. Native kernel IDs may also appear in the model namespace; these figures do not count unique projects or trained language models. [Inventory binding](https://github.com/szl-holdings/.github/blob/main/profile/public-inventory.json) · [Exact source](https://github.com/szl-holdings/a11oy/blob/fef0c7e1223f91a78253f6a3ef1abe33173418c8/docs/huggingface-ecosystem-manifest.json) · [Current Hub listing](https://huggingface.co/SZLHOLDINGS). Hub inventory is registry evidence, not availability, operational readiness, or publication policy. It does not establish model quality.
+The source-bound public inventory records **52 public Spaces, 138 model repositories, 14 native kernels, 68 datasets** at **2026-11-14T04:09:48Z** under `hf-public-author-membership/v2`. This is a dated observation, not a live count. Native kernel IDs may also appear in the model namespace; these figures do not count unique projects or trained language models. [Inventory binding](https://github.com/szl-holdings/.github/blob/main/profile/public-inventory.json) · [Exact source](https://github.com/szl-holdings/a11oy/blob/dac5a4cac8011af907146e813b0e8996a3bee424/docs/huggingface-ecosystem-manifest.json) · [Current Hub listing](https://huggingface.co/SZLHOLDINGS). Hub inventory is registry evidence, not availability, operational readiness, or publication policy. It does not establish model quality.
 <!-- szl:public-inventory:end -->
 
 **HISTORICAL:** estate-alignment v1 described 16 portfolio Spaces, 1 inventory-only Space, 45 models, and 34 datasets. The [`SZLHOLDINGS/SZLHOLDINGS` dataset](https://huggingface.co/datasets/SZLHOLDINGS/SZLHOLDINGS) is a historical profile mirror. It does not establish today's inventory, readiness, or model quality.
