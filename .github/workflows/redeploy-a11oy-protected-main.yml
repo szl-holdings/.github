@@ -16,7 +16,6 @@ on:
 
 permissions:
   contents: read
-  issues: write
 
 concurrency:
   group: verify-canonical-a11oy-recovery-authority
@@ -24,6 +23,9 @@ concurrency:
 
 jobs:
   verify:
+    permissions:
+      contents: read
+      issues: write
     name: Verify repository-native deployment and current public parity
     runs-on: ubuntu-latest
     timeout-minutes: 15

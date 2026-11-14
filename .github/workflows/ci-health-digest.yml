@@ -37,7 +37,6 @@ on:
 
 permissions:
   contents: read
-  issues: write
 
 concurrency:
   group: ci-health-digest
@@ -53,6 +52,9 @@ env:
 
 jobs:
   digest:
+    permissions:
+      contents: read
+      issues: write
     name: Authenticated organization sweep and rolling evidence issue
     runs-on: ubuntu-latest
     timeout-minutes: 100
