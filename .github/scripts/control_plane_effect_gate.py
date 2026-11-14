@@ -955,6 +955,36 @@ def forge9_attestor_profile(document: Mapping[str, Any]) -> bool:
 
 
 
+def hf_daily_activity_oidc_scope(document: Mapping[str, Any]) -> bool:
+    """Admit id-token:write only for the daily activity signing job.
+
+    Workflow permissions stay contents:read. Exactly one job, hf-daily-refresh,
+    may hold contents:read plus id-token:write so Sigstore can mint a keyless
+    certificate. No other write grant is admitted.
+    """
+    if document.get("permissions") != {"contents": "read"}:
+        return False
+    jobs = document.get("jobs")
+    if not isinstance(jobs, dict):
+        return False
+    writers = []
+    for name, job in jobs.items():
+        if not isinstance(job, dict):
+            return False
+        permission = job.get("permissions")
+        if not isinstance(permission, dict):
+            continue
+        if any(access == "write" for access in permission.values()):
+            writers.append((name, job, permission))
+    if len(writers) != 1:
+        return False
+    name, _job, permission = writers[0]
+    return (
+        name == "hf-daily-refresh"
+        and permission == {"contents": "read", "id-token": "write"}
+    )
+
+
 def hf_card_reconcile_oidc_scope(document: Mapping[str, Any]) -> bool:
     """Admit id-token:write only for the reviewed hf-card-reconcile apply job.
 
@@ -2163,6 +2193,8 @@ def analyze_workflow_source(source: str, *, path: str) -> dict[str, Any]:
     if runtime_signing or contract_call:
         scoped.extend(["id-token:write", "attestations:write"])
     if path == ".github/workflows/hf-card-reconcile.yml" and hf_card_reconcile_oidc_scope(document):
+        scoped.append("id-token:write")
+    if path == ".github/workflows/hf-daily-activity.yml" and hf_daily_activity_oidc_scope(document):
         scoped.append("id-token:write")
     if scoped:
         result["scoped_write_permissions"] = sorted(set(scoped))
