@@ -954,6 +954,40 @@ def forge9_attestor_profile(document: Mapping[str, Any]) -> bool:
     return True
 
 
+
+def hf_card_reconcile_oidc_scope(document: Mapping[str, Any]) -> bool:
+    """Admit id-token:write only for the reviewed hf-card-reconcile apply job.
+
+    Workflow top-level permissions stay contents:read. Exactly one job may hold
+    id-token:write, and that job must be the apply job with contents:read plus
+    actions:read for plan-receipt download. No other write grants are admitted.
+    """
+    if document.get("permissions") != {"contents": "read"}:
+        return False
+    jobs = document.get("jobs")
+    if not isinstance(jobs, dict):
+        return False
+    writers = []
+    for name, job in jobs.items():
+        if not isinstance(job, dict):
+            return False
+        permission = job.get("permissions")
+        if not isinstance(permission, dict):
+            continue
+        if any(access == "write" for access in permission.values()):
+            writers.append((name, job, permission))
+    if len(writers) != 1:
+        return False
+    name, job, permission = writers[0]
+    if name != "apply":
+        return False
+    if permission != {"contents": "read", "actions": "read", "id-token": "write"}:
+        return False
+    if job.get("runs-on") != "ubuntu-latest":
+        return False
+    return True
+
+
 def scoped_write_permissions(
     document: Mapping[str, Any], *, path: str = ""
 ) -> list[str]:
@@ -1992,6 +2026,11 @@ def analyze_workflow_source(source: str, *, path: str) -> dict[str, Any]:
                             resource = "github:actions:artifact:estate-deadman"
                         elif artifact == "estate-deadman-contract-${{ github.run_id }}-${{ github.run_attempt }}":
                             resource = "github:actions:artifact:estate-deadman-contract"
+                        elif path == ".github/workflows/hf-card-reconcile.yml" and artifact == (
+                            "hf-card-reconcile-${{ github.run_id }}-${{ github.run_attempt }}"
+                        ):
+                            # Exact reviewed attempt-scoped reconcile receipt.
+                            resource = "github:actions:artifact:hf-card-reconcile"
                         elif path == FORGE9_ATTESTOR and artifact == FORGE9_ATTEST_ARTIFACT:
                             resource = "github:actions:artifact:forge9-merge-receipt"
                         elif path == FORGE9_QUEUE_CONTROLLER and artifact == FORGE9_QUEUE_ARTIFACT:
@@ -2123,8 +2162,10 @@ def analyze_workflow_source(source: str, *, path: str) -> dict[str, Any]:
     scoped = scoped_write_permissions(document, path=path)
     if runtime_signing or contract_call:
         scoped.extend(["id-token:write", "attestations:write"])
+    if path == ".github/workflows/hf-card-reconcile.yml" and hf_card_reconcile_oidc_scope(document):
+        scoped.append("id-token:write")
     if scoped:
-        result["scoped_write_permissions"] = scoped
+        result["scoped_write_permissions"] = sorted(set(scoped))
     return result
 
 
