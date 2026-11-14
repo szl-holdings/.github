@@ -1,0 +1,47 @@
+{
+  "schema": "szl.org-card-drift-observation/v1",
+  "observed_at": "2026-11-13T20:29:44.920222+00:00",
+  "github_revision": "fba828f6c6b32e829f56cb76e1e9f0965bddd5c5",
+  "hf_revision": "5fd6b26e8880ba1de7f4cfeb0e4f8a691e18794c",
+  "source_index_sha256": "a8d1a0f17c785dd8038d6998b41d0ec955538f944daf4eafb7326a716fb4b7c0",
+  "observed_hf_index_sha256": "b3f05d5361d2490ebd34753c75b91d7290463dd96cb8a0e71f85343a9da7cb66",
+  "observed_hub_commits": [
+    {
+      "id": "5fd6b26e8880ba1de7f4cfeb0e4f8a691e18794c",
+      "date": "2026-11-13T19:48:00.000Z",
+      "title": "fix: frontmatter \u2014 app_file (the static serving configuration)",
+      "authors": [
+        "betterwithage"
+      ]
+    },
+    {
+      "id": "6b37abc367b54f8e670aaa867a9dcfd08a5e448a",
+      "date": "2026-11-13T19:44:31.000Z",
+      "title": "fix: cutting-edge index.html \u2014 full navigation with live counts, styled, the estate's HF front door",
+      "authors": [
+        "betterwithage"
+      ]
+    },
+    {
+      "id": "f562887a3de3ffdf4a4dce8b542bbedbede0d923",
+      "date": "2026-11-13T16:38:01.000Z",
+      "title": "fix: add index.html \u2014 the README space needs a servable entry point",
+      "authors": [
+        "betterwithage"
+      ]
+    }
+  ],
+  "attribution_boundary": "Account identity is observed; the human or automation using it is not established.",
+  "source_restoration": "Candidate preserves canonical design and publisher; no direct Hub writes.",
+  "observed_hub_hardcoded_counts": {
+    "models": 139,
+    "datasets": 94,
+    "spaces": 66
+  },
+  "public_api_counts": {
+    "models": 96,
+    "spaces": 52,
+    "datasets": 68
+  },
+  "counts_boundary": "Public API membership snapshot; not current runtime qualification or all private assets."
+}
