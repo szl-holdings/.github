@@ -36,6 +36,10 @@
       "destination": "assets/estate-banner-v2.svg"
     },
     {
+      "source": "profile/assets/estate-banner-v3-holo.svg",
+      "destination": "assets/estate-banner-v3-holo.svg"
+    },
+    {
       "source": "profile/assets/hf-portfolio-map.svg",
       "destination": "assets/hf-portfolio-map.svg"
     },
@@ -164,7 +168,9 @@
     }
   },
   "prune": true,
-  "allowed_deletions": [],
+  "allowed_deletions": [
+    "assets/estate-banner-v3.svg"
+  ],
   "smoke": {
     "path": "/",
     "required_marker": "data-szl-surface=\"company-front-door\""
