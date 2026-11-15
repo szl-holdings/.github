@@ -22,11 +22,15 @@ Source-traceable research software; every claim is evidenced or limited.
 
 ## Flagships
 
-Three commercial flagships, one doctrine — control first, evidence after.
+Control first, evidence after.
 
-- **[A11oy](https://a-11-oy.com)** — governed product; published capability state.
+- **[A11oy](https://a-11-oy.com)** — governed product.
 - **[Forge](https://github.com/szl-holdings)** — models, kernels, datasets, tooling.
 - **[Killinchu](https://huggingface.co/spaces/SZLHOLDINGS/killinchu)** — automation body; public effectors **SIMULATED**.
+
+## Pushing the frontier
+
+[Ring-0 compute receipts](https://huggingface.co/datasets/SZLHOLDINGS/frontier-54-runs) · [x402-metered inference](https://inference.a-11-oy.com) · [checkable estate math](https://github.com/szl-holdings/lutar-lean).
 
 ## Live surfaces
 
@@ -36,15 +40,16 @@ Three commercial flagships, one doctrine — control first, evidence after.
 
 ## Repeat a public calculation
 
-[Input and hash](https://github.com/szl-holdings/governed-receipt-spec/tree/320983d22e76fc9b26af0b2cd20799c5000543fc/examples/public-single-cell#public-data-and-attribution) [Executed code](https://github.com/szl-holdings/governed-receipt-spec/blob/160e39b1383a0e249399b6dfb72983b67aef7fe8/examples/public-single-cell/run_example.py) [Limits](https://github.com/szl-holdings/governed-receipt-spec/tree/320983d22e76fc9b26af0b2cd20799c5000543fc/examples/public-single-cell#outputs-and-verification-boundary)
+[Input and hash](https://github.com/szl-holdings/governed-receipt-spec/tree/320983d22e76fc9b26af0b2cd20799c5000543fc/examples/public-single-cell#public-data-and-attribution) [Executed code](https://github.com/szl-holdings/governed-receipt-spec/blob/160e39b1383a0e249399b6dfb72983b67aef7fe8/examples/public-single-cell/run_example.py) [Limits](https://github.com/szl-holdings/governed-receip
+t-spec/tree/320983d22e76fc9b26af0b2cd20799c5000543fc/examples/public-single-cell#outputs-and-verification-boundary)
 
 GEO GSE85241: integrity and repeatability; unsigned receipt; no clinical claim.
 
 ## Choose a path
 
-- **Use:** [A11oy](https://a-11-oy.com), with its published capability state.
+- **Use:** [A11oy](https://a-11-oy.com).
 - **Build:** [models, kernels, datasets and Spaces](https://huggingface.co/SZLHOLDINGS).
-- **Verify:** [records](https://a11oy.net), [diagrams](https://a11oy.net/diagrams/), stated limits.
+- **Verify:** [records](https://a11oy.net), [diagrams](https://a11oy.net/diagrams/).
 
 ## Inference flagship
 
@@ -58,7 +63,8 @@ GEO GSE85241: integrity and repeatability; unsigned receipt; no clinical claim.
 The source-bound public inventory records **22 public Spaces, 121 model repositories, 14 native kernels, 69 datasets** at **2026-11-15T03:48:57Z** under `hf-public-author-membership/v2`. This is a dated observation, not a live count. Native kernel IDs may also appear in the model namespace; these figures do not count unique projects or trained language models. [Inventory binding](https://github.com/szl-holdings/.github/blob/main/profile/public-inventory.json) · [Exact source](https://github.com/szl-holdings/a11oy/blob/177fc4d95ed45ad88e3c7f1db09ea8b76763e82a/docs/huggingface-ecosystem-manifest.json) · [Current Hub listing](https://huggingface.co/SZLHOLDINGS). Hub inventory is registry evidence, not availability, operational readiness, or publication policy. It does not establish model quality.
 <!-- szl:public-inventory:end -->
 
-**HISTORICAL** alignment v1 recorded 16 portfolio Spaces, 1 inventory-only Space, 45 models, 34 datasets; the [legacy dataset](https://huggingface.co/datasets/SZLHOLDINGS/SZLHOLDINGS) is not readiness evidence.
+**HISTORICAL** alignment v1 recorded 16 portfolio Spaces, 1 inventory-only Space, 45 models, 34 datasets; the [legacy dataset](https://huggingface.co/d
+atasets/SZLHOLDINGS/SZLHOLDINGS) is not readiness evidence.
 
 <details>
 <summary>Reproduction and provenance</summary>
