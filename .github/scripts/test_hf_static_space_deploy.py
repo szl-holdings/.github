@@ -815,5 +815,167 @@ class StaticSpaceDeployTests(unittest.TestCase):
         )
 
 
+    def _social_policy(self):
+        bootstrap = (
+            b'<script>window.huggingface={variables:{'
+            b'"SPACE_CREATOR_USER_ID":"69ec7d565e5561c3b16baba8"'
+            b'}};</script>'
+        )
+        og_title = "SZL " + chr(0x2014) + " Governed AI Command Fabric"
+        og_description = "Trace governed AI artifacts to source and evidence."
+        og_image = (
+            "https://huggingface.co/spaces/SZLHOLDINGS/README/resolve/main/"
+            "assets/evidence-lattice-v2.webp"
+        )
+        social = (
+            '<meta property="og:title" content="' + og_title + '">'
+            '<meta property="og:description" content="' + og_description + '">'
+            '<meta property="og:image" content="' + og_image + '">'
+            '<meta name="twitter:card" content="summary_large_image">'
+            '<meta name="twitter:image" content="' + og_image + '">'
+        ).encode("utf-8")
+        policy = {
+            "mode": "hf_bootstrap_social_injected",
+            "variables": {"SPACE_CREATOR_USER_ID": "69ec7d565e5561c3b16baba8"},
+            "expected_bootstrap_sha256": deploy.sha256_bytes(bootstrap),
+            "og_title": og_title,
+            "og_description": og_description,
+            "og_image": og_image,
+            "expected_social_meta_sha256": deploy.sha256_bytes(social),
+        }
+        return policy, bootstrap, social
+
+    def test_hf_bootstrap_social_contract_requires_exact_hash(self):
+        contract = json.loads(self.manifest.read_text(encoding="utf-8"))
+        contract["runtime_transforms"] = {
+            "index.html": {
+                "mode": "hf_bootstrap_social_injected",
+                "variables": {
+                    "SPACE_CREATOR_USER_ID": "69ec7d565e5561c3b16baba8"
+                },
+                "expected_bootstrap_sha256": deploy.sha256_bytes(
+                    b'<script>window.huggingface={variables:{'
+                    b'"SPACE_CREATOR_USER_ID":"69ec7d565e5561c3b16baba8"'
+                    b'}};</script>'
+                ),
+                "og_title": "SZL Holdings",
+                "og_description": "Governed AI.",
+                "og_image": "https://example.hf.space/assets/card.webp",
+            }
+        }
+        self.manifest.write_text(json.dumps(contract), encoding="utf-8")
+
+        with self.assertRaisesRegex(
+            deploy.ContractError, "expected_social_meta_sha256"
+        ):
+            deploy.load_contract(self.root, self.manifest)
+
+    def test_hf_bootstrap_social_canonicalization_is_exact_and_fail_closed(self):
+        policy, bootstrap, social = self._social_policy()
+        source = b"<head>\n<meta>\n</head>\n<body><main>y</main></body>"
+        served = source.replace(b"<head>", b"<head>" + bootstrap, 1)
+        served = served.replace(b"</head>", social + b"</head>", 1)
+        self.assertEqual(
+            deploy.canonicalize_hf_bootstrap_social(served, policy), source
+        )
+
+        hostile_bootstrap = bootstrap.replace(
+            b"69ec7d565e5561c3b16baba8", b"deadbeefdeadbeefdeadbeef"
+        )
+        rejected = (
+            source.replace(b"<head>", b"<head>" + bootstrap, 1),
+            source.replace(b"</head>", social + b"</head>", 1),
+            source.replace(b"<head>", b"<head>" + bootstrap, 1).replace(
+                b"</head>", social + social + b"</head>", 1
+            ),
+            source.replace(b"<head>", b"<head>" + bootstrap, 1).replace(
+                b"</head>", b"</head>" + social, 1
+            ),
+            source.replace(b"<head>", b"<head>" + hostile_bootstrap, 1).replace(
+                b"</head>", social + b"</head>", 1
+            ),
+            source.replace(b"<head>", b"<head>" + bootstrap, 1).replace(
+                b"</head>", social + b" " + b"</head>", 1
+            ),
+        )
+        for hostile in rejected:
+            with self.subTest(hostile=hostile):
+                self.assertIsNone(
+                    deploy.canonicalize_hf_bootstrap_social(hostile, policy)
+                )
+
+        broken_policy = dict(policy, og_title=policy["og_title"] + "!")
+        self.assertIsNone(
+            deploy.canonicalize_hf_bootstrap_social(served, broken_policy)
+        )
+
+    def test_hf_bootstrap_social_readback_requires_manifest_bound_bytes(self):
+        policy, bootstrap, social = self._social_policy()
+        index_path = self.root / "src" / "index.html"
+        index_path.write_bytes(b"<head>\n<meta>\n</head>\n")
+        _, files = deploy.load_contract(self.root, self.manifest)
+        expected = {item.destination: item.source.read_bytes() for item in files}
+        transforms = {"index.html": policy}
+
+        def injected_fetch(url, max_bytes=0):
+            path = url.removeprefix("https://example.hf.space/")
+            data = expected[path]
+            if path == "index.html":
+                data = data.replace(b"<head>", b"<head>" + bootstrap, 1)
+                data = data.replace(b"</head>", social + b"</head>", 1)
+            return 200, data, url
+
+        with mock.patch.object(deploy, "fetch", side_effect=injected_fetch):
+            matches, rows = deploy.verify_served_files(
+                "https://example.hf.space", files, transforms
+            )
+        self.assertTrue(matches)
+        index_row = next(row for row in rows if row["path"] == "index.html")
+        self.assertTrue(index_row["same_origin"])
+        self.assertEqual(
+            index_row["canonical_sha256"],
+            deploy.sha256_bytes(expected["index.html"]),
+        )
+        self.assertEqual(
+            index_row["canonical_size"], len(expected["index.html"])
+        )
+
+        def stale_fetch(url, max_bytes=0):
+            path = url.removeprefix("https://example.hf.space/")
+            data = expected[path]
+            if path == "index.html":
+                data = data.replace(b"<head>", b"<head>" + bootstrap, 1)
+                data = data.replace(b"</head>", social + b"</head>", 1)
+                data = data + b"<!-- stale -->"
+            return 200, data, url
+
+        with mock.patch.object(deploy, "fetch", side_effect=stale_fetch):
+            matches, rows = deploy.verify_served_files(
+                "https://example.hf.space", files, transforms
+            )
+        self.assertFalse(matches)
+        index_row = next(row for row in rows if row["path"] == "index.html")
+        self.assertFalse(index_row["matches"])
+
+    def test_production_manifest_binds_exact_reviewed_social_preview(self):
+        repo_root = Path(__file__).resolve().parents[2]
+        contract, _ = deploy.load_contract(
+            repo_root, repo_root / "huggingface" / "org-card.manifest.json"
+        )
+        policy = contract["runtime_transforms"]["evidence.html"]
+        self.assertEqual(policy["mode"], "hf_bootstrap_social_injected")
+        social = deploy.hf_social_meta_bytes(policy)
+        self.assertEqual(len(social), 482)
+        self.assertEqual(
+            deploy.sha256_bytes(social),
+            "6a3593c61c1b73f4db7f2f8f8ea07d54277168163b54aae2dd225ffc67b3597e",
+        )
+        bootstrap = deploy.hf_bootstrap_bytes(deploy._bootstrap_subpolicy(policy))
+        self.assertEqual(len(bootstrap), 101)
+        self.assertEqual(
+            deploy.sha256_bytes(bootstrap),
+            "7792f93053b55830155c4f95b656b36323482e646e55aea2979d228c7f290c0c",
+        )
+
 if __name__ == "__main__":
     unittest.main()

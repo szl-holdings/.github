@@ -91,7 +91,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
-          name: router-flagship-validation-${{ github.sha }}
+          name: router-flagship-validation
           path: ${{ env.VALIDATION_REPORT }}
           if-no-files-found: error
           retention-days: 90
@@ -228,7 +228,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
-          name: router-flagship-live-${{ github.sha }}
+          name: router-flagship-live
           path: ${{ env.LIVE_REPORT }}
           if-no-files-found: error
           retention-days: 90
