@@ -131,8 +131,8 @@
    (browser lane in progress), then tag `v0.1.0` releases.
 3. ~~Orphan Spaces~~ — resolved this pass (szl-gpu-bridge#189, §2).
 4. **szl-gov pyproject** package discovery fix before any release.
-5. **OpenSSF Scorecard + SLSA L3 attestation** posture: scorecard.yml already
-   present across repos; next step is attestations on the wiring-wave merges
+5. **Supply-chain attestation roadmap (planned, not claimed)**: OpenSSF
+   Scorecard analysis is wired via the org reusable workflow; posture today
    (`attestation/qillqaq` already signs gate runs in .github).
 6. **arXiv/OSF presence** for the thesis + Stellar Death Clock paper (Zenodo
    DOIs exist; preprint mirrors would raise discoverability).
