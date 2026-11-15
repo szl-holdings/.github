@@ -188,7 +188,7 @@ theorem concept_doi_alias_must_be_labeled
 def isKnownConceptAlias (doi : String) : Bool :=
   -- In production: check against the canonical alias registry
   -- Stub: flag the specific alias from tonight's audit
-  doi == "10.5281/zenodo.19944926"
+  doi == "10.5281/zenodo.24239896"
 
 theorem known_alias_must_not_be_cited_as_version
     (d : DOICitation) (hAlias : isKnownConceptAlias d.doi = true)
