@@ -2627,10 +2627,6 @@
           "access": "read"
         },
         {
-          "key": "public-get:https://gdw.a-11-oy.com/healthz",
-          "access": "read"
-        },
-        {
           "key": "github:repository:szl-holdings/killinchu:observed-main-commit:docs/VESSELS-CONSOLIDATION.md",
           "access": "read"
         },
@@ -2731,9 +2727,9 @@
       "trusted_transitives": {},
       "reviewed_unknowns": {
         "files": {
-          ".github/scripts/frontier_payload/config.py": "sha256:d9d2605f8bf324ca6f4e3f9c103f2710dc3c38ef02f317661ad96f5ac98d80ff",
+          ".github/scripts/frontier_payload/config.py": "sha256:400678615d359a0a109af8de2904eba68a11461efc3e32b32a04d379daf16919",
           ".github/scripts/frontier_payload_readonly.py": "sha256:8df91601dda5b95348952f23dfb03cd4fba5043915968ba9151ce8e970e43467",
-          ".github/scripts/test_frontier_payload_readonly.py": "sha256:6c4cc4ef69f7c74ea6cd43e4a1e2ede787b3c32f9f1d59db0ad122176d382ad4",
+          ".github/scripts/test_frontier_payload_readonly.py": "sha256:d900e9c44da29116ab6037a37ce324edd06d1d941daf849e2f4c7de9ae72836d",
           ".github/workflows/frontier-payload-convergence.yml": "sha256:2293b4c109ff0cd65294b93fe6bc8028ceb6c3aa1ac04dc4fe598f0aa2685b24"
         },
         "unknowns": [
