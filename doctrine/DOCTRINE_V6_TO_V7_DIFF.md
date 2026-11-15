@@ -44,7 +44,7 @@ Each new clause is traced to a specific lesson from the 2026-05-29 evening sessi
 ### §9 — DOI Dereferencing Required Before Citation
 
 **Lesson:** LIE #5 from HF Truth Audit  
-**Failure case:** DOI `10.5281/zenodo.19944926` (concept-DOI alias) was cited and treated as a distinct Zenodo release for several weeks. It resolves to `10.5281/zenodo.20434276`. The distinction between a concept-DOI alias and a version-DOI was not enforced anywhere in the codebase.  
+**Failure case:** DOI `10.5281/zenodo.24239896` (concept-DOI alias) was cited and treated as a distinct Zenodo release for several weeks. It resolves to `10.5281/zenodo.20434276`. The distinction between a concept-DOI alias and a version-DOI was not enforced anywhere in the codebase.  
 **Session artifact:** `/home/user/workspace/szl/audit_2026-05-29_evening/payload_refresh/ZENODO_GITHUB_MISMATCHES.csv` row 2  
 **New rule (condensed):** DOIs must be dereferenced before citation. Concept-DOI aliases must be labeled `[concept-DOI-alias]`. Treating a concept-DOI alias as a fixed release is a violation.
 
