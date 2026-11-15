@@ -4,7 +4,7 @@ license: apache-2.0
 pretty_name: SZL Holdings
 tags:
 - org-profile
-- doi:10.5281/zenodo.19944926
+- doi:10.5281/zenodo.24239896
 size_categories:
 - n<1K
 task_categories:
@@ -51,7 +51,7 @@ corpus and does not contain the thesis datasets named below.
 ## Thesis and research references
 
 The card references the SZL Holdings research program and concept DOI
-[`10.5281/zenodo.19944926`](https://doi.org/10.5281/zenodo.19944926). The
+[`10.5281/zenodo.24239896`](https://doi.org/10.5281/zenodo.24239896). The
 concept DOI is not an artifact-specific DOI for this repository and does not
 prove that a dataset payload exists here.
 
