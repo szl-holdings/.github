@@ -36,12 +36,21 @@ class MergeQueueEnqueueContractTests(unittest.TestCase):
         self.assertNotIn("github.event.pull_request.head.sha", self.source)
 
     def test_write_token_never_reaches_checkout_or_contract_test(self) -> None:
-        secret = "GH_TOKEN: ${{ secrets.SZL_GITHUB_TOKEN }}"
+        secret = "QUEUE_WRITE_TOKEN: ${{ secrets.SZL_GITHUB_TOKEN }}"
         self.assertEqual(self.source.count(secret), 1)
         secret_offset = self.source.index(secret)
         self.assertGreater(secret_offset, self.source.index("Checkout trusted controller source"))
         self.assertGreater(secret_offset, self.source.index("Verify the enqueue-only source contract"))
         self.assertNotIn(secret, self.source.split("steps:", 1)[0])
+
+    def test_read_token_is_default_and_write_token_is_mutation_scoped(self) -> None:
+        self.assertIn('export GH_TOKEN="$ADMISSION_READ_TOKEN"', self.source)
+        mutation_token = 'GH_TOKEN="$QUEUE_WRITE_TOKEN" gh api graphql'
+        self.assertEqual(self.source.count(mutation_token), 2)
+        for operation in ("enqueuePullRequest", "dequeuePullRequest"):
+            offset = self.source.index(operation)
+            prefix = self.source.rfind("GH_TOKEN=", 0, offset)
+            self.assertEqual(self.source[prefix:prefix + len(mutation_token)], mutation_token)
 
     def test_uses_only_the_queue_mutation(self) -> None:
         self.assertIn("enqueuePullRequest", self.source)
@@ -103,6 +112,12 @@ class MergeQueueEnqueueContractTests(unittest.TestCase):
         )
         self.assertRegex(self.source, guard)
 
+    def test_closed_targets_exit_without_a_queue_mutation(self) -> None:
+        for state in ("CURRENT_STATE", "FINAL_STATE", "GRAPH_STATE"):
+            guard = f'if [ "${state}" != \'OPEN\' ]; then'
+            self.assertIn(guard, self.source)
+            self.assertLess(self.source.index(guard), self.source.index("enqueuePullRequest"))
+
     def test_is_same_repository_only_and_does_not_expose_token(self) -> None:
         required = (
             '.head.repo.full_name == $repository',
@@ -156,14 +171,21 @@ class MergeQueueEnqueueContractTests(unittest.TestCase):
 
     def test_case09_verifier_never_receives_the_write_token(self) -> None:
         self.assertIn("ADMISSION_READ_TOKEN: ${{ github.token }}", self.source)
-        self.assertIn("env -u GH_TOKEN python3 -I .github/scripts/release_admission_verifier.py", self.source)
+        self.assertIn(
+            "env -u GH_TOKEN -u QUEUE_WRITE_TOKEN python3 -I "
+            ".github/scripts/release_admission_verifier.py",
+            self.source,
+        )
         self.assertIn("--token-env ADMISSION_READ_TOKEN", self.source)
         self.assertIn("admission_rechecked_immediately_before_enqueue: true", self.source)
         # The controller self-tests the verifier contract from its exact
         # trusted bytes before the write token exists in any step.
         contract = self.source.index("python .github/scripts/test_release_admission_verifier.py")
         self.assertGreater(contract, self.source.index("Verify the enqueue-only source contract"))
-        self.assertLess(contract, self.source.index("GH_TOKEN: ${{ secrets.SZL_GITHUB_TOKEN }}"))
+        self.assertLess(
+            contract,
+            self.source.index("QUEUE_WRITE_TOKEN: ${{ secrets.SZL_GITHUB_TOKEN }}"),
+        )
 
 
 class PreEnqueueAdmissionExecutionTests(unittest.TestCase):
@@ -208,6 +230,7 @@ class PreEnqueueAdmissionExecutionTests(unittest.TestCase):
             environment.update({
                 "PATH": str(stub) + os.pathsep + environment["PATH"],
                 "GH_TOKEN": "write-token-must-not-reach-verifier",
+                "QUEUE_WRITE_TOKEN": "queue-write-token-must-not-reach-verifier",
                 "ADMISSION_READ_TOKEN": "read-token",
                 "REPOSITORY": "szl-holdings/.github", "EXPECTED_HEAD": "a" * 40, "PR": "7",
                 "CURRENT_BASE_REF": "main", "CURRENT_BASE_SHA": "b" * 40,
@@ -234,6 +257,7 @@ class PreEnqueueAdmissionExecutionTests(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stderr + result.stdout)
         self.assertIn("REACHED_ENQUEUE_MUTATION", result.stdout)
         self.assertNotIn("GH_TOKEN", seen)
+        self.assertNotIn("QUEUE_WRITE_TOKEN", seen)
         self.assertEqual(seen.get("ADMISSION_READ_TOKEN"), "read-token")
 
     def test_hold_block_or_drifted_evidence_stops_before_the_mutation(self) -> None:

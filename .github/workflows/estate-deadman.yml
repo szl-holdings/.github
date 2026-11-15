@@ -150,9 +150,4 @@ jobs:
           receipt_sha="$(sha256sum reports/estate-deadman.json | cut -d' ' -f1)"
           expected_sha="$(tr -d '\r\n' < reports/estate-deadman.json.sha256)"
           test "$receipt_sha" = "$expected_sha"
-          jq -e '.schema == "szl.estate-deadman-receipt/v1"' reports/estate-deadman.json >/dev/null
-          jq -e '.secret_values_recorded == false' reports/estate-deadman.json >/dev/null
-          jq -e '.authority.controller_tip_reverified == true' reports/estate-deadman.json >/dev/null
-          jq -e '.authority.workflow_mutation == false and .authority.deployment_mutation == false' reports/estate-deadman.json >/dev/null
-          jq -e '.incident.ok == true' reports/estate-deadman.json >/dev/null
-          jq -e '.confirmed_healthy == true' reports/estate-deadman.json >/dev/null
+          python .github/scripts/estate_deadman.py --gate-receipt reports/estate-deadman.json

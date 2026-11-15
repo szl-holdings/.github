@@ -18,6 +18,8 @@ import textwrap
 import unittest
 from unittest.mock import patch
 import urllib.error
+import urllib.response
+from email.message import Message
 
 
 SPEC = importlib.util.spec_from_file_location("hf_card_reconcile", Path(__file__).with_name("hf_card_reconcile.py"))
@@ -332,11 +334,54 @@ class CardReconcileTests(unittest.TestCase):
 
     def test_post_transport_failure_is_never_retried(self):
         for failure in (urllib.error.URLError("connection lost"), urllib.error.HTTPError("https://huggingface.co/test", 503, "unavailable", {}, io.BytesIO(b"failed"))):
-            with self.subTest(failure=type(failure).__name__), patch.object(RECONCILE.urllib.request, "urlopen", side_effect=failure) as request, patch.object(RECONCILE.time, "sleep") as sleep:
+            with self.subTest(failure=type(failure).__name__), patch.object(RECONCILE.urllib.request.OpenerDirector, "open", side_effect=failure) as request, patch.object(RECONCILE.time, "sleep") as sleep:
                 _, status = RECONCILE.hub_request("POST", "/test", TOKEN, b"{}")
                 self.assertIn(status, (0, 503))
                 self.assertEqual(request.call_count, 1)
                 sleep.assert_not_called()
+
+    def test_redirect_never_forwards_credentials_or_changes_target(self):
+        """Exercise urllib's real redirect chain with an in-memory HTTPS transport."""
+        build_opener = RECONCILE.urllib.request.build_opener
+        for method in ("GET", "POST"):
+            for status in (301, 302, 303, 307, 308):
+                for destination in ("https://other.invalid/collect", "https://huggingface.co/api/spaces/SZLHOLDINGS/other"):
+                    seen = []
+
+                    class Transport(RECONCILE.urllib.request.HTTPSHandler):
+                        def https_open(self, req):
+                            seen.append(req)
+                            headers = Message()
+                            if len(seen) == 1:
+                                headers["Location"] = destination
+                            response = urllib.response.addinfourl(
+                                io.BytesIO(b"redirect" if len(seen) == 1 else b"accepted"),
+                                headers, req.full_url, status if len(seen) == 1 else 200)
+                            response.msg = "synthetic response"
+                            return response
+
+                    transport = Transport()
+                    with self.subTest(method=method, status=status, destination=destination), \
+                         patch.object(RECONCILE.urllib.request, "build_opener", side_effect=lambda *handlers: build_opener(*handlers, transport)), \
+                         patch.object(RECONCILE.urllib.request, "urlopen", side_effect=build_opener(transport).open), \
+                         patch.object(RECONCILE.time, "sleep") as sleep:
+                        _, actual = RECONCILE.hub_request(method, "/api/spaces/SZLHOLDINGS/yarqa", TOKEN,
+                                                         b"reviewed payload" if method == "POST" else None)
+                        self.assertEqual(len(seen), 1, "redirect issued an unreviewed second request")
+                        self.assertEqual(actual, status)
+                        self.assertEqual(seen[0].get_header("Authorization"), "Bearer " + TOKEN)
+                        sleep.assert_not_called()
+
+    def test_redirected_commit_is_uncertain_and_never_falls_back_or_retries(self):
+        for status in (301, 302, 303, 307, 308):
+            row = self.plan()
+            with self.subTest(status=status), patch.object(RECONCILE, "hub_request", return_value=("redirect", status)) as requests:
+                result = RECONCILE.apply_asset(row, TOKEN, "reconcile")
+                self.assertEqual(result["outcome"], "unknown_write_result")
+                self.assertFalse(result["applied"])
+                self.assertFalse(result["verified"])
+                self.assertEqual(len(result["apply_attempts"]), 1)
+                self.assertEqual(requests.call_count, 1)
 
     def governed(self, repo="yarqa"):
         return {"repo_id": f"SZLHOLDINGS/{repo}", "kind": "spaces", "license": "apache-2.0",
