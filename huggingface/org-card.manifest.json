@@ -165,6 +165,17 @@
         "SPACE_CREATOR_USER_ID": "69ec7d565e5561c3b16baba8"
       },
       "expected_bootstrap_sha256": "7792f93053b55830155c4f95b656b36323482e646e55aea2979d228c7f290c0c"
+    },
+    "evidence.html": {
+      "mode": "hf_bootstrap_social_injected",
+      "variables": {
+        "SPACE_CREATOR_USER_ID": "69ec7d565e5561c3b16baba8"
+      },
+      "expected_bootstrap_sha256": "7792f93053b55830155c4f95b656b36323482e646e55aea2979d228c7f290c0c",
+      "og_title": "SZL \u2014 Governed AI Command Fabric",
+      "og_description": "Trace governed AI artifacts to source and evidence.",
+      "og_image": "https://huggingface.co/spaces/SZLHOLDINGS/README/resolve/main/assets/evidence-lattice-v2.webp",
+      "expected_social_meta_sha256": "6a3593c61c1b73f4db7f2f8f8ea07d54277168163b54aae2dd225ffc67b3597e"
     }
   },
   "prune": true,
