@@ -123,7 +123,7 @@ Verified via `gh api repos/szl-holdings/<repo>/releases/tags/uds-v0.3.0`:
 **HF tarball:** `SZLHOLDINGS/uds-mesh-source` · `uds-mesh-uds-0.3.0.tar.zst`
 **sha256:** `44727fdcb89027aed39d39e821302c5e60e2bf2d1d3f5504b508e7099b742eb6`
 **Size:** 69,606 bytes (~67 KB)
-**Zenodo DOIs:** Concept: `10.5281/zenodo.19944926` · v18: `10.5281/zenodo.20195368` (only repo with standalone DOIs)
+**Zenodo DOIs:** Concept: `10.5281/zenodo.24239896` · v18: `10.5281/zenodo.20195368` (only repo with standalone DOIs)
 
 **SBOM scope covers:**
 - pointer manifest binding a11oy + amaru + rosie + sentra + vessels @ v0.3.0
