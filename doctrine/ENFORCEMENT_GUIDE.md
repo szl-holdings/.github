@@ -81,7 +81,7 @@ print("[G-2 PASS] No emoji in headers")
 
 ```bash
 # G-3: Known concept-DOI aliases must carry [concept-DOI-alias] label
-KNOWN_ALIASES=("10.5281/zenodo.19944926")
+KNOWN_ALIASES=("10.5281/zenodo.24239896")
 for alias in "${KNOWN_ALIASES[@]}"; do
   git diff --name-only --diff-filter=ACM HEAD~1 HEAD | grep '\.md$' | while read -r file; do
     if grep -q "$alias" "$file"; then
