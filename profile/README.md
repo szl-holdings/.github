@@ -2,30 +2,47 @@
 
 # Governed intelligence. Checkable results.
 
-SZL Holdings builds AI software, models and research tools that connect an output to its source and evidence. Explore the systems, inspect what is available, and reproduce the work behind each claim.
+SZL Holdings builds AI software, models and research tools that connect an output to its source and evidence.
 
 [**Explore A11oy →**](https://huggingface.co/spaces/SZLHOLDINGS/a11oy) · [**Build with the source →**](https://github.com/szl-holdings)
 
 ## Repeat a public calculation
 
-[Input and hash](https://github.com/szl-holdings/governed-receipt-spec/tree/320983d22e76fc9b26af0b2cd20799c5000543fc/examples/public-single-cell#public-data-and-attribution) → [Executed code](https://github.com/szl-holdings/governed-receipt-spec/blob/160e39b1383a0e249399b6dfb72983b67aef7fe8/examples/public-single-cell/run_example.py) → [Retained result](https://github.com/szl-holdings/governed-receipt-spec/blob/320983d22e76fc9b26af0b2cd20799c5000543fc/examples/public-single-cell/observed-run.json) → [Repeat](https://github.com/szl-holdings/governed-receipt-spec/tree/320983d22e76fc9b26af0b2cd20799c5000543fc/examples/public-single-cell#reproduce-the-recorded-run) → [Limits](https://github.com/szl-holdings/governed-receipt-spec/tree/320983d22e76fc9b26af0b2cd20799c5000543fc/examples/public-single-cell#outputs-and-verification-boundary)
+[Repeat a public calculation](https://github.com/szl-holdings/governed-receipt-spec/tree/320983d22e76fc9b26af0b2cd20799c5000543fc/examples/public-single-cell) — input → code → result → limits
 
-The single-cell example summarizes public GEO GSE85241 data and checks integrity and repeatability. Its receipt is unsigned; it makes no biological or clinical claim.
+Receipt unsigned; no biological claim.
 
 ## Choose a path
 
-- **Explore:** [A11oy](https://huggingface.co/spaces/SZLHOLDINGS/a11oy) is the estate's live governed command surface.
-- **Use:** [A11oy](https://a-11-oy.com) exposes tools and their current capability state.
-- **Build:** browse [models, kernels, datasets and Spaces](https://huggingface.co/SZLHOLDINGS), or [published Python packages](https://pypi.org/user/betterwithage/).
-- **Verify:** [a11oy.net](https://a11oy.net) links computation records and their limits, with [evidence diagrams](https://a11oy.net/diagrams/) drawn from recorded runs.
+- **Explore:** [Command Lab](https://huggingface.co/spaces/SZLHOLDINGS/szl-command-lab) — the searchable portfolio.
+- **Use:** [A11oy](https://a-11-oy.com) — tools with live capability state.
+- **Build:** [models, kernels, datasets, Spaces](https://huggingface.co/SZLHOLDINGS) · [PyPI packages](https://pypi.org/user/betterwithage/).
+- **Verify:** [a11oy.net](https://a11oy.net) — records, limits, [evidence diagrams](https://a11oy.net/diagrams/).
 
 <a href="https://a11oy.net/diagrams/"><img src="https://raw.githubusercontent.com/szl-holdings/.github/main/profile/assets/diagrams/evidence-diagrams-overview.png" alt="Overview of four SZL evidence diagrams" width="720" /></a>
 
 ## What we build
 
-**A11oy** connects governed workflows. **[SZL Router](https://github.com/szl-holdings/szl-router)** routes model requests through [A11oy Code](https://a-11-oy.com/code) and publishes a [status surface](https://huggingface.co/spaces/SZLHOLDINGS/llm-router-live). **Killinchu** demonstrates public observation and operator decisions; public effectors remain **SIMULATED**. **Forge** houses model and software research.
+**A11oy** connects governed workflows; **[SZL Router](https://github.com/szl-holdings/szl-router)** routes model requests through [A11oy Code](https://a-11-oy.com/code) ([status surface](https://huggingface.co/spaces/SZLHOLDINGS/llm-router-live)). **Killinchu** demonstrates public observation; effectors remain **SIMULATED**. **Forge** houses model and software research.
 
-A published file, running application and independently checked result establish different things. Each artifact needs its own evidence and use limits.
+A published file, running application and independently checked result establish different things.
+
+
+## The flagship estate
+
+- **a11oy** — governed runtime, x402 APIs
+- **Living Anatomy** — the anatomy engine · [Space](https://szlholdings-anatomy.hf.space)
+- **Second Brain** — the memory plane · [Space](https://huggingface.co/spaces/SZLHOLDINGS/szl-second-brain)
+- **hatun-mcp** — production MCP · [repo](https://github.com/szl-holdings/hatun-mcp)
+- **killinchu** — counter-UAS · [killinchu.a-11-oy.com](https://killinchu.a-11-oy.com)
+
+## Measured: the confabulation floor
+
+6-probe battery, every failure published — [receipts](https://huggingface.co/datasets/SZLHOLDINGS/model-eval-receipts) · [P8](https://doi.org/10.5281/zenodo.24043620) · [P9](https://doi.org/10.5281/zenodo.24043622).
+
+- Estate students 0.8B–4B: 0–2/6 FAIL · Qwen3-8B/14B: 1/6 FAIL
+- Copy-constrained decoding: 21.9% capture — 16× the floor
+- Claude Sonnet 4.5: 5/6 PASS
 
 ## Current state
 
@@ -47,7 +64,7 @@ The source-bound public inventory records **22 public Spaces, 121 model reposito
 - **Five public domain bodies:** Terra, Killinchu, PRISM Counsel, PURIQ Finance, LYTE.
 - **Six internal engines:** CHAPAQ (folded into Killinchu), Lyte, Killinchu, Finance, Terra, Counsel.
 
-These are architecture roles. Inspect each artifact's source and stated use limits before choosing a use.
+Inspect each artifact's source and stated use limits before choosing a use.
 
 </details>
 
