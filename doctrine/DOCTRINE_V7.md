@@ -87,7 +87,7 @@ Any reference to an ancient, philosophical, or esoteric source must carry a `lin
 
 **Rule:** A DOI may not be cited as a distinct work unless it has been dereferenced (resolved) at the time of citation and confirmed to identify the work being described. Concept-DOI aliases (DOIs that resolve to another DOI representing the latest version of a work) must be explicitly identified as concept-DOI aliases; they may not be cited as if they identify a specific, immutable snapshot. Any claim that treats a concept-DOI alias as a fixed release is a doctrine violation.
 
-**Rationale:** DOI `10.5281/zenodo.19944926` was treated for weeks as a distinct Zenodo release when it is a concept-DOI alias that resolves to `10.5281/zenodo.20434276`. This produced stale and incorrect provenance chains.  
+**Rationale:** DOI `10.5281/zenodo.24239896` was treated for weeks as a distinct Zenodo release when it is a concept-DOI alias that resolves to `10.5281/zenodo.20434276`. This produced stale and incorrect provenance chains.  
 Source: `/home/user/workspace/szl/audit_2026-05-29_evening/payload_refresh/ZENODO_GITHUB_MISMATCHES.csv`, row 2, column `notes`: "19944926 is the concept-DOI alias for ouroboros-thesis. It resolves to 20434276 (v18.0). NOT a separate work."
 
 **Enforcement:**  
