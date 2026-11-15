@@ -36,7 +36,7 @@ Copy the checklist below into your PR description. Check each item. A PR with un
 
 ### A-5 | §9 — DOI Dereferencing
 
-- [ ] No known concept-DOI alias (e.g., `10.5281/zenodo.19944926`) cited without `[concept-DOI-alias]` annotation.
+- [ ] No known concept-DOI alias (e.g., `10.5281/zenodo.24239896`) cited without `[concept-DOI-alias]` annotation.
 - [ ] a11oy checker reports no `DOI_UNRESOLVED` violations.
 
 ### A-6 | §10 — Badge Scoping
