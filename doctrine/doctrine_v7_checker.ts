@@ -152,7 +152,7 @@ function checkEmojiInHeaders(lines: string[]): Violation[] {
 
 // Known concept-DOI aliases from tonight's audit
 const KNOWN_CONCEPT_ALIASES: string[] = [
-  "10.5281/zenodo.19944926",
+  "10.5281/zenodo.24239896",
 ];
 
 const DOI_PATTERN = /10\.\d{4,}\/\S+/g;
