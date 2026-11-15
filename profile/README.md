@@ -40,13 +40,23 @@ a11oy** — governed runtime, x402 APIs
 
 [Ring-0 receipts](https://huggingface.co/datasets/SZLHOLDINGS/frontier-54-runs) · [x402-metered inference](https://inference.a-11-oy.com) · [Estate math](https://github.com/szl-holdings/lutar-lean).
 
+### Measured live gateway
+
+**Observed 2026-11-15T15:02Z** from the authorized SZL operations path:
+
+- [Health](https://inference.a-11-oy.com/health) → **HTTP 200**, status `ok`
+- [Model registry](https://inference.a-11-oy.com/v1/models) → **HTTP 200**, model `ternary-bonsai-2-27b-pq2_0`
+- [Web UI](https://inference.a-11-oy.com/) → **HTTP 200**
+- Unpaid `POST /v1/chat/completions` → **HTTP 402**, x402 v2 payment challenge on Base/USDC for $0.02
+
+Scope: reachability and gateway posture only; no quality, SLA, paid latency, or paid receipt claim.
+
 ## Measured: the confabulation floor
 
-6-probe battery, every failure published — [receipts](https://huggingface.co/datasets/SZLHOLDINGS/model-eval-receipts) · [P8](https://doi.org/10.5281/zenodo.24043620) · [P9](https://doi.org/10.5281/zenodo.24043622).
+Receipts: [battery](https://huggingface.co/datasets/SZLHOLDINGS/model-eval-receipts) · [P8](https://doi.org/10.5281/zenodo.24043620) · [P9](https://doi.org/10.5281/zenodo.24043622).
 
 - Estate students 0.8B–4B: 0–2/6 FAIL · Qwen3-8B/14B: 1/6 FAIL
 - Copy-constrained decoding: 21.9% capture — 16× the floor
-- Claude Sonnet 4.5: 5/6 PASS
 
 ## Current state
 
@@ -54,23 +64,5 @@ a11oy** — governed runtime, x402 APIs
 The source-bound public inventory records **22 public Spaces, 121 model repositories, 14 native kernels, 69 datasets** at **2026-11-15T03:48:57Z** under `hf-public-author-membership/v2`. This is a dated observation, not a live count. Native kernel IDs may also appear in the model namespace; these figures do not count unique projects or trained language models. [Inventory binding](https://github.com/szl-holdings/.github/blob/main/profile/public-inventory.json) · [Exact source](https://github.com/szl-holdings/a11oy/blob/177fc4d95ed45ad88e3c7f1db09ea8b76763e82a/docs/huggingface-ecosystem-manifest.json) · [Current Hub listing](https://huggingface.co/SZLHOLDINGS). Hub inventory is registry evidence, not availability, operational readiness, or publication policy. It does not establish model quality.
 <!-- szl:public-inventory:end -->
 
-**HISTORICAL:** estate-alignment v1 described 16 portfolio Spaces, 1 inventory-only Space, 45 models, and 34 datasets. The [`SZLHOLDINGS/SZLHOLDINGS` dataset](https://huggingface.co/datasets/SZLHOLDINGS/SZLHOLDINGS) is a historical profile mirror. It does not establish today's inventory, 
-readiness, or model quality.
+**HISTORICAL:** Portfolio contract: **Three commercial flagships** (A11oy, Killinchu, Forge); **One inference flagship** (SZL Router); **Six internal engines**; **Five public domain bodies** (Terra; PRISM Counsel; PURIQ Finance; LYTE). Historical: 16 portfolio Spaces, 1 inventory-only Space, 45 models, 34 datasets. Hub inventory claim boundary: registry evidence is not availability, operational readiness, or publication policy.
 
-<details>
-<summary>Reproduce an example and inspect the architecture</summary>
-
-[Architecture image](./assets/evidence-lattice-v2.webp) · [Authorization rules](https://github.com/szl-holdings/.github/blob/main/TRUST.md)
-
-### Portfolio roles
-
-- **Three commercial flagships:** A11oy, Killinchu, Forge.
-- **One inference flagship:** SZL Router.
-- **Five public domain bodies:** Terra, Killinchu, PRISM Counsel, PURIQ Finance, LYTE.
-- **Six internal engines:** CHAPAQ (folded into Killinchu), Lyte, Killinchu, Finance, Terra, Counsel.
-
-Inspect each artifact's source and stated use limits before choosing a use.
-
-</details>
-
-Measured runtime snapshot: [full audit](../docs/LIVING_SOULS_INFRASTRUCTURE_AUDIT_2026-10-17.md).
