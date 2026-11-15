@@ -31,6 +31,7 @@ PUBLISH_ENVIRONMENT = "production"
 PUBLISH_WORKFLOW_PATH = ".github/workflows/hf-org-card-deploy.yml"
 RUNTIME_TRANSFORM_MODES = {
     "hf_bootstrap_injected",
+    "hf_bootstrap_social_injected",
     "rendered_markdown",
 }
 HF_BOOTSTRAP_PREFIX = b"<script>window.huggingface="
@@ -55,6 +56,16 @@ HF_BOOTSTRAP_POLICY_KEYS = {
 }
 RENDERED_MARKDOWN_POLICY_KEYS = {"mode", "required_markers"}
 HF_BOOTSTRAP_VARIABLE_KEYS = {"SPACE_CREATOR_USER_ID"}
+HF_BOOTSTRAP_SOCIAL_POLICY_KEYS = {
+    "mode",
+    "variables",
+    "expected_bootstrap_sha256",
+    "og_title",
+    "og_description",
+    "og_image",
+    "expected_social_meta_sha256",
+}
+SOCIAL_META_VALUE_RE = re.compile(r"[^\x00-\x1f\"<>&]+")
 
 
 class ContractError(ValueError):
@@ -174,6 +185,80 @@ def hf_bootstrap_bytes(policy: dict[str, Any]) -> bytes:
     return bootstrap
 
 
+def hf_social_meta_bytes(policy: dict[str, Any]) -> bytes:
+    require_object_keys(
+        policy,
+        HF_BOOTSTRAP_SOCIAL_POLICY_KEYS,
+        HF_BOOTSTRAP_SOCIAL_POLICY_KEYS,
+        "Hugging Face bootstrap and social preview policy",
+    )
+    for key in ("og_title", "og_description", "og_image"):
+        value = policy.get(key)
+        if not isinstance(value, str) or not SOCIAL_META_VALUE_RE.fullmatch(value):
+            raise ContractError(
+                "social preview values must be non-empty text without "
+                "quotes, angle brackets, ampersands, or control characters"
+            )
+    if not str(policy["og_image"]).startswith("https://"):
+        raise ContractError("og_image must be an HTTPS URL")
+    og_title = policy["og_title"].encode("utf-8")
+    og_description = policy["og_description"].encode("utf-8")
+    og_image = policy["og_image"].encode("utf-8")
+    block = (
+        b'<meta property="og:title" content="'
+        + og_title
+        + b'"><meta property="og:description" content="'
+        + og_description
+        + b'"><meta property="og:image" content="'
+        + og_image
+        + b'"><meta name="twitter:card" content="summary_large_image">'
+        b'<meta name="twitter:image" content="'
+        + og_image
+        + b'">'
+    )
+    expected = policy.get("expected_social_meta_sha256")
+    if not isinstance(expected, str) or not re.fullmatch(r"[0-9a-f]{64}", expected):
+        raise ContractError(
+            "Hugging Face social preview transform requires an exact "
+            "lowercase expected_social_meta_sha256"
+        )
+    if sha256_bytes(block) != expected:
+        raise ContractError(
+            "Hugging Face social preview digest does not match the "
+            "declarative variables"
+        )
+    return block
+
+
+def _bootstrap_subpolicy(policy: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "mode": "hf_bootstrap_injected",
+        "variables": policy.get("variables"),
+        "expected_bootstrap_sha256": policy.get("expected_bootstrap_sha256"),
+    }
+
+
+def canonicalize_hf_bootstrap_social(
+    data: bytes, policy: dict[str, Any]
+) -> bytes | None:
+    """Remove exactly one reviewed bootstrap and social preview insertion."""
+    try:
+        expected_social = hf_social_meta_bytes(policy)
+        expected_bootstrap = hf_bootstrap_bytes(_bootstrap_subpolicy(policy))
+    except ContractError:
+        return None
+    del expected_bootstrap
+    head_end = data.find(b"</head>")
+    if head_end < len(expected_social):
+        return None
+    if data[head_end - len(expected_social):head_end] != expected_social:
+        return None
+    stripped = data[: head_end - len(expected_social)] + data[head_end:]
+    if expected_social in stripped:
+        return None
+    return canonicalize_hf_bootstrap(stripped, _bootstrap_subpolicy(policy))
+
+
 def utc_now() -> str:
     return datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
 
@@ -283,6 +368,9 @@ def load_contract(
                 raise ContractError(
                     f"rendered Markdown requires markers: {destination!r}"
                 )
+        elif policy["mode"] == "hf_bootstrap_social_injected":
+            hf_bootstrap_bytes(_bootstrap_subpolicy(policy))
+            hf_social_meta_bytes(policy)
         else:
             hf_bootstrap_bytes(policy)
 
@@ -606,7 +694,7 @@ def _readback_result(
     bootstrap_policy: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     max_bytes = target.size + 1
-    if mode == "hf_bootstrap_injected":
+    if mode in {"hf_bootstrap_injected", "hf_bootstrap_social_injected"}:
         max_bytes = target.size + 4096
     elif mode == "rendered_markdown":
         max_bytes = max(1_000_000, target.size * 8)
@@ -650,6 +738,19 @@ def _readback_result(
                 and observed_sha256 == target.sha256
                 and len(data) == target.size
             )
+        elif mode == "hf_bootstrap_social_injected":
+            canonical = canonicalize_hf_bootstrap_social(
+                data, bootstrap_policy or {}
+            )
+            if canonical is not None:
+                result["canonical_sha256"] = sha256_bytes(canonical)
+                result["canonical_size"] = len(canonical)
+                result["matches"] = bool(
+                    status == 200
+                    and same
+                    and result["canonical_sha256"] == target.sha256
+                    and result["canonical_size"] == target.size
+                )
         elif mode == "hf_bootstrap_injected":
             canonical = canonicalize_hf_bootstrap(data, bootstrap_policy or {})
             if canonical is not None:
@@ -733,7 +834,9 @@ def verify_served_files(
             mode,
             origin,
             markers,
-            policy if mode == "hf_bootstrap_injected" else None,
+            policy
+            if mode in {"hf_bootstrap_injected", "hf_bootstrap_social_injected"}
+            else None,
         )
 
     with ThreadPoolExecutor(max_workers=min(8, max(1, len(files)))) as executor:
