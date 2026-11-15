@@ -35,7 +35,7 @@ Perplexity has delivered:
 | Claim | Current status | What makes it REAL |
 |-------|---------------|-------------------|
 | Live benchmark integration (Putnam snapshots, receipt-chained) | REAL (one run) | Already done. Needs second run + cosign signing. |
-| Lean-verified gate definitions | PARTIAL | Λ-uniqueness proven. Gate thresholds NOT Lean-verified. You must write Lean. |
+| Lean-verified gate definitions | PARTIAL | Λ-uniqueness remains Conjecture 1; gate thresholds are NOT Lean-verified. You must write Lean. |
 | DSSE-wrapped forecast deliveries | PARTIAL | slsa.yml is a stub. You must wire the real SLSA generator. |
 | Benchmark tied to safety gates | PARTIAL | Wiring design exists. You must implement `putnam_to_fg_wiring.ts`. |
 | Open source (Apache 2.0) | REAL | Done. Maintain it. |
