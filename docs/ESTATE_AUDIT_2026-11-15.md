@@ -132,8 +132,9 @@
 3. ~~Orphan Spaces~~ — resolved this pass (szl-gpu-bridge#189, §2).
 4. **szl-gov pyproject** package discovery fix before any release.
 5. **Supply-chain attestation roadmap (planned, not claimed)**: OpenSSF
-   Scorecard analysis is wired via the org reusable workflow; posture today
-   (`attestation/qillqaq` already signs gate runs in .github).
+   Scorecard analysis is wired via the org reusable workflow; attestation
+   posture today remains SLSA L1 honest; L3 is planned future work, not a
+   current claim (attestation/qillqaq already signs gate runs in .github).
 6. **arXiv/OSF presence** for the thesis + Stellar Death Clock paper (Zenodo
    DOIs exist; preprint mirrors would raise discoverability).
 7. **Trademark** (owner-side legal) for SZL Holdings marks.
