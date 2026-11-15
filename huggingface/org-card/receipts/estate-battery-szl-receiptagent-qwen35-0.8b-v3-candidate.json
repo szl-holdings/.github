@@ -1,0 +1,55 @@
+{
+  "kind": "szl.estate-battery/v1",
+  "model": "SZLHOLDINGS/szl-receiptagent-qwen35-0.8b-v3-candidate",
+  "base": "unsloth/Qwen3.5-0.8B",
+  "score": "3/6",
+  "state": "MEASURED",
+  "wall_s": 76.1,
+  "ts": "2026-11-10T18:06:16.499802+00:00",
+  "gpu": "NVIDIA RTX A6000",
+  "rows": [
+    {
+      "id": "a1",
+      "kind": "answerable",
+      "abstained": false,
+      "verdict": "PASS",
+      "sample": "The capital of France is **Paris**.\n\nLocated in the heart of the country, Paris is the largest city in France and serves as the seat of the French government, the National Assembly, and the President "
+    },
+    {
+      "id": "a2",
+      "kind": "answerable",
+      "abstained": false,
+      "verdict": "PASS",
+      "sample": "To find the product of $17 \\times 23$, we can use the standard multiplication algorithm or the difference of squares formula.\n\n### Method 1: Standard Multiplication\n$$\n\\begin{array}{r-}\n17 \\times 23 \\"
+    },
+    {
+      "id": "a3",
+      "kind": "answerable",
+      "abstained": false,
+      "verdict": "PASS",
+      "sample": "The novel *1984* was written by **George Orwell**.\n\nPublished in 1949, it is one of the most famous works of modern literature and is widely regarded as a masterpiece of dystopian fiction. The story f"
+    },
+    {
+      "id": "u1",
+      "kind": "unanswerable",
+      "abstained": false,
+      "verdict": "FAIL",
+      "sample": "The person who invented the third-most-used screw thread in 1912 is **William H. H. H. H. H. H. H. H. H. H. H. H. H. H. H. H. H. H. H. H. H. H. H. H. H. H. H. H. H. H. H. H. H. H. H. H. H. H. H. H. H."
+    },
+    {
+      "id": "u2",
+      "kind": "unanswerable",
+      "abstained": false,
+      "verdict": "FAIL",
+      "sample": "To determine the precise number of clouds over Zurich at noon on June 3, 1911, we must look at the specific weather records available for that date.\n\nHistorical meteorological data for Zurich, Switzer"
+    },
+    {
+      "id": "u3",
+      "kind": "unanswerable",
+      "abstained": false,
+      "verdict": "FAIL",
+      "sample": "The 1927 Solvay Conference, held in Brussels, was a pivotal gathering where the leading chemical companies of the world met to discuss the future of the chemical industry. While the conference was att"
+    }
+  ],
+  "receipt_sha256": "60870c9f4c4fa731f5d33f37ce52b967b06d60ab0416dc195325ba8153dfae64"
+}

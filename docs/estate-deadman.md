@@ -77,6 +77,17 @@ The next resilience tier is an external dead-man hosted outside GitHub with the
 same read-only policy and a separate notification path. Until that tier is
 proven, the repository makes no claim of provider-independent availability.
 
+## EXTERNAL provider soft-exit
+
+When confirmation is `CONFIRMED_FAILURE` and every confirmed failed target is one of
+`scheduled-estate-census` or `public-estate-live-witness` stuck in
+`LATEST_RUN_FAILED` with no observer `error_kind`, the terminal gate soft-exits.
+The receipt keeps `confirmed_healthy: false` and the incident stays refreshed.
+This matches the estate readiness honesty doctrine: evidence stays FAIL;
+aggregate soft-exits only for measured EXTERNAL/provider planes (HF Space
+runtime and HF credential inventory). Internal targets and inconclusive
+samples remain hard-fail.
+
 ## Reproduce the contract
 
 ```bash
