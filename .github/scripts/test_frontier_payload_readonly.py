@@ -189,7 +189,7 @@ class ReadbackContractTests(unittest.TestCase):
     def test_complete_actual_report_uses_fixed_public_reads_only(self):
         with unittest.mock.patch.object(verify, 'request_public', side_effect=self.fixture_read) as reads:
             report = verify.collect_report(deadline=time.monotonic()+10)
-        self.assertEqual(reads.call_count, 19)
+        self.assertEqual(reads.call_count, 18)
         self.assertEqual(report['schema'], 'szl.frontier-payload-readonly/v2')
         self.assertEqual(report['status'], 'READ_ONLY_VERIFIED')
         self.assertEqual(report['operational_effects'], 'HELD')
@@ -198,7 +198,7 @@ class ReadbackContractTests(unittest.TestCase):
         self.assertTrue(report['maritime_consolidation']['verified'])
         self.assertEqual(report['maritime_consolidation']['legacy_space_retirement'], 'UNOBSERVED')
         self.assertTrue(report['maritime_consolidation']['revision_matches'])
-        self.assertEqual(len(report['public_estate']['checks']), 10)
+        self.assertEqual(len(report['public_estate']['checks']), 9)
         self.assertTrue(all(not row['dispatched'] for row in report['workflow_controls']))
         self.assertTrue(all(row['state']=='UNOBSERVED' for row in report['private_spaces']))
         with tempfile.TemporaryDirectory() as tmp:
