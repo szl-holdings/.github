@@ -103,7 +103,6 @@ PROBES = (
     ProbeContract("proof-registry", "https://a11oy.net/", ("record",)),
     ProbeContract("product-spectral-alias", "https://a-11-oy.com/spectral", ("A11oy Holographic Operations",)),
     ProbeContract("product-controller-alias", "https://a-11-oy.com/controller", json_contract="controller"),
-    ProbeContract("gdw-health", "https://gdw.a-11-oy.com/healthz", critical=False),
 )
 
 
