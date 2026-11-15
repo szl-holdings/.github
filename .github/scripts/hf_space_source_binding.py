@@ -85,6 +85,48 @@ def live_origin(repo_id: str) -> str:
     return f"https://{host}.hf.space"
 
 
+_HF_API = "https://huggingface.co/api"
+_SPACE_JWT_CACHE: dict[str, str] = {}
+
+
+def _space_jwt(repo_id: str) -> str:
+    """Fetch and cache the short-lived read JWT for a Space runtime origin.
+
+    Used only when an anonymous probe is rejected by a private Space. The
+    JWT grants read-only route access: no Hub writes, and no change to
+    visibility, hardware, sleep policy, secrets, models, or data. Returns ""
+    without HF_TOKEN or when the JWT is unavailable, so probes stay
+    anonymous and fail closed exactly as before.
+    """
+    token = os.environ.get("HF_TOKEN", "").strip()
+    if not token:
+        return ""
+    cached = _SPACE_JWT_CACHE.get(repo_id)
+    if cached:
+        return cached
+    try:
+        response = requests.get(
+            f"{_HF_API}/spaces/{repo_id}/jwt",
+            headers={
+                "Authorization": f"Bearer {token}",
+                "User-Agent": "szl-hf-space-source-binding/1",
+            },
+            timeout=20,
+        )
+        if response.status_code == 200:
+            payload = response.json()
+            jwt = str(payload.get("token") or "") if isinstance(payload, Mapping) else ""
+            if jwt:
+                _SPACE_JWT_CACHE[repo_id] = jwt
+                return jwt
+    except requests.RequestException:
+        # Intentional: an unavailable JWT degrades to anonymous
+        # probing via the empty-string return below; the caller
+        # still fails closed on the anonymous readback.
+        pass
+    return ""
+
+
 def _variable_value(value: Any) -> str | None:
     if isinstance(value, Mapping):
         observed = value.get("value")
@@ -219,12 +261,13 @@ def _runtime_probe_observation(
         "request_identity": "headers",
         "matched": False,
     }
+    probe_headers = _probe_headers(binding, attempt)
     try:
         response = session.get(
             canonical_url,
             allow_redirects=False,
             timeout=request_timeout_seconds,
-            headers=_probe_headers(binding, attempt),
+            headers=probe_headers,
         )
     except Exception as exc:  # noqa: BLE001 - preserve a bounded transport observation
         observation.update(
@@ -234,6 +277,31 @@ def _runtime_probe_observation(
             }
         )
         return observation
+
+    if response.status_code in (401, 404):
+        # A private Space rejects anonymous probes. Retry the same canonical
+        # route once with a short-lived, read-only Space JWT minted from
+        # HF_TOKEN. No Hub writes, no visibility change; without a token or
+        # JWT the observation below fails closed exactly as before.
+        jwt = _space_jwt(binding["repo_id"])
+        if jwt:
+            retry_headers = dict(probe_headers)
+            retry_headers["Authorization"] = f"Bearer {jwt}"
+            try:
+                response = session.get(
+                    canonical_url,
+                    allow_redirects=False,
+                    timeout=request_timeout_seconds,
+                    headers=retry_headers,
+                )
+            except Exception as exc:  # noqa: BLE001 - preserve a bounded transport observation
+                observation.update(
+                    {
+                        "error_type": type(exc).__name__,
+                        "error": "source revision probe transport failure",
+                    }
+                )
+                return observation
 
     observation.update(
         {
@@ -378,6 +446,7 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
             "Verification uses supported HfApi variable readback and bounded same-host GET convergence.",
             "Probe retries preserve the canonical application URL and carry attempt identity only in headers.",
             "No Space hardware, visibility, sleep policy, secret, model, dataset, or branch state is changed.",
+            "Private-Space probes retry anonymously-rejected routes once with a short-lived read-only Space JWT; visibility is never changed.",
         ],
     }
 
