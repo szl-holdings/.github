@@ -25,8 +25,8 @@ Source: `/home/user/workspace/szl/audit_2026-05-29_evening/cto_final_sweep/PHASE
 | HuggingFace Spaces | 27 | `https://huggingface.co/api/spaces?author=SZLHOLDINGS` |
 | HuggingFace Datasets | 31 | `https://huggingface.co/api/datasets?author=SZLHOLDINGS` |
 | HuggingFace Models | 2 | `https://huggingface.co/api/models?author=SZLHOLDINGS` |
-| Lean declarations (lutar-lean/Lutar/) | 217 | DOI 10.5281/zenodo.20434308 |
-| Lean axioms (lutar-lean/Lutar/) | 12 | DOI 10.5281/zenodo.20434308 |
+| Lean declarations (lutar-lean/Lutar/) | 217 | DOI 10.5281/zenodo.24239654 |
+| Lean axioms (lutar-lean/Lutar/) | 12 | DOI 10.5281/zenodo.24239654 |
 | Putnam sorry count across 11 problems | 135 total (5–20 per problem) | `grep -rn "sorry" lutar-lean/Lutar/` |
 | Putnam P_A3 | 0 sorries — fully discharged | lutar-lean main HEAD |
 | a11oy anchor gates instilled | 7 (NOT 35 — gap is real) | anchor_gates_instill subagent running |
@@ -43,7 +43,7 @@ Source: `/home/user/workspace/szl/audit_2026-05-29_evening/cto_final_sweep/PHASE
 | SLSA honest level | L1 (L3 fake purged from a11oy; 13 other repos still show echo-stub) | `/home/user/workspace/szl/audit_2026-05-29_evening/uds_v030_sign/REPORT.md` |
 | SLSA L3 real provenance PRs open | a11oy#137, lutar-lean#117 | Live PR API |
 | Doctrine v7 PR | OPEN — all green: .github#94 | https://github.com/szl-holdings/.github/pull/94 |
-| Zenodo DOI chain | 7 DOIs, all HTTP 302 resolvable | DOI 10.5281/zenodo.19944926 [concept-DOI-alias] → 10.5281/zenodo.20434276 (v18.0) |
+| Zenodo DOI chain | 7 DOIs, all HTTP 302 resolvable | DOI 10.5281/zenodo.24239896 [concept-DOI-alias] → 10.5281/zenodo.20434276 (v18.0) |
 
 ### What Shipped Tonight (Verified URLs)
 
@@ -466,7 +466,7 @@ Cursor MUST honor these on every commit, PR, and file write. Violations will be 
 
 ### v7 Guardrails (New — All Active from 2026-05-30)
 
-**§9 — DOI dereferencing required before citation.** DOI `10.5281/zenodo.19944926` is a concept-DOI alias and must be labeled `[concept-DOI-alias]` whenever cited. Version DOIs (e.g., `10.5281/zenodo.20434276`) refer to specific immutable snapshots and must be labeled `[version-DOI]`.
+**§9 — DOI dereferencing required before citation.** DOI `10.5281/zenodo.24239896` is a concept-DOI alias and must be labeled `[concept-DOI-alias]` whenever cited. Version DOIs (e.g., `10.5281/zenodo.20434276`) refer to specific immutable snapshots and must be labeled `[version-DOI]`.
 
 **§10 — Version-scoped badge requirement.** Any CI/status badge must be annotated with `(as of <sha|tag>)`. Unscoped badges are fake-green violations.
 
@@ -509,7 +509,7 @@ Cursor MUST honor these on every commit, PR, and file write. Violations will be 
 | a11oy CONFLICTING PRs | #105, #107, #108, #114, #116, #123, #132 |
 | vessels uds-v0.3.0 release | https://github.com/szl-holdings/vessels/releases/tag/uds-v0.3.0 |
 | Zenodo ouroboros thesis (version-DOI) | https://doi.org/10.5281/zenodo.20434276 |
-| Zenodo concept-DOI-alias | https://doi.org/10.5281/zenodo.19944926 [concept-DOI-alias] |
+| Zenodo concept-DOI-alias | https://doi.org/10.5281/zenodo.24239896 [concept-DOI-alias] |
 | MCP governance server | https://szlholdings-mcp-receipts-server.hf.space |
 | HuggingFace org | https://huggingface.co/SZLHOLDINGS |
 | UDS catalog readiness scorecard | https://huggingface.co/datasets/SZLHOLDINGS/uds-governance-receipts/blob/main/UDS_CATALOG_READINESS_2026-05-30.md |
