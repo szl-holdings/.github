@@ -1,6 +1,6 @@
 # SZL estate lifecycle map
 
-Status date: 2026-08-01
+Status date: 2026-11-16 UTC\n\nInventory observed from the live GitHub organization search on 2026-11-16 UTC: **162 repositories** (all indexed).
 
 This map distinguishes active product surfaces from frozen public records.
 Archiving preserves source, release, citation, and provenance history; it is
@@ -10,12 +10,12 @@ not deletion and does not mean the artifact was unimportant.
 
 | State | Count | Policy |
 |---|---:|---|
-| Public repositories | 58 | Open by default after license, secret, dependency, and release-history review |
-| Private repositories | 4 | Retained only for lead data, fundraising material, or security operations |
-| Archived repositories | 7 | Public and read-only; retained for reproducibility and provenance |
-| Active repositories | 55 | Product, proof, documentation, or shared infrastructure |
+| Public repositories | 137 | Open by default after license, secret, dependency, and release-history review |
+| Private repositories | 25 | Retained only for lead data, fundraising material, or security operations |
+| Archived repositories | 29 | Public and read-only; retained for reproducibility and provenance |
+| Active repositories | 133 | Product, proof, documentation, or shared infrastructure |
 
-[`szl-substrate`](https://github.com/szl-holdings/szl-substrate) is the newest
+[### Inventory reconciliation\n\nThe counts above supersede the 2026-08-01 snapshot. Visibility and archive state were observed read-only; this update does not change repository settings. The seven historical mappings below are retained, and the remaining archived repositories stay governed by the same retention policy while their canonical destinations are reconciled individually.\n\nCurrent archived names observed: `a-11-oy.github.io`, `cosmos`, `counsel`, `developers`, `docs-site`, `energy-attest-holo`, `evidence-typed-formula-governance`, `fail-closed-governed-ai-services`, `governed-inference-meter`, `governed-norm-holo`, `immune-lattice`, `khipu-lab`, `khipu-pages`, `lambda-gate-holo`, `lean-kernel`, `ouroboros`, `receipt-chain-live`, `szl-cookbook`, `szl-experiments`, `szl-fleet-overlay`, `szl-formula-ledger`, `szl-governed-norm`, `szl-kernels-live`, `szl-otel-mesh`, `szl-organ-integrity`, `szl-provctl-live`, `szl-telemetry`, `szl-uds-deployment`, `warhacker-demo`.\n\n`szl-substrate`](https://github.com/szl-holdings/szl-substrate) is the newest
 public shared package. It remains an active, independently versioned boundary
 used by a11oy and killinchu.
 
