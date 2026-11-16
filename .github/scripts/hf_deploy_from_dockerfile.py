@@ -62,6 +62,7 @@ import time
 import urllib.error
 import urllib.parse
 import urllib.request
+from concurrent.futures import ThreadPoolExecutor
 
 HF_HOST = "https://huggingface.co"
 UA = {"User-Agent": "hf-deploy-from-dockerfile/1.0"}
@@ -70,6 +71,7 @@ RESERVED_HF_ROOT_TARGETS = {"dockerfile", "dockerfile.dockerignore"}
 HF_TREE_LIST_MAX_ATTEMPTS = 5
 HF_TREE_LIST_BASE_DELAY_S = 2.0
 HF_TREE_LIST_MAX_DELAY_S = 30.0
+HF_ATTEST_READ_WORKERS = 8
 
 
 class DeployContractError(ValueError):
@@ -1947,6 +1949,19 @@ def deploy(args):
 # --------------------------------------------------------------------------- #
 # attest: re-fetch each pushed file from the live Space and verify sha256
 # --------------------------------------------------------------------------- #
+def _attest_immutable_file(hf_repo, hf_commit_oid, item):
+    """Hash one bounded immutable read; never retain response bodies in futures."""
+    path, meta = item
+    want = meta.get("sha256")
+    try:
+        status, body = hf_resolve(hf_repo, path, hf_commit_oid)
+    except RuntimeError as exc:
+        return path, want, None, f"fetch-failed: {exc}"
+    if status != 200:
+        return path, want, None, f"HTTP {status}"
+    return path, want, sha256(body), None
+
+
 def attest(args):
     with open(args.manifest) as fh:
         manifest = json.load(fh)
@@ -1971,21 +1986,22 @@ def attest(args):
         return 1
 
     mism, missing, ok = [], [], 0
-    for path, meta in sorted(files.items()):
-        want = meta.get("sha256")
-        try:
-            status, body = hf_resolve(hf_repo, path, hf_commit_oid)
-        except RuntimeError as e:
-            missing.append((path, f"fetch-failed: {e}"))
-            continue
-        if status != 200:
-            missing.append((path, f"HTTP {status}"))
-            continue
-        got = sha256(body)
-        if got == want:
-            ok += 1
-        else:
-            mism.append((path, want, got))
+    # The immutable commit was admitted above. Only its independent file reads
+    # overlap; each retains the existing origin/auth/redirect/body/retry bounds.
+    # map yields in sorted input order, keeping diagnostics deterministic even
+    # when network reads complete out of order. Workers return digests, not bodies.
+    with ThreadPoolExecutor(max_workers=HF_ATTEST_READ_WORKERS) as workers:
+        results = workers.map(
+            lambda item: _attest_immutable_file(hf_repo, hf_commit_oid, item),
+            sorted(files.items()),
+        )
+        for path, want, got, error in results:
+            if error is not None:
+                missing.append((path, error))
+            elif got == want:
+                ok += 1
+            else:
+                mism.append((path, want, got))
 
     print(f"\n== HF deploy attestation: {hf_repo} ({hf_commit_oid}) ==")
     print(f"   verified OK: {ok}   mismatched: {len(mism)}   missing: {len(missing)}")

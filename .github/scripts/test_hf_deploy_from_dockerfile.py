@@ -18,7 +18,9 @@ Runs with NO network (derivation + expansion are pure stdlib).
 from __future__ import annotations
 
 import importlib.util
+import contextlib
 import copy
+import io
 import json
 import os
 import sys
@@ -966,6 +968,151 @@ class TestImmutableAttestation(unittest.TestCase):
         probe.assert_called_once_with(
             "SZLHOLDINGS/a11oy", ["/", "/openapi.json"], retries=2
         )
+
+    def _manifest_file(self, files):
+        manifest = {
+            "hf_repo": "SZLHOLDINGS/a11oy",
+            "hf_commit_oid": "a" * 40,
+            "smoke_paths": ["/", "/openapi.json"],
+            "files": files,
+        }
+        with tempfile.NamedTemporaryFile("w", delete=False) as fh:
+            json.dump(manifest, fh)
+            path = fh.name
+        self.addCleanup(lambda: os.unlink(path))
+        return path
+
+    def test_parallel_reads_are_capped_and_visit_every_immutable_path_once(self):
+        body = b"deployed"
+        # Match the observed canonical deployment size, with deliberately
+        # reversed insertion order. These are local transport fixtures only.
+        paths = ["source-%04d.py" % index for index in range(1565)]
+        manifest_path = self._manifest_file({
+            path: {"sha256": dep.sha256(body)} for path in reversed(paths)
+        })
+        lock = threading.Lock()
+        all_workers_entered = threading.Event()
+        release = threading.Event()
+        active = peak = 0
+        calls = []
+        outcome = []
+
+        def resolve(repo, path, ref):
+            nonlocal active, peak
+            with lock:
+                calls.append((repo, path, ref))
+                active += 1
+                peak = max(peak, active)
+                if active == 8:
+                    all_workers_entered.set()
+            try:
+                if not release.wait(timeout=10):
+                    raise AssertionError("test did not release immutable reads")
+                return 200, body
+            finally:
+                with lock:
+                    active -= 1
+
+        def run_attestation():
+            try:
+                outcome.append(dep.attest(self._args(manifest_path)))
+            except BaseException as exc:
+                outcome.append(exc)
+
+        with (
+            mock.patch.object(dep, "wait_for_expected_runtime", return_value=True),
+            mock.patch.object(dep, "hf_resolve", side_effect=resolve),
+            mock.patch.object(dep, "probe_smoke_routes", return_value=[]) as probe,
+            contextlib.redirect_stdout(io.StringIO()),
+        ):
+            worker = threading.Thread(target=run_attestation)
+            worker.start()
+            try:
+                self.assertTrue(
+                    all_workers_entered.wait(timeout=5),
+                    "immutable file reads did not overlap at the fixed worker cap",
+                )
+            finally:
+                release.set()
+                worker.join(timeout=10)
+            self.assertFalse(worker.is_alive(), "attestation worker did not finish")
+            self.assertEqual(outcome, [0])
+        self.assertEqual(peak, 8)
+        self.assertEqual(len(calls), len(paths))
+        self.assertCountEqual(calls, [
+            ("SZLHOLDINGS/a11oy", path, "a" * 40) for path in paths
+        ])
+        probe.assert_called_once_with(
+            "SZLHOLDINGS/a11oy", ["/", "/openapi.json"], retries=2
+        )
+
+    def test_parallel_mixed_failures_are_complete_sorted_and_skip_smoke(self):
+        expected = b"expected"
+        changed = b"changed"
+        paths = ["e-ok.py", "d-missing.py", "c-missing.py",
+                 "b-drift.py", "a-drift.py"]
+        manifest_path = self._manifest_file({
+            path: {"sha256": dep.sha256(expected)} for path in paths
+        })
+        lock = threading.Lock()
+        other_reads_finished = threading.Event()
+        completed = []
+
+        def resolve(repo, path, ref):
+            self.assertEqual((repo, ref), ("SZLHOLDINGS/a11oy", "a" * 40))
+            if path == "a-drift.py":
+                if not other_reads_finished.wait(timeout=5):
+                    raise AssertionError("other immutable reads did not finish")
+            try:
+                if path == "d-missing.py":
+                    raise RuntimeError("bounded transport failure")
+                if path == "c-missing.py":
+                    return 404, b"missing"
+                return 200, changed if path.endswith("drift.py") else expected
+            finally:
+                with lock:
+                    completed.append(path)
+                    if len(completed) == len(paths) - 1:
+                        other_reads_finished.set()
+
+        output = io.StringIO()
+        with (
+            mock.patch.object(dep, "wait_for_expected_runtime", return_value=True),
+            mock.patch.object(dep, "hf_resolve", side_effect=resolve),
+            mock.patch.object(dep, "probe_smoke_routes") as probe,
+            contextlib.redirect_stdout(output),
+        ):
+            self.assertEqual(dep.attest(self._args(manifest_path)), 1)
+        self.assertCountEqual(completed, paths)
+        self.assertEqual(completed[-1], "a-drift.py")
+        errors = [line for line in output.getvalue().splitlines()
+                  if line.startswith("::error")]
+        self.assertEqual(errors, [
+            "::error title=HF deploy drift::a-drift.py: sha256 mismatch "
+            f"git={dep.sha256(expected)[:16]} live={dep.sha256(changed)[:16]}",
+            "::error title=HF deploy drift::b-drift.py: sha256 mismatch "
+            f"git={dep.sha256(expected)[:16]} live={dep.sha256(changed)[:16]}",
+            "::error title=HF deploy missing::c-missing.py: HTTP 404",
+            "::error title=HF deploy missing::d-missing.py: "
+            "fetch-failed: bounded transport failure",
+        ])
+        self.assertIn("verified OK: 1   mismatched: 2   missing: 2",
+                      output.getvalue())
+        probe.assert_not_called()
+
+    def test_denied_runtime_starts_no_file_reads_or_smoke(self):
+        manifest_path = self._manifest_file({
+            "app.py": {"sha256": dep.sha256(b"deployed")}
+        })
+        with (
+            mock.patch.object(dep, "wait_for_expected_runtime", return_value=False) as runtime,
+            mock.patch.object(dep, "hf_resolve") as resolve,
+            mock.patch.object(dep, "probe_smoke_routes") as probe,
+        ):
+            self.assertEqual(dep.attest(self._args(manifest_path)), 1)
+        runtime.assert_called_once_with("SZLHOLDINGS/a11oy", "a" * 40, 0)
+        resolve.assert_not_called()
+        probe.assert_not_called()
 
     def test_missing_commit_oid_fails_before_network(self):
         manifest = {
