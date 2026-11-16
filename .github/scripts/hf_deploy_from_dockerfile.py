@@ -62,6 +62,7 @@ import time
 import urllib.error
 import urllib.parse
 import urllib.request
+from concurrent.futures import ThreadPoolExecutor
 
 HF_HOST = "https://huggingface.co"
 UA = {"User-Agent": "hf-deploy-from-dockerfile/1.0"}
@@ -70,6 +71,7 @@ RESERVED_HF_ROOT_TARGETS = {"dockerfile", "dockerfile.dockerignore"}
 HF_TREE_LIST_MAX_ATTEMPTS = 5
 HF_TREE_LIST_BASE_DELAY_S = 2.0
 HF_TREE_LIST_MAX_DELAY_S = 30.0
+HF_ATTEST_READ_WORKERS = 8
 
 
 class DeployContractError(ValueError):
@@ -692,27 +694,18 @@ def _immutable_hub_file_read(origin, parsed):
     return True
 
 
-def _http(url, headers=None, retries=6, follow_redirects=True, space_auth=None):
+def _http(url, headers=None, retries=6, follow_redirects=True):
     """GET with bounded bodies/retries and management-origin authentication.
 
     Each socket operation has the existing 45-second timeout. This is not a
     strict whole-call wall-clock deadline; the workflow deadline is separate.
     Mutating SDK operations are deliberately outside this read-only helper.
-
-    space_auth carries a short-lived Space JWT minted by _space_jwt() for the
-    target *.hf.space application origin. Hub credentials still never leave
-    the huggingface.co origin: Authorization in the headers dict keeps its
-    existing origin boundary, and only this explicit parameter, valid solely
-    on an https *.hf.space origin, can attach the read-only Space JWT.
     """
     if type(retries) is not int or not 1 <= retries <= HTTP_MAX_ATTEMPTS:
         raise _ReadContractError("HTTP read attempts must be an integer from 1 to 10")
     if type(follow_redirects) is not bool:
         raise _ReadContractError("HTTP redirect policy must be boolean")
     origin = _read_origin(url)
-    if space_auth and not (isinstance(space_auth, str) and space_auth and
-                           origin[1].endswith(".hf.space")):
-        raise _ReadContractError("Space authentication cannot enter a non-Space origin")
     parsed = urllib.parse.urlsplit(url)
     # A cancelled immutable Hub file read may be retried without changing the
     # artifact being verified. Do not extend 499 retries to APIs, mutable refs,
@@ -730,12 +723,8 @@ def _http(url, headers=None, retries=6, follow_redirects=True, space_auth=None):
             raise _ReadContractError("HTTP credential/header boundary rejected request")
         if lower == "authorization" and origin != ("https", "huggingface.co", 443):
             raise _ReadContractError("Hub authentication cannot enter another origin")
-        if lower == "authorization" and space_auth:
-            raise _ReadContractError("Space authentication cannot combine with explicit Hub authentication")
         seen.add(lower)
         hdrs[key] = value
-    if space_auth:
-        hdrs["Authorization"] = f"Bearer {space_auth}"
     handler = _HubReadRedirect() if follow_redirects else _NoRedirect()
     opener = urllib.request.build_opener(urllib.request.ProxyHandler({}), handler)
     last = "unavailable"
@@ -919,54 +908,13 @@ def wait_for_expected_runtime(hf_repo, expected_sha, timeout, poll_interval=15):
     return False
 
 
-_SPACE_JWT_CACHE: dict = {}
-
-
-def _space_jwt(hf_repo):
-    """Fetch and cache the short-lived read JWT for a Space runtime origin.
-
-    The JWT authorizes read-only probes of a private Space's application
-    routes: it grants no Hub writes and never changes Space visibility.
-    Returns "" when no HF_TOKEN is configured or the JWT is unavailable, so
-    probes stay anonymous and fail closed exactly as before.
-    """
-    token = os.environ.get("HF_TOKEN", "").strip()
-    if not token:
-        return ""
-    cached = _SPACE_JWT_CACHE.get(hf_repo)
-    if cached:
-        return cached
-    try:
-        status, body = _http(
-            f"{HF_HOST}/api/spaces/{hf_repo}/jwt",
-            headers={"Authorization": f"Bearer {token}"},
-            retries=1,
-        )
-        if status == 200:
-            jwt = str(json.loads(body).get("token") or "")
-            if jwt:
-                _SPACE_JWT_CACHE[hf_repo] = jwt
-                return jwt
-    except (RuntimeError, ValueError):
-        # Intentional: an unavailable JWT (transport failure or
-        # malformed response) degrades to anonymous probing via the
-        # empty-string return below; callers keep their fail-closed
-        # gates unchanged.
-        pass
-    return ""
-
-
 def probe_smoke_routes(hf_repo, smoke_paths, retries=6, delay=5):
-    """Probe the application, not a Hub-authenticated tenant session.
+    """Probe the public application, not a Hub-authenticated tenant session.
 
     HF_TOKEN belongs to Hub control/file APIs, not the application's bearer
-    namespace: a public route must still pass anonymously so anyone can
-    repeat the check. A private Space rejects anonymous probes (HTTP
-    401/404), so after an anonymous rejection the same canonical route is
-    retried with a short-lived, read-only Space JWT minted from HF_TOKEN,
-    carried by the origin-checked space_auth parameter rather than the
-    Hub-credential header path. Redirect, non-200, empty-body, source, and
-    immutable-byte gates are unchanged.
+    namespace. A public route must pass without it; a private or authenticated
+    route remains a failure here and needs its own application-owned contract.
+    Redirect, non-200, empty-body, source, and immutable-byte gates are unchanged.
     """
     paths = normalize_smoke_paths(smoke_paths)
     origin = hf_live_origin(hf_repo)
@@ -975,25 +923,17 @@ def probe_smoke_routes(hf_repo, smoke_paths, retries=6, delay=5):
         url = origin + path
         last_status = None
         last_detail = "not attempted"
-        authorized = False
         for attempt in range(max(1, int(retries))):
-            space_auth = None
-            if last_status in (401, 404):
-                space_auth = _space_jwt(hf_repo)
-                authorized = bool(space_auth)
             try:
                 status, body = _http(
                     url, headers={"Cache-Control": "no-cache"}, retries=1,
-                    follow_redirects=False, space_auth=space_auth,
+                    follow_redirects=False,
                 )
                 last_status = status
                 last_detail = f"HTTP {status}, {len(body)} bytes"
                 if status == 200 and body:
                     print(f"   smoke OK: {path} (HTTP 200, {len(body)} bytes)")
                     break
-                if authorized and status in (401, 403):
-                    _SPACE_JWT_CACHE.pop(hf_repo, None)
-                    authorized = False
             except RuntimeError as exc:
                 last_detail = str(exc)
             if attempt + 1 < max(1, int(retries)):
@@ -1947,6 +1887,19 @@ def deploy(args):
 # --------------------------------------------------------------------------- #
 # attest: re-fetch each pushed file from the live Space and verify sha256
 # --------------------------------------------------------------------------- #
+def _attest_immutable_file(hf_repo, hf_commit_oid, item):
+    """Hash one bounded immutable read; never retain response bodies in futures."""
+    path, meta = item
+    want = meta.get("sha256")
+    try:
+        status, body = hf_resolve(hf_repo, path, hf_commit_oid)
+    except RuntimeError as exc:
+        return path, want, None, f"fetch-failed: {exc}"
+    if status != 200:
+        return path, want, None, f"HTTP {status}"
+    return path, want, sha256(body), None
+
+
 def attest(args):
     with open(args.manifest) as fh:
         manifest = json.load(fh)
@@ -1971,21 +1924,22 @@ def attest(args):
         return 1
 
     mism, missing, ok = [], [], 0
-    for path, meta in sorted(files.items()):
-        want = meta.get("sha256")
-        try:
-            status, body = hf_resolve(hf_repo, path, hf_commit_oid)
-        except RuntimeError as e:
-            missing.append((path, f"fetch-failed: {e}"))
-            continue
-        if status != 200:
-            missing.append((path, f"HTTP {status}"))
-            continue
-        got = sha256(body)
-        if got == want:
-            ok += 1
-        else:
-            mism.append((path, want, got))
+    # The immutable commit was admitted above. Only its independent file reads
+    # overlap; each retains the existing origin/auth/redirect/body/retry bounds.
+    # map yields in sorted input order, keeping diagnostics deterministic even
+    # when network reads complete out of order. Workers return digests, not bodies.
+    with ThreadPoolExecutor(max_workers=HF_ATTEST_READ_WORKERS) as workers:
+        results = workers.map(
+            lambda item: _attest_immutable_file(hf_repo, hf_commit_oid, item),
+            sorted(files.items()),
+        )
+        for path, want, got, error in results:
+            if error is not None:
+                missing.append((path, error))
+            elif got == want:
+                ok += 1
+            else:
+                mism.append((path, want, got))
 
     print(f"\n== HF deploy attestation: {hf_repo} ({hf_commit_oid}) ==")
     print(f"   verified OK: {ok}   mismatched: {len(mism)}   missing: {len(missing)}")
