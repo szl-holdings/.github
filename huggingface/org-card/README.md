@@ -40,8 +40,7 @@ Control first, evidence after.
 
 ## Repeat a public calculation
 
-[Input and hash](https://github.com/szl-holdings/governed-receipt-spec/tree/320983d22e76fc9b26af0b2cd20799c5000543fc/examples/public-single-cell#public-data-and-attribution) [Executed code](https://github.com/szl-holdings/governed-receipt-spec/blob/160e39b1383a0e249399b6dfb72983b67aef7fe8/examples/public-single-cell/run_example.py) [Limits](https://github.com/szl-holdings/governed-receip
-t-spec/tree/320983d22e76fc9b26af0b2cd20799c5000543fc/examples/public-single-cell#outputs-and-verification-boundary)
+[Input and hash](https://github.com/szl-holdings/governed-receipt-spec/tree/320983d22e76fc9b26af0b2cd20799c5000543fc/examples/public-single-cell#public-data-and-attribution) [Executed code](https://github.com/szl-holdings/governed-receipt-spec/blob/160e39b1383a0e249399b6dfb72983b67aef7fe8/examples/public-single-cell/run_example.py) [Limits](https://github.com/szl-holdings/governed-receipt-spec/tree/320983d22e76fc9b26af0b2cd20799c5000543fc/examples/public-single-cell#outputs-and-verification-boundary)
 
 GEO GSE85241: integrity and repeatability; unsigned receipt; no clinical claim.
 
