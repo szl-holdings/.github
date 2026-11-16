@@ -694,27 +694,18 @@ def _immutable_hub_file_read(origin, parsed):
     return True
 
 
-def _http(url, headers=None, retries=6, follow_redirects=True, space_auth=None):
+def _http(url, headers=None, retries=6, follow_redirects=True):
     """GET with bounded bodies/retries and management-origin authentication.
 
     Each socket operation has the existing 45-second timeout. This is not a
     strict whole-call wall-clock deadline; the workflow deadline is separate.
     Mutating SDK operations are deliberately outside this read-only helper.
-
-    space_auth carries a short-lived Space JWT minted by _space_jwt() for the
-    target *.hf.space application origin. Hub credentials still never leave
-    the huggingface.co origin: Authorization in the headers dict keeps its
-    existing origin boundary, and only this explicit parameter, valid solely
-    on an https *.hf.space origin, can attach the read-only Space JWT.
     """
     if type(retries) is not int or not 1 <= retries <= HTTP_MAX_ATTEMPTS:
         raise _ReadContractError("HTTP read attempts must be an integer from 1 to 10")
     if type(follow_redirects) is not bool:
         raise _ReadContractError("HTTP redirect policy must be boolean")
     origin = _read_origin(url)
-    if space_auth and not (isinstance(space_auth, str) and space_auth and
-                           origin[1].endswith(".hf.space")):
-        raise _ReadContractError("Space authentication cannot enter a non-Space origin")
     parsed = urllib.parse.urlsplit(url)
     # A cancelled immutable Hub file read may be retried without changing the
     # artifact being verified. Do not extend 499 retries to APIs, mutable refs,
@@ -732,12 +723,8 @@ def _http(url, headers=None, retries=6, follow_redirects=True, space_auth=None):
             raise _ReadContractError("HTTP credential/header boundary rejected request")
         if lower == "authorization" and origin != ("https", "huggingface.co", 443):
             raise _ReadContractError("Hub authentication cannot enter another origin")
-        if lower == "authorization" and space_auth:
-            raise _ReadContractError("Space authentication cannot combine with explicit Hub authentication")
         seen.add(lower)
         hdrs[key] = value
-    if space_auth:
-        hdrs["Authorization"] = f"Bearer {space_auth}"
     handler = _HubReadRedirect() if follow_redirects else _NoRedirect()
     opener = urllib.request.build_opener(urllib.request.ProxyHandler({}), handler)
     last = "unavailable"
@@ -921,54 +908,13 @@ def wait_for_expected_runtime(hf_repo, expected_sha, timeout, poll_interval=15):
     return False
 
 
-_SPACE_JWT_CACHE: dict = {}
-
-
-def _space_jwt(hf_repo):
-    """Fetch and cache the short-lived read JWT for a Space runtime origin.
-
-    The JWT authorizes read-only probes of a private Space's application
-    routes: it grants no Hub writes and never changes Space visibility.
-    Returns "" when no HF_TOKEN is configured or the JWT is unavailable, so
-    probes stay anonymous and fail closed exactly as before.
-    """
-    token = os.environ.get("HF_TOKEN", "").strip()
-    if not token:
-        return ""
-    cached = _SPACE_JWT_CACHE.get(hf_repo)
-    if cached:
-        return cached
-    try:
-        status, body = _http(
-            f"{HF_HOST}/api/spaces/{hf_repo}/jwt",
-            headers={"Authorization": f"Bearer {token}"},
-            retries=1,
-        )
-        if status == 200:
-            jwt = str(json.loads(body).get("token") or "")
-            if jwt:
-                _SPACE_JWT_CACHE[hf_repo] = jwt
-                return jwt
-    except (RuntimeError, ValueError):
-        # Intentional: an unavailable JWT (transport failure or
-        # malformed response) degrades to anonymous probing via the
-        # empty-string return below; callers keep their fail-closed
-        # gates unchanged.
-        pass
-    return ""
-
-
 def probe_smoke_routes(hf_repo, smoke_paths, retries=6, delay=5):
-    """Probe the application, not a Hub-authenticated tenant session.
+    """Probe the public application, not a Hub-authenticated tenant session.
 
     HF_TOKEN belongs to Hub control/file APIs, not the application's bearer
-    namespace: a public route must still pass anonymously so anyone can
-    repeat the check. A private Space rejects anonymous probes (HTTP
-    401/404), so after an anonymous rejection the same canonical route is
-    retried with a short-lived, read-only Space JWT minted from HF_TOKEN,
-    carried by the origin-checked space_auth parameter rather than the
-    Hub-credential header path. Redirect, non-200, empty-body, source, and
-    immutable-byte gates are unchanged.
+    namespace. A public route must pass without it; a private or authenticated
+    route remains a failure here and needs its own application-owned contract.
+    Redirect, non-200, empty-body, source, and immutable-byte gates are unchanged.
     """
     paths = normalize_smoke_paths(smoke_paths)
     origin = hf_live_origin(hf_repo)
@@ -977,25 +923,17 @@ def probe_smoke_routes(hf_repo, smoke_paths, retries=6, delay=5):
         url = origin + path
         last_status = None
         last_detail = "not attempted"
-        authorized = False
         for attempt in range(max(1, int(retries))):
-            space_auth = None
-            if last_status in (401, 404):
-                space_auth = _space_jwt(hf_repo)
-                authorized = bool(space_auth)
             try:
                 status, body = _http(
                     url, headers={"Cache-Control": "no-cache"}, retries=1,
-                    follow_redirects=False, space_auth=space_auth,
+                    follow_redirects=False,
                 )
                 last_status = status
                 last_detail = f"HTTP {status}, {len(body)} bytes"
                 if status == 200 and body:
                     print(f"   smoke OK: {path} (HTTP 200, {len(body)} bytes)")
                     break
-                if authorized and status in (401, 403):
-                    _SPACE_JWT_CACHE.pop(hf_repo, None)
-                    authorized = False
             except RuntimeError as exc:
                 last_detail = str(exc)
             if attempt + 1 < max(1, int(retries)):
