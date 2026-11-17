@@ -142,6 +142,68 @@ class PublicSmokeTests(unittest.TestCase):
         self.assertEqual(len(self.app_requests()), 3)
         self.assertTrue(all(request.get_header("Authorization") is None for request in self.app_requests()))
 
+    def test_401_and_404_retries_never_acquire_or_send_credentials(self):
+        # Even if an authenticated runtime would return 200, that response
+        # cannot qualify an anonymous public route. Exercise the real _http.
+        for rejected_status in (401, 404):
+            with self.subTest(status=rejected_status):
+                self.requests.clear()
+
+                def endpoint(request, timeout):
+                    self.requests.append(request)
+                    self.assertEqual(timeout, 45)
+                    if request.full_url == ORIGIN + "/":
+                        if request.get_header("Authorization") is not None:
+                            return Reply(b"authenticated runtime", 200)
+                        raise urllib.error.HTTPError(
+                            request.full_url, rejected_status, "fixture rejection",
+                            {}, io.BytesIO(b"anonymous unavailable"),
+                        )
+                    if request.full_url == f"https://huggingface.co/api/spaces/{REPO}/jwt":
+                        self.assertEqual(request.get_header("Authorization"),
+                                         "Bearer " + CONTROL_TOKEN)
+                        return Reply(json.dumps({
+                            "token": "fixture-space-jwt-not-a-credential",
+                        }).encode())
+                    raise AssertionError("unexpected fixture endpoint")
+
+                with unittest.mock.patch.object(self, "open_request", side_effect=endpoint):
+                    failures = publisher.probe_smoke_routes(REPO, ["/"], retries=3, delay=0)
+                self.assertEqual(len(failures), 1)
+                self.assertEqual(failures[0][0:2], ("/", rejected_status))
+                self.assertEqual(len(self.requests), 3)
+                self.assertEqual(len(self.app_requests()), 3)
+                self.assertTrue(all(
+                    request.get_header("Authorization") is None
+                    and request.get_header("Cookie") is None
+                    for request in self.requests
+                ))
+
+    def test_401_and_404_recover_only_through_later_anonymous_200(self):
+        for rejected_status in (401, 404):
+            with self.subTest(status=rejected_status):
+                self.requests.clear()
+
+                def endpoint(request, timeout):
+                    self.requests.append(request)
+                    self.assertEqual(timeout, 45)
+                    self.assertEqual(request.full_url, ORIGIN + "/")
+                    self.assertIsNone(request.get_header("Authorization"))
+                    self.assertIsNone(request.get_header("Cookie"))
+                    if len(self.requests) == 1:
+                        raise urllib.error.HTTPError(
+                            request.full_url, rejected_status, "fixture rejection",
+                            {}, io.BytesIO(b"not ready"),
+                        )
+                    return Reply(b"publicly available", 200)
+
+                with unittest.mock.patch.object(self, "open_request", side_effect=endpoint):
+                    self.assertEqual(
+                        publisher.probe_smoke_routes(REPO, ["/"], retries=3, delay=0),
+                        [],
+                    )
+                self.assertEqual(len(self.requests), 2)
+
     def test_unsafe_paths_fail_before_transport(self):
         for path in ("https://other.invalid/", "//other.invalid/", "/\\other", "/x\nheader", "/#fragment"):
             with self.subTest(path=path), self.assertRaises(publisher.DeployContractError):
