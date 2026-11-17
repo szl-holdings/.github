@@ -7149,6 +7149,284 @@
         ]
       }
     },
+      ".github/workflows/org-code-scanning-baseline-contract.yml": {
+
+        "intent_id": "org-code-scanning-baseline-contract-v1",
+
+        "valid_until": "2026-11-30",
+
+        "source_sha256": "sha256:44e60369dc01b9e78d8ceefa4f7319196c172e84a9131bb2975e16a78281871f",
+
+        "credentials": [],
+
+        "resources": [
+
+          {
+
+            "key": "github:repository:szl-holdings/.github:contents",
+
+            "access": "read"
+
+          },
+
+          {
+
+            "key": "runner:guard:egress",
+
+            "access": "local-write"
+
+          },
+
+          {
+
+            "key": "stepsecurity:monitor:szl-holdings/.github",
+
+            "access": "external-write"
+
+          },
+
+          {
+
+            "key": "runner:toolchain:python",
+
+            "access": "local-write"
+
+          }
+
+        ],
+
+        "effects": [
+
+          {
+
+            "sink": "github.contents.checkout",
+
+            "resource": "github:repository:szl-holdings/.github:contents",
+
+            "access": "read",
+
+            "max_calls": 1
+
+          },
+
+          {
+
+            "sink": "runner.guard.configure",
+
+            "resource": "runner:guard:egress",
+
+            "access": "local-write",
+
+            "max_calls": 1
+
+          },
+
+          {
+
+            "sink": "runner.guard.telemetry",
+
+            "resource": "stepsecurity:monitor:szl-holdings/.github",
+
+            "access": "external-write",
+
+            "max_calls": 1
+
+          },
+
+          {
+
+            "sink": "runner.toolchain.install",
+
+            "resource": "runner:toolchain:python",
+
+            "access": "local-write",
+
+            "max_calls": 1
+
+          }
+
+        ],
+
+        "max_external_writes": 1,
+
+        "required_controls": {
+
+          "triggers": [
+
+            "pull_request",
+
+            "push"
+
+          ],
+
+          "contents_read": true,
+
+          "no_explicit_secrets": true,
+
+          "concurrency": true,
+
+          "protected_ref": false,
+
+          "exact_sha": false,
+
+          "expected_before": false,
+
+          "readback": false
+
+        },
+
+        "trusted_transitives": {},
+
+        "reviewed_unknowns": {
+
+          "files": {
+
+            ".github/workflows/org-code-scanning-baseline-contract.yml": "sha256:44e60369dc01b9e78d8ceefa4f7319196c172e84a9131bb2975e16a78281871f",
+
+            ".github/scripts/org_code_scanning_baseline_v2.py": "sha256:726e539aae6a25ea449d3ec18264a11925d68d4b111aa481de5a404285cd8efd",
+
+            ".github/workflows/org-code-scanning-baseline.yml": "sha256:437ab52e1d9f8b7e08e1378227ed7f3dae159bb5482aee3733a3802133f3738c"
+
+          },
+
+          "unknowns": [
+
+            "ACTION_INPUTS_REVIEW_REQUIRED@.github/workflows/org-code-scanning-baseline-contract.yml:35",
+
+            "ACTION_INPUTS_REVIEW_REQUIRED@.github/workflows/org-code-scanning-baseline-contract.yml:40",
+
+            "ACTION_INPUTS_REVIEW_REQUIRED@.github/workflows/org-code-scanning-baseline-contract.yml:45",
+
+            "HTTP_TARGET_UNRESOLVED@.github/scripts/org_code_scanning_baseline_v2.py:164",
+
+            "PYTHON_CLIENT_UNRESOLVED@.github/scripts/org_code_scanning_baseline_v2.py:189",
+
+            "PYTHON_CLIENT_UNRESOLVED@.github/scripts/org_code_scanning_baseline_v2.py:204",
+
+            "PYTHON_CLIENT_UNRESOLVED@.github/scripts/org_code_scanning_baseline_v2.py:211",
+
+            "PYTHON_CLIENT_UNRESOLVED@.github/scripts/org_code_scanning_baseline_v2.py:222",
+
+            "PYTHON_CLIENT_UNRESOLVED@.github/scripts/org_code_scanning_baseline_v2.py:245",
+
+            "PYTHON_CLIENT_UNRESOLVED@.github/scripts/org_code_scanning_baseline_v2.py:275",
+
+            "PYTHON_CLIENT_UNRESOLVED@.github/scripts/org_code_scanning_baseline_v2.py:290",
+
+            "PYTHON_CLIENT_UNRESOLVED@.github/scripts/org_code_scanning_baseline_v2.py:296",
+
+            "PYTHON_DYNAMIC_HTTP_METHOD@.github/scripts/org_code_scanning_baseline_v2.py:164",
+
+            "PYTHON_IMPORT_UNRESOLVED@.github/scripts/org_code_scanning_baseline_v2.py:14",
+
+            "PYTHON_IMPORT_UNRESOLVED@.github/scripts/org_code_scanning_baseline_v2.py:16",
+
+            "PYTHON_IMPORT_UNRESOLVED@.github/scripts/org_code_scanning_baseline_v2.py:21",
+
+            "PYTHON_IMPORT_UNRESOLVED@.github/scripts/org_code_scanning_baseline_v2.py:22",
+
+            "PYTHON_IMPORT_UNRESOLVED@.github/scripts/org_code_scanning_baseline_v2.py:23",
+
+            "PYTHON_IMPORT_UNRESOLVED@.github/scripts/org_code_scanning_baseline_v2.py:24",
+
+            "PYTHON_IMPORT_UNRESOLVED@.github/scripts/org_code_scanning_baseline_v2.py:26",
+
+            "PYTHON_SOURCE_REVIEW_REQUIRED@.github/scripts/org_code_scanning_baseline_v2.py:1",
+
+            "PYTHON_SOURCE_REVIEW_REQUIRED@.github/workflows/org-code-scanning-baseline-contract.yml:58",
+
+            "SCRIPT_SOURCE_REVIEW_REQUIRED@.github/workflows/org-code-scanning-baseline-contract.yml:1",
+
+            "SCRIPT_SOURCE_REVIEW_REQUIRED@.github/workflows/org-code-scanning-baseline.yml:1",
+
+            "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/org-code-scanning-baseline-contract.yml:101",
+
+            "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/org-code-scanning-baseline-contract.yml:49",
+
+            "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/org-code-scanning-baseline-contract.yml:50",
+
+            "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/org-code-scanning-baseline-contract.yml:51",
+
+            "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/org-code-scanning-baseline-contract.yml:57",
+
+            "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/org-code-scanning-baseline-contract.yml:58",
+
+            "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/org-code-scanning-baseline-contract.yml:60",
+
+            "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/org-code-scanning-baseline-contract.yml:61",
+
+            "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/org-code-scanning-baseline-contract.yml:62",
+
+            "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/org-code-scanning-baseline-contract.yml:63",
+
+            "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/org-code-scanning-baseline-contract.yml:64",
+
+            "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/org-code-scanning-baseline-contract.yml:65",
+
+            "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/org-code-scanning-baseline-contract.yml:66",
+
+            "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/org-code-scanning-baseline-contract.yml:67",
+
+            "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/org-code-scanning-baseline-contract.yml:68",
+
+            "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/org-code-scanning-baseline-contract.yml:69",
+
+            "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/org-code-scanning-baseline-contract.yml:70",
+
+            "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/org-code-scanning-baseline-contract.yml:71",
+
+            "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/org-code-scanning-baseline-contract.yml:72",
+
+            "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/org-code-scanning-baseline-contract.yml:73",
+
+            "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/org-code-scanning-baseline-contract.yml:74",
+
+            "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/org-code-scanning-baseline-contract.yml:75",
+
+            "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/org-code-scanning-baseline-contract.yml:76",
+
+            "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/org-code-scanning-baseline-contract.yml:77",
+
+            "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/org-code-scanning-baseline-contract.yml:78",
+
+            "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/org-code-scanning-baseline-contract.yml:79",
+
+            "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/org-code-scanning-baseline-contract.yml:80",
+
+            "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/org-code-scanning-baseline-contract.yml:81",
+
+            "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/org-code-scanning-baseline-contract.yml:82",
+
+            "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/org-code-scanning-baseline-contract.yml:83",
+
+            "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/org-code-scanning-baseline-contract.yml:84",
+
+            "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/org-code-scanning-baseline-contract.yml:85",
+
+            "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/org-code-scanning-baseline-contract.yml:86",
+
+            "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/org-code-scanning-baseline-contract.yml:87",
+
+            "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/org-code-scanning-baseline-contract.yml:88",
+
+            "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/org-code-scanning-baseline-contract.yml:89",
+
+            "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/org-code-scanning-baseline-contract.yml:90",
+
+            "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/org-code-scanning-baseline-contract.yml:96",
+
+            "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/org-code-scanning-baseline-contract.yml:97",
+
+            "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/org-code-scanning-baseline-contract.yml:98",
+
+            "SHELL_COMPOSITION_UNKNOWN@.github/workflows/org-code-scanning-baseline-contract.yml:96"
+
+          ]
+
+        }
+
+      },
+
     ".github/workflows/public-estate-convergence.yml": {
       "intent_id": "public-estate-convergence-static-boundary-v1",
       "valid_until": "2026-11-30",
