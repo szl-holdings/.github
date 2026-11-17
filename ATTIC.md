@@ -11,8 +11,8 @@ Every public archived repository in the `szl-holdings` organization, mapped to t
 
 | Metric | Count |
 |---|---:|
-| Public repositories total | 134 |
-| Active public repositories | 105 |
+| Public repositories total | 142 |
+| Active public repositories | 113 |
 | Archived public repositories (tombstones) | 29 |
 | Tombstones with a resolved successor | 22 |
 | Tombstones terminal by design | 6 |
