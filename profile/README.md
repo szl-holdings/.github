@@ -16,7 +16,7 @@ Receipt unsigned; no biological claim.
 
 - **Explore:** [Command Lab](https://huggingface.co/spaces/SZLHOLDINGS/szl-command-lab) — the searchable portfolio.
 - **Use:** [A11oy](https://a-11-oy.com) — tools with live capability state.
-- **Build:** [models, kernels, datasets, Spaces](https://huggingface.co/SZLHOLDINGS) · [PyPI packages](https://pypi.org/org/SZL-HOLDINGS/).
+- **Build:** [source map](https://github.com/szl-holdings/.github/blob/main/profile/SOURCE_MAP.md) · [models, kernels, datasets, Spaces](https://huggingface.co/SZLHOLDINGS) · [PyPI](https://pypi.org/org/SZL-HOLDINGS/).
 - **Verify:** [a11oy.net](https://a11oy.net) — records, limits, [evidence diagrams](https://a11oy.net/diagrams/).
 
 <a href="https://a11oy.net/diagrams/"><img src="https://raw.githubusercontent.com/szl-holdings/.github/main/profile/assets/diagrams/evidence-diagrams-overview.png" alt="Overview of four SZL evidence diagrams" width="720" /></a>
@@ -67,4 +67,3 @@ The source-bound public inventory records **22 public Spaces, 121 model reposito
 <!-- szl:public-inventory:end -->
 
 **HISTORICAL:** Three commercial flagships, one inference flagship, six internal engines, **Five public domain bodies** (Terra; PRISM Counsel; PURIQ Finance; LYTE). Earlier snapshot: 16 portfolio Spaces, 1 inventory-only Space, 45 models, 34 datasets. Hub listings do not establish deployment, capability, quality or publication policy.
-
