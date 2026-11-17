@@ -68,8 +68,7 @@ jobs:
               "secrets.SZL_GITHUB_TOKEN || secrets.GH_PAT || github.token"
           )
           required = (
-              "permissions: read-all",
-              "    permissions:\n      contents: read\n      issues: write\n      security-events: write",
+              "permissions:\n  contents: read\n  issues: write\n  security-events: write",
               "python .github/scripts/org_code_scanning_baseline_v2.py",
               "--apply",
               "if-no-files-found: error",
