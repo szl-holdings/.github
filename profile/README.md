@@ -16,7 +16,7 @@ Receipt unsigned; no biological claim.
 
 - **Explore:** [Command Lab](https://huggingface.co/spaces/SZLHOLDINGS/szl-command-lab) — the searchable portfolio.
 - **Use:** [A11oy](https://a-11-oy.com) — tools with live capability state.
-- **Build:** [models, kernels, datasets, Spaces](https://huggingface.co/SZLHOLDINGS) · [PyPI packages](https://pypi.org/user/betterwithage/).
+- **Build:** [source map](https://github.com/szl-holdings/.github/blob/main/profile/SOURCE_MAP.md) · [models, kernels, datasets, Spaces](https://huggingface.co/SZLHOLDINGS) · [PyPI](https://pypi.org/user/betterwithage/).
 - **Verify:** [a11oy.net](https://a11oy.net) — records, limits, [evidence diagrams](https://a11oy.net/diagrams/).
 
 <a href="https://a11oy.net/diagrams/"><img src="https://raw.githubusercontent.com/szl-holdings/.github/main/profile/assets/diagrams/evidence-diagrams-overview.png" alt="Overview of four SZL evidence diagrams" width="720" /></a>
@@ -36,25 +36,9 @@ a11oy** — governed runtime, x402 APIs
 - **hatun-mcp** — production MCP · [repo](https://github.com/szl-holdings/hatun-mcp)
 - **killinchu** — counter-UAS · [killinchu.a-11-oy.com](https://killinchu.a-11-oy.com)
 
-## Source map
-
-Front end, back end, and Python — all public, all investor- and dev-friendly:
-
-| Layer | Project | What it is |
-| --- | --- | --- |
-| Front end | [wink-observatory](https://github.com/szl-holdings/wink-observatory) | live 3D estate telemetry — witness records, receipt-trippability audit, fleet telemetry |
-| Front end | [szl-khipu-scholar](https://github.com/szl-holdings/szl-khipu-scholar) | khipu explorer — provenance-first corpus, OKR-derived QA dataset, receipts API |
-| Back end | [a11oy](https://github.com/szl-holdings/a11oy) | governed runtime — deny by default, signed receipts, x402 APIs |
-| Back end | [szl-inference-gateway](https://github.com/szl-holdings/szl-inference-gateway) | production x402-metered LLM inference on SaladCloud GPUs — live at [inference.a-11-oy.com](https://inference.a-11-oy.com) |
-| Back end | [szl-router](https://github.com/szl-holdings/szl-router) · [hatun-mcp](https://github.com/szl-holdings/hatun-mcp) | receipted OpenAI-compatible gateway · doctrine-aware production MCP |
-| Python | [PyPI — betterwithage](https://pypi.org/user/betterwithage/) — 19 packages observed 2026-11-17: [khipu-x1](https://pypi.org/project/khipu-x1/) · [szl-provctl](https://pypi.org/project/szl-provctl/) · [szl-khipu](https://pypi.org/project/szl-khipu/) · [szl-router](https://pypi.org/project/szl-router/) · [a11oy-factory](https://pypi.org/project/a11oy-factory/) · [szl-os](https://pypi.org/project/szl-os/) · … | estate tooling, `pip install`-able |
-| Frontier evidence | [frontier-54-runs](https://huggingface.co/datasets/SZLHOLDINGS/frontier-54-runs) (HF system of record) · [frontier-55-runs](https://github.com/szl-holdings/frontier-55-runs) (public mirror) | frontier run receipts — anonymous-only, no claims beyond receipts |
-
 ## Pushing the frontier
 
 [Ring-0 receipts](https://huggingface.co/datasets/SZLHOLDINGS/frontier-54-runs) · [x402-metered inference](https://inference.a-11-oy.com) · [Estate math](https://github.com/szl-holdings/lutar-lean).
-
-**In flight (observed 2026-11-17):** `szl-frontier54-v2r-all` — the flagship-54 successor resumed from [`salad-flagship54-v1/checkpoint-37000`](https://huggingface.co/SZLHOLDINGS/salad-flagship54-v1/tree/main/checkpoint-37000) on an all-estates curriculum: the three pinned phases (doctrine · math+governance · replay-reweight) kept exactly, then 93 additional estate datasets — axioms, Lean proofs, khipu corpora, doctrine, math, thesis lineage — across two new phases; budget 54h → 78h. Training-in-progress observation; no capability claim until receipts land.
 
 ### Measured live gateway
 
@@ -81,4 +65,3 @@ The source-bound public inventory records **22 public Spaces, 121 model reposito
 <!-- szl:public-inventory:end -->
 
 **HISTORICAL:** Portfolio contract: **Three commercial flagships** (A11oy, Killinchu, Forge); **One inference flagship** (SZL Router); **Six internal engines**; **Five public domain bodies** (Terra; PRISM Counsel; PURIQ Finance; LYTE). Historical: 16 portfolio Spaces, 1 inventory-only Space, 45 models, 34 datasets. Hub inventory claim boundary: registry evidence is not availability, operational readiness, or publication policy.
-
