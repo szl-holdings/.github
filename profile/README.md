@@ -39,10 +39,12 @@ a11oy** — governed runtime, x402 APIs
 ## Pushing the frontier
 
 [Ring-0 receipts](https://huggingface.co/datasets/SZLHOLDINGS/frontier-54-runs) · [x402-metered inference](https://inference.a-11-oy.com) · [Estate math](https://github.com/szl-holdings/lutar-lean).
+- **khipu-x1** → [PyPI v0.1.1](https://pypi.org/project/khipu-x1/) → [source](https://github.com/szl-holdings/khipu-x1) → governed LLM accelerator reference, trusted-publisher releases.
+- **Ouroboros ring receipts** → [mesh/ring/ouro](https://huggingface.co/datasets/SZLHOLDINGS/frontier-54-runs/tree/main/mesh/ring/ouro) → chained self-training lap receipts, honest SERVE/LEARN NOT_RUN boundaries.
 
 ### Measured live gateway
 
-**Observed 2026-11-15T15:02Z** from the authorized SZL operations path:
+**Observed 2026-11-17T19:29Z** from the authorized SZL operations path:
 
 - [Health](https://inference.a-11-oy.com/health) → **HTTP 200**, status `ok`
 - [Model registry](https://inference.a-11-oy.com/v1/models) → **HTTP 200**, model `ternary-bonsai-2-27b-pq2_0`
