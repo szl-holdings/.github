@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import importlib.util
+import io
 import json
 import os
 import sys
@@ -17,9 +18,15 @@ MODULE_PATH = os.path.join(HERE, "hf_space_source_binding.py")
 # The contract tests are network-free and must run in the repository's stdlib-only
 # test job. Stub import-time client modules only when they are not installed; every
 # API interaction is injected below.
-if "requests" not in sys.modules:
+try:
+    import requests as requests_real
+    REAL_REQUESTS = True
+except ImportError:
+    REAL_REQUESTS = False
     requests_stub = types.ModuleType("requests")
     requests_stub.Session = object
+    requests_stub.Request = lambda method, url: SimpleNamespace(
+        prepare=lambda: SimpleNamespace(url=url))
     sys.modules["requests"] = requests_stub
 if "huggingface_hub" not in sys.modules:
     hub_stub = types.ModuleType("huggingface_hub")
@@ -47,25 +54,52 @@ class FakeApi:
 
 
 class FakeResponse:
-    def __init__(self, payload, status=200, content_type="application/json"):
+    def __init__(self, payload, status=200, content_type="application/json", raw=None):
         self._payload = payload
         self.status_code = status
         self.headers = {"content-type": content_type}
-        self.content = json.dumps(payload).encode("utf-8")
+        self.content = json.dumps(payload).encode("utf-8") if raw is None else raw
+        self.url = None
+        self.closed = False
+        self.read_bytes = 0
+        response = self
+        class Body(io.BytesIO):
+            def read(self, size=-1):
+                value = super().read(size)
+                response.read_bytes += len(value)
+                return value
+        self.raw = Body(self.content)
 
     def json(self):
         return self._payload
 
+    def close(self):
+        self.closed = True
+        self.raw.close()
 
-class FakeSession:
+
+class FakeSession(binding._ReadSession):
     def __init__(self, response):
         self.responses = list(response) if isinstance(response, list) else [response]
         self.headers = {}
         self.calls = []
+        self.closed = False
 
     def get(self, url, **kwargs):
+        headers = dict(self.headers)
+        headers.update(kwargs.get("headers", {}))
+        request = SimpleNamespace(method="GET", url=url, headers=headers)
+        if kwargs.get("auth") is not None:
+            kwargs["auth"](request)
+        kwargs["headers"] = dict(request.headers)
         self.calls.append((url, kwargs))
-        return self.responses.pop(0) if len(self.responses) > 1 else self.responses[0]
+        response = self.responses.pop(0) if len(self.responses) > 1 else self.responses[0]
+        if response.url is None:
+            response.url = url
+        return response
+
+    def close(self):
+        self.closed = True
 
 
 class FakeClock:
@@ -81,6 +115,9 @@ class FakeClock:
 
 class SourceBindingTests(unittest.TestCase):
     def setUp(self):
+        patcher = mock.patch.dict(os.environ, {"HF_TOKEN": ""})
+        patcher.start()
+        self.addCleanup(patcher.stop)
         self.sha = "a" * 40
         self.normalized = binding.normalize_binding(
             "SZLHOLDINGS/a11oy", "SZL_GIT_SHA", self.sha, "/api/build-info"
@@ -327,8 +364,7 @@ class SourceBindingTests(unittest.TestCase):
                 session=FakeSession(FakeResponse({}, status=503)),
                 timeout_seconds=0,
             )
-        response = FakeResponse({}, status=200, content_type="text/html")
-        response.json = mock.Mock(side_effect=ValueError("not json"))
+        response = FakeResponse({}, status=200, content_type="text/html", raw=b"not json")
         with self.assertRaises(binding.SourceBindingError):
             binding.verify_runtime_probe(
                 self.normalized,
@@ -513,6 +549,344 @@ class ReusableWorkflowSourceBindingTests(unittest.TestCase):
         self.assertIn("contract-only: true", self.witness_workflow)
         self.assertIn("HF_TOKEN: ${{ github.token }}", self.witness_workflow)
         self.assertIn("permissions:\n  contents: read", self.witness_workflow)
+
+
+
+class SourceReadBoundaryTests(unittest.TestCase):
+    def setUp(self):
+        self.sha = "b" * 40
+        self.normalized = binding.normalize_binding(
+            "SZLHOLDINGS/a11oy", "SZL_GIT_SHA", self.sha, "/api/build-info"
+        )
+        self.payload = SourceBindingTests.observed_payload(self.sha)
+        self.clock = FakeClock()
+        patcher = mock.patch.dict(os.environ, {"HF_TOKEN": ""})
+        patcher.start()
+        self.addCleanup(patcher.stop)
+
+    def verify(self, session, timeout=0):
+        return binding.verify_runtime_probe(
+            self.normalized, session=session, timeout_seconds=timeout,
+            interval_seconds=1, monotonic=self.clock.monotonic, sleep=self.clock.sleep,
+        )
+
+    def rejected(self, session, code):
+        with self.assertRaises(binding.SourceBindingError) as raised:
+            self.verify(session)
+        observation = raised.exception.evidence["observations"][-1]
+        self.assertFalse(observation["matched"])
+        self.assertEqual(observation["error_code"], code)
+        return observation
+
+    def test_anonymous_identity_has_no_ambient_credentials_or_public_claim(self):
+        response = FakeResponse(self.payload)
+        session = FakeSession(response)
+        session.headers.update({"Authorization": "ambient", "Cookie": "ambient",
+                                "Proxy-Authorization": "ambient", "Host": "other.invalid"})
+        result = self.verify(session)
+        self.assertTrue(result["matched"])
+        self.assertEqual(result["availability_scope"], "not_evaluated")
+        self.assertEqual(result["observations"][0]["authentication"], "anonymous")
+        headers = session.calls[0][1]["headers"]
+        for name in ("Authorization", "Cookie", "Proxy-Authorization", "Host"):
+            self.assertNotIn(name, headers)
+        self.assertTrue(session.calls[0][1]["stream"])
+        self.assertFalse(session.calls[0][1]["allow_redirects"])
+        self.assertTrue(response.closed)
+
+    def test_authenticated_identity_is_scoped_and_never_claims_public_availability(self):
+        for status in (401, 404):
+            with self.subTest(status=status):
+                session = FakeSession([FakeResponse({}, status=status),
+                                       FakeResponse({"token": "synthetic-space-jwt"}),
+                                       FakeResponse(self.payload)])
+                with mock.patch.dict(os.environ, {"HF_TOKEN": "synthetic-hub-token"}):
+                    report = self.verify(session)
+                self.assertTrue(report["matched"])
+                observation = report["observations"][0]
+                self.assertEqual(observation["authentication"], "space_read_jwt")
+                self.assertEqual(observation["availability_scope"], "not_evaluated")
+                self.assertEqual(observation["anonymous_http_status"], status)
+                self.assertNotIn("private", observation)
+                self.assertEqual(len(session.calls), 3)
+                first, jwt, last = session.calls
+                self.assertEqual(first[0], last[0])
+                self.assertEqual(jwt[0], "https://huggingface.co/api/spaces/SZLHOLDINGS/a11oy/jwt")
+                self.assertNotIn("Authorization", first[1]["headers"])
+                self.assertEqual(jwt[1]["headers"]["Authorization"], "Bearer synthetic-hub-token")
+                self.assertEqual(last[1]["headers"]["Authorization"], "Bearer synthetic-space-jwt")
+                self.assertEqual(first[1]["headers"][binding.PROBE_ATTEMPT_HEADER],
+                                 last[1]["headers"][binding.PROBE_ATTEMPT_HEADER])
+                self.assertNotIn("synthetic-space-jwt", json.dumps(report))
+                self.assertNotIn("synthetic-hub-token", json.dumps(report))
+
+    def test_credentials_reject_other_origins_paths_and_methods(self):
+        hub = "https://huggingface.co/api/spaces/SZLHOLDINGS/a11oy/jwt"
+        runtime = binding.live_origin(self.normalized["repo_id"]) + "/api/build-info"
+        for destination in ("https://other.hf.space/api/build-info", "http://huggingface.co/api",
+                            "https://huggingface.co.evil.invalid/api", "https://u@huggingface.co/api",
+                            "https://huggingface.co:444/api", "https://huggingface.co/api/spaces/x/y/jwt"):
+            with self.subTest(destination=destination), self.assertRaises(binding.SourceBindingError):
+                auth = binding._ScopedReadAuth(hub, "synthetic-hub-token", hub_jwt=True)
+                auth(SimpleNamespace(method="GET", url=destination, headers={}))
+        with self.assertRaises(binding.SourceBindingError):
+            binding._ScopedReadAuth("https://huggingface.co/other", "token", hub_jwt=True)
+        with self.assertRaises(binding.SourceBindingError):
+            binding._ScopedReadAuth("https://other.invalid/path", "token")
+        with self.assertRaises(binding.SourceBindingError):
+            binding._ScopedReadAuth(runtime, "token")(SimpleNamespace(method="POST", url=runtime, headers={}))
+
+    def test_runtime_credential_rejects_same_origin_wrong_path_or_query(self):
+        selected = binding.live_origin(self.normalized["repo_id"]) + "/api/build-info?view=release"
+        auth = binding._ScopedReadAuth(selected, "synthetic-space-jwt")
+        for target in (selected.replace("/api/build-info", "/other"),
+                       selected.replace("view=release", "view=other"),
+                       selected + "&extra=1", selected.split("?")[0]):
+            with self.subTest(target=target), self.assertRaises(binding.SourceBindingError):
+                auth(SimpleNamespace(method="GET", url=target, headers={}))
+        request = auth(SimpleNamespace(method="GET", url=selected, headers={}))
+        self.assertEqual(request.headers["Authorization"], "Bearer synthetic-space-jwt")
+        response = FakeResponse(self.payload)
+        response.url = binding.live_origin(self.normalized["repo_id"]) + "/other"
+        self.rejected(FakeSession(response), "RESPONSE_TARGET")
+
+    def test_failure_evidence_retains_existing_timing_schema(self):
+        with self.assertRaises(binding.SourceBindingError) as raised:
+            self.verify(FakeSession(FakeResponse({}, status=503)))
+        evidence = raised.exception.evidence
+        self.assertEqual(evidence["elapsed_seconds"], 0.0)
+        self.assertEqual(evidence["interval_seconds"], 1)
+        self.assertEqual(evidence["timeout_seconds"], 0)
+        self.assertNotIn("converged_after_seconds", evidence)
+
+    def test_runtime_bodies_are_bounded_before_json_admission(self):
+        payload = dict(self.payload, padding="x" * binding.RUNTIME_JSON_MAX_BYTES)
+        response = FakeResponse(payload)
+        self.rejected(FakeSession(response), "BODY_LIMIT")
+        self.assertEqual(response.read_bytes, binding.RUNTIME_JSON_MAX_BYTES + 1)
+        self.assertTrue(response.closed)
+
+    def test_declared_length_encoding_and_truncation_fail_closed(self):
+        for headers, code in (
+            ({"Content-Length": str(binding.RUNTIME_JSON_MAX_BYTES + 1)}, "BODY_LIMIT"),
+            ({"Content-Length": "2, 2"}, "CONTENT_LENGTH"),
+            ({"Content-Length": "-1"}, "CONTENT_LENGTH"),
+            ({"Content-Length": "2", "content-length": "2"}, "CONTENT_LENGTH"),
+            ({"Content-Length": "3"}, "BODY_LENGTH_MISMATCH"),
+            ({"Content-Encoding": "gzip"}, "CONTENT_ENCODING"),
+        ):
+            with self.subTest(headers=headers):
+                response = FakeResponse({})
+                response.headers.update(headers)
+                self.rejected(FakeSession(response), code)
+                self.assertTrue(response.closed)
+                if code != "BODY_LENGTH_MISMATCH":
+                    self.assertEqual(response.read_bytes, 0)
+
+    def test_error_bodies_and_redirects_are_bounded(self):
+        for status in (302, 401, 404, 503):
+            with self.subTest(status=status):
+                response = FakeResponse({}, status=status,
+                                        raw=b"x" * (binding.ERROR_BODY_MAX_BYTES + 50))
+                self.rejected(FakeSession(response), "BODY_LIMIT")
+                self.assertLessEqual(response.read_bytes, binding.ERROR_BODY_MAX_BYTES + 1)
+                self.assertTrue(response.closed)
+        response = FakeResponse({}, status=302)
+        with self.assertRaises(binding.SourceBindingError) as raised:
+            self.verify(FakeSession(response))
+        self.assertEqual(raised.exception.evidence["observations"][0]["http_status"], 302)
+
+    def test_jwt_body_type_size_and_bearer_validation(self):
+        cases = [
+            ({"token": "x" * binding.JWT_JSON_MAX_BYTES}, "BODY_LIMIT"),
+            ({"token": ["not", "a", "token"]}, "INVALID_BEARER"),
+            ({"token": ""}, "INVALID_BEARER"),
+            ({"token": "bad\r\nheader"}, "INVALID_BEARER"),
+            ({"token": "x" * (binding.TOKEN_MAX_CHARS + 1)}, "INVALID_BEARER"),
+        ]
+        for payload, code in cases:
+            with self.subTest(code=code):
+                jwt_response = FakeResponse(payload)
+                session = FakeSession([FakeResponse({}, status=401), jwt_response])
+                with mock.patch.dict(os.environ, {"HF_TOKEN": "synthetic-hub-token"}):
+                    self.rejected(session, code)
+                self.assertEqual(len(session.calls), 2)
+                self.assertTrue(jwt_response.closed)
+
+    def test_json_transport_and_response_origin_errors_are_sanitized(self):
+        self.rejected(FakeSession(FakeResponse({}, raw=b"not-json")), "INVALID_JSON")
+        response = FakeResponse(self.payload)
+        response.url = "https://other.hf.space/api/build-info"
+        self.rejected(FakeSession(response), "RESPONSE_ORIGIN")
+        class FailedSession(binding._ReadSession):
+            def get(self, *args, **kwargs):
+                raise RuntimeError("synthetic-sensitive-body-or-token")
+        observation = self.rejected(FailedSession(), "TRANSPORT_UNAVAILABLE")
+        self.assertNotIn("synthetic-sensitive", json.dumps(observation))
+
+    def test_exact_response_after_deadline_is_not_admitted(self):
+        clock = self.clock
+        class LateSession(FakeSession):
+            def get(self, *args, **kwargs):
+                response = super().get(*args, **kwargs)
+                clock.now = 2.0
+                return response
+        session = LateSession(FakeResponse(self.payload))
+        self.rejected(session, "DEADLINE_EXCEEDED")
+        self.assertEqual(len(session.calls), 1)
+
+    def test_jwt_and_authenticated_retry_share_remaining_budget(self):
+        clock = self.clock
+        class TimedSession(FakeSession):
+            def get(self, *args, **kwargs):
+                response = super().get(*args, **kwargs)
+                clock.now += 0.3
+                return response
+        session = TimedSession([FakeResponse({}, status=401),
+                                FakeResponse({"token": "synthetic-space-jwt"}),
+                                FakeResponse(self.payload)])
+        with mock.patch.dict(os.environ, {"HF_TOKEN": "synthetic-hub-token"}):
+            self.assertTrue(self.verify(session)["matched"])
+        self.assertAlmostEqual(session.calls[0][1]["timeout"], 1.0)
+        self.assertAlmostEqual(session.calls[1][1]["timeout"], 0.7)
+        self.assertAlmostEqual(session.calls[2][1]["timeout"], 0.4)
+
+    def test_expired_jwt_request_cannot_start_authenticated_retry(self):
+        clock = self.clock
+        class ExpiredJwtSession(FakeSession):
+            def get(self, *args, **kwargs):
+                response = super().get(*args, **kwargs)
+                if len(self.calls) == 2:
+                    clock.now = 2.0
+                return response
+        session = ExpiredJwtSession([FakeResponse({}, status=401),
+                                     FakeResponse({"token": "synthetic-space-jwt"})])
+        with mock.patch.dict(os.environ, {"HF_TOKEN": "synthetic-hub-token"}):
+            self.rejected(session, "DEADLINE_EXCEEDED")
+        self.assertEqual(len(session.calls), 2)
+
+    def test_capability_cache_does_not_cross_verification_calls(self):
+        with mock.patch.dict(os.environ, {"HF_TOKEN": "synthetic-hub-token"}):
+            for token in ("synthetic-first-jwt", "synthetic-second-jwt"):
+                session = FakeSession([FakeResponse({}, status=401), FakeResponse({"token": token}),
+                                       FakeResponse(self.payload)])
+                self.assertTrue(self.verify(session)["matched"])
+                self.assertEqual(len(session.calls), 3)
+                self.assertEqual(session.calls[-1][1]["headers"]["Authorization"], "Bearer " + token)
+
+    def test_verify_does_not_write_hub_variables(self):
+        with mock.patch.object(binding, "HfApi", side_effect=AssertionError("no SDK mutation")):
+            self.assertTrue(self.verify(FakeSession(FakeResponse(self.payload)))["matched"])
+
+    def test_owned_session_is_closed_and_environment_trust_is_not_disabled(self):
+        session = FakeSession(FakeResponse(self.payload))
+        session.trust_env = True
+        session.proxies = {"https": "configured-proxy"}
+        session.verify = "configured-ca.pem"
+        with mock.patch.object(binding, "_ReadSession", return_value=session):
+            binding.verify_runtime_probe(self.normalized, timeout_seconds=0,
+                                         monotonic=self.clock.monotonic, sleep=self.clock.sleep)
+        self.assertTrue(session.closed)
+        self.assertTrue(session.trust_env)
+        self.assertEqual(session.proxies, {"https": "configured-proxy"})
+        self.assertEqual(session.verify, "configured-ca.pem")
+        self.assertNotIn("proxies", session.calls[0][1])
+        self.assertNotIn("verify", session.calls[0][1])
+
+
+@unittest.skipUnless(REAL_REQUESTS, "real Requests is required; publisher-lock CI supplies it")
+class RealRequestsSourceReadTests(unittest.TestCase):
+    def setUp(self):
+        self.normalized = binding.normalize_binding(
+            "SZLHOLDINGS/a11oy", "SZL_GIT_SHA", "c" * 40, "/api/build-info"
+        )
+        self.payload = SourceBindingTests.observed_payload("c" * 40)
+
+    def session(self, responses):
+        calls = []
+        class Adapter(requests_real.adapters.BaseAdapter):
+            def send(self, request, **kwargs):
+                calls.append((request, kwargs))
+                status, body, headers = responses.pop(0)
+                response = requests_real.Response()
+                response.status_code = status
+                response.url = request.url
+                response.request = request
+                response.headers.update(headers)
+                response.raw = io.BytesIO(body)
+                return response
+            def close(self): pass
+        session = binding._ReadSession()
+        session.mount("https://", Adapter())
+        return session, calls
+
+    def test_configured_proxy_ca_survive_while_netrc_cookies_and_origin_auth_do_not(self):
+        session, calls = self.session([(200, json.dumps(self.payload).encode(), {})])
+        session.auth = ("ambient-user", "ambient-password")
+        session.headers.update({"Authorization": "Bearer ambient",
+                                "Cookie": "ambient=secret", "Proxy-Authorization": "ambient",
+                                "Host": "wrong.invalid"})
+        session.cookies.set("ambient", "cookie")
+        environment = {
+            "HTTPS_PROXY": "http://configured-proxy.invalid:3128",
+            "NO_PROXY": "unrelated.invalid",
+            "REQUESTS_CA_BUNDLE": "synthetic-configured-ca.pem",
+        }
+        with session, mock.patch.dict(os.environ, environment, clear=True), mock.patch.object(
+            requests_real.sessions, "get_netrc_auth", side_effect=AssertionError("netrc must not be read")
+        ):
+            report = binding.verify_runtime_probe(self.normalized, session=session, timeout_seconds=5)
+        self.assertTrue(report["matched"])
+        request, options = calls[0]
+        self.assertEqual(options["proxies"]["https"], environment["HTTPS_PROXY"])
+        self.assertEqual(options["verify"], environment["REQUESTS_CA_BUNDLE"])
+        for header in ("Authorization", "Cookie", "Proxy-Authorization", "Host"):
+            self.assertNotIn(header, request.headers)
+        self.assertTrue(options["stream"])
+
+    def test_redirect_preparation_neither_reads_netrc_nor_follows_target(self):
+        body = b"x" * (binding.ERROR_BODY_MAX_BYTES + 1)
+        session, calls = self.session([(302, body, {"Location": "https://other.hf.space/private"})])
+        with session, mock.patch.dict(os.environ, {}, clear=True), mock.patch.object(
+            requests_real.sessions, "get_netrc_auth", side_effect=AssertionError("netrc must not be read")
+        ), self.assertRaises(binding.SourceBindingError) as raised:
+            binding.verify_runtime_probe(self.normalized, session=session, timeout_seconds=0)
+        self.assertEqual(len(calls), 1)
+        self.assertEqual(raised.exception.evidence["observations"][0]["error_code"], "BODY_LIMIT")
+
+    def test_runtime_credential_preserves_valid_url_preparation_and_exact_target(self):
+        selected = binding.live_origin(self.normalized["repo_id"]) + "/api/%62uild-info?view=%7E"
+        auth = binding._ScopedReadAuth(selected, "synthetic-space-jwt")
+        prepared = requests_real.Request("GET", selected).prepare()
+        self.assertEqual(prepared.url,
+                         binding.live_origin(self.normalized["repo_id"]) + "/api/build-info?view=~")
+        self.assertEqual(auth(prepared).headers["Authorization"], "Bearer synthetic-space-jwt")
+        for target in (prepared.url.replace("/api/build-info", "/other"),
+                       prepared.url.replace("view=~", "view=other"),
+                       prepared.url + "&extra=1"):
+            with self.subTest(target=target), self.assertRaises(binding.SourceBindingError):
+                auth(requests_real.Request("GET", target).prepare())
+
+    def test_plain_session_cannot_reintroduce_redirect_prefetch(self):
+        with requests_real.Session() as session, mock.patch.object(
+            session, "get", side_effect=AssertionError("unsafe session must not run")
+        ):
+            with self.assertRaisesRegex(binding.SourceBindingError, "redirect-blocking"):
+                binding.verify_runtime_probe(self.normalized, session=session, timeout_seconds=0)
+
+    def test_real_prepared_requests_keep_hub_and_space_credentials_separate(self):
+        session, calls = self.session([
+            (401, b"{}", {}),
+            (200, b'{"token":"synthetic-runtime-jwt"}', {}),
+            (200, json.dumps(self.payload).encode(), {}),
+        ])
+        with session, mock.patch.dict(os.environ, {"HF_TOKEN": "synthetic-hub-token"}, clear=True):
+            report = binding.verify_runtime_probe(self.normalized, session=session, timeout_seconds=5)
+        self.assertTrue(report["matched"])
+        self.assertNotIn("Authorization", calls[0][0].headers)
+        self.assertEqual(calls[1][0].headers["Authorization"], "Bearer synthetic-hub-token")
+        self.assertEqual(calls[2][0].headers["Authorization"], "Bearer synthetic-runtime-jwt")
+        self.assertEqual(report["observations"][0]["authentication"], "space_read_jwt")
 
 
 if __name__ == "__main__":
