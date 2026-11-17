@@ -175,9 +175,9 @@ class CheckedOutReceiptIdentityTests(unittest.TestCase):
         error = subprocess.CalledProcessError(1, ["git"], stderr="DO_NOT_RECORD")
         with patch.object(alignment.subprocess, "run", side_effect=error):
             receipt = alignment.build_receipt(ROOT, live=False)
-        self.assertEqual(receipt["state"], "DIVERGENT")
+        self.assertEqual(receipt["state"], "UNAVAILABLE")
         self.assertEqual(receipt["source_revision"], "UNAVAILABLE")
-        self.assertIn("checked-out Git source identity unavailable", receipt["failures"])
+        self.assertIn("checked-out Git source identity unavailable", receipt["unavailable"])
         self.assertNotIn("DO_NOT_RECORD", json.dumps(receipt))
 
     def test_invalid_commit_output_is_not_an_identity(self) -> None:
@@ -197,7 +197,7 @@ class CheckedOutReceiptIdentityTests(unittest.TestCase):
     def test_missing_git_cannot_become_a_source_claim(self) -> None:
         with patch.object(alignment.subprocess, "run", side_effect=FileNotFoundError("DO_NOT_RECORD")):
             receipt = alignment.build_receipt(ROOT, live=False)
-        self.assertEqual(receipt["state"], "DIVERGENT")
+        self.assertEqual(receipt["state"], "UNAVAILABLE")
         self.assertEqual(receipt["source_revision"], "UNAVAILABLE")
         self.assertNotIn("DO_NOT_RECORD", json.dumps(receipt))
 
