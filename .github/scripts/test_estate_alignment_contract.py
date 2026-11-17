@@ -164,26 +164,168 @@ class EstateAlignmentContractTests(unittest.TestCase):
     def test_public_membership_loader_preserves_strict_validation(self) -> None:
         observation = self.contract["public_space_membership_observation"]
         rows = [{"id": row["repo_id"]} for row in observation["spaces"]]
-        with patch.object(alignment, "fetch_bytes", return_value=json.dumps(rows).encode()):
+        with patch.object(
+            alignment, "fetch_hf_page", return_value=(json.dumps(rows).encode(), None)
+        ):
             loaded = alignment.list_hf("spaces")
         failures, observed = alignment.validate_live_public_space_membership(loaded, observation)
         self.assertEqual(failures, [])
         self.assertEqual(observed, alignment.EXPECTED_PUBLIC_SPACE_IDS)
+        self.assertTrue(loaded.complete)
+        self.assertEqual(loaded.pages, 1)
         for malformed in (None, "invalid", 42, []):
             with self.subTest(malformed=malformed), patch.object(
-                alignment, "fetch_bytes", return_value=json.dumps(rows + [malformed]).encode()
+                alignment, "fetch_hf_page",
+                return_value=(json.dumps(rows + [malformed]).encode(), None)
             ):
                 with self.assertRaisesRegex(alignment.AlignmentError, "malformed row"):
                     alignment.list_hf("spaces")
 
-    def test_provider_loader_refuses_potentially_truncated_membership(self) -> None:
+    def test_provider_loader_refuses_unproved_terminal_or_oversized_page(self) -> None:
         for kind in ("spaces", "models", "datasets"):
-            for count in (100, 101):
-                with self.subTest(kind=kind, count=count), patch.object(
-                    alignment, "fetch_bytes", return_value=json.dumps([{}] * count).encode()
-                ):
-                    with self.assertRaisesRegex(alignment.AlignmentError, "bounded page"):
-                        alignment.list_hf(kind)
+            rows = [{"id": f"SZLHOLDINGS/synthetic-{i}"} for i in range(101)]
+            with self.subTest(kind=kind, count=100), patch.object(
+                alignment, "fetch_hf_page",
+                return_value=(json.dumps(rows[:100]).encode(), None),
+            ):
+                with self.assertRaisesRegex(alignment.AlignmentError, "completion proof"):
+                    alignment.list_hf(kind)
+            with self.subTest(kind=kind, count=101), patch.object(
+                alignment, "fetch_hf_page",
+                return_value=(json.dumps(rows).encode(), None),
+            ):
+                with self.assertRaisesRegex(alignment.AlignmentError, "oversized page"):
+                    alignment.list_hf(kind)
+
+    def test_hf_inventory_cursor_pages_preserve_exact_author_membership(self) -> None:
+        for count in (0, 1, 99, 101, 237):
+            kind = "models"
+            rows = [{"id": f"SZLHOLDINGS/synthetic-{i:04d}"} for i in range(count)]
+            pages = [rows[i:i + alignment.HF_PAGE_SIZE] for i in range(0, count, alignment.HF_PAGE_SIZE)]
+            if not pages:
+                pages = [[]]
+            calls: list[str] = []
+
+            def provider(url: str):
+                page_index = len(calls)
+                calls.append(url)
+                next_link = None
+                if page_index < len(pages) - 1:
+                    next_url = (
+                        f"{alignment.HF_API}/{kind}?author=SZLHOLDINGS"
+                        f"&limit=100&full=true&cursor=page-{page_index + 2}"
+                    )
+                    next_link = f'<{next_url}>; rel="next"'
+                return json.dumps(pages[page_index]).encode(), next_link
+
+            with self.subTest(count=count), patch.object(
+                alignment, "fetch_hf_page", side_effect=provider
+            ):
+                loaded = alignment.list_hf(kind)
+                self.assertEqual(list(loaded), rows)
+                self.assertEqual(loaded.pages, len(pages))
+                self.assertTrue(loaded.complete)
+                self.assertEqual(len(calls), len(pages))
+
+    def test_hf_inventory_rejects_cross_origin_links_duplicates_and_cursor_loops(self) -> None:
+        kind = "datasets"
+        first = [{"id": f"SZLHOLDINGS/synthetic-{i:04d}"} for i in range(100)]
+        prefix = f"{alignment.HF_API}/{kind}?author=SZLHOLDINGS&limit=100&full=true"
+        for candidate in (
+            f"https://attacker.invalid/api/{kind}?author=SZLHOLDINGS&limit=100&full=true&cursor=2",
+            f"{alignment.HF_API}/{kind}?author=OTHER&limit=100&full=true&cursor=2",
+            f"{alignment.HF_API}/{kind}?author=SZLHOLDINGS&limit=100&full=true&cursor=2&sort=likes",
+            f"{alignment.HF_API}/{kind}?author=SZLHOLDINGS&limit=100&full=true&cursor=2&cursor=3",
+        ):
+            with self.subTest(next_url=candidate), patch.object(
+                alignment, "fetch_hf_page",
+                return_value=(json.dumps(first).encode(), f'<{candidate}>; rel="next"'),
+            ):
+                with self.assertRaises(alignment.AlignmentError):
+                    alignment.list_hf(kind)
+
+        next_url = prefix + "&cursor=2"
+        with patch.object(alignment, "fetch_hf_page", side_effect=[
+            (json.dumps(first).encode(), f'<{next_url}>; rel="next"'),
+            (json.dumps(first).encode(), f'<{next_url}>; rel="next"'),
+        ]):
+            with self.assertRaisesRegex(alignment.AlignmentError, "duplicated an ID"):
+                alignment.list_hf(kind)
+        with patch.object(alignment, "fetch_hf_page", side_effect=[
+            (json.dumps(first).encode(), f'<{next_url}>; rel="next"'),
+            (json.dumps([{"id": "SZLHOLDINGS/next"}]).encode(), f'<{next_url}>; rel="next"'),
+        ]):
+            with self.assertRaisesRegex(alignment.AlignmentError, "repeated a cursor"):
+                alignment.list_hf(kind)
+        with patch.object(alignment, "fetch_hf_page", return_value=(
+            json.dumps(first).encode(), '<https://huggingface.co/api/models?cursor=2>; rel="next"',
+        )):
+            with self.assertRaises(alignment.AlignmentError):
+                alignment.list_hf(kind)
+
+    def test_hf_pagination_rejects_duplicate_params_before_fetch(self) -> None:
+        base = f"{alignment.HF_API}/models?author=SZLHOLDINGS&limit=100&full=true"
+        for candidate in (
+            base + "&cursor=1&cursor=2",
+            base + "&cursor=1&full=true",
+            base + "&cursor=1&author=SZLHOLDINGS",
+            base + "&cursor=",
+        ):
+            with self.subTest(url=candidate), self.assertRaisesRegex(
+                alignment.AlignmentError, "scope"
+            ):
+                alignment.validate_hf_page_url(candidate, "models", next_page=True)
+
+    def test_hf_inventory_page_budget_and_network_errors_fail_closed(self) -> None:
+        rows = [{"id": f"SZLHOLDINGS/synthetic-{i:04d}"} for i in range(100)]
+        calls: list[str] = []
+        def endless(url: str):
+            calls.append(url)
+            next_url = (
+                f"{alignment.HF_API}/models?author=SZLHOLDINGS"
+                f"&limit=100&full=true&cursor={len(calls)}"
+            )
+            offset = (len(calls) - 1) * 100
+            current = [
+                {"id": f"SZLHOLDINGS/synthetic-{offset + i:04d}"}
+                for i in range(100)
+            ]
+            return json.dumps(current).encode(), f'<{next_url}>; rel="next"'
+
+        with patch.object(alignment, "fetch_hf_page", side_effect=endless):
+            with self.assertRaisesRegex(alignment.AlignmentError, "page budget"):
+                alignment.list_hf("models")
+        self.assertEqual(len(calls), alignment.HF_MAX_PAGES)
+        with patch.object(
+            alignment, "fetch_hf_page", side_effect=TimeoutError("provider timeout")
+        ):
+            with self.assertRaises(TimeoutError):
+                alignment.list_hf("models")
+
+    def test_unavailable_live_evidence_cannot_be_issued_as_divergent_or_aligned(self) -> None:
+        revision = "a" * 40
+        with (
+            patch.object(alignment, "checked_out_revision", return_value=revision),
+            patch.object(alignment, "validate_live", side_effect=alignment.AlignmentError(
+                "Hugging Face models inventory exceeded page budget"
+            )),
+        ):
+            receipt = alignment.build_receipt(ROOT, live=True)
+        self.assertEqual(receipt["state"], "UNAVAILABLE")
+        self.assertEqual(receipt["failures"], [])
+        self.assertEqual(len(receipt["unavailable"]), 1)
+        self.assertIsNone(receipt["live_observation"])
+
+        with (
+            patch.object(alignment, "checked_out_revision", return_value=revision),
+            patch.object(alignment, "validate_live", return_value=(
+                ["verified source mismatch"], {"unavailable": ["provider timeout"]}
+            )),
+        ):
+            receipt = alignment.build_receipt(ROOT, live=True)
+        self.assertEqual(receipt["state"], "UNAVAILABLE")
+        self.assertIn("verified source mismatch", receipt["failures"])
+        self.assertEqual(receipt["unavailable"], ["provider timeout"])
 
     def test_live_readback_runs_after_publication_or_explicit_audit(self) -> None:
         workflow = (
@@ -499,10 +641,12 @@ class EstateAlignmentContractTests(unittest.TestCase):
 
         def list_hf(kind: str):
             if kind == "models":
-                return [{}] * 48
-            if kind == "datasets":
-                return [{}] * 37
-            return [{"id": repo_id} for repo_id in space_ids]
+                rows = [{"id": f"SZLHOLDINGS/test-model-{i}"} for i in range(48)]
+            elif kind == "datasets":
+                rows = [{"id": f"SZLHOLDINGS/test-dataset-{i}"} for i in range(37)]
+            else:
+                rows = [{"id": repo_id} for repo_id in space_ids]
+            return alignment.HFListing(rows, pages=1)
 
         seen: list[str] = []
 

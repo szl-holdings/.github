@@ -120,6 +120,9 @@ ALLOWED_SPACE_CLASSES = {
 }
 GITHUB_API = "https://api.github.com"
 HF_API = "https://huggingface.co/api"
+HF_PAGE_SIZE = 100
+HF_MAX_PAGES = 8
+HF_PAGE_MAX_BYTES = 4_000_000
 USER_AGENT = "SZL-Estate-Alignment/1.0"
 PRODUCT_PATH = "docs/strategy/living-command-fabric.v1.json"
 RUNTIME_BINDING_PATHS = ("/api/build-info", "/deployment.json")
@@ -767,22 +770,169 @@ def canonical_repositories(contract: Mapping[str, Any]) -> set[str]:
     return repositories
 
 
-def list_hf(kind: str) -> list[dict[str, Any]]:
-    value = json.loads(
-        fetch_bytes(f"https://huggingface.co/api/{kind}?author=SZLHOLDINGS&limit=100&full=true")
-    )
-    if not isinstance(value, list):
-        raise AlignmentError(f"Hugging Face {kind} endpoint did not return an array")
-    if any(not isinstance(row, dict) for row in value):
-        raise AlignmentError(f"Hugging Face {kind} endpoint returned a malformed row")
-    # A full bounded page cannot establish complete author membership.
-    if len(value) >= 100:
-        raise AlignmentError(f"Hugging Face {kind} membership exceeds the bounded page")
-    return value
+class HFListing(list):
+    """Completed public listing, with bounded-read coverage attached."""
+
+    def __init__(self, rows: list[dict[str, Any]], *, pages: int) -> None:
+        super().__init__(rows)
+        self.pages = pages
+        self.complete = True
+        self.observed_at = dt.datetime.now(dt.timezone.utc).isoformat().replace("+00:00", "Z")
+
+
+def validate_hf_page_url(url: str, kind: str, *, next_page: bool) -> None:
+    """Only follow the Hub's exact author-scoped cursor URL, never arbitrary links."""
+    if kind not in {"models", "datasets", "spaces"}:
+        raise AlignmentError(f"unsupported Hugging Face inventory kind: {kind}")
+    parts = urllib.parse.urlsplit(url)
+    if (
+        parts.scheme != "https"
+        or parts.netloc != "huggingface.co"
+        or parts.path != f"/api/{kind}"
+        or parts.fragment
+        or parts.username is not None
+        or parts.password is not None
+    ):
+        raise AlignmentError(f"Hugging Face {kind} pagination URL outside approved endpoint")
+    try:
+        query = urllib.parse.parse_qs(parts.query, keep_blank_values=True, strict_parsing=True)
+    except ValueError as exc:
+        raise AlignmentError(f"Hugging Face {kind} pagination query malformed") from exc
+    expected = {"author", "limit", "full"} | ({"cursor"} if next_page else set())
+    if (
+        set(query) != expected
+        or any(len(values) != 1 for values in query.values())
+        or query.get("author") != ["SZLHOLDINGS"]
+        or query.get("limit") != [str(HF_PAGE_SIZE)]
+        or query.get("full") != ["true"]
+        or (next_page and not query.get("cursor", [""])[0])
+    ):
+        raise AlignmentError(f"Hugging Face {kind} pagination changed the author or request scope")
+
+
+def next_hf_page(link_header: str | None, kind: str) -> str | None:
+    """Read the provider-supplied Link rel=next; do not synthesize cursors."""
+    if link_header is None:
+        return None
+    if not isinstance(link_header, str) or not link_header.strip():
+        raise AlignmentError(f"Hugging Face {kind} pagination Link is malformed")
+    next_urls: list[str] = []
+    for item in link_header.split(","):
+        match = re.fullmatch(r"\s*<([^<>]+)>\s*(.*)\s*", item)
+        if match is None or not match.group(2).strip().startswith(";"):
+            raise AlignmentError(f"Hugging Face {kind} pagination Link is malformed")
+        attributes: dict[str, str] = {}
+        for parameter in match.group(2).strip().split(";")[1:]:
+            name, separator, raw = parameter.strip().partition("=")
+            if not separator or not name or not raw.strip():
+                raise AlignmentError(f"Hugging Face {kind} pagination Link has malformed attributes")
+            name = name.strip().lower()
+            value = raw.strip().strip('"').lower()
+            if name in attributes:
+                raise AlignmentError(f"Hugging Face {kind} pagination Link has duplicate attributes")
+            attributes[name] = value
+        if "next" in attributes.get("rel", "").split():
+            next_urls.append(match.group(1))
+    if len(next_urls) > 1:
+        raise AlignmentError(f"Hugging Face {kind} pagination has multiple next links")
+    if not next_urls:
+        return None
+    validate_hf_page_url(next_urls[0], kind, next_page=True)
+    return next_urls[0]
+
+
+def fetch_hf_page(
+    url: str,
+    *,
+    attempts: int = 3,
+    max_bytes: int = HF_PAGE_MAX_BYTES,
+    sleep: Callable[[float], None] = time.sleep,
+) -> tuple[bytes, str | None]:
+    """Read one anonymous, bounded page including its pagination header."""
+    headers = {
+        "Accept": "application/json",
+        "User-Agent": USER_AGENT,
+        "Cache-Control": "no-cache, no-store, max-age=0",
+        "Pragma": "no-cache",
+    }
+    for attempt in range(attempts):
+        try:
+            request = urllib.request.Request(url, headers=headers)
+            with urllib.request.urlopen(request, timeout=45) as response:
+                # Never follow a redirect that silently changes inventory scope.
+                if str(response.geturl()) != url:
+                    raise AlignmentError("Hugging Face inventory pagination redirect rejected")
+                payload = response.read(max_bytes + 1)
+                if len(payload) > max_bytes:
+                    raise AlignmentError("Hugging Face inventory page exceeds byte budget")
+                return payload, response.headers.get("Link")
+        except urllib.error.HTTPError as exc:
+            if str(exc.geturl()) != url:
+                raise AlignmentError("Hugging Face inventory pagination error redirect rejected") from exc
+            if exc.code not in {429, 500, 502, 503, 504} or attempt + 1 == attempts:
+                raise
+            sleep(retry_delay(exc, float(2**attempt)))
+        except (urllib.error.URLError, TimeoutError, ConnectionError):
+            if attempt + 1 == attempts:
+                raise
+            sleep(float(2**attempt))
+    raise AlignmentError("unreachable Hugging Face inventory retry state")
+
+
+def list_hf(kind: str) -> HFListing:
+    """Return only complete, author-verified public inventory under a rate budget."""
+    url = f"{HF_API}/{kind}?author=SZLHOLDINGS&limit={HF_PAGE_SIZE}&full=true"
+    seen_pages: set[str] = set()
+    seen_ids: set[str] = set()
+    rows: list[dict[str, Any]] = []
+    for page_index in range(HF_MAX_PAGES):
+        validate_hf_page_url(url, kind, next_page=page_index > 0)
+        if url in seen_pages:
+            raise AlignmentError(f"Hugging Face {kind} pagination repeated a cursor")
+        seen_pages.add(url)
+        payload, link = fetch_hf_page(url)
+        try:
+            page = json.loads(
+                payload,
+                object_pairs_hook=_reject_duplicate_keys,
+                parse_constant=_reject_nonfinite,
+            )
+        except (json.JSONDecodeError, UnicodeDecodeError) as exc:
+            raise AlignmentError(f"Hugging Face {kind} page is not strict JSON") from exc
+        if not isinstance(page, list):
+            raise AlignmentError(f"Hugging Face {kind} endpoint did not return an array")
+        if len(page) > HF_PAGE_SIZE:
+            raise AlignmentError(f"Hugging Face {kind} returned oversized page")
+        for row in page:
+            if not isinstance(row, dict):
+                raise AlignmentError(f"Hugging Face {kind} endpoint returned a malformed row")
+            repo_id = row.get("id")
+            if not isinstance(repo_id, str) or re.fullmatch(
+                r"SZLHOLDINGS/[A-Za-z0-9][A-Za-z0-9._-]*", repo_id
+            ) is None:
+                raise AlignmentError(f"Hugging Face {kind} returned non-author or invalid ID")
+            if repo_id in seen_ids:
+                raise AlignmentError(f"Hugging Face {kind} pagination duplicated an ID")
+            seen_ids.add(repo_id)
+            rows.append(row)
+        next_url = next_hf_page(link, kind)
+        if next_url is None:
+            # An exactly full page without provider continuation cannot prove
+            # the author listing was complete. Preserve UNAVAILABLE, not green.
+            if len(page) == HF_PAGE_SIZE:
+                raise AlignmentError(f"Hugging Face {kind} full terminal page lacks completion proof")
+            return HFListing(rows, pages=page_index + 1)
+        if not page:
+            raise AlignmentError(f"Hugging Face {kind} pagination advertised an empty next page")
+        if next_url in seen_pages:
+            raise AlignmentError(f"Hugging Face {kind} pagination repeated a cursor")
+        url = next_url
+    raise AlignmentError(f"Hugging Face {kind} inventory exceeded {HF_MAX_PAGES}-page budget")
 
 
 def validate_live(contract: Mapping[str, Any]) -> tuple[list[str], dict[str, Any]]:
     failures: list[str] = []
+    unavailable: list[str] = []
     token = os.getenv("GITHUB_TOKEN") or os.getenv("GH_TOKEN")
     a11oy_sha = github_main_sha("szl-holdings/a11oy", token)
     product = load_json_bytes(
@@ -812,11 +962,18 @@ def validate_live(contract: Mapping[str, Any]) -> tuple[list[str], dict[str, Any
             require(value.get("archived") is False, f"canonical repository is archived: {repository}", failures)
             repository_revisions[repository] = github_main_sha(repository, token)
         except Exception as exc:
-            failures.append(f"canonical repository unavailable: {repository}: {type(exc).__name__}")
+            unavailable.append(f"canonical repository unavailable: {repository}: {type(exc).__name__}")
 
     models = list_hf("models")
     datasets = list_hf("datasets")
     spaces = list_hf("spaces")
+    for kind, listing in (("models", models), ("datasets", datasets), ("spaces", spaces)):
+        if (
+            not isinstance(listing, HFListing)
+            or listing.complete is not True
+            or not (1 <= listing.pages <= HF_MAX_PAGES)
+        ):
+            raise AlignmentError(f"Hugging Face {kind} inventory coverage unavailable")
     snapshot = contract["huggingface_inventory_snapshot"]
     expected_portfolio = {row["repo_id"] for row in snapshot["portfolio_spaces"]}
     expected_inventory_only = {row["repo_id"] for row in snapshot["inventory_only_spaces"]}
@@ -842,7 +999,7 @@ def validate_live(contract: Mapping[str, Any]) -> tuple[list[str], dict[str, Any
         )
     except Exception as exc:
         org_card_present = False
-        failures.append(
+        unavailable.append(
             "Hugging Face organization-card Space unavailable: "
             f"{type(exc).__name__}"
         )
@@ -860,25 +1017,31 @@ def validate_live(contract: Mapping[str, Any]) -> tuple[list[str], dict[str, Any
 
     def read_runtime_binding(
         indexed_row: tuple[int, Mapping[str, Any]],
-    ) -> tuple[int, dict[str, Any] | None, str | None]:
+    ) -> tuple[int, dict[str, Any] | None, str | None, str]:
         index, row = indexed_row
         repository = source_repository(row["deployment_source"])
         expected_revision = repository_revisions.get(repository)
         if expected_revision is None:
             return (
-                index,
-                None,
+                index, None,
                 f"runtime source authority unavailable for {row['repo_id']}: {repository}",
+                "UNAVAILABLE",
             )
         observation = runtime_source_binding(row, expected_revision)
         failure = None
+        verdict = "ALIGNED"
         if observation["matched"] is not True:
-            failure = (
-                f"runtime source revision drift for {row['repo_id']}: "
-                f"expected {repository}@{expected_revision}, observed "
-                f"{observation.get('observed_source')}@{observation['observed_revision']}"
-            )
-        return index, observation, failure
+            if observation.get("observed_revision") is None:
+                verdict = "UNAVAILABLE"
+                failure = f"runtime source identity unavailable for {row['repo_id']}"
+            else:
+                verdict = "DIVERGENT"
+                failure = (
+                    f"runtime source revision drift for {row['repo_id']}: "
+                    f"expected {repository}@{expected_revision}, observed "
+                    f"{observation.get('observed_source')}@{observation['observed_revision']}"
+                )
+        return index, observation, failure, verdict
 
     with concurrent.futures.ThreadPoolExecutor(
         max_workers=min(MAX_RUNTIME_WORKERS, max(1, len(runtime_rows)))
@@ -888,41 +1051,45 @@ def validate_live(contract: Mapping[str, Any]) -> tuple[list[str], dict[str, Any
         )
 
     runtime_bindings: list[dict[str, Any]] = []
-    for _, observation, failure in sorted(runtime_results):
+    for _, observation, failure, verdict in sorted(runtime_results):
         if observation is not None:
             runtime_bindings.append(observation)
         if failure is not None:
-            failures.append(failure)
+            (unavailable if verdict == "UNAVAILABLE" else failures).append(failure)
 
     org_card_binding: dict[str, Any] | None = None
     org_card = contract.get("organization_card_control_surface")
     if not isinstance(org_card, Mapping):
-        failures.append("organization-card source contract unavailable")
+        unavailable.append("organization-card source contract unavailable")
     else:
         org_card_repository = source_repository(org_card.get("deployment_source"))
         org_card_revision = repository_revisions.get(org_card_repository)
         if org_card_revision is None:
-            failures.append(
+            unavailable.append(
                 f"organization-card source authority unavailable: {org_card_repository}"
             )
         else:
             try:
                 org_card_binding = runtime_source_binding(org_card, org_card_revision)
             except Exception as exc:
-                failures.append(
+                unavailable.append(
                     "organization-card source binding unavailable: "
                     f"{type(exc).__name__}"
                 )
             else:
                 if org_card_binding.get("matched") is not True:
-                    failures.append(
-                        "organization-card source revision drift: "
-                        f"expected {org_card_repository}@{org_card_revision}, observed "
-                        f"{org_card_binding.get('observed_source')}@"
-                        f"{org_card_binding.get('observed_revision')}"
-                    )
+                    if org_card_binding.get("observed_revision") is None:
+                        unavailable.append("organization-card runtime source identity unavailable")
+                    else:
+                        failures.append(
+                            "organization-card source revision drift: "
+                            f"expected {org_card_repository}@{org_card_revision}, observed "
+                            f"{org_card_binding.get('observed_source')}@"
+                            f"{org_card_binding.get('observed_revision')}"
+                        )
 
     return failures, {
+        "unavailable": unavailable,
         "a11oy_contract_revision": a11oy_sha,
         "canonical_repositories": repository_observations,
         "runtime_source_bindings": runtime_bindings,
@@ -930,6 +1097,17 @@ def validate_live(contract: Mapping[str, Any]) -> tuple[list[str], dict[str, Any
         "huggingface": {
             "models": len(models),
             "datasets": len(datasets),
+            "inventory_coverage": {
+                kind: {
+                    "pages": getattr(listing, "pages", None),
+                    "complete": getattr(listing, "complete", False),
+                    "observed_at": getattr(listing, "observed_at", None),
+                    "observed_count": len(listing),
+                }
+                for kind, listing in (
+                    ("models", models), ("datasets", datasets), ("spaces", spaces)
+                )
+            },
             "spaces_including_org_card": len(
                 listed_space_ids | ({ORG_CARD_SPACE_ID} if org_card_present else set())
             ),
@@ -979,27 +1157,32 @@ def build_receipt(root: Path, *, live: bool) -> dict[str, Any]:
     contract = load_json(contract_path)
     failures = validate_contract(contract)
     failures.extend(validate_documents(root, contract))
+    unavailable: list[str] = []
     try:
         checkout_revision = checked_out_revision(root)
     except AlignmentError as exc:
         checkout_revision = "UNAVAILABLE"
-        failures.append(str(exc))
+        unavailable.append(str(exc))
     live_observation: dict[str, Any] | None = None
     if live:
         try:
             live_failures, live_observation = validate_live(contract)
             failures.extend(live_failures)
+            unavailable.extend(live_observation.get("unavailable", []))
         except Exception as exc:
-            failures.append(f"live alignment evidence unavailable: {type(exc).__name__}: {exc}")
+            unavailable.append(f"live alignment evidence unavailable: {type(exc).__name__}: {exc}")
+    # Incomplete coverage takes precedence; verified divergence remains in failures.
+    state = "UNAVAILABLE" if unavailable else "DIVERGENT" if failures else "ALIGNED"
     receipt = {
         "schema": "szl.estate-alignment-receipt/v1",
         "observed_at": dt.datetime.now(dt.timezone.utc).isoformat().replace("+00:00", "Z"),
-        "state": "ALIGNED" if not failures else "DIVERGENT",
+        "state": state,
         "contract_sha256": sha256_bytes(contract_path.read_bytes()),
         "source_revision": checkout_revision,
         "live_requested": live,
         "live_observation": live_observation,
         "failures": failures,
+        "unavailable": unavailable,
         "authority": {
             "provider_writes": False,
             "secret_values_recorded": False,
