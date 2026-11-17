@@ -11,8 +11,8 @@ Every public archived repository in the `szl-holdings` organization, mapped to t
 
 | Metric | Count |
 |---|---:|
-| Public repositories total | 134 |
-| Active public repositories | 105 |
+| Public repositories total | 142 |
+| Active public repositories | 113 |
 | Archived public repositories (tombstones) | 29 |
 | Tombstones with a resolved successor | 22 |
 | Tombstones terminal by design | 6 |
@@ -63,7 +63,7 @@ These archived repositories carry no `Canonical:` pointer and are not declared t
 
 | Archived repo | Description | Last push |
 |---|---|---|
-| `a-11-oy.github.io` | SZL Holdings — a-11-oy.com front door | 2026-09-30 |
+| `a-11-oy.github.io` | SZL Holdings â€” a-11-oy.com front door | 2026-09-30 |
 
 ---
 
