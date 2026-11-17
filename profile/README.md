@@ -2,7 +2,7 @@
 
 # Governed intelligence. Checkable results.
 
-SZL Holdings builds AI software, models and research tools that connect an output to its source and evidence.
+SZL Holdings builds source-linked AI software, models and research.
 
 [**Explore A11oy →**](https://huggingface.co/spaces/SZLHOLDINGS/a11oy) · [**Build with the source →**](https://github.com/szl-holdings)
 
@@ -23,7 +23,7 @@ Receipt unsigned; no biological claim.
 
 ## What we build
 
-**A11oy** connects governed workflows; **[SZL Router](https://github.com/szl-holdings/szl-router)** routes model requests through [A11oy Code](https://a-11-oy.com/code) ([status surface](https://huggingface.co/spaces/SZLHOLDINGS/llm-router-live)). **Killinchu** demonstrates public observation; effectors remain **SIMULATED**. **Forge** houses model and software research.
+**A11oy** governs workflows; **[SZL Router](https://github.com/szl-holdings/szl-router)** routes models via [A11oy Code](https://a-11-oy.com/code). **Killinchu** remains **SIMULATED**; **Forge** supports research.
 
 
 
@@ -39,10 +39,12 @@ a11oy** — governed runtime, x402 APIs
 ## Pushing the frontier
 
 [Ring-0 receipts](https://huggingface.co/datasets/SZLHOLDINGS/frontier-54-runs) · [x402-metered inference](https://inference.a-11-oy.com) · [Estate math](https://github.com/szl-holdings/lutar-lean).
+- **khipu-x1:** [PyPI 0.1.1](https://pypi.org/project/khipu-x1/0.1.1/) · [Python source](https://github.com/szl-holdings/khipu-x1) · release-file provenance is independently verifiable.
+- **Ouroboros:** [ring observations](https://huggingface.co/datasets/SZLHOLDINGS/frontier-54-runs/tree/main/mesh/ring/ouro) · SERVE/LEARN remain NOT_RUN where recorded.
 
 ### Measured live gateway
 
-**Observed 2026-11-15T15:02Z** from the authorized SZL operations path:
+**Observed 2026-11-17T19:29Z** from the authorized SZL operations path:
 
 - [Health](https://inference.a-11-oy.com/health) → **HTTP 200**, status `ok`
 - [Model registry](https://inference.a-11-oy.com/v1/models) → **HTTP 200**, model `ternary-bonsai-2-27b-pq2_0`
@@ -64,5 +66,5 @@ Receipts: [battery](https://huggingface.co/datasets/SZLHOLDINGS/model-eval-recei
 The source-bound public inventory records **22 public Spaces, 121 model repositories, 14 native kernels, 69 datasets** at **2026-11-15T03:48:57Z** under `hf-public-author-membership/v2`. This is a dated observation, not a live count. Native kernel IDs may also appear in the model namespace; these figures do not count unique projects or trained language models. [Inventory binding](https://github.com/szl-holdings/.github/blob/main/profile/public-inventory.json) · [Exact source](https://github.com/szl-holdings/a11oy/blob/177fc4d95ed45ad88e3c7f1db09ea8b76763e82a/docs/huggingface-ecosystem-manifest.json) · [Current Hub listing](https://huggingface.co/SZLHOLDINGS). Hub inventory is registry evidence, not availability, operational readiness, or publication policy. It does not establish model quality.
 <!-- szl:public-inventory:end -->
 
-**HISTORICAL:** Portfolio contract: **Three commercial flagships** (A11oy, Killinchu, Forge); **One inference flagship** (SZL Router); **Six internal engines**; **Five public domain bodies** (Terra; PRISM Counsel; PURIQ Finance; LYTE). Historical: 16 portfolio Spaces, 1 inventory-only Space, 45 models, 34 datasets. Hub inventory claim boundary: registry evidence is not availability, operational readiness, or publication policy.
+**HISTORICAL:** Portfolio taxonomy: three commercial flagships, one inference flagship, six internal engines, five domain bodies. Earlier snapshot: 16 portfolio Spaces, 1 inventory-only Space, 45 models, 34 datasets. Hub listings do not establish deployment, capability, quality or publication policy.
 
