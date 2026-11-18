@@ -60,13 +60,16 @@ jobs:
       - name: Compare active Living Anatomy surfaces
         env:
           GITHUB_TOKEN: ${{ github.token }}
+          EVENT_NAME: ${{ github.event_name }}
+          CALLER_REPO: ${{ github.repository }}
+          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.event.merge_group.head.sha || github.sha }}
         run: |
           set +e
           EXTRA=""
-          if [ "${{ github.event_name }}" = "pull_request" ]; then
-            # Validate the calling repository's proposed head while excluding
+          if [ "$EVENT_NAME" = "pull_request" ]; then
+            # Validate the calling repository proposed head while excluding
             # independently deployed URL surfaces from the PR merge gate.
-            EXTRA="--skip-kind url --ref-override ${{ github.repository }}=${{ github.event.pull_request.head.sha }}"
+            EXTRA="--skip-kind url --ref-override $CALLER_REPO=$PR_HEAD_SHA"
           fi
           python3 .github/scripts/anatomy_map_drift.py $EXTRA \
             --report anatomy_map_report.out.json
@@ -76,7 +79,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: anatomy-map-drift-report
+          name: anatomy-map-drift-reusable-report
           path: anatomy_map_report.out.json
           if-no-files-found: ignore
           retention-days: 14
