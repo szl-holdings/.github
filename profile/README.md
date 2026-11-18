@@ -67,3 +67,8 @@ The source-bound public inventory records **22 public Spaces, 121 model reposito
 <!-- szl:public-inventory:end -->
 
 **HISTORICAL:** Three commercial flagships, one inference flagship, six internal engines, **Five public domain bodies** (Terra; PRISM Counsel; PURIQ Finance; LYTE). Earlier snapshot: 16 portfolio Spaces, 1 inventory-only Space, 45 models, 34 datasets. Hub listings do not establish deployment, capability, quality or publication policy.
+
+## Live estate observability
+
+- **[Frontier Console](https://huggingface.co/spaces/SZLHOLDINGS/frontier-console)** - receipts-native live console: Salad GPU fleet, khipu receipts mesh, HF inventory, proofs, governance. Source: [frontier-console](https://github.com/szl-holdings/frontier-console).
+- **khipu-scholar-v1 RELEASED** - [LoRA adapter](https://huggingface.co/SZLHOLDINGS/salad-khipu-scholar-v1): final loss 0.0085 over 2,000 steps in 9.45 GPU-hours, DSSE-signed completion receipt bound to the corpus sha256. [Proof Loom](https://huggingface.co/spaces/SZLHOLDINGS/khipu-proof-loom) live; 4B + structure adapters training under the same receipt regime.
