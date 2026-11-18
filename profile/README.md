@@ -8,22 +8,22 @@ Source-linked AI software, models and research.
 
 ## Repeat a public calculation
 
-[Run it](https://github.com/szl-holdings/governed-receipt-spec/tree/320983d22e76fc9b26af0b2cd20799c5000543fc/examples/public-single-cell) — input → code → result → limits
+[Repeat a public calculation](https://github.com/szl-holdings/governed-receipt-spec/tree/320983d22e76fc9b26af0b2cd20799c5000543fc/examples/public-single-cell) — input → code → result → limits
 
 Receipt unsigned; no biological claim.
 
 ## Choose a path
 
 - **Explore:** [Command Lab](https://huggingface.co/spaces/SZLHOLDINGS/szl-command-lab) — the searchable portfolio.
-- **Use:** [A11oy](https://a-11-oy.com) — tools with live capability state.
-- **Build:** [source map](https://github.com/szl-holdings/.github/blob/main/profile/SOURCE_MAP.md) · [models, kernels, datasets, Spaces](https://huggingface.co/SZLHOLDINGS) · [PyPI](https://pypi.org/org/SZL-HOLDINGS/).
+- **Use:** [A11oy](https://a-11-oy.com) — live capability state.
+- **Build:** [source map](https://github.com/szl-holdings/.github/blob/main/profile/SOURCE_MAP.md) · [Hub models, datasets, Spaces](https://huggingface.co/SZLHOLDINGS) · [PyPI](https://pypi.org/org/SZL-HOLDINGS/).
 - **Verify:** [a11oy.net](https://a11oy.net) — records, limits, [diagrams](https://a11oy.net/diagrams/).
 
 <a href="https://a11oy.net/diagrams/"><img src="https://raw.githubusercontent.com/szl-holdings/.github/main/profile/assets/diagrams/evidence-diagrams-overview.png" alt="Overview of four SZL evidence diagrams" width="720" /></a>
 
 ## What we build
 
-**A11oy** governs workflows; **[SZL Router](https://github.com/szl-holdings/szl-router)** routes models via [A11oy Code](https://a-11-oy.com/code). **Killinchu** remains **SIMULATED**; **Forge** supports research.
+**A11oy** governs workflows; **[SZL Router](https://github.com/szl-holdings/szl-router)** routes models via [A11oy Code](https://a-11-oy.com/code) ([SZLHOLDINGS/llm-router-live](https://huggingface.co/spaces/SZLHOLDINGS/llm-router-live)). **Killinchu** remains **SIMULATED**; **Forge** supports research.
 
 
 
@@ -39,19 +39,19 @@ a11oy** — governed runtime, x402 APIs
 ## Pushing the frontier
 
 [Ring-0 receipts](https://huggingface.co/datasets/SZLHOLDINGS/frontier-54-runs) · [x402-metered inference](https://inference.a-11-oy.com) · [Estate math](https://github.com/szl-holdings/lutar-lean).
-- **khipu-x1:** [PyPI 0.1.1](https://pypi.org/project/khipu-x1/0.1.1/) · [Python source](https://github.com/szl-holdings/khipu-x1) · release provenance independently verifiable.
+- **khipu-x1:** [PyPI 0.1.1](https://pypi.org/project/khipu-x1/0.1.1/) · [Python source](https://github.com/szl-holdings/khipu-x1) · release-file provenance is independently verifiable.
 - **Ouroboros:** [ring observations](https://huggingface.co/datasets/SZLHOLDINGS/frontier-54-runs/tree/main/mesh/ring/ouro) · SERVE/LEARN remain NOT_RUN where recorded.
 
 ### Measured live gateway
 
-**Observed 2026-11-17T19:29Z**
+**Observed 2026-11-17T19:29Z**:
 
 - [Health](https://inference.a-11-oy.com/health) → **HTTP 200**, status `ok`
 - [Model registry](https://inference.a-11-oy.com/v1/models) → **HTTP 200**, model `ternary-bonsai-2-27b-pq2_0`
 - [Web UI](https://inference.a-11-oy.com/) → **HTTP 200**
 - Unpaid `POST /v1/chat/completions` → **HTTP 402**, x402 v2 challenge, Base/USDC $0.02
 
-Scope: reachability and gateway posture only; no quality, SLA, latency, or paid-receipt claim.
+Scope: reachability and gateway posture only; no quality, SLA, paid latency, or paid receipt claim.
 
 ## Measured: the confabulation floor
 
@@ -66,9 +66,9 @@ Receipts: [battery](https://huggingface.co/datasets/SZLHOLDINGS/model-eval-recei
 The source-bound public inventory records **22 public Spaces, 121 model repositories, 14 native kernels, 69 datasets** at **2026-11-15T03:48:57Z** under `hf-public-author-membership/v2`. This is a dated observation, not a live count. Native kernel IDs may also appear in the model namespace; these figures do not count unique projects or trained language models. [Inventory binding](https://github.com/szl-holdings/.github/blob/main/profile/public-inventory.json) · [Exact source](https://github.com/szl-holdings/a11oy/blob/177fc4d95ed45ad88e3c7f1db09ea8b76763e82a/docs/huggingface-ecosystem-manifest.json) · [Current Hub listing](https://huggingface.co/SZLHOLDINGS). Hub inventory is registry evidence, not availability, operational readiness, or publication policy. It does not establish model quality.
 <!-- szl:public-inventory:end -->
 
-**HISTORICAL:** **Five public domain bodies** (Terra; PRISM Counsel; PURIQ Finance; LYTE). Hub listings do not establish deployment, capability, quality or publication policy.
+**HISTORICAL:** Three commercial flagships, one inference flagship, six internal engines, **Five public domain bodies** (Terra; PRISM Counsel; PURIQ Finance; LYTE). Earlier snapshot: 16 portfolio Spaces, 1 inventory-only Space, 45 models, 34 datasets. Hub listings do not establish deployment, capability, quality or publication policy.
 
 ## Live estate observability
 
-- **[Frontier Console](https://huggingface.co/spaces/SZLHOLDINGS/frontier-console)** - receipts-native console: Salad GPU fleet, khipu receipts mesh, HF inventory, proofs, governance. Source: [frontier-console](https://github.com/szl-holdings/frontier-console).
-- **khipu-scholar-v1 RELEASED** - [LoRA adapter](https://huggingface.co/SZLHOLDINGS/salad-khipu-scholar-v1): DSSE-signed completion receipt, corpus-sha256-bound: final loss 0.0085, 2,000 steps, 9.45 GPU-hours. [Proof Loom](https://huggingface.co/spaces/SZLHOLDINGS/khipu-proof-loom) live; 4B + structure adapters training.
+- **[Frontier Console](https://huggingface.co/spaces/SZLHOLDINGS/frontier-console)** - receipts-native console. Source: [frontier-console](https://github.com/szl-holdings/frontier-console).
+- **[khipu-scholar-v1](https://huggingface.co/SZLHOLDINGS/salad-khipu-scholar-v1)** released with a DSSE-signed completion receipt; [Proof Loom](https://huggingface.co/spaces/SZLHOLDINGS/khipu-proof-loom) live.
