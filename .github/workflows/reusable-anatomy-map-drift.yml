@@ -33,11 +33,19 @@ jobs:
         with:
           egress-policy: audit
 
-      - name: Checkout shared checker and registry
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          repository: szl-holdings/.github
-          ref: ${{ inputs.checker-ref }}
+      - name: Clone the exact pinned checker revision
+        env:
+          CHECKER_REF: ${{ inputs.checker-ref }}
+        run: |
+          set -euo pipefail
+          git clone --quiet https://github.com/szl-holdings/.github .
+          if git rev-parse --verify --quiet "$CHECKER_REF" -- >/dev/null; then
+            git checkout --quiet "$CHECKER_REF"
+          else
+            git fetch --quiet origin "$CHECKER_REF"
+            git checkout --quiet FETCH_HEAD
+          fi
+          test -f .github/scripts/anatomy_map_drift.py
 
       - name: Set up Python
         uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
@@ -52,13 +60,16 @@ jobs:
       - name: Compare active Living Anatomy surfaces
         env:
           GITHUB_TOKEN: ${{ github.token }}
+          EVENT_NAME: ${{ github.event_name }}
+          CALLER_REPO: ${{ github.repository }}
+          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.event.merge_group.head.sha || github.sha }}
         run: |
           set +e
           EXTRA=""
-          if [ "${{ github.event_name }}" = "pull_request" ]; then
-            # Validate the calling repository's proposed head while excluding
+          if [ "$EVENT_NAME" = "pull_request" ]; then
+            # Validate the calling repository proposed head while excluding
             # independently deployed URL surfaces from the PR merge gate.
-            EXTRA="--skip-kind url --ref-override ${{ github.repository }}=${{ github.event.pull_request.head.sha }}"
+            EXTRA="--skip-kind url --ref-override $CALLER_REPO=$PR_HEAD_SHA"
           fi
           python3 .github/scripts/anatomy_map_drift.py $EXTRA \
             --report anatomy_map_report.out.json
@@ -68,7 +79,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: anatomy-map-drift-report
+          name: anatomy-map-drift-reusable-report
           path: anatomy_map_report.out.json
           if-no-files-found: ignore
           retention-days: 14
