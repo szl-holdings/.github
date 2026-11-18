@@ -2,7 +2,7 @@
 
 # Governed intelligence. Checkable results.
 
-SZL Holdings builds source-linked AI software, models and research.
+Source-linked AI software, models and research.
 
 [**Explore A11oy →**](https://huggingface.co/spaces/SZLHOLDINGS/a11oy) · [**Build with the source →**](https://github.com/szl-holdings)
 
@@ -15,9 +15,9 @@ Receipt unsigned; no biological claim.
 ## Choose a path
 
 - **Explore:** [Command Lab](https://huggingface.co/spaces/SZLHOLDINGS/szl-command-lab) — the searchable portfolio.
-- **Use:** [A11oy](https://a-11-oy.com) — tools with live capability state.
-- **Build:** [source map](https://github.com/szl-holdings/.github/blob/main/profile/SOURCE_MAP.md) · [models, kernels, datasets, Spaces](https://huggingface.co/SZLHOLDINGS) · [PyPI](https://pypi.org/org/SZL-HOLDINGS/).
-- **Verify:** [a11oy.net](https://a11oy.net) — records, limits, [evidence diagrams](https://a11oy.net/diagrams/).
+- **Use:** [A11oy](https://a-11-oy.com) — live capability state.
+- **Build:** [source map](https://github.com/szl-holdings/.github/blob/main/profile/SOURCE_MAP.md) · [Hub models, datasets, Spaces](https://huggingface.co/SZLHOLDINGS) · [PyPI](https://pypi.org/org/SZL-HOLDINGS/).
+- **Verify:** [a11oy.net](https://a11oy.net) — records, limits, [diagrams](https://a11oy.net/diagrams/).
 
 <a href="https://a11oy.net/diagrams/"><img src="https://raw.githubusercontent.com/szl-holdings/.github/main/profile/assets/diagrams/evidence-diagrams-overview.png" alt="Overview of four SZL evidence diagrams" width="720" /></a>
 
@@ -31,8 +31,8 @@ Receipt unsigned; no biological claim.
 
 - **
 a11oy** — governed runtime, x402 APIs
-- **Living Anatomy** — the anatomy engine · [Space](https://szlholdings-anatomy.hf.space)
-- **Second Brain** — the memory plane · [Space](https://huggingface.co/spaces/SZLHOLDINGS/szl-second-brain)
+- **Living Anatomy** — · [Space](https://szlholdings-anatomy.hf.space)
+- **Second Brain** — · [Space](https://huggingface.co/spaces/SZLHOLDINGS/szl-second-brain)
 - **hatun-mcp** — production MCP · [repo](https://github.com/szl-holdings/hatun-mcp)
 - **killinchu** — counter-UAS · [killinchu.a-11-oy.com](https://killinchu.a-11-oy.com)
 
@@ -44,12 +44,12 @@ a11oy** — governed runtime, x402 APIs
 
 ### Measured live gateway
 
-**Observed 2026-11-17T19:29Z** from the authorized SZL operations path:
+**Observed 2026-11-17T19:29Z**:
 
 - [Health](https://inference.a-11-oy.com/health) → **HTTP 200**, status `ok`
 - [Model registry](https://inference.a-11-oy.com/v1/models) → **HTTP 200**, model `ternary-bonsai-2-27b-pq2_0`
 - [Web UI](https://inference.a-11-oy.com/) → **HTTP 200**
-- Unpaid `POST /v1/chat/completions` → **HTTP 402**, x402 v2 payment challenge on Base/USDC for $0.02
+- Unpaid `POST /v1/chat/completions` → **HTTP 402**, x402 v2 challenge, Base/USDC $0.02
 
 Scope: reachability and gateway posture only; no quality, SLA, paid latency, or paid receipt claim.
 
@@ -67,3 +67,8 @@ The source-bound public inventory records **22 public Spaces, 121 model reposito
 <!-- szl:public-inventory:end -->
 
 **HISTORICAL:** Three commercial flagships, one inference flagship, six internal engines, **Five public domain bodies** (Terra; PRISM Counsel; PURIQ Finance; LYTE). Earlier snapshot: 16 portfolio Spaces, 1 inventory-only Space, 45 models, 34 datasets. Hub listings do not establish deployment, capability, quality or publication policy.
+
+## Live estate observability
+
+- **[Frontier Console](https://huggingface.co/spaces/SZLHOLDINGS/frontier-console)** - receipts-native console. Source: [frontier-console](https://github.com/szl-holdings/frontier-console).
+- **[khipu-scholar-v1](https://huggingface.co/SZLHOLDINGS/salad-khipu-scholar-v1)** released with a DSSE-signed completion receipt; [Proof Loom](https://huggingface.co/spaces/SZLHOLDINGS/khipu-proof-loom) live.
