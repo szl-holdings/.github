@@ -181,6 +181,24 @@ class EstateAlignmentContractTests(unittest.TestCase):
                 with self.assertRaisesRegex(alignment.AlignmentError, "malformed row"):
                     alignment.list_hf("spaces")
 
+    def test_listing_equality_preserves_rows_and_checks_coverage_metadata(self) -> None:
+        rows = [{"id": "SZLHOLDINGS/synthetic"}]
+        first = alignment.HFListing(rows, pages=1)
+        second = alignment.HFListing(rows, pages=1)
+        second.observed_at = first.observed_at
+        self.assertEqual(first, second)
+        self.assertEqual(first, rows)
+        self.assertEqual(rows, first)
+        second.pages = 2
+        self.assertNotEqual(first, second)
+        second.pages = 1
+        second.complete = False
+        self.assertNotEqual(first, second)
+        second.complete = True
+        second.observed_at = "different-observation"
+        self.assertNotEqual(first, second)
+        self.assertNotEqual(first, object())
+
     def test_provider_loader_refuses_unproved_terminal_or_oversized_page(self) -> None:
         for kind in ("spaces", "models", "datasets"):
             rows = [{"id": f"SZLHOLDINGS/synthetic-{i}"} for i in range(101)]
@@ -277,7 +295,6 @@ class EstateAlignmentContractTests(unittest.TestCase):
                 alignment.validate_hf_page_url(candidate, "models", next_page=True)
 
     def test_hf_inventory_page_budget_and_network_errors_fail_closed(self) -> None:
-        rows = [{"id": f"SZLHOLDINGS/synthetic-{i:04d}"} for i in range(100)]
         calls: list[str] = []
         def endless(url: str):
             calls.append(url)

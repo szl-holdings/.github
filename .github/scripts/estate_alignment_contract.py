@@ -779,6 +779,20 @@ class HFListing(list):
         self.complete = True
         self.observed_at = dt.datetime.now(dt.timezone.utc).isoformat().replace("+00:00", "Z")
 
+    def __eq__(self, other: object) -> bool:
+        payload_equal = list.__eq__(self, other)
+        if payload_equal is NotImplemented:
+            return NotImplemented
+        if not payload_equal or not isinstance(other, HFListing):
+            return payload_equal
+        return (self.pages, self.complete, self.observed_at) == (
+            other.pages, other.complete, other.observed_at
+        )
+
+    def __ne__(self, other: object) -> bool:
+        equal = self.__eq__(other)
+        return NotImplemented if equal is NotImplemented else not equal
+
 
 def validate_hf_page_url(url: str, kind: str, *, next_page: bool) -> None:
     """Only follow the Hub's exact author-scoped cursor URL, never arbitrary links."""
