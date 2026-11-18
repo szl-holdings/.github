@@ -381,6 +381,12 @@ def fetch_surface(spec, ref_overrides=None):
             "text": "\n\n".join(texts)}
 
 
+def _configure_output():
+    """Preserve the Unicode doctrine labels on legacy Windows codepages."""
+    if hasattr(sys.stdout, "reconfigure"):
+        sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+
+
 def main(argv=None):
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--registry",
@@ -482,4 +488,5 @@ def main(argv=None):
 
 
 if __name__ == "__main__":
+    _configure_output()
     sys.exit(main())

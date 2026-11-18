@@ -23,8 +23,10 @@ matching the locked ladder, the Λ label, the capability list, or the markers
 from __future__ import annotations
 
 import importlib.util
+import io
 import os
 import unittest
+from unittest import mock
 
 _HERE = os.path.dirname(os.path.abspath(__file__))
 _MODULE_PATH = os.path.join(_HERE, "anatomy_map_drift.py")
@@ -107,6 +109,21 @@ class TestExtractors(unittest.TestCase):
         self.assertIsNotNone(b)
         self.assertTrue(b.startswith("anatomy-map-tab-patch ::"))
         self.assertTrue(b.rstrip().endswith("end anatomy-map-tab-patch"))
+
+    def test_legacy_windows_console_reconfigures_to_utf8(self):
+        output = io.BytesIO()
+        stream = io.TextIOWrapper(output, encoding="cp1252", errors="strict")
+        with mock.patch.object(amd.sys, "stdout", stream):
+            amd._configure_output()
+            print("\u2713 Λ = Conjecture 1")
+            stream.flush()
+        self.assertIn("\u2713 Λ = Conjecture 1", output.getvalue().decode("utf-8"))
+
+    def test_product_origin_403_stays_unavailable(self):
+        # An active HF origin must not cause an unrelated 403 product check to pass.
+        with mock.patch.object(amd, "_http", return_value=(403, b"")):
+            with self.assertRaisesRegex(RuntimeError, "HTTP 403"):
+                amd.fetch_raw_url("https://a-11-oy.com/anatomy-map/data.js")
 
     def test_marker_block_absent(self):
         self.assertIsNone(amd.extract_marker_block("no markers here"))
