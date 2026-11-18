@@ -11559,12 +11559,6 @@
      "max_calls": 1
     },
     {
-     "sink": "github.artifact.upload",
-     "resource": "github:actions:artifact:anatomy-map-drift-reusable-report",
-     "access": "external-write",
-     "max_calls": 1
-    },
-    {
      "sink": "github.contents.checkout",
      "resource": "github:repository:szl-holdings/.github:contents",
      "access": "read",
