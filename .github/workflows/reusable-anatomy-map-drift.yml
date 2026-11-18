@@ -33,11 +33,19 @@ jobs:
         with:
           egress-policy: audit
 
-      - name: Checkout shared checker and registry
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          repository: szl-holdings/.github
-          ref: ${{ inputs.checker-ref }}
+      - name: Clone the exact pinned checker revision
+        env:
+          CHECKER_REF: ${{ inputs.checker-ref }}
+        run: |
+          set -euo pipefail
+          git clone --quiet https://github.com/szl-holdings/.github .
+          if git rev-parse --verify --quiet "$CHECKER_REF" -- >/dev/null; then
+            git checkout --quiet "$CHECKER_REF"
+          else
+            git fetch --quiet origin "$CHECKER_REF"
+            git checkout --quiet FETCH_HEAD
+          fi
+          test -f .github/scripts/anatomy_map_drift.py
 
       - name: Set up Python
         uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
