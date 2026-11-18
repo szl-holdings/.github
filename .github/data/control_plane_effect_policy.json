@@ -11052,23 +11052,23 @@
      ".github/scripts/test_hf_space_source_binding.py": "sha256:8ff7f58b9227cde00cca0d196dd5bb0f08229c2cf6e0585f96450291da3cc848",
      ".github/scripts/test_codename_sweep.py": "sha256:8a9d636e7d4b2dd02f5eadfdfdf3a18c77c033af10927f4e954303f7d7d3693c",
      ".github/scripts/test_hf_module_drift_check.py": "sha256:fdb716fcb6f8eb2b57ee61db7e05624cf1a057455ec78266a8acd152d52cb66f",
-     ".github/scripts/test_license_consistency.py": "sha256:f1f6cf9bd10223ce89e989878dde5ca3cadfdbfb221505bcca7795b7dfbc88be",
-     ".github/scripts/test_required_check_drift.py": "sha256:8543f7af153262c201aa7749fe146f947375f9bdd53d414904215269eb78561b",
-     ".github/scripts/test_attestation_queue_precondition.py": "sha256:7f96441c7625e77038295c08e27021d6983e9b99139f3cb6e8c4297daff94951",
+     ".github/scripts/test_license_consistency.py": "sha256:a32c4f929a9004a69454b5be1c84e26fd76552ffaa5aa3cc8ad229a911e6b767",
+     ".github/scripts/test_required_check_drift.py": "sha256:dae9f0ffd01aa39e51eb4e2928f58478fb06204d8af9a3df03b851c34d80f7fb",
+     ".github/scripts/test_attestation_queue_precondition.py": "sha256:e51afd489b6230a2aeb6933e3067588936b51958adfefc38c68850c1f854ba49",
      ".github/scripts/test_hf_candidate_plan.py": "sha256:ff41bc0a106ad8322fadf77250dd508a9367367194900fa26343e3e4de628a6c",
      ".github/scripts/test_hf_card_reconcile.py": "sha256:f3a33ff5f33a59ad6fb342a0ba891942502231cfd1a7e82ceffcefc48307b8c3",
-     ".github/scripts/test_lockfile_registry_check.py": "sha256:42dbcf506e07a3fb280436d4d99af34e621e92690065f318fac5d1ba82d69b12",
+     ".github/scripts/test_lockfile_registry_check.py": "sha256:856e95621872cd27f3237520c10276934e0dcbb46100fe34bd719b0447a5f1c4",
      ".github/scripts/test_reusable_workflow_lint.py": "sha256:8e00cc12f4f8631df77093177acf9804a8651f15a41ed172d754545a75dfb382",
-     ".github/scripts/public_front_door_check.py": "sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-     ".github/scripts/test_anatomy_map_drift.py": "sha256:7c4b8b3412a22ea49222ce94fed28bc80a1010a4b8c5579fd2b334de87ace71a",
+     ".github/scripts/public_front_door_check.py": "sha256:27557fe242ae4376d9771c8101ab8ca916f8e2e3edbdd564d0b543a6dafedb2d",
+     ".github/scripts/test_anatomy_map_drift.py": "sha256:d5fbe9dd28dfe2e1373f848939f31f45da51f7ed7ffd0f6082a27e68a367fa99",
      ".github/scripts/test_build_drift_alert.py": "sha256:c2185652af353d2e1efafb1e2d02291a6a39a513a9ddc9d42e65ba95f547272c",
-     ".github/scripts/test_bundle_ref_check.py": "sha256:df69616bebb2297d041faf02c04aff8e74a1aba8b96d681eb42f6cf66bb709d1",
+     ".github/scripts/test_bundle_ref_check.py": "sha256:e63582db27bb0ecb0e9b5d5ed425abfcd0a1cba9016dca6dfd7841a503a3221e",
      ".github/scripts/test_ci_health_digest.py": "sha256:38356d8abe224858f70b53b0c5b88b12057da2c962b0c7b9ee34c9e5ce8ddfce",
-     ".github/scripts/test_code_security_drift.py": "sha256:717aa8ca9bbed1f9540597f88dc10f21fd286b6e78e6709981dd2de2b2faa006",
-     ".github/scripts/test_doctrine_check.py": "sha256:3158eb5de776617da562b4766e952152776a82ae31413063320b27e8c4005b17",
-     ".github/scripts/test_energy_provenance_check.py": "sha256:661cbafb06350e67f2e7b16d918847a79e2023d2b49017f80bc9002d3bcea57f",
+     ".github/scripts/test_code_security_drift.py": "sha256:c8e22a3799c5353fffaba077cc2daf04d50f695af4a1b1e8b97f961c1bbb6871",
+     ".github/scripts/test_doctrine_check.py": "sha256:97b0da8a0068c00a3a3d06e0d12ecc7fedc10247a09a50027f3bef514bd0ec1d",
+     ".github/scripts/test_energy_provenance_check.py": "sha256:ccd110d4c3e2fb3a089529713b0828da662b62ac93bdf7f821150f4ec28b41fb",
      ".github/scripts/test_hf_deploy_from_dockerfile.py": "sha256:6c0ce5848020257941e7dedfa3049b13fa5c812e8b48c4e4965254598e4698a9",
-     ".github/scripts/test_hf_license_consistency.py": "sha256:5a320f3834f300a469339579590de947c73e7f9f6da9a1bd79d9b13c87e538a4",
+     ".github/scripts/test_hf_license_consistency.py": "sha256:247d9028e0f4443dd7920462faaf07b21444200f5224a94ba9c87e1d62447500",
      ".github/scripts/test_hf_live_pr_pair.py": "sha256:8e5814a52e7460a22db174e6923acdf15aa16ba995445b0aa7c4d08a55b54483",
      ".github/scripts/test_hf_module_drift_prune.py": "sha256:19e84279dfbadf538b509c690b48dc94f17ff98ffb29c9a556dd1a16a47aca8b",
      ".github/scripts/test_hf_publisher_lock.py": "sha256:2155df425ecdaacfad961971c9365ab07c09d4c776b07854a842253eeb4da6f0",
@@ -11076,10 +11076,10 @@
      ".github/scripts/test_hf_source_bound_baseline.py": "sha256:ba444e68085a860dda654936089d2dac2f774991f8aa444f85788677f8828ec7",
      ".github/scripts/test_hf_space_lifecycle_reconcile.py": "sha256:ba82032048bf4d2a07b72a8afec6f092b793003456000da61e8bfe29793a9c14",
      ".github/scripts/test_hf_the_grid_publish_contract.py": "sha256:28092caf71996560cd3dacb557f4f36e165d287448cff3ec9aaafd64a8be67f8",
-     ".github/scripts/test_lean_numbers.py": "sha256:1430163c16c570a02e9ec159d9055b9bc5fcf56223a2060dcfaf65f64138b90d",
-     ".github/scripts/test_overclaim_sweep.py": "sha256:d4d8cad2a2dcf267df8be16acc78f38ee45e1944df3661a38fcdc777ee8a49e8",
-     ".github/scripts/test_public_repo_link_check.py": "sha256:d82015618c883e31a34aa9bd620894941ef06414cfc67b9a4c8fd4a73889b522",
-     ".github/scripts/test_receipt_shape_check.py": "sha256:5ce42edea42a35ccb926b5b03c45c48054d33b68511a64b59b41fc5a07eb0cdd",
+     ".github/scripts/test_lean_numbers.py": "sha256:19a392035dae5fd3824b52bfb96318d0b8bea9762ee1e14a68fdf92eeabd213e",
+     ".github/scripts/test_overclaim_sweep.py": "sha256:cc52af7de1e2bb1b3e103d5ad59685d286a7f41c34cd4688efc79d9bfa29169c",
+     ".github/scripts/test_public_repo_link_check.py": "sha256:b8f1abc16ed6adf534a63f1ffd53165948951664788a7cbdca7e1b1408917de0",
+     ".github/scripts/test_receipt_shape_check.py": "sha256:b89ecebe25b826df5854b9976ef71282a216a47768a61adad6b16ea03844430f",
      ".github/scripts/test_replit_decommission.py": "sha256:ceeae82f6111d096883b4541cc56a92060c1088e27dd341d5722a8c6f6c34e47",
      ".github/scripts/test_reusable_workflow_target_check.py": "sha256:d145f78f6bb4ae0b76a9f35210882e0ff96d511ece8630d39f5d99f775f9ed54",
      ".github/scripts/test_szl_codename_gate.py": "sha256:bcfcbbf52dd4cfe7761372fa4acd08b98aec327cb4f7f7dc2c1bc86029fd5b0f",
@@ -11527,8 +11527,16 @@
      "access": "external-write"
     },
     {
+     "key": "github:actions:artifact:anatomy-map-drift-reusable-report",
+     "access": "external-write"
+    },
+    {
      "key": "github:repository:szl-holdings/.github:contents",
      "access": "read"
+    },
+    {
+     "key": "http:slack:webhook",
+     "access": "external-write"
     },
     {
      "key": "runner:guard:egress",
@@ -11548,34 +11556,46 @@
      "sink": "github.artifact.upload",
      "resource": "github:actions:artifact:anatomy-map-drift-report",
      "access": "external-write",
-     "max_calls": 3
+     "max_calls": 1
+    },
+    {
+     "sink": "github.artifact.upload",
+     "resource": "github:actions:artifact:anatomy-map-drift-reusable-report",
+     "access": "external-write",
+     "max_calls": 1
     },
     {
      "sink": "github.contents.checkout",
      "resource": "github:repository:szl-holdings/.github:contents",
      "access": "read",
-     "max_calls": 3
+     "max_calls": 1
+    },
+    {
+     "sink": "http.post",
+     "resource": "http:slack:webhook",
+     "access": "external-write",
+     "max_calls": 2
     },
     {
      "sink": "runner.guard.configure",
      "resource": "runner:guard:egress",
      "access": "local-write",
-     "max_calls": 3
+     "max_calls": 1
     },
     {
      "sink": "runner.guard.telemetry",
      "resource": "stepsecurity:monitor:szl-holdings/.github",
      "access": "external-write",
-     "max_calls": 3
+     "max_calls": 1
     },
     {
      "sink": "runner.toolchain.install",
      "resource": "runner:toolchain:python",
      "access": "local-write",
-     "max_calls": 3
+     "max_calls": 1
     }
    ],
-   "max_external_writes": 4,
+   "max_external_writes": 5,
    "required_controls": {
     "triggers": [
      "pull_request",
@@ -11596,11 +11616,11 @@
    "reviewed_unknowns": {
     "files": {
      ".github/workflows/anatomy-map-drift.yml": "sha256:8c35e5cd87099f2ff3c9178660151563b3630c2f66de80b48bdf2974988fab1e",
-     ".github/scripts/anatomy_map_drift.py": "sha256:5e435b5fea6c14537a4a9af3459e0b3572d6a6f286488ad62419b6b38229ab43",
-     ".github/scripts/test_anatomy_map_drift.py": "sha256:7c4b8b3412a22ea49222ce94fed28bc80a1010a4b8c5579fd2b334de87ace71a",
+     ".github/scripts/anatomy_map_drift.py": "sha256:303ed5b5a689ed81e6fb59206a46407b2e3471c8bf9e31523e2e767946b4ff5d",
+     ".github/scripts/test_anatomy_map_drift.py": "sha256:d5fbe9dd28dfe2e1373f848939f31f45da51f7ed7ffd0f6082a27e68a367fa99",
      ".github/scripts/test_anatomy_product_contract.py": "sha256:f5994a123494611b33f2915e9f39bb6e504dd01185fef0de57af69736f7fc7b3",
      ".github/workflows/anatomy-map-product-drift.yml": "sha256:a0bf347425bccaf1207508e197d78d661e17a85bd78b809de10bc58bd0a7b498",
-     ".github/workflows/reusable-anatomy-map-drift.yml": "sha256:8c95cd8efd9069ca20254d8e11901609c8ead5a9b6461dbb05f0b38a837f4dac"
+     ".github/workflows/reusable-anatomy-map-drift.yml": "sha256:f8d5da055dc1e4b94945a7e4e3da832d7adcc3932c772f1c9fc44e4e86891a91"
     },
     "unknowns": [
      "ACTION_INPUTS_REVIEW_REQUIRED@.github/workflows/anatomy-map-drift.yml:52",
@@ -11690,6 +11710,10 @@
      "access": "read"
     },
     {
+     "key": "http:slack:webhook",
+     "access": "external-write"
+    },
+    {
      "key": "runner:guard:egress",
      "access": "local-write"
     },
@@ -11707,34 +11731,40 @@
      "sink": "github.artifact.upload",
      "resource": "github:actions:artifact:anatomy-map-product-drift-report",
      "access": "external-write",
-     "max_calls": 3
+     "max_calls": 1
     },
     {
      "sink": "github.contents.checkout",
      "resource": "github:repository:szl-holdings/.github:contents",
      "access": "read",
-     "max_calls": 3
+     "max_calls": 1
+    },
+    {
+     "sink": "http.post",
+     "resource": "http:slack:webhook",
+     "access": "external-write",
+     "max_calls": 1
     },
     {
      "sink": "runner.guard.configure",
      "resource": "runner:guard:egress",
      "access": "local-write",
-     "max_calls": 3
+     "max_calls": 1
     },
     {
      "sink": "runner.guard.telemetry",
      "resource": "stepsecurity:monitor:szl-holdings/.github",
      "access": "external-write",
-     "max_calls": 3
+     "max_calls": 1
     },
     {
      "sink": "runner.toolchain.install",
      "resource": "runner:toolchain:python",
      "access": "local-write",
-     "max_calls": 3
+     "max_calls": 1
     }
    ],
-   "max_external_writes": 4,
+   "max_external_writes": 3,
    "required_controls": {
     "triggers": [
      "pull_request",
@@ -11755,8 +11785,8 @@
    "reviewed_unknowns": {
     "files": {
      ".github/workflows/anatomy-map-product-drift.yml": "sha256:a0bf347425bccaf1207508e197d78d661e17a85bd78b809de10bc58bd0a7b498",
-     ".github/scripts/anatomy_map_drift.py": "sha256:5e435b5fea6c14537a4a9af3459e0b3572d6a6f286488ad62419b6b38229ab43",
-     ".github/scripts/test_anatomy_map_drift.py": "sha256:7c4b8b3412a22ea49222ce94fed28bc80a1010a4b8c5579fd2b334de87ace71a",
+     ".github/scripts/anatomy_map_drift.py": "sha256:303ed5b5a689ed81e6fb59206a46407b2e3471c8bf9e31523e2e767946b4ff5d",
+     ".github/scripts/test_anatomy_map_drift.py": "sha256:d5fbe9dd28dfe2e1373f848939f31f45da51f7ed7ffd0f6082a27e68a367fa99",
      ".github/scripts/test_anatomy_product_contract.py": "sha256:f5994a123494611b33f2915e9f39bb6e504dd01185fef0de57af69736f7fc7b3"
     },
     "unknowns": [
@@ -11831,13 +11861,13 @@
   ".github/workflows/reusable-anatomy-map-drift.yml": {
    "intent_id": "reusable_anatomy_map_drift_v1",
    "valid_until": "2026-11-30",
-   "source_sha256": "sha256:9e550450008b901b2c73ed7e6de64e8c7e7cd9e8a4a1be5e337e999fc142360e",
+   "source_sha256": "sha256:f8d5da055dc1e4b94945a7e4e3da832d7adcc3932c772f1c9fc44e4e86891a91",
    "credentials": [
     "GITHUB_TOKEN"
    ],
    "resources": [
     {
-     "key": "github:actions:artifact:anatomy-map-drift-report",
+     "key": "github:actions:artifact:anatomy-map-drift-reusable-report",
      "access": "external-write"
     },
     {
@@ -11856,30 +11886,30 @@
    "effects": [
     {
      "sink": "github.artifact.upload",
-     "resource": "github:actions:artifact:anatomy-map-drift-report",
+     "resource": "github:actions:artifact:anatomy-map-drift-reusable-report",
      "access": "external-write",
-     "max_calls": 3
+     "max_calls": 1
     },
     {
      "sink": "runner.guard.configure",
      "resource": "runner:guard:egress",
      "access": "local-write",
-     "max_calls": 3
+     "max_calls": 1
     },
     {
      "sink": "runner.guard.telemetry",
      "resource": "stepsecurity:monitor:szl-holdings/.github",
      "access": "external-write",
-     "max_calls": 3
+     "max_calls": 1
     },
     {
      "sink": "runner.toolchain.install",
      "resource": "runner:toolchain:python",
      "access": "local-write",
-     "max_calls": 3
+     "max_calls": 1
     }
    ],
-   "max_external_writes": 4,
+   "max_external_writes": 2,
    "required_controls": {
     "triggers": [
      "workflow_call"
@@ -11895,16 +11925,16 @@
    "trusted_transitives": {},
    "reviewed_unknowns": {
     "files": {
-     ".github/workflows/reusable-anatomy-map-drift.yml": "sha256:9e550450008b901b2c73ed7e6de64e8c7e7cd9e8a4a1be5e337e999fc142360e",
-     ".github/scripts/anatomy_map_drift.py": "sha256:5e435b5fea6c14537a4a9af3459e0b3572d6a6f286488ad62419b6b38229ab43",
-     ".github/scripts/test_anatomy_map_drift.py": "sha256:7c4b8b3412a22ea49222ce94fed28bc80a1010a4b8c5579fd2b334de87ace71a",
+     ".github/workflows/reusable-anatomy-map-drift.yml": "sha256:f8d5da055dc1e4b94945a7e4e3da832d7adcc3932c772f1c9fc44e4e86891a91",
+     ".github/scripts/anatomy_map_drift.py": "sha256:303ed5b5a689ed81e6fb59206a46407b2e3471c8bf9e31523e2e767946b4ff5d",
+     ".github/scripts/test_anatomy_map_drift.py": "sha256:d5fbe9dd28dfe2e1373f848939f31f45da51f7ed7ffd0f6082a27e68a367fa99",
      ".github/scripts/test_anatomy_product_contract.py": "sha256:f5994a123494611b33f2915e9f39bb6e504dd01185fef0de57af69736f7fc7b3"
     },
     "unknowns": [
      "ACTION_INPUTS_REVIEW_REQUIRED@.github/workflows/reusable-anatomy-map-drift.yml:34",
      "ACTION_INPUTS_REVIEW_REQUIRED@.github/workflows/reusable-anatomy-map-drift.yml:53",
-     "ACTION_INPUTS_REVIEW_REQUIRED@.github/workflows/reusable-anatomy-map-drift.yml:79",
-     "DYNAMIC_EXECUTION@.github/workflows/reusable-anatomy-map-drift.yml:95",
+     "ACTION_INPUTS_REVIEW_REQUIRED@.github/workflows/reusable-anatomy-map-drift.yml:82",
+     "DYNAMIC_EXECUTION@.github/workflows/reusable-anatomy-map-drift.yml:98",
      "HTTP_TARGET_UNRESOLVED@.github/scripts/anatomy_map_drift.py:87",
      "PYTHON_IMPORT_UNRESOLVED@.github/scripts/anatomy_map_drift.py:150",
      "PYTHON_IMPORT_UNRESOLVED@.github/scripts/anatomy_map_drift.py:50",
@@ -11923,6 +11953,8 @@
      "PYTHON_SOURCE_REVIEW_REQUIRED@.github/scripts/test_anatomy_map_drift.py:1",
      "PYTHON_SOURCE_REVIEW_REQUIRED@.github/scripts/test_anatomy_product_contract.py:1",
      "SECRET_EXPRESSION_REVIEW_REQUIRED@.github/workflows/reusable-anatomy-map-drift.yml:1",
+     "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-anatomy-map-drift.yml:100",
+     "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-anatomy-map-drift.yml:101",
      "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-anatomy-map-drift.yml:41",
      "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-anatomy-map-drift.yml:42",
      "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-anatomy-map-drift.yml:43",
@@ -11933,17 +11965,14 @@
      "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-anatomy-map-drift.yml:48",
      "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-anatomy-map-drift.yml:57",
      "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-anatomy-map-drift.yml:58",
-     "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-anatomy-map-drift.yml:64",
-     "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-anatomy-map-drift.yml:65",
-     "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-anatomy-map-drift.yml:66",
+     "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-anatomy-map-drift.yml:67",
+     "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-anatomy-map-drift.yml:68",
      "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-anatomy-map-drift.yml:69",
-     "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-anatomy-map-drift.yml:70",
-     "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-anatomy-map-drift.yml:71",
      "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-anatomy-map-drift.yml:72",
      "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-anatomy-map-drift.yml:73",
-     "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-anatomy-map-drift.yml:86",
-     "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-anatomy-map-drift.yml:87",
-     "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-anatomy-map-drift.yml:88",
+     "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-anatomy-map-drift.yml:74",
+     "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-anatomy-map-drift.yml:75",
+     "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-anatomy-map-drift.yml:76",
      "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-anatomy-map-drift.yml:89",
      "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-anatomy-map-drift.yml:90",
      "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-anatomy-map-drift.yml:91",
@@ -11954,17 +11983,17 @@
      "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-anatomy-map-drift.yml:96",
      "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-anatomy-map-drift.yml:97",
      "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-anatomy-map-drift.yml:98",
+     "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-anatomy-map-drift.yml:99",
      "SHELL_COMPOSITION_UNKNOWN@.github/workflows/reusable-anatomy-map-drift.yml:42",
      "SHELL_COMPOSITION_UNKNOWN@.github/workflows/reusable-anatomy-map-drift.yml:43",
      "SHELL_COMPOSITION_UNKNOWN@.github/workflows/reusable-anatomy-map-drift.yml:45",
-     "SHELL_COMPOSITION_UNKNOWN@.github/workflows/reusable-anatomy-map-drift.yml:66",
      "SHELL_COMPOSITION_UNKNOWN@.github/workflows/reusable-anatomy-map-drift.yml:69",
-     "SHELL_COMPOSITION_UNKNOWN@.github/workflows/reusable-anatomy-map-drift.yml:71",
-     "SHELL_COMPOSITION_UNKNOWN@.github/workflows/reusable-anatomy-map-drift.yml:73",
-     "SHELL_COMPOSITION_UNKNOWN@.github/workflows/reusable-anatomy-map-drift.yml:86",
+     "SHELL_COMPOSITION_UNKNOWN@.github/workflows/reusable-anatomy-map-drift.yml:72",
+     "SHELL_COMPOSITION_UNKNOWN@.github/workflows/reusable-anatomy-map-drift.yml:74",
+     "SHELL_COMPOSITION_UNKNOWN@.github/workflows/reusable-anatomy-map-drift.yml:76",
+     "SHELL_COMPOSITION_UNKNOWN@.github/workflows/reusable-anatomy-map-drift.yml:89",
      "WORKFLOW_ENVIRONMENT_REVIEW_REQUIRED@.github/workflows/reusable-anatomy-map-drift.yml:38",
-     "WORKFLOW_ENVIRONMENT_REVIEW_REQUIRED@.github/workflows/reusable-anatomy-map-drift.yml:62",
-     "WORKFLOW_EXPRESSION_EXECUTION_UNSUPPORTED@.github/workflows/reusable-anatomy-map-drift.yml:64"
+     "WORKFLOW_ENVIRONMENT_REVIEW_REQUIRED@.github/workflows/reusable-anatomy-map-drift.yml:62"
     ]
    }
   }
