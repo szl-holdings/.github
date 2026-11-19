@@ -82,31 +82,29 @@ jobs:
         uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: '22'
-          cache: npm
-          cache-dependency-path: release-harness/package-lock.json
+          package-manager-cache: 'false'
 
       - name: Python self-tests
-        working-directory: release-harness
         run: |
+          cd release-harness
           python3 -m unittest discover -s canary -p 'test_*.py' -v
           python3 -m unittest discover -s contract -p 'test_*.py' -v
 
       - name: Install npm dependencies
-        working-directory: release-harness
         run: npm ci
+          cd release-harness
 
       - name: Unit tests and typecheck
-        working-directory: release-harness
         run: |
+          cd release-harness
           npm run test:unit
           npm run typecheck
 
       - name: Install Playwright browsers
-        working-directory: release-harness
         run: npx playwright install --with-deps chromium firefox webkit
+          cd release-harness
 
       - name: Playwright fixture journey
-        working-directory: release-harness
         env:
           HARNESS_FIXTURE: '1'
           STAGING: 'true'
@@ -117,6 +115,7 @@ jobs:
           PW_TRACE: 'on'
           CI: 'true'
         run: |
+          cd release-harness
           set -euo pipefail
           projects="$(node scripts/playwright-projects.mjs)"
           # shellcheck disable=SC2086
@@ -155,40 +154,38 @@ jobs:
         uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: '22'
-          cache: npm
-          cache-dependency-path: release-harness/package-lock.json
+          package-manager-cache: 'false'
 
       - name: Refuse production hosts
-        working-directory: release-harness
         env:
           BASE_URL: ${{ inputs.base_url }}
           API_URL: ${{ inputs.api_url }}
         run: |
+          cd release-harness
           python3 canary/compare.py --check-only --staging \
             --canary "$BASE_URL" --control "$API_URL"
 
       - name: Install npm dependencies
-        working-directory: release-harness
         run: npm ci
+          cd release-harness
 
       - name: Install selected Playwright browsers
-        working-directory: release-harness
         env:
           BROWSERS: ${{ inputs.browsers }}
         run: |
+          cd release-harness
           set -euo pipefail
           browsers="$(node scripts/playwright-browsers.mjs)"
           # shellcheck disable=SC2086
           npx playwright install --with-deps $browsers
 
       - name: API contract
-        working-directory: release-harness
         env:
           BASE_URL: ${{ inputs.base_url }}
         run: python3 contract/check_api.py --base-url "$BASE_URL" --staging
+          cd release-harness
 
       - name: Playwright journey
-        working-directory: release-harness
         env:
           BASE_URL: ${{ inputs.base_url }}
           API_URL: ${{ inputs.api_url }}
@@ -198,6 +195,7 @@ jobs:
           PW_TRACE: 'on'
           CI: 'true'
         run: |
+          cd release-harness
           set -euo pipefail
           projects="$(node scripts/playwright-projects.mjs)"
           # shellcheck disable=SC2086
