@@ -39,8 +39,8 @@ a11oy** — governed runtime, x402 APIs
 ## Pushing the frontier
 
 [Ring-0 receipts](https://huggingface.co/datasets/SZLHOLDINGS/frontier-54-runs) · [x402-metered inference](https://inference.a-11-oy.com) · [Estate math](https://github.com/szl-holdings/lutar-lean).
-- **khipu-x1:** [PyPI 0.1.2](https://pypi.org/project/khipu-x1/0.1.2/) · [Python source](https://github.com/szl-holdings/khipu-x1) · release-file provenance is independently verifiable.
-- **PyPI estate:** [szl-khipu 0.2.0](https://pypi.org/project/szl-khipu/0.2.0/) · [szl-receipt-dsse 0.3.4](https://pypi.org/project/szl-receipt-dsse/0.3.4/) — owner-verified publications.
+- **khipu-x1:** [PyPI 0.1.2](https://pypi.org/project/khipu-x1/0.1.2/) · [Python source](https://github.com/szl-holdings/khipu-x1) · verifiable release provenance.
+- **PyPI estate:** [szl-khipu 0.2.0](https://pypi.org/project/szl-khipu/0.2.0/) · [szl-receipt-dsse 0.3.4](https://pypi.org/project/szl-receipt-dsse/0.3.4/).
 - **Ouroboros:** [ring observations](https://huggingface.co/datasets/SZLHOLDINGS/frontier-54-runs/tree/main/mesh/ring/ouro) · SERVE/LEARN remain NOT_RUN where recorded.
 
 ### Measured live gateway
