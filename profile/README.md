@@ -57,7 +57,7 @@ Scope: reachability and gateway posture only; no quality, SLA, paid latency, or 
 
 Receipts: [battery](https://huggingface.co/datasets/SZLHOLDINGS/model-eval-receipts) · [P8](https://doi.org/10.5281/zenodo.24043620) · [P9](https://doi.org/10.5281/zenodo.24043622).
 
-- Estate students 0.8B–4B: 0‗2/6 FAIL · Qwen3-8B/14B: 1/6 FAIL
+- Estate students 0.8B–4B: 0–2/6 FAIL · Qwen3-8B/14B: 1/6 FAIL
 - Copy-constrained decoding: 21.9% capture — 16× the floor
 
 ## Current state
