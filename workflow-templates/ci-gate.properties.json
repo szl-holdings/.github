@@ -1,0 +1,7 @@
+{
+  "name": "SZL CI gate",
+  "description": "Aggregate ci-gate check for the szl-required-ci org ruleset. Fails unless every listed CI job succeeded.",
+  "iconName": "octicon check-circle",
+  "categories": ["Continuous integration"],
+  "filePatterns": [".*"]
+}
