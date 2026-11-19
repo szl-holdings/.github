@@ -91,8 +91,9 @@ jobs:
           python3 -m unittest discover -s contract -p 'test_*.py' -v
 
       - name: Install npm dependencies
-        run: npm ci
+        run: |
           cd release-harness
+          npm ci
 
       - name: Unit tests and typecheck
         run: |
@@ -101,8 +102,9 @@ jobs:
           npm run typecheck
 
       - name: Install Playwright browsers
-        run: npx playwright install --with-deps chromium firefox webkit
+        run: |
           cd release-harness
+          npx playwright install --with-deps chromium firefox webkit
 
       - name: Playwright fixture journey
         env:
@@ -115,9 +117,9 @@ jobs:
           PW_TRACE: 'on'
           CI: 'true'
         run: |
+          projects="$(node scripts/playwright-projects.mjs)"
           cd release-harness
           set -euo pipefail
-          projects="$(node scripts/playwright-projects.mjs)"
           # shellcheck disable=SC2086
           npx playwright test $projects
 
@@ -166,24 +168,26 @@ jobs:
             --canary "$BASE_URL" --control "$API_URL"
 
       - name: Install npm dependencies
-        run: npm ci
+        run: |
           cd release-harness
+          npm ci
 
       - name: Install selected Playwright browsers
         env:
           BROWSERS: ${{ inputs.browsers }}
         run: |
+          browsers="$(node scripts/playwright-browsers.mjs)"
           cd release-harness
           set -euo pipefail
-          browsers="$(node scripts/playwright-browsers.mjs)"
           # shellcheck disable=SC2086
           npx playwright install --with-deps $browsers
 
       - name: API contract
         env:
           BASE_URL: ${{ inputs.base_url }}
-        run: python3 contract/check_api.py --base-url "$BASE_URL" --staging
+        run: |
           cd release-harness
+          python3 contract/check_api.py --base-url "$BASE_URL" --staging
 
       - name: Playwright journey
         env:
@@ -195,9 +199,9 @@ jobs:
           PW_TRACE: 'on'
           CI: 'true'
         run: |
+          projects="$(node scripts/playwright-projects.mjs)"
           cd release-harness
           set -euo pipefail
-          projects="$(node scripts/playwright-projects.mjs)"
           # shellcheck disable=SC2086
           npx playwright test $projects
 
