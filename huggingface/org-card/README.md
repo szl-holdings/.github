@@ -9,6 +9,18 @@ short_description: Trace governed AI artifacts to source and evidence.
 thumbnail: https://huggingface.co/spaces/SZLHOLDINGS/README/resolve/main/assets/evidence-lattice-v2.webp
 pinned: true
 license: apache-2.0
+source:
+  schema: szl.hf-card-source-binding/v1
+  repository: https://github.com/szl-holdings/.github
+  path: "huggingface/org-card"
+  path_kind: tree-dir-match
+  revision: null
+  revision_basis: "README.md is byte-identical to huggingface/org-card/README.md at head_at_binding; published by hf-org-card-autopublish.yml"
+  head_at_binding: f33ee74353c19336130d00ec3cd8d230c1057008
+  hf_revision_at_binding: 02aae1512c1abae355018df2939460b753973ea9
+  binding_basis: publisher-workflow
+  bound_at: "2026-11-19"
+  bound_by: "Tinkuy 118f2a5e (GitHub szl-holdings is source of truth)"
 ---
 
 <!-- markdownlint-disable MD013 MD033 MD041 -->
