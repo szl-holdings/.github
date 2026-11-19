@@ -1,7 +1,0 @@
-{
-  "name": "SZL release attest",
-  "description": "On a published release: SLSA provenance, SPDX SBOM attestation and keyless Sigstore signatures, uploaded to the release.",
-  "iconName": "octicon shield-check",
-  "categories": ["Deployment", "Python"],
-  "filePatterns": ["pyproject.toml$", "setup.py$"]
-}
