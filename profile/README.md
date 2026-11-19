@@ -29,16 +29,15 @@ Receipt unsigned; no biological claim.
 
 ## The flagship estate
 
-- **
-a11oy** — governed runtime, x402 APIs
-- **Living Anatomy** — · [Space](https://szlholdings-anatomy.hf.space)
-- **Second Brain** — · [Space](https://huggingface.co/spaces/SZLHOLDINGS/szl-second-brain)
+- **a11oy** — governed runtime, x402 APIs
+- **Living Anatomy** — [Space](https://szlholdings-anatomy.hf.space)
+- **Second Brain** — [Space](https://huggingface.co/spaces/SZLHOLDINGS/szl-second-brain)
 - **hatun-mcp** — production MCP · [repo](https://github.com/szl-holdings/hatun-mcp)
 - **killinchu** — counter-UAS · [killinchu.a-11-oy.com](https://killinchu.a-11-oy.com)
 
 ## Pushing the frontier
 
-[Ring-0 receipts](https://huggingface.co/datasets/SZLHOLDINGS/frontier-54-runs) · [x402-metered inference](https://inference.a-11-oy.com) · [Estate math](https://github.com/szl-holdings/lutar-lean).
+[Ring-0 receipts](https://huggingface.co/datasets/SZLHOLDINGS/frontier-54-runs) · [x402-metered inference](https://inference.a-11-oy.com) · [Estate math (lutar-lean)](https://github.com/szl-holdings/lutar-lean) — kernel-checked Lean formalization estate whose tracked proof-sorry count is ratcheted down by CI.
 - **khipu-x1:** [PyPI 0.1.1](https://pypi.org/project/khipu-x1/0.1.1/) · [Python source](https://github.com/szl-holdings/khipu-x1) · release-file provenance is independently verifiable.
 - **Ouroboros:** [ring observations](https://huggingface.co/datasets/SZLHOLDINGS/frontier-54-runs/tree/main/mesh/ring/ouro) · SERVE/LEARN remain NOT_RUN where recorded.
 
