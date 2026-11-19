@@ -57,13 +57,13 @@ Scope: reachability and gateway posture only; no quality, SLA, paid latency, or 
 
 Receipts: [battery](https://huggingface.co/datasets/SZLHOLDINGS/model-eval-receipts) · [P8](https://doi.org/10.5281/zenodo.24043620) · [P9](https://doi.org/10.5281/zenodo.24043622).
 
-- Estate students 0.8B–4B: 0–2/6 FAIL · Qwen3-8B/14B: 1/6 FAIL
+- Estate students 0.8B–4B: 0‗2/6 FAIL · Qwen3-8B/14B: 1/6 FAIL
 - Copy-constrained decoding: 21.9% capture — 16× the floor
 
 ## Current state
 
 <!-- szl:public-inventory:start -->
-The source-bound public inventory records **77 public Spaces, 405 model repositories, 14 native kernels, 169 datasets** at **2026-11-19T10:16:27Z** (`szl.org-census/v1`; **0 private repositories remain**). This is a dated observation, not a live count. Native kernel IDs may also appear in the model namespace; these figures do not count unique projects or trained language models. [Census receipt](https://huggingface.co/datasets/SZLHOLDINGS/frontier-54-runs/blob/main/mesh/org-census/org-census-20261119.json) · [Inventory binding](https://github.com/szl-holdings/.github/blob/main/profile/public-inventory.json) · [Exact source](https://github.com/szl-holdings/a11oy/blob/177fc4d95ed45ad88e3c7f1db09ea8b76763e82a/docs/huggingface-ecosystem-manifest.json). Hub inventory is registry evidence, not availability, operational readiness, or publication policy. It does not establish model quality.
+The source-bound public inventory records **33 public Spaces, 150 model repositories, 14 native kernels, 99 datasets** at **2026-11-18T05:28:05Z** under `hf-public-author-membership/v2`. This is a dated observation, not a live count. Native kernel IDs may also appear in the model namespace; these figures do not count unique projects or trained language models. [Inventory binding](https://github.com/szl-holdings/.github/blob/main/profile/public-inventory.json) · [Exact source](https://github.com/szl-holdings/a11oy/blob/02fe78903c859aa7ef570b96bcb36724b5d59bb4/docs/huggingface-ecosystem-manifest.json) · [Current Hub listing](https://huggingface.co/SZLHOLDINGS). Hub inventory is registry evidence, not availability, operational readiness, or publication policy. It does not establish model quality.
 <!-- szl:public-inventory:end -->
 
 **HISTORICAL:** Three commercial flagships, one inference flagship, six internal engines, **Five public domain bodies** (Terra; PRISM Counsel; PURIQ Finance; LYTE). Earlier snapshot: 16 portfolio Spaces, 1 inventory-only Space, 45 models, 34 datasets. Hub listings do not establish deployment, capability, quality or publication policy.
