@@ -5,7 +5,9 @@
 #   2. generates an SPDX SBOM of the source (anchore/sbom-action / Syft) and
 #      attests it against the same files (actions/attest, sbom-path),
 #   3. signs each file keylessly with Sigstore cosign (<file>.sigstore.json),
-#   4. uploads the SBOM, Sigstore bundles and attestation bundles to the release.
+#   4. uploads the built files themselves plus the SBOM, Sigstore bundles and
+#      attestation bundles to the release, so every verify command below has a
+#      durable subject to check.
 # It does not publish to PyPI or Hugging Face; keep publishing in its own
 # approval-gated workflow.
 #
@@ -114,5 +116,5 @@ jobs:
           set -euo pipefail
           cp "${PROVENANCE_BUNDLE}" provenance.intoto.jsonl
           cp "${SBOM_BUNDLE}" sbom.intoto.jsonl
-          gh release upload "${RELEASE_TAG}" provenance.intoto.jsonl sbom.intoto.jsonl sbom.spdx.json dist/*.sigstore.json \
+          gh release upload "${RELEASE_TAG}" dist/* provenance.intoto.jsonl sbom.intoto.jsonl sbom.spdx.json \
             --repo "${GITHUB_REPOSITORY}" --clobber
