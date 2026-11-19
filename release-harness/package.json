@@ -1,0 +1,16 @@
+{
+  "name": "@szl/release-harness",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "playwright test",
+    "test:unit": "node --experimental-strip-types --test src/same-build.test.ts src/result-honesty.test.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@axe-core/playwright": "4.14.0",
+    "@playwright/test": "1.65.1",
+    "@types/node": "22.20.5",
+    "typescript": "5.9.3"
+  }
+}
