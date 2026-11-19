@@ -37,7 +37,7 @@ Receipt unsigned; no biological claim.
 
 ## Pushing the frontier
 
-[Ring-0 receipts](https://huggingface.co/datasets/SZLHOLDINGS/frontier-54-runs) · [x402-metered inference](https://inference.a-11-oy.com) · [Estate math (lutar-lean)](https://github.com/szl-holdings/lutar-lean) — kernel-checked Lean formalization estate whose tracked proof-sorry count is ratcheted down by CI.
+[Ring-0 receipts](https://huggingface.co/datasets/SZLHOLDINGS/frontier-54-runs) · [x402-metered inference](https://inference.a-11-oy.com) · [Estate math: lutar-lean, CI-ratcheted sorry count](https://github.com/szl-holdings/lutar-lean).
 - **khipu-x1:** [PyPI 0.1.1](https://pypi.org/project/khipu-x1/0.1.1/) · [Python source](https://github.com/szl-holdings/khipu-x1) · release-file provenance is independently verifiable.
 - **Ouroboros:** [ring observations](https://huggingface.co/datasets/SZLHOLDINGS/frontier-54-runs/tree/main/mesh/ring/ouro) · SERVE/LEARN remain NOT_RUN where recorded.
 
