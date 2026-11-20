@@ -1,0 +1,188 @@
+name: Reusable — Hugging Face card lint
+
+# Opt-in lint for Hugging Face model, dataset and Space cards (README.md with
+# YAML front matter). Nothing calls this workflow until a repository adds a
+# caller job, so existing workflows are unaffected.
+#
+# Errors (fail the job):
+#   - card missing, or front matter missing / not valid YAML
+#   - no `license` (or `license: other` without `license_name` or `license_link`)
+#   - model card with neither `library_name` nor `pipeline_tag`
+#   - Space card without `sdk`
+# Warnings (job still passes unless `strict-claims: true`):
+#   - model card without `base_model`
+#   - dataset card without `configs` or `size_categories`
+#   - card body that looks like it reports a metric, with no `model-index`
+#     and no explicit "not yet benchmarked" / "not yet measured" statement
+#
+# Example caller:
+#
+#   jobs:
+#     hf-card-lint:
+#       uses: szl-holdings/.github/.github/workflows/reusable-hf-card-lint.yml@<sha>
+#       with:
+#         cards: 'hf/model/README.md hf/dataset/README.md'
+
+on:
+  workflow_call:
+    inputs:
+      cards:
+        description: 'Space-separated paths or globs of card files to lint'
+        required: false
+        type: string
+        default: 'README.md'
+      card-type:
+        description: 'auto, model, dataset or space (auto infers from front matter)'
+        required: false
+        type: string
+        default: 'auto'
+      strict-claims:
+        description: 'Treat unbacked metric-claim warnings as errors'
+        required: false
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+jobs:
+  lint:
+    name: HF card lint
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Harden runner
+        uses: step-security/harden-runner@e14015d583714f6e62063499dc959a02595150a1 # v2.21.1
+        with:
+          egress-policy: audit
+
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12"
+
+      - name: Install PyYAML (hash-pinned)
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -I -m pip --isolated install --no-deps --no-cache-dir --disable-pip-version-check \
+            'https://files.pythonhosted.org/packages/8b/9d/b3589d3877982d4f2329302ef98a8026e7f4443c765c46cfecc8858c6b4b/pyyaml-6.0.3-cp312-cp312-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl#sha256=ba1cc08a7ccde2d2ec775841541641e4548226580ab850948cbfda66a1befcdc'
+
+      - name: Lint cards
+        shell: bash
+        env:
+          CARDS: ${{ inputs.cards }}
+          CARD_TYPE: ${{ inputs.card-type }}
+          STRICT_CLAIMS: ${{ inputs.strict-claims }}
+        run: |
+          set -euo pipefail
+          python -I - <<'PY'
+          import glob, os, re, sys
+          import yaml
+
+          cards = os.environ["CARDS"].split()
+          card_type = os.environ["CARD_TYPE"].strip().lower()
+          strict = os.environ["STRICT_CLAIMS"].strip().lower() == "true"
+          if card_type not in {"auto", "model", "dataset", "space"}:
+              sys.exit(f"::error::card-type must be auto, model, dataset or space, got {card_type!r}")
+
+          METRIC = re.compile(
+              r"(\b\d+(?:\.\d+)?\s?%|\baccuracy\b|\bF1\b|\bpass@\d+|\bBLEU\b|\bROUGE\b|\bMMLU\b|\bwin[- ]rate\b|\bperplexity\b)",
+              re.IGNORECASE,
+          )
+          HONEST = re.compile(r"not yet (benchmarked|measured)", re.IGNORECASE)
+
+          paths = []
+          for pattern in cards:
+              hits = sorted(glob.glob(pattern, recursive=True))
+              if not hits:
+                  print(f"::error file={pattern}::card not found")
+                  paths.append((pattern, None))
+              paths.extend((h, h) for h in hits)
+
+          errors = warnings = 0
+          rows = []
+
+          def err(path, msg):
+              global errors
+              errors += 1
+              print(f"::error file={path}::{msg}")
+              rows.append((path, "error", msg))
+
+          def warn(path, msg):
+              global warnings, errors
+              if strict and msg.startswith("unbacked metric"):
+                  err(path, msg)
+                  return
+              warnings += 1
+              print(f"::warning file={path}::{msg}")
+              rows.append((path, "warning", msg))
+
+          for label, path in paths:
+              if path is None:
+                  rows.append((label, "error", "card not found"))
+                  errors += 1
+                  continue
+              text = open(path, encoding="utf-8").read()
+              m = re.match(r"^---\r?\n(.*?)\r?\n---\r?\n?(.*)$", text, re.DOTALL)
+              if not m:
+                  err(path, "missing YAML front matter")
+                  continue
+              try:
+                  meta = yaml.safe_load(m.group(1)) or {}
+              except yaml.YAMLError as exc:
+                  err(path, f"front matter is not valid YAML: {exc.__class__.__name__}")
+                  continue
+              if not isinstance(meta, dict):
+                  err(path, "front matter is not a mapping")
+                  continue
+              body = m.group(2)
+
+              kind = card_type
+              if kind == "auto":
+                  if "sdk" in meta:
+                      kind = "space"
+                  elif {"configs", "task_categories", "size_categories", "dataset_info"} & meta.keys():
+                      kind = "dataset"
+                  else:
+                      kind = "model"
+
+              lic = meta.get("license")
+              if not lic:
+                  err(path, "missing `license`")
+              elif str(lic).lower() == "other" and not (meta.get("license_name") or meta.get("license_link")):
+                  err(path, "`license: other` needs `license_name` or `license_link`")
+
+              if kind == "model":
+                  if not (meta.get("library_name") or meta.get("pipeline_tag")):
+                      err(path, "model card needs `library_name` or `pipeline_tag`")
+                  if not meta.get("base_model"):
+                      warn(path, "model card has no `base_model` (fine for from-scratch models)")
+                  if METRIC.search(body) and "model-index" not in meta and not HONEST.search(body):
+                      warn(path, "unbacked metric: body reports a metric but has no `model-index` and no 'not yet benchmarked' statement")
+              elif kind == "dataset":
+                  if "configs" not in meta:
+                      warn(path, "dataset card has no `configs` (dataset viewer may not load)")
+                  if "size_categories" not in meta:
+                      warn(path, "dataset card has no `size_categories`")
+              elif kind == "space":
+                  if not meta.get("sdk"):
+                      err(path, "Space card needs `sdk`")
+
+              if not any(r[0] == path for r in rows):
+                  rows.append((path, "ok", f"{kind} card passes"))
+
+          summary = os.environ.get("GITHUB_STEP_SUMMARY")
+          if summary:
+              with open(summary, "a", encoding="utf-8") as fh:
+                  fh.write("### Hugging Face card lint\n\n| Card | Result | Detail |\n|---|---|---|\n")
+                  for p, level, msg in rows:
+                      fh.write(f"| `{p}` | {level} | {msg.replace('|', '/')} |\n")
+          print(f"cards={len(paths)} errors={errors} warnings={warnings}")
+          sys.exit(1 if errors else 0)
+          PY

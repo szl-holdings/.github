@@ -11986,6 +11986,189 @@
      "WORKFLOW_ENVIRONMENT_REVIEW_REQUIRED@.github/workflows/reusable-anatomy-map-drift.yml:62"
     ]
    }
+  },
+  ".github/workflows/reusable-hf-card-lint.yml": {
+   "intent_id": "reusable-hf-card-lint-opt-in-v1",
+   "valid_until": "2026-11-30",
+   "source_sha256": "sha256:da49470cd671cfcc8a99742a751b76dacf17dc1e6c3c96afdb5cfccb93813ca9",
+   "credentials": [],
+   "resources": [
+    {
+     "key": "github:repository:szl-holdings/.github:contents",
+     "access": "read"
+    },
+    {
+     "key": "runner:guard:egress",
+     "access": "local-write"
+    },
+    {
+     "key": "runner:toolchain:python",
+     "access": "local-write"
+    },
+    {
+     "key": "stepsecurity:monitor:szl-holdings/.github",
+     "access": "external-write"
+    }
+   ],
+   "effects": [
+    {
+     "sink": "github.contents.checkout",
+     "resource": "github:repository:szl-holdings/.github:contents",
+     "access": "read",
+     "max_calls": 1
+    },
+    {
+     "sink": "runner.guard.configure",
+     "resource": "runner:guard:egress",
+     "access": "local-write",
+     "max_calls": 1
+    },
+    {
+     "sink": "runner.guard.telemetry",
+     "resource": "stepsecurity:monitor:szl-holdings/.github",
+     "access": "external-write",
+     "max_calls": 1
+    },
+    {
+     "sink": "runner.toolchain.install",
+     "resource": "runner:toolchain:python",
+     "access": "local-write",
+     "max_calls": 1
+    }
+   ],
+   "max_external_writes": 1,
+   "required_controls": {
+    "triggers": [
+     "workflow_call"
+    ],
+    "contents_read": true,
+    "no_explicit_secrets": true,
+    "concurrency": false,
+    "protected_ref": false,
+    "exact_sha": false,
+    "expected_before": false,
+    "readback": false
+   },
+   "trusted_transitives": {},
+   "reviewed_unknowns": {
+    "files": {
+     ".github/workflows/reusable-hf-card-lint.yml": "sha256:da49470cd671cfcc8a99742a751b76dacf17dc1e6c3c96afdb5cfccb93813ca9"
+    },
+    "unknowns": [
+     "ACTION_INPUTS_REVIEW_REQUIRED@.github/workflows/reusable-hf-card-lint.yml:57",
+     "ACTION_INPUTS_REVIEW_REQUIRED@.github/workflows/reusable-hf-card-lint.yml:62",
+     "ACTION_INPUTS_REVIEW_REQUIRED@.github/workflows/reusable-hf-card-lint.yml:67",
+     "PYTHON_IMPORT_UNRESOLVED@.github/workflows/reusable-hf-card-lint.yml:85",
+     "PYTHON_IMPORT_UNRESOLVED@.github/workflows/reusable-hf-card-lint.yml:86",
+     "PYTHON_SOURCE_REVIEW_REQUIRED@.github/workflows/reusable-hf-card-lint.yml:85",
+     "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-card-lint.yml:100",
+     "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-card-lint.yml:101",
+     "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-card-lint.yml:102",
+     "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-card-lint.yml:103",
+     "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-card-lint.yml:104",
+     "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-card-lint.yml:105",
+     "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-card-lint.yml:106",
+     "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-card-lint.yml:108",
+     "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-card-lint.yml:109",
+     "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-card-lint.yml:111",
+     "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-card-lint.yml:112",
+     "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-card-lint.yml:113",
+     "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-card-lint.yml:114",
+     "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-card-lint.yml:115",
+     "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-card-lint.yml:117",
+     "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-card-lint.yml:118",
+     "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-card-lint.yml:119",
+     "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-card-lint.yml:120",
+     "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-card-lint.yml:121",
+     "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-card-lint.yml:122",
+     "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-card-lint.yml:123",
+     "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-card-lint.yml:124",
+     "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-card-lint.yml:126",
+     "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-card-lint.yml:127",
+     "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-card-lint.yml:128",
+     "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-card-lint.yml:129",
+     "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-card-lint.yml:130",
+     "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-card-lint.yml:131",
+     "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-card-lint.yml:132",
+     "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-card-lint.yml:133",
+     "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-card-lint.yml:134",
+     "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-card-lint.yml:135",
+     "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-card-lint.yml:136",
+     "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-card-lint.yml:137",
+     "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-card-lint.yml:138",
+     "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-card-lint.yml:139",
+     "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-card-lint.yml:140",
+     "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-card-lint.yml:141",
+     "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-card-lint.yml:142",
+     "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-card-lint.yml:143",
+     "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-card-lint.yml:144",
+     "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-card-lint.yml:146",
+     "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-card-lint.yml:147",
+     "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-card-lint.yml:148",
+     "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-card-lint.yml:149",
+     "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-card-lint.yml:150",
+     "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-card-lint.yml:151",
+     "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-card-lint.yml:152",
+     "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-card-lint.yml:153",
+     "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-card-lint.yml:155",
+     "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-card-lint.yml:156",
+     "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-card-lint.yml:157",
+     "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-card-lint.yml:158",
+     "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-card-lint.yml:159",
+     "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-card-lint.yml:161",
+     "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-card-lint.yml:162",
+     "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-card-lint.yml:163",
+     "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-card-lint.yml:164",
+     "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-card-lint.yml:165",
+     "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-card-lint.yml:166",
+     "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-card-lint.yml:167",
+     "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-card-lint.yml:168",
+     "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-card-lint.yml:169",
+     "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-card-lint.yml:170",
+     "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-card-lint.yml:171",
+     "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-card-lint.yml:172",
+     "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-card-lint.yml:173",
+     "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-card-lint.yml:174",
+     "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-card-lint.yml:175",
+     "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-card-lint.yml:177",
+     "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-card-lint.yml:178",
+     "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-card-lint.yml:180",
+     "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-card-lint.yml:181",
+     "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-card-lint.yml:182",
+     "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-card-lint.yml:183",
+     "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-card-lint.yml:184",
+     "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-card-lint.yml:185",
+     "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-card-lint.yml:186",
+     "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-card-lint.yml:187",
+     "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-card-lint.yml:188",
+     "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-card-lint.yml:73",
+     "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-card-lint.yml:74",
+     "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-card-lint.yml:84",
+     "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-card-lint.yml:85",
+     "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-card-lint.yml:86",
+     "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-card-lint.yml:88",
+     "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-card-lint.yml:89",
+     "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-card-lint.yml:90",
+     "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-card-lint.yml:91",
+     "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-card-lint.yml:92",
+     "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-card-lint.yml:94",
+     "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-card-lint.yml:95",
+     "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-card-lint.yml:96",
+     "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-card-lint.yml:97",
+     "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/reusable-hf-card-lint.yml:98",
+     "SHELL_COMPOSITION_UNKNOWN@.github/workflows/reusable-hf-card-lint.yml:157",
+     "SHELL_COMPOSITION_UNKNOWN@.github/workflows/reusable-hf-card-lint.yml:159",
+     "SHELL_COMPOSITION_UNKNOWN@.github/workflows/reusable-hf-card-lint.yml:163",
+     "SHELL_COMPOSITION_UNKNOWN@.github/workflows/reusable-hf-card-lint.yml:165",
+     "SHELL_COMPOSITION_UNKNOWN@.github/workflows/reusable-hf-card-lint.yml:167",
+     "SHELL_COMPOSITION_UNKNOWN@.github/workflows/reusable-hf-card-lint.yml:170",
+     "SHELL_COMPOSITION_UNKNOWN@.github/workflows/reusable-hf-card-lint.yml:172",
+     "SHELL_COMPOSITION_UNKNOWN@.github/workflows/reusable-hf-card-lint.yml:175",
+     "SHELL_COMPOSITION_UNKNOWN@.github/workflows/reusable-hf-card-lint.yml:185",
+     "SHELL_COMPOSITION_UNKNOWN@.github/workflows/reusable-hf-card-lint.yml:73",
+     "WORKFLOW_ENVIRONMENT_REVIEW_REQUIRED@.github/workflows/reusable-hf-card-lint.yml:79"
+    ]
+   }
   }
  }
 }
