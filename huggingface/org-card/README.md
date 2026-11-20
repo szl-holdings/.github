@@ -12,7 +12,7 @@ license: apache-2.0
 ---
 
 <!-- markdownlint-disable MD013 MD033 MD041 -->
-<p><a href="https://a-11-oy.com"><img src="https://huggingface.co/spaces/SZLHOLDINGS/README/resolve/main/assets/estate-banner-v3-holo.svg" alt="SZL Holdings" width="100%" /></a></p>
+<p><a href="https://a-11-oy.com"><img src="https://raw.githubusercontent.com/szl-holdings/.github/main/profile/assets/szl-org-khipu-banner.png" alt="SZL Holdings" width="100%" /></a></p>
 
 # Governed intelligence. Receipted evidence. Checkable results.
 
