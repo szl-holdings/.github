@@ -66,7 +66,7 @@ Receipts: [battery](https://huggingface.co/datasets/SZLHOLDINGS/model-eval-recei
 The source-bound public inventory records **22 public Spaces, 121 model repositories, 14 native kernels, 69 datasets** at **2026-11-15T03:48:57Z** under `hf-public-author-membership/v2`. This is a dated observation, not a live count. Native kernel IDs may also appear in the model namespace; these figures do not count unique projects or trained language models. [Inventory binding](https://github.com/szl-holdings/.github/blob/main/profile/public-inventory.json) · [Exact source](https://github.com/szl-holdings/a11oy/blob/177fc4d95ed45ad88e3c7f1db09ea8b76763e82a/docs/huggingface-ecosystem-manifest.json) · [Current Hub listing](https://huggingface.co/SZLHOLDINGS). Hub inventory is registry evidence, not availability, operational readiness, or publication policy. It does not establish model quality.
 <!-- szl:public-inventory:end -->
 
-**HISTORICAL:** Earlier snapshots had 16 portfolio Spaces, 45 models and 34 datasets; they are not current capability evidence.
+**HISTORICAL:** Three commercial flagships; one inference flagship; Six internal engines; Five public domain bodies: Terra, PRISM Counsel, PURIQ Finance, LYTE. 16 portfolio Spaces, 1 inventory-only Space; historical counts, not readiness.
 
 ## Live estate observability
 
@@ -77,6 +77,6 @@ The source-bound public inventory records **22 public Spaces, 121 model reposito
 
 ## Estate snapshot
 
-[Measured census, limits and graphs](ESTATE_AT_A_GLANCE.md) (2026-11-20T03:48:04Z; not training or production proof).
+[Measured census and limitations](ESTATE_AT_A_GLANCE.md).
 
 <!-- /szl:estate-cards:v1 -->
