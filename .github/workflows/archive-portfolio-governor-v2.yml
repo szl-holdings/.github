@@ -95,6 +95,7 @@ jobs:
           required_workflow = (
               "ref: $" + "{{ github.sha }}",
               "needs.preflight.outputs.needs_restore == 'true'",
+              "Enforce pre-mutation audit result",
               "environment: production",
               "test \"$(git rev-parse HEAD)\" = \"$GITHUB_SHA\"",
           )
@@ -288,6 +289,21 @@ jobs:
           code=$?
           echo "exit_code=$code" >> "$GITHUB_OUTPUT"
           exit 0
+
+      - name: Enforce pre-mutation audit result
+        # Neutered-gate closure (T14 cof census): the audit step above runs
+        # continue-on-error:true and captures its exit code, but nothing
+        # enforced it, letting the production apply proceed on an
+        # unverified pre-mutation state. Fail closed instead: apply runs
+        # only after the audit exited 0.
+        shell: bash
+        run: |
+          set -euo pipefail
+          code="${{ steps.audit.outputs.exit_code }}"
+          if [ "$code" != "0" ]; then
+            echo "::error::Pre-mutation audit failed (exit=$code); production restore refused (fail-closed). See receipt: $AUDIT_REPORT"
+            exit 1
+          fi
 
       - name: Apply exact manifest-authorized restoration wave
         id: apply
