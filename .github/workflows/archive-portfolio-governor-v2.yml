@@ -107,6 +107,42 @@ jobs:
                   f"missing exact-head workflow contracts: {missing_workflow}"
               )
 
+          # Inspect the actual restore job, never the assertion's own text.
+          def enforced_restore_gate(text: str) -> bool:
+              sections = text.split("\n  restore:\n", 1)
+              if len(sections) != 2:
+                  return False
+              restore = sections[1].split("\n  converged:\n", 1)[0]
+              names = (
+                  "Audit live provider state before mutation",
+                  "Enforce pre-mutation audit result",
+                  "Apply exact manifest-authorized restoration wave",
+              )
+              markers = ["      - name: " + name + "\n" for name in names]
+              if any(restore.count(marker) != 1 for marker in markers):
+                  return False
+              positions = [restore.index(marker) for marker in markers]
+              if positions != sorted(positions) or len(set(positions)) != 3:
+                  return False
+              enforcement = restore[positions[1]:positions[2]]
+              return (
+                  ('code="$' + '{{ steps.audit.outputs.exit_code }}"') in enforcement
+                  and 'if [ "$code" != "0" ]; then' in enforcement
+                  and re.search(r"(?m)^\s+exit 1\s*$", enforcement) is not None
+              )
+
+          if not enforced_restore_gate(workflow):
+              raise SystemExit("production audit enforcement is missing or unbound")
+          negative_removed = re.sub(
+              r"(?ms)^      - name: Enforce pre-mutation audit result\n"
+              r".*?(?=^      - name: Apply exact manifest-authorized restoration wave\n)",
+              "",
+              workflow,
+              count=1,
+          )
+          if negative_removed == workflow or enforced_restore_gate(negative_removed):
+              raise SystemExit("negative fixture: deleted audit guard was not rejected")
+
           source = Path(".github/scripts/archive_portfolio_governor_v2.py").read_text()
           required_source = (
               '{"archived": False}',
