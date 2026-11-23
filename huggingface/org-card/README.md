@@ -11,7 +11,7 @@ pinned: true
 license: apache-2.0
 ---
 
-<!--szl.hf-card-source-binding/v1{"schema":"szl.hf-card-source-binding/v1","repository":"https://github.com/szl-holdings/.github","path":"huggingface/org-card","path_kind":"tree-dir-match","revision":null,"revision_basis":"README.md\u0020is\u0020byte-identical\u0020to\u0020huggingface/org-card/README.md\u0020at\u0020head_at_binding;\u0020published\u0020by\u0020hf-org-card-autopublish.yml","head_at_binding":"f33ee74353c19336130d00ec3cd8d230c1057008","hf_revision_at_binding":"02aae1512c1abae355018df2939460b753973ea9","binding_basis":"publisher-workflow","bound_at":"2026-11-19","bound_by":"Tinkuy\u0020118f2a5e\u0020(GitHub\u0020szl-holdings\u0020is\u0020source\u0020of\u0020truth)"}-->
+<!--szl.hf-card-source-binding/v1{"schema":"szl.hf-card-source-binding/v1","repository":"https://github.com/szl-holdings/.github","path":"huggingface/org-card","path_kind":"tree-dir-match","revision":"b9ac82d74324324273e13da74bc60eb95400a092","revision_basis":"README.md source binding is present at this exact source revision; published by hf-org-card-autopublish.yml","head_at_binding":"b9ac82d74324324273e13da74bc60eb95400a092","hf_revision_at_binding":"02aae1512c1abae355018df2939460b753973ea9","binding_basis":"publisher-workflow","bound_at":"2026-11-19","bound_by":"Tinkuy\u0020118f2a5e\u0020(GitHub\u0020szl-holdings\u0020is\u0020source\u0020of\u0020truth)"}-->
 
 <!-- markdownlint-disable MD013 MD033 MD041 -->
 <p><a href="https://a-11-oy.com"><img src="https://huggingface.co/spaces/SZLHOLDINGS/README/resolve/main/assets/estate-banner-v3-holo.svg" alt="SZL Holdings" width="100%" /></a></p>
