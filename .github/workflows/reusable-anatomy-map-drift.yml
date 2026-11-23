@@ -13,7 +13,7 @@ on:
         description: "Immutable ref of szl-holdings/.github containing this checker and registry."
         required: false
         type: string
-        default: "f33ee74353c19336130d00ec3cd8d230c1057008 " # immutable main HEAD measured 2026-11-22; bump via pull request
+        default: "f33ee74353c19336130d00ec3cd8d230c1057008" # immutable main HEAD measured 2026-11-22; bump via pull request
 
 permissions:
   contents: read
