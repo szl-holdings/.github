@@ -16,16 +16,13 @@ on:
   release:
     types: [published]
 
-permissions:
-  id-token: write
-  contents: write
-  actions: read
+permissions: {}
 
 jobs:
   slsa-verify:
     name: SLSA supply-chain checks
     runs-on: ubuntu-latest
-    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch' || github.event_name == 'release'
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: SLSA L1 supply-chain baseline (SBOM + source record; honest — not L3)
