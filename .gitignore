@@ -21,5 +21,11 @@ reports/code-security-drift.json
 .DS_Store
 .pytest_cache/
 
+# Release harness local installs and Playwright output
+release-harness/node_modules/
+release-harness/playwright-report/
+release-harness/test-results/
+release-harness/blob-report/
+
 # NOTE: coordination/**/*.log are intentional evidence-run artifacts and are
 # tracked on purpose — not ignored here.

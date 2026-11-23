@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>SZL Atelier · Command centre</title>
+  <meta name="description" content="Fixture for the a11oy critical journey. Not a production deployment.">
+  <link rel="stylesheet" href="/command-centre/style.css">
+  <script src="/command-centre/app.js" defer></script>
+</head>
+<body>
+  <a class="skip" href="#work">Skip to work</a>
+  <div class="shell">
+    <header class="rail">
+      <a class="identity" href="/">SZL Atelier</a>
+      <p class="eyebrow">Command centre</p>
+      <nav aria-label="Command centre">
+        <a href="#work">01 · Work</a>
+        <a href="#verify">03 · Verify</a>
+      </nav>
+    </header>
+    <main>
+      <div class="mast">
+        <h1>Your work. One centre.</h1>
+        <button id="refresh" class="secondary" type="button">Refresh status</button>
+      </div>
+      <section class="status-grid" aria-label="Observed runtime status">
+        <article>
+          <h2>Python source</h2>
+          <p id="source-state">Not observed yet</p>
+          <code id="source-sha">Not observed yet</code>
+        </article>
+        <article>
+          <h2>Grok connection</h2>
+          <p id="grok-state">Not observed yet</p>
+          <p id="grok-detail">Configuration is not successful inference.</p>
+        </article>
+        <article>
+          <h2>HF inventory</h2>
+          <p id="inventory-state">Not observed yet</p>
+          <p id="inventory-detail">Public snapshot, not qualification.</p>
+        </article>
+      </section>
+      <section id="work" tabindex="-1">
+        <h2>Think with Atelier.</h2>
+        <p>Grok 4.7 supplies text. SZL controls the receipt. This fixture is not production.</p>
+        <form id="turn-form">
+          <label for="operator-key">Atelier operator credential</label>
+          <input id="operator-key" type="password" autocomplete="off" spellcheck="false">
+          <label for="prompt">What are we working on?</label>
+          <textarea id="prompt" rows="4" maxlength="32000" required></textarea>
+          <div class="controls">
+            <label for="model">Model
+              <select id="model">
+                <option value="grok-4.7">Grok 4.7</option>
+                <option value="grok-4.6">Grok 4.6 · explicit rollback</option>
+              </select>
+            </label>
+            <label for="effort">Reasoning
+              <select id="effort">
+                <option>low</option>
+                <option>medium</option>
+                <option selected>high</option>
+                <option>xhigh</option>
+              </select>
+            </label>
+            <label for="classification">Data classification
+              <select id="classification">
+                <option>PUBLIC</option>
+                <option>INTERNAL</option>
+                <option>RESTRICTED</option>
+                <option>SECRET</option>
+              </select>
+            </label>
+            <button id="send" type="submit">Send governed request</button>
+          </div>
+        </form>
+        <p id="turn-status" role="status" aria-live="polite">No request has been sent.</p>
+        <div id="answer" role="region" aria-label="Final assistant answer" hidden></div>
+        <details id="receipt-panel" hidden>
+          <summary>Inspect outcome and receipt</summary>
+          <pre id="receipt"></pre>
+        </details>
+      </section>
+      <section id="verify">
+        <h2>Follow the source.</h2>
+        <p>The build id in the receipt must equal the build id shown above.</p>
+      </section>
+    </main>
+  </div>
+</body>
+</html>

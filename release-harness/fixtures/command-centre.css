@@ -1,0 +1,100 @@
+:root {
+  color: #102033;
+  background: #f7f4ef;
+}
+
+body {
+  font: 16px/1.5 "Segoe UI", sans-serif;
+  margin: 0;
+}
+
+a {
+  color: #0b3a82;
+}
+
+.skip {
+  position: absolute;
+  left: 0.5rem;
+  top: 0.5rem;
+  transform: translateY(-200%);
+  background: #fff;
+  color: #102033;
+  padding: 0.5rem 0.75rem;
+}
+
+.skip:focus {
+  transform: none;
+}
+
+.shell {
+  max-width: 40rem;
+  margin: 0 auto;
+  padding: 1rem;
+}
+
+h1, h2, p {
+  margin-top: 0;
+}
+
+h1 {
+  font-size: 1.75rem;
+}
+
+h2 {
+  font-size: 1.1rem;
+}
+
+.mast, .controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  align-items: end;
+}
+
+label {
+  display: block;
+  margin-top: 0.75rem;
+}
+
+input, textarea, select, button {
+  font: inherit;
+}
+
+textarea, input[type="password"] {
+  width: 100%;
+  box-sizing: border-box;
+}
+
+button {
+  min-height: 44px;
+  background: #102033;
+  color: #fff;
+  border: 0;
+  padding: 0.6rem 1rem;
+}
+
+button.secondary {
+  background: #fff;
+  color: #102033;
+  border: 1px solid #102033;
+}
+
+button:disabled {
+  opacity: 0.6;
+}
+
+:focus-visible {
+  outline: 3px solid #0b3a82;
+  outline-offset: 2px;
+}
+
+code, pre {
+  font-family: ui-monospace, monospace;
+  word-break: break-all;
+}
+
+#answer {
+  margin-top: 1rem;
+  padding: 0.75rem;
+  background: #fff;
+}

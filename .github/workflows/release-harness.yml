@@ -1,0 +1,219 @@
+name: Release harness
+
+# Reusable staging journey for a11oy, plus fixture self-tests on this repo.
+# staging must be true. Production hosts are refused before any browser opens.
+
+on:
+  workflow_call:
+    inputs:
+      base_url:
+        description: 'UI origin that serves /command-centre'
+        required: true
+        type: string
+      api_url:
+        description: 'API origin for /api/build-info and the turn route'
+        required: true
+        type: string
+      browsers:
+        description: 'Comma-separated subset of chromium, firefox, webkit'
+        required: false
+        type: string
+        default: 'chromium,firefox,webkit'
+      staging:
+        description: 'Must be true. Any other value refuses the run.'
+        required: true
+        type: boolean
+    secrets:
+      operator_credential:
+        description: >-
+          Optional Atelier operator credential for one live staging turn.
+          Fixture self-tests do not use a secret.
+        required: false
+  pull_request:
+    paths:
+      - 'release-harness/**'
+      - '.github/workflows/release-harness.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'release-harness/**'
+      - '.github/workflows/release-harness.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  guard:
+    if: github.event_name == 'workflow_call'
+    name: Require staging
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Refuse unless staging is true
+        env:
+          STAGING: ${{ inputs.staging }}
+        run: |
+          set -euo pipefail
+          if [ "$STAGING" != "true" ]; then
+            echo "refusing: staging must be true"
+            exit 1
+          fi
+
+  self-test:
+    if: github.event_name != 'workflow_call'
+    name: Fixture self-test
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - name: Harden runner
+        uses: step-security/harden-runner@e14015d583714f6e62063499dc959a02595150a1 # v2.21.1
+        with:
+          egress-policy: audit
+
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: '3.12'
+
+      - name: Set up Node
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '22'
+          package-manager-cache: 'false'
+
+      - name: Python self-tests
+        run: |
+          cd release-harness
+          python3 -m unittest discover -s canary -p 'test_*.py' -v
+          python3 -m unittest discover -s contract -p 'test_*.py' -v
+
+      - name: Install npm dependencies
+        run: |
+          cd release-harness
+          npm ci
+
+      - name: Unit tests and typecheck
+        run: |
+          cd release-harness
+          npm run test:unit
+          npm run typecheck
+
+      - name: Install Playwright browsers
+        run: |
+          cd release-harness
+          npx playwright install --with-deps chromium firefox webkit
+
+      - name: Playwright fixture journey
+        env:
+          HARNESS_FIXTURE: '1'
+          STAGING: 'true'
+          BASE_URL: http://127.0.0.1:8765
+          API_URL: http://127.0.0.1:8765
+          A11OY_OPERATOR_CREDENTIAL: fixture-operator
+          BROWSERS: chromium,firefox,webkit
+          PW_TRACE: 'on'
+          CI: 'true'
+        run: |
+          projects="$(node scripts/playwright-projects.mjs)"
+          cd release-harness
+          set -euo pipefail
+          # shellcheck disable=SC2086
+          npx playwright test $projects
+
+      - name: Upload Playwright traces and reports
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: release-harness-playwright
+          path: |
+            release-harness/playwright-report/
+            release-harness/test-results/
+          if-no-files-found: ignore
+
+  release:
+    if: github.event_name == 'workflow_call' && inputs.staging == true
+    name: Staging journey
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - name: Harden runner
+        uses: step-security/harden-runner@e14015d583714f6e62063499dc959a02595150a1 # v2.21.1
+        with:
+          egress-policy: audit
+
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: szl-holdings/.github
+          ref: ${{ github.workflow_sha }}
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: '3.12'
+
+      - name: Set up Node
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '22'
+          package-manager-cache: 'false'
+
+      - name: Refuse production hosts
+        env:
+          BASE_URL: ${{ inputs.base_url }}
+          API_URL: ${{ inputs.api_url }}
+        run: |
+          cd release-harness
+          python3 canary/compare.py --check-only --staging --target-class staging \
+            --canary "$BASE_URL" --control "$API_URL"
+
+      - name: Install npm dependencies
+        run: |
+          cd release-harness
+          npm ci
+
+      - name: Install selected Playwright browsers
+        env:
+          BROWSERS: ${{ inputs.browsers }}
+        run: |
+          browsers="$(node scripts/playwright-browsers.mjs)"
+          cd release-harness
+          set -euo pipefail
+          # shellcheck disable=SC2086
+          npx playwright install --with-deps $browsers
+
+      - name: API contract
+        env:
+          API_URL: ${{ inputs.api_url }}
+        run: |
+          cd release-harness
+          python3 contract/check_api.py --base-url "$API_URL" --staging --target-class staging
+
+      - name: Playwright journey
+        env:
+          BASE_URL: ${{ inputs.base_url }}
+          API_URL: ${{ inputs.api_url }}
+          STAGING: 'true'
+          BROWSERS: ${{ inputs.browsers }}
+          A11OY_OPERATOR_CREDENTIAL: ${{ secrets.operator_credential }}
+          PW_TRACE: 'on'
+          CI: 'true'
+        run: |
+          projects="$(node scripts/playwright-projects.mjs)"
+          cd release-harness
+          set -euo pipefail
+          # shellcheck disable=SC2086
+          npx playwright test $projects
+
+      - name: Upload Playwright traces and reports
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: release-harness-staging-playwright
+          path: |
+            release-harness/playwright-report/
+            release-harness/test-results/
+          if-no-files-found: ignore
