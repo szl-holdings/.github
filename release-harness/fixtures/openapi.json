@@ -1,0 +1,39 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "a11oy fixture — routes present in the generated flagship schema",
+    "version": "0"
+  },
+  "paths": {
+    "/api/build-info": {
+      "get": {
+        "responses": {
+          "200": {
+            "description": "Observed build identity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": ["status", "service", "build", "receipt_minted"],
+                  "properties": {
+                    "status": {"type": "string"},
+                    "service": {"type": "string"},
+                    "build": {
+                      "type": "object",
+                      "required": ["revision", "state"],
+                      "properties": {
+                        "revision": {"type": "string"},
+                        "state": {"type": "string"}
+                      }
+                    },
+                    "receipt_minted": {"type": "boolean"}
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
