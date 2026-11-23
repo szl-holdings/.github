@@ -1,0 +1,111 @@
+{
+  "source": {
+    "repository": "szl-holdings/a11oy",
+    "commit": "9467fa988ff63c919954adbd8e23e930412321b5",
+    "journey_page": "/command-centre",
+    "turn": "POST /api/a11oy/v1/atelier/turn",
+    "build": "GET /api/build-info build.revision, also shown in #source-sha",
+    "evidence": "outcome receipt payload.source_revision in the command-centre receipt panel",
+    "openapi": "No committed flagship OpenAPI document. Runtime generator is /api/a11oy/openapi.json. Atelier turn and health are include_in_schema false, so a spec that omits them is UNKNOWN rather than a schema pass."
+  },
+  "routes": [
+    {
+      "id": "livez",
+      "method": "GET",
+      "path": "/api/livez",
+      "expect": [200],
+      "auth": "none",
+      "profile": "public"
+    },
+    {
+      "id": "command-centre",
+      "method": "GET",
+      "path": "/command-centre",
+      "expect": [200],
+      "auth": "none",
+      "profile": "public"
+    },
+    {
+      "id": "build-info",
+      "method": "GET",
+      "path": "/api/build-info",
+      "expect": [200],
+      "auth": "none",
+      "profile": "public",
+      "schema": "if-specified"
+    },
+    {
+      "id": "atelier-health",
+      "method": "GET",
+      "path": "/api/a11oy/v1/atelier/health",
+      "expect": [200],
+      "auth": "none",
+      "profile": "public",
+      "schema": "if-specified"
+    },
+    {
+      "id": "atelier-turn-unauthenticated",
+      "method": "POST",
+      "path": "/api/a11oy/v1/atelier/turn",
+      "expect": [401],
+      "auth": "none",
+      "profile": "public",
+      "body": {
+        "client_request_id": "11111111-1111-4111-8111-111111111111",
+        "prompt": "What is the public status of this build?",
+        "model": "grok-4.7",
+        "reasoning_effort": "low",
+        "declared": "PUBLIC"
+      },
+      "note": "routers/atelier_grok.py authenticate() returns 401 AUTH_REQUIRED before the body is trusted."
+    },
+    {
+      "id": "atelier-turn-forbidden",
+      "method": "POST",
+      "path": "/api/a11oy/v1/atelier/turn",
+      "expect": [403],
+      "auth": "bearer:forbidden-fixture",
+      "profile": "fixture-auth",
+      "body": {
+        "client_request_id": "11111111-1111-4111-8111-111111111111",
+        "prompt": "What is the public status of this build?",
+        "model": "grok-4.7",
+        "reasoning_effort": "low",
+        "declared": "PUBLIC"
+      },
+      "note": "403 AUTH_FORBIDDEN is revoked, foreign-namespace, or missing atelier:write. The fixture token stands in for that denial."
+    },
+    {
+      "id": "atelier-turn-payment",
+      "method": "POST",
+      "path": "/api/a11oy/v1/atelier/turn",
+      "expect": [402],
+      "auth": "bearer:payment-fixture",
+      "profile": "fixture-auth",
+      "body": {
+        "client_request_id": "11111111-1111-4111-8111-111111111111",
+        "prompt": "What is the public status of this build?",
+        "model": "grok-4.7",
+        "reasoning_effort": "low",
+        "declared": "PUBLIC"
+      },
+      "note": "402 is PROVIDER_HTTP_402 from the upstream provider, not an a11oy price list."
+    },
+    {
+      "id": "atelier-turn-ok",
+      "method": "POST",
+      "path": "/api/a11oy/v1/atelier/turn",
+      "expect": [200],
+      "auth": "bearer:fixture-operator",
+      "profile": "fixture-auth",
+      "body": {
+        "client_request_id": "11111111-1111-4111-8111-111111111111",
+        "prompt": "What is the public status of this build?",
+        "model": "grok-4.7",
+        "reasoning_effort": "low",
+        "declared": "PUBLIC"
+      },
+      "schema": "if-specified"
+    }
+  ]
+}
