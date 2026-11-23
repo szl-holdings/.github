@@ -7,19 +7,18 @@ name: SLSA Provenance (L1 honest)
 # Real build provenance for release artifacts is produced per-repo by
 # actions/attest-build-provenance@v2 (SLSA L2 roadmap — NOT yet earned; verifiable via
 # `gh attestation verify` / slsa-verifier). See each flagship's
-# .github/workflows for the actual attestation step.
+# `.github/workflows` for the actual attestation step.
 
 on:
   push:
     branches: [main]
   workflow_dispatch:
-  release:
-    types: [published]
 
+# The current job only checks out source and records the L1 baseline.
+# Keep the default token read-only until a step needs an explicitly reviewed
+# write capability.
 permissions:
-  id-token: write
-  contents: write
-  actions: read
+  contents: read
 
 jobs:
   slsa-verify:
