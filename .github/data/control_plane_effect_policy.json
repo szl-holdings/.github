@@ -8362,7 +8362,172 @@
     ]
    }
   },
-  ".github/workflows/repository-verification.yml": {
+  ".github/workflows/release-harness.yml":  {
+  "intent_id": "a11oy_release_harness_staging_and_fixture_selftest_v1",
+  "valid_until": "2026-11-30",
+  "source_sha256": "sha256:3c95173926457f38fda77207043cf03aef5ff7d4fcc507c7819c1be6eb041ce7",
+  "credentials": [
+   "operator_credential"
+  ],
+  "resources": [
+   {
+    "key": "github:actions:artifact:release-harness-playwright",
+    "access": "external-write"
+   },
+   {
+    "key": "github:actions:artifact:release-harness-staging-playwright",
+    "access": "external-write"
+   },
+   {
+    "key": "github:repository:szl-holdings/.github:contents",
+    "access": "read"
+   },
+   {
+    "key": "runner:guard:egress",
+    "access": "local-write"
+   },
+   {
+    "key": "runner:toolchain:node",
+    "access": "local-write"
+   },
+   {
+    "key": "runner:toolchain:python",
+    "access": "local-write"
+   },
+   {
+    "key": "stepsecurity:monitor:szl-holdings/.github",
+    "access": "external-write"
+   }
+  ],
+  "effects": [
+   {
+    "sink": "github.artifact.upload",
+    "resource": "github:actions:artifact:release-harness-playwright",
+    "access": "external-write",
+    "max_calls": 1
+   },
+   {
+    "sink": "github.artifact.upload",
+    "resource": "github:actions:artifact:release-harness-staging-playwright",
+    "access": "external-write",
+    "max_calls": 1
+   },
+   {
+    "sink": "github.contents.checkout",
+    "resource": "github:repository:szl-holdings/.github:contents",
+    "access": "read",
+    "max_calls": 2
+   },
+   {
+    "sink": "runner.guard.configure",
+    "resource": "runner:guard:egress",
+    "access": "local-write",
+    "max_calls": 2
+   },
+   {
+    "sink": "runner.guard.telemetry",
+    "resource": "stepsecurity:monitor:szl-holdings/.github",
+    "access": "external-write",
+    "max_calls": 2
+   },
+   {
+    "sink": "runner.toolchain.install",
+    "resource": "runner:toolchain:node",
+    "access": "local-write",
+    "max_calls": 2
+   },
+   {
+    "sink": "runner.toolchain.install",
+    "resource": "runner:toolchain:python",
+    "access": "local-write",
+    "max_calls": 2
+   }
+  ],
+  "max_external_writes": 4,
+  "required_controls": {
+   "triggers": [
+    "pull_request",
+    "push",
+    "workflow_call"
+   ],
+   "contents_read": true,
+   "no_explicit_secrets": false,
+   "concurrency": false,
+   "protected_ref": false,
+   "exact_sha": false,
+   "expected_before": false,
+   "readback": false
+  },
+  "trusted_transitives": {},
+  "reviewed_unknowns": {
+   "files": {
+    ".github/workflows/release-harness.yml": "sha256:3c95173926457f38fda77207043cf03aef5ff7d4fcc507c7819c1be6eb041ce7",
+    "scripts/playwright-browsers.mjs": "sha256:dd29a871286dacfdd0233483f654b35fcd827e640f0128a72e695ea44e8e7a9e",
+    "scripts/playwright-projects.mjs": "sha256:6eea61c36eb60059623f8445f075ff818db52ebf1ecd2bff335bc98bda3fbb1d"
+   },
+   "unknowns": [
+    "ACTION_INPUTS_REVIEW_REQUIRED@.github/workflows/release-harness.yml:130",
+    "ACTION_INPUTS_REVIEW_REQUIRED@.github/workflows/release-harness.yml:145",
+    "ACTION_INPUTS_REVIEW_REQUIRED@.github/workflows/release-harness.yml:153",
+    "ACTION_INPUTS_REVIEW_REQUIRED@.github/workflows/release-harness.yml:158",
+    "ACTION_INPUTS_REVIEW_REQUIRED@.github/workflows/release-harness.yml:212",
+    "ACTION_INPUTS_REVIEW_REQUIRED@.github/workflows/release-harness.yml:71",
+    "ACTION_INPUTS_REVIEW_REQUIRED@.github/workflows/release-harness.yml:79",
+    "ACTION_INPUTS_REVIEW_REQUIRED@.github/workflows/release-harness.yml:84",
+    "SCRIPT_SOURCE_REVIEW_REQUIRED@.github/workflows/release-harness.yml:1",
+    "SCRIPT_SOURCE_REVIEW_REQUIRED@scripts/playwright-browsers.mjs:1",
+    "SCRIPT_SOURCE_REVIEW_REQUIRED@scripts/playwright-projects.mjs:1",
+    "SECRET_EXPRESSION_REVIEW_REQUIRED@.github/workflows/release-harness.yml:1",
+    "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/release-harness.yml:100",
+    "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/release-harness.yml:101",
+    "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/release-harness.yml:102",
+    "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/release-harness.yml:106",
+    "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/release-harness.yml:107",
+    "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/release-harness.yml:120",
+    "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/release-harness.yml:121",
+    "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/release-harness.yml:124",
+    "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/release-harness.yml:166",
+    "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/release-harness.yml:167",
+    "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/release-harness.yml:168",
+    "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/release-harness.yml:172",
+    "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/release-harness.yml:173",
+    "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/release-harness.yml:179",
+    "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/release-harness.yml:180",
+    "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/release-harness.yml:183",
+    "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/release-harness.yml:189",
+    "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/release-harness.yml:190",
+    "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/release-harness.yml:202",
+    "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/release-harness.yml:203",
+    "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/release-harness.yml:206",
+    "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/release-harness.yml:57",
+    "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/release-harness.yml:58",
+    "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/release-harness.yml:59",
+    "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/release-harness.yml:60",
+    "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/release-harness.yml:89",
+    "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/release-harness.yml:90",
+    "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/release-harness.yml:91",
+    "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/release-harness.yml:95",
+    "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/release-harness.yml:96",
+    "SHELL_COMPOSITION_UNKNOWN@.github/workflows/release-harness.yml:120",
+    "SHELL_COMPOSITION_UNKNOWN@.github/workflows/release-harness.yml:124",
+    "SHELL_COMPOSITION_UNKNOWN@.github/workflows/release-harness.yml:167",
+    "SHELL_COMPOSITION_UNKNOWN@.github/workflows/release-harness.yml:168",
+    "SHELL_COMPOSITION_UNKNOWN@.github/workflows/release-harness.yml:179",
+    "SHELL_COMPOSITION_UNKNOWN@.github/workflows/release-harness.yml:183",
+    "SHELL_COMPOSITION_UNKNOWN@.github/workflows/release-harness.yml:190",
+    "SHELL_COMPOSITION_UNKNOWN@.github/workflows/release-harness.yml:202",
+    "SHELL_COMPOSITION_UNKNOWN@.github/workflows/release-harness.yml:206",
+    "SHELL_COMPOSITION_UNKNOWN@.github/workflows/release-harness.yml:57",
+    "WORKFLOW_ENVIRONMENT_REVIEW_REQUIRED@.github/workflows/release-harness.yml:111",
+    "WORKFLOW_ENVIRONMENT_REVIEW_REQUIRED@.github/workflows/release-harness.yml:163",
+    "WORKFLOW_ENVIRONMENT_REVIEW_REQUIRED@.github/workflows/release-harness.yml:177",
+    "WORKFLOW_ENVIRONMENT_REVIEW_REQUIRED@.github/workflows/release-harness.yml:187",
+    "WORKFLOW_ENVIRONMENT_REVIEW_REQUIRED@.github/workflows/release-harness.yml:194",
+    "WORKFLOW_ENVIRONMENT_REVIEW_REQUIRED@.github/workflows/release-harness.yml:54"
+   ]
+  }
+ },
+ ".github/workflows/repository-verification.yml": {
    "intent_id": "repository-verification-contract-v1",
    "valid_until": "2026-11-30",
    "source_sha256": "sha256:471d656f4dc1f6f36acbb24501db338354ed60733fb74d34e7a3bdc0e60d9846",
