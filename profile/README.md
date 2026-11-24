@@ -14,7 +14,7 @@ Receipt unsigned; no biological claim.
 
 ## Choose a path
 
-- **Explore:** [Command Lab](https://huggingface.co/spaces/SZLHOLDINGS/szl-command-lab) — the searchable portfolio.
+- **Explore:** [Command Lab](https://huggingface.co/spaces/SZLHOLDINGS/szl-command-lab) — searchable portfolio.
 - **Use:** [A11oy](https://a-11-oy.com) — live capability state.
 - **Build:** [source map](https://github.com/szl-holdings/.github/blob/main/profile/SOURCE_MAP.md) · [Hub models, datasets, Spaces](https://huggingface.co/SZLHOLDINGS) · [PyPI](https://pypi.org/org/SZL-HOLDINGS/).
 - **Verify:** [a11oy.net](https://a11oy.net) — records, limits, [diagrams](https://a11oy.net/diagrams/).
@@ -38,7 +38,7 @@ Receipt unsigned; no biological claim.
 ## Pushing the frontier
 
 [Ring-0 receipts](https://huggingface.co/datasets/SZLHOLDINGS/frontier-54-runs) · [x402-metered inference](https://inference.a-11-oy.com) · [Estate math: lutar-lean, CI-ratcheted sorry count](https://github.com/szl-holdings/lutar-lean).
-- **khipu-x1:** [PyPI 0.1.2](https://pypi.org/project/khipu-x1/0.1.2/) · [Python source](https://github.com/szl-holdings/khipu-x1) · verifiable release provenance.
+- **khipu-x1:** [PyPI 0.1.2](https://pypi.org/project/khipu-x1/0.1.2/) · [Python source](https://github.com/szl-holdings/khipu-x1)
 - **PyPI estate:** [szl-khipu 0.2.0](https://pypi.org/project/szl-khipu/0.2.0/) · [szl-receipt-dsse 0.3.4](https://pypi.org/project/szl-receipt-dsse/0.3.4/).
 - **Ouroboros:** [ring observations](https://huggingface.co/datasets/SZLHOLDINGS/frontier-54-runs/tree/main/mesh/ring/ouro) · SERVE/LEARN remain NOT_RUN where recorded.
 
@@ -63,7 +63,7 @@ Receipts: [battery](https://huggingface.co/datasets/SZLHOLDINGS/model-eval-recei
 ## Current state
 
 <!-- szl:public-inventory:start -->
-The source-bound public inventory records **22 public Spaces, 121 model repositories, 14 native kernels, 69 datasets** at **2026-11-15T03:48:57Z** under `hf-public-author-membership/v2`. This is a dated observation, not a live count. Native kernel IDs may also appear in the model namespace; these figures do not count unique projects or trained language models. [Inventory binding](https://github.com/szl-holdings/.github/blob/main/profile/public-inventory.json) · [Exact source](https://github.com/szl-holdings/a11oy/blob/177fc4d95ed45ad88e3c7f1db09ea8b76763e82a/docs/huggingface-ecosystem-manifest.json) · [Current Hub listing](https://huggingface.co/SZLHOLDINGS). Hub inventory is registry evidence, not availability, operational readiness, or publication policy. It does not establish model quality.
+The source-bound public inventory records **22 public Spaces, 121 model repositories, 14 native kernels, 69 datasets** at **2026-11-15T03:48:57Z** under `hf-public-author-membership/v2`. This is a dated observation, not a live count. Kernel IDs may also appear in the model namespace; these figures do not count unique projects or trained models. [Inventory binding](https://github.com/szl-holdings/.github/blob/main/profile/public-inventory.json) · [Exact source](https://github.com/szl-holdings/a11oy/blob/177fc4d95ed45ad88e3c7f1db09ea8b76763e82a/docs/huggingface-ecosystem-manifest.json) · [Current Hub listing](https://huggingface.co/SZLHOLDINGS). Hub inventory is registry evidence, not availability, readiness, or publication policy. It does not establish model quality.
 <!-- szl:public-inventory:end -->
 
 **HISTORICAL:** Three commercial flagships; one inference flagship; Six internal engines; Five public domain bodies: Terra, PRISM Counsel, PURIQ Finance, LYTE. 16 portfolio Spaces, 1 inventory-only Space; 45 models, 34 datasets; historical, not readiness.
