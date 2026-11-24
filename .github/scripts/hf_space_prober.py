@@ -139,8 +139,14 @@ def probe(kind: str, org: str, token: str | None, check_cards: bool) -> tuple[li
         f"{kind}_private": sum(1 for x in rows if x["private"]),
     }
     if kind == "spaces":
+        # Preserve the existing fail-closed admission count. A missing runtime
+        # stage is *unproven*, not evidence that the Space is stopped.
         summary["public_not_running"] = sum(
             1 for x in spaces if not x["private"] and not x.get("running"))
+        summary["public_runtime_unknown"] = sum(
+            1 for x in spaces if not x["private"] and x.get("stage") == "UNKNOWN")
+        summary["public_confirmed_not_running"] = sum(
+            1 for x in spaces if not x["private"] and x.get("stage") not in ("RUNNING", "UNKNOWN"))
         summary["stages"] = {}
         for x in spaces:
             summary["stages"][x.get("stage", "UNKNOWN")] = summary["stages"].get(x.get("stage", "UNKNOWN"), 0) + 1

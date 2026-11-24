@@ -2,7 +2,7 @@
 
 # Governed intelligence. Checkable results.
 
-Source-linked AI software, models and research.
+Source-linked AI software, models, research.
 
 [**Explore A11oy →**](https://huggingface.co/spaces/SZLHOLDINGS/a11oy) · [**Build with the source →**](https://github.com/szl-holdings)
 
@@ -14,7 +14,7 @@ Receipt unsigned; no biological claim.
 
 ## Choose a path
 
-- **Explore:** [Command Lab](https://huggingface.co/spaces/SZLHOLDINGS/szl-command-lab) — the searchable portfolio.
+- **Explore:** [Command Lab](https://huggingface.co/spaces/SZLHOLDINGS/szl-command-lab) — searchable portfolio.
 - **Use:** [A11oy](https://a-11-oy.com) — live capability state.
 - **Build:** [source map](https://github.com/szl-holdings/.github/blob/main/profile/SOURCE_MAP.md) · [Hub models, datasets, Spaces](https://huggingface.co/SZLHOLDINGS) · [PyPI](https://pypi.org/org/SZL-HOLDINGS/).
 - **Verify:** [a11oy.net](https://a11oy.net) — records, limits, [diagrams](https://a11oy.net/diagrams/).
@@ -38,7 +38,7 @@ Receipt unsigned; no biological claim.
 ## Pushing the frontier
 
 [Ring-0 receipts](https://huggingface.co/datasets/SZLHOLDINGS/frontier-54-runs) · [x402-metered inference](https://inference.a-11-oy.com) · [Estate math: lutar-lean, CI-ratcheted sorry count](https://github.com/szl-holdings/lutar-lean).
-- **khipu-x1:** [PyPI 0.1.2](https://pypi.org/project/khipu-x1/0.1.2/) · [Python source](https://github.com/szl-holdings/khipu-x1) · verifiable release provenance.
+- **khipu-x1:** [PyPI 0.1.2](https://pypi.org/project/khipu-x1/0.1.2/) · [Python source](https://github.com/szl-holdings/khipu-x1)
 - **PyPI estate:** [szl-khipu 0.2.0](https://pypi.org/project/szl-khipu/0.2.0/) · [szl-receipt-dsse 0.3.4](https://pypi.org/project/szl-receipt-dsse/0.3.4/).
 - **Ouroboros:** [ring observations](https://huggingface.co/datasets/SZLHOLDINGS/frontier-54-runs/tree/main/mesh/ring/ouro) · SERVE/LEARN remain NOT_RUN where recorded.
 

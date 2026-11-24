@@ -86,6 +86,21 @@ class Api:
         return out
 
 
+def space_runtime_detail(summary: dict) -> str:
+    """Separate unavailable runtime evidence from a confirmed non-RUNNING stage.
+
+    This is only presentation: the pre-existing public_not_running fail-closed
+    gate is deliberately unchanged.
+    """
+    unproven = summary.get("public_not_running", 0)
+    unknown = summary.get("public_runtime_unknown")
+    stopped = summary.get("public_confirmed_not_running")
+    if unknown is None or stopped is None:
+        return f"{unproven} public Spaces not confirmed RUNNING (stage breakdown unavailable)"
+    return (f"{unproven} public Spaces not confirmed RUNNING "
+            f"({unknown} UNKNOWN, {stopped} confirmed non-RUNNING)")
+
+
 class Board:
     def __init__(self) -> None:
         self.findings: list[dict] = []
@@ -377,8 +392,8 @@ def main() -> int:
             s = hf_report.get("summary", {})
             board.add("hf.public_spaces_running", "huggingface",
                       s.get("public_not_running", 0) == 0, MEASURED,
-                      f"{s.get('public_not_running', 0)} public Spaces not RUNNING", 3,
-                      "Restart or repair non-running public Spaces.")
+                      space_runtime_detail(s), 3,
+                      "Independently read back UNKNOWN Space runtimes; repair confirmed non-RUNNING Spaces.")
             board.add("hf.governance_stamp_present", "huggingface",
                       s.get("missing_stamp", 0) == 0, MEASURED,
                       f"{s.get('missing_stamp', 0)} assets missing a governance stamp backlink", 2,
