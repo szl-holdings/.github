@@ -39,6 +39,16 @@
       "max_success_age_minutes": 480,
       "max_active_age_minutes": 45,
       "bootstrap_grace_minutes": 540
+    },
+    {
+      "id": "estate-governance-scorecard",
+      "repository": "szl-holdings/.github",
+      "workflow_path": ".github/workflows/estate-governance-scorecard.yml",
+      "branch": "main",
+      "event": "schedule",
+      "max_success_age_minutes": 600,
+      "max_active_age_minutes": 45,
+      "bootstrap_grace_minutes": 660
     }
   ]
 }
