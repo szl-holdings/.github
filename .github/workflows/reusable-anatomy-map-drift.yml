@@ -13,7 +13,7 @@ on:
         description: "Immutable ref of szl-holdings/.github containing this checker and registry."
         required: false
         type: string
-        default: "main"
+        default: "f33ee74353c19336130d00ec3cd8d230c1057008" # immutable main HEAD measured 2026-11-22; bump via pull request
 
 permissions:
   contents: read
@@ -46,6 +46,9 @@ jobs:
             git checkout --quiet FETCH_HEAD
           fi
           test -f .github/scripts/anatomy_map_drift.py
+          if echo "$CHECKER_REF" | grep -qE "^[0-9a-f]{40}$"; then
+            test "$(git rev-parse HEAD)" = "$CHECKER_REF"
+          fi
 
       - name: Set up Python
         uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0

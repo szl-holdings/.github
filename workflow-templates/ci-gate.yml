@@ -1,0 +1,43 @@
+# SZL starter workflow: one aggregate `ci-gate` check.
+#
+# The org ruleset `szl-required-ci` (evaluate mode) watches for a status
+# check named exactly `ci-gate` on default branches. Add this workflow, list
+# every CI job of this repository under `needs:`, and `ci-gate` passes only
+# when all of them succeeded. A failed, cancelled or skipped dependency fails
+# the gate, so a skipped job can never satisfy the required check.
+name: CI gate
+
+on:
+  pull_request:
+  push:
+    branches: [$default-branch]
+  merge_group:
+
+permissions:
+  contents: read
+
+jobs:
+  # Replace this example with the repository's own CI job(s), or call a
+  # reusable workflow such as reusable-node-ci.yml as shown.
+  ci:
+    uses: szl-holdings/.github/.github/workflows/reusable-node-ci.yml@f33ee74353c19336130d00ec3cd8d230c1057008
+
+  ci-gate:
+    name: ci-gate
+    if: ${{ always() }}
+    needs: [ci]
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Require every needed job to succeed
+        shell: bash
+        env:
+          NEEDS_JSON: ${{ toJSON(needs) }}
+        run: |
+          set -euo pipefail
+          echo "${NEEDS_JSON}" | jq -r 'to_entries[] | "\(.key)=\(.value.result)"'
+          bad=$(echo "${NEEDS_JSON}" | jq -r '[to_entries[] | select(.value.result != "success") | .key] | join(" ")')
+          if [ -n "${bad}" ]; then
+            echo "::error::ci-gate: not successful: ${bad}"
+            exit 1
+          fi
