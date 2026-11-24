@@ -1516,6 +1516,181 @@
         ]
       }
     },
+    ".github/workflows/estate-governance-scorecard.yml":     {
+      "intent_id": "estate-governance-scorecard-measurement-v1",
+      "valid_until": "2026-11-30",
+      "source_sha256": "sha256:5a38869990bc9616b03b472868d96138b6fc019090013b4b1c6b594229381deb",
+      "credentials": [
+        "GH_PAT",
+        "GITHUB_TOKEN",
+        "HF_ORG_TOKEN",
+        "HF_ORG_TOKEN1",
+        "HF_TOKEN",
+        "HF_WRITE_TOKEN",
+        "ORG_ADMIN_TOKEN",
+        "SZL_GITHUB_TOKEN",
+        "SZL_ORG_ADMIN_TOKEN"
+      ],
+      "resources": [
+        {
+          "key": "github:actions:artifact:governance-scorecard-evidence",
+          "access": "external-write"
+        },
+        {
+          "key": "github:repository:szl-holdings/.github:contents",
+          "access": "read"
+        },
+        {
+          "key": "runner:guard:egress",
+          "access": "local-write"
+        },
+        {
+          "key": "runner:toolchain:python",
+          "access": "local-write"
+        },
+        {
+          "key": "stepsecurity:monitor:szl-holdings/.github",
+          "access": "external-write"
+        }
+      ],
+      "effects": [
+        {
+          "sink": "github.artifact.upload",
+          "resource": "github:actions:artifact:governance-scorecard-evidence",
+          "access": "external-write",
+          "max_calls": 1
+        },
+        {
+          "sink": "github.contents.checkout",
+          "resource": "github:repository:szl-holdings/.github:contents",
+          "access": "read",
+          "max_calls": 1
+        },
+        {
+          "sink": "runner.guard.configure",
+          "resource": "runner:guard:egress",
+          "access": "local-write",
+          "max_calls": 1
+        },
+        {
+          "sink": "runner.guard.telemetry",
+          "resource": "stepsecurity:monitor:szl-holdings/.github",
+          "access": "external-write",
+          "max_calls": 1
+        },
+        {
+          "sink": "runner.toolchain.install",
+          "resource": "runner:toolchain:python",
+          "access": "local-write",
+          "max_calls": 1
+        }
+      ],
+      "max_external_writes": 2,
+      "required_controls": {
+        "triggers": [
+          "push",
+          "schedule",
+          "workflow_dispatch"
+        ],
+        "contents_read": true,
+        "no_explicit_secrets": false,
+        "concurrency": true,
+        "protected_ref": false,
+        "exact_sha": false,
+        "expected_before": false,
+        "readback": false
+      },
+      "trusted_transitives": {},
+      "reviewed_unknowns": {
+        "files": {
+          ".github/workflows/estate-governance-scorecard.yml": "sha256:5a38869990bc9616b03b472868d96138b6fc019090013b4b1c6b594229381deb",
+          ".github/scripts/governance_scorecard.py": "sha256:6d487eb768072604e5577238cec80daf77fc533eaa62fb7f002f6241028012a5",
+          ".github/scripts/hf_space_prober.py": "sha256:ef67392b790db0d98a8f4eb9f203cfbf81f458a2b710970d91064886b0fd34e6",
+          ".github/scripts/test_hf_space_prober_runtime_honesty.py": "sha256:e2e80d7a07fd16d40664590f9118587d5eaaca26cf4e96d00ba51c353d2b0132"
+        },
+        "unknowns": [
+          "ACTION_INPUTS_REVIEW_REQUIRED@.github/workflows/estate-governance-scorecard.yml:127",
+          "ACTION_INPUTS_REVIEW_REQUIRED@.github/workflows/estate-governance-scorecard.yml:61",
+          "ACTION_INPUTS_REVIEW_REQUIRED@.github/workflows/estate-governance-scorecard.yml:66",
+          "ACTION_INPUTS_REVIEW_REQUIRED@.github/workflows/estate-governance-scorecard.yml:72",
+          "HTTP_TARGET_UNRESOLVED@.github/scripts/governance_scorecard.py:53",
+          "HTTP_TARGET_UNRESOLVED@.github/scripts/hf_space_prober.py:45",
+          "PYTHON_IMPORT_UNRESOLVED@.github/scripts/governance_scorecard.py:18",
+          "PYTHON_IMPORT_UNRESOLVED@.github/scripts/governance_scorecard.py:20",
+          "PYTHON_IMPORT_UNRESOLVED@.github/scripts/governance_scorecard.py:21",
+          "PYTHON_IMPORT_UNRESOLVED@.github/scripts/governance_scorecard.py:26",
+          "PYTHON_IMPORT_UNRESOLVED@.github/scripts/governance_scorecard.py:27",
+          "PYTHON_IMPORT_UNRESOLVED@.github/scripts/governance_scorecard.py:28",
+          "PYTHON_IMPORT_UNRESOLVED@.github/scripts/hf_space_prober.py:15",
+          "PYTHON_IMPORT_UNRESOLVED@.github/scripts/hf_space_prober.py:17",
+          "PYTHON_IMPORT_UNRESOLVED@.github/scripts/hf_space_prober.py:22",
+          "PYTHON_IMPORT_UNRESOLVED@.github/scripts/hf_space_prober.py:23",
+          "PYTHON_IMPORT_UNRESOLVED@.github/scripts/hf_space_prober.py:24",
+          "PYTHON_IMPORT_UNRESOLVED@.github/scripts/hf_space_prober.py:25",
+          "PYTHON_IMPORT_UNRESOLVED@.github/scripts/test_hf_space_prober_runtime_honesty.py:5",
+          "PYTHON_IMPORT_UNRESOLVED@.github/scripts/test_hf_space_prober_runtime_honesty.py:6",
+          "PYTHON_SOURCE_REVIEW_REQUIRED@.github/scripts/governance_scorecard.py:1",
+          "PYTHON_SOURCE_REVIEW_REQUIRED@.github/scripts/hf_space_prober.py:1",
+          "PYTHON_SOURCE_REVIEW_REQUIRED@.github/scripts/test_hf_space_prober_runtime_honesty.py:1",
+          "SCRIPT_SOURCE_REVIEW_REQUIRED@.github/workflows/estate-governance-scorecard.yml:1",
+          "SECRET_EXPRESSION_REVIEW_REQUIRED@.github/workflows/estate-governance-scorecard.yml:1",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/estate-governance-scorecard.yml:101",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/estate-governance-scorecard.yml:102",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/estate-governance-scorecard.yml:103",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/estate-governance-scorecard.yml:104",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/estate-governance-scorecard.yml:105",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/estate-governance-scorecard.yml:106",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/estate-governance-scorecard.yml:107",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/estate-governance-scorecard.yml:108",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/estate-governance-scorecard.yml:109",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/estate-governance-scorecard.yml:110",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/estate-governance-scorecard.yml:116",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/estate-governance-scorecard.yml:117",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/estate-governance-scorecard.yml:118",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/estate-governance-scorecard.yml:119",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/estate-governance-scorecard.yml:120",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/estate-governance-scorecard.yml:121",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/estate-governance-scorecard.yml:139",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/estate-governance-scorecard.yml:140",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/estate-governance-scorecard.yml:141",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/estate-governance-scorecard.yml:142",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/estate-governance-scorecard.yml:77",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/estate-governance-scorecard.yml:88",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/estate-governance-scorecard.yml:89",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/estate-governance-scorecard.yml:90",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/estate-governance-scorecard.yml:91",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/estate-governance-scorecard.yml:92",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/estate-governance-scorecard.yml:93",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/estate-governance-scorecard.yml:94",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/estate-governance-scorecard.yml:102",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/estate-governance-scorecard.yml:103",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/estate-governance-scorecard.yml:104",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/estate-governance-scorecard.yml:105",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/estate-governance-scorecard.yml:106",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/estate-governance-scorecard.yml:107",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/estate-governance-scorecard.yml:108",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/estate-governance-scorecard.yml:109",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/estate-governance-scorecard.yml:110",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/estate-governance-scorecard.yml:116",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/estate-governance-scorecard.yml:117",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/estate-governance-scorecard.yml:118",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/estate-governance-scorecard.yml:119",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/estate-governance-scorecard.yml:140",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/estate-governance-scorecard.yml:141",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/estate-governance-scorecard.yml:142",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/estate-governance-scorecard.yml:89",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/estate-governance-scorecard.yml:90",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/estate-governance-scorecard.yml:91",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/estate-governance-scorecard.yml:92",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/estate-governance-scorecard.yml:93",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/estate-governance-scorecard.yml:94",
+          "WORKFLOW_ENVIRONMENT_REVIEW_REQUIRED@.github/workflows/estate-governance-scorecard.yml:135",
+          "WORKFLOW_ENVIRONMENT_REVIEW_REQUIRED@.github/workflows/estate-governance-scorecard.yml:50",
+          "WORKFLOW_ENVIRONMENT_REVIEW_REQUIRED@.github/workflows/estate-governance-scorecard.yml:82",
+          "WORKFLOW_ENVIRONMENT_REVIEW_REQUIRED@.github/workflows/estate-governance-scorecard.yml:99"
+        ]
+      }
+    },
     ".github/workflows/estate-one-fabric-alignment.yml": {
       "intent_id": "estate-one-fabric-alignment-readback-v1",
       "valid_until": "2026-11-30",
