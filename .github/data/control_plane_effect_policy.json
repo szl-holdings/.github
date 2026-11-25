@@ -1257,7 +1257,7 @@
       "reviewed_unknowns": {
         "files": {
           ".github/workflows/estate-deadman-contract.yml": "sha256:71af0893dd77e0a9e8a86cffab90f538a0be2ef95a4689b2b4411d65f6ceb7e2",
-          ".github/scripts/estate_deadman.py": "sha256:de4526384cdc568919188ad46d2ab654ee5dc5c8e65a4e90f6f909da6ee551c3",
+          ".github/scripts/estate_deadman.py": "sha256:0e6dc38dec602bd95a58dc7dca3782c9f5089064873d713f27ad79d6d1d0b471",
           ".github/scripts/validate_estate_deadman_workflow.py": "sha256:62f0e811cfab50faa9ce30119aefe7616a3a65361d8482ef7204b4965a6b424c",
           ".github/workflows/estate-deadman.yml": "sha256:00de3bf8ba49e80000f90d922159d3bdb224df1286de5ce3161be8be2e66f7d6"
         },
@@ -1394,7 +1394,7 @@
       "reviewed_unknowns": {
         "files": {
           ".github/workflows/estate-deadman.yml": "sha256:00de3bf8ba49e80000f90d922159d3bdb224df1286de5ce3161be8be2e66f7d6",
-          ".github/scripts/estate_deadman.py": "sha256:de4526384cdc568919188ad46d2ab654ee5dc5c8e65a4e90f6f909da6ee551c3",
+          ".github/scripts/estate_deadman.py": "sha256:0e6dc38dec602bd95a58dc7dca3782c9f5089064873d713f27ad79d6d1d0b471",
           ".github/scripts/validate_estate_deadman_workflow.py": "sha256:62f0e811cfab50faa9ce30119aefe7616a3a65361d8482ef7204b4965a6b424c"
         },
         "unknowns": [
@@ -1519,7 +1519,7 @@
     ".github/workflows/estate-governance-scorecard.yml":     {
       "intent_id": "estate-governance-scorecard-measurement-v1",
       "valid_until": "2026-11-30",
-      "source_sha256": "sha256:5a38869990bc9616b03b472868d96138b6fc019090013b4b1c6b594229381deb",
+      "source_sha256": "sha256:78872bed672899a9592b5ac786fd3f7879432c2777f5a916828e5bb82d030ca0",
       "credentials": [
         "GH_PAT",
         "GITHUB_TOKEN",
@@ -1603,7 +1603,7 @@
       "trusted_transitives": {},
       "reviewed_unknowns": {
         "files": {
-          ".github/workflows/estate-governance-scorecard.yml": "sha256:5a38869990bc9616b03b472868d96138b6fc019090013b4b1c6b594229381deb",
+          ".github/workflows/estate-governance-scorecard.yml": "sha256:78872bed672899a9592b5ac786fd3f7879432c2777f5a916828e5bb82d030ca0",
           ".github/scripts/governance_scorecard.py": "sha256:6d487eb768072604e5577238cec80daf77fc533eaa62fb7f002f6241028012a5",
           ".github/scripts/hf_space_prober.py": "sha256:ef67392b790db0d98a8f4eb9f203cfbf81f458a2b710970d91064886b0fd34e6",
           ".github/scripts/test_hf_space_prober_runtime_honesty.py": "sha256:e2e80d7a07fd16d40664590f9118587d5eaaca26cf4e96d00ba51c353d2b0132"

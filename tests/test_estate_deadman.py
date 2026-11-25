@@ -162,7 +162,24 @@ class PolicyContractTests(unittest.TestCase):
         path = ROOT / "governance" / "estate-deadman.v1.json"
         loaded, digest = load_policy(path)
         self.assertEqual(loaded["schema"], "szl.estate-deadman-policy/v1")
-        self.assertEqual(len(loaded["targets"]), 3)
+        self.assertEqual(len(loaded["targets"]), 4)
+        scorecard = next(
+            item for item in loaded["targets"]
+            if item["id"] == "estate-governance-scorecard"
+        )
+        self.assertEqual(
+            scorecard,
+            {
+                "id": "estate-governance-scorecard",
+                "repository": "szl-holdings/.github",
+                "workflow_path": ".github/workflows/estate-governance-scorecard.yml",
+                "branch": "main",
+                "event": "schedule",
+                "max_success_age_minutes": 600,
+                "max_active_age_minutes": 45,
+                "bootstrap_grace_minutes": 660,
+            },
+        )
         canonical_source = path.read_bytes().replace(b"\r\n", b"\n")
         self.assertEqual(digest, hashlib.sha256(canonical_source).hexdigest())
         self.assertTrue(all(item["event"] == "schedule" for item in loaded["targets"]))
@@ -211,6 +228,16 @@ class PolicyContractTests(unittest.TestCase):
     ) -> None:
         raw = policy()
         raw["confirmation"]["samples"] = 3
+        with self.assertRaises(ContractError):
+            validate_policy(raw)
+
+    def test_policy_max_success_age_ceiling_edge(self) -> None:
+        raw = policy()
+        raw["targets"][0]["max_success_age_minutes"] = 1620
+        self.assertEqual(
+            validate_policy(raw)["targets"][0]["max_success_age_minutes"], 1620
+        )
+        raw["targets"][0]["max_success_age_minutes"] = 1621
         with self.assertRaises(ContractError):
             validate_policy(raw)
 

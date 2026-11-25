@@ -338,7 +338,7 @@ def validate_policy(raw: Any) -> dict[str, Any]:
             item.get("max_success_age_minutes"),
             f"{target_id}.max_success_age_minutes",
             10,
-            1440,
+            1620,
         )
         max_active = require_int(
             item.get("max_active_age_minutes"),
