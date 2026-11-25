@@ -1,9 +1,25 @@
 """Regression: missing Hub runtime metadata must not masquerade as a stopped Space."""
+import importlib.util
+import sys
 import unittest
+from pathlib import Path
 from unittest.mock import patch
 
-import governance_scorecard
-import hf_space_prober
+
+def _load_sibling(name):
+    """Load the exact checked-out script without relaxing Python isolation."""
+    path = Path(__file__).resolve().with_name(f"{name}.py")
+    spec = importlib.util.spec_from_file_location(name, path)
+    if spec is None or spec.loader is None:
+        raise ImportError(f"Cannot load {path}")
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[name] = module
+    spec.loader.exec_module(module)
+    return module
+
+
+governance_scorecard = _load_sibling("governance_scorecard")
+hf_space_prober = _load_sibling("hf_space_prober")
 
 
 class SpaceRuntimeEvidenceTests(unittest.TestCase):
