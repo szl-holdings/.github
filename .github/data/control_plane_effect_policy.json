@@ -12173,6 +12173,105 @@
           "WORKFLOW_ENVIRONMENT_REVIEW_REQUIRED@.github/workflows/reusable-anatomy-map-drift.yml:65"
         ]
       }
+    },
+    ".github/workflows/public-experience-frontier-v4.yml": {
+      "intent_id": "public-experience-v4-measured-audit-v1",
+      "valid_until": "2026-11-30",
+      "source_sha256": "sha256:46673b89d9fc7a3c45097d715616a3fd37d321499add271a005ab3bfbca2604f",
+      "credentials": [],
+      "resources": [
+        {
+          "key": "github:actions:artifact:public-experience-v4",
+          "access": "external-write"
+        },
+        {
+          "key": "github:repository:szl-holdings/.github:contents",
+          "access": "read"
+        },
+        {
+          "key": "runner:guard:egress",
+          "access": "local-write"
+        },
+        {
+          "key": "stepsecurity:monitor:szl-holdings/.github",
+          "access": "external-write"
+        },
+        {
+          "key": "runner:toolchain:node",
+          "access": "local-write"
+        },
+        {
+          "key": "runner:toolchain:python",
+          "access": "local-write"
+        }
+      ],
+      "effects": [
+        {
+          "sink": "github.artifact.upload",
+          "resource": "github:actions:artifact:public-experience-v4",
+          "access": "external-write",
+          "max_calls": 1
+        },
+        {
+          "sink": "github.contents.checkout",
+          "resource": "github:repository:szl-holdings/.github:contents",
+          "access": "read",
+          "max_calls": 2
+        },
+        {
+          "sink": "runner.guard.configure",
+          "resource": "runner:guard:egress",
+          "access": "local-write",
+          "max_calls": 2
+        },
+        {
+          "sink": "runner.guard.telemetry",
+          "resource": "stepsecurity:monitor:szl-holdings/.github",
+          "access": "external-write",
+          "max_calls": 2
+        },
+        {
+          "sink": "runner.toolchain.install",
+          "resource": "runner:toolchain:node",
+          "access": "local-write",
+          "max_calls": 2
+        },
+        {
+          "sink": "runner.toolchain.install",
+          "resource": "runner:toolchain:python",
+          "access": "local-write",
+          "max_calls": 2
+        }
+      ],
+      "max_external_writes": 3,
+      "required_controls": {
+        "triggers": [
+          "merge_group",
+          "pull_request",
+          "push",
+          "schedule",
+          "workflow_dispatch"
+        ],
+        "contents_read": true,
+        "no_explicit_secrets": true,
+        "concurrency": true,
+        "protected_ref": false,
+        "exact_sha": false,
+        "expected_before": false,
+        "readback": false
+      },
+      "trusted_transitives": {},
+      "reviewed_unknowns": {
+        "files": {
+          ".github/workflows/responsive-estate-v3.yml": "sha256:8dd355219f6b90c2eabc56effed9d1dc8fa55ce311ebfc0a3d4f7203f7341680",
+          "scripts/audit_responsive_estate_v3.mjs": "sha256:b4a2b76d41bd2d37fdbda2bdacf6052a12b719534a50a936e8830888c7d1a777",
+          "scripts/normalize_responsive_estate_v31.mjs": "sha256:7ef9be1f8bc887feed648e1ce739a3bfee0bf5dac60d716af96120e60a1f520c",
+          "scripts/responsive_audit_policy_v31.mjs": "sha256:fa93396b7107419f0475a3b6c530ac187942b5d78a68e7a00a5cfd96df5f72b9",
+          ".github/workflows/public-experience-frontier-v4.yml": "sha256:46673b89d9fc7a3c45097d715616a3fd37d321499add271a005ab3bfbca2604f",
+          "scripts/annotate_public_experience_v4.py": "sha256:f722b0088cac1e71a3fd9b60ea078827b444da03489314c8dda4424bf68d88be"
+        },
+        "unknowns": []
+      }
     }
   }
 }
