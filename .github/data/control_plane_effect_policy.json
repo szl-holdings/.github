@@ -12177,7 +12177,7 @@
     ".github/workflows/public-experience-frontier-v4.yml": {
       "intent_id": "public-experience-v4-measured-audit-v1",
       "valid_until": "2026-11-30",
-      "source_sha256": "sha256:228ff9c3aaeddbc399bee86faa1b43d220f236218c1c766f93cb47b71659843f",
+      "source_sha256": "sha256:e5c912ac7a6aecb707d6d8236abdea9505d34fa0943342a13ce94ccc0201ea83",
       "credentials": [],
       "resources": [
         {
@@ -12198,6 +12198,10 @@
         },
         {
           "key": "runner:toolchain:python",
+          "access": "local-write"
+        },
+        {
+          "key": "runner:guard:egress",
           "access": "local-write"
         }
       ],
@@ -12253,7 +12257,7 @@
       "trusted_transitives": {},
       "reviewed_unknowns": {
         "files": {
-          ".github/workflows/public-experience-frontier-v4.yml": "sha256:316d987f9595e25583fa881db11ca498467a75549ed84b2aaf77d625b0a10f0f",
+          ".github/workflows/public-experience-frontier-v4.yml": "sha256:e5c912ac7a6aecb707d6d8236abdea9505d34fa0943342a13ce94ccc0201ea83",
           "scripts/annotate_public_experience_v4.py": "sha256:f722b0088cac1e71a3fd9b60ea078827b444da03489314c8dda4424bf68d88be",
           "scripts/audit_responsive_estate_v3.mjs": "sha256:b4a2b76d41bd2d37fdbda2bdacf6052a12b719534a50a936e8830888c7d1a777",
           "scripts/check_public_experience_v4.py": "sha256:7ac09e2be6bd71979a7f8556d3fdf7674e6020f99d7b4a8e0cef954d2e650f66",
