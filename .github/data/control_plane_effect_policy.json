@@ -12185,10 +12185,6 @@
           "access": "read"
         },
         {
-          "key": "runner:guard:egress",
-          "access": "local-write"
-        },
-        {
           "key": "runner:toolchain:node",
           "access": "local-write"
         },
@@ -12202,12 +12198,6 @@
           "sink": "github.contents.checkout",
           "resource": "github:repository:szl-holdings/.github:contents",
           "access": "read",
-          "max_calls": 2
-        },
-        {
-          "sink": "runner.guard.configure",
-          "resource": "runner:guard:egress",
-          "access": "local-write",
           "max_calls": 2
         },
         {
