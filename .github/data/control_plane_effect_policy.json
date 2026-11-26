@@ -12177,7 +12177,7 @@
     ".github/workflows/public-experience-frontier-v4.yml": {
       "intent_id": "public-experience-v4-measured-audit-v1",
       "valid_until": "2026-11-30",
-      "source_sha256": "sha256:0005a2d67eb0631fe4dde607582319881608371dc28a2b48a24311fe30eab879",
+      "source_sha256": "sha256:316d987f9595e25583fa881db11ca498467a75549ed84b2aaf77d625b0a10f0f",
       "credentials": [],
       "resources": [
         {
@@ -12191,6 +12191,18 @@
         {
           "key": "runner:toolchain:python",
           "access": "local-write"
+        },
+        {
+          "key": "runner:guard:egress",
+          "access": "local-write"
+        },
+        {
+          "key": "stepsecurity:monitor:szl-holdings/.github",
+          "access": "external-write"
+        },
+        {
+          "key": "github:actions:artifact:public-experience-v4",
+          "access": "external-write"
         }
       ],
       "effects": [
@@ -12211,9 +12223,21 @@
           "resource": "runner:toolchain:python",
           "access": "local-write",
           "max_calls": 2
+        },
+        {
+          "sink": "runner.guard.telemetry",
+          "resource": "stepsecurity:monitor:szl-holdings/.github",
+          "access": "external-write",
+          "max_calls": 1
+        },
+        {
+          "sink": "github.artifact.upload",
+          "resource": "github:actions:artifact:public-experience-v4",
+          "access": "external-write",
+          "max_calls": 1
         }
       ],
-      "max_external_writes": 0,
+      "max_external_writes": 2,
       "required_controls": {
         "triggers": [
           "merge_group",
@@ -12240,7 +12264,6 @@
           "scripts/normalize_responsive_estate_v31.mjs": "sha256:7ef9be1f8bc887feed648e1ce739a3bfee0bf5dac60d716af96120e60a1f520c"
         },
         "unknowns": [
-          "ACTION_EXTRA_EFFECT_UNSUPPORTED@.github/workflows/public-experience-frontier-v4.yml:70",
           "ACTION_INPUTS_REVIEW_REQUIRED@.github/workflows/public-experience-frontier-v4.yml:119",
           "ACTION_INPUTS_REVIEW_REQUIRED@.github/workflows/public-experience-frontier-v4.yml:44",
           "ACTION_INPUTS_REVIEW_REQUIRED@.github/workflows/public-experience-frontier-v4.yml:48",
@@ -12248,7 +12271,6 @@
           "ACTION_INPUTS_REVIEW_REQUIRED@.github/workflows/public-experience-frontier-v4.yml:75",
           "ACTION_INPUTS_REVIEW_REQUIRED@.github/workflows/public-experience-frontier-v4.yml:79",
           "ACTION_INPUTS_REVIEW_REQUIRED@.github/workflows/public-experience-frontier-v4.yml:84",
-          "ACTION_RESOURCE_OVERRIDE_UNSUPPORTED@.github/workflows/public-experience-frontier-v4.yml:119",
           "INLINE_DYNAMIC_CODE@.github/workflows/public-experience-frontier-v4.yml:142",
           "PYTHON_IMPORT_UNRESOLVED@scripts/annotate_public_experience_v4.py:10",
           "PYTHON_IMPORT_UNRESOLVED@scripts/annotate_public_experience_v4.py:8",
