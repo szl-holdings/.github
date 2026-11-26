@@ -113,6 +113,15 @@ def probe(kind: str, org: str, token: str | None, check_cards: bool) -> tuple[li
         row["license_source"] = "index" if row["license"] else "UNKNOWN"
         if kind == "spaces":
             runtime = r.get("runtime") or {}
+            if not runtime.get("stage"):
+                # 2026-11-26: the Hub spaces listing (GET /api/spaces?author=..&full=true)
+                # no longer carries a runtime object in each row (measured 2026-11-26:
+                # 0/75 rows with runtime.stage). Fall back to the per-space read, which
+                # still reports runtime.stage. This enriches evidence only; the
+                # fail-closed RUNNING admission below is unchanged.
+                detail, _detail_status = hub_get(f"/api/spaces/{repo_id}", token)
+                if isinstance(detail, dict) and isinstance(detail.get("runtime"), dict):
+                    runtime = detail["runtime"]
             row["stage"] = runtime.get("stage") or "UNKNOWN"
             row["hardware"] = (runtime.get("hardware") or {}).get("current")
             row["sdk"] = r.get("sdk")
