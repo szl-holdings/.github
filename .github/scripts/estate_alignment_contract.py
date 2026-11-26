@@ -33,64 +33,100 @@ EXPECTED_FOLDS = {
 EXPECTED_FORBIDDEN_PRODUCTS = {"nexus", *EXPECTED_FOLDS}
 EXPECTED_PORTFOLIO_SPACES = {
     "SZLHOLDINGS/a11oy",
-    "SZLHOLDINGS/killinchu",
-    "SZLHOLDINGS/immune",
-    "SZLHOLDINGS/immune-lattice",
-    "SZLHOLDINGS/terra",
-    "SZLHOLDINGS/sentra",
+    "SZLHOLDINGS/ayllu",
     "SZLHOLDINGS/counsel",
-    "SZLHOLDINGS/finance",
-    "SZLHOLDINGS/lyte",
-    "SZLHOLDINGS/vertical-services",
-    "SZLHOLDINGS/szl-command-lab",
     "SZLHOLDINGS/david-leads",
+    "SZLHOLDINGS/finance",
+    "SZLHOLDINGS/killinchu",
+    "SZLHOLDINGS/lyte",
+    "SZLHOLDINGS/sentra",
+    "SZLHOLDINGS/szl-command-lab",
     "SZLHOLDINGS/szl-constellation",
     "SZLHOLDINGS/szl-frontier",
     "SZLHOLDINGS/szl-model-inference-lab",
-    "SZLHOLDINGS/ayllu",
+    "SZLHOLDINGS/terra",
+    "SZLHOLDINGS/vertical-services",
 }
 EXPECTED_INVENTORY_ONLY_SPACES = {"SZLHOLDINGS/yarqa"}
 # Anonymous membership observation, separate from the historical fleet policy.
 EXPECTED_PUBLIC_SPACE_IDS = {
     "SZLHOLDINGS/a11oy",
+    "SZLHOLDINGS/a11oy-factory",
+    "SZLHOLDINGS/agents-studio",
+    "SZLHOLDINGS/anatomy",
     "SZLHOLDINGS/ayllu",
     "SZLHOLDINGS/counsel",
+    "SZLHOLDINGS/counsel-assurance",
+    "SZLHOLDINGS/curation-atlas",
     "SZLHOLDINGS/david-leads",
+    "SZLHOLDINGS/estate-gardener",
+    "SZLHOLDINGS/estate-holo",
+    "SZLHOLDINGS/eternal-auditor",
     "SZLHOLDINGS/finance",
     "SZLHOLDINGS/foundation-confirmation-v2",
+    "SZLHOLDINGS/frontier-console",
+    "SZLHOLDINGS/frontier-showcase",
     "SZLHOLDINGS/gdw-frontier",
     "SZLHOLDINGS/governed-agent-bench",
     "SZLHOLDINGS/governed-receipt-verifier",
     "SZLHOLDINGS/holographic-unify",
-    "SZLHOLDINGS/immune",
-    "SZLHOLDINGS/immune-lattice",
+    "SZLHOLDINGS/khipu-hologram",
+    "SZLHOLDINGS/khipu-playground",
+    "SZLHOLDINGS/khipu-proof-loom",
+    "SZLHOLDINGS/khipu-yachay",
     "SZLHOLDINGS/killinchu",
+    "SZLHOLDINGS/living-anatomy",
     "SZLHOLDINGS/llm-router-live",
     "SZLHOLDINGS/lyte",
+    "SZLHOLDINGS/measured-honesty-census",
+    "SZLHOLDINGS/newton-trust-upgrade",
     "SZLHOLDINGS/nexus",
     "SZLHOLDINGS/oac-system-health-lab",
     "SZLHOLDINGS/prove-it",
+    "SZLHOLDINGS/puriq-markets",
     "SZLHOLDINGS/sentra",
     "SZLHOLDINGS/szl-atelier",
     "SZLHOLDINGS/szl-bench-suite",
     "SZLHOLDINGS/szl-brand-campaign",
+    "SZLHOLDINGS/szl-chief-engineer",
+    "SZLHOLDINGS/szl-command-center",
     "SZLHOLDINGS/szl-command-lab",
     "SZLHOLDINGS/szl-constellation",
+    "SZLHOLDINGS/szl-cram-demo",
+    "SZLHOLDINGS/szl-cyber-shield",
+    "SZLHOLDINGS/szl-dream-architect",
+    "SZLHOLDINGS/szl-energy-hologram",
+    "SZLHOLDINGS/szl-energy-ledger",
     "SZLHOLDINGS/szl-forge-lab",
     "SZLHOLDINGS/szl-foundation-confirmation",
     "SZLHOLDINGS/szl-frontier",
+    "SZLHOLDINGS/szl-frontier-deck",
+    "SZLHOLDINGS/szl-infra-warden",
     "SZLHOLDINGS/szl-khipu",
-    "SZLHOLDINGS/szl-marketing-1.1",
+    "SZLHOLDINGS/szl-marketing",
+    "SZLHOLDINGS/szl-marketing-1-1",
     "SZLHOLDINGS/szl-model-inference-lab",
+    "SZLHOLDINGS/szl-muhu-frontier",
+    "SZLHOLDINGS/szl-provenance-pitch",
+    "SZLHOLDINGS/szl-receipt-constellation",
+    "SZLHOLDINGS/szl-receipts-chain",
+    "SZLHOLDINGS/szl-research-council",
     "SZLHOLDINGS/szl-router-control",
+    "SZLHOLDINGS/szl-science-gate-studio",
+    "SZLHOLDINGS/szl-second-brain",
     "SZLHOLDINGS/szl-seismic-review",
     "SZLHOLDINGS/szl-typesafe-triage",
+    "SZLHOLDINGS/szlholdings-si",
     "SZLHOLDINGS/terra",
+    "SZLHOLDINGS/terra-assurance",
     "SZLHOLDINGS/the-grid",
+    "SZLHOLDINGS/training-ledger-explorer",
+    "SZLHOLDINGS/truth-router",
     "SZLHOLDINGS/vertical-services",
+    "SZLHOLDINGS/wink-observatory",
     "SZLHOLDINGS/yarqa",
 }
-PUBLIC_SPACE_OBSERVED_AT = "2026-10-14T03:31:52.247053Z"
+PUBLIC_SPACE_OBSERVED_AT = "2026-11-26T05:58:09.411368Z"
 PUBLIC_SPACE_CLAIM_BOUNDARY = (
     "Anonymous public Space membership only; not fleet policy, ownership, "
     "publication eligibility, or runtime qualification."
@@ -311,7 +347,7 @@ def validate_contract(contract: Mapping[str, Any]) -> list[str]:
         if isinstance(rows, list):
             ids = [row.get("repo_id") if isinstance(row, dict) else None for row in rows]
             require(set(ids) == EXPECTED_PORTFOLIO_SPACES, "portfolio Space set mismatch", failures)
-            require(len(ids) == len(set(ids)) == 16, "portfolio Spaces must contain 16 unique IDs", failures)
+            require(len(ids) == len(set(ids)) == 14, "portfolio Spaces must contain 14 unique IDs", failures)
             require(all(isinstance(row, dict) and row.get("class") in ALLOWED_SPACE_CLASSES for row in rows), "unknown portfolio Space class", failures)
             require(all(isinstance(row, dict) and str(row.get("canonical_source", "")).startswith("szl-holdings/") for row in rows), "every Space requires canonical GitHub source", failures)
             require(all(isinstance(row, dict) and str(row.get("deployment_source", "")).startswith("szl-holdings/") for row in rows), "every Space requires canonical deployment source", failures)
@@ -325,13 +361,13 @@ def validate_contract(contract: Mapping[str, Any]) -> list[str]:
             require(all(isinstance(row, dict) and row.get("governed_keep") is False for row in inventory_only), "inventory-only Space cannot be a keeper", failures)
             require(all(isinstance(row, dict) and row.get("disposition") == "FOLD" for row in inventory_only), "inventory-only disposition must be FOLD", failures)
             require(all(isinstance(row, dict) and str(row.get("canonical_source", "")).startswith("szl-holdings/") for row in inventory_only), "inventory-only Space requires canonical GitHub source", failures)
-        require(snapshot.get("portfolio_space_count") == 16, "portfolio_space_count must be 16", failures)
-        require(snapshot.get("public_space_count") == 17, "public_space_count must be 17", failures)
+        require(snapshot.get("portfolio_space_count") == 14, "portfolio_space_count must be 14", failures)
+        require(snapshot.get("public_space_count") == 15, "public_space_count must be 15", failures)
         require(snapshot.get("public_space_count") == snapshot.get("portfolio_space_count") + len(inventory_only or []), "public Space decomposition mismatch", failures)
-        require(snapshot.get("model_count") == 48, "model_count must be 48", failures)
-        require(snapshot.get("model_count_observed_at") == "2026-10-11T14:19:39Z", "model count observation time mismatch", failures)
-        require(snapshot.get("dataset_count") == 37, "dataset_count must be 37", failures)
-        require(snapshot.get("dataset_count_observed_at") == "2026-10-11T14:19:39Z", "dataset count observation time mismatch", failures)
+        require(snapshot.get("model_count") == 69, "model_count must be 69", failures)
+        require(snapshot.get("model_count_observed_at") == "2026-11-26T05:58:09Z", "model count observation time mismatch", failures)
+        require(snapshot.get("dataset_count") == 174, "dataset_count must be 174", failures)
+        require(snapshot.get("dataset_count_observed_at") == "2026-11-26T05:58:09Z", "dataset count observation time mismatch", failures)
         require(snapshot.get("organization_card_space_excluded_from_portfolio_count") == ORG_CARD_SPACE_ID, "README control-surface exclusion missing", failures)
 
     failures.extend(validate_public_space_observation(contract.get("public_space_membership_observation")))
@@ -347,7 +383,7 @@ def validate_contract(contract: Mapping[str, Any]) -> list[str]:
         require(org_card.get("portfolio_member") is False, "organization-card must remain outside the portfolio count", failures)
         require(
             org_card.get("claim_boundary")
-            == "Source-bound organization front door; excluded from the 16 portfolio-Space count.",
+            == "Source-bound organization front door; excluded from the 14 portfolio-Space count.",
             "organization-card claim boundary mismatch",
             failures,
         )
@@ -387,7 +423,7 @@ def validate_documents(root: Path, contract: Mapping[str, Any]) -> list[str]:
             require(marker.casefold() in text.casefold(), f"{label} missing {marker!r}", failures)
         for name in ("A11oy", "Killinchu", "Forge", "Terra", "PRISM Counsel", "PURIQ Finance", "LYTE"):
             require(name.casefold() in text.casefold(), f"{label} missing {name}", failures)
-    for marker in ("16 portfolio Spaces", "1 inventory-only Space", "45 models", "34 datasets"):
+    for marker in ("14 portfolio Spaces", "1 inventory-only Space", "69 models", "174 datasets"):
         require(marker.casefold() in profile.casefold(), f"GitHub profile missing {marker}", failures)
         require(marker.casefold() in hf_readme.casefold(), f"Hugging Face README missing {marker}", failures)
     for label, text in documents.items():

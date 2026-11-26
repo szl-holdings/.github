@@ -53,8 +53,8 @@ class EstateAlignmentContractTests(unittest.TestCase):
             {row["repo_id"] for row in snapshot["inventory_only_spaces"]},
             alignment.EXPECTED_INVENTORY_ONLY_SPACES,
         )
-        self.assertEqual(snapshot["public_space_count"], 17)
-        self.assertEqual(snapshot["portfolio_space_count"], 16)
+        self.assertEqual(snapshot["public_space_count"], 15)
+        self.assertEqual(snapshot["portfolio_space_count"], 14)
 
         promoted = copy.deepcopy(self.contract)
         promoted["huggingface_inventory_snapshot"]["inventory_only_spaces"][0][
@@ -86,7 +86,7 @@ class EstateAlignmentContractTests(unittest.TestCase):
     def test_public_membership_observation_does_not_reclassify_fleet(self) -> None:
         observation = self.contract["public_space_membership_observation"]
         self.assertEqual(alignment.validate_public_space_observation(observation), [])
-        self.assertEqual(observation["public_space_count"], 37)
+        self.assertEqual(observation["public_space_count"], 75)
         self.assertFalse(observation["policy_authority"])
         self.assertEqual(observation["policy_alignment"], "UNKNOWN")
         self.assertEqual(
@@ -94,8 +94,8 @@ class EstateAlignmentContractTests(unittest.TestCase):
             {"SZLHOLDINGS/llm-router-live", "SZLHOLDINGS/szl-atelier"},
         )
         historical = self.contract["huggingface_inventory_snapshot"]
-        self.assertEqual(historical["public_space_count"], 17)
-        self.assertEqual(historical["portfolio_space_count"], 16)
+        self.assertEqual(historical["public_space_count"], 15)
+        self.assertEqual(historical["portfolio_space_count"], 14)
         self.assertEqual(
             {row["repo_id"] for row in historical["inventory_only_spaces"]},
             {"SZLHOLDINGS/yarqa"},
@@ -658,9 +658,9 @@ class EstateAlignmentContractTests(unittest.TestCase):
 
         def list_hf(kind: str):
             if kind == "models":
-                rows = [{"id": f"SZLHOLDINGS/test-model-{i}"} for i in range(48)]
+                rows = [{"id": f"SZLHOLDINGS/test-model-{i}"} for i in range(69)]
             elif kind == "datasets":
-                rows = [{"id": f"SZLHOLDINGS/test-dataset-{i}"} for i in range(37)]
+                rows = [{"id": f"SZLHOLDINGS/test-dataset-{i}"} for i in range(174)]
             else:
                 rows = [{"id": repo_id} for repo_id in space_ids]
             return alignment.HFListing(rows, pages=1)
@@ -690,9 +690,9 @@ class EstateAlignmentContractTests(unittest.TestCase):
             alignment.EXPECTED_PORTFOLIO_SPACES | {alignment.ORG_CARD_SPACE_ID},
         )
         self.assertNotIn("SZLHOLDINGS/yarqa", seen)
-        self.assertEqual(len(observation["runtime_source_bindings"]), 16)
-        self.assertEqual(observation["huggingface"]["public_listed_spaces"], 37)
-        self.assertEqual(observation["huggingface"]["portfolio_spaces"], 16)
+        self.assertEqual(len(observation["runtime_source_bindings"]), 14)
+        self.assertEqual(observation["huggingface"]["public_listed_spaces"], 75)
+        self.assertEqual(observation["huggingface"]["portfolio_spaces"], 14)
         self.assertEqual(observation["huggingface"]["inventory_only_spaces"], 1)
         self.assertEqual(
             observation["huggingface"]["inventory_only_space_ids"],
@@ -726,7 +726,7 @@ class EstateAlignmentContractTests(unittest.TestCase):
             row["repo_id"]
             for row in self.contract["huggingface_inventory_snapshot"]["portfolio_spaces"]
         }
-        self.assertEqual(len(portfolio_ids), 16)
+        self.assertEqual(len(portfolio_ids), 14)
         self.assertNotIn(alignment.ORG_CARD_SPACE_ID, portfolio_ids)
 
     def test_org_card_runtime_binding_uses_static_deployment_receipt_only(self) -> None:

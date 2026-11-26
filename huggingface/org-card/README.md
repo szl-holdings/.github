@@ -64,7 +64,7 @@ GEO GSE85241: integrity and repeatability; unsigned receipt; no clinical claim.
 The source-bound public inventory records **33 public Spaces, 150 model repositories, 14 native kernels, 99 datasets** at **2026-11-18T05:28:05Z** under `hf-public-author-membership/v2`. This is a dated observation, not a live count. Native kernel IDs may also appear in the model namespace; these figures do not count unique projects or trained language models. [Inventory binding](https://github.com/szl-holdings/.github/blob/main/profile/public-inventory.json) · [Exact source](https://github.com/szl-holdings/a11oy/blob/02fe78903c859aa7ef570b96bcb36724b5d59bb4/docs/huggingface-ecosystem-manifest.json) · [Current Hub listing](https://huggingface.co/SZLHOLDINGS). Hub inventory is registry evidence, not availability, operational readiness, or publication policy. It does not establish model quality.
 <!-- szl:public-inventory:end -->
 
-**HISTORICAL** alignment v1 recorded 16 portfolio Spaces, 1 inventory-only Space, 45 models, 34 datasets; the [legacy dataset](https://huggingface.co/datasets/SZLHOLDINGS/SZLHOLDINGS) is not readiness evidence.
+**HISTORICAL** alignment v1 recorded 14 portfolio Spaces, 1 inventory-only Space, 69 models, 174 datasets; the [legacy dataset](https://huggingface.co/datasets/SZLHOLDINGS/SZLHOLDINGS) is not readiness evidence.
 
 <details>
 <summary>Reproduction and provenance</summary>
