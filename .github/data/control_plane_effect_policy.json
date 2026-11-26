@@ -12203,6 +12203,10 @@
         {
           "key": "stepsecurity:monitor:szl-holdings/.github",
           "access": "external-write"
+        },
+        {
+          "key": "github:actions:artifact:public-experience-v4",
+          "access": "external-write"
         }
       ],
       "effects": [
@@ -12241,6 +12245,12 @@
           "resource": "runner:toolchain:python",
           "access": "local-write",
           "max_calls": 2
+        },
+        {
+          "sink": "github.artifact.upload",
+          "resource": "github:actions:artifact:public-experience-v4",
+          "access": "external-write",
+          "max_calls": 1
         }
       ],
       "max_external_writes": 2,
