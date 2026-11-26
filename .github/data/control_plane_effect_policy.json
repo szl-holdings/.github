@@ -12177,13 +12177,9 @@
     ".github/workflows/public-experience-frontier-v4.yml": {
       "intent_id": "public-experience-v4-measured-audit-v1",
       "valid_until": "2026-11-30",
-      "source_sha256": "sha256:46673b89d9fc7a3c45097d715616a3fd37d321499add271a005ab3bfbca2604f",
+      "source_sha256": "sha256:0005a2d67eb0631fe4dde607582319881608371dc28a2b48a24311fe30eab879",
       "credentials": [],
       "resources": [
-        {
-          "key": "github:actions:artifact:public-experience-v4",
-          "access": "external-write"
-        },
         {
           "key": "github:repository:szl-holdings/.github:contents",
           "access": "read"
@@ -12191,10 +12187,6 @@
         {
           "key": "runner:guard:egress",
           "access": "local-write"
-        },
-        {
-          "key": "stepsecurity:monitor:szl-holdings/.github",
-          "access": "external-write"
         },
         {
           "key": "runner:toolchain:node",
@@ -12207,12 +12199,6 @@
       ],
       "effects": [
         {
-          "sink": "github.artifact.upload",
-          "resource": "github:actions:artifact:public-experience-v4",
-          "access": "external-write",
-          "max_calls": 1
-        },
-        {
           "sink": "github.contents.checkout",
           "resource": "github:repository:szl-holdings/.github:contents",
           "access": "read",
@@ -12222,12 +12208,6 @@
           "sink": "runner.guard.configure",
           "resource": "runner:guard:egress",
           "access": "local-write",
-          "max_calls": 2
-        },
-        {
-          "sink": "runner.guard.telemetry",
-          "resource": "stepsecurity:monitor:szl-holdings/.github",
-          "access": "external-write",
           "max_calls": 2
         },
         {
@@ -12243,7 +12223,7 @@
           "max_calls": 2
         }
       ],
-      "max_external_writes": 3,
+      "max_external_writes": 0,
       "required_controls": {
         "triggers": [
           "merge_group",
@@ -12267,8 +12247,9 @@
           "scripts/audit_responsive_estate_v3.mjs": "sha256:b4a2b76d41bd2d37fdbda2bdacf6052a12b719534a50a936e8830888c7d1a777",
           "scripts/normalize_responsive_estate_v31.mjs": "sha256:7ef9be1f8bc887feed648e1ce739a3bfee0bf5dac60d716af96120e60a1f520c",
           "scripts/responsive_audit_policy_v31.mjs": "sha256:fa93396b7107419f0475a3b6c530ac187942b5d78a68e7a00a5cfd96df5f72b9",
-          ".github/workflows/public-experience-frontier-v4.yml": "sha256:46673b89d9fc7a3c45097d715616a3fd37d321499add271a005ab3bfbca2604f",
-          "scripts/annotate_public_experience_v4.py": "sha256:f722b0088cac1e71a3fd9b60ea078827b444da03489314c8dda4424bf68d88be"
+          ".github/workflows/public-experience-frontier-v4.yml": "sha256:0005a2d67eb0631fe4dde607582319881608371dc28a2b48a24311fe30eab879",
+          "scripts/annotate_public_experience_v4.py": "sha256:f722b0088cac1e71a3fd9b60ea078827b444da03489314c8dda4424bf68d88be",
+          "scripts/check_public_experience_v4.py": "sha256:7ac09e2be6bd71979a7f8556d3fdf7674e6020f99d7b4a8e0cef954d2e650f66"
         },
         "unknowns": [
           "ACTION_INPUTS_REVIEW_REQUIRED@.github/workflows/responsive-estate-v3.yml:102",
@@ -13213,8 +13194,17 @@
           "WORKFLOW_ENVIRONMENT_REVIEW_REQUIRED@.github/workflows/public-experience-frontier-v4.yml:218",
           "WORKFLOW_ENVIRONMENT_REVIEW_REQUIRED@.github/workflows/public-experience-frontier-v4.yml:219",
           "WORKFLOW_ENVIRONMENT_REVIEW_REQUIRED@.github/workflows/public-experience-frontier-v4.yml:220",
-          "SCRIPT_SOURCE_REVIEW_REQUIRED@.github/workflows/public-experience-frontier-v4.yml:1",
-          "PYTHON_SOURCE_REVIEW_REQUIRED@scripts/annotate_public_experience_v4.py:1"
+          "ACTION_RESOURCE_OVERRIDE_UNSUPPORTED@.github/workflows/public-experience-frontier-v4.yml:114",
+          "INLINE_DYNAMIC_CODE@.github/workflows/public-experience-frontier-v4.yml:137",
+          "PYTHON_IMPORT_UNRESOLVED@scripts/annotate_public_experience_v4.py:8",
+          "PYTHON_IMPORT_UNRESOLVED@scripts/annotate_public_experience_v4.py:10",
+          "PYTHON_IMPORT_UNRESOLVED@scripts/check_public_experience_v4.py:8",
+          "PYTHON_IMPORT_UNRESOLVED@scripts/check_public_experience_v4.py:10",
+          "PYTHON_IMPORT_UNRESOLVED@scripts/check_public_experience_v4.py:11",
+          "PYTHON_IMPORT_UNRESOLVED@scripts/check_public_experience_v4.py:15",
+          "PYTHON_SOURCE_REVIEW_REQUIRED@scripts/annotate_public_experience_v4.py:1",
+          "PYTHON_SOURCE_REVIEW_REQUIRED@scripts/check_public_experience_v4.py:1",
+          "SCRIPT_SOURCE_REVIEW_REQUIRED@.github/workflows/public-experience-frontier-v4.yml:1"
         ]
       }
     }
