@@ -12237,7 +12237,7 @@
           "max_calls": 2
         }
       ],
-      "max_external_writes": 2,
+      "max_external_writes": 3,
       "required_controls": {
         "triggers": [
           "merge_group",
