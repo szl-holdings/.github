@@ -57,7 +57,7 @@ def build_report(source: dict[str, Any], source_sha256: str) -> dict[str, Any]:
         "passCount": pass_count,
         "failCount": fail_count,
         "criteria": criteria,
-        "status": "PASS" if fail_count == 0 else "FAIL",
+        "status": "FAIL" if fail_count else "INCOMPLETE",
         "disposition": "HOLD",
         "sourceReportSha256": source_sha256,
         "authority": {
@@ -84,4 +84,5 @@ def main() -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
+
 
