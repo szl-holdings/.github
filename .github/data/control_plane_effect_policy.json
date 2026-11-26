@@ -1791,7 +1791,7 @@
       "trusted_transitives": {},
       "reviewed_unknowns": {
         "files": {
-          ".github/scripts/estate_alignment_contract.py": "sha256:ac49604c8e1bb65310fc823fb5a523e4fef0363250529bcae6c53241c0c0cf39",
+          ".github/scripts/estate_alignment_contract.py": "sha256:029456867ba96973db06f92f476b31eb0c3e6b0528ffa4db2b2cb22e3dda8418",
           ".github/scripts/hf_static_space_deploy.py": "sha256:93b280bc64fa9e308d7d9cd540f2888d04f668804b6431403dc00a397a9d3663",
           ".github/scripts/test_estate_alignment_contract.py": "sha256:dec3f81cf64095483a885651b9bd5a9642f02be2b9ce2a325e0d43e42cae68c9",
           ".github/scripts/test_estate_alignment_identity.py": "sha256:663bd924115227421ba45658ba84490c9be1858f9bc54f0135edb51dd97dee12",
@@ -2006,7 +2006,7 @@
       "trusted_transitives": {},
       "reviewed_unknowns": {
         "files": {
-          ".github/scripts/estate_alignment_contract.py": "sha256:ac49604c8e1bb65310fc823fb5a523e4fef0363250529bcae6c53241c0c0cf39",
+          ".github/scripts/estate_alignment_contract.py": "sha256:029456867ba96973db06f92f476b31eb0c3e6b0528ffa4db2b2cb22e3dda8418",
           ".github/scripts/estate_operational_inventory.py": "sha256:e0a7870da14e2ebe1cf71a3edabd10ff01c3e93b6d22c1cd39596e5830de2874",
           ".github/scripts/router_flagship_contract.py": "sha256:b191e2fcad51426867d4272ba7064cadc15489073047aeb2a682443e774c9265",
           ".github/scripts/test_estate_operational_inventory.py": "sha256:548bc88fecab7e98d751ae4a281b1f583c41cb5d7c379d4feba0cbddb338f8f2",

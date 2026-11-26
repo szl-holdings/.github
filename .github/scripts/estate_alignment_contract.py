@@ -423,7 +423,7 @@ def validate_documents(root: Path, contract: Mapping[str, Any]) -> list[str]:
             require(marker.casefold() in text.casefold(), f"{label} missing {marker!r}", failures)
         for name in ("A11oy", "Killinchu", "Forge", "Terra", "PRISM Counsel", "PURIQ Finance", "LYTE"):
             require(name.casefold() in text.casefold(), f"{label} missing {name}", failures)
-    for marker in ("14 portfolio Spaces", "1 inventory-only Space", "69 models", "174 datasets"):
+    for marker in ("16 portfolio Spaces", "1 inventory-only Space", "45 models", "34 datasets"):
         require(marker.casefold() in profile.casefold(), f"GitHub profile missing {marker}", failures)
         require(marker.casefold() in hf_readme.casefold(), f"Hugging Face README missing {marker}", failures)
     for label, text in documents.items():
