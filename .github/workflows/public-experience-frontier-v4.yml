@@ -4,6 +4,7 @@ on:
   pull_request:
     paths:
     - scripts/check_public_experience_v4.py
+    - scripts/annotate_public_experience_v4.py
     - tests/test_public_experience_gate_v4.py
     - docs/PUBLIC_EXPERIENCE_FRONTIER_V4.md
     - docs/PUBLIC_EXPERIENCE_RELEASE_CHECKLIST.md
@@ -13,16 +14,23 @@ on:
     - main
     paths:
     - scripts/check_public_experience_v4.py
+    - scripts/annotate_public_experience_v4.py
     - tests/test_public_experience_gate_v4.py
     - docs/PUBLIC_EXPERIENCE_FRONTIER_V4.md
     - docs/PUBLIC_EXPERIENCE_RELEASE_CHECKLIST.md
     - .github/workflows/public-experience-frontier-v4.yml
   workflow_dispatch: null
+  schedule:
+    - cron: "17 5 * * *"
   merge_group:
     types:
     - checks_requested
 permissions:
   contents: read
+
+concurrency:
+  group: public-experience-frontier-v4-${{ github.ref }}
+  cancel-in-progress: false
 
 jobs:
   contract:
@@ -40,6 +48,100 @@ jobs:
           python-version: '3.12'
       - name: Compile and prove positive + negative controls
         run: |
-          python -m py_compile scripts/check_public_experience_v4.py tests/test_public_experience_gate_v4.py
+          python -m py_compile scripts/check_public_experience_v4.py scripts/annotate_public_experience_v4.py tests/test_public_experience_gate_v4.py
           python tests/test_public_experience_gate_v4.py
           git diff --check
+
+  surface-audit:
+    name: Measured v4 public-surface audit
+    needs: contract
+    if: ${{ github.event_name != 'pull_request' && github.event_name != 'merge_group' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 55
+    env:
+      RAW_REPORT: reports/public-experience-v4-raw.json
+      NORMALIZED_REPORT: reports/public-experience-v4-normalized.json
+      V4_REPORT: reports/public-experience-v4.json
+      EVIDENCE_DIR: reports/public-experience-v4-evidence
+    steps:
+      - name: Harden runner
+        uses: step-security/harden-runner@ccd8616d44fd3846e67624a50d5aad6d37bf2d25 # v2.22.1
+        with:
+          egress-policy: audit
+          disable-telemetry: false
+      - name: Check out exact controller source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Set up Node
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: "22"
+          package-manager-cache: false
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: '3.12'
+      - name: Install exact browser harness
+        run: |
+          set -euo pipefail
+          npm install --no-save --package-lock=false --ignore-scripts playwright@1.55.0
+          npx playwright install --with-deps chromium
+      - name: Measure public surfaces
+        id: raw
+        run: |
+          set +e
+          mkdir -p reports
+          node scripts/audit_responsive_estate_v3.mjs             --json-out "$RAW_REPORT"             --html-out /tmp/public-experience-v4-raw.html             --evidence-dir "$EVIDENCE_DIR"             --concurrency 3
+          code=$?
+          echo "exit_code=$code" >> "$GITHUB_OUTPUT"
+          exit 0
+      - name: Normalize measured geometry
+        id: normalized
+        run: |
+          set +e
+          node scripts/normalize_responsive_estate_v31.mjs             --input "$RAW_REPORT"             --json-out "$NORMALIZED_REPORT"             --html-out reports/public-experience-v4-normalized.html
+          code=$?
+          echo "exit_code=$code" >> "$GITHUB_OUTPUT"
+          exit 0
+      - name: Project v4 criteria and preserve HOLD
+        if: always()
+        run: |
+          if [ -f "$NORMALIZED_REPORT" ]; then
+            python scripts/annotate_public_experience_v4.py --input "$NORMALIZED_REPORT" --output "$V4_REPORT" || true
+          else
+            printf '%s\n' '{"schema":"szl.public-experience-v4-runtime/v1","status":"INCOMPLETE","disposition":"HOLD","authority":{"automaticPromotion":false}}' > "$V4_REPORT"
+          fi
+      - name: Upload measured v4 evidence
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: public-experience-v4
+          path: reports/
+          if-no-files-found: warn
+          retention-days: 90
+      - name: Enforce measured browser evidence
+        if: always()
+        env:
+          RAW_EXIT: ${{ steps.raw.outputs.exit_code }}
+          NORMALIZED_EXIT: ${{ steps.normalized.outputs.exit_code }}
+        run: |
+          set -euo pipefail
+          if [ "$RAW_EXIT" != "0" ] && [ "$RAW_EXIT" != "1" ]; then
+            echo "::error::The public-surface browser probe did not complete."
+            exit 1
+          fi
+          if [ "$NORMALIZED_EXIT" != "0" ] && [ "$NORMALIZED_EXIT" != "1" ]; then
+            echo "::error::The public-surface normalizer did not complete."
+            exit 1
+          fi
+          if [ ! -s "$V4_REPORT" ]; then
+            echo "::error::The v4 evidence report is missing."
+            exit 1
+          fi
+          measured_status=$(python -c 'import json, os; report=json.load(open(os.environ["V4_REPORT"])); keys=("responsive_viewports", "runtime_reachability"); print("PASS" if all(report.get("criteria", {}).get(key, {}).get("status") == "PASS" for key in keys) else "FAIL")')
+          if [ "$measured_status" != "PASS" ]; then
+            echo "::error::Measured v4 browser criteria are not green: $measured_status"
+            exit 1
+          fi
+          echo "Measured browser criteria passed. Overall v4 disposition remains HOLD until unavailable criteria receive dedicated probes."

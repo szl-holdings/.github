@@ -12173,6 +12173,178 @@
           "WORKFLOW_ENVIRONMENT_REVIEW_REQUIRED@.github/workflows/reusable-anatomy-map-drift.yml:65"
         ]
       }
+    },
+    ".github/workflows/public-experience-frontier-v4.yml": {
+      "intent_id": "public-experience-v4-measured-audit-v1",
+      "valid_until": "2026-11-30",
+      "source_sha256": "sha256:e5c912ac7a6aecb707d6d8236abdea9505d34fa0943342a13ce94ccc0201ea83",
+      "credentials": [],
+      "resources": [
+        {
+          "key": "github:actions:artifact:public-experience-v4",
+          "access": "external-write"
+        },
+        {
+          "key": "github:repository:szl-holdings/.github:contents",
+          "access": "read"
+        },
+        {
+          "key": "stepsecurity:monitor:szl-holdings/.github",
+          "access": "external-write"
+        },
+        {
+          "key": "runner:toolchain:node",
+          "access": "local-write"
+        },
+        {
+          "key": "runner:toolchain:python",
+          "access": "local-write"
+        },
+        {
+          "key": "runner:guard:egress",
+          "access": "local-write"
+        }
+      ],
+      "effects": [
+        {
+          "sink": "github.artifact.upload",
+          "resource": "github:actions:artifact:public-experience-v4",
+          "access": "external-write",
+          "max_calls": 1
+        },
+        {
+          "sink": "github.contents.checkout",
+          "resource": "github:repository:szl-holdings/.github:contents",
+          "access": "read",
+          "max_calls": 2
+        },
+        {
+          "sink": "runner.guard.configure",
+          "resource": "runner:guard:egress",
+          "access": "local-write",
+          "max_calls": 1
+        },
+        {
+          "sink": "runner.guard.telemetry",
+          "resource": "stepsecurity:monitor:szl-holdings/.github",
+          "access": "external-write",
+          "max_calls": 2
+        },
+        {
+          "sink": "runner.toolchain.install",
+          "resource": "runner:toolchain:node",
+          "access": "local-write",
+          "max_calls": 2
+        },
+        {
+          "sink": "runner.toolchain.install",
+          "resource": "runner:toolchain:python",
+          "access": "local-write",
+          "max_calls": 2
+        }
+      ],
+      "max_external_writes": 3,
+      "required_controls": {
+        "triggers": [
+          "merge_group",
+          "pull_request",
+          "push",
+          "schedule",
+          "workflow_dispatch"
+        ],
+        "contents_read": true,
+        "no_explicit_secrets": true,
+        "concurrency": true,
+        "protected_ref": false,
+        "exact_sha": false,
+        "expected_before": false,
+        "readback": false
+      },
+      "trusted_transitives": {},
+      "reviewed_unknowns": {
+        "files": {
+          ".github/workflows/public-experience-frontier-v4.yml": "sha256:e5c912ac7a6aecb707d6d8236abdea9505d34fa0943342a13ce94ccc0201ea83",
+          "scripts/annotate_public_experience_v4.py": "sha256:f722b0088cac1e71a3fd9b60ea078827b444da03489314c8dda4424bf68d88be",
+          "scripts/audit_responsive_estate_v3.mjs": "sha256:b4a2b76d41bd2d37fdbda2bdacf6052a12b719534a50a936e8830888c7d1a777",
+          "scripts/check_public_experience_v4.py": "sha256:7ac09e2be6bd71979a7f8556d3fdf7674e6020f99d7b4a8e0cef954d2e650f66",
+          "scripts/normalize_responsive_estate_v31.mjs": "sha256:7ef9be1f8bc887feed648e1ce739a3bfee0bf5dac60d716af96120e60a1f520c"
+        },
+        "unknowns": [
+          "ACTION_INPUTS_REVIEW_REQUIRED@.github/workflows/public-experience-frontier-v4.yml:119",
+          "ACTION_INPUTS_REVIEW_REQUIRED@.github/workflows/public-experience-frontier-v4.yml:44",
+          "ACTION_INPUTS_REVIEW_REQUIRED@.github/workflows/public-experience-frontier-v4.yml:48",
+          "ACTION_INPUTS_REVIEW_REQUIRED@.github/workflows/public-experience-frontier-v4.yml:70",
+          "ACTION_INPUTS_REVIEW_REQUIRED@.github/workflows/public-experience-frontier-v4.yml:75",
+          "ACTION_INPUTS_REVIEW_REQUIRED@.github/workflows/public-experience-frontier-v4.yml:79",
+          "ACTION_INPUTS_REVIEW_REQUIRED@.github/workflows/public-experience-frontier-v4.yml:84",
+          "INLINE_DYNAMIC_CODE@.github/workflows/public-experience-frontier-v4.yml:142",
+          "PYTHON_IMPORT_UNRESOLVED@scripts/annotate_public_experience_v4.py:10",
+          "PYTHON_IMPORT_UNRESOLVED@scripts/annotate_public_experience_v4.py:8",
+          "PYTHON_IMPORT_UNRESOLVED@scripts/check_public_experience_v4.py:10",
+          "PYTHON_IMPORT_UNRESOLVED@scripts/check_public_experience_v4.py:11",
+          "PYTHON_IMPORT_UNRESOLVED@scripts/check_public_experience_v4.py:15",
+          "PYTHON_IMPORT_UNRESOLVED@scripts/check_public_experience_v4.py:8",
+          "PYTHON_SOURCE_REVIEW_REQUIRED@scripts/annotate_public_experience_v4.py:1",
+          "PYTHON_SOURCE_REVIEW_REQUIRED@scripts/check_public_experience_v4.py:1",
+          "SCRIPT_SOURCE_REVIEW_REQUIRED@.github/workflows/public-experience-frontier-v4.yml:1",
+          "SCRIPT_SOURCE_REVIEW_REQUIRED@scripts/audit_responsive_estate_v3.mjs:1",
+          "SCRIPT_SOURCE_REVIEW_REQUIRED@scripts/normalize_responsive_estate_v31.mjs:1",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/public-experience-frontier-v4.yml:102",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/public-experience-frontier-v4.yml:103",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/public-experience-frontier-v4.yml:104",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/public-experience-frontier-v4.yml:105",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/public-experience-frontier-v4.yml:106",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/public-experience-frontier-v4.yml:110",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/public-experience-frontier-v4.yml:111",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/public-experience-frontier-v4.yml:112",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/public-experience-frontier-v4.yml:113",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/public-experience-frontier-v4.yml:114",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/public-experience-frontier-v4.yml:130",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/public-experience-frontier-v4.yml:131",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/public-experience-frontier-v4.yml:132",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/public-experience-frontier-v4.yml:133",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/public-experience-frontier-v4.yml:134",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/public-experience-frontier-v4.yml:135",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/public-experience-frontier-v4.yml:136",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/public-experience-frontier-v4.yml:137",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/public-experience-frontier-v4.yml:138",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/public-experience-frontier-v4.yml:139",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/public-experience-frontier-v4.yml:140",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/public-experience-frontier-v4.yml:141",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/public-experience-frontier-v4.yml:142",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/public-experience-frontier-v4.yml:143",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/public-experience-frontier-v4.yml:144",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/public-experience-frontier-v4.yml:145",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/public-experience-frontier-v4.yml:146",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/public-experience-frontier-v4.yml:147",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/public-experience-frontier-v4.yml:51",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/public-experience-frontier-v4.yml:52",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/public-experience-frontier-v4.yml:53",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/public-experience-frontier-v4.yml:88",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/public-experience-frontier-v4.yml:89",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/public-experience-frontier-v4.yml:93",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/public-experience-frontier-v4.yml:94",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/public-experience-frontier-v4.yml:95",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/public-experience-frontier-v4.yml:96",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/public-experience-frontier-v4.yml:97",
+          "SHELL_COMMAND_UNCLASSIFIED@.github/workflows/public-experience-frontier-v4.yml:98",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/public-experience-frontier-v4.yml:103",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/public-experience-frontier-v4.yml:105",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/public-experience-frontier-v4.yml:110",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/public-experience-frontier-v4.yml:111",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/public-experience-frontier-v4.yml:113",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/public-experience-frontier-v4.yml:130",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/public-experience-frontier-v4.yml:134",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/public-experience-frontier-v4.yml:138",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/public-experience-frontier-v4.yml:142",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/public-experience-frontier-v4.yml:143",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/public-experience-frontier-v4.yml:144",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/public-experience-frontier-v4.yml:95",
+          "SHELL_COMPOSITION_UNKNOWN@.github/workflows/public-experience-frontier-v4.yml:97",
+          "WORKFLOW_ENVIRONMENT_REVIEW_REQUIRED@.github/workflows/public-experience-frontier-v4.yml:126",
+          "WORKFLOW_ENVIRONMENT_REVIEW_REQUIRED@.github/workflows/public-experience-frontier-v4.yml:62"
+        ]
+      }
     }
   }
 }
