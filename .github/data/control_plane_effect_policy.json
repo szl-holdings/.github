@@ -1605,7 +1605,7 @@
         "files": {
           ".github/workflows/estate-governance-scorecard.yml": "sha256:78872bed672899a9592b5ac786fd3f7879432c2777f5a916828e5bb82d030ca0",
           ".github/scripts/governance_scorecard.py": "sha256:6d487eb768072604e5577238cec80daf77fc533eaa62fb7f002f6241028012a5",
-          ".github/scripts/hf_space_prober.py": "sha256:ef67392b790db0d98a8f4eb9f203cfbf81f458a2b710970d91064886b0fd34e6",
+          ".github/scripts/hf_space_prober.py": "sha256:75201034877a6f8c9191b75b7637723db600aafb0375c0415f4e072e933291a1",
           ".github/scripts/test_hf_space_prober_runtime_honesty.py": "sha256:09f6576a24d40a9852091b4a25b8dcd3894be0653751317219460c5957c5f8ca"
         },
         "unknowns": [
