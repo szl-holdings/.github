@@ -13204,7 +13204,9 @@
           "PYTHON_IMPORT_UNRESOLVED@scripts/check_public_experience_v4.py:15",
           "PYTHON_SOURCE_REVIEW_REQUIRED@scripts/annotate_public_experience_v4.py:1",
           "PYTHON_SOURCE_REVIEW_REQUIRED@scripts/check_public_experience_v4.py:1",
-          "SCRIPT_SOURCE_REVIEW_REQUIRED@.github/workflows/public-experience-frontier-v4.yml:1"
+          "SCRIPT_SOURCE_REVIEW_REQUIRED@.github/workflows/public-experience-frontier-v4.yml:1",
+          "ACTION_EXTRA_EFFECT_UNSUPPORTED@.github/workflows/public-experience-frontier-v4.yml:70",
+          "ACTION_RESOURCE_OVERRIDE_UNSUPPORTED@.github/workflows/public-experience-frontier-v4.yml:119"
         ]
       }
     }
