@@ -34,8 +34,6 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     env:
-      HF_ORG_TOKEN: ${{ secrets.HF_ORG_TOKEN || secrets.HF_ORG_TOKEN1 }}
-      HF_TOKEN: ${{ secrets.HF_TOKEN }}
       HF_HUB_DISABLE_PROGRESS_BARS: "1"
     steps:
       - name: Checkout exact candidate
@@ -72,10 +70,6 @@ jobs:
             publish=true
           fi
           echo "publish=$publish" >> "$GITHUB_OUTPUT"
-          if [ "$publish" = true ] && [ -z "${HF_ORG_TOKEN:-${HF_TOKEN:-}}" ]; then
-            echo "::error::No approved Hugging Face organization write credential is configured."
-            exit 2
-          fi
 
       - name: Dry-run against live collections
         if: steps.mode.outputs.publish != 'true'
@@ -85,10 +79,18 @@ jobs:
 
       - name: Publish from protected merged main and read back
         if: steps.mode.outputs.publish == 'true'
-        run: >-
-          python .github/scripts/hf_collection_truth_reconcile.py
-          --publish
-          --report reports/hf-collection-truth-reconcile-latest.json
+        env:
+          HF_ORG_TOKEN: ${{ secrets.HF_ORG_TOKEN || secrets.HF_ORG_TOKEN1 }}
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+        run: |
+          set -euo pipefail
+          if [ -z "${HF_ORG_TOKEN:-${HF_TOKEN:-}}" ]; then
+            echo "::error::No approved Hugging Face organization write credential is configured."
+            exit 2
+          fi
+          python .github/scripts/hf_collection_truth_reconcile.py \
+            --publish \
+            --report reports/hf-collection-truth-reconcile-latest.json
 
       - name: Upload immutable workflow evidence
         if: always()
