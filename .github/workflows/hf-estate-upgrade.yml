@@ -40,8 +40,6 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 180
     env:
-      HF_ORG_TOKEN: ${{ secrets.HF_ORG_TOKEN || secrets.HF_ORG_TOKEN1 }}
-      HF_TOKEN: ${{ secrets.HF_TOKEN }}
       HF_HUB_DISABLE_PROGRESS_BARS: "1"
       GH_TOKEN: ${{ github.token }}
       GITHUB_TOKEN: ${{ github.token }}
@@ -87,7 +85,11 @@ jobs:
           echo "publish=${publish}" >> "$GITHUB_OUTPUT"
 
       - name: Verify Hugging Face credential without exposing it
+        if: github.event_name != 'pull_request'
         shell: bash
+        env:
+          HF_ORG_TOKEN: ${{ secrets.HF_ORG_TOKEN || secrets.HF_ORG_TOKEN1 }}
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
         run: |
           set -euo pipefail
           if [ -z "${HF_ORG_TOKEN:-}" ] && [ -z "${HF_TOKEN:-}" ]; then
@@ -135,7 +137,11 @@ jobs:
           fi
 
       - name: Prove Dockerfile-derived byte parity with canonical Space
+        if: github.event_name != 'pull_request'
         shell: bash
+        env:
+          HF_ORG_TOKEN: ${{ secrets.HF_ORG_TOKEN || secrets.HF_ORG_TOKEN1 }}
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
         run: |
           set -euo pipefail
           python .github/scripts/hf_module_drift_check.py \
@@ -157,8 +163,12 @@ jobs:
           PY
 
       - name: Verify canonical runtime, routes, collections, and clone absence
+        if: github.event_name != 'pull_request'
         id: estate
         shell: bash
+        env:
+          HF_ORG_TOKEN: ${{ secrets.HF_ORG_TOKEN || secrets.HF_ORG_TOKEN1 }}
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
         run: |
           set +e
           args=(--generation "${GITHUB_SHA}")
@@ -169,7 +179,7 @@ jobs:
           exit 0
 
       - name: Upload immutable singleton evidence
-        if: always()
+        if: always() && github.event_name != 'pull_request'
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: hf-canonical-a11oy-${{ github.run_id }}
@@ -241,7 +251,7 @@ jobs:
           PY
 
       - name: Enforce fail-closed completion
-        if: always()
+        if: always() && github.event_name != 'pull_request'
         run: |
           code="${{ steps.estate.outputs.exit_code }}"
           if [ -z "$code" ]; then code=2; fi

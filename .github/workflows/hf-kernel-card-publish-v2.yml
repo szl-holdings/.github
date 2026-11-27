@@ -29,7 +29,6 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 60
     env:
-      HF_PUBLISH_TOKEN: ${{ secrets.HF_ORG_TOKEN || secrets.HF_ORG_TOKEN1 || secrets.HF_TOKEN }}
       HF_HUB_DISABLE_PROGRESS_BARS: "1"
       GH_TOKEN: ${{ github.token }}
       REPORT_ISSUE_TITLE: '[hf-kernel-card-publish] first-class card contracts'
@@ -145,6 +144,8 @@ jobs:
         if: steps.mode.outputs.publish == 'true'
         id: auth
         shell: bash
+        env:
+          HF_PUBLISH_TOKEN: ${{ secrets.HF_ORG_TOKEN || secrets.HF_ORG_TOKEN1 || secrets.HF_TOKEN }}
         run: |
           set -euo pipefail
           test -n "${HF_PUBLISH_TOKEN:-}" || {
@@ -178,6 +179,7 @@ jobs:
         shell: bash
         env:
           HF_USERNAME: ${{ steps.auth.outputs.username }}
+          HF_PUBLISH_TOKEN: ${{ secrets.HF_ORG_TOKEN || secrets.HF_ORG_TOKEN1 || secrets.HF_TOKEN }}
         run: |
           set -euo pipefail
           askpass="$(mktemp)"
