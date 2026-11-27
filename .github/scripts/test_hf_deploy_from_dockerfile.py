@@ -1888,5 +1888,138 @@ class TestRuntimeMarkerCollisions(unittest.TestCase):
         self.assertNotIn(dep.RUNTIME_MARKER, manifest["runtime_identity"]["catalog"])
 
 
+class TestPublisherGeneratedReleaseManifest(unittest.TestCase):
+    """a11oy #3770: the publisher replaces only the committed placeholder."""
+
+    PLACEHOLDER = json.dumps({
+        "kind": "szl.release-manifest/v1",
+        "status": "PLACEHOLDER_UNTIL_CI_GENERATED",
+        "release_id": "UNKNOWN",
+        "generated_at": "UNKNOWN",
+        "source": {"git_commit": "UNKNOWN", "git_ref": "UNKNOWN"},
+        "runtime": {
+            "served_frontend_sha256": "UNKNOWN",
+            "api_contract_sha256": "UNKNOWN",
+            "model_identity": "UNKNOWN",
+            "deployment_identity": "UNKNOWN",
+        },
+    }) + "\n"
+    REV = "67d60ec577730747055491640cfb91fc4a4b5d25"
+    DOCKERFILE = (
+        "FROM scratch\n"
+        "ARG MODEL_REPO=SZLHOLDINGS/SZL-Khipu-1.5B-GGUF\n"
+        f"ARG MODEL_REV={REV}\n"
+        "COPY console/ ./static/\n"
+        "COPY serve.py .szl-release-manifest.json ./\n"
+    )
+    SHA = "c" * 40
+
+    def _derive(self, files=None, dockerfile=None, **overrides):
+        base = {
+            "console/index.html": "<html>served</html>\n",
+            "docs/api-contract.md": "# contract\n",
+            "serve.py": "pass\n",
+            ".szl-release-manifest.json": self.PLACEHOLDER,
+        }
+        base.update(files or {})
+        with tempfile.TemporaryDirectory() as repo_root:
+            for rel, content in {"Dockerfile": dockerfile or self.DOCKERFILE, **base}.items():
+                if content is None:
+                    continue
+                path = os.path.join(repo_root, *rel.split("/"))
+                os.makedirs(os.path.dirname(path), exist_ok=True)
+                with open(path, "wb") as fh:
+                    fh.write(content.encode("utf-8"))
+            values = dict(
+                repo_root=repo_root, dockerfile_path="Dockerfile",
+                include_readme=False, readme_path="README.md",
+                github_repo="szl-holdings/a11oy", hf_repo="SZLHOLDINGS/a11oy",
+                ref=self.SHA, smoke_paths=None, source_revision_file="",
+                source_sha=self.SHA, manifest_out="",
+                release_manifest_file=".szl-release-manifest.json",
+                release_served_artifact="console/index.html",
+                release_api_contract="docs/api-contract.md",
+                release_model_identity_args="MODEL_REPO@MODEL_REV",
+            )
+            values.update(overrides)
+            return dep.derive(types.SimpleNamespace(**values))
+
+    def test_generated_manifest_replaces_only_placeholder_bytes(self):
+        manifest, files = self._derive()
+        entry = files[".szl-release-manifest.json"]
+        self.assertTrue(entry["generated_release_manifest"])
+        doc = json.loads(entry["generated_content_utf8"])
+        self.assertEqual(doc["status"], "GENERATED")
+        self.assertEqual(doc["source"]["git_commit"], self.SHA)
+        self.assertEqual(doc["runtime"]["served_frontend_sha256"],
+                         dep.sha256(b"<html>served</html>\n"))
+        self.assertEqual(doc["runtime"]["api_contract_sha256"],
+                         dep.sha256(b"# contract\n"))
+        self.assertEqual(doc["runtime"]["model_identity"],
+                         f"SZLHOLDINGS/SZL-Khipu-1.5B-GGUF@{self.REV}")
+        self.assertEqual(doc["runtime"]["deployment_identity"],
+                         f"SZLHOLDINGS/a11oy@{self.SHA}")
+        self.assertEqual(entry["sha256"],
+                         dep.sha256(entry["generated_content_utf8"].encode()))
+        self.assertEqual(files["serve.py"]["sha256"], dep.sha256(b"pass\n"))
+        self.assertNotIn("generated_content_utf8", files["serve.py"])
+        rm = manifest["release_manifest"]
+        self.assertEqual(rm["path"], ".szl-release-manifest.json")
+        self.assertEqual(rm["space_variables"]["SZL_RELEASE_COMMIT"], self.SHA)
+        for key, name in dep.RELEASE_RUNTIME_VARIABLES:
+            self.assertEqual(rm["space_variables"][name], doc["runtime"][key])
+        self.assertEqual(rm["space_variables"]["SZL_RELEASE_ID"], doc["release_id"])
+
+    def test_generation_is_deterministic(self):
+        _, a = self._derive()
+        _, b = self._derive()
+        self.assertEqual(a[".szl-release-manifest.json"]["sha256"],
+                         b[".szl-release-manifest.json"]["sha256"])
+
+    def test_without_flag_placeholder_ships_unchanged(self):
+        manifest, files = self._derive(release_manifest_file="")
+        self.assertNotIn("release_manifest", manifest)
+        self.assertEqual(files[".szl-release-manifest.json"]["sha256"],
+                         dep.sha256(self.PLACEHOLDER.encode()))
+
+    def test_refuses_non_placeholder_source(self):
+        real = self.PLACEHOLDER.replace("PLACEHOLDER_UNTIL_CI_GENERATED", "GENERATED")
+        with self.assertRaisesRegex(dep.DeployContractError, "placeholder"):
+            self._derive({".szl-release-manifest.json": real})
+
+    def test_refuses_duplicate_keys_and_non_dot_path(self):
+        dup = '{"kind":"szl.release-manifest/v1","kind":"x","status":"PLACEHOLDER_UNTIL_CI_GENERATED"}\n'
+        with self.assertRaisesRegex(dep.DeployContractError, "duplicate"):
+            self._derive({".szl-release-manifest.json": dup})
+        with self.assertRaisesRegex(dep.DeployContractError, "leading-dot"):
+            self._derive({"release-manifest.json": self.PLACEHOLDER},
+                         release_manifest_file="release-manifest.json")
+
+    def test_requires_exact_source_sha(self):
+        with self.assertRaisesRegex(dep.DeployContractError, "40-character"):
+            self._derive(source_sha="main")
+
+    def test_requires_copy_coverage(self):
+        dockerfile = self.DOCKERFILE.replace(" .szl-release-manifest.json", "")
+        with self.assertRaisesRegex(dep.DeployContractError, "not covered"):
+            self._derive(dockerfile=dockerfile)
+
+    def test_model_identity_must_be_single_immutable_pin(self):
+        ambiguous = self.DOCKERFILE + "ARG MODEL_REV=" + "d" * 40 + "\n"
+        with self.assertRaisesRegex(dep.DeployContractError, "exactly one"):
+            self._derive(dockerfile=ambiguous)
+        floating = self.DOCKERFILE.replace(f"ARG MODEL_REV={self.REV}", "ARG MODEL_REV=main")
+        with self.assertRaisesRegex(dep.DeployContractError, "immutable"):
+            self._derive(dockerfile=floating)
+        with self.assertRaisesRegex(dep.DeployContractError, "REPO_ARG@REVISION_ARG"):
+            self._derive(release_model_identity_args="MODEL_REPO")
+
+    def test_missing_inputs_fail_closed(self):
+        with self.assertRaises(dep.DeployContractError):
+            self._derive({"docs/api-contract.md": None})
+        with self.assertRaises(dep.DeployContractError):
+            self._derive(release_served_artifact="")
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

@@ -28,6 +28,16 @@ def validate(env):
     need(env.get("SOURCE_VARIABLE") == "SZL_GIT_SHA" and env.get("SOURCE_PROBE") == "/api/build-info")
     need(env.get("INCLUDE_README") == "true")
     need(env.get("PRUNE") in {"true", "false"} and env.get("RESTART") in {"true", "false"})
+    release = env.get("RELEASE_MANIFEST_FILE", "")
+    release_inputs = (env.get("RELEASE_SERVED_ARTIFACT", ""), env.get("RELEASE_API_CONTRACT", ""),
+                      env.get("RELEASE_MODEL_IDENTITY_ARGS", ""))
+    if release == "":
+        need(release_inputs == ("", "", ""))
+    else:
+        need(release == ".szl-release-manifest.json")
+        need(all(bool(re.fullmatch(r"[A-Za-z0-9_][A-Za-z0-9_./-]{0,199}", p))
+                 and ".." not in p.split("/") for p in release_inputs[:2]))
+        need(bool(re.fullmatch(r"[A-Z][A-Z0-9_]{0,99}@[A-Z][A-Z0-9_]{0,99}", release_inputs[2])))
     wait = env.get("WAIT_RUNNING", "")
     need(bool(re.fullmatch(r"[0-9]{1,4}", wait)) and 0 <= int(wait) <= 1200)
     return "CANONICAL_A11OY_PUBLICATION"

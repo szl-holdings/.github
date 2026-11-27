@@ -172,6 +172,178 @@ def materialize_source_revision_file(repo_root, requested_path, source_sha):
     return rel
 
 
+# --------------------------------------------------------------------------- #
+# Publisher-generated release manifest (a11oy #3770)
+# --------------------------------------------------------------------------- #
+# The caller commits an honest placeholder (status PLACEHOLDER_UNTIL_CI_GENERATED)
+# at a leading-dot path the Dockerfile COPYs. At publication the publisher
+# replaces ONLY that file's bytes with a GENERATED manifest whose every value is
+# re-derivable from immutable inputs: the exact source SHA, the committed bytes
+# of the served frontend entry and API contract, the Dockerfile's pinned model
+# ARG defaults, and the target Space id. Nothing is guessed: a missing or
+# ambiguous input is a hard DeployContractError, never an UNKNOWN that ships.
+RELEASE_MANIFEST_KIND = "szl.release-manifest/v1"
+RELEASE_MANIFEST_PLACEHOLDER_STATUS = "PLACEHOLDER_UNTIL_CI_GENERATED"
+RELEASE_MANIFEST_GENERATED_STATUS = "GENERATED"
+RELEASE_MANIFEST_MAX_BYTES = 64 * 1024
+RELEASE_RUNTIME_VARIABLES = (
+    ("served_frontend_sha256", "SZL_SERVED_FRONTEND_SHA256"),
+    ("api_contract_sha256", "SZL_API_CONTRACT_SHA256"),
+    ("model_identity", "SZL_MODEL_IDENTITY"),
+    ("deployment_identity", "SZL_DEPLOYMENT_IDENTITY"),
+)
+_RELEASE_ARG_NAME_RE = re.compile(r"[A-Z][A-Z0-9_]{0,99}")
+_RELEASE_IMMUTABLE_ID_RE = re.compile(
+    r"^[A-Za-z0-9][A-Za-z0-9._:/+-]{0,191}@"
+    r"(?:sha256:(?!0{64}$)[0-9a-f]{64}|(?!0{40}$)[0-9a-f]{40})$"
+)
+
+
+def dockerfile_arg_defaults(dockerfile_text):
+    """Map ARG name -> set of literal default values declared in the Dockerfile."""
+    defaults = {}
+    for raw in dockerfile_text.splitlines():
+        line = raw.strip()
+        m = re.fullmatch(r"ARG\s+([A-Za-z_][A-Za-z0-9_]*)=(\S*)", line)
+        if not m:
+            continue
+        value = m.group(2)
+        if len(value) >= 2 and value[0] == value[-1] and value[0] in "\"'":
+            value = value[1:-1]
+        defaults.setdefault(m.group(1), set()).add(value)
+    return defaults
+
+
+def release_model_identity(dockerfile_text, spec):
+    """Resolve 'REPO_ARG@REV_ARG' to one immutable '<repo>@<revision>' identity."""
+    parts = str(spec or "").split("@")
+    if len(parts) != 2 or not all(_RELEASE_ARG_NAME_RE.fullmatch(p) for p in parts):
+        raise DeployContractError(
+            "--release-model-identity-args must be REPO_ARG@REVISION_ARG"
+        )
+    defaults = dockerfile_arg_defaults(dockerfile_text)
+    values = []
+    for name in parts:
+        found = {v for v in defaults.get(name, set()) if v}
+        if len(found) != 1:
+            raise DeployContractError(
+                f"release model identity ARG {name} must have exactly one "
+                f"non-empty Dockerfile default; found {len(found)}"
+            )
+        values.append(found.pop())
+    identity = f"{values[0]}@{values[1]}"
+    if not _RELEASE_IMMUTABLE_ID_RE.fullmatch(identity):
+        raise DeployContractError(
+            "release model identity is not an immutable name@revision pin"
+        )
+    return identity
+
+
+def _strict_release_json(data):
+    def pairs(items):
+        out = {}
+        for key, value in items:
+            if key in out:
+                raise DeployContractError("release manifest placeholder has duplicate keys")
+            out[key] = value
+        return out
+    try:
+        return json.loads(data.decode("utf-8"), object_pairs_hook=pairs)
+    except DeployContractError:
+        raise
+    except (UnicodeDecodeError, ValueError) as exc:
+        raise DeployContractError(
+            f"release manifest placeholder is not strict JSON: {type(exc).__name__}"
+        ) from None
+
+
+def _source_commit_time(repo_root, source_sha):
+    try:
+        import subprocess
+        out = subprocess.run(
+            ["git", "-C", repo_root, "show", "-s", "--format=%cI", source_sha],
+            check=True, capture_output=True, text=True, timeout=30,
+        ).stdout.strip()
+    except Exception:  # noqa: BLE001 - honest label, never a guessed time
+        return "UNKNOWN"
+    return out if re.fullmatch(r"\d{4}-\d\d-\d\dT[0-9:+\-Z]+", out) else "UNKNOWN"
+
+
+def generate_release_manifest(args, source_sha, dockerfile_text):
+    """Return (rel, content, runtime_variables) for the publisher-generated manifest."""
+    if not re.fullmatch(r"[0-9a-f]{40}", str(source_sha or "")):
+        raise DeployContractError(
+            "--release-manifest-file requires --source-sha to be an exact "
+            "lowercase 40-character SHA"
+        )
+    rel = normalize_repo_path(args.release_manifest_file, label="release manifest file")
+    if not posixpath.basename(rel).startswith("."):
+        raise DeployContractError(
+            "release manifest file must be a leading-dot path so source-parity "
+            "comparators verify it as an authenticated derived artifact"
+        )
+    _, full = source_file(args.repo_root, rel)
+    with open(full, "rb") as fh:
+        placeholder = fh.read(RELEASE_MANIFEST_MAX_BYTES + 1)
+    if len(placeholder) > RELEASE_MANIFEST_MAX_BYTES:
+        raise DeployContractError("release manifest placeholder exceeds byte bound")
+    doc = _strict_release_json(placeholder)
+    if (
+        not isinstance(doc, dict)
+        or doc.get("kind") != RELEASE_MANIFEST_KIND
+        or doc.get("status") != RELEASE_MANIFEST_PLACEHOLDER_STATUS
+    ):
+        raise DeployContractError(
+            "release manifest file must be the committed "
+            f"{RELEASE_MANIFEST_PLACEHOLDER_STATUS} placeholder"
+        )
+    served_rel, served_full = source_file(
+        args.repo_root, args.release_served_artifact or ""
+    )
+    api_rel, api_full = source_file(args.repo_root, args.release_api_contract or "")
+    with open(served_full, "rb") as fh:
+        served_sha = sha256(fh.read())
+    with open(api_full, "rb") as fh:
+        api_sha = sha256(fh.read())
+    model_identity = release_model_identity(
+        dockerfile_text, getattr(args, "release_model_identity_args", "")
+    )
+    deployment_identity = f"{args.hf_repo}@{source_sha}"
+    if not _RELEASE_IMMUTABLE_ID_RE.fullmatch(deployment_identity):
+        raise DeployContractError("release deployment identity is malformed")
+    release_id = f"{args.hf_repo.split('/')[-1].lower()}-{source_sha[:12]}"
+    runtime = {
+        "served_frontend_sha256": served_sha,
+        "api_contract_sha256": api_sha,
+        "model_identity": model_identity,
+        "deployment_identity": deployment_identity,
+    }
+    document = {
+        "kind": RELEASE_MANIFEST_KIND,
+        "status": RELEASE_MANIFEST_GENERATED_STATUS,
+        "release_id": release_id,
+        "generated_at": _source_commit_time(args.repo_root, source_sha),
+        "source": {"git_commit": source_sha, "git_ref": "refs/heads/main"},
+        "runtime": runtime,
+        "api_contract_source": api_rel,
+        "honesty": {
+            "never_hardcoded": True,
+            "missing_values_stay_unknown": True,
+            "generator": "szl-holdings/.github hf_deploy_from_dockerfile.py",
+            "served_frontend_basis": f"sha256 of committed {served_rel} bytes COPYed into the image",
+            "api_contract_basis": f"sha256 of committed {api_rel}",
+            "model_identity_basis": "Dockerfile ARG defaults " + str(args.release_model_identity_args),
+            "deployment_identity_basis": "target Space id @ exact source git SHA",
+            "generated_at_basis": "source commit committer time",
+        },
+    }
+    content = json.dumps(document, indent=2, sort_keys=True) + "\n"
+    variables = {name: runtime[key] for key, name in RELEASE_RUNTIME_VARIABLES}
+    variables["SZL_RELEASE_ID"] = release_id
+    variables["SZL_RELEASE_COMMIT"] = source_sha
+    return rel, content, variables
+
+
 def _dockerignore_pattern_regex(pattern, *, rooted=False):
     """Compile Docker patternmatcher wildcards for slash-delimited repo paths."""
     pieces = ["^(?:.*/)?" if not rooted and "/" not in pattern else "^"]
@@ -1234,6 +1406,28 @@ def derive(args):
         revision_rel = revision_candidate
         revision_content = source_sha + "\n"
 
+    release_rel = None
+    release_content = None
+    release_variables = None
+    if getattr(args, "release_manifest_file", ""):
+        release_rel, release_content, release_variables = generate_release_manifest(
+            args, source_sha, dockerfile_text,
+        )
+        if release_rel in {revision_rel, RUNTIME_MARKER} or (
+            args.include_readme and release_rel.casefold() == readme_path.casefold()
+        ):
+            raise DeployContractError(
+                "release manifest file collides with another generated target"
+            )
+        ignored_by = source_revision_is_dockerignored(
+            args.repo_root, dockerfile_rel, release_rel,
+        )
+        if ignored_by:
+            raise DeployContractError(
+                "release manifest file is excluded from the Docker build "
+                f"context by {ignored_by!r}: {release_rel!r}"
+            )
+
     runtime_marker = None
     if getattr(args, "runtime_identity", False):
         runtime_marker = runtime_identity_marker(args)
@@ -1249,6 +1443,8 @@ def derive(args):
         tree[RUNTIME_MARKER] = "generated"
     if revision_rel:
         tree[revision_rel] = git_blob_sha1(revision_content.encode("ascii"))
+    if release_rel:
+        tree[release_rel] = git_blob_sha1(release_content.encode("utf-8"))
     targets, unresolved = expand_sources(sources, tree)
     eligible_targets, _ = expand_sources(eligible_sources, tree)
 
@@ -1265,6 +1461,12 @@ def derive(args):
             "Dockerfile COPY/ADD sources were not found in the checkout: "
             + ", ".join(sorted(unresolved))
         )
+    if release_rel and release_rel not in eligible_targets:
+        raise DeployContractError(
+            "release manifest file is not covered by a Dockerfile COPY/ADD "
+            "instruction without --exclude: "
+            f"source: {release_rel!r}"
+        )
     if revision_rel and revision_rel not in eligible_targets:
         raise DeployContractError(
             "source revision file is not covered by a Dockerfile COPY/ADD "
@@ -1279,6 +1481,8 @@ def derive(args):
         source_meta = {"source_path": rel}
         if rel == revision_rel:
             source_meta["generated_content_utf8"] = revision_content
+        elif rel == release_rel:
+            source_meta["generated_content_utf8"] = release_content
         data = read_source_bytes(args.repo_root, rel, source_meta)
         files[rel] = {
             "git_blob_sha1": git_blob_sha1(data),
@@ -1290,6 +1494,9 @@ def derive(args):
         if rel == revision_rel:
             files[rel]["generated_from_source_sha"] = True
             files[rel]["generated_content_utf8"] = revision_content
+        elif rel == release_rel:
+            files[rel]["generated_release_manifest"] = True
+            files[rel]["generated_content_utf8"] = release_content
 
     readme_rel = None
     if args.include_readme:
@@ -1381,6 +1588,12 @@ def derive(args):
         "source_revision_file": revision_rel,
         "files": files,
     }
+    if release_rel:
+        manifest["release_manifest"] = {
+            "path": release_rel,
+            "sha256": files[release_rel]["sha256"],
+            "space_variables": release_variables,
+        }
     if runtime_marker is not None:
         if RUNTIME_MARKER not in eligible_targets:
             raise DeployContractError("runtime marker must be explicitly COPYed into the image")
@@ -1988,6 +2201,15 @@ def main(argv=None):
             "derivation; the Dockerfile must COPY the generated file"
         ),
     )
+    ap.add_argument("--release-manifest-file", default="",
+                    help="leading-dot committed placeholder replaced by the "
+                         "publisher-generated release manifest (a11oy #3770)")
+    ap.add_argument("--release-served-artifact", default="",
+                    help="committed served frontend entry hashed into the manifest")
+    ap.add_argument("--release-api-contract", default="",
+                    help="committed API contract hashed into the manifest")
+    ap.add_argument("--release-model-identity-args", default="",
+                    help="REPO_ARG@REVISION_ARG Dockerfile ARG defaults for model identity")
     ap.add_argument("--readme-path", default="README.md")
     ap.add_argument("--include-readme", default="true")
     ap.add_argument(

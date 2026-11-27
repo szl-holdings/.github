@@ -78,6 +78,26 @@ on:
         required: false
         type: boolean
         default: false
+      release-manifest-file:
+        description: "Optional leading-dot committed placeholder that the publisher replaces with the generated release manifest (a11oy #3770)."
+        required: false
+        type: string
+        default: ""
+      release-served-artifact:
+        description: "Required with release-manifest-file: committed served frontend entry hashed into the manifest."
+        required: false
+        type: string
+        default: ""
+      release-api-contract:
+        description: "Required with release-manifest-file: committed API contract hashed into the manifest."
+        required: false
+        type: string
+        default: ""
+      release-model-identity-args:
+        description: "Required with release-manifest-file: REPO_ARG@REVISION_ARG Dockerfile ARG defaults naming the pinned model."
+        required: false
+        type: string
+        default: ""
     secrets:
       HF_TOKEN:
         description: "HF write token with organization write access to the target Space."
@@ -129,6 +149,10 @@ jobs:
           PRUNE: ${{ inputs.prune }}
           RESTART: ${{ inputs.restart-space }}
           WAIT_RUNNING: ${{ inputs.wait-running }}
+          RELEASE_MANIFEST_FILE: ${{ inputs.release-manifest-file }}
+          RELEASE_SERVED_ARTIFACT: ${{ inputs.release-served-artifact }}
+          RELEASE_API_CONTRACT: ${{ inputs.release-api-contract }}
+          RELEASE_MODEL_IDENTITY_ARGS: ${{ inputs.release-model-identity-args }}
         run: python3 -I -P tools/.github/scripts/hf_runtime_publish_contract.py
 
   hf-deploy:
@@ -272,6 +296,10 @@ jobs:
           SMOKE_PATHS: ${{ inputs.smoke-paths }}
           RUNTIME_IDENTITY: ${{ inputs.runtime-identity }}
           RUNTIME_IDENTITY_PUBLISHER_SHA: ${{ job.workflow_sha }}
+          RELEASE_MANIFEST_FILE: ${{ inputs.release-manifest-file }}
+          RELEASE_SERVED_ARTIFACT: ${{ inputs.release-served-artifact }}
+          RELEASE_API_CONTRACT: ${{ inputs.release-api-contract }}
+          RELEASE_MODEL_IDENTITY_ARGS: ${{ inputs.release-model-identity-args }}
         run: |
           set -euo pipefail
           PRUNE_ARGS=()
@@ -288,6 +316,13 @@ jobs:
           if [ -n "$SOURCE_REVISION_FILE" ]; then
             SOURCE_REVISION_ARGS+=(--source-revision-file "$SOURCE_REVISION_FILE")
           fi
+          RELEASE_ARGS=()
+          if [ -n "$RELEASE_MANIFEST_FILE" ]; then
+            RELEASE_ARGS+=(--release-manifest-file "$RELEASE_MANIFEST_FILE"
+              --release-served-artifact "$RELEASE_SERVED_ARTIFACT"
+              --release-api-contract "$RELEASE_API_CONTRACT"
+              --release-model-identity-args "$RELEASE_MODEL_IDENTITY_ARGS")
+          fi
           "$RUNNER_TEMP/hf-publisher-venv/bin/python" -I -P tools/.github/scripts/hf_deploy_from_dockerfile.py \
             --repo-root caller \
             --github-repo "$GH_REPO" \
@@ -297,11 +332,22 @@ jobs:
             --dockerfile-path "$DOCKERFILE_PATH" \
             "${SOURCE_REVISION_ARGS[@]}" \
             "${RUNTIME_IDENTITY_ARGS[@]}" \
+            "${RELEASE_ARGS[@]}" \
             --include-readme "$INCLUDE_README" \
             --smoke-paths "${SMOKE_PATHS}" \
             "${PRUNE_ARGS[@]}" \
             "${TIP_GUARD_ARGS[@]}" \
             --manifest-out hf-deploy-manifest.json
+
+      - name: Bind publisher-generated release variables after publication
+        if: inputs.release-manifest-file != ''
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+        run: |
+          set -euo pipefail
+          "$RUNNER_TEMP/hf-publisher-venv/bin/python" -I -P tools/.github/scripts/hf_release_variables.py \
+            --manifest hf-deploy-manifest.json \
+            --output hf-release-variables.json
 
       - name: Publish immutable runtime source binding before readiness
         if: inputs.runtime-identity == true
