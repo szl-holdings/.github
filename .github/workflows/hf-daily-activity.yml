@@ -58,6 +58,7 @@ jobs:
   hf-daily-refresh:
     name: Refresh HF org card + push signed activity receipt
     if: github.event_name != 'pull_request'
+    environment: hf
     runs-on: ubuntu-latest
     permissions:
       contents: read
