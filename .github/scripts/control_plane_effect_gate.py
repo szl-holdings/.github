@@ -191,9 +191,11 @@ ATTEST_ACTION = "actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1e
 # commit. Registry and artifact-metadata storage branches are excluded by the
 # sole admitted subject-path input. See docs/CONTROL_PLANE_EFFECTS.md.
 ATTEST_TRANSITIVE = "actions/attest@508db95dd578ae2727ebd6217d5ba78e4fbda05d"
-RUNTIME_VALIDATOR_DIGEST = "sha256:7cc16d1421b4e76ce281e3dcadfee36b790891fbc56a533c53fd43bdf0bf55a1"
+RUNTIME_VALIDATOR_DIGEST = "sha256:dde3b03e7fb3498b99d6307b5397c53b6a0b9e1444fd6ed6650ab97520a59caa"
 RUNTIME_TOOLS = frozenset({RUNTIME_VALIDATOR, RUNTIME_LOCK,
-    ".github/scripts/hf_deploy_from_dockerfile.py", ".github/scripts/hf_space_source_binding.py"})
+    ".github/scripts/hf_deploy_from_dockerfile.py", ".github/scripts/hf_space_source_binding.py",
+    ".github/scripts/hf_release_variables.py"})
+RUNTIME_RELEASE_VARIABLES_TOOL = ".github/scripts/hf_release_variables.py"
 SEISMIC_PUBLISHER = ".github/workflows/reusable-hf-deploy-seismic.yml"
 SEISMIC_WITNESS = ".github/workflows/reusable-hf-deploy-seismic-source-witness.yml"
 SEISMIC_VALIDATOR = ".github/scripts/hf_seismic_publish_contract.py"
@@ -1235,6 +1237,10 @@ def canonical_runtime_profile(document: Mapping[str, Any]) -> bool:
         "SOURCE_VARIABLE": "${{ inputs.source-revision-variable }}", "SOURCE_PROBE": "${{ inputs.source-revision-probe-path }}",
         "INCLUDE_README": "${{ inputs.include-readme }}", "PRUNE": "${{ inputs.prune }}",
         "RESTART": "${{ inputs.restart-space }}", "WAIT_RUNNING": "${{ inputs.wait-running }}",
+        "RELEASE_MANIFEST_FILE": "${{ inputs.release-manifest-file }}",
+        "RELEASE_SERVED_ARTIFACT": "${{ inputs.release-served-artifact }}",
+        "RELEASE_API_CONTRACT": "${{ inputs.release-api-contract }}",
+        "RELEASE_MODEL_IDENTITY_ARGS": "${{ inputs.release-model-identity-args }}",
     }
     if (set(guard) != {"name", "env", "run"} or guard["env"] != expected_env
             or guard["run"] != "python3 -I -P tools/.github/scripts/hf_runtime_publish_contract.py"):
@@ -2589,7 +2595,10 @@ def bind_declaration(
         dep_effects, dep_unknowns = analyze_dependency(dependency, content)
         if workflow_path == RUNTIME_PUBLISHER and dependency in RUNTIME_TOOLS:
             dep_effects = [RawEffect(item.sink, item.access, item.path, item.line,
-                ("huggingface:space:SZLHOLDINGS/a11oy:source-variable:SZL_GIT_SHA"
+                ("huggingface:space:SZLHOLDINGS/a11oy:release-variables"
+                 if item.sink == "sdk.huggingface.add_space_variable"
+                 and dependency == RUNTIME_RELEASE_VARIABLES_TOOL
+                 else "huggingface:space:SZLHOLDINGS/a11oy:source-variable:SZL_GIT_SHA"
                  if item.sink == "sdk.huggingface.add_space_variable"
                  else "huggingface:space:SZLHOLDINGS/a11oy")
                 if item.sink in {"sdk.repository.create_commit", "sdk.huggingface.add_space_variable", "sdk.huggingface.restart_space"}
