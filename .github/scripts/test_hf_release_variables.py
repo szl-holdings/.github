@@ -6,7 +6,7 @@ import importlib.util
 import types
 import unittest
 from pathlib import Path
-from unittest import mock
+import unittest.mock
 
 SCRIPT = Path(__file__).with_name("hf_release_variables.py")
 SPEC = importlib.util.spec_from_file_location("hf_release_variables", SCRIPT)
@@ -55,7 +55,7 @@ class ReleaseVariableTests(unittest.TestCase):
         variables = MOD.planned_variables(manifest())
         state = {name: types.SimpleNamespace(value=value) for name, value in variables.items()}
         state["SZL_RELEASE_COMMIT"] = types.SimpleNamespace(value="old")
-        api = mock.Mock()
+        api = unittest.mock.Mock()
 
         def add(repo_id, key, value, description):
             state[key] = types.SimpleNamespace(value=value)
@@ -67,7 +67,7 @@ class ReleaseVariableTests(unittest.TestCase):
 
     def test_readback_mismatch_fails(self):
         variables = MOD.planned_variables(manifest())
-        api = mock.Mock()
+        api = unittest.mock.Mock()
         api.get_space_variables.return_value = {}
         with self.assertRaises(MOD.ReleaseVariableError):
             MOD.bind(api, variables)

@@ -11319,7 +11319,7 @@
           ".github/scripts/test_reusable_workflow_target_check.py": "sha256:d145f78f6bb4ae0b76a9f35210882e0ff96d511ece8630d39f5d99f775f9ed54",
           ".github/scripts/test_szl_codename_gate.py": "sha256:bcfcbbf52dd4cfe7761372fa4acd08b98aec327cb4f7f7dc2c1bc86029fd5b0f",
           ".github/scripts/test_solo_builder_provenance.py": "sha256:32abce0cee25db6fbf2d2e9d313054b73ecbbfc4eaa469462c11e1cdd6a69f14",
-          ".github/scripts/test_hf_release_variables.py": "sha256:2853c5990ef75f0c8b56033800435ea5207c3009016ba42f49c02491c3dd4b41",
+          ".github/scripts/test_hf_release_variables.py": "sha256:07f250642106f0257656385967e22b5946fdf1e412c348bbb8679dcfb6805ebe",
           ".github/scripts/test_hf_runtime_publish_contract.py": "sha256:a8ff730f5d185daa72ab614714879307812972b03b2e6cfc35e421be37b5a091"
         },
         "unknowns": [
