@@ -105,6 +105,38 @@ test("canonical holographic ambient layers stay evidence-only", () => {
   }
 });
 
+test("aria-hidden presentational svg geometry without a decorative class stays evidence-only", () => {
+  for (const tag of ["circle", "ellipse", "line", "path", "polygon", "polyline", "rect"]) {
+    for (const field of ["offscreen", "fixedOversize"]) {
+      const row = normalizedElement(element({
+        tag, id: null, className: null, text: "", role: null,
+      }), field);
+      assert.equal(row.pass, true, `${tag} ${field}`);
+      assert.equal(row.failureCount, 0, `${tag} ${field}`);
+      assert.equal(row.viewports[0].warnings[0].code, field === "offscreen"
+        ? "DECORATIVE_LAYER_OFFSCREEN" : "DECORATIVE_FIXED_LAYER_OVERSIZE");
+    }
+  }
+});
+
+test("presentational svg geometry stays blocking without hidden noninteractive evidence", () => {
+  const candidates = [
+    { tag: "path", text: "Operating lenses" },
+    { tag: "ellipse", role: "img" },
+    { tag: "rect", ariaHidden: false },
+    { tag: "path", tabIndex: 0 },
+    { tag: "path", interactive: true },
+    { tag: "div", id: null, className: null, text: "" },
+    { tag: "img", id: null, className: null, text: "" },
+    { tag: "svg", id: null, className: null, text: "" },
+  ];
+  for (const candidate of candidates) {
+    const row = normalizedElement(element(candidate));
+    assert.equal(row.pass, false, JSON.stringify(candidate));
+    assert.equal(row.viewports[0].warnings.length, 0, JSON.stringify(candidate));
+  }
+});
+
 test("ambient-layer lookalikes and labeled layers stay blocking", () => {
   for (const className of ["field", "scan", "szl-space-scanner", "szl-space-field-label", "not-szl-space-field", "szl-space-skip-link"]) {
     const row = normalizedElement(element({ tag: "span", id: null, className, text: "" }));

@@ -30,6 +30,13 @@ const ASSISTIVE_CLASS = /(?:^|[\s_-])(sr-only|screen-reader|visually-hidden|a11y
 const PRIMARY_TAGS = new Set(["button", "input", "select", "textarea", "summary"]);
 const ACTIONABLE_TAGS = new Set([...PRIMARY_TAGS, "a"]);
 const PRESENTATIONAL_ROLES = new Set(["", "none", "presentation"]);
+// Shape nodes inside an aria-hidden SVG. They carry no class of their own;
+// the live canonical surfaces fail closed on these as UNCLASSIFIED even though
+// the accessibility tree has already removed them. Containers (svg, g) and
+// replaced content (img) stay unclassified until their own evidence says so.
+const PRESENTATIONAL_SVG_TAGS = new Set([
+  "circle", "ellipse", "line", "path", "polygon", "polyline", "rect",
+]);
 
 function arg(name, fallback = null) {
   const index = process.argv.indexOf(name);
@@ -59,10 +66,12 @@ function isAssistive(item) {
 
 function isDecorative(item) {
   const className = String(item.className ?? "");
+  const presentationalShape = PRESENTATIONAL_SVG_TAGS.has(String(item.tag ?? "").toLowerCase());
   return observedNonInteractive(item) && item.ariaHidden === true
     && String(item.text ?? "").trim().length === 0
     && (DECORATIVE_CLASS.test(`${item.id ?? ""} ${className}`)
-      || AMBIENT_LAYER_CLASS.test(className));
+      || AMBIENT_LAYER_CLASS.test(className)
+      || presentationalShape);
 }
 
 function isActionable(item) {
